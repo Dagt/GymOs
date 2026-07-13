@@ -15,7 +15,12 @@ GymOS es una plataforma SaaS modular para la operacion integral de gimnasios y c
 - Node.js 24 para trabajar en el frontend fuera de Docker.
 - JDK 25 para compilar el backend fuera de Docker.
 
-El equipo local detectado inicialmente tenia Java 8, por lo que el backend debe ejecutarse con Docker o con JDK 25 instalado/configurado.
+El equipo local detectado inicialmente tenia Java 8 primero en PATH. Si `java -version` no muestra Java 25, usar temporalmente:
+
+```powershell
+$env:JAVA_HOME='C:\Program Files\Java\jdk-25.0.3'
+$env:Path="$env:JAVA_HOME\bin;$env:Path"
+```
 
 ## Arranque rapido
 

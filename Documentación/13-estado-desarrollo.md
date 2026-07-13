@@ -15,6 +15,7 @@ Implementado:
 - Manejo uniforme de errores con `code`, `message`, `details`, `correlationId` y `timestamp`.
 - Filtro de correlation id con header `X-Correlation-Id`.
 - Migracion Flyway inicial para organizaciones, sucursales, identidad, clientes, kiosco y auditoria.
+- Migracion Flyway para `event_publication` de Spring Modulith.
 - Frontend Next.js 16.2.10 con TypeScript, Tailwind y pantalla inicial GymOS.
 - Dockerfiles para backend y frontend.
 - Docker Compose local con PostgreSQL, Redis, MinIO, backend y frontend.
@@ -25,16 +26,21 @@ Verificado:
 - Frontend lint.
 - Frontend typecheck.
 - Frontend production build.
+- Backend tests con Java 25.
+- Docker Compose config.
+- Docker Compose build de backend y frontend.
+- Docker Compose up con PostgreSQL, Redis, MinIO, backend y frontend.
+- Smoke test frontend en `http://localhost:3000`.
+- Smoke test backend en `http://localhost:8080/api/v1/system/info`.
+- Flyway aplicado en PostgreSQL hasta version 2.
 
 Pendiente de verificar:
 
-- Backend tests y build con JDK 25.
-- Docker build del backend y stack completo con Docker Desktop activo.
+- Configuracion global de `JAVA_HOME` y `PATH` para que `java` y `javac` apunten a JDK 25 sin variables temporales.
 
 Bloqueos locales:
 
-- El equipo tiene Java 8 configurado y Gradle 9.5.1 requiere JVM 17 o superior.
-- Docker Desktop no estaba corriendo al intentar compilar backend con imagen JDK 25.
+- JDK 25 esta instalado en `C:\Program Files\Java\jdk-25.0.3`, pero el PATH global sigue resolviendo Java 8 desde Oracle javapath.
 
 ## Siguiente corte
 
