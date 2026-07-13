@@ -51,3 +51,42 @@ Implementar Hito 1:
 - Onboarding de organizacion y sucursal inicial.
 - Alta, busqueda y ficha de cliente.
 - Pantallas frontend de login, seleccion de sucursal, recepcion y clientes.
+
+## Hito 1 - Identidad, seguridad y clientes
+
+Implementado:
+
+- Endpoints backend `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh`, `POST /api/v1/auth/logout`, `GET /api/v1/auth/me` y `POST /api/v1/auth/select-branch`.
+- JWT HMAC local con expiracion corta.
+- Refresh tokens revocables almacenados en Redis.
+- Filtro Bearer token integrado en Spring Security.
+- Respuestas de autenticacion alineadas al formato de errores estandar.
+- Seed local de organizacion, sucursal, persona, usuario administrador, rol y permisos base.
+- Pantalla frontend `/login` consumiendo la API real.
+
+Credenciales locales de desarrollo:
+
+- Usuario: `admin@gymos.local`
+- Password: `Admin123!`
+- Sucursal semilla: `22222222-2222-2222-2222-222222222222`
+
+Verificado:
+
+- Backend tests con Java 25.
+- Spring Modulith architecture test.
+- Docker build backend.
+- Docker restart backend.
+- Smoke test `POST /api/v1/auth/login`.
+- Smoke test `GET /api/v1/auth/me`.
+- Smoke test `POST /api/v1/auth/select-branch`.
+- Smoke test `POST /api/v1/auth/refresh`.
+- Frontend lint, typecheck y production build.
+- Docker build frontend.
+- Smoke test `GET /login`.
+
+Pendiente del Hito 1:
+
+- Persistencia de auditoria para login/logout/seleccion de sucursal.
+- Onboarding editable de organizacion y sucursal.
+- Pantalla de seleccion de sucursal.
+- Alta, busqueda y ficha de cliente.

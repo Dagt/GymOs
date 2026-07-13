@@ -36,6 +36,11 @@ URLs locales:
 - Health: http://localhost:8080/actuator/health
 - MinIO: http://localhost:9001
 
+Credenciales locales de desarrollo:
+
+- Usuario: `admin@gymos.local`
+- Password: `Admin123!`
+
 ## Flujo de trabajo
 
 - Rama estable: `main`.

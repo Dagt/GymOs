@@ -68,6 +68,12 @@ export default function Home() {
             El siguiente corte conectara autenticacion real, organizacion,
             sucursal y alta de clientes contra la API.
           </p>
+          <a
+            href="/login"
+            className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#d7f2df] px-4 text-sm font-semibold text-[#13251c] transition hover:bg-white"
+          >
+            Iniciar sesion
+          </a>
         </aside>
       </section>
     </main>
