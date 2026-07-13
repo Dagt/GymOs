@@ -65,15 +65,23 @@ export default function Home() {
           <h2 className="mt-3 text-2xl font-semibold">Base tecnica vendible</h2>
           <p className="mt-3 text-sm leading-6 text-[#dbe8df]">
             Esta pantalla confirma que el monorepo ya tiene frontend operativo.
-            El siguiente corte conectara autenticacion real, organizacion,
-            sucursal y alta de clientes contra la API.
+            El siguiente corte conectara clientes, ventas y pagos manuales
+            contra la API.
           </p>
-          <a
-            href="/login"
-            className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#d7f2df] px-4 text-sm font-semibold text-[#13251c] transition hover:bg-white"
-          >
-            Iniciar sesion
-          </a>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <a
+              href="/reception"
+              className="inline-flex h-11 items-center justify-center rounded-md bg-[#d7f2df] px-4 text-sm font-semibold text-[#13251c] transition hover:bg-white"
+            >
+              Ir a recepcion
+            </a>
+            <a
+              href="/login"
+              className="inline-flex h-11 items-center justify-center rounded-md border border-[#d7f2df] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
+            >
+              Iniciar sesion
+            </a>
+          </div>
         </aside>
       </section>
     </main>

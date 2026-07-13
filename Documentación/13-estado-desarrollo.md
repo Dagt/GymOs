@@ -63,6 +63,8 @@ Implementado:
 - Respuestas de autenticacion alineadas al formato de errores estandar.
 - Seed local de organizacion, sucursal, persona, usuario administrador, rol y permisos base.
 - Pantalla frontend `/login` consumiendo la API real.
+- Endpoints backend `GET /api/v1/organizations/current` y `GET /api/v1/organizations/current/branches`.
+- Pantalla frontend `/reception` con sesion local, resumen de organizacion, selector de sucursal y permisos cargados.
 
 Credenciales locales de desarrollo:
 
@@ -83,10 +85,12 @@ Verificado:
 - Frontend lint, typecheck y production build.
 - Docker build frontend.
 - Smoke test `GET /login`.
+- Smoke test `GET /api/v1/organizations/current`.
+- Smoke test `GET /api/v1/organizations/current/branches`.
+- Smoke test `GET /reception`.
 
 Pendiente del Hito 1:
 
 - Persistencia de auditoria para login/logout/seleccion de sucursal.
 - Onboarding editable de organizacion y sucursal.
-- Pantalla de seleccion de sucursal.
 - Alta, busqueda y ficha de cliente.

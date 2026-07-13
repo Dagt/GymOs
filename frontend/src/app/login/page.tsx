@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import Link from "next/link";
 import { login, storeSession, type CurrentUser } from "@/lib/api";
 
 export default function LoginPage() {
@@ -90,6 +91,12 @@ export default function LoginPage() {
               <p className="mt-4 text-xs font-medium uppercase tracking-wide text-[#6f7a73]">
                 Permisos cargados: {user.permissions.length}
               </p>
+              <Link
+                className="mt-4 inline-flex h-10 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
+                href="/reception"
+              >
+                Ir a recepcion
+              </Link>
             </section>
           ) : null}
         </div>
