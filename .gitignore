@@ -1,0 +1,27 @@
+# Java / Spring
+target/
+.gradle/
+build/
+*.class
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+dist/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs / caches
+*.log
+.cache/
+.turbo/
