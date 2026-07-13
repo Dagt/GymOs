@@ -1,0 +1,53 @@
+package com.gymos.common.api;
+
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+	@ExceptionHandler(BusinessException.class)
+	ResponseEntity<ApiError> handleBusiness(BusinessException exception, HttpServletRequest request) {
+		return ResponseEntity.badRequest()
+				.body(ApiError.of(exception.code(), exception.getMessage(), exception.details(), correlationId(request)));
+	}
+
+	@ExceptionHandler(MethodArgumentNotValidException.class)
+	ResponseEntity<ApiError> handleValidation(MethodArgumentNotValidException exception, HttpServletRequest request) {
+		Map<String, Object> details = new LinkedHashMap<>();
+		exception.getBindingResult().getFieldErrors()
+				.forEach(error -> details.put(error.getField(), error.getDefaultMessage()));
+		return ResponseEntity.badRequest()
+				.body(ApiError.of("VALIDATION_ERROR", "La solicitud contiene datos inválidos.", details, correlationId(request)));
+	}
+
+	@ExceptionHandler(ConstraintViolationException.class)
+	ResponseEntity<ApiError> handleConstraintViolation(ConstraintViolationException exception, HttpServletRequest request) {
+		return ResponseEntity.badRequest()
+				.body(ApiError.of("VALIDATION_ERROR", "La solicitud contiene datos inválidos.", Map.of("violations", exception.getMessage()), correlationId(request)));
+	}
+
+	@ExceptionHandler(AccessDeniedException.class)
+	ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException exception, HttpServletRequest request) {
+		return ResponseEntity.status(HttpStatus.FORBIDDEN)
+				.body(ApiError.of("PERMISSION_DENIED", "No tienes permiso para realizar esta acción.", Map.of(), correlationId(request)));
+	}
+
+	@ExceptionHandler(Exception.class)
+	ResponseEntity<ApiError> handleUnexpected(Exception exception, HttpServletRequest request) {
+		return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+				.body(ApiError.of("INTERNAL_ERROR", "Ocurrió un error inesperado.", Map.of(), correlationId(request)));
+	}
+
+	private String correlationId(HttpServletRequest request) {
+		Object value = request.getAttribute(Correlation.ATTRIBUTE);
+		return value == null ? "unknown" : value.toString();
+	}
+}

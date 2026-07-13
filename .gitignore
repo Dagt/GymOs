@@ -25,3 +25,11 @@ Thumbs.db
 *.log
 .cache/
 .turbo/
+
+# Test / reports
+coverage/
+playwright-report/
+test-results/
+
+# Local runtime data
+infra/.data/
