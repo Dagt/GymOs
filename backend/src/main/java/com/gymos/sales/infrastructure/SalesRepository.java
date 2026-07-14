@@ -1,6 +1,7 @@
 package com.gymos.sales.infrastructure;
 
 import java.time.OffsetDateTime;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -198,6 +199,72 @@ public class SalesRepository {
 				.optional();
 	}
 
+	public List<MembershipPlanForSale> membershipPlansForSale(UUID organizationId, UUID saleId) {
+		return jdbcClient.sql("""
+				SELECT DISTINCT mp.id AS plan_id, si.product_id, mp.duration_days, mp.grace_days
+				FROM sale_item si
+				JOIN membership_plan mp ON mp.product_id = si.product_id
+				WHERE si.organization_id = :organizationId
+				  AND si.sale_id = :saleId
+				  AND mp.status = 'ACTIVE'
+				  AND mp.deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("saleId", saleId)
+				.query((resultSet, rowNumber) -> new MembershipPlanForSale(
+						resultSet.getObject("plan_id", UUID.class),
+						resultSet.getObject("product_id", UUID.class),
+						resultSet.getInt("duration_days"),
+						resultSet.getInt("grace_days")
+				))
+				.list();
+	}
+
+	public boolean membershipExistsForSalePlan(UUID organizationId, UUID saleId, UUID planId) {
+		Integer count = jdbcClient.sql("""
+				SELECT COUNT(*)
+				FROM membership
+				WHERE organization_id = :organizationId
+				  AND sale_id = :saleId
+				  AND plan_id = :planId
+				  AND deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("saleId", saleId)
+				.param("planId", planId)
+				.query(Integer.class)
+				.single();
+		return count > 0;
+	}
+
+	public List<MembershipDetail> membershipsForSale(UUID organizationId, UUID saleId) {
+		return jdbcClient.sql("""
+				SELECT m.id, m.client_id, m.plan_id, cp.name AS plan_name, m.status,
+				       m.activated_at, m.starts_on, m.ends_on, m.grace_ends_on
+				FROM membership m
+				JOIN membership_plan mp ON mp.id = m.plan_id
+				JOIN catalog_product cp ON cp.id = mp.product_id
+				WHERE m.organization_id = :organizationId
+				  AND m.sale_id = :saleId
+				  AND m.deleted_at IS NULL
+				ORDER BY m.activated_at DESC
+				""")
+				.param("organizationId", organizationId)
+				.param("saleId", saleId)
+				.query((resultSet, rowNumber) -> new MembershipDetail(
+						resultSet.getObject("id", UUID.class),
+						resultSet.getObject("client_id", UUID.class),
+						resultSet.getObject("plan_id", UUID.class),
+						resultSet.getString("plan_name"),
+						resultSet.getString("status"),
+						resultSet.getObject("activated_at", OffsetDateTime.class),
+						resultSet.getObject("starts_on", LocalDate.class),
+						resultSet.getObject("ends_on", LocalDate.class),
+						resultSet.getObject("grace_ends_on", LocalDate.class)
+				))
+				.list();
+	}
+
 	public Optional<UUID> saleIdForPayment(UUID organizationId, UUID paymentId) {
 		return jdbcClient.sql("""
 				SELECT sale_id
@@ -210,6 +277,22 @@ public class SalesRepository {
 				.param("paymentId", paymentId)
 				.query(UUID.class)
 				.optional();
+	}
+
+	public record MembershipPlanForSale(UUID planId, UUID productId, int durationDays, int graceDays) {
+	}
+
+	public record MembershipDetail(
+			UUID id,
+			UUID clientId,
+			UUID planId,
+			String planName,
+			String status,
+			OffsetDateTime activatedAt,
+			LocalDate startsOn,
+			LocalDate endsOn,
+			LocalDate graceEndsOn
+	) {
 	}
 
 	public record ProductForSale(UUID id, String name, String productType, long priceCents, String currency) {

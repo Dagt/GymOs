@@ -49,3 +49,8 @@ gymos:
     jwt-secret: ${GYMOS_JWT_SECRET:dev-only-change-this-secret-before-production-please}
     access-token-seconds: ${GYMOS_ACCESS_TOKEN_SECONDS:900}
     refresh-token-days: ${GYMOS_REFRESH_TOKEN_DAYS:7}
+  storage:
+    endpoint: ${GYMOS_MINIO_ENDPOINT:http://localhost:9000}
+    access-key: ${GYMOS_MINIO_ACCESS_KEY:gymos}
+    secret-key: ${GYMOS_MINIO_SECRET_KEY:gymos-secret}
+    bucket: ${GYMOS_MINIO_BUCKET:gymos-receipts}

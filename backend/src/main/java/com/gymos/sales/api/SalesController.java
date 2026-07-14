@@ -7,6 +7,7 @@ import com.gymos.sales.infrastructure.SalesRepository.PaymentDetail;
 import com.gymos.sales.infrastructure.SalesRepository.SaleHeader;
 import com.gymos.sales.infrastructure.SalesRepository.SaleItemDetail;
 import com.gymos.sales.infrastructure.SalesRepository.SaleSummary;
+import com.gymos.sales.infrastructure.SalesRepository.MembershipDetail;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -22,7 +23,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1/sales")
@@ -71,6 +75,16 @@ public class SalesController {
 		return salesService.validatePayment(principal, paymentId, correlationId(servletRequest));
 	}
 
+	@PostMapping(value = "/payments/{paymentId}/receipt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	SaleDetailResponse uploadReceipt(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID paymentId,
+			@RequestPart("file") MultipartFile file,
+			HttpServletRequest servletRequest
+	) {
+		return salesService.uploadReceipt(principal, paymentId, file, correlationId(servletRequest));
+	}
+
 	private String correlationId(HttpServletRequest request) {
 		Object value = request.getAttribute(Correlation.ATTRIBUTE);
 		return value == null ? "unknown" : value.toString();
@@ -105,7 +119,8 @@ public class SalesController {
 	public record SaleDetailResponse(
 			SaleHeader sale,
 			List<SaleItemDetail> items,
-			List<PaymentDetail> payments
+			List<PaymentDetail> payments,
+			List<MembershipDetail> memberships
 	) {
 	}
 }

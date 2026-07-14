@@ -80,6 +80,7 @@ Los endpoints de autoservicio sólo exponen acciones permitidas para clientes en
 - `POST /memberships/{id}/renew`
 - `POST /memberships/{id}/cancel`
 - `PATCH /memberships/{id}/auto-renew`
+- Nota implementada: una venta pagada que incluya un producto vinculado a `membership_plan` activa una membresia.
 
 La activación ocurre como consecuencia de pago completado.
 
@@ -107,6 +108,7 @@ La activación ocurre como consecuencia de pago completado.
 
 - `POST /sales/{saleId}/payments`
 - `POST /sales/payments/{paymentId}/validate`
+- `POST /sales/payments/{paymentId}/receipt`
 - `POST /payments/{id}/approve` (pendiente)
 - `POST /payments/{id}/reject` (pendiente)
 - `GET /payments` (pendiente)

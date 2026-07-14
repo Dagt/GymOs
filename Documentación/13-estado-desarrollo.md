@@ -47,7 +47,6 @@ Bloqueos locales:
 Continuar Hito 2:
 
 - Comprobantes en MinIO.
-- Activacion de membresia como consecuencia de pago completo.
 - Validacion de pagos con rechazo y motivo.
 - Reporte operativo basico de ventas y pagos.
 
@@ -130,6 +129,11 @@ Implementado:
 - Pantalla frontend `/catalog` con lista de productos, lista de planes y alta rapida de producto.
 - Pantalla frontend `/sales/[saleId]` con detalle de venta, items, pagos y validacion de pagos pendientes.
 - Accesos a POS y catalogo desde `/reception`.
+- Migracion Flyway `V4__memberships_and_receipts.sql` con tabla `membership`.
+- Configuracion backend de MinIO con bucket `gymos-receipts`.
+- Endpoint backend `POST /api/v1/sales/payments/{paymentId}/receipt` para subir comprobantes reales.
+- Activacion automatica de membresia `ACTIVE` cuando una venta de plan queda `PAID`.
+- Pantalla frontend `/sales/[saleId]` con subida de comprobante y membresias activadas por la venta.
 
 Verificado localmente:
 
@@ -148,10 +152,12 @@ Verificado localmente:
 - Smoke test `POST /api/v1/sales/payments/{paymentId}/validate`.
 - Smoke test `GET /api/v1/sales`.
 - Smoke test `GET /pos`, `GET /catalog` y `GET /sales/{saleId}`.
+- Docker Compose up con Flyway aplicado hasta version 4.
+- Smoke test `POST /api/v1/sales/payments/{paymentId}/receipt`.
+- Smoke test de objeto existente en MinIO dentro de `gymos-receipts`.
+- Smoke test de venta de plan pagada con membresia `ACTIVE` generada.
 
 Pendiente del Hito 2:
 
-- Comprobantes reales en MinIO en vez de solo `receiptObjectKey`.
 - Rechazo de pagos pendientes con motivo.
-- Activacion de membresia al completarse el pago de un plan.
 - Reporte basico de ventas/pagos.

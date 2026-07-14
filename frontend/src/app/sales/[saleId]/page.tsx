@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import {
   getSale,
   getStoredSession,
+  uploadPaymentReceipt,
   validatePayment,
   type SaleDetailResponse,
   type StoredSession,
@@ -18,6 +19,7 @@ export default function SaleDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [validatingPaymentId, setValidatingPaymentId] = useState<string | null>(null);
+  const [uploadingPaymentId, setUploadingPaymentId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -66,6 +68,21 @@ export default function SaleDetailPage() {
       setError(exception instanceof Error ? exception.message : "No fue posible validar pago.");
     } finally {
       setValidatingPaymentId(null);
+    }
+  }
+
+  async function uploadReceipt(paymentId: string, file: File | null) {
+    if (!session || !file) {
+      return;
+    }
+    setUploadingPaymentId(paymentId);
+    setError(null);
+    try {
+      setData(await uploadPaymentReceipt(session.accessToken, paymentId, file));
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible subir comprobante.");
+    } finally {
+      setUploadingPaymentId(null);
     }
   }
 
@@ -140,6 +157,20 @@ export default function SaleDetailPage() {
                   </div>
                   <p className="font-semibold">{formatMoney(payment.amountCents, payment.currency)}</p>
                 </div>
+                {payment.receiptObjectKey ? (
+                  <p className="mt-2 break-all text-xs text-[#6f7a73]">
+                    Comprobante: {payment.receiptObjectKey}
+                  </p>
+                ) : null}
+                <label className="mt-3 grid gap-2 text-sm font-medium text-[#42514a]">
+                  Comprobante
+                  <input
+                    className="text-sm"
+                    disabled={uploadingPaymentId === payment.id}
+                    onChange={(event) => uploadReceipt(payment.id, event.target.files?.[0] ?? null)}
+                    type="file"
+                  />
+                </label>
                 {payment.status === "PENDING_VALIDATION" ? (
                   <button
                     className="mt-3 h-10 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30] disabled:opacity-60"
@@ -150,6 +181,26 @@ export default function SaleDetailPage() {
                     {validatingPaymentId === payment.id ? "Validando..." : "Validar pago"}
                   </button>
                 ) : null}
+              </article>
+            ))}
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm lg:col-span-2">
+          <h2 className="text-xl font-semibold">Membresias activadas</h2>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {data.memberships.length === 0 ? (
+              <p className="text-sm text-[#5d6b63]">Sin membresias activadas por esta venta.</p>
+            ) : null}
+            {data.memberships.map((membership) => (
+              <article className="rounded-md border border-[#d8ddd2] px-4 py-3" key={membership.id}>
+                <p className="font-semibold">{membership.planName}</p>
+                <p className="mt-1 text-sm text-[#5d6b63]">
+                  {membership.status} - {membership.startsOn} a {membership.endsOn}
+                </p>
+                <p className="mt-1 text-xs text-[#6f7a73]">
+                  Gracia hasta {membership.graceEndsOn}
+                </p>
               </article>
             ))}
           </div>

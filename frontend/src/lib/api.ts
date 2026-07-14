@@ -204,10 +204,23 @@ export type PaymentDetail = {
   notes: string | null;
 };
 
+export type MembershipDetail = {
+  id: string;
+  clientId: string;
+  planId: string;
+  planName: string;
+  status: "ACTIVE" | "EXPIRED" | "CANCELLED";
+  activatedAt: string;
+  startsOn: string;
+  endsOn: string;
+  graceEndsOn: string;
+};
+
 export type SaleDetailResponse = {
   sale: SaleHeader;
   items: SaleItemDetail[];
   payments: PaymentDetail[];
+  memberships: MembershipDetail[];
 };
 
 export type SaleItemPayload = {
@@ -396,6 +409,19 @@ export async function validatePayment(
   });
 }
 
+export async function uploadPaymentReceipt(
+  accessToken: string,
+  paymentId: string,
+  file: File,
+): Promise<SaleDetailResponse> {
+  const body = new FormData();
+  body.set("file", file);
+  return apiFetch<SaleDetailResponse>(`/sales/payments/${paymentId}/receipt`, accessToken, {
+    method: "POST",
+    body,
+  });
+}
+
 export function storeSession(session: AuthResponse) {
   window.localStorage.setItem("gymos.accessToken", session.accessToken);
   window.localStorage.setItem("gymos.refreshToken", session.refreshToken);
@@ -443,10 +469,11 @@ async function apiFetch<T>(
   accessToken: string,
   init: RequestInit = {},
 ): Promise<T> {
+  const isFormData = init.body instanceof FormData;
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...init,
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       Authorization: `Bearer ${accessToken}`,
       ...init.headers,
     },

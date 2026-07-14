@@ -20,6 +20,7 @@ repositories {
 
 extra["springModulithVersion"] = "2.1.0"
 extra["springdocVersion"] = "3.0.3"
+extra["minioVersion"] = "8.5.17"
 
 dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
@@ -30,6 +31,7 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
 	implementation("org.springframework.boot:spring-boot-starter-webmvc")
+	implementation("io.minio:minio:${property("minioVersion")}")
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${property("springdocVersion")}")
 	implementation("org.springframework.modulith:spring-modulith-starter-core")
 	implementation("org.springframework.modulith:spring-modulith-starter-jpa")
