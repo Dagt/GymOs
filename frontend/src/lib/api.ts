@@ -117,6 +117,122 @@ export type BranchUpdatePayload = {
   phone?: string | null;
 };
 
+export type ProductSummary = {
+  id: string;
+  sku: string;
+  name: string;
+  description: string | null;
+  productType: "PHYSICAL" | "SERVICE" | "MEMBERSHIP_PLAN";
+  priceCents: number;
+  currency: string;
+  taxable: boolean;
+  status: "ACTIVE" | "INACTIVE";
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PlanSummary = {
+  id: string;
+  productId: string;
+  sku: string;
+  name: string;
+  priceCents: number;
+  currency: string;
+  durationDays: number;
+  graceDays: number;
+  benefitsJson: string | null;
+  status: "ACTIVE" | "INACTIVE";
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProductPayload = {
+  sku: string;
+  name: string;
+  description?: string | null;
+  productType: "PHYSICAL" | "SERVICE" | "MEMBERSHIP_PLAN";
+  priceCents: number;
+  currency: string;
+  taxable: boolean;
+  status: "ACTIVE" | "INACTIVE";
+};
+
+export type SaleSummary = {
+  id: string;
+  saleNumber: string;
+  clientId: string | null;
+  clientName: string;
+  status: "PENDING_PAYMENT" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
+  totalCents: number;
+  paidCents: number;
+  balanceCents: number;
+  currency: string;
+  soldAt: string;
+};
+
+export type SaleHeader = SaleSummary & {
+  branchId: string;
+  subtotalCents: number;
+  discountCents: number;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type SaleItemDetail = {
+  id: string;
+  productId: string | null;
+  itemType: string;
+  name: string;
+  quantity: number;
+  unitPriceCents: number;
+  discountCents: number;
+  totalCents: number;
+  createdAt: string;
+};
+
+export type PaymentDetail = {
+  id: string;
+  method: "CASH" | "TRANSFER" | "CARD_MANUAL";
+  status: "PENDING_VALIDATION" | "COMPLETED" | "CANCELLED";
+  amountCents: number;
+  currency: string;
+  reference: string | null;
+  receiptObjectKey: string | null;
+  receivedAt: string;
+  validatedAt: string | null;
+  notes: string | null;
+};
+
+export type SaleDetailResponse = {
+  sale: SaleHeader;
+  items: SaleItemDetail[];
+  payments: PaymentDetail[];
+};
+
+export type SaleItemPayload = {
+  productId: string;
+  quantity: number;
+  discountCents: number;
+};
+
+export type ManualPaymentPayload = {
+  method: "CASH" | "TRANSFER" | "CARD_MANUAL";
+  amountCents: number;
+  reference?: string | null;
+  receiptObjectKey?: string | null;
+  validateNow: boolean;
+  notes?: string | null;
+};
+
+export type CreateSalePayload = {
+  clientId?: string | null;
+  items: SaleItemPayload[];
+  discountCents: number;
+  notes?: string | null;
+  payment?: ManualPaymentPayload | null;
+};
+
 export async function login(username: string, password: string): Promise<AuthResponse> {
   const response = await fetch(`${API_BASE_URL}/auth/login`, {
     method: "POST",
@@ -218,6 +334,65 @@ export async function updateClient(
   return apiFetch<ClientDetailResponse>(`/clients/${clientId}`, accessToken, {
     method: "PUT",
     body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function getProducts(accessToken: string): Promise<ProductSummary[]> {
+  return apiFetch<ProductSummary[]>("/catalog/products", accessToken);
+}
+
+export async function createProduct(
+  accessToken: string,
+  payload: ProductPayload,
+): Promise<ProductSummary> {
+  return apiFetch<ProductSummary>("/catalog/products", accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function getPlans(accessToken: string): Promise<PlanSummary[]> {
+  return apiFetch<PlanSummary[]>("/catalog/plans", accessToken);
+}
+
+export async function getRecentSales(accessToken: string): Promise<SaleSummary[]> {
+  return apiFetch<SaleSummary[]>("/sales", accessToken);
+}
+
+export async function createSale(
+  accessToken: string,
+  payload: CreateSalePayload,
+): Promise<SaleDetailResponse> {
+  return apiFetch<SaleDetailResponse>("/sales", accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function getSale(
+  accessToken: string,
+  saleId: string,
+): Promise<SaleDetailResponse> {
+  return apiFetch<SaleDetailResponse>(`/sales/${saleId}`, accessToken);
+}
+
+export async function addManualPayment(
+  accessToken: string,
+  saleId: string,
+  payload: ManualPaymentPayload,
+): Promise<SaleDetailResponse> {
+  return apiFetch<SaleDetailResponse>(`/sales/${saleId}/payments`, accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function validatePayment(
+  accessToken: string,
+  paymentId: string,
+): Promise<SaleDetailResponse> {
+  return apiFetch<SaleDetailResponse>(`/sales/payments/${paymentId}/validate`, accessToken, {
+    method: "POST",
   });
 }
 

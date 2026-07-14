@@ -44,14 +44,12 @@ Bloqueos locales:
 
 ## Siguiente corte
 
-Implementar Hito 2:
+Continuar Hito 2:
 
-- Catalogo de productos, planes y beneficios.
-- Venta con sale items.
-- Pagos manuales en efectivo, transferencia y tarjeta registrada manualmente.
 - Comprobantes en MinIO.
-- Validacion manual de pagos.
-- POS basico conectado a clientes y membresias.
+- Activacion de membresia como consecuencia de pago completo.
+- Validacion de pagos con rechazo y motivo.
+- Reporte operativo basico de ventas y pagos.
 
 ## Hito 1 - Identidad, seguridad y clientes
 
@@ -112,3 +110,48 @@ Pendiente de producto fuera de Hito 1:
 - Gestion avanzada de usuarios internos y roles desde UI.
 - Importacion masiva de clientes.
 - Fotos reales de cliente con almacenamiento de objetos.
+
+## Hito 2 - Catalogo, ventas y pagos manuales
+
+Estado: en progreso
+
+Implementado:
+
+- Migracion Flyway `V3__catalog_sales_payments.sql` con `catalog_product`, `membership_plan`, `sale`, `sale_item` y `payment`.
+- Permisos base `catalog.manage`, `catalog.read`, `sale.create`, `sale.read`, `payment.manual.create` y `payment.manual.validate`.
+- Datos semilla para `Membresia mensual` y `Botella de agua`.
+- Modulo backend `catalog` con endpoints `GET /api/v1/catalog/products`, `POST /api/v1/catalog/products`, `GET /api/v1/catalog/plans` y `POST /api/v1/catalog/plans`.
+- Modulo backend `sales` con endpoints `GET /api/v1/sales`, `POST /api/v1/sales`, `GET /api/v1/sales/{saleId}`, `POST /api/v1/sales/{saleId}/payments` y `POST /api/v1/sales/payments/{paymentId}/validate`.
+- Calculo backend de subtotal, descuentos, total, pagos completados y saldo.
+- Pagos manuales `CASH`, `TRANSFER` y `CARD_MANUAL`.
+- Estado de pago `PENDING_VALIDATION` y `COMPLETED`.
+- Auditoria para producto creado, plan creado, venta creada, pago registrado y pago validado.
+- Pantalla frontend `/pos` con catalogo vendible, carrito, busqueda de cliente, pago manual y ventas recientes.
+- Pantalla frontend `/catalog` con lista de productos, lista de planes y alta rapida de producto.
+- Pantalla frontend `/sales/[saleId]` con detalle de venta, items, pagos y validacion de pagos pendientes.
+- Accesos a POS y catalogo desde `/reception`.
+
+Verificado localmente:
+
+- Backend tests con Java 25.
+- Spring Modulith architecture test.
+- Frontend lint.
+- Frontend typecheck.
+- Frontend production build.
+- Docker build backend y frontend.
+- Docker Compose up con Flyway aplicado hasta version 3.
+- Smoke test `GET /api/v1/catalog/products`.
+- Smoke test `GET /api/v1/catalog/plans`.
+- Smoke test `POST /api/v1/catalog/products`.
+- Smoke test `POST /api/v1/sales` con pago `TRANSFER` pendiente.
+- Smoke test `GET /api/v1/sales/{saleId}`.
+- Smoke test `POST /api/v1/sales/payments/{paymentId}/validate`.
+- Smoke test `GET /api/v1/sales`.
+- Smoke test `GET /pos`, `GET /catalog` y `GET /sales/{saleId}`.
+
+Pendiente del Hito 2:
+
+- Comprobantes reales en MinIO en vez de solo `receiptObjectKey`.
+- Rechazo de pagos pendientes con motivo.
+- Activacion de membresia al completarse el pago de un plan.
+- Reporte basico de ventas/pagos.
