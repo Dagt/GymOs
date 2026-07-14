@@ -109,8 +109,8 @@ La activación ocurre como consecuencia de pago completado.
 - `POST /sales/{saleId}/payments`
 - `POST /sales/payments/{paymentId}/validate`
 - `POST /sales/payments/{paymentId}/receipt`
+- `POST /sales/payments/{paymentId}/reject`
 - `POST /payments/{id}/approve` (pendiente)
-- `POST /payments/{id}/reject` (pendiente)
 - `GET /payments` (pendiente)
 - `GET /payments/{id}` (pendiente)
 

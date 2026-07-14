@@ -270,6 +270,47 @@ public class SalesService {
 		return detail(principal, saleId);
 	}
 
+	@Transactional
+	public SaleDetailResponse rejectPayment(
+			GymOsPrincipal principal,
+			UUID paymentId,
+			String reason,
+			String correlationId
+	) {
+		requireBranch(principal);
+		UUID saleId = salesRepository.saleIdForPayment(principal.organizationId(), paymentId)
+				.orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "El pago no existe o no esta disponible."));
+		PaymentDetail payment = salesRepository.payment(principal.organizationId(), paymentId)
+				.orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "El pago no existe o no esta disponible."));
+		if ("COMPLETED".equals(payment.status())) {
+			throw new BusinessException("PAYMENT_ALREADY_COMPLETED", "No puedes rechazar un pago completado.");
+		}
+		if ("REJECTED".equals(payment.status())) {
+			return detail(principal, saleId);
+		}
+		OffsetDateTime now = OffsetDateTime.now();
+		jdbcClient.sql("""
+				UPDATE payment
+				SET status = 'REJECTED',
+				    notes = :notes,
+				    updated_at = :updatedAt,
+				    updated_by = :updatedBy,
+				    version = version + 1
+				WHERE organization_id = :organizationId
+				  AND id = :paymentId
+				  AND deleted_at IS NULL
+				""")
+				.param("notes", blankToNull(reason))
+				.param("updatedAt", now)
+				.param("updatedBy", principal.userId())
+				.param("organizationId", principal.organizationId())
+				.param("paymentId", paymentId)
+				.update();
+		auditService.record(principal, "PAYMENT_REJECTED", "PAYMENT", paymentId, "POS", reason, correlationId);
+		recalculateSale(principal.organizationId(), saleId, principal.userId());
+		return detail(principal, saleId);
+	}
+
 	private void addPaymentInternal(
 			GymOsPrincipal principal,
 			UUID saleId,

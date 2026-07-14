@@ -2,12 +2,16 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
 import {
+  addManualPayment,
   getSale,
   getStoredSession,
+  rejectPayment,
   uploadPaymentReceipt,
   validatePayment,
+  type ManualPaymentPayload,
   type SaleDetailResponse,
   type StoredSession,
 } from "@/lib/api";
@@ -20,6 +24,12 @@ export default function SaleDetailPage() {
   const [loading, setLoading] = useState(true);
   const [validatingPaymentId, setValidatingPaymentId] = useState<string | null>(null);
   const [uploadingPaymentId, setUploadingPaymentId] = useState<string | null>(null);
+  const [rejectingPaymentId, setRejectingPaymentId] = useState<string | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<ManualPaymentPayload["method"]>("CASH");
+  const [paymentAmount, setPaymentAmount] = useState("");
+  const [paymentReference, setPaymentReference] = useState("");
+  const [validateNow, setValidateNow] = useState(true);
 
   useEffect(() => {
     let active = true;
@@ -86,6 +96,47 @@ export default function SaleDetailPage() {
     }
   }
 
+  async function reject(paymentId: string) {
+    if (!session) {
+      return;
+    }
+    setRejectingPaymentId(paymentId);
+    setError(null);
+    try {
+      setData(await rejectPayment(session.accessToken, paymentId, rejectReason || "Comprobante no valido"));
+      setRejectReason("");
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible rechazar pago.");
+    } finally {
+      setRejectingPaymentId(null);
+    }
+  }
+
+  async function submitPayment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session || !data) {
+      return;
+    }
+    setError(null);
+    try {
+      const amountCents = paymentAmount.trim()
+        ? Math.round(Number(paymentAmount) * 100)
+        : data.sale.balanceCents;
+      setData(await addManualPayment(session.accessToken, data.sale.id, {
+        method: paymentMethod,
+        amountCents,
+        reference: paymentReference,
+        receiptObjectKey: null,
+        validateNow,
+        notes: null,
+      }));
+      setPaymentReference("");
+      setPaymentAmount("");
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible registrar pago.");
+    }
+  }
+
   if (!session) {
     return <AuthRequired />;
   }
@@ -142,6 +193,57 @@ export default function SaleDetailPage() {
 
         <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
           <h2 className="text-xl font-semibold">Pagos</h2>
+          {data.sale.balanceCents > 0 ? (
+            <form className="mt-4 grid gap-3 rounded-md border border-[#d8ddd2] bg-[#f6f7f2] p-4" onSubmit={submitPayment}>
+              <h3 className="font-semibold">Registrar pago</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+                  Metodo
+                  <select
+                    className="h-10 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm"
+                    onChange={(event) => setPaymentMethod(event.target.value as ManualPaymentPayload["method"])}
+                    value={paymentMethod}
+                  >
+                    <option value="CASH">Efectivo</option>
+                    <option value="TRANSFER">Transferencia</option>
+                    <option value="CARD_MANUAL">Tarjeta manual</option>
+                  </select>
+                </label>
+                <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+                  Monto
+                  <input
+                    className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm"
+                    onChange={(event) => setPaymentAmount(event.target.value)}
+                    placeholder={(data.sale.balanceCents / 100).toFixed(2)}
+                    type="number"
+                    value={paymentAmount}
+                  />
+                </label>
+              </div>
+              <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+                Referencia
+                <input
+                  className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm"
+                  onChange={(event) => setPaymentReference(event.target.value)}
+                  value={paymentReference}
+                />
+              </label>
+              <label className="flex items-center gap-2 text-sm font-medium text-[#42514a]">
+                <input
+                  checked={validateNow}
+                  onChange={(event) => setValidateNow(event.target.checked)}
+                  type="checkbox"
+                />
+                Validar pago ahora
+              </label>
+              <button
+                className="h-10 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
+                type="submit"
+              >
+                Registrar pago
+              </button>
+            </form>
+          ) : null}
           <div className="mt-4 grid gap-3">
             {data.payments.length === 0 ? (
               <p className="text-sm text-[#5d6b63]">Sin pagos registrados.</p>
@@ -172,14 +274,30 @@ export default function SaleDetailPage() {
                   />
                 </label>
                 {payment.status === "PENDING_VALIDATION" ? (
-                  <button
-                    className="mt-3 h-10 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30] disabled:opacity-60"
-                    disabled={validatingPaymentId === payment.id}
-                    onClick={() => validate(payment.id)}
-                    type="button"
-                  >
-                    {validatingPaymentId === payment.id ? "Validando..." : "Validar pago"}
-                  </button>
+                  <div className="mt-3 grid gap-2">
+                    <button
+                      className="h-10 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30] disabled:opacity-60"
+                      disabled={validatingPaymentId === payment.id}
+                      onClick={() => validate(payment.id)}
+                      type="button"
+                    >
+                      {validatingPaymentId === payment.id ? "Validando..." : "Validar pago"}
+                    </button>
+                    <input
+                      className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm"
+                      onChange={(event) => setRejectReason(event.target.value)}
+                      placeholder="Motivo de rechazo"
+                      value={rejectReason}
+                    />
+                    <button
+                      className="h-10 rounded-md border border-[#d99a9a] bg-white px-4 text-sm font-semibold text-[#8c2f2f] transition hover:bg-[#fff4f4] disabled:opacity-60"
+                      disabled={rejectingPaymentId === payment.id}
+                      onClick={() => reject(payment.id)}
+                      type="button"
+                    >
+                      {rejectingPaymentId === payment.id ? "Rechazando..." : "Rechazar pago"}
+                    </button>
+                  </div>
                 ) : null}
               </article>
             ))}

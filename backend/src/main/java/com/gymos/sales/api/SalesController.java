@@ -75,6 +75,16 @@ public class SalesController {
 		return salesService.validatePayment(principal, paymentId, correlationId(servletRequest));
 	}
 
+	@PostMapping("/payments/{paymentId}/reject")
+	SaleDetailResponse rejectPayment(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID paymentId,
+			@Valid @RequestBody RejectPaymentRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return salesService.rejectPayment(principal, paymentId, request.reason(), correlationId(servletRequest));
+	}
+
 	@PostMapping(value = "/payments/{paymentId}/receipt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	SaleDetailResponse uploadReceipt(
 			@AuthenticationPrincipal GymOsPrincipal principal,
@@ -113,6 +123,11 @@ public class SalesController {
 			@Size(max = 512) String receiptObjectKey,
 			boolean validateNow,
 			@Size(max = 2000) String notes
+	) {
+	}
+
+	public record RejectPaymentRequest(
+			@NotNull @Size(min = 3, max = 500) String reason
 	) {
 	}
 

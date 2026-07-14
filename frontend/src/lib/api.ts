@@ -194,7 +194,7 @@ export type SaleItemDetail = {
 export type PaymentDetail = {
   id: string;
   method: "CASH" | "TRANSFER" | "CARD_MANUAL";
-  status: "PENDING_VALIDATION" | "COMPLETED" | "CANCELLED";
+  status: "PENDING_VALIDATION" | "COMPLETED" | "REJECTED" | "CANCELLED";
   amountCents: number;
   currency: string;
   reference: string | null;
@@ -406,6 +406,17 @@ export async function validatePayment(
 ): Promise<SaleDetailResponse> {
   return apiFetch<SaleDetailResponse>(`/sales/payments/${paymentId}/validate`, accessToken, {
     method: "POST",
+  });
+}
+
+export async function rejectPayment(
+  accessToken: string,
+  paymentId: string,
+  reason: string,
+): Promise<SaleDetailResponse> {
+  return apiFetch<SaleDetailResponse>(`/sales/payments/${paymentId}/reject`, accessToken, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
   });
 }
 

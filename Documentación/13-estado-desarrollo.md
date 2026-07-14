@@ -120,14 +120,14 @@ Implementado:
 - Permisos base `catalog.manage`, `catalog.read`, `sale.create`, `sale.read`, `payment.manual.create` y `payment.manual.validate`.
 - Datos semilla para `Membresia mensual` y `Botella de agua`.
 - Modulo backend `catalog` con endpoints `GET /api/v1/catalog/products`, `POST /api/v1/catalog/products`, `GET /api/v1/catalog/plans` y `POST /api/v1/catalog/plans`.
-- Modulo backend `sales` con endpoints `GET /api/v1/sales`, `POST /api/v1/sales`, `GET /api/v1/sales/{saleId}`, `POST /api/v1/sales/{saleId}/payments` y `POST /api/v1/sales/payments/{paymentId}/validate`.
+- Modulo backend `sales` con endpoints `GET /api/v1/sales`, `POST /api/v1/sales`, `GET /api/v1/sales/{saleId}`, `POST /api/v1/sales/{saleId}/payments`, `POST /api/v1/sales/payments/{paymentId}/validate` y `POST /api/v1/sales/payments/{paymentId}/reject`.
 - Calculo backend de subtotal, descuentos, total, pagos completados y saldo.
 - Pagos manuales `CASH`, `TRANSFER` y `CARD_MANUAL`.
-- Estado de pago `PENDING_VALIDATION` y `COMPLETED`.
-- Auditoria para producto creado, plan creado, venta creada, pago registrado y pago validado.
+- Estado de pago `PENDING_VALIDATION`, `COMPLETED` y `REJECTED`.
+- Auditoria para producto creado, plan creado, venta creada, pago registrado, pago validado y pago rechazado.
 - Pantalla frontend `/pos` con catalogo vendible, carrito, busqueda de cliente, pago manual y ventas recientes.
 - Pantalla frontend `/catalog` con lista de productos, lista de planes y alta rapida de producto.
-- Pantalla frontend `/sales/[saleId]` con detalle de venta, items, pagos y validacion de pagos pendientes.
+- Pantalla frontend `/sales/[saleId]` con detalle de venta, items, pagos, registro posterior de pagos, validacion de pagos pendientes y rechazo con motivo.
 - Accesos a POS y catalogo desde `/reception`.
 - Migracion Flyway `V4__memberships_and_receipts.sql` con tabla `membership`.
 - Configuracion backend de MinIO con bucket `gymos-receipts`.
@@ -156,8 +156,10 @@ Verificado localmente:
 - Smoke test `POST /api/v1/sales/payments/{paymentId}/receipt`.
 - Smoke test de objeto existente en MinIO dentro de `gymos-receipts`.
 - Smoke test de venta de plan pagada con membresia `ACTIVE` generada.
+- Smoke test `POST /api/v1/sales/{saleId}/payments` desde venta ya existente.
+- Smoke test `POST /api/v1/sales/payments/{paymentId}/reject` con motivo.
+- Smoke test de venta pendiente que ignora pagos `REJECTED` y queda pagada al registrar un nuevo pago `COMPLETED`.
 
 Pendiente del Hito 2:
 
-- Rechazo de pagos pendientes con motivo.
 - Reporte basico de ventas/pagos.
