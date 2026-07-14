@@ -44,15 +44,18 @@ Bloqueos locales:
 
 ## Siguiente corte
 
-Implementar Hito 1:
+Implementar Hito 2:
 
-- Autenticacion real con login, refresh token y logout.
-- Modelo persistente de usuarios, roles, permisos, organizacion y sucursal.
-- Onboarding de organizacion y sucursal inicial.
-- Alta, busqueda y ficha de cliente.
-- Pantallas frontend de login, seleccion de sucursal, recepcion y clientes.
+- Catalogo de productos, planes y beneficios.
+- Venta con sale items.
+- Pagos manuales en efectivo, transferencia y tarjeta registrada manualmente.
+- Comprobantes en MinIO.
+- Validacion manual de pagos.
+- POS basico conectado a clientes y membresias.
 
 ## Hito 1 - Identidad, seguridad y clientes
+
+Estado: completado funcionalmente
 
 Implementado:
 
@@ -64,7 +67,13 @@ Implementado:
 - Seed local de organizacion, sucursal, persona, usuario administrador, rol y permisos base.
 - Pantalla frontend `/login` consumiendo la API real.
 - Endpoints backend `GET /api/v1/organizations/current` y `GET /api/v1/organizations/current/branches`.
+- Endpoints backend `PUT /api/v1/organizations/current` y `PUT /api/v1/organizations/current/branches/{branchId}`.
+- Auditoria persistente para login, logout, seleccion de sucursal, cambios de organizacion, cambios de sucursal, alta de cliente y actualizacion de cliente.
+- Endpoints backend `GET /api/v1/clients`, `POST /api/v1/clients`, `GET /api/v1/clients/{clientId}` y `PUT /api/v1/clients/{clientId}`.
 - Pantalla frontend `/reception` con sesion local, resumen de organizacion, selector de sucursal y permisos cargados.
+- Pantalla frontend `/clients` con busqueda, lista y alta rapida.
+- Pantalla frontend `/clients/[clientId]` con ficha editable y timeline operativo.
+- Pantalla frontend `/settings/organization` para editar organizacion y sucursal inicial.
 
 Credenciales locales de desarrollo:
 
@@ -88,9 +97,18 @@ Verificado:
 - Smoke test `GET /api/v1/organizations/current`.
 - Smoke test `GET /api/v1/organizations/current/branches`.
 - Smoke test `GET /reception`.
+- Smoke test `PUT /api/v1/organizations/current`.
+- Smoke test `PUT /api/v1/organizations/current/branches/{branchId}`.
+- Smoke test `POST /api/v1/clients`.
+- Smoke test `GET /api/v1/clients`.
+- Smoke test `GET /api/v1/clients/{clientId}`.
+- Smoke test `PUT /api/v1/clients/{clientId}`.
+- Smoke test `POST /api/v1/auth/logout`.
+- Smoke test `GET /clients`, `GET /clients/{clientId}` y `GET /settings/organization`.
 
-Pendiente del Hito 1:
+Pendiente de producto fuera de Hito 1:
 
-- Persistencia de auditoria para login/logout/seleccion de sucursal.
-- Onboarding editable de organizacion y sucursal.
-- Alta, busqueda y ficha de cliente.
+- RBAC granular por endpoint.
+- Gestion avanzada de usuarios internos y roles desde UI.
+- Importacion masiva de clientes.
+- Fotos reales de cliente con almacenamiento de objetos.

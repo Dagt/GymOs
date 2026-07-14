@@ -7,6 +7,7 @@ import {
   getBranches,
   getCurrentOrganization,
   getStoredSession,
+  logout as logoutRequest,
   selectBranch,
   storeSession,
   type BranchSummary,
@@ -19,17 +20,20 @@ const shortcuts = [
   {
     title: "Alta rapida",
     detail: "Registro de cliente y captura de datos base.",
-    status: "Siguiente corte",
+    status: "Disponible",
+    href: "/clients",
   },
   {
-    title: "Pagos manuales",
-    detail: "Efectivo, transferencia o tarjeta registrada por recepcion.",
-    status: "Hito 2",
+    title: "Configuracion",
+    detail: "Datos de organizacion y sucursal para el arranque.",
+    status: "Disponible",
+    href: "/settings/organization",
   },
   {
     title: "Kiosco interno",
     detail: "Autoservicio para pagos, renovaciones y cambios de membresia.",
     status: "Hito 3",
+    href: null,
   },
 ];
 
@@ -111,6 +115,9 @@ export default function ReceptionPage() {
   }
 
   function logout() {
+    if (session) {
+      void logoutRequest(session.accessToken, session.refreshToken).catch(() => undefined);
+    }
     clearSession();
     setSession(null);
     setOrganization(null);
@@ -246,15 +253,20 @@ export default function ReceptionPage() {
 
           <div className="grid gap-4 md:grid-cols-3">
             {shortcuts.map((shortcut) => (
-              <article
-                className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm"
-                key={shortcut.title}
-              >
+              <article className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm" key={shortcut.title}>
                 <p className="text-xs font-semibold uppercase tracking-wide text-[#51735f]">
                   {shortcut.status}
                 </p>
                 <h3 className="mt-3 text-xl font-semibold">{shortcut.title}</h3>
                 <p className="mt-3 text-sm leading-6 text-[#5d6b63]">{shortcut.detail}</p>
+                {shortcut.href ? (
+                  <Link
+                    className="mt-4 inline-flex h-10 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
+                    href={shortcut.href}
+                  >
+                    Abrir
+                  </Link>
+                ) : null}
               </article>
             ))}
           </div>
