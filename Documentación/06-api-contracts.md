@@ -207,3 +207,33 @@ La activación ocurre como consecuencia de pago completado.
 - ACCESS_DENIED
 - INVENTORY_INSUFFICIENT
 - PERMISSION_DENIED
+
+## 6.18 Cambios Hito 3.5
+
+Contratos HTTP preservados:
+- No se eliminaron rutas existentes de ventas, pagos, membresias ni kiosco.
+- `ManualPaymentRequest`, renovacion, cambio de plan y creacion de venta aceptan `idempotencyKey` opcional.
+- `POST /self-service/terminals/{terminalCode}/sessions` ahora devuelve tambien `sessionToken`.
+- Las rutas de sesion de kiosco requieren header `X-Self-Service-Session-Token`.
+
+API interna publica:
+- `SalesOperations.createMembershipRenewal(CreateMembershipRenewalSaleCommand)`
+- `SalesOperations.createMembershipPlanChange(CreateMembershipPlanChangeSaleCommand)`
+
+Permisos por endpoint interno:
+- `organization.read`, `organization.update`
+- `branch.read`, `branch.update`
+- `client.read`, `client.create`, `client.update`
+- `catalog.read`, `catalog.manage`
+- `sale.read`, `sale.create`
+- `payment.manual.create`, `payment.manual.validate`, `payment.manual.reject`, `payment.receipt.upload`
+- `membership.read`, `membership.renew`, `membership.change-plan`
+- `report.sales.read`
+
+Errores agregados o formalizados:
+- `IDEMPOTENCY_KEY_REUSED`
+- `PAYMENT_ALREADY_COMPLETED`
+- `SELF_SERVICE_SESSION_INVALID`
+- `SELF_SERVICE_SESSION_BLOCKED`
+- `SELF_SERVICE_VERIFICATION_FAILED`
+- `RATE_LIMIT_EXCEEDED`

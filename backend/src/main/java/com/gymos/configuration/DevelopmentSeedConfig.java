@@ -139,9 +139,15 @@ public class DevelopmentSeedConfig {
 						.param("module", permissions.get(index).split("\\.")[0])
 						.param("now", now)
 						.update();
-				jdbcClient.sql("INSERT INTO role_permission (role_id, permission_id) VALUES (:roleId, :permissionId) ON CONFLICT DO NOTHING")
+				jdbcClient.sql("""
+						INSERT INTO role_permission (role_id, permission_id)
+						SELECT :roleId, p.id
+						FROM permission p
+						WHERE p.code = :code
+						ON CONFLICT DO NOTHING
+						""")
 						.param("roleId", ROLE_ID)
-						.param("permissionId", permissionId)
+						.param("code", permissions.get(index))
 						.update();
 			}
 		}

@@ -330,3 +330,34 @@ Regla:
 - Check constraints para montos no negativos.
 - Exclusión o validación transaccional para evitar traslapes.
 - Nunca borrar auditoría.
+- Nunca borrar auditorÃ­a.
+
+## 5.4 Cambios Hito 3.5
+
+Columnas agregadas:
+- `sale.idempotency_key`
+- `sale.business_context`
+- `sale.context_membership_id`
+- `sale.context_target_plan_id`
+- `sale.payment_completed_at`
+- `payment.idempotency_key`
+- `self_service_session.session_token_hash`
+- `self_service_session.verification_attempts`
+- `self_service_session.blocked_until`
+- `self_service_session.last_request_at`
+- `membership.source_membership_id`
+- `membership.source_payment_event_key`
+
+Tabla nueva:
+- `processed_domain_event`: registra `organization_id`, `event_key`, `event_type` y `processed_at` para consumo idempotente.
+
+Restricciones nuevas:
+- `ux_sale_org_idempotency_key`
+- `ux_payment_org_idempotency_key`
+- `ux_self_service_session_token_hash`
+- `ux_membership_org_payment_event_key`
+
+Migraciones nuevas:
+- `V2_1__demo_organization_prerequisite.sql`: garantiza que los datos demo historicos de catalogo y kiosco tengan organizacion/sucursal al migrar desde una base vacia.
+- `V6__hito3_5_architectural_stabilization.sql`: agrega idempotencia, contexto comercial, eventos procesados, seguridad de kiosco y trazabilidad de membresias.
+- `V7__permissions_and_kiosk_security.sql`: registra permisos granulares faltantes y los asigna al rol administrador.

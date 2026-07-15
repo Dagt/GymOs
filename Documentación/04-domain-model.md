@@ -343,3 +343,23 @@ Atributos:
 - actionConfiguration
 - active
 - retryPolicy
+
+## 4.17 Eventos versionados implementados
+
+Eventos de ventas:
+- `SaleCreatedV1`: venta creada por POS o flujo de membresia.
+- `PaymentRecordedV1`: pago manual registrado.
+- `PaymentCompletedV1`: venta cubierta por pagos completados; dispara efectos de negocio.
+- `PaymentRejectedV1`: pago rechazado con razon.
+
+Eventos de membresias:
+- `MembershipActivatedV1`: membresia activada por venta pagada.
+- `MembershipRenewedV1`: renovacion acumulativa procesada.
+- `MembershipPlanChangedV1`: membresia anterior cancelada y nuevo plan activado.
+
+Reglas reforzadas:
+- Una membresia solo se activa desde pago completado.
+- Reprocesar `PaymentCompletedV1` no duplica efectos porque se registra `processed_domain_event`.
+- Un cambio al mismo plan es invalido.
+- Una membresia cancelada no puede renovarse.
+- El kiosco opera con sesion temporal, token aleatorio y origen auditado `SELF_SERVICE_KIOSK`.

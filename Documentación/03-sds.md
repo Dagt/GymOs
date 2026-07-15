@@ -145,3 +145,23 @@ Reglas:
 - Debe cerrar sesión automáticamente por inactividad.
 - Toda acción debe auditarse con origen `SELF_SERVICE_KIOSK`.
 - Los pagos manuales iniciados desde kiosco quedan en estado pendiente o en revisión hasta que el flujo de pagos los complete según reglas.
+- Los pagos manuales iniciados desde kiosco quedan en estado pendiente o en revisiÃ³n hasta que el flujo de pagos los complete segÃºn reglas.
+
+## 3.14 Estabilizacion arquitectonica Hito 3.5
+
+Decisiones implementadas:
+- `memberships` ya no escribe en tablas `sale`, `sale_item` ni `payment`.
+- `sales` es propietario unico de ventas, partidas, pagos, validacion, numeros de venta e idempotencia comercial.
+- La API interna publica de ventas vive en `com.gymos.sales.api.operations` y expone `SalesOperations`, comandos de renovacion/cambio de plan y resultados inmutables.
+- La capa `application` ya no depende de DTOs HTTP ni controladores; los controladores mapean request/response hacia comandos/resultados de aplicacion.
+- Eventos de negocio versionados implementados: `SaleCreatedV1`, `PaymentRecordedV1`, `PaymentCompletedV1`, `PaymentRejectedV1`, `MembershipActivatedV1`, `MembershipRenewedV1` y `MembershipPlanChangedV1`.
+- La activacion de membresias por pago se consume desde `PaymentCompletedV1` y se protege con `processed_domain_event`.
+- Las operaciones comerciales aceptan `idempotencyKey`; `sale` y `payment` tienen restricciones unicas por organizacion.
+- RBAC granular se aplica por ruta interna con permisos como `sale.create`, `payment.manual.validate`, `membership.renew` y `report.sales.read`.
+- El kiosco sigue siendo publico sin JWT interno, pero exige token temporal por sesion en `X-Self-Service-Session-Token`, rate limiting, expiracion, bloqueo por intentos y auditoria.
+
+Pruebas arquitectonicas:
+- Spring Modulith verifica fronteras.
+- ArchUnit bloquea dependencias de application hacia controladores HTTP.
+- ArchUnit bloquea dependencias a infraestructura de otros modulos.
+- El uso temporal de `JdbcClient` en application queda listado explicitamente hasta extraer command repositories.

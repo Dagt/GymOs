@@ -209,3 +209,40 @@ Verificado localmente:
 - Smoke test Docker `POST /api/v1/self-service/sessions/{sessionId}/membership-change-requests/{membershipId}`.
 - Smoke test Docker `POST /api/v1/self-service/sessions/{sessionId}/end`.
 - Smoke test Docker `GET /kiosk/KIOSK-MAIN`.
+
+## Hito 3.5 - Estabilizacion arquitectonica de membresias, ventas y kiosco
+
+Estado: completado tecnico
+
+Implementado:
+
+- Rama `feature/hito-3-5-architecture-stabilization` creada desde `main` con Hito 3 completo.
+- API interna publica `SalesOperations` para renovaciones y cambios de plan de membresia.
+- `memberships` dejo de escribir directamente en tablas `sale`, `sale_item` y `payment`.
+- `sales` concentra creacion de ventas, partidas, pagos, validacion, eventos y numeros de venta.
+- Comandos y resultados de application separados de DTOs HTTP en ventas, membresias, clientes, catalogo, organizaciones, seguridad y autoservicio.
+- Eventos versionados de ventas/pagos/membresias en `common.events`.
+- Consumo idempotente de `PaymentCompletedV1` mediante `processed_domain_event`.
+- Idempotencia comercial en `sale` y `payment` con `idempotencyKey` y restricciones unicas.
+- Kiosco endurecido con `sessionToken`, hash de token, header `X-Self-Service-Session-Token`, expiracion, rate limiting, contador de intentos y bloqueo temporal.
+- RBAC granular por endpoint interno.
+- Migracion `V2_1__demo_organization_prerequisite.sql` para que una base limpia pueda ejecutar datos demo historicos.
+- Migracion `V6__hito3_5_architectural_stabilization.sql`.
+- Migracion `V7__permissions_and_kiosk_security.sql`.
+- Seed local idempotente para completar admin, rol y permisos aunque la organizacion demo ya exista.
+- Frontend actualizado para enviar idempotency keys y token de kiosco.
+
+Verificado:
+
+- `backend`: `./gradlew.bat test` con Java 25.
+- Spring Modulith architecture test.
+- Reglas ArchUnit adicionales.
+- Testcontainers con PostgreSQL y Flyway.
+- `frontend`: `npm.cmd run lint`.
+- `frontend`: `npm.cmd run typecheck`.
+- `frontend`: `npm.cmd run build`.
+
+Riesgos residuales controlados:
+
+- Algunos servicios application siguen usando `JdbcClient` internamente; el uso queda listado por prueba de arquitectura y debe extraerse a command repositories en un hito tecnico posterior.
+- `frontend/src/lib/api.ts` sigue siendo un cliente API grande; se mantiene funcional y tipado, pero conviene dividirlo por dominio en una refactorizacion frontend dedicada.
