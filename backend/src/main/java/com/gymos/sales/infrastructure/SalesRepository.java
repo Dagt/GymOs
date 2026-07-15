@@ -389,6 +389,23 @@ public class SalesRepository {
 		return count > 0;
 	}
 
+	public Optional<LocalDate> latestMembershipEnd(UUID organizationId, UUID clientId, UUID planId) {
+		return jdbcClient.sql("""
+				SELECT MAX(ends_on)
+				FROM membership
+				WHERE organization_id = :organizationId
+				  AND client_id = :clientId
+				  AND plan_id = :planId
+				  AND status = 'ACTIVE'
+				  AND deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("clientId", clientId)
+				.param("planId", planId)
+				.query(LocalDate.class)
+				.optional();
+	}
+
 	public List<MembershipDetail> membershipsForSale(UUID organizationId, UUID saleId) {
 		return jdbcClient.sql("""
 				SELECT m.id, m.client_id, m.plan_id, cp.name AS plan_name, m.status,

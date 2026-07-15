@@ -50,8 +50,8 @@ const shortcuts = [
   {
     title: "Kiosco interno",
     detail: "Autoservicio para pagos, renovaciones y cambios de membresia.",
-    status: "Hito 3",
-    href: null,
+    status: "Disponible",
+    href: "/kiosk/KIOSK-MAIN",
   },
 ];
 
