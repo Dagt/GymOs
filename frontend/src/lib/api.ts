@@ -347,6 +347,78 @@ export type SalesReportResponse = {
   recentSales: SaleSummary[];
 };
 
+export type AccessDevice = {
+  id: string;
+  name: string;
+  deviceCode: string;
+  deviceType: "TURNSTILE" | "DOOR" | string;
+  status: "ACTIVE" | "INACTIVE" | string;
+  provider: string;
+  lastSeenAt: string | null;
+};
+
+export type AccessDecision = {
+  logId: string;
+  decision: "GRANTED" | "DENIED";
+  accessType: "MEMBERSHIP_CHECK" | "TEMPORARY_PASS" | "MANUAL_OPEN" | string;
+  reason: string | null;
+  commandStatus: "SIMULATED_OPEN" | "NOT_SENT" | string | null;
+  occurredAt: string;
+  deviceName: string | null;
+  deviceCode: string | null;
+  clientId: string | null;
+  clientName: string | null;
+  membershipId: string | null;
+  planName: string | null;
+  temporaryPassId: string | null;
+};
+
+export type AccessLog = {
+  id: string;
+  decision: "GRANTED" | "DENIED";
+  accessType: string;
+  source: string;
+  reason: string | null;
+  commandStatus: string | null;
+  occurredAt: string;
+  deviceName: string | null;
+  deviceCode: string | null;
+  clientId: string | null;
+  clientName: string | null;
+};
+
+export type TemporaryPass = {
+  id: string;
+  clientId: string;
+  clientName: string;
+  status: "ACTIVE" | "CONSUMED" | "CANCELLED" | string;
+  startsAt: string;
+  expiresAt: string;
+  maxUses: number;
+  usesCount: number;
+  reason: string;
+};
+
+export type AccessRequestPayload = {
+  clientId?: string | null;
+  identifier?: string | null;
+  deviceCode?: string | null;
+};
+
+export type ManualOpenPayload = {
+  clientId?: string | null;
+  deviceCode?: string | null;
+  reason: string;
+};
+
+export type TemporaryPassPayload = {
+  clientId: string;
+  startsAt?: string | null;
+  expiresAt: string;
+  maxUses: number;
+  reason: string;
+};
+
 export type SaleItemPayload = {
   productId: string;
   quantity: number;
@@ -588,6 +660,44 @@ export async function getSalesReport(
   }
   const suffix = params.toString() ? `?${params.toString()}` : "";
   return apiFetch<SalesReportResponse>(`/sales/reports/summary${suffix}`, accessToken);
+}
+
+export async function getAccessDevices(accessToken: string): Promise<AccessDevice[]> {
+  return apiFetch<AccessDevice[]>("/access/devices", accessToken);
+}
+
+export async function getAccessLogs(accessToken: string, limit = 30): Promise<AccessLog[]> {
+  return apiFetch<AccessLog[]>(`/access/logs?limit=${limit}`, accessToken);
+}
+
+export async function requestAccess(
+  accessToken: string,
+  payload: AccessRequestPayload,
+): Promise<AccessDecision> {
+  return apiFetch<AccessDecision>("/access/requests", accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function manualOpenAccess(
+  accessToken: string,
+  payload: ManualOpenPayload,
+): Promise<AccessDecision> {
+  return apiFetch<AccessDecision>("/access/commands/open", accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function createTemporaryPass(
+  accessToken: string,
+  payload: TemporaryPassPayload,
+): Promise<TemporaryPass> {
+  return apiFetch<TemporaryPass>("/access/commands/temporary", accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
 }
 
 export async function createSale(

@@ -209,3 +209,43 @@ Verificado localmente:
 - Smoke test Docker `POST /api/v1/self-service/sessions/{sessionId}/membership-change-requests/{membershipId}`.
 - Smoke test Docker `POST /api/v1/self-service/sessions/{sessionId}/end`.
 - Smoke test Docker `GET /kiosk/KIOSK-MAIN`.
+
+## Hito 4 - Operacion del gimnasio
+
+Estado: en progreso
+
+Implementado:
+
+- Rama de trabajo `feature/hito-4-gym-operations` creada desde `main` con Hito 3 integrado.
+- Migracion Flyway `V6__hito4_access_control.sql` con `access_device`, `access_temporary_pass`, `access_log`, permisos de acceso y dispositivo semilla `MAIN-DOOR`.
+- Modulo backend `access` con endpoints `GET /api/v1/access/devices`, `GET /api/v1/access/logs`, `POST /api/v1/access/requests`, `POST /api/v1/access/commands/open` y `POST /api/v1/access/commands/temporary`.
+- Evaluacion de acceso por cliente o identificador contra membresia activa en sucursal y periodo de gracia.
+- Acceso por pase temporal con expiracion, numero maximo de usos y consumo automatico.
+- Apertura manual con motivo obligatorio y comando simulado `SIMULATED_OPEN`.
+- Bitacora de accesos concedidos/denegados con dispositivo, cliente, tipo, motivo, comando y correlacion.
+- Auditoria de `ACCESS_GRANTED`, `ACCESS_DENIED` y `ACCESS_TEMPORARY_PASS_CREATED`.
+- Pantalla frontend `/access` para recepcion: busqueda de cliente, evaluacion, apertura manual, pase temporal y bitacora reciente.
+- Acceso directo a `/access` desde `/reception`.
+
+Verificado localmente:
+
+- Backend tests con Java 25.
+- Spring Modulith architecture test.
+- Frontend lint.
+- Frontend typecheck.
+- Frontend production build con ruta `/access`.
+- Docker build backend y frontend.
+- Smoke test Docker con Flyway V6 aplicada y dispositivo `MAIN-DOOR`.
+- Smoke test Docker `GET /api/v1/access/devices`.
+- Smoke test Docker `POST /api/v1/access/requests` con membresia activa y decision `GRANTED`.
+- Smoke test Docker `POST /api/v1/access/requests` sin membresia ni pase temporal y decision `DENIED`.
+- Smoke test Docker `POST /api/v1/access/commands/temporary`.
+- Smoke test Docker `POST /api/v1/access/requests` con pase temporal vigente y decision `GRANTED`.
+- Smoke test Docker `POST /api/v1/access/commands/open` con comando simulado.
+- Smoke test Docker `GET /api/v1/access/logs`.
+- Smoke test Docker `GET /access`.
+
+Pendiente del Hito 4:
+
+- Inventario: existencias, movimientos, mermas, alertas y descuento posterior por venta.
+- Recursos y reservas: recursos reservables, disponibilidad, booking, check-in, finalizacion y cancelacion.

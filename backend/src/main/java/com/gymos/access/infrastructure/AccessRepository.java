@@ -1,0 +1,363 @@
+package com.gymos.access.infrastructure;
+
+import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public class AccessRepository {
+	private final JdbcClient jdbcClient;
+
+	public AccessRepository(JdbcClient jdbcClient) {
+		this.jdbcClient = jdbcClient;
+	}
+
+	public List<AccessDeviceRecord> devices(UUID organizationId, UUID branchId) {
+		return jdbcClient.sql("""
+				SELECT id, name, device_code, device_type, status, provider, last_seen_at
+				FROM access_device
+				WHERE organization_id = :organizationId
+				  AND branch_id = :branchId
+				  AND deleted_at IS NULL
+				ORDER BY name
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.query((resultSet, rowNumber) -> new AccessDeviceRecord(
+						resultSet.getObject("id", UUID.class),
+						resultSet.getString("name"),
+						resultSet.getString("device_code"),
+						resultSet.getString("device_type"),
+						resultSet.getString("status"),
+						resultSet.getString("provider"),
+						resultSet.getObject("last_seen_at", OffsetDateTime.class)
+				))
+				.list();
+	}
+
+	public Optional<AccessDeviceRecord> defaultDevice(UUID organizationId, UUID branchId) {
+		return jdbcClient.sql("""
+				SELECT id, name, device_code, device_type, status, provider, last_seen_at
+				FROM access_device
+				WHERE organization_id = :organizationId
+				  AND branch_id = :branchId
+				  AND status = 'ACTIVE'
+				  AND deleted_at IS NULL
+				ORDER BY name
+				LIMIT 1
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.query(this::mapDevice)
+				.optional();
+	}
+
+	public Optional<AccessDeviceRecord> deviceByCode(UUID organizationId, UUID branchId, String deviceCode) {
+		return jdbcClient.sql("""
+				SELECT id, name, device_code, device_type, status, provider, last_seen_at
+				FROM access_device
+				WHERE organization_id = :organizationId
+				  AND branch_id = :branchId
+				  AND device_code = :deviceCode
+				  AND status = 'ACTIVE'
+				  AND deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("deviceCode", deviceCode)
+				.query(this::mapDevice)
+				.optional();
+	}
+
+	public Optional<ClientAccessRecord> clientById(UUID organizationId, UUID clientId) {
+		return jdbcClient.sql("""
+				SELECT c.id, p.first_name || ' ' || p.last_name AS full_name,
+				       p.phone, p.email, c.status
+				FROM client c
+				JOIN person p ON p.id = c.person_id
+				WHERE c.organization_id = :organizationId
+				  AND c.id = :clientId
+				  AND c.deleted_at IS NULL
+				  AND p.deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("clientId", clientId)
+				.query(this::mapClient)
+				.optional();
+	}
+
+	public Optional<ClientAccessRecord> clientByIdentifier(UUID organizationId, String identifier) {
+		String normalized = identifier == null ? "" : identifier.trim().toLowerCase();
+		return jdbcClient.sql("""
+				SELECT c.id, p.first_name || ' ' || p.last_name AS full_name,
+				       p.phone, p.email, c.status
+				FROM client c
+				JOIN person p ON p.id = c.person_id
+				WHERE c.organization_id = :organizationId
+				  AND c.deleted_at IS NULL
+				  AND p.deleted_at IS NULL
+				  AND (
+				      LOWER(COALESCE(p.email, '')) = :identifier
+				      OR LOWER(COALESCE(p.phone, '')) = :identifier
+				  )
+				ORDER BY c.joined_at DESC
+				LIMIT 1
+				""")
+				.param("organizationId", organizationId)
+				.param("identifier", normalized)
+				.query(this::mapClient)
+				.optional();
+	}
+
+	public Optional<ActiveMembershipRecord> activeMembership(UUID organizationId, UUID branchId, UUID clientId, LocalDate today) {
+		return jdbcClient.sql("""
+				SELECT m.id, m.plan_id, cp.name AS plan_name, m.starts_on, m.ends_on, m.grace_ends_on
+				FROM membership m
+				JOIN membership_plan mp ON mp.id = m.plan_id
+				JOIN catalog_product cp ON cp.id = mp.product_id
+				WHERE m.organization_id = :organizationId
+				  AND m.branch_id = :branchId
+				  AND m.client_id = :clientId
+				  AND m.status = 'ACTIVE'
+				  AND m.starts_on <= :today
+				  AND m.grace_ends_on >= :today
+				  AND m.deleted_at IS NULL
+				ORDER BY m.ends_on DESC
+				LIMIT 1
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("clientId", clientId)
+				.param("today", today)
+				.query((resultSet, rowNumber) -> new ActiveMembershipRecord(
+						resultSet.getObject("id", UUID.class),
+						resultSet.getObject("plan_id", UUID.class),
+						resultSet.getString("plan_name"),
+						resultSet.getObject("starts_on", LocalDate.class),
+						resultSet.getObject("ends_on", LocalDate.class),
+						resultSet.getObject("grace_ends_on", LocalDate.class)
+				))
+				.optional();
+	}
+
+	public Optional<TemporaryPassRecord> validTemporaryPass(UUID organizationId, UUID branchId, UUID clientId, OffsetDateTime now) {
+		return jdbcClient.sql("""
+				SELECT p.id, p.client_id, person.first_name || ' ' || person.last_name AS client_name,
+				       p.status, p.starts_at, p.expires_at, p.max_uses, p.uses_count, p.reason
+				FROM access_temporary_pass p
+				JOIN client c ON c.id = p.client_id
+				JOIN person person ON person.id = c.person_id
+				WHERE p.organization_id = :organizationId
+				  AND p.branch_id = :branchId
+				  AND p.client_id = :clientId
+				  AND p.status = 'ACTIVE'
+				  AND p.starts_at <= :now
+				  AND p.expires_at >= :now
+				  AND p.uses_count < p.max_uses
+				  AND p.deleted_at IS NULL
+				ORDER BY p.expires_at
+				LIMIT 1
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("clientId", clientId)
+				.param("now", now)
+				.query(this::mapTemporaryPass)
+				.optional();
+	}
+
+	public Optional<TemporaryPassRecord> temporaryPass(UUID organizationId, UUID passId) {
+		return jdbcClient.sql("""
+				SELECT p.id, p.client_id, person.first_name || ' ' || person.last_name AS client_name,
+				       p.status, p.starts_at, p.expires_at, p.max_uses, p.uses_count, p.reason
+				FROM access_temporary_pass p
+				JOIN client c ON c.id = p.client_id
+				JOIN person person ON person.id = c.person_id
+				WHERE p.organization_id = :organizationId
+				  AND p.id = :passId
+				  AND p.deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("passId", passId)
+				.query(this::mapTemporaryPass)
+				.optional();
+	}
+
+	public Optional<AccessDecisionResponse> decision(UUID logId) {
+		return jdbcClient.sql("""
+				SELECT l.id, l.decision, l.access_type, l.reason, l.command_status, l.occurred_at,
+				       d.name AS device_name, d.device_code,
+				       c.id AS client_id, person.first_name || ' ' || person.last_name AS client_name,
+				       m.id AS membership_id, cp.name AS plan_name,
+				       p.id AS temporary_pass_id
+				FROM access_log l
+				LEFT JOIN access_device d ON d.id = l.device_id
+				LEFT JOIN client c ON c.id = l.client_id
+				LEFT JOIN person person ON person.id = c.person_id
+				LEFT JOIN membership m ON m.id = l.membership_id
+				LEFT JOIN membership_plan mp ON mp.id = m.plan_id
+				LEFT JOIN catalog_product cp ON cp.id = mp.product_id
+				LEFT JOIN access_temporary_pass p ON p.id = l.temporary_pass_id
+				WHERE l.id = :logId
+				""")
+				.param("logId", logId)
+				.query((resultSet, rowNumber) -> new AccessDecisionResponse(
+						resultSet.getObject("id", UUID.class),
+						resultSet.getString("decision"),
+						resultSet.getString("access_type"),
+						resultSet.getString("reason"),
+						resultSet.getString("command_status"),
+						resultSet.getObject("occurred_at", OffsetDateTime.class),
+						resultSet.getString("device_name"),
+						resultSet.getString("device_code"),
+						resultSet.getObject("client_id", UUID.class),
+						resultSet.getString("client_name"),
+						resultSet.getObject("membership_id", UUID.class),
+						resultSet.getString("plan_name"),
+						resultSet.getObject("temporary_pass_id", UUID.class)
+				))
+				.optional();
+	}
+
+	public List<AccessLogRecord> logs(UUID organizationId, UUID branchId, int limit) {
+		return jdbcClient.sql("""
+				SELECT l.id, l.decision, l.access_type, l.source, l.reason, l.command_status, l.occurred_at,
+				       d.name AS device_name, d.device_code,
+				       c.id AS client_id, person.first_name || ' ' || person.last_name AS client_name
+				FROM access_log l
+				LEFT JOIN access_device d ON d.id = l.device_id
+				LEFT JOIN client c ON c.id = l.client_id
+				LEFT JOIN person person ON person.id = c.person_id
+				WHERE l.organization_id = :organizationId
+				  AND l.branch_id = :branchId
+				ORDER BY l.occurred_at DESC
+				LIMIT :limit
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("limit", limit)
+				.query((resultSet, rowNumber) -> new AccessLogRecord(
+						resultSet.getObject("id", UUID.class),
+						resultSet.getString("decision"),
+						resultSet.getString("access_type"),
+						resultSet.getString("source"),
+						resultSet.getString("reason"),
+						resultSet.getString("command_status"),
+						resultSet.getObject("occurred_at", OffsetDateTime.class),
+						resultSet.getString("device_name"),
+						resultSet.getString("device_code"),
+						resultSet.getObject("client_id", UUID.class),
+						resultSet.getString("client_name")
+				))
+				.list();
+	}
+
+	private AccessDeviceRecord mapDevice(java.sql.ResultSet resultSet, int rowNumber) throws java.sql.SQLException {
+		return new AccessDeviceRecord(
+				resultSet.getObject("id", UUID.class),
+				resultSet.getString("name"),
+				resultSet.getString("device_code"),
+				resultSet.getString("device_type"),
+				resultSet.getString("status"),
+				resultSet.getString("provider"),
+				resultSet.getObject("last_seen_at", OffsetDateTime.class)
+		);
+	}
+
+	private ClientAccessRecord mapClient(java.sql.ResultSet resultSet, int rowNumber) throws java.sql.SQLException {
+		return new ClientAccessRecord(
+				resultSet.getObject("id", UUID.class),
+				resultSet.getString("full_name"),
+				resultSet.getString("phone"),
+				resultSet.getString("email"),
+				resultSet.getString("status")
+		);
+	}
+
+	private TemporaryPassRecord mapTemporaryPass(java.sql.ResultSet resultSet, int rowNumber) throws java.sql.SQLException {
+		return new TemporaryPassRecord(
+				resultSet.getObject("id", UUID.class),
+				resultSet.getObject("client_id", UUID.class),
+				resultSet.getString("client_name"),
+				resultSet.getString("status"),
+				resultSet.getObject("starts_at", OffsetDateTime.class),
+				resultSet.getObject("expires_at", OffsetDateTime.class),
+				resultSet.getInt("max_uses"),
+				resultSet.getInt("uses_count"),
+				resultSet.getString("reason")
+		);
+	}
+
+	public record AccessDeviceRecord(
+			UUID id,
+			String name,
+			String deviceCode,
+			String deviceType,
+			String status,
+			String provider,
+			OffsetDateTime lastSeenAt
+	) {
+	}
+
+	public record ClientAccessRecord(UUID id, String fullName, String phone, String email, String status) {
+	}
+
+	public record ActiveMembershipRecord(
+			UUID id,
+			UUID planId,
+			String planName,
+			LocalDate startsOn,
+			LocalDate endsOn,
+			LocalDate graceEndsOn
+	) {
+	}
+
+	public record TemporaryPassRecord(
+			UUID id,
+			UUID clientId,
+			String clientName,
+			String status,
+			OffsetDateTime startsAt,
+			OffsetDateTime expiresAt,
+			int maxUses,
+			int usesCount,
+			String reason
+	) {
+	}
+
+	public record AccessDecisionResponse(
+			UUID logId,
+			String decision,
+			String accessType,
+			String reason,
+			String commandStatus,
+			OffsetDateTime occurredAt,
+			String deviceName,
+			String deviceCode,
+			UUID clientId,
+			String clientName,
+			UUID membershipId,
+			String planName,
+			UUID temporaryPassId
+	) {
+	}
+
+	public record AccessLogRecord(
+			UUID id,
+			String decision,
+			String accessType,
+			String source,
+			String reason,
+			String commandStatus,
+			OffsetDateTime occurredAt,
+			String deviceName,
+			String deviceCode,
+			UUID clientId,
+			String clientName
+	) {
+	}
+}

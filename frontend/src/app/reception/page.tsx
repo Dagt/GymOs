@@ -53,6 +53,12 @@ const shortcuts = [
     status: "Disponible",
     href: "/kiosk/KIOSK-MAIN",
   },
+  {
+    title: "Accesos",
+    detail: "Entrada, aperturas manuales, pases temporales y bitacora.",
+    status: "Disponible",
+    href: "/access",
+  },
 ];
 
 export default function ReceptionPage() {
@@ -269,7 +275,7 @@ export default function ReceptionPage() {
             </p>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {shortcuts.map((shortcut) => (
               <article className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm" key={shortcut.title}>
                 <p className="text-xs font-semibold uppercase tracking-wide text-[#51735f]">

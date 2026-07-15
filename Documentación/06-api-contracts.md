@@ -153,6 +153,14 @@ La activación ocurre como consecuencia de pago completado.
 - `GET /access/logs`
 - `GET /access/devices`
 
+Nota implementada Hito 4:
+- `GET /access/devices` lista dispositivos de acceso por sucursal activa.
+- `GET /access/logs` lista la bitacora reciente de accesos por sucursal activa.
+- `POST /access/requests` evalua acceso por cliente o identificador contra membresia activa o pase temporal vigente.
+- `POST /access/commands/open` registra apertura manual con motivo y comando simulado.
+- `POST /access/commands/temporary` crea pase temporal limitado por expiracion y numero de usos.
+- `POST /access/commands/block` queda pendiente para integracion futura con hardware real.
+
 ## 6.13 Coaches y rutinas
 
 - `POST /coaches`
