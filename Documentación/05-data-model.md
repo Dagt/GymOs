@@ -302,34 +302,78 @@ Regla:
 - notes
 
 ### professional
-- person_id
-- type
+- organization_id
+- branch_id
+- display_name
+- professional_type
+- email
+- phone
+- bio
 - status
-- schedule_json
+- version
+- deleted_at
 
 ### professional_service
+- organization_id
+- branch_id
 - professional_id
-- product_id
-- duration_minutes
-- booking_rules_json
-
-### automation
 - name
-- trigger_event
+- service_type
+- duration_minutes
+- price_cents
+- currency
+- status
+- version
+- deleted_at
+
+### professional_availability
+- organization_id
+- branch_id
+- professional_id
+- day_of_week
+- opens_at
+- closes_at
+- status
+- version
+- deleted_at
+
+### notification_log
+- organization_id
+- branch_id
+- channel
+- recipient
+- subject
+- body
+- status
+- trigger_type
+- reference_type
+- reference_id
+- scheduled_at
+- sent_at
+- error_message
+- version
+
+### automation_rule
+- organization_id
+- branch_id
+- name
+- trigger_type
 - condition_json
 - action_type
 - action_config_json
-- active
-- retry_policy_json
-
-### notification
-- recipient_type
-- recipient_id
-- channel
-- template_key
 - status
-- sent_at
+- retry_limit
+- version
+- deleted_at
+
+### automation_execution
+- organization_id
+- branch_id
+- rule_id
+- status
+- trigger_reference
 - error_message
+- occurred_at
 
 ### audit_log
 - actor_user_id

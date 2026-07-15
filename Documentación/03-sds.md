@@ -182,9 +182,14 @@ Decisiones implementadas:
 
 ## 3.16 Servicios avanzados Hito 5
 
-Primer corte implementado:
+Decisiones implementadas:
 - `coaching` gestiona coaches por organizacion y sucursal.
 - Las rutinas se modelan como `workout` con versiones publicadas en `workout_version`.
 - Las asignaciones a clientes quedan en `workout_assignment`, apuntando a una version concreta para preservar historial.
+- `wellness` gestiona profesionales, servicios, precios, duracion y disponibilidad base.
+- `notifications` funciona como cola/log interno auditable; el envio externo por correo, WhatsApp o push queda aislado para una integracion posterior.
+- `automations` gestiona reglas configurables, enable/disable y ejecucion manual; la accion inicial soportada crea notificaciones internas.
+- `reporting` expone el dashboard del dueno con metricas agregadas de ventas, clientes, membresias, reservas, inventario, coaches, profesionales, notificaciones y automatizaciones.
 - Los endpoints internos usan permisos `coach.read`, `coach.manage`, `workout.read`, `workout.manage` y `report.coaches.read`.
-- La pantalla `/coaches` permite alta de coach, alta de rutina, asignacion a clientes y lectura de metricas base de coaches.
+- Permisos adicionales: `professional.read`, `professional.manage`, `notification.read`, `notification.manage`, `automation.read`, `automation.manage` y `report.owner.read`.
+- Las pantallas `/coaches`, `/wellness`, `/automations` y `/dashboard` completan el primer paquete vendible de servicios avanzados.

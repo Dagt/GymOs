@@ -48,6 +48,12 @@ class DatabaseMigrationTests {
 			assertThat(tableExists(connection, "workout")).isTrue();
 			assertThat(tableExists(connection, "workout_version")).isTrue();
 			assertThat(tableExists(connection, "workout_assignment")).isTrue();
+			assertThat(tableExists(connection, "professional")).isTrue();
+			assertThat(tableExists(connection, "professional_service")).isTrue();
+			assertThat(tableExists(connection, "professional_availability")).isTrue();
+			assertThat(tableExists(connection, "notification_log")).isTrue();
+			assertThat(tableExists(connection, "automation_rule")).isTrue();
+			assertThat(tableExists(connection, "automation_execution")).isTrue();
 		}
 	}
 

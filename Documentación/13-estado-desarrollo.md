@@ -305,31 +305,40 @@ Pendiente fuera del alcance central del Hito 4:
 
 ## Hito 5 - Servicios avanzados
 
-Estado: en progreso
+Estado: completo
 
-Primer corte implementado:
+Implementado:
 
 - Rama de trabajo `feature/hito-5-advanced-services` creada desde Hito 4 completo.
 - Migracion Flyway `V13__hito5_coaches_workouts.sql` con `coach`, `workout`, `workout_version`, `workout_assignment`, permisos y datos demo.
+- Migracion Flyway `V14__hito5_wellness_notifications_automations.sql` con `professional`, `professional_service`, `professional_availability`, `notification_log`, `automation_rule`, `automation_execution`, permisos y datos demo.
 - Modulo backend `coaching` con endpoints `GET /api/v1/coaches`, `POST /api/v1/coaches`, `GET /api/v1/workouts`, `POST /api/v1/workouts`, `GET /api/v1/workouts/{workoutId}`, `POST /api/v1/workouts/{workoutId}/versions`, `POST /api/v1/workouts/{workoutId}/assign`, `GET /api/v1/clients/{clientId}/workouts` y `GET /api/v1/reports/coaches`.
 - Rutinas versionadas: cada asignacion apunta a una version concreta para preservar historial.
 - Validaciones de coach activo, cliente activo, nivel de rutina, JSON de rutina y rango de fechas.
-- RBAC para `coach.read`, `coach.manage`, `workout.read`, `workout.manage` y `report.coaches.read`.
+- Modulo backend `wellness` con profesionales de bienestar, servicios y disponibilidad por sucursal.
+- Modulo backend `notifications` con registro interno de notificaciones operativas.
+- Modulo backend `automations` con reglas habilitables, ejecucion manual y bitacora de ejecuciones.
+- Modulo backend `reporting` con dashboard del dueno para ingresos, ventas, clientes, membresias, accesos, reservas, inventario, coaches, rutinas y profesionales.
+- RBAC para `coach.read`, `coach.manage`, `workout.read`, `workout.manage`, `report.coaches.read`, `professional.read`, `professional.manage`, `notification.read`, `notification.manage`, `automation.read`, `automation.manage` y `report.owner.read`.
 - Seed local actualizado para incluir permisos de Hito 4 y Hito 5 en el administrador demo.
 - Pantalla frontend `/coaches` con alta de coach, alta de rutina, busqueda de cliente, asignacion de rutina y metricas base.
-- Acceso directo a `/coaches` desde `/reception`.
+- Pantalla frontend `/wellness` con alta de profesional, servicios, disponibilidad y consulta por profesional.
+- Pantalla frontend `/automations` con alta de reglas, habilitar/deshabilitar, ejecucion manual y notificaciones internas.
+- Pantalla frontend `/dashboard` con metricas de dueno por rango de fechas.
+- Accesos directos a `/coaches`, `/wellness`, `/automations` y `/dashboard` desde `/reception`.
 
 Verificado localmente:
 
 - Backend tests con Java 25.
-- Testcontainers PostgreSQL y Flyway hasta `V13`.
-- Pruebas de seguridad MVC para permisos de coaches y rutinas.
+- Testcontainers PostgreSQL y Flyway hasta `V14`.
+- Pruebas de seguridad MVC para permisos de coaches, rutinas, profesionales, automatizaciones y notificaciones.
 - Frontend lint.
 - Frontend typecheck.
+- Frontend build de produccion.
+- Docker Compose config.
 
-Pendiente para completar Hito 5:
+Pendiente fuera del alcance central del Hito 5:
 
-- Profesionales de bienestar, servicios y disponibilidad.
-- Notificaciones y automatizaciones.
-- Dashboard del dueno mas completo con metricas cruzadas.
-- Build frontend de produccion, Docker config/build y smoke tests del flujo `/coaches`.
+- Integracion real con proveedores externos de email, SMS o WhatsApp; la V1 deja registro interno y contratos preparados.
+- Automatizaciones programadas por scheduler; la V1 permite ejecucion manual y deja la estructura persistente lista.
+- Agenda completa de servicios profesionales con reservas pagadas queda para la evolucion posterior sobre el modulo de reservas.

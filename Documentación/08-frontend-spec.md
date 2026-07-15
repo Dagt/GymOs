@@ -154,6 +154,15 @@ Widgets:
 - reservas
 - inventario
 - desempeño de coaches
+- profesionales y servicios de bienestar
+- actividad operativa por sucursal
+
+Pantallas implementadas hasta Hito 5:
+- `/reception`: hub operativo con accesos a clientes, POS, catalogo, ventas, reportes, kiosco, inventario, reservas, accesos, coaches, bienestar, automatizaciones y dashboard.
+- `/coaches`: alta de coaches, rutinas, versiones, asignacion a clientes y metricas base.
+- `/wellness`: alta de profesionales, servicios, disponibilidad y consulta por profesional.
+- `/automations`: reglas internas, ejecucion manual y notificaciones operativas.
+- `/dashboard`: vista del dueno por rango de fechas.
 
 ## 8.10 Diseño visual
 

@@ -75,6 +75,13 @@ public class SecurityConfig {
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/workouts/**").hasAuthority("workout.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/workouts/**").hasAuthority("workout.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/reports/coaches").hasAuthority("report.coaches.read")
+						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/professionals/**").hasAuthority("professional.read")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/professionals/**").hasAuthority("professional.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/notifications/**").hasAuthority("notification.read")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/notifications/**").hasAuthority("notification.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/automations/**").hasAuthority("automation.read")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/automations/**").hasAuthority("automation.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/reports/owner-dashboard").hasAuthority("report.owner.read")
 						.anyRequest().authenticated())
 				.exceptionHandling(exceptions -> exceptions
 						.authenticationEntryPoint(new StandardAuthenticationEntryPoint()))

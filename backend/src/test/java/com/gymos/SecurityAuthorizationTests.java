@@ -58,6 +58,27 @@ class SecurityAuthorizationTests {
 	}
 
 	@Test
+	@WithMockUser(authorities = "professional.read")
+	void professionalCreationRequiresManagePermission() throws Exception {
+		mockMvc.perform(post("/api/v1/professionals").contentType("application/json").content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(authorities = "automation.read")
+	void automationCreationRequiresManagePermission() throws Exception {
+		mockMvc.perform(post("/api/v1/automations").contentType("application/json").content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(authorities = "notification.read")
+	void notificationCreationRequiresManagePermission() throws Exception {
+		mockMvc.perform(post("/api/v1/notifications").contentType("application/json").content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
 	void selfServiceSessionCreationIsPublic() throws Exception {
 		var result = mockMvc.perform(post("/api/v1/self-service/terminals/UNKNOWN/sessions"))
 				.andReturn();

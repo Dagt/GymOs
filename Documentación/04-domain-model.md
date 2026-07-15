@@ -355,6 +355,16 @@ Atributos:
 - schedule
 - reservableResourceId
 
+Implementado en Hito 5:
+- `Professional` pertenece a organizacion y sucursal, tiene tipo profesional, contacto, biografia y estado.
+- `ProfessionalService` define nombre, tipo, duracion, precio, moneda y estado.
+- `ProfessionalAvailability` define disponibilidad semanal por dia y rango horario.
+
+Invariantes:
+- Solo profesionales activos pueden recibir servicios o disponibilidad.
+- La duracion del servicio debe estar dentro de un rango operativo valido.
+- La disponibilidad debe cerrar despues de abrir.
+
 ## 4.16 Automation
 
 Atributos:
@@ -364,6 +374,17 @@ Atributos:
 - actionConfiguration
 - active
 - retryPolicy
+
+Implementado en Hito 5:
+- `AutomationRule` guarda evento, condicion JSON, accion, configuracion JSON, estado y limite de reintentos.
+- `AutomationExecution` registra cada ejecucion y su resultado.
+- La accion inicial soportada es `CREATE_NOTIFICATION`.
+- `NotificationLog` registra canal, destinatario, asunto, cuerpo, estado, referencia y programacion.
+
+Invariantes:
+- Solo reglas `ENABLED` pueden ejecutarse.
+- La configuracion de condicion y accion debe ser JSON valido.
+- Las notificaciones quedan auditadas aunque el envio externo aun no este conectado.
 
 ## 4.17 Eventos versionados implementados
 

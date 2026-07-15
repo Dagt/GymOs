@@ -77,6 +77,24 @@ const shortcuts = [
     status: "Disponible",
     href: "/coaches",
   },
+  {
+    title: "Bienestar",
+    detail: "Profesionales, servicios y disponibilidad.",
+    status: "Disponible",
+    href: "/wellness",
+  },
+  {
+    title: "Automatizaciones",
+    detail: "Reglas, ejecuciones y notificaciones internas.",
+    status: "Disponible",
+    href: "/automations",
+  },
+  {
+    title: "Dashboard",
+    detail: "Indicadores ejecutivos de operacion y venta.",
+    status: "Disponible",
+    href: "/dashboard",
+  },
 ];
 
 export default function ReceptionPage() {

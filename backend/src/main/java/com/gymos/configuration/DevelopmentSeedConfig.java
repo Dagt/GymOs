@@ -138,7 +138,14 @@ public class DevelopmentSeedConfig {
 					"coach.manage",
 					"workout.read",
 					"workout.manage",
-					"report.coaches.read"
+					"report.coaches.read",
+					"professional.read",
+					"professional.manage",
+					"notification.read",
+					"notification.manage",
+					"automation.read",
+					"automation.manage",
+					"report.owner.read"
 			);
 			for (int index = 0; index < permissions.size(); index++) {
 				UUID permissionId = UUID.nameUUIDFromBytes(("gymos:" + permissions.get(index)).getBytes());

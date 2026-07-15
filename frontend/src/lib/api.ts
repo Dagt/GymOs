@@ -612,6 +612,135 @@ export type AssignWorkoutPayload = {
   notes?: string | null;
 };
 
+export type ProfessionalSummary = {
+  id: string;
+  displayName: string;
+  professionalType: string;
+  email: string | null;
+  phone: string | null;
+  bio: string | null;
+  status: "ACTIVE" | "INACTIVE" | string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProfessionalServiceSummary = {
+  id: string;
+  professionalId: string;
+  name: string;
+  serviceType: string;
+  durationMinutes: number;
+  priceCents: number;
+  currency: string;
+  status: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProfessionalAvailability = {
+  id: string;
+  professionalId: string;
+  dayOfWeek: number;
+  opensAt: string;
+  closesAt: string;
+  status: string;
+};
+
+export type CreateProfessionalPayload = {
+  displayName: string;
+  professionalType: string;
+  email?: string | null;
+  phone?: string | null;
+  bio?: string | null;
+};
+
+export type CreateProfessionalServicePayload = {
+  name: string;
+  serviceType: string;
+  durationMinutes: number;
+  priceCents: number;
+  currency: string;
+};
+
+export type CreateProfessionalAvailabilityPayload = {
+  dayOfWeek: number;
+  opensAt: string;
+  closesAt: string;
+};
+
+export type NotificationLog = {
+  id: string;
+  channel: string;
+  recipient: string | null;
+  subject: string | null;
+  body: string;
+  status: string;
+  triggerType: string | null;
+  referenceType: string | null;
+  referenceId: string | null;
+  scheduledAt: string | null;
+  sentAt: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+};
+
+export type CreateNotificationPayload = {
+  channel: string;
+  recipient?: string | null;
+  subject?: string | null;
+  body: string;
+  triggerType?: string | null;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  scheduledAt?: string | null;
+};
+
+export type AutomationRule = {
+  id: string;
+  name: string;
+  triggerType: string;
+  conditionJson: string;
+  actionType: string;
+  actionConfigJson: string;
+  status: "ENABLED" | "DISABLED" | string;
+  retryLimit: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type AutomationExecution = {
+  id: string;
+  ruleId: string;
+  status: string;
+  triggerReference: string | null;
+  errorMessage: string | null;
+  occurredAt: string;
+};
+
+export type CreateAutomationPayload = {
+  name: string;
+  triggerType: string;
+  conditionJson?: string | null;
+  actionType: string;
+  actionConfigJson?: string | null;
+  retryLimit: number;
+};
+
+export type OwnerDashboard = {
+  fromDate: string;
+  toDate: string;
+  paidRevenueCents: number;
+  saleCount: number;
+  newClients: number;
+  activeMemberships: number;
+  bookingCount: number;
+  lowStockItems: number;
+  activeWorkoutAssignments: number;
+  activeProfessionals: number;
+  queuedNotifications: number;
+  enabledAutomations: number;
+};
+
 export type SaleItemPayload = {
   productId: string;
   quantity: number;
@@ -1036,6 +1165,128 @@ export async function getClientWorkouts(
 
 export async function getCoachReport(accessToken: string): Promise<CoachReport> {
   return apiFetch<CoachReport>("/reports/coaches", accessToken);
+}
+
+export async function getProfessionals(accessToken: string): Promise<ProfessionalSummary[]> {
+  return apiFetch<ProfessionalSummary[]>("/professionals", accessToken);
+}
+
+export async function createProfessional(
+  accessToken: string,
+  payload: CreateProfessionalPayload,
+): Promise<ProfessionalSummary> {
+  return apiFetch<ProfessionalSummary>("/professionals", accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function getProfessionalServices(
+  accessToken: string,
+  professionalId: string,
+): Promise<ProfessionalServiceSummary[]> {
+  return apiFetch<ProfessionalServiceSummary[]>(`/professionals/${professionalId}/services`, accessToken);
+}
+
+export async function createProfessionalService(
+  accessToken: string,
+  professionalId: string,
+  payload: CreateProfessionalServicePayload,
+): Promise<ProfessionalServiceSummary> {
+  return apiFetch<ProfessionalServiceSummary>(`/professionals/${professionalId}/services`, accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function getProfessionalAvailability(
+  accessToken: string,
+  professionalId: string,
+): Promise<ProfessionalAvailability[]> {
+  return apiFetch<ProfessionalAvailability[]>(`/professionals/${professionalId}/availability`, accessToken);
+}
+
+export async function createProfessionalAvailability(
+  accessToken: string,
+  professionalId: string,
+  payload: CreateProfessionalAvailabilityPayload,
+): Promise<ProfessionalAvailability> {
+  return apiFetch<ProfessionalAvailability>(`/professionals/${professionalId}/availability`, accessToken, {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getNotifications(accessToken: string, limit = 80): Promise<NotificationLog[]> {
+  return apiFetch<NotificationLog[]>(`/notifications?limit=${limit}`, accessToken);
+}
+
+export async function createNotification(
+  accessToken: string,
+  payload: CreateNotificationPayload,
+): Promise<NotificationLog> {
+  return apiFetch<NotificationLog>("/notifications", accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function getAutomations(accessToken: string): Promise<AutomationRule[]> {
+  return apiFetch<AutomationRule[]>("/automations", accessToken);
+}
+
+export async function createAutomation(
+  accessToken: string,
+  payload: CreateAutomationPayload,
+): Promise<AutomationRule> {
+  return apiFetch<AutomationRule>("/automations", accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function setAutomationStatus(
+  accessToken: string,
+  ruleId: string,
+  action: "enable" | "disable",
+): Promise<AutomationRule> {
+  return apiFetch<AutomationRule>(`/automations/${ruleId}/${action}`, accessToken, {
+    method: "POST",
+  });
+}
+
+export async function executeAutomation(
+  accessToken: string,
+  ruleId: string,
+  triggerReference?: string,
+): Promise<AutomationExecution> {
+  return apiFetch<AutomationExecution>(`/automations/${ruleId}/execute`, accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload({ triggerReference: triggerReference ?? null })),
+  });
+}
+
+export async function getAutomationExecutions(
+  accessToken: string,
+  ruleId: string,
+): Promise<AutomationExecution[]> {
+  return apiFetch<AutomationExecution[]>(`/automations/${ruleId}/executions`, accessToken);
+}
+
+export async function getOwnerDashboard(
+  accessToken: string,
+  fromDate?: string,
+  toDate?: string,
+): Promise<OwnerDashboard> {
+  const params = new URLSearchParams();
+  if (fromDate) {
+    params.set("fromDate", fromDate);
+  }
+  if (toDate) {
+    params.set("toDate", toDate);
+  }
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return apiFetch<OwnerDashboard>(`/reports/owner-dashboard${suffix}`, accessToken);
 }
 
 export async function createSale(

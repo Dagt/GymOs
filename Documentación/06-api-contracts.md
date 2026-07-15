@@ -202,21 +202,42 @@ Nota implementada Hito 5:
 
 ## 6.14 Profesionales
 
-- `POST /professionals`
 - `GET /professionals`
-- `POST /professionals/{id}/services`
-- `GET /professionals/{id}/availability`
+- `POST /professionals`
+- `GET /professionals/{professionalId}/services`
+- `POST /professionals/{professionalId}/services`
+- `GET /professionals/{professionalId}/availability`
+- `POST /professionals/{professionalId}/availability`
+
+Nota implementada Hito 5:
+- Los profesionales pertenecen siempre a la organizacion y sucursal activa.
+- Los servicios profesionales mantienen precio, moneda, duracion, tipo y estado propio.
+- La disponibilidad se expresa por dia de semana y rango horario; el backend valida `day_of_week` entre 1 y 7 y que la hora de cierre sea posterior a la apertura.
 
 ## 6.15 Automatizaciones
 
 - `POST /automations`
 - `GET /automations`
-- `PATCH /automations/{id}`
-- `POST /automations/{id}/enable`
-- `POST /automations/{id}/disable`
-- `GET /automations/{id}/executions`
+- `POST /automations/{ruleId}/enable`
+- `POST /automations/{ruleId}/disable`
+- `POST /automations/{ruleId}/execute`
+- `GET /automations/{ruleId}/executions`
 
-## 6.16 Reportes
+Nota implementada Hito 5:
+- Las reglas tienen `triggerType`, `conditionJson`, `actionType`, `actionConfigJson`, `status` y `retryLimit`.
+- `actionType = CREATE_NOTIFICATION` crea una notificacion interna en `notification_log`.
+- Las ejecuciones registran estado `SUCCEEDED`, `SKIPPED` o `FAILED`, referencia del disparador y error cuando aplique.
+
+## 6.16 Notificaciones
+
+- `GET /notifications?limit=50`
+- `POST /notifications`
+
+Nota implementada Hito 5:
+- La V1 registra notificaciones internas y auditorias de envio en `notification_log`.
+- Los canales externos reales quedan preparados por contrato y no se conectan aun a proveedores de email, SMS o WhatsApp.
+
+## 6.17 Reportes
 
 - `GET /reports/sales`
 - `GET /reports/memberships`
@@ -224,8 +245,12 @@ Nota implementada Hito 5:
 - `GET /reports/bookings`
 - `GET /reports/inventory`
 - `GET /reports/coaches`
+- `GET /reports/owner-dashboard?fromDate=YYYY-MM-DD&toDate=YYYY-MM-DD`
 
-## 6.17 Códigos de error
+Nota implementada Hito 5:
+- `owner-dashboard` devuelve ingresos, ventas, clientes nuevos, membresias activas, accesos, reservas, inventario, coaches, rutinas, asignaciones y profesionales para la organizacion/sucursal activa.
+
+## 6.18 Códigos de error
 
 - PERSON_ALREADY_EXISTS
 - CLIENT_ALREADY_EXISTS
@@ -243,9 +268,11 @@ Nota implementada Hito 5:
 - BOOKING_NOT_ALLOWED
 - ACCESS_DENIED
 - INVENTORY_STOCK_INSUFFICIENT
+- PROFESSIONAL_NOT_FOUND
+- AUTOMATION_RULE_NOT_FOUND
 - PERMISSION_DENIED
 
-## 6.18 Cambios Hito 3.5
+## 6.19 Cambios Hito 3.5
 
 Contratos HTTP preservados:
 - No se eliminaron rutas existentes de ventas, pagos, membresias ni kiosco.
@@ -286,6 +313,10 @@ Permisos por endpoint interno:
 - `coach.read`, `coach.manage`
 - `workout.read`, `workout.manage`
 - `report.coaches.read`
+- `professional.read`, `professional.manage`
+- `notification.read`, `notification.manage`
+- `automation.read`, `automation.manage`
+- `report.owner.read`
 
 Errores agregados o formalizados:
 - `IDEMPOTENCY_KEY_REUSED`
