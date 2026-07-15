@@ -2,12 +2,15 @@ package com.gymos.memberships.application;
 
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
-import com.gymos.common.events.MembershipActivatedV1;
-import com.gymos.common.events.MembershipPlanChangedV1;
-import com.gymos.common.events.MembershipRenewedV1;
-import com.gymos.common.events.PaymentCompletedLineItemV1;
-import com.gymos.common.events.PaymentCompletedV1;
 import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.memberships.api.events.MembershipActivatedV1;
+import com.gymos.memberships.api.events.MembershipPlanChangedV1;
+import com.gymos.memberships.api.events.MembershipRenewedV1;
+import com.gymos.memberships.api.operations.ChangeMembershipPlanOperationCommand;
+import com.gymos.memberships.api.operations.MembershipOperations;
+import com.gymos.memberships.api.operations.MembershipSaleOperationResult;
+import com.gymos.memberships.api.operations.MembershipSummaryOperationResult;
+import com.gymos.memberships.api.operations.RenewMembershipOperationCommand;
 import com.gymos.memberships.application.command.ChangeMembershipPlanCommand;
 import com.gymos.memberships.application.command.RenewMembershipCommand;
 import com.gymos.memberships.application.result.MembershipSaleResult;
@@ -18,32 +21,30 @@ import com.gymos.memberships.infrastructure.MembershipRepository.PlanForRenewal;
 import com.gymos.sales.api.operations.CreateMembershipPlanChangeSaleCommand;
 import com.gymos.sales.api.operations.CreateMembershipRenewalSaleCommand;
 import com.gymos.sales.api.operations.SalesOperations;
+import com.gymos.sales.api.events.PaymentCompletedLineItemV1;
+import com.gymos.sales.api.events.PaymentCompletedV1;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.event.EventListener;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class MembershipService {
-	private final JdbcClient jdbcClient;
+public class MembershipService implements MembershipOperations {
 	private final MembershipRepository membershipRepository;
 	private final SalesOperations salesOperations;
 	private final AuditService auditService;
 	private final ApplicationEventPublisher eventPublisher;
 
 	public MembershipService(
-			JdbcClient jdbcClient,
 			MembershipRepository membershipRepository,
 			SalesOperations salesOperations,
 			AuditService auditService,
 			ApplicationEventPublisher eventPublisher
 	) {
-		this.jdbcClient = jdbcClient;
 		this.membershipRepository = membershipRepository;
 		this.salesOperations = salesOperations;
 		this.auditService = auditService;
@@ -106,6 +107,23 @@ public class MembershipService {
 		return toMembershipSaleResult(sale, renewed);
 	}
 
+	@Override
+	@Transactional
+	public MembershipSaleOperationResult renew(
+			GymOsPrincipal principal,
+			UUID membershipId,
+			RenewMembershipOperationCommand command,
+			String correlationId
+	) {
+		return toOperationResult(renew(principal, membershipId, new RenewMembershipCommand(
+				command.method(),
+				command.reference(),
+				command.validateNow(),
+				command.notes(),
+				command.idempotencyKey()
+		), correlationId));
+	}
+
 	@Transactional
 	public MembershipSaleResult changePlan(
 			GymOsPrincipal principal,
@@ -151,6 +169,24 @@ public class MembershipService {
 				? membershipRepository.bySaleAndPlan(principal.organizationId(), principal.branchId(), sale.saleId(), plan.planId()).orElse(null)
 				: null;
 		return toMembershipSaleResult(sale, changed);
+	}
+
+	@Override
+	@Transactional
+	public MembershipSaleOperationResult changePlan(
+			GymOsPrincipal principal,
+			UUID membershipId,
+			ChangeMembershipPlanOperationCommand command,
+			String correlationId
+	) {
+		return toOperationResult(changePlan(principal, membershipId, new ChangeMembershipPlanCommand(
+				command.targetPlanId(),
+				command.method(),
+				command.reference(),
+				command.validateNow(),
+				command.notes(),
+				command.idempotencyKey()
+		), correlationId));
 	}
 
 	@EventListener
@@ -215,7 +251,6 @@ public class MembershipService {
 			PlanForRenewal plan,
 			String action
 	) {
-		OffsetDateTime now = OffsetDateTime.now();
 		LocalDate today = LocalDate.now();
 		LocalDate latestEnd = membershipRepository.latestMembershipEnd(event.organizationId(), event.clientId(), plan.planId())
 				.orElse(null);
@@ -225,36 +260,18 @@ public class MembershipService {
 		}
 		LocalDate endsOn = startsOn.plusDays(plan.durationDays() - 1L);
 		LocalDate graceEndsOn = endsOn.plusDays(plan.graceDays());
-		UUID membershipId = UUID.randomUUID();
-		jdbcClient.sql("""
-				INSERT INTO membership (
-				    id, organization_id, branch_id, client_id, plan_id, sale_id, status,
-				    activated_at, starts_on, ends_on, grace_ends_on,
-				    created_at, updated_at, created_by, updated_by, version,
-				    source_membership_id, source_payment_event_key
-				)
-				VALUES (
-				    :id, :organizationId, :branchId, :clientId, :planId, :saleId, 'ACTIVE',
-				    :activatedAt, :startsOn, :endsOn, :graceEndsOn,
-				    :createdAt, :updatedAt, NULL, NULL, 0,
-				    :sourceMembershipId, :sourcePaymentEventKey
-				)
-				""")
-				.param("id", membershipId)
-				.param("organizationId", event.organizationId())
-				.param("branchId", event.branchId())
-				.param("clientId", event.clientId())
-				.param("planId", plan.planId())
-				.param("saleId", event.saleId())
-				.param("activatedAt", now)
-				.param("startsOn", startsOn)
-				.param("endsOn", endsOn)
-				.param("graceEndsOn", graceEndsOn)
-				.param("createdAt", now)
-				.param("updatedAt", now)
-				.param("sourceMembershipId", sourceMembershipId)
-				.param("sourcePaymentEventKey", event.eventKey())
-				.update();
+		UUID membershipId = membershipRepository.insertActiveMembership(
+				event.organizationId(),
+				event.branchId(),
+				event.clientId(),
+				plan.planId(),
+				event.saleId(),
+				startsOn,
+				endsOn,
+				graceEndsOn,
+				sourceMembershipId,
+				event.eventKey()
+		);
 		auditService.recordSystem(event.organizationId(), event.branchId(), null, action, "MEMBERSHIP", membershipId, event.businessContext(), null, event.eventKey());
 		MembershipSummary membership = membershipRepository.byId(event.organizationId(), event.branchId(), membershipId)
 				.orElseThrow(() -> new BusinessException("MEMBERSHIP_NOT_FOUND", "La membresia activada no esta disponible."));
@@ -263,22 +280,7 @@ public class MembershipService {
 	}
 
 	private void cancelForPlanChange(PaymentCompletedV1 event, MembershipSummary current) {
-		jdbcClient.sql("""
-				UPDATE membership
-				SET status = 'CANCELLED',
-				    updated_at = :updatedAt,
-				    version = version + 1
-				WHERE organization_id = :organizationId
-				  AND branch_id = :branchId
-				  AND id = :membershipId
-				  AND status = 'ACTIVE'
-				  AND deleted_at IS NULL
-				""")
-				.param("updatedAt", OffsetDateTime.now())
-				.param("organizationId", event.organizationId())
-				.param("branchId", event.branchId())
-				.param("membershipId", current.id())
-				.update();
+		membershipRepository.cancelActiveForPlanChange(event.organizationId(), event.branchId(), current.id());
 		auditService.recordSystem(event.organizationId(), event.branchId(), null, "MEMBERSHIP_CANCELLED_BY_PLAN_CHANGE", "MEMBERSHIP", current.id(), event.businessContext(), null, event.eventKey());
 	}
 
@@ -347,6 +349,38 @@ public class MembershipService {
 			return null;
 		}
 		return new MembershipSummaryResult(
+				membership.id(),
+				membership.clientId(),
+				membership.planId(),
+				membership.planName(),
+				membership.saleId(),
+				membership.saleNumber(),
+				membership.status(),
+				membership.activatedAt(),
+				membership.startsOn(),
+				membership.endsOn(),
+				membership.graceEndsOn()
+		);
+	}
+
+	private MembershipSaleOperationResult toOperationResult(MembershipSaleResult result) {
+		return new MembershipSaleOperationResult(
+				result.saleId(),
+				result.saleNumber(),
+				result.saleStatus(),
+				result.totalCents(),
+				result.paidCents(),
+				result.balanceCents(),
+				result.currency(),
+				toOperationSummary(result.membership())
+		);
+	}
+
+	private MembershipSummaryOperationResult toOperationSummary(MembershipSummaryResult membership) {
+		if (membership == null) {
+			return null;
+		}
+		return new MembershipSummaryOperationResult(
 				membership.id(),
 				membership.clientId(),
 				membership.planId(),

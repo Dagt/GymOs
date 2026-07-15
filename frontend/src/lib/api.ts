@@ -502,11 +502,16 @@ export async function createKioskSession(terminalCode: string): Promise<KioskSes
   });
 }
 
-export async function verifyKioskSession(sessionId: string, sessionToken: string, identifier: string): Promise<KioskSummaryResponse> {
+export async function verifyKioskSession(
+  sessionId: string,
+  sessionToken: string,
+  identifier: string,
+  birthDate: string,
+): Promise<KioskSummaryResponse> {
   return publicApiFetch<KioskSummaryResponse>(`/self-service/sessions/${sessionId}/verify`, {
     method: "POST",
     headers: kioskSessionHeaders(sessionToken),
-    body: JSON.stringify({ identifier }),
+    body: JSON.stringify({ identifier, birthDate }),
   });
 }
 

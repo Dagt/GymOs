@@ -22,6 +22,7 @@ export default function KioskPage() {
   const [summary, setSummary] = useState<KioskSummaryResponse | null>(null);
   const [plans, setPlans] = useState<KioskPlanOption[]>([]);
   const [identifier, setIdentifier] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [targetPlanId, setTargetPlanId] = useState("");
   const [reference, setReference] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -65,7 +66,7 @@ export default function KioskPage() {
     setError(null);
     setMessage(null);
     try {
-      const nextSummary = await verifyKioskSession(session.sessionId, session.sessionToken, identifier);
+      const nextSummary = await verifyKioskSession(session.sessionId, session.sessionToken, identifier, birthDate);
       const options = await getKioskMembershipOptions(session.sessionId, session.sessionToken);
       setSummary(nextSummary);
       setPlans(options);
@@ -132,6 +133,7 @@ export default function KioskPage() {
     }
     setSummary(null);
     setIdentifier("");
+    setBirthDate("");
     setReference("");
     setMessage("Sesion cerrada.");
   }
@@ -169,12 +171,20 @@ export default function KioskPage() {
         {!summary ? (
           <form className="rounded-lg border border-[#2f473c] bg-[#17231f] p-6" onSubmit={verify}>
             <h2 className="text-2xl font-semibold">Verifica tu identidad</h2>
-            <p className="mt-2 text-sm text-[#c6d5cd]">Ingresa el email o telefono registrado en recepcion.</p>
+            <p className="mt-2 text-sm text-[#c6d5cd]">Ingresa tus datos registrados en recepcion.</p>
             <input
               className="mt-5 h-14 w-full rounded-md border border-[#3e5a4d] bg-[#101916] px-4 text-lg outline-none transition focus:border-[#93d2a8]"
               onChange={(event) => setIdentifier(event.target.value)}
               placeholder="email o telefono"
+              required
               value={identifier}
+            />
+            <input
+              className="mt-4 h-14 w-full rounded-md border border-[#3e5a4d] bg-[#101916] px-4 text-lg outline-none transition focus:border-[#93d2a8]"
+              onChange={(event) => setBirthDate(event.target.value)}
+              required
+              type="date"
+              value={birthDate}
             />
             <button
               className="mt-5 h-14 w-full rounded-md bg-[#93d2a8] px-5 text-base font-semibold text-[#101916] transition hover:bg-[#b5e6c5]"

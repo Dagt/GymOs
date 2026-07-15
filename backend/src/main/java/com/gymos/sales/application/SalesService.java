@@ -2,13 +2,13 @@ package com.gymos.sales.application;
 
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
-import com.gymos.common.events.PaymentCompletedLineItemV1;
-import com.gymos.common.events.PaymentCompletedV1;
-import com.gymos.common.events.PaymentRecordedV1;
-import com.gymos.common.events.PaymentRejectedV1;
-import com.gymos.common.events.SaleCreatedV1;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.storage.ObjectStorageService;
+import com.gymos.sales.api.events.PaymentCompletedLineItemV1;
+import com.gymos.sales.api.events.PaymentCompletedV1;
+import com.gymos.sales.api.events.PaymentRecordedV1;
+import com.gymos.sales.api.events.PaymentRejectedV1;
+import com.gymos.sales.api.events.SaleCreatedV1;
 import com.gymos.sales.api.operations.CreateMembershipPlanChangeSaleCommand;
 import com.gymos.sales.api.operations.CreateMembershipRenewalSaleCommand;
 import com.gymos.sales.api.operations.SalesOperations;
@@ -22,6 +22,9 @@ import com.gymos.sales.infrastructure.SalesRepository.ProductForSale;
 import com.gymos.sales.infrastructure.SalesRepository.SaleHeader;
 import com.gymos.sales.infrastructure.SalesRepository.SaleSummary;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -108,9 +111,15 @@ public class SalesService implements SalesOperations {
 	@Transactional
 	public SaleDetailResult create(GymOsPrincipal principal, CreateSaleCommand request, String correlationId) {
 		requireBranch(principal);
+		String idempotencyHash = saleRequestHash(request);
 		if (request.idempotencyKey() != null && !request.idempotencyKey().isBlank()) {
-			var existing = salesRepository.saleHeaderByIdempotencyKey(principal.organizationId(), request.idempotencyKey().trim());
+			String key = request.idempotencyKey().trim();
+			var existing = salesRepository.saleHeaderByIdempotencyKey(principal.organizationId(), key);
 			if (existing.isPresent()) {
+				ensureSameIdempotencyRequest(
+						salesRepository.saleRequestHashByIdempotencyKey(principal.organizationId(), key).orElse(null),
+						idempotencyHash
+				);
 				return detail(principal, existing.get().id());
 			}
 		}
@@ -165,13 +174,13 @@ public class SalesService implements SalesOperations {
 				    id, organization_id, branch_id, client_id, sale_number, status,
 				    subtotal_cents, discount_cents, total_cents, paid_cents, balance_cents,
 				    currency, notes, sold_at, created_at, updated_at, created_by, updated_by, version,
-				    idempotency_key
+				    idempotency_key, idempotency_request_hash
 				)
 				VALUES (
 				    :id, :organizationId, :branchId, :clientId, :saleNumber, 'PENDING_PAYMENT',
 				    :subtotalCents, :discountCents, :totalCents, 0, :balanceCents,
 				    :currency, :notes, :soldAt, :createdAt, :updatedAt, :createdBy, :updatedBy, 0,
-				    :idempotencyKey
+				    :idempotencyKey, :idempotencyRequestHash
 				)
 				""")
 				.param("id", saleId)
@@ -191,6 +200,7 @@ public class SalesService implements SalesOperations {
 				.param("createdBy", principal.userId())
 				.param("updatedBy", principal.userId())
 				.param("idempotencyKey", blankToNull(request.idempotencyKey()))
+				.param("idempotencyRequestHash", idempotencyHash)
 				.update();
 
 		for (var item : request.items()) {
@@ -297,9 +307,15 @@ public class SalesService implements SalesOperations {
 			String businessContext,
 			String correlationId
 	) {
+		String idempotencyHash = membershipSaleRequestHash(clientId, sourceMembershipId, targetPlanId, productId, priceCents, currency, method, reference, validateNow, notes, businessContext);
 		if (idempotencyKey != null && !idempotencyKey.isBlank()) {
-			var existing = salesRepository.saleHeaderByIdempotencyKey(organizationId, idempotencyKey.trim());
+			String key = idempotencyKey.trim();
+			var existing = salesRepository.saleHeaderByIdempotencyKey(organizationId, key);
 			if (existing.isPresent()) {
+				ensureSameIdempotencyRequest(
+						salesRepository.saleRequestHashByIdempotencyKey(organizationId, key).orElse(null),
+						idempotencyHash
+				);
 				return toMembershipSaleResult(existing.get());
 			}
 		}
@@ -320,13 +336,13 @@ public class SalesService implements SalesOperations {
 				    id, organization_id, branch_id, client_id, sale_number, status,
 				    subtotal_cents, discount_cents, total_cents, paid_cents, balance_cents,
 				    currency, notes, sold_at, created_at, updated_at, created_by, updated_by, version,
-				    idempotency_key, business_context, context_membership_id, context_target_plan_id
+				    idempotency_key, idempotency_request_hash, business_context, context_membership_id, context_target_plan_id
 				)
 				VALUES (
 				    :id, :organizationId, :branchId, :clientId, :saleNumber, :status,
 				    :subtotalCents, 0, :totalCents, :paidCents, :balanceCents,
 				    :currency, :notes, :soldAt, :createdAt, :updatedAt, :createdBy, :updatedBy, 0,
-				    :idempotencyKey, :businessContext, :contextMembershipId, :contextTargetPlanId
+				    :idempotencyKey, :idempotencyRequestHash, :businessContext, :contextMembershipId, :contextTargetPlanId
 				)
 				""")
 				.param("id", saleId)
@@ -347,6 +363,7 @@ public class SalesService implements SalesOperations {
 				.param("createdBy", actorUserId)
 				.param("updatedBy", actorUserId)
 				.param("idempotencyKey", blankToNull(idempotencyKey))
+				.param("idempotencyRequestHash", idempotencyHash)
 				.param("businessContext", businessContext)
 				.param("contextMembershipId", sourceMembershipId)
 				.param("contextTargetPlanId", targetPlanId)
@@ -377,13 +394,13 @@ public class SalesService implements SalesOperations {
 				    id, organization_id, branch_id, sale_id, client_id, method, status,
 				    amount_cents, currency, reference, receipt_object_key, received_at,
 				    validated_at, validated_by, notes, created_at, updated_at, created_by, updated_by, version,
-				    idempotency_key
+				    idempotency_key, idempotency_request_hash
 				)
 				VALUES (
 				    :id, :organizationId, :branchId, :saleId, :clientId, :method, :status,
 				    :amountCents, :currency, :reference, NULL, :receivedAt,
 				    :validatedAt, :validatedBy, :notes, :createdAt, :updatedAt, :createdBy, :updatedBy, 0,
-				    :idempotencyKey
+				    :idempotencyKey, :idempotencyRequestHash
 				)
 				""")
 				.param("id", paymentId)
@@ -405,6 +422,7 @@ public class SalesService implements SalesOperations {
 				.param("createdBy", actorUserId)
 				.param("updatedBy", actorUserId)
 				.param("idempotencyKey", blankToNull(idempotencyKey == null ? null : idempotencyKey + ":payment"))
+				.param("idempotencyRequestHash", paymentRequestHash(method, priceCents, reference, null, validateNow, notes))
 				.update();
 
 		auditService.recordSystem(organizationId, branchId, actorUserId, "SALE_CREATED", "SALE", saleId, businessContext, null, correlationId);
@@ -559,12 +577,25 @@ public class SalesService implements SalesOperations {
 			String correlationId
 	) {
 		SaleHeader sale = ensureSale(principal, saleId);
+		String idempotencyHash = paymentRequestHash(
+				request.method(),
+				request.amountCents(),
+				request.reference(),
+				request.receiptObjectKey(),
+				request.validateNow(),
+				request.notes()
+		);
 		if (request.idempotencyKey() != null && !request.idempotencyKey().isBlank()) {
-			UUID existingSaleId = paymentSaleByIdempotencyKey(principal.organizationId(), request.idempotencyKey().trim());
+			String key = request.idempotencyKey().trim();
+			UUID existingSaleId = paymentSaleByIdempotencyKey(principal.organizationId(), key);
 			if (existingSaleId != null) {
 				if (!existingSaleId.equals(saleId)) {
 					throw new BusinessException("IDEMPOTENCY_KEY_REUSED", "La llave de idempotencia ya fue usada en otra venta.");
 				}
+				ensureSameIdempotencyRequest(
+						salesRepository.paymentRequestHashByIdempotencyKey(principal.organizationId(), key).orElse(null),
+						idempotencyHash
+				);
 				return;
 			}
 		}
@@ -580,13 +611,13 @@ public class SalesService implements SalesOperations {
 				    id, organization_id, branch_id, sale_id, client_id, method, status,
 				    amount_cents, currency, reference, receipt_object_key, received_at,
 				    validated_at, validated_by, notes, created_at, updated_at, created_by, updated_by, version,
-				    idempotency_key
+				    idempotency_key, idempotency_request_hash
 				)
 				VALUES (
 				    :id, :organizationId, :branchId, :saleId, :clientId, :method, :status,
 				    :amountCents, :currency, :reference, :receiptObjectKey, :receivedAt,
 				    :validatedAt, :validatedBy, :notes, :createdAt, :updatedAt, :createdBy, :updatedBy, 0,
-				    :idempotencyKey
+				    :idempotencyKey, :idempotencyRequestHash
 				)
 				""")
 				.param("id", paymentId)
@@ -609,6 +640,7 @@ public class SalesService implements SalesOperations {
 				.param("createdBy", principal.userId())
 				.param("updatedBy", principal.userId())
 				.param("idempotencyKey", blankToNull(request.idempotencyKey()))
+				.param("idempotencyRequestHash", idempotencyHash)
 				.update();
 		auditService.record(principal, "PAYMENT_RECORDED", "PAYMENT", paymentId, "POS", null, correlationId);
 		eventPublisher.publishEvent(new PaymentRecordedV1("payment-recorded:" + paymentId, principal.organizationId(), principal.branchId(), saleId, paymentId, method, status, request.amountCents(), sale.currency(), now));
@@ -784,6 +816,96 @@ public class SalesService implements SalesOperations {
 
 	private String blankToNull(String value) {
 		return value == null || value.isBlank() ? null : value.trim();
+	}
+
+	private void ensureSameIdempotencyRequest(String existingHash, String requestedHash) {
+		if (existingHash != null && requestedHash != null && !existingHash.equals(requestedHash)) {
+			throw new BusinessException("IDEMPOTENCY_KEY_REUSED", "La llave de idempotencia ya fue usada con una solicitud diferente.");
+		}
+	}
+
+	private String saleRequestHash(CreateSaleCommand request) {
+		StringBuilder value = new StringBuilder()
+				.append("client=").append(request.clientId()).append('|')
+				.append("discount=").append(request.discountCents()).append('|')
+				.append("notes=").append(normalized(request.notes())).append('|');
+		request.items().stream()
+				.sorted(java.util.Comparator.comparing(item -> item.productId().toString()))
+				.forEach(item -> value
+						.append("item=").append(item.productId())
+						.append(',').append(item.quantity())
+						.append(',').append(item.discountCents())
+						.append('|'));
+		if (request.payment() != null) {
+			value.append("payment=").append(paymentRequestHash(
+					request.payment().method(),
+					request.payment().amountCents(),
+					request.payment().reference(),
+					request.payment().receiptObjectKey(),
+					request.payment().validateNow(),
+					request.payment().notes()
+			));
+		}
+		return sha256(value.toString());
+	}
+
+	private String membershipSaleRequestHash(
+			UUID clientId,
+			UUID sourceMembershipId,
+			UUID targetPlanId,
+			UUID productId,
+			long priceCents,
+			String currency,
+			String method,
+			String reference,
+			boolean validateNow,
+			String notes,
+			String businessContext
+	) {
+		return sha256(String.join("|",
+				"client=" + clientId,
+				"sourceMembership=" + sourceMembershipId,
+				"targetPlan=" + targetPlanId,
+				"product=" + productId,
+				"price=" + priceCents,
+				"currency=" + normalized(currency),
+				"method=" + normalized(method).toUpperCase(),
+				"reference=" + normalized(reference),
+				"validateNow=" + validateNow,
+				"notes=" + normalized(notes),
+				"context=" + businessContext
+		));
+	}
+
+	private String paymentRequestHash(
+			String method,
+			long amountCents,
+			String reference,
+			String receiptObjectKey,
+			boolean validateNow,
+			String notes
+	) {
+		return sha256(String.join("|",
+				"method=" + normalized(method).toUpperCase(),
+				"amount=" + amountCents,
+				"reference=" + normalized(reference),
+				"receipt=" + normalized(receiptObjectKey),
+				"validateNow=" + validateNow,
+				"notes=" + normalized(notes)
+		));
+	}
+
+	private String sha256(String value) {
+		try {
+			byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+			return java.util.HexFormat.of().formatHex(digest);
+		} catch (NoSuchAlgorithmException exception) {
+			throw new IllegalStateException("SHA-256 is required", exception);
+		}
+	}
+
+	private String normalized(String value) {
+		return value == null ? "" : value.trim();
 	}
 
 	private String receiptObjectKey(UUID organizationId, UUID saleId, UUID paymentId, String originalFilename) {

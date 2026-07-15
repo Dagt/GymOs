@@ -36,6 +36,8 @@ class DatabaseMigrationTests {
 			assertThat(columnExists(connection, "self_service_session", "session_token_hash")).isTrue();
 			assertThat(columnExists(connection, "self_service_session", "verification_attempts")).isTrue();
 			assertThat(columnExists(connection, "membership", "source_payment_event_key")).isTrue();
+			assertThat(columnExists(connection, "sale", "idempotency_request_hash")).isTrue();
+			assertThat(columnExists(connection, "payment", "idempotency_request_hash")).isTrue();
 			assertThat(tableExists(connection, "processed_domain_event")).isTrue();
 		}
 	}

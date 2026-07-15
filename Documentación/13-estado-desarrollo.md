@@ -1,7 +1,7 @@
 # 13. Estado de Desarrollo
 
 Estado: en progreso  
-Fecha: 13 de julio de 2026
+Fecha: 15 de julio de 2026
 
 ## Hito 0 - Base tecnica vendible
 
@@ -222,21 +222,30 @@ Implementado:
 - `sales` concentra creacion de ventas, partidas, pagos, validacion, eventos y numeros de venta.
 - Comandos y resultados de application separados de DTOs HTTP en ventas, membresias, clientes, catalogo, organizaciones, seguridad y autoservicio.
 - Eventos versionados de ventas/pagos/membresias en `common.events`.
+- Eventos versionados movidos a APIs publicas de sus modulos propietarios: `sales.api.events` y `memberships.api.events`.
+- API publica `MembershipOperations` para renovacion/cambio de plan consumida por `selfservice`.
+- API publica `ClientLookupOperations` para verificacion de identidad y perfil limitado de kiosco.
+- `selfservice` ya no depende de `memberships.application` ni consulta tablas `client`/`person`.
+- `MembershipService` y `SelfServiceService` ya no usan `JdbcClient`; la persistencia queda en repositorios de su modulo.
 - Consumo idempotente de `PaymentCompletedV1` mediante `processed_domain_event`.
 - Idempotencia comercial en `sale` y `payment` con `idempotencyKey` y restricciones unicas.
-- Kiosco endurecido con `sessionToken`, hash de token, header `X-Self-Service-Session-Token`, expiracion, rate limiting, contador de intentos y bloqueo temporal.
+- Hash de solicitud para ventas y pagos idempotentes mediante `sale.idempotency_request_hash` y `payment.idempotency_request_hash`.
+- Kiosco endurecido con `sessionToken`, hash de token, header `X-Self-Service-Session-Token`, verificacion por contacto + fecha de nacimiento, expiracion, rate limiting por puerto Redis/local, contador de intentos y bloqueo temporal.
 - RBAC granular por endpoint interno.
 - Migracion `V2_1__demo_organization_prerequisite.sql` para que una base limpia pueda ejecutar datos demo historicos.
 - Migracion `V6__hito3_5_architectural_stabilization.sql`.
 - Migracion `V7__permissions_and_kiosk_security.sql`.
+- Migracion `V8__idempotency_request_hashes.sql`.
 - Seed local idempotente para completar admin, rol y permisos aunque la organizacion demo ya exista.
-- Frontend actualizado para enviar idempotency keys y token de kiosco.
+- Frontend actualizado para enviar idempotency keys, token de kiosco y fecha de nacimiento en verificacion.
 
 Verificado:
 
 - `backend`: `./gradlew.bat test` con Java 25.
 - Spring Modulith architecture test.
 - Reglas ArchUnit adicionales.
+- Pruebas de seguridad MVC para permisos internos y acceso publico del kiosco.
+- Prueba unitaria de rate limiting local.
 - Testcontainers con PostgreSQL y Flyway.
 - `frontend`: `npm.cmd run lint`.
 - `frontend`: `npm.cmd run typecheck`.
@@ -246,3 +255,4 @@ Riesgos residuales controlados:
 
 - Algunos servicios application siguen usando `JdbcClient` internamente; el uso queda listado por prueba de arquitectura y debe extraerse a command repositories en un hito tecnico posterior.
 - `frontend/src/lib/api.ts` sigue siendo un cliente API grande; se mantiene funcional y tipado, pero conviene dividirlo por dominio en una refactorizacion frontend dedicada.
+- Aun falta una suite amplia de concurrencia real para pagos/renovaciones; la proteccion base existe por restricciones unicas, hashes de idempotencia, transacciones y eventos procesados.

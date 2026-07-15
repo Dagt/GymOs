@@ -153,15 +153,19 @@ Decisiones implementadas:
 - `memberships` ya no escribe en tablas `sale`, `sale_item` ni `payment`.
 - `sales` es propietario unico de ventas, partidas, pagos, validacion, numeros de venta e idempotencia comercial.
 - La API interna publica de ventas vive en `com.gymos.sales.api.operations` y expone `SalesOperations`, comandos de renovacion/cambio de plan y resultados inmutables.
+- `memberships` expone `com.gymos.memberships.api.operations.MembershipOperations`; `selfservice` consume esa API publica y ya no depende de `memberships.application`.
+- `clients` expone `com.gymos.clients.api.operations.ClientLookupOperations`; la verificacion de identidad del kiosco se resuelve dentro del modulo `clients` y `selfservice` ya no consulta tablas `client` ni `person`.
 - La capa `application` ya no depende de DTOs HTTP ni controladores; los controladores mapean request/response hacia comandos/resultados de aplicacion.
-- Eventos de negocio versionados implementados: `SaleCreatedV1`, `PaymentRecordedV1`, `PaymentCompletedV1`, `PaymentRejectedV1`, `MembershipActivatedV1`, `MembershipRenewedV1` y `MembershipPlanChangedV1`.
+- Eventos de negocio versionados implementados en APIs de sus modulos propietarios: `sales.api.events` contiene eventos de venta/pago y `memberships.api.events` contiene eventos de membresias.
 - La activacion de membresias por pago se consume desde `PaymentCompletedV1` y se protege con `processed_domain_event`.
-- Las operaciones comerciales aceptan `idempotencyKey`; `sale` y `payment` tienen restricciones unicas por organizacion.
+- Las operaciones comerciales aceptan `idempotencyKey`; `sale` y `payment` tienen restricciones unicas por organizacion y hash de solicitud para detectar reuse con payload distinto.
 - RBAC granular se aplica por ruta interna con permisos como `sale.create`, `payment.manual.validate`, `membership.renew` y `report.sales.read`.
-- El kiosco sigue siendo publico sin JWT interno, pero exige token temporal por sesion en `X-Self-Service-Session-Token`, rate limiting, expiracion, bloqueo por intentos y auditoria.
+- El kiosco sigue siendo publico sin JWT interno, pero exige token temporal por sesion en `X-Self-Service-Session-Token`, verificacion por contacto + fecha de nacimiento, rate limiting via puerto `RateLimiter`, expiracion, bloqueo por intentos y auditoria.
 
 Pruebas arquitectonicas:
 - Spring Modulith verifica fronteras.
 - ArchUnit bloquea dependencias de application hacia controladores HTTP.
 - ArchUnit bloquea dependencias a infraestructura de otros modulos.
-- El uso temporal de `JdbcClient` en application queda listado explicitamente hasta extraer command repositories.
+- ArchUnit bloquea que `selfservice` dependa de `memberships.application`, `clients.application` o `clients.infrastructure`.
+- ArchUnit bloquea que los eventos de negocio vuelvan a `common.events`.
+- `MembershipService` y `SelfServiceService` ya no usan `JdbcClient`; el uso temporal restante en application queda listado explicitamente hasta extraer command repositories.

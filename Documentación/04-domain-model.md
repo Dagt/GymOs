@@ -351,15 +351,20 @@ Eventos de ventas:
 - `PaymentRecordedV1`: pago manual registrado.
 - `PaymentCompletedV1`: venta cubierta por pagos completados; dispara efectos de negocio.
 - `PaymentRejectedV1`: pago rechazado con razon.
+- Paquete propietario: `com.gymos.sales.api.events`.
 
 Eventos de membresias:
 - `MembershipActivatedV1`: membresia activada por venta pagada.
 - `MembershipRenewedV1`: renovacion acumulativa procesada.
 - `MembershipPlanChangedV1`: membresia anterior cancelada y nuevo plan activado.
+- Paquete propietario: `com.gymos.memberships.api.events`.
 
 Reglas reforzadas:
 - Una membresia solo se activa desde pago completado.
 - Reprocesar `PaymentCompletedV1` no duplica efectos porque se registra `processed_domain_event`.
 - Un cambio al mismo plan es invalido.
 - Una membresia cancelada no puede renovarse.
-- El kiosco opera con sesion temporal, token aleatorio y origen auditado `SELF_SERVICE_KIOSK`.
+- El kiosco opera con sesion temporal, token aleatorio, verificacion por contacto + fecha de nacimiento y origen auditado `SELF_SERVICE_KIOSK`.
+- `selfservice` no resuelve identidad personal directamente; consume `ClientLookupOperations`.
+- Las renovaciones/cambios del kiosco se ejecutan mediante `MembershipOperations`, no por dependencia directa a la capa application de membresias.
+- Las llaves de idempotencia en ventas/pagos incluyen hash de solicitud para detectar reutilizacion con contenido distinto.

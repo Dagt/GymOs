@@ -118,6 +118,68 @@ public class ClientRepository {
 				.optional();
 	}
 
+	public Optional<SelfServiceClientRecord> verifyForSelfService(
+			UUID organizationId,
+			UUID branchId,
+			String identifier,
+			LocalDate birthDate
+	) {
+		String normalizedIdentifier = identifier == null ? "" : identifier.trim().toLowerCase();
+		return jdbcClient.sql("""
+				SELECT c.id AS client_id, p.first_name || ' ' || p.last_name AS full_name
+				FROM client c
+				JOIN person p ON p.id = c.person_id
+				WHERE c.organization_id = :organizationId
+				  AND c.status = 'ACTIVE'
+				  AND c.deleted_at IS NULL
+				  AND p.deleted_at IS NULL
+				  AND p.birth_date = :birthDate
+				  AND (
+				      LOWER(COALESCE(p.email, '')) = :identifier
+				      OR LOWER(COALESCE(p.phone, '')) = :identifier
+				  )
+				  AND EXISTS (
+				      SELECT 1
+				      FROM membership m
+				      WHERE m.organization_id = c.organization_id
+				        AND m.branch_id = :branchId
+				        AND m.client_id = c.id
+				        AND m.deleted_at IS NULL
+				  )
+				ORDER BY c.joined_at DESC
+				LIMIT 1
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("identifier", normalizedIdentifier)
+				.param("birthDate", birthDate)
+				.query((resultSet, rowNumber) -> new SelfServiceClientRecord(
+						resultSet.getObject("client_id", UUID.class),
+						resultSet.getString("full_name")
+				))
+				.optional();
+	}
+
+	public Optional<SelfServiceClientRecord> selfServiceProfile(UUID organizationId, UUID clientId) {
+		return jdbcClient.sql("""
+				SELECT c.id AS client_id, p.first_name || ' ' || p.last_name AS full_name
+				FROM client c
+				JOIN person p ON p.id = c.person_id
+				WHERE c.organization_id = :organizationId
+				  AND c.id = :clientId
+				  AND c.status = 'ACTIVE'
+				  AND c.deleted_at IS NULL
+				  AND p.deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("clientId", clientId)
+				.query((resultSet, rowNumber) -> new SelfServiceClientRecord(
+						resultSet.getObject("client_id", UUID.class),
+						resultSet.getString("full_name")
+				))
+				.optional();
+	}
+
 	public List<ClientSummary> search(UUID organizationId, String query, String status, int limit) {
 		String normalizedQuery = query == null || query.isBlank() ? null : "%" + query.trim().toLowerCase() + "%";
 		String normalizedStatus = status == null || status.isBlank() ? null : status.trim().toUpperCase();
@@ -232,5 +294,8 @@ public class ClientRepository {
 			String reason,
 			OffsetDateTime occurredAt
 	) {
+	}
+
+	public record SelfServiceClientRecord(UUID id, String fullName) {
 	}
 }

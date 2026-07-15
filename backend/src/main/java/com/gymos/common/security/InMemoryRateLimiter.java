@@ -5,12 +5,15 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 @Component
-public class InMemoryRateLimiter {
+@Profile({"test", "local"})
+public class InMemoryRateLimiter implements RateLimiter {
 	private final Map<String, Window> windows = new ConcurrentHashMap<>();
 
+	@Override
 	public void check(String key, int maxRequests, Duration windowDuration) {
 		Instant now = Instant.now();
 		Window window = windows.compute(key, (ignored, current) -> {

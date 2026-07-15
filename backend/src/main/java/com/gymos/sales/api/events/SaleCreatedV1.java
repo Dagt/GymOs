@@ -1,21 +1,18 @@
-package com.gymos.common.events;
+package com.gymos.sales.api.events;
 
 import java.io.Serializable;
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.UUID;
 
-public record PaymentCompletedV1(
+public record SaleCreatedV1(
 		String eventKey,
 		UUID organizationId,
 		UUID branchId,
 		UUID saleId,
-		UUID clientId,
 		String saleNumber,
 		String businessContext,
-		UUID contextMembershipId,
-		UUID contextTargetPlanId,
-		List<PaymentCompletedLineItemV1> items,
+		long totalCents,
+		String currency,
 		OffsetDateTime occurredAt
 ) implements Serializable {
 }

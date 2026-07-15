@@ -310,6 +310,34 @@ public class SalesRepository {
 				.optional();
 	}
 
+	public Optional<String> saleRequestHashByIdempotencyKey(UUID organizationId, String idempotencyKey) {
+		return jdbcClient.sql("""
+				SELECT idempotency_request_hash
+				FROM sale
+				WHERE organization_id = :organizationId
+				  AND idempotency_key = :idempotencyKey
+				  AND deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("idempotencyKey", idempotencyKey)
+				.query(String.class)
+				.optional();
+	}
+
+	public Optional<String> paymentRequestHashByIdempotencyKey(UUID organizationId, String idempotencyKey) {
+		return jdbcClient.sql("""
+				SELECT idempotency_request_hash
+				FROM payment
+				WHERE organization_id = :organizationId
+				  AND idempotency_key = :idempotencyKey
+				  AND deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("idempotencyKey", idempotencyKey)
+				.query(String.class)
+				.optional();
+	}
+
 	public List<SaleItemDetail> saleItems(UUID organizationId, UUID saleId) {
 		return jdbcClient.sql("""
 				SELECT id, product_id, item_type, name, quantity, unit_price_cents,

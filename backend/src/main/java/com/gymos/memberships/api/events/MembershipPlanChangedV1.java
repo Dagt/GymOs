@@ -1,4 +1,4 @@
-package com.gymos.common.events;
+package com.gymos.memberships.api.events;
 
 import java.io.Serializable;
 import java.time.LocalDate;

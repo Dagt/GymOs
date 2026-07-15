@@ -1,4 +1,6 @@
 package com.gymos.selfservice.application.command;
 
-public record VerifySessionCommand(String identifier) {
+import java.time.LocalDate;
+
+public record VerifySessionCommand(String identifier, LocalDate birthDate) {
 }

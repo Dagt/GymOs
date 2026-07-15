@@ -43,6 +43,12 @@ Nota implementada Hito 3: las acciones de renovacion y cambio de plan reciben `{
 - `POST /self-service/sessions/{sessionId}/membership-renewals/{membershipId}`
 - `POST /self-service/sessions/{sessionId}/membership-change-requests/{membershipId}`
 
+Cambio Hito 3.5 final:
+- `POST /self-service/sessions/{sessionId}/verify` ahora recibe `{ "identifier": "email o telefono", "birthDate": "YYYY-MM-DD" }`.
+- Contrato anterior: `{ "identifier": "email o telefono" }`.
+- Razon: evitar verificacion debil y reducir riesgo de enumeracion de clientes.
+- Impacto frontend: `/kiosk/[terminalCode]` solicita fecha de nacimiento y envia ambos campos.
+
 ## 6.2 Personas
 
 - `POST /persons`
@@ -219,6 +225,19 @@ Contratos HTTP preservados:
 API interna publica:
 - `SalesOperations.createMembershipRenewal(CreateMembershipRenewalSaleCommand)`
 - `SalesOperations.createMembershipPlanChange(CreateMembershipPlanChangeSaleCommand)`
+- `MembershipOperations.renew(RenewMembershipOperationCommand)`
+- `MembershipOperations.changePlan(ChangeMembershipPlanOperationCommand)`
+- `ClientLookupOperations.verifyForSelfService(VerifyClientIdentityCommand)`
+- `ClientLookupOperations.selfServiceProfile(organizationId, clientId)`
+
+Eventos internos publicos:
+- `com.gymos.sales.api.events.SaleCreatedV1`
+- `com.gymos.sales.api.events.PaymentRecordedV1`
+- `com.gymos.sales.api.events.PaymentCompletedV1`
+- `com.gymos.sales.api.events.PaymentRejectedV1`
+- `com.gymos.memberships.api.events.MembershipActivatedV1`
+- `com.gymos.memberships.api.events.MembershipRenewedV1`
+- `com.gymos.memberships.api.events.MembershipPlanChangedV1`
 
 Permisos por endpoint interno:
 - `organization.read`, `organization.update`

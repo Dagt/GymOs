@@ -1,8 +1,8 @@
 package com.gymos.selfservice.api;
 
 import com.gymos.common.api.Correlation;
-import com.gymos.memberships.application.command.ChangeMembershipPlanCommand;
-import com.gymos.memberships.application.command.RenewMembershipCommand;
+import com.gymos.memberships.api.operations.ChangeMembershipPlanOperationCommand;
+import com.gymos.memberships.api.operations.RenewMembershipOperationCommand;
 import com.gymos.selfservice.application.SelfServiceService;
 import com.gymos.selfservice.application.command.VerifySessionCommand;
 import com.gymos.selfservice.application.result.CreateSessionResult;
@@ -18,6 +18,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -139,9 +140,9 @@ public class SelfServiceController {
 		);
 	}
 
-	public record VerifySessionRequest(@NotBlank String identifier) {
+	public record VerifySessionRequest(@NotBlank String identifier, @NotNull LocalDate birthDate) {
 		private VerifySessionCommand toCommand() {
-			return new VerifySessionCommand(identifier);
+			return new VerifySessionCommand(identifier, birthDate);
 		}
 	}
 
@@ -152,8 +153,8 @@ public class SelfServiceController {
 			@Size(max = 2000) String notes,
 			@Size(max = 160) String idempotencyKey
 	) {
-		private RenewMembershipCommand toCommand() {
-			return new RenewMembershipCommand(method, reference, validateNow, notes, idempotencyKey);
+		private RenewMembershipOperationCommand toCommand() {
+			return new RenewMembershipOperationCommand(method, reference, validateNow, notes, idempotencyKey);
 		}
 	}
 
@@ -165,8 +166,8 @@ public class SelfServiceController {
 			@Size(max = 2000) String notes,
 			@Size(max = 160) String idempotencyKey
 	) {
-		private ChangeMembershipPlanCommand toCommand() {
-			return new ChangeMembershipPlanCommand(targetPlanId, method, reference, validateNow, notes, idempotencyKey);
+		private ChangeMembershipPlanOperationCommand toCommand() {
+			return new ChangeMembershipPlanOperationCommand(targetPlanId, method, reference, validateNow, notes, idempotencyKey);
 		}
 	}
 

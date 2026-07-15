@@ -279,3 +279,7 @@ Flujo:
 5. Al superar el limite, la sesion queda bloqueada temporalmente.
 6. Rate limiting protege por IP, terminal y sesion.
 7. Al cerrar sesion, no puede reutilizarse.
+
+## Anexo Hito 3.5 final
+
+Ver `Documentación/07-use-cases-hito-3-5-final.md` para la definicion vigente de verificacion segura de kiosco, idempotencia por hash de solicitud y eventos por modulo propietario.

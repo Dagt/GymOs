@@ -1,20 +1,19 @@
-package com.gymos.common.events;
+package com.gymos.sales.api.events;
 
 import java.io.Serializable;
-import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
-public record MembershipActivatedV1(
+public record PaymentRecordedV1(
 		String eventKey,
 		UUID organizationId,
 		UUID branchId,
-		UUID clientId,
-		UUID membershipId,
-		UUID planId,
 		UUID saleId,
-		LocalDate startsOn,
-		LocalDate endsOn,
+		UUID paymentId,
+		String method,
+		String status,
+		long amountCents,
+		String currency,
 		OffsetDateTime occurredAt
 ) implements Serializable {
 }

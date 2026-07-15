@@ -336,11 +336,13 @@ Regla:
 
 Columnas agregadas:
 - `sale.idempotency_key`
+- `sale.idempotency_request_hash`
 - `sale.business_context`
 - `sale.context_membership_id`
 - `sale.context_target_plan_id`
 - `sale.payment_completed_at`
 - `payment.idempotency_key`
+- `payment.idempotency_request_hash`
 - `self_service_session.session_token_hash`
 - `self_service_session.verification_attempts`
 - `self_service_session.blocked_until`
@@ -361,3 +363,4 @@ Migraciones nuevas:
 - `V2_1__demo_organization_prerequisite.sql`: garantiza que los datos demo historicos de catalogo y kiosco tengan organizacion/sucursal al migrar desde una base vacia.
 - `V6__hito3_5_architectural_stabilization.sql`: agrega idempotencia, contexto comercial, eventos procesados, seguridad de kiosco y trazabilidad de membresias.
 - `V7__permissions_and_kiosk_security.sql`: registra permisos granulares faltantes y los asigna al rol administrador.
+- `V8__idempotency_request_hashes.sql`: agrega hash de solicitud a ventas y pagos para detectar reutilizacion de idempotency key con payload distinto.

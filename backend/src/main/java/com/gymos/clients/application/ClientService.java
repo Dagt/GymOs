@@ -1,6 +1,10 @@
 package com.gymos.clients.application;
 
 import com.gymos.audit.api.AuditService;
+import com.gymos.clients.api.operations.ClientLookupOperations;
+import com.gymos.clients.api.operations.ClientVerificationResult;
+import com.gymos.clients.api.operations.SelfServiceClientProfile;
+import com.gymos.clients.api.operations.VerifyClientIdentityCommand;
 import com.gymos.clients.application.command.CreateClientCommand;
 import com.gymos.clients.application.command.UpdateClientCommand;
 import com.gymos.clients.application.result.ClientDetailResult;
@@ -12,13 +16,14 @@ import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class ClientService {
+public class ClientService implements ClientLookupOperations {
 	private final JdbcClient jdbcClient;
 	private final ClientRepository clientRepository;
 	private final AuditService auditService;
@@ -167,6 +172,28 @@ public class ClientService {
 				.update();
 		auditService.record(principal, "CLIENT_UPDATED", "CLIENT", clientId, "RECEPTION", null, correlationId);
 		return detail(principal, clientId);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public Optional<ClientVerificationResult> verifyForSelfService(VerifyClientIdentityCommand command) {
+		if (command.birthDate() == null || command.identifier() == null || command.identifier().isBlank()) {
+			return Optional.empty();
+		}
+		return clientRepository.verifyForSelfService(
+						command.organizationId(),
+						command.branchId(),
+						command.identifier(),
+						command.birthDate()
+				)
+				.map(client -> new ClientVerificationResult(client.id(), client.fullName()));
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public Optional<SelfServiceClientProfile> selfServiceProfile(UUID organizationId, UUID clientId) {
+		return clientRepository.selfServiceProfile(organizationId, clientId)
+				.map(client -> new SelfServiceClientProfile(client.id(), client.fullName()));
 	}
 
 	private void ensureUniqueContact(UUID organizationId, String email, String phone, UUID excludedPersonId) {

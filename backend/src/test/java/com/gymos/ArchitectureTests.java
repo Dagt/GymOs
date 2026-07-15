@@ -67,10 +67,8 @@ class ArchitectureTests {
 		Set<String> allowedApplicationServices = Set.of(
 				"com.gymos.catalog.application.CatalogService",
 				"com.gymos.clients.application.ClientService",
-				"com.gymos.memberships.application.MembershipService",
 				"com.gymos.organizations.application.OrganizationService",
-				"com.gymos.sales.application.SalesService",
-				"com.gymos.selfservice.application.SelfServiceService"
+				"com.gymos.sales.application.SalesService"
 		);
 
 		Set<String> actual = classes.stream()
@@ -81,6 +79,35 @@ class ArchitectureTests {
 				.collect(java.util.stream.Collectors.toSet());
 
 		assertThat(actual).isSubsetOf(allowedApplicationServices);
+	}
+
+	@Test
+	void selfServiceUsesOnlyPublicApisFromOtherModules() {
+		var violations = classes.stream()
+				.filter(javaClass -> javaClass.getPackageName().startsWith("com.gymos.selfservice."))
+				.flatMap(javaClass -> javaClass.getDirectDependenciesFromSelf().stream())
+				.filter(dependency -> {
+					String targetPackage = dependency.getTargetClass().getPackageName();
+					return targetPackage.startsWith("com.gymos.memberships.application")
+							|| targetPackage.startsWith("com.gymos.clients.application")
+							|| targetPackage.startsWith("com.gymos.clients.infrastructure");
+				})
+				.map(dependency -> dependency.getOriginClass().getName() + " -> " + dependency.getTargetClass().getName())
+				.sorted()
+				.toList();
+
+		assertThat(violations).isEmpty();
+	}
+
+	@Test
+	void commonDoesNotOwnBusinessEvents() {
+		var commonEvents = classes.stream()
+				.map(javaClass -> javaClass.getPackageName())
+				.filter(packageName -> packageName.startsWith("com.gymos.common.events"))
+				.distinct()
+				.toList();
+
+		assertThat(commonEvents).isEmpty();
 	}
 
 	private String moduleOf(String packageName) {
