@@ -166,3 +166,23 @@ Verificado localmente:
 Pendiente del Hito 2:
 
 - Sin pendientes funcionales para el alcance definido del hito.
+
+## Hito 3 - Membresias y kiosco
+
+Estado: en progreso
+
+Implementado:
+
+- Rama de trabajo `feature/hito-3-memberships-kiosk` creada desde `main` con Hito 2 integrado.
+- Modulo backend `memberships` con endpoints `GET /api/v1/clients/{clientId}/memberships` y `GET /api/v1/memberships/{membershipId}`.
+- Consulta de membresias por organizacion, sucursal activa y cliente.
+- Pantalla frontend `/clients/[clientId]` con resumen de membresias del cliente y enlace a la venta que activo cada membresia.
+
+Pendiente del Hito 3:
+
+- Renovacion acumulativa de membresia sin perder dias vigentes.
+- Cambio de plan con venta/pago y auditoria.
+- Registro tecnico de terminales de kiosco y sesiones temporales.
+- Pantalla frontend de kiosco interno con verificacion de cliente, resumen limitado, pagos pendientes, renovacion y cambio de plan.
+- Auditoria de acciones `SELF_SERVICE_KIOSK`.
+- Smoke tests Docker para flujo de renovacion y sesion de kiosco.

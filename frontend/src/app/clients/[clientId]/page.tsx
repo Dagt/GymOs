@@ -5,8 +5,10 @@ import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import {
   getClient,
+  getClientMemberships,
   getStoredSession,
   updateClient,
+  type ClientMembershipSummary,
   type ClientDetail,
   type ClientDetailResponse,
   type ClientUpdatePayload,
@@ -17,6 +19,7 @@ export default function ClientDetailPage() {
   const params = useParams<{ clientId: string }>();
   const [session, setSession] = useState<StoredSession | null>(null);
   const [data, setData] = useState<ClientDetailResponse | null>(null);
+  const [memberships, setMemberships] = useState<ClientMembershipSummary[]>([]);
   const [form, setForm] = useState<ClientUpdatePayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -38,11 +41,15 @@ export default function ClientDetailPage() {
       setLoading(true);
       setError(null);
       try {
-        const response = await getClient(storedSession.accessToken, params.clientId);
+        const [response, loadedMemberships] = await Promise.all([
+          getClient(storedSession.accessToken, params.clientId),
+          getClientMemberships(storedSession.accessToken, params.clientId),
+        ]);
         if (!active) {
           return;
         }
         setData(response);
+        setMemberships(loadedMemberships);
         setForm(toForm(response.client));
       } catch (exception) {
         if (active) {
@@ -123,50 +130,87 @@ export default function ClientDetailPage() {
       </header>
 
       <section className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[1.2fr_0.8fr]">
-        <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-semibold">Ficha base</h2>
-          <form className="mt-5 grid gap-4" onSubmit={submit}>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Nombre" value={form.firstName ?? ""} onChange={(value) => updateField("firstName", value)} />
-              <Field label="Apellido" value={form.lastName ?? ""} onChange={(value) => updateField("lastName", value)} />
-              <Field label="Telefono" value={form.phone ?? ""} onChange={(value) => updateField("phone", value)} />
-              <Field label="Email" type="email" value={form.email ?? ""} onChange={(value) => updateField("email", value)} />
-              <Field label="Fecha de nacimiento" type="date" value={form.birthDate ?? ""} onChange={(value) => updateField("birthDate", value)} />
-              <Field label="Genero" value={form.gender ?? ""} onChange={(value) => updateField("gender", value)} />
-            </div>
-            <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-              Estado
-              <select
-                className="h-11 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm outline-none transition focus:border-[#51735f]"
-                onChange={(event) => updateField("status", event.target.value)}
-                value={form.status}
+        <section className="grid gap-6">
+          <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+            <h2 className="text-xl font-semibold">Ficha base</h2>
+            <form className="mt-5 grid gap-4" onSubmit={submit}>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Nombre" value={form.firstName ?? ""} onChange={(value) => updateField("firstName", value)} />
+                <Field label="Apellido" value={form.lastName ?? ""} onChange={(value) => updateField("lastName", value)} />
+                <Field label="Telefono" value={form.phone ?? ""} onChange={(value) => updateField("phone", value)} />
+                <Field label="Email" type="email" value={form.email ?? ""} onChange={(value) => updateField("email", value)} />
+                <Field label="Fecha de nacimiento" type="date" value={form.birthDate ?? ""} onChange={(value) => updateField("birthDate", value)} />
+                <Field label="Genero" value={form.gender ?? ""} onChange={(value) => updateField("gender", value)} />
+              </div>
+              <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+                Estado
+                <select
+                  className="h-11 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm outline-none transition focus:border-[#51735f]"
+                  onChange={(event) => updateField("status", event.target.value)}
+                  value={form.status}
+                >
+                  <option value="ACTIVE">ACTIVE</option>
+                  <option value="INACTIVE">INACTIVE</option>
+                  <option value="SUSPENDED">SUSPENDED</option>
+                </select>
+              </label>
+              <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+                Notas
+                <textarea
+                  className="min-h-28 rounded-md border border-[#cdd5ca] px-3 py-2 text-sm outline-none transition focus:border-[#51735f]"
+                  onChange={(event) => updateField("notes", event.target.value)}
+                  value={form.notes ?? ""}
+                />
+              </label>
+              {error ? (
+                <p className="rounded-md border border-[#e5b7b7] bg-[#fff4f4] px-3 py-2 text-sm text-[#8c2f2f]">
+                  {error}
+                </p>
+              ) : null}
+              <button
+                className="h-11 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30] disabled:opacity-60"
+                disabled={saving}
+                type="submit"
               >
-                <option value="ACTIVE">ACTIVE</option>
-                <option value="INACTIVE">INACTIVE</option>
-                <option value="SUSPENDED">SUSPENDED</option>
-              </select>
-            </label>
-            <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-              Notas
-              <textarea
-                className="min-h-28 rounded-md border border-[#cdd5ca] px-3 py-2 text-sm outline-none transition focus:border-[#51735f]"
-                onChange={(event) => updateField("notes", event.target.value)}
-                value={form.notes ?? ""}
-              />
-            </label>
-            {error ? (
-              <p className="rounded-md border border-[#e5b7b7] bg-[#fff4f4] px-3 py-2 text-sm text-[#8c2f2f]">
-                {error}
-              </p>
-            ) : null}
-            <button
-              className="h-11 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30] disabled:opacity-60"
-              disabled={saving}
-              type="submit"
-            >
-              {saving ? "Guardando..." : "Guardar cambios"}
-            </button>
-          </form>
+                {saving ? "Guardando..." : "Guardar cambios"}
+              </button>
+            </form>
+          </section>
+
+          <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold">Membresias</h2>
+                <p className="mt-1 text-sm text-[#5d6b63]">Planes activos e historicos del cliente.</p>
+              </div>
+              <Link className="text-sm font-semibold text-[#51735f]" href="/pos">
+                Nueva venta
+              </Link>
+            </div>
+            <div className="mt-4 grid gap-3">
+              {memberships.length === 0 ? (
+                <p className="text-sm text-[#5d6b63]">Sin membresias registradas.</p>
+              ) : null}
+              {memberships.map((membership) => (
+                <article className="rounded-md border border-[#d8ddd2] px-4 py-3" key={membership.id}>
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <p className="font-semibold">{membership.planName}</p>
+                      <p className="mt-1 text-sm text-[#5d6b63]">
+                        {membershipStatusLabel(membership.status)} - {formatDay(membership.startsOn)} a {formatDay(membership.endsOn)}
+                      </p>
+                      <p className="mt-1 text-xs text-[#6f7a73]">
+                        Gracia hasta {formatDay(membership.graceEndsOn)}
+                      </p>
+                    </div>
+                    <Link className="text-sm font-semibold text-[#51735f]" href={`/sales/${membership.saleId}`}>
+                      {membership.saleNumber}
+                    </Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
         </section>
 
         <aside className="grid gap-6">
@@ -269,4 +313,20 @@ function formatDate(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function formatDay(value: string) {
+  return new Intl.DateTimeFormat("es-MX", {
+    dateStyle: "medium",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00Z`));
+}
+
+function membershipStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    ACTIVE: "Activa",
+    EXPIRED: "Expirada",
+    CANCELLED: "Cancelada",
+  };
+  return labels[status] ?? status;
 }

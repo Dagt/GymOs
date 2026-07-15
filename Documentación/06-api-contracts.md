@@ -80,6 +80,7 @@ Los endpoints de autoservicio sólo exponen acciones permitidas para clientes en
 - `POST /memberships/{id}/renew`
 - `POST /memberships/{id}/cancel`
 - `PATCH /memberships/{id}/auto-renew`
+- Nota implementada: `GET /clients/{clientId}/memberships` y `GET /memberships/{id}` exponen membresias por cliente y detalle por membresia.
 - Nota implementada: una venta pagada que incluya un producto vinculado a `membership_plan` activa una membresia.
 
 La activación ocurre como consecuencia de pago completado.

@@ -216,6 +216,11 @@ export type MembershipDetail = {
   graceEndsOn: string;
 };
 
+export type ClientMembershipSummary = MembershipDetail & {
+  saleId: string;
+  saleNumber: string;
+};
+
 export type SaleDetailResponse = {
   sale: SaleHeader;
   items: SaleItemDetail[];
@@ -388,6 +393,13 @@ export async function getClient(
   clientId: string,
 ): Promise<ClientDetailResponse> {
   return apiFetch<ClientDetailResponse>(`/clients/${clientId}`, accessToken);
+}
+
+export async function getClientMemberships(
+  accessToken: string,
+  clientId: string,
+): Promise<ClientMembershipSummary[]> {
+  return apiFetch<ClientMembershipSummary[]>(`/clients/${clientId}/memberships`, accessToken);
 }
 
 export async function updateClient(
