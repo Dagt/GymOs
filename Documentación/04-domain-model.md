@@ -230,6 +230,7 @@ Invariantes:
 - Una venta pagada no se modifica.
 - La suma de pagos debe cubrir el total.
 - Los efectos de negocio ocurren después de PaymentCompleted.
+- Una venta pagada con productos fisicos descuenta inventario mediante movimientos `Sale` idempotentes.
 
 ## 4.9 Payment
 
@@ -316,6 +317,11 @@ Movimientos:
 - Waste
 - Return
 - TransferFuture
+
+Invariantes:
+- La existencia nunca puede quedar negativa.
+- Un movimiento automatico de venta se identifica por organizacion, sucursal, venta y producto.
+- Reprocesar el mismo pago completado no puede descontar dos veces el mismo producto.
 
 ## 4.14 Workout
 

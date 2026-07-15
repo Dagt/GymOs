@@ -174,7 +174,8 @@ Pruebas arquitectonicas:
 
 Decisiones implementadas:
 - `access` gestiona dispositivos, pases temporales y bitacora de accesos manuales o evaluados por membresia.
-- `inventory` gestiona existencias y movimientos manuales con bloqueo de stock negativo.
+- `inventory` gestiona existencias, movimientos manuales y descuento automatico por ventas pagadas con bloqueo de stock negativo.
 - `bookings` gestiona recursos reservables y reservas operativas por sucursal.
 - Las reservas validan capacidad del recurso, horario operativo y traslapes de reservas activas.
+- `inventory` consume `PaymentCompletedV1` publicado por `sales` y registra movimientos `SALE` idempotentes por venta y producto.
 - Las pantallas `/access`, `/inventory` y `/bookings` son herramientas operativas para recepcion.

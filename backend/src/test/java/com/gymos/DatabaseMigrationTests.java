@@ -43,6 +43,7 @@ class DatabaseMigrationTests {
 			assertThat(tableExists(connection, "inventory_stock")).isTrue();
 			assertThat(tableExists(connection, "resource")).isTrue();
 			assertThat(tableExists(connection, "booking")).isTrue();
+			assertThat(indexExists(connection, "ux_inventory_movement_sale_product_effect")).isTrue();
 		}
 	}
 
@@ -84,6 +85,20 @@ class DatabaseMigrationTests {
 				  AND table_name = ?
 				""")) {
 			statement.setString(1, table);
+			try (var resultSet = statement.executeQuery()) {
+				return resultSet.next();
+			}
+		}
+	}
+
+	private boolean indexExists(java.sql.Connection connection, String indexName) throws Exception {
+		try (var statement = connection.prepareStatement("""
+				SELECT 1
+				FROM pg_indexes
+				WHERE schemaname = 'public'
+				  AND indexname = ?
+				""")) {
+			statement.setString(1, indexName);
 			try (var resultSet = statement.executeQuery()) {
 				return resultSet.next();
 			}

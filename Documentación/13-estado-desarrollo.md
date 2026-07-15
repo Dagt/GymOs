@@ -259,7 +259,7 @@ Riesgos residuales controlados:
 
 ## Hito 4 - Operacion del gimnasio
 
-Estado: en progreso
+Estado: completado
 
 Implementado:
 
@@ -281,12 +281,24 @@ Implementado:
 - Pantalla frontend `/inventory` para existencias, alertas, movimientos, ajustes, mermas y costo unitario.
 - Acceso directo a `/inventory` desde `/reception`.
 - Migracion Flyway `V11__hito4_resources_bookings.sql` con `resource`, `booking`, permisos de recursos/reservas y recurso demo `Consultorio evaluacion`.
+- Migracion Flyway `V12__hito4_inventory_sale_idempotency.sql` con indice unico para evitar doble descuento de inventario por venta y producto.
+- Consumidor de `PaymentCompletedV1` en inventario para descontar automaticamente productos fisicos al pagarse una venta.
+- Descuento automatico de inventario idempotente por organizacion, sucursal, venta y producto.
 - Modulo backend `bookings` con endpoints `GET /api/v1/resources`, `POST /api/v1/resources`, `GET /api/v1/resources/{resourceId}/availability`, `GET /api/v1/bookings`, `GET /api/v1/bookings/{bookingId}`, `POST /api/v1/bookings`, `POST /api/v1/bookings/{bookingId}/confirm`, `POST /api/v1/bookings/{bookingId}/check-in`, `POST /api/v1/bookings/{bookingId}/complete` y `POST /api/v1/bookings/{bookingId}/cancel`.
 - Validacion de disponibilidad por capacidad, horario del recurso y traslapes activos.
 - Pantalla frontend `/bookings` para agenda diaria, disponibilidad, creacion de recursos, creacion de reservas y transiciones operativas.
 - Acceso directo a `/bookings` desde `/reception`.
 
-Pendiente del Hito 4:
+Verificado localmente:
 
-- Inventario: descuento automatico posterior por venta.
+- Backend tests con Java 25.
+- Testcontainers PostgreSQL y Flyway hasta `V12`.
+- Spring Modulith architecture test.
+- Prueba unitaria de descuento automatico de inventario por evento de pago completado.
+- Frontend lint, typecheck y production build.
+- Docker Compose config.
+
+Pendiente fuera del alcance central del Hito 4:
+
 - Recursos y reservas: edicion de recursos, politicas avanzadas de cancelacion y cobro asociado a reservas.
+- Integracion futura con hardware real de torniquetes o lectores fisicos.

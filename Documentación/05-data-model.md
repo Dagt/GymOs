@@ -224,6 +224,8 @@ Regla:
 - reference_type
 - reference_id
 - reason
+- Los movimientos automaticos por venta usan `reference_type = SALE`, `reference_id = sale.id` y `product_id`.
+- La restriccion `ux_inventory_movement_sale_product_effect` evita descontar dos veces el mismo producto por la misma venta.
 
 ### resource
 - name
@@ -367,3 +369,4 @@ Migraciones nuevas:
 - `V9__hito4_access_control.sql`: agrega dispositivos de acceso, pases temporales y bitacora de accesos.
 - `V10__hito4_inventory.sql`: agrega existencias, movimientos de inventario y stock semilla.
 - `V11__hito4_resources_bookings.sql`: agrega recursos reservables, reservas, permisos y recurso demo.
+- `V12__hito4_inventory_sale_idempotency.sql`: agrega indice unico para movimientos automaticos de inventario por venta y producto.

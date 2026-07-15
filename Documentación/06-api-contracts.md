@@ -142,6 +142,8 @@ Nota implementada Hito 4:
 - `POST /inventory/movements` registra entradas, salidas, ajustes, mermas, devoluciones y ventas manuales; evita existencias negativas.
 - `GET /inventory/movements` lista movimientos recientes, con filtro opcional por producto.
 - `GET /inventory/low-stock` lista productos bajo minimo.
+- Cuando una venta queda pagada, `inventory` consume `PaymentCompletedV1` y descuenta automaticamente productos fisicos con movimiento `SALE`.
+- El descuento automatico es idempotente por organizacion, sucursal, venta y producto; reentregar el evento no duplica movimientos ni reduce stock de nuevo.
 
 ## 6.11 Recursos y reservas
 
@@ -232,7 +234,7 @@ Nota implementada Hito 4:
 - BOOKING_CONFLICT
 - BOOKING_NOT_ALLOWED
 - ACCESS_DENIED
-- INVENTORY_INSUFFICIENT
+- INVENTORY_STOCK_INSUFFICIENT
 - PERMISSION_DENIED
 
 ## 6.18 Cambios Hito 3.5
