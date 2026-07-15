@@ -59,16 +59,16 @@ Los endpoints de autoservicio sólo exponen acciones permitidas para clientes en
 
 ## 6.4 Productos
 
-- `POST /products`
-- `GET /products`
-- `GET /products/{id}`
-- `PATCH /products/{id}`
-- `PATCH /products/{id}/status`
+- `GET /catalog/products`
+- `POST /catalog/products`
+- `GET /products/{id}` (pendiente)
+- `PATCH /products/{id}` (pendiente)
+- `PATCH /products/{id}/status` (pendiente)
 
 ## 6.5 Planes
 
-- `POST /plans`
-- `GET /plans`
+- `GET /catalog/plans`
+- `POST /catalog/plans`
 - `GET /plans/{id}`
 - `PATCH /plans/{id}`
 - `POST /plans/{id}/archive`
@@ -80,6 +80,7 @@ Los endpoints de autoservicio sólo exponen acciones permitidas para clientes en
 - `POST /memberships/{id}/renew`
 - `POST /memberships/{id}/cancel`
 - `PATCH /memberships/{id}/auto-renew`
+- Nota implementada: una venta pagada que incluya un producto vinculado a `membership_plan` activa una membresia.
 
 La activación ocurre como consecuencia de pago completado.
 
@@ -93,22 +94,26 @@ La activación ocurre como consecuencia de pago completado.
 
 ## 6.8 Ventas
 
+- `GET /sales`
+- `GET /sales/reports/summary`
 - `POST /sales`
 - `GET /sales/{id}`
-- `POST /sales/{id}/items`
-- `DELETE /sales/{id}/items/{itemId}`
-- `POST /sales/{id}/apply-benefit`
-- `POST /sales/{id}/checkout`
-- `POST /sales/{id}/cancel`
-- `POST /sales/{id}/refund`
+- `POST /sales/{id}/items` (pendiente)
+- `DELETE /sales/{id}/items/{itemId}` (pendiente)
+- `POST /sales/{id}/apply-benefit` (pendiente)
+- `POST /sales/{id}/checkout` (pendiente)
+- `POST /sales/{id}/cancel` (pendiente)
+- `POST /sales/{id}/refund` (pendiente)
 
 ## 6.9 Pagos
 
 - `POST /sales/{saleId}/payments`
-- `POST /payments/{id}/approve`
-- `POST /payments/{id}/reject`
-- `GET /payments`
-- `GET /payments/{id}`
+- `POST /sales/payments/{paymentId}/validate`
+- `POST /sales/payments/{paymentId}/receipt`
+- `POST /sales/payments/{paymentId}/reject`
+- `POST /payments/{id}/approve` (pendiente)
+- `GET /payments` (pendiente)
+- `GET /payments/{id}` (pendiente)
 
 ## 6.10 Inventario
 

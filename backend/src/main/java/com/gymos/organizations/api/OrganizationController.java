@@ -1,0 +1,85 @@
+package com.gymos.organizations.api;
+
+import com.gymos.common.api.Correlation;
+import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.organizations.application.OrganizationService;
+import com.gymos.organizations.infrastructure.OrganizationQueryRepository.BranchSummary;
+import com.gymos.organizations.infrastructure.OrganizationQueryRepository.OrganizationSummary;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import java.util.List;
+import java.util.UUID;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/api/v1/organizations")
+public class OrganizationController {
+	private final OrganizationService organizationService;
+
+	public OrganizationController(OrganizationService organizationService) {
+		this.organizationService = organizationService;
+	}
+
+	@GetMapping("/current")
+	OrganizationSummary current(@AuthenticationPrincipal GymOsPrincipal principal) {
+		return organizationService.current(principal);
+	}
+
+	@GetMapping("/current/branches")
+	List<BranchSummary> branches(@AuthenticationPrincipal GymOsPrincipal principal) {
+		return organizationService.branches(principal);
+	}
+
+	@PutMapping("/current")
+	OrganizationSummary updateOrganization(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@Valid @RequestBody OrganizationUpdateRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return organizationService.updateOrganization(principal, request, correlationId(servletRequest));
+	}
+
+	@PutMapping("/current/branches/{branchId}")
+	BranchSummary updateBranch(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID branchId,
+			@Valid @RequestBody BranchUpdateRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return organizationService.updateBranch(principal, branchId, request, correlationId(servletRequest));
+	}
+
+	private String correlationId(HttpServletRequest request) {
+		Object value = request.getAttribute(Correlation.ATTRIBUTE);
+		return value == null ? "unknown" : value.toString();
+	}
+
+	public record OrganizationUpdateRequest(
+			@NotBlank @Size(max = 180) String legalName,
+			@NotBlank @Size(max = 120) String tradeName,
+			@Size(max = 64) String taxId,
+			@NotBlank @Size(max = 64) String timezone,
+			@NotBlank @Pattern(regexp = "[A-Za-z]{3}") String defaultCurrency,
+			@Email @Size(max = 180) String contactEmail,
+			@Size(max = 32) String contactPhone
+	) {
+	}
+
+	public record BranchUpdateRequest(
+			@NotBlank @Size(max = 120) String name,
+			@NotBlank @Size(max = 32) String code,
+			@NotBlank @Size(max = 64) String timezone,
+			@Size(max = 32) String phone
+	) {
+	}
+}

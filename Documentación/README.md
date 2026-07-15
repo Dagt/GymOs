@@ -20,6 +20,7 @@ GymOS es una plataforma web modular para la administración integral de gimnasio
 10. `10-ai-development.md` — Estrategia de desarrollo asistido por IA y prompts maestros.
 11. `11-roadmap.md` — Orden de implementación, épicas y entregables.
 12. `12-decisiones-fundacionales.md` — Decisiones confirmadas sobre producto vendible, multi-organización, sucursales, primer hito, seguridad, pagos e infraestructura local.
+13. `13-estado-desarrollo.md` — Estado de implementacion por hito, verificaciones y bloqueos locales.
 
 ## Alcance de la versión 1
 
