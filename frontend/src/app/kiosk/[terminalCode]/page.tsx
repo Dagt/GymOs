@@ -7,6 +7,7 @@ import {
   createKioskSession,
   endKioskSession,
   getKioskMembershipOptions,
+  getKioskSummary,
   renewMembershipFromKiosk,
   verifyKioskSession,
   type KioskMembership,
@@ -64,8 +65,8 @@ export default function KioskPage() {
     setError(null);
     setMessage(null);
     try {
-      const nextSummary = await verifyKioskSession(session.sessionId, identifier);
-      const options = await getKioskMembershipOptions(session.sessionId);
+      const nextSummary = await verifyKioskSession(session.sessionId, session.sessionToken, identifier);
+      const options = await getKioskMembershipOptions(session.sessionId, session.sessionToken);
       setSummary(nextSummary);
       setPlans(options);
       setTargetPlanId(options[0]?.id ?? "");
@@ -82,13 +83,14 @@ export default function KioskPage() {
     setError(null);
     setMessage(null);
     try {
-      const response = await renewMembershipFromKiosk(session.sessionId, membership.id, {
+      const response = await renewMembershipFromKiosk(session.sessionId, session.sessionToken, membership.id, {
         method: "CASH",
         reference,
         validateNow: true,
         notes: "Renovacion desde kiosco",
+        idempotencyKey: operationKey("kiosk-renewal", session.sessionId, membership.id),
       });
-      setSummary(await verifyKioskSession(session.sessionId, identifier));
+      setSummary(await getKioskSummary(session.sessionId, session.sessionToken));
       setMessage(response.membership ? `Renovada hasta ${formatDay(response.membership.endsOn)}.` : "Pago pendiente.");
       setReference("");
     } catch (exception) {
@@ -106,14 +108,15 @@ export default function KioskPage() {
     setError(null);
     setMessage(null);
     try {
-      const response = await changeMembershipPlanFromKiosk(session.sessionId, membership.id, {
+      const response = await changeMembershipPlanFromKiosk(session.sessionId, session.sessionToken, membership.id, {
         targetPlanId,
         method: "CASH",
         reference,
         validateNow: true,
         notes: "Cambio de plan desde kiosco",
+        idempotencyKey: operationKey("kiosk-plan-change", session.sessionId, membership.id, targetPlanId),
       });
-      setSummary(await verifyKioskSession(session.sessionId, identifier));
+      setSummary(await getKioskSummary(session.sessionId, session.sessionToken));
       setMessage(response.membership ? `Nuevo plan activo: ${response.membership.planName}.` : "Solicitud registrada.");
       setReference("");
     } catch (exception) {
@@ -125,7 +128,7 @@ export default function KioskPage() {
 
   async function end() {
     if (session) {
-      await endKioskSession(session.sessionId).catch(() => undefined);
+      await endKioskSession(session.sessionId, session.sessionToken).catch(() => undefined);
     }
     setSummary(null);
     setIdentifier("");
@@ -294,4 +297,9 @@ function formatTime(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function operationKey(...parts: string[]) {
+  const random = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`;
+  return [...parts, random].join(":");
 }

@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -49,19 +50,26 @@ public class SelfServiceController {
 	SelfServiceSummaryResponse verify(
 			@PathVariable UUID sessionId,
 			@Valid @RequestBody VerifySessionRequest request,
+			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken,
 			HttpServletRequest servletRequest
 	) {
-		return toResponse(selfServiceService.verify(sessionId, request.toCommand(), correlationId(servletRequest)));
+		return toResponse(selfServiceService.verify(sessionId, sessionToken, request.toCommand(), correlationId(servletRequest), servletRequest.getRemoteAddr()));
 	}
 
 	@GetMapping("/sessions/{sessionId}/summary")
-	SelfServiceSummaryResponse summary(@PathVariable UUID sessionId) {
-		return toResponse(selfServiceService.summary(sessionId));
+	SelfServiceSummaryResponse summary(
+			@PathVariable UUID sessionId,
+			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken
+	) {
+		return toResponse(selfServiceService.summary(sessionId, sessionToken));
 	}
 
 	@GetMapping("/sessions/{sessionId}/membership-options")
-	List<PlanOptionRecord> membershipOptions(@PathVariable UUID sessionId) {
-		return selfServiceService.membershipOptions(sessionId);
+	List<PlanOptionRecord> membershipOptions(
+			@PathVariable UUID sessionId,
+			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken
+	) {
+		return selfServiceService.membershipOptions(sessionId, sessionToken);
 	}
 
 	@PostMapping("/sessions/{sessionId}/membership-renewals/{membershipId}")
@@ -69,9 +77,10 @@ public class SelfServiceController {
 			@PathVariable UUID sessionId,
 			@PathVariable UUID membershipId,
 			@Valid @RequestBody RenewMembershipRequest request,
+			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken,
 			HttpServletRequest servletRequest
 	) {
-		return toResponse(selfServiceService.renew(sessionId, membershipId, request.toCommand(), correlationId(servletRequest)));
+		return toResponse(selfServiceService.renew(sessionId, sessionToken, membershipId, request.toCommand(), correlationId(servletRequest), servletRequest.getRemoteAddr()));
 	}
 
 	@PostMapping("/sessions/{sessionId}/membership-change-requests/{membershipId}")
@@ -79,21 +88,29 @@ public class SelfServiceController {
 			@PathVariable UUID sessionId,
 			@PathVariable UUID membershipId,
 			@Valid @RequestBody ChangePlanRequest request,
+			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken,
 			HttpServletRequest servletRequest
 	) {
-		return toResponse(selfServiceService.changePlan(sessionId, membershipId, request.toCommand(), correlationId(servletRequest)));
+		return toResponse(selfServiceService.changePlan(sessionId, sessionToken, membershipId, request.toCommand(), correlationId(servletRequest), servletRequest.getRemoteAddr()));
 	}
 
 	@PostMapping("/sessions/{sessionId}/end")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
-	void end(@PathVariable UUID sessionId, HttpServletRequest servletRequest) {
-		selfServiceService.end(sessionId, correlationId(servletRequest));
+	void end(
+			@PathVariable UUID sessionId,
+			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken,
+			HttpServletRequest servletRequest
+	) {
+		selfServiceService.end(sessionId, sessionToken, correlationId(servletRequest));
 	}
 
 	@PatchMapping("/sessions/{sessionId}/contact-data")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
-	void contactDataPlaceholder(@PathVariable UUID sessionId) {
-		selfServiceService.summary(sessionId);
+	void contactDataPlaceholder(
+			@PathVariable UUID sessionId,
+			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken
+	) {
+		selfServiceService.summary(sessionId, sessionToken);
 	}
 
 	private String correlationId(HttpServletRequest request) {
@@ -102,7 +119,7 @@ public class SelfServiceController {
 	}
 
 	private CreateSessionResponse toResponse(CreateSessionResult result) {
-		return new CreateSessionResponse(result.sessionId(), result.terminalName(), result.expiresAt(), result.verified());
+		return new CreateSessionResponse(result.sessionId(), result.sessionToken(), result.terminalName(), result.expiresAt(), result.verified());
 	}
 
 	private SelfServiceSummaryResponse toResponse(SelfServiceSummaryResult result) {
@@ -155,6 +172,7 @@ public class SelfServiceController {
 
 	public record CreateSessionResponse(
 			UUID sessionId,
+			String sessionToken,
 			String terminalName,
 			OffsetDateTime expiresAt,
 			boolean verified

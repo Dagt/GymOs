@@ -226,6 +226,7 @@ export type RenewMembershipPayload = {
   reference?: string | null;
   validateNow: boolean;
   notes?: string | null;
+  idempotencyKey?: string | null;
 };
 
 export type ChangeMembershipPlanPayload = RenewMembershipPayload & {
@@ -276,6 +277,7 @@ export type KioskPlanOption = {
 
 export type KioskSessionResponse = {
   sessionId: string;
+  sessionToken: string;
   terminalName: string;
   expiresAt: string;
   verified: boolean;
@@ -360,6 +362,7 @@ export type ManualPaymentPayload = {
   receiptObjectKey?: string | null;
   validateNow: boolean;
   notes?: string | null;
+  idempotencyKey?: string | null;
 };
 
 export type CreateSalePayload = {
@@ -368,6 +371,7 @@ export type CreateSalePayload = {
   discountCents: number;
   notes?: string | null;
   payment?: ManualPaymentPayload | null;
+  idempotencyKey?: string | null;
 };
 
 export async function login(username: string, password: string): Promise<AuthResponse> {
@@ -477,7 +481,7 @@ export async function renewMembership(
 ): Promise<RenewMembershipResponse> {
   return apiFetch<RenewMembershipResponse>(`/memberships/${membershipId}/renew`, accessToken, {
     method: "POST",
-    body: JSON.stringify(normalizePayload(payload)),
+    body: JSON.stringify(normalizePayload(withIdempotency(payload, "membership-renewal", membershipId))),
   });
 }
 
@@ -488,7 +492,7 @@ export async function changeMembershipPlan(
 ): Promise<RenewMembershipResponse> {
   return apiFetch<RenewMembershipResponse>(`/memberships/${membershipId}/change-plan`, accessToken, {
     method: "POST",
-    body: JSON.stringify(normalizePayload(payload)),
+    body: JSON.stringify(normalizePayload(withIdempotency(payload, "membership-plan-change", membershipId))),
   });
 }
 
@@ -498,46 +502,56 @@ export async function createKioskSession(terminalCode: string): Promise<KioskSes
   });
 }
 
-export async function verifyKioskSession(sessionId: string, identifier: string): Promise<KioskSummaryResponse> {
+export async function verifyKioskSession(sessionId: string, sessionToken: string, identifier: string): Promise<KioskSummaryResponse> {
   return publicApiFetch<KioskSummaryResponse>(`/self-service/sessions/${sessionId}/verify`, {
     method: "POST",
+    headers: kioskSessionHeaders(sessionToken),
     body: JSON.stringify({ identifier }),
   });
 }
 
-export async function getKioskSummary(sessionId: string): Promise<KioskSummaryResponse> {
-  return publicApiFetch<KioskSummaryResponse>(`/self-service/sessions/${sessionId}/summary`);
+export async function getKioskSummary(sessionId: string, sessionToken: string): Promise<KioskSummaryResponse> {
+  return publicApiFetch<KioskSummaryResponse>(`/self-service/sessions/${sessionId}/summary`, {
+    headers: kioskSessionHeaders(sessionToken),
+  });
 }
 
-export async function getKioskMembershipOptions(sessionId: string): Promise<KioskPlanOption[]> {
-  return publicApiFetch<KioskPlanOption[]>(`/self-service/sessions/${sessionId}/membership-options`);
+export async function getKioskMembershipOptions(sessionId: string, sessionToken: string): Promise<KioskPlanOption[]> {
+  return publicApiFetch<KioskPlanOption[]>(`/self-service/sessions/${sessionId}/membership-options`, {
+    headers: kioskSessionHeaders(sessionToken),
+  });
 }
 
 export async function renewMembershipFromKiosk(
   sessionId: string,
+  sessionToken: string,
   membershipId: string,
   payload: RenewMembershipPayload,
 ): Promise<RenewMembershipResponse> {
   return publicApiFetch<RenewMembershipResponse>(`/self-service/sessions/${sessionId}/membership-renewals/${membershipId}`, {
     method: "POST",
+    headers: kioskSessionHeaders(sessionToken),
     body: JSON.stringify(normalizePayload(payload)),
   });
 }
 
 export async function changeMembershipPlanFromKiosk(
   sessionId: string,
+  sessionToken: string,
   membershipId: string,
   payload: ChangeMembershipPlanPayload,
 ): Promise<RenewMembershipResponse> {
   return publicApiFetch<RenewMembershipResponse>(`/self-service/sessions/${sessionId}/membership-change-requests/${membershipId}`, {
     method: "POST",
+    headers: kioskSessionHeaders(sessionToken),
     body: JSON.stringify(normalizePayload(payload)),
   });
 }
 
-export async function endKioskSession(sessionId: string): Promise<void> {
+export async function endKioskSession(sessionId: string, sessionToken: string): Promise<void> {
   await publicApiFetch<void>(`/self-service/sessions/${sessionId}/end`, {
     method: "POST",
+    headers: kioskSessionHeaders(sessionToken),
   });
 }
 
@@ -596,7 +610,7 @@ export async function createSale(
 ): Promise<SaleDetailResponse> {
   return apiFetch<SaleDetailResponse>("/sales", accessToken, {
     method: "POST",
-    body: JSON.stringify(normalizePayload(payload)),
+    body: JSON.stringify(normalizePayload(withIdempotency(payload, "sale"))),
   });
 }
 
@@ -614,7 +628,7 @@ export async function addManualPayment(
 ): Promise<SaleDetailResponse> {
   return apiFetch<SaleDetailResponse>(`/sales/${saleId}/payments`, accessToken, {
     method: "POST",
-    body: JSON.stringify(normalizePayload(payload)),
+    body: JSON.stringify(normalizePayload(withIdempotency(payload, "manual-payment", saleId))),
   });
 }
 
@@ -685,12 +699,33 @@ export function clearSession() {
 }
 
 function normalizePayload<T extends Record<string, unknown>>(payload: T): T {
-  return Object.fromEntries(
-    Object.entries(payload).map(([key, value]) => [
-      key,
-      typeof value === "string" && value.trim() === "" ? null : value,
+	return Object.fromEntries(
+		Object.entries(payload).map(([key, value]) => [
+			key,
+			typeof value === "string" && value.trim() === "" ? null : value,
     ]),
-  ) as T;
+	) as T;
+}
+
+function kioskSessionHeaders(sessionToken: string): HeadersInit {
+	return {
+		"X-Self-Service-Session-Token": sessionToken,
+	};
+}
+
+function withIdempotency<T extends { idempotencyKey?: string | null }>(payload: T, ...parts: string[]): T {
+  if (payload.idempotencyKey) {
+    return payload;
+  }
+  return {
+    ...payload,
+    idempotencyKey: operationKey(...parts),
+  };
+}
+
+function operationKey(...parts: string[]) {
+  const random = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`;
+  return [...parts, random].join(":");
 }
 
 async function apiFetch<T>(

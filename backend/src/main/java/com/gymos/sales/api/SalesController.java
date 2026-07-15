@@ -143,7 +143,8 @@ public class SalesController {
 			@NotEmpty List<@Valid SaleItemRequest> items,
 			@Min(0) long discountCents,
 			@Size(max = 2000) String notes,
-			@Valid ManualPaymentRequest payment
+			@Valid ManualPaymentRequest payment,
+			@Size(max = 160) String idempotencyKey
 	) {
 		private CreateSaleCommand toCommand() {
 			return new CreateSaleCommand(
@@ -151,7 +152,8 @@ public class SalesController {
 					items.stream().map(SaleItemRequest::toCommand).toList(),
 					discountCents,
 					notes,
-					payment == null ? null : payment.toCommand()
+					payment == null ? null : payment.toCommand(),
+					idempotencyKey
 			);
 		}
 	}

@@ -362,7 +362,7 @@ public class MembershipService {
 	}
 
 	private String defaultIdempotencyKey(String operation, UUID membershipId, String provided) {
-		return provided == null || provided.isBlank() ? operation + ":" + membershipId : provided.trim();
+		return provided == null || provided.isBlank() ? operation + ":" + membershipId + ":" + UUID.randomUUID() : provided.trim();
 	}
 
 	private void requireBranch(GymOsPrincipal principal) {

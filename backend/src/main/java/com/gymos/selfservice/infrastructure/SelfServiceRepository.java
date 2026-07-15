@@ -39,7 +39,8 @@ public class SelfServiceRepository {
 	public Optional<SessionRecord> session(UUID sessionId) {
 		return jdbcClient.sql("""
 				SELECT id, organization_id, branch_id, terminal_id, client_id,
-				       status, started_at, expires_at, ended_at, verification_method
+				       status, started_at, expires_at, ended_at, verification_method,
+				       session_token_hash, verification_attempts, blocked_until
 				FROM self_service_session
 				WHERE id = :sessionId
 				  AND deleted_at IS NULL
@@ -55,7 +56,10 @@ public class SelfServiceRepository {
 						resultSet.getObject("started_at", OffsetDateTime.class),
 						resultSet.getObject("expires_at", OffsetDateTime.class),
 						resultSet.getObject("ended_at", OffsetDateTime.class),
-						resultSet.getString("verification_method")
+						resultSet.getString("verification_method"),
+						resultSet.getString("session_token_hash"),
+						resultSet.getInt("verification_attempts"),
+						resultSet.getObject("blocked_until", OffsetDateTime.class)
 				))
 				.optional();
 	}
@@ -186,7 +190,10 @@ public class SelfServiceRepository {
 			OffsetDateTime startedAt,
 			OffsetDateTime expiresAt,
 			OffsetDateTime endedAt,
-			String verificationMethod
+			String verificationMethod,
+			String sessionTokenHash,
+			int verificationAttempts,
+			OffsetDateTime blockedUntil
 	) {
 	}
 

@@ -108,6 +108,12 @@ public class SalesService implements SalesOperations {
 	@Transactional
 	public SaleDetailResult create(GymOsPrincipal principal, CreateSaleCommand request, String correlationId) {
 		requireBranch(principal);
+		if (request.idempotencyKey() != null && !request.idempotencyKey().isBlank()) {
+			var existing = salesRepository.saleHeaderByIdempotencyKey(principal.organizationId(), request.idempotencyKey().trim());
+			if (existing.isPresent()) {
+				return detail(principal, existing.get().id());
+			}
+		}
 		if (request.clientId() != null && !salesRepository.clientExists(principal.organizationId(), request.clientId())) {
 			throw new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible.");
 		}
@@ -158,12 +164,14 @@ public class SalesService implements SalesOperations {
 				INSERT INTO sale (
 				    id, organization_id, branch_id, client_id, sale_number, status,
 				    subtotal_cents, discount_cents, total_cents, paid_cents, balance_cents,
-				    currency, notes, sold_at, created_at, updated_at, created_by, updated_by, version
+				    currency, notes, sold_at, created_at, updated_at, created_by, updated_by, version,
+				    idempotency_key
 				)
 				VALUES (
 				    :id, :organizationId, :branchId, :clientId, :saleNumber, 'PENDING_PAYMENT',
 				    :subtotalCents, :discountCents, :totalCents, 0, :balanceCents,
-				    :currency, :notes, :soldAt, :createdAt, :updatedAt, :createdBy, :updatedBy, 0
+				    :currency, :notes, :soldAt, :createdAt, :updatedAt, :createdBy, :updatedBy, 0,
+				    :idempotencyKey
 				)
 				""")
 				.param("id", saleId)
@@ -182,6 +190,7 @@ public class SalesService implements SalesOperations {
 				.param("updatedAt", now)
 				.param("createdBy", principal.userId())
 				.param("updatedBy", principal.userId())
+				.param("idempotencyKey", blankToNull(request.idempotencyKey()))
 				.update();
 
 		for (var item : request.items()) {
@@ -550,6 +559,15 @@ public class SalesService implements SalesOperations {
 			String correlationId
 	) {
 		SaleHeader sale = ensureSale(principal, saleId);
+		if (request.idempotencyKey() != null && !request.idempotencyKey().isBlank()) {
+			UUID existingSaleId = paymentSaleByIdempotencyKey(principal.organizationId(), request.idempotencyKey().trim());
+			if (existingSaleId != null) {
+				if (!existingSaleId.equals(saleId)) {
+					throw new BusinessException("IDEMPOTENCY_KEY_REUSED", "La llave de idempotencia ya fue usada en otra venta.");
+				}
+				return;
+			}
+		}
 		if (request.amountCents() <= 0) {
 			throw new BusinessException("PAYMENT_AMOUNT_INVALID", "El pago debe ser mayor a cero.");
 		}
@@ -561,12 +579,14 @@ public class SalesService implements SalesOperations {
 				INSERT INTO payment (
 				    id, organization_id, branch_id, sale_id, client_id, method, status,
 				    amount_cents, currency, reference, receipt_object_key, received_at,
-				    validated_at, validated_by, notes, created_at, updated_at, created_by, updated_by, version
+				    validated_at, validated_by, notes, created_at, updated_at, created_by, updated_by, version,
+				    idempotency_key
 				)
 				VALUES (
 				    :id, :organizationId, :branchId, :saleId, :clientId, :method, :status,
 				    :amountCents, :currency, :reference, :receiptObjectKey, :receivedAt,
-				    :validatedAt, :validatedBy, :notes, :createdAt, :updatedAt, :createdBy, :updatedBy, 0
+				    :validatedAt, :validatedBy, :notes, :createdAt, :updatedAt, :createdBy, :updatedBy, 0,
+				    :idempotencyKey
 				)
 				""")
 				.param("id", paymentId)
@@ -588,9 +608,25 @@ public class SalesService implements SalesOperations {
 				.param("updatedAt", now)
 				.param("createdBy", principal.userId())
 				.param("updatedBy", principal.userId())
+				.param("idempotencyKey", blankToNull(request.idempotencyKey()))
 				.update();
 		auditService.record(principal, "PAYMENT_RECORDED", "PAYMENT", paymentId, "POS", null, correlationId);
 		eventPublisher.publishEvent(new PaymentRecordedV1("payment-recorded:" + paymentId, principal.organizationId(), principal.branchId(), saleId, paymentId, method, status, request.amountCents(), sale.currency(), now));
+	}
+
+	private UUID paymentSaleByIdempotencyKey(UUID organizationId, String idempotencyKey) {
+		return jdbcClient.sql("""
+				SELECT sale_id
+				FROM payment
+				WHERE organization_id = :organizationId
+				  AND idempotency_key = :idempotencyKey
+				  AND deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("idempotencyKey", idempotencyKey)
+				.query(UUID.class)
+				.optional()
+				.orElse(null);
 	}
 
 	private void recalculateSale(UUID organizationId, UUID saleId, UUID userId) {

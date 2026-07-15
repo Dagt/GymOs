@@ -8,6 +8,7 @@ public record CreateSaleCommand(
 		List<SaleItemCommand> items,
 		long discountCents,
 		String notes,
-		ManualPaymentCommand payment
+		ManualPaymentCommand payment,
+		String idempotencyKey
 ) {
 }

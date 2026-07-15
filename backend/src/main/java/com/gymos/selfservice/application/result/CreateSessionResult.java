@@ -5,6 +5,7 @@ import java.util.UUID;
 
 public record CreateSessionResult(
 		UUID sessionId,
+		String sessionToken,
 		String terminalName,
 		OffsetDateTime expiresAt,
 		boolean verified

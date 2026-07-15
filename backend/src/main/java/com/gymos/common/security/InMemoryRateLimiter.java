@@ -1,0 +1,32 @@
+package com.gymos.common.security;
+
+import com.gymos.common.api.BusinessException;
+import java.time.Duration;
+import java.time.Instant;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import org.springframework.stereotype.Component;
+
+@Component
+public class InMemoryRateLimiter {
+	private final Map<String, Window> windows = new ConcurrentHashMap<>();
+
+	public void check(String key, int maxRequests, Duration windowDuration) {
+		Instant now = Instant.now();
+		Window window = windows.compute(key, (ignored, current) -> {
+			if (current == null || now.isAfter(current.startedAt().plus(windowDuration))) {
+				return new Window(now, 1);
+			}
+			return new Window(current.startedAt(), current.count() + 1);
+		});
+		if (window.count() > maxRequests) {
+			throw new BusinessException("RATE_LIMIT_EXCEEDED", "Demasiados intentos. Espera un momento y vuelve a intentar.");
+		}
+		if (windows.size() > 10_000) {
+			windows.entrySet().removeIf(entry -> now.isAfter(entry.getValue().startedAt().plus(windowDuration.multipliedBy(2))));
+		}
+	}
+
+	private record Window(Instant startedAt, int count) {
+	}
+}
