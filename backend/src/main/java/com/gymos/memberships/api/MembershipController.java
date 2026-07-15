@@ -5,6 +5,7 @@ import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.memberships.application.command.ChangeMembershipPlanCommand;
 import com.gymos.memberships.application.command.RenewMembershipCommand;
 import com.gymos.memberships.application.result.MembershipSaleResult;
+import com.gymos.memberships.application.result.MembershipSummaryResult;
 import com.gymos.memberships.application.MembershipService;
 import com.gymos.memberships.infrastructure.MembershipRepository.MembershipSummary;
 import jakarta.servlet.http.HttpServletRequest;
@@ -105,7 +106,7 @@ public class MembershipController {
 			long paidCents,
 			long balanceCents,
 			String currency,
-			MembershipSummary membership
+			MembershipSummaryResult membership
 	) {
 	}
 

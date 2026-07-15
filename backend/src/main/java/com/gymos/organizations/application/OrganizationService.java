@@ -3,8 +3,8 @@ package com.gymos.organizations.application;
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
-import com.gymos.organizations.api.OrganizationController.BranchUpdateRequest;
-import com.gymos.organizations.api.OrganizationController.OrganizationUpdateRequest;
+import com.gymos.organizations.application.command.UpdateBranchCommand;
+import com.gymos.organizations.application.command.UpdateOrganizationCommand;
 import com.gymos.organizations.infrastructure.OrganizationQueryRepository;
 import com.gymos.organizations.infrastructure.OrganizationQueryRepository.BranchSummary;
 import com.gymos.organizations.infrastructure.OrganizationQueryRepository.OrganizationSummary;
@@ -50,7 +50,7 @@ public class OrganizationService {
 	@Transactional
 	public OrganizationSummary updateOrganization(
 			GymOsPrincipal principal,
-			OrganizationUpdateRequest request,
+			UpdateOrganizationCommand request,
 			String correlationId
 	) {
 		requirePrincipal(principal);
@@ -89,7 +89,7 @@ public class OrganizationService {
 	public BranchSummary updateBranch(
 			GymOsPrincipal principal,
 			UUID branchId,
-			BranchUpdateRequest request,
+			UpdateBranchCommand request,
 			String correlationId
 	) {
 		requirePrincipal(principal);

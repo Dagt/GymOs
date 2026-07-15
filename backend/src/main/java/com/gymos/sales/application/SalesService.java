@@ -9,13 +9,13 @@ import com.gymos.common.events.PaymentRejectedV1;
 import com.gymos.common.events.SaleCreatedV1;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.storage.ObjectStorageService;
-import com.gymos.sales.api.SalesController.CreateSaleRequest;
-import com.gymos.sales.api.SalesController.ManualPaymentRequest;
-import com.gymos.sales.api.SalesController.SaleDetailResponse;
-import com.gymos.sales.api.SalesController.SalesReportResponse;
 import com.gymos.sales.api.operations.CreateMembershipPlanChangeSaleCommand;
 import com.gymos.sales.api.operations.CreateMembershipRenewalSaleCommand;
 import com.gymos.sales.api.operations.SalesOperations;
+import com.gymos.sales.application.command.CreateSaleCommand;
+import com.gymos.sales.application.command.ManualPaymentCommand;
+import com.gymos.sales.application.result.SaleDetailResult;
+import com.gymos.sales.application.result.SalesReportResult;
 import com.gymos.sales.infrastructure.SalesRepository;
 import com.gymos.sales.infrastructure.SalesRepository.PaymentDetail;
 import com.gymos.sales.infrastructure.SalesRepository.ProductForSale;
@@ -66,7 +66,7 @@ public class SalesService implements SalesOperations {
 	}
 
 	@Transactional(readOnly = true)
-	public SalesReportResponse report(GymOsPrincipal principal, LocalDate fromDate, LocalDate toDate) {
+	public SalesReportResult report(GymOsPrincipal principal, LocalDate fromDate, LocalDate toDate) {
 		requireBranch(principal);
 		LocalDate resolvedTo = toDate == null ? LocalDate.now() : toDate;
 		LocalDate resolvedFrom = fromDate == null ? resolvedTo.minusDays(6) : fromDate;
@@ -80,7 +80,7 @@ public class SalesService implements SalesOperations {
 		OffsetDateTime from = resolvedFrom.atStartOfDay().atOffset(ZoneOffset.UTC);
 		OffsetDateTime toExclusive = resolvedTo.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
 		var sales = salesRepository.salesReportTotals(principal.organizationId(), principal.branchId(), from, toExclusive);
-		return new SalesReportResponse(
+		return new SalesReportResult(
 				resolvedFrom,
 				resolvedTo,
 				sales.currency(),
@@ -93,11 +93,11 @@ public class SalesService implements SalesOperations {
 	}
 
 	@Transactional(readOnly = true)
-	public SaleDetailResponse detail(GymOsPrincipal principal, UUID saleId) {
+	public SaleDetailResult detail(GymOsPrincipal principal, UUID saleId) {
 		requirePrincipal(principal);
 		SaleHeader sale = salesRepository.saleHeader(principal.organizationId(), saleId)
 				.orElseThrow(() -> new BusinessException("SALE_NOT_FOUND", "La venta no existe o no esta disponible."));
-		return new SaleDetailResponse(
+		return new SaleDetailResult(
 				sale,
 				salesRepository.saleItems(principal.organizationId(), saleId),
 				salesRepository.payments(principal.organizationId(), saleId),
@@ -106,7 +106,7 @@ public class SalesService implements SalesOperations {
 	}
 
 	@Transactional
-	public SaleDetailResponse create(GymOsPrincipal principal, CreateSaleRequest request, String correlationId) {
+	public SaleDetailResult create(GymOsPrincipal principal, CreateSaleCommand request, String correlationId) {
 		requireBranch(principal);
 		if (request.clientId() != null && !salesRepository.clientExists(principal.organizationId(), request.clientId())) {
 			throw new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible.");
@@ -410,10 +410,10 @@ public class SalesService implements SalesOperations {
 	}
 
 	@Transactional
-	public SaleDetailResponse addPayment(
+	public SaleDetailResult addPayment(
 			GymOsPrincipal principal,
 			UUID saleId,
-			ManualPaymentRequest request,
+			ManualPaymentCommand request,
 			String correlationId
 	) {
 		requireBranch(principal);
@@ -424,7 +424,7 @@ public class SalesService implements SalesOperations {
 	}
 
 	@Transactional
-	public SaleDetailResponse uploadReceipt(
+	public SaleDetailResult uploadReceipt(
 			GymOsPrincipal principal,
 			UUID paymentId,
 			MultipartFile file,
@@ -467,7 +467,7 @@ public class SalesService implements SalesOperations {
 	}
 
 	@Transactional
-	public SaleDetailResponse validatePayment(GymOsPrincipal principal, UUID paymentId, String correlationId) {
+	public SaleDetailResult validatePayment(GymOsPrincipal principal, UUID paymentId, String correlationId) {
 		requireBranch(principal);
 		UUID saleId = salesRepository.saleIdForPayment(principal.organizationId(), paymentId)
 				.orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "El pago no existe o no esta disponible."));
@@ -502,7 +502,7 @@ public class SalesService implements SalesOperations {
 	}
 
 	@Transactional
-	public SaleDetailResponse rejectPayment(
+	public SaleDetailResult rejectPayment(
 			GymOsPrincipal principal,
 			UUID paymentId,
 			String reason,
@@ -546,7 +546,7 @@ public class SalesService implements SalesOperations {
 	private void addPaymentInternal(
 			GymOsPrincipal principal,
 			UUID saleId,
-			ManualPaymentRequest request,
+			ManualPaymentCommand request,
 			String correlationId
 	) {
 		SaleHeader sale = ensureSale(principal, saleId);

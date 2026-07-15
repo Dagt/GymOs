@@ -3,6 +3,11 @@ package com.gymos.sales.api;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.sales.application.SalesService;
+import com.gymos.sales.application.command.CreateSaleCommand;
+import com.gymos.sales.application.command.ManualPaymentCommand;
+import com.gymos.sales.application.command.SaleItemCommand;
+import com.gymos.sales.application.result.SaleDetailResult;
+import com.gymos.sales.application.result.SalesReportResult;
 import com.gymos.sales.infrastructure.SalesRepository.PaymentDetail;
 import com.gymos.sales.infrastructure.SalesRepository.PaymentMethodBreakdown;
 import com.gymos.sales.infrastructure.SalesRepository.PaymentReportTotals;
@@ -55,7 +60,7 @@ public class SalesController {
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate
 	) {
-		return salesService.report(principal, fromDate, toDate);
+		return toResponse(salesService.report(principal, fromDate, toDate));
 	}
 
 	@PostMapping
@@ -64,12 +69,12 @@ public class SalesController {
 			@Valid @RequestBody CreateSaleRequest request,
 			HttpServletRequest servletRequest
 	) {
-		return salesService.create(principal, request, correlationId(servletRequest));
+		return toResponse(salesService.create(principal, request.toCommand(), correlationId(servletRequest)));
 	}
 
 	@GetMapping("/{saleId}")
 	SaleDetailResponse detail(@AuthenticationPrincipal GymOsPrincipal principal, @PathVariable UUID saleId) {
-		return salesService.detail(principal, saleId);
+		return toResponse(salesService.detail(principal, saleId));
 	}
 
 	@PostMapping("/{saleId}/payments")
@@ -79,7 +84,7 @@ public class SalesController {
 			@Valid @RequestBody ManualPaymentRequest request,
 			HttpServletRequest servletRequest
 	) {
-		return salesService.addPayment(principal, saleId, request, correlationId(servletRequest));
+		return toResponse(salesService.addPayment(principal, saleId, request.toCommand(), correlationId(servletRequest)));
 	}
 
 	@PostMapping("/payments/{paymentId}/validate")
@@ -88,7 +93,7 @@ public class SalesController {
 			@PathVariable UUID paymentId,
 			HttpServletRequest servletRequest
 	) {
-		return salesService.validatePayment(principal, paymentId, correlationId(servletRequest));
+		return toResponse(salesService.validatePayment(principal, paymentId, correlationId(servletRequest)));
 	}
 
 	@PostMapping("/payments/{paymentId}/reject")
@@ -98,7 +103,7 @@ public class SalesController {
 			@Valid @RequestBody RejectPaymentRequest request,
 			HttpServletRequest servletRequest
 	) {
-		return salesService.rejectPayment(principal, paymentId, request.reason(), correlationId(servletRequest));
+		return toResponse(salesService.rejectPayment(principal, paymentId, request.reason(), correlationId(servletRequest)));
 	}
 
 	@PostMapping(value = "/payments/{paymentId}/receipt", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -108,7 +113,24 @@ public class SalesController {
 			@RequestPart("file") MultipartFile file,
 			HttpServletRequest servletRequest
 	) {
-		return salesService.uploadReceipt(principal, paymentId, file, correlationId(servletRequest));
+		return toResponse(salesService.uploadReceipt(principal, paymentId, file, correlationId(servletRequest)));
+	}
+
+	private SaleDetailResponse toResponse(SaleDetailResult result) {
+		return new SaleDetailResponse(result.sale(), result.items(), result.payments(), result.memberships());
+	}
+
+	private SalesReportResponse toResponse(SalesReportResult result) {
+		return new SalesReportResponse(
+				result.fromDate(),
+				result.toDate(),
+				result.currency(),
+				result.sales(),
+				result.payments(),
+				result.salesByStatus(),
+				result.paymentsByMethod(),
+				result.recentSales()
+		);
 	}
 
 	private String correlationId(HttpServletRequest request) {
@@ -123,6 +145,15 @@ public class SalesController {
 			@Size(max = 2000) String notes,
 			@Valid ManualPaymentRequest payment
 	) {
+		private CreateSaleCommand toCommand() {
+			return new CreateSaleCommand(
+					clientId,
+					items.stream().map(SaleItemRequest::toCommand).toList(),
+					discountCents,
+					notes,
+					payment == null ? null : payment.toCommand()
+			);
+		}
 	}
 
 	public record SaleItemRequest(
@@ -130,6 +161,9 @@ public class SalesController {
 			@Min(1) int quantity,
 			@Min(0) long discountCents
 	) {
+		private SaleItemCommand toCommand() {
+			return new SaleItemCommand(productId, quantity, discountCents);
+		}
 	}
 
 	public record ManualPaymentRequest(
@@ -138,8 +172,12 @@ public class SalesController {
 			@Size(max = 160) String reference,
 			@Size(max = 512) String receiptObjectKey,
 			boolean validateNow,
-			@Size(max = 2000) String notes
+			@Size(max = 2000) String notes,
+			@Size(max = 160) String idempotencyKey
 	) {
+		private ManualPaymentCommand toCommand() {
+			return new ManualPaymentCommand(method, amountCents, reference, receiptObjectKey, validateNow, notes, idempotencyKey);
+		}
 	}
 
 	public record RejectPaymentRequest(

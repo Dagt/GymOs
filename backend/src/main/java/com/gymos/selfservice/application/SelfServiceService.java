@@ -3,16 +3,15 @@ package com.gymos.selfservice.application;
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
-import com.gymos.memberships.api.MembershipController.ChangePlanRequest;
-import com.gymos.memberships.api.MembershipController.RenewMembershipRequest;
-import com.gymos.memberships.api.MembershipController.RenewMembershipResponse;
 import com.gymos.memberships.application.command.ChangeMembershipPlanCommand;
 import com.gymos.memberships.application.command.RenewMembershipCommand;
 import com.gymos.memberships.application.result.MembershipSaleResult;
 import com.gymos.memberships.application.MembershipService;
-import com.gymos.selfservice.api.SelfServiceController.CreateSessionResponse;
-import com.gymos.selfservice.api.SelfServiceController.SelfServiceSummaryResponse;
-import com.gymos.selfservice.api.SelfServiceController.VerifySessionRequest;
+import com.gymos.selfservice.application.command.VerifySessionCommand;
+import com.gymos.selfservice.application.result.CreateSessionResult;
+import com.gymos.selfservice.application.result.SelfServiceMembershipSaleResult;
+import com.gymos.selfservice.application.result.SelfServiceMembershipSummaryResult;
+import com.gymos.selfservice.application.result.SelfServiceSummaryResult;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.ClientRecord;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.MembershipRecord;
@@ -50,7 +49,7 @@ public class SelfServiceService {
 	}
 
 	@Transactional
-	public CreateSessionResponse createSession(String terminalCode, String originIp, String correlationId) {
+	public CreateSessionResult createSession(String terminalCode, String originIp, String correlationId) {
 		TerminalRecord terminal = repository.terminal(terminalCode)
 				.orElseThrow(() -> new BusinessException("SELF_SERVICE_TERMINAL_NOT_FOUND", "El kiosco no esta disponible."));
 		OffsetDateTime now = OffsetDateTime.now();
@@ -76,11 +75,11 @@ public class SelfServiceService {
 				.param("updatedAt", now)
 				.update();
 		auditService.recordSystem(terminal.organizationId(), terminal.branchId(), null, "SELF_SERVICE_SESSION_STARTED", "SELF_SERVICE_SESSION", sessionId, "SELF_SERVICE_KIOSK", terminal.deviceCode(), correlationId);
-		return new CreateSessionResponse(sessionId, terminal.name(), now.plusMinutes(SESSION_MINUTES), false);
+		return new CreateSessionResult(sessionId, terminal.name(), now.plusMinutes(SESSION_MINUTES), false);
 	}
 
 	@Transactional
-	public SelfServiceSummaryResponse verify(UUID sessionId, VerifySessionRequest request, String correlationId) {
+	public SelfServiceSummaryResult verify(UUID sessionId, VerifySessionCommand request, String correlationId) {
 		SessionRecord session = activeSession(sessionId);
 		ClientRecord client = repository.clientByIdentifier(session.organizationId(), request.identifier())
 				.orElseThrow(() -> new BusinessException("SELF_SERVICE_CLIENT_NOT_FOUND", "No encontramos un cliente activo con ese dato."));
@@ -104,13 +103,13 @@ public class SelfServiceService {
 	}
 
 	@Transactional(readOnly = true)
-	public SelfServiceSummaryResponse summary(UUID sessionId) {
+	public SelfServiceSummaryResult summary(UUID sessionId) {
 		SessionRecord session = verifiedSession(sessionId);
 		ClientRecord client = repository.clientByIdentifier(session.organizationId(), clientIdentifier(session.clientId()))
 				.orElse(null);
 		List<MembershipRecord> memberships = repository.memberships(session.organizationId(), session.branchId(), session.clientId());
 		List<PendingPaymentRecord> pendingPayments = repository.pendingPayments(session.organizationId(), session.branchId(), session.clientId());
-		return new SelfServiceSummaryResponse(
+		return new SelfServiceSummaryResult(
 				session.id(),
 				session.expiresAt(),
 				client == null ? "Cliente" : client.fullName(),
@@ -126,36 +125,23 @@ public class SelfServiceService {
 	}
 
 	@Transactional
-	public RenewMembershipResponse renew(UUID sessionId, UUID membershipId, RenewMembershipRequest request, String correlationId) {
+	public SelfServiceMembershipSaleResult renew(UUID sessionId, UUID membershipId, RenewMembershipCommand request, String correlationId) {
 		SessionRecord session = verifiedSession(sessionId);
-		MembershipSaleResult response = membershipService.renew(kioskPrincipal(session), membershipId, new RenewMembershipCommand(
-				request.method(),
-				request.reference(),
-				request.validateNow(),
-				request.notes(),
-				request.idempotencyKey()
-		), correlationId);
+		MembershipSaleResult response = membershipService.renew(kioskPrincipal(session), membershipId, request, correlationId);
 		auditService.recordSystem(session.organizationId(), session.branchId(), null, "SELF_SERVICE_MEMBERSHIP_RENEWED", "MEMBERSHIP", membershipId, "SELF_SERVICE_KIOSK", null, correlationId);
 		return toResponse(response);
 	}
 
 	@Transactional
-	public RenewMembershipResponse changePlan(UUID sessionId, UUID membershipId, ChangePlanRequest request, String correlationId) {
+	public SelfServiceMembershipSaleResult changePlan(UUID sessionId, UUID membershipId, ChangeMembershipPlanCommand request, String correlationId) {
 		SessionRecord session = verifiedSession(sessionId);
-		MembershipSaleResult response = membershipService.changePlan(kioskPrincipal(session), membershipId, new ChangeMembershipPlanCommand(
-				request.targetPlanId(),
-				request.method(),
-				request.reference(),
-				request.validateNow(),
-				request.notes(),
-				request.idempotencyKey()
-		), correlationId);
+		MembershipSaleResult response = membershipService.changePlan(kioskPrincipal(session), membershipId, request, correlationId);
 		auditService.recordSystem(session.organizationId(), session.branchId(), null, "SELF_SERVICE_MEMBERSHIP_PLAN_CHANGED", "MEMBERSHIP", membershipId, "SELF_SERVICE_KIOSK", null, correlationId);
 		return toResponse(response);
 	}
 
-	private RenewMembershipResponse toResponse(MembershipSaleResult result) {
-		return new RenewMembershipResponse(
+	private SelfServiceMembershipSaleResult toResponse(MembershipSaleResult result) {
+		return new SelfServiceMembershipSaleResult(
 				result.saleId(),
 				result.saleNumber(),
 				result.saleStatus(),
@@ -163,7 +149,19 @@ public class SelfServiceService {
 				result.paidCents(),
 				result.balanceCents(),
 				result.currency(),
-				result.membership()
+				result.membership() == null ? null : new SelfServiceMembershipSummaryResult(
+						result.membership().id(),
+						result.membership().clientId(),
+						result.membership().planId(),
+						result.membership().planName(),
+						result.membership().saleId(),
+						result.membership().saleNumber(),
+						result.membership().status(),
+						result.membership().activatedAt(),
+						result.membership().startsOn(),
+						result.membership().endsOn(),
+						result.membership().graceEndsOn()
+				)
 		);
 	}
 

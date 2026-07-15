@@ -1,9 +1,9 @@
 package com.gymos.clients.application;
 
 import com.gymos.audit.api.AuditService;
-import com.gymos.clients.api.ClientController.ClientCreateRequest;
-import com.gymos.clients.api.ClientController.ClientDetailResponse;
-import com.gymos.clients.api.ClientController.ClientUpdateRequest;
+import com.gymos.clients.application.command.CreateClientCommand;
+import com.gymos.clients.application.command.UpdateClientCommand;
+import com.gymos.clients.application.result.ClientDetailResult;
 import com.gymos.clients.infrastructure.ClientRepository;
 import com.gymos.clients.infrastructure.ClientRepository.ClientDetail;
 import com.gymos.clients.infrastructure.ClientRepository.ClientSummary;
@@ -30,7 +30,7 @@ public class ClientService {
 	}
 
 	@Transactional
-	public ClientDetailResponse create(GymOsPrincipal principal, ClientCreateRequest request, String correlationId) {
+	public ClientDetailResult create(GymOsPrincipal principal, CreateClientCommand request, String correlationId) {
 		requirePrincipal(principal);
 		String email = blankToNull(request.email());
 		String phone = blankToNull(request.phone());
@@ -96,19 +96,19 @@ public class ClientService {
 	}
 
 	@Transactional(readOnly = true)
-	public ClientDetailResponse detail(GymOsPrincipal principal, UUID clientId) {
+	public ClientDetailResult detail(GymOsPrincipal principal, UUID clientId) {
 		requirePrincipal(principal);
 		ClientDetail client = clientRepository.findDetail(principal.organizationId(), clientId)
 				.orElseThrow(() -> new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible."));
 		List<ClientTimelineEntry> timeline = clientRepository.timeline(principal.organizationId(), clientId);
-		return new ClientDetailResponse(client, timeline);
+		return new ClientDetailResult(client, timeline);
 	}
 
 	@Transactional
-	public ClientDetailResponse update(
+	public ClientDetailResult update(
 			GymOsPrincipal principal,
 			UUID clientId,
-			ClientUpdateRequest request,
+			UpdateClientCommand request,
 			String correlationId
 	) {
 		requirePrincipal(principal);

@@ -11,6 +11,7 @@ import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.memberships.application.command.ChangeMembershipPlanCommand;
 import com.gymos.memberships.application.command.RenewMembershipCommand;
 import com.gymos.memberships.application.result.MembershipSaleResult;
+import com.gymos.memberships.application.result.MembershipSummaryResult;
 import com.gymos.memberships.infrastructure.MembershipRepository;
 import com.gymos.memberships.infrastructure.MembershipRepository.MembershipSummary;
 import com.gymos.memberships.infrastructure.MembershipRepository.PlanForRenewal;
@@ -337,7 +338,26 @@ public class MembershipService {
 				sale.paidCents(),
 				sale.balanceCents(),
 				sale.currency(),
-				membership
+				toMembershipSummaryResult(membership)
+		);
+	}
+
+	private MembershipSummaryResult toMembershipSummaryResult(MembershipSummary membership) {
+		if (membership == null) {
+			return null;
+		}
+		return new MembershipSummaryResult(
+				membership.id(),
+				membership.clientId(),
+				membership.planId(),
+				membership.planName(),
+				membership.saleId(),
+				membership.saleNumber(),
+				membership.status(),
+				membership.activatedAt(),
+				membership.startsOn(),
+				membership.endsOn(),
+				membership.graceEndsOn()
 		);
 	}
 
