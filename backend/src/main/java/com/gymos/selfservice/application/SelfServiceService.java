@@ -6,6 +6,9 @@ import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.memberships.api.MembershipController.ChangePlanRequest;
 import com.gymos.memberships.api.MembershipController.RenewMembershipRequest;
 import com.gymos.memberships.api.MembershipController.RenewMembershipResponse;
+import com.gymos.memberships.application.command.ChangeMembershipPlanCommand;
+import com.gymos.memberships.application.command.RenewMembershipCommand;
+import com.gymos.memberships.application.result.MembershipSaleResult;
 import com.gymos.memberships.application.MembershipService;
 import com.gymos.selfservice.api.SelfServiceController.CreateSessionResponse;
 import com.gymos.selfservice.api.SelfServiceController.SelfServiceSummaryResponse;
@@ -125,17 +128,43 @@ public class SelfServiceService {
 	@Transactional
 	public RenewMembershipResponse renew(UUID sessionId, UUID membershipId, RenewMembershipRequest request, String correlationId) {
 		SessionRecord session = verifiedSession(sessionId);
-		RenewMembershipResponse response = membershipService.renew(kioskPrincipal(session), membershipId, request, correlationId);
+		MembershipSaleResult response = membershipService.renew(kioskPrincipal(session), membershipId, new RenewMembershipCommand(
+				request.method(),
+				request.reference(),
+				request.validateNow(),
+				request.notes(),
+				request.idempotencyKey()
+		), correlationId);
 		auditService.recordSystem(session.organizationId(), session.branchId(), null, "SELF_SERVICE_MEMBERSHIP_RENEWED", "MEMBERSHIP", membershipId, "SELF_SERVICE_KIOSK", null, correlationId);
-		return response;
+		return toResponse(response);
 	}
 
 	@Transactional
 	public RenewMembershipResponse changePlan(UUID sessionId, UUID membershipId, ChangePlanRequest request, String correlationId) {
 		SessionRecord session = verifiedSession(sessionId);
-		RenewMembershipResponse response = membershipService.changePlan(kioskPrincipal(session), membershipId, request, correlationId);
+		MembershipSaleResult response = membershipService.changePlan(kioskPrincipal(session), membershipId, new ChangeMembershipPlanCommand(
+				request.targetPlanId(),
+				request.method(),
+				request.reference(),
+				request.validateNow(),
+				request.notes(),
+				request.idempotencyKey()
+		), correlationId);
 		auditService.recordSystem(session.organizationId(), session.branchId(), null, "SELF_SERVICE_MEMBERSHIP_PLAN_CHANGED", "MEMBERSHIP", membershipId, "SELF_SERVICE_KIOSK", null, correlationId);
-		return response;
+		return toResponse(response);
+	}
+
+	private RenewMembershipResponse toResponse(MembershipSaleResult result) {
+		return new RenewMembershipResponse(
+				result.saleId(),
+				result.saleNumber(),
+				result.saleStatus(),
+				result.totalCents(),
+				result.paidCents(),
+				result.balanceCents(),
+				result.currency(),
+				result.membership()
+		);
 	}
 
 	@Transactional

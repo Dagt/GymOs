@@ -2,6 +2,9 @@ package com.gymos.memberships.api;
 
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.memberships.application.command.ChangeMembershipPlanCommand;
+import com.gymos.memberships.application.command.RenewMembershipCommand;
+import com.gymos.memberships.application.result.MembershipSaleResult;
 import com.gymos.memberships.application.MembershipService;
 import com.gymos.memberships.infrastructure.MembershipRepository.MembershipSummary;
 import jakarta.servlet.http.HttpServletRequest;
@@ -51,7 +54,7 @@ public class MembershipController {
 			@Valid @RequestBody RenewMembershipRequest request,
 			HttpServletRequest servletRequest
 	) {
-		return membershipService.renew(principal, membershipId, request, correlationId(servletRequest));
+		return toResponse(membershipService.renew(principal, membershipId, request.toCommand(), correlationId(servletRequest)));
 	}
 
 	@PostMapping("/memberships/{membershipId}/change-plan")
@@ -61,7 +64,7 @@ public class MembershipController {
 			@Valid @RequestBody ChangePlanRequest request,
 			HttpServletRequest servletRequest
 	) {
-		return membershipService.changePlan(principal, membershipId, request, correlationId(servletRequest));
+		return toResponse(membershipService.changePlan(principal, membershipId, request.toCommand(), correlationId(servletRequest)));
 	}
 
 	private String correlationId(HttpServletRequest request) {
@@ -73,8 +76,12 @@ public class MembershipController {
 			@NotNull @Pattern(regexp = "CASH|TRANSFER|CARD_MANUAL") String method,
 			@Size(max = 160) String reference,
 			boolean validateNow,
-			@Size(max = 2000) String notes
+			@Size(max = 2000) String notes,
+			@Size(max = 160) String idempotencyKey
 	) {
+		RenewMembershipCommand toCommand() {
+			return new RenewMembershipCommand(method, reference, validateNow, notes, idempotencyKey);
+		}
 	}
 
 	public record ChangePlanRequest(
@@ -82,8 +89,12 @@ public class MembershipController {
 			@NotNull @Pattern(regexp = "CASH|TRANSFER|CARD_MANUAL") String method,
 			@Size(max = 160) String reference,
 			boolean validateNow,
-			@Size(max = 2000) String notes
+			@Size(max = 2000) String notes,
+			@Size(max = 160) String idempotencyKey
 	) {
+		ChangeMembershipPlanCommand toCommand() {
+			return new ChangeMembershipPlanCommand(targetPlanId, method, reference, validateNow, notes, idempotencyKey);
+		}
 	}
 
 	public record RenewMembershipResponse(
@@ -96,5 +107,18 @@ public class MembershipController {
 			String currency,
 			MembershipSummary membership
 	) {
+	}
+
+	private RenewMembershipResponse toResponse(MembershipSaleResult result) {
+		return new RenewMembershipResponse(
+				result.saleId(),
+				result.saleNumber(),
+				result.saleStatus(),
+				result.totalCents(),
+				result.paidCents(),
+				result.balanceCents(),
+				result.currency(),
+				result.membership()
+		);
 	}
 }
