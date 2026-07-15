@@ -59,6 +59,12 @@ const shortcuts = [
     status: "Disponible",
     href: "/access",
   },
+  {
+    title: "Inventario",
+    detail: "Existencias, movimientos, ajustes, mermas y alertas.",
+    status: "Disponible",
+    href: "/inventory",
+  },
 ];
 
 export default function ReceptionPage() {

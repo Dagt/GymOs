@@ -130,6 +130,13 @@ La activación ocurre como consecuencia de pago completado.
 - `GET /inventory/movements`
 - `GET /inventory/low-stock`
 
+Nota implementada Hito 4:
+- `GET /inventory` lista existencias de productos fisicos por sucursal activa.
+- `GET /inventory/{productId}` muestra existencias de un producto fisico.
+- `POST /inventory/movements` registra entradas, salidas, ajustes, mermas, devoluciones y ventas manuales; evita existencias negativas.
+- `GET /inventory/movements` lista movimientos recientes, con filtro opcional por producto.
+- `GET /inventory/low-stock` lista productos bajo minimo.
+
 ## 6.11 Recursos y reservas
 
 - `POST /resources`

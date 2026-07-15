@@ -1,0 +1,234 @@
+package com.gymos.inventory.infrastructure;
+
+import java.time.OffsetDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.stereotype.Repository;
+
+@Repository
+public class InventoryRepository {
+	private final JdbcClient jdbcClient;
+
+	public InventoryRepository(JdbcClient jdbcClient) {
+		this.jdbcClient = jdbcClient;
+	}
+
+	public List<InventoryStockRecord> stock(UUID organizationId, UUID branchId) {
+		return jdbcClient.sql("""
+				SELECT cp.id AS product_id, cp.sku, cp.name AS product_name, cp.price_cents, cp.currency,
+				       s.id AS stock_id, COALESCE(s.quantity_on_hand, 0) AS quantity_on_hand,
+				       COALESCE(s.reorder_point, 0) AS reorder_point,
+				       s.average_cost_cents, s.updated_at
+				FROM catalog_product cp
+				LEFT JOIN inventory_stock s ON s.product_id = cp.id
+				    AND s.organization_id = cp.organization_id
+				    AND s.branch_id = :branchId
+				    AND s.deleted_at IS NULL
+				WHERE cp.organization_id = :organizationId
+				  AND cp.product_type = 'PHYSICAL'
+				  AND cp.deleted_at IS NULL
+				ORDER BY cp.name
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.query(this::mapStock)
+				.list();
+	}
+
+	public Optional<InventoryStockRecord> stockDetail(UUID organizationId, UUID branchId, UUID productId) {
+		return jdbcClient.sql("""
+				SELECT cp.id AS product_id, cp.sku, cp.name AS product_name, cp.price_cents, cp.currency,
+				       s.id AS stock_id, COALESCE(s.quantity_on_hand, 0) AS quantity_on_hand,
+				       COALESCE(s.reorder_point, 0) AS reorder_point,
+				       s.average_cost_cents, s.updated_at
+				FROM catalog_product cp
+				LEFT JOIN inventory_stock s ON s.product_id = cp.id
+				    AND s.organization_id = cp.organization_id
+				    AND s.branch_id = :branchId
+				    AND s.deleted_at IS NULL
+				WHERE cp.organization_id = :organizationId
+				  AND cp.id = :productId
+				  AND cp.product_type = 'PHYSICAL'
+				  AND cp.deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("productId", productId)
+				.query(this::mapStock)
+				.optional();
+	}
+
+	public Optional<InventoryStockRecord> stockById(UUID organizationId, UUID branchId, UUID stockId) {
+		return jdbcClient.sql("""
+				SELECT cp.id AS product_id, cp.sku, cp.name AS product_name, cp.price_cents, cp.currency,
+				       s.id AS stock_id, s.quantity_on_hand, s.reorder_point, s.average_cost_cents, s.updated_at
+				FROM inventory_stock s
+				JOIN catalog_product cp ON cp.id = s.product_id
+				WHERE s.organization_id = :organizationId
+				  AND s.branch_id = :branchId
+				  AND s.id = :stockId
+				  AND s.deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("stockId", stockId)
+				.query(this::mapStock)
+				.optional();
+	}
+
+	public List<InventoryStockRecord> lowStock(UUID organizationId, UUID branchId) {
+		return jdbcClient.sql("""
+				SELECT cp.id AS product_id, cp.sku, cp.name AS product_name, cp.price_cents, cp.currency,
+				       s.id AS stock_id, COALESCE(s.quantity_on_hand, 0) AS quantity_on_hand,
+				       COALESCE(s.reorder_point, 0) AS reorder_point,
+				       s.average_cost_cents, s.updated_at
+				FROM catalog_product cp
+				JOIN inventory_stock s ON s.product_id = cp.id
+				    AND s.organization_id = cp.organization_id
+				    AND s.branch_id = :branchId
+				    AND s.deleted_at IS NULL
+				WHERE cp.organization_id = :organizationId
+				  AND cp.product_type = 'PHYSICAL'
+				  AND cp.deleted_at IS NULL
+				  AND s.reorder_point > 0
+				  AND s.quantity_on_hand <= s.reorder_point
+				ORDER BY s.quantity_on_hand, cp.name
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.query(this::mapStock)
+				.list();
+	}
+
+	public List<InventoryMovementRecord> movements(UUID organizationId, UUID branchId, UUID productId, int limit) {
+		StringBuilder sql = new StringBuilder("""
+				SELECT m.id, m.product_id, cp.sku, cp.name AS product_name, m.movement_type,
+				       m.quantity_delta, m.quantity_before, m.quantity_after, m.unit_cost_cents,
+				       m.reference_type, m.reference_id, m.reason, m.occurred_at
+				FROM inventory_movement m
+				JOIN catalog_product cp ON cp.id = m.product_id
+				WHERE m.organization_id = :organizationId
+				  AND m.branch_id = :branchId
+				""");
+		if (productId != null) {
+			sql.append(" AND m.product_id = :productId\n");
+		}
+		sql.append("""
+				ORDER BY m.occurred_at DESC
+				LIMIT :limit
+				""");
+		var spec = jdbcClient.sql(sql.toString())
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("limit", limit);
+		if (productId != null) {
+			spec = spec.param("productId", productId);
+		}
+		return spec.query((resultSet, rowNumber) -> new InventoryMovementRecord(
+						resultSet.getObject("id", UUID.class),
+						resultSet.getObject("product_id", UUID.class),
+						resultSet.getString("sku"),
+						resultSet.getString("product_name"),
+						resultSet.getString("movement_type"),
+						resultSet.getInt("quantity_delta"),
+						resultSet.getInt("quantity_before"),
+						resultSet.getInt("quantity_after"),
+						resultSet.getObject("unit_cost_cents", Long.class),
+						resultSet.getString("reference_type"),
+						resultSet.getObject("reference_id", UUID.class),
+						resultSet.getString("reason"),
+						resultSet.getObject("occurred_at", OffsetDateTime.class)
+				))
+				.list();
+	}
+
+	public Optional<UUID> stockIdentity(UUID organizationId, UUID branchId, UUID productId) {
+		return jdbcClient.sql("""
+				SELECT id
+				FROM inventory_stock
+				WHERE organization_id = :organizationId
+				  AND branch_id = :branchId
+				  AND product_id = :productId
+				  AND deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("productId", productId)
+				.query(UUID.class)
+				.optional();
+	}
+
+	public Optional<ProductForInventory> product(UUID organizationId, UUID productId) {
+		return jdbcClient.sql("""
+				SELECT id, sku, name, product_type, status
+				FROM catalog_product
+				WHERE organization_id = :organizationId
+				  AND id = :productId
+				  AND deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("productId", productId)
+				.query((resultSet, rowNumber) -> new ProductForInventory(
+						resultSet.getObject("id", UUID.class),
+						resultSet.getString("sku"),
+						resultSet.getString("name"),
+						resultSet.getString("product_type"),
+						resultSet.getString("status")
+				))
+				.optional();
+	}
+
+	private InventoryStockRecord mapStock(java.sql.ResultSet resultSet, int rowNumber) throws java.sql.SQLException {
+		return new InventoryStockRecord(
+				resultSet.getObject("stock_id", UUID.class),
+				resultSet.getObject("product_id", UUID.class),
+				resultSet.getString("sku"),
+				resultSet.getString("product_name"),
+				resultSet.getLong("price_cents"),
+				resultSet.getString("currency"),
+				resultSet.getInt("quantity_on_hand"),
+				resultSet.getInt("reorder_point"),
+				resultSet.getObject("average_cost_cents", Long.class),
+				resultSet.getObject("updated_at", OffsetDateTime.class)
+		);
+	}
+
+	public record ProductForInventory(UUID id, String sku, String name, String productType, String status) {
+	}
+
+	public record InventoryStockRecord(
+			UUID stockId,
+			UUID productId,
+			String sku,
+			String productName,
+			long priceCents,
+			String currency,
+			int quantityOnHand,
+			int reorderPoint,
+			Long averageCostCents,
+			OffsetDateTime updatedAt
+	) {
+		public boolean lowStock() {
+			return reorderPoint > 0 && quantityOnHand <= reorderPoint;
+		}
+	}
+
+	public record InventoryMovementRecord(
+			UUID id,
+			UUID productId,
+			String sku,
+			String productName,
+			String movementType,
+			int quantityDelta,
+			int quantityBefore,
+			int quantityAfter,
+			Long unitCostCents,
+			String referenceType,
+			UUID referenceId,
+			String reason,
+			OffsetDateTime occurredAt
+	) {
+	}
+}

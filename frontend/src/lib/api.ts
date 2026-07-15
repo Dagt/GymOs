@@ -419,6 +419,56 @@ export type TemporaryPassPayload = {
   reason: string;
 };
 
+export type InventoryStock = {
+  stockId: string | null;
+  productId: string;
+  sku: string;
+  productName: string;
+  priceCents: number;
+  currency: string;
+  quantityOnHand: number;
+  reorderPoint: number;
+  averageCostCents: number | null;
+  updatedAt: string | null;
+  lowStock: boolean;
+};
+
+export type InventoryMovement = {
+  id: string;
+  productId: string;
+  sku: string;
+  productName: string;
+  movementType: InventoryMovementType;
+  quantityDelta: number;
+  quantityBefore: number;
+  quantityAfter: number;
+  unitCostCents: number | null;
+  referenceType: string | null;
+  referenceId: string | null;
+  reason: string;
+  occurredAt: string;
+};
+
+export type InventoryMovementType =
+  | "INITIAL"
+  | "PURCHASE"
+  | "ADJUSTMENT_IN"
+  | "ADJUSTMENT_OUT"
+  | "WASTE"
+  | "RETURN"
+  | "SALE";
+
+export type InventoryMovementPayload = {
+  productId: string;
+  movementType: InventoryMovementType;
+  quantity: number;
+  unitCostCents?: number | null;
+  reorderPoint?: number | null;
+  referenceType?: string | null;
+  referenceId?: string | null;
+  reason: string;
+};
+
 export type SaleItemPayload = {
   productId: string;
   quantity: number;
@@ -695,6 +745,36 @@ export async function createTemporaryPass(
   payload: TemporaryPassPayload,
 ): Promise<TemporaryPass> {
   return apiFetch<TemporaryPass>("/access/commands/temporary", accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function getInventoryStock(accessToken: string): Promise<InventoryStock[]> {
+  return apiFetch<InventoryStock[]>("/inventory", accessToken);
+}
+
+export async function getLowInventoryStock(accessToken: string): Promise<InventoryStock[]> {
+  return apiFetch<InventoryStock[]>("/inventory/low-stock", accessToken);
+}
+
+export async function getInventoryMovements(
+  accessToken: string,
+  productId?: string,
+  limit = 50,
+): Promise<InventoryMovement[]> {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (productId) {
+    params.set("productId", productId);
+  }
+  return apiFetch<InventoryMovement[]>(`/inventory/movements?${params.toString()}`, accessToken);
+}
+
+export async function createInventoryMovement(
+  accessToken: string,
+  payload: InventoryMovementPayload,
+): Promise<InventoryStock> {
+  return apiFetch<InventoryStock>("/inventory/movements", accessToken, {
     method: "POST",
     body: JSON.stringify(normalizePayload(payload)),
   });

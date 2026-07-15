@@ -226,6 +226,13 @@ Implementado:
 - Auditoria de `ACCESS_GRANTED`, `ACCESS_DENIED` y `ACCESS_TEMPORARY_PASS_CREATED`.
 - Pantalla frontend `/access` para recepcion: busqueda de cliente, evaluacion, apertura manual, pase temporal y bitacora reciente.
 - Acceso directo a `/access` desde `/reception`.
+- Migracion Flyway `V7__hito4_inventory.sql` con `inventory_stock`, `inventory_movement`, permisos de inventario e inventario semilla para `BOTELLA-AGUA`.
+- Modulo backend `inventory` con endpoints `GET /api/v1/inventory`, `GET /api/v1/inventory/{productId}`, `POST /api/v1/inventory/movements`, `GET /api/v1/inventory/movements` y `GET /api/v1/inventory/low-stock`.
+- Movimientos de inventario `INITIAL`, `PURCHASE`, `ADJUSTMENT_IN`, `ADJUSTMENT_OUT`, `WASTE`, `RETURN` y `SALE`.
+- Validacion de producto fisico activo, bloqueo de existencias negativas, minimo de inventario y costo promedio ponderado para entradas con costo.
+- Auditoria de `INVENTORY_MOVEMENT_CREATED`.
+- Pantalla frontend `/inventory` para existencias, alertas, movimientos, ajustes, mermas y costo unitario.
+- Acceso directo a `/inventory` desde `/reception`.
 
 Verificado localmente:
 
@@ -233,7 +240,7 @@ Verificado localmente:
 - Spring Modulith architecture test.
 - Frontend lint.
 - Frontend typecheck.
-- Frontend production build con ruta `/access`.
+- Frontend production build con rutas `/access` y `/inventory`.
 - Docker build backend y frontend.
 - Smoke test Docker con Flyway V6 aplicada y dispositivo `MAIN-DOOR`.
 - Smoke test Docker `GET /api/v1/access/devices`.
@@ -244,8 +251,16 @@ Verificado localmente:
 - Smoke test Docker `POST /api/v1/access/commands/open` con comando simulado.
 - Smoke test Docker `GET /api/v1/access/logs`.
 - Smoke test Docker `GET /access`.
+- Smoke test Docker con Flyway V7 aplicada e inventario semilla para `BOTELLA-AGUA`.
+- Smoke test Docker `GET /api/v1/inventory`.
+- Smoke test Docker `GET /api/v1/inventory/{productId}`.
+- Smoke test Docker `POST /api/v1/inventory/movements` con movimiento `PURCHASE`.
+- Smoke test Docker `POST /api/v1/inventory/movements` con movimiento `WASTE`.
+- Smoke test Docker `GET /api/v1/inventory/low-stock`.
+- Smoke test Docker `GET /api/v1/inventory/movements`.
+- Smoke test Docker `GET /inventory`.
 
 Pendiente del Hito 4:
 
-- Inventario: existencias, movimientos, mermas, alertas y descuento posterior por venta.
+- Inventario: descuento automatico posterior por venta.
 - Recursos y reservas: recursos reservables, disponibilidad, booking, check-in, finalizacion y cancelacion.
