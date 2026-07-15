@@ -43,17 +43,11 @@ public class DevelopmentSeedConfig {
 
 		@Transactional
 		void seed() {
-			Integer organizations = jdbcClient.sql("SELECT COUNT(*) FROM organization")
-					.query(Integer.class)
-					.single();
-			if (organizations > 0) {
-				return;
-			}
-
 			OffsetDateTime now = OffsetDateTime.now();
 			jdbcClient.sql("""
 					INSERT INTO organization (id, legal_name, trade_name, tax_id, status, timezone, default_currency, contact_email, contact_phone, created_at, updated_at, version)
 					VALUES (:id, 'GymOS Demo S.A. de C.V.', 'GymOS Demo', 'GYMOS-DEMO', 'ACTIVE', 'America/Mexico_City', 'MXN', 'admin@gymos.local', '+520000000000', :now, :now, 0)
+					ON CONFLICT (id) DO NOTHING
 					""")
 					.param("id", ORGANIZATION_ID)
 					.param("now", now)
@@ -61,6 +55,7 @@ public class DevelopmentSeedConfig {
 			jdbcClient.sql("""
 					INSERT INTO branch (id, organization_id, name, code, timezone, status, phone, created_at, updated_at, version)
 					VALUES (:id, :organizationId, 'Sucursal Principal', 'MAIN', 'America/Mexico_City', 'ACTIVE', '+520000000000', :now, :now, 0)
+					ON CONFLICT (id) DO NOTHING
 					""")
 					.param("id", BRANCH_ID)
 					.param("organizationId", ORGANIZATION_ID)
@@ -69,6 +64,7 @@ public class DevelopmentSeedConfig {
 			jdbcClient.sql("""
 					INSERT INTO person (id, organization_id, first_name, last_name, email, phone, status, created_at, updated_at, version)
 					VALUES (:id, :organizationId, 'Admin', 'GymOS', 'admin@gymos.local', '+520000000001', 'ACTIVE', :now, :now, 0)
+					ON CONFLICT (id) DO NOTHING
 					""")
 					.param("id", PERSON_ID)
 					.param("organizationId", ORGANIZATION_ID)
@@ -77,6 +73,7 @@ public class DevelopmentSeedConfig {
 			jdbcClient.sql("""
 					INSERT INTO user_account (id, organization_id, person_id, username, password_hash, status, failed_attempts, created_at, updated_at, version)
 					VALUES (:id, :organizationId, :personId, 'admin@gymos.local', :passwordHash, 'ACTIVE', 0, :now, :now, 0)
+					ON CONFLICT (id) DO NOTHING
 					""")
 					.param("id", USER_ID)
 					.param("organizationId", ORGANIZATION_ID)
@@ -87,16 +84,17 @@ public class DevelopmentSeedConfig {
 			jdbcClient.sql("""
 					INSERT INTO role (id, organization_id, name, description, system_role, created_at, updated_at, version)
 					VALUES (:id, :organizationId, 'Administrador', 'Administrador inicial de organizacion', true, :now, :now, 0)
+					ON CONFLICT (id) DO NOTHING
 					""")
 					.param("id", ROLE_ID)
 					.param("organizationId", ORGANIZATION_ID)
 					.param("now", now)
 					.update();
-			jdbcClient.sql("INSERT INTO user_role (user_id, role_id) VALUES (:userId, :roleId)")
+			jdbcClient.sql("INSERT INTO user_role (user_id, role_id) VALUES (:userId, :roleId) ON CONFLICT DO NOTHING")
 					.param("userId", USER_ID)
 					.param("roleId", ROLE_ID)
 					.update();
-			jdbcClient.sql("INSERT INTO user_branch_access (user_id, branch_id, access_scope) VALUES (:userId, :branchId, 'BRANCH')")
+			jdbcClient.sql("INSERT INTO user_branch_access (user_id, branch_id, access_scope) VALUES (:userId, :branchId, 'BRANCH') ON CONFLICT DO NOTHING")
 					.param("userId", USER_ID)
 					.param("branchId", BRANCH_ID)
 					.update();
@@ -133,6 +131,7 @@ public class DevelopmentSeedConfig {
 				jdbcClient.sql("""
 						INSERT INTO permission (id, code, description, module, created_at, updated_at, version)
 						VALUES (:id, :code, :description, :module, :now, :now, 0)
+						ON CONFLICT (code) DO NOTHING
 						""")
 						.param("id", permissionId)
 						.param("code", permissions.get(index))
@@ -140,7 +139,7 @@ public class DevelopmentSeedConfig {
 						.param("module", permissions.get(index).split("\\.")[0])
 						.param("now", now)
 						.update();
-				jdbcClient.sql("INSERT INTO role_permission (role_id, permission_id) VALUES (:roleId, :permissionId)")
+				jdbcClient.sql("INSERT INTO role_permission (role_id, permission_id) VALUES (:roleId, :permissionId) ON CONFLICT DO NOTHING")
 						.param("roleId", ROLE_ID)
 						.param("permissionId", permissionId)
 						.update();
