@@ -3,6 +3,8 @@ package com.gymos.organizations.api;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.organizations.application.OrganizationService;
+import com.gymos.organizations.application.command.UpdateBranchCommand;
+import com.gymos.organizations.application.command.UpdateOrganizationCommand;
 import com.gymos.organizations.infrastructure.OrganizationQueryRepository.BranchSummary;
 import com.gymos.organizations.infrastructure.OrganizationQueryRepository.OrganizationSummary;
 import jakarta.servlet.http.HttpServletRequest;
@@ -46,7 +48,7 @@ public class OrganizationController {
 			@Valid @RequestBody OrganizationUpdateRequest request,
 			HttpServletRequest servletRequest
 	) {
-		return organizationService.updateOrganization(principal, request, correlationId(servletRequest));
+		return organizationService.updateOrganization(principal, request.toCommand(), correlationId(servletRequest));
 	}
 
 	@PutMapping("/current/branches/{branchId}")
@@ -56,7 +58,7 @@ public class OrganizationController {
 			@Valid @RequestBody BranchUpdateRequest request,
 			HttpServletRequest servletRequest
 	) {
-		return organizationService.updateBranch(principal, branchId, request, correlationId(servletRequest));
+		return organizationService.updateBranch(principal, branchId, request.toCommand(), correlationId(servletRequest));
 	}
 
 	private String correlationId(HttpServletRequest request) {
@@ -73,6 +75,9 @@ public class OrganizationController {
 			@Email @Size(max = 180) String contactEmail,
 			@Size(max = 32) String contactPhone
 	) {
+		private UpdateOrganizationCommand toCommand() {
+			return new UpdateOrganizationCommand(legalName, tradeName, taxId, timezone, defaultCurrency, contactEmail, contactPhone);
+		}
 	}
 
 	public record BranchUpdateRequest(
@@ -81,5 +86,8 @@ public class OrganizationController {
 			@NotBlank @Size(max = 64) String timezone,
 			@Size(max = 32) String phone
 	) {
+		private UpdateBranchCommand toCommand() {
+			return new UpdateBranchCommand(name, code, timezone, phone);
+		}
 	}
 }

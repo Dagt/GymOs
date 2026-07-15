@@ -7,6 +7,7 @@ import {
   createKioskSession,
   endKioskSession,
   getKioskMembershipOptions,
+  getKioskSummary,
   renewMembershipFromKiosk,
   verifyKioskSession,
   type KioskMembership,
@@ -21,6 +22,7 @@ export default function KioskPage() {
   const [summary, setSummary] = useState<KioskSummaryResponse | null>(null);
   const [plans, setPlans] = useState<KioskPlanOption[]>([]);
   const [identifier, setIdentifier] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [targetPlanId, setTargetPlanId] = useState("");
   const [reference, setReference] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -64,8 +66,8 @@ export default function KioskPage() {
     setError(null);
     setMessage(null);
     try {
-      const nextSummary = await verifyKioskSession(session.sessionId, identifier);
-      const options = await getKioskMembershipOptions(session.sessionId);
+      const nextSummary = await verifyKioskSession(session.sessionId, session.sessionToken, identifier, birthDate);
+      const options = await getKioskMembershipOptions(session.sessionId, session.sessionToken);
       setSummary(nextSummary);
       setPlans(options);
       setTargetPlanId(options[0]?.id ?? "");
@@ -82,13 +84,14 @@ export default function KioskPage() {
     setError(null);
     setMessage(null);
     try {
-      const response = await renewMembershipFromKiosk(session.sessionId, membership.id, {
+      const response = await renewMembershipFromKiosk(session.sessionId, session.sessionToken, membership.id, {
         method: "CASH",
         reference,
         validateNow: true,
         notes: "Renovacion desde kiosco",
+        idempotencyKey: operationKey("kiosk-renewal", session.sessionId, membership.id),
       });
-      setSummary(await verifyKioskSession(session.sessionId, identifier));
+      setSummary(await getKioskSummary(session.sessionId, session.sessionToken));
       setMessage(response.membership ? `Renovada hasta ${formatDay(response.membership.endsOn)}.` : "Pago pendiente.");
       setReference("");
     } catch (exception) {
@@ -106,14 +109,15 @@ export default function KioskPage() {
     setError(null);
     setMessage(null);
     try {
-      const response = await changeMembershipPlanFromKiosk(session.sessionId, membership.id, {
+      const response = await changeMembershipPlanFromKiosk(session.sessionId, session.sessionToken, membership.id, {
         targetPlanId,
         method: "CASH",
         reference,
         validateNow: true,
         notes: "Cambio de plan desde kiosco",
+        idempotencyKey: operationKey("kiosk-plan-change", session.sessionId, membership.id, targetPlanId),
       });
-      setSummary(await verifyKioskSession(session.sessionId, identifier));
+      setSummary(await getKioskSummary(session.sessionId, session.sessionToken));
       setMessage(response.membership ? `Nuevo plan activo: ${response.membership.planName}.` : "Solicitud registrada.");
       setReference("");
     } catch (exception) {
@@ -125,10 +129,11 @@ export default function KioskPage() {
 
   async function end() {
     if (session) {
-      await endKioskSession(session.sessionId).catch(() => undefined);
+      await endKioskSession(session.sessionId, session.sessionToken).catch(() => undefined);
     }
     setSummary(null);
     setIdentifier("");
+    setBirthDate("");
     setReference("");
     setMessage("Sesion cerrada.");
   }
@@ -166,12 +171,20 @@ export default function KioskPage() {
         {!summary ? (
           <form className="rounded-lg border border-[#2f473c] bg-[#17231f] p-6" onSubmit={verify}>
             <h2 className="text-2xl font-semibold">Verifica tu identidad</h2>
-            <p className="mt-2 text-sm text-[#c6d5cd]">Ingresa el email o telefono registrado en recepcion.</p>
+            <p className="mt-2 text-sm text-[#c6d5cd]">Ingresa tus datos registrados en recepcion.</p>
             <input
               className="mt-5 h-14 w-full rounded-md border border-[#3e5a4d] bg-[#101916] px-4 text-lg outline-none transition focus:border-[#93d2a8]"
               onChange={(event) => setIdentifier(event.target.value)}
               placeholder="email o telefono"
+              required
               value={identifier}
+            />
+            <input
+              className="mt-4 h-14 w-full rounded-md border border-[#3e5a4d] bg-[#101916] px-4 text-lg outline-none transition focus:border-[#93d2a8]"
+              onChange={(event) => setBirthDate(event.target.value)}
+              required
+              type="date"
+              value={birthDate}
             />
             <button
               className="mt-5 h-14 w-full rounded-md bg-[#93d2a8] px-5 text-base font-semibold text-[#101916] transition hover:bg-[#b5e6c5]"
@@ -294,4 +307,9 @@ function formatTime(value: string) {
     dateStyle: "medium",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function operationKey(...parts: string[]) {
+  const random = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`;
+  return [...parts, random].join(":");
 }

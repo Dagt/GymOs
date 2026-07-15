@@ -1,8 +1,8 @@
 package com.gymos.catalog.application;
 
 import com.gymos.audit.api.AuditService;
-import com.gymos.catalog.api.CatalogController.CreatePlanRequest;
-import com.gymos.catalog.api.CatalogController.ProductRequest;
+import com.gymos.catalog.application.command.CreatePlanCommand;
+import com.gymos.catalog.application.command.ProductCommand;
 import com.gymos.catalog.infrastructure.CatalogRepository;
 import com.gymos.catalog.infrastructure.CatalogRepository.PlanSummary;
 import com.gymos.catalog.infrastructure.CatalogRepository.ProductSummary;
@@ -34,7 +34,7 @@ public class CatalogService {
 	}
 
 	@Transactional
-	public ProductSummary createProduct(GymOsPrincipal principal, ProductRequest request, String correlationId) {
+	public ProductSummary createProduct(GymOsPrincipal principal, ProductCommand request, String correlationId) {
 		requirePrincipal(principal);
 		String sku = request.sku().trim().toUpperCase();
 		if (catalogRepository.skuExists(principal.organizationId(), sku, null)) {
@@ -79,7 +79,7 @@ public class CatalogService {
 	}
 
 	@Transactional
-	public PlanSummary createPlan(GymOsPrincipal principal, CreatePlanRequest request, String correlationId) {
+	public PlanSummary createPlan(GymOsPrincipal principal, CreatePlanCommand request, String correlationId) {
 		requirePrincipal(principal);
 		ProductSummary product = catalogRepository.product(principal.organizationId(), request.productId())
 				.orElseThrow(() -> new BusinessException("PRODUCT_NOT_FOUND", "El producto no esta disponible."));

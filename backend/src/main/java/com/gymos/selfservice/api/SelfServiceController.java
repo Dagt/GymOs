@@ -1,16 +1,24 @@
 package com.gymos.selfservice.api;
 
 import com.gymos.common.api.Correlation;
-import com.gymos.memberships.api.MembershipController.ChangePlanRequest;
-import com.gymos.memberships.api.MembershipController.RenewMembershipRequest;
-import com.gymos.memberships.api.MembershipController.RenewMembershipResponse;
+import com.gymos.memberships.api.operations.ChangeMembershipPlanOperationCommand;
+import com.gymos.memberships.api.operations.RenewMembershipOperationCommand;
 import com.gymos.selfservice.application.SelfServiceService;
+import com.gymos.selfservice.application.command.VerifySessionCommand;
+import com.gymos.selfservice.application.result.CreateSessionResult;
+import com.gymos.selfservice.application.result.SelfServiceMembershipSaleResult;
+import com.gymos.selfservice.application.result.SelfServiceMembershipSummaryResult;
+import com.gymos.selfservice.application.result.SelfServiceSummaryResult;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.MembershipRecord;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.PendingPaymentRecord;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.PlanOptionRecord;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -19,6 +27,7 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -35,58 +44,74 @@ public class SelfServiceController {
 
 	@PostMapping("/terminals/{terminalCode}/sessions")
 	CreateSessionResponse createSession(@PathVariable String terminalCode, HttpServletRequest servletRequest) {
-		return selfServiceService.createSession(terminalCode, servletRequest.getRemoteAddr(), correlationId(servletRequest));
+		return toResponse(selfServiceService.createSession(terminalCode, servletRequest.getRemoteAddr(), correlationId(servletRequest)));
 	}
 
 	@PostMapping("/sessions/{sessionId}/verify")
 	SelfServiceSummaryResponse verify(
 			@PathVariable UUID sessionId,
 			@Valid @RequestBody VerifySessionRequest request,
+			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken,
 			HttpServletRequest servletRequest
 	) {
-		return selfServiceService.verify(sessionId, request, correlationId(servletRequest));
+		return toResponse(selfServiceService.verify(sessionId, sessionToken, request.toCommand(), correlationId(servletRequest), servletRequest.getRemoteAddr()));
 	}
 
 	@GetMapping("/sessions/{sessionId}/summary")
-	SelfServiceSummaryResponse summary(@PathVariable UUID sessionId) {
-		return selfServiceService.summary(sessionId);
+	SelfServiceSummaryResponse summary(
+			@PathVariable UUID sessionId,
+			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken
+	) {
+		return toResponse(selfServiceService.summary(sessionId, sessionToken));
 	}
 
 	@GetMapping("/sessions/{sessionId}/membership-options")
-	List<PlanOptionRecord> membershipOptions(@PathVariable UUID sessionId) {
-		return selfServiceService.membershipOptions(sessionId);
+	List<PlanOptionRecord> membershipOptions(
+			@PathVariable UUID sessionId,
+			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken
+	) {
+		return selfServiceService.membershipOptions(sessionId, sessionToken);
 	}
 
 	@PostMapping("/sessions/{sessionId}/membership-renewals/{membershipId}")
-	RenewMembershipResponse renew(
+	SelfServiceMembershipSaleResponse renew(
 			@PathVariable UUID sessionId,
 			@PathVariable UUID membershipId,
 			@Valid @RequestBody RenewMembershipRequest request,
+			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken,
 			HttpServletRequest servletRequest
 	) {
-		return selfServiceService.renew(sessionId, membershipId, request, correlationId(servletRequest));
+		return toResponse(selfServiceService.renew(sessionId, sessionToken, membershipId, request.toCommand(), correlationId(servletRequest), servletRequest.getRemoteAddr()));
 	}
 
 	@PostMapping("/sessions/{sessionId}/membership-change-requests/{membershipId}")
-	RenewMembershipResponse changePlan(
+	SelfServiceMembershipSaleResponse changePlan(
 			@PathVariable UUID sessionId,
 			@PathVariable UUID membershipId,
 			@Valid @RequestBody ChangePlanRequest request,
+			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken,
 			HttpServletRequest servletRequest
 	) {
-		return selfServiceService.changePlan(sessionId, membershipId, request, correlationId(servletRequest));
+		return toResponse(selfServiceService.changePlan(sessionId, sessionToken, membershipId, request.toCommand(), correlationId(servletRequest), servletRequest.getRemoteAddr()));
 	}
 
 	@PostMapping("/sessions/{sessionId}/end")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
-	void end(@PathVariable UUID sessionId, HttpServletRequest servletRequest) {
-		selfServiceService.end(sessionId, correlationId(servletRequest));
+	void end(
+			@PathVariable UUID sessionId,
+			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken,
+			HttpServletRequest servletRequest
+	) {
+		selfServiceService.end(sessionId, sessionToken, correlationId(servletRequest));
 	}
 
 	@PatchMapping("/sessions/{sessionId}/contact-data")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
-	void contactDataPlaceholder(@PathVariable UUID sessionId) {
-		selfServiceService.summary(sessionId);
+	void contactDataPlaceholder(
+			@PathVariable UUID sessionId,
+			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken
+	) {
+		selfServiceService.summary(sessionId, sessionToken);
 	}
 
 	private String correlationId(HttpServletRequest request) {
@@ -94,11 +119,61 @@ public class SelfServiceController {
 		return value == null ? "unknown" : value.toString();
 	}
 
-	public record VerifySessionRequest(@NotBlank String identifier) {
+	private CreateSessionResponse toResponse(CreateSessionResult result) {
+		return new CreateSessionResponse(result.sessionId(), result.sessionToken(), result.terminalName(), result.expiresAt(), result.verified());
+	}
+
+	private SelfServiceSummaryResponse toResponse(SelfServiceSummaryResult result) {
+		return new SelfServiceSummaryResponse(result.sessionId(), result.expiresAt(), result.clientName(), result.memberships(), result.pendingPayments());
+	}
+
+	private SelfServiceMembershipSaleResponse toResponse(SelfServiceMembershipSaleResult result) {
+		return new SelfServiceMembershipSaleResponse(
+				result.saleId(),
+				result.saleNumber(),
+				result.saleStatus(),
+				result.totalCents(),
+				result.paidCents(),
+				result.balanceCents(),
+				result.currency(),
+				result.membership()
+		);
+	}
+
+	public record VerifySessionRequest(@NotBlank String identifier, @NotNull LocalDate birthDate) {
+		private VerifySessionCommand toCommand() {
+			return new VerifySessionCommand(identifier, birthDate);
+		}
+	}
+
+	public record RenewMembershipRequest(
+			@NotBlank @Pattern(regexp = "CASH|TRANSFER|CARD_MANUAL") String method,
+			@Size(max = 160) String reference,
+			boolean validateNow,
+			@Size(max = 2000) String notes,
+			@Size(max = 160) String idempotencyKey
+	) {
+		private RenewMembershipOperationCommand toCommand() {
+			return new RenewMembershipOperationCommand(method, reference, validateNow, notes, idempotencyKey);
+		}
+	}
+
+	public record ChangePlanRequest(
+			@NotNull UUID targetPlanId,
+			@NotBlank @Pattern(regexp = "CASH|TRANSFER|CARD_MANUAL") String method,
+			@Size(max = 160) String reference,
+			boolean validateNow,
+			@Size(max = 2000) String notes,
+			@Size(max = 160) String idempotencyKey
+	) {
+		private ChangeMembershipPlanOperationCommand toCommand() {
+			return new ChangeMembershipPlanOperationCommand(targetPlanId, method, reference, validateNow, notes, idempotencyKey);
+		}
 	}
 
 	public record CreateSessionResponse(
 			UUID sessionId,
+			String sessionToken,
 			String terminalName,
 			OffsetDateTime expiresAt,
 			boolean verified
@@ -111,6 +186,18 @@ public class SelfServiceController {
 			String clientName,
 			List<MembershipRecord> memberships,
 			List<PendingPaymentRecord> pendingPayments
+	) {
+	}
+
+	public record SelfServiceMembershipSaleResponse(
+			UUID saleId,
+			String saleNumber,
+			String saleStatus,
+			long totalCents,
+			long paidCents,
+			long balanceCents,
+			String currency,
+			SelfServiceMembershipSummaryResult membership
 	) {
 	}
 }

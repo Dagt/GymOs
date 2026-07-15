@@ -273,6 +273,71 @@ public class SalesRepository {
 				.optional();
 	}
 
+	public Optional<SaleHeader> saleHeaderByIdempotencyKey(UUID organizationId, String idempotencyKey) {
+		return jdbcClient.sql("""
+				SELECT s.id, s.branch_id, s.client_id,
+				       COALESCE(p.first_name || ' ' || p.last_name, 'Cliente general') AS client_name,
+				       s.sale_number, s.status, s.subtotal_cents,
+				       s.discount_cents, s.total_cents, s.paid_cents, s.balance_cents, s.currency,
+				       s.notes, s.sold_at, s.created_at, s.updated_at
+				FROM sale s
+				LEFT JOIN client c ON c.id = s.client_id
+				LEFT JOIN person p ON p.id = c.person_id
+				WHERE s.organization_id = :organizationId
+				  AND s.idempotency_key = :idempotencyKey
+				  AND s.deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("idempotencyKey", idempotencyKey)
+				.query((resultSet, rowNumber) -> new SaleHeader(
+						resultSet.getObject("id", UUID.class),
+						resultSet.getString("sale_number"),
+						resultSet.getObject("branch_id", UUID.class),
+						resultSet.getObject("client_id", UUID.class),
+						resultSet.getString("client_name"),
+						resultSet.getString("status"),
+						resultSet.getLong("subtotal_cents"),
+						resultSet.getLong("discount_cents"),
+						resultSet.getLong("total_cents"),
+						resultSet.getLong("paid_cents"),
+						resultSet.getLong("balance_cents"),
+						resultSet.getString("currency"),
+						resultSet.getString("notes"),
+						resultSet.getObject("sold_at", OffsetDateTime.class),
+						resultSet.getObject("created_at", OffsetDateTime.class),
+						resultSet.getObject("updated_at", OffsetDateTime.class)
+				))
+				.optional();
+	}
+
+	public Optional<String> saleRequestHashByIdempotencyKey(UUID organizationId, String idempotencyKey) {
+		return jdbcClient.sql("""
+				SELECT idempotency_request_hash
+				FROM sale
+				WHERE organization_id = :organizationId
+				  AND idempotency_key = :idempotencyKey
+				  AND deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("idempotencyKey", idempotencyKey)
+				.query(String.class)
+				.optional();
+	}
+
+	public Optional<String> paymentRequestHashByIdempotencyKey(UUID organizationId, String idempotencyKey) {
+		return jdbcClient.sql("""
+				SELECT idempotency_request_hash
+				FROM payment
+				WHERE organization_id = :organizationId
+				  AND idempotency_key = :idempotencyKey
+				  AND deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("idempotencyKey", idempotencyKey)
+				.query(String.class)
+				.optional();
+	}
+
 	public List<SaleItemDetail> saleItems(UUID organizationId, UUID saleId) {
 		return jdbcClient.sql("""
 				SELECT id, product_id, item_type, name, quantity, unit_price_cents,

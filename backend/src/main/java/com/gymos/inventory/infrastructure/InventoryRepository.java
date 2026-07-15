@@ -160,6 +160,101 @@ public class InventoryRepository {
 				.optional();
 	}
 
+	public UUID createStock(UUID organizationId, UUID branchId, UUID productId, UUID actorUserId, OffsetDateTime now) {
+		UUID stockId = UUID.randomUUID();
+		jdbcClient.sql("""
+				INSERT INTO inventory_stock (
+				    id, organization_id, branch_id, product_id, quantity_on_hand, reorder_point,
+				    created_at, updated_at, created_by, updated_by, version
+				)
+				VALUES (
+				    :id, :organizationId, :branchId, :productId, 0, 0,
+				    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
+				)
+				""")
+				.param("id", stockId)
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("productId", productId)
+				.param("createdAt", now)
+				.param("updatedAt", now)
+				.param("createdBy", actorUserId)
+				.param("updatedBy", actorUserId)
+				.update();
+		return stockId;
+	}
+
+	public void updateStock(UUID stockId, int quantityOnHand, int reorderPoint, Long averageCostCents, UUID actorUserId, OffsetDateTime now) {
+		jdbcClient.sql("""
+				UPDATE inventory_stock
+				SET quantity_on_hand = :quantityOnHand,
+				    reorder_point = :reorderPoint,
+				    average_cost_cents = :averageCostCents,
+				    updated_at = :updatedAt,
+				    updated_by = :updatedBy,
+				    version = version + 1
+				WHERE id = :stockId
+				""")
+				.param("quantityOnHand", quantityOnHand)
+				.param("reorderPoint", reorderPoint)
+				.param("averageCostCents", averageCostCents)
+				.param("updatedAt", now)
+				.param("updatedBy", actorUserId)
+				.param("stockId", stockId)
+				.update();
+	}
+
+	public UUID createMovement(
+			UUID organizationId,
+			UUID branchId,
+			UUID stockId,
+			UUID productId,
+			String movementType,
+			int quantityDelta,
+			int quantityBefore,
+			int quantityAfter,
+			Long unitCostCents,
+			String referenceType,
+			UUID referenceId,
+			String reason,
+			OffsetDateTime occurredAt,
+			UUID actorUserId,
+			UUID correlationId
+	) {
+		UUID movementId = UUID.randomUUID();
+		jdbcClient.sql("""
+				INSERT INTO inventory_movement (
+				    id, organization_id, branch_id, stock_id, product_id, movement_type,
+				    quantity_delta, quantity_before, quantity_after, unit_cost_cents,
+				    reference_type, reference_id, reason, occurred_at, created_at, created_by, correlation_id
+				)
+				VALUES (
+				    :id, :organizationId, :branchId, :stockId, :productId, :movementType,
+				    :quantityDelta, :quantityBefore, :quantityAfter, :unitCostCents,
+				    :referenceType, :referenceId, :reason, :occurredAt, :createdAt, :createdBy, :correlationId
+				)
+				""")
+				.param("id", movementId)
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("stockId", stockId)
+				.param("productId", productId)
+				.param("movementType", movementType)
+				.param("quantityDelta", quantityDelta)
+				.param("quantityBefore", quantityBefore)
+				.param("quantityAfter", quantityAfter)
+				.param("unitCostCents", unitCostCents)
+				.param("referenceType", referenceType)
+				.param("referenceId", referenceId)
+				.param("reason", reason)
+				.param("occurredAt", occurredAt)
+				.param("createdAt", occurredAt)
+				.param("createdBy", actorUserId)
+				.param("correlationId", correlationId)
+				.update();
+		return movementId;
+	}
+
 	public Optional<ProductForInventory> product(UUID organizationId, UUID productId) {
 		return jdbcClient.sql("""
 				SELECT id, sku, name, product_type, status

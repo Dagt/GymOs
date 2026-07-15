@@ -3,37 +3,52 @@ package com.gymos.memberships.application;
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
-import com.gymos.memberships.api.MembershipController.ChangePlanRequest;
-import com.gymos.memberships.api.MembershipController.RenewMembershipRequest;
-import com.gymos.memberships.api.MembershipController.RenewMembershipResponse;
+import com.gymos.memberships.api.events.MembershipActivatedV1;
+import com.gymos.memberships.api.events.MembershipPlanChangedV1;
+import com.gymos.memberships.api.events.MembershipRenewedV1;
+import com.gymos.memberships.api.operations.ChangeMembershipPlanOperationCommand;
+import com.gymos.memberships.api.operations.MembershipOperations;
+import com.gymos.memberships.api.operations.MembershipSaleOperationResult;
+import com.gymos.memberships.api.operations.MembershipSummaryOperationResult;
+import com.gymos.memberships.api.operations.RenewMembershipOperationCommand;
+import com.gymos.memberships.application.command.ChangeMembershipPlanCommand;
+import com.gymos.memberships.application.command.RenewMembershipCommand;
+import com.gymos.memberships.application.result.MembershipSaleResult;
+import com.gymos.memberships.application.result.MembershipSummaryResult;
 import com.gymos.memberships.infrastructure.MembershipRepository;
 import com.gymos.memberships.infrastructure.MembershipRepository.MembershipSummary;
 import com.gymos.memberships.infrastructure.MembershipRepository.PlanForRenewal;
+import com.gymos.sales.api.operations.CreateMembershipPlanChangeSaleCommand;
+import com.gymos.sales.api.operations.CreateMembershipRenewalSaleCommand;
+import com.gymos.sales.api.operations.SalesOperations;
+import com.gymos.sales.api.events.PaymentCompletedLineItemV1;
+import com.gymos.sales.api.events.PaymentCompletedV1;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class MembershipService {
-	private static final DateTimeFormatter SALE_NUMBER_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
-
-	private final JdbcClient jdbcClient;
+public class MembershipService implements MembershipOperations {
 	private final MembershipRepository membershipRepository;
+	private final SalesOperations salesOperations;
 	private final AuditService auditService;
+	private final ApplicationEventPublisher eventPublisher;
 
 	public MembershipService(
-			JdbcClient jdbcClient,
 			MembershipRepository membershipRepository,
-			AuditService auditService
+			SalesOperations salesOperations,
+			AuditService auditService,
+			ApplicationEventPublisher eventPublisher
 	) {
-		this.jdbcClient = jdbcClient;
 		this.membershipRepository = membershipRepository;
+		this.salesOperations = salesOperations;
 		this.auditService = auditService;
+		this.eventPublisher = eventPublisher;
 	}
 
 	@Transactional(readOnly = true)
@@ -53,10 +68,10 @@ public class MembershipService {
 	}
 
 	@Transactional
-	public RenewMembershipResponse renew(
+	public MembershipSaleResult renew(
 			GymOsPrincipal principal,
 			UUID membershipId,
-			RenewMembershipRequest request,
+			RenewMembershipCommand command,
 			String correlationId
 	) {
 		requireBranch(principal);
@@ -68,126 +83,52 @@ public class MembershipService {
 		PlanForRenewal plan = membershipRepository.planForRenewal(principal.organizationId(), current.planId())
 				.orElseThrow(() -> new BusinessException("PLAN_NOT_AVAILABLE", "El plan de la membresia no esta disponible para renovacion."));
 
-		OffsetDateTime now = OffsetDateTime.now();
-		UUID saleId = UUID.randomUUID();
-		UUID saleItemId = UUID.randomUUID();
-		UUID paymentId = UUID.randomUUID();
-		String saleNumber = "S-" + now.format(SALE_NUMBER_FORMAT) + "-" + saleId.toString().substring(0, 6).toUpperCase();
-		String method = request.method().trim().toUpperCase();
-		boolean completed = request.validateNow() || "CASH".equals(method);
-		String paymentStatus = completed ? "COMPLETED" : "PENDING_VALIDATION";
-		String saleStatus = completed ? "PAID" : "PENDING_PAYMENT";
-		long paidCents = completed ? plan.priceCents() : 0;
-		long balanceCents = completed ? 0 : plan.priceCents();
-
-		jdbcClient.sql("""
-				INSERT INTO sale (
-				    id, organization_id, branch_id, client_id, sale_number, status,
-				    subtotal_cents, discount_cents, total_cents, paid_cents, balance_cents,
-				    currency, notes, sold_at, created_at, updated_at, created_by, updated_by, version
-				)
-				VALUES (
-				    :id, :organizationId, :branchId, :clientId, :saleNumber, :status,
-				    :subtotalCents, 0, :totalCents, :paidCents, :balanceCents,
-				    :currency, :notes, :soldAt, :createdAt, :updatedAt, :createdBy, :updatedBy, 0
-				)
-				""")
-				.param("id", saleId)
-				.param("organizationId", principal.organizationId())
-				.param("branchId", principal.branchId())
-				.param("clientId", current.clientId())
-				.param("saleNumber", saleNumber)
-				.param("status", saleStatus)
-				.param("subtotalCents", plan.priceCents())
-				.param("totalCents", plan.priceCents())
-				.param("paidCents", paidCents)
-				.param("balanceCents", balanceCents)
-				.param("currency", plan.currency())
-				.param("notes", blankToNull(request.notes()))
-				.param("soldAt", now)
-				.param("createdAt", now)
-				.param("updatedAt", now)
-				.param("createdBy", principal.userId())
-				.param("updatedBy", principal.userId())
-				.update();
-
-		jdbcClient.sql("""
-				INSERT INTO sale_item (
-				    id, sale_id, organization_id, product_id, item_type, name, quantity,
-				    unit_price_cents, discount_cents, total_cents, created_at
-				)
-				VALUES (
-				    :id, :saleId, :organizationId, :productId, 'MEMBERSHIP_PLAN', :name, 1,
-				    :unitPriceCents, 0, :totalCents, :createdAt
-				)
-				""")
-				.param("id", saleItemId)
-				.param("saleId", saleId)
-				.param("organizationId", principal.organizationId())
-				.param("productId", plan.productId())
-				.param("name", plan.planName())
-				.param("unitPriceCents", plan.priceCents())
-				.param("totalCents", plan.priceCents())
-				.param("createdAt", now)
-				.update();
-
-		jdbcClient.sql("""
-				INSERT INTO payment (
-				    id, organization_id, branch_id, sale_id, client_id, method, status,
-				    amount_cents, currency, reference, receipt_object_key, received_at,
-				    validated_at, validated_by, notes, created_at, updated_at, created_by, updated_by, version
-				)
-				VALUES (
-				    :id, :organizationId, :branchId, :saleId, :clientId, :method, :status,
-				    :amountCents, :currency, :reference, NULL, :receivedAt,
-				    :validatedAt, :validatedBy, :notes, :createdAt, :updatedAt, :createdBy, :updatedBy, 0
-				)
-				""")
-				.param("id", paymentId)
-				.param("organizationId", principal.organizationId())
-				.param("branchId", principal.branchId())
-				.param("saleId", saleId)
-				.param("clientId", current.clientId())
-				.param("method", method)
-				.param("status", paymentStatus)
-				.param("amountCents", plan.priceCents())
-				.param("currency", plan.currency())
-				.param("reference", blankToNull(request.reference()))
-				.param("receivedAt", now)
-				.param("validatedAt", completed ? now : null)
-				.param("validatedBy", completed ? principal.userId() : null)
-				.param("notes", blankToNull(request.notes()))
-				.param("createdAt", now)
-				.param("updatedAt", now)
-				.param("createdBy", principal.userId())
-				.param("updatedBy", principal.userId())
-				.update();
-
-		auditService.record(principal, "SALE_CREATED", "SALE", saleId, "MEMBERSHIP_RENEWAL", null, correlationId);
-		auditService.record(principal, "PAYMENT_RECORDED", "PAYMENT", paymentId, "MEMBERSHIP_RENEWAL", null, correlationId);
-
-		MembershipSummary renewed = null;
-		if (completed) {
-			renewed = activateRenewal(principal, current, plan, saleId, now, correlationId);
-		}
-
-		return new RenewMembershipResponse(
-				saleId,
-				saleNumber,
-				saleStatus,
+		var sale = salesOperations.createMembershipRenewal(new CreateMembershipRenewalSaleCommand(
+				principal.organizationId(),
+				principal.branchId(),
+				principal.userId(),
+				current.clientId(),
+				current.id(),
+				plan.planId(),
+				plan.productId(),
+				plan.planName(),
 				plan.priceCents(),
-				paidCents,
-				balanceCents,
 				plan.currency(),
-				renewed
-		);
+				command.method(),
+				command.reference(),
+				command.validateNow(),
+				command.notes(),
+				defaultIdempotencyKey("membership-renewal", membershipId, command.idempotencyKey()),
+				correlationId
+		));
+		MembershipSummary renewed = sale.paymentCompleted()
+				? membershipRepository.bySaleAndPlan(principal.organizationId(), principal.branchId(), sale.saleId(), plan.planId()).orElse(null)
+				: null;
+		return toMembershipSaleResult(sale, renewed);
+	}
+
+	@Override
+	@Transactional
+	public MembershipSaleOperationResult renew(
+			GymOsPrincipal principal,
+			UUID membershipId,
+			RenewMembershipOperationCommand command,
+			String correlationId
+	) {
+		return toOperationResult(renew(principal, membershipId, new RenewMembershipCommand(
+				command.method(),
+				command.reference(),
+				command.validateNow(),
+				command.notes(),
+				command.idempotencyKey()
+		), correlationId));
 	}
 
 	@Transactional
-	public RenewMembershipResponse changePlan(
+	public MembershipSaleResult changePlan(
 			GymOsPrincipal principal,
 			UUID membershipId,
-			ChangePlanRequest request,
+			ChangeMembershipPlanCommand command,
 			String correlationId
 	) {
 		requireBranch(principal);
@@ -196,226 +137,266 @@ public class MembershipService {
 		if (!"ACTIVE".equals(current.status())) {
 			throw new BusinessException("MEMBERSHIP_NOT_CHANGEABLE", "Solo puedes cambiar una membresia activa.");
 		}
-		if (current.planId().equals(request.targetPlanId())) {
+		if (current.planId().equals(command.targetPlanId())) {
 			throw new BusinessException("MEMBERSHIP_PLAN_UNCHANGED", "Selecciona un plan diferente.");
 		}
-		PlanForRenewal plan = membershipRepository.planForRenewal(principal.organizationId(), request.targetPlanId())
+		PlanForRenewal plan = membershipRepository.planForRenewal(principal.organizationId(), command.targetPlanId())
 				.orElseThrow(() -> new BusinessException("PLAN_NOT_AVAILABLE", "El plan seleccionado no esta disponible."));
-		String method = request.method().trim().toUpperCase();
-		if (!request.validateNow() && !"CASH".equals(method)) {
+		String method = command.method().trim().toUpperCase();
+		if (!command.validateNow() && !"CASH".equals(method)) {
 			throw new BusinessException("PLAN_CHANGE_REQUIRES_COMPLETED_PAYMENT", "El cambio de plan requiere pago completado.");
 		}
 
-		OffsetDateTime now = OffsetDateTime.now();
-		UUID saleId = UUID.randomUUID();
-		UUID saleItemId = UUID.randomUUID();
-		UUID paymentId = UUID.randomUUID();
-		String saleNumber = "S-" + now.format(SALE_NUMBER_FORMAT) + "-" + saleId.toString().substring(0, 6).toUpperCase();
-
-		jdbcClient.sql("""
-				INSERT INTO sale (
-				    id, organization_id, branch_id, client_id, sale_number, status,
-				    subtotal_cents, discount_cents, total_cents, paid_cents, balance_cents,
-				    currency, notes, sold_at, created_at, updated_at, created_by, updated_by, version
-				)
-				VALUES (
-				    :id, :organizationId, :branchId, :clientId, :saleNumber, 'PAID',
-				    :subtotalCents, 0, :totalCents, :paidCents, 0,
-				    :currency, :notes, :soldAt, :createdAt, :updatedAt, :createdBy, :updatedBy, 0
-				)
-				""")
-				.param("id", saleId)
-				.param("organizationId", principal.organizationId())
-				.param("branchId", principal.branchId())
-				.param("clientId", current.clientId())
-				.param("saleNumber", saleNumber)
-				.param("subtotalCents", plan.priceCents())
-				.param("totalCents", plan.priceCents())
-				.param("paidCents", plan.priceCents())
-				.param("currency", plan.currency())
-				.param("notes", blankToNull(request.notes()))
-				.param("soldAt", now)
-				.param("createdAt", now)
-				.param("updatedAt", now)
-				.param("createdBy", principal.userId())
-				.param("updatedBy", principal.userId())
-				.update();
-
-		jdbcClient.sql("""
-				INSERT INTO sale_item (
-				    id, sale_id, organization_id, product_id, item_type, name, quantity,
-				    unit_price_cents, discount_cents, total_cents, created_at
-				)
-				VALUES (
-				    :id, :saleId, :organizationId, :productId, 'MEMBERSHIP_PLAN', :name, 1,
-				    :unitPriceCents, 0, :totalCents, :createdAt
-				)
-				""")
-				.param("id", saleItemId)
-				.param("saleId", saleId)
-				.param("organizationId", principal.organizationId())
-				.param("productId", plan.productId())
-				.param("name", plan.planName())
-				.param("unitPriceCents", plan.priceCents())
-				.param("totalCents", plan.priceCents())
-				.param("createdAt", now)
-				.update();
-
-		jdbcClient.sql("""
-				INSERT INTO payment (
-				    id, organization_id, branch_id, sale_id, client_id, method, status,
-				    amount_cents, currency, reference, receipt_object_key, received_at,
-				    validated_at, validated_by, notes, created_at, updated_at, created_by, updated_by, version
-				)
-				VALUES (
-				    :id, :organizationId, :branchId, :saleId, :clientId, :method, 'COMPLETED',
-				    :amountCents, :currency, :reference, NULL, :receivedAt,
-				    :validatedAt, :validatedBy, :notes, :createdAt, :updatedAt, :createdBy, :updatedBy, 0
-				)
-				""")
-				.param("id", paymentId)
-				.param("organizationId", principal.organizationId())
-				.param("branchId", principal.branchId())
-				.param("saleId", saleId)
-				.param("clientId", current.clientId())
-				.param("method", method)
-				.param("amountCents", plan.priceCents())
-				.param("currency", plan.currency())
-				.param("reference", blankToNull(request.reference()))
-				.param("receivedAt", now)
-				.param("validatedAt", now)
-				.param("validatedBy", principal.userId())
-				.param("notes", blankToNull(request.notes()))
-				.param("createdAt", now)
-				.param("updatedAt", now)
-				.param("createdBy", principal.userId())
-				.param("updatedBy", principal.userId())
-				.update();
-
-		jdbcClient.sql("""
-				UPDATE membership
-				SET status = 'CANCELLED',
-				    updated_at = :updatedAt,
-				    updated_by = :updatedBy,
-				    version = version + 1
-				WHERE organization_id = :organizationId
-				  AND branch_id = :branchId
-				  AND id = :membershipId
-				  AND deleted_at IS NULL
-				""")
-				.param("updatedAt", now)
-				.param("updatedBy", principal.userId())
-				.param("organizationId", principal.organizationId())
-				.param("branchId", principal.branchId())
-				.param("membershipId", current.id())
-				.update();
-
-		MembershipSummary changed = activatePlanChange(principal, current, plan, saleId, now, correlationId);
-		auditService.record(principal, "SALE_CREATED", "SALE", saleId, "MEMBERSHIP_PLAN_CHANGE", null, correlationId);
-		auditService.record(principal, "PAYMENT_RECORDED", "PAYMENT", paymentId, "MEMBERSHIP_PLAN_CHANGE", null, correlationId);
-		auditService.record(principal, "MEMBERSHIP_PLAN_CHANGED", "MEMBERSHIP", changed.id(), "MEMBERSHIP_PLAN_CHANGE", null, correlationId);
-
-		return new RenewMembershipResponse(
-				saleId,
-				saleNumber,
-				"PAID",
+		var sale = salesOperations.createMembershipPlanChange(new CreateMembershipPlanChangeSaleCommand(
+				principal.organizationId(),
+				principal.branchId(),
+				principal.userId(),
+				current.clientId(),
+				current.id(),
+				plan.planId(),
+				plan.productId(),
+				plan.planName(),
 				plan.priceCents(),
-				plan.priceCents(),
-				0,
 				plan.currency(),
-				changed
+				command.method(),
+				command.reference(),
+				command.validateNow(),
+				command.notes(),
+				defaultIdempotencyKey("membership-plan-change", membershipId, command.idempotencyKey()),
+				correlationId
+		));
+		MembershipSummary changed = sale.paymentCompleted()
+				? membershipRepository.bySaleAndPlan(principal.organizationId(), principal.branchId(), sale.saleId(), plan.planId()).orElse(null)
+				: null;
+		return toMembershipSaleResult(sale, changed);
+	}
+
+	@Override
+	@Transactional
+	public MembershipSaleOperationResult changePlan(
+			GymOsPrincipal principal,
+			UUID membershipId,
+			ChangeMembershipPlanOperationCommand command,
+			String correlationId
+	) {
+		return toOperationResult(changePlan(principal, membershipId, new ChangeMembershipPlanCommand(
+				command.targetPlanId(),
+				command.method(),
+				command.reference(),
+				command.validateNow(),
+				command.notes(),
+				command.idempotencyKey()
+		), correlationId));
+	}
+
+	@EventListener
+	@Transactional
+	public void onPaymentCompleted(PaymentCompletedV1 event) {
+		if (!membershipRepository.markEventProcessed(event.organizationId(), event.eventKey(), event.getClass().getSimpleName())) {
+			return;
+		}
+		if (event.clientId() == null) {
+			return;
+		}
+		if ("MEMBERSHIP_RENEWAL".equals(event.businessContext())) {
+			processRenewalPayment(event);
+			return;
+		}
+		if ("MEMBERSHIP_PLAN_CHANGE".equals(event.businessContext())) {
+			processPlanChangePayment(event);
+			return;
+		}
+		for (PaymentCompletedLineItemV1 item : event.items()) {
+			membershipRepository.planForProduct(event.organizationId(), item.productId())
+					.ifPresent(plan -> activateMembershipForSale(event, null, plan, "MEMBERSHIP_ACTIVATED"));
+		}
+	}
+
+	private void processRenewalPayment(PaymentCompletedV1 event) {
+		if (event.contextMembershipId() == null) {
+			throw new BusinessException("MEMBERSHIP_CONTEXT_REQUIRED", "La renovacion necesita membresia origen.");
+		}
+		MembershipSummary current = membershipRepository.byId(event.organizationId(), event.branchId(), event.contextMembershipId())
+				.orElseThrow(() -> new BusinessException("MEMBERSHIP_NOT_FOUND", "La membresia no existe o no esta disponible."));
+		PlanForRenewal plan = membershipRepository.planForRenewal(event.organizationId(), current.planId())
+				.orElseThrow(() -> new BusinessException("PLAN_NOT_AVAILABLE", "El plan de la membresia no esta disponible para renovacion."));
+		activateMembershipForSale(event, current.id(), plan, "MEMBERSHIP_RENEWED");
+	}
+
+	private void processPlanChangePayment(PaymentCompletedV1 event) {
+		if (event.contextMembershipId() == null || event.contextTargetPlanId() == null) {
+			throw new BusinessException("MEMBERSHIP_CONTEXT_REQUIRED", "El cambio de plan necesita membresia origen y plan destino.");
+		}
+		MembershipSummary current = membershipRepository.byId(event.organizationId(), event.branchId(), event.contextMembershipId())
+				.orElseThrow(() -> new BusinessException("MEMBERSHIP_NOT_FOUND", "La membresia no existe o no esta disponible."));
+		PlanForRenewal targetPlan = membershipRepository.planForRenewal(event.organizationId(), event.contextTargetPlanId())
+				.orElseThrow(() -> new BusinessException("PLAN_NOT_AVAILABLE", "El plan seleccionado no esta disponible."));
+		cancelForPlanChange(event, current);
+		activateMembershipForSale(event, current.id(), targetPlan, "MEMBERSHIP_PLAN_CHANGED");
+	}
+
+	private MembershipSummary activateMembershipForSale(
+			PaymentCompletedV1 event,
+			UUID sourceMembershipId,
+			PlanForRenewal plan,
+			String action
+	) {
+		return membershipRepository.bySaleAndPlan(event.organizationId(), event.branchId(), event.saleId(), plan.planId())
+				.orElseGet(() -> insertMembership(event, sourceMembershipId, plan, action));
+	}
+
+	private MembershipSummary insertMembership(
+			PaymentCompletedV1 event,
+			UUID sourceMembershipId,
+			PlanForRenewal plan,
+			String action
+	) {
+		LocalDate today = LocalDate.now();
+		LocalDate latestEnd = membershipRepository.latestMembershipEnd(event.organizationId(), event.clientId(), plan.planId())
+				.orElse(null);
+		LocalDate startsOn = latestEnd != null && !latestEnd.isBefore(today) ? latestEnd.plusDays(1) : today;
+		if ("MEMBERSHIP_PLAN_CHANGED".equals(action)) {
+			startsOn = today;
+		}
+		LocalDate endsOn = startsOn.plusDays(plan.durationDays() - 1L);
+		LocalDate graceEndsOn = endsOn.plusDays(plan.graceDays());
+		UUID membershipId = membershipRepository.insertActiveMembership(
+				event.organizationId(),
+				event.branchId(),
+				event.clientId(),
+				plan.planId(),
+				event.saleId(),
+				startsOn,
+				endsOn,
+				graceEndsOn,
+				sourceMembershipId,
+				event.eventKey()
+		);
+		auditService.recordSystem(event.organizationId(), event.branchId(), null, action, "MEMBERSHIP", membershipId, event.businessContext(), null, event.eventKey());
+		MembershipSummary membership = membershipRepository.byId(event.organizationId(), event.branchId(), membershipId)
+				.orElseThrow(() -> new BusinessException("MEMBERSHIP_NOT_FOUND", "La membresia activada no esta disponible."));
+		publishMembershipEvent(event, sourceMembershipId, membership, action);
+		return membership;
+	}
+
+	private void cancelForPlanChange(PaymentCompletedV1 event, MembershipSummary current) {
+		membershipRepository.cancelActiveForPlanChange(event.organizationId(), event.branchId(), current.id());
+		auditService.recordSystem(event.organizationId(), event.branchId(), null, "MEMBERSHIP_CANCELLED_BY_PLAN_CHANGE", "MEMBERSHIP", current.id(), event.businessContext(), null, event.eventKey());
+	}
+
+	private void publishMembershipEvent(PaymentCompletedV1 paymentEvent, UUID sourceMembershipId, MembershipSummary membership, String action) {
+		if ("MEMBERSHIP_RENEWED".equals(action)) {
+			eventPublisher.publishEvent(new MembershipRenewedV1(
+					paymentEvent.eventKey() + ":membership-renewed",
+					paymentEvent.organizationId(),
+					paymentEvent.branchId(),
+					paymentEvent.clientId(),
+					sourceMembershipId,
+					membership.id(),
+					membership.planId(),
+					paymentEvent.saleId(),
+					membership.startsOn(),
+					membership.endsOn(),
+					OffsetDateTime.now()
+			));
+			return;
+		}
+		if ("MEMBERSHIP_PLAN_CHANGED".equals(action)) {
+			eventPublisher.publishEvent(new MembershipPlanChangedV1(
+					paymentEvent.eventKey() + ":membership-plan-changed",
+					paymentEvent.organizationId(),
+					paymentEvent.branchId(),
+					paymentEvent.clientId(),
+					sourceMembershipId,
+					membership.id(),
+					membership.planId(),
+					paymentEvent.saleId(),
+					membership.startsOn(),
+					membership.endsOn(),
+					OffsetDateTime.now()
+			));
+			return;
+		}
+		eventPublisher.publishEvent(new MembershipActivatedV1(
+				paymentEvent.eventKey() + ":membership-activated:" + membership.planId(),
+				paymentEvent.organizationId(),
+				paymentEvent.branchId(),
+				paymentEvent.clientId(),
+				membership.id(),
+				membership.planId(),
+				paymentEvent.saleId(),
+				membership.startsOn(),
+				membership.endsOn(),
+				OffsetDateTime.now()
+		));
+	}
+
+	private MembershipSaleResult toMembershipSaleResult(com.gymos.sales.api.operations.MembershipSaleResult sale, MembershipSummary membership) {
+		return new MembershipSaleResult(
+				sale.saleId(),
+				sale.saleNumber(),
+				sale.saleStatus(),
+				sale.totalCents(),
+				sale.paidCents(),
+				sale.balanceCents(),
+				sale.currency(),
+				toMembershipSummaryResult(membership)
 		);
 	}
 
-	private MembershipSummary activateRenewal(
-			GymOsPrincipal principal,
-			MembershipSummary current,
-			PlanForRenewal plan,
-			UUID saleId,
-			OffsetDateTime now,
-			String correlationId
-	) {
-		LocalDate today = LocalDate.now();
-		LocalDate latestEnd = membershipRepository.latestMembershipEnd(principal.organizationId(), current.clientId(), plan.planId())
-				.orElse(null);
-		LocalDate startsOn = latestEnd != null && !latestEnd.isBefore(today) ? latestEnd.plusDays(1) : today;
-		LocalDate endsOn = startsOn.plusDays(plan.durationDays() - 1L);
-		LocalDate graceEndsOn = endsOn.plusDays(plan.graceDays());
-		UUID renewedMembershipId = UUID.randomUUID();
-		jdbcClient.sql("""
-				INSERT INTO membership (
-				    id, organization_id, branch_id, client_id, plan_id, sale_id, status,
-				    activated_at, starts_on, ends_on, grace_ends_on,
-				    created_at, updated_at, created_by, updated_by, version
-				)
-				VALUES (
-				    :id, :organizationId, :branchId, :clientId, :planId, :saleId, 'ACTIVE',
-				    :activatedAt, :startsOn, :endsOn, :graceEndsOn,
-				    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
-				)
-				""")
-				.param("id", renewedMembershipId)
-				.param("organizationId", principal.organizationId())
-				.param("branchId", principal.branchId())
-				.param("clientId", current.clientId())
-				.param("planId", plan.planId())
-				.param("saleId", saleId)
-				.param("activatedAt", now)
-				.param("startsOn", startsOn)
-				.param("endsOn", endsOn)
-				.param("graceEndsOn", graceEndsOn)
-				.param("createdAt", now)
-				.param("updatedAt", now)
-				.param("createdBy", principal.userId())
-				.param("updatedBy", principal.userId())
-				.update();
-		auditService.record(principal, "MEMBERSHIP_RENEWED", "MEMBERSHIP", renewedMembershipId, "MEMBERSHIP_RENEWAL", null, correlationId);
-		return membershipRepository.byId(principal.organizationId(), principal.branchId(), renewedMembershipId)
-				.orElseThrow(() -> new BusinessException("MEMBERSHIP_NOT_FOUND", "La membresia renovada no esta disponible."));
+	private MembershipSummaryResult toMembershipSummaryResult(MembershipSummary membership) {
+		if (membership == null) {
+			return null;
+		}
+		return new MembershipSummaryResult(
+				membership.id(),
+				membership.clientId(),
+				membership.planId(),
+				membership.planName(),
+				membership.saleId(),
+				membership.saleNumber(),
+				membership.status(),
+				membership.activatedAt(),
+				membership.startsOn(),
+				membership.endsOn(),
+				membership.graceEndsOn()
+		);
 	}
 
-	private MembershipSummary activatePlanChange(
-			GymOsPrincipal principal,
-			MembershipSummary current,
-			PlanForRenewal plan,
-			UUID saleId,
-			OffsetDateTime now,
-			String correlationId
-	) {
-		LocalDate startsOn = LocalDate.now();
-		LocalDate endsOn = startsOn.plusDays(plan.durationDays() - 1L);
-		LocalDate graceEndsOn = endsOn.plusDays(plan.graceDays());
-		UUID changedMembershipId = UUID.randomUUID();
-		jdbcClient.sql("""
-				INSERT INTO membership (
-				    id, organization_id, branch_id, client_id, plan_id, sale_id, status,
-				    activated_at, starts_on, ends_on, grace_ends_on,
-				    created_at, updated_at, created_by, updated_by, version
-				)
-				VALUES (
-				    :id, :organizationId, :branchId, :clientId, :planId, :saleId, 'ACTIVE',
-				    :activatedAt, :startsOn, :endsOn, :graceEndsOn,
-				    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
-				)
-				""")
-				.param("id", changedMembershipId)
-				.param("organizationId", principal.organizationId())
-				.param("branchId", principal.branchId())
-				.param("clientId", current.clientId())
-				.param("planId", plan.planId())
-				.param("saleId", saleId)
-				.param("activatedAt", now)
-				.param("startsOn", startsOn)
-				.param("endsOn", endsOn)
-				.param("graceEndsOn", graceEndsOn)
-				.param("createdAt", now)
-				.param("updatedAt", now)
-				.param("createdBy", principal.userId())
-				.param("updatedBy", principal.userId())
-				.update();
-		auditService.record(principal, "MEMBERSHIP_CANCELLED_BY_PLAN_CHANGE", "MEMBERSHIP", current.id(), "MEMBERSHIP_PLAN_CHANGE", null, correlationId);
-		return membershipRepository.byId(principal.organizationId(), principal.branchId(), changedMembershipId)
-				.orElseThrow(() -> new BusinessException("MEMBERSHIP_NOT_FOUND", "La membresia de cambio de plan no esta disponible."));
+	private MembershipSaleOperationResult toOperationResult(MembershipSaleResult result) {
+		return new MembershipSaleOperationResult(
+				result.saleId(),
+				result.saleNumber(),
+				result.saleStatus(),
+				result.totalCents(),
+				result.paidCents(),
+				result.balanceCents(),
+				result.currency(),
+				toOperationSummary(result.membership())
+		);
+	}
+
+	private MembershipSummaryOperationResult toOperationSummary(MembershipSummaryResult membership) {
+		if (membership == null) {
+			return null;
+		}
+		return new MembershipSummaryOperationResult(
+				membership.id(),
+				membership.clientId(),
+				membership.planId(),
+				membership.planName(),
+				membership.saleId(),
+				membership.saleNumber(),
+				membership.status(),
+				membership.activatedAt(),
+				membership.startsOn(),
+				membership.endsOn(),
+				membership.graceEndsOn()
+		);
+	}
+
+	private String defaultIdempotencyKey(String operation, UUID membershipId, String provided) {
+		return provided == null || provided.isBlank() ? operation + ":" + membershipId + ":" + UUID.randomUUID() : provided.trim();
 	}
 
 	private void requireBranch(GymOsPrincipal principal) {
@@ -425,9 +406,5 @@ public class MembershipService {
 		if (principal.branchId() == null) {
 			throw new BusinessException("BRANCH_REQUIRED", "Selecciona una sucursal para operar.");
 		}
-	}
-
-	private String blankToNull(String value) {
-		return value == null || value.isBlank() ? null : value.trim();
 	}
 }

@@ -145,3 +145,36 @@ Reglas:
 - Debe cerrar sesión automáticamente por inactividad.
 - Toda acción debe auditarse con origen `SELF_SERVICE_KIOSK`.
 - Los pagos manuales iniciados desde kiosco quedan en estado pendiente o en revisión hasta que el flujo de pagos los complete según reglas.
+- Los pagos manuales iniciados desde kiosco quedan en estado pendiente o en revisiÃ³n hasta que el flujo de pagos los complete segÃºn reglas.
+
+## 3.14 Estabilizacion arquitectonica Hito 3.5
+
+Decisiones implementadas:
+- `memberships` ya no escribe en tablas `sale`, `sale_item` ni `payment`.
+- `sales` es propietario unico de ventas, partidas, pagos, validacion, numeros de venta e idempotencia comercial.
+- La API interna publica de ventas vive en `com.gymos.sales.api.operations` y expone `SalesOperations`, comandos de renovacion/cambio de plan y resultados inmutables.
+- `memberships` expone `com.gymos.memberships.api.operations.MembershipOperations`; `selfservice` consume esa API publica y ya no depende de `memberships.application`.
+- `clients` expone `com.gymos.clients.api.operations.ClientLookupOperations`; la verificacion de identidad del kiosco se resuelve dentro del modulo `clients` y `selfservice` ya no consulta tablas `client` ni `person`.
+- La capa `application` ya no depende de DTOs HTTP ni controladores; los controladores mapean request/response hacia comandos/resultados de aplicacion.
+- Eventos de negocio versionados implementados en APIs de sus modulos propietarios: `sales.api.events` contiene eventos de venta/pago y `memberships.api.events` contiene eventos de membresias.
+- La activacion de membresias por pago se consume desde `PaymentCompletedV1` y se protege con `processed_domain_event`.
+- Las operaciones comerciales aceptan `idempotencyKey`; `sale` y `payment` tienen restricciones unicas por organizacion y hash de solicitud para detectar reuse con payload distinto.
+- RBAC granular se aplica por ruta interna con permisos como `sale.create`, `payment.manual.validate`, `membership.renew` y `report.sales.read`.
+- El kiosco sigue siendo publico sin JWT interno, pero exige token temporal por sesion en `X-Self-Service-Session-Token`, verificacion por contacto + fecha de nacimiento, rate limiting via puerto `RateLimiter`, expiracion, bloqueo por intentos y auditoria.
+
+Pruebas arquitectonicas:
+- Spring Modulith verifica fronteras.
+- ArchUnit bloquea dependencias de application hacia controladores HTTP.
+- ArchUnit bloquea dependencias a infraestructura de otros modulos.
+- ArchUnit bloquea que `selfservice` dependa de `memberships.application`, `clients.application` o `clients.infrastructure`.
+- ArchUnit bloquea que los eventos de negocio vuelvan a `common.events`.
+- `MembershipService` y `SelfServiceService` ya no usan `JdbcClient`; el uso temporal restante en application queda listado explicitamente hasta extraer command repositories.
+
+## 3.15 Operacion Hito 4
+
+Decisiones implementadas:
+- `access` gestiona dispositivos, pases temporales y bitacora de accesos manuales o evaluados por membresia.
+- `inventory` gestiona existencias y movimientos manuales con bloqueo de stock negativo.
+- `bookings` gestiona recursos reservables y reservas operativas por sucursal.
+- Las reservas validan capacidad del recurso, horario operativo y traslapes de reservas activas.
+- Las pantallas `/access`, `/inventory` y `/bookings` son herramientas operativas para recepcion.

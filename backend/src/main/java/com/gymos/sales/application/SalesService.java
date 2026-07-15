@@ -4,46 +4,62 @@ import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.storage.ObjectStorageService;
-import com.gymos.sales.api.SalesController.CreateSaleRequest;
-import com.gymos.sales.api.SalesController.ManualPaymentRequest;
-import com.gymos.sales.api.SalesController.SaleDetailResponse;
-import com.gymos.sales.api.SalesController.SalesReportResponse;
+import com.gymos.sales.api.events.PaymentCompletedLineItemV1;
+import com.gymos.sales.api.events.PaymentCompletedV1;
+import com.gymos.sales.api.events.PaymentRecordedV1;
+import com.gymos.sales.api.events.PaymentRejectedV1;
+import com.gymos.sales.api.events.SaleCreatedV1;
+import com.gymos.sales.api.operations.CreateMembershipPlanChangeSaleCommand;
+import com.gymos.sales.api.operations.CreateMembershipRenewalSaleCommand;
+import com.gymos.sales.api.operations.SalesOperations;
+import com.gymos.sales.application.command.CreateSaleCommand;
+import com.gymos.sales.application.command.ManualPaymentCommand;
+import com.gymos.sales.application.result.SaleDetailResult;
+import com.gymos.sales.application.result.SalesReportResult;
 import com.gymos.sales.infrastructure.SalesRepository;
 import com.gymos.sales.infrastructure.SalesRepository.PaymentDetail;
 import com.gymos.sales.infrastructure.SalesRepository.ProductForSale;
 import com.gymos.sales.infrastructure.SalesRepository.SaleHeader;
 import com.gymos.sales.infrastructure.SalesRepository.SaleSummary;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
-public class SalesService {
+public class SalesService implements SalesOperations {
 	private static final DateTimeFormatter SALE_NUMBER_FORMAT = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
 
 	private final JdbcClient jdbcClient;
 	private final SalesRepository salesRepository;
 	private final AuditService auditService;
 	private final ObjectStorageService objectStorageService;
+	private final ApplicationEventPublisher eventPublisher;
 
 	public SalesService(
 			JdbcClient jdbcClient,
 			SalesRepository salesRepository,
 			AuditService auditService,
-			ObjectStorageService objectStorageService
+			ObjectStorageService objectStorageService,
+			ApplicationEventPublisher eventPublisher
 	) {
 		this.jdbcClient = jdbcClient;
 		this.salesRepository = salesRepository;
 		this.auditService = auditService;
 		this.objectStorageService = objectStorageService;
+		this.eventPublisher = eventPublisher;
 	}
 
 	@Transactional(readOnly = true)
@@ -53,7 +69,7 @@ public class SalesService {
 	}
 
 	@Transactional(readOnly = true)
-	public SalesReportResponse report(GymOsPrincipal principal, LocalDate fromDate, LocalDate toDate) {
+	public SalesReportResult report(GymOsPrincipal principal, LocalDate fromDate, LocalDate toDate) {
 		requireBranch(principal);
 		LocalDate resolvedTo = toDate == null ? LocalDate.now() : toDate;
 		LocalDate resolvedFrom = fromDate == null ? resolvedTo.minusDays(6) : fromDate;
@@ -67,7 +83,7 @@ public class SalesService {
 		OffsetDateTime from = resolvedFrom.atStartOfDay().atOffset(ZoneOffset.UTC);
 		OffsetDateTime toExclusive = resolvedTo.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
 		var sales = salesRepository.salesReportTotals(principal.organizationId(), principal.branchId(), from, toExclusive);
-		return new SalesReportResponse(
+		return new SalesReportResult(
 				resolvedFrom,
 				resolvedTo,
 				sales.currency(),
@@ -80,11 +96,11 @@ public class SalesService {
 	}
 
 	@Transactional(readOnly = true)
-	public SaleDetailResponse detail(GymOsPrincipal principal, UUID saleId) {
+	public SaleDetailResult detail(GymOsPrincipal principal, UUID saleId) {
 		requirePrincipal(principal);
 		SaleHeader sale = salesRepository.saleHeader(principal.organizationId(), saleId)
 				.orElseThrow(() -> new BusinessException("SALE_NOT_FOUND", "La venta no existe o no esta disponible."));
-		return new SaleDetailResponse(
+		return new SaleDetailResult(
 				sale,
 				salesRepository.saleItems(principal.organizationId(), saleId),
 				salesRepository.payments(principal.organizationId(), saleId),
@@ -93,8 +109,20 @@ public class SalesService {
 	}
 
 	@Transactional
-	public SaleDetailResponse create(GymOsPrincipal principal, CreateSaleRequest request, String correlationId) {
+	public SaleDetailResult create(GymOsPrincipal principal, CreateSaleCommand request, String correlationId) {
 		requireBranch(principal);
+		String idempotencyHash = saleRequestHash(request);
+		if (request.idempotencyKey() != null && !request.idempotencyKey().isBlank()) {
+			String key = request.idempotencyKey().trim();
+			var existing = salesRepository.saleHeaderByIdempotencyKey(principal.organizationId(), key);
+			if (existing.isPresent()) {
+				ensureSameIdempotencyRequest(
+						salesRepository.saleRequestHashByIdempotencyKey(principal.organizationId(), key).orElse(null),
+						idempotencyHash
+				);
+				return detail(principal, existing.get().id());
+			}
+		}
 		if (request.clientId() != null && !salesRepository.clientExists(principal.organizationId(), request.clientId())) {
 			throw new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible.");
 		}
@@ -145,12 +173,14 @@ public class SalesService {
 				INSERT INTO sale (
 				    id, organization_id, branch_id, client_id, sale_number, status,
 				    subtotal_cents, discount_cents, total_cents, paid_cents, balance_cents,
-				    currency, notes, sold_at, created_at, updated_at, created_by, updated_by, version
+				    currency, notes, sold_at, created_at, updated_at, created_by, updated_by, version,
+				    idempotency_key, idempotency_request_hash
 				)
 				VALUES (
 				    :id, :organizationId, :branchId, :clientId, :saleNumber, 'PENDING_PAYMENT',
 				    :subtotalCents, :discountCents, :totalCents, 0, :balanceCents,
-				    :currency, :notes, :soldAt, :createdAt, :updatedAt, :createdBy, :updatedBy, 0
+				    :currency, :notes, :soldAt, :createdAt, :updatedAt, :createdBy, :updatedBy, 0,
+				    :idempotencyKey, :idempotencyRequestHash
 				)
 				""")
 				.param("id", saleId)
@@ -169,6 +199,8 @@ public class SalesService {
 				.param("updatedAt", now)
 				.param("createdBy", principal.userId())
 				.param("updatedBy", principal.userId())
+				.param("idempotencyKey", blankToNull(request.idempotencyKey()))
+				.param("idempotencyRequestHash", idempotencyHash)
 				.update();
 
 		for (var item : request.items()) {
@@ -200,6 +232,7 @@ public class SalesService {
 		}
 
 		auditService.record(principal, "SALE_CREATED", "SALE", saleId, "POS", null, correlationId);
+		eventPublisher.publishEvent(new SaleCreatedV1("sale-created:" + saleId, principal.organizationId(), principal.branchId(), saleId, saleNumber, null, total, currency, now));
 		if (request.payment() != null) {
 			addPaymentInternal(principal, saleId, request.payment(), correlationId);
 		}
@@ -207,11 +240,207 @@ public class SalesService {
 		return detail(principal, saleId);
 	}
 
+	@Override
 	@Transactional
-	public SaleDetailResponse addPayment(
+	public com.gymos.sales.api.operations.MembershipSaleResult createMembershipRenewal(CreateMembershipRenewalSaleCommand command) {
+		return createMembershipSale(
+				command.organizationId(),
+				command.branchId(),
+				command.actorUserId(),
+				command.clientId(),
+				command.sourceMembershipId(),
+				command.planId(),
+				command.productId(),
+				command.planName(),
+				command.priceCents(),
+				command.currency(),
+				command.method(),
+				command.reference(),
+				command.validateNow(),
+				command.notes(),
+				command.idempotencyKey(),
+				"MEMBERSHIP_RENEWAL",
+				command.correlationId()
+		);
+	}
+
+	@Override
+	@Transactional
+	public com.gymos.sales.api.operations.MembershipSaleResult createMembershipPlanChange(CreateMembershipPlanChangeSaleCommand command) {
+		return createMembershipSale(
+				command.organizationId(),
+				command.branchId(),
+				command.actorUserId(),
+				command.clientId(),
+				command.sourceMembershipId(),
+				command.targetPlanId(),
+				command.productId(),
+				command.planName(),
+				command.priceCents(),
+				command.currency(),
+				command.method(),
+				command.reference(),
+				command.validateNow(),
+				command.notes(),
+				command.idempotencyKey(),
+				"MEMBERSHIP_PLAN_CHANGE",
+				command.correlationId()
+		);
+	}
+
+	private com.gymos.sales.api.operations.MembershipSaleResult createMembershipSale(
+			UUID organizationId,
+			UUID branchId,
+			UUID actorUserId,
+			UUID clientId,
+			UUID sourceMembershipId,
+			UUID targetPlanId,
+			UUID productId,
+			String planName,
+			long priceCents,
+			String currency,
+			String method,
+			String reference,
+			boolean validateNow,
+			String notes,
+			String idempotencyKey,
+			String businessContext,
+			String correlationId
+	) {
+		String idempotencyHash = membershipSaleRequestHash(clientId, sourceMembershipId, targetPlanId, productId, priceCents, currency, method, reference, validateNow, notes, businessContext);
+		if (idempotencyKey != null && !idempotencyKey.isBlank()) {
+			String key = idempotencyKey.trim();
+			var existing = salesRepository.saleHeaderByIdempotencyKey(organizationId, key);
+			if (existing.isPresent()) {
+				ensureSameIdempotencyRequest(
+						salesRepository.saleRequestHashByIdempotencyKey(organizationId, key).orElse(null),
+						idempotencyHash
+				);
+				return toMembershipSaleResult(existing.get());
+			}
+		}
+
+		OffsetDateTime now = OffsetDateTime.now();
+		UUID saleId = UUID.randomUUID();
+		UUID paymentId = UUID.randomUUID();
+		String saleNumber = "S-" + now.format(SALE_NUMBER_FORMAT) + "-" + saleId.toString().substring(0, 6).toUpperCase();
+		String normalizedMethod = method.trim().toUpperCase();
+		boolean completed = validateNow || "CASH".equals(normalizedMethod);
+		String paymentStatus = completed ? "COMPLETED" : "PENDING_VALIDATION";
+		String saleStatus = completed ? "PAID" : "PENDING_PAYMENT";
+		long paidCents = completed ? priceCents : 0;
+		long balanceCents = completed ? 0 : priceCents;
+
+		jdbcClient.sql("""
+				INSERT INTO sale (
+				    id, organization_id, branch_id, client_id, sale_number, status,
+				    subtotal_cents, discount_cents, total_cents, paid_cents, balance_cents,
+				    currency, notes, sold_at, created_at, updated_at, created_by, updated_by, version,
+				    idempotency_key, idempotency_request_hash, business_context, context_membership_id, context_target_plan_id
+				)
+				VALUES (
+				    :id, :organizationId, :branchId, :clientId, :saleNumber, :status,
+				    :subtotalCents, 0, :totalCents, :paidCents, :balanceCents,
+				    :currency, :notes, :soldAt, :createdAt, :updatedAt, :createdBy, :updatedBy, 0,
+				    :idempotencyKey, :idempotencyRequestHash, :businessContext, :contextMembershipId, :contextTargetPlanId
+				)
+				""")
+				.param("id", saleId)
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("clientId", clientId)
+				.param("saleNumber", saleNumber)
+				.param("status", saleStatus)
+				.param("subtotalCents", priceCents)
+				.param("totalCents", priceCents)
+				.param("paidCents", paidCents)
+				.param("balanceCents", balanceCents)
+				.param("currency", currency)
+				.param("notes", blankToNull(notes))
+				.param("soldAt", now)
+				.param("createdAt", now)
+				.param("updatedAt", now)
+				.param("createdBy", actorUserId)
+				.param("updatedBy", actorUserId)
+				.param("idempotencyKey", blankToNull(idempotencyKey))
+				.param("idempotencyRequestHash", idempotencyHash)
+				.param("businessContext", businessContext)
+				.param("contextMembershipId", sourceMembershipId)
+				.param("contextTargetPlanId", targetPlanId)
+				.update();
+
+		jdbcClient.sql("""
+				INSERT INTO sale_item (
+				    id, sale_id, organization_id, product_id, item_type, name, quantity,
+				    unit_price_cents, discount_cents, total_cents, created_at
+				)
+				VALUES (
+				    :id, :saleId, :organizationId, :productId, 'MEMBERSHIP_PLAN', :name, 1,
+				    :unitPriceCents, 0, :totalCents, :createdAt
+				)
+				""")
+				.param("id", UUID.randomUUID())
+				.param("saleId", saleId)
+				.param("organizationId", organizationId)
+				.param("productId", productId)
+				.param("name", planName)
+				.param("unitPriceCents", priceCents)
+				.param("totalCents", priceCents)
+				.param("createdAt", now)
+				.update();
+
+		jdbcClient.sql("""
+				INSERT INTO payment (
+				    id, organization_id, branch_id, sale_id, client_id, method, status,
+				    amount_cents, currency, reference, receipt_object_key, received_at,
+				    validated_at, validated_by, notes, created_at, updated_at, created_by, updated_by, version,
+				    idempotency_key, idempotency_request_hash
+				)
+				VALUES (
+				    :id, :organizationId, :branchId, :saleId, :clientId, :method, :status,
+				    :amountCents, :currency, :reference, NULL, :receivedAt,
+				    :validatedAt, :validatedBy, :notes, :createdAt, :updatedAt, :createdBy, :updatedBy, 0,
+				    :idempotencyKey, :idempotencyRequestHash
+				)
+				""")
+				.param("id", paymentId)
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("saleId", saleId)
+				.param("clientId", clientId)
+				.param("method", normalizedMethod)
+				.param("status", paymentStatus)
+				.param("amountCents", priceCents)
+				.param("currency", currency)
+				.param("reference", blankToNull(reference))
+				.param("receivedAt", now)
+				.param("validatedAt", completed ? now : null)
+				.param("validatedBy", completed ? actorUserId : null)
+				.param("notes", blankToNull(notes))
+				.param("createdAt", now)
+				.param("updatedAt", now)
+				.param("createdBy", actorUserId)
+				.param("updatedBy", actorUserId)
+				.param("idempotencyKey", blankToNull(idempotencyKey == null ? null : idempotencyKey + ":payment"))
+				.param("idempotencyRequestHash", paymentRequestHash(method, priceCents, reference, null, validateNow, notes))
+				.update();
+
+		auditService.recordSystem(organizationId, branchId, actorUserId, "SALE_CREATED", "SALE", saleId, businessContext, null, correlationId);
+		auditService.recordSystem(organizationId, branchId, actorUserId, "PAYMENT_RECORDED", "PAYMENT", paymentId, businessContext, null, correlationId);
+		eventPublisher.publishEvent(new SaleCreatedV1("sale-created:" + saleId, organizationId, branchId, saleId, saleNumber, businessContext, priceCents, currency, now));
+		eventPublisher.publishEvent(new PaymentRecordedV1("payment-recorded:" + paymentId, organizationId, branchId, saleId, paymentId, normalizedMethod, paymentStatus, priceCents, currency, now));
+		if (completed) {
+			publishPaymentCompletedIfNeeded(organizationId, saleId);
+		}
+		SaleHeader sale = salesRepository.saleHeader(organizationId, saleId).orElseThrow();
+		return toMembershipSaleResult(sale);
+	}
+
+	@Transactional
+	public SaleDetailResult addPayment(
 			GymOsPrincipal principal,
 			UUID saleId,
-			ManualPaymentRequest request,
+			ManualPaymentCommand request,
 			String correlationId
 	) {
 		requireBranch(principal);
@@ -222,7 +451,7 @@ public class SalesService {
 	}
 
 	@Transactional
-	public SaleDetailResponse uploadReceipt(
+	public SaleDetailResult uploadReceipt(
 			GymOsPrincipal principal,
 			UUID paymentId,
 			MultipartFile file,
@@ -265,7 +494,7 @@ public class SalesService {
 	}
 
 	@Transactional
-	public SaleDetailResponse validatePayment(GymOsPrincipal principal, UUID paymentId, String correlationId) {
+	public SaleDetailResult validatePayment(GymOsPrincipal principal, UUID paymentId, String correlationId) {
 		requireBranch(principal);
 		UUID saleId = salesRepository.saleIdForPayment(principal.organizationId(), paymentId)
 				.orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "El pago no existe o no esta disponible."));
@@ -300,7 +529,7 @@ public class SalesService {
 	}
 
 	@Transactional
-	public SaleDetailResponse rejectPayment(
+	public SaleDetailResult rejectPayment(
 			GymOsPrincipal principal,
 			UUID paymentId,
 			String reason,
@@ -336,6 +565,7 @@ public class SalesService {
 				.param("paymentId", paymentId)
 				.update();
 		auditService.record(principal, "PAYMENT_REJECTED", "PAYMENT", paymentId, "POS", reason, correlationId);
+		eventPublisher.publishEvent(new PaymentRejectedV1("payment-rejected:" + paymentId, principal.organizationId(), principal.branchId(), saleId, paymentId, reason, OffsetDateTime.now()));
 		recalculateSale(principal.organizationId(), saleId, principal.userId());
 		return detail(principal, saleId);
 	}
@@ -343,10 +573,32 @@ public class SalesService {
 	private void addPaymentInternal(
 			GymOsPrincipal principal,
 			UUID saleId,
-			ManualPaymentRequest request,
+			ManualPaymentCommand request,
 			String correlationId
 	) {
 		SaleHeader sale = ensureSale(principal, saleId);
+		String idempotencyHash = paymentRequestHash(
+				request.method(),
+				request.amountCents(),
+				request.reference(),
+				request.receiptObjectKey(),
+				request.validateNow(),
+				request.notes()
+		);
+		if (request.idempotencyKey() != null && !request.idempotencyKey().isBlank()) {
+			String key = request.idempotencyKey().trim();
+			UUID existingSaleId = paymentSaleByIdempotencyKey(principal.organizationId(), key);
+			if (existingSaleId != null) {
+				if (!existingSaleId.equals(saleId)) {
+					throw new BusinessException("IDEMPOTENCY_KEY_REUSED", "La llave de idempotencia ya fue usada en otra venta.");
+				}
+				ensureSameIdempotencyRequest(
+						salesRepository.paymentRequestHashByIdempotencyKey(principal.organizationId(), key).orElse(null),
+						idempotencyHash
+				);
+				return;
+			}
+		}
 		if (request.amountCents() <= 0) {
 			throw new BusinessException("PAYMENT_AMOUNT_INVALID", "El pago debe ser mayor a cero.");
 		}
@@ -358,12 +610,14 @@ public class SalesService {
 				INSERT INTO payment (
 				    id, organization_id, branch_id, sale_id, client_id, method, status,
 				    amount_cents, currency, reference, receipt_object_key, received_at,
-				    validated_at, validated_by, notes, created_at, updated_at, created_by, updated_by, version
+				    validated_at, validated_by, notes, created_at, updated_at, created_by, updated_by, version,
+				    idempotency_key, idempotency_request_hash
 				)
 				VALUES (
 				    :id, :organizationId, :branchId, :saleId, :clientId, :method, :status,
 				    :amountCents, :currency, :reference, :receiptObjectKey, :receivedAt,
-				    :validatedAt, :validatedBy, :notes, :createdAt, :updatedAt, :createdBy, :updatedBy, 0
+				    :validatedAt, :validatedBy, :notes, :createdAt, :updatedAt, :createdBy, :updatedBy, 0,
+				    :idempotencyKey, :idempotencyRequestHash
 				)
 				""")
 				.param("id", paymentId)
@@ -385,8 +639,26 @@ public class SalesService {
 				.param("updatedAt", now)
 				.param("createdBy", principal.userId())
 				.param("updatedBy", principal.userId())
+				.param("idempotencyKey", blankToNull(request.idempotencyKey()))
+				.param("idempotencyRequestHash", idempotencyHash)
 				.update();
 		auditService.record(principal, "PAYMENT_RECORDED", "PAYMENT", paymentId, "POS", null, correlationId);
+		eventPublisher.publishEvent(new PaymentRecordedV1("payment-recorded:" + paymentId, principal.organizationId(), principal.branchId(), saleId, paymentId, method, status, request.amountCents(), sale.currency(), now));
+	}
+
+	private UUID paymentSaleByIdempotencyKey(UUID organizationId, String idempotencyKey) {
+		return jdbcClient.sql("""
+				SELECT sale_id
+				FROM payment
+				WHERE organization_id = :organizationId
+				  AND idempotency_key = :idempotencyKey
+				  AND deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("idempotencyKey", idempotencyKey)
+				.query(UUID.class)
+				.optional()
+				.orElse(null);
 	}
 
 	private void recalculateSale(UUID organizationId, UUID saleId, UUID userId) {
@@ -427,58 +699,97 @@ public class SalesService {
 				.param("saleId", saleId)
 				.update();
 		if ("PAID".equals(status)) {
-			activateMembershipsForPaidSale(organizationId, saleId, userId);
+			publishPaymentCompletedIfNeeded(organizationId, saleId);
 		}
 	}
 
-	private void activateMembershipsForPaidSale(UUID organizationId, UUID saleId, UUID userId) {
-		SaleHeader sale = salesRepository.saleHeader(organizationId, saleId)
-				.orElseThrow(() -> new BusinessException("SALE_NOT_FOUND", "La venta no existe o no esta disponible."));
-		if (sale.clientId() == null) {
+	private void publishPaymentCompletedIfNeeded(UUID organizationId, UUID saleId) {
+		OffsetDateTime now = OffsetDateTime.now();
+		int updated = jdbcClient.sql("""
+				UPDATE sale
+				SET payment_completed_at = :paymentCompletedAt
+				WHERE organization_id = :organizationId
+				  AND id = :saleId
+				  AND payment_completed_at IS NULL
+				  AND deleted_at IS NULL
+				""")
+				.param("paymentCompletedAt", now)
+				.param("organizationId", organizationId)
+				.param("saleId", saleId)
+				.update();
+		if (updated == 0) {
 			return;
 		}
-		List<SalesRepository.MembershipPlanForSale> plans = salesRepository.membershipPlansForSale(organizationId, saleId);
-		for (SalesRepository.MembershipPlanForSale plan : plans) {
-			if (salesRepository.membershipExistsForSalePlan(organizationId, saleId, plan.planId())) {
-				continue;
-			}
-			OffsetDateTime now = OffsetDateTime.now();
-			LocalDate today = LocalDate.now();
-			LocalDate latestEnd = salesRepository.latestMembershipEnd(organizationId, sale.clientId(), plan.planId())
-					.orElse(null);
-			LocalDate startsOn = latestEnd != null && !latestEnd.isBefore(today) ? latestEnd.plusDays(1) : today;
-			LocalDate endsOn = startsOn.plusDays(plan.durationDays() - 1L);
-			LocalDate graceEndsOn = endsOn.plusDays(plan.graceDays());
-			UUID membershipId = UUID.randomUUID();
-			jdbcClient.sql("""
-					INSERT INTO membership (
-					    id, organization_id, branch_id, client_id, plan_id, sale_id, status,
-					    activated_at, starts_on, ends_on, grace_ends_on,
-					    created_at, updated_at, created_by, updated_by, version
-					)
-					VALUES (
-					    :id, :organizationId, :branchId, :clientId, :planId, :saleId, 'ACTIVE',
-					    :activatedAt, :startsOn, :endsOn, :graceEndsOn,
-					    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
-					)
-					""")
-					.param("id", membershipId)
-					.param("organizationId", organizationId)
-					.param("branchId", sale.branchId())
-					.param("clientId", sale.clientId())
-					.param("planId", plan.planId())
-					.param("saleId", saleId)
-					.param("activatedAt", now)
-					.param("startsOn", startsOn)
-					.param("endsOn", endsOn)
-					.param("graceEndsOn", graceEndsOn)
-					.param("createdAt", now)
-					.param("updatedAt", now)
-					.param("createdBy", userId)
-					.param("updatedBy", userId)
-					.update();
-			auditService.recordSystem(organizationId, sale.branchId(), userId, "MEMBERSHIP_ACTIVATED", "MEMBERSHIP", membershipId, "PAYMENT_COMPLETED", null, UUID.randomUUID().toString());
-		}
+		eventPublisher.publishEvent(paymentCompletedEvent(organizationId, saleId, now));
+	}
+
+	private PaymentCompletedV1 paymentCompletedEvent(UUID organizationId, UUID saleId, OffsetDateTime occurredAt) {
+		SaleHeader sale = salesRepository.saleHeader(organizationId, saleId)
+				.orElseThrow(() -> new BusinessException("SALE_NOT_FOUND", "La venta no existe o no esta disponible."));
+		SaleContext context = saleContext(organizationId, saleId);
+		return new PaymentCompletedV1(
+				"payment-completed:" + saleId,
+				organizationId,
+				sale.branchId(),
+				saleId,
+				sale.clientId(),
+				sale.saleNumber(),
+				context.businessContext(),
+				context.contextMembershipId(),
+				context.contextTargetPlanId(),
+				paymentCompletedItems(organizationId, saleId),
+				occurredAt
+		);
+	}
+
+	private SaleContext saleContext(UUID organizationId, UUID saleId) {
+		return jdbcClient.sql("""
+				SELECT business_context, context_membership_id, context_target_plan_id
+				FROM sale
+				WHERE organization_id = :organizationId
+				  AND id = :saleId
+				""")
+				.param("organizationId", organizationId)
+				.param("saleId", saleId)
+				.query((resultSet, rowNumber) -> new SaleContext(
+						resultSet.getString("business_context"),
+						resultSet.getObject("context_membership_id", UUID.class),
+						resultSet.getObject("context_target_plan_id", UUID.class)
+				))
+				.single();
+	}
+
+	private List<PaymentCompletedLineItemV1> paymentCompletedItems(UUID organizationId, UUID saleId) {
+		return new ArrayList<>(jdbcClient.sql("""
+				SELECT product_id, item_type, quantity
+				FROM sale_item
+				WHERE organization_id = :organizationId
+				  AND sale_id = :saleId
+				""")
+				.param("organizationId", organizationId)
+				.param("saleId", saleId)
+				.query((resultSet, rowNumber) -> new PaymentCompletedLineItemV1(
+						resultSet.getObject("product_id", UUID.class),
+						resultSet.getString("item_type"),
+						resultSet.getInt("quantity")
+				))
+				.list());
+	}
+
+	private com.gymos.sales.api.operations.MembershipSaleResult toMembershipSaleResult(SaleHeader sale) {
+		return new com.gymos.sales.api.operations.MembershipSaleResult(
+				sale.id(),
+				sale.saleNumber(),
+				sale.status(),
+				sale.totalCents(),
+				sale.paidCents(),
+				sale.balanceCents(),
+				sale.currency(),
+				"PAID".equals(sale.status())
+		);
+	}
+
+	private record SaleContext(String businessContext, UUID contextMembershipId, UUID contextTargetPlanId) {
 	}
 
 	private SaleHeader ensureSale(GymOsPrincipal principal, UUID saleId) {
@@ -505,6 +816,96 @@ public class SalesService {
 
 	private String blankToNull(String value) {
 		return value == null || value.isBlank() ? null : value.trim();
+	}
+
+	private void ensureSameIdempotencyRequest(String existingHash, String requestedHash) {
+		if (existingHash != null && requestedHash != null && !existingHash.equals(requestedHash)) {
+			throw new BusinessException("IDEMPOTENCY_KEY_REUSED", "La llave de idempotencia ya fue usada con una solicitud diferente.");
+		}
+	}
+
+	private String saleRequestHash(CreateSaleCommand request) {
+		StringBuilder value = new StringBuilder()
+				.append("client=").append(request.clientId()).append('|')
+				.append("discount=").append(request.discountCents()).append('|')
+				.append("notes=").append(normalized(request.notes())).append('|');
+		request.items().stream()
+				.sorted(java.util.Comparator.comparing(item -> item.productId().toString()))
+				.forEach(item -> value
+						.append("item=").append(item.productId())
+						.append(',').append(item.quantity())
+						.append(',').append(item.discountCents())
+						.append('|'));
+		if (request.payment() != null) {
+			value.append("payment=").append(paymentRequestHash(
+					request.payment().method(),
+					request.payment().amountCents(),
+					request.payment().reference(),
+					request.payment().receiptObjectKey(),
+					request.payment().validateNow(),
+					request.payment().notes()
+			));
+		}
+		return sha256(value.toString());
+	}
+
+	private String membershipSaleRequestHash(
+			UUID clientId,
+			UUID sourceMembershipId,
+			UUID targetPlanId,
+			UUID productId,
+			long priceCents,
+			String currency,
+			String method,
+			String reference,
+			boolean validateNow,
+			String notes,
+			String businessContext
+	) {
+		return sha256(String.join("|",
+				"client=" + clientId,
+				"sourceMembership=" + sourceMembershipId,
+				"targetPlan=" + targetPlanId,
+				"product=" + productId,
+				"price=" + priceCents,
+				"currency=" + normalized(currency),
+				"method=" + normalized(method).toUpperCase(),
+				"reference=" + normalized(reference),
+				"validateNow=" + validateNow,
+				"notes=" + normalized(notes),
+				"context=" + businessContext
+		));
+	}
+
+	private String paymentRequestHash(
+			String method,
+			long amountCents,
+			String reference,
+			String receiptObjectKey,
+			boolean validateNow,
+			String notes
+	) {
+		return sha256(String.join("|",
+				"method=" + normalized(method).toUpperCase(),
+				"amount=" + amountCents,
+				"reference=" + normalized(reference),
+				"receipt=" + normalized(receiptObjectKey),
+				"validateNow=" + validateNow,
+				"notes=" + normalized(notes)
+		));
+	}
+
+	private String sha256(String value) {
+		try {
+			byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+			return java.util.HexFormat.of().formatHex(digest);
+		} catch (NoSuchAlgorithmException exception) {
+			throw new IllegalStateException("SHA-256 is required", exception);
+		}
+	}
+
+	private String normalized(String value) {
+		return value == null ? "" : value.trim();
 	}
 
 	private String receiptObjectKey(UUID organizationId, UUID saleId, UUID paymentId, String originalFilename) {

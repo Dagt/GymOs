@@ -65,6 +65,12 @@ const shortcuts = [
     status: "Disponible",
     href: "/inventory",
   },
+  {
+    title: "Reservas",
+    detail: "Recursos, disponibilidad, agenda y check-in.",
+    status: "Disponible",
+    href: "/bookings",
+  },
 ];
 
 export default function ReceptionPage() {

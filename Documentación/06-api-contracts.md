@@ -43,6 +43,12 @@ Nota implementada Hito 3: las acciones de renovacion y cambio de plan reciben `{
 - `POST /self-service/sessions/{sessionId}/membership-renewals/{membershipId}`
 - `POST /self-service/sessions/{sessionId}/membership-change-requests/{membershipId}`
 
+Cambio Hito 3.5 final:
+- `POST /self-service/sessions/{sessionId}/verify` ahora recibe `{ "identifier": "email o telefono", "birthDate": "YYYY-MM-DD" }`.
+- Contrato anterior: `{ "identifier": "email o telefono" }`.
+- Razon: evitar verificacion debil y reducir riesgo de enumeracion de clientes.
+- Impacto frontend: `/kiosk/[terminalCode]` solicita fecha de nacimiento y envia ambos campos.
+
 ## 6.2 Personas
 
 - `POST /persons`
@@ -141,7 +147,7 @@ Nota implementada Hito 4:
 
 - `POST /resources`
 - `GET /resources`
-- `PATCH /resources/{id}`
+- `PATCH /resources/{id}` (pendiente)
 - `GET /resources/{id}/availability`
 - `POST /bookings`
 - `GET /bookings`
@@ -150,6 +156,12 @@ Nota implementada Hito 4:
 - `POST /bookings/{id}/check-in`
 - `POST /bookings/{id}/complete`
 - `POST /bookings/{id}/cancel`
+
+Nota implementada Hito 4:
+- `POST /resources` crea recursos activos con capacidad, duracion de slot y horario.
+- `GET /resources/{resourceId}/availability?date=YYYY-MM-DD` devuelve slots con capacidad, reservados y disponibilidad.
+- `POST /bookings` crea reserva en estado `RESERVED`.
+- Acciones implementadas: `confirm`, `check-in`, `complete` y `cancel`.
 
 ## 6.12 Accesos
 
@@ -222,3 +234,50 @@ Nota implementada Hito 4:
 - ACCESS_DENIED
 - INVENTORY_INSUFFICIENT
 - PERMISSION_DENIED
+
+## 6.18 Cambios Hito 3.5
+
+Contratos HTTP preservados:
+- No se eliminaron rutas existentes de ventas, pagos, membresias ni kiosco.
+- `ManualPaymentRequest`, renovacion, cambio de plan y creacion de venta aceptan `idempotencyKey` opcional.
+- `POST /self-service/terminals/{terminalCode}/sessions` ahora devuelve tambien `sessionToken`.
+- Las rutas de sesion de kiosco requieren header `X-Self-Service-Session-Token`.
+
+API interna publica:
+- `SalesOperations.createMembershipRenewal(CreateMembershipRenewalSaleCommand)`
+- `SalesOperations.createMembershipPlanChange(CreateMembershipPlanChangeSaleCommand)`
+- `MembershipOperations.renew(RenewMembershipOperationCommand)`
+- `MembershipOperations.changePlan(ChangeMembershipPlanOperationCommand)`
+- `ClientLookupOperations.verifyForSelfService(VerifyClientIdentityCommand)`
+- `ClientLookupOperations.selfServiceProfile(organizationId, clientId)`
+
+Eventos internos publicos:
+- `com.gymos.sales.api.events.SaleCreatedV1`
+- `com.gymos.sales.api.events.PaymentRecordedV1`
+- `com.gymos.sales.api.events.PaymentCompletedV1`
+- `com.gymos.sales.api.events.PaymentRejectedV1`
+- `com.gymos.memberships.api.events.MembershipActivatedV1`
+- `com.gymos.memberships.api.events.MembershipRenewedV1`
+- `com.gymos.memberships.api.events.MembershipPlanChangedV1`
+
+Permisos por endpoint interno:
+- `organization.read`, `organization.update`
+- `branch.read`, `branch.update`
+- `client.read`, `client.create`, `client.update`
+- `catalog.read`, `catalog.manage`
+- `sale.read`, `sale.create`
+- `payment.manual.create`, `payment.manual.validate`, `payment.manual.reject`, `payment.receipt.upload`
+- `membership.read`, `membership.renew`, `membership.change-plan`
+- `report.sales.read`
+- `access.read`, `access.manage`, `access.manual.open`
+- `inventory.read`, `inventory.manage`
+- `resource.read`, `resource.manage`
+- `booking.read`, `booking.manage`
+
+Errores agregados o formalizados:
+- `IDEMPOTENCY_KEY_REUSED`
+- `PAYMENT_ALREADY_COMPLETED`
+- `SELF_SERVICE_SESSION_INVALID`
+- `SELF_SERVICE_SESSION_BLOCKED`
+- `SELF_SERVICE_VERIFICATION_FAILED`
+- `RATE_LIMIT_EXCEEDED`

@@ -123,10 +123,12 @@ Criterios:
 2. Consultar disponibilidad.
 3. Validar capacidad y elegibilidad.
 4. Seleccionar horario.
-5. Cobrar si aplica.
-6. Crear Booking.
-7. Confirmar.
-8. Notificar.
+5. Crear Booking en estado `RESERVED`.
+6. Confirmar.
+7. Hacer check-in.
+8. Completar.
+9. Cobrar si aplica en una iteracion posterior.
+10. Notificar en una iteracion posterior.
 
 ## UC-009 Cancelar reserva
 
@@ -237,3 +239,49 @@ Criterios:
 - Las reglas de negocio se ejecutan en backend.
 - La sesión se cierra automáticamente por inactividad.
 - Toda acción queda auditada.
+
+## UC-018 Renovacion idempotente por pago completado
+
+Actor: Recepcionista, kiosco o sistema de pagos.
+
+Flujo:
+1. `memberships` solicita a `sales` una venta de renovacion mediante API interna.
+2. `sales` crea venta, partida y pago manual con `idempotencyKey`.
+3. Si el pago queda pendiente, no se activa membresia.
+4. Al validar el pago, `sales` publica `PaymentCompletedV1`.
+5. `memberships` consume el evento, registra `processed_domain_event` y extiende desde la fecha final vigente.
+6. Si el evento se reprocesa, no se crea otra membresia.
+7. `memberships` publica `MembershipRenewedV1`.
+
+Criterios:
+- Una renovacion anticipada no pierde dias.
+- Una membresia cancelada no se renueva.
+- La misma llave de idempotencia no crea dos ventas.
+
+## UC-019 Cambio de plan idempotente
+
+Flujo:
+1. `memberships` valida membresia activa y plan destino distinto.
+2. `memberships` solicita a `sales` venta de cambio de plan.
+3. Al completarse el pago, `memberships` cancela la membresia anterior y activa la nueva.
+4. El evento de pago es idempotente.
+
+Criterios:
+- No se permite cambiar al mismo plan.
+- La membresia anterior queda cancelada con auditoria.
+- La nueva membresia se activa solo con pago completado.
+
+## UC-020 Seguridad de sesion de kiosco
+
+Flujo:
+1. El kiosco activo crea sesion temporal.
+2. Backend devuelve `sessionId` y `sessionToken`.
+3. Cada operacion posterior envia `X-Self-Service-Session-Token`.
+4. Verificaciones fallidas incrementan intentos.
+5. Al superar el limite, la sesion queda bloqueada temporalmente.
+6. Rate limiting protege por IP, terminal y sesion.
+7. Al cerrar sesion, no puede reutilizarse.
+
+## Anexo Hito 3.5 final
+
+Ver `Documentación/07-use-cases-hito-3-5-final.md` para la definicion vigente de verificacion segura de kiosco, idempotencia por hash de solicitud y eventos por modulo propietario.

@@ -3,7 +3,7 @@ package com.gymos.inventory.application;
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
-import com.gymos.inventory.api.InventoryController.InventoryMovementRequest;
+import com.gymos.inventory.application.command.InventoryMovementCommand;
 import com.gymos.inventory.infrastructure.InventoryRepository;
 import com.gymos.inventory.infrastructure.InventoryRepository.InventoryMovementRecord;
 import com.gymos.inventory.infrastructure.InventoryRepository.InventoryStockRecord;
@@ -11,18 +11,15 @@ import com.gymos.inventory.infrastructure.InventoryRepository.ProductForInventor
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class InventoryService {
-	private final JdbcClient jdbcClient;
 	private final InventoryRepository inventoryRepository;
 	private final AuditService auditService;
 
-	public InventoryService(JdbcClient jdbcClient, InventoryRepository inventoryRepository, AuditService auditService) {
-		this.jdbcClient = jdbcClient;
+	public InventoryService(InventoryRepository inventoryRepository, AuditService auditService) {
 		this.inventoryRepository = inventoryRepository;
 		this.auditService = auditService;
 	}
@@ -55,7 +52,7 @@ public class InventoryService {
 	}
 
 	@Transactional
-	public InventoryStockRecord createMovement(GymOsPrincipal principal, InventoryMovementRequest request, String correlationId) {
+	public InventoryStockRecord createMovement(GymOsPrincipal principal, InventoryMovementCommand request, String correlationId) {
 		requireBranch(principal);
 		ProductForInventory product = ensurePhysicalProduct(principal.organizationId(), request.productId());
 		String movementType = request.movementType().trim().toUpperCase();
@@ -71,55 +68,25 @@ public class InventoryService {
 		Long averageCost = nextAverageCost(current, quantityDelta, request.unitCostCents());
 		int reorderPoint = request.reorderPoint() == null ? current.reorderPoint() : request.reorderPoint();
 
-		jdbcClient.sql("""
-				UPDATE inventory_stock
-				SET quantity_on_hand = :quantityOnHand,
-				    reorder_point = :reorderPoint,
-				    average_cost_cents = :averageCostCents,
-				    updated_at = :updatedAt,
-				    updated_by = :updatedBy,
-				    version = version + 1
-				WHERE id = :stockId
-				""")
-				.param("quantityOnHand", quantityAfter)
-				.param("reorderPoint", reorderPoint)
-				.param("averageCostCents", averageCost)
-				.param("updatedAt", now)
-				.param("updatedBy", principal.userId())
-				.param("stockId", stockId)
-				.update();
+		inventoryRepository.updateStock(stockId, quantityAfter, reorderPoint, averageCost, principal.userId(), now);
 
-		UUID movementId = UUID.randomUUID();
-		jdbcClient.sql("""
-				INSERT INTO inventory_movement (
-				    id, organization_id, branch_id, stock_id, product_id, movement_type,
-				    quantity_delta, quantity_before, quantity_after, unit_cost_cents,
-				    reference_type, reference_id, reason, occurred_at, created_at, created_by, correlation_id
-				)
-				VALUES (
-				    :id, :organizationId, :branchId, :stockId, :productId, :movementType,
-				    :quantityDelta, :quantityBefore, :quantityAfter, :unitCostCents,
-				    :referenceType, :referenceId, :reason, :occurredAt, :createdAt, :createdBy, :correlationId
-				)
-				""")
-				.param("id", movementId)
-				.param("organizationId", principal.organizationId())
-				.param("branchId", principal.branchId())
-				.param("stockId", stockId)
-				.param("productId", product.id())
-				.param("movementType", movementType)
-				.param("quantityDelta", quantityDelta)
-				.param("quantityBefore", current.quantityOnHand())
-				.param("quantityAfter", quantityAfter)
-				.param("unitCostCents", request.unitCostCents())
-				.param("referenceType", blankToNull(request.referenceType()))
-				.param("referenceId", request.referenceId())
-				.param("reason", request.reason())
-				.param("occurredAt", now)
-				.param("createdAt", now)
-				.param("createdBy", principal.userId())
-				.param("correlationId", UUID.fromString(correlationId))
-				.update();
+		UUID movementId = inventoryRepository.createMovement(
+				principal.organizationId(),
+				principal.branchId(),
+				stockId,
+				product.id(),
+				movementType,
+				quantityDelta,
+				current.quantityOnHand(),
+				quantityAfter,
+				request.unitCostCents(),
+				blankToNull(request.referenceType()),
+				request.referenceId(),
+				request.reason(),
+				now,
+				principal.userId(),
+				UUID.fromString(correlationId)
+		);
 		auditService.record(principal, "INVENTORY_MOVEMENT_CREATED", "INVENTORY_MOVEMENT", movementId, "BACKOFFICE", request.reason(), correlationId);
 		return inventoryRepository.stockDetail(principal.organizationId(), principal.branchId(), product.id())
 				.orElseThrow(() -> new BusinessException("INVENTORY_STOCK_NOT_FOUND", "No fue posible recuperar existencias."));
@@ -128,27 +95,7 @@ public class InventoryService {
 	private UUID ensureStock(GymOsPrincipal principal, UUID productId, OffsetDateTime now) {
 		return inventoryRepository.stockIdentity(principal.organizationId(), principal.branchId(), productId)
 				.orElseGet(() -> {
-					UUID stockId = UUID.randomUUID();
-					jdbcClient.sql("""
-							INSERT INTO inventory_stock (
-							    id, organization_id, branch_id, product_id, quantity_on_hand, reorder_point,
-							    created_at, updated_at, created_by, updated_by, version
-							)
-							VALUES (
-							    :id, :organizationId, :branchId, :productId, 0, 0,
-							    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
-							)
-							""")
-							.param("id", stockId)
-							.param("organizationId", principal.organizationId())
-							.param("branchId", principal.branchId())
-							.param("productId", productId)
-							.param("createdAt", now)
-							.param("updatedAt", now)
-							.param("createdBy", principal.userId())
-							.param("updatedBy", principal.userId())
-							.update();
-					return stockId;
+					return inventoryRepository.createStock(principal.organizationId(), principal.branchId(), productId, principal.userId(), now);
 				});
 	}
 

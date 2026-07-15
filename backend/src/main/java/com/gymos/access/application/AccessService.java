@@ -1,8 +1,8 @@
 package com.gymos.access.application;
 
-import com.gymos.access.api.AccessController.AccessRequest;
-import com.gymos.access.api.AccessController.ManualOpenRequest;
-import com.gymos.access.api.AccessController.TemporaryPassRequest;
+import com.gymos.access.application.command.AccessRequestCommand;
+import com.gymos.access.application.command.ManualOpenCommand;
+import com.gymos.access.application.command.TemporaryPassCommand;
 import com.gymos.access.infrastructure.AccessRepository;
 import com.gymos.access.infrastructure.AccessRepository.AccessDecisionResponse;
 import com.gymos.access.infrastructure.AccessRepository.AccessDeviceRecord;
@@ -17,18 +17,15 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AccessService {
-	private final JdbcClient jdbcClient;
 	private final AccessRepository accessRepository;
 	private final AuditService auditService;
 
-	public AccessService(JdbcClient jdbcClient, AccessRepository accessRepository, AuditService auditService) {
-		this.jdbcClient = jdbcClient;
+	public AccessService(AccessRepository accessRepository, AuditService auditService) {
 		this.accessRepository = accessRepository;
 		this.auditService = auditService;
 	}
@@ -47,7 +44,7 @@ public class AccessService {
 	}
 
 	@Transactional
-	public AccessDecisionResponse requestAccess(GymOsPrincipal principal, AccessRequest request, String correlationId) {
+	public AccessDecisionResponse requestAccess(GymOsPrincipal principal, AccessRequestCommand request, String correlationId) {
 		requireBranch(principal);
 		AccessDeviceRecord device = resolveDevice(principal, request.deviceCode());
 		ClientAccessRecord client = resolveClient(principal, request.clientId(), request.identifier());
@@ -66,7 +63,7 @@ public class AccessService {
 		TemporaryPassRecord pass = accessRepository.validTemporaryPass(principal.organizationId(), principal.branchId(), client.id(), now)
 				.orElse(null);
 		if (pass != null) {
-			consumeTemporaryPass(pass.id(), now);
+			accessRepository.consumeTemporaryPass(pass.id(), now);
 			return recordDecision(principal, device, client, null, pass.id(), "TEMPORARY_PASS", "GRANTED", "RECEPTION", "Pase temporal vigente.", now, correlationId);
 		}
 
@@ -74,7 +71,7 @@ public class AccessService {
 	}
 
 	@Transactional
-	public AccessDecisionResponse manualOpen(GymOsPrincipal principal, ManualOpenRequest request, String correlationId) {
+	public AccessDecisionResponse manualOpen(GymOsPrincipal principal, ManualOpenCommand request, String correlationId) {
 		requireBranch(principal);
 		AccessDeviceRecord device = resolveDevice(principal, request.deviceCode());
 		ClientAccessRecord client = request.clientId() == null ? null : accessRepository.clientById(principal.organizationId(), request.clientId())
@@ -83,7 +80,7 @@ public class AccessService {
 	}
 
 	@Transactional
-	public TemporaryPassRecord createTemporaryPass(GymOsPrincipal principal, TemporaryPassRequest request, String correlationId) {
+	public TemporaryPassRecord createTemporaryPass(GymOsPrincipal principal, TemporaryPassCommand request, String correlationId) {
 		requireBranch(principal);
 		ClientAccessRecord client = accessRepository.clientById(principal.organizationId(), request.clientId())
 				.orElseThrow(() -> new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible."));
@@ -95,30 +92,16 @@ public class AccessService {
 		if (!request.expiresAt().isAfter(startsAt)) {
 			throw new BusinessException("TEMPORARY_PASS_INVALID_RANGE", "La expiracion debe ser posterior al inicio.");
 		}
-		UUID passId = UUID.randomUUID();
-		jdbcClient.sql("""
-				INSERT INTO access_temporary_pass (
-				    id, organization_id, branch_id, client_id, status, starts_at, expires_at,
-				    max_uses, uses_count, reason, created_at, updated_at, created_by, updated_by, version
-				)
-				VALUES (
-				    :id, :organizationId, :branchId, :clientId, 'ACTIVE', :startsAt, :expiresAt,
-				    :maxUses, 0, :reason, :createdAt, :updatedAt, :createdBy, :updatedBy, 0
-				)
-				""")
-				.param("id", passId)
-				.param("organizationId", principal.organizationId())
-				.param("branchId", principal.branchId())
-				.param("clientId", client.id())
-				.param("startsAt", startsAt)
-				.param("expiresAt", request.expiresAt())
-				.param("maxUses", request.maxUses())
-				.param("reason", request.reason())
-				.param("createdAt", now)
-				.param("updatedAt", now)
-				.param("createdBy", principal.userId())
-				.param("updatedBy", principal.userId())
-				.update();
+		UUID passId = accessRepository.createTemporaryPass(
+				principal.organizationId(),
+				principal.branchId(),
+				client.id(),
+				principal.userId(),
+				startsAt,
+				request.expiresAt(),
+				request.maxUses(),
+				request.reason()
+		);
 		auditService.record(principal, "ACCESS_TEMPORARY_PASS_CREATED", "ACCESS_TEMPORARY_PASS", passId, "RECEPTION", request.reason(), correlationId);
 		return accessRepository.temporaryPass(principal.organizationId(), passId)
 				.orElseThrow(() -> new BusinessException("TEMPORARY_PASS_NOT_FOUND", "El pase temporal no esta disponible."));
@@ -137,53 +120,25 @@ public class AccessService {
 			OffsetDateTime now,
 			String correlationId
 	) {
-		UUID logId = UUID.randomUUID();
-		jdbcClient.sql("""
-				INSERT INTO access_log (
-				    id, organization_id, branch_id, device_id, client_id, membership_id,
-				    temporary_pass_id, access_type, decision, source, reason, command_status,
-				    occurred_at, created_at, created_by, correlation_id
-				)
-				VALUES (
-				    :id, :organizationId, :branchId, :deviceId, :clientId, :membershipId,
-				    :temporaryPassId, :accessType, :decision, :source, :reason, :commandStatus,
-				    :occurredAt, :createdAt, :createdBy, :correlationId
-				)
-				""")
-				.param("id", logId)
-				.param("organizationId", principal.organizationId())
-				.param("branchId", principal.branchId())
-				.param("deviceId", device.id())
-				.param("clientId", client == null ? null : client.id())
-				.param("membershipId", membershipId)
-				.param("temporaryPassId", temporaryPassId)
-				.param("accessType", accessType)
-				.param("decision", decision)
-				.param("source", source)
-				.param("reason", reason)
-				.param("commandStatus", "GRANTED".equals(decision) ? "SIMULATED_OPEN" : "NOT_SENT")
-				.param("occurredAt", now)
-				.param("createdAt", now)
-				.param("createdBy", principal.userId())
-				.param("correlationId", UUID.fromString(correlationId))
-				.update();
+		UUID logId = accessRepository.createAccessLog(
+				principal.organizationId(),
+				principal.branchId(),
+				device.id(),
+				client == null ? null : client.id(),
+				membershipId,
+				temporaryPassId,
+				accessType,
+				decision,
+				source,
+				reason,
+				"GRANTED".equals(decision) ? "SIMULATED_OPEN" : "NOT_SENT",
+				now,
+				principal.userId(),
+				UUID.fromString(correlationId)
+		);
 		auditService.record(principal, "GRANTED".equals(decision) ? "ACCESS_GRANTED" : "ACCESS_DENIED", "ACCESS_LOG", logId, source, reason, correlationId);
 		return accessRepository.decision(logId)
 				.orElseThrow(() -> new BusinessException("ACCESS_LOG_NOT_FOUND", "No fue posible recuperar la decision de acceso."));
-	}
-
-	private void consumeTemporaryPass(UUID passId, OffsetDateTime now) {
-		jdbcClient.sql("""
-				UPDATE access_temporary_pass
-				SET uses_count = uses_count + 1,
-				    status = CASE WHEN uses_count + 1 >= max_uses THEN 'CONSUMED' ELSE status END,
-				    updated_at = :updatedAt,
-				    version = version + 1
-				WHERE id = :passId
-				""")
-				.param("updatedAt", now)
-				.param("passId", passId)
-				.update();
 	}
 
 	private AccessDeviceRecord resolveDevice(GymOsPrincipal principal, String deviceCode) {

@@ -187,6 +187,107 @@ public class AccessRepository {
 				.optional();
 	}
 
+	public UUID createTemporaryPass(
+			UUID organizationId,
+			UUID branchId,
+			UUID clientId,
+			UUID actorUserId,
+			OffsetDateTime startsAt,
+			OffsetDateTime expiresAt,
+			int maxUses,
+			String reason
+	) {
+		OffsetDateTime now = OffsetDateTime.now();
+		UUID passId = UUID.randomUUID();
+		jdbcClient.sql("""
+				INSERT INTO access_temporary_pass (
+				    id, organization_id, branch_id, client_id, status, starts_at, expires_at,
+				    max_uses, uses_count, reason, created_at, updated_at, created_by, updated_by, version
+				)
+				VALUES (
+				    :id, :organizationId, :branchId, :clientId, 'ACTIVE', :startsAt, :expiresAt,
+				    :maxUses, 0, :reason, :createdAt, :updatedAt, :createdBy, :updatedBy, 0
+				)
+				""")
+				.param("id", passId)
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("clientId", clientId)
+				.param("startsAt", startsAt)
+				.param("expiresAt", expiresAt)
+				.param("maxUses", maxUses)
+				.param("reason", reason)
+				.param("createdAt", now)
+				.param("updatedAt", now)
+				.param("createdBy", actorUserId)
+				.param("updatedBy", actorUserId)
+				.update();
+		return passId;
+	}
+
+	public UUID createAccessLog(
+			UUID organizationId,
+			UUID branchId,
+			UUID deviceId,
+			UUID clientId,
+			UUID membershipId,
+			UUID temporaryPassId,
+			String accessType,
+			String decision,
+			String source,
+			String reason,
+			String commandStatus,
+			OffsetDateTime occurredAt,
+			UUID actorUserId,
+			UUID correlationId
+	) {
+		UUID logId = UUID.randomUUID();
+		jdbcClient.sql("""
+				INSERT INTO access_log (
+				    id, organization_id, branch_id, device_id, client_id, membership_id,
+				    temporary_pass_id, access_type, decision, source, reason, command_status,
+				    occurred_at, created_at, created_by, correlation_id
+				)
+				VALUES (
+				    :id, :organizationId, :branchId, :deviceId, :clientId, :membershipId,
+				    :temporaryPassId, :accessType, :decision, :source, :reason, :commandStatus,
+				    :occurredAt, :createdAt, :createdBy, :correlationId
+				)
+				""")
+				.param("id", logId)
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("deviceId", deviceId)
+				.param("clientId", clientId)
+				.param("membershipId", membershipId)
+				.param("temporaryPassId", temporaryPassId)
+				.param("accessType", accessType)
+				.param("decision", decision)
+				.param("source", source)
+				.param("reason", reason)
+				.param("commandStatus", commandStatus)
+				.param("occurredAt", occurredAt)
+				.param("createdAt", occurredAt)
+				.param("createdBy", actorUserId)
+				.param("correlationId", correlationId)
+				.update();
+		return logId;
+	}
+
+	public void consumeTemporaryPass(UUID passId, OffsetDateTime now) {
+		jdbcClient.sql("""
+				UPDATE access_temporary_pass
+				SET uses_count = uses_count + 1,
+				    status = CASE WHEN uses_count + 1 >= max_uses THEN 'CONSUMED' ELSE status END,
+				    updated_at = :updatedAt,
+				    version = version + 1
+				WHERE id = :passId
+				""")
+				.param("updatedAt", now)
+				.param("passId", passId)
+				.update();
+	}
+
 	public Optional<AccessDecisionResponse> decision(UUID logId) {
 		return jdbcClient.sql("""
 				SELECT l.id, l.decision, l.access_type, l.reason, l.command_status, l.occurred_at,

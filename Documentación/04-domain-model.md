@@ -280,6 +280,9 @@ Invariantes:
 - No traslapes incompatibles.
 - El cliente debe cumplir reglas de acceso o elegibilidad.
 - La capacidad no se excede.
+- La reserva debe estar dentro del horario operativo del recurso.
+- Check-in solo aplica a reservas confirmadas.
+- Completion solo aplica a reservas con check-in.
 
 ## 4.12 AccessAttempt
 
@@ -343,3 +346,28 @@ Atributos:
 - actionConfiguration
 - active
 - retryPolicy
+
+## 4.17 Eventos versionados implementados
+
+Eventos de ventas:
+- `SaleCreatedV1`: venta creada por POS o flujo de membresia.
+- `PaymentRecordedV1`: pago manual registrado.
+- `PaymentCompletedV1`: venta cubierta por pagos completados; dispara efectos de negocio.
+- `PaymentRejectedV1`: pago rechazado con razon.
+- Paquete propietario: `com.gymos.sales.api.events`.
+
+Eventos de membresias:
+- `MembershipActivatedV1`: membresia activada por venta pagada.
+- `MembershipRenewedV1`: renovacion acumulativa procesada.
+- `MembershipPlanChangedV1`: membresia anterior cancelada y nuevo plan activado.
+- Paquete propietario: `com.gymos.memberships.api.events`.
+
+Reglas reforzadas:
+- Una membresia solo se activa desde pago completado.
+- Reprocesar `PaymentCompletedV1` no duplica efectos porque se registra `processed_domain_event`.
+- Un cambio al mismo plan es invalido.
+- Una membresia cancelada no puede renovarse.
+- El kiosco opera con sesion temporal, token aleatorio, verificacion por contacto + fecha de nacimiento y origen auditado `SELF_SERVICE_KIOSK`.
+- `selfservice` no resuelve identidad personal directamente; consume `ClientLookupOperations`.
+- Las renovaciones/cambios del kiosco se ejecutan mediante `MembershipOperations`, no por dependencia directa a la capa application de membresias.
+- Las llaves de idempotencia en ventas/pagos incluyen hash de solicitud para detectar reutilizacion con contenido distinto.

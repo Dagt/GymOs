@@ -39,7 +39,8 @@ public class SelfServiceRepository {
 	public Optional<SessionRecord> session(UUID sessionId) {
 		return jdbcClient.sql("""
 				SELECT id, organization_id, branch_id, terminal_id, client_id,
-				       status, started_at, expires_at, ended_at, verification_method
+				       status, started_at, expires_at, ended_at, verification_method,
+				       session_token_hash, verification_attempts, blocked_until
 				FROM self_service_session
 				WHERE id = :sessionId
 				  AND deleted_at IS NULL
@@ -55,38 +56,97 @@ public class SelfServiceRepository {
 						resultSet.getObject("started_at", OffsetDateTime.class),
 						resultSet.getObject("expires_at", OffsetDateTime.class),
 						resultSet.getObject("ended_at", OffsetDateTime.class),
-						resultSet.getString("verification_method")
+						resultSet.getString("verification_method"),
+						resultSet.getString("session_token_hash"),
+						resultSet.getInt("verification_attempts"),
+						resultSet.getObject("blocked_until", OffsetDateTime.class)
 				))
 				.optional();
 	}
 
-	public Optional<ClientRecord> clientByIdentifier(UUID organizationId, String identifier) {
-		String like = identifier == null ? "" : identifier.trim().toLowerCase();
-		return jdbcClient.sql("""
-				SELECT c.id, p.first_name || ' ' || p.last_name AS full_name,
-				       p.phone, p.email, c.status
-				FROM client c
-				JOIN person p ON p.id = c.person_id
-				WHERE c.organization_id = :organizationId
-				  AND c.status = 'ACTIVE'
-				  AND c.deleted_at IS NULL
-				  AND (
-				      LOWER(COALESCE(p.email, '')) = :identifier
-				      OR LOWER(COALESCE(p.phone, '')) = :identifier
-				  )
-				ORDER BY c.joined_at DESC
-				LIMIT 1
+	public void createSession(
+			UUID sessionId,
+			UUID organizationId,
+			UUID branchId,
+			UUID terminalId,
+			OffsetDateTime startedAt,
+			OffsetDateTime expiresAt,
+			String originIp,
+			String sessionTokenHash
+	) {
+		jdbcClient.sql("""
+				INSERT INTO self_service_session (
+				    id, organization_id, branch_id, terminal_id, status, started_at,
+				    expires_at, origin_ip, session_token_hash, created_at, updated_at, version
+				)
+				VALUES (
+				    :id, :organizationId, :branchId, :terminalId, 'ACTIVE', :startedAt,
+				    :expiresAt, :originIp, :sessionTokenHash, :createdAt, :updatedAt, 0
+				)
 				""")
+				.param("id", sessionId)
 				.param("organizationId", organizationId)
-				.param("identifier", like)
-				.query((resultSet, rowNumber) -> new ClientRecord(
-						resultSet.getObject("id", UUID.class),
-						resultSet.getString("full_name"),
-						resultSet.getString("phone"),
-						resultSet.getString("email"),
-						resultSet.getString("status")
-				))
-				.optional();
+				.param("branchId", branchId)
+				.param("terminalId", terminalId)
+				.param("startedAt", startedAt)
+				.param("expiresAt", expiresAt)
+				.param("originIp", originIp)
+				.param("sessionTokenHash", sessionTokenHash)
+				.param("createdAt", startedAt)
+				.param("updatedAt", startedAt)
+				.update();
+	}
+
+	public void markVerified(UUID sessionId, UUID clientId, OffsetDateTime expiresAt) {
+		OffsetDateTime now = OffsetDateTime.now();
+		jdbcClient.sql("""
+				UPDATE self_service_session
+				SET client_id = :clientId,
+				    verification_method = 'CONTACT_BIRTH_DATE',
+				    verification_attempts = 0,
+				    blocked_until = NULL,
+				    expires_at = :expiresAt,
+				    updated_at = :updatedAt,
+				    version = version + 1
+				WHERE id = :sessionId
+				""")
+				.param("clientId", clientId)
+				.param("expiresAt", expiresAt)
+				.param("updatedAt", now)
+				.param("sessionId", sessionId)
+				.update();
+	}
+
+	public void recordFailedVerification(UUID sessionId, int attempts, OffsetDateTime blockedUntil) {
+		jdbcClient.sql("""
+				UPDATE self_service_session
+				SET verification_attempts = :verificationAttempts,
+				    blocked_until = :blockedUntil,
+				    updated_at = :updatedAt,
+				    version = version + 1
+				WHERE id = :sessionId
+				""")
+				.param("verificationAttempts", attempts)
+				.param("blockedUntil", blockedUntil)
+				.param("updatedAt", OffsetDateTime.now())
+				.param("sessionId", sessionId)
+				.update();
+	}
+
+	public void endSession(UUID sessionId) {
+		OffsetDateTime now = OffsetDateTime.now();
+		jdbcClient.sql("""
+				UPDATE self_service_session
+				SET status = 'ENDED',
+				    ended_at = :endedAt,
+				    updated_at = :updatedAt,
+				    version = version + 1
+				WHERE id = :sessionId
+				""")
+				.param("endedAt", now)
+				.param("updatedAt", now)
+				.param("sessionId", sessionId)
+				.update();
 	}
 
 	public List<MembershipRecord> memberships(UUID organizationId, UUID branchId, UUID clientId) {
@@ -186,11 +246,11 @@ public class SelfServiceRepository {
 			OffsetDateTime startedAt,
 			OffsetDateTime expiresAt,
 			OffsetDateTime endedAt,
-			String verificationMethod
+			String verificationMethod,
+			String sessionTokenHash,
+			int verificationAttempts,
+			OffsetDateTime blockedUntil
 	) {
-	}
-
-	public record ClientRecord(UUID id, String fullName, String phone, String email, String status) {
 	}
 
 	public record MembershipRecord(

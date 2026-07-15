@@ -1,6 +1,9 @@
 package com.gymos.access.api;
 
 import com.gymos.access.application.AccessService;
+import com.gymos.access.application.command.AccessRequestCommand;
+import com.gymos.access.application.command.ManualOpenCommand;
+import com.gymos.access.application.command.TemporaryPassCommand;
 import com.gymos.access.infrastructure.AccessRepository.AccessDecisionResponse;
 import com.gymos.access.infrastructure.AccessRepository.AccessDeviceRecord;
 import com.gymos.access.infrastructure.AccessRepository.AccessLogRecord;
@@ -52,7 +55,7 @@ public class AccessController {
 			@Valid @RequestBody AccessRequest request,
 			HttpServletRequest servletRequest
 	) {
-		return accessService.requestAccess(principal, request, correlationId(servletRequest));
+		return accessService.requestAccess(principal, request.toCommand(), correlationId(servletRequest));
 	}
 
 	@PostMapping("/commands/open")
@@ -61,7 +64,7 @@ public class AccessController {
 			@Valid @RequestBody ManualOpenRequest request,
 			HttpServletRequest servletRequest
 	) {
-		return accessService.manualOpen(principal, request, correlationId(servletRequest));
+		return accessService.manualOpen(principal, request.toCommand(), correlationId(servletRequest));
 	}
 
 	@PostMapping("/commands/temporary")
@@ -70,7 +73,7 @@ public class AccessController {
 			@Valid @RequestBody TemporaryPassRequest request,
 			HttpServletRequest servletRequest
 	) {
-		return accessService.createTemporaryPass(principal, request, correlationId(servletRequest));
+		return accessService.createTemporaryPass(principal, request.toCommand(), correlationId(servletRequest));
 	}
 
 	private String correlationId(HttpServletRequest request) {
@@ -83,6 +86,9 @@ public class AccessController {
 			@Size(max = 180) String identifier,
 			@Size(max = 80) String deviceCode
 	) {
+		private AccessRequestCommand toCommand() {
+			return new AccessRequestCommand(clientId, identifier, deviceCode);
+		}
 	}
 
 	public record ManualOpenRequest(
@@ -90,6 +96,9 @@ public class AccessController {
 			@Size(max = 80) String deviceCode,
 			@NotBlank @Size(max = 500) String reason
 	) {
+		private ManualOpenCommand toCommand() {
+			return new ManualOpenCommand(clientId, deviceCode, reason);
+		}
 	}
 
 	public record TemporaryPassRequest(
@@ -99,5 +108,8 @@ public class AccessController {
 			@Min(1) int maxUses,
 			@NotBlank @Size(max = 500) String reason
 	) {
+		private TemporaryPassCommand toCommand() {
+			return new TemporaryPassCommand(clientId, startsAt, expiresAt, maxUses, reason);
+		}
 	}
 }

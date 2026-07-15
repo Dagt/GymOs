@@ -1,7 +1,7 @@
 # 13. Estado de Desarrollo
 
 Estado: en progreso  
-Fecha: 13 de julio de 2026
+Fecha: 15 de julio de 2026
 
 ## Hito 0 - Base tecnica vendible
 
@@ -210,14 +210,61 @@ Verificado localmente:
 - Smoke test Docker `POST /api/v1/self-service/sessions/{sessionId}/end`.
 - Smoke test Docker `GET /kiosk/KIOSK-MAIN`.
 
+## Hito 3.5 - Estabilizacion arquitectonica de membresias, ventas y kiosco
+
+Estado: completado tecnico
+
+Implementado:
+
+- Rama `feature/hito-3-5-architecture-stabilization` creada desde `main` con Hito 3 completo.
+- API interna publica `SalesOperations` para renovaciones y cambios de plan de membresia.
+- `memberships` dejo de escribir directamente en tablas `sale`, `sale_item` y `payment`.
+- `sales` concentra creacion de ventas, partidas, pagos, validacion, eventos y numeros de venta.
+- Comandos y resultados de application separados de DTOs HTTP en ventas, membresias, clientes, catalogo, organizaciones, seguridad y autoservicio.
+- Eventos versionados de ventas/pagos/membresias en `common.events`.
+- Eventos versionados movidos a APIs publicas de sus modulos propietarios: `sales.api.events` y `memberships.api.events`.
+- API publica `MembershipOperations` para renovacion/cambio de plan consumida por `selfservice`.
+- API publica `ClientLookupOperations` para verificacion de identidad y perfil limitado de kiosco.
+- `selfservice` ya no depende de `memberships.application` ni consulta tablas `client`/`person`.
+- `MembershipService` y `SelfServiceService` ya no usan `JdbcClient`; la persistencia queda en repositorios de su modulo.
+- Consumo idempotente de `PaymentCompletedV1` mediante `processed_domain_event`.
+- Idempotencia comercial en `sale` y `payment` con `idempotencyKey` y restricciones unicas.
+- Hash de solicitud para ventas y pagos idempotentes mediante `sale.idempotency_request_hash` y `payment.idempotency_request_hash`.
+- Kiosco endurecido con `sessionToken`, hash de token, header `X-Self-Service-Session-Token`, verificacion por contacto + fecha de nacimiento, expiracion, rate limiting por puerto Redis/local, contador de intentos y bloqueo temporal.
+- RBAC granular por endpoint interno.
+- Migracion `V2_1__demo_organization_prerequisite.sql` para que una base limpia pueda ejecutar datos demo historicos.
+- Migracion `V6__hito3_5_architectural_stabilization.sql`.
+- Migracion `V7__permissions_and_kiosk_security.sql`.
+- Migracion `V8__idempotency_request_hashes.sql`.
+- Seed local idempotente para completar admin, rol y permisos aunque la organizacion demo ya exista.
+- Frontend actualizado para enviar idempotency keys, token de kiosco y fecha de nacimiento en verificacion.
+
+Verificado:
+
+- `backend`: `./gradlew.bat test` con Java 25.
+- Spring Modulith architecture test.
+- Reglas ArchUnit adicionales.
+- Pruebas de seguridad MVC para permisos internos y acceso publico del kiosco.
+- Prueba unitaria de rate limiting local.
+- Testcontainers con PostgreSQL y Flyway.
+- `frontend`: `npm.cmd run lint`.
+- `frontend`: `npm.cmd run typecheck`.
+- `frontend`: `npm.cmd run build`.
+
+Riesgos residuales controlados:
+
+- Algunos servicios application siguen usando `JdbcClient` internamente; el uso queda listado por prueba de arquitectura y debe extraerse a command repositories en un hito tecnico posterior.
+- `frontend/src/lib/api.ts` sigue siendo un cliente API grande; se mantiene funcional y tipado, pero conviene dividirlo por dominio en una refactorizacion frontend dedicada.
+- Aun falta una suite amplia de concurrencia real para pagos/renovaciones; la proteccion base existe por restricciones unicas, hashes de idempotencia, transacciones y eventos procesados.
+
 ## Hito 4 - Operacion del gimnasio
 
 Estado: en progreso
 
 Implementado:
 
-- Rama de trabajo `feature/hito-4-gym-operations` creada desde `main` con Hito 3 integrado.
-- Migracion Flyway `V6__hito4_access_control.sql` con `access_device`, `access_temporary_pass`, `access_log`, permisos de acceso y dispositivo semilla `MAIN-DOOR`.
+- Rama de trabajo `feature/hito-4-gym-operations` actualizada sobre Hito 3.5.
+- Migracion Flyway `V9__hito4_access_control.sql` con `access_device`, `access_temporary_pass`, `access_log`, permisos de acceso y dispositivo semilla `MAIN-DOOR`.
 - Modulo backend `access` con endpoints `GET /api/v1/access/devices`, `GET /api/v1/access/logs`, `POST /api/v1/access/requests`, `POST /api/v1/access/commands/open` y `POST /api/v1/access/commands/temporary`.
 - Evaluacion de acceso por cliente o identificador contra membresia activa en sucursal y periodo de gracia.
 - Acceso por pase temporal con expiracion, numero maximo de usos y consumo automatico.
@@ -226,41 +273,20 @@ Implementado:
 - Auditoria de `ACCESS_GRANTED`, `ACCESS_DENIED` y `ACCESS_TEMPORARY_PASS_CREATED`.
 - Pantalla frontend `/access` para recepcion: busqueda de cliente, evaluacion, apertura manual, pase temporal y bitacora reciente.
 - Acceso directo a `/access` desde `/reception`.
-- Migracion Flyway `V7__hito4_inventory.sql` con `inventory_stock`, `inventory_movement`, permisos de inventario e inventario semilla para `BOTELLA-AGUA`.
+- Migracion Flyway `V10__hito4_inventory.sql` con `inventory_stock`, `inventory_movement`, permisos de inventario e inventario semilla para `BOTELLA-AGUA`.
 - Modulo backend `inventory` con endpoints `GET /api/v1/inventory`, `GET /api/v1/inventory/{productId}`, `POST /api/v1/inventory/movements`, `GET /api/v1/inventory/movements` y `GET /api/v1/inventory/low-stock`.
 - Movimientos de inventario `INITIAL`, `PURCHASE`, `ADJUSTMENT_IN`, `ADJUSTMENT_OUT`, `WASTE`, `RETURN` y `SALE`.
 - Validacion de producto fisico activo, bloqueo de existencias negativas, minimo de inventario y costo promedio ponderado para entradas con costo.
 - Auditoria de `INVENTORY_MOVEMENT_CREATED`.
 - Pantalla frontend `/inventory` para existencias, alertas, movimientos, ajustes, mermas y costo unitario.
 - Acceso directo a `/inventory` desde `/reception`.
-
-Verificado localmente:
-
-- Backend tests con Java 25.
-- Spring Modulith architecture test.
-- Frontend lint.
-- Frontend typecheck.
-- Frontend production build con rutas `/access` y `/inventory`.
-- Docker build backend y frontend.
-- Smoke test Docker con Flyway V6 aplicada y dispositivo `MAIN-DOOR`.
-- Smoke test Docker `GET /api/v1/access/devices`.
-- Smoke test Docker `POST /api/v1/access/requests` con membresia activa y decision `GRANTED`.
-- Smoke test Docker `POST /api/v1/access/requests` sin membresia ni pase temporal y decision `DENIED`.
-- Smoke test Docker `POST /api/v1/access/commands/temporary`.
-- Smoke test Docker `POST /api/v1/access/requests` con pase temporal vigente y decision `GRANTED`.
-- Smoke test Docker `POST /api/v1/access/commands/open` con comando simulado.
-- Smoke test Docker `GET /api/v1/access/logs`.
-- Smoke test Docker `GET /access`.
-- Smoke test Docker con Flyway V7 aplicada e inventario semilla para `BOTELLA-AGUA`.
-- Smoke test Docker `GET /api/v1/inventory`.
-- Smoke test Docker `GET /api/v1/inventory/{productId}`.
-- Smoke test Docker `POST /api/v1/inventory/movements` con movimiento `PURCHASE`.
-- Smoke test Docker `POST /api/v1/inventory/movements` con movimiento `WASTE`.
-- Smoke test Docker `GET /api/v1/inventory/low-stock`.
-- Smoke test Docker `GET /api/v1/inventory/movements`.
-- Smoke test Docker `GET /inventory`.
+- Migracion Flyway `V11__hito4_resources_bookings.sql` con `resource`, `booking`, permisos de recursos/reservas y recurso demo `Consultorio evaluacion`.
+- Modulo backend `bookings` con endpoints `GET /api/v1/resources`, `POST /api/v1/resources`, `GET /api/v1/resources/{resourceId}/availability`, `GET /api/v1/bookings`, `GET /api/v1/bookings/{bookingId}`, `POST /api/v1/bookings`, `POST /api/v1/bookings/{bookingId}/confirm`, `POST /api/v1/bookings/{bookingId}/check-in`, `POST /api/v1/bookings/{bookingId}/complete` y `POST /api/v1/bookings/{bookingId}/cancel`.
+- Validacion de disponibilidad por capacidad, horario del recurso y traslapes activos.
+- Pantalla frontend `/bookings` para agenda diaria, disponibilidad, creacion de recursos, creacion de reservas y transiciones operativas.
+- Acceso directo a `/bookings` desde `/reception`.
 
 Pendiente del Hito 4:
 
 - Inventario: descuento automatico posterior por venta.
-- Recursos y reservas: recursos reservables, disponibilidad, booking, check-in, finalizacion y cancelacion.
+- Recursos y reservas: edicion de recursos, politicas avanzadas de cancelacion y cobro asociado a reservas.

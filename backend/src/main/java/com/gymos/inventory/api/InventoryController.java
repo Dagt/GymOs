@@ -3,6 +3,7 @@ package com.gymos.inventory.api;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.inventory.application.InventoryService;
+import com.gymos.inventory.application.command.InventoryMovementCommand;
 import com.gymos.inventory.infrastructure.InventoryRepository.InventoryMovementRecord;
 import com.gymos.inventory.infrastructure.InventoryRepository.InventoryStockRecord;
 import jakarta.servlet.http.HttpServletRequest;
@@ -65,7 +66,7 @@ public class InventoryController {
 			@Valid @RequestBody InventoryMovementRequest request,
 			HttpServletRequest servletRequest
 	) {
-		return inventoryService.createMovement(principal, request, correlationId(servletRequest));
+		return inventoryService.createMovement(principal, request.toCommand(), correlationId(servletRequest));
 	}
 
 	private String correlationId(HttpServletRequest request) {
@@ -84,5 +85,8 @@ public class InventoryController {
 			UUID referenceId,
 			@NotBlank @Size(max = 500) String reason
 	) {
+		private InventoryMovementCommand toCommand() {
+			return new InventoryMovementCommand(productId, movementType, quantity, unitCostCents, reorderPoint, referenceType, referenceId, reason);
+		}
 	}
 }
