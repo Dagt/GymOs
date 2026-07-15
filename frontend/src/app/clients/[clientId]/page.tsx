@@ -7,11 +7,13 @@ import {
   getClient,
   getClientMemberships,
   getStoredSession,
+  renewMembership,
   updateClient,
   type ClientMembershipSummary,
   type ClientDetail,
   type ClientDetailResponse,
   type ClientUpdatePayload,
+  type RenewMembershipPayload,
   type StoredSession,
 } from "@/lib/api";
 
@@ -21,7 +23,12 @@ export default function ClientDetailPage() {
   const [data, setData] = useState<ClientDetailResponse | null>(null);
   const [memberships, setMemberships] = useState<ClientMembershipSummary[]>([]);
   const [form, setForm] = useState<ClientUpdatePayload | null>(null);
+  const [renewMethod, setRenewMethod] = useState<RenewMembershipPayload["method"]>("CASH");
+  const [renewReference, setRenewReference] = useState("");
+  const [renewValidateNow, setRenewValidateNow] = useState(true);
+  const [renewingMembershipId, setRenewingMembershipId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -84,6 +91,34 @@ export default function ClientDetailPage() {
       setError(exception instanceof Error ? exception.message : "No fue posible actualizar cliente.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function renew(activeMembership: ClientMembershipSummary) {
+    if (!session) {
+      return;
+    }
+    setRenewingMembershipId(activeMembership.id);
+    setError(null);
+    setMessage(null);
+    try {
+      const response = await renewMembership(session.accessToken, activeMembership.id, {
+        method: renewMethod,
+        reference: renewReference,
+        validateNow: renewValidateNow,
+        notes: "Renovacion desde ficha de cliente",
+      });
+      setMemberships(await getClientMemberships(session.accessToken, params.clientId));
+      setRenewReference("");
+      setMessage(
+        response.membership
+          ? `Membresia renovada desde ${formatDay(response.membership.startsOn)} hasta ${formatDay(response.membership.endsOn)}.`
+          : `Venta ${response.saleNumber} creada con pago pendiente.`,
+      );
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible renovar membresia.");
+    } finally {
+      setRenewingMembershipId(null);
     }
   }
 
@@ -187,6 +222,43 @@ export default function ClientDetailPage() {
                 Nueva venta
               </Link>
             </div>
+            <div className="mt-4 grid gap-3 rounded-md border border-[#d8ddd2] bg-[#f6f7f2] p-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+                  Metodo
+                  <select
+                    className="h-10 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm"
+                    onChange={(event) => setRenewMethod(event.target.value as RenewMembershipPayload["method"])}
+                    value={renewMethod}
+                  >
+                    <option value="CASH">Efectivo</option>
+                    <option value="TRANSFER">Transferencia</option>
+                    <option value="CARD_MANUAL">Tarjeta manual</option>
+                  </select>
+                </label>
+                <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+                  Referencia
+                  <input
+                    className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm"
+                    onChange={(event) => setRenewReference(event.target.value)}
+                    value={renewReference}
+                  />
+                </label>
+              </div>
+              <label className="flex items-center gap-2 text-sm font-medium text-[#42514a]">
+                <input
+                  checked={renewValidateNow}
+                  onChange={(event) => setRenewValidateNow(event.target.checked)}
+                  type="checkbox"
+                />
+                Validar pago ahora
+              </label>
+            </div>
+            {message ? (
+              <p className="mt-4 rounded-md border border-[#bad9c4] bg-[#eff8f1] px-3 py-2 text-sm text-[#31563c]">
+                {message}
+              </p>
+            ) : null}
             <div className="mt-4 grid gap-3">
               {memberships.length === 0 ? (
                 <p className="text-sm text-[#5d6b63]">Sin membresias registradas.</p>
@@ -207,6 +279,14 @@ export default function ClientDetailPage() {
                       {membership.saleNumber}
                     </Link>
                   </div>
+                  <button
+                    className="mt-3 h-10 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30] disabled:opacity-60"
+                    disabled={renewingMembershipId !== null || membership.status !== "ACTIVE"}
+                    onClick={() => renew(membership)}
+                    type="button"
+                  >
+                    {renewingMembershipId === membership.id ? "Renovando..." : "Renovar"}
+                  </button>
                 </article>
               ))}
             </div>

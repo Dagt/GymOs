@@ -98,6 +98,50 @@ public class MembershipRepository {
 				.optional();
 	}
 
+	public Optional<PlanForRenewal> planForRenewal(UUID organizationId, UUID planId) {
+		return jdbcClient.sql("""
+				SELECT mp.id AS plan_id, mp.product_id, cp.name AS plan_name,
+				       mp.duration_days, mp.grace_days, cp.price_cents, cp.currency
+				FROM membership_plan mp
+				JOIN catalog_product cp ON cp.id = mp.product_id
+				WHERE mp.organization_id = :organizationId
+				  AND mp.id = :planId
+				  AND mp.status = 'ACTIVE'
+				  AND mp.deleted_at IS NULL
+				  AND cp.status = 'ACTIVE'
+				  AND cp.deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("planId", planId)
+				.query((resultSet, rowNumber) -> new PlanForRenewal(
+						resultSet.getObject("plan_id", UUID.class),
+						resultSet.getObject("product_id", UUID.class),
+						resultSet.getString("plan_name"),
+						resultSet.getInt("duration_days"),
+						resultSet.getInt("grace_days"),
+						resultSet.getLong("price_cents"),
+						resultSet.getString("currency")
+				))
+				.optional();
+	}
+
+	public Optional<LocalDate> latestMembershipEnd(UUID organizationId, UUID clientId, UUID planId) {
+		return jdbcClient.sql("""
+				SELECT MAX(ends_on)
+				FROM membership
+				WHERE organization_id = :organizationId
+				  AND client_id = :clientId
+				  AND plan_id = :planId
+				  AND status = 'ACTIVE'
+				  AND deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("clientId", clientId)
+				.param("planId", planId)
+				.query(LocalDate.class)
+				.optional();
+	}
+
 	public record MembershipSummary(
 			UUID id,
 			UUID clientId,
@@ -110,6 +154,17 @@ public class MembershipRepository {
 			LocalDate startsOn,
 			LocalDate endsOn,
 			LocalDate graceEndsOn
+	) {
+	}
+
+	public record PlanForRenewal(
+			UUID planId,
+			UUID productId,
+			String planName,
+			int durationDays,
+			int graceDays,
+			long priceCents,
+			String currency
 	) {
 	}
 }

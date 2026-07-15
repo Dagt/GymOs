@@ -443,7 +443,10 @@ public class SalesService {
 				continue;
 			}
 			OffsetDateTime now = OffsetDateTime.now();
-			LocalDate startsOn = LocalDate.now();
+			LocalDate today = LocalDate.now();
+			LocalDate latestEnd = salesRepository.latestMembershipEnd(organizationId, sale.clientId(), plan.planId())
+					.orElse(null);
+			LocalDate startsOn = latestEnd != null && !latestEnd.isBefore(today) ? latestEnd.plusDays(1) : today;
 			LocalDate endsOn = startsOn.plusDays(plan.durationDays() - 1L);
 			LocalDate graceEndsOn = endsOn.plusDays(plan.graceDays());
 			UUID membershipId = UUID.randomUUID();

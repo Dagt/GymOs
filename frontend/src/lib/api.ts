@@ -221,6 +221,24 @@ export type ClientMembershipSummary = MembershipDetail & {
   saleNumber: string;
 };
 
+export type RenewMembershipPayload = {
+  method: "CASH" | "TRANSFER" | "CARD_MANUAL";
+  reference?: string | null;
+  validateNow: boolean;
+  notes?: string | null;
+};
+
+export type RenewMembershipResponse = {
+  saleId: string;
+  saleNumber: string;
+  saleStatus: "PENDING_PAYMENT" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
+  totalCents: number;
+  paidCents: number;
+  balanceCents: number;
+  currency: string;
+  membership: ClientMembershipSummary | null;
+};
+
 export type SaleDetailResponse = {
   sale: SaleHeader;
   items: SaleItemDetail[];
@@ -400,6 +418,17 @@ export async function getClientMemberships(
   clientId: string,
 ): Promise<ClientMembershipSummary[]> {
   return apiFetch<ClientMembershipSummary[]>(`/clients/${clientId}/memberships`, accessToken);
+}
+
+export async function renewMembership(
+  accessToken: string,
+  membershipId: string,
+  payload: RenewMembershipPayload,
+): Promise<RenewMembershipResponse> {
+  return apiFetch<RenewMembershipResponse>(`/memberships/${membershipId}/renew`, accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
 }
 
 export async function updateClient(

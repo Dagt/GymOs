@@ -177,10 +177,25 @@ Implementado:
 - Modulo backend `memberships` con endpoints `GET /api/v1/clients/{clientId}/memberships` y `GET /api/v1/memberships/{membershipId}`.
 - Consulta de membresias por organizacion, sucursal activa y cliente.
 - Pantalla frontend `/clients/[clientId]` con resumen de membresias del cliente y enlace a la venta que activo cada membresia.
+- Endpoint backend `POST /api/v1/memberships/{membershipId}/renew` para renovacion acumulativa con venta y pago manual.
+- Activacion acumulativa de membresias de plan: si existe una membresia vigente del mismo plan, la nueva inicia al dia siguiente del vencimiento anterior.
+- Pantalla frontend `/clients/[clientId]` con renovacion manual de membresia desde la ficha.
+
+Verificado localmente:
+
+- Backend tests con Java 25.
+- Spring Modulith architecture test.
+- Frontend lint.
+- Frontend typecheck.
+- Frontend production build.
+- Docker build backend y frontend.
+- Smoke test `GET /api/v1/clients/{clientId}/memberships`.
+- Smoke test `POST /api/v1/memberships/{membershipId}/renew` con pago `CASH` completado.
+- Smoke test de renovacion acumulativa: membresia inicial termina `2026-08-13` y renovacion inicia `2026-08-14`.
+- Smoke test `GET /clients/{clientId}` con membresias y renovacion visible.
 
 Pendiente del Hito 3:
 
-- Renovacion acumulativa de membresia sin perder dias vigentes.
 - Cambio de plan con venta/pago y auditoria.
 - Registro tecnico de terminales de kiosco y sesiones temporales.
 - Pantalla frontend de kiosco interno con verificacion de cliente, resumen limitado, pagos pendientes, renovacion y cambio de plan.
