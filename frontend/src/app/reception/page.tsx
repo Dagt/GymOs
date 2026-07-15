@@ -71,6 +71,12 @@ const shortcuts = [
     status: "Disponible",
     href: "/bookings",
   },
+  {
+    title: "Coaches",
+    detail: "Entrenadores, rutinas y asignaciones a clientes.",
+    status: "Disponible",
+    href: "/coaches",
+  },
 ];
 
 export default function ReceptionPage() {

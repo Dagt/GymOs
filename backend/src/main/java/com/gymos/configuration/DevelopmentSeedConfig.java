@@ -124,7 +124,21 @@ public class DevelopmentSeedConfig {
 					"membership.cancel",
 					"report.sales.read",
 					"audit.read",
-					"selfservice.terminal.manage"
+					"selfservice.terminal.manage",
+					"access.read",
+					"access.manage",
+					"access.manual.open",
+					"inventory.read",
+					"inventory.manage",
+					"resource.read",
+					"resource.manage",
+					"booking.read",
+					"booking.manage",
+					"coach.read",
+					"coach.manage",
+					"workout.read",
+					"workout.manage",
+					"report.coaches.read"
 			);
 			for (int index = 0; index < permissions.size(); index++) {
 				UUID permissionId = UUID.nameUUIDFromBytes(("gymos:" + permissions.get(index)).getBytes());

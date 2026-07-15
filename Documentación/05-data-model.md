@@ -267,21 +267,39 @@ Regla:
 - raw_event_reference
 
 ### coach
-- person_id
+- organization_id
+- branch_id
+- display_name
+- email
+- phone
+- specialties_json
+- bio
 - status
-- commission_rule_json
 
 ### workout
 - coach_id
-- client_id
+- title
+- goal
+- level
 - status
-- current_version
 
 ### workout_version
 - workout_id
 - version_number
+- summary
 - content_json
 - created_by
+
+### workout_assignment
+- workout_id
+- workout_version_id
+- client_id
+- coach_id
+- status
+- assigned_on
+- starts_on
+- ends_on
+- notes
 
 ### professional
 - person_id
@@ -370,3 +388,4 @@ Migraciones nuevas:
 - `V10__hito4_inventory.sql`: agrega existencias, movimientos de inventario y stock semilla.
 - `V11__hito4_resources_bookings.sql`: agrega recursos reservables, reservas, permisos y recurso demo.
 - `V12__hito4_inventory_sale_idempotency.sql`: agrega indice unico para movimientos automaticos de inventario por venta y producto.
+- `V13__hito5_coaches_workouts.sql`: agrega coaches, rutinas versionadas, asignaciones a clientes, permisos y datos demo de coaching.

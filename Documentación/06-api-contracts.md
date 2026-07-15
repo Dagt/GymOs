@@ -187,10 +187,18 @@ Nota implementada Hito 4:
 - `POST /coaches`
 - `GET /coaches`
 - `POST /workouts`
+- `GET /workouts`
 - `GET /workouts/{id}`
 - `POST /workouts/{id}/versions`
 - `POST /workouts/{id}/assign`
 - `GET /clients/{clientId}/workouts`
+
+Nota implementada Hito 5:
+- `GET /coaches` y `POST /coaches` operan por organizacion y sucursal activa.
+- `POST /workouts` crea la rutina y su primera version publicada.
+- `POST /workouts/{id}/versions` agrega una nueva version publicada sin modificar asignaciones historicas.
+- `POST /workouts/{id}/assign` asigna una version concreta o la ultima version publicada a un cliente activo.
+- `GET /reports/coaches` devuelve conteos base: coaches, rutinas, asignaciones activas y asignaciones de ultimos 30 dias.
 
 ## 6.14 Profesionales
 
@@ -275,6 +283,9 @@ Permisos por endpoint interno:
 - `inventory.read`, `inventory.manage`
 - `resource.read`, `resource.manage`
 - `booking.read`, `booking.manage`
+- `coach.read`, `coach.manage`
+- `workout.read`, `workout.manage`
+- `report.coaches.read`
 
 Errores agregados o formalizados:
 - `IDEMPOTENCY_KEY_REUSED`

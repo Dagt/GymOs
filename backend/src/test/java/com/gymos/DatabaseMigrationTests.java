@@ -44,6 +44,10 @@ class DatabaseMigrationTests {
 			assertThat(tableExists(connection, "resource")).isTrue();
 			assertThat(tableExists(connection, "booking")).isTrue();
 			assertThat(indexExists(connection, "ux_inventory_movement_sale_product_effect")).isTrue();
+			assertThat(tableExists(connection, "coach")).isTrue();
+			assertThat(tableExists(connection, "workout")).isTrue();
+			assertThat(tableExists(connection, "workout_version")).isTrue();
+			assertThat(tableExists(connection, "workout_assignment")).isTrue();
 		}
 	}
 

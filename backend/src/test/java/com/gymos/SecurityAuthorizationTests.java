@@ -42,6 +42,22 @@ class SecurityAuthorizationTests {
 	}
 
 	@Test
+	@WithMockUser(authorities = "coach.read")
+	void coachCreationRequiresManagePermission() throws Exception {
+		mockMvc.perform(post("/api/v1/coaches").contentType("application/json").content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(authorities = "workout.read")
+	void workoutAssignmentRequiresManagePermission() throws Exception {
+		mockMvc.perform(post("/api/v1/workouts/99999999-9999-9999-9999-999999999952/assign")
+						.contentType("application/json")
+						.content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
 	void selfServiceSessionCreationIsPublic() throws Exception {
 		var result = mockMvc.perform(post("/api/v1/self-service/terminals/UNKNOWN/sessions"))
 				.andReturn();

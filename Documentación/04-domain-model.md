@@ -333,6 +333,18 @@ Atributos:
 
 Cada edición crea WorkoutVersion.
 
+Implementado en Hito 5:
+- `Coach` pertenece a organizacion y sucursal, tiene estado, contacto y especialidades.
+- `Workout` define titulo, objetivo, nivel, estado y coach opcional.
+- `WorkoutVersion` guarda contenido JSON versionado; una asignacion siempre apunta a una version especifica.
+- `WorkoutAssignment` vincula cliente, rutina, version, coach, fechas y notas.
+
+Invariantes:
+- Una rutina asignada a cliente no cambia retroactivamente si se publica una nueva version.
+- Solo clientes activos pueden recibir rutinas.
+- Solo versiones publicadas pueden asignarse.
+- Las fechas de asignacion no pueden cerrar antes de iniciar.
+
 ## 4.15 ProfessionalService
 
 Atributos:

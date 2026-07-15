@@ -179,3 +179,12 @@ Decisiones implementadas:
 - Las reservas validan capacidad del recurso, horario operativo y traslapes de reservas activas.
 - `inventory` consume `PaymentCompletedV1` publicado por `sales` y registra movimientos `SALE` idempotentes por venta y producto.
 - Las pantallas `/access`, `/inventory` y `/bookings` son herramientas operativas para recepcion.
+
+## 3.16 Servicios avanzados Hito 5
+
+Primer corte implementado:
+- `coaching` gestiona coaches por organizacion y sucursal.
+- Las rutinas se modelan como `workout` con versiones publicadas en `workout_version`.
+- Las asignaciones a clientes quedan en `workout_assignment`, apuntando a una version concreta para preservar historial.
+- Los endpoints internos usan permisos `coach.read`, `coach.manage`, `workout.read`, `workout.manage` y `report.coaches.read`.
+- La pantalla `/coaches` permite alta de coach, alta de rutina, asignacion a clientes y lectura de metricas base de coaches.

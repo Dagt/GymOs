@@ -302,3 +302,34 @@ Pendiente fuera del alcance central del Hito 4:
 
 - Recursos y reservas: edicion de recursos, politicas avanzadas de cancelacion y cobro asociado a reservas.
 - Integracion futura con hardware real de torniquetes o lectores fisicos.
+
+## Hito 5 - Servicios avanzados
+
+Estado: en progreso
+
+Primer corte implementado:
+
+- Rama de trabajo `feature/hito-5-advanced-services` creada desde Hito 4 completo.
+- Migracion Flyway `V13__hito5_coaches_workouts.sql` con `coach`, `workout`, `workout_version`, `workout_assignment`, permisos y datos demo.
+- Modulo backend `coaching` con endpoints `GET /api/v1/coaches`, `POST /api/v1/coaches`, `GET /api/v1/workouts`, `POST /api/v1/workouts`, `GET /api/v1/workouts/{workoutId}`, `POST /api/v1/workouts/{workoutId}/versions`, `POST /api/v1/workouts/{workoutId}/assign`, `GET /api/v1/clients/{clientId}/workouts` y `GET /api/v1/reports/coaches`.
+- Rutinas versionadas: cada asignacion apunta a una version concreta para preservar historial.
+- Validaciones de coach activo, cliente activo, nivel de rutina, JSON de rutina y rango de fechas.
+- RBAC para `coach.read`, `coach.manage`, `workout.read`, `workout.manage` y `report.coaches.read`.
+- Seed local actualizado para incluir permisos de Hito 4 y Hito 5 en el administrador demo.
+- Pantalla frontend `/coaches` con alta de coach, alta de rutina, busqueda de cliente, asignacion de rutina y metricas base.
+- Acceso directo a `/coaches` desde `/reception`.
+
+Verificado localmente:
+
+- Backend tests con Java 25.
+- Testcontainers PostgreSQL y Flyway hasta `V13`.
+- Pruebas de seguridad MVC para permisos de coaches y rutinas.
+- Frontend lint.
+- Frontend typecheck.
+
+Pendiente para completar Hito 5:
+
+- Profesionales de bienestar, servicios y disponibilidad.
+- Notificaciones y automatizaciones.
+- Dashboard del dueno mas completo con metricas cruzadas.
+- Build frontend de produccion, Docker config/build y smoke tests del flujo `/coaches`.
