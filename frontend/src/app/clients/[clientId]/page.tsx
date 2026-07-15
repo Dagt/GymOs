@@ -4,15 +4,19 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import {
+  changeMembershipPlan,
   getClient,
   getClientMemberships,
+  getPlans,
   getStoredSession,
   renewMembership,
   updateClient,
+  type ChangeMembershipPlanPayload,
   type ClientMembershipSummary,
   type ClientDetail,
   type ClientDetailResponse,
   type ClientUpdatePayload,
+  type PlanSummary,
   type RenewMembershipPayload,
   type StoredSession,
 } from "@/lib/api";
@@ -22,11 +26,14 @@ export default function ClientDetailPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
   const [data, setData] = useState<ClientDetailResponse | null>(null);
   const [memberships, setMemberships] = useState<ClientMembershipSummary[]>([]);
+  const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [form, setForm] = useState<ClientUpdatePayload | null>(null);
   const [renewMethod, setRenewMethod] = useState<RenewMembershipPayload["method"]>("CASH");
   const [renewReference, setRenewReference] = useState("");
   const [renewValidateNow, setRenewValidateNow] = useState(true);
+  const [targetPlanId, setTargetPlanId] = useState("");
   const [renewingMembershipId, setRenewingMembershipId] = useState<string | null>(null);
+  const [changingMembershipId, setChangingMembershipId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,15 +55,18 @@ export default function ClientDetailPage() {
       setLoading(true);
       setError(null);
       try {
-        const [response, loadedMemberships] = await Promise.all([
+        const [response, loadedMemberships, loadedPlans] = await Promise.all([
           getClient(storedSession.accessToken, params.clientId),
           getClientMemberships(storedSession.accessToken, params.clientId),
+          getPlans(storedSession.accessToken),
         ]);
         if (!active) {
           return;
         }
         setData(response);
         setMemberships(loadedMemberships);
+        setPlans(loadedPlans.filter((plan) => plan.status === "ACTIVE"));
+        setTargetPlanId((current) => current || loadedPlans.find((plan) => plan.status === "ACTIVE")?.id || "");
         setForm(toForm(response.client));
       } catch (exception) {
         if (active) {
@@ -119,6 +129,36 @@ export default function ClientDetailPage() {
       setError(exception instanceof Error ? exception.message : "No fue posible renovar membresia.");
     } finally {
       setRenewingMembershipId(null);
+    }
+  }
+
+  async function changePlan(activeMembership: ClientMembershipSummary) {
+    if (!session || !targetPlanId) {
+      return;
+    }
+    setChangingMembershipId(activeMembership.id);
+    setError(null);
+    setMessage(null);
+    try {
+      const payload: ChangeMembershipPlanPayload = {
+        targetPlanId,
+        method: renewMethod,
+        reference: renewReference,
+        validateNow: renewValidateNow,
+        notes: "Cambio de plan desde ficha de cliente",
+      };
+      const response = await changeMembershipPlan(session.accessToken, activeMembership.id, payload);
+      setMemberships(await getClientMemberships(session.accessToken, params.clientId));
+      setRenewReference("");
+      setMessage(
+        response.membership
+          ? `Plan cambiado a ${response.membership.planName}. Vigencia hasta ${formatDay(response.membership.endsOn)}.`
+          : `Venta ${response.saleNumber} creada.`,
+      );
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible cambiar plan.");
+    } finally {
+      setChangingMembershipId(null);
     }
   }
 
@@ -245,6 +285,20 @@ export default function ClientDetailPage() {
                   />
                 </label>
               </div>
+              <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+                Nuevo plan
+                <select
+                  className="h-10 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm"
+                  onChange={(event) => setTargetPlanId(event.target.value)}
+                  value={targetPlanId}
+                >
+                  {plans.map((plan) => (
+                    <option key={plan.id} value={plan.id}>
+                      {plan.name} - {formatMoney(plan.priceCents, plan.currency)}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <label className="flex items-center gap-2 text-sm font-medium text-[#42514a]">
                 <input
                   checked={renewValidateNow}
@@ -281,11 +335,25 @@ export default function ClientDetailPage() {
                   </div>
                   <button
                     className="mt-3 h-10 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30] disabled:opacity-60"
-                    disabled={renewingMembershipId !== null || membership.status !== "ACTIVE"}
+                    disabled={renewingMembershipId !== null || changingMembershipId !== null || membership.status !== "ACTIVE"}
                     onClick={() => renew(membership)}
                     type="button"
                   >
                     {renewingMembershipId === membership.id ? "Renovando..." : "Renovar"}
+                  </button>
+                  <button
+                    className="mt-2 h-10 rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f] disabled:opacity-60"
+                    disabled={
+                      renewingMembershipId !== null
+                      || changingMembershipId !== null
+                      || membership.status !== "ACTIVE"
+                      || !targetPlanId
+                      || targetPlanId === membership.planId
+                    }
+                    onClick={() => changePlan(membership)}
+                    type="button"
+                  >
+                    {changingMembershipId === membership.id ? "Cambiando..." : "Cambiar plan"}
                   </button>
                 </article>
               ))}
@@ -409,4 +477,11 @@ function membershipStatusLabel(status: string) {
     CANCELLED: "Cancelada",
   };
   return labels[status] ?? status;
+}
+
+function formatMoney(cents: number, currency: string) {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency,
+  }).format(cents / 100);
 }

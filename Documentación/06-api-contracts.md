@@ -39,6 +39,10 @@ Base path: `/api/v1`
 
 Los endpoints de autoservicio sólo exponen acciones permitidas para clientes en una sesión temporal de kiosco. Las reglas de pagos, membresías, beneficios y permisos se validan en backend.
 
+Nota implementada Hito 3: las acciones de renovacion y cambio de plan reciben `{membershipId}` en la ruta concreta:
+- `POST /self-service/sessions/{sessionId}/membership-renewals/{membershipId}`
+- `POST /self-service/sessions/{sessionId}/membership-change-requests/{membershipId}`
+
 ## 6.2 Personas
 
 - `POST /persons`
@@ -82,6 +86,7 @@ Los endpoints de autoservicio sólo exponen acciones permitidas para clientes en
 - `PATCH /memberships/{id}/auto-renew`
 - Nota implementada: `GET /clients/{clientId}/memberships` y `GET /memberships/{id}` exponen membresias por cliente y detalle por membresia.
 - Nota implementada: `POST /memberships/{id}/renew` crea una venta de renovacion, registra pago manual y activa una nueva membresia acumulativa cuando el pago queda completado.
+- Nota implementada: `POST /memberships/{id}/change-plan` crea una venta de cambio de plan, exige pago completado, cancela la membresia anterior y activa la nueva.
 - Nota implementada: una venta pagada que incluya un producto vinculado a `membership_plan` activa una membresia.
 
 La activación ocurre como consecuencia de pago completado.

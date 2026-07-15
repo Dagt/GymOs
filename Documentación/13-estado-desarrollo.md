@@ -169,7 +169,7 @@ Pendiente del Hito 2:
 
 ## Hito 3 - Membresias y kiosco
 
-Estado: en progreso
+Estado: completo
 
 Implementado:
 
@@ -178,8 +178,14 @@ Implementado:
 - Consulta de membresias por organizacion, sucursal activa y cliente.
 - Pantalla frontend `/clients/[clientId]` con resumen de membresias del cliente y enlace a la venta que activo cada membresia.
 - Endpoint backend `POST /api/v1/memberships/{membershipId}/renew` para renovacion acumulativa con venta y pago manual.
+- Endpoint backend `POST /api/v1/memberships/{membershipId}/change-plan` para cambio de plan con venta, pago completado, cancelacion de membresia anterior y activacion de nuevo plan.
 - Activacion acumulativa de membresias de plan: si existe una membresia vigente del mismo plan, la nueva inicia al dia siguiente del vencimiento anterior.
-- Pantalla frontend `/clients/[clientId]` con renovacion manual de membresia desde la ficha.
+- Migracion Flyway `V5__hito3_plans_and_kiosk_seed.sql` con plan trimestral y terminal demo `KIOSK-MAIN`.
+- Endpoints backend publicos de kiosco `POST /api/v1/self-service/terminals/{terminalCode}/sessions`, `POST /api/v1/self-service/sessions/{sessionId}/verify`, `GET /api/v1/self-service/sessions/{sessionId}/summary`, `GET /api/v1/self-service/sessions/{sessionId}/membership-options`, `POST /api/v1/self-service/sessions/{sessionId}/membership-renewals/{membershipId}`, `POST /api/v1/self-service/sessions/{sessionId}/membership-change-requests/{membershipId}` y `POST /api/v1/self-service/sessions/{sessionId}/end`.
+- Sesiones temporales de kiosco con expiracion de 15 minutos, verificacion por email o telefono y auditoria `SELF_SERVICE_KIOSK`.
+- Pantalla frontend `/clients/[clientId]` con renovacion manual y cambio de plan desde la ficha.
+- Pantalla frontend `/kiosk/[terminalCode]` para verificacion de cliente, resumen limitado, pagos pendientes, renovacion y cambio de plan.
+- Acceso al kiosco demo desde `/reception`.
 
 Verificado localmente:
 
@@ -193,11 +199,13 @@ Verificado localmente:
 - Smoke test `POST /api/v1/memberships/{membershipId}/renew` con pago `CASH` completado.
 - Smoke test de renovacion acumulativa: membresia inicial termina `2026-08-13` y renovacion inicia `2026-08-14`.
 - Smoke test `GET /clients/{clientId}` con membresias y renovacion visible.
-
-Pendiente del Hito 3:
-
-- Cambio de plan con venta/pago y auditoria.
-- Registro tecnico de terminales de kiosco y sesiones temporales.
-- Pantalla frontend de kiosco interno con verificacion de cliente, resumen limitado, pagos pendientes, renovacion y cambio de plan.
-- Auditoria de acciones `SELF_SERVICE_KIOSK`.
-- Smoke tests Docker para flujo de renovacion y sesion de kiosco.
+- Smoke test Docker con Flyway V5 aplicada.
+- Smoke test Docker `POST /api/v1/memberships/{membershipId}/change-plan` con pago `CASH` completado.
+- Smoke test Docker `POST /api/v1/self-service/terminals/KIOSK-MAIN/sessions`.
+- Smoke test Docker `POST /api/v1/self-service/sessions/{sessionId}/verify`.
+- Smoke test Docker `GET /api/v1/self-service/sessions/{sessionId}/summary`.
+- Smoke test Docker `GET /api/v1/self-service/sessions/{sessionId}/membership-options`.
+- Smoke test Docker `POST /api/v1/self-service/sessions/{sessionId}/membership-renewals/{membershipId}`.
+- Smoke test Docker `POST /api/v1/self-service/sessions/{sessionId}/membership-change-requests/{membershipId}`.
+- Smoke test Docker `POST /api/v1/self-service/sessions/{sessionId}/end`.
+- Smoke test Docker `GET /kiosk/KIOSK-MAIN`.

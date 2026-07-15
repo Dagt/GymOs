@@ -54,12 +54,31 @@ public class MembershipController {
 		return membershipService.renew(principal, membershipId, request, correlationId(servletRequest));
 	}
 
+	@PostMapping("/memberships/{membershipId}/change-plan")
+	RenewMembershipResponse changePlan(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID membershipId,
+			@Valid @RequestBody ChangePlanRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return membershipService.changePlan(principal, membershipId, request, correlationId(servletRequest));
+	}
+
 	private String correlationId(HttpServletRequest request) {
 		Object value = request.getAttribute(Correlation.ATTRIBUTE);
 		return value == null ? "unknown" : value.toString();
 	}
 
 	public record RenewMembershipRequest(
+			@NotNull @Pattern(regexp = "CASH|TRANSFER|CARD_MANUAL") String method,
+			@Size(max = 160) String reference,
+			boolean validateNow,
+			@Size(max = 2000) String notes
+	) {
+	}
+
+	public record ChangePlanRequest(
+			@NotNull UUID targetPlanId,
 			@NotNull @Pattern(regexp = "CASH|TRANSFER|CARD_MANUAL") String method,
 			@Size(max = 160) String reference,
 			boolean validateNow,

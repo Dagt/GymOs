@@ -228,6 +228,10 @@ export type RenewMembershipPayload = {
   notes?: string | null;
 };
 
+export type ChangeMembershipPlanPayload = RenewMembershipPayload & {
+  targetPlanId: string;
+};
+
 export type RenewMembershipResponse = {
   saleId: string;
   saleNumber: string;
@@ -237,6 +241,52 @@ export type RenewMembershipResponse = {
   balanceCents: number;
   currency: string;
   membership: ClientMembershipSummary | null;
+};
+
+export type KioskMembership = {
+  id: string;
+  planId: string;
+  planName: string;
+  status: "ACTIVE" | "EXPIRED" | "CANCELLED";
+  startsOn: string;
+  endsOn: string;
+  graceEndsOn: string;
+};
+
+export type KioskPendingPayment = {
+  id: string;
+  saleId: string;
+  saleNumber: string;
+  method: "CASH" | "TRANSFER" | "CARD_MANUAL";
+  status: "PENDING_VALIDATION";
+  amountCents: number;
+  currency: string;
+  receivedAt: string;
+};
+
+export type KioskPlanOption = {
+  id: string;
+  productId: string;
+  name: string;
+  priceCents: number;
+  currency: string;
+  durationDays: number;
+  graceDays: number;
+};
+
+export type KioskSessionResponse = {
+  sessionId: string;
+  terminalName: string;
+  expiresAt: string;
+  verified: boolean;
+};
+
+export type KioskSummaryResponse = {
+  sessionId: string;
+  expiresAt: string;
+  clientName: string;
+  memberships: KioskMembership[];
+  pendingPayments: KioskPendingPayment[];
 };
 
 export type SaleDetailResponse = {
@@ -431,6 +481,66 @@ export async function renewMembership(
   });
 }
 
+export async function changeMembershipPlan(
+  accessToken: string,
+  membershipId: string,
+  payload: ChangeMembershipPlanPayload,
+): Promise<RenewMembershipResponse> {
+  return apiFetch<RenewMembershipResponse>(`/memberships/${membershipId}/change-plan`, accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function createKioskSession(terminalCode: string): Promise<KioskSessionResponse> {
+  return publicApiFetch<KioskSessionResponse>(`/self-service/terminals/${terminalCode}/sessions`, {
+    method: "POST",
+  });
+}
+
+export async function verifyKioskSession(sessionId: string, identifier: string): Promise<KioskSummaryResponse> {
+  return publicApiFetch<KioskSummaryResponse>(`/self-service/sessions/${sessionId}/verify`, {
+    method: "POST",
+    body: JSON.stringify({ identifier }),
+  });
+}
+
+export async function getKioskSummary(sessionId: string): Promise<KioskSummaryResponse> {
+  return publicApiFetch<KioskSummaryResponse>(`/self-service/sessions/${sessionId}/summary`);
+}
+
+export async function getKioskMembershipOptions(sessionId: string): Promise<KioskPlanOption[]> {
+  return publicApiFetch<KioskPlanOption[]>(`/self-service/sessions/${sessionId}/membership-options`);
+}
+
+export async function renewMembershipFromKiosk(
+  sessionId: string,
+  membershipId: string,
+  payload: RenewMembershipPayload,
+): Promise<RenewMembershipResponse> {
+  return publicApiFetch<RenewMembershipResponse>(`/self-service/sessions/${sessionId}/membership-renewals/${membershipId}`, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function changeMembershipPlanFromKiosk(
+  sessionId: string,
+  membershipId: string,
+  payload: ChangeMembershipPlanPayload,
+): Promise<RenewMembershipResponse> {
+  return publicApiFetch<RenewMembershipResponse>(`/self-service/sessions/${sessionId}/membership-change-requests/${membershipId}`, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function endKioskSession(sessionId: string): Promise<void> {
+  await publicApiFetch<void>(`/self-service/sessions/${sessionId}/end`, {
+    method: "POST",
+  });
+}
+
 export async function updateClient(
   accessToken: string,
   clientId: string,
@@ -594,6 +704,31 @@ async function apiFetch<T>(
     headers: {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
       Authorization: `Bearer ${accessToken}`,
+      ...init.headers,
+    },
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new Error(error?.message ?? "No fue posible completar la operacion.");
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const text = await response.text();
+  return (text ? JSON.parse(text) : undefined) as T;
+}
+
+async function publicApiFetch<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...init,
+    headers: {
+      "Content-Type": "application/json",
       ...init.headers,
     },
   });
