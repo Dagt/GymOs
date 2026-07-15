@@ -175,12 +175,20 @@ export default function PosPage() {
               Venta rapida con pago manual y validacion interna.
             </p>
           </div>
-          <Link
-            className="inline-flex h-11 items-center justify-center rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f]"
-            href="/catalog"
-          >
-            Catalogo
-          </Link>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              className="inline-flex h-11 items-center justify-center rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f]"
+              href="/reports/sales"
+            >
+              Reportes
+            </Link>
+            <Link
+              className="inline-flex h-11 items-center justify-center rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f]"
+              href="/catalog"
+            >
+              Catalogo
+            </Link>
+          </div>
         </div>
       </header>
 

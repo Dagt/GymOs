@@ -223,6 +223,57 @@ export type SaleDetailResponse = {
   memberships: MembershipDetail[];
 };
 
+export type SalesReportTotals = {
+  currency: string;
+  saleCount: number;
+  subtotalCents: number;
+  discountCents: number;
+  totalCents: number;
+  paidCents: number;
+  balanceCents: number;
+  paidSales: number;
+  partiallyPaidSales: number;
+  pendingSales: number;
+};
+
+export type PaymentReportTotals = {
+  paymentCount: number;
+  completedPayments: number;
+  pendingPayments: number;
+  rejectedPayments: number;
+  completedCents: number;
+  pendingCents: number;
+  rejectedCents: number;
+};
+
+export type SaleStatusBreakdown = {
+  status: "PENDING_PAYMENT" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
+  saleCount: number;
+  totalCents: number;
+  paidCents: number;
+  balanceCents: number;
+};
+
+export type PaymentMethodBreakdown = {
+  method: "CASH" | "TRANSFER" | "CARD_MANUAL";
+  paymentCount: number;
+  totalCents: number;
+  completedCents: number;
+  pendingCents: number;
+  rejectedCents: number;
+};
+
+export type SalesReportResponse = {
+  fromDate: string;
+  toDate: string;
+  currency: string;
+  sales: SalesReportTotals;
+  payments: PaymentReportTotals;
+  salesByStatus: SaleStatusBreakdown[];
+  paymentsByMethod: PaymentMethodBreakdown[];
+  recentSales: SaleSummary[];
+};
+
 export type SaleItemPayload = {
   productId: string;
   quantity: number;
@@ -370,6 +421,22 @@ export async function getPlans(accessToken: string): Promise<PlanSummary[]> {
 
 export async function getRecentSales(accessToken: string): Promise<SaleSummary[]> {
   return apiFetch<SaleSummary[]>("/sales", accessToken);
+}
+
+export async function getSalesReport(
+  accessToken: string,
+  fromDate?: string,
+  toDate?: string,
+): Promise<SalesReportResponse> {
+  const params = new URLSearchParams();
+  if (fromDate) {
+    params.set("fromDate", fromDate);
+  }
+  if (toDate) {
+    params.set("toDate", toDate);
+  }
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return apiFetch<SalesReportResponse>(`/sales/reports/summary${suffix}`, accessToken);
 }
 
 export async function createSale(

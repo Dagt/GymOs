@@ -95,6 +95,7 @@ La activación ocurre como consecuencia de pago completado.
 ## 6.8 Ventas
 
 - `GET /sales`
+- `GET /sales/reports/summary`
 - `POST /sales`
 - `GET /sales/{id}`
 - `POST /sales/{id}/items` (pendiente)

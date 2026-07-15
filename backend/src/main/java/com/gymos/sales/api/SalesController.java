@@ -4,10 +4,14 @@ import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.sales.application.SalesService;
 import com.gymos.sales.infrastructure.SalesRepository.PaymentDetail;
+import com.gymos.sales.infrastructure.SalesRepository.PaymentMethodBreakdown;
+import com.gymos.sales.infrastructure.SalesRepository.PaymentReportTotals;
 import com.gymos.sales.infrastructure.SalesRepository.SaleHeader;
 import com.gymos.sales.infrastructure.SalesRepository.SaleItemDetail;
 import com.gymos.sales.infrastructure.SalesRepository.SaleSummary;
 import com.gymos.sales.infrastructure.SalesRepository.MembershipDetail;
+import com.gymos.sales.infrastructure.SalesRepository.SaleStatusBreakdown;
+import com.gymos.sales.infrastructure.SalesRepository.SalesReportTotals;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Min;
@@ -15,14 +19,17 @@ import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.http.MediaType;
@@ -40,6 +47,15 @@ public class SalesController {
 	@GetMapping
 	List<SaleSummary> recent(@AuthenticationPrincipal GymOsPrincipal principal) {
 		return salesService.recent(principal);
+	}
+
+	@GetMapping("/reports/summary")
+	SalesReportResponse report(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate toDate
+	) {
+		return salesService.report(principal, fromDate, toDate);
 	}
 
 	@PostMapping
@@ -136,6 +152,18 @@ public class SalesController {
 			List<SaleItemDetail> items,
 			List<PaymentDetail> payments,
 			List<MembershipDetail> memberships
+	) {
+	}
+
+	public record SalesReportResponse(
+			LocalDate fromDate,
+			LocalDate toDate,
+			String currency,
+			SalesReportTotals sales,
+			PaymentReportTotals payments,
+			List<SaleStatusBreakdown> salesByStatus,
+			List<PaymentMethodBreakdown> paymentsByMethod,
+			List<SaleSummary> recentSales
 	) {
 	}
 }

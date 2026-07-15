@@ -36,6 +36,12 @@ const shortcuts = [
     href: "/catalog",
   },
   {
+    title: "Reportes",
+    detail: "Resumen de ventas, saldos y pagos manuales.",
+    status: "Disponible",
+    href: "/reports/sales",
+  },
+  {
     title: "Configuracion",
     detail: "Datos de organizacion y sucursal para el arranque.",
     status: "Disponible",
@@ -263,7 +269,7 @@ export default function ReceptionPage() {
             </p>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
             {shortcuts.map((shortcut) => (
               <article className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm" key={shortcut.title}>
                 <p className="text-xs font-semibold uppercase tracking-wide text-[#51735f]">

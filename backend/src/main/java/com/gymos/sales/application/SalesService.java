@@ -7,6 +7,7 @@ import com.gymos.common.storage.ObjectStorageService;
 import com.gymos.sales.api.SalesController.CreateSaleRequest;
 import com.gymos.sales.api.SalesController.ManualPaymentRequest;
 import com.gymos.sales.api.SalesController.SaleDetailResponse;
+import com.gymos.sales.api.SalesController.SalesReportResponse;
 import com.gymos.sales.infrastructure.SalesRepository;
 import com.gymos.sales.infrastructure.SalesRepository.PaymentDetail;
 import com.gymos.sales.infrastructure.SalesRepository.ProductForSale;
@@ -15,6 +16,7 @@ import com.gymos.sales.infrastructure.SalesRepository.SaleSummary;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.UUID;
@@ -48,6 +50,33 @@ public class SalesService {
 	public List<SaleSummary> recent(GymOsPrincipal principal) {
 		requireBranch(principal);
 		return salesRepository.recentSales(principal.organizationId(), principal.branchId());
+	}
+
+	@Transactional(readOnly = true)
+	public SalesReportResponse report(GymOsPrincipal principal, LocalDate fromDate, LocalDate toDate) {
+		requireBranch(principal);
+		LocalDate resolvedTo = toDate == null ? LocalDate.now() : toDate;
+		LocalDate resolvedFrom = fromDate == null ? resolvedTo.minusDays(6) : fromDate;
+		if (resolvedFrom.isAfter(resolvedTo)) {
+			throw new BusinessException("REPORT_DATE_RANGE_INVALID", "La fecha inicial no puede ser posterior a la fecha final.");
+		}
+		if (resolvedFrom.plusDays(370).isBefore(resolvedTo)) {
+			throw new BusinessException("REPORT_DATE_RANGE_TOO_LARGE", "El reporte no puede cubrir mas de 370 dias.");
+		}
+
+		OffsetDateTime from = resolvedFrom.atStartOfDay().atOffset(ZoneOffset.UTC);
+		OffsetDateTime toExclusive = resolvedTo.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
+		var sales = salesRepository.salesReportTotals(principal.organizationId(), principal.branchId(), from, toExclusive);
+		return new SalesReportResponse(
+				resolvedFrom,
+				resolvedTo,
+				sales.currency(),
+				sales,
+				salesRepository.paymentReportTotals(principal.organizationId(), principal.branchId(), from, toExclusive),
+				salesRepository.salesByStatus(principal.organizationId(), principal.branchId(), from, toExclusive),
+				salesRepository.paymentsByMethod(principal.organizationId(), principal.branchId(), from, toExclusive),
+				salesRepository.recentSales(principal.organizationId(), principal.branchId())
+		);
 	}
 
 	@Transactional(readOnly = true)

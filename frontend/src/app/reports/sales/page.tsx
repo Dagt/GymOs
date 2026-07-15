@@ -1,0 +1,366 @@
+"use client";
+
+import Link from "next/link";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  getSalesReport,
+  getStoredSession,
+  type PaymentMethodBreakdown,
+  type SaleStatusBreakdown,
+  type SalesReportResponse,
+  type StoredSession,
+} from "@/lib/api";
+
+export default function SalesReportPage() {
+  const [session, setSession] = useState<StoredSession | null>(null);
+  const [report, setReport] = useState<SalesReportResponse | null>(null);
+  const [fromDate, setFromDate] = useState(() => addDays(todayIso(), -6));
+  const [toDate, setToDate] = useState(todayIso());
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadInitial() {
+      const storedSession = getStoredSession();
+      if (!active) {
+        return;
+      }
+      if (!storedSession) {
+        setLoading(false);
+        return;
+      }
+      setSession(storedSession);
+      try {
+        const loadedReport = await getSalesReport(storedSession.accessToken, fromDate, toDate);
+        if (active) {
+          setReport(loadedReport);
+        }
+      } catch (exception) {
+        if (active) {
+          setError(exception instanceof Error ? exception.message : "No fue posible cargar reporte.");
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    }
+
+    void loadInitial();
+    return () => {
+      active = false;
+    };
+  }, [fromDate, toDate]);
+
+  const averageTicket = useMemo(() => {
+    if (!report || report.sales.saleCount === 0) {
+      return 0;
+    }
+    return Math.round(report.sales.totalCents / report.sales.saleCount);
+  }, [report]);
+
+  async function submitFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session) {
+      return;
+    }
+    setRefreshing(true);
+    setError(null);
+    try {
+      setReport(await getSalesReport(session.accessToken, fromDate, toDate));
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible cargar reporte.");
+    } finally {
+      setRefreshing(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
+        <p className="rounded-md border border-[#d8ddd2] bg-white px-4 py-3 text-sm text-[#42514a]">
+          Cargando reporte...
+        </p>
+      </main>
+    );
+  }
+
+  if (!session) {
+    return <AuthRequired />;
+  }
+
+  const currency = report?.currency ?? "MXN";
+
+  return (
+    <main className="min-h-screen bg-[#f6f7f2] text-[#111815]">
+      <header className="border-b border-[#d8ddd2] bg-white">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <Link className="text-sm font-semibold text-[#51735f]" href="/reception">
+              Recepcion
+            </Link>
+            <h1 className="mt-1 text-3xl font-semibold">Reporte de ventas</h1>
+            <p className="mt-1 text-sm text-[#5d6b63]">
+              Resumen operativo de ventas, saldos y pagos manuales.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Link
+              className="inline-flex h-11 items-center justify-center rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f]"
+              href="/pos"
+            >
+              POS
+            </Link>
+            <Link
+              className="inline-flex h-11 items-center justify-center rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f]"
+              href="/catalog"
+            >
+              Catalogo
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      <section className="mx-auto grid max-w-7xl gap-6 px-6 py-6">
+        <form
+          className="grid gap-3 rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm md:grid-cols-[1fr_1fr_auto]"
+          onSubmit={submitFilters}
+        >
+          <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+            Desde
+            <input
+              className="h-11 rounded-md border border-[#cdd5ca] px-3 text-sm"
+              onChange={(event) => setFromDate(event.target.value)}
+              type="date"
+              value={fromDate}
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+            Hasta
+            <input
+              className="h-11 rounded-md border border-[#cdd5ca] px-3 text-sm"
+              onChange={(event) => setToDate(event.target.value)}
+              type="date"
+              value={toDate}
+            />
+          </label>
+          <button
+            className="h-11 self-end rounded-md bg-[#13251c] px-5 text-sm font-semibold text-white transition hover:bg-[#243d30] disabled:opacity-60"
+            disabled={refreshing}
+            type="submit"
+          >
+            {refreshing ? "Actualizando..." : "Actualizar"}
+          </button>
+        </form>
+
+        {error ? (
+          <p className="rounded-md border border-[#e5b7b7] bg-[#fff4f4] px-3 py-2 text-sm text-[#8c2f2f]">
+            {error}
+          </p>
+        ) : null}
+
+        {report ? (
+          <>
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <MetricCard label="Ventas" value={report.sales.saleCount.toString()} detail={periodLabel(report)} />
+              <MetricCard
+                label="Total vendido"
+                value={formatMoney(report.sales.totalCents, currency)}
+                detail={`${formatMoney(averageTicket, currency)} ticket promedio`}
+              />
+              <MetricCard
+                label="Cobrado"
+                value={formatMoney(report.sales.paidCents, currency)}
+                detail={`${report.payments.completedPayments} pagos completados`}
+              />
+              <MetricCard
+                label="Saldo pendiente"
+                value={formatMoney(report.sales.balanceCents, currency)}
+                detail={`${report.sales.pendingSales + report.sales.partiallyPaidSales} ventas abiertas`}
+              />
+            </section>
+
+            <section className="grid gap-6 lg:grid-cols-2">
+              <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+                <h2 className="text-xl font-semibold">Ventas por estado</h2>
+                <div className="mt-4 overflow-x-auto">
+                  <table className="w-full min-w-[560px] border-collapse text-sm">
+                    <thead className="text-left text-[#6f7a73]">
+                      <tr>
+                        <th className="border-b border-[#e4e8df] py-2 pr-3">Estado</th>
+                        <th className="border-b border-[#e4e8df] py-2 pr-3">Ventas</th>
+                        <th className="border-b border-[#e4e8df] py-2 pr-3">Total</th>
+                        <th className="border-b border-[#e4e8df] py-2 pr-3">Cobrado</th>
+                        <th className="border-b border-[#e4e8df] py-2">Saldo</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {report.salesByStatus.length === 0 ? (
+                        <tr>
+                          <td className="py-4 text-[#5d6b63]" colSpan={5}>
+                            Sin ventas en el periodo.
+                          </td>
+                        </tr>
+                      ) : null}
+                      {report.salesByStatus.map((row) => (
+                        <SaleStatusRow currency={currency} key={row.status} row={row} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+                <h2 className="text-xl font-semibold">Pagos por metodo</h2>
+                <div className="mt-4 overflow-x-auto">
+                  <table className="w-full min-w-[620px] border-collapse text-sm">
+                    <thead className="text-left text-[#6f7a73]">
+                      <tr>
+                        <th className="border-b border-[#e4e8df] py-2 pr-3">Metodo</th>
+                        <th className="border-b border-[#e4e8df] py-2 pr-3">Pagos</th>
+                        <th className="border-b border-[#e4e8df] py-2 pr-3">Completado</th>
+                        <th className="border-b border-[#e4e8df] py-2 pr-3">Pendiente</th>
+                        <th className="border-b border-[#e4e8df] py-2">Rechazado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {report.paymentsByMethod.length === 0 ? (
+                        <tr>
+                          <td className="py-4 text-[#5d6b63]" colSpan={5}>
+                            Sin pagos en el periodo.
+                          </td>
+                        </tr>
+                      ) : null}
+                      {report.paymentsByMethod.map((row) => (
+                        <PaymentMethodRow currency={currency} key={row.method} row={row} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            </section>
+
+            <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold">Ventas recientes</h2>
+                  <p className="mt-1 text-sm text-[#5d6b63]">Ultimas operaciones de la sucursal activa.</p>
+                </div>
+                <Link className="text-sm font-semibold text-[#51735f]" href="/pos">
+                  Abrir POS
+                </Link>
+              </div>
+              <div className="mt-4 grid gap-3">
+                {report.recentSales.map((sale) => (
+                  <Link
+                    className="rounded-md border border-[#d8ddd2] px-4 py-3 transition hover:border-[#51735f] hover:bg-[#f6f7f2]"
+                    href={`/sales/${sale.id}`}
+                    key={sale.id}
+                  >
+                    <span className="block font-semibold">{sale.saleNumber}</span>
+                    <span className="mt-1 block text-sm text-[#5d6b63]">
+                      {sale.clientName} - {saleStatusLabel(sale.status)} - {formatMoney(sale.totalCents, sale.currency)}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          </>
+        ) : null}
+      </section>
+    </main>
+  );
+}
+
+function MetricCard({ label, value, detail }: { label: string; value: string; detail: string }) {
+  return (
+    <article className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+      <p className="text-sm font-medium text-[#6f7a73]">{label}</p>
+      <p className="mt-2 text-2xl font-semibold">{value}</p>
+      <p className="mt-2 text-sm text-[#5d6b63]">{detail}</p>
+    </article>
+  );
+}
+
+function SaleStatusRow({ row, currency }: { row: SaleStatusBreakdown; currency: string }) {
+  return (
+    <tr>
+      <td className="border-b border-[#eef1ea] py-3 pr-3 font-semibold">{saleStatusLabel(row.status)}</td>
+      <td className="border-b border-[#eef1ea] py-3 pr-3">{row.saleCount}</td>
+      <td className="border-b border-[#eef1ea] py-3 pr-3">{formatMoney(row.totalCents, currency)}</td>
+      <td className="border-b border-[#eef1ea] py-3 pr-3">{formatMoney(row.paidCents, currency)}</td>
+      <td className="border-b border-[#eef1ea] py-3">{formatMoney(row.balanceCents, currency)}</td>
+    </tr>
+  );
+}
+
+function PaymentMethodRow({ row, currency }: { row: PaymentMethodBreakdown; currency: string }) {
+  return (
+    <tr>
+      <td className="border-b border-[#eef1ea] py-3 pr-3 font-semibold">{paymentMethodLabel(row.method)}</td>
+      <td className="border-b border-[#eef1ea] py-3 pr-3">{row.paymentCount}</td>
+      <td className="border-b border-[#eef1ea] py-3 pr-3">{formatMoney(row.completedCents, currency)}</td>
+      <td className="border-b border-[#eef1ea] py-3 pr-3">{formatMoney(row.pendingCents, currency)}</td>
+      <td className="border-b border-[#eef1ea] py-3">{formatMoney(row.rejectedCents, currency)}</td>
+    </tr>
+  );
+}
+
+function AuthRequired() {
+  return (
+    <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
+      <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6 shadow-sm">
+        <h1 className="text-2xl font-semibold">Necesitas iniciar sesion</h1>
+        <Link
+          className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
+          href="/login"
+        >
+          Iniciar sesion
+        </Link>
+      </section>
+    </main>
+  );
+}
+
+function formatMoney(cents: number, currency: string) {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency,
+  }).format(cents / 100);
+}
+
+function saleStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    PENDING_PAYMENT: "Pendiente",
+    PARTIALLY_PAID: "Parcial",
+    PAID: "Pagada",
+    CANCELLED: "Cancelada",
+  };
+  return labels[status] ?? status;
+}
+
+function paymentMethodLabel(method: string) {
+  const labels: Record<string, string> = {
+    CASH: "Efectivo",
+    TRANSFER: "Transferencia",
+    CARD_MANUAL: "Tarjeta manual",
+  };
+  return labels[method] ?? method;
+}
+
+function periodLabel(report: SalesReportResponse) {
+  return `${report.fromDate} a ${report.toDate}`;
+}
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function addDays(dateIso: string, days: number) {
+  const date = new Date(`${dateIso}T00:00:00`);
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
