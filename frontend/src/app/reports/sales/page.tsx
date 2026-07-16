@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { AppNavigation } from "@/components/AppNavigation";
 import {
   getSalesReport,
   getStoredSession,
@@ -95,36 +96,33 @@ export default function SalesReportPage() {
   const currency = report?.currency ?? "MXN";
 
   return (
-    <main className="min-h-screen bg-[#f6f7f2] text-[#111815]">
-      <header className="border-b border-[#d8ddd2] bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <Link className="text-sm font-semibold text-[#51735f]" href="/reception">
-              Recepcion
-            </Link>
-            <h1 className="mt-1 text-3xl font-semibold">Reporte de ventas</h1>
-            <p className="mt-1 text-sm text-[#5d6b63]">
-              Resumen operativo de ventas, saldos y pagos manuales.
-            </p>
+    <main className="app-shell text-[#111815]">
+      <div className="app-shell-inner">
+      <header className="app-topbar">
+          <div className="app-title-block">
+            <p className="app-eyebrow">Reportes</p>
+            <h1 className="app-title">Reporte de ventas</h1>
+            <p className="app-subtitle">Resumen operativo de ventas, saldos y pagos manuales.</p>
           </div>
-          <div className="flex flex-wrap gap-3">
+          <div className="app-actions">
             <Link
-              className="inline-flex h-11 items-center justify-center rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f]"
+              className="app-button"
               href="/pos"
             >
               POS
             </Link>
             <Link
-              className="inline-flex h-11 items-center justify-center rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f]"
+              className="app-button-secondary"
               href="/catalog"
             >
               Catalogo
             </Link>
           </div>
-        </div>
       </header>
 
-      <section className="mx-auto grid max-w-7xl gap-6 px-6 py-6">
+      <AppNavigation />
+
+      <section className="grid gap-6">
         <form
           className="grid gap-3 rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm md:grid-cols-[1fr_1fr_auto]"
           onSubmit={submitFilters}
@@ -271,13 +269,14 @@ export default function SalesReportPage() {
           </>
         ) : null}
       </section>
+      </div>
     </main>
   );
 }
 
 function MetricCard({ label, value, detail }: { label: string; value: string; detail: string }) {
   return (
-    <article className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+    <article className="app-card p-5">
       <p className="text-sm font-medium text-[#6f7a73]">{label}</p>
       <p className="mt-2 text-2xl font-semibold">{value}</p>
       <p className="mt-2 text-sm text-[#5d6b63]">{detail}</p>

@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { AppNavigation } from "@/components/AppNavigation";
 import {
   clearSession,
   getBranches,
@@ -16,97 +17,43 @@ import {
   type StoredSession,
 } from "@/lib/api";
 
-const shortcuts = [
+const primaryActions = [
   {
-    title: "POS",
-    detail: "Ventas con pagos manuales y validacion interna.",
-    status: "Disponible",
+    title: "Nueva venta",
+    detail: "Cobrar productos, planes o servicios con pagos manuales.",
     href: "/pos",
+    action: "Abrir POS",
   },
   {
-    title: "Alta rapida",
-    detail: "Registro de cliente y captura de datos base.",
-    status: "Disponible",
+    title: "Registrar cliente",
+    detail: "Alta rapida, busqueda y ficha completa del cliente.",
     href: "/clients",
+    action: "Ir a clientes",
   },
   {
-    title: "Catalogo",
-    detail: "Productos, servicios y planes vendibles.",
-    status: "Disponible",
-    href: "/catalog",
-  },
-  {
-    title: "Reportes",
-    detail: "Resumen de ventas, saldos y pagos manuales.",
-    status: "Disponible",
-    href: "/reports/sales",
-  },
-  {
-    title: "Configuracion",
-    detail: "Datos de organizacion y sucursal para el arranque.",
-    status: "Disponible",
-    href: "/settings/organization",
-  },
-  {
-    title: "Onboarding",
-    detail: "Checklist y setup piloto para dejar el gimnasio vendible.",
-    status: "Disponible",
-    href: "/onboarding",
-  },
-  {
-    title: "Importar clientes",
-    detail: "Carga inicial CSV con validacion y resultado por fila.",
-    status: "Disponible",
-    href: "/clients/import",
-  },
-  {
-    title: "Kiosco interno",
-    detail: "Autoservicio para pagos, renovaciones y cambios de membresia.",
-    status: "Disponible",
+    title: "Renovar en kiosco",
+    detail: "Modo autoservicio para pagos, cambios de plan y membresias.",
     href: "/kiosk/KIOSK-MAIN",
+    action: "Abrir kiosco",
   },
-  {
-    title: "Accesos",
-    detail: "Entrada, aperturas manuales, pases temporales y bitacora.",
-    status: "Disponible",
-    href: "/access",
-  },
-  {
-    title: "Inventario",
-    detail: "Existencias, movimientos, ajustes, mermas y alertas.",
-    status: "Disponible",
-    href: "/inventory",
-  },
-  {
-    title: "Reservas",
-    detail: "Recursos, disponibilidad, agenda y check-in.",
-    status: "Disponible",
-    href: "/bookings",
-  },
-  {
-    title: "Coaches",
-    detail: "Entrenadores, rutinas y asignaciones a clientes.",
-    status: "Disponible",
-    href: "/coaches",
-  },
-  {
-    title: "Bienestar",
-    detail: "Profesionales, servicios y disponibilidad.",
-    status: "Disponible",
-    href: "/wellness",
-  },
-  {
-    title: "Automatizaciones",
-    detail: "Reglas, ejecuciones y notificaciones internas.",
-    status: "Disponible",
-    href: "/automations",
-  },
-  {
-    title: "Dashboard",
-    detail: "Indicadores ejecutivos de operacion y venta.",
-    status: "Disponible",
-    href: "/dashboard",
-  },
+];
+
+const managementActions = [
+  { title: "Catalogo", detail: "Productos, planes, beneficios y servicios.", href: "/catalog" },
+  { title: "Reporte de ventas", detail: "Saldos, cobros, pagos pendientes y ventas recientes.", href: "/reports/sales" },
+  { title: "Dashboard", detail: "Indicadores ejecutivos para direccion.", href: "/dashboard" },
+  { title: "Configuracion", detail: "Organizacion, sucursales y datos comerciales.", href: "/settings/organization" },
+  { title: "Importar clientes", detail: "Carga inicial CSV con validaciones.", href: "/clients/import" },
+  { title: "Onboarding", detail: "Checklist comercial y preparacion de piloto.", href: "/onboarding" },
+];
+
+const operationModules = [
+  { title: "Accesos", detail: "Entradas, pases temporales y bitacora.", href: "/access" },
+  { title: "Reservas", detail: "Recursos, agenda y check-in.", href: "/bookings" },
+  { title: "Inventario", detail: "Existencias, movimientos y alertas.", href: "/inventory" },
+  { title: "Coaches", detail: "Entrenadores, rutinas y asignaciones.", href: "/coaches" },
+  { title: "Bienestar", detail: "Servicios profesionales y disponibilidad.", href: "/wellness" },
+  { title: "Automatizaciones", detail: "Reglas, ejecuciones y notificaciones.", href: "/automations" },
 ];
 
 export default function ReceptionPage() {
@@ -163,6 +110,7 @@ export default function ReceptionPage() {
   }, []);
 
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
+  const permissionCount = useMemo(() => session?.user.permissions.length ?? 0, [session]);
 
   async function switchBranch(branchId: string) {
     if (!session || branchId === session.user.branchId) {
@@ -197,29 +145,19 @@ export default function ReceptionPage() {
   }
 
   if (loading) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-        <p className="rounded-md border border-[#d8ddd2] bg-white px-4 py-3 text-sm text-[#42514a]">
-          Cargando recepcion...
-        </p>
-      </main>
-    );
+    return <Centered text="Cargando recepcion..." />;
   }
 
   if (!session) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-        <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6 shadow-sm">
-          <p className="text-sm font-semibold uppercase tracking-wide text-[#51735f]">GymOS</p>
-          <h1 className="mt-3 text-2xl font-semibold">Necesitas iniciar sesion</h1>
-          <p className="mt-3 text-sm leading-6 text-[#5d6b63]">
-            La recepcion requiere una sesion activa para cargar organizacion,
-            permisos y sucursales disponibles.
+      <main className="grid min-h-screen place-items-center px-6 text-[#111815]">
+        <section className="app-card w-full max-w-md p-6">
+          <p className="app-eyebrow">GymOS</p>
+          <h1 className="mt-3 text-2xl font-black">Necesitas iniciar sesion</h1>
+          <p className="mt-3 app-card-copy">
+            La recepcion requiere una sesion activa para cargar organizacion, permisos y sucursales disponibles.
           </p>
-          <Link
-            className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
-            href="/login"
-          >
+          <Link className="mt-5 app-button" href="/login">
             Iniciar sesion
           </Link>
         </section>
@@ -228,128 +166,140 @@ export default function ReceptionPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f7f2] text-[#111815]">
-      <header className="border-b border-[#d8ddd2] bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-[#51735f]">Recepcion</p>
-            <h1 className="mt-1 text-3xl font-semibold">
-              {organization?.tradeName ?? "GymOS"}
-            </h1>
-            <p className="mt-1 text-sm text-[#5d6b63]">
-              {activeBranch ? activeBranch.name : "Selecciona una sucursal para operar"}
+    <main className="app-shell text-[#111815]">
+      <div className="app-shell-inner">
+        <header className="app-topbar">
+          <div className="app-title-block">
+            <p className="app-eyebrow">Recepcion</p>
+            <h1 className="app-title">{organization?.tradeName ?? "GymOS"}</h1>
+            <p className="app-subtitle">
+              {activeBranch ? activeBranch.name : "Selecciona una sucursal para operar"} - {session.user.fullName}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="rounded-md border border-[#d8ddd2] px-3 py-2 text-sm text-[#42514a]">
-              {session.user.fullName}
-            </span>
-            <button
-              className="h-10 rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f]"
-              onClick={logout}
-              type="button"
-            >
+          <div className="app-actions">
+            <span className="app-pill">{permissionCount} permisos</span>
+            <button className="app-button-secondary" onClick={logout} type="button">
               Salir
             </button>
           </div>
-        </div>
-      </header>
+        </header>
 
-      <section className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[1.1fr_1.4fr]">
-        <aside className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-semibold">Contexto operativo</h2>
-          <dl className="mt-5 grid gap-4 text-sm">
-            <div>
-              <dt className="font-medium text-[#6f7a73]">Organizacion</dt>
-              <dd className="mt-1 font-semibold">{organization?.legalName ?? "Sin cargar"}</dd>
-            </div>
-            <div>
-              <dt className="font-medium text-[#6f7a73]">Moneda</dt>
-              <dd className="mt-1 font-semibold">{organization?.defaultCurrency ?? "N/A"}</dd>
-            </div>
-            <div>
-              <dt className="font-medium text-[#6f7a73]">Usuario</dt>
-              <dd className="mt-1 font-semibold">{session.user.username}</dd>
-            </div>
-          </dl>
+        <AppNavigation />
 
-          <div className="mt-6 border-t border-[#e4e8df] pt-5">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-[#51735f]">
-              Sucursales disponibles
-            </h3>
-            <div className="mt-3 grid gap-2">
-              {branches.map((branch) => (
-                <button
-                  className={`rounded-md border px-3 py-3 text-left text-sm transition ${
-                    branch.id === session.user.branchId
-                      ? "border-[#51735f] bg-[#eef7f0]"
-                      : "border-[#d8ddd2] bg-white hover:border-[#51735f]"
-                  }`}
-                  disabled={switchingBranchId !== null}
-                  key={branch.id}
-                  onClick={() => switchBranch(branch.id)}
-                  type="button"
-                >
-                  <span className="block font-semibold">{branch.name}</span>
-                  <span className="mt-1 block text-xs text-[#6f7a73]">
-                    {branch.code} - {branch.accessScope} - {branch.status}
-                  </span>
-                  {switchingBranchId === branch.id ? (
-                    <span className="mt-2 block text-xs font-semibold text-[#51735f]">
-                      Cambiando...
-                    </span>
-                  ) : null}
-                </button>
-              ))}
-            </div>
-          </div>
-        </aside>
+        {error ? (
+          <p className="rounded-md border border-[#e5b7b7] bg-[#fff4f4] px-3 py-2 text-sm text-[#8c2f2f]">
+            {error}
+          </p>
+        ) : null}
 
-        <section className="grid gap-6">
-          {error ? (
-            <p className="rounded-md border border-[#e5b7b7] bg-[#fff4f4] px-3 py-2 text-sm text-[#8c2f2f]">
-              {error}
-            </p>
-          ) : null}
+        <section className="grid gap-5 lg:grid-cols-[0.9fr_1.45fr]">
+          <aside className="app-card p-5">
+            <p className="app-eyebrow">Contexto operativo</p>
+            <h2 className="mt-2 app-card-title">{organization?.legalName ?? "Sin organizacion"}</h2>
+            <dl className="mt-5 grid gap-4 text-sm">
+              <InfoRow label="Moneda" value={organization?.defaultCurrency ?? "N/A"} />
+              <InfoRow label="Usuario" value={session.user.username} />
+              <InfoRow label="Sucursal activa" value={activeBranch?.name ?? "Sin seleccionar"} />
+            </dl>
 
-          <div className="rounded-lg border border-[#d8ddd2] bg-[#13251c] p-5 text-white shadow-sm">
-            <p className="text-sm font-medium text-[#9cc7ad]">Sesion activa</p>
-            <h2 className="mt-2 text-2xl font-semibold">
-              {activeBranch ? "Lista para operar en sucursal" : "Falta seleccionar sucursal"}
-            </h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-[#dbe8df]">
-              El token actual contiene organizacion, usuario, permisos y sucursal activa.
-              Este contexto sera usado por clientes, ventas, pagos y kiosco.
-            </p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {shortcuts.map((shortcut) => (
-              <article className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm" key={shortcut.title}>
-                <p className="text-xs font-semibold uppercase tracking-wide text-[#51735f]">
-                  {shortcut.status}
-                </p>
-                <h3 className="mt-3 text-xl font-semibold">{shortcut.title}</h3>
-                <p className="mt-3 text-sm leading-6 text-[#5d6b63]">{shortcut.detail}</p>
-                {shortcut.href ? (
-                  <Link
-                    className="mt-4 inline-flex h-10 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
-                    href={shortcut.href}
+            <div className="mt-6 border-t border-[#e4e8df] pt-5">
+              <h3 className="app-eyebrow">Cambiar sucursal</h3>
+              <div className="mt-3 grid gap-2">
+                {branches.map((branch) => (
+                  <button
+                    className={`rounded-md border px-3 py-3 text-left text-sm transition ${
+                      branch.id === session.user.branchId
+                        ? "border-[#51735f] bg-[#eef7f0]"
+                        : "border-[#d8ddd2] bg-white hover:border-[#51735f]"
+                    }`}
+                    disabled={switchingBranchId !== null}
+                    key={branch.id}
+                    onClick={() => switchBranch(branch.id)}
+                    type="button"
                   >
-                    Abrir
-                  </Link>
-                ) : null}
-              </article>
-            ))}
-          </div>
+                    <span className="block font-black">{branch.name}</span>
+                    <span className="mt-1 block text-xs text-[#6f7a73]">
+                      {branch.code} - {branch.accessScope} - {branch.status}
+                    </span>
+                    {switchingBranchId === branch.id ? (
+                      <span className="mt-2 block text-xs font-bold text-[#51735f]">Cambiando...</span>
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </aside>
 
-          <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-semibold">Permisos cargados</h2>
-            <PermissionList user={session.user} />
+          <section className="grid gap-5">
+            <section className="app-hero-panel p-6">
+              <div className="relative z-10">
+                <p className="text-sm font-bold uppercase text-white/75">Turno activo</p>
+                <h2 className="mt-2 text-3xl font-black">
+                  {activeBranch ? "Lista para operar en mostrador" : "Selecciona una sucursal"}
+                </h2>
+                <p className="mt-3 max-w-2xl text-sm leading-6 text-white/80">
+                  Desde aqui puedes vender, registrar clientes, abrir el kiosco, consultar reportes y cambiar de
+                  sucursal sin salir del flujo de recepcion.
+                </p>
+              </div>
+            </section>
+
+            <section className="grid gap-4 md:grid-cols-3">
+              {primaryActions.map((item) => (
+                <article className="app-card p-5" key={item.title}>
+                  <h3 className="app-card-title">{item.title}</h3>
+                  <p className="mt-2 app-card-copy">{item.detail}</p>
+                  <Link className="mt-5 app-button" href={item.href}>
+                    {item.action}
+                  </Link>
+                </article>
+              ))}
+            </section>
           </section>
         </section>
-      </section>
+
+        <section className="grid gap-5 lg:grid-cols-[1fr_1fr]">
+          <ActionGrid title="Gestion y reportes" items={managementActions} />
+          <ActionGrid title="Modulos operativos" items={operationModules} />
+        </section>
+
+        <section className="app-card p-5">
+          <h2 className="app-card-title">Permisos cargados</h2>
+          <PermissionList user={session.user} />
+        </section>
+      </div>
     </main>
+  );
+}
+
+function ActionGrid({
+  title,
+  items,
+}: {
+  title: string;
+  items: Array<{ title: string; detail: string; href: string }>;
+}) {
+  return (
+    <section className="app-card p-5">
+      <h2 className="app-card-title">{title}</h2>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {items.map((item) => (
+          <Link className="rounded-md border border-[#d8ddd2] bg-white px-4 py-3 transition hover:border-[#51735f]" href={item.href} key={item.href}>
+            <span className="block font-black">{item.title}</span>
+            <span className="mt-1 block text-sm leading-5 text-[#5d6b63]">{item.detail}</span>
+          </Link>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function InfoRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="font-bold text-[#6f7a73]">{label}</dt>
+      <dd className="mt-1 font-black">{value}</dd>
+    </div>
   );
 }
 
@@ -361,13 +311,18 @@ function PermissionList({ user }: { user: CurrentUser }) {
   return (
     <div className="mt-4 flex flex-wrap gap-2">
       {user.permissions.map((permission) => (
-        <span
-          className="rounded-md border border-[#d8ddd2] bg-[#f6f7f2] px-3 py-2 text-xs font-medium text-[#42514a]"
-          key={permission}
-        >
+        <span className="app-pill" key={permission}>
           {permission}
         </span>
       ))}
     </div>
+  );
+}
+
+function Centered({ text }: { text: string }) {
+  return (
+    <main className="grid min-h-screen place-items-center px-6 text-[#111815]">
+      <p className="app-card px-4 py-3 text-sm text-[#42514a]">{text}</p>
+    </main>
   );
 }

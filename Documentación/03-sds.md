@@ -205,3 +205,13 @@ Decisiones implementadas:
 - Los permisos nuevos son `onboarding.manage` y `client.import`.
 - Las pantallas `/onboarding` y `/clients/import` convierten la preparacion comercial en flujos operables desde la app.
 - Backups, staging formal, capacitacion, manual operativo y checklist comercial pasan al Hito 7 por ser trabajo administrativo/operativo.
+
+## 3.18 RediseÃ±o frontend Hito 6.5
+
+Decisiones implementadas:
+- La personalizacion visual se resuelve inicialmente en frontend mediante tokens CSS y `localStorage`.
+- El alcance permite demos y pilotos con nombre visible, logo y colores del gimnasio sin introducir tablas nuevas.
+- La persistencia multi-organizacion de tema queda preparada como evolucion posterior de configuracion.
+- La navegacion principal se centraliza en un componente reutilizable para reducir inconsistencia entre pantallas.
+- Portada, login, recepcion, dashboard, reporte de ventas y configuracion usan el mismo lenguaje visual.
+- El frontend sigue sin contener reglas de negocio; solo mejora presentacion, formularios, jerarquia visual y rutas de acceso.

@@ -126,7 +126,16 @@
 - Permisos `onboarding.manage` y `client.import`.
 - Pantallas `/onboarding` y `/clients/import`.
 
-## Fase 10 - Hito 7: Preparacion administrativa y piloto comercial
+## Fase 10 - Hito 6.5: RediseÃ±o frontend y experiencia comercial
+
+- Sistema visual frontend con tokens de marca.
+- Navegacion principal por areas: Operacion, Gestion y Direccion.
+- Portada como centro operativo del producto.
+- Login, recepcion, dashboard, reporte de ventas y configuracion alineados a una UI moderna.
+- Personalizacion local de nombre visible, colores y logo para demos y pilotos.
+- Sin cambios de contrato HTTP ni reglas de negocio en frontend.
+
+## Fase 11 - Hito 7: Preparacion administrativa y piloto comercial
 
 - Capacitacion.
 - Scripts y politica de backups.

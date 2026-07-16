@@ -388,3 +388,32 @@ Alcance trasladado desde Hito 6 por decision de producto:
 - Entorno staging formal.
 - Preparacion administrativa del piloto real.
 - Registro de feedback, soporte, precios y procesos comerciales.
+
+## Hito 6.5 - RediseÃ±o frontend y experiencia comercial
+
+Estado: completado frontend
+
+Implementado en rama `feature/hito-6-5-frontend-redesign`:
+
+- Sistema visual global con tokens de marca, superficies, tarjetas, botones, navegacion y estados.
+- Componente `BrandTheme` para personalizar nombre visible, URL de logo, color principal, acento y fondo.
+- Componente `AppNavigation` con accesos agrupados por Operacion, Gestion y Direccion.
+- Portada `/` convertida en centro operativo del producto.
+- Login `/login` redisenado con formularios y textos mas claros para usuarios comunes.
+- Recepcion `/reception` redisenada como tablero operativo con acciones criticas, contexto de sucursal, gestion, reportes y modulos.
+- Dashboard `/dashboard` alineado al nuevo layout.
+- Reporte de ventas `/reports/sales` alineado al nuevo layout y navegacion.
+- Configuracion `/settings/organization` alineada al nuevo layout y con nota de marca visual.
+- Sin cambios de contratos HTTP ni reglas de negocio frontend.
+
+Verificado localmente:
+
+- Frontend lint.
+- Frontend typecheck.
+- Frontend build de produccion.
+
+Pendiente de evolucion posterior:
+
+- Persistir tema visual por organizacion desde backend.
+- Dividir `frontend/src/lib/api.ts` por dominio en una refactorizacion dedicada.
+- Extender el nuevo layout a pantallas secundarias largas que todavia conservan estructura local propia.
