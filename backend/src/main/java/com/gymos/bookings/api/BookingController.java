@@ -3,6 +3,7 @@ package com.gymos.bookings.api;
 import com.gymos.bookings.application.BookingService;
 import com.gymos.bookings.application.command.CreateBookingCommand;
 import com.gymos.bookings.application.command.CreateResourceCommand;
+import com.gymos.bookings.application.command.LinkBookingPaymentCommand;
 import com.gymos.bookings.infrastructure.BookingRepository.AvailabilitySlot;
 import com.gymos.bookings.infrastructure.BookingRepository.BookingRecord;
 import com.gymos.bookings.infrastructure.BookingRepository.ResourceRecord;
@@ -103,6 +104,16 @@ public class BookingController {
 		return bookingService.transition(principal, bookingId, "CANCELLED", correlationId(servletRequest));
 	}
 
+	@PostMapping("/bookings/{bookingId}/payments")
+	BookingRecord linkPayment(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID bookingId,
+			@Valid @RequestBody LinkBookingPaymentRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return bookingService.linkPayment(principal, bookingId, request.toCommand(), correlationId(servletRequest));
+	}
+
 	private String correlationId(HttpServletRequest request) {
 		Object value = request.getAttribute(Correlation.ATTRIBUTE);
 		return value == null ? "unknown" : value.toString();
@@ -131,6 +142,16 @@ public class BookingController {
 	) {
 		private CreateBookingCommand toCommand() {
 			return new CreateBookingCommand(resourceId, clientId, startsAt, endsAt, notes);
+		}
+	}
+
+	public record LinkBookingPaymentRequest(
+			@NotNull UUID saleId,
+			@NotBlank @jakarta.validation.constraints.Pattern(regexp = "PENDING|PAID|EXPIRED|CANCELLED") String status,
+			OffsetDateTime expiresAt
+	) {
+		private LinkBookingPaymentCommand toCommand() {
+			return new LinkBookingPaymentCommand(saleId, status, expiresAt);
 		}
 	}
 }

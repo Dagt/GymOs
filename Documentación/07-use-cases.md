@@ -369,6 +369,31 @@ Criterios:
 - No se borra ni modifica el historial de pagos.
 - El reembolso queda separado para conciliacion manual del piloto.
 
+## UC-025 Reserva pagada vinculada a POS
+
+Actor: Recepcionista o administrador.
+
+Precondiciones:
+- Reserva activa.
+- Venta existente creada desde POS en la misma sucursal.
+- Usuario con permiso `booking.payment.manage`.
+
+Flujo:
+1. Usuario crea una venta desde POS para el servicio o reserva.
+2. Usuario abre la agenda de reservas.
+3. Usuario selecciona la reserva y captura el ID de venta.
+4. Usuario define estado `PENDING` o `PAID`.
+5. Sistema registra o actualiza `booking_payment`.
+6. Si el estado es `PAID` y la reserva estaba `RESERVED`, sistema confirma la reserva.
+7. Sistema audita `BOOKING_PAYMENT_LINKED` y, si aplica, `BOOKING_CONFIRMED`.
+8. La agenda muestra estado de pago y numero de venta vinculado.
+
+Criterios:
+- La venta debe pertenecer a la misma organizacion y sucursal.
+- La reserva cerrada no puede cambiar de pago.
+- El modulo de reservas no crea ventas por su cuenta en esta version.
+- La relacion es actualizable sin duplicar registros por reserva.
+
 ## Anexo Hito 3.5 final
 
 Ver `Documentación/07-use-cases-hito-3-5-final.md` para la definicion vigente de verificacion segura de kiosco, idempotencia por hash de solicitud y eventos por modulo propietario.

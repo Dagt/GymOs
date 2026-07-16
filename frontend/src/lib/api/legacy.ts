@@ -590,6 +590,10 @@ export type BookingSummary = {
   startsAt: string;
   endsAt: string;
   notes: string | null;
+  bookingPaymentId: string | null;
+  saleId: string | null;
+  paymentStatus: "PENDING" | "PAID" | "EXPIRED" | "CANCELLED" | string | null;
+  saleNumber: string | null;
 };
 
 export type AvailabilitySlot = {
@@ -616,6 +620,12 @@ export type CreateBookingPayload = {
   startsAt: string;
   endsAt: string;
   notes?: string | null;
+};
+
+export type LinkBookingPaymentPayload = {
+  saleId: string;
+  status: "PENDING" | "PAID" | "EXPIRED" | "CANCELLED";
+  expiresAt?: string | null;
 };
 
 export type CoachSummary = {
@@ -1344,6 +1354,17 @@ export async function transitionBooking(
 ): Promise<BookingSummary> {
   return apiFetch<BookingSummary>(`/bookings/${bookingId}/${action}`, accessToken, {
     method: "POST",
+  });
+}
+
+export async function linkBookingPayment(
+  accessToken: string,
+  bookingId: string,
+  payload: LinkBookingPaymentPayload,
+): Promise<BookingSummary> {
+  return apiFetch<BookingSummary>(`/bookings/${bookingId}/payments`, accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
   });
 }
 

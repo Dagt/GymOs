@@ -4,5 +4,6 @@ export {
   getBookings,
   getResourceAvailability,
   getResources,
+  linkBookingPayment,
   transitionBooking,
 } from "./legacy";

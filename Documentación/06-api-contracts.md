@@ -496,3 +496,40 @@ Errores:
 - `REFUND_EXCEEDS_PAYMENT`
 - `REFUND_EXCEEDS_REFUNDABLE_BALANCE`
 - `IDEMPOTENCY_KEY_REUSED`
+
+## Hito 7 - Booking Payment API
+
+### `POST /api/v1/bookings/{bookingId}/payments`
+
+Permiso: `booking.payment.manage`.
+
+Vincula una reserva con una venta existente del POS. La venta sigue perteneciendo al modulo `sales`; `bookings` solo registra la relacion operativa en `booking_payment`.
+
+Request:
+
+```json
+{
+  "saleId": "uuid",
+  "status": "PAID",
+  "expiresAt": null
+}
+```
+
+Estados permitidos:
+
+- `PENDING`
+- `PAID`
+- `EXPIRED`
+- `CANCELLED`
+
+Comportamiento:
+
+- Si la reserva ya tenia pago vinculado, la relacion se actualiza de forma idempotente por `organization_id + booking_id`.
+- Si `status = PAID` y la reserva estaba `RESERVED`, la reserva pasa a `CONFIRMED`.
+- `GET /api/v1/bookings` y `GET /api/v1/bookings/{bookingId}` incluyen `bookingPaymentId`, `saleId`, `paymentStatus` y `saleNumber`.
+
+Errores:
+
+- `BOOKING_NOT_FOUND`
+- `BOOKING_ALREADY_CLOSED`
+- `SALE_NOT_FOUND`
