@@ -342,3 +342,49 @@ Pendiente fuera del alcance central del Hito 5:
 - Integracion real con proveedores externos de email, SMS o WhatsApp; la V1 deja registro interno y contratos preparados.
 - Automatizaciones programadas por scheduler; la V1 permite ejecucion manual y deja la estructura persistente lista.
 - Agenda completa de servicios profesionales con reservas pagadas queda para la evolucion posterior sobre el modulo de reservas.
+
+## Hito 6 - Productizacion por codigo
+
+Estado: completo
+
+Implementado en rama `feature/hito-6-productization`:
+
+- Migracion Flyway `V15__hito6_productization_onboarding_imports.sql` con `client_import_batch`, `client_import_row` y permisos `onboarding.manage` y `client.import`.
+- Modulo backend `onboarding` con endpoints `GET /api/v1/onboarding/checklist` y `POST /api/v1/onboarding/pilot-setup`.
+- Checklist vendible para organizacion, sucursal, planes, productos, kiosco y clientes.
+- Setup piloto idempotente para actualizar organizacion/sucursal activa y crear catalogo base y kiosco si faltan.
+- Importacion inicial de clientes por CSV con endpoint `POST /api/v1/clients/imports`, dry-run, deteccion de duplicados, resultado por fila y bitacora persistente.
+- RBAC granular para onboarding e importacion.
+- Pantalla frontend `/onboarding`.
+- Pantalla frontend `/clients/import`.
+- Accesos directos desde `/reception`.
+
+Verificado localmente:
+
+- Backend tests con Java 25.
+- Testcontainers PostgreSQL y Flyway hasta `V15`.
+- Pruebas de seguridad MVC para permisos `onboarding.manage` y `client.import`.
+- Frontend lint.
+- Frontend typecheck.
+- Frontend build de produccion.
+- Docker Compose config y build.
+- Docker Compose up con backend `UP` y frontend `/onboarding` respondiendo 200.
+- Smoke autenticado: login, seleccion de sucursal, checklist, setup piloto, importacion dry-run e importacion real.
+
+Pendiente fuera del alcance central del Hito 6:
+
+- Las filas de smoke agregadas a la base local son datos de prueba; no forman parte de migraciones ni del repositorio.
+- La importacion Excel directa queda para una evolucion posterior; la V1 usa CSV por ser suficiente para el piloto inicial.
+
+## Hito 7 - Preparacion administrativa y piloto comercial
+
+Estado: planificado
+
+Alcance trasladado desde Hito 6 por decision de producto:
+
+- Capacitacion y manual operativo del gimnasio piloto.
+- Scripts, politica y checklist de backups.
+- Checklist de venta, instalacion y produccion.
+- Entorno staging formal.
+- Preparacion administrativa del piloto real.
+- Registro de feedback, soporte, precios y procesos comerciales.

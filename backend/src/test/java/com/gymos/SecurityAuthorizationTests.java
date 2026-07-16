@@ -79,6 +79,20 @@ class SecurityAuthorizationTests {
 	}
 
 	@Test
+	@WithMockUser(authorities = "client.create")
+	void clientImportRequiresImportPermission() throws Exception {
+		mockMvc.perform(post("/api/v1/clients/imports").contentType("application/json").content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(authorities = "organization.update")
+	void onboardingRequiresOnboardingPermission() throws Exception {
+		mockMvc.perform(post("/api/v1/onboarding/pilot-setup").contentType("application/json").content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
 	void selfServiceSessionCreationIsPublic() throws Exception {
 		var result = mockMvc.perform(post("/api/v1/self-service/terminals/UNKNOWN/sessions"))
 				.andReturn();

@@ -145,7 +145,9 @@ public class DevelopmentSeedConfig {
 					"notification.manage",
 					"automation.read",
 					"automation.manage",
-					"report.owner.read"
+					"report.owner.read",
+					"onboarding.manage",
+					"client.import"
 			);
 			for (int index = 0; index < permissions.size(); index++) {
 				UUID permissionId = UUID.nameUUIDFromBytes(("gymos:" + permissions.get(index)).getBytes());

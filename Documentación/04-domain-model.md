@@ -386,7 +386,43 @@ Invariantes:
 - La configuracion de condicion y accion debe ser JSON valido.
 - Las notificaciones quedan auditadas aunque el envio externo aun no este conectado.
 
-## 4.17 Eventos versionados implementados
+## 4.17 OnboardingChecklist
+
+Responsabilidad: medir si una organizacion/sucursal esta lista para operar un piloto vendible.
+
+Atributos:
+- organizationProfileComplete
+- branchConfigured
+- hasMembershipPlans
+- hasRetailProducts
+- hasKioskTerminal
+- hasClients
+- readyForPilot
+
+Invariantes:
+- El checklist se calcula por organizacion y sucursal activa.
+- La preparacion administrativa externa no forma parte del calculo; se gestiona en Hito 7.
+
+## 4.18 ClientImportBatch
+
+Responsabilidad: representar una carga inicial de clientes desde CSV.
+
+Atributos:
+- fileName
+- dryRun
+- status
+- totalRows
+- createdCount
+- skippedCount
+- errorCount
+
+Invariantes:
+- Cada fila se clasifica como `VALID`, `CREATED`, `SKIPPED` o `ERROR`.
+- `dryRun=true` nunca crea clientes.
+- Duplicados por email o telefono se omiten y no detienen el lote.
+- La importacion pertenece siempre a una organizacion.
+
+## 4.19 Eventos versionados implementados
 
 Eventos de ventas:
 - `SaleCreatedV1`: venta creada por POS o flujo de membresia.

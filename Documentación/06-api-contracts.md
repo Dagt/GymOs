@@ -250,7 +250,20 @@ Nota implementada Hito 5:
 Nota implementada Hito 5:
 - `owner-dashboard` devuelve ingresos, ventas, clientes nuevos, membresias activas, accesos, reservas, inventario, coaches, rutinas, asignaciones y profesionales para la organizacion/sucursal activa.
 
-## 6.18 Códigos de error
+## 6.18 Onboarding e importacion inicial
+
+- `GET /onboarding/checklist`
+- `POST /onboarding/pilot-setup`
+- `POST /clients/imports`
+
+Nota implementada Hito 6:
+- `GET /onboarding/checklist` devuelve banderas de preparacion comercial: organizacion, sucursal, planes, productos, kiosco y clientes.
+- `POST /onboarding/pilot-setup` actualiza organizacion/sucursal activa y crea de forma idempotente planes, productos y kiosco base para piloto.
+- `POST /clients/imports` recibe `{ fileName, csvText, dryRun }` y devuelve conteos y resultado por fila.
+- La plantilla CSV soportada usa columnas `firstName,lastName,birthDate,gender,phone,email,notes`.
+- `dryRun=true` valida filas sin crear clientes; `dryRun=false` crea clientes validos y omite duplicados.
+
+## 6.19 Códigos de error
 
 - PERSON_ALREADY_EXISTS
 - CLIENT_ALREADY_EXISTS
@@ -270,9 +283,12 @@ Nota implementada Hito 5:
 - INVENTORY_STOCK_INSUFFICIENT
 - PROFESSIONAL_NOT_FOUND
 - AUTOMATION_RULE_NOT_FOUND
+- CLIENT_IMPORT_EMPTY
+- CLIENT_IMPORT_TOO_LARGE
+- BRANCH_REQUIRED
 - PERMISSION_DENIED
 
-## 6.19 Cambios Hito 3.5
+## 6.20 Cambios Hito 3.5
 
 Contratos HTTP preservados:
 - No se eliminaron rutas existentes de ventas, pagos, membresias ni kiosco.
@@ -317,6 +333,8 @@ Permisos por endpoint interno:
 - `notification.read`, `notification.manage`
 - `automation.read`, `automation.manage`
 - `report.owner.read`
+- `onboarding.manage`
+- `client.import`
 
 Errores agregados o formalizados:
 - `IDEMPOTENCY_KEY_REUSED`

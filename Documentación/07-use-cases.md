@@ -282,6 +282,41 @@ Flujo:
 6. Rate limiting protege por IP, terminal y sesion.
 7. Al cerrar sesion, no puede reutilizarse.
 
+## UC-021 Setup piloto vendible
+
+Actor: Administrador.
+
+Flujo:
+1. Administrador abre `/onboarding`.
+2. Sistema muestra checklist de organizacion, sucursal, planes, productos, kiosco y clientes.
+3. Administrador ajusta datos de organizacion, sucursal, plan base, producto base y codigo de kiosco.
+4. Sistema actualiza organizacion/sucursal activa.
+5. Sistema crea productos, planes y terminal de kiosco faltantes sin duplicar SKU ni terminal.
+6. Sistema devuelve checklist actualizado.
+
+Criterios:
+- Repetir el setup no duplica catalogo ni kiosco.
+- La operacion requiere `onboarding.manage`.
+- La preparacion administrativa externa queda para Hito 7.
+
+## UC-022 Importacion inicial de clientes
+
+Actor: Administrador o responsable de recepcion con permiso.
+
+Flujo:
+1. Usuario abre `/clients/import`.
+2. Usuario carga CSV o pega contenido con columnas `firstName,lastName,birthDate,gender,phone,email,notes`.
+3. Usuario ejecuta `dryRun=true`.
+4. Sistema valida formato, duplicados internos y duplicados contra la organizacion.
+5. Usuario corrige errores y ejecuta importacion real.
+6. Sistema crea clientes validos, omite duplicados y persiste batch/filas.
+
+Criterios:
+- `dryRun=true` no crea clientes.
+- Una fila invalida no detiene todo el lote.
+- La operacion requiere `client.import`.
+- El resultado muestra conteos y detalle por fila.
+
 ## Anexo Hito 3.5 final
 
 Ver `Documentación/07-use-cases-hito-3-5-final.md` para la definicion vigente de verificacion segura de kiosco, idempotencia por hash de solicitud y eventos por modulo propietario.

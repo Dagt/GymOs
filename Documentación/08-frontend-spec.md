@@ -163,6 +163,8 @@ Pantallas implementadas hasta Hito 5:
 - `/wellness`: alta de profesionales, servicios, disponibilidad y consulta por profesional.
 - `/automations`: reglas internas, ejecucion manual y notificaciones operativas.
 - `/dashboard`: vista del dueno por rango de fechas.
+- `/onboarding`: checklist vendible y setup piloto de organizacion, sucursal, catalogo base y kiosco.
+- `/clients/import`: importacion inicial CSV con dry-run, duplicados y resultado por fila.
 
 ## 8.10 Diseño visual
 

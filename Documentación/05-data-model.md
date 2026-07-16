@@ -375,6 +375,30 @@ Regla:
 - error_message
 - occurred_at
 
+### client_import_batch
+- organization_id
+- branch_id
+- file_name
+- dry_run
+- status
+- total_rows
+- created_count
+- skipped_count
+- error_count
+- completed_at
+
+### client_import_row
+- batch_id
+- organization_id
+- row_number
+- status
+- reason
+- client_id
+- first_name
+- last_name
+- email
+- phone
+
 ### audit_log
 - actor_user_id
 - action
@@ -433,3 +457,5 @@ Migraciones nuevas:
 - `V11__hito4_resources_bookings.sql`: agrega recursos reservables, reservas, permisos y recurso demo.
 - `V12__hito4_inventory_sale_idempotency.sql`: agrega indice unico para movimientos automaticos de inventario por venta y producto.
 - `V13__hito5_coaches_workouts.sql`: agrega coaches, rutinas versionadas, asignaciones a clientes, permisos y datos demo de coaching.
+- `V14__hito5_wellness_notifications_automations.sql`: agrega profesionales de bienestar, servicios, disponibilidad, notificaciones, automatizaciones y dashboard del dueno.
+- `V15__hito6_productization_onboarding_imports.sql`: agrega bitacora de importacion inicial de clientes y permisos `onboarding.manage` y `client.import`.

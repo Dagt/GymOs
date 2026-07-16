@@ -741,6 +741,76 @@ export type OwnerDashboard = {
   enabledAutomations: number;
 };
 
+export type OnboardingChecklist = {
+  organizationProfileComplete: boolean;
+  branchConfigured: boolean;
+  hasMembershipPlans: boolean;
+  hasRetailProducts: boolean;
+  hasKioskTerminal: boolean;
+  hasClients: boolean;
+  readyForPilot: boolean;
+  activePlanCount: number;
+  activeProductCount: number;
+  clientCount: number;
+  activeKioskCount: number;
+};
+
+export type PilotSetupPayload = {
+  organization: OrganizationUpdatePayload;
+  branch: BranchUpdatePayload;
+  plans: Array<{
+    sku: string;
+    name: string;
+    description?: string | null;
+    priceCents: number;
+    currency: string;
+    durationDays: number;
+    graceDays: number;
+    benefitsJson?: string | null;
+  }>;
+  products: Array<{
+    sku: string;
+    name: string;
+    description?: string | null;
+    productType: "PHYSICAL" | "SERVICE";
+    priceCents: number;
+    currency: string;
+    taxable: boolean;
+  }>;
+  kioskTerminalCode?: string | null;
+  kioskName?: string | null;
+};
+
+export type PilotSetupResult = {
+  checklist: OnboardingChecklist;
+  productsCreated: number;
+  plansCreated: number;
+  kioskCreated: boolean;
+};
+
+export type ClientImportRow = {
+  rowNumber: number;
+  status: "VALID" | "CREATED" | "SKIPPED" | "ERROR";
+  reason: string;
+  clientId: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  email: string | null;
+  phone: string | null;
+};
+
+export type ClientImportResult = {
+  batchId: string;
+  dryRun: boolean;
+  status: string;
+  totalRows: number;
+  createdCount: number;
+  skippedCount: number;
+  errorCount: number;
+  createdAt: string;
+  rows: ClientImportRow[];
+};
+
 export type SaleItemPayload = {
   productId: string;
   quantity: number;
@@ -826,6 +896,20 @@ export async function updateBranch(
   });
 }
 
+export async function getOnboardingChecklist(accessToken: string): Promise<OnboardingChecklist> {
+  return apiFetch<OnboardingChecklist>("/onboarding/checklist", accessToken);
+}
+
+export async function applyPilotSetup(
+  accessToken: string,
+  payload: PilotSetupPayload,
+): Promise<PilotSetupResult> {
+  return apiFetch<PilotSetupResult>("/onboarding/pilot-setup", accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
 export async function searchClients(
   accessToken: string,
   query: string,
@@ -849,6 +933,18 @@ export async function createClient(
   return apiFetch<ClientDetailResponse>("/clients", accessToken, {
     method: "POST",
     body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function importClientsCsv(
+  accessToken: string,
+  fileName: string,
+  csvText: string,
+  dryRun: boolean,
+): Promise<ClientImportResult> {
+  return apiFetch<ClientImportResult>("/clients/imports", accessToken, {
+    method: "POST",
+    body: JSON.stringify({ fileName, csvText, dryRun }),
   });
 }
 

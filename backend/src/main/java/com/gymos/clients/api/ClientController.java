@@ -1,9 +1,12 @@
 package com.gymos.clients.api;
 
 import com.gymos.clients.application.ClientService;
+import com.gymos.clients.application.ClientImportService;
 import com.gymos.clients.application.command.CreateClientCommand;
+import com.gymos.clients.application.command.ImportClientsCommand;
 import com.gymos.clients.application.command.UpdateClientCommand;
 import com.gymos.clients.application.result.ClientDetailResult;
+import com.gymos.clients.application.result.ClientImportResult;
 import com.gymos.clients.infrastructure.ClientRepository.ClientDetail;
 import com.gymos.clients.infrastructure.ClientRepository.ClientSummary;
 import com.gymos.clients.infrastructure.ClientRepository.ClientTimelineEntry;
@@ -32,9 +35,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/clients")
 public class ClientController {
 	private final ClientService clientService;
+	private final ClientImportService clientImportService;
 
-	public ClientController(ClientService clientService) {
+	public ClientController(ClientService clientService, ClientImportService clientImportService) {
 		this.clientService = clientService;
+		this.clientImportService = clientImportService;
 	}
 
 	@GetMapping
@@ -68,6 +73,15 @@ public class ClientController {
 			HttpServletRequest servletRequest
 	) {
 		return toResponse(clientService.update(principal, clientId, request.toCommand(), correlationId(servletRequest)));
+	}
+
+	@PostMapping("/imports")
+	ClientImportResult importClients(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@Valid @RequestBody ClientImportRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return clientImportService.importCsv(principal, request.toCommand(), correlationId(servletRequest));
 	}
 
 	private ClientDetailResponse toResponse(ClientDetailResult result) {
@@ -107,6 +121,16 @@ public class ClientController {
 	) {
 		private UpdateClientCommand toCommand() {
 			return new UpdateClientCommand(firstName, lastName, birthDate, gender, phone, email, photoReference, status, notes);
+		}
+	}
+
+	public record ClientImportRequest(
+			@Size(max = 180) String fileName,
+			@NotBlank @Size(max = 2_000_000) String csvText,
+			boolean dryRun
+	) {
+		private ImportClientsCommand toCommand() {
+			return new ImportClientsCommand(fileName, csvText, dryRun);
 		}
 	}
 

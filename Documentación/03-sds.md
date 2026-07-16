@@ -24,6 +24,7 @@ GymOS se implementará como monolito modular con Spring Modulith. Cada módulo r
 - notifications
 - automations
 - reporting
+- onboarding
 - audit
 - configuration
 
@@ -193,3 +194,14 @@ Decisiones implementadas:
 - Los endpoints internos usan permisos `coach.read`, `coach.manage`, `workout.read`, `workout.manage` y `report.coaches.read`.
 - Permisos adicionales: `professional.read`, `professional.manage`, `notification.read`, `notification.manage`, `automation.read`, `automation.manage` y `report.owner.read`.
 - Las pantallas `/coaches`, `/wellness`, `/automations` y `/dashboard` completan el primer paquete vendible de servicios avanzados.
+
+## 3.17 Productizacion Hito 6
+
+Decisiones implementadas:
+- `onboarding` orquesta setup piloto sobre organizacion y sucursal activa.
+- El setup piloto es idempotente para catalogo base y kiosco: repetirlo no duplica SKU ni terminal.
+- `clients` incorpora importacion CSV como caso de uso propio del modulo, con batch y filas persistidas.
+- La importacion soporta `dryRun` para validar duplicados y errores antes de crear clientes.
+- Los permisos nuevos son `onboarding.manage` y `client.import`.
+- Las pantallas `/onboarding` y `/clients/import` convierten la preparacion comercial en flujos operables desde la app.
+- Backups, staging formal, capacitacion, manual operativo y checklist comercial pasan al Hito 7 por ser trabajo administrativo/operativo.

@@ -66,7 +66,9 @@ class ArchitectureTests {
 	void jdbcClientUsageInApplicationIsExplicitlyTracked() {
 		Set<String> allowedApplicationServices = Set.of(
 				"com.gymos.catalog.application.CatalogService",
+				"com.gymos.clients.application.ClientImportService",
 				"com.gymos.clients.application.ClientService",
+				"com.gymos.onboarding.application.OnboardingService",
 				"com.gymos.organizations.application.OrganizationService",
 				"com.gymos.sales.application.SalesService"
 		);

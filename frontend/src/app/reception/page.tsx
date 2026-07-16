@@ -48,6 +48,18 @@ const shortcuts = [
     href: "/settings/organization",
   },
   {
+    title: "Onboarding",
+    detail: "Checklist y setup piloto para dejar el gimnasio vendible.",
+    status: "Disponible",
+    href: "/onboarding",
+  },
+  {
+    title: "Importar clientes",
+    detail: "Carga inicial CSV con validacion y resultado por fila.",
+    status: "Disponible",
+    href: "/clients/import",
+  },
+  {
     title: "Kiosco interno",
     detail: "Autoservicio para pagos, renovaciones y cambios de membresia.",
     status: "Disponible",

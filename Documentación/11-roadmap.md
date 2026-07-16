@@ -116,16 +116,26 @@
 - Dashboards.
 - Reportes.
 
-## Fase 9 — Preparación comercial
+## Fase 9 - Hito 6: Productizacion por codigo
 
-- Datos iniciales.
-- Configuración.
-- Importación.
-- Capacitación.
-- Piloto.
-- Onboarding de organización y sucursales.
-- Checklist de venta e instalación.
-- Checklist de producción.
+- Checklist vendible dentro de la aplicacion.
+- Onboarding piloto de organizacion y sucursal activa.
+- Creacion idempotente de catalogo base: planes, productos y kiosco.
+- Importacion inicial de clientes por CSV.
+- Dry-run y resultado por fila para importaciones.
+- Permisos `onboarding.manage` y `client.import`.
+- Pantallas `/onboarding` y `/clients/import`.
+
+## Fase 10 - Hito 7: Preparacion administrativa y piloto comercial
+
+- Capacitacion.
+- Scripts y politica de backups.
+- Checklist de venta e instalacion.
+- Checklist de produccion.
+- Entorno staging formal.
+- Manual operativo para el gimnasio piloto.
+- Ejecucion del piloto con datos reales.
+- Registro de feedback, pricing, soporte y procesos comerciales.
 
 ## Definición de terminado
 
