@@ -149,7 +149,24 @@ public class DevelopmentSeedConfig {
 					"automation.manage",
 					"report.owner.read",
 					"onboarding.manage",
-					"client.import"
+					"client.import",
+					"benefit.read",
+					"benefit.manage",
+					"client.benefit.assign",
+					"client.benefit.verify",
+					"membership.expire",
+					"membership.auto-renew.manage",
+					"visit.create",
+					"visit.consume",
+					"visit.read",
+					"booking.payment.manage",
+					"booking.policy.manage",
+					"notification.template.manage",
+					"automation.execute",
+					"automation.scheduler.manage",
+					"backup.execute",
+					"backup.restore",
+					"operations.read"
 			);
 			for (int index = 0; index < permissions.size(); index++) {
 				UUID permissionId = UUID.nameUUIDFromBytes(("gymos:" + permissions.get(index)).getBytes());

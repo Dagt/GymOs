@@ -93,6 +93,29 @@ class SecurityAuthorizationTests {
 	}
 
 	@Test
+	@WithMockUser(authorities = "benefit.read")
+	void benefitCreationRequiresManagePermission() throws Exception {
+		mockMvc.perform(post("/api/v1/benefits").contentType("application/json").content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(authorities = "client.read")
+	void clientBenefitAssignmentRequiresAssignPermission() throws Exception {
+		mockMvc.perform(post("/api/v1/clients/99999999-9999-9999-9999-999999999951/benefits")
+						.contentType("application/json")
+						.content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(authorities = "client.benefit.assign")
+	void clientBenefitVerificationRequiresVerifyPermission() throws Exception {
+		mockMvc.perform(post("/api/v1/client-benefits/99999999-9999-9999-9999-999999999952/verify"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
 	void selfServiceSessionCreationIsPublic() throws Exception {
 		var result = mockMvc.perform(post("/api/v1/self-service/terminals/UNKNOWN/sessions"))
 				.andReturn();

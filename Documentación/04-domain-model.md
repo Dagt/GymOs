@@ -446,3 +446,41 @@ Reglas reforzadas:
 - `selfservice` no resuelve identidad personal directamente; consume `ClientLookupOperations`.
 - Las renovaciones/cambios del kiosco se ejecutan mediante `MembershipOperations`, no por dependencia directa a la capa application de membresias.
 - Las llaves de idempotencia en ventas/pagos incluyen hash de solicitud para detectar reutilizacion con contenido distinto.
+ 
+## Hito 7 - Entidades piloto agregadas
+
+### Benefit
+
+Beneficio comercial aplicable a clientes, planes, productos o accesos. Puede representar estudiante, adulto mayor, convenio, promocion, descuento porcentual, descuento fijo, precio especial o beneficio de acceso.
+
+### ClientBenefit
+
+Asignacion de un beneficio a un cliente dentro de una organizacion y, opcionalmente, una sucursal. Estados iniciales: `ASSIGNED`, `VERIFIED`, `EXPIRED`, `REJECTED`.
+
+### BenefitEvidence
+
+Evidencia documental asociada a un beneficio asignado. Guarda referencia a objeto, estado y datos de revision.
+
+### VisitPass
+
+Derecho de acceso por visita unica, paquete de visitas o pase diario. Controla visitas totales, restantes, vigencia y venta origen.
+
+### SaleRefund
+
+Solicitud y procesamiento de reembolso de venta o pago, con idempotencia, motivo y auditoria.
+
+### BookingPayment
+
+Relacion entre reserva y venta. Permite reservas provisionales que se confirman al completar pago.
+
+### BookingPolicy
+
+Politica de anticipacion, cancelacion, penalizacion, buffers y pago requerido para recursos reservables.
+
+### AutoRenewalAttempt
+
+Intento idempotente de renovacion automatica de membresia.
+
+### NotificationTemplate
+
+Plantilla versionable por organizacion para correo u otros canales.

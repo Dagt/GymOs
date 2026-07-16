@@ -343,3 +343,52 @@ Errores agregados o formalizados:
 - `SELF_SERVICE_SESSION_BLOCKED`
 - `SELF_SERVICE_VERIFICATION_FAILED`
 - `RATE_LIMIT_EXCEEDED`
+ 
+## Hito 7 - Benefits API
+
+### `GET /api/v1/benefits`
+
+Permiso: `benefit.read`.
+
+Devuelve beneficios de la organizacion activa.
+
+### `POST /api/v1/benefits`
+
+Permiso: `benefit.manage`.
+
+Request:
+
+```json
+{
+  "branchId": null,
+  "code": "STUDENT",
+  "name": "Estudiante",
+  "benefitType": "STUDENT",
+  "discountType": "PERCENT",
+  "discountValueCents": null,
+  "discountPercent": 15,
+  "requiresEvidence": true,
+  "combinable": false,
+  "priority": 10,
+  "validFrom": "2026-01-01",
+  "validUntil": null,
+  "status": "ACTIVE"
+}
+```
+
+Errores:
+
+- `BENEFIT_ALREADY_EXISTS`
+- `AUTHENTICATION_REQUIRED`
+
+### `POST /api/v1/clients/{clientId}/benefits`
+
+Permiso: `client.benefit.assign`.
+
+Asigna beneficio a un cliente del tenant activo.
+
+### `POST /api/v1/client-benefits/{clientBenefitId}/verify`
+
+Permiso: `client.benefit.verify`.
+
+Verifica un beneficio asignado.
