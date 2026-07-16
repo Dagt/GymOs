@@ -343,6 +343,32 @@ Criterios:
 - La operacion respeta organizacion y sucursal activa.
 - La integracion automatica con ventas queda preparada por `saleId`, pero la creacion manual ya es usable para piloto.
 
+## UC-024 Reembolso manual de venta
+
+Actor: Administrador o encargado con permiso financiero.
+
+Precondiciones:
+- Venta existente en la organizacion y sucursal activa.
+- La venta tiene pagos completados.
+- Usuario con permiso `sale.refund`.
+
+Flujo:
+1. Usuario abre el detalle de una venta.
+2. Sistema muestra pagos y reembolsos registrados.
+3. Usuario captura monto, motivo y opcionalmente pago relacionado.
+4. Sistema valida que el monto sea positivo.
+5. Si se relaciona a un pago, valida que el pago pertenezca a la venta y este completado.
+6. Sistema calcula saldo reembolsable como pagos completados menos reembolsos procesados.
+7. Sistema registra `sale_refund` con estado `PROCESSED`.
+8. Sistema audita `SALE_REFUND_PROCESSED`.
+9. El detalle de venta muestra el historial actualizado de reembolsos.
+
+Criterios:
+- Una misma `idempotencyKey` no registra dos reembolsos.
+- No se reembolsa mas de lo pagado.
+- No se borra ni modifica el historial de pagos.
+- El reembolso queda separado para conciliacion manual del piloto.
+
 ## Anexo Hito 3.5 final
 
 Ver `Documentación/07-use-cases-hito-3-5-final.md` para la definicion vigente de verificacion segura de kiosco, idempotencia por hash de solicitud y eventos por modulo propietario.

@@ -14,6 +14,7 @@ import com.gymos.sales.api.operations.CreateMembershipRenewalSaleCommand;
 import com.gymos.sales.api.operations.SalesOperations;
 import com.gymos.sales.application.command.CreateSaleCommand;
 import com.gymos.sales.application.command.ManualPaymentCommand;
+import com.gymos.sales.application.command.RequestRefundCommand;
 import com.gymos.sales.application.result.SaleDetailResult;
 import com.gymos.sales.application.result.SalesReportResult;
 import com.gymos.sales.infrastructure.SalesRepository;
@@ -104,6 +105,7 @@ public class SalesService implements SalesOperations {
 				sale,
 				salesRepository.saleItems(principal.organizationId(), saleId),
 				salesRepository.payments(principal.organizationId(), saleId),
+				salesRepository.refunds(principal.organizationId(), saleId),
 				salesRepository.membershipsForSale(principal.organizationId(), saleId)
 		);
 	}
@@ -567,6 +569,69 @@ public class SalesService implements SalesOperations {
 		auditService.record(principal, "PAYMENT_REJECTED", "PAYMENT", paymentId, "POS", reason, correlationId);
 		eventPublisher.publishEvent(new PaymentRejectedV1("payment-rejected:" + paymentId, principal.organizationId(), principal.branchId(), saleId, paymentId, reason, OffsetDateTime.now()));
 		recalculateSale(principal.organizationId(), saleId, principal.userId());
+		return detail(principal, saleId);
+	}
+
+	@Transactional
+	public SaleDetailResult requestRefund(
+			GymOsPrincipal principal,
+			UUID saleId,
+			RequestRefundCommand request,
+			String correlationId
+	) {
+		requireBranch(principal);
+		SaleHeader sale = ensureSale(principal, saleId);
+		if (!principal.branchId().equals(sale.branchId())) {
+			throw new BusinessException("SALE_NOT_FOUND", "La venta no existe o no esta disponible en esta sucursal.");
+		}
+		if (request.amountCents() <= 0) {
+			throw new BusinessException("REFUND_AMOUNT_INVALID", "El reembolso debe ser mayor a cero.");
+		}
+		if (request.idempotencyKey() != null && !request.idempotencyKey().isBlank()) {
+			String key = request.idempotencyKey().trim();
+			var existing = salesRepository.refundByIdempotencyKey(principal.organizationId(), key);
+			if (existing.isPresent()) {
+				var refund = existing.get();
+				if (!refund.saleId().equals(saleId)
+						|| refund.amountCents() != request.amountCents()
+						|| (request.paymentId() != null && !request.paymentId().equals(refund.paymentId()))) {
+					throw new BusinessException("IDEMPOTENCY_KEY_REUSED", "La llave de idempotencia ya fue usada en otro reembolso.");
+				}
+				return detail(principal, refund.saleId());
+			}
+		}
+		if (request.paymentId() != null) {
+			PaymentDetail payment = salesRepository.payment(principal.organizationId(), request.paymentId())
+					.orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "El pago no existe o no esta disponible."));
+			UUID paymentSaleId = salesRepository.saleIdForPayment(principal.organizationId(), request.paymentId())
+					.orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "El pago no existe o no esta disponible."));
+			if (!paymentSaleId.equals(saleId)) {
+				throw new BusinessException("PAYMENT_SALE_MISMATCH", "El pago no pertenece a la venta.");
+			}
+			if (!"COMPLETED".equals(payment.status())) {
+				throw new BusinessException("PAYMENT_NOT_COMPLETED", "Solo puedes reembolsar pagos completados.");
+			}
+			if (request.amountCents() > payment.amountCents()) {
+				throw new BusinessException("REFUND_EXCEEDS_PAYMENT", "El reembolso no puede superar el pago seleccionado.");
+			}
+		}
+		long alreadyRefunded = salesRepository.processedRefundTotal(principal.organizationId(), saleId);
+		long refundable = sale.paidCents() - alreadyRefunded;
+		if (request.amountCents() > refundable) {
+			throw new BusinessException("REFUND_EXCEEDS_REFUNDABLE_BALANCE", "El reembolso supera el saldo pagado disponible.");
+		}
+		UUID refundId = salesRepository.createProcessedRefund(
+				principal.organizationId(),
+				principal.branchId(),
+				saleId,
+				request.paymentId(),
+				request.amountCents(),
+				sale.currency(),
+				request.reason(),
+				blankToNull(request.idempotencyKey()),
+				principal.userId()
+		);
+		auditService.record(principal, "SALE_REFUND_PROCESSED", "SALE_REFUND", refundId, "POS", request.reason(), correlationId);
 		return detail(principal, saleId);
 	}
 

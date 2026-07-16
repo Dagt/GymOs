@@ -5,12 +5,14 @@ import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.sales.application.SalesService;
 import com.gymos.sales.application.command.CreateSaleCommand;
 import com.gymos.sales.application.command.ManualPaymentCommand;
+import com.gymos.sales.application.command.RequestRefundCommand;
 import com.gymos.sales.application.command.SaleItemCommand;
 import com.gymos.sales.application.result.SaleDetailResult;
 import com.gymos.sales.application.result.SalesReportResult;
 import com.gymos.sales.infrastructure.SalesRepository.PaymentDetail;
 import com.gymos.sales.infrastructure.SalesRepository.PaymentMethodBreakdown;
 import com.gymos.sales.infrastructure.SalesRepository.PaymentReportTotals;
+import com.gymos.sales.infrastructure.SalesRepository.RefundDetail;
 import com.gymos.sales.infrastructure.SalesRepository.SaleHeader;
 import com.gymos.sales.infrastructure.SalesRepository.SaleItemDetail;
 import com.gymos.sales.infrastructure.SalesRepository.SaleSummary;
@@ -116,8 +118,18 @@ public class SalesController {
 		return toResponse(salesService.uploadReceipt(principal, paymentId, file, correlationId(servletRequest)));
 	}
 
+	@PostMapping("/{saleId}/refunds")
+	SaleDetailResponse requestRefund(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID saleId,
+			@Valid @RequestBody RefundRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return toResponse(salesService.requestRefund(principal, saleId, request.toCommand(), correlationId(servletRequest)));
+	}
+
 	private SaleDetailResponse toResponse(SaleDetailResult result) {
-		return new SaleDetailResponse(result.sale(), result.items(), result.payments(), result.memberships());
+		return new SaleDetailResponse(result.sale(), result.items(), result.payments(), result.refunds(), result.memberships());
 	}
 
 	private SalesReportResponse toResponse(SalesReportResult result) {
@@ -187,10 +199,22 @@ public class SalesController {
 	) {
 	}
 
+	public record RefundRequest(
+			UUID paymentId,
+			@Min(1) long amountCents,
+			@NotNull @Size(min = 3, max = 500) String reason,
+			@Size(max = 160) String idempotencyKey
+	) {
+		private RequestRefundCommand toCommand() {
+			return new RequestRefundCommand(paymentId, amountCents, reason, idempotencyKey);
+		}
+	}
+
 	public record SaleDetailResponse(
 			SaleHeader sale,
 			List<SaleItemDetail> items,
 			List<PaymentDetail> payments,
+			List<RefundDetail> refunds,
 			List<MembershipDetail> memberships
 	) {
 	}

@@ -459,3 +459,40 @@ Errores:
 - `VISIT_PASS_OUT_OF_RANGE`
 - `VISIT_PASS_CONSUMED`
 - `VISIT_PASS_CONFLICT`
+
+## Hito 7 - Refund API
+
+### `POST /api/v1/sales/{saleId}/refunds`
+
+Permiso: `sale.refund`.
+
+Registra un reembolso manual procesado sobre una venta de la sucursal activa. El reembolso no elimina pagos ni cambia la venta historica; queda registrado como movimiento financiero separado en `sale_refund`.
+
+Request:
+
+```json
+{
+  "paymentId": null,
+  "amountCents": 50000,
+  "reason": "Cancelacion autorizada por administracion",
+  "idempotencyKey": "refund-20260716-0001"
+}
+```
+
+Notas:
+
+- `paymentId` es opcional. Si se informa, debe pertenecer a la venta y estar `COMPLETED`.
+- `amountCents` no puede exceder el saldo pagado disponible menos reembolsos `PROCESSED` previos.
+- `idempotencyKey` evita registrar dos veces la misma operacion.
+- `GET /api/v1/sales/{saleId}` incluye `refunds` en el detalle.
+
+Errores:
+
+- `SALE_NOT_FOUND`
+- `PAYMENT_NOT_FOUND`
+- `PAYMENT_SALE_MISMATCH`
+- `PAYMENT_NOT_COMPLETED`
+- `REFUND_AMOUNT_INVALID`
+- `REFUND_EXCEEDS_PAYMENT`
+- `REFUND_EXCEEDS_REFUNDABLE_BALANCE`
+- `IDEMPOTENCY_KEY_REUSED`

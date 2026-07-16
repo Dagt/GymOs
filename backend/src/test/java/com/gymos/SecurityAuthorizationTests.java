@@ -35,6 +35,15 @@ class SecurityAuthorizationTests {
 	}
 
 	@Test
+	@WithMockUser(authorities = "sale.read")
+	void saleRefundRequiresRefundPermission() throws Exception {
+		mockMvc.perform(post("/api/v1/sales/99999999-9999-9999-9999-999999999954/refunds")
+						.contentType("application/json")
+						.content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
 	@WithMockUser(authorities = "booking.read")
 	void bookingCreationRequiresManagePermission() throws Exception {
 		mockMvc.perform(post("/api/v1/bookings").contentType("application/json").content("{}"))

@@ -204,6 +204,22 @@ export type PaymentDetail = {
   notes: string | null;
 };
 
+export type RefundDetail = {
+  id: string;
+  saleId: string;
+  paymentId: string | null;
+  status: "REQUESTED" | "PROCESSED" | "REJECTED" | "CANCELLED" | string;
+  amountCents: number;
+  currency: string;
+  reason: string;
+  idempotencyKey: string | null;
+  requestedBy: string | null;
+  requestedAt: string;
+  processedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type MembershipDetail = {
   id: string;
   clientId: string;
@@ -347,6 +363,7 @@ export type SaleDetailResponse = {
   sale: SaleHeader;
   items: SaleItemDetail[];
   payments: PaymentDetail[];
+  refunds: RefundDetail[];
   memberships: MembershipDetail[];
 };
 
@@ -904,6 +921,13 @@ export type ManualPaymentPayload = {
   receiptObjectKey?: string | null;
   validateNow: boolean;
   notes?: string | null;
+  idempotencyKey?: string | null;
+};
+
+export type SaleRefundPayload = {
+  paymentId?: string | null;
+  amountCents: number;
+  reason: string;
   idempotencyKey?: string | null;
 };
 
@@ -1520,6 +1544,17 @@ export async function addManualPayment(
   return apiFetch<SaleDetailResponse>(`/sales/${saleId}/payments`, accessToken, {
     method: "POST",
     body: JSON.stringify(normalizePayload(withIdempotency(payload, "manual-payment", saleId))),
+  });
+}
+
+export async function requestSaleRefund(
+  accessToken: string,
+  saleId: string,
+  payload: SaleRefundPayload,
+): Promise<SaleDetailResponse> {
+  return apiFetch<SaleDetailResponse>(`/sales/${saleId}/refunds`, accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(withIdempotency(payload, "sale-refund", saleId))),
   });
 }
 

@@ -65,6 +65,7 @@ public class SecurityConfig {
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/sales/reports/**").hasAuthority("report.sales.read")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/sales/**").hasAuthority("sale.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/sales").hasAuthority("sale.create")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/sales/*/refunds").hasAuthority("sale.refund")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/sales/*/payments").hasAuthority("payment.manual.create")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/sales/payments/*/validate").hasAuthority("payment.manual.validate")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/sales/payments/*/reject").hasAuthority("payment.manual.reject")

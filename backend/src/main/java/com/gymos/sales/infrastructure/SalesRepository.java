@@ -390,6 +390,121 @@ public class SalesRepository {
 				.list();
 	}
 
+	public List<RefundDetail> refunds(UUID organizationId, UUID saleId) {
+		return jdbcClient.sql("""
+				SELECT id, sale_id, payment_id, status, amount_cents, currency, reason,
+				       idempotency_key, requested_by, requested_at, processed_at, created_at, updated_at
+				FROM sale_refund
+				WHERE organization_id = :organizationId
+				  AND sale_id = :saleId
+				ORDER BY requested_at DESC
+				""")
+				.param("organizationId", organizationId)
+				.param("saleId", saleId)
+				.query((resultSet, rowNumber) -> new RefundDetail(
+						resultSet.getObject("id", UUID.class),
+						resultSet.getObject("sale_id", UUID.class),
+						resultSet.getObject("payment_id", UUID.class),
+						resultSet.getString("status"),
+						resultSet.getLong("amount_cents"),
+						resultSet.getString("currency"),
+						resultSet.getString("reason"),
+						resultSet.getString("idempotency_key"),
+						resultSet.getObject("requested_by", UUID.class),
+						resultSet.getObject("requested_at", OffsetDateTime.class),
+						resultSet.getObject("processed_at", OffsetDateTime.class),
+						resultSet.getObject("created_at", OffsetDateTime.class),
+						resultSet.getObject("updated_at", OffsetDateTime.class)
+				))
+				.list();
+	}
+
+	public Optional<RefundDetail> refundByIdempotencyKey(UUID organizationId, String idempotencyKey) {
+		return jdbcClient.sql("""
+				SELECT id, sale_id, payment_id, status, amount_cents, currency, reason,
+				       idempotency_key, requested_by, requested_at, processed_at, created_at, updated_at
+				FROM sale_refund
+				WHERE organization_id = :organizationId
+				  AND idempotency_key = :idempotencyKey
+				""")
+				.param("organizationId", organizationId)
+				.param("idempotencyKey", idempotencyKey)
+				.query((resultSet, rowNumber) -> new RefundDetail(
+						resultSet.getObject("id", UUID.class),
+						resultSet.getObject("sale_id", UUID.class),
+						resultSet.getObject("payment_id", UUID.class),
+						resultSet.getString("status"),
+						resultSet.getLong("amount_cents"),
+						resultSet.getString("currency"),
+						resultSet.getString("reason"),
+						resultSet.getString("idempotency_key"),
+						resultSet.getObject("requested_by", UUID.class),
+						resultSet.getObject("requested_at", OffsetDateTime.class),
+						resultSet.getObject("processed_at", OffsetDateTime.class),
+						resultSet.getObject("created_at", OffsetDateTime.class),
+						resultSet.getObject("updated_at", OffsetDateTime.class)
+				))
+				.optional();
+	}
+
+	public long processedRefundTotal(UUID organizationId, UUID saleId) {
+		Long total = jdbcClient.sql("""
+				SELECT COALESCE(SUM(amount_cents), 0)
+				FROM sale_refund
+				WHERE organization_id = :organizationId
+				  AND sale_id = :saleId
+				  AND status = 'PROCESSED'
+				""")
+				.param("organizationId", organizationId)
+				.param("saleId", saleId)
+				.query(Long.class)
+				.single();
+		return total == null ? 0 : total;
+	}
+
+	public UUID createProcessedRefund(
+			UUID organizationId,
+			UUID branchId,
+			UUID saleId,
+			UUID paymentId,
+			long amountCents,
+			String currency,
+			String reason,
+			String idempotencyKey,
+			UUID requestedBy
+	) {
+		OffsetDateTime now = OffsetDateTime.now();
+		UUID refundId = UUID.randomUUID();
+		jdbcClient.sql("""
+				INSERT INTO sale_refund (
+				    id, organization_id, branch_id, sale_id, payment_id, status, amount_cents,
+				    currency, reason, idempotency_key, requested_by, requested_at, processed_at,
+				    created_at, updated_at, version
+				)
+				VALUES (
+				    :id, :organizationId, :branchId, :saleId, :paymentId, 'PROCESSED', :amountCents,
+				    :currency, :reason, :idempotencyKey, :requestedBy, :requestedAt, :processedAt,
+				    :createdAt, :updatedAt, 0
+				)
+				""")
+				.param("id", refundId)
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("saleId", saleId)
+				.param("paymentId", paymentId)
+				.param("amountCents", amountCents)
+				.param("currency", currency)
+				.param("reason", reason)
+				.param("idempotencyKey", idempotencyKey)
+				.param("requestedBy", requestedBy)
+				.param("requestedAt", now)
+				.param("processedAt", now)
+				.param("createdAt", now)
+				.param("updatedAt", now)
+				.update();
+		return refundId;
+	}
+
 	public Optional<PaymentDetail> payment(UUID organizationId, UUID paymentId) {
 		return jdbcClient.sql("""
 				SELECT id, method, status, amount_cents, currency, reference,
@@ -634,6 +749,23 @@ public class SalesRepository {
 			OffsetDateTime receivedAt,
 			OffsetDateTime validatedAt,
 			String notes
+	) {
+	}
+
+	public record RefundDetail(
+			UUID id,
+			UUID saleId,
+			UUID paymentId,
+			String status,
+			long amountCents,
+			String currency,
+			String reason,
+			String idempotencyKey,
+			UUID requestedBy,
+			OffsetDateTime requestedAt,
+			OffsetDateTime processedAt,
+			OffsetDateTime createdAt,
+			OffsetDateTime updatedAt
 	) {
 	}
 }
