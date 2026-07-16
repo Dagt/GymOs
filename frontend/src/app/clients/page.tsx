@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { AppNavigation } from "@/components/AppNavigation";
+import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   createClient,
   getStoredSession,
@@ -125,18 +127,18 @@ export default function ClientsPage() {
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <Link className="text-sm font-semibold text-[#51735f]" href="/reception">
-              Recepcion
+              Recepción
             </Link>
             <h1 className="mt-1 text-3xl font-semibold">Clientes</h1>
             <p className="mt-1 text-sm text-[#5d6b63]">
-              Alta, busqueda y ficha base para operar desde recepcion.
+              Alta, búsqueda y ficha base para operar desde recepción.
             </p>
           </div>
           <form className="flex w-full gap-2 lg:w-auto" onSubmit={submitSearch}>
             <input
               className="h-11 min-w-0 flex-1 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm outline-none transition focus:border-[#51735f] lg:w-80"
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Nombre, telefono o email"
+              placeholder="Nombre, teléfono o email"
               value={query}
             />
             <button
@@ -149,17 +151,21 @@ export default function ClientsPage() {
         </div>
       </header>
 
+      <div className="mx-auto max-w-7xl px-6 pt-6">
+        <AppNavigation />
+      </div>
+
       <section className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[1fr_1.3fr]">
         <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-semibold">Alta rapida</h2>
+          <h2 className="text-xl font-semibold">Alta rápida</h2>
           <form className="mt-5 grid gap-4" onSubmit={submitCreate}>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Nombre" value={form.firstName ?? ""} onChange={(value) => updateForm("firstName", value)} />
               <Field label="Apellido" value={form.lastName ?? ""} onChange={(value) => updateForm("lastName", value)} />
-              <Field label="Telefono" value={form.phone ?? ""} onChange={(value) => updateForm("phone", value)} />
+              <Field label="Teléfono" value={form.phone ?? ""} onChange={(value) => updateForm("phone", value)} />
               <Field label="Email" type="email" value={form.email ?? ""} onChange={(value) => updateForm("email", value)} />
               <Field label="Fecha de nacimiento" type="date" value={form.birthDate ?? ""} onChange={(value) => updateForm("birthDate", value)} />
-              <Field label="Genero" value={form.gender ?? ""} onChange={(value) => updateForm("gender", value)} />
+              <Field label="Género" value={form.gender ?? ""} onChange={(value) => updateForm("gender", value)} />
             </div>
             <label className="grid gap-2 text-sm font-medium text-[#42514a]">
               Notas
@@ -207,7 +213,7 @@ export default function ClientsPage() {
               >
                 <span className="block font-semibold">{client.firstName} {client.lastName}</span>
                 <span className="mt-1 block text-sm text-[#5d6b63]">
-                  {client.phone ?? "Sin telefono"} - {client.email ?? "Sin email"} - {client.status}
+                  {client.phone ?? "Sin teléfono"} - {client.email ?? "Sin email"} - {client.status}
                 </span>
               </Link>
             ))}
@@ -244,16 +250,9 @@ function Field({
 
 function AuthRequired() {
   return (
-    <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-      <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">Necesitas iniciar sesion</h1>
-        <Link
-          className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
-          href="/login"
-        >
-          Iniciar sesion
-        </Link>
-      </section>
-    </main>
+    <AuthRequiredCard
+      message="La lista de clientes contiene información sensible y requiere una cuenta autorizada."
+      title="Inicia sesión para consultar clientes"
+    />
   );
 }

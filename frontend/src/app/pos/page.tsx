@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { AppNavigation } from "@/components/AppNavigation";
+import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   createSale,
   getProducts,
@@ -168,11 +170,11 @@ export default function PosPage() {
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <Link className="text-sm font-semibold text-[#51735f]" href="/reception">
-              Recepcion
+              Recepción
             </Link>
             <h1 className="mt-1 text-3xl font-semibold">POS</h1>
             <p className="mt-1 text-sm text-[#5d6b63]">
-              Venta rapida con pago manual y validacion interna.
+              Venta rápida con pago manual y validación interna.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -186,18 +188,22 @@ export default function PosPage() {
               className="inline-flex h-11 items-center justify-center rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f]"
               href="/catalog"
             >
-              Catalogo
+              Catálogo
             </Link>
           </div>
         </div>
       </header>
+
+      <div className="mx-auto max-w-7xl px-6 pt-6">
+        <AppNavigation />
+      </div>
 
       <section className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[1.1fr_0.9fr]">
         <section className="grid gap-6">
           <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
             <h2 className="text-xl font-semibold">Productos</h2>
             <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {loading ? <p className="text-sm text-[#5d6b63]">Cargando catalogo...</p> : null}
+              {loading ? <p className="text-sm text-[#5d6b63]">Cargando catálogo...</p> : null}
               {products.map((product) => (
                 <button
                   className="rounded-md border border-[#d8ddd2] bg-white p-4 text-left transition hover:border-[#51735f] hover:bg-[#f6f7f2]"
@@ -241,7 +247,7 @@ export default function PosPage() {
               <input
                 className="h-11 min-w-0 flex-1 rounded-md border border-[#cdd5ca] px-3 text-sm outline-none transition focus:border-[#51735f]"
                 onChange={(event) => setClientQuery(event.target.value)}
-                placeholder="Nombre, telefono o email"
+                placeholder="Nombre, teléfono o email"
                 value={clientQuery}
               />
               <button
@@ -302,7 +308,7 @@ export default function PosPage() {
               </div>
               <div className="mt-4 grid gap-3">
                 <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-                  Metodo
+                  Método
                   <select
                     className="h-11 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm"
                     onChange={(event) => setPaymentMethod(event.target.value as "CASH" | "TRANSFER" | "CARD_MANUAL")}
@@ -368,17 +374,10 @@ export default function PosPage() {
 
 function AuthRequired() {
   return (
-    <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-      <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">Necesitas iniciar sesion</h1>
-        <Link
-          className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
-          href="/login"
-        >
-          Iniciar sesion
-        </Link>
-      </section>
-    </main>
+    <AuthRequiredCard
+      message="El punto de venta requiere una sesión de recepción o administración."
+      title="Inicia sesión para cobrar"
+    />
   );
 }
 

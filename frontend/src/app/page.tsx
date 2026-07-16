@@ -3,21 +3,21 @@ import Link from "next/link";
 const roleEntrances = [
   {
     title: "Administrar gimnasio",
-    detail: "Ventas, clientes, membresias, sucursales y reportes en un solo lugar.",
+    detail: "Ventas, socios, membresías, sucursales y reportes en un solo lugar.",
     href: "/reception",
     action: "Entrar al panel",
     tone: "primary",
   },
   {
-    title: "Atender en recepcion",
-    detail: "Registrar clientes, cobrar, renovar membresias y consultar pagos pendientes.",
+    title: "Atender en recepción",
+    detail: "Registrar socios, cobrar, renovar membresías y consultar pagos pendientes.",
     href: "/pos",
     action: "Abrir caja",
     tone: "warm",
   },
   {
     title: "Pantalla para socios",
-    detail: "Autoservicio para pagos, renovaciones y cambios de membresia dentro del gimnasio.",
+    detail: "Autoservicio para pagos, renovaciones y cambios de membresía dentro del gimnasio.",
     href: "/kiosk/KIOSK-MAIN",
     action: "Abrir kiosco",
     tone: "cool",
@@ -26,8 +26,8 @@ const roleEntrances = [
 
 const everydaySignals = [
   "Cobros y saldos visibles",
-  "Clientes y membresias organizados",
-  "Reportes listos para el dueno",
+  "Clientes y membresías organizados",
+  "Reportes listos para el dueño",
   "Marca configurable por gimnasio",
 ];
 
@@ -41,7 +41,7 @@ export default function Home() {
             <strong>GymOS</strong>
           </div>
           <nav aria-label="Accesos principales">
-            <Link href="/login">Iniciar sesion</Link>
+            <Link href="/login">Iniciar sesión</Link>
             <Link className="home-primary-link" href="/reception">
               Ir al panel
             </Link>
@@ -51,10 +51,10 @@ export default function Home() {
         <section className="home-hero" aria-labelledby="home-title">
           <div>
             <p className="home-kicker">Sistema para operar gimnasios</p>
-            <h1 id="home-title">Controla recepcion, pagos, membresias y reportes sin complicar al equipo.</h1>
+            <h1 id="home-title">Controla recepción, pagos, membresías y reportes sin complicar al equipo.</h1>
             <p>
-              Diseñado para mostrador, administracion y autoservicio. Cada usuario entra directo a lo que necesita
-              hacer, sin informacion tecnica ni pasos innecesarios.
+              Diseñado para mostrador, administración y autoservicio. Cada usuario entra directo a lo que necesita
+              hacer, sin información técnica ni pasos innecesarios.
             </p>
             <div className="home-actions">
               <Link className="home-cta" href="/reception">
@@ -66,7 +66,7 @@ export default function Home() {
             </div>
           </div>
 
-          <aside className="home-preview" aria-label="Resumen de operacion">
+          <aside className="home-preview" aria-label="Resumen de operación">
             <div className="home-preview-top">
               <span>Hoy</span>
               <strong>Mostrador activo</strong>

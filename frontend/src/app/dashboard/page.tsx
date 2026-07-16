@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppNavigation } from "@/components/AppNavigation";
+import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   getOwnerDashboard,
   getStoredSession,
@@ -80,9 +80,11 @@ export default function OwnerDashboardPage() {
       <div className="app-shell-inner">
         <header className="app-topbar">
           <div className="app-title-block">
-            <p className="app-eyebrow">Direccion</p>
-            <h1 className="app-title">Dashboard del dueno</h1>
-            <p className="app-subtitle">Salud operativa y comercial de la sucursal activa.</p>
+            <p className="app-eyebrow">Dirección</p>
+            <h1 className="app-title">Panel administrativo</h1>
+            <p className="app-subtitle">
+              Indicadores claros para revisar ingresos, membresías, operación diaria y pendientes de la sucursal activa.
+            </p>
           </div>
           <div className="app-actions">
             <input className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => setFromDate(event.target.value)} type="date" value={fromDate} />
@@ -96,18 +98,55 @@ export default function OwnerDashboardPage() {
         <section className="grid gap-6">
           {error ? <p className="rounded-md border border-[#e5b7b7] bg-[#fff4f4] px-3 py-2 text-sm text-[#8c2f2f]">{error}</p> : null}
           {dashboard ? (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-              <Metric label="Ingresos pagados" value={formatMoney(dashboard.paidRevenueCents, "MXN")} />
-              <Metric label="Ventas" value={dashboard.saleCount.toString()} />
-              <Metric label="Clientes nuevos" value={dashboard.newClients.toString()} />
-              <Metric label="Membresias activas" value={dashboard.activeMemberships.toString()} />
-              <Metric label="Reservas" value={dashboard.bookingCount.toString()} />
-              <Metric label="Inventario bajo" value={dashboard.lowStockItems.toString()} />
-              <Metric label="Rutinas activas" value={dashboard.activeWorkoutAssignments.toString()} />
-              <Metric label="Profesionales activos" value={dashboard.activeProfessionals.toString()} />
-              <Metric label="Notificaciones" value={dashboard.queuedNotifications.toString()} />
-              <Metric label="Automatizaciones" value={dashboard.enabledAutomations.toString()} />
-            </div>
+            <>
+              <section className="owner-summary-grid">
+                <Metric
+                  accent="green"
+                  label="Ingresos cobrados"
+                  helper="Pagos confirmados en el periodo"
+                  value={formatMoney(dashboard.paidRevenueCents, "MXN")}
+                />
+                <Metric
+                  accent="blue"
+                  label="Ventas creadas"
+                  helper="Tickets y renovaciones registradas"
+                  value={dashboard.saleCount.toString()}
+                />
+                <Metric
+                  accent="amber"
+                  label="Membresías activas"
+                  helper="Socios con acceso vigente"
+                  value={dashboard.activeMemberships.toString()}
+                />
+              </section>
+
+              <section className="owner-section-grid">
+                <article className="owner-panel">
+                  <div>
+                    <p className="app-eyebrow">Crecimiento</p>
+                    <h2>Clientes y servicios</h2>
+                  </div>
+                  <div className="owner-mini-grid">
+                    <MiniMetric label="Clientes nuevos" value={dashboard.newClients.toString()} />
+                    <MiniMetric label="Reservas" value={dashboard.bookingCount.toString()} />
+                    <MiniMetric label="Rutinas activas" value={dashboard.activeWorkoutAssignments.toString()} />
+                    <MiniMetric label="Profesionales activos" value={dashboard.activeProfessionals.toString()} />
+                  </div>
+                </article>
+
+                <article className="owner-panel">
+                  <div>
+                    <p className="app-eyebrow">Pendientes</p>
+                    <h2>Operación por revisar</h2>
+                  </div>
+                  <div className="owner-mini-grid">
+                    <MiniMetric label="Inventario bajo" value={dashboard.lowStockItems.toString()} tone={dashboard.lowStockItems > 0 ? "warning" : "ok"} />
+                    <MiniMetric label="Notificaciones en cola" value={dashboard.queuedNotifications.toString()} />
+                    <MiniMetric label="Automatizaciones activas" value={dashboard.enabledAutomations.toString()} />
+                  </div>
+                </article>
+              </section>
+            </>
           ) : null}
         </section>
       </div>
@@ -115,12 +154,32 @@ export default function OwnerDashboardPage() {
   );
 }
 
-function Metric({ label, value }: { label: string; value: string }) {
+function Metric({
+  accent,
+  helper,
+  label,
+  value,
+}: {
+  accent: "green" | "blue" | "amber";
+  helper: string;
+  label: string;
+  value: string;
+}) {
   return (
-    <article className="app-card p-5">
-      <p className="text-sm font-bold text-[#5d6b63]">{label}</p>
-      <p className="mt-2 text-3xl font-black">{value}</p>
+    <article className={`owner-metric ${accent}`}>
+      <p>{label}</p>
+      <strong>{value}</strong>
+      <span>{helper}</span>
     </article>
+  );
+}
+
+function MiniMetric({ label, tone, value }: { label: string; tone?: "ok" | "warning"; value: string }) {
+  return (
+    <div className={`owner-mini-metric ${tone ?? ""}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
   );
 }
 
@@ -134,9 +193,10 @@ function Centered({ text }: { text: string }) {
 
 function AuthRequired() {
   return (
-    <main className="grid min-h-screen place-items-center px-6 text-[#111815]">
-      <Link className="app-button" href="/login">Iniciar sesion</Link>
-    </main>
+    <AuthRequiredCard
+      message="El panel administrativo requiere una cuenta con permisos de dirección o administración."
+      title="Inicia sesión para ver indicadores"
+    />
   );
 }
 

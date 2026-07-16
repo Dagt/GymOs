@@ -18,58 +18,74 @@ import {
 
 const focusActions = [
   {
-    title: "Cobrar venta",
-    detail: "Productos, planes o pagos manuales.",
+    title: "Cobrar o renovar",
+    detail: "Venta de productos, mensualidades, renovaciones y pagos manuales.",
     href: "/pos",
-    label: "Abrir caja",
+    label: "Abrir punto de venta",
     accent: "money",
   },
   {
-    title: "Buscar o registrar socio",
-    detail: "Alta rapida, ficha y membresias.",
+    title: "Socios",
+    detail: "Buscar, registrar, consultar membresía y actualizar datos.",
     href: "/clients",
-    label: "Ir a socios",
+    label: "Gestionar socios",
     accent: "people",
   },
   {
-    title: "Revisar ventas",
-    detail: "Pagos, saldos y operaciones recientes.",
+    title: "Reportes del día",
+    detail: "Ventas, pagos pendientes, saldos y actividad reciente.",
     href: "/reports/sales",
-    label: "Ver reporte",
+    label: "Ver ventas",
     accent: "report",
   },
   {
-    title: "Abrir autoservicio",
-    detail: "Pantalla de pagos y renovaciones.",
+    title: "Kiosco para socios",
+    detail: "Pantalla táctil para pagos, renovaciones y cambios de plan.",
     href: "/kiosk/KIOSK-MAIN",
-    label: "Abrir kiosco",
+    label: "Abrir pantalla",
     accent: "kiosk",
   },
 ];
 
 const adminShortcuts = [
-  { label: "Catalogo", href: "/catalog" },
+  { label: "Catálogo", href: "/catalog" },
   { label: "Beneficios", href: "/benefits" },
-  { label: "Configuracion", href: "/settings/organization" },
-  { label: "Onboarding", href: "/onboarding" },
+  { label: "Marca y datos", href: "/settings/organization" },
+  { label: "Preparar gimnasio", href: "/onboarding" },
   { label: "Importar clientes", href: "/clients/import" },
 ];
 
-const operationShortcuts = [
-  { label: "Accesos", href: "/access" },
-  { label: "Reservas", href: "/bookings" },
-  { label: "Inventario", href: "/inventory" },
-  { label: "Coaches", href: "/coaches" },
-  { label: "Bienestar", href: "/wellness" },
-  { label: "Automatizaciones", href: "/automations" },
+const operationGroups = [
+  {
+    title: "Operación",
+    items: [
+      { label: "Control de acceso", href: "/access" },
+      { label: "Reservas", href: "/bookings" },
+      { label: "Inventario", href: "/inventory" },
+    ],
+  },
+  {
+    title: "Servicios",
+    items: [
+      { label: "Coaches", href: "/coaches" },
+      { label: "Bienestar", href: "/wellness" },
+      { label: "Automatizaciones", href: "/automations" },
+    ],
+  },
 ];
 
 const navigation = [
-  { label: "Inicio", href: "/" },
-  { label: "Recepcion", href: "/reception" },
-  { label: "Caja", href: "/pos" },
-  { label: "Socios", href: "/clients" },
-  { label: "Reportes", href: "/dashboard" },
+  { label: "Inicio", href: "/", hint: "Entrada" },
+  { label: "Panel", href: "/reception", hint: "Administración" },
+  { label: "Caja", href: "/pos", hint: "Cobros" },
+  { label: "Socios", href: "/clients", hint: "Clientes" },
+  { label: "Reportes", href: "/dashboard", hint: "Dueño" },
+];
+
+const daySignals = [
+  { label: "Caja", value: "Lista", tone: "green" },
+  { label: "Pagos", value: "Pendientes", tone: "amber" },
+  { label: "Kiosco", value: "Disponible", tone: "blue" },
 ];
 
 export default function ReceptionPage() {
@@ -110,7 +126,7 @@ export default function ReceptionPage() {
         if (!active) {
           return;
         }
-        setError(exception instanceof Error ? exception.message : "No fue posible cargar recepcion.");
+        setError(exception instanceof Error ? exception.message : "No fue posible cargar recepción.");
       } finally {
         if (active) {
           setLoading(false);
@@ -168,9 +184,9 @@ export default function ReceptionPage() {
       <main className="admin-empty-state">
         <section>
           <p>GymOS</p>
-          <h1>Inicia sesion para administrar el gimnasio</h1>
+          <h1>Inicia sesión para administrar el gimnasio</h1>
           <span>El panel carga tu sucursal, tus permisos y las acciones disponibles para tu rol.</span>
-          <Link href="/login">Iniciar sesion</Link>
+          <Link href="/login">Iniciar sesión</Link>
         </section>
       </main>
     );
@@ -187,10 +203,11 @@ export default function ReceptionPage() {
           </div>
         </div>
 
-        <nav aria-label="Navegacion de administracion">
+        <nav aria-label="Navegación de administración">
           {navigation.map((item) => (
             <Link href={item.href} key={item.href}>
-              {item.label}
+              <strong>{item.label}</strong>
+              <span>{item.hint}</span>
             </Link>
           ))}
         </nav>
@@ -206,13 +223,17 @@ export default function ReceptionPage() {
       <section className="admin-workspace">
         <header className="admin-command-bar">
           <div>
-            <p>Panel de administracion</p>
-            <h1>Que quieres hacer ahora?</h1>
+            <p>Panel de administración</p>
+            <h1>Operación del gimnasio</h1>
             <span>
-              Acciones principales al frente. Los modulos menos frecuentes estan agrupados para no saturar la pantalla.
+              Accesos rápidos para mostrador, administración y dirección. Todo organizado por tarea, no por módulo técnico.
             </span>
           </div>
           <div className="admin-command-actions">
+            <label className="admin-search-box">
+              <span>Buscar</span>
+              <input placeholder="Socio, venta o acción" />
+            </label>
             <Link href="/reports/sales">Ventas</Link>
             <Link href="/settings/organization">Personalizar</Link>
           </div>
@@ -222,6 +243,12 @@ export default function ReceptionPage() {
 
         <section className="admin-content-grid">
           <section className="admin-main-column">
+            <section className="admin-status-board" aria-label="Estado operativo">
+              {daySignals.map((signal) => (
+                <ReportMetric key={signal.label} label={signal.label} value={signal.value} tone={signal.tone} />
+              ))}
+            </section>
+
             <section className="admin-focus-grid" aria-label="Acciones principales">
               {focusActions.map((action) => (
                 <Link className={`admin-action-card ${action.accent}`} href={action.href} key={action.href}>
@@ -235,7 +262,7 @@ export default function ReceptionPage() {
             <section className="admin-panel">
               <div className="admin-panel-header">
                 <div>
-                  <p>Reportes rapidos</p>
+                  <p>Reportes rápidos</p>
                   <h2>Vista para decisiones</h2>
                 </div>
                 <Link href="/dashboard">Dashboard completo</Link>
@@ -248,12 +275,19 @@ export default function ReceptionPage() {
             </section>
 
             <details className="admin-panel admin-details">
-              <summary>Mas herramientas operativas</summary>
-              <div className="admin-link-grid">
-                {operationShortcuts.map((item) => (
-                  <Link href={item.href} key={item.href}>
-                    {item.label}
-                  </Link>
+              <summary>Más herramientas</summary>
+              <div className="admin-module-groups">
+                {operationGroups.map((group) => (
+                  <section key={group.title}>
+                    <h3>{group.title}</h3>
+                    <div className="admin-link-grid">
+                      {group.items.map((item) => (
+                        <Link href={item.href} key={item.href}>
+                          {item.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </section>
                 ))}
               </div>
             </details>
@@ -287,7 +321,7 @@ export default function ReceptionPage() {
               <div className="admin-panel-header">
                 <div>
                   <p>Administracion</p>
-                  <h2>Configuracion frecuente</h2>
+                  <h2>Configuración frecuente</h2>
                 </div>
               </div>
               <div className="admin-link-grid single">

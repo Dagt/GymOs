@@ -140,75 +140,88 @@ export default function KioskPage() {
 
   if (loading) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#101916] px-6 text-white">
-        <p className="text-lg font-semibold">Iniciando kiosco...</p>
+      <main className="kiosk-screen grid place-items-center px-6 text-white">
+        <p className="kiosk-loading">Preparando pantalla de socios...</p>
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#101916] text-white">
-      <section className="mx-auto grid min-h-screen max-w-5xl content-center gap-6 px-6 py-8">
-        <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+    <main className="kiosk-screen text-white">
+      <section className="kiosk-shell">
+        <header className="kiosk-header">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-[#93d2a8]">GymOS Kiosco</p>
-            <h1 className="mt-2 text-4xl font-semibold">{session?.terminalName ?? params.terminalCode}</h1>
+            <p>Autoservicio</p>
+            <h1>{session?.terminalName ?? params.terminalCode}</h1>
+            <span>Renueva, revisa pagos o cambia tu membresía sin pasar por mostrador.</span>
           </div>
-          <p className="text-sm text-[#c6d5cd]">Expira: {session ? formatTime(session.expiresAt) : "N/A"}</p>
+          <aside>
+            <strong>Sesión segura</strong>
+            <span>Expira {session ? formatTime(session.expiresAt) : "N/A"}</span>
+          </aside>
         </header>
 
         {error ? (
-          <p className="rounded-md border border-[#8b3939] bg-[#2a1616] px-4 py-3 text-sm text-[#ffd0d0]">
+          <p className="kiosk-notice error">
             {error}
           </p>
         ) : null}
         {message ? (
-          <p className="rounded-md border border-[#3b7650] bg-[#12291d] px-4 py-3 text-sm text-[#c8f2d6]">
+          <p className="kiosk-notice ok">
             {message}
           </p>
         ) : null}
 
         {!summary ? (
-          <form className="rounded-lg border border-[#2f473c] bg-[#17231f] p-6" onSubmit={verify}>
-            <h2 className="text-2xl font-semibold">Verifica tu identidad</h2>
-            <p className="mt-2 text-sm text-[#c6d5cd]">Ingresa tus datos registrados en recepcion.</p>
+          <form className="kiosk-card kiosk-verify" onSubmit={verify}>
+            <div className="kiosk-step">
+              <span>1</span>
+              <div>
+                <h2>Verifica tu identidad</h2>
+                <p>Usa los datos que registraste en recepción. Tu información se muestra sólo después de verificarte.</p>
+              </div>
+            </div>
             <input
-              className="mt-5 h-14 w-full rounded-md border border-[#3e5a4d] bg-[#101916] px-4 text-lg outline-none transition focus:border-[#93d2a8]"
+              className="kiosk-input"
               onChange={(event) => setIdentifier(event.target.value)}
-              placeholder="email o telefono"
+              placeholder="Correo o teléfono"
               required
               value={identifier}
             />
             <input
-              className="mt-4 h-14 w-full rounded-md border border-[#3e5a4d] bg-[#101916] px-4 text-lg outline-none transition focus:border-[#93d2a8]"
+              className="kiosk-input"
               onChange={(event) => setBirthDate(event.target.value)}
               required
               type="date"
               value={birthDate}
             />
             <button
-              className="mt-5 h-14 w-full rounded-md bg-[#93d2a8] px-5 text-base font-semibold text-[#101916] transition hover:bg-[#b5e6c5]"
+              className="kiosk-primary-action"
               type="submit"
             >
-              Continuar
+              Continuar de forma segura
             </button>
           </form>
         ) : (
-          <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
-            <div className="rounded-lg border border-[#2f473c] bg-[#17231f] p-6">
-              <h2 className="text-2xl font-semibold">{summary.clientName}</h2>
-              <label className="mt-5 grid gap-2 text-sm font-medium text-[#c6d5cd]">
+          <section className="kiosk-content-grid">
+            <div className="kiosk-card">
+              <div className="kiosk-member-header">
+                <span>Hola</span>
+                <h2>{summary.clientName}</h2>
+              </div>
+              <label className="kiosk-field">
                 Referencia de pago
                 <input
-                  className="h-12 rounded-md border border-[#3e5a4d] bg-[#101916] px-3 text-base text-white"
+                  className="kiosk-input compact"
                   onChange={(event) => setReference(event.target.value)}
+                  placeholder="Opcional"
                   value={reference}
                 />
               </label>
-              <label className="mt-4 grid gap-2 text-sm font-medium text-[#c6d5cd]">
-                Plan para cambio
+              <label className="kiosk-field">
+                Nuevo plan
                 <select
-                  className="h-12 rounded-md border border-[#3e5a4d] bg-[#101916] px-3 text-base text-white"
+                  className="kiosk-input compact"
                   onChange={(event) => setTargetPlanId(event.target.value)}
                   value={targetPlanId}
                 >
@@ -220,19 +233,22 @@ export default function KioskPage() {
                 </select>
               </label>
 
-              <div className="mt-5 grid gap-4">
+              <div className="kiosk-membership-list">
                 {summary.memberships.length === 0 ? (
-                  <p className="text-sm text-[#c6d5cd]">No hay membresias registradas.</p>
+                  <p className="kiosk-muted">No hay membresías registradas.</p>
                 ) : null}
                 {summary.memberships.map((membership) => (
-                  <article className="rounded-md border border-[#3e5a4d] p-4" key={membership.id}>
-                    <p className="text-lg font-semibold">{membership.planName}</p>
-                    <p className="mt-1 text-sm text-[#c6d5cd]">
+                  <article className="kiosk-membership-card" key={membership.id}>
+                    <div>
+                      <span>{membership.status}</span>
+                      <h3>{membership.planName}</h3>
+                    </div>
+                    <p>
                       {membership.status} - {formatDay(membership.startsOn)} a {formatDay(membership.endsOn)}
                     </p>
-                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                    <div className="kiosk-action-grid">
                       <button
-                        className="h-12 rounded-md bg-[#93d2a8] px-4 text-sm font-semibold text-[#101916] transition hover:bg-[#b5e6c5] disabled:opacity-50"
+                        className="kiosk-primary-action small"
                         disabled={workingMembershipId !== null || membership.status !== "ACTIVE"}
                         onClick={() => renew(membership)}
                         type="button"
@@ -240,7 +256,7 @@ export default function KioskPage() {
                         {workingMembershipId === membership.id ? "Procesando..." : "Renovar"}
                       </button>
                       <button
-                        className="h-12 rounded-md border border-[#93d2a8] px-4 text-sm font-semibold text-[#dff5e7] transition hover:bg-[#1f3329] disabled:opacity-50"
+                        className="kiosk-secondary-action"
                         disabled={
                           workingMembershipId !== null
                           || membership.status !== "ACTIVE"
@@ -258,27 +274,33 @@ export default function KioskPage() {
               </div>
             </div>
 
-            <aside className="rounded-lg border border-[#2f473c] bg-[#17231f] p-6">
-              <h2 className="text-2xl font-semibold">Pagos pendientes</h2>
-              <div className="mt-5 grid gap-3">
+            <aside className="kiosk-card kiosk-side-card">
+              <div className="kiosk-step">
+                <span>2</span>
+                <div>
+                  <h2>Pagos pendientes</h2>
+                  <p>Consulta lo que requiere revisión o pago en mostrador.</p>
+                </div>
+              </div>
+              <div className="kiosk-payment-list">
                 {summary.pendingPayments.length === 0 ? (
-                  <p className="text-sm text-[#c6d5cd]">Sin pagos pendientes.</p>
+                  <p className="kiosk-muted">No tienes pagos pendientes.</p>
                 ) : null}
                 {summary.pendingPayments.map((payment) => (
-                  <article className="rounded-md border border-[#3e5a4d] p-4" key={payment.id}>
-                    <p className="font-semibold">{payment.saleNumber}</p>
-                    <p className="mt-1 text-sm text-[#c6d5cd]">
+                  <article className="kiosk-payment-card" key={payment.id}>
+                    <strong>{payment.saleNumber}</strong>
+                    <span>
                       {payment.method} - {formatMoney(payment.amountCents, payment.currency)}
-                    </p>
+                    </span>
                   </article>
                 ))}
               </div>
               <button
-                className="mt-6 h-12 w-full rounded-md border border-[#6f8580] px-4 text-sm font-semibold text-[#dff5e7] transition hover:bg-[#1f3329]"
+                className="kiosk-end-action"
                 onClick={end}
                 type="button"
               >
-                Cerrar sesion
+                Cerrar sesión
               </button>
             </aside>
           </section>

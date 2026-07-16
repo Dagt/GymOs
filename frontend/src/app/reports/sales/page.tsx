@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppNavigation } from "@/components/AppNavigation";
+import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   getSalesReport,
   getStoredSession,
@@ -115,7 +116,7 @@ export default function SalesReportPage() {
               className="app-button-secondary"
               href="/catalog"
             >
-              Catalogo
+              Catálogo
             </Link>
           </div>
       </header>
@@ -217,7 +218,7 @@ export default function SalesReportPage() {
                   <table className="w-full min-w-[620px] border-collapse text-sm">
                     <thead className="text-left text-[#6f7a73]">
                       <tr>
-                        <th className="border-b border-[#e4e8df] py-2 pr-3">Metodo</th>
+                    <th className="border-b border-[#e4e8df] py-2 pr-3">Método</th>
                         <th className="border-b border-[#e4e8df] py-2 pr-3">Pagos</th>
                         <th className="border-b border-[#e4e8df] py-2 pr-3">Completado</th>
                         <th className="border-b border-[#e4e8df] py-2 pr-3">Pendiente</th>
@@ -245,7 +246,7 @@ export default function SalesReportPage() {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <h2 className="text-xl font-semibold">Ventas recientes</h2>
-                  <p className="mt-1 text-sm text-[#5d6b63]">Ultimas operaciones de la sucursal activa.</p>
+                  <p className="mt-1 text-sm text-[#5d6b63]">Últimas operaciones de la sucursal activa.</p>
                 </div>
                 <Link className="text-sm font-semibold text-[#51735f]" href="/pos">
                   Abrir POS
@@ -310,17 +311,10 @@ function PaymentMethodRow({ row, currency }: { row: PaymentMethodBreakdown; curr
 
 function AuthRequired() {
   return (
-    <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-      <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">Necesitas iniciar sesion</h1>
-        <Link
-          className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
-          href="/login"
-        >
-          Iniciar sesion
-        </Link>
-      </section>
-    </main>
+    <AuthRequiredCard
+      message="Los reportes de ventas requieren permisos administrativos o de dirección."
+      title="Inicia sesión para ver reportes"
+    />
   );
 }
 

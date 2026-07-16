@@ -5,30 +5,30 @@ import { usePathname } from "next/navigation";
 
 const navigationSections = [
   {
-    title: "Operacion",
+    title: "Operación",
     links: [
-      { label: "Recepcion", href: "/reception" },
-      { label: "Clientes", href: "/clients" },
-      { label: "POS", href: "/pos" },
-      { label: "Kiosco", href: "/kiosk/KIOSK-MAIN" },
+      { label: "Recepción", href: "/reception", hint: "Mostrador" },
+      { label: "Clientes", href: "/clients", hint: "Altas y fichas" },
+      { label: "POS", href: "/pos", hint: "Ventas y pagos" },
+      { label: "Kiosco", href: "/kiosk/KIOSK-MAIN", hint: "Autoservicio" },
     ],
   },
   {
-    title: "Gestion",
+    title: "Gestión",
     links: [
-      { label: "Catalogo", href: "/catalog" },
-      { label: "Accesos", href: "/access" },
-      { label: "Reservas", href: "/bookings" },
-      { label: "Inventario", href: "/inventory" },
+      { label: "Catálogo", href: "/catalog", hint: "Planes y productos" },
+      { label: "Accesos", href: "/access", hint: "Pases y visitas" },
+      { label: "Reservas", href: "/bookings", hint: "Agenda" },
+      { label: "Inventario", href: "/inventory", hint: "Stock" },
     ],
   },
   {
-    title: "Direccion",
+    title: "Dirección",
     links: [
-      { label: "Dashboard", href: "/dashboard" },
-      { label: "Ventas", href: "/reports/sales" },
-      { label: "Automatizaciones", href: "/automations" },
-      { label: "Configuracion", href: "/settings/organization" },
+      { label: "Dashboard", href: "/dashboard", hint: "Indicadores" },
+      { label: "Ventas", href: "/reports/sales", hint: "Reportes" },
+      { label: "Automatizaciones", href: "/automations", hint: "Reglas" },
+      { label: "Configuración", href: "/settings/organization", hint: "Marca y sucursales" },
     ],
   },
 ];
@@ -37,7 +37,7 @@ export function AppNavigation() {
   const pathname = usePathname();
 
   return (
-    <nav className="app-nav" aria-label="Navegacion principal">
+    <nav className="app-nav" aria-label="Navegación principal">
       {navigationSections.map((section) => (
         <section className="app-nav-section" key={section.title}>
           <p>{section.title}</p>
@@ -49,7 +49,8 @@ export function AppNavigation() {
                 href={link.href}
                 key={link.href}
               >
-                {link.label}
+                <strong>{link.label}</strong>
+                <span>{link.hint}</span>
               </Link>
             ))}
           </div>

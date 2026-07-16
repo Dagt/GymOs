@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { AppNavigation } from "@/components/AppNavigation";
+import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   createProduct,
   getPlans,
@@ -60,7 +62,7 @@ export default function CatalogPage() {
         setPlans(loadedPlans);
       } catch (exception) {
         if (active) {
-          setError(exception instanceof Error ? exception.message : "No fue posible cargar catalogo.");
+          setError(exception instanceof Error ? exception.message : "No fue posible cargar catálogo.");
         }
       } finally {
         if (active) {
@@ -112,19 +114,23 @@ export default function CatalogPage() {
             <Link className="text-sm font-semibold text-[#51735f]" href="/pos">
               POS
             </Link>
-            <h1 className="mt-1 text-3xl font-semibold">Catalogo</h1>
+            <h1 className="mt-1 text-3xl font-semibold">Catálogo</h1>
             <p className="mt-1 text-sm text-[#5d6b63]">
-              Productos y planes disponibles para vender desde recepcion.
+              Productos y planes disponibles para vender desde recepción.
             </p>
           </div>
           <Link
             className="inline-flex h-11 items-center justify-center rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f]"
             href="/reception"
           >
-            Recepcion
+            Recepción
           </Link>
         </div>
       </header>
+
+      <div className="mx-auto max-w-7xl px-6 pt-6">
+        <AppNavigation />
+      </div>
 
       <section className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[0.9fr_1.1fr]">
         <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
@@ -143,13 +149,13 @@ export default function CatalogPage() {
                 onChange={(event) => setForm({ ...form, productType: event.target.value as ProductPayload["productType"] })}
                 value={form.productType}
               >
-                <option value="PHYSICAL">Producto fisico</option>
+                <option value="PHYSICAL">Producto físico</option>
                 <option value="SERVICE">Servicio</option>
-                <option value="MEMBERSHIP_PLAN">Plan de membresia</option>
+                <option value="MEMBERSHIP_PLAN">Plan de membresía</option>
               </select>
             </label>
             <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-              Descripcion
+              Descripción
               <textarea
                 className="min-h-24 rounded-md border border-[#cdd5ca] px-3 py-2 text-sm outline-none transition focus:border-[#51735f]"
                 onChange={(event) => setForm({ ...form, description: event.target.value })}
@@ -183,7 +189,7 @@ export default function CatalogPage() {
               <span className="text-sm text-[#6f7a73]">{products.length}</span>
             </div>
             <div className="mt-4 grid gap-3">
-              {loading ? <p className="text-sm text-[#5d6b63]">Cargando catalogo...</p> : null}
+              {loading ? <p className="text-sm text-[#5d6b63]">Cargando catálogo...</p> : null}
               {products.map((product) => (
                 <article className="rounded-md border border-[#d8ddd2] px-4 py-3" key={product.id}>
                   <div className="flex items-start justify-between gap-3">
@@ -207,7 +213,7 @@ export default function CatalogPage() {
                 <article className="rounded-md border border-[#d8ddd2] px-4 py-3" key={plan.id}>
                   <p className="font-semibold">{plan.name}</p>
                   <p className="mt-1 text-sm text-[#5d6b63]">
-                    {plan.durationDays} dias - gracia {plan.graceDays} - {formatMoney(plan.priceCents, plan.currency)}
+                    {plan.durationDays} días - gracia {plan.graceDays} - {formatMoney(plan.priceCents, plan.currency)}
                   </p>
                 </article>
               ))}
@@ -245,17 +251,10 @@ function Field({
 
 function AuthRequired() {
   return (
-    <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-      <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">Necesitas iniciar sesion</h1>
-        <Link
-          className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
-          href="/login"
-        >
-          Iniciar sesion
-        </Link>
-      </section>
-    </main>
+    <AuthRequiredCard
+      message="El catálogo requiere una cuenta con permisos para consultar o administrar productos y planes."
+      title="Inicia sesión para ver el catálogo"
+    />
   );
 }
 
