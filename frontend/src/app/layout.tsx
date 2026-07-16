@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { BrandTheme } from "@/components/BrandTheme";
+import { GlobalSessionNav } from "@/components/GlobalSessionNav";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -15,7 +16,7 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "GymOS",
-  description: "Operacion modular para gimnasios y centros de bienestar",
+  description: "Operación modular para gimnasios y centros de bienestar",
 };
 
 export default function RootLayout({
@@ -29,6 +30,7 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
+        <GlobalSessionNav />
         {children}
         <BrandTheme />
       </body>
