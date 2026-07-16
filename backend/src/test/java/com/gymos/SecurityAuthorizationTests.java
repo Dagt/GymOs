@@ -116,6 +116,22 @@ class SecurityAuthorizationTests {
 	}
 
 	@Test
+	@WithMockUser(authorities = "access.manage")
+	void visitPassCreationRequiresVisitCreatePermission() throws Exception {
+		mockMvc.perform(post("/api/v1/access/visit-passes").contentType("application/json").content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(authorities = "visit.create")
+	void visitPassConsumeRequiresVisitConsumePermission() throws Exception {
+		mockMvc.perform(post("/api/v1/access/visit-passes/99999999-9999-9999-9999-999999999953/consume")
+						.contentType("application/json")
+						.content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
 	void selfServiceSessionCreationIsPublic() throws Exception {
 		var result = mockMvc.perform(post("/api/v1/self-service/terminals/UNKNOWN/sessions"))
 				.andReturn();

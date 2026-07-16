@@ -445,7 +445,7 @@ Estado general: IN_PROGRESS
 | 7.1 Calidad y regresion | IN_PROGRESS | Auditoria realizada; suite amplia pendiente. |
 | 7.2 Refactorizacion tecnica | IN_PROGRESS | Cliente API frontend dividido con fachada compatible; backend application todavia usa JdbcClient en algunos servicios. |
 | 7.3 Operacion y produccion | IN_PROGRESS | Runbooks, env example, Caddy example, Prometheus config, scripts backup/restore y seed local-only agregados. |
-| 7.4 Cierre funcional minimo | PLANNED | Beneficios, visitas, reembolsos, reservas pagadas y scheduler funcional pendientes. |
+| 7.4 Cierre funcional minimo | IN_PROGRESS | Beneficios y paquetes de visitas funcionales parcialmente; reembolsos, reservas pagadas y scheduler funcional pendientes. |
 | 7.5 Preparacion del piloto | PLANNED | Manuales, feedback, soporte y pricing pendientes. |
 
 ### Matriz de modulos
@@ -468,8 +468,8 @@ Estado general: IN_PROGRESS
 | automations | FUNCTIONAL | PARTIAL | FUNCTIONAL | PARTIAL | IN_PROGRESS |
 | reporting | FUNCTIONAL | PARTIAL | FUNCTIONAL | PARTIAL | IN_PROGRESS |
 | onboarding/imports | FUNCTIONAL | PARTIAL | FUNCTIONAL | PARTIAL | IN_PROGRESS |
-| benefits | PLANNED | NONE | PLANNED | PLANNED | PLANNED |
-| visits | PLANNED | NONE | PLANNED | PLANNED | PLANNED |
+| benefits | FUNCTIONAL | PARTIAL | FUNCTIONAL | FUNCTIONAL | IN_PROGRESS |
+| visits | FUNCTIONAL | PARTIAL | FUNCTIONAL | FUNCTIONAL | IN_PROGRESS |
 | refunds | PLANNED | NONE | PLANNED | PLANNED | PLANNED |
 | operations | IN_PROGRESS | MANUAL | N/A | FUNCTIONAL | IN_PROGRESS |
 

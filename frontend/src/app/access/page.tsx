@@ -3,10 +3,13 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import {
+  consumeVisitPass,
   createTemporaryPass,
+  createVisitPass,
   getAccessDevices,
   getAccessLogs,
   getStoredSession,
+  getVisitPasses,
   manualOpenAccess,
   requestAccess,
   searchClients,
@@ -15,6 +18,7 @@ import {
   type AccessLog,
   type ClientSummary,
   type StoredSession,
+  type VisitPass,
 } from "@/lib/api";
 
 export default function AccessPage() {
@@ -30,6 +34,10 @@ export default function AccessPage() {
   const [temporaryReason, setTemporaryReason] = useState("");
   const [temporaryHours, setTemporaryHours] = useState(4);
   const [temporaryMaxUses, setTemporaryMaxUses] = useState(1);
+  const [visitPasses, setVisitPasses] = useState<VisitPass[]>([]);
+  const [visitPassType, setVisitPassType] = useState<"DROP_IN" | "VISIT_PACK" | "COURTESY" | "PROMOTION">("VISIT_PACK");
+  const [visitPassTotal, setVisitPassTotal] = useState(5);
+  const [visitPassValidDays, setVisitPassValidDays] = useState(30);
   const [lastDecision, setLastDecision] = useState<AccessDecision | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -84,6 +92,30 @@ export default function AccessPage() {
     () => clients.find((client) => client.id === selectedClientId) ?? null,
     [clients, selectedClientId],
   );
+
+  useEffect(() => {
+    if (!session || !selectedClientId) {
+      return;
+    }
+    const accessToken = session.accessToken;
+    let active = true;
+    async function loadVisitPasses() {
+      try {
+        const passes = await getVisitPasses(accessToken, selectedClientId);
+        if (active) {
+          setVisitPasses(passes);
+        }
+      } catch {
+        if (active) {
+          setVisitPasses([]);
+        }
+      }
+    }
+    void loadVisitPasses();
+    return () => {
+      active = false;
+    };
+  }, [session, selectedClientId]);
 
   async function refreshLogs(activeSession = session) {
     if (!activeSession) {
@@ -178,6 +210,50 @@ export default function AccessPage() {
       setMessage(`Pase temporal creado para ${pass.clientName}.`);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible crear pase temporal.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createVisitPack() {
+    if (!session || !selectedClientId) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const validFrom = new Date();
+      const validUntil = new Date(Date.now() + visitPassValidDays * 24 * 60 * 60 * 1000);
+      const pass = await createVisitPass(session.accessToken, {
+        clientId: selectedClientId,
+        passType: visitPassType,
+        totalVisits: visitPassTotal,
+        validFrom: toDateOnly(validFrom),
+        validUntil: toDateOnly(validUntil),
+      });
+      setVisitPasses((current) => [pass, ...current.filter((item) => item.id !== pass.id)]);
+      setMessage(`Paquete creado para ${pass.clientName}.`);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible crear paquete de visitas.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function consumeVisit(visitPassId: string) {
+    if (!session) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const pass = await consumeVisitPass(session.accessToken, visitPassId, { reason: "Consumo registrado en recepcion" });
+      setVisitPasses((current) => current.map((item) => (item.id === pass.id ? pass : item)));
+      setMessage(`Visita consumida. Quedan ${pass.remainingVisits}.`);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible consumir la visita.");
     } finally {
       setBusy(false);
     }
@@ -280,6 +356,7 @@ export default function AccessPage() {
                   onClick={() => {
                     setSelectedClientId(client.id);
                     setIdentifier(client.email ?? client.phone ?? "");
+                    setVisitPasses([]);
                   }}
                   type="button"
                 >
@@ -429,6 +506,100 @@ export default function AccessPage() {
           </section>
 
           <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h2 className="text-xl font-semibold">Paquetes de visitas</h2>
+                <p className="mt-1 text-sm text-[#5d6b63]">
+                  Crea paquetes sencillos y descuenta visitas desde recepcion.
+                </p>
+              </div>
+              <button
+                className="h-10 rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f]"
+                disabled={!session || !selectedClientId}
+                onClick={() => selectedClientId && session ? getVisitPasses(session.accessToken, selectedClientId).then(setVisitPasses) : undefined}
+                type="button"
+              >
+                Actualizar
+              </button>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-4">
+              <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+                Tipo
+                <select
+                  className="h-10 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm"
+                  onChange={(event) => setVisitPassType(event.target.value as typeof visitPassType)}
+                  value={visitPassType}
+                >
+                  <option value="VISIT_PACK">Paquete</option>
+                  <option value="DROP_IN">Visita unica</option>
+                  <option value="COURTESY">Cortesia</option>
+                  <option value="PROMOTION">Promocion</option>
+                </select>
+              </label>
+              <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+                Visitas
+                <input
+                  className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm"
+                  min={1}
+                  onChange={(event) => setVisitPassTotal(Number(event.target.value))}
+                  type="number"
+                  value={visitPassTotal}
+                />
+              </label>
+              <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+                Vigencia dias
+                <input
+                  className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm"
+                  min={1}
+                  onChange={(event) => setVisitPassValidDays(Number(event.target.value))}
+                  type="number"
+                  value={visitPassValidDays}
+                />
+              </label>
+              <div className="flex items-end">
+                <button
+                  className="h-10 w-full rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30] disabled:opacity-60"
+                  disabled={busy || !selectedClientId || visitPassTotal < 1 || visitPassValidDays < 1}
+                  onClick={createVisitPack}
+                  type="button"
+                >
+                  Crear paquete
+                </button>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3">
+              {visitPasses.length === 0 ? (
+                <p className="rounded-md border border-[#e4e8df] bg-[#fafbf8] px-3 py-3 text-sm text-[#5d6b63]">
+                  Selecciona un cliente para ver sus paquetes.
+                </p>
+              ) : (
+                visitPasses.map((pass) => (
+                  <article className="rounded-md border border-[#e4e8df] p-4" key={pass.id}>
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <p className="text-sm font-semibold">{pass.clientName}</p>
+                        <p className="mt-1 text-xs text-[#6f7a73]">
+                          {pass.passType} - {pass.remainingVisits}/{pass.totalVisits} visitas - vence {pass.validUntil ?? "sin fecha"}
+                        </p>
+                      </div>
+                      <button
+                        className="h-9 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f] disabled:opacity-60"
+                        disabled={busy || pass.status !== "ACTIVE" || pass.remainingVisits < 1}
+                        onClick={() => consumeVisit(pass.id)}
+                        type="button"
+                      >
+                        Consumir visita
+                      </button>
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-xl font-semibold">Bitacora reciente</h2>
               <button
@@ -485,4 +656,8 @@ function formatDateTime(value: string) {
     dateStyle: "short",
     timeStyle: "short",
   }).format(new Date(value));
+}
+
+function toDateOnly(value: Date) {
+  return value.toISOString().slice(0, 10);
 }

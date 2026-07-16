@@ -357,6 +357,104 @@ public class AccessRepository {
 				.list();
 	}
 
+	public List<VisitPassRecord> visitPasses(UUID organizationId, UUID branchId, UUID clientId) {
+		var statement = jdbcClient.sql("""
+				SELECT vp.id, vp.client_id, person.first_name || ' ' || person.last_name AS client_name,
+				       vp.sale_id, vp.pass_type, vp.status, vp.total_visits, vp.remaining_visits,
+				       vp.valid_from, vp.valid_until, vp.created_at, vp.updated_at
+				FROM visit_pass vp
+				LEFT JOIN client c ON c.id = vp.client_id
+				LEFT JOIN person person ON person.id = c.person_id
+				WHERE vp.organization_id = :organizationId
+				  AND vp.branch_id = :branchId
+				  AND (:clientId IS NULL OR vp.client_id = :clientId)
+				ORDER BY vp.updated_at DESC
+				LIMIT 100
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("clientId", clientId);
+		return statement.query(this::mapVisitPass).list();
+	}
+
+	public Optional<VisitPassRecord> visitPass(UUID organizationId, UUID branchId, UUID visitPassId) {
+		return jdbcClient.sql("""
+				SELECT vp.id, vp.client_id, person.first_name || ' ' || person.last_name AS client_name,
+				       vp.sale_id, vp.pass_type, vp.status, vp.total_visits, vp.remaining_visits,
+				       vp.valid_from, vp.valid_until, vp.created_at, vp.updated_at
+				FROM visit_pass vp
+				LEFT JOIN client c ON c.id = vp.client_id
+				LEFT JOIN person person ON person.id = c.person_id
+				WHERE vp.organization_id = :organizationId
+				  AND vp.branch_id = :branchId
+				  AND vp.id = :visitPassId
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("visitPassId", visitPassId)
+				.query(this::mapVisitPass)
+				.optional();
+	}
+
+	public UUID createVisitPass(
+			UUID organizationId,
+			UUID branchId,
+			UUID clientId,
+			UUID saleId,
+			String passType,
+			int totalVisits,
+			LocalDate validFrom,
+			LocalDate validUntil
+	) {
+		OffsetDateTime now = OffsetDateTime.now();
+		UUID passId = UUID.randomUUID();
+		jdbcClient.sql("""
+				INSERT INTO visit_pass (
+				    id, organization_id, branch_id, client_id, sale_id, pass_type, status,
+				    total_visits, remaining_visits, valid_from, valid_until, created_at, updated_at, version
+				)
+				VALUES (
+				    :id, :organizationId, :branchId, :clientId, :saleId, :passType, 'ACTIVE',
+				    :totalVisits, :remainingVisits, :validFrom, :validUntil, :createdAt, :updatedAt, 0
+				)
+				""")
+				.param("id", passId)
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("clientId", clientId)
+				.param("saleId", saleId)
+				.param("passType", passType == null ? "VISIT_PACK" : passType.trim().toUpperCase())
+				.param("totalVisits", totalVisits)
+				.param("remainingVisits", totalVisits)
+				.param("validFrom", validFrom)
+				.param("validUntil", validUntil)
+				.param("createdAt", now)
+				.param("updatedAt", now)
+				.update();
+		return passId;
+	}
+
+	public boolean consumeVisitPass(UUID organizationId, UUID branchId, UUID visitPassId, OffsetDateTime now) {
+		int updated = jdbcClient.sql("""
+				UPDATE visit_pass
+				SET remaining_visits = remaining_visits - 1,
+				    status = CASE WHEN remaining_visits - 1 <= 0 THEN 'CONSUMED' ELSE status END,
+				    updated_at = :updatedAt,
+				    version = version + 1
+				WHERE organization_id = :organizationId
+				  AND branch_id = :branchId
+				  AND id = :visitPassId
+				  AND status = 'ACTIVE'
+				  AND remaining_visits > 0
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("visitPassId", visitPassId)
+				.param("updatedAt", now)
+				.update();
+		return updated == 1;
+	}
+
 	private AccessDeviceRecord mapDevice(java.sql.ResultSet resultSet, int rowNumber) throws java.sql.SQLException {
 		return new AccessDeviceRecord(
 				resultSet.getObject("id", UUID.class),
@@ -390,6 +488,23 @@ public class AccessRepository {
 				resultSet.getInt("max_uses"),
 				resultSet.getInt("uses_count"),
 				resultSet.getString("reason")
+		);
+	}
+
+	private VisitPassRecord mapVisitPass(java.sql.ResultSet resultSet, int rowNumber) throws java.sql.SQLException {
+		return new VisitPassRecord(
+				resultSet.getObject("id", UUID.class),
+				resultSet.getObject("client_id", UUID.class),
+				resultSet.getString("client_name"),
+				resultSet.getObject("sale_id", UUID.class),
+				resultSet.getString("pass_type"),
+				resultSet.getString("status"),
+				resultSet.getInt("total_visits"),
+				resultSet.getInt("remaining_visits"),
+				resultSet.getObject("valid_from", LocalDate.class),
+				resultSet.getObject("valid_until", LocalDate.class),
+				resultSet.getObject("created_at", OffsetDateTime.class),
+				resultSet.getObject("updated_at", OffsetDateTime.class)
 		);
 	}
 
@@ -427,6 +542,22 @@ public class AccessRepository {
 			int maxUses,
 			int usesCount,
 			String reason
+	) {
+	}
+
+	public record VisitPassRecord(
+			UUID id,
+			UUID clientId,
+			String clientName,
+			UUID saleId,
+			String passType,
+			String status,
+			int totalVisits,
+			int remainingVisits,
+			LocalDate validFrom,
+			LocalDate validUntil,
+			OffsetDateTime createdAt,
+			OffsetDateTime updatedAt
 	) {
 	}
 

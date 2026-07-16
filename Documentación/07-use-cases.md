@@ -317,6 +317,32 @@ Criterios:
 - La operacion requiere `client.import`.
 - El resultado muestra conteos y detalle por fila.
 
+## UC-023 Paquetes de visitas
+
+Actor: Recepcionista.
+
+Precondiciones:
+- Usuario autenticado con sucursal activa.
+- Cliente activo en la organizacion.
+- Permisos `visit.read`, `visit.create` y/o `visit.consume` segun operacion.
+
+Flujo:
+1. Recepcion busca y selecciona un cliente activo desde control de acceso.
+2. Sistema muestra paquetes de visita recientes del cliente en la sucursal activa.
+3. Recepcion crea un paquete indicando tipo, total de visitas y vigencia.
+4. Sistema registra el paquete como `ACTIVE` con `remainingVisits = totalVisits`.
+5. Cuando el cliente usa una visita, recepcion consume el paquete.
+6. Sistema descuenta una visita en una actualizacion atomica.
+7. Si no quedan visitas, el paquete cambia a `CONSUMED`.
+8. La creacion y el consumo quedan auditados.
+
+Criterios:
+- No se crean paquetes para clientes inactivos.
+- No se consume un paquete fuera de vigencia.
+- No se consume un paquete ya agotado.
+- La operacion respeta organizacion y sucursal activa.
+- La integracion automatica con ventas queda preparada por `saleId`, pero la creacion manual ya es usable para piloto.
+
 ## Anexo Hito 3.5 final
 
 Ver `Documentación/07-use-cases-hito-3-5-final.md` para la definicion vigente de verificacion segura de kiosco, idempotencia por hash de solicitud y eventos por modulo propietario.

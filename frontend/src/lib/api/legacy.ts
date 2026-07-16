@@ -453,6 +453,21 @@ export type TemporaryPass = {
   reason: string;
 };
 
+export type VisitPass = {
+  id: string;
+  clientId: string;
+  clientName: string;
+  saleId: string | null;
+  passType: "DROP_IN" | "VISIT_PACK" | "COURTESY" | "PROMOTION" | string;
+  status: "ACTIVE" | "CONSUMED" | "CANCELLED" | string;
+  totalVisits: number;
+  remainingVisits: number;
+  validFrom: string;
+  validUntil: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type AccessRequestPayload = {
   clientId?: string | null;
   identifier?: string | null;
@@ -471,6 +486,19 @@ export type TemporaryPassPayload = {
   expiresAt: string;
   maxUses: number;
   reason: string;
+};
+
+export type CreateVisitPassPayload = {
+  clientId: string;
+  saleId?: string | null;
+  passType: "DROP_IN" | "VISIT_PACK" | "COURTESY" | "PROMOTION";
+  totalVisits: number;
+  validFrom?: string | null;
+  validUntil?: string | null;
+};
+
+export type ConsumeVisitPassPayload = {
+  reason?: string | null;
 };
 
 export type InventoryStock = {
@@ -1182,6 +1210,36 @@ export async function createTemporaryPass(
   payload: TemporaryPassPayload,
 ): Promise<TemporaryPass> {
   return apiFetch<TemporaryPass>("/access/commands/temporary", accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function getVisitPasses(accessToken: string, clientId?: string): Promise<VisitPass[]> {
+  const params = new URLSearchParams();
+  if (clientId) {
+    params.set("clientId", clientId);
+  }
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return apiFetch<VisitPass[]>(`/access/visit-passes${suffix}`, accessToken);
+}
+
+export async function createVisitPass(
+  accessToken: string,
+  payload: CreateVisitPassPayload,
+): Promise<VisitPass> {
+  return apiFetch<VisitPass>("/access/visit-passes", accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function consumeVisitPass(
+  accessToken: string,
+  visitPassId: string,
+  payload: ConsumeVisitPassPayload = {},
+): Promise<VisitPass> {
+  return apiFetch<VisitPass>(`/access/visit-passes/${visitPassId}/consume`, accessToken, {
     method: "POST",
     body: JSON.stringify(normalizePayload(payload)),
   });

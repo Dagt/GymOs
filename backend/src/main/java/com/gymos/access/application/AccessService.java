@@ -1,6 +1,8 @@
 package com.gymos.access.application;
 
 import com.gymos.access.application.command.AccessRequestCommand;
+import com.gymos.access.application.command.ConsumeVisitPassCommand;
+import com.gymos.access.application.command.CreateVisitPassCommand;
 import com.gymos.access.application.command.ManualOpenCommand;
 import com.gymos.access.application.command.TemporaryPassCommand;
 import com.gymos.access.infrastructure.AccessRepository;
@@ -10,6 +12,7 @@ import com.gymos.access.infrastructure.AccessRepository.AccessLogRecord;
 import com.gymos.access.infrastructure.AccessRepository.ActiveMembershipRecord;
 import com.gymos.access.infrastructure.AccessRepository.ClientAccessRecord;
 import com.gymos.access.infrastructure.AccessRepository.TemporaryPassRecord;
+import com.gymos.access.infrastructure.AccessRepository.VisitPassRecord;
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
@@ -41,6 +44,12 @@ public class AccessService {
 		requireBranch(principal);
 		int boundedLimit = Math.max(1, Math.min(limit, 100));
 		return accessRepository.logs(principal.organizationId(), principal.branchId(), boundedLimit);
+	}
+
+	@Transactional(readOnly = true)
+	public List<VisitPassRecord> visitPasses(GymOsPrincipal principal, UUID clientId) {
+		requireBranch(principal);
+		return accessRepository.visitPasses(principal.organizationId(), principal.branchId(), clientId);
 	}
 
 	@Transactional
@@ -105,6 +114,57 @@ public class AccessService {
 		auditService.record(principal, "ACCESS_TEMPORARY_PASS_CREATED", "ACCESS_TEMPORARY_PASS", passId, "RECEPTION", request.reason(), correlationId);
 		return accessRepository.temporaryPass(principal.organizationId(), passId)
 				.orElseThrow(() -> new BusinessException("TEMPORARY_PASS_NOT_FOUND", "El pase temporal no esta disponible."));
+	}
+
+	@Transactional
+	public VisitPassRecord createVisitPass(GymOsPrincipal principal, CreateVisitPassCommand request, String correlationId) {
+		requireBranch(principal);
+		ClientAccessRecord client = accessRepository.clientById(principal.organizationId(), request.clientId())
+				.orElseThrow(() -> new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible."));
+		if (!"ACTIVE".equals(client.status())) {
+			throw new BusinessException("CLIENT_NOT_ACTIVE", "Solo puedes crear paquetes de visita para clientes activos.");
+		}
+		LocalDate validFrom = request.validFrom() == null ? LocalDate.now() : request.validFrom();
+		if (request.validUntil() != null && request.validUntil().isBefore(validFrom)) {
+			throw new BusinessException("VISIT_PASS_INVALID_RANGE", "La vigencia final no puede ser anterior al inicio.");
+		}
+		UUID passId = accessRepository.createVisitPass(
+				principal.organizationId(),
+				principal.branchId(),
+				request.clientId(),
+				request.saleId(),
+				request.passType(),
+				request.totalVisits(),
+				validFrom,
+				request.validUntil()
+		);
+		auditService.record(principal, "VISIT_PASS_CREATED", "VISIT_PASS", passId, "RECEPTION", client.fullName(), correlationId);
+		return accessRepository.visitPass(principal.organizationId(), principal.branchId(), passId)
+				.orElseThrow(() -> new BusinessException("VISIT_PASS_NOT_FOUND", "El paquete de visitas no esta disponible."));
+	}
+
+	@Transactional
+	public VisitPassRecord consumeVisitPass(GymOsPrincipal principal, UUID visitPassId, ConsumeVisitPassCommand request, String correlationId) {
+		requireBranch(principal);
+		VisitPassRecord current = accessRepository.visitPass(principal.organizationId(), principal.branchId(), visitPassId)
+				.orElseThrow(() -> new BusinessException("VISIT_PASS_NOT_FOUND", "El paquete de visitas no esta disponible."));
+		LocalDate today = LocalDate.now();
+		if (!"ACTIVE".equals(current.status())) {
+			throw new BusinessException("VISIT_PASS_NOT_ACTIVE", "El paquete de visitas no esta activo.");
+		}
+		if (current.validFrom().isAfter(today) || (current.validUntil() != null && current.validUntil().isBefore(today))) {
+			throw new BusinessException("VISIT_PASS_OUT_OF_RANGE", "El paquete no esta vigente hoy.");
+		}
+		if (current.remainingVisits() <= 0) {
+			throw new BusinessException("VISIT_PASS_CONSUMED", "El paquete ya no tiene visitas disponibles.");
+		}
+		boolean consumed = accessRepository.consumeVisitPass(principal.organizationId(), principal.branchId(), visitPassId, OffsetDateTime.now());
+		if (!consumed) {
+			throw new BusinessException("VISIT_PASS_CONFLICT", "El paquete fue actualizado por otra operacion. Intenta de nuevo.");
+		}
+		auditService.record(principal, "VISIT_PASS_CONSUMED", "VISIT_PASS", visitPassId, "RECEPTION", request.reason(), correlationId);
+		return accessRepository.visitPass(principal.organizationId(), principal.branchId(), visitPassId)
+				.orElseThrow(() -> new BusinessException("VISIT_PASS_NOT_FOUND", "El paquete de visitas no esta disponible."));
 	}
 
 	private AccessDecisionResponse recordDecision(

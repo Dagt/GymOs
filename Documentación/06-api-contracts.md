@@ -392,3 +392,70 @@ Asigna beneficio a un cliente del tenant activo.
 Permiso: `client.benefit.verify`.
 
 Verifica un beneficio asignado.
+
+## Hito 7 - Visit Pass API
+
+Las rutas viven dentro del modulo de acceso porque su operacion diaria sucede en recepcion/entrada, pero usan permisos propios de visitas.
+
+### `GET /api/v1/access/visit-passes`
+
+Permiso: `visit.read`.
+
+Query opcional:
+
+- `clientId`: filtra paquetes de un cliente.
+
+Devuelve hasta 100 paquetes recientes de la sucursal activa.
+
+### `POST /api/v1/access/visit-passes`
+
+Permiso: `visit.create`.
+
+Request:
+
+```json
+{
+  "clientId": "uuid",
+  "saleId": null,
+  "passType": "VISIT_PACK",
+  "totalVisits": 5,
+  "validFrom": "2026-07-16",
+  "validUntil": "2026-08-15"
+}
+```
+
+Tipos permitidos:
+
+- `DROP_IN`
+- `VISIT_PACK`
+- `COURTESY`
+- `PROMOTION`
+
+Errores:
+
+- `CLIENT_NOT_FOUND`
+- `CLIENT_NOT_ACTIVE`
+- `VISIT_PASS_INVALID_RANGE`
+- `BRANCH_REQUIRED`
+
+### `POST /api/v1/access/visit-passes/{visitPassId}/consume`
+
+Permiso: `visit.consume`.
+
+Request:
+
+```json
+{
+  "reason": "Consumo registrado en recepcion"
+}
+```
+
+Descuenta una visita de forma atomica. Si era la ultima, cambia el estado a `CONSUMED`.
+
+Errores:
+
+- `VISIT_PASS_NOT_FOUND`
+- `VISIT_PASS_NOT_ACTIVE`
+- `VISIT_PASS_OUT_OF_RANGE`
+- `VISIT_PASS_CONSUMED`
+- `VISIT_PASS_CONFLICT`
