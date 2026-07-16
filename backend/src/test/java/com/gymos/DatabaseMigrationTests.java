@@ -56,6 +56,19 @@ class DatabaseMigrationTests {
 			assertThat(tableExists(connection, "automation_execution")).isTrue();
 			assertThat(tableExists(connection, "client_import_batch")).isTrue();
 			assertThat(tableExists(connection, "client_import_row")).isTrue();
+			assertThat(tableExists(connection, "benefit")).isTrue();
+			assertThat(tableExists(connection, "client_benefit")).isTrue();
+			assertThat(tableExists(connection, "benefit_evidence")).isTrue();
+			assertThat(tableExists(connection, "visit_pass")).isTrue();
+			assertThat(tableExists(connection, "sale_refund")).isTrue();
+			assertThat(tableExists(connection, "booking_payment")).isTrue();
+			assertThat(tableExists(connection, "booking_policy")).isTrue();
+			assertThat(tableExists(connection, "auto_renewal_attempt")).isTrue();
+			assertThat(tableExists(connection, "notification_template")).isTrue();
+			assertThat(columnExists(connection, "membership", "auto_renew")).isTrue();
+			assertThat(columnExists(connection, "membership", "cancelled_at")).isTrue();
+			assertThat(columnExists(connection, "automation_rule", "trigger_type")).isTrue();
+			assertThat(columnExists(connection, "automation_rule", "next_run_at")).isTrue();
 		}
 	}
 
