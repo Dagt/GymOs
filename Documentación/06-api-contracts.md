@@ -533,3 +533,28 @@ Errores:
 - `BOOKING_NOT_FOUND`
 - `BOOKING_ALREADY_CLOSED`
 - `SALE_NOT_FOUND`
+
+## Hito 7 - Scheduled Automations
+
+Las automatizaciones aceptan `triggerType = SCHEDULED` usando el contrato existente de `POST /api/v1/automations`.
+
+Request ejemplo:
+
+```json
+{
+  "name": "Recordatorio operativo diario",
+  "triggerType": "SCHEDULED",
+  "conditionJson": "{\"intervalMinutes\":1440}",
+  "actionType": "CREATE_NOTIFICATION",
+  "actionConfigJson": "{\"channel\":\"IN_APP\",\"subject\":\"Revision diaria\",\"body\":\"Revisa pagos pendientes y reservas.\"}",
+  "retryLimit": 3
+}
+```
+
+Comportamiento:
+
+- Al crear una regla `SCHEDULED`, backend calcula `nextRunAt` usando `conditionJson.intervalMinutes`.
+- Un job interno `@Scheduled` revisa reglas vencidas cada `gymos.automation.scheduler-delay-ms` milisegundos, por defecto 60000.
+- Cada regla vencida se reclama con `locked_until` para evitar ejecuciones simultaneas.
+- Al terminar, la regla se reprograma sumando nuevamente `intervalMinutes`.
+- Las ejecuciones se registran en `automation_execution` y, para `CREATE_NOTIFICATION`, se encola una notificacion interna.

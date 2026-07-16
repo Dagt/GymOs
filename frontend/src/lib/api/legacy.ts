@@ -803,6 +803,8 @@ export type CreateNotificationPayload = {
 };
 
 export type AutomationRule = {
+  organizationId: string;
+  branchId: string | null;
   id: string;
   name: string;
   triggerType: string;
@@ -811,6 +813,9 @@ export type AutomationRule = {
   actionConfigJson: string;
   status: "ENABLED" | "DISABLED" | string;
   retryLimit: number;
+  scheduleCron: string | null;
+  nextRunAt: string | null;
+  lockedUntil: string | null;
   createdAt: string;
   updatedAt: string;
 };

@@ -394,6 +394,31 @@ Criterios:
 - El modulo de reservas no crea ventas por su cuenta en esta version.
 - La relacion es actualizable sin duplicar registros por reserva.
 
+## UC-026 Automatizacion programada
+
+Actor: Sistema.
+
+Precondiciones:
+- Regla `ENABLED`.
+- `triggerType = SCHEDULED`.
+- `conditionJson.intervalMinutes` definido o se usa 1440 minutos.
+
+Flujo:
+1. Usuario crea una regla programada desde automatizaciones.
+2. Sistema calcula `nextRunAt`.
+3. Scheduler interno revisa reglas vencidas de forma periodica.
+4. Sistema reclama la regla con `locked_until`.
+5. Sistema ejecuta la accion configurada.
+6. Si la accion es `CREATE_NOTIFICATION`, se crea una notificacion interna.
+7. Sistema registra `automation_execution`.
+8. Sistema libera el bloqueo y reprograma `nextRunAt`.
+
+Criterios:
+- Una regla reclamada no se ejecuta simultaneamente por otro ciclo.
+- El intervalo se limita entre 1 minuto y 10080 minutos.
+- Los errores quedan como ejecucion `FAILED`.
+- No se requiere proveedor externo para la V1.
+
 ## Anexo Hito 3.5 final
 
 Ver `Documentación/07-use-cases-hito-3-5-final.md` para la definicion vigente de verificacion segura de kiosco, idempotencia por hash de solicitud y eventos por modulo propietario.
