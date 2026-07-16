@@ -3,6 +3,7 @@ export * from "./api/auth";
 export * from "./api/organizations";
 export * from "./api/clients";
 export * from "./api/catalog";
+export * from "./api/benefits";
 export * from "./api/sales";
 export * from "./api/memberships";
 export * from "./api/selfservice";

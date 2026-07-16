@@ -49,6 +49,7 @@ const focusActions = [
 
 const adminShortcuts = [
   { label: "Catalogo", href: "/catalog" },
+  { label: "Beneficios", href: "/benefits" },
   { label: "Configuracion", href: "/settings/organization" },
   { label: "Onboarding", href: "/onboarding" },
   { label: "Importar clientes", href: "/clients/import" },
