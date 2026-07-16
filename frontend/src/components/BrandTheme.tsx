@@ -46,14 +46,6 @@ export function BrandTheme() {
 
   return (
     <>
-      <div aria-hidden="true" className="brand-watermark">
-        {theme.logoUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img alt="" src={theme.logoUrl} />
-        ) : (
-          <span>{initials(theme.name)}</span>
-        )}
-      </div>
       <button
         aria-label="Personalizar marca"
         className="brand-customizer-trigger"
