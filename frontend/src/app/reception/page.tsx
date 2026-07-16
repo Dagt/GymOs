@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { AppNavigation } from "@/components/AppNavigation";
+import { useEffect, useState } from "react";
 import {
   clearSession,
   getBranches,
@@ -17,43 +16,59 @@ import {
   type StoredSession,
 } from "@/lib/api";
 
-const primaryActions = [
+const focusActions = [
   {
-    title: "Nueva venta",
-    detail: "Cobrar productos, planes o servicios con pagos manuales.",
+    title: "Cobrar venta",
+    detail: "Productos, planes o pagos manuales.",
     href: "/pos",
-    action: "Abrir POS",
+    label: "Abrir caja",
+    accent: "money",
   },
   {
-    title: "Registrar cliente",
-    detail: "Alta rapida, busqueda y ficha completa del cliente.",
+    title: "Buscar o registrar socio",
+    detail: "Alta rapida, ficha y membresias.",
     href: "/clients",
-    action: "Ir a clientes",
+    label: "Ir a socios",
+    accent: "people",
   },
   {
-    title: "Renovar en kiosco",
-    detail: "Modo autoservicio para pagos, cambios de plan y membresias.",
+    title: "Revisar ventas",
+    detail: "Pagos, saldos y operaciones recientes.",
+    href: "/reports/sales",
+    label: "Ver reporte",
+    accent: "report",
+  },
+  {
+    title: "Abrir autoservicio",
+    detail: "Pantalla de pagos y renovaciones.",
     href: "/kiosk/KIOSK-MAIN",
-    action: "Abrir kiosco",
+    label: "Abrir kiosco",
+    accent: "kiosk",
   },
 ];
 
-const managementActions = [
-  { title: "Catalogo", detail: "Productos, planes, beneficios y servicios.", href: "/catalog" },
-  { title: "Reporte de ventas", detail: "Saldos, cobros, pagos pendientes y ventas recientes.", href: "/reports/sales" },
-  { title: "Dashboard", detail: "Indicadores ejecutivos para direccion.", href: "/dashboard" },
-  { title: "Configuracion", detail: "Organizacion, sucursales y datos comerciales.", href: "/settings/organization" },
-  { title: "Importar clientes", detail: "Carga inicial CSV con validaciones.", href: "/clients/import" },
-  { title: "Onboarding", detail: "Checklist comercial y preparacion de piloto.", href: "/onboarding" },
+const adminShortcuts = [
+  { label: "Catalogo", href: "/catalog" },
+  { label: "Configuracion", href: "/settings/organization" },
+  { label: "Onboarding", href: "/onboarding" },
+  { label: "Importar clientes", href: "/clients/import" },
 ];
 
-const operationModules = [
-  { title: "Accesos", detail: "Entradas, pases temporales y bitacora.", href: "/access" },
-  { title: "Reservas", detail: "Recursos, agenda y check-in.", href: "/bookings" },
-  { title: "Inventario", detail: "Existencias, movimientos y alertas.", href: "/inventory" },
-  { title: "Coaches", detail: "Entrenadores, rutinas y asignaciones.", href: "/coaches" },
-  { title: "Bienestar", detail: "Servicios profesionales y disponibilidad.", href: "/wellness" },
-  { title: "Automatizaciones", detail: "Reglas, ejecuciones y notificaciones.", href: "/automations" },
+const operationShortcuts = [
+  { label: "Accesos", href: "/access" },
+  { label: "Reservas", href: "/bookings" },
+  { label: "Inventario", href: "/inventory" },
+  { label: "Coaches", href: "/coaches" },
+  { label: "Bienestar", href: "/wellness" },
+  { label: "Automatizaciones", href: "/automations" },
+];
+
+const navigation = [
+  { label: "Inicio", href: "/" },
+  { label: "Recepcion", href: "/reception" },
+  { label: "Caja", href: "/pos" },
+  { label: "Socios", href: "/clients" },
+  { label: "Reportes", href: "/dashboard" },
 ];
 
 export default function ReceptionPage() {
@@ -110,7 +125,6 @@ export default function ReceptionPage() {
   }, []);
 
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
-  const permissionCount = useMemo(() => session?.user.permissions.length ?? 0, [session]);
 
   async function switchBranch(branchId: string) {
     if (!session || branchId === session.user.branchId) {
@@ -145,175 +159,174 @@ export default function ReceptionPage() {
   }
 
   if (loading) {
-    return <Centered text="Cargando recepcion..." />;
+    return <Centered text="Cargando panel..." />;
   }
 
   if (!session) {
     return (
-      <main className="grid min-h-screen place-items-center px-6 text-[#111815]">
-        <section className="app-card w-full max-w-md p-6">
-          <p className="app-eyebrow">GymOS</p>
-          <h1 className="mt-3 text-2xl font-black">Necesitas iniciar sesion</h1>
-          <p className="mt-3 app-card-copy">
-            La recepcion requiere una sesion activa para cargar organizacion, permisos y sucursales disponibles.
-          </p>
-          <Link className="mt-5 app-button" href="/login">
-            Iniciar sesion
-          </Link>
+      <main className="admin-empty-state">
+        <section>
+          <p>GymOS</p>
+          <h1>Inicia sesion para administrar el gimnasio</h1>
+          <span>El panel carga tu sucursal, tus permisos y las acciones disponibles para tu rol.</span>
+          <Link href="/login">Iniciar sesion</Link>
         </section>
       </main>
     );
   }
 
   return (
-    <main className="app-shell text-[#111815]">
-      <div className="app-shell-inner">
-        <header className="app-topbar">
-          <div className="app-title-block">
-            <p className="app-eyebrow">Recepcion</p>
-            <h1 className="app-title">{organization?.tradeName ?? "GymOS"}</h1>
-            <p className="app-subtitle">
-              {activeBranch ? activeBranch.name : "Selecciona una sucursal para operar"} - {session.user.fullName}
-            </p>
+    <main className="admin-console">
+      <aside className="admin-sidebar">
+        <div className="admin-sidebar-brand">
+          <span>G</span>
+          <div>
+            <strong>{organization?.tradeName ?? "GymOS"}</strong>
+            <small>{activeBranch?.name ?? "Sin sucursal"}</small>
           </div>
-          <div className="app-actions">
-            <span className="app-pill">{permissionCount} permisos</span>
-            <button className="app-button-secondary" onClick={logout} type="button">
-              Salir
-            </button>
+        </div>
+
+        <nav aria-label="Navegacion de administracion">
+          {navigation.map((item) => (
+            <Link href={item.href} key={item.href}>
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+
+        <div className="admin-sidebar-footer">
+          <span>{session.user.fullName}</span>
+          <button onClick={logout} type="button">
+            Salir
+          </button>
+        </div>
+      </aside>
+
+      <section className="admin-workspace">
+        <header className="admin-command-bar">
+          <div>
+            <p>Panel de administracion</p>
+            <h1>Que quieres hacer ahora?</h1>
+            <span>
+              Acciones principales al frente. Los modulos menos frecuentes estan agrupados para no saturar la pantalla.
+            </span>
+          </div>
+          <div className="admin-command-actions">
+            <Link href="/reports/sales">Ventas</Link>
+            <Link href="/settings/organization">Personalizar</Link>
           </div>
         </header>
 
-        <AppNavigation />
+        {error ? <p className="admin-alert">{error}</p> : null}
 
-        {error ? (
-          <p className="rounded-md border border-[#e5b7b7] bg-[#fff4f4] px-3 py-2 text-sm text-[#8c2f2f]">
-            {error}
-          </p>
-        ) : null}
+        <section className="admin-content-grid">
+          <section className="admin-main-column">
+            <section className="admin-focus-grid" aria-label="Acciones principales">
+              {focusActions.map((action) => (
+                <Link className={`admin-action-card ${action.accent}`} href={action.href} key={action.href}>
+                  <span>{action.title}</span>
+                  <p>{action.detail}</p>
+                  <strong>{action.label}</strong>
+                </Link>
+              ))}
+            </section>
 
-        <section className="grid gap-5 lg:grid-cols-[0.9fr_1.45fr]">
-          <aside className="app-card p-5">
-            <p className="app-eyebrow">Contexto operativo</p>
-            <h2 className="mt-2 app-card-title">{organization?.legalName ?? "Sin organizacion"}</h2>
-            <dl className="mt-5 grid gap-4 text-sm">
-              <InfoRow label="Moneda" value={organization?.defaultCurrency ?? "N/A"} />
-              <InfoRow label="Usuario" value={session.user.username} />
-              <InfoRow label="Sucursal activa" value={activeBranch?.name ?? "Sin seleccionar"} />
-            </dl>
+            <section className="admin-panel">
+              <div className="admin-panel-header">
+                <div>
+                  <p>Reportes rapidos</p>
+                  <h2>Vista para decisiones</h2>
+                </div>
+                <Link href="/dashboard">Dashboard completo</Link>
+              </div>
+              <div className="admin-report-strip">
+                <ReportMetric label="Ventas del dia" value="$0.00" tone="green" />
+                <ReportMetric label="Pagos pendientes" value="Por revisar" tone="amber" />
+                <ReportMetric label="Membresias" value="Activas" tone="blue" />
+              </div>
+            </section>
 
-            <div className="mt-6 border-t border-[#e4e8df] pt-5">
-              <h3 className="app-eyebrow">Cambiar sucursal</h3>
-              <div className="mt-3 grid gap-2">
+            <details className="admin-panel admin-details">
+              <summary>Mas herramientas operativas</summary>
+              <div className="admin-link-grid">
+                {operationShortcuts.map((item) => (
+                  <Link href={item.href} key={item.href}>
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+            </details>
+          </section>
+
+          <aside className="admin-context-column">
+            <section className="admin-panel">
+              <div className="admin-panel-header">
+                <div>
+                  <p>Sucursal actual</p>
+                  <h2>{activeBranch?.name ?? "Selecciona una sucursal"}</h2>
+                </div>
+              </div>
+              <div className="admin-branch-list">
                 {branches.map((branch) => (
                   <button
-                    className={`rounded-md border px-3 py-3 text-left text-sm transition ${
-                      branch.id === session.user.branchId
-                        ? "border-[#51735f] bg-[#eef7f0]"
-                        : "border-[#d8ddd2] bg-white hover:border-[#51735f]"
-                    }`}
+                    className={branch.id === session.user.branchId ? "active" : undefined}
                     disabled={switchingBranchId !== null}
                     key={branch.id}
                     onClick={() => switchBranch(branch.id)}
                     type="button"
                   >
-                    <span className="block font-black">{branch.name}</span>
-                    <span className="mt-1 block text-xs text-[#6f7a73]">
-                      {branch.code} - {branch.accessScope} - {branch.status}
-                    </span>
-                    {switchingBranchId === branch.id ? (
-                      <span className="mt-2 block text-xs font-bold text-[#51735f]">Cambiando...</span>
-                    ) : null}
+                    <strong>{branch.name}</strong>
+                    <span>{branch.code}</span>
                   </button>
                 ))}
               </div>
-            </div>
-          </aside>
+            </section>
 
-          <section className="grid gap-5">
-            <section className="app-hero-panel p-6">
-              <div className="relative z-10">
-                <p className="text-sm font-bold uppercase text-white/75">Turno activo</p>
-                <h2 className="mt-2 text-3xl font-black">
-                  {activeBranch ? "Lista para operar en mostrador" : "Selecciona una sucursal"}
-                </h2>
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-white/80">
-                  Desde aqui puedes vender, registrar clientes, abrir el kiosco, consultar reportes y cambiar de
-                  sucursal sin salir del flujo de recepcion.
-                </p>
+            <section className="admin-panel">
+              <div className="admin-panel-header">
+                <div>
+                  <p>Administracion</p>
+                  <h2>Configuracion frecuente</h2>
+                </div>
+              </div>
+              <div className="admin-link-grid single">
+                {adminShortcuts.map((item) => (
+                  <Link href={item.href} key={item.href}>
+                    {item.label}
+                  </Link>
+                ))}
               </div>
             </section>
 
-            <section className="grid gap-4 md:grid-cols-3">
-              {primaryActions.map((item) => (
-                <article className="app-card p-5" key={item.title}>
-                  <h3 className="app-card-title">{item.title}</h3>
-                  <p className="mt-2 app-card-copy">{item.detail}</p>
-                  <Link className="mt-5 app-button" href={item.href}>
-                    {item.action}
-                  </Link>
-                </article>
-              ))}
-            </section>
-          </section>
+            <details className="admin-panel admin-details">
+              <summary>Permisos del usuario</summary>
+              <PermissionList user={session.user} />
+            </details>
+          </aside>
         </section>
-
-        <section className="grid gap-5 lg:grid-cols-[1fr_1fr]">
-          <ActionGrid title="Gestion y reportes" items={managementActions} />
-          <ActionGrid title="Modulos operativos" items={operationModules} />
-        </section>
-
-        <section className="app-card p-5">
-          <h2 className="app-card-title">Permisos cargados</h2>
-          <PermissionList user={session.user} />
-        </section>
-      </div>
+      </section>
     </main>
   );
 }
 
-function ActionGrid({
-  title,
-  items,
-}: {
-  title: string;
-  items: Array<{ title: string; detail: string; href: string }>;
-}) {
+function ReportMetric({ label, value, tone }: { label: string; value: string; tone: string }) {
   return (
-    <section className="app-card p-5">
-      <h2 className="app-card-title">{title}</h2>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
-        {items.map((item) => (
-          <Link className="rounded-md border border-[#d8ddd2] bg-white px-4 py-3 transition hover:border-[#51735f]" href={item.href} key={item.href}>
-            <span className="block font-black">{item.title}</span>
-            <span className="mt-1 block text-sm leading-5 text-[#5d6b63]">{item.detail}</span>
-          </Link>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="font-bold text-[#6f7a73]">{label}</dt>
-      <dd className="mt-1 font-black">{value}</dd>
-    </div>
+    <article className={`admin-report-metric ${tone}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </article>
   );
 }
 
 function PermissionList({ user }: { user: CurrentUser }) {
   if (user.permissions.length === 0) {
-    return <p className="mt-3 text-sm text-[#5d6b63]">Sin permisos asignados.</p>;
+    return <p className="admin-muted-text">Sin permisos asignados.</p>;
   }
 
   return (
-    <div className="mt-4 flex flex-wrap gap-2">
+    <div className="admin-permission-list">
       {user.permissions.map((permission) => (
-        <span className="app-pill" key={permission}>
-          {permission}
-        </span>
+        <span key={permission}>{permission}</span>
       ))}
     </div>
   );
@@ -321,8 +334,11 @@ function PermissionList({ user }: { user: CurrentUser }) {
 
 function Centered({ text }: { text: string }) {
   return (
-    <main className="grid min-h-screen place-items-center px-6 text-[#111815]">
-      <p className="app-card px-4 py-3 text-sm text-[#42514a]">{text}</p>
+    <main className="admin-empty-state">
+      <section>
+        <p>GymOS</p>
+        <h1>{text}</h1>
+      </section>
     </main>
   );
 }

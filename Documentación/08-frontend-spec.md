@@ -199,3 +199,12 @@ Reglas de producto:
 - La persistencia multi-tenant de tema en backend queda para evolucion posterior.
 - Ninguna regla de negocio se mueve al frontend.
 - Los formularios deben usar etiquetas de negocio entendibles para recepcion y administracion.
+
+Correccion UX posterior:
+- La pagina inicial no debe mostrar informacion tecnica de stack, hitos ni estado de desarrollo.
+- La pagina inicial debe funcionar como entrada por rol: administracion, recepcion y kiosco.
+- La administracion no debe mostrar todos los modulos al mismo nivel visual.
+- Las acciones frecuentes deben tener prioridad: cobrar, buscar socio, reportar ventas y abrir kiosco.
+- Las herramientas menos frecuentes deben agruparse en secciones secundarias o plegables.
+- Los permisos y datos internos del usuario no deben ocupar espacio principal en la vista administrativa.
+- La paleta debe combinar color principal, acento y tonos funcionales para evitar una interfaz monotona.

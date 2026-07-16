@@ -417,3 +417,19 @@ Pendiente de evolucion posterior:
 - Persistir tema visual por organizacion desde backend.
 - Dividir `frontend/src/lib/api.ts` por dominio en una refactorizacion dedicada.
 - Extender el nuevo layout a pantallas secundarias largas que todavia conservan estructura local propia.
+
+Correccion aplicada despues de revision visual:
+
+- Se elimino de `/` toda informacion tecnica de stack, hitos y desarrollo.
+- `/` queda como entrada de producto por rol: administrador, recepcion y pantalla de socios.
+- `/reception` deja de mostrar todos los modulos como tarjetas principales.
+- `/reception` se reorganiza como consola administrativa con barra lateral, acciones frecuentes, reportes rapidos y herramientas secundarias plegadas.
+- Los permisos del usuario pasan a una seccion plegable.
+- Se removio el logotipo flotante permanente para evitar duplicidad visual; la personalizacion queda en el boton `Marca`.
+- Se agregaron tonos visuales diferenciados para caja, socios, reportes y kiosco.
+
+Verificado despues de la correccion:
+
+- Frontend lint.
+- Frontend typecheck.
+- Frontend build de produccion.

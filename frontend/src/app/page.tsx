@@ -1,108 +1,110 @@
 import Link from "next/link";
-import { AppNavigation } from "@/components/AppNavigation";
 
-const workAreas = [
+const roleEntrances = [
   {
-    title: "Recepcion diaria",
-    detail: "Clientes, ventas, pagos manuales, renovaciones y cambio de sucursal.",
+    title: "Administrar gimnasio",
+    detail: "Ventas, clientes, membresias, sucursales y reportes en un solo lugar.",
     href: "/reception",
-    action: "Abrir recepcion",
+    action: "Entrar al panel",
+    tone: "primary",
   },
   {
-    title: "Reportes y direccion",
-    detail: "Dashboard ejecutivo, ventas recientes, saldos y actividad comercial.",
-    href: "/dashboard",
-    action: "Ver dashboard",
+    title: "Atender en recepcion",
+    detail: "Registrar clientes, cobrar, renovar membresias y consultar pagos pendientes.",
+    href: "/pos",
+    action: "Abrir caja",
+    tone: "warm",
   },
   {
-    title: "Configuracion de marca",
-    detail: "Datos del gimnasio, sucursales, colores y logo para presentarlo al cliente.",
-    href: "/settings/organization",
-    action: "Configurar",
+    title: "Pantalla para socios",
+    detail: "Autoservicio para pagos, renovaciones y cambios de membresia dentro del gimnasio.",
+    href: "/kiosk/KIOSK-MAIN",
+    action: "Abrir kiosco",
+    tone: "cool",
   },
 ];
 
-const quickLinks = [
-  { label: "POS", href: "/pos" },
-  { label: "Clientes", href: "/clients" },
-  { label: "Catalogo", href: "/catalog" },
-  { label: "Reporte ventas", href: "/reports/sales" },
-  { label: "Kiosco", href: "/kiosk/KIOSK-MAIN" },
-  { label: "Onboarding", href: "/onboarding" },
+const everydaySignals = [
+  "Cobros y saldos visibles",
+  "Clientes y membresias organizados",
+  "Reportes listos para el dueno",
+  "Marca configurable por gimnasio",
 ];
 
 export default function Home() {
   return (
-    <main className="app-shell text-[#111815]">
-      <div className="app-shell-inner">
-        <header className="app-topbar">
-          <div className="app-title-block">
-            <p className="app-eyebrow">GymOS</p>
-            <h1 className="app-title">Centro operativo del gimnasio</h1>
-            <p className="app-subtitle">
-              Un punto de entrada claro para recepcion, ventas, membresias, reportes y configuracion comercial.
-            </p>
+    <main className="home-screen">
+      <section className="home-panel">
+        <header className="home-header">
+          <div className="home-brand">
+            <span>G</span>
+            <strong>GymOS</strong>
           </div>
-          <div className="app-actions">
-            <Link className="app-button-secondary" href="/login">
-              Iniciar sesion
+          <nav aria-label="Accesos principales">
+            <Link href="/login">Iniciar sesion</Link>
+            <Link className="home-primary-link" href="/reception">
+              Ir al panel
             </Link>
-            <Link className="app-button" href="/reception">
-              Entrar a operacion
-            </Link>
-          </div>
+          </nav>
         </header>
 
-        <AppNavigation />
-
-        <section className="grid gap-5 lg:grid-cols-[1.35fr_0.85fr]">
-          <section className="app-hero-panel p-6 sm:p-8">
-            <div className="relative z-10 max-w-3xl">
-              <p className="text-sm font-bold uppercase text-white/75">Producto vendible</p>
-              <h2 className="mt-3 text-3xl font-black leading-tight sm:text-5xl">
-                Una interfaz lista para mostrador, administracion y autoservicio.
-              </h2>
-              <p className="mt-5 max-w-2xl text-sm leading-6 text-white/80 sm:text-base">
-                Los flujos principales estan agrupados por tarea cotidiana para que un usuario comun sepa donde
-                empezar: cobrar, registrar, renovar, consultar reportes o ajustar la sucursal.
-              </p>
-              <div className="mt-6 flex flex-wrap gap-3">
-                {quickLinks.map((link) => (
-                  <Link className="app-button-soft bg-white/95" href={link.href} key={link.href}>
-                    {link.label}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <aside className="app-card p-5">
-            <p className="app-eyebrow">Personalizacion</p>
-            <h2 className="mt-2 app-card-title">Marca por cliente</h2>
-            <p className="mt-3 app-card-copy">
-              Usa el boton Marca para ajustar nombre visible, logo y colores. La vista cambia al instante y queda
-              guardada localmente para demos y pilotos.
+        <section className="home-hero" aria-labelledby="home-title">
+          <div>
+            <p className="home-kicker">Sistema para operar gimnasios</p>
+            <h1 id="home-title">Controla recepcion, pagos, membresias y reportes sin complicar al equipo.</h1>
+            <p>
+              Diseñado para mostrador, administracion y autoservicio. Cada usuario entra directo a lo que necesita
+              hacer, sin informacion tecnica ni pasos innecesarios.
             </p>
-            <div className="mt-5 grid gap-3">
-              <span className="app-pill">Color principal</span>
-              <span className="app-pill">Color de acento</span>
-              <span className="app-pill">Logo del gimnasio</span>
+            <div className="home-actions">
+              <Link className="home-cta" href="/reception">
+                Empezar a operar
+              </Link>
+              <Link className="home-secondary" href="/reports/sales">
+                Ver reportes
+              </Link>
+            </div>
+          </div>
+
+          <aside className="home-preview" aria-label="Resumen de operacion">
+            <div className="home-preview-top">
+              <span>Hoy</span>
+              <strong>Mostrador activo</strong>
+            </div>
+            <div className="home-preview-grid">
+              <PreviewMetric label="Cobros" value="$18,450" />
+              <PreviewMetric label="Socios activos" value="342" />
+              <PreviewMetric label="Por vencer" value="18" />
+              <PreviewMetric label="Pagos por revisar" value="7" />
             </div>
           </aside>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-3">
-          {workAreas.map((area) => (
-            <article className="app-card p-5" key={area.title}>
-              <h2 className="app-card-title">{area.title}</h2>
-              <p className="mt-3 app-card-copy">{area.detail}</p>
-              <Link className="mt-5 app-button" href={area.href}>
-                {area.action}
-              </Link>
+        <section className="home-roles" aria-label="Entradas por rol">
+          {roleEntrances.map((entry) => (
+            <article className={`home-role-card ${entry.tone}`} key={entry.title}>
+              <h2>{entry.title}</h2>
+              <p>{entry.detail}</p>
+              <Link href={entry.href}>{entry.action}</Link>
             </article>
           ))}
         </section>
-      </div>
+
+        <section className="home-signals" aria-label="Beneficios operativos">
+          {everydaySignals.map((signal) => (
+            <span key={signal}>{signal}</span>
+          ))}
+        </section>
+      </section>
     </main>
+  );
+}
+
+function PreviewMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
   );
 }
