@@ -1,9 +1,13 @@
 package com.gymos.clients.application;
 
 import com.gymos.audit.api.AuditService;
-import com.gymos.clients.api.ClientController.ClientCreateRequest;
-import com.gymos.clients.api.ClientController.ClientDetailResponse;
-import com.gymos.clients.api.ClientController.ClientUpdateRequest;
+import com.gymos.clients.api.operations.ClientLookupOperations;
+import com.gymos.clients.api.operations.ClientVerificationResult;
+import com.gymos.clients.api.operations.SelfServiceClientProfile;
+import com.gymos.clients.api.operations.VerifyClientIdentityCommand;
+import com.gymos.clients.application.command.CreateClientCommand;
+import com.gymos.clients.application.command.UpdateClientCommand;
+import com.gymos.clients.application.result.ClientDetailResult;
 import com.gymos.clients.infrastructure.ClientRepository;
 import com.gymos.clients.infrastructure.ClientRepository.ClientDetail;
 import com.gymos.clients.infrastructure.ClientRepository.ClientSummary;
@@ -12,13 +16,14 @@ import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class ClientService {
+public class ClientService implements ClientLookupOperations {
 	private final JdbcClient jdbcClient;
 	private final ClientRepository clientRepository;
 	private final AuditService auditService;
@@ -30,7 +35,7 @@ public class ClientService {
 	}
 
 	@Transactional
-	public ClientDetailResponse create(GymOsPrincipal principal, ClientCreateRequest request, String correlationId) {
+	public ClientDetailResult create(GymOsPrincipal principal, CreateClientCommand request, String correlationId) {
 		requirePrincipal(principal);
 		String email = blankToNull(request.email());
 		String phone = blankToNull(request.phone());
@@ -96,19 +101,19 @@ public class ClientService {
 	}
 
 	@Transactional(readOnly = true)
-	public ClientDetailResponse detail(GymOsPrincipal principal, UUID clientId) {
+	public ClientDetailResult detail(GymOsPrincipal principal, UUID clientId) {
 		requirePrincipal(principal);
 		ClientDetail client = clientRepository.findDetail(principal.organizationId(), clientId)
 				.orElseThrow(() -> new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible."));
 		List<ClientTimelineEntry> timeline = clientRepository.timeline(principal.organizationId(), clientId);
-		return new ClientDetailResponse(client, timeline);
+		return new ClientDetailResult(client, timeline);
 	}
 
 	@Transactional
-	public ClientDetailResponse update(
+	public ClientDetailResult update(
 			GymOsPrincipal principal,
 			UUID clientId,
-			ClientUpdateRequest request,
+			UpdateClientCommand request,
 			String correlationId
 	) {
 		requirePrincipal(principal);
@@ -167,6 +172,28 @@ public class ClientService {
 				.update();
 		auditService.record(principal, "CLIENT_UPDATED", "CLIENT", clientId, "RECEPTION", null, correlationId);
 		return detail(principal, clientId);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public Optional<ClientVerificationResult> verifyForSelfService(VerifyClientIdentityCommand command) {
+		if (command.birthDate() == null || command.identifier() == null || command.identifier().isBlank()) {
+			return Optional.empty();
+		}
+		return clientRepository.verifyForSelfService(
+						command.organizationId(),
+						command.branchId(),
+						command.identifier(),
+						command.birthDate()
+				)
+				.map(client -> new ClientVerificationResult(client.id(), client.fullName()));
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public Optional<SelfServiceClientProfile> selfServiceProfile(UUID organizationId, UUID clientId) {
+		return clientRepository.selfServiceProfile(organizationId, clientId)
+				.map(client -> new SelfServiceClientProfile(client.id(), client.fullName()));
 	}
 
 	private void ensureUniqueContact(UUID organizationId, String email, String phone, UUID excludedPersonId) {

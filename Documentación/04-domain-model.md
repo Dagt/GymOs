@@ -230,6 +230,7 @@ Invariantes:
 - Una venta pagada no se modifica.
 - La suma de pagos debe cubrir el total.
 - Los efectos de negocio ocurren después de PaymentCompleted.
+- Una venta pagada con productos fisicos descuenta inventario mediante movimientos `Sale` idempotentes.
 
 ## 4.9 Payment
 
@@ -280,6 +281,9 @@ Invariantes:
 - No traslapes incompatibles.
 - El cliente debe cumplir reglas de acceso o elegibilidad.
 - La capacidad no se excede.
+- La reserva debe estar dentro del horario operativo del recurso.
+- Check-in solo aplica a reservas confirmadas.
+- Completion solo aplica a reservas con check-in.
 
 ## 4.12 AccessAttempt
 
@@ -314,6 +318,11 @@ Movimientos:
 - Return
 - TransferFuture
 
+Invariantes:
+- La existencia nunca puede quedar negativa.
+- Un movimiento automatico de venta se identifica por organizacion, sucursal, venta y producto.
+- Reprocesar el mismo pago completado no puede descontar dos veces el mismo producto.
+
 ## 4.14 Workout
 
 Atributos:
@@ -323,6 +332,18 @@ Atributos:
 - currentVersion
 
 Cada edición crea WorkoutVersion.
+
+Implementado en Hito 5:
+- `Coach` pertenece a organizacion y sucursal, tiene estado, contacto y especialidades.
+- `Workout` define titulo, objetivo, nivel, estado y coach opcional.
+- `WorkoutVersion` guarda contenido JSON versionado; una asignacion siempre apunta a una version especifica.
+- `WorkoutAssignment` vincula cliente, rutina, version, coach, fechas y notas.
+
+Invariantes:
+- Una rutina asignada a cliente no cambia retroactivamente si se publica una nueva version.
+- Solo clientes activos pueden recibir rutinas.
+- Solo versiones publicadas pueden asignarse.
+- Las fechas de asignacion no pueden cerrar antes de iniciar.
 
 ## 4.15 ProfessionalService
 
@@ -334,6 +355,16 @@ Atributos:
 - schedule
 - reservableResourceId
 
+Implementado en Hito 5:
+- `Professional` pertenece a organizacion y sucursal, tiene tipo profesional, contacto, biografia y estado.
+- `ProfessionalService` define nombre, tipo, duracion, precio, moneda y estado.
+- `ProfessionalAvailability` define disponibilidad semanal por dia y rango horario.
+
+Invariantes:
+- Solo profesionales activos pueden recibir servicios o disponibilidad.
+- La duracion del servicio debe estar dentro de un rango operativo valido.
+- La disponibilidad debe cerrar despues de abrir.
+
 ## 4.16 Automation
 
 Atributos:
@@ -343,3 +374,75 @@ Atributos:
 - actionConfiguration
 - active
 - retryPolicy
+
+Implementado en Hito 5:
+- `AutomationRule` guarda evento, condicion JSON, accion, configuracion JSON, estado y limite de reintentos.
+- `AutomationExecution` registra cada ejecucion y su resultado.
+- La accion inicial soportada es `CREATE_NOTIFICATION`.
+- `NotificationLog` registra canal, destinatario, asunto, cuerpo, estado, referencia y programacion.
+
+Invariantes:
+- Solo reglas `ENABLED` pueden ejecutarse.
+- La configuracion de condicion y accion debe ser JSON valido.
+- Las notificaciones quedan auditadas aunque el envio externo aun no este conectado.
+
+## 4.17 OnboardingChecklist
+
+Responsabilidad: medir si una organizacion/sucursal esta lista para operar un piloto vendible.
+
+Atributos:
+- organizationProfileComplete
+- branchConfigured
+- hasMembershipPlans
+- hasRetailProducts
+- hasKioskTerminal
+- hasClients
+- readyForPilot
+
+Invariantes:
+- El checklist se calcula por organizacion y sucursal activa.
+- La preparacion administrativa externa no forma parte del calculo; se gestiona en Hito 7.
+
+## 4.18 ClientImportBatch
+
+Responsabilidad: representar una carga inicial de clientes desde CSV.
+
+Atributos:
+- fileName
+- dryRun
+- status
+- totalRows
+- createdCount
+- skippedCount
+- errorCount
+
+Invariantes:
+- Cada fila se clasifica como `VALID`, `CREATED`, `SKIPPED` o `ERROR`.
+- `dryRun=true` nunca crea clientes.
+- Duplicados por email o telefono se omiten y no detienen el lote.
+- La importacion pertenece siempre a una organizacion.
+
+## 4.19 Eventos versionados implementados
+
+Eventos de ventas:
+- `SaleCreatedV1`: venta creada por POS o flujo de membresia.
+- `PaymentRecordedV1`: pago manual registrado.
+- `PaymentCompletedV1`: venta cubierta por pagos completados; dispara efectos de negocio.
+- `PaymentRejectedV1`: pago rechazado con razon.
+- Paquete propietario: `com.gymos.sales.api.events`.
+
+Eventos de membresias:
+- `MembershipActivatedV1`: membresia activada por venta pagada.
+- `MembershipRenewedV1`: renovacion acumulativa procesada.
+- `MembershipPlanChangedV1`: membresia anterior cancelada y nuevo plan activado.
+- Paquete propietario: `com.gymos.memberships.api.events`.
+
+Reglas reforzadas:
+- Una membresia solo se activa desde pago completado.
+- Reprocesar `PaymentCompletedV1` no duplica efectos porque se registra `processed_domain_event`.
+- Un cambio al mismo plan es invalido.
+- Una membresia cancelada no puede renovarse.
+- El kiosco opera con sesion temporal, token aleatorio, verificacion por contacto + fecha de nacimiento y origen auditado `SELF_SERVICE_KIOSK`.
+- `selfservice` no resuelve identidad personal directamente; consume `ClientLookupOperations`.
+- Las renovaciones/cambios del kiosco se ejecutan mediante `MembershipOperations`, no por dependencia directa a la capa application de membresias.
+- Las llaves de idempotencia en ventas/pagos incluyen hash de solicitud para detectar reutilizacion con contenido distinto.

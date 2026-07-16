@@ -1,89 +1,108 @@
-const operationalCards = [
+import Link from "next/link";
+import { AppNavigation } from "@/components/AppNavigation";
+
+const workAreas = [
   {
-    title: "Recepcion",
-    value: "Lista para operar",
-    detail: "Alta de clientes, pagos, renovaciones y reservas.",
+    title: "Recepcion diaria",
+    detail: "Clientes, ventas, pagos manuales, renovaciones y cambio de sucursal.",
+    href: "/reception",
+    action: "Abrir recepcion",
   },
   {
-    title: "Administracion",
-    value: "Base modular",
-    detail: "Organizaciones, sucursales, permisos y auditoria.",
+    title: "Reportes y direccion",
+    detail: "Dashboard ejecutivo, ventas recientes, saldos y actividad comercial.",
+    href: "/dashboard",
+    action: "Ver dashboard",
   },
   {
-    title: "Kiosco",
-    value: "Autoservicio previsto",
-    detail: "Sesiones temporales para pagos y membresias.",
+    title: "Configuracion de marca",
+    detail: "Datos del gimnasio, sucursales, colores y logo para presentarlo al cliente.",
+    href: "/settings/organization",
+    action: "Configurar",
   },
 ];
 
-const foundationItems = [
-  "Spring Boot + Spring Modulith",
-  "Next.js + TypeScript + Tailwind",
-  "PostgreSQL, Redis y MinIO",
-  "OpenAPI, Flyway y auditoria",
+const quickLinks = [
+  { label: "POS", href: "/pos" },
+  { label: "Clientes", href: "/clients" },
+  { label: "Catalogo", href: "/catalog" },
+  { label: "Reporte ventas", href: "/reports/sales" },
+  { label: "Kiosco", href: "/kiosk/KIOSK-MAIN" },
+  { label: "Onboarding", href: "/onboarding" },
 ];
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-[#f6f7f2] text-[#111815]">
-      <section className="border-b border-[#d8ddd2] bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-8 px-6 py-8 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-[#51735f]">
-              GymOS
+    <main className="app-shell text-[#111815]">
+      <div className="app-shell-inner">
+        <header className="app-topbar">
+          <div className="app-title-block">
+            <p className="app-eyebrow">GymOS</p>
+            <h1 className="app-title">Centro operativo del gimnasio</h1>
+            <p className="app-subtitle">
+              Un punto de entrada claro para recepcion, ventas, membresias, reportes y configuracion comercial.
             </p>
-            <h1 className="mt-2 max-w-3xl text-4xl font-semibold leading-tight sm:text-5xl">
-              Operacion integral para gimnasios, lista para crecer por modulos.
-            </h1>
           </div>
-          <div className="grid gap-2 text-sm text-[#42514a]">
-            {foundationItems.map((item) => (
-              <span key={item} className="rounded-md border border-[#d8ddd2] px-3 py-2">
-                {item}
-              </span>
-            ))}
+          <div className="app-actions">
+            <Link className="app-button-secondary" href="/login">
+              Iniciar sesion
+            </Link>
+            <Link className="app-button" href="/reception">
+              Entrar a operacion
+            </Link>
           </div>
-        </div>
-      </section>
+        </header>
 
-      <section className="mx-auto grid max-w-7xl gap-6 px-6 py-8 lg:grid-cols-[1.5fr_1fr]">
-        <div className="grid gap-4 sm:grid-cols-3">
-          {operationalCards.map((card) => (
-            <article
-              key={card.title}
-              className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm"
-            >
-              <p className="text-sm font-medium text-[#51735f]">{card.title}</p>
-              <h2 className="mt-3 text-2xl font-semibold">{card.value}</h2>
-              <p className="mt-3 text-sm leading-6 text-[#5d6b63]">{card.detail}</p>
+        <AppNavigation />
+
+        <section className="grid gap-5 lg:grid-cols-[1.35fr_0.85fr]">
+          <section className="app-hero-panel p-6 sm:p-8">
+            <div className="relative z-10 max-w-3xl">
+              <p className="text-sm font-bold uppercase text-white/75">Producto vendible</p>
+              <h2 className="mt-3 text-3xl font-black leading-tight sm:text-5xl">
+                Una interfaz lista para mostrador, administracion y autoservicio.
+              </h2>
+              <p className="mt-5 max-w-2xl text-sm leading-6 text-white/80 sm:text-base">
+                Los flujos principales estan agrupados por tarea cotidiana para que un usuario comun sepa donde
+                empezar: cobrar, registrar, renovar, consultar reportes o ajustar la sucursal.
+              </p>
+              <div className="mt-6 flex flex-wrap gap-3">
+                {quickLinks.map((link) => (
+                  <Link className="app-button-soft bg-white/95" href={link.href} key={link.href}>
+                    {link.label}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <aside className="app-card p-5">
+            <p className="app-eyebrow">Personalizacion</p>
+            <h2 className="mt-2 app-card-title">Marca por cliente</h2>
+            <p className="mt-3 app-card-copy">
+              Usa el boton Marca para ajustar nombre visible, logo y colores. La vista cambia al instante y queda
+              guardada localmente para demos y pilotos.
+            </p>
+            <div className="mt-5 grid gap-3">
+              <span className="app-pill">Color principal</span>
+              <span className="app-pill">Color de acento</span>
+              <span className="app-pill">Logo del gimnasio</span>
+            </div>
+          </aside>
+        </section>
+
+        <section className="grid gap-4 md:grid-cols-3">
+          {workAreas.map((area) => (
+            <article className="app-card p-5" key={area.title}>
+              <h2 className="app-card-title">{area.title}</h2>
+              <p className="mt-3 app-card-copy">{area.detail}</p>
+              <Link className="mt-5 app-button" href={area.href}>
+                {area.action}
+              </Link>
             </article>
           ))}
-        </div>
-
-        <aside className="rounded-lg border border-[#d8ddd2] bg-[#13251c] p-5 text-white shadow-sm">
-          <p className="text-sm font-medium text-[#9cc7ad]">Hito 0</p>
-          <h2 className="mt-3 text-2xl font-semibold">Base tecnica vendible</h2>
-          <p className="mt-3 text-sm leading-6 text-[#dbe8df]">
-            Esta pantalla confirma que el monorepo ya tiene frontend operativo.
-            El siguiente corte conectara clientes, ventas y pagos manuales
-            contra la API.
-          </p>
-          <div className="mt-5 flex flex-wrap gap-3">
-            <a
-              href="/reception"
-              className="inline-flex h-11 items-center justify-center rounded-md bg-[#d7f2df] px-4 text-sm font-semibold text-[#13251c] transition hover:bg-white"
-            >
-              Ir a recepcion
-            </a>
-            <a
-              href="/login"
-              className="inline-flex h-11 items-center justify-center rounded-md border border-[#d7f2df] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
-            >
-              Iniciar sesion
-            </a>
-          </div>
-        </aside>
-      </section>
+        </section>
+      </div>
     </main>
   );
 }

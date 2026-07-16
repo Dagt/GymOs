@@ -1,6 +1,8 @@
 package com.gymos.catalog.api;
 
 import com.gymos.catalog.application.CatalogService;
+import com.gymos.catalog.application.command.CreatePlanCommand;
+import com.gymos.catalog.application.command.ProductCommand;
 import com.gymos.catalog.infrastructure.CatalogRepository.PlanSummary;
 import com.gymos.catalog.infrastructure.CatalogRepository.ProductSummary;
 import com.gymos.common.api.Correlation;
@@ -41,7 +43,7 @@ public class CatalogController {
 			@Valid @RequestBody ProductRequest request,
 			HttpServletRequest servletRequest
 	) {
-		return catalogService.createProduct(principal, request, correlationId(servletRequest));
+		return catalogService.createProduct(principal, request.toCommand(), correlationId(servletRequest));
 	}
 
 	@GetMapping("/plans")
@@ -55,7 +57,7 @@ public class CatalogController {
 			@Valid @RequestBody CreatePlanRequest request,
 			HttpServletRequest servletRequest
 	) {
-		return catalogService.createPlan(principal, request, correlationId(servletRequest));
+		return catalogService.createPlan(principal, request.toCommand(), correlationId(servletRequest));
 	}
 
 	private String correlationId(HttpServletRequest request) {
@@ -73,6 +75,9 @@ public class CatalogController {
 			boolean taxable,
 			@NotBlank @Pattern(regexp = "ACTIVE|INACTIVE") String status
 	) {
+		private ProductCommand toCommand() {
+			return new ProductCommand(sku, name, description, productType, priceCents, currency, taxable, status);
+		}
 	}
 
 	public record CreatePlanRequest(
@@ -82,5 +87,8 @@ public class CatalogController {
 			@Size(max = 4000) String benefitsJson,
 			@NotBlank @Pattern(regexp = "ACTIVE|INACTIVE") String status
 	) {
+		private CreatePlanCommand toCommand() {
+			return new CreatePlanCommand(productId, durationDays, graceDays, benefitsJson, status);
+		}
 	}
 }

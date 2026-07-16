@@ -1,6 +1,12 @@
 package com.gymos.clients.api;
 
 import com.gymos.clients.application.ClientService;
+import com.gymos.clients.application.ClientImportService;
+import com.gymos.clients.application.command.CreateClientCommand;
+import com.gymos.clients.application.command.ImportClientsCommand;
+import com.gymos.clients.application.command.UpdateClientCommand;
+import com.gymos.clients.application.result.ClientDetailResult;
+import com.gymos.clients.application.result.ClientImportResult;
 import com.gymos.clients.infrastructure.ClientRepository.ClientDetail;
 import com.gymos.clients.infrastructure.ClientRepository.ClientSummary;
 import com.gymos.clients.infrastructure.ClientRepository.ClientTimelineEntry;
@@ -29,9 +35,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/clients")
 public class ClientController {
 	private final ClientService clientService;
+	private final ClientImportService clientImportService;
 
-	public ClientController(ClientService clientService) {
+	public ClientController(ClientService clientService, ClientImportService clientImportService) {
 		this.clientService = clientService;
+		this.clientImportService = clientImportService;
 	}
 
 	@GetMapping
@@ -49,12 +57,12 @@ public class ClientController {
 			@Valid @RequestBody ClientCreateRequest request,
 			HttpServletRequest servletRequest
 	) {
-		return clientService.create(principal, request, correlationId(servletRequest));
+		return toResponse(clientService.create(principal, request.toCommand(), correlationId(servletRequest)));
 	}
 
 	@GetMapping("/{clientId}")
 	ClientDetailResponse detail(@AuthenticationPrincipal GymOsPrincipal principal, @PathVariable UUID clientId) {
-		return clientService.detail(principal, clientId);
+		return toResponse(clientService.detail(principal, clientId));
 	}
 
 	@PutMapping("/{clientId}")
@@ -64,7 +72,20 @@ public class ClientController {
 			@Valid @RequestBody ClientUpdateRequest request,
 			HttpServletRequest servletRequest
 	) {
-		return clientService.update(principal, clientId, request, correlationId(servletRequest));
+		return toResponse(clientService.update(principal, clientId, request.toCommand(), correlationId(servletRequest)));
+	}
+
+	@PostMapping("/imports")
+	ClientImportResult importClients(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@Valid @RequestBody ClientImportRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return clientImportService.importCsv(principal, request.toCommand(), correlationId(servletRequest));
+	}
+
+	private ClientDetailResponse toResponse(ClientDetailResult result) {
+		return new ClientDetailResponse(result.client(), result.timeline());
 	}
 
 	private String correlationId(HttpServletRequest request) {
@@ -82,6 +103,9 @@ public class ClientController {
 			@Size(max = 512) String photoReference,
 			@Size(max = 2000) String notes
 	) {
+		private CreateClientCommand toCommand() {
+			return new CreateClientCommand(firstName, lastName, birthDate, gender, phone, email, photoReference, notes);
+		}
 	}
 
 	public record ClientUpdateRequest(
@@ -95,6 +119,19 @@ public class ClientController {
 			@NotBlank @Pattern(regexp = "ACTIVE|INACTIVE|SUSPENDED") String status,
 			@Size(max = 2000) String notes
 	) {
+		private UpdateClientCommand toCommand() {
+			return new UpdateClientCommand(firstName, lastName, birthDate, gender, phone, email, photoReference, status, notes);
+		}
+	}
+
+	public record ClientImportRequest(
+			@Size(max = 180) String fileName,
+			@NotBlank @Size(max = 2_000_000) String csvText,
+			boolean dryRun
+	) {
+		private ImportClientsCommand toCommand() {
+			return new ImportClientsCommand(fileName, csvText, dryRun);
+		}
 	}
 
 	public record ClientDetailResponse(ClientDetail client, List<ClientTimelineEntry> timeline) {

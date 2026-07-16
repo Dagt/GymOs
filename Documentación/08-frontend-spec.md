@@ -154,6 +154,17 @@ Widgets:
 - reservas
 - inventario
 - desempeño de coaches
+- profesionales y servicios de bienestar
+- actividad operativa por sucursal
+
+Pantallas implementadas hasta Hito 5:
+- `/reception`: hub operativo con accesos a clientes, POS, catalogo, ventas, reportes, kiosco, inventario, reservas, accesos, coaches, bienestar, automatizaciones y dashboard.
+- `/coaches`: alta de coaches, rutinas, versiones, asignacion a clientes y metricas base.
+- `/wellness`: alta de profesionales, servicios, disponibilidad y consulta por profesional.
+- `/automations`: reglas internas, ejecucion manual y notificaciones operativas.
+- `/dashboard`: vista del dueno por rango de fechas.
+- `/onboarding`: checklist vendible y setup piloto de organizacion, sucursal, catalogo base y kiosco.
+- `/clients/import`: importacion inicial CSV con dry-run, duplicados y resultado por fila.
 
 ## 8.10 Diseño visual
 
@@ -164,3 +175,27 @@ Widgets:
 - Estados por iconos y etiquetas.
 - No depender exclusivamente del color.
 - Accesibilidad mínima WCAG AA.
+
+## 8.11 Hito 6.5 - Rediseno frontend y marca
+
+Objetivo:
+- Mejorar la interfaz antes de continuar con nuevas fases funcionales.
+- Reducir friccion para usuarios comunes de recepcion, administracion y direccion.
+- Mantener contratos HTTP existentes.
+- Permitir presentaciones comerciales con colores y logo del gimnasio cliente.
+
+Implementacion frontend:
+- Layout global con tokens de marca: color principal, acento, superficie, texto, bordes y tarjetas.
+- Navegacion principal reutilizable por areas: Operacion, Gestion y Direccion.
+- Portada convertida en centro operativo, no en pagina tecnica.
+- Login redisenado con campos claros, mensajes comprensibles y continuidad hacia recepcion.
+- Recepcion redisenada como tablero operativo con acciones criticas, contexto de sucursal, reportes y modulos.
+- Dashboard y reporte de ventas integrados al mismo cascaron visual.
+- Configuracion de organizacion integrada al layout principal.
+- Personalizador de marca local con nombre visible, URL de logo y colores por cliente.
+
+Reglas de producto:
+- La personalizacion visual local sirve para demos, pilotos y venta temprana.
+- La persistencia multi-tenant de tema en backend queda para evolucion posterior.
+- Ninguna regla de negocio se mueve al frontend.
+- Los formularios deben usar etiquetas de negocio entendibles para recepcion y administracion.

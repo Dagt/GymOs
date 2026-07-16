@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { AppNavigation } from "@/components/AppNavigation";
 import {
   getBranches,
   getCurrentOrganization,
@@ -139,26 +140,25 @@ export default function OrganizationSettingsPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f7f2] text-[#111815]">
-      <header className="border-b border-[#d8ddd2] bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <Link className="text-sm font-semibold text-[#51735f]" href="/reception">
-              Recepcion
-            </Link>
-            <h1 className="mt-1 text-3xl font-semibold">Configuracion inicial</h1>
-            <p className="mt-1 text-sm text-[#5d6b63]">
-              Organizacion y sucursal activa para dejar listo el gimnasio piloto.
+    <main className="app-shell text-[#111815]">
+      <div className="app-shell-inner">
+      <header className="app-topbar">
+          <div className="app-title-block">
+            <p className="app-eyebrow">Administracion</p>
+            <h1 className="app-title">Configuracion del gimnasio</h1>
+            <p className="app-subtitle">
+              Datos comerciales, sucursal operativa y preparacion para demos o pilotos.
             </p>
           </div>
-          <span className="rounded-md border border-[#d8ddd2] bg-white px-3 py-2 text-sm text-[#42514a]">
+          <span className="app-pill">
             {organization?.status ?? "ACTIVE"}
           </span>
-        </div>
       </header>
 
-      <section className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-2">
-        <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+      <AppNavigation />
+
+      <section className="grid gap-6 lg:grid-cols-2">
+        <section className="app-card p-5">
           <h2 className="text-xl font-semibold">Organizacion</h2>
           <form className="mt-5 grid gap-4" onSubmit={submitOrganization}>
             <Field label="Nombre legal" value={organizationForm.legalName} onChange={(value) => setOrganizationForm({ ...organizationForm, legalName: value })} />
@@ -180,7 +180,7 @@ export default function OrganizationSettingsPage() {
           </form>
         </section>
 
-        <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+        <section className="app-card p-5">
           <h2 className="text-xl font-semibold">Sucursal</h2>
           <form className="mt-5 grid gap-4" onSubmit={submitBranch}>
             <label className="grid gap-2 text-sm font-medium text-[#42514a]">
@@ -223,7 +223,16 @@ export default function OrganizationSettingsPage() {
             {message}
           </p>
         ) : null}
+        <section className="app-card p-5 lg:col-span-2">
+          <p className="app-eyebrow">Marca visual</p>
+          <h2 className="mt-2 app-card-title">Colores y logo por cliente</h2>
+          <p className="mt-3 app-card-copy">
+            El boton Marca permite ajustar nombre visible, logo y colores para presentar GymOS con la identidad
+            del gimnasio durante demos y pilotos.
+          </p>
+        </section>
       </section>
+      </div>
     </main>
   );
 }

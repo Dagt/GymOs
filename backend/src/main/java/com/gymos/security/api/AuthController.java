@@ -3,6 +3,8 @@ package com.gymos.security.api;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.security.application.AuthService;
+import com.gymos.security.application.result.AuthResult;
+import com.gymos.security.application.result.CurrentUserResult;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -27,12 +29,12 @@ public class AuthController {
 
 	@PostMapping("/login")
 	AuthResponse login(@Valid @RequestBody LoginRequest request, HttpServletRequest servletRequest) {
-		return authService.login(request.username(), request.password(), correlationId(servletRequest));
+		return toResponse(authService.login(request.username(), request.password(), correlationId(servletRequest)));
 	}
 
 	@PostMapping("/refresh")
 	AuthResponse refresh(@Valid @RequestBody RefreshRequest request) {
-		return authService.refresh(request.refreshToken());
+		return toResponse(authService.refresh(request.refreshToken()));
 	}
 
 	@PostMapping("/logout")
@@ -46,7 +48,7 @@ public class AuthController {
 
 	@GetMapping("/me")
 	CurrentUserResponse me(@AuthenticationPrincipal GymOsPrincipal principal) {
-		return authService.currentUser(principal);
+		return toResponse(authService.currentUser(principal));
 	}
 
 	@PostMapping("/select-branch")
@@ -55,7 +57,28 @@ public class AuthController {
 			@Valid @RequestBody SelectBranchRequest request,
 			HttpServletRequest servletRequest
 	) {
-		return authService.selectBranch(principal, request.branchId(), correlationId(servletRequest));
+		return toResponse(authService.selectBranch(principal, request.branchId(), correlationId(servletRequest)));
+	}
+
+	private AuthResponse toResponse(AuthResult result) {
+		return new AuthResponse(
+				result.accessToken(),
+				result.refreshToken(),
+				result.tokenType(),
+				result.expiresIn(),
+				toResponse(result.user())
+		);
+	}
+
+	private CurrentUserResponse toResponse(CurrentUserResult result) {
+		return new CurrentUserResponse(
+				result.userId(),
+				result.organizationId(),
+				result.branchId(),
+				result.username(),
+				result.fullName(),
+				result.permissions()
+		);
 	}
 
 	private String correlationId(HttpServletRequest request) {

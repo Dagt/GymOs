@@ -224,6 +224,8 @@ Regla:
 - reference_type
 - reference_id
 - reason
+- Los movimientos automaticos por venta usan `reference_type = SALE`, `reference_id = sale.id` y `product_id`.
+- La restriccion `ux_inventory_movement_sale_product_effect` evita descontar dos veces el mismo producto por la misma venta.
 
 ### resource
 - name
@@ -265,51 +267,137 @@ Regla:
 - raw_event_reference
 
 ### coach
-- person_id
+- organization_id
+- branch_id
+- display_name
+- email
+- phone
+- specialties_json
+- bio
 - status
-- commission_rule_json
 
 ### workout
 - coach_id
-- client_id
+- title
+- goal
+- level
 - status
-- current_version
 
 ### workout_version
 - workout_id
 - version_number
+- summary
 - content_json
 - created_by
 
-### professional
-- person_id
-- type
+### workout_assignment
+- workout_id
+- workout_version_id
+- client_id
+- coach_id
 - status
-- schedule_json
+- assigned_on
+- starts_on
+- ends_on
+- notes
+
+### professional
+- organization_id
+- branch_id
+- display_name
+- professional_type
+- email
+- phone
+- bio
+- status
+- version
+- deleted_at
 
 ### professional_service
+- organization_id
+- branch_id
 - professional_id
-- product_id
-- duration_minutes
-- booking_rules_json
-
-### automation
 - name
-- trigger_event
+- service_type
+- duration_minutes
+- price_cents
+- currency
+- status
+- version
+- deleted_at
+
+### professional_availability
+- organization_id
+- branch_id
+- professional_id
+- day_of_week
+- opens_at
+- closes_at
+- status
+- version
+- deleted_at
+
+### notification_log
+- organization_id
+- branch_id
+- channel
+- recipient
+- subject
+- body
+- status
+- trigger_type
+- reference_type
+- reference_id
+- scheduled_at
+- sent_at
+- error_message
+- version
+
+### automation_rule
+- organization_id
+- branch_id
+- name
+- trigger_type
 - condition_json
 - action_type
 - action_config_json
-- active
-- retry_policy_json
-
-### notification
-- recipient_type
-- recipient_id
-- channel
-- template_key
 - status
-- sent_at
+- retry_limit
+- version
+- deleted_at
+
+### automation_execution
+- organization_id
+- branch_id
+- rule_id
+- status
+- trigger_reference
 - error_message
+- occurred_at
+
+### client_import_batch
+- organization_id
+- branch_id
+- file_name
+- dry_run
+- status
+- total_rows
+- created_count
+- skipped_count
+- error_count
+- completed_at
+
+### client_import_row
+- batch_id
+- organization_id
+- row_number
+- status
+- reason
+- client_id
+- first_name
+- last_name
+- email
+- phone
 
 ### audit_log
 - actor_user_id
@@ -330,3 +418,44 @@ Regla:
 - Check constraints para montos no negativos.
 - Exclusión o validación transaccional para evitar traslapes.
 - Nunca borrar auditoría.
+- Nunca borrar auditorÃ­a.
+
+## 5.4 Cambios Hito 3.5
+
+Columnas agregadas:
+- `sale.idempotency_key`
+- `sale.idempotency_request_hash`
+- `sale.business_context`
+- `sale.context_membership_id`
+- `sale.context_target_plan_id`
+- `sale.payment_completed_at`
+- `payment.idempotency_key`
+- `payment.idempotency_request_hash`
+- `self_service_session.session_token_hash`
+- `self_service_session.verification_attempts`
+- `self_service_session.blocked_until`
+- `self_service_session.last_request_at`
+- `membership.source_membership_id`
+- `membership.source_payment_event_key`
+
+Tabla nueva:
+- `processed_domain_event`: registra `organization_id`, `event_key`, `event_type` y `processed_at` para consumo idempotente.
+
+Restricciones nuevas:
+- `ux_sale_org_idempotency_key`
+- `ux_payment_org_idempotency_key`
+- `ux_self_service_session_token_hash`
+- `ux_membership_org_payment_event_key`
+
+Migraciones nuevas:
+- `V2_1__demo_organization_prerequisite.sql`: garantiza que los datos demo historicos de catalogo y kiosco tengan organizacion/sucursal al migrar desde una base vacia.
+- `V6__hito3_5_architectural_stabilization.sql`: agrega idempotencia, contexto comercial, eventos procesados, seguridad de kiosco y trazabilidad de membresias.
+- `V7__permissions_and_kiosk_security.sql`: registra permisos granulares faltantes y los asigna al rol administrador.
+- `V8__idempotency_request_hashes.sql`: agrega hash de solicitud a ventas y pagos para detectar reutilizacion de idempotency key con payload distinto.
+- `V9__hito4_access_control.sql`: agrega dispositivos de acceso, pases temporales y bitacora de accesos.
+- `V10__hito4_inventory.sql`: agrega existencias, movimientos de inventario y stock semilla.
+- `V11__hito4_resources_bookings.sql`: agrega recursos reservables, reservas, permisos y recurso demo.
+- `V12__hito4_inventory_sale_idempotency.sql`: agrega indice unico para movimientos automaticos de inventario por venta y producto.
+- `V13__hito5_coaches_workouts.sql`: agrega coaches, rutinas versionadas, asignaciones a clientes, permisos y datos demo de coaching.
+- `V14__hito5_wellness_notifications_automations.sql`: agrega profesionales de bienestar, servicios, disponibilidad, notificaciones, automatizaciones y dashboard del dueno.
+- `V15__hito6_productization_onboarding_imports.sql`: agrega bitacora de importacion inicial de clientes y permisos `onboarding.manage` y `client.import`.

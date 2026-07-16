@@ -24,6 +24,7 @@ GymOS se implementará como monolito modular con Spring Modulith. Cada módulo r
 - notifications
 - automations
 - reporting
+- onboarding
 - audit
 - configuration
 
@@ -145,3 +146,72 @@ Reglas:
 - Debe cerrar sesión automáticamente por inactividad.
 - Toda acción debe auditarse con origen `SELF_SERVICE_KIOSK`.
 - Los pagos manuales iniciados desde kiosco quedan en estado pendiente o en revisión hasta que el flujo de pagos los complete según reglas.
+- Los pagos manuales iniciados desde kiosco quedan en estado pendiente o en revisiÃ³n hasta que el flujo de pagos los complete segÃºn reglas.
+
+## 3.14 Estabilizacion arquitectonica Hito 3.5
+
+Decisiones implementadas:
+- `memberships` ya no escribe en tablas `sale`, `sale_item` ni `payment`.
+- `sales` es propietario unico de ventas, partidas, pagos, validacion, numeros de venta e idempotencia comercial.
+- La API interna publica de ventas vive en `com.gymos.sales.api.operations` y expone `SalesOperations`, comandos de renovacion/cambio de plan y resultados inmutables.
+- `memberships` expone `com.gymos.memberships.api.operations.MembershipOperations`; `selfservice` consume esa API publica y ya no depende de `memberships.application`.
+- `clients` expone `com.gymos.clients.api.operations.ClientLookupOperations`; la verificacion de identidad del kiosco se resuelve dentro del modulo `clients` y `selfservice` ya no consulta tablas `client` ni `person`.
+- La capa `application` ya no depende de DTOs HTTP ni controladores; los controladores mapean request/response hacia comandos/resultados de aplicacion.
+- Eventos de negocio versionados implementados en APIs de sus modulos propietarios: `sales.api.events` contiene eventos de venta/pago y `memberships.api.events` contiene eventos de membresias.
+- La activacion de membresias por pago se consume desde `PaymentCompletedV1` y se protege con `processed_domain_event`.
+- Las operaciones comerciales aceptan `idempotencyKey`; `sale` y `payment` tienen restricciones unicas por organizacion y hash de solicitud para detectar reuse con payload distinto.
+- RBAC granular se aplica por ruta interna con permisos como `sale.create`, `payment.manual.validate`, `membership.renew` y `report.sales.read`.
+- El kiosco sigue siendo publico sin JWT interno, pero exige token temporal por sesion en `X-Self-Service-Session-Token`, verificacion por contacto + fecha de nacimiento, rate limiting via puerto `RateLimiter`, expiracion, bloqueo por intentos y auditoria.
+
+Pruebas arquitectonicas:
+- Spring Modulith verifica fronteras.
+- ArchUnit bloquea dependencias de application hacia controladores HTTP.
+- ArchUnit bloquea dependencias a infraestructura de otros modulos.
+- ArchUnit bloquea que `selfservice` dependa de `memberships.application`, `clients.application` o `clients.infrastructure`.
+- ArchUnit bloquea que los eventos de negocio vuelvan a `common.events`.
+- `MembershipService` y `SelfServiceService` ya no usan `JdbcClient`; el uso temporal restante en application queda listado explicitamente hasta extraer command repositories.
+
+## 3.15 Operacion Hito 4
+
+Decisiones implementadas:
+- `access` gestiona dispositivos, pases temporales y bitacora de accesos manuales o evaluados por membresia.
+- `inventory` gestiona existencias, movimientos manuales y descuento automatico por ventas pagadas con bloqueo de stock negativo.
+- `bookings` gestiona recursos reservables y reservas operativas por sucursal.
+- Las reservas validan capacidad del recurso, horario operativo y traslapes de reservas activas.
+- `inventory` consume `PaymentCompletedV1` publicado por `sales` y registra movimientos `SALE` idempotentes por venta y producto.
+- Las pantallas `/access`, `/inventory` y `/bookings` son herramientas operativas para recepcion.
+
+## 3.16 Servicios avanzados Hito 5
+
+Decisiones implementadas:
+- `coaching` gestiona coaches por organizacion y sucursal.
+- Las rutinas se modelan como `workout` con versiones publicadas en `workout_version`.
+- Las asignaciones a clientes quedan en `workout_assignment`, apuntando a una version concreta para preservar historial.
+- `wellness` gestiona profesionales, servicios, precios, duracion y disponibilidad base.
+- `notifications` funciona como cola/log interno auditable; el envio externo por correo, WhatsApp o push queda aislado para una integracion posterior.
+- `automations` gestiona reglas configurables, enable/disable y ejecucion manual; la accion inicial soportada crea notificaciones internas.
+- `reporting` expone el dashboard del dueno con metricas agregadas de ventas, clientes, membresias, reservas, inventario, coaches, profesionales, notificaciones y automatizaciones.
+- Los endpoints internos usan permisos `coach.read`, `coach.manage`, `workout.read`, `workout.manage` y `report.coaches.read`.
+- Permisos adicionales: `professional.read`, `professional.manage`, `notification.read`, `notification.manage`, `automation.read`, `automation.manage` y `report.owner.read`.
+- Las pantallas `/coaches`, `/wellness`, `/automations` y `/dashboard` completan el primer paquete vendible de servicios avanzados.
+
+## 3.17 Productizacion Hito 6
+
+Decisiones implementadas:
+- `onboarding` orquesta setup piloto sobre organizacion y sucursal activa.
+- El setup piloto es idempotente para catalogo base y kiosco: repetirlo no duplica SKU ni terminal.
+- `clients` incorpora importacion CSV como caso de uso propio del modulo, con batch y filas persistidas.
+- La importacion soporta `dryRun` para validar duplicados y errores antes de crear clientes.
+- Los permisos nuevos son `onboarding.manage` y `client.import`.
+- Las pantallas `/onboarding` y `/clients/import` convierten la preparacion comercial en flujos operables desde la app.
+- Backups, staging formal, capacitacion, manual operativo y checklist comercial pasan al Hito 7 por ser trabajo administrativo/operativo.
+
+## 3.18 RediseÃ±o frontend Hito 6.5
+
+Decisiones implementadas:
+- La personalizacion visual se resuelve inicialmente en frontend mediante tokens CSS y `localStorage`.
+- El alcance permite demos y pilotos con nombre visible, logo y colores del gimnasio sin introducir tablas nuevas.
+- La persistencia multi-organizacion de tema queda preparada como evolucion posterior de configuracion.
+- La navegacion principal se centraliza en un componente reutilizable para reducir inconsistencia entre pantallas.
+- Portada, login, recepcion, dashboard, reporte de ventas y configuracion usan el mismo lenguaje visual.
+- El frontend sigue sin contener reglas de negocio; solo mejora presentacion, formularios, jerarquia visual y rutas de acceso.

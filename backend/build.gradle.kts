@@ -21,6 +21,7 @@ repositories {
 extra["springModulithVersion"] = "2.1.0"
 extra["springdocVersion"] = "3.0.3"
 extra["minioVersion"] = "8.5.17"
+extra["testcontainersVersion"] = "1.21.3"
 
 dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
@@ -47,7 +48,10 @@ dependencies {
 	testImplementation("org.springframework.boot:spring-boot-starter-security-test")
 	testImplementation("org.springframework.boot:spring-boot-starter-validation-test")
 	testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
+	testImplementation("org.springframework.boot:spring-boot-testcontainers")
 	testImplementation("org.springframework.modulith:spring-modulith-starter-test")
+	testImplementation("org.testcontainers:junit-jupiter:${property("testcontainersVersion")}")
+	testImplementation("org.testcontainers:postgresql:${property("testcontainersVersion")}")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 

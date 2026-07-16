@@ -43,6 +43,12 @@ Nota implementada Hito 3: las acciones de renovacion y cambio de plan reciben `{
 - `POST /self-service/sessions/{sessionId}/membership-renewals/{membershipId}`
 - `POST /self-service/sessions/{sessionId}/membership-change-requests/{membershipId}`
 
+Cambio Hito 3.5 final:
+- `POST /self-service/sessions/{sessionId}/verify` ahora recibe `{ "identifier": "email o telefono", "birthDate": "YYYY-MM-DD" }`.
+- Contrato anterior: `{ "identifier": "email o telefono" }`.
+- Razon: evitar verificacion debil y reducir riesgo de enumeracion de clientes.
+- Impacto frontend: `/kiosk/[terminalCode]` solicita fecha de nacimiento y envia ambos campos.
+
 ## 6.2 Personas
 
 - `POST /persons`
@@ -130,11 +136,20 @@ La activación ocurre como consecuencia de pago completado.
 - `GET /inventory/movements`
 - `GET /inventory/low-stock`
 
+Nota implementada Hito 4:
+- `GET /inventory` lista existencias de productos fisicos por sucursal activa.
+- `GET /inventory/{productId}` muestra existencias de un producto fisico.
+- `POST /inventory/movements` registra entradas, salidas, ajustes, mermas, devoluciones y ventas manuales; evita existencias negativas.
+- `GET /inventory/movements` lista movimientos recientes, con filtro opcional por producto.
+- `GET /inventory/low-stock` lista productos bajo minimo.
+- Cuando una venta queda pagada, `inventory` consume `PaymentCompletedV1` y descuenta automaticamente productos fisicos con movimiento `SALE`.
+- El descuento automatico es idempotente por organizacion, sucursal, venta y producto; reentregar el evento no duplica movimientos ni reduce stock de nuevo.
+
 ## 6.11 Recursos y reservas
 
 - `POST /resources`
 - `GET /resources`
-- `PATCH /resources/{id}`
+- `PATCH /resources/{id}` (pendiente)
 - `GET /resources/{id}/availability`
 - `POST /bookings`
 - `GET /bookings`
@@ -143,6 +158,12 @@ La activación ocurre como consecuencia de pago completado.
 - `POST /bookings/{id}/check-in`
 - `POST /bookings/{id}/complete`
 - `POST /bookings/{id}/cancel`
+
+Nota implementada Hito 4:
+- `POST /resources` crea recursos activos con capacidad, duracion de slot y horario.
+- `GET /resources/{resourceId}/availability?date=YYYY-MM-DD` devuelve slots con capacidad, reservados y disponibilidad.
+- `POST /bookings` crea reserva en estado `RESERVED`.
+- Acciones implementadas: `confirm`, `check-in`, `complete` y `cancel`.
 
 ## 6.12 Accesos
 
@@ -153,33 +174,70 @@ La activación ocurre como consecuencia de pago completado.
 - `GET /access/logs`
 - `GET /access/devices`
 
+Nota implementada Hito 4:
+- `GET /access/devices` lista dispositivos de acceso por sucursal activa.
+- `GET /access/logs` lista la bitacora reciente de accesos por sucursal activa.
+- `POST /access/requests` evalua acceso por cliente o identificador contra membresia activa o pase temporal vigente.
+- `POST /access/commands/open` registra apertura manual con motivo y comando simulado.
+- `POST /access/commands/temporary` crea pase temporal limitado por expiracion y numero de usos.
+- `POST /access/commands/block` queda pendiente para integracion futura con hardware real.
+
 ## 6.13 Coaches y rutinas
 
 - `POST /coaches`
 - `GET /coaches`
 - `POST /workouts`
+- `GET /workouts`
 - `GET /workouts/{id}`
 - `POST /workouts/{id}/versions`
 - `POST /workouts/{id}/assign`
 - `GET /clients/{clientId}/workouts`
 
+Nota implementada Hito 5:
+- `GET /coaches` y `POST /coaches` operan por organizacion y sucursal activa.
+- `POST /workouts` crea la rutina y su primera version publicada.
+- `POST /workouts/{id}/versions` agrega una nueva version publicada sin modificar asignaciones historicas.
+- `POST /workouts/{id}/assign` asigna una version concreta o la ultima version publicada a un cliente activo.
+- `GET /reports/coaches` devuelve conteos base: coaches, rutinas, asignaciones activas y asignaciones de ultimos 30 dias.
+
 ## 6.14 Profesionales
 
-- `POST /professionals`
 - `GET /professionals`
-- `POST /professionals/{id}/services`
-- `GET /professionals/{id}/availability`
+- `POST /professionals`
+- `GET /professionals/{professionalId}/services`
+- `POST /professionals/{professionalId}/services`
+- `GET /professionals/{professionalId}/availability`
+- `POST /professionals/{professionalId}/availability`
+
+Nota implementada Hito 5:
+- Los profesionales pertenecen siempre a la organizacion y sucursal activa.
+- Los servicios profesionales mantienen precio, moneda, duracion, tipo y estado propio.
+- La disponibilidad se expresa por dia de semana y rango horario; el backend valida `day_of_week` entre 1 y 7 y que la hora de cierre sea posterior a la apertura.
 
 ## 6.15 Automatizaciones
 
 - `POST /automations`
 - `GET /automations`
-- `PATCH /automations/{id}`
-- `POST /automations/{id}/enable`
-- `POST /automations/{id}/disable`
-- `GET /automations/{id}/executions`
+- `POST /automations/{ruleId}/enable`
+- `POST /automations/{ruleId}/disable`
+- `POST /automations/{ruleId}/execute`
+- `GET /automations/{ruleId}/executions`
 
-## 6.16 Reportes
+Nota implementada Hito 5:
+- Las reglas tienen `triggerType`, `conditionJson`, `actionType`, `actionConfigJson`, `status` y `retryLimit`.
+- `actionType = CREATE_NOTIFICATION` crea una notificacion interna en `notification_log`.
+- Las ejecuciones registran estado `SUCCEEDED`, `SKIPPED` o `FAILED`, referencia del disparador y error cuando aplique.
+
+## 6.16 Notificaciones
+
+- `GET /notifications?limit=50`
+- `POST /notifications`
+
+Nota implementada Hito 5:
+- La V1 registra notificaciones internas y auditorias de envio en `notification_log`.
+- Los canales externos reales quedan preparados por contrato y no se conectan aun a proveedores de email, SMS o WhatsApp.
+
+## 6.17 Reportes
 
 - `GET /reports/sales`
 - `GET /reports/memberships`
@@ -187,8 +245,25 @@ La activación ocurre como consecuencia de pago completado.
 - `GET /reports/bookings`
 - `GET /reports/inventory`
 - `GET /reports/coaches`
+- `GET /reports/owner-dashboard?fromDate=YYYY-MM-DD&toDate=YYYY-MM-DD`
 
-## 6.17 Códigos de error
+Nota implementada Hito 5:
+- `owner-dashboard` devuelve ingresos, ventas, clientes nuevos, membresias activas, accesos, reservas, inventario, coaches, rutinas, asignaciones y profesionales para la organizacion/sucursal activa.
+
+## 6.18 Onboarding e importacion inicial
+
+- `GET /onboarding/checklist`
+- `POST /onboarding/pilot-setup`
+- `POST /clients/imports`
+
+Nota implementada Hito 6:
+- `GET /onboarding/checklist` devuelve banderas de preparacion comercial: organizacion, sucursal, planes, productos, kiosco y clientes.
+- `POST /onboarding/pilot-setup` actualiza organizacion/sucursal activa y crea de forma idempotente planes, productos y kiosco base para piloto.
+- `POST /clients/imports` recibe `{ fileName, csvText, dryRun }` y devuelve conteos y resultado por fila.
+- La plantilla CSV soportada usa columnas `firstName,lastName,birthDate,gender,phone,email,notes`.
+- `dryRun=true` valida filas sin crear clientes; `dryRun=false` crea clientes validos y omite duplicados.
+
+## 6.19 Códigos de error
 
 - PERSON_ALREADY_EXISTS
 - CLIENT_ALREADY_EXISTS
@@ -205,5 +280,66 @@ La activación ocurre como consecuencia de pago completado.
 - BOOKING_CONFLICT
 - BOOKING_NOT_ALLOWED
 - ACCESS_DENIED
-- INVENTORY_INSUFFICIENT
+- INVENTORY_STOCK_INSUFFICIENT
+- PROFESSIONAL_NOT_FOUND
+- AUTOMATION_RULE_NOT_FOUND
+- CLIENT_IMPORT_EMPTY
+- CLIENT_IMPORT_TOO_LARGE
+- BRANCH_REQUIRED
 - PERMISSION_DENIED
+
+## 6.20 Cambios Hito 3.5
+
+Contratos HTTP preservados:
+- No se eliminaron rutas existentes de ventas, pagos, membresias ni kiosco.
+- `ManualPaymentRequest`, renovacion, cambio de plan y creacion de venta aceptan `idempotencyKey` opcional.
+- `POST /self-service/terminals/{terminalCode}/sessions` ahora devuelve tambien `sessionToken`.
+- Las rutas de sesion de kiosco requieren header `X-Self-Service-Session-Token`.
+
+API interna publica:
+- `SalesOperations.createMembershipRenewal(CreateMembershipRenewalSaleCommand)`
+- `SalesOperations.createMembershipPlanChange(CreateMembershipPlanChangeSaleCommand)`
+- `MembershipOperations.renew(RenewMembershipOperationCommand)`
+- `MembershipOperations.changePlan(ChangeMembershipPlanOperationCommand)`
+- `ClientLookupOperations.verifyForSelfService(VerifyClientIdentityCommand)`
+- `ClientLookupOperations.selfServiceProfile(organizationId, clientId)`
+
+Eventos internos publicos:
+- `com.gymos.sales.api.events.SaleCreatedV1`
+- `com.gymos.sales.api.events.PaymentRecordedV1`
+- `com.gymos.sales.api.events.PaymentCompletedV1`
+- `com.gymos.sales.api.events.PaymentRejectedV1`
+- `com.gymos.memberships.api.events.MembershipActivatedV1`
+- `com.gymos.memberships.api.events.MembershipRenewedV1`
+- `com.gymos.memberships.api.events.MembershipPlanChangedV1`
+
+Permisos por endpoint interno:
+- `organization.read`, `organization.update`
+- `branch.read`, `branch.update`
+- `client.read`, `client.create`, `client.update`
+- `catalog.read`, `catalog.manage`
+- `sale.read`, `sale.create`
+- `payment.manual.create`, `payment.manual.validate`, `payment.manual.reject`, `payment.receipt.upload`
+- `membership.read`, `membership.renew`, `membership.change-plan`
+- `report.sales.read`
+- `access.read`, `access.manage`, `access.manual.open`
+- `inventory.read`, `inventory.manage`
+- `resource.read`, `resource.manage`
+- `booking.read`, `booking.manage`
+- `coach.read`, `coach.manage`
+- `workout.read`, `workout.manage`
+- `report.coaches.read`
+- `professional.read`, `professional.manage`
+- `notification.read`, `notification.manage`
+- `automation.read`, `automation.manage`
+- `report.owner.read`
+- `onboarding.manage`
+- `client.import`
+
+Errores agregados o formalizados:
+- `IDEMPOTENCY_KEY_REUSED`
+- `PAYMENT_ALREADY_COMPLETED`
+- `SELF_SERVICE_SESSION_INVALID`
+- `SELF_SERVICE_SESSION_BLOCKED`
+- `SELF_SERVICE_VERIFICATION_FAILED`
+- `RATE_LIMIT_EXCEEDED`
