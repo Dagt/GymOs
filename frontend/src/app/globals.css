@@ -801,8 +801,12 @@ th {
   color: white;
   display: flex;
   flex-direction: column;
-  gap: 1.5rem;
+  gap: 1rem;
+  max-height: 100vh;
+  overflow-y: auto;
   padding: 1.25rem;
+  position: sticky;
+  top: 0;
 }
 
 .admin-sidebar-brand {
@@ -842,6 +846,40 @@ th {
 
 .admin-sidebar nav {
   display: grid;
+  gap: 1rem;
+}
+
+.admin-user-card {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.65rem;
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.85rem;
+}
+
+.admin-user-card p,
+.admin-nav-section p {
+  color: rgba(255, 255, 255, 0.52);
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.admin-user-card strong {
+  color: white;
+  font-size: 1.05rem;
+  font-weight: 950;
+}
+
+.admin-user-card span {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.admin-nav-section {
+  display: grid;
   gap: 0.35rem;
 }
 
@@ -865,6 +903,15 @@ th {
   color: white;
 }
 
+.admin-sidebar nav a.active {
+  background: white;
+  color: #0f172a;
+}
+
+.admin-sidebar nav a.active span {
+  color: #64748b;
+}
+
 .admin-sidebar-footer {
   border-top: 1px solid rgba(255, 255, 255, 0.1);
   display: grid;
@@ -878,6 +925,12 @@ th {
   font-size: 0.86rem;
 }
 
+.admin-sidebar-footer small {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.78rem;
+  margin-top: -0.55rem;
+}
+
 .admin-sidebar-footer button {
   background: white;
   border-radius: 0.5rem;
@@ -887,6 +940,7 @@ th {
 }
 
 .admin-workspace {
+  align-content: start;
   display: grid;
   gap: 1.25rem;
   padding: clamp(1rem, 3vw, 2rem);
@@ -936,6 +990,34 @@ th {
   flex-wrap: wrap;
   gap: 0.6rem;
   justify-content: flex-end;
+}
+
+.admin-role-chip {
+  background: color-mix(in srgb, var(--brand-primary-soft) 65%, white);
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 16%, white);
+  border-radius: 0.5rem;
+  display: grid;
+  gap: 0.08rem;
+  min-height: 3.05rem;
+  min-width: 9.8rem;
+  padding: 0.48rem 0.75rem;
+}
+
+.admin-role-chip span {
+  color: var(--brand-muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.admin-role-chip strong {
+  color: var(--brand-ink);
+  font-size: 0.88rem;
+  font-weight: 900;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-search-box {
@@ -1195,7 +1277,19 @@ th {
   border: 1px solid #fecdd3;
   border-radius: 0.5rem;
   color: #9f1239;
+  display: grid;
+  gap: 0.25rem;
   padding: 0.85rem 1rem;
+}
+
+.admin-alert strong {
+  font-weight: 950;
+}
+
+.admin-alert span {
+  color: #be123c;
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 .admin-empty-state {
@@ -1259,8 +1353,13 @@ th {
   }
 
   .admin-sidebar nav {
-    display: flex;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .admin-sidebar {
+    max-height: none;
+    position: static;
   }
 
   .admin-command-bar {

@@ -150,7 +150,7 @@ export default function InventoryPage() {
       <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
         <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6 shadow-sm">
           <p className="text-sm font-semibold uppercase tracking-wide text-[#51735f]">GymOS</p>
-          <h1 className="mt-3 text-2xl font-semibold">Necesitas iniciar sesion</h1>
+          <h1 className="mt-3 text-2xl font-semibold">Necesitas iniciar sesión</h1>
           <Link
             className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
             href="/login"

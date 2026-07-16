@@ -249,7 +249,7 @@ export default function AccessPage() {
     setError(null);
     setMessage(null);
     try {
-      const pass = await consumeVisitPass(session.accessToken, visitPassId, { reason: "Consumo registrado en recepcion" });
+      const pass = await consumeVisitPass(session.accessToken, visitPassId, { reason: "Consumo registrado en recepción" });
       setVisitPasses((current) => current.map((item) => (item.id === pass.id ? pass : item)));
       setMessage(`Visita consumida. Quedan ${pass.remainingVisits}.`);
     } catch (exception) {
@@ -274,7 +274,7 @@ export default function AccessPage() {
       <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
         <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6 shadow-sm">
           <p className="text-sm font-semibold uppercase tracking-wide text-[#51735f]">GymOS</p>
-          <h1 className="mt-3 text-2xl font-semibold">Necesitas iniciar sesion</h1>
+          <h1 className="mt-3 text-2xl font-semibold">Necesitas iniciar sesión</h1>
           <Link
             className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
             href="/login"
@@ -332,7 +332,7 @@ export default function AccessPage() {
               <input
                 className="h-10 min-w-0 flex-1 rounded-md border border-[#cdd5ca] px-3 text-sm"
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Nombre, email o telefono"
+                placeholder="Nombre, email o teléfono"
                 value={query}
               />
               <button
@@ -373,7 +373,7 @@ export default function AccessPage() {
               <input
                 className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm"
                 onChange={(event) => setIdentifier(event.target.value)}
-                placeholder="Email o telefono"
+                placeholder="Email o teléfono"
                 value={identifier}
               />
             </label>
@@ -510,7 +510,7 @@ export default function AccessPage() {
               <div>
                 <h2 className="text-xl font-semibold">Paquetes de visitas</h2>
                 <p className="mt-1 text-sm text-[#5d6b63]">
-                  Crea paquetes sencillos y descuenta visitas desde recepcion.
+                  Crea paquetes sencillos y descuenta visitas desde recepción.
                 </p>
               </div>
               <button

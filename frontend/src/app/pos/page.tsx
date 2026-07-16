@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { AppNavigation } from "@/components/AppNavigation";
+import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   createSale,
@@ -160,45 +160,33 @@ export default function PosPage() {
     }
   }
 
+  if (loading && !session) {
+    return <LoadingScreen text="Cargando caja..." />;
+  }
+
   if (!session) {
     return <AuthRequired />;
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f7f2] text-[#111815]">
-      <header className="border-b border-[#d8ddd2] bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <Link className="text-sm font-semibold text-[#51735f]" href="/reception">
-              Recepción
-            </Link>
-            <h1 className="mt-1 text-3xl font-semibold">POS</h1>
-            <p className="mt-1 text-sm text-[#5d6b63]">
-              Venta rápida con pago manual y validación interna.
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <Link
-              className="inline-flex h-11 items-center justify-center rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f]"
-              href="/reports/sales"
-            >
-              Reportes
-            </Link>
-            <Link
-              className="inline-flex h-11 items-center justify-center rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f]"
-              href="/catalog"
-            >
-              Catálogo
-            </Link>
-          </div>
-        </div>
-      </header>
+    <AppShell
+      actions={[
+        { href: "/reports/sales", label: "Reportes" },
+        { href: "/catalog", label: "Catálogo" },
+      ]}
+      eyebrow="Recepción / Caja"
+      session={session}
+      subtitle="Venta rápida con pago manual y validación interna."
+      title="Caja / POS"
+    >
+      {error ? <InlineError message={error} /> : null}
+      {message ? (
+        <p className="rounded-md border border-[#bad9c4] bg-[#eff8f1] px-3 py-2 text-sm text-[#31563c]">
+          {message}
+        </p>
+      ) : null}
 
-      <div className="mx-auto max-w-7xl px-6 pt-6">
-        <AppNavigation />
-      </div>
-
-      <section className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[1.1fr_0.9fr]">
+      <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <section className="grid gap-6">
           <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
             <h2 className="text-xl font-semibold">Productos</h2>
@@ -250,10 +238,7 @@ export default function PosPage() {
                 placeholder="Nombre, teléfono o email"
                 value={clientQuery}
               />
-              <button
-                className="h-11 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
-                type="submit"
-              >
+              <button className="app-button" type="submit">
                 Buscar
               </button>
             </form>
@@ -279,7 +264,7 @@ export default function PosPage() {
           <form className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm" onSubmit={submitSale}>
             <h2 className="text-xl font-semibold">Carrito</h2>
             <div className="mt-4 grid gap-3">
-              {cart.length === 0 ? <p className="text-sm text-[#5d6b63]">Sin items.</p> : null}
+              {cart.length === 0 ? <p className="text-sm text-[#5d6b63]">Sin artículos.</p> : null}
               {cart.map((item) => (
                 <div className="grid gap-2 rounded-md border border-[#d8ddd2] p-3" key={item.product.id}>
                   <div className="flex items-start justify-between gap-3">
@@ -348,27 +333,13 @@ export default function PosPage() {
               </div>
             </div>
 
-            {error ? (
-              <p className="mt-4 rounded-md border border-[#e5b7b7] bg-[#fff4f4] px-3 py-2 text-sm text-[#8c2f2f]">
-                {error}
-              </p>
-            ) : null}
-            {message ? (
-              <p className="mt-4 rounded-md border border-[#bad9c4] bg-[#eff8f1] px-3 py-2 text-sm text-[#31563c]">
-                {message}
-              </p>
-            ) : null}
-            <button
-              className="mt-5 h-11 w-full rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30] disabled:opacity-60"
-              disabled={saving || cart.length === 0}
-              type="submit"
-            >
+            <button className="app-button mt-5 h-11 w-full" disabled={saving || cart.length === 0} type="submit">
               {saving ? "Registrando..." : "Registrar venta"}
             </button>
           </form>
         </aside>
       </section>
-    </main>
+    </AppShell>
   );
 }
 

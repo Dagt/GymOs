@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AppNavigation } from "@/components/AppNavigation";
+import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   getOwnerDashboard,
@@ -68,7 +68,7 @@ export default function OwnerDashboardPage() {
   }
 
   if (loading) {
-    return <Centered text="Cargando dashboard..." />;
+    return <LoadingScreen text="Cargando panel ejecutivo..." />;
   }
 
   if (!session) {
@@ -76,81 +76,86 @@ export default function OwnerDashboardPage() {
   }
 
   return (
-    <main className="app-shell text-[#111815]">
-      <div className="app-shell-inner">
-        <header className="app-topbar">
-          <div className="app-title-block">
-            <p className="app-eyebrow">Dirección</p>
-            <h1 className="app-title">Panel administrativo</h1>
-            <p className="app-subtitle">
-              Indicadores claros para revisar ingresos, membresías, operación diaria y pendientes de la sucursal activa.
-            </p>
+    <AppShell
+      actions={[
+        { href: "/reports/sales", label: "Reporte de ventas" },
+        { href: "/reception", label: "Ir a operación" },
+      ]}
+      eyebrow="Gerencia"
+      session={session}
+      subtitle="Indicadores claros para revisar ingresos, membresías, operación diaria y pendientes de la sucursal activa."
+      title="Panel ejecutivo"
+    >
+      <section className="grid gap-6">
+        <section className="admin-panel">
+          <div className="admin-panel-header">
+            <div>
+              <p>Periodo</p>
+              <h2>Filtrar indicadores</h2>
+            </div>
           </div>
-          <div className="app-actions">
+          <div className="admin-command-actions justify-start">
             <input className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => setFromDate(event.target.value)} type="date" value={fromDate} />
             <input className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => setToDate(event.target.value)} type="date" value={toDate} />
             <button className="app-button" onClick={refresh} type="button">Actualizar</button>
           </div>
-        </header>
-
-        <AppNavigation />
-
-        <section className="grid gap-6">
-          {error ? <p className="rounded-md border border-[#e5b7b7] bg-[#fff4f4] px-3 py-2 text-sm text-[#8c2f2f]">{error}</p> : null}
-          {dashboard ? (
-            <>
-              <section className="owner-summary-grid">
-                <Metric
-                  accent="green"
-                  label="Ingresos cobrados"
-                  helper="Pagos confirmados en el periodo"
-                  value={formatMoney(dashboard.paidRevenueCents, "MXN")}
-                />
-                <Metric
-                  accent="blue"
-                  label="Ventas creadas"
-                  helper="Tickets y renovaciones registradas"
-                  value={dashboard.saleCount.toString()}
-                />
-                <Metric
-                  accent="amber"
-                  label="Membresías activas"
-                  helper="Socios con acceso vigente"
-                  value={dashboard.activeMemberships.toString()}
-                />
-              </section>
-
-              <section className="owner-section-grid">
-                <article className="owner-panel">
-                  <div>
-                    <p className="app-eyebrow">Crecimiento</p>
-                    <h2>Clientes y servicios</h2>
-                  </div>
-                  <div className="owner-mini-grid">
-                    <MiniMetric label="Clientes nuevos" value={dashboard.newClients.toString()} />
-                    <MiniMetric label="Reservas" value={dashboard.bookingCount.toString()} />
-                    <MiniMetric label="Rutinas activas" value={dashboard.activeWorkoutAssignments.toString()} />
-                    <MiniMetric label="Profesionales activos" value={dashboard.activeProfessionals.toString()} />
-                  </div>
-                </article>
-
-                <article className="owner-panel">
-                  <div>
-                    <p className="app-eyebrow">Pendientes</p>
-                    <h2>Operación por revisar</h2>
-                  </div>
-                  <div className="owner-mini-grid">
-                    <MiniMetric label="Inventario bajo" value={dashboard.lowStockItems.toString()} tone={dashboard.lowStockItems > 0 ? "warning" : "ok"} />
-                    <MiniMetric label="Notificaciones en cola" value={dashboard.queuedNotifications.toString()} />
-                    <MiniMetric label="Automatizaciones activas" value={dashboard.enabledAutomations.toString()} />
-                  </div>
-                </article>
-              </section>
-            </>
-          ) : null}
         </section>
-      </div>
-    </main>
+
+        {error ? <InlineError message={error} /> : null}
+
+        {dashboard ? (
+          <>
+            <section className="owner-summary-grid">
+              <Metric
+                accent="green"
+                helper="Pagos confirmados en el periodo"
+                label="Ingresos cobrados"
+                value={formatMoney(dashboard.paidRevenueCents, "MXN")}
+              />
+              <Metric
+                accent="blue"
+                helper="Tickets y renovaciones registradas"
+                label="Ventas creadas"
+                value={dashboard.saleCount.toString()}
+              />
+              <Metric
+                accent="amber"
+                helper="Socios con acceso vigente"
+                label="Membresías activas"
+                value={dashboard.activeMemberships.toString()}
+              />
+            </section>
+
+            <section className="owner-section-grid">
+              <article className="owner-panel">
+                <div>
+                  <p className="app-eyebrow">Crecimiento</p>
+                  <h2>Clientes y servicios</h2>
+                </div>
+                <div className="owner-mini-grid">
+                  <MiniMetric label="Clientes nuevos" value={dashboard.newClients.toString()} />
+                  <MiniMetric label="Reservas" value={dashboard.bookingCount.toString()} />
+                  <MiniMetric label="Rutinas activas" value={dashboard.activeWorkoutAssignments.toString()} />
+                  <MiniMetric label="Profesionales activos" value={dashboard.activeProfessionals.toString()} />
+                </div>
+              </article>
+
+              <article className="owner-panel">
+                <div>
+                  <p className="app-eyebrow">Pendientes</p>
+                  <h2>Operación por revisar</h2>
+                </div>
+                <div className="owner-mini-grid">
+                  <MiniMetric label="Inventario bajo" tone={dashboard.lowStockItems > 0 ? "warning" : "ok"} value={dashboard.lowStockItems.toString()} />
+                  <MiniMetric label="Notificaciones en cola" value={dashboard.queuedNotifications.toString()} />
+                  <MiniMetric label="Automatizaciones activas" value={dashboard.enabledAutomations.toString()} />
+                </div>
+              </article>
+            </section>
+          </>
+        ) : null}
+      </section>
+    </AppShell>
   );
 }
 
@@ -180,14 +185,6 @@ function MiniMetric({ label, tone, value }: { label: string; tone?: "ok" | "warn
       <span>{label}</span>
       <strong>{value}</strong>
     </div>
-  );
-}
-
-function Centered({ text }: { text: string }) {
-  return (
-    <main className="grid min-h-screen place-items-center px-6 text-[#111815]">
-      <p className="app-card px-4 py-3 text-sm text-[#42514a]">{text}</p>
-    </main>
   );
 }
 

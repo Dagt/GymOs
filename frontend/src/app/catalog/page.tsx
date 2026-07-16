@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import { AppNavigation } from "@/components/AppNavigation";
+import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   createProduct,
@@ -102,37 +101,33 @@ export default function CatalogPage() {
     }
   }
 
+  if (loading && !session) {
+    return <LoadingScreen text="Cargando catálogo..." />;
+  }
+
   if (!session) {
     return <AuthRequired />;
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f7f2] text-[#111815]">
-      <header className="border-b border-[#d8ddd2] bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <Link className="text-sm font-semibold text-[#51735f]" href="/pos">
-              POS
-            </Link>
-            <h1 className="mt-1 text-3xl font-semibold">Catálogo</h1>
-            <p className="mt-1 text-sm text-[#5d6b63]">
-              Productos y planes disponibles para vender desde recepción.
-            </p>
-          </div>
-          <Link
-            className="inline-flex h-11 items-center justify-center rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f]"
-            href="/reception"
-          >
-            Recepción
-          </Link>
-        </div>
-      </header>
+    <AppShell
+      actions={[
+        { href: "/pos", label: "Abrir POS" },
+        { href: "/reception", label: "Inicio operativo" },
+      ]}
+      eyebrow="Administración"
+      session={session}
+      subtitle="Productos, servicios y planes disponibles para vender desde recepción."
+      title="Catálogo"
+    >
+      {error ? <InlineError message={error} /> : null}
+      {message ? (
+        <p className="rounded-md border border-[#bad9c4] bg-[#eff8f1] px-3 py-2 text-sm text-[#31563c]">
+          {message}
+        </p>
+      ) : null}
 
-      <div className="mx-auto max-w-7xl px-6 pt-6">
-        <AppNavigation />
-      </div>
-
-      <section className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[0.9fr_1.1fr]">
+      <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
           <h2 className="text-xl font-semibold">Nuevo producto</h2>
           <form className="mt-5 grid gap-4" onSubmit={submit}>
@@ -162,21 +157,7 @@ export default function CatalogPage() {
                 value={form.description ?? ""}
               />
             </label>
-            {error ? (
-              <p className="rounded-md border border-[#e5b7b7] bg-[#fff4f4] px-3 py-2 text-sm text-[#8c2f2f]">
-                {error}
-              </p>
-            ) : null}
-            {message ? (
-              <p className="rounded-md border border-[#bad9c4] bg-[#eff8f1] px-3 py-2 text-sm text-[#31563c]">
-                {message}
-              </p>
-            ) : null}
-            <button
-              className="h-11 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30] disabled:opacity-60"
-              disabled={saving}
-              type="submit"
-            >
+            <button className="app-button h-11" disabled={saving} type="submit">
               {saving ? "Guardando..." : "Crear producto"}
             </button>
           </form>
@@ -221,7 +202,7 @@ export default function CatalogPage() {
           </section>
         </section>
       </section>
-    </main>
+    </AppShell>
   );
 }
 
