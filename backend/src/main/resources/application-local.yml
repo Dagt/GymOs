@@ -1,0 +1,3 @@
+gymos:
+  seed:
+    enabled: ${GYMOS_SEED_ENABLED:true}

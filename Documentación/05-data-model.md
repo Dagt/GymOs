@@ -418,7 +418,7 @@ Regla:
 - Check constraints para montos no negativos.
 - Exclusión o validación transaccional para evitar traslapes.
 - Nunca borrar auditoría.
-- Nunca borrar auditorÃ­a.
+- Nunca borrar auditoría.
 
 ## 5.4 Cambios Hito 3.5
 

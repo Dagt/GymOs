@@ -141,3 +141,29 @@ Requisitos:
 - Restricción de rutas al flujo de autoservicio.
 - No almacenar tokens de cliente persistentes en el dispositivo.
 - Auditoría con origen `SELF_SERVICE_KIOSK`.
+
+## 9.9 Operacion piloto
+
+Artefactos agregados:
+
+- Variables de entorno: `infra/.env.example`.
+- Reverse proxy HTTPS: `infra/caddy/Caddyfile.example`.
+- Prometheus: `infra/monitoring/prometheus.yml`.
+- Backup: `scripts/backup-postgres.ps1`.
+- Restore: `scripts/restore-postgres.ps1`.
+
+Runbooks:
+
+- `docs/operations/deployment.md`
+- `docs/operations/backup.md`
+- `docs/operations/restore.md`
+- `docs/operations/incident-response.md`
+- `docs/operations/rollback.md`
+- `docs/operations/secret-rotation.md`
+- `docs/operations/kiosk-troubleshooting.md`
+- `docs/operations/access-device-troubleshooting.md`
+- `docs/operations/database-maintenance.md`
+
+RPO piloto: 24 horas.
+
+RTO piloto: 4 horas.
