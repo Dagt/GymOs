@@ -343,3 +343,218 @@ Errores agregados o formalizados:
 - `SELF_SERVICE_SESSION_BLOCKED`
 - `SELF_SERVICE_VERIFICATION_FAILED`
 - `RATE_LIMIT_EXCEEDED`
+ 
+## Hito 7 - Benefits API
+
+### `GET /api/v1/benefits`
+
+Permiso: `benefit.read`.
+
+Devuelve beneficios de la organizacion activa.
+
+### `POST /api/v1/benefits`
+
+Permiso: `benefit.manage`.
+
+Request:
+
+```json
+{
+  "branchId": null,
+  "code": "STUDENT",
+  "name": "Estudiante",
+  "benefitType": "STUDENT",
+  "discountType": "PERCENT",
+  "discountValueCents": null,
+  "discountPercent": 15,
+  "requiresEvidence": true,
+  "combinable": false,
+  "priority": 10,
+  "validFrom": "2026-01-01",
+  "validUntil": null,
+  "status": "ACTIVE"
+}
+```
+
+Errores:
+
+- `BENEFIT_ALREADY_EXISTS`
+- `AUTHENTICATION_REQUIRED`
+
+### `POST /api/v1/clients/{clientId}/benefits`
+
+Permiso: `client.benefit.assign`.
+
+Asigna beneficio a un cliente del tenant activo.
+
+### `POST /api/v1/client-benefits/{clientBenefitId}/verify`
+
+Permiso: `client.benefit.verify`.
+
+Verifica un beneficio asignado.
+
+## Hito 7 - Visit Pass API
+
+Las rutas viven dentro del modulo de acceso porque su operacion diaria sucede en recepcion/entrada, pero usan permisos propios de visitas.
+
+### `GET /api/v1/access/visit-passes`
+
+Permiso: `visit.read`.
+
+Query opcional:
+
+- `clientId`: filtra paquetes de un cliente.
+
+Devuelve hasta 100 paquetes recientes de la sucursal activa.
+
+### `POST /api/v1/access/visit-passes`
+
+Permiso: `visit.create`.
+
+Request:
+
+```json
+{
+  "clientId": "uuid",
+  "saleId": null,
+  "passType": "VISIT_PACK",
+  "totalVisits": 5,
+  "validFrom": "2026-07-16",
+  "validUntil": "2026-08-15"
+}
+```
+
+Tipos permitidos:
+
+- `DROP_IN`
+- `VISIT_PACK`
+- `COURTESY`
+- `PROMOTION`
+
+Errores:
+
+- `CLIENT_NOT_FOUND`
+- `CLIENT_NOT_ACTIVE`
+- `VISIT_PASS_INVALID_RANGE`
+- `BRANCH_REQUIRED`
+
+### `POST /api/v1/access/visit-passes/{visitPassId}/consume`
+
+Permiso: `visit.consume`.
+
+Request:
+
+```json
+{
+  "reason": "Consumo registrado en recepcion"
+}
+```
+
+Descuenta una visita de forma atomica. Si era la ultima, cambia el estado a `CONSUMED`.
+
+Errores:
+
+- `VISIT_PASS_NOT_FOUND`
+- `VISIT_PASS_NOT_ACTIVE`
+- `VISIT_PASS_OUT_OF_RANGE`
+- `VISIT_PASS_CONSUMED`
+- `VISIT_PASS_CONFLICT`
+
+## Hito 7 - Refund API
+
+### `POST /api/v1/sales/{saleId}/refunds`
+
+Permiso: `sale.refund`.
+
+Registra un reembolso manual procesado sobre una venta de la sucursal activa. El reembolso no elimina pagos ni cambia la venta historica; queda registrado como movimiento financiero separado en `sale_refund`.
+
+Request:
+
+```json
+{
+  "paymentId": null,
+  "amountCents": 50000,
+  "reason": "Cancelacion autorizada por administracion",
+  "idempotencyKey": "refund-20260716-0001"
+}
+```
+
+Notas:
+
+- `paymentId` es opcional. Si se informa, debe pertenecer a la venta y estar `COMPLETED`.
+- `amountCents` no puede exceder el saldo pagado disponible menos reembolsos `PROCESSED` previos.
+- `idempotencyKey` evita registrar dos veces la misma operacion.
+- `GET /api/v1/sales/{saleId}` incluye `refunds` en el detalle.
+
+Errores:
+
+- `SALE_NOT_FOUND`
+- `PAYMENT_NOT_FOUND`
+- `PAYMENT_SALE_MISMATCH`
+- `PAYMENT_NOT_COMPLETED`
+- `REFUND_AMOUNT_INVALID`
+- `REFUND_EXCEEDS_PAYMENT`
+- `REFUND_EXCEEDS_REFUNDABLE_BALANCE`
+- `IDEMPOTENCY_KEY_REUSED`
+
+## Hito 7 - Booking Payment API
+
+### `POST /api/v1/bookings/{bookingId}/payments`
+
+Permiso: `booking.payment.manage`.
+
+Vincula una reserva con una venta existente del POS. La venta sigue perteneciendo al modulo `sales`; `bookings` solo registra la relacion operativa en `booking_payment`.
+
+Request:
+
+```json
+{
+  "saleId": "uuid",
+  "status": "PAID",
+  "expiresAt": null
+}
+```
+
+Estados permitidos:
+
+- `PENDING`
+- `PAID`
+- `EXPIRED`
+- `CANCELLED`
+
+Comportamiento:
+
+- Si la reserva ya tenia pago vinculado, la relacion se actualiza de forma idempotente por `organization_id + booking_id`.
+- Si `status = PAID` y la reserva estaba `RESERVED`, la reserva pasa a `CONFIRMED`.
+- `GET /api/v1/bookings` y `GET /api/v1/bookings/{bookingId}` incluyen `bookingPaymentId`, `saleId`, `paymentStatus` y `saleNumber`.
+
+Errores:
+
+- `BOOKING_NOT_FOUND`
+- `BOOKING_ALREADY_CLOSED`
+- `SALE_NOT_FOUND`
+
+## Hito 7 - Scheduled Automations
+
+Las automatizaciones aceptan `triggerType = SCHEDULED` usando el contrato existente de `POST /api/v1/automations`.
+
+Request ejemplo:
+
+```json
+{
+  "name": "Recordatorio operativo diario",
+  "triggerType": "SCHEDULED",
+  "conditionJson": "{\"intervalMinutes\":1440}",
+  "actionType": "CREATE_NOTIFICATION",
+  "actionConfigJson": "{\"channel\":\"IN_APP\",\"subject\":\"Revision diaria\",\"body\":\"Revisa pagos pendientes y reservas.\"}",
+  "retryLimit": 3
+}
+```
+
+Comportamiento:
+
+- Al crear una regla `SCHEDULED`, backend calcula `nextRunAt` usando `conditionJson.intervalMinutes`.
+- Un job interno `@Scheduled` revisa reglas vencidas cada `gymos.automation.scheduler-delay-ms` milisegundos, por defecto 60000.
+- Cada regla vencida se reclama con `locked_until` para evitar ejecuciones simultaneas.
+- Al terminar, la regla se reprograma sumando nuevamente `intervalMinutes`.
+- Las ejecuciones se registran en `automation_execution` y, para `CREATE_NOTIFICATION`, se encola una notificacion interna.

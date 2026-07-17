@@ -145,7 +145,7 @@ export default function OrganizationSettingsPage() {
       <header className="app-topbar">
           <div className="app-title-block">
             <p className="app-eyebrow">Administracion</p>
-            <h1 className="app-title">Configuracion del gimnasio</h1>
+            <h1 className="app-title">Configuración del gimnasio</h1>
             <p className="app-subtitle">
               Datos comerciales, sucursal operativa y preparacion para demos o pilotos.
             </p>
@@ -286,7 +286,7 @@ function AuthRequired() {
   return (
     <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
       <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">Necesitas iniciar sesion</h1>
+        <h1 className="text-2xl font-semibold">Necesitas iniciar sesión</h1>
         <Link
           className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
           href="/login"

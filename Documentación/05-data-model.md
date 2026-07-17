@@ -418,7 +418,7 @@ Regla:
 - Check constraints para montos no negativos.
 - Exclusión o validación transaccional para evitar traslapes.
 - Nunca borrar auditoría.
-- Nunca borrar auditorÃ­a.
+- Nunca borrar auditoría.
 
 ## 5.4 Cambios Hito 3.5
 
@@ -459,3 +459,40 @@ Migraciones nuevas:
 - `V13__hito5_coaches_workouts.sql`: agrega coaches, rutinas versionadas, asignaciones a clientes, permisos y datos demo de coaching.
 - `V14__hito5_wellness_notifications_automations.sql`: agrega profesionales de bienestar, servicios, disponibilidad, notificaciones, automatizaciones y dashboard del dueno.
 - `V15__hito6_productization_onboarding_imports.sql`: agrega bitacora de importacion inicial de clientes y permisos `onboarding.manage` y `client.import`.
+ 
+## Hito 7 - Tablas V16
+
+Migracion: `V16__hito7_pilot_readiness_foundations.sql`.
+
+Tablas nuevas:
+
+- `benefit`
+- `client_benefit`
+- `benefit_evidence`
+- `visit_pass`
+- `sale_refund`
+- `booking_payment`
+- `booking_policy`
+- `auto_renewal_attempt`
+- `notification_template`
+
+Columnas nuevas:
+
+- `membership.auto_renew`
+- `membership.cancelled_at`
+- `membership.cancellation_reason`
+- `automation_rule.trigger_type`
+- `automation_rule.schedule_cron`
+- `automation_rule.next_run_at`
+- `automation_rule.locked_until`
+
+Restricciones e indices destacados:
+
+- `ux_benefit_org_code`
+- `ux_client_benefit_active`
+- `ux_sale_refund_org_idempotency`
+- `ux_booking_payment_booking`
+- `ux_auto_renewal_attempt_idempotency`
+- `ux_notification_template_org_code_channel`
+
+Todas las tablas operativas incluyen `organization_id`; las tablas localizables incluyen `branch_id`.

@@ -9,9 +9,11 @@ import {
   getSale,
   getStoredSession,
   rejectPayment,
+  requestSaleRefund,
   uploadPaymentReceipt,
   validatePayment,
   type ManualPaymentPayload,
+  type PaymentDetail,
   type SaleDetailResponse,
   type StoredSession,
 } from "@/lib/api";
@@ -30,6 +32,9 @@ export default function SaleDetailPage() {
   const [paymentAmount, setPaymentAmount] = useState("");
   const [paymentReference, setPaymentReference] = useState("");
   const [validateNow, setValidateNow] = useState(true);
+  const [refundPaymentId, setRefundPaymentId] = useState("");
+  const [refundAmount, setRefundAmount] = useState("");
+  const [refundReason, setRefundReason] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -134,6 +139,29 @@ export default function SaleDetailPage() {
       setPaymentAmount("");
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible registrar pago.");
+    }
+  }
+
+  async function submitRefund(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session || !data) {
+      return;
+    }
+    setError(null);
+    try {
+      const amountCents = refundAmount.trim()
+        ? Math.round(Number(refundAmount) * 100)
+        : refundableCents(data);
+      setData(await requestSaleRefund(session.accessToken, data.sale.id, {
+        paymentId: refundPaymentId || null,
+        amountCents,
+        reason: refundReason,
+      }));
+      setRefundPaymentId("");
+      setRefundAmount("");
+      setRefundReason("");
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible registrar reembolso.");
     }
   }
 
@@ -304,11 +332,84 @@ export default function SaleDetailPage() {
           </div>
         </section>
 
+        <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+          <h2 className="text-xl font-semibold">Reembolsos</h2>
+          {refundableCents(data) > 0 ? (
+            <form className="mt-4 grid gap-3 rounded-md border border-[#d8ddd2] bg-[#f6f7f2] p-4" onSubmit={submitRefund}>
+              <h3 className="font-semibold">Registrar reembolso manual</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+                  Pago relacionado
+                  <select
+                    className="h-10 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm"
+                    onChange={(event) => setRefundPaymentId(event.target.value)}
+                    value={refundPaymentId}
+                  >
+                    <option value="">Venta completa</option>
+                    {completedPayments(data.payments).map((payment) => (
+                      <option key={payment.id} value={payment.id}>
+                        {payment.method} - {formatMoney(payment.amountCents, payment.currency)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+                  Monto
+                  <input
+                    className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm"
+                    min={0}
+                    onChange={(event) => setRefundAmount(event.target.value)}
+                    placeholder={(refundableCents(data) / 100).toFixed(2)}
+                    step="0.01"
+                    type="number"
+                    value={refundAmount}
+                  />
+                </label>
+              </div>
+              <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+                Motivo
+                <textarea
+                  className="min-h-20 rounded-md border border-[#cdd5ca] px-3 py-2 text-sm"
+                  onChange={(event) => setRefundReason(event.target.value)}
+                  value={refundReason}
+                />
+              </label>
+              <button
+                className="h-10 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30] disabled:opacity-60"
+                disabled={!refundReason.trim()}
+                type="submit"
+              >
+                Registrar reembolso
+              </button>
+            </form>
+          ) : (
+            <p className="mt-4 text-sm text-[#5d6b63]">No hay saldo pagado disponible para reembolso.</p>
+          )}
+
+          <div className="mt-4 grid gap-3">
+            {data.refunds.length === 0 ? (
+              <p className="text-sm text-[#5d6b63]">Sin reembolsos registrados.</p>
+            ) : null}
+            {data.refunds.map((refund) => (
+              <article className="rounded-md border border-[#d8ddd2] px-4 py-3" key={refund.id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold">{refund.status}</p>
+                    <p className="mt-1 text-sm text-[#5d6b63]">{refund.reason}</p>
+                    <p className="mt-1 text-xs text-[#6f7a73]">{formatDateTime(refund.requestedAt)}</p>
+                  </div>
+                  <p className="font-semibold">{formatMoney(refund.amountCents, refund.currency)}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+
         <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm lg:col-span-2">
           <h2 className="text-xl font-semibold">Membresias activadas</h2>
           <div className="mt-4 grid gap-3 md:grid-cols-2">
             {data.memberships.length === 0 ? (
-              <p className="text-sm text-[#5d6b63]">Sin membresias activadas por esta venta.</p>
+              <p className="text-sm text-[#5d6b63]">Sin membresías activadas por esta venta.</p>
             ) : null}
             {data.memberships.map((membership) => (
               <article className="rounded-md border border-[#d8ddd2] px-4 py-3" key={membership.id}>
@@ -338,7 +439,7 @@ function AuthRequired() {
   return (
     <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
       <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">Necesitas iniciar sesion</h1>
+        <h1 className="text-2xl font-semibold">Necesitas iniciar sesión</h1>
         <Link
           className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
           href="/login"
@@ -355,4 +456,22 @@ function formatMoney(cents: number, currency: string) {
     style: "currency",
     currency,
   }).format(cents / 100);
+}
+
+function completedPayments(payments: PaymentDetail[]) {
+  return payments.filter((payment) => payment.status === "COMPLETED");
+}
+
+function refundableCents(data: SaleDetailResponse) {
+  const refunded = data.refunds
+    .filter((refund) => refund.status === "PROCESSED")
+    .reduce((total, refund) => total + refund.amountCents, 0);
+  return Math.max(0, data.sale.paidCents - refunded);
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat("es-MX", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(new Date(value));
 }

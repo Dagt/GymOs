@@ -146,7 +146,7 @@ Reglas:
 - Debe cerrar sesión automáticamente por inactividad.
 - Toda acción debe auditarse con origen `SELF_SERVICE_KIOSK`.
 - Los pagos manuales iniciados desde kiosco quedan en estado pendiente o en revisión hasta que el flujo de pagos los complete según reglas.
-- Los pagos manuales iniciados desde kiosco quedan en estado pendiente o en revisiÃ³n hasta que el flujo de pagos los complete segÃºn reglas.
+- Los pagos manuales iniciados desde kiosco quedan en estado pendiente o en revisión hasta que el flujo de pagos los complete según reglas.
 
 ## 3.14 Estabilizacion arquitectonica Hito 3.5
 
@@ -206,7 +206,7 @@ Decisiones implementadas:
 - Las pantallas `/onboarding` y `/clients/import` convierten la preparacion comercial en flujos operables desde la app.
 - Backups, staging formal, capacitacion, manual operativo y checklist comercial pasan al Hito 7 por ser trabajo administrativo/operativo.
 
-## 3.18 RediseÃ±o frontend Hito 6.5
+## 3.18 Rediseño frontend Hito 6.5
 
 Decisiones implementadas:
 - La personalizacion visual se resuelve inicialmente en frontend mediante tokens CSS y `localStorage`.

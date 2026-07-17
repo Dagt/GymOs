@@ -44,7 +44,7 @@ springdoc:
 
 gymos:
   seed:
-    enabled: ${GYMOS_SEED_ENABLED:true}
+    enabled: ${GYMOS_SEED_ENABLED:false}
   security:
     cors-allowed-origins: ${GYMOS_CORS_ALLOWED_ORIGINS:http://localhost:3000}
     jwt-secret: ${GYMOS_JWT_SECRET:dev-only-change-this-secret-before-production-please}

@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
+import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   createProduct,
   getPlans,
@@ -60,7 +61,7 @@ export default function CatalogPage() {
         setPlans(loadedPlans);
       } catch (exception) {
         if (active) {
-          setError(exception instanceof Error ? exception.message : "No fue posible cargar catalogo.");
+          setError(exception instanceof Error ? exception.message : "No fue posible cargar catálogo.");
         }
       } finally {
         if (active) {
@@ -100,33 +101,33 @@ export default function CatalogPage() {
     }
   }
 
+  if (loading && !session) {
+    return <LoadingScreen text="Cargando catálogo..." />;
+  }
+
   if (!session) {
     return <AuthRequired />;
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f7f2] text-[#111815]">
-      <header className="border-b border-[#d8ddd2] bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <Link className="text-sm font-semibold text-[#51735f]" href="/pos">
-              POS
-            </Link>
-            <h1 className="mt-1 text-3xl font-semibold">Catalogo</h1>
-            <p className="mt-1 text-sm text-[#5d6b63]">
-              Productos y planes disponibles para vender desde recepcion.
-            </p>
-          </div>
-          <Link
-            className="inline-flex h-11 items-center justify-center rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f]"
-            href="/reception"
-          >
-            Recepcion
-          </Link>
-        </div>
-      </header>
+    <AppShell
+      actions={[
+        { href: "/pos", label: "Abrir POS" },
+        { href: "/reception", label: "Inicio operativo" },
+      ]}
+      eyebrow="Administración"
+      session={session}
+      subtitle="Productos, servicios y planes disponibles para vender desde recepción."
+      title="Catálogo"
+    >
+      {error ? <InlineError message={error} /> : null}
+      {message ? (
+        <p className="rounded-md border border-[#bad9c4] bg-[#eff8f1] px-3 py-2 text-sm text-[#31563c]">
+          {message}
+        </p>
+      ) : null}
 
-      <section className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[0.9fr_1.1fr]">
+      <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
         <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
           <h2 className="text-xl font-semibold">Nuevo producto</h2>
           <form className="mt-5 grid gap-4" onSubmit={submit}>
@@ -143,34 +144,20 @@ export default function CatalogPage() {
                 onChange={(event) => setForm({ ...form, productType: event.target.value as ProductPayload["productType"] })}
                 value={form.productType}
               >
-                <option value="PHYSICAL">Producto fisico</option>
+                <option value="PHYSICAL">Producto físico</option>
                 <option value="SERVICE">Servicio</option>
-                <option value="MEMBERSHIP_PLAN">Plan de membresia</option>
+                <option value="MEMBERSHIP_PLAN">Plan de membresía</option>
               </select>
             </label>
             <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-              Descripcion
+              Descripción
               <textarea
                 className="min-h-24 rounded-md border border-[#cdd5ca] px-3 py-2 text-sm outline-none transition focus:border-[#51735f]"
                 onChange={(event) => setForm({ ...form, description: event.target.value })}
                 value={form.description ?? ""}
               />
             </label>
-            {error ? (
-              <p className="rounded-md border border-[#e5b7b7] bg-[#fff4f4] px-3 py-2 text-sm text-[#8c2f2f]">
-                {error}
-              </p>
-            ) : null}
-            {message ? (
-              <p className="rounded-md border border-[#bad9c4] bg-[#eff8f1] px-3 py-2 text-sm text-[#31563c]">
-                {message}
-              </p>
-            ) : null}
-            <button
-              className="h-11 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30] disabled:opacity-60"
-              disabled={saving}
-              type="submit"
-            >
+            <button className="app-button h-11" disabled={saving} type="submit">
               {saving ? "Guardando..." : "Crear producto"}
             </button>
           </form>
@@ -183,7 +170,7 @@ export default function CatalogPage() {
               <span className="text-sm text-[#6f7a73]">{products.length}</span>
             </div>
             <div className="mt-4 grid gap-3">
-              {loading ? <p className="text-sm text-[#5d6b63]">Cargando catalogo...</p> : null}
+              {loading ? <p className="text-sm text-[#5d6b63]">Cargando catálogo...</p> : null}
               {products.map((product) => (
                 <article className="rounded-md border border-[#d8ddd2] px-4 py-3" key={product.id}>
                   <div className="flex items-start justify-between gap-3">
@@ -207,7 +194,7 @@ export default function CatalogPage() {
                 <article className="rounded-md border border-[#d8ddd2] px-4 py-3" key={plan.id}>
                   <p className="font-semibold">{plan.name}</p>
                   <p className="mt-1 text-sm text-[#5d6b63]">
-                    {plan.durationDays} dias - gracia {plan.graceDays} - {formatMoney(plan.priceCents, plan.currency)}
+                    {plan.durationDays} días - gracia {plan.graceDays} - {formatMoney(plan.priceCents, plan.currency)}
                   </p>
                 </article>
               ))}
@@ -215,7 +202,7 @@ export default function CatalogPage() {
           </section>
         </section>
       </section>
-    </main>
+    </AppShell>
   );
 }
 
@@ -245,17 +232,10 @@ function Field({
 
 function AuthRequired() {
   return (
-    <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-      <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">Necesitas iniciar sesion</h1>
-        <Link
-          className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
-          href="/login"
-        >
-          Iniciar sesion
-        </Link>
-      </section>
-    </main>
+    <AuthRequiredCard
+      message="El catálogo requiere una cuenta con permisos para consultar o administrar productos y planes."
+      title="Inicia sesión para ver el catálogo"
+    />
   );
 }
 

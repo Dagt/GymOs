@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { AppNavigation } from "@/components/AppNavigation";
+import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
+import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   getSalesReport,
   getStoredSession,
@@ -80,13 +81,7 @@ export default function SalesReportPage() {
   }
 
   if (loading) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-        <p className="rounded-md border border-[#d8ddd2] bg-white px-4 py-3 text-sm text-[#42514a]">
-          Cargando reporte...
-        </p>
-      </main>
-    );
+    return <LoadingScreen text="Cargando reporte..." />;
   }
 
   if (!session) {
@@ -96,32 +91,16 @@ export default function SalesReportPage() {
   const currency = report?.currency ?? "MXN";
 
   return (
-    <main className="app-shell text-[#111815]">
-      <div className="app-shell-inner">
-      <header className="app-topbar">
-          <div className="app-title-block">
-            <p className="app-eyebrow">Reportes</p>
-            <h1 className="app-title">Reporte de ventas</h1>
-            <p className="app-subtitle">Resumen operativo de ventas, saldos y pagos manuales.</p>
-          </div>
-          <div className="app-actions">
-            <Link
-              className="app-button"
-              href="/pos"
-            >
-              POS
-            </Link>
-            <Link
-              className="app-button-secondary"
-              href="/catalog"
-            >
-              Catalogo
-            </Link>
-          </div>
-      </header>
-
-      <AppNavigation />
-
+    <AppShell
+      actions={[
+        { href: "/pos", label: "Abrir POS" },
+        { href: "/dashboard", label: "Panel ejecutivo" },
+      ]}
+      eyebrow="Gerencia"
+      session={session}
+      subtitle="Resumen operativo de ventas, saldos y pagos manuales."
+      title="Reporte de ventas"
+    >
       <section className="grid gap-6">
         <form
           className="grid gap-3 rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm md:grid-cols-[1fr_1fr_auto]"
@@ -129,55 +108,37 @@ export default function SalesReportPage() {
         >
           <label className="grid gap-2 text-sm font-medium text-[#42514a]">
             Desde
-            <input
-              className="h-11 rounded-md border border-[#cdd5ca] px-3 text-sm"
-              onChange={(event) => setFromDate(event.target.value)}
-              type="date"
-              value={fromDate}
-            />
+            <input className="h-11 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => setFromDate(event.target.value)} type="date" value={fromDate} />
           </label>
           <label className="grid gap-2 text-sm font-medium text-[#42514a]">
             Hasta
-            <input
-              className="h-11 rounded-md border border-[#cdd5ca] px-3 text-sm"
-              onChange={(event) => setToDate(event.target.value)}
-              type="date"
-              value={toDate}
-            />
+            <input className="h-11 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => setToDate(event.target.value)} type="date" value={toDate} />
           </label>
-          <button
-            className="h-11 self-end rounded-md bg-[#13251c] px-5 text-sm font-semibold text-white transition hover:bg-[#243d30] disabled:opacity-60"
-            disabled={refreshing}
-            type="submit"
-          >
+          <button className="app-button h-11 self-end" disabled={refreshing} type="submit">
             {refreshing ? "Actualizando..." : "Actualizar"}
           </button>
         </form>
 
-        {error ? (
-          <p className="rounded-md border border-[#e5b7b7] bg-[#fff4f4] px-3 py-2 text-sm text-[#8c2f2f]">
-            {error}
-          </p>
-        ) : null}
+        {error ? <InlineError message={error} /> : null}
 
         {report ? (
           <>
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               <MetricCard label="Ventas" value={report.sales.saleCount.toString()} detail={periodLabel(report)} />
               <MetricCard
+                detail={`${formatMoney(averageTicket, currency)} ticket promedio`}
                 label="Total vendido"
                 value={formatMoney(report.sales.totalCents, currency)}
-                detail={`${formatMoney(averageTicket, currency)} ticket promedio`}
               />
               <MetricCard
+                detail={`${report.payments.completedPayments} pagos completados`}
                 label="Cobrado"
                 value={formatMoney(report.sales.paidCents, currency)}
-                detail={`${report.payments.completedPayments} pagos completados`}
               />
               <MetricCard
+                detail={`${report.sales.pendingSales + report.sales.partiallyPaidSales} ventas abiertas`}
                 label="Saldo pendiente"
                 value={formatMoney(report.sales.balanceCents, currency)}
-                detail={`${report.sales.pendingSales + report.sales.partiallyPaidSales} ventas abiertas`}
               />
             </section>
 
@@ -212,12 +173,12 @@ export default function SalesReportPage() {
               </section>
 
               <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
-                <h2 className="text-xl font-semibold">Pagos por metodo</h2>
+                <h2 className="text-xl font-semibold">Pagos por método</h2>
                 <div className="mt-4 overflow-x-auto">
                   <table className="w-full min-w-[620px] border-collapse text-sm">
                     <thead className="text-left text-[#6f7a73]">
                       <tr>
-                        <th className="border-b border-[#e4e8df] py-2 pr-3">Metodo</th>
+                        <th className="border-b border-[#e4e8df] py-2 pr-3">Método</th>
                         <th className="border-b border-[#e4e8df] py-2 pr-3">Pagos</th>
                         <th className="border-b border-[#e4e8df] py-2 pr-3">Completado</th>
                         <th className="border-b border-[#e4e8df] py-2 pr-3">Pendiente</th>
@@ -245,7 +206,7 @@ export default function SalesReportPage() {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <h2 className="text-xl font-semibold">Ventas recientes</h2>
-                  <p className="mt-1 text-sm text-[#5d6b63]">Ultimas operaciones de la sucursal activa.</p>
+                  <p className="mt-1 text-sm text-[#5d6b63]">Últimas operaciones de la sucursal activa.</p>
                 </div>
                 <Link className="text-sm font-semibold text-[#51735f]" href="/pos">
                   Abrir POS
@@ -269,8 +230,7 @@ export default function SalesReportPage() {
           </>
         ) : null}
       </section>
-      </div>
-    </main>
+    </AppShell>
   );
 }
 
@@ -310,17 +270,10 @@ function PaymentMethodRow({ row, currency }: { row: PaymentMethodBreakdown; curr
 
 function AuthRequired() {
   return (
-    <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-      <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">Necesitas iniciar sesion</h1>
-        <Link
-          className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
-          href="/login"
-        >
-          Iniciar sesion
-        </Link>
-      </section>
-    </main>
+    <AuthRequiredCard
+      message="Los reportes de ventas requieren permisos administrativos o de dirección."
+      title="Inicia sesión para ver reportes"
+    />
   );
 }
 

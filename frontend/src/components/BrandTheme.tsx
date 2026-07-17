@@ -63,7 +63,7 @@ export function BrandTheme() {
               <h2>Marca del gimnasio</h2>
             </div>
             <button aria-label="Cerrar" onClick={() => setOpen(false)} type="button">
-              x
+              Cerrar
             </button>
           </div>
           <form className="brand-customizer-form" onSubmit={submit}>

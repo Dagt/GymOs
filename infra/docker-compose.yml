@@ -50,6 +50,7 @@ services:
     build:
       context: ../backend
     environment:
+      SPRING_PROFILES_ACTIVE: local
       GYMOS_DB_URL: jdbc:postgresql://postgres:5432/gymos
       GYMOS_DB_USERNAME: gymos
       GYMOS_DB_PASSWORD: gymos
@@ -60,6 +61,7 @@ services:
       GYMOS_MINIO_ACCESS_KEY: gymos
       GYMOS_MINIO_SECRET_KEY: gymos-secret
       GYMOS_MINIO_BUCKET: gymos-receipts
+      GYMOS_SEED_ENABLED: "true"
     ports:
       - "8080:8080"
     depends_on:

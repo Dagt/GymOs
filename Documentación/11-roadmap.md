@@ -126,7 +126,7 @@
 - Permisos `onboarding.manage` y `client.import`.
 - Pantallas `/onboarding` y `/clients/import`.
 
-## Fase 10 - Hito 6.5: RediseÃ±o frontend y experiencia comercial
+## Fase 10 - Hito 6.5: Rediseño frontend y experiencia comercial
 
 - Sistema visual frontend con tokens de marca.
 - Navegacion principal por areas: Operacion, Gestion y Direccion.
@@ -145,6 +145,67 @@
 - Manual operativo para el gimnasio piloto.
 - Ejecucion del piloto con datos reales.
 - Registro de feedback, pricing, soporte y procesos comerciales.
+
+## Hito 7.1 - Calidad y regresion
+
+Estado: IN_PROGRESS
+
+- Suite transversal multi-tenant.
+- Regresion de autenticacion, ventas, pagos, membresias, kiosco, inventario, reservas, acceso e importacion.
+- Pruebas de concurrencia e idempotencia.
+- Testcontainers como base para flujos criticos.
+
+## Hito 7.2 - Refactorizacion tecnica
+
+Estado: IN_PROGRESS
+
+- Separacion gradual de servicios grandes por casos de uso.
+- Eliminacion de `JdbcClient` en `application`.
+- Division del cliente frontend API por dominio.
+- Extraccion de paginas frontend grandes en componentes y hooks.
+
+## Hito 7.3 - Operacion y produccion
+
+Estado: IN_PROGRESS
+
+- Perfiles `local`, `test`, `development`, `staging` y `production`.
+- Seed demo limitado a `local`.
+- Reverse proxy, HTTPS, backups, restore, observabilidad y runbooks.
+- CI ampliado con validacion Docker.
+
+## Hito 7.4 - Cierre funcional minimo
+
+Estado: PLANNED
+
+- Beneficios.
+- Expiracion y recordatorios de membresia.
+- Renovacion automatica con pasarela abstracta.
+- Visitas.
+- Cancelaciones y reembolsos.
+- Reservas pagadas.
+- Automatizaciones programadas y correo.
+
+## Hito 7.5 - Preparacion del piloto
+
+Estado: PLANNED
+
+- Checklist operativo del gimnasio piloto.
+- Plantillas de importacion.
+- Manuales por rol.
+- Operacion paralela.
+- Feedback, soporte y pricing.
+
+## Hito 8 - Integraciones reales
+
+- Torniquetes, reconocimiento facial, WhatsApp, SMS, pasarela de pagos, facturacion, webhooks y modo offline.
+
+## Hito 9 - Aplicacion de clientes
+
+- Login cliente, membresia, pagos, reservas, rutinas, notificaciones, perfil, QR e historial.
+
+## Hito 10 - SaaS avanzado
+
+- Provisionamiento, suscripciones B2B, licenciamiento, modulos contratados, facturacion GymOS y marketplace.
 
 ## Definición de terminado
 

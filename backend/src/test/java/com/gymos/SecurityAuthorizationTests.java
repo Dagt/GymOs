@@ -35,9 +35,27 @@ class SecurityAuthorizationTests {
 	}
 
 	@Test
+	@WithMockUser(authorities = "sale.read")
+	void saleRefundRequiresRefundPermission() throws Exception {
+		mockMvc.perform(post("/api/v1/sales/99999999-9999-9999-9999-999999999954/refunds")
+						.contentType("application/json")
+						.content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
 	@WithMockUser(authorities = "booking.read")
 	void bookingCreationRequiresManagePermission() throws Exception {
 		mockMvc.perform(post("/api/v1/bookings").contentType("application/json").content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(authorities = "booking.manage")
+	void bookingPaymentRequiresPaymentManagePermission() throws Exception {
+		mockMvc.perform(post("/api/v1/bookings/99999999-9999-9999-9999-999999999955/payments")
+						.contentType("application/json")
+						.content("{}"))
 				.andExpect(status().isForbidden());
 	}
 
@@ -89,6 +107,45 @@ class SecurityAuthorizationTests {
 	@WithMockUser(authorities = "organization.update")
 	void onboardingRequiresOnboardingPermission() throws Exception {
 		mockMvc.perform(post("/api/v1/onboarding/pilot-setup").contentType("application/json").content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(authorities = "benefit.read")
+	void benefitCreationRequiresManagePermission() throws Exception {
+		mockMvc.perform(post("/api/v1/benefits").contentType("application/json").content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(authorities = "client.read")
+	void clientBenefitAssignmentRequiresAssignPermission() throws Exception {
+		mockMvc.perform(post("/api/v1/clients/99999999-9999-9999-9999-999999999951/benefits")
+						.contentType("application/json")
+						.content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(authorities = "client.benefit.assign")
+	void clientBenefitVerificationRequiresVerifyPermission() throws Exception {
+		mockMvc.perform(post("/api/v1/client-benefits/99999999-9999-9999-9999-999999999952/verify"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(authorities = "access.manage")
+	void visitPassCreationRequiresVisitCreatePermission() throws Exception {
+		mockMvc.perform(post("/api/v1/access/visit-passes").contentType("application/json").content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(authorities = "visit.create")
+	void visitPassConsumeRequiresVisitConsumePermission() throws Exception {
+		mockMvc.perform(post("/api/v1/access/visit-passes/99999999-9999-9999-9999-999999999953/consume")
+						.contentType("application/json")
+						.content("{}"))
 				.andExpect(status().isForbidden());
 	}
 

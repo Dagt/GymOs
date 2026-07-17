@@ -3,6 +3,7 @@ package com.gymos.bookings.application;
 import com.gymos.audit.api.AuditService;
 import com.gymos.bookings.application.command.CreateBookingCommand;
 import com.gymos.bookings.application.command.CreateResourceCommand;
+import com.gymos.bookings.application.command.LinkBookingPaymentCommand;
 import com.gymos.bookings.infrastructure.BookingRepository;
 import com.gymos.bookings.infrastructure.BookingRepository.AvailabilitySlot;
 import com.gymos.bookings.infrastructure.BookingRepository.BookingRecord;
@@ -136,6 +137,25 @@ public class BookingService {
 		}
 		bookingRepository.updateStatus(principal.organizationId(), principal.branchId(), bookingId, targetStatus, principal.userId());
 		auditService.record(principal, "BOOKING_" + targetStatus, "BOOKING", bookingId, "RECEPTION", null, correlationId);
+		return detail(principal, bookingId);
+	}
+
+	@Transactional
+	public BookingRecord linkPayment(GymOsPrincipal principal, UUID bookingId, LinkBookingPaymentCommand command, String correlationId) {
+		BookingRecord current = detail(principal, bookingId);
+		if ("CANCELLED".equals(current.status()) || "COMPLETED".equals(current.status())) {
+			throw new BusinessException("BOOKING_ALREADY_CLOSED", "La reserva ya esta cerrada.");
+		}
+		if (!bookingRepository.saleExists(principal.organizationId(), principal.branchId(), command.saleId())) {
+			throw new BusinessException("SALE_NOT_FOUND", "La venta no existe o no esta disponible en esta sucursal.");
+		}
+		String status = command.status().trim().toUpperCase();
+		bookingRepository.upsertBookingPayment(principal.organizationId(), principal.branchId(), bookingId, command.saleId(), status, command.expiresAt());
+		auditService.record(principal, "BOOKING_PAYMENT_LINKED", "BOOKING", bookingId, "RECEPTION", status, correlationId);
+		if ("PAID".equals(status) && "RESERVED".equals(current.status())) {
+			bookingRepository.updateStatus(principal.organizationId(), principal.branchId(), bookingId, "CONFIRMED", principal.userId());
+			auditService.record(principal, "BOOKING_CONFIRMED", "BOOKING", bookingId, "RECEPTION", "Pago vinculado", correlationId);
+		}
 		return detail(principal, bookingId);
 	}
 

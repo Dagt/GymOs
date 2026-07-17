@@ -30,7 +30,7 @@ const defaultPlan = {
 const defaultProduct = {
   sku: "AGUA-PILOTO",
   name: "Botella de agua",
-  description: "Producto basico para venta rapida en recepcion.",
+  description: "Producto básico para venta rápida en recepción.",
   productType: "PHYSICAL" as const,
   priceCents: 2500,
   currency: "MXN",
@@ -172,7 +172,7 @@ export default function OnboardingPage() {
           <h2 className="text-xl font-semibold">Checklist vendible</h2>
           <div className="mt-5 grid gap-3">
             <ChecklistItem done={checklist.organizationProfileComplete} label="Organizacion con contacto" value={organization.tradeName} />
-            <ChecklistItem done={checklist.branchConfigured} label="Sucursal con telefono" value={branch.name} />
+            <ChecklistItem done={checklist.branchConfigured} label="Sucursal con teléfono" value={branch.name} />
             <ChecklistItem done={checklist.hasMembershipPlans} label="Planes activos" value={`${checklist.activePlanCount}`} />
             <ChecklistItem done={checklist.hasRetailProducts} label="Productos vendibles" value={`${checklist.activeProductCount}`} />
             <ChecklistItem done={checklist.hasKioskTerminal} label="Kiosco activo" value={`${checklist.activeKioskCount}`} />
@@ -292,7 +292,7 @@ function AuthRequired() {
   return (
     <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
       <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">Necesitas iniciar sesion</h1>
+        <h1 className="text-2xl font-semibold">Necesitas iniciar sesión</h1>
         <Link
           className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
           href="/login"

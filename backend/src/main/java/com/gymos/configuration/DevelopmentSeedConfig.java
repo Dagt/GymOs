@@ -8,11 +8,13 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 
 @Configuration
+@Profile("local")
 @EnableConfigurationProperties(SeedProperties.class)
 public class DevelopmentSeedConfig {
 	static final UUID ORGANIZATION_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
@@ -147,7 +149,24 @@ public class DevelopmentSeedConfig {
 					"automation.manage",
 					"report.owner.read",
 					"onboarding.manage",
-					"client.import"
+					"client.import",
+					"benefit.read",
+					"benefit.manage",
+					"client.benefit.assign",
+					"client.benefit.verify",
+					"membership.expire",
+					"membership.auto-renew.manage",
+					"visit.create",
+					"visit.consume",
+					"visit.read",
+					"booking.payment.manage",
+					"booking.policy.manage",
+					"notification.template.manage",
+					"automation.execute",
+					"automation.scheduler.manage",
+					"backup.execute",
+					"backup.restore",
+					"operations.read"
 			);
 			for (int index = 0; index < permissions.size(); index++) {
 				UUID permissionId = UUID.nameUUIDFromBytes(("gymos:" + permissions.get(index)).getBytes());

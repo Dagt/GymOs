@@ -317,6 +317,108 @@ Criterios:
 - La operacion requiere `client.import`.
 - El resultado muestra conteos y detalle por fila.
 
+## UC-023 Paquetes de visitas
+
+Actor: Recepcionista.
+
+Precondiciones:
+- Usuario autenticado con sucursal activa.
+- Cliente activo en la organizacion.
+- Permisos `visit.read`, `visit.create` y/o `visit.consume` segun operacion.
+
+Flujo:
+1. Recepcion busca y selecciona un cliente activo desde control de acceso.
+2. Sistema muestra paquetes de visita recientes del cliente en la sucursal activa.
+3. Recepcion crea un paquete indicando tipo, total de visitas y vigencia.
+4. Sistema registra el paquete como `ACTIVE` con `remainingVisits = totalVisits`.
+5. Cuando el cliente usa una visita, recepcion consume el paquete.
+6. Sistema descuenta una visita en una actualizacion atomica.
+7. Si no quedan visitas, el paquete cambia a `CONSUMED`.
+8. La creacion y el consumo quedan auditados.
+
+Criterios:
+- No se crean paquetes para clientes inactivos.
+- No se consume un paquete fuera de vigencia.
+- No se consume un paquete ya agotado.
+- La operacion respeta organizacion y sucursal activa.
+- La integracion automatica con ventas queda preparada por `saleId`, pero la creacion manual ya es usable para piloto.
+
+## UC-024 Reembolso manual de venta
+
+Actor: Administrador o encargado con permiso financiero.
+
+Precondiciones:
+- Venta existente en la organizacion y sucursal activa.
+- La venta tiene pagos completados.
+- Usuario con permiso `sale.refund`.
+
+Flujo:
+1. Usuario abre el detalle de una venta.
+2. Sistema muestra pagos y reembolsos registrados.
+3. Usuario captura monto, motivo y opcionalmente pago relacionado.
+4. Sistema valida que el monto sea positivo.
+5. Si se relaciona a un pago, valida que el pago pertenezca a la venta y este completado.
+6. Sistema calcula saldo reembolsable como pagos completados menos reembolsos procesados.
+7. Sistema registra `sale_refund` con estado `PROCESSED`.
+8. Sistema audita `SALE_REFUND_PROCESSED`.
+9. El detalle de venta muestra el historial actualizado de reembolsos.
+
+Criterios:
+- Una misma `idempotencyKey` no registra dos reembolsos.
+- No se reembolsa mas de lo pagado.
+- No se borra ni modifica el historial de pagos.
+- El reembolso queda separado para conciliacion manual del piloto.
+
+## UC-025 Reserva pagada vinculada a POS
+
+Actor: Recepcionista o administrador.
+
+Precondiciones:
+- Reserva activa.
+- Venta existente creada desde POS en la misma sucursal.
+- Usuario con permiso `booking.payment.manage`.
+
+Flujo:
+1. Usuario crea una venta desde POS para el servicio o reserva.
+2. Usuario abre la agenda de reservas.
+3. Usuario selecciona la reserva y captura el ID de venta.
+4. Usuario define estado `PENDING` o `PAID`.
+5. Sistema registra o actualiza `booking_payment`.
+6. Si el estado es `PAID` y la reserva estaba `RESERVED`, sistema confirma la reserva.
+7. Sistema audita `BOOKING_PAYMENT_LINKED` y, si aplica, `BOOKING_CONFIRMED`.
+8. La agenda muestra estado de pago y numero de venta vinculado.
+
+Criterios:
+- La venta debe pertenecer a la misma organizacion y sucursal.
+- La reserva cerrada no puede cambiar de pago.
+- El modulo de reservas no crea ventas por su cuenta en esta version.
+- La relacion es actualizable sin duplicar registros por reserva.
+
+## UC-026 Automatizacion programada
+
+Actor: Sistema.
+
+Precondiciones:
+- Regla `ENABLED`.
+- `triggerType = SCHEDULED`.
+- `conditionJson.intervalMinutes` definido o se usa 1440 minutos.
+
+Flujo:
+1. Usuario crea una regla programada desde automatizaciones.
+2. Sistema calcula `nextRunAt`.
+3. Scheduler interno revisa reglas vencidas de forma periodica.
+4. Sistema reclama la regla con `locked_until`.
+5. Sistema ejecuta la accion configurada.
+6. Si la accion es `CREATE_NOTIFICATION`, se crea una notificacion interna.
+7. Sistema registra `automation_execution`.
+8. Sistema libera el bloqueo y reprograma `nextRunAt`.
+
+Criterios:
+- Una regla reclamada no se ejecuta simultaneamente por otro ciclo.
+- El intervalo se limita entre 1 minuto y 10080 minutos.
+- Los errores quedan como ejecucion `FAILED`.
+- No se requiere proveedor externo para la V1.
+
 ## Anexo Hito 3.5 final
 
 Ver `Documentación/07-use-cases-hito-3-5-final.md` para la definicion vigente de verificacion segura de kiosco, idempotencia por hash de solicitud y eventos por modulo propietario.

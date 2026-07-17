@@ -1,0 +1,1 @@
+export { getOwnerDashboard } from "./legacy";

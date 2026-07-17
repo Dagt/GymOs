@@ -187,6 +187,7 @@ export default function AutomationsPage() {
                 <option value="MEMBERSHIP_EXPIRING">Membresia por vencer</option>
                 <option value="PAYMENT_COMPLETED">Pago completado</option>
                 <option value="BOOKING_CONFIRMED">Reserva confirmada</option>
+                <option value="SCHEDULED">Programada</option>
                 <option value="MANUAL">Manual</option>
               </select>
               <textarea className="min-h-24 rounded-md border border-[#cdd5ca] px-3 py-2 font-mono text-xs" onChange={(event) => setConditionJson(event.target.value)} value={conditionJson} />
@@ -212,6 +213,11 @@ export default function AutomationsPage() {
                     <div>
                       <p className="font-semibold">{rule.name}</p>
                       <p className="mt-1 text-sm text-[#5d6b63]">{rule.triggerType} - {rule.actionType}</p>
+                      {rule.nextRunAt ? (
+                        <p className="mt-1 text-xs text-[#6f7a73]">
+                          Proxima ejecucion: {formatDateTime(rule.nextRunAt)}
+                        </p>
+                      ) : null}
                     </div>
                     <span className="rounded-md bg-[#eef7f0] px-2 py-1 text-xs font-semibold text-[#31543d]">{rule.status}</span>
                   </div>

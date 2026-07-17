@@ -126,7 +126,7 @@ export default function ClientDetailPage() {
           : `Venta ${response.saleNumber} creada con pago pendiente.`,
       );
     } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible renovar membresia.");
+      setError(exception instanceof Error ? exception.message : "No fue posible renovar membresía.");
     } finally {
       setRenewingMembershipId(null);
     }
@@ -315,7 +315,7 @@ export default function ClientDetailPage() {
             ) : null}
             <div className="mt-4 grid gap-3">
               {memberships.length === 0 ? (
-                <p className="text-sm text-[#5d6b63]">Sin membresias registradas.</p>
+                <p className="text-sm text-[#5d6b63]">Sin membresías registradas.</p>
               ) : null}
               {memberships.map((membership) => (
                 <article className="rounded-md border border-[#d8ddd2] px-4 py-3" key={membership.id}>
@@ -365,7 +365,7 @@ export default function ClientDetailPage() {
           <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
             <h2 className="text-xl font-semibold">Resumen</h2>
             <dl className="mt-4 grid gap-3 text-sm">
-              <Metric label="Telefono" value={data.client.phone ?? "Sin telefono"} />
+              <Metric label="Teléfono" value={data.client.phone ?? "Sin teléfono"} />
               <Metric label="Email" value={data.client.email ?? "Sin email"} />
               <Metric label="Actualizado" value={formatDate(data.client.updatedAt)} />
             </dl>
@@ -444,7 +444,7 @@ function AuthRequired() {
   return (
     <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
       <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">Necesitas iniciar sesion</h1>
+        <h1 className="text-2xl font-semibold">Necesitas iniciar sesión</h1>
         <Link
           className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
           href="/login"

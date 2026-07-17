@@ -9,6 +9,7 @@ import {
   getResourceAvailability,
   getResources,
   getStoredSession,
+  linkBookingPayment,
   searchClients,
   transitionBooking,
   type AvailabilitySlot,
@@ -31,6 +32,9 @@ export default function BookingsPage() {
   const [endsAt, setEndsAt] = useState("");
   const [notes, setNotes] = useState("");
   const [resourceName, setResourceName] = useState("");
+  const [paymentBookingId, setPaymentBookingId] = useState("");
+  const [paymentSaleId, setPaymentSaleId] = useState("");
+  const [paymentStatus, setPaymentStatus] = useState<"PENDING" | "PAID" | "EXPIRED" | "CANCELLED">("PAID");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -187,6 +191,31 @@ export default function BookingsPage() {
     }
   }
 
+  async function submitBookingPayment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session || !paymentBookingId || !paymentSaleId.trim()) {
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await linkBookingPayment(session.accessToken, paymentBookingId, {
+        saleId: paymentSaleId.trim(),
+        status: paymentStatus,
+      });
+      await refresh();
+      setPaymentBookingId("");
+      setPaymentSaleId("");
+      setPaymentStatus("PAID");
+      setMessage("Pago de reserva vinculado.");
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible vincular pago.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) {
     return (
       <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
@@ -199,7 +228,7 @@ export default function BookingsPage() {
     return (
       <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
         <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6">
-          <h1 className="text-2xl font-semibold">Necesitas iniciar sesion</h1>
+          <h1 className="text-2xl font-semibold">Necesitas iniciar sesión</h1>
           <Link className="mt-5 inline-flex h-11 items-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white" href="/login">
             Iniciar sesion
           </Link>
@@ -275,6 +304,37 @@ export default function BookingsPage() {
               Crear recurso
             </button>
           </form>
+
+          <form className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm" onSubmit={submitBookingPayment}>
+            <h2 className="text-xl font-semibold">Pago de reserva</h2>
+            <label className="mt-4 grid gap-2 text-sm font-medium">
+              Reserva
+              <select className="h-11 rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setPaymentBookingId(event.target.value)} value={paymentBookingId}>
+                <option value="">Selecciona reserva</option>
+                {bookings.map((booking) => (
+                  <option key={booking.id} value={booking.id}>
+                    {booking.clientName} - {formatTime(booking.startsAt)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="mt-4 grid gap-2 text-sm font-medium">
+              ID de venta POS
+              <input className="h-11 rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setPaymentSaleId(event.target.value)} placeholder="UUID de venta" value={paymentSaleId} />
+            </label>
+            <label className="mt-4 grid gap-2 text-sm font-medium">
+              Estado
+              <select className="h-11 rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setPaymentStatus(event.target.value as typeof paymentStatus)} value={paymentStatus}>
+                <option value="PAID">Pagada</option>
+                <option value="PENDING">Pendiente</option>
+                <option value="EXPIRED">Expirada</option>
+                <option value="CANCELLED">Cancelada</option>
+              </select>
+            </label>
+            <button className="mt-5 h-11 w-full rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white disabled:opacity-60" disabled={saving || !paymentBookingId || !paymentSaleId.trim()} type="submit">
+              Vincular pago
+            </button>
+          </form>
         </aside>
 
         <section className="grid gap-5">
@@ -309,6 +369,11 @@ export default function BookingsPage() {
                       <p className="font-semibold">{booking.resourceName}</p>
                       <p className="mt-1 text-sm text-[#5d6b63]">{booking.clientName} - {formatTime(booking.startsAt)} a {formatTime(booking.endsAt)}</p>
                       <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-[#51735f]">{booking.status}</p>
+                      {booking.paymentStatus ? (
+                        <p className="mt-1 text-xs text-[#6f7a73]">
+                          Pago {booking.paymentStatus} {booking.saleNumber ? `- ${booking.saleNumber}` : ""}
+                        </p>
+                      ) : null}
                     </div>
                     <div className="flex flex-wrap gap-2">
                       <ActionButton action="confirm" booking={booking} onRun={runAction} />

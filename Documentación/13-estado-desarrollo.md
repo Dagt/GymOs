@@ -389,7 +389,7 @@ Alcance trasladado desde Hito 6 por decision de producto:
 - Preparacion administrativa del piloto real.
 - Registro de feedback, soporte, precios y procesos comerciales.
 
-## Hito 6.5 - RediseÃ±o frontend y experiencia comercial
+## Hito 6.5 - Rediseño frontend y experiencia comercial
 
 Estado: completado frontend
 
@@ -433,3 +433,44 @@ Verificado despues de la correccion:
 - Frontend lint.
 - Frontend typecheck.
 - Frontend build de produccion.
+
+## Hito 7 - Production readiness
+
+Estado general: IN_PROGRESS
+
+### Estado Hito 7.x
+
+| Hito | Estado | Evidencia actual |
+| ---- | ------ | ---------------- |
+| 7.1 Calidad y regresion | IN_PROGRESS | Auditoria realizada; suite amplia pendiente. |
+| 7.2 Refactorizacion tecnica | IN_PROGRESS | Cliente API frontend dividido con fachada compatible; backend application todavia usa JdbcClient en algunos servicios. |
+| 7.3 Operacion y produccion | IN_PROGRESS | Runbooks, env example, Caddy example, Prometheus config, scripts backup/restore y seed local-only agregados. |
+| 7.4 Cierre funcional minimo | FUNCTIONAL | Beneficios, paquetes de visitas, reembolsos manuales, reservas pagadas por venta vinculada y scheduler interno funcionales parcialmente. |
+| 7.5 Preparacion del piloto | PLANNED | Manuales, feedback, soporte y pricing pendientes. |
+
+### Matriz de modulos
+
+| Modulo | Estado | Pruebas | Frontend | Documentacion | Produccion |
+| ------ | ------ | ------- | -------- | ------------- | ---------- |
+| identity/security | STABILIZED | PARTIAL | FUNCTIONAL | PARTIAL | IN_PROGRESS |
+| organizations | FUNCTIONAL | PARTIAL | FUNCTIONAL | PARTIAL | IN_PROGRESS |
+| clients | FUNCTIONAL | PARTIAL | FUNCTIONAL | PARTIAL | IN_PROGRESS |
+| catalog | FUNCTIONAL | PARTIAL | FUNCTIONAL | PARTIAL | IN_PROGRESS |
+| sales/payments | FUNCTIONAL | PARTIAL | FUNCTIONAL | PARTIAL | IN_PROGRESS |
+| memberships | FUNCTIONAL | PARTIAL | FUNCTIONAL | PARTIAL | IN_PROGRESS |
+| selfservice/kiosk | FUNCTIONAL | PARTIAL | FUNCTIONAL | PARTIAL | IN_PROGRESS |
+| access | FUNCTIONAL | PARTIAL | FUNCTIONAL | PARTIAL | IN_PROGRESS |
+| inventory | FUNCTIONAL | PARTIAL | FUNCTIONAL | PARTIAL | IN_PROGRESS |
+| bookings | FUNCTIONAL | PARTIAL | FUNCTIONAL | FUNCTIONAL | IN_PROGRESS |
+| coaching | FUNCTIONAL | PARTIAL | FUNCTIONAL | PARTIAL | IN_PROGRESS |
+| wellness | FUNCTIONAL | PARTIAL | FUNCTIONAL | PARTIAL | IN_PROGRESS |
+| notifications | FUNCTIONAL | PARTIAL | FUNCTIONAL | PARTIAL | IN_PROGRESS |
+| automations | FUNCTIONAL | PARTIAL | FUNCTIONAL | FUNCTIONAL | IN_PROGRESS |
+| reporting | FUNCTIONAL | PARTIAL | FUNCTIONAL | PARTIAL | IN_PROGRESS |
+| onboarding/imports | FUNCTIONAL | PARTIAL | FUNCTIONAL | PARTIAL | IN_PROGRESS |
+| benefits | FUNCTIONAL | PARTIAL | FUNCTIONAL | FUNCTIONAL | IN_PROGRESS |
+| visits | FUNCTIONAL | PARTIAL | FUNCTIONAL | FUNCTIONAL | IN_PROGRESS |
+| refunds | FUNCTIONAL | PARTIAL | FUNCTIONAL | FUNCTIONAL | IN_PROGRESS |
+| operations | IN_PROGRESS | MANUAL | N/A | FUNCTIONAL | IN_PROGRESS |
+
+Estados permitidos: PLANNED, IN_PROGRESS, FUNCTIONAL, STABILIZED, PILOT_READY, PRODUCTION_READY.

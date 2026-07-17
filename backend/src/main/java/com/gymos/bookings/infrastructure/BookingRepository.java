@@ -150,11 +150,14 @@ public class BookingRepository {
 		return jdbcClient.sql("""
 				SELECT b.id, b.resource_id, r.name AS resource_name, b.client_id,
 				       p.first_name || ' ' || p.last_name AS client_name,
-				       b.status, b.starts_at, b.ends_at, b.notes
+				       b.status, b.starts_at, b.ends_at, b.notes,
+				       bp.id AS booking_payment_id, bp.sale_id, bp.status AS payment_status, s.sale_number
 				FROM booking b
 				JOIN resource r ON r.id = b.resource_id
 				JOIN client c ON c.id = b.client_id
 				JOIN person p ON p.id = c.person_id
+				LEFT JOIN booking_payment bp ON bp.booking_id = b.id AND bp.organization_id = b.organization_id
+				LEFT JOIN sale s ON s.id = bp.sale_id
 				WHERE b.organization_id = :organizationId
 				  AND b.branch_id = :branchId
 				  AND b.id = :bookingId
@@ -173,11 +176,14 @@ public class BookingRepository {
 		return jdbcClient.sql("""
 				SELECT b.id, b.resource_id, r.name AS resource_name, b.client_id,
 				       p.first_name || ' ' || p.last_name AS client_name,
-				       b.status, b.starts_at, b.ends_at, b.notes
+				       b.status, b.starts_at, b.ends_at, b.notes,
+				       bp.id AS booking_payment_id, bp.sale_id, bp.status AS payment_status, s.sale_number
 				FROM booking b
 				JOIN resource r ON r.id = b.resource_id
 				JOIN client c ON c.id = b.client_id
 				JOIN person p ON p.id = c.person_id
+				LEFT JOIN booking_payment bp ON bp.booking_id = b.id AND bp.organization_id = b.organization_id
+				LEFT JOIN sale s ON s.id = bp.sale_id
 				WHERE b.organization_id = :organizationId
 				  AND b.branch_id = :branchId
 				  AND b.starts_at >= :from
@@ -216,6 +222,52 @@ public class BookingRepository {
 				.update();
 	}
 
+	public boolean saleExists(UUID organizationId, UUID branchId, UUID saleId) {
+		Integer count = jdbcClient.sql("""
+				SELECT COUNT(*)
+				FROM sale
+				WHERE organization_id = :organizationId
+				  AND branch_id = :branchId
+				  AND id = :saleId
+				  AND deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("saleId", saleId)
+				.query(Integer.class)
+				.single();
+		return count > 0;
+	}
+
+	public void upsertBookingPayment(UUID organizationId, UUID branchId, UUID bookingId, UUID saleId, String status, OffsetDateTime expiresAt) {
+		OffsetDateTime now = OffsetDateTime.now();
+		jdbcClient.sql("""
+				INSERT INTO booking_payment (
+				    id, organization_id, branch_id, booking_id, sale_id, status, expires_at, created_at, updated_at, version
+				)
+				VALUES (
+				    :id, :organizationId, :branchId, :bookingId, :saleId, :status, :expiresAt, :createdAt, :updatedAt, 0
+				)
+				ON CONFLICT (organization_id, booking_id)
+				DO UPDATE SET
+				    sale_id = EXCLUDED.sale_id,
+				    status = EXCLUDED.status,
+				    expires_at = EXCLUDED.expires_at,
+				    updated_at = EXCLUDED.updated_at,
+				    version = booking_payment.version + 1
+				""")
+				.param("id", UUID.randomUUID())
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("bookingId", bookingId)
+				.param("saleId", saleId)
+				.param("status", status)
+				.param("expiresAt", expiresAt)
+				.param("createdAt", now)
+				.param("updatedAt", now)
+				.update();
+	}
+
 	private ResourceRecord mapResource(java.sql.ResultSet resultSet, int rowNumber) throws java.sql.SQLException {
 		return new ResourceRecord(
 				resultSet.getObject("id", UUID.class),
@@ -240,7 +292,11 @@ public class BookingRepository {
 				resultSet.getString("status"),
 				resultSet.getObject("starts_at", OffsetDateTime.class),
 				resultSet.getObject("ends_at", OffsetDateTime.class),
-				resultSet.getString("notes")
+				resultSet.getString("notes"),
+				resultSet.getObject("booking_payment_id", UUID.class),
+				resultSet.getObject("sale_id", UUID.class),
+				resultSet.getString("payment_status"),
+				resultSet.getString("sale_number")
 		);
 	}
 
@@ -253,7 +309,21 @@ public class BookingRepository {
 	public record ResourceRecord(UUID id, String name, String resourceType, int capacity, int slotMinutes, String status, LocalTime opensAt, LocalTime closesAt, String notes) {
 	}
 
-	public record BookingRecord(UUID id, UUID resourceId, String resourceName, UUID clientId, String clientName, String status, OffsetDateTime startsAt, OffsetDateTime endsAt, String notes) {
+	public record BookingRecord(
+			UUID id,
+			UUID resourceId,
+			String resourceName,
+			UUID clientId,
+			String clientName,
+			String status,
+			OffsetDateTime startsAt,
+			OffsetDateTime endsAt,
+			String notes,
+			UUID bookingPaymentId,
+			UUID saleId,
+			String paymentStatus,
+			String saleNumber
+	) {
 	}
 
 	public record AvailabilitySlot(OffsetDateTime startsAt, OffsetDateTime endsAt, int reserved, int capacity, boolean available) {

@@ -13,6 +13,7 @@ import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.notifications.application.NotificationService;
 import com.gymos.notifications.application.NotificationService.CreateNotificationCommand;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -48,17 +49,21 @@ public class AutomationService {
 		requireBranch(principal);
 		String conditionJson = validJsonOrDefault(command.conditionJson());
 		String actionConfigJson = validJsonOrDefault(command.actionConfigJson());
+		String triggerType = required(command.triggerType(), "AUTOMATION_TRIGGER_REQUIRED", "La automatizacion necesita evento.").toUpperCase();
+		int intervalMinutes = intervalMinutes(conditionJson);
 		UUID ruleId = automationRepository.createRule(
 				principal.organizationId(),
 				principal.branchId(),
 				principal.userId(),
 				new CreateRuleData(
 						required(command.name(), "AUTOMATION_NAME_REQUIRED", "La automatizacion necesita nombre."),
-						required(command.triggerType(), "AUTOMATION_TRIGGER_REQUIRED", "La automatizacion necesita evento.").toUpperCase(),
+						triggerType,
 						conditionJson,
 						required(command.actionType(), "AUTOMATION_ACTION_REQUIRED", "La automatizacion necesita accion.").toUpperCase(),
 						actionConfigJson,
-						Math.max(0, Math.min(command.retryLimit(), 10))
+						Math.max(0, Math.min(command.retryLimit(), 10)),
+						"SCHEDULED".equals(triggerType) ? "interval:" + intervalMinutes : null,
+						"SCHEDULED".equals(triggerType) ? OffsetDateTime.now().plusMinutes(intervalMinutes) : null
 				)
 		);
 		auditService.record(principal, "AUTOMATION_RULE_CREATED", "AUTOMATION_RULE", ruleId, "BACKOFFICE", null, correlationId);
@@ -87,15 +92,43 @@ public class AutomationService {
 		if (!"ENABLED".equals(rule.status())) {
 			throw new BusinessException("AUTOMATION_RULE_DISABLED", "La automatizacion no esta habilitada.");
 		}
+		return executeRule(rule, principal.userId(), blankToNull(triggerReference), correlationId, "BACKOFFICE");
+	}
+
+	@Transactional
+	public int runDueScheduledRules() {
+		OffsetDateTime now = OffsetDateTime.now();
+		int executed = 0;
+		for (AutomationRuleRecord rule : automationRepository.dueScheduledRules(now, 25)) {
+			if (!automationRepository.claimScheduledRule(rule.id(), now, now.plusMinutes(5))) {
+				continue;
+			}
+			try {
+				executeRule(rule, null, "scheduled:" + rule.id(), "automation-scheduler", "SCHEDULER");
+			} finally {
+				automationRepository.rescheduleRule(rule.id(), OffsetDateTime.now().plusMinutes(intervalMinutes(rule.conditionJson())));
+			}
+			executed++;
+		}
+		return executed;
+	}
+
+	private AutomationExecutionRecord executeRule(
+			AutomationRuleRecord rule,
+			UUID actorUserId,
+			String triggerReference,
+			String correlationId,
+			String auditOrigin
+	) {
 		String status = "COMPLETED";
 		String error = null;
 		try {
 			if ("CREATE_NOTIFICATION".equals(rule.actionType())) {
 				JsonNode config = objectMapper.readTree(rule.actionConfigJson());
 				notificationService.createSystem(
-						principal.organizationId(),
-						principal.branchId(),
-						principal.userId(),
+						rule.organizationId(),
+						rule.branchId(),
+						actorUserId,
 						new CreateNotificationCommand(
 								text(config, "channel", "IN_APP"),
 								text(config, "recipient", null),
@@ -113,9 +146,9 @@ public class AutomationService {
 			status = "FAILED";
 			error = exception.getMessage();
 		}
-		UUID executionId = automationRepository.createExecution(principal.organizationId(), principal.branchId(), rule.id(), status, blankToNull(triggerReference), error);
-		auditService.record(principal, "AUTOMATION_EXECUTED", "AUTOMATION_EXECUTION", executionId, "BACKOFFICE", status, correlationId);
-		return automationRepository.executions(principal.organizationId(), principal.branchId(), rule.id()).stream()
+		UUID executionId = automationRepository.createExecution(rule.organizationId(), rule.branchId(), rule.id(), status, blankToNull(triggerReference), error);
+		auditService.recordSystem(rule.organizationId(), rule.branchId(), actorUserId, "AUTOMATION_EXECUTED", "AUTOMATION_EXECUTION", executionId, auditOrigin, status, correlationId);
+		return automationRepository.executions(rule.organizationId(), rule.branchId(), rule.id()).stream()
 				.filter(execution -> execution.id().equals(executionId))
 				.findFirst()
 				.orElseThrow();
@@ -140,6 +173,16 @@ public class AutomationService {
 			return resolved;
 		} catch (JsonProcessingException exception) {
 			throw new BusinessException("AUTOMATION_JSON_INVALID", "La configuracion JSON de la automatizacion es invalida.");
+		}
+	}
+
+	private int intervalMinutes(String conditionJson) {
+		try {
+			JsonNode node = objectMapper.readTree(conditionJson == null || conditionJson.isBlank() ? "{}" : conditionJson);
+			int value = node.path("intervalMinutes").asInt(1440);
+			return Math.max(1, Math.min(value, 10080));
+		} catch (JsonProcessingException exception) {
+			return 1440;
 		}
 	}
 
