@@ -1798,6 +1798,133 @@ th {
   grid-column: 1 / -1;
 }
 
+.team-layout {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 25rem);
+}
+
+.team-side {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.team-warning {
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 1rem;
+  padding: 1rem;
+}
+
+.team-warning strong {
+  color: #9a3412;
+  font-weight: 950;
+}
+
+.team-warning span {
+  color: #7c2d12;
+  line-height: 1.45;
+}
+
+.team-warning a {
+  color: var(--brand-primary);
+  font-weight: 900;
+  margin-top: 0.25rem;
+}
+
+.team-branch-selector {
+  border: 1px solid var(--brand-line);
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 0.6rem;
+  padding: 0.9rem;
+}
+
+.team-branch-selector > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.team-branch-selector strong,
+.team-role-list strong,
+.team-user-table strong {
+  color: var(--brand-ink);
+  font-weight: 950;
+}
+
+.team-branch-selector > div span,
+.team-role-list span,
+.team-user-table span,
+.team-user-table small {
+  color: var(--brand-muted);
+  line-height: 1.45;
+}
+
+.team-branch-selector label {
+  align-items: center;
+  background: white;
+  border: 1px solid var(--brand-line);
+  border-radius: 0.65rem;
+  cursor: pointer;
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: auto 1fr auto;
+  min-height: 3.1rem;
+  padding: 0.7rem 0.85rem;
+}
+
+.team-branch-selector input {
+  height: 1.05rem;
+  width: 1.05rem;
+}
+
+.team-branch-selector small,
+.team-role-list small,
+.team-user-table p {
+  background: var(--brand-primary-soft);
+  border-radius: 999px;
+  color: var(--brand-primary);
+  font-size: 0.72rem;
+  font-weight: 850;
+  padding: 0.35rem 0.55rem;
+}
+
+.team-role-list,
+.team-user-table {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.team-role-list article {
+  background: white;
+  border: 1px solid var(--brand-line);
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.9rem;
+}
+
+.team-user-table article {
+  align-items: center;
+  background: white;
+  border: 1px solid var(--brand-line);
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto;
+  padding: 0.95rem;
+}
+
+.team-user-table article > div {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
 .admin-empty-state {
   display: grid;
   min-height: 100vh;
@@ -2452,5 +2579,12 @@ body.has-global-session-nav {
 
   .kiosk-header aside {
     text-align: left;
+  }
+}
+
+@media (max-width: 980px) {
+  .team-layout,
+  .team-user-table article {
+    grid-template-columns: 1fr;
   }
 }

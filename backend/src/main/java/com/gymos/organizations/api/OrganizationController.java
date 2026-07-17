@@ -3,6 +3,7 @@ package com.gymos.organizations.api;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.organizations.application.OrganizationService;
+import com.gymos.organizations.application.command.CreateBranchCommand;
 import com.gymos.organizations.application.command.UpdateBranchCommand;
 import com.gymos.organizations.application.command.UpdateOrganizationCommand;
 import com.gymos.organizations.infrastructure.OrganizationQueryRepository.BranchSummary;
@@ -18,6 +19,7 @@ import java.util.UUID;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -49,6 +51,15 @@ public class OrganizationController {
 			HttpServletRequest servletRequest
 	) {
 		return organizationService.updateOrganization(principal, request.toCommand(), correlationId(servletRequest));
+	}
+
+	@PostMapping("/current/branches")
+	BranchSummary createBranch(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@Valid @RequestBody BranchCreateRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return organizationService.createBranch(principal, request.toCommand(), correlationId(servletRequest));
 	}
 
 	@PutMapping("/current/branches/{branchId}")
@@ -88,6 +99,17 @@ public class OrganizationController {
 	) {
 		private UpdateBranchCommand toCommand() {
 			return new UpdateBranchCommand(name, code, timezone, phone);
+		}
+	}
+
+	public record BranchCreateRequest(
+			@NotBlank @Size(max = 120) String name,
+			@NotBlank @Size(max = 32) String code,
+			@NotBlank @Size(max = 64) String timezone,
+			@Size(max = 32) String phone
+	) {
+		private CreateBranchCommand toCommand() {
+			return new CreateBranchCommand(name, code, timezone, phone);
 		}
 	}
 }

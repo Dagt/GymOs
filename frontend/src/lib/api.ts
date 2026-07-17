@@ -15,3 +15,4 @@ export * from "./api/wellness";
 export * from "./api/automations";
 export * from "./api/reporting";
 export * from "./api/onboarding";
+export * from "./api/users";

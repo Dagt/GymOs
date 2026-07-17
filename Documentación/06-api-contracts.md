@@ -23,6 +23,77 @@ Base path: `/api/v1`
 - `GET /branches/{id}`
 - `PATCH /branches/{id}`
 
+Nota implementada Hito 7.6:
+
+- `GET /organizations/current`
+- `PUT /organizations/current`
+- `GET /organizations/current/branches`
+- `POST /organizations/current/branches`
+- `PUT /organizations/current/branches/{branchId}`
+
+`POST /organizations/current/branches` crea una nueva sucursal activa para la organizacion actual y asigna acceso al administrador que la crea. Requiere permiso `branch.create`. Esto habilita gimnasios con multiples sucursales desde la configuracion administrativa.
+
+Request:
+
+```json
+{
+  "name": "Sucursal Norte",
+  "code": "NORTE",
+  "timezone": "America/Mexico_City",
+  "phone": "+520000000000"
+}
+```
+
+Errores:
+
+- `BRANCH_CODE_ALREADY_EXISTS`
+- `AUTHENTICATION_REQUIRED`
+- `PERMISSION_DENIED`
+
+## 6.1.1.1 Usuarios internos, roles y accesos
+
+- `GET /users/roles`
+- `GET /users/internal`
+- `POST /users/internal`
+
+Permisos:
+
+- `user.read` para listar roles y usuarios internos.
+- `user.manage` para crear usuarios internos.
+
+`POST /users/internal` crea persona, cuenta de usuario, rol y accesos a sucursales dentro de la organizacion actual. No devuelve contrasenas ni hashes.
+
+Request:
+
+```json
+{
+  "firstName": "Ana",
+  "lastName": "Lopez",
+  "email": "ana@example.com",
+  "phone": "+520000000000",
+  "username": "ana@example.com",
+  "temporaryPassword": "Temporal123!",
+  "roleId": "uuid",
+  "branchIds": ["uuid"]
+}
+```
+
+Roles semilla Hito 7.6:
+
+- `Administrador GymOS`
+- `Dueno / Gerencia`
+- `Recepcion / Caja`
+- `Coach`
+- `Operacion`
+
+Errores:
+
+- `ROLE_NOT_AVAILABLE`
+- `BRANCH_NOT_AVAILABLE`
+- `USER_ALREADY_EXISTS`
+- `AUTHENTICATION_REQUIRED`
+- `PERMISSION_DENIED`
+
 ## 6.1.2 Kiosco de autoservicio
 
 - `POST /self-service/terminals/{terminalCode}/sessions`

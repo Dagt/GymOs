@@ -214,7 +214,7 @@ Evidencia:
 
 | Módulo | Estado actual | Riesgo principal | Criterio para `PILOT_READY` |
 | --- | --- | --- | --- |
-| identity | `FUNCTIONAL` | sin administración completa de usuarios internos | CRUD seguro de usuarios, roles, sucursales y pruebas multi-tenant |
+| identity | `FUNCTIONAL` | administracion inicial de usuarios internos implementada; faltan edicion/desactivacion y pruebas completas | CRUD seguro de usuarios, roles, sucursales y pruebas multi-tenant |
 | security | `FUNCTIONAL` | hardening prod y matriz incompleta | permisos documentados/probados, perfiles seguros, tokens y CORS validados |
 | organizations | `FUNCTIONAL` | application usa `JdbcClient` | puertos/repositorios, pruebas de sucursales ajenas |
 | clients | `FUNCTIONAL` | importación y duplicados con cobertura baja | pruebas de alta, edición, búsqueda, import dry-run/real y aislamiento |
@@ -275,6 +275,7 @@ Evidencia:
 
 - Objetivo: usuarios/roles, expiración de membresías, políticas operativas y cierre diario.
 - Alcance: backend, frontend, pruebas y docs.
+- Avance Hito 7.6: se agrego primera version funcional de usuarios internos, roles semilla, creacion de sucursales multiples y navegacion filtrada por permisos.
 
 ### Bloque 7: Operación/staging
 
@@ -299,4 +300,3 @@ Evidencia:
 ## 8. Recomendación
 
 GymOS debe mantenerse como `STABILIZED` hasta completar los bloques de pruebas, seguridad multi-tenant y operación. No debe declararse `PILOT_READY` ni `PRODUCTION_READY` con la evidencia actual.
-

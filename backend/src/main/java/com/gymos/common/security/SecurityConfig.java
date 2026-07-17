@@ -42,6 +42,10 @@ public class SecurityConfig {
 								"/swagger-ui/**"
 						).permitAll()
 						.requestMatchers("/api/v1/auth/select-branch").hasAuthority("branch.read")
+						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/roles").hasAuthority("user.read")
+						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/internal").hasAuthority("user.read")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/users/internal").hasAuthority("user.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/organizations/current/branches").hasAuthority("branch.create")
 						.requestMatchers("/api/v1/organizations/current/branches/*").hasAuthority("branch.update")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/organizations/current/branches").hasAuthority("branch.read")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/organizations/current").hasAuthority("organization.read")

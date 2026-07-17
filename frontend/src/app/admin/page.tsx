@@ -102,6 +102,7 @@ export default function AdminPage() {
     <AppShell
       actions={[
         { href: "/settings/organization", label: "Datos y sucursales" },
+        { href: "/users", label: "Equipo y accesos" },
         { href: "/onboarding", label: "Preparar piloto" },
       ]}
       branchName={activeBranch?.name}
@@ -177,14 +178,33 @@ export default function AdminPage() {
                 <span>Nombre comercial, contacto, moneda y zona horaria.</span>
               </li>
               <li>
-                <strong>2. Selecciona sucursal</strong>
-                <span>Esto activa el contexto para reportes y operación diaria.</span>
+                <strong>2. Crea sucursales</strong>
+                <span>Registra cada sede antes de entregar accesos al equipo.</span>
               </li>
               <li>
-                <strong>3. Entrega al dueño</strong>
-                <span>Catálogo, coaches e inventario pueden completarse después.</span>
+                <strong>3. Crea equipo y accesos</strong>
+                <span>Recepcion, gerencia, coaches y operacion veran menus distintos.</span>
+              </li>
+              <li>
+                <strong>4. Selecciona sucursal</strong>
+                <span>Esto activa caja, socios, reportes y operacion diaria.</span>
               </li>
             </ol>
+          </section>
+
+          <section className="admin-panel">
+            <div className="admin-panel-header">
+              <div>
+                <p>Equipo</p>
+                <h2>Usuarios por rol</h2>
+              </div>
+            </div>
+            <p className="admin-muted-text">
+              Crea cuentas para cada persona y limita que ve segun rol y sucursal.
+            </p>
+            <Link className="admin-secondary-link" href="/users">
+              Abrir equipo y accesos
+            </Link>
           </section>
 
           <section className="admin-panel">

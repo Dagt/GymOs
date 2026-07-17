@@ -447,13 +447,14 @@ Estado general: IN_PROGRESS
 | 7.3 Operacion y produccion | IN_PROGRESS | Runbooks, env example, Caddy example, Prometheus config, scripts backup/restore y seed local-only agregados. |
 | 7.4 Cierre funcional minimo | FUNCTIONAL | Beneficios, paquetes de visitas, reembolsos manuales, reservas pagadas por venta vinculada y scheduler interno funcionales parcialmente. |
 | 7.5 Preparacion del piloto | PLANNED | Manuales, feedback, soporte y pricing pendientes. |
+| 7.6 Administracion multi-sucursal y equipo | FUNCTIONAL | API/UI para crear multiples sucursales, crear usuarios internos, asignar rol y asignar sucursales; navegacion filtrada por permisos. |
 
 ### Matriz de modulos
 
 | Modulo | Estado | Pruebas | Frontend | Documentacion | Produccion |
 | ------ | ------ | ------- | -------- | ------------- | ---------- |
-| identity/security | STABILIZED | PARTIAL | FUNCTIONAL | PARTIAL | IN_PROGRESS |
-| organizations | FUNCTIONAL | PARTIAL | FUNCTIONAL | PARTIAL | IN_PROGRESS |
+| identity/security | FUNCTIONAL | PARTIAL | FUNCTIONAL | FUNCTIONAL | IN_PROGRESS |
+| organizations | FUNCTIONAL | PARTIAL | FUNCTIONAL | FUNCTIONAL | IN_PROGRESS |
 | clients | FUNCTIONAL | PARTIAL | FUNCTIONAL | PARTIAL | IN_PROGRESS |
 | catalog | FUNCTIONAL | PARTIAL | FUNCTIONAL | PARTIAL | IN_PROGRESS |
 | sales/payments | FUNCTIONAL | PARTIAL | FUNCTIONAL | PARTIAL | IN_PROGRESS |
@@ -474,3 +475,31 @@ Estado general: IN_PROGRESS
 | operations | IN_PROGRESS | MANUAL | N/A | FUNCTIONAL | IN_PROGRESS |
 
 Estados permitidos: PLANNED, IN_PROGRESS, FUNCTIONAL, STABILIZED, PILOT_READY, PRODUCTION_READY.
+
+### Hito 7.6 - Administracion multi-sucursal y equipo
+
+Estado: FUNCTIONAL
+
+Implementado:
+
+- Migracion `V17__team_roles_and_branch_creation.sql`.
+- Permisos nuevos: `branch.create`, `user.read`, `user.manage`.
+- Roles semilla: `Administrador GymOS`, `Dueno / Gerencia`, `Recepcion / Caja`, `Coach`, `Operacion`.
+- Endpoint `POST /api/v1/organizations/current/branches` para crear multiples sucursales en la organizacion actual.
+- Endpoints `GET /api/v1/users/roles`, `GET /api/v1/users/internal`, `POST /api/v1/users/internal`.
+- Pantalla frontend `/settings/organization` separada por datos del gimnasio, creacion de sucursales, edicion de sucursales y acceso a equipo.
+- Pantalla frontend `/users` para crear usuarios internos, elegir rol y asignar sucursales.
+- `AppShell` y `GlobalSessionNav` filtran menus por permisos del usuario activo.
+- `/admin` ahora muestra ruta recomendada: revisar gimnasio, crear sucursales, crear equipo/accesos y seleccionar sucursal operativa.
+
+Verificado localmente:
+
+- Backend: `.\gradlew.bat test --no-daemon` con Java 25.
+- Frontend: `npm.cmd run lint`.
+- Frontend: `npm.cmd run typecheck`.
+- Frontend: `npm.cmd run build`.
+
+Notas:
+
+- Despues de aplicar la migracion o reiniciar el backend local, los usuarios deben volver a iniciar sesion para que el JWT incluya `branch.create`, `user.read` y `user.manage`.
+- Sigue pendiente una suite amplia de pruebas automatizadas para CRUD completo de usuarios, edicion/desactivacion de usuarios y validaciones multi-tenant negativas.

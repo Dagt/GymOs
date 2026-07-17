@@ -3,6 +3,7 @@ package com.gymos.organizations.application;
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.organizations.application.command.CreateBranchCommand;
 import com.gymos.organizations.application.command.UpdateBranchCommand;
 import com.gymos.organizations.application.command.UpdateOrganizationCommand;
 import com.gymos.organizations.infrastructure.OrganizationQueryRepository;
@@ -11,6 +12,7 @@ import com.gymos.organizations.infrastructure.OrganizationQueryRepository.Organi
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -83,6 +85,53 @@ public class OrganizationService {
 				.update();
 		auditService.record(principal, "ORGANIZATION_UPDATED", "ORGANIZATION", principal.organizationId(), "RECEPTION", null, correlationId);
 		return current(principal);
+	}
+
+	@Transactional
+	public BranchSummary createBranch(
+			GymOsPrincipal principal,
+			CreateBranchCommand request,
+			String correlationId
+	) {
+		requirePrincipal(principal);
+		OffsetDateTime now = OffsetDateTime.now();
+		UUID branchId = UUID.randomUUID();
+		try {
+			jdbcClient.sql("""
+					INSERT INTO branch (
+					    id, organization_id, name, code, timezone, status, phone,
+					    created_at, updated_at, created_by, updated_by, version
+					)
+					VALUES (
+					    :branchId, :organizationId, :name, :code, :timezone, 'ACTIVE', :phone,
+					    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
+					)
+					""")
+					.param("branchId", branchId)
+					.param("organizationId", principal.organizationId())
+					.param("name", request.name().trim())
+					.param("code", request.code().trim().toUpperCase())
+					.param("timezone", request.timezone().trim())
+					.param("phone", blankToNull(request.phone()))
+					.param("createdAt", now)
+					.param("updatedAt", now)
+					.param("createdBy", principal.userId())
+					.param("updatedBy", principal.userId())
+					.update();
+		} catch (DuplicateKeyException exception) {
+			throw new BusinessException("BRANCH_CODE_ALREADY_EXISTS", "Ya existe una sucursal con ese codigo.");
+		}
+		jdbcClient.sql("""
+				INSERT INTO user_branch_access (user_id, branch_id, access_scope)
+				VALUES (:userId, :branchId, 'ADMIN')
+				ON CONFLICT DO NOTHING
+				""")
+				.param("userId", principal.userId())
+				.param("branchId", branchId)
+				.update();
+		auditService.record(principal, "BRANCH_CREATED", "BRANCH", branchId, "ADMIN", null, correlationId);
+		return organizationQueryRepository.findBranchForUser(principal.userId(), principal.organizationId(), branchId)
+				.orElseThrow(() -> new BusinessException("BRANCH_NOT_FOUND", "La sucursal no esta disponible."));
 	}
 
 	@Transactional

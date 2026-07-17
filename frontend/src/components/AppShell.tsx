@@ -10,46 +10,60 @@ type ShellAction = {
   label: string;
 };
 
-const navigationSections = [
+type NavigationLink = {
+  label: string;
+  href: string;
+  hint: string;
+  permissions?: string[];
+};
+
+type NavigationSection = {
+  title: string;
+  links: NavigationLink[];
+};
+
+const navigationSections: NavigationSection[] = [
   {
-    title: "Recepción",
+    title: "Recepcion",
     links: [
-      { label: "Inicio operativo", href: "/reception", hint: "Resumen del día" },
-      { label: "Caja / POS", href: "/pos", hint: "Ventas y pagos" },
-      { label: "Socios", href: "/clients", hint: "Altas y fichas" },
-      { label: "Kiosco", href: "/kiosk/KIOSK-MAIN", hint: "Autoservicio" },
+      { label: "Inicio operativo", href: "/reception", hint: "Resumen del dia", permissions: ["sale.create", "client.create", "report.sales.read"] },
+      { label: "Caja / POS", href: "/pos", hint: "Ventas y pagos", permissions: ["sale.create"] },
+      { label: "Socios", href: "/clients", hint: "Altas y fichas", permissions: ["client.read"] },
+      { label: "Kiosco", href: "/kiosk/KIOSK-MAIN", hint: "Autoservicio", permissions: ["selfservice.terminal.manage"] },
     ],
   },
   {
-    title: "Administración",
+    title: "Administracion",
     links: [
-      { label: "Catálogo", href: "/catalog", hint: "Planes y productos" },
-      { label: "Accesos", href: "/access", hint: "Pases y visitas" },
-      { label: "Reservas", href: "/bookings", hint: "Agenda" },
-      { label: "Inventario", href: "/inventory", hint: "Stock" },
-      { label: "Beneficios", href: "/benefits", hint: "Promos y reglas" },
-      { label: "Marca", href: "/settings/organization", hint: "Colores y sucursales" },
+      { label: "Catalogo", href: "/catalog", hint: "Planes y productos", permissions: ["catalog.read"] },
+      { label: "Accesos", href: "/access", hint: "Pases y visitas", permissions: ["access.read"] },
+      { label: "Reservas", href: "/bookings", hint: "Agenda", permissions: ["booking.read"] },
+      { label: "Inventario", href: "/inventory", hint: "Stock", permissions: ["inventory.read"] },
+      { label: "Beneficios", href: "/benefits", hint: "Promos y reglas", permissions: ["benefit.read"] },
+      { label: "Equipo", href: "/users", hint: "Usuarios y roles", permissions: ["user.read"] },
+      { label: "Datos y sucursales", href: "/settings/organization", hint: "Marca y sedes", permissions: ["organization.update", "branch.update"] },
     ],
   },
   {
     title: "Gerencia",
     links: [
-      { label: "Panel ejecutivo", href: "/dashboard", hint: "Indicadores" },
-      { label: "Ventas", href: "/reports/sales", hint: "Reportes" },
-      { label: "Automatizaciones", href: "/automations", hint: "Reglas" },
-      { label: "Onboarding", href: "/onboarding", hint: "Preparación" },
-      { label: "Importar clientes", href: "/clients/import", hint: "Carga inicial" },
-      { label: "Servicios", href: "/wellness", hint: "Bienestar" },
+      { label: "Panel ejecutivo", href: "/dashboard", hint: "Indicadores", permissions: ["report.owner.read", "report.sales.read"] },
+      { label: "Ventas", href: "/reports/sales", hint: "Reportes", permissions: ["report.sales.read"] },
+      { label: "Automatizaciones", href: "/automations", hint: "Reglas", permissions: ["automation.read"] },
+      { label: "Onboarding", href: "/onboarding", hint: "Preparacion", permissions: ["onboarding.manage"] },
+      { label: "Importar clientes", href: "/clients/import", hint: "Carga inicial", permissions: ["client.import"] },
+      { label: "Servicios", href: "/wellness", hint: "Bienestar", permissions: ["professional.read"] },
     ],
   },
 ];
 
-const setupSections = [
+const setupSections: NavigationSection[] = [
   {
-    title: "Configuración inicial",
+    title: "Configuracion inicial",
     links: [
       { label: "Gimnasios", href: "/admin", hint: "Elegir o preparar" },
-      { label: "Datos y sucursales", href: "/settings/organization", hint: "Base operativa" },
+      { label: "Datos y sucursales", href: "/settings/organization", hint: "Base operativa", permissions: ["organization.update", "branch.update"] },
+      { label: "Equipo y accesos", href: "/users", hint: "Usuarios por rol", permissions: ["user.read"] },
     ],
   },
 ];
@@ -80,7 +94,13 @@ export function AppShell({
   const hasBranch = mode === "operation" ? true : mode === "setup" ? false : Boolean(branchName || session.user.branchId);
   const role = resolveUserRole(session.user.permissions, session.user.username, hasBranch);
   const visibleBranch = branchName ?? (session.user.branchId ? "Sucursal seleccionada" : "Sin sucursal");
-  const sections = hasBranch ? navigationSections : setupSections;
+  const permissionSet = new Set(session.user.permissions);
+  const sections = (hasBranch ? navigationSections : setupSections)
+    .map((section) => ({
+      ...section,
+      links: section.links.filter((link) => canSeeLink(permissionSet, link)),
+    }))
+    .filter((section) => section.links.length > 0);
 
   function logout() {
     clearSession();
@@ -104,7 +124,7 @@ export function AppShell({
           <span>{role.description}</span>
         </section>
 
-        <nav aria-label="Menú principal">
+        <nav aria-label="Menu principal">
           {sections.map((section) => (
             <section className="admin-nav-section" key={section.title}>
               <p>{section.title}</p>
@@ -149,7 +169,7 @@ export function AppShell({
               <strong>{visibleBranch}</strong>
             </div>
             {actions.map((action) => (
-              hasBranch || action.href === "/admin" || action.href === "/onboarding" || action.href === "/settings/organization" ? (
+              hasBranch || action.href === "/admin" || action.href === "/onboarding" || action.href === "/settings/organization" || action.href === "/users" ? (
                 <Link href={action.href} key={action.href}>
                   {action.label}
                 </Link>
@@ -161,12 +181,12 @@ export function AppShell({
         {!hasBranch ? (
           <section className="admin-setup-banner">
             <div>
-              <p>Configuración pendiente</p>
+              <p>Configuracion pendiente</p>
               <h2>Primero elige o prepara una sucursal operativa</h2>
               <span>
-                Mientras no exista una sucursal activa en tu sesión, GymOS mantiene caja, socios, reportes operativos
-                y kiosco fuera del primer plano. El dueño o gerente del gimnasio puede completar la operación diaria
-                después.
+                Mientras no exista una sucursal activa en tu sesion, GymOS mantiene caja, socios, reportes operativos
+                y kiosco fuera del primer plano. El dueno o gerente del gimnasio puede completar la operacion diaria
+                despues.
               </span>
             </div>
             <Link href="/admin">Ir a gimnasios</Link>
@@ -193,7 +213,7 @@ export function LoadingScreen({ text }: { text: string }) {
 export function InlineError({ message }: { message: string }) {
   return (
     <section className="admin-alert" role="alert">
-      <strong>No se pudo cargar esta sección</strong>
+      <strong>No se pudo cargar esta seccion</strong>
       <span>{message}</span>
     </section>
   );
@@ -205,6 +225,7 @@ function resolveUserRole(permissions: string[], username: string, hasBranch: boo
 
   if (
     normalizedUsername.includes("admin") ||
+    values.has("user.manage") ||
     values.has("organization.update") ||
     values.has("branch.update") ||
     values.has("selfservice.terminal.manage") ||
@@ -213,34 +234,48 @@ function resolveUserRole(permissions: string[], username: string, hasBranch: boo
     if (!hasBranch) {
       return {
         label: "Administrador GymOS",
-        description: "Administra altas de gimnasios y configuración base. La operación diaria queda para cada gimnasio.",
+        description: "Administra altas de gimnasios, sucursales, equipo y configuracion base.",
       };
     }
 
     return {
       label: "Administrador",
-      description: "Supervisa configuración, permisos y operación del gimnasio seleccionado.",
+      description: "Supervisa configuracion, permisos y operacion del gimnasio seleccionado.",
     };
   }
 
-  if (values.has("report.sales.read") || values.has("sale.refund") || values.has("catalog.manage")) {
+  if (values.has("report.owner.read") || values.has("report.sales.read") || values.has("catalog.manage")) {
     return {
-      label: "Dueño / Gerencia",
-      description: "Consulta reportes, ventas, decisiones y supervisión del negocio.",
+      label: "Dueno / Gerencia",
+      description: "Consulta reportes, ventas, decisiones y supervision del negocio.",
+    };
+  }
+
+  if (values.has("workout.manage") || values.has("coach.read")) {
+    return {
+      label: "Coach",
+      description: "Consulta socios y gestiona rutinas o asignaciones permitidas.",
     };
   }
 
   if (values.has("sale.create") || values.has("payment.manual.create") || values.has("client.create")) {
     return {
-      label: "Recepción / Caja",
+      label: "Recepcion / Caja",
       description: "Atiende socios, registra ventas, cobra pagos y opera el mostrador.",
     };
   }
 
   return {
     label: "Usuario operativo",
-    description: "Acceso limitado según los permisos asignados a esta cuenta.",
+    description: "Acceso limitado segun los permisos asignados a esta cuenta.",
   };
+}
+
+function canSeeLink(permissions: Set<string>, link: NavigationLink) {
+  if (!link.permissions || link.permissions.length === 0) {
+    return true;
+  }
+  return link.permissions.some((permission) => permissions.has(permission));
 }
 
 function isActive(pathname: string, href: string) {

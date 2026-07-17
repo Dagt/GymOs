@@ -117,6 +117,38 @@ export type BranchUpdatePayload = {
   phone?: string | null;
 };
 
+export type CreateBranchPayload = BranchUpdatePayload;
+
+export type RoleOption = {
+  id: string;
+  name: string;
+  description: string | null;
+  systemRole: boolean;
+  permissionCount: number;
+};
+
+export type InternalUserSummary = {
+  id: string;
+  fullName: string;
+  username: string;
+  email: string | null;
+  phone: string | null;
+  status: string;
+  roles: string[];
+  branches: string[];
+};
+
+export type CreateInternalUserPayload = {
+  firstName: string;
+  lastName: string;
+  email?: string | null;
+  phone?: string | null;
+  username: string;
+  temporaryPassword: string;
+  roleId: string;
+  branchIds: string[];
+};
+
 export type ProductSummary = {
   id: string;
   sku: string;
@@ -994,6 +1026,16 @@ export async function getBranches(accessToken: string): Promise<BranchSummary[]>
   return apiFetch<BranchSummary[]>("/organizations/current/branches", accessToken);
 }
 
+export async function createBranch(
+  accessToken: string,
+  payload: CreateBranchPayload,
+): Promise<BranchSummary> {
+  return apiFetch<BranchSummary>("/organizations/current/branches", accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
 export async function updateOrganization(
   accessToken: string,
   payload: OrganizationUpdatePayload,
@@ -1001,6 +1043,24 @@ export async function updateOrganization(
   return apiFetch<OrganizationSummary>("/organizations/current", accessToken, {
     method: "PUT",
     body: JSON.stringify(payload),
+  });
+}
+
+export async function getUserRoles(accessToken: string): Promise<RoleOption[]> {
+  return apiFetch<RoleOption[]>("/users/roles", accessToken);
+}
+
+export async function getInternalUsers(accessToken: string): Promise<InternalUserSummary[]> {
+  return apiFetch<InternalUserSummary[]>("/users/internal", accessToken);
+}
+
+export async function createInternalUser(
+  accessToken: string,
+  payload: CreateInternalUserPayload,
+): Promise<InternalUserSummary> {
+  return apiFetch<InternalUserSummary>("/users/internal", accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
   });
 }
 
