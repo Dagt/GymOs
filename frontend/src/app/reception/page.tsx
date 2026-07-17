@@ -175,18 +175,18 @@ export default function ReceptionPage() {
     <AppShell
       actions={[
         ...(canOperate ? [{ href: "/reports/sales", label: "Ventas" }] : []),
-        { href: "/settings/organization", label: "Personalizar" },
+        { href: "/settings/organization", label: canOperate ? "Personalizar" : "Datos y sucursales" },
       ]}
       branchName={activeBranch?.name}
-      eyebrow={canOperate ? "Inicio operativo" : "Configuración inicial"}
+      eyebrow={canOperate ? "Inicio operativo" : "Administrador GymOS"}
       organizationName={organization?.tradeName}
       session={session}
       subtitle={
         canOperate
           ? "Acciones principales para recepción y caja. La administración y gerencia viven en el menú lateral."
-          : "Antes de operar caja, socios, membresías o reportes, configura la primera sucursal del gimnasio."
+          : "Gestiona altas de gimnasios y deja lista la base operativa. Productos, coaches, inventario y operación diaria vendrán después."
       }
-      title={canOperate ? "Qué hacer ahora" : "Configura tu gimnasio"}
+      title={canOperate ? "Qué hacer ahora" : "Panel de administración"}
     >
       {error ? <InlineError message={error} /> : null}
 
@@ -197,15 +197,23 @@ export default function ReceptionPage() {
               <div className="admin-panel-header">
                 <div>
                   <p>Siguiente paso</p>
-                  <h2>Completa la configuración inicial</h2>
+                  <h2>Empieza por lo indispensable</h2>
                 </div>
               </div>
               <div className="admin-setup-steps">
-                <Link href="/onboarding">1. Preparar gimnasio</Link>
-                <Link href="/settings/organization">2. Revisar datos y sucursales</Link>
-                <Link href="/catalog">3. Crear planes y productos</Link>
-                <Link href="/clients/import">4. Importar clientes iniciales</Link>
+                <Link href="/onboarding">1. Alta o preparación del gimnasio</Link>
+                <Link href="/settings/organization">2. Datos, marca y primera sucursal</Link>
               </div>
+              <details className="admin-advanced-setup">
+                <summary>Opciones avanzadas para apoyar al dueño</summary>
+                <p>
+                  Úsalas sólo si quieres dejar cargada información inicial. El dueño o gerente puede completarla después.
+                </p>
+                <div>
+                  <Link href="/catalog">Catálogo de planes y productos</Link>
+                  <Link href="/clients/import">Importar clientes iniciales</Link>
+                </div>
+              </details>
             </section>
           </section>
 
@@ -218,7 +226,8 @@ export default function ReceptionPage() {
                 </div>
               </div>
               <p className="admin-muted-text">
-                Cuando configures una sucursal, se activarán caja, socios, membresías, kiosco y reportes operativos.
+                Cuando configures una sucursal, GymOS mostrará caja, socios, membresías, kiosco y reportes operativos
+                para el equipo del gimnasio.
               </p>
             </section>
           </aside>

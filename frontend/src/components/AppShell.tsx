@@ -48,10 +48,8 @@ const setupSections = [
   {
     title: "Configuración inicial",
     links: [
-      { label: "Preparar gimnasio", href: "/onboarding", hint: "Crear datos base" },
-      { label: "Marca y sucursales", href: "/settings/organization", hint: "Datos del gimnasio" },
-      { label: "Catálogo", href: "/catalog", hint: "Planes y productos" },
-      { label: "Importar clientes", href: "/clients/import", hint: "Carga inicial" },
+      { label: "Gimnasios", href: "/onboarding", hint: "Alta y preparación" },
+      { label: "Datos y sucursales", href: "/settings/organization", hint: "Base operativa" },
     ],
   },
 ];
@@ -77,8 +75,8 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const role = resolveUserRole(session.user.permissions, session.user.username);
   const hasBranch = Boolean(branchName || session.user.branchId);
+  const role = resolveUserRole(session.user.permissions, session.user.username, hasBranch);
   const visibleBranch = branchName ?? (session.user.branchId ? "Sucursal seleccionada" : "Sin sucursal");
   const sections = hasBranch ? navigationSections : setupSections;
 
@@ -149,7 +147,7 @@ export function AppShell({
               <strong>{visibleBranch}</strong>
             </div>
             {actions.map((action) => (
-              hasBranch || action.href === "/onboarding" || action.href === "/settings/organization" || action.href === "/catalog" ? (
+              hasBranch || action.href === "/onboarding" || action.href === "/settings/organization" ? (
                 <Link href={action.href} key={action.href}>
                   {action.label}
                 </Link>
@@ -164,8 +162,8 @@ export function AppShell({
               <p>Configuración pendiente</p>
               <h2>Primero configura al menos una sucursal</h2>
               <span>
-                Mientras no exista una sucursal activa, GymOS oculta caja, socios, reportes operativos y kiosco para evitar
-                pantallas vacías o errores confusos.
+                Mientras no exista una sucursal activa, GymOS oculta caja, socios, reportes operativos y kiosco. El
+                dueño o gerente del gimnasio podrá completar productos, coaches y operación diaria después.
               </span>
             </div>
             <Link href="/onboarding">Preparar gimnasio</Link>
@@ -198,7 +196,7 @@ export function InlineError({ message }: { message: string }) {
   );
 }
 
-function resolveUserRole(permissions: string[], username: string) {
+function resolveUserRole(permissions: string[], username: string, hasBranch: boolean) {
   const values = new Set(permissions);
   const normalizedUsername = username.toLowerCase();
 
@@ -209,9 +207,16 @@ function resolveUserRole(permissions: string[], username: string) {
     values.has("selfservice.terminal.manage") ||
     values.has("audit.read")
   ) {
+    if (!hasBranch) {
+      return {
+        label: "Administrador GymOS",
+        description: "Administra altas de gimnasios y configuración base. La operación diaria queda para cada gimnasio.",
+      };
+    }
+
     return {
       label: "Administrador",
-      description: "Configura gimnasio, sucursales, permisos, catálogo y operación.",
+      description: "Supervisa configuración, permisos y operación del gimnasio seleccionado.",
     };
   }
 

@@ -1420,6 +1420,39 @@ th {
   margin-top: 1rem;
 }
 
+.admin-advanced-setup {
+  border-top: 1px solid var(--brand-line);
+  margin-top: 1rem;
+  padding-top: 1rem;
+}
+
+.admin-advanced-setup summary {
+  color: var(--brand-muted);
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 900;
+}
+
+.admin-advanced-setup p {
+  color: var(--brand-muted);
+  font-size: 0.86rem;
+  line-height: 1.45;
+  margin-top: 0.55rem;
+}
+
+.admin-advanced-setup div {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 0.75rem;
+}
+
+.admin-advanced-setup a {
+  background: white;
+  border: 1px solid var(--brand-line);
+  color: var(--brand-ink);
+}
+
 .admin-empty-state {
   display: grid;
   min-height: 100vh;
