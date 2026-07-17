@@ -54,6 +54,40 @@ public class AuthQueryRepository {
 		return count > 0;
 	}
 
+	public boolean userHasOrganizationAccess(UUID userId, UUID organizationId) {
+		Integer count = jdbcClient.sql("""
+				SELECT COUNT(*)
+				FROM user_branch_access uba
+				JOIN branch b ON b.id = uba.branch_id
+				WHERE uba.user_id = :userId
+				  AND b.organization_id = :organizationId
+				  AND b.deleted_at IS NULL
+				""")
+				.param("userId", userId)
+				.param("organizationId", organizationId)
+				.query(Integer.class)
+				.single();
+		return count > 0;
+	}
+
+	public Optional<UUID> firstAccessibleBranch(UUID userId, UUID organizationId) {
+		return jdbcClient.sql("""
+				SELECT b.id
+				FROM user_branch_access uba
+				JOIN branch b ON b.id = uba.branch_id
+				WHERE uba.user_id = :userId
+				  AND b.organization_id = :organizationId
+				  AND b.status = 'ACTIVE'
+				  AND b.deleted_at IS NULL
+				ORDER BY b.name
+				LIMIT 1
+				""")
+				.param("userId", userId)
+				.param("organizationId", organizationId)
+				.query(UUID.class)
+				.optional();
+	}
+
 	private Optional<AuthenticatedUser> findUser(String sql, String parameterName, Object parameterValue) {
 		return jdbcClient.sql(sql)
 				.param(parameterName, parameterValue)

@@ -60,6 +60,15 @@ public class AuthController {
 		return toResponse(authService.selectBranch(principal, request.branchId(), correlationId(servletRequest)));
 	}
 
+	@PostMapping("/select-organization")
+	AuthResponse selectOrganization(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@Valid @RequestBody SelectOrganizationRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return toResponse(authService.selectOrganization(principal, request.organizationId(), correlationId(servletRequest)));
+	}
+
 	private AuthResponse toResponse(AuthResult result) {
 		return new AuthResponse(
 				result.accessToken(),
@@ -96,6 +105,9 @@ public class AuthController {
 	}
 
 	public record SelectBranchRequest(@NotNull UUID branchId) {
+	}
+
+	public record SelectOrganizationRequest(@NotNull UUID organizationId) {
 	}
 
 	public record AuthResponse(

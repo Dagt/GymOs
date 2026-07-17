@@ -50,7 +50,6 @@ const navigationSections: NavigationSection[] = [
       { label: "Panel ejecutivo", href: "/dashboard", hint: "Indicadores", permissions: ["report.owner.read", "report.sales.read"] },
       { label: "Ventas", href: "/reports/sales", hint: "Reportes", permissions: ["report.sales.read"] },
       { label: "Automatizaciones", href: "/automations", hint: "Reglas", permissions: ["automation.read"] },
-      { label: "Onboarding", href: "/onboarding", hint: "Preparacion", permissions: ["onboarding.manage"] },
       { label: "Importar clientes", href: "/clients/import", hint: "Carga inicial", permissions: ["client.import"] },
       { label: "Servicios", href: "/wellness", hint: "Bienestar", permissions: ["professional.read"] },
     ],
@@ -69,7 +68,6 @@ const setupSections: NavigationSection[] = [
 ];
 
 export function AppShell({
-  actions = [],
   branchName,
   children,
   eyebrow,
@@ -168,17 +166,10 @@ export function AppShell({
               <span>Sucursal</span>
               <strong>{visibleBranch}</strong>
             </div>
-            {actions.map((action) => (
-              hasBranch || action.href === "/admin" || action.href === "/onboarding" || action.href === "/settings/organization" || action.href === "/users" ? (
-                <Link href={action.href} key={action.href}>
-                  {action.label}
-                </Link>
-              ) : null
-            ))}
           </div>
         </header>
 
-        {!hasBranch ? (
+        {!hasBranch && pathname !== "/admin" ? (
           <section className="admin-setup-banner">
             <div>
               <p>Configuracion pendiente</p>
@@ -233,21 +224,21 @@ function resolveUserRole(permissions: string[], username: string, hasBranch: boo
   ) {
     if (!hasBranch) {
       return {
-        label: "Administrador GymOS",
-        description: "Administra altas de gimnasios, sucursales, equipo y configuracion base.",
+        label: "Administrador de plataforma",
+        description: "Crea gimnasios, cambia de gimnasio y deja lista la configuracion base.",
       };
     }
 
     return {
-      label: "Administrador",
-      description: "Supervisa configuracion, permisos y operacion del gimnasio seleccionado.",
+      label: "Administrador del gimnasio",
+      description: "Administra sucursales, equipo, permisos y configuracion del gimnasio activo.",
     };
   }
 
   if (values.has("report.owner.read") || values.has("report.sales.read") || values.has("catalog.manage")) {
     return {
-      label: "Dueno / Gerencia",
-      description: "Consulta reportes, ventas, decisiones y supervision del negocio.",
+      label: "Gerencia del gimnasio",
+      description: "Consulta reportes, ventas y decisiones del negocio.",
     };
   }
 
@@ -260,7 +251,7 @@ function resolveUserRole(permissions: string[], username: string, hasBranch: boo
 
   if (values.has("sale.create") || values.has("payment.manual.create") || values.has("client.create")) {
     return {
-      label: "Recepcion / Caja",
+      label: "Recepcion y caja",
       description: "Atiende socios, registra ventas, cobra pagos y opera el mostrador.",
     };
   }

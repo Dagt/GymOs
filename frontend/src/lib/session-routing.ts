@@ -5,7 +5,7 @@ export function getPostLoginPath(user: CurrentUser) {
   const username = user.username.toLowerCase();
 
   if (username.includes("admin") || permissions.has("organization.update") || permissions.has("branch.update")) {
-    return user.branchId ? "/dashboard" : "/admin";
+    return "/admin";
   }
 
   if (permissions.has("report.sales.read") || permissions.has("catalog.manage")) {
@@ -14,4 +14,3 @@ export function getPostLoginPath(user: CurrentUser) {
 
   return "/reception";
 }
-

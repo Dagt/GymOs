@@ -4,9 +4,11 @@ import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.organizations.application.OrganizationService;
 import com.gymos.organizations.application.command.CreateBranchCommand;
+import com.gymos.organizations.application.command.CreateOrganizationCommand;
 import com.gymos.organizations.application.command.UpdateBranchCommand;
 import com.gymos.organizations.application.command.UpdateOrganizationCommand;
 import com.gymos.organizations.infrastructure.OrganizationQueryRepository.BranchSummary;
+import com.gymos.organizations.infrastructure.OrganizationQueryRepository.ManagedOrganizationSummary;
 import com.gymos.organizations.infrastructure.OrganizationQueryRepository.OrganizationSummary;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -37,6 +39,20 @@ public class OrganizationController {
 	@GetMapping("/current")
 	OrganizationSummary current(@AuthenticationPrincipal GymOsPrincipal principal) {
 		return organizationService.current(principal);
+	}
+
+	@GetMapping
+	List<ManagedOrganizationSummary> organizations(@AuthenticationPrincipal GymOsPrincipal principal) {
+		return organizationService.organizations(principal);
+	}
+
+	@PostMapping
+	ManagedOrganizationSummary createOrganization(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@Valid @RequestBody OrganizationCreateRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return organizationService.createOrganization(principal, request.toCommand(), correlationId(servletRequest));
 	}
 
 	@GetMapping("/current/branches")
@@ -88,6 +104,34 @@ public class OrganizationController {
 	) {
 		private UpdateOrganizationCommand toCommand() {
 			return new UpdateOrganizationCommand(legalName, tradeName, taxId, timezone, defaultCurrency, contactEmail, contactPhone);
+		}
+	}
+
+	public record OrganizationCreateRequest(
+			@NotBlank @Size(max = 180) String legalName,
+			@NotBlank @Size(max = 120) String tradeName,
+			@Size(max = 64) String taxId,
+			@NotBlank @Size(max = 64) String timezone,
+			@NotBlank @Pattern(regexp = "[A-Za-z]{3}") String defaultCurrency,
+			@Email @Size(max = 180) String contactEmail,
+			@Size(max = 32) String contactPhone,
+			@NotBlank @Size(max = 120) String firstBranchName,
+			@NotBlank @Size(max = 32) String firstBranchCode,
+			@Size(max = 32) String firstBranchPhone
+	) {
+		private CreateOrganizationCommand toCommand() {
+			return new CreateOrganizationCommand(
+					legalName,
+					tradeName,
+					taxId,
+					timezone,
+					defaultCurrency,
+					contactEmail,
+					contactPhone,
+					firstBranchName,
+					firstBranchCode,
+					firstBranchPhone
+			);
 		}
 	}
 

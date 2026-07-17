@@ -35,6 +35,11 @@ export type OrganizationSummary = {
   contactPhone: string | null;
 };
 
+export type ManagedOrganizationSummary = OrganizationSummary & {
+  branchCount: number;
+  activeBranchCount: number;
+};
+
 export type BranchSummary = {
   id: string;
   name: string;
@@ -108,6 +113,12 @@ export type OrganizationUpdatePayload = {
   defaultCurrency: string;
   contactEmail?: string | null;
   contactPhone?: string | null;
+};
+
+export type CreateOrganizationPayload = OrganizationUpdatePayload & {
+  firstBranchName: string;
+  firstBranchCode: string;
+  firstBranchPhone?: string | null;
 };
 
 export type BranchUpdatePayload = {
@@ -1011,6 +1022,13 @@ export async function selectBranch(accessToken: string, branchId: string): Promi
   });
 }
 
+export async function selectOrganization(accessToken: string, organizationId: string): Promise<AuthResponse> {
+  return apiFetch<AuthResponse>("/auth/select-organization", accessToken, {
+    method: "POST",
+    body: JSON.stringify({ organizationId }),
+  });
+}
+
 export async function logout(accessToken: string, refreshToken: string): Promise<void> {
   await apiFetch<void>("/auth/logout", accessToken, {
     method: "POST",
@@ -1020,6 +1038,20 @@ export async function logout(accessToken: string, refreshToken: string): Promise
 
 export async function getCurrentOrganization(accessToken: string): Promise<OrganizationSummary> {
   return apiFetch<OrganizationSummary>("/organizations/current", accessToken);
+}
+
+export async function getOrganizations(accessToken: string): Promise<ManagedOrganizationSummary[]> {
+  return apiFetch<ManagedOrganizationSummary[]>("/organizations", accessToken);
+}
+
+export async function createOrganization(
+  accessToken: string,
+  payload: CreateOrganizationPayload,
+): Promise<ManagedOrganizationSummary> {
+  return apiFetch<ManagedOrganizationSummary>("/organizations", accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
 }
 
 export async function getBranches(accessToken: string): Promise<BranchSummary[]> {

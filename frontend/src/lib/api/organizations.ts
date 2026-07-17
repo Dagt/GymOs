@@ -1,1 +1,9 @@
-export { createBranch, getBranches, getCurrentOrganization, updateBranch, updateOrganization } from "./legacy";
+export {
+  createBranch,
+  createOrganization,
+  getBranches,
+  getCurrentOrganization,
+  getOrganizations,
+  updateBranch,
+  updateOrganization,
+} from "./legacy";

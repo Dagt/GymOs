@@ -4,10 +4,12 @@ import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.organizations.application.command.CreateBranchCommand;
+import com.gymos.organizations.application.command.CreateOrganizationCommand;
 import com.gymos.organizations.application.command.UpdateBranchCommand;
 import com.gymos.organizations.application.command.UpdateOrganizationCommand;
 import com.gymos.organizations.infrastructure.OrganizationQueryRepository;
 import com.gymos.organizations.infrastructure.OrganizationQueryRepository.BranchSummary;
+import com.gymos.organizations.infrastructure.OrganizationQueryRepository.ManagedOrganizationSummary;
 import com.gymos.organizations.infrastructure.OrganizationQueryRepository.OrganizationSummary;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -34,6 +36,12 @@ public class OrganizationService {
 	}
 
 	@Transactional(readOnly = true)
+	public List<ManagedOrganizationSummary> organizations(GymOsPrincipal principal) {
+		requirePrincipal(principal);
+		return organizationQueryRepository.findOrganizationsForUser(principal.userId());
+	}
+
+	@Transactional(readOnly = true)
 	public OrganizationSummary current(GymOsPrincipal principal) {
 		requirePrincipal(principal);
 		return organizationQueryRepository.findCurrentOrganization(principal.organizationId())
@@ -47,6 +55,79 @@ public class OrganizationService {
 	public List<BranchSummary> branches(GymOsPrincipal principal) {
 		requirePrincipal(principal);
 		return organizationQueryRepository.findBranchesForUser(principal.userId(), principal.organizationId());
+	}
+
+	@Transactional
+	public ManagedOrganizationSummary createOrganization(
+			GymOsPrincipal principal,
+			CreateOrganizationCommand request,
+			String correlationId
+	) {
+		requirePrincipal(principal);
+		OffsetDateTime now = OffsetDateTime.now();
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		try {
+			jdbcClient.sql("""
+					INSERT INTO organization (
+					    id, legal_name, trade_name, tax_id, status, timezone, default_currency,
+					    contact_email, contact_phone, created_at, updated_at, created_by, updated_by, version
+					)
+					VALUES (
+					    :id, :legalName, :tradeName, :taxId, 'ACTIVE', :timezone, :defaultCurrency,
+					    :contactEmail, :contactPhone, :createdAt, :updatedAt, :createdBy, :updatedBy, 0
+					)
+					""")
+					.param("id", organizationId)
+					.param("legalName", request.legalName().trim())
+					.param("tradeName", request.tradeName().trim())
+					.param("taxId", blankToNull(request.taxId()))
+					.param("timezone", request.timezone().trim())
+					.param("defaultCurrency", request.defaultCurrency().trim().toUpperCase())
+					.param("contactEmail", blankToNull(request.contactEmail()))
+					.param("contactPhone", blankToNull(request.contactPhone()))
+					.param("createdAt", now)
+					.param("updatedAt", now)
+					.param("createdBy", principal.userId())
+					.param("updatedBy", principal.userId())
+					.update();
+			jdbcClient.sql("""
+					INSERT INTO branch (
+					    id, organization_id, name, code, timezone, status, phone,
+					    created_at, updated_at, created_by, updated_by, version
+					)
+					VALUES (
+					    :branchId, :organizationId, :name, :code, :timezone, 'ACTIVE', :phone,
+					    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
+					)
+					""")
+					.param("branchId", branchId)
+					.param("organizationId", organizationId)
+					.param("name", request.firstBranchName().trim())
+					.param("code", request.firstBranchCode().trim().toUpperCase())
+					.param("timezone", request.timezone().trim())
+					.param("phone", blankToNull(request.firstBranchPhone()))
+					.param("createdAt", now)
+					.param("updatedAt", now)
+					.param("createdBy", principal.userId())
+					.param("updatedBy", principal.userId())
+					.update();
+		} catch (DuplicateKeyException exception) {
+			throw new BusinessException("ORGANIZATION_ALREADY_EXISTS", "Ya existe un gimnasio con esos datos.");
+		}
+		jdbcClient.sql("""
+				INSERT INTO user_branch_access (user_id, branch_id, access_scope)
+				VALUES (:userId, :branchId, 'ADMIN')
+				ON CONFLICT DO NOTHING
+				""")
+				.param("userId", principal.userId())
+				.param("branchId", branchId)
+				.update();
+		auditService.recordSystem(organizationId, branchId, principal.userId(), "ORGANIZATION_CREATED", "ORGANIZATION", organizationId, "ADMIN", null, correlationId);
+		return organizationQueryRepository.findOrganizationsForUser(principal.userId()).stream()
+				.filter(organization -> organization.id().equals(organizationId))
+				.findFirst()
+				.orElseThrow(() -> new BusinessException("ORGANIZATION_NOT_FOUND", "El gimnasio creado no esta disponible."));
 	}
 
 	@Transactional

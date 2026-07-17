@@ -2,28 +2,50 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired } from "@/components/AuthRequired";
 import {
+  createOrganization,
   getBranches,
   getCurrentOrganization,
+  getOrganizations,
   getStoredSession,
   selectBranch,
+  selectOrganization,
   storeSession,
   type BranchSummary,
+  type CreateOrganizationPayload,
+  type ManagedOrganizationSummary,
   type OrganizationSummary,
   type StoredSession,
 } from "@/lib/api";
+
+const emptyOrganizationForm: CreateOrganizationPayload = {
+  legalName: "",
+  tradeName: "",
+  taxId: "",
+  timezone: "America/Mexico_City",
+  defaultCurrency: "MXN",
+  contactEmail: "",
+  contactPhone: "",
+  firstBranchName: "",
+  firstBranchCode: "",
+  firstBranchPhone: "",
+};
 
 export default function AdminPage() {
   const router = useRouter();
   const [session, setSession] = useState<StoredSession | null>(null);
   const [organization, setOrganization] = useState<OrganizationSummary | null>(null);
+  const [organizations, setOrganizations] = useState<ManagedOrganizationSummary[]>([]);
   const [branches, setBranches] = useState<BranchSummary[]>([]);
+  const [form, setForm] = useState<CreateOrganizationPayload>(emptyOrganizationForm);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectingBranchId, setSelectingBranchId] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [selectingId, setSelectingId] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -37,18 +59,20 @@ export default function AdminPage() {
 
       setSession(stored);
       try {
-        const [currentOrganization, availableBranches] = await Promise.all([
+        const [currentOrganization, availableOrganizations, availableBranches] = await Promise.all([
           getCurrentOrganization(stored.accessToken),
+          getOrganizations(stored.accessToken),
           getBranches(stored.accessToken),
         ]);
         if (!active) {
           return;
         }
         setOrganization(currentOrganization);
+        setOrganizations(availableOrganizations);
         setBranches(availableBranches);
       } catch (exception) {
         if (active) {
-          setError(exception instanceof Error ? exception.message : "No fue posible cargar administración.");
+          setError(exception instanceof Error ? exception.message : "No fue posible cargar gimnasios.");
         }
       } finally {
         if (active) {
@@ -64,13 +88,40 @@ export default function AdminPage() {
     };
   }, []);
 
+  async function activateOrganization(organizationId: string) {
+    if (!session) {
+      return;
+    }
+
+    setSelectingId(organizationId);
+    setError(null);
+    setMessage(null);
+    try {
+      const nextSession = await selectOrganization(session.accessToken, organizationId);
+      storeSession(nextSession);
+      setSession(nextSession);
+      const [currentOrganization, availableBranches] = await Promise.all([
+        getCurrentOrganization(nextSession.accessToken),
+        getBranches(nextSession.accessToken),
+      ]);
+      setOrganization(currentOrganization);
+      setBranches(availableBranches);
+      setMessage("Gimnasio seleccionado.");
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible cambiar de gimnasio.");
+    } finally {
+      setSelectingId(null);
+    }
+  }
+
   async function activateBranch(branchId: string) {
     if (!session) {
       return;
     }
 
-    setSelectingBranchId(branchId);
+    setSelectingId(branchId);
     setError(null);
+    setMessage(null);
     try {
       const nextSession = await selectBranch(session.accessToken, branchId);
       storeSession(nextSession);
@@ -79,19 +130,40 @@ export default function AdminPage() {
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible seleccionar sucursal.");
     } finally {
-      setSelectingBranchId(null);
+      setSelectingId(null);
+    }
+  }
+
+  async function submitOrganization(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session) {
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const created = await createOrganization(session.accessToken, form);
+      setOrganizations((current) => [...current, created].sort((left, right) => left.tradeName.localeCompare(right.tradeName)));
+      setForm(emptyOrganizationForm);
+      setMessage("Gimnasio creado. Seleccionalo para trabajar en el.");
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible crear el gimnasio.");
+    } finally {
+      setSaving(false);
     }
   }
 
   if (loading) {
-    return <LoadingScreen text="Cargando administración..." />;
+    return <LoadingScreen text="Cargando gimnasios..." />;
   }
 
   if (!session) {
     return (
       <AuthRequired
-        message="El panel de administración permite elegir gimnasio, preparar sucursales y entrar al contexto operativo."
-        title="Inicia sesión como administrador"
+        message="El panel de administracion permite crear gimnasios, cambiar de gimnasio y seleccionar sucursal operativa."
+        title="Inicia sesion como administrador"
       />
     );
   }
@@ -100,28 +172,24 @@ export default function AdminPage() {
 
   return (
     <AppShell
-      actions={[
-        { href: "/settings/organization", label: "Datos y sucursales" },
-        { href: "/users", label: "Equipo y accesos" },
-        { href: "/onboarding", label: "Preparar piloto" },
-      ]}
       branchName={activeBranch?.name}
-      eyebrow="Administrador GymOS"
+      eyebrow="Administrador de plataforma"
       mode={activeBranch ? "operation" : "setup"}
       organizationName={organization?.tradeName}
       session={session}
-      subtitle="Elige el gimnasio y la sucursal sobre la que vas a trabajar. Después entrarás a reportes, caja y operación."
+      subtitle="Crea gimnasios, cambia entre ellos y selecciona la sucursal operativa del gimnasio activo."
       title="Gimnasios"
     >
       {error ? <InlineError message={error} /> : null}
+      {message ? <p className="form-message success">{message}</p> : null}
 
       <section className="admin-home-grid">
         <section className="admin-home-main">
           <section className="admin-hero-card">
             <div>
-              <p>Gimnasio actual</p>
-              <h2>{organization?.tradeName ?? "Gimnasio sin nombre"}</h2>
-              <span>{organization?.legalName ?? "Completa los datos comerciales para identificar este gimnasio."}</span>
+              <p>Gimnasio activo</p>
+              <h2>{organization?.tradeName ?? "Sin gimnasio seleccionado"}</h2>
+              <span>{organization?.legalName ?? "Selecciona o crea un gimnasio para continuar."}</span>
             </div>
             <Link href="/settings/organization">Editar datos y sucursales</Link>
           </section>
@@ -129,7 +197,34 @@ export default function AdminPage() {
           <section className="admin-panel">
             <div className="admin-panel-header">
               <div>
-                <p>Sucursales</p>
+                <p>Gimnasios</p>
+                <h2>Cambia de gimnasio</h2>
+              </div>
+            </div>
+            <div className="admin-branch-cards">
+              {organizations.map((item) => (
+                <article className={item.id === session.user.organizationId ? "active" : undefined} key={item.id}>
+                  <div>
+                    <p>{item.status}</p>
+                    <h3>{item.tradeName}</h3>
+                    <span>{item.activeBranchCount} sucursales activas</span>
+                  </div>
+                  <button
+                    disabled={selectingId !== null || item.id === session.user.organizationId}
+                    onClick={() => activateOrganization(item.id)}
+                    type="button"
+                  >
+                    {item.id === session.user.organizationId ? "Gimnasio activo" : "Usar este gimnasio"}
+                  </button>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="admin-panel">
+            <div className="admin-panel-header">
+              <div>
+                <p>Sucursales del gimnasio activo</p>
                 <h2>Selecciona contexto operativo</h2>
               </div>
               <Link href="/settings/organization">Administrar sucursales</Link>
@@ -138,8 +233,8 @@ export default function AdminPage() {
             <div className="admin-branch-cards">
               {branches.length === 0 ? (
                 <section className="admin-empty-card">
-                  <strong>Aún no hay sucursales</strong>
-                  <span>Crea la primera sucursal para poder operar caja, socios, membresías y reportes.</span>
+                  <strong>Aun no hay sucursales</strong>
+                  <span>Crea la primera sucursal para poder operar caja, socios, membresias y reportes.</span>
                   <Link href="/settings/organization">Crear sucursal</Link>
                 </section>
               ) : null}
@@ -149,10 +244,10 @@ export default function AdminPage() {
                   <div>
                     <p>{branch.code}</p>
                     <h3>{branch.name}</h3>
-                    <span>{branch.phone ?? "Sin teléfono registrado"}</span>
+                    <span>{branch.phone ?? "Sin telefono registrado"}</span>
                   </div>
                   <button
-                    disabled={selectingBranchId !== null || branch.id === session.user.branchId}
+                    disabled={selectingId !== null || branch.id === session.user.branchId}
                     onClick={() => activateBranch(branch.id)}
                     type="button"
                   >
@@ -168,28 +263,30 @@ export default function AdminPage() {
           <section className="admin-panel">
             <div className="admin-panel-header">
               <div>
-                <p>Siguiente</p>
-                <h2>Ruta recomendada</h2>
+                <p>Nuevo gimnasio</p>
+                <h2>Alta de gimnasio</h2>
               </div>
             </div>
-            <ol className="admin-route-list">
-              <li>
-                <strong>1. Revisa el gimnasio</strong>
-                <span>Nombre comercial, contacto, moneda y zona horaria.</span>
-              </li>
-              <li>
-                <strong>2. Crea sucursales</strong>
-                <span>Registra cada sede antes de entregar accesos al equipo.</span>
-              </li>
-              <li>
-                <strong>3. Crea equipo y accesos</strong>
-                <span>Recepcion, gerencia, coaches y operacion veran menus distintos.</span>
-              </li>
-              <li>
-                <strong>4. Selecciona sucursal</strong>
-                <span>Esto activa caja, socios, reportes y operacion diaria.</span>
-              </li>
-            </ol>
+            <form className="mt-4 grid gap-3" onSubmit={submitOrganization}>
+              <Field label="Nombre comercial" value={form.tradeName} onChange={(value) => setForm({ ...form, tradeName: value })} />
+              <Field label="Nombre legal" value={form.legalName} onChange={(value) => setForm({ ...form, legalName: value })} />
+              <Field label="RFC / Tax ID" required={false} value={form.taxId ?? ""} onChange={(value) => setForm({ ...form, taxId: value })} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Moneda" value={form.defaultCurrency} onChange={(value) => setForm({ ...form, defaultCurrency: value })} />
+                <Field label="Zona horaria" value={form.timezone} onChange={(value) => setForm({ ...form, timezone: value })} />
+              </div>
+              <Field label="Email contacto" required={false} type="email" value={form.contactEmail ?? ""} onChange={(value) => setForm({ ...form, contactEmail: value })} />
+              <Field label="Telefono contacto" required={false} value={form.contactPhone ?? ""} onChange={(value) => setForm({ ...form, contactPhone: value })} />
+              <hr className="border-[#dbe4ee]" />
+              <Field label="Primera sucursal" value={form.firstBranchName} onChange={(value) => setForm({ ...form, firstBranchName: value })} />
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Codigo sucursal" value={form.firstBranchCode} onChange={(value) => setForm({ ...form, firstBranchCode: value })} />
+                <Field label="Telefono sucursal" required={false} value={form.firstBranchPhone ?? ""} onChange={(value) => setForm({ ...form, firstBranchPhone: value })} />
+              </div>
+              <button className="form-primary-button" disabled={saving} type="submit">
+                Crear gimnasio
+              </button>
+            </form>
           </section>
 
           <section className="admin-panel">
@@ -200,29 +297,41 @@ export default function AdminPage() {
               </div>
             </div>
             <p className="admin-muted-text">
-              Crea cuentas para cada persona y limita que ve segun rol y sucursal.
+              Crea cuentas para recepcion, gerencia, coaches y operacion dentro del gimnasio activo.
             </p>
             <Link className="admin-secondary-link" href="/users">
               Abrir equipo y accesos
             </Link>
           </section>
-
-          <section className="admin-panel">
-            <div className="admin-panel-header">
-              <div>
-                <p>Alta rápida</p>
-                <h2>Preparar piloto</h2>
-              </div>
-            </div>
-            <p className="admin-muted-text">
-              Usa este flujo sólo cuando quieras generar datos mínimos de demostración para un gimnasio real.
-            </p>
-            <Link className="admin-secondary-link" href="/onboarding">
-              Abrir preparación guiada
-            </Link>
-          </section>
         </aside>
       </section>
     </AppShell>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  type = "text",
+  required = true,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  type?: string;
+  required?: boolean;
+}) {
+  return (
+    <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+      {label}
+      <input
+        className="h-11 rounded-md border border-[#cdd5ca] px-3 text-sm outline-none transition focus:border-[#51735f]"
+        onChange={(event) => onChange(event.target.value)}
+        required={required}
+        type={type}
+        value={value}
+      />
+    </label>
   );
 }

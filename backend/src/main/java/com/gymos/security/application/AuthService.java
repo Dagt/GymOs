@@ -86,6 +86,30 @@ public class AuthService {
 		return response;
 	}
 
+	@Transactional
+	public AuthResult selectOrganization(GymOsPrincipal principal, UUID organizationId, String correlationId) {
+		if (principal == null) {
+			throw new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesion para continuar.");
+		}
+		if (!authQueryRepository.userHasOrganizationAccess(principal.userId(), organizationId)) {
+			throw new BusinessException("ORGANIZATION_ACCESS_DENIED", "No tienes acceso al gimnasio solicitado.");
+		}
+		AuthenticatedUser user = authQueryRepository.findActiveUserById(principal.userId())
+				.orElseThrow(() -> new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesion para continuar."));
+		UUID branchId = authQueryRepository.firstAccessibleBranch(principal.userId(), organizationId).orElse(null);
+		GymOsPrincipal selectedPrincipal = new GymOsPrincipal(
+				user.userId(),
+				organizationId,
+				branchId,
+				user.username(),
+				user.fullName(),
+				user.permissions()
+		);
+		AuthResult response = issue(selectedPrincipal);
+		auditService.recordSystem(organizationId, branchId, principal.userId(), "ORGANIZATION_SELECTED", "ORGANIZATION", organizationId, "BACKOFFICE", null, correlationId);
+		return response;
+	}
+
 	public CurrentUserResult currentUser(GymOsPrincipal principal) {
 		if (principal == null) {
 			throw new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesion para continuar.");

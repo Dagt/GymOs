@@ -190,7 +190,7 @@ export default function UsersPage() {
               >
                 {roles.map((role) => (
                   <option key={role.id} value={role.id}>
-                    {role.name}
+                    {displayRoleName(role.name)}
                   </option>
                 ))}
               </select>
@@ -227,8 +227,8 @@ export default function UsersPage() {
             <div className="team-role-list">
               {roles.map((role) => (
                 <article key={role.id}>
-                  <strong>{role.name}</strong>
-                  <span>{role.description ?? "Rol operativo"}</span>
+                  <strong>{displayRoleName(role.name)}</strong>
+                  <span>{roleDescription(role.name, role.description)}</span>
                   <small>{role.permissionCount} permisos</small>
                 </article>
               ))}
@@ -260,7 +260,7 @@ export default function UsersPage() {
                 <span>{user.username}</span>
               </div>
               <div>
-                <span>{user.roles.join(", ") || "Sin rol"}</span>
+                <span>{user.roles.map(displayRoleName).join(", ") || "Sin rol"}</span>
                 <small>{user.branches.join(", ") || "Sin sucursal"}</small>
               </div>
               <p>{user.status}</p>
@@ -295,4 +295,44 @@ function Field({
       />
     </label>
   );
+}
+
+function displayRoleName(roleName: string) {
+  const normalized = roleName.toLowerCase();
+  if (normalized.includes("admin") && normalized.includes("gymos")) {
+    return "Administrador de plataforma";
+  }
+  if (normalized === "administrador" || normalized.includes("owner")) {
+    return "Administrador del gimnasio";
+  }
+  if (normalized.includes("gerencia") || normalized.includes("gerente") || normalized.includes("dueno")) {
+    return "Gerencia del gimnasio";
+  }
+  if (normalized.includes("recepcion") || normalized.includes("caja")) {
+    return "Recepcion y caja";
+  }
+  if (normalized.includes("coach")) {
+    return "Coach";
+  }
+  return roleName;
+}
+
+function roleDescription(roleName: string, fallback?: string | null) {
+  const label = displayRoleName(roleName);
+  if (label === "Administrador de plataforma") {
+    return "Crea gimnasios, cambia de gimnasio y prepara configuracion base.";
+  }
+  if (label === "Administrador del gimnasio") {
+    return "Administra sucursales, usuarios, permisos y configuracion del gimnasio.";
+  }
+  if (label === "Gerencia del gimnasio") {
+    return "Consulta reportes, ventas y operacion para tomar decisiones.";
+  }
+  if (label === "Recepcion y caja") {
+    return "Registra socios, cobra ventas, renueva membresias y atiende mostrador.";
+  }
+  if (label === "Coach") {
+    return "Consulta socios asignados y gestiona rutinas o servicios permitidos.";
+  }
+  return fallback ?? "Rol operativo";
 }

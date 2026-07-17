@@ -178,7 +178,7 @@ export default function ReceptionPage() {
         { href: "/settings/organization", label: canOperate ? "Personalizar" : "Datos y sucursales" },
       ]}
       branchName={activeBranch?.name}
-      eyebrow={canOperate ? "Inicio operativo" : "Administrador GymOS"}
+      eyebrow={canOperate ? "Inicio operativo" : "Administrador de plataforma"}
       organizationName={organization?.tradeName}
       session={session}
       subtitle={

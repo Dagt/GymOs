@@ -37,6 +37,44 @@ public class OrganizationQueryRepository {
 				.optional();
 	}
 
+	public List<ManagedOrganizationSummary> findOrganizationsForUser(UUID userId) {
+		return jdbcClient.sql("""
+				SELECT o.id, o.legal_name, o.trade_name, o.tax_id, o.status, o.timezone,
+				       o.default_currency, o.contact_email, o.contact_phone,
+				       COUNT(DISTINCT b.id) AS branch_count,
+				       COUNT(DISTINCT CASE WHEN b.status = 'ACTIVE' THEN b.id END) AS active_branch_count
+				FROM organization o
+				LEFT JOIN branch b ON b.organization_id = o.id AND b.deleted_at IS NULL
+				WHERE o.deleted_at IS NULL
+				  AND EXISTS (
+				      SELECT 1
+				      FROM user_branch_access uba
+				      JOIN branch accessible_branch ON accessible_branch.id = uba.branch_id
+				      WHERE uba.user_id = :userId
+				        AND accessible_branch.organization_id = o.id
+				        AND accessible_branch.deleted_at IS NULL
+				  )
+				GROUP BY o.id, o.legal_name, o.trade_name, o.tax_id, o.status, o.timezone,
+				         o.default_currency, o.contact_email, o.contact_phone
+				ORDER BY LOWER(o.trade_name)
+				""")
+				.param("userId", userId)
+				.query((resultSet, rowNumber) -> new ManagedOrganizationSummary(
+						resultSet.getObject("id", UUID.class),
+						resultSet.getString("legal_name"),
+						resultSet.getString("trade_name"),
+						resultSet.getString("tax_id"),
+						resultSet.getString("status"),
+						resultSet.getString("timezone"),
+						resultSet.getString("default_currency"),
+						resultSet.getString("contact_email"),
+						resultSet.getString("contact_phone"),
+						resultSet.getInt("branch_count"),
+						resultSet.getInt("active_branch_count")
+				))
+				.list();
+	}
+
 	public List<BranchSummary> findBranchesForUser(UUID userId, UUID organizationId) {
 		return jdbcClient.sql("""
 				SELECT b.id, b.name, b.code, b.status, b.timezone, b.phone, uba.access_scope
@@ -102,6 +140,21 @@ public class OrganizationQueryRepository {
 				.query(Integer.class)
 				.single();
 		return count > 0;
+	}
+
+	public record ManagedOrganizationSummary(
+			UUID id,
+			String legalName,
+			String tradeName,
+			String taxId,
+			String status,
+			String timezone,
+			String defaultCurrency,
+			String contactEmail,
+			String contactPhone,
+			int branchCount,
+			int activeBranchCount
+	) {
 	}
 
 	public record OrganizationSummary(

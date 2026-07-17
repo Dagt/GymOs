@@ -30,10 +30,20 @@ const setupLinks: GlobalLink[] = [
   { label: "Gimnasios", href: "/admin" },
   { label: "Datos y sucursales", href: "/settings/organization", permissions: ["organization.update", "branch.update"] },
   { label: "Equipo y accesos", href: "/users", permissions: ["user.read"] },
-  { label: "Preparar piloto", href: "/onboarding", permissions: ["onboarding.manage"] },
 ];
 
-const shellRoutes = ["/admin", "/reception", "/pos", "/clients", "/catalog", "/dashboard", "/reports/sales", "/settings/organization", "/users"];
+const shellRoutes = [
+  "/admin",
+  "/reception",
+  "/pos",
+  "/clients",
+  "/catalog",
+  "/dashboard",
+  "/reports/sales",
+  "/settings/organization",
+  "/users",
+  "/wellness",
+];
 
 export function GlobalSessionNav() {
   const pathname = usePathname();
@@ -111,16 +121,16 @@ export function GlobalSessionNav() {
 function resolveRole(session: StoredSession) {
   const permissions = new Set(session.user.permissions);
   if (session.user.username.toLowerCase().includes("admin") || permissions.has("user.manage") || permissions.has("organization.update")) {
-    return session.user.branchId ? "Administrador" : "Administrador GymOS";
+    return session.user.branchId ? "Administrador del gimnasio" : "Administrador de plataforma";
   }
   if (permissions.has("report.owner.read") || permissions.has("report.sales.read") || permissions.has("catalog.manage")) {
-    return "Dueno / Gerencia";
+    return "Gerencia del gimnasio";
   }
   if (permissions.has("workout.manage") || permissions.has("coach.read")) {
     return "Coach";
   }
   if (permissions.has("sale.create") || permissions.has("client.create")) {
-    return "Recepcion / Caja";
+    return "Recepcion y caja";
   }
   return "Usuario operativo";
 }

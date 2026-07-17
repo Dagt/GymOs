@@ -214,6 +214,29 @@ th {
   color: var(--brand-primary);
 }
 
+.app-input {
+  background: white;
+  border: 1px solid var(--brand-line);
+  border-radius: 0.5rem;
+  color: var(--brand-ink);
+  font-size: 0.92rem;
+  font-weight: 650;
+  min-height: 2.75rem;
+  outline: none;
+  padding: 0 0.85rem;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+  width: 100%;
+}
+
+.app-input:focus {
+  border-color: color-mix(in srgb, var(--brand-primary) 52%, white);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 16%, transparent);
+}
+
+.app-input::placeholder {
+  color: color-mix(in srgb, var(--brand-muted) 65%, white);
+}
+
 .app-nav {
   background: rgba(255, 255, 255, 0.76);
   border: 1px solid var(--brand-line);

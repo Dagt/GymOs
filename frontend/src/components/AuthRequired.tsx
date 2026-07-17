@@ -1,8 +1,8 @@
 import Link from "next/link";
 
 export function AuthRequired({
-  title = "Inicia sesión para continuar",
-  message = "Usa una cuenta autorizada para ver esta sección de GymOS.",
+  title = "Inicia sesion para continuar",
+  message = "Usa una cuenta autorizada para ver esta seccion de GymOS.",
 }: {
   title?: string;
   message?: string;
@@ -14,7 +14,7 @@ export function AuthRequired({
         <h1>{title}</h1>
         <p>{message}</p>
         <Link className="app-button" href="/login">
-          Iniciar sesión
+          Iniciar sesion
         </Link>
       </section>
     </main>

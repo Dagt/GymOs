@@ -33,7 +33,7 @@ export default function LoginPage() {
       storeSession(session);
       router.replace(getPostLoginPath(session.user));
     } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible iniciar sesión.");
+      setError(exception instanceof Error ? exception.message : "No fue posible iniciar sesion.");
     } finally {
       setLoading(false);
     }
@@ -45,7 +45,7 @@ export default function LoginPage() {
         <section>
           <p>GymOS</p>
           <h1>Abriendo tu panel...</h1>
-          <span>Tu sesión sigue activa en este navegador.</span>
+          <span>Tu sesion sigue activa en este navegador.</span>
         </section>
       </main>
     );
@@ -58,12 +58,12 @@ export default function LoginPage() {
           <p>Acceso seguro</p>
           <h1>Entra directo a tu panel.</h1>
           <span>
-            GymOS identifica tu rol y te lleva a administración del sistema, gerencia o recepción sin pasos extra.
+            GymOS identifica tu rol y te lleva a administracion de plataforma, gerencia o recepcion sin pasos extra.
           </span>
           <div>
-            <small>Administrador GymOS</small>
-            <small>Dueño o gerente</small>
-            <small>Recepción y caja</small>
+            <small>Administrador de plataforma</small>
+            <small>Gerencia del gimnasio</small>
+            <small>Recepcion y caja</small>
           </div>
         </div>
 
@@ -71,8 +71,8 @@ export default function LoginPage() {
           <div className="login-form-header">
             <div>
               <p>GymOS</p>
-              <h2>Iniciar sesión</h2>
-              <span>Al validar tus credenciales entrarás automáticamente al panel correcto.</span>
+              <h2>Iniciar sesion</h2>
+              <span>Al validar tus credenciales entraras automaticamente al panel correcto.</span>
             </div>
             <Link href="/">Inicio</Link>
           </div>
@@ -89,11 +89,11 @@ export default function LoginPage() {
             </label>
 
             <label>
-              Contraseña
+              Contrasena
               <input
                 autoComplete="current-password"
                 onChange={(event) => setPassword(event.target.value)}
-                placeholder="Tu contraseña"
+                placeholder="Tu contrasena"
                 type="password"
                 value={password}
               />
