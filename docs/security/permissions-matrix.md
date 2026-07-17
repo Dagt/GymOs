@@ -23,7 +23,7 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 
 | Método | Endpoint | Módulo | Permiso | Organización | Sucursal | Auditoría | Prueba actual |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/auth/select-branch` | security | `branch.read` | Sí | Sí | Recomendado | Pendiente sucursal ajena |
+| POST | `/api/v1/auth/select-branch` | security | `branch.read` | Sí | Sí | Recomendado | `AuthServiceTests.selectingBranchWithoutUserAccessIsDenied` |
 | GET | `/api/v1/organizations/current` | organizations | `organization.read` | Sí | No | No | Pendiente |
 | PUT | `/api/v1/organizations/current` | organizations | `organization.update` | Sí | No | Sí | Pendiente |
 | GET | `/api/v1/organizations/current/branches` | organizations | `branch.read` | Sí | No | No | Pendiente |
@@ -119,4 +119,3 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 3. Agregar prueba negativa de selección de sucursal ajena.
 4. Agregar prueba negativa de UUID ajeno por módulo crítico.
 5. Verificar que toda operación marcada con auditoría escriba realmente `audit_log`.
-
