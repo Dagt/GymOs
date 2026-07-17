@@ -209,9 +209,24 @@ Decisiones implementadas:
 ## 3.18 Rediseño frontend Hito 6.5
 
 Decisiones implementadas:
-- La personalizacion visual se resuelve inicialmente en frontend mediante tokens CSS y `localStorage`.
-- El alcance permite demos y pilotos con nombre visible, logo y colores del gimnasio sin introducir tablas nuevas.
-- La persistencia multi-organizacion de tema queda preparada como evolucion posterior de configuracion.
+- La personalizacion visual se resolvio inicialmente en frontend mediante tokens CSS y despues evoluciono a marca persistida por organizacion.
+- El alcance permite demos y venta temprana con nombre visible, logo y colores propios por gimnasio.
+- La persistencia multi-organizacion de tema ya existe en la tabla `organization` mediante migracion posterior.
 - La navegacion principal se centraliza en un componente reutilizable para reducir inconsistencia entre pantallas.
 - Portada, login, recepcion, dashboard, reporte de ventas y configuracion usan el mismo lenguaje visual.
 - El frontend sigue sin contener reglas de negocio; solo mejora presentacion, formularios, jerarquia visual y rutas de acceso.
+
+## 3.19 Estabilizacion frontend Hito 7.7
+
+Decisiones implementadas:
+- El frontend se organiza por consolas de trabajo, no por una unica administracion generica.
+- `PLATFORM_ADMIN` administra gimnasios y tenants desde `/platform/gymnasiums`.
+- `GYM_ADMIN` y gerencia entran a `/dashboard`.
+- Recepcion entra a `/reception` y solo ve herramientas operativas permitidas.
+- Coaches entran a `/coaches`.
+- El ruteo post-login se resuelve por permisos en `role-model`, no por nombres de usuario.
+- `platform.admin` identifica al Administrador GymOS y le permite volver a administracion de gimnasios desde cualquier pantalla.
+- `AppShell` es la unica navegacion visible; `GlobalSessionNav` solo valida sesion y redirige.
+- La marca del gimnasio se aplica por tenant con `TenantThemeProvider`; la plataforma conserva marca neutral.
+- La administracion de muchos gimnasios y sucursales usa un patron maestro-detalle para evitar saturacion visual.
+- Los formularios comunes aplican validacion previa al envio y muestran errores de backend con codigo y `correlationId`.

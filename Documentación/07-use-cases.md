@@ -419,6 +419,83 @@ Criterios:
 - Los errores quedan como ejecucion `FAILED`.
 - No se requiere proveedor externo para la V1.
 
+## UC-027 Login y entrada por consola
+
+Actor: Administrador GymOS, administrador del gimnasio, gerente, recepcionista o coach.
+
+Precondiciones:
+- Usuario activo con permisos asignados.
+- Si el rol opera dentro de un gimnasio, debe existir organizacion activa y, cuando aplique, sucursal activa.
+
+Flujo:
+1. Usuario captura usuario o email y contrasena.
+2. Backend valida credenciales y devuelve permisos.
+3. Frontend resuelve consola por permisos.
+4. El usuario entra automaticamente a la ruta correcta.
+
+Resultado esperado:
+- Administrador GymOS entra a `/platform/gymnasiums`.
+- Administrador o gerente del gimnasio entra a `/dashboard`.
+- Recepcion entra a `/reception`.
+- Coach entra a `/coaches`.
+- No se muestra una administracion generica con menus que no correspondan al rol.
+
+## UC-028 Administrar multiples gimnasios
+
+Actor: Administrador GymOS.
+
+Precondiciones:
+- Usuario con permiso `platform.admin`.
+
+Flujo:
+1. Administrador abre `/platform/gymnasiums`.
+2. Sistema muestra buscador/lista de gimnasios en formato maestro-detalle.
+3. Administrador selecciona un gimnasio existente o crea uno nuevo.
+4. Sistema muestra datos del tenant, marca y sucursales en el panel de detalle.
+5. Administrador selecciona la sucursal operativa o administra sus datos base.
+
+Resultado esperado:
+- La pantalla escala con muchos gimnasios y sucursales sin convertirse en una lista larga de cards.
+- Desde cualquier modulo, el Administrador GymOS puede volver a administracion de gimnasios.
+
+## UC-029 Configurar marca por gimnasio
+
+Actor: Administrador GymOS o administrador del gimnasio con permisos de configuracion.
+
+Precondiciones:
+- Organizacion existente.
+
+Flujo:
+1. Usuario abre configuracion del gimnasio.
+2. Captura nombre de marca, logo opcional y colores.
+3. Frontend valida colores `#RRGGBB`.
+4. Backend guarda la marca en `organization`.
+5. Gerencia, recepcion, coaches y kiosco usan la marca del tenant.
+
+Resultado esperado:
+- La marca no afecta el panel neutral de Administrador GymOS.
+- Cada gimnasio puede verse distinto cuando lo usan sus usuarios internos.
+
+## UC-030 Crear usuarios internos por rol
+
+Actor: Administrador GymOS o administrador del gimnasio.
+
+Precondiciones:
+- Organizacion existente.
+- Sucursal activa o sucursales disponibles si el rol requiere operacion local.
+
+Flujo:
+1. Usuario abre Equipo y accesos.
+2. Frontend muestra solo roles validos para el contexto.
+3. Usuario captura nombre, apellido, email, telefono, usuario, contrasena temporal, rol y sucursal.
+4. Frontend valida campos antes de enviar.
+5. Backend crea persona, cuenta, rol y acceso de sucursal.
+
+Resultado esperado:
+- Un gimnasio no ofrece el rol "Administrador de plataforma" como rol operativo normal.
+- Un recepcionista creado inicia sesion en recepcion y no ve administracion de plataforma.
+- Si faltan campos o hay permisos invalidos, se muestra error claro con codigo y `correlationId`.
+
 ## Anexo Hito 3.5 final
 
 Ver `Documentación/07-use-cases-hito-3-5-final.md` para la definicion vigente de verificacion segura de kiosco, idempotencia por hash de solicitud y eventos por modulo propietario.

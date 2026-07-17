@@ -531,8 +531,12 @@ Verificado localmente:
 - Frontend: `npm.cmd run typecheck`.
 - Frontend: `npm.cmd run build`.
 - Docker Compose: `docker compose -f infra/docker-compose.yml config`.
+- Docker Compose runtime: backend, frontend, PostgreSQL, Redis y MinIO levantados localmente.
+- Smoke auth: `admin@gymos.local` inicia sesion con permiso `platform.admin` y sin sucursal forzada.
 
 Notas:
 
 - Despues de `V18`/`V19`, los usuarios existentes deben volver a iniciar sesion para recibir marca actualizada y `platform.admin` en el JWT si aplica.
 - El personalizador flotante local de marca fue eliminado; la marca ahora pertenece al gimnasio y se guarda en backend.
+- Documentacion sincronizada en SDS, modelo de datos, contratos API, casos de uso y especificacion frontend.
+- Rama estable esperada: `main`. Rama de trabajo equivalente para auditoria: `feature/frontend-architecture-stabilization`.

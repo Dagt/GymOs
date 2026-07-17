@@ -195,8 +195,8 @@ Implementacion frontend:
 - Personalizador de marca local con nombre visible, URL de logo y colores por cliente.
 
 Reglas de producto:
-- La personalizacion visual local sirve para demos, pilotos y venta temprana.
-- La persistencia multi-tenant de tema en backend queda para evolucion posterior.
+- La personalizacion visual ya pertenece al gimnasio/tenant y se persiste en backend.
+- El panel de Administrador GymOS conserva marca neutral de plataforma; gerencia, recepcion, coaches y kiosco usan la marca del gimnasio activo.
 - Ninguna regla de negocio se mueve al frontend.
 - Los formularios deben usar etiquetas de negocio entendibles para recepcion y administracion.
 
@@ -208,3 +208,43 @@ Correccion UX posterior:
 - Las herramientas menos frecuentes deben agruparse en secciones secundarias o plegables.
 - Los permisos y datos internos del usuario no deben ocupar espacio principal en la vista administrativa.
 - La paleta debe combinar color principal, acento y tonos funcionales para evitar una interfaz monotona.
+
+## 8.12 Hito 7.7 - Consolas separadas y navegacion por rol
+
+Objetivo:
+- Evitar que el Administrador GymOS, el administrador del gimnasio, gerencia, recepcion y coaches vean el mismo panel.
+- Mantener un solo menu lateral visible y estable.
+- Hacer que el login lleve automaticamente a la consola correcta.
+- Permitir regresar a administracion de gimnasios desde cualquier pantalla cuando el usuario sea Administrador GymOS.
+
+Consolas:
+- `PLATFORM_ADMIN`: entra a `/platform/gymnasiums`. Administra altas de gimnasios, seleccion de tenant, sucursales base, marca y usuarios iniciales.
+- `GYM_ADMIN`: entra a `/dashboard`. Opera como dueno/administrador del gimnasio dentro del tenant activo.
+- `MANAGER`: entra a `/dashboard`. Consulta direccion, reportes y operacion autorizada segun permisos.
+- `RECEPTION`: entra a `/reception`. Ve recepcion, POS, socios, ventas y reportes operativos permitidos.
+- `COACH`: entra a `/coaches`. Ve coaches, rutinas y asignaciones permitidas.
+
+Implementacion:
+- `frontend/src/lib/role-model.ts` resuelve consola, ruta post-login y acceso por permisos.
+- `AppShell` es el unico shell visible. `GlobalSessionNav` queda como guardia silencioso de sesion y redireccion.
+- `/admin` queda como redirect temporal hacia `/platform/gymnasiums`.
+- El menu se declara por consola, con secciones visuales y sin duplicar navegacion lateral/superior.
+- La logica de rol no usa nombres de usuario ni `username.includes("admin")`; se basa en permisos, especialmente `platform.admin`.
+
+Administracion de gimnasios:
+- `/platform/gymnasiums` usa maestro-detalle para evitar listas largas de cards.
+- La lista izquierda permite buscar y seleccionar gimnasios.
+- El detalle derecho muestra datos del tenant, marca y sucursales.
+- Las sucursales se presentan en tabla compacta con acciones de seleccion.
+- La creacion de gimnasio se realiza en panel dedicado; no debe vivir como formulario permanente que alarga la pagina.
+- El lenguaje de "piloto" y "alta rapida" no pertenece al flujo principal de administracion.
+
+Marca por gimnasio:
+- `TenantThemeProvider` aplica tokens CSS desde la organizacion activa.
+- Campos soportados: `brandName`, `logoUrl`, `primaryColor`, `accentColor`, `surfaceColor`.
+- Plataforma usa tema neutral; tenant usa su propia marca en gerencia, recepcion, kiosco y pantallas internas.
+
+Formularios:
+- Los campos compartidos viven en `frontend/src/components/forms/FormFields.tsx`.
+- Validaciones frontend minimas: email, telefono, contrasena de al menos 8 caracteres, codigo de sucursal, moneda, zona horaria y colores hexadecimales.
+- Los errores de backend deben mostrar mensaje, codigo y `correlationId` cuando existan.

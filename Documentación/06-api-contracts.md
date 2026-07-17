@@ -629,3 +629,61 @@ Comportamiento:
 - Cada regla vencida se reclama con `locked_until` para evitar ejecuciones simultaneas.
 - Al terminar, la regla se reprograma sumando nuevamente `intervalMinutes`.
 - Las ejecuciones se registran en `automation_execution` y, para `CREATE_NOTIFICATION`, se encola una notificacion interna.
+
+## Hito 7.7 - Consolas, marca tenant y administracion de plataforma
+
+### Auth
+
+`POST /api/v1/auth/login` acepta `username` con nombre de usuario interno o email de la persona asociada. La respuesta mantiene el contrato existente de usuario, permisos, organizacion y sucursal.
+
+El frontend decide la consola inicial por permisos:
+
+- `platform.admin` -> `/platform/gymnasiums`
+- permisos gerenciales/reportes -> `/dashboard`
+- permisos de recepcion/caja -> `/reception`
+- permisos de coaching -> `/coaches`
+
+### Organizaciones
+
+Los contratos de organizacion incluyen marca de tenant:
+
+```json
+{
+  "id": "uuid",
+  "legalName": "Appex S.A. de C.V.",
+  "displayName": "Appex Gym",
+  "brandName": "Appex Gym",
+  "logoUrl": "https://example.com/logo.png",
+  "primaryColor": "#0f766e",
+  "accentColor": "#f59e0b",
+  "surfaceColor": "#f8fafc"
+}
+```
+
+Endpoints afectados:
+
+- `GET /api/v1/organizations/current`
+- `PUT /api/v1/organizations/current`
+- `GET /api/v1/organizations`
+- `POST /api/v1/organizations`
+
+Reglas:
+
+- `primaryColor`, `accentColor` y `surfaceColor` deben usar formato hexadecimal `#RRGGBB`.
+- La marca se guarda por organizacion y se aplica a gerencia, recepcion, coaches, kiosco y pantallas internas del tenant.
+- La consola de Administrador GymOS conserva marca neutral de plataforma.
+
+### Usuarios internos
+
+`POST /api/v1/users/internal` no permite asignar roles con permiso `platform.admin` si el usuario autenticado no tiene `platform.admin`.
+
+El frontend debe filtrar roles por contexto:
+
+- Plataforma puede crear accesos de administracion de plataforma cuando corresponda.
+- Un gimnasio no debe ofrecer "Administrador de plataforma" como rol operativo del tenant.
+- Recepcionistas, coaches, gerentes y administradores de gimnasio entran a consolas distintas segun permisos.
+
+Errores esperados:
+
+- `VALIDATION_ERROR`: campos invalidos, telefono/correo/contrasena no aceptados o sucursal requerida.
+- `FORBIDDEN`: intento de asignar un rol de plataforma sin permiso.

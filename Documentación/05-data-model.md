@@ -496,3 +496,28 @@ Restricciones e indices destacados:
 - `ux_notification_template_org_code_channel`
 
 Todas las tablas operativas incluyen `organization_id`; las tablas localizables incluyen `branch_id`.
+
+## Hito 7.7 - Marca por tenant y administrador de plataforma
+
+Migraciones:
+
+- `V18__organization_branding.sql`
+- `V19__platform_admin_legacy_role.sql`
+
+Columnas agregadas a `organization`:
+
+- `brand_name`: nombre visible de marca para el tenant.
+- `logo_url`: URL opcional del logo del gimnasio.
+- `primary_color`: color principal de interfaz en formato hexadecimal.
+- `accent_color`: color de acento en formato hexadecimal.
+- `surface_color`: color de superficie/fondo en formato hexadecimal.
+
+Permisos:
+
+- `platform.admin`: identifica al Administrador GymOS de plataforma. Permite administrar gimnasios/tenants y regresar a `/platform/gymnasiums` desde cualquier pantalla.
+
+Notas de integridad:
+
+- Los colores deben validarse como `#RRGGBB` desde API/frontend.
+- La marca pertenece a la organizacion, no a la sesion local ni al navegador.
+- El panel de plataforma no toma la marca del tenant; usa identidad neutral de GymOS para evitar confusion entre administracion SaaS y operacion del gimnasio.
