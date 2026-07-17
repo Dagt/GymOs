@@ -44,6 +44,18 @@ const navigationSections = [
   },
 ];
 
+const setupSections = [
+  {
+    title: "Configuración inicial",
+    links: [
+      { label: "Preparar gimnasio", href: "/onboarding", hint: "Crear datos base" },
+      { label: "Marca y sucursales", href: "/settings/organization", hint: "Datos del gimnasio" },
+      { label: "Catálogo", href: "/catalog", hint: "Planes y productos" },
+      { label: "Importar clientes", href: "/clients/import", hint: "Carga inicial" },
+    ],
+  },
+];
+
 export function AppShell({
   actions = [],
   branchName,
@@ -66,7 +78,9 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const role = resolveUserRole(session.user.permissions, session.user.username);
-  const visibleBranch = branchName ?? (session.user.branchId ? "Sucursal seleccionada" : "Sin sucursal seleccionada");
+  const hasBranch = Boolean(branchName || session.user.branchId);
+  const visibleBranch = branchName ?? (session.user.branchId ? "Sucursal seleccionada" : "Sin sucursal");
+  const sections = hasBranch ? navigationSections : setupSections;
 
   function logout() {
     clearSession();
@@ -91,7 +105,7 @@ export function AppShell({
         </section>
 
         <nav aria-label="Menú principal">
-          {navigationSections.map((section) => (
+          {sections.map((section) => (
             <section className="admin-nav-section" key={section.title}>
               <p>{section.title}</p>
               {section.links.map((item) => (
@@ -135,12 +149,28 @@ export function AppShell({
               <strong>{visibleBranch}</strong>
             </div>
             {actions.map((action) => (
-              <Link href={action.href} key={action.href}>
-                {action.label}
-              </Link>
+              hasBranch || action.href === "/onboarding" || action.href === "/settings/organization" || action.href === "/catalog" ? (
+                <Link href={action.href} key={action.href}>
+                  {action.label}
+                </Link>
+              ) : null
             ))}
           </div>
         </header>
+
+        {!hasBranch ? (
+          <section className="admin-setup-banner">
+            <div>
+              <p>Configuración pendiente</p>
+              <h2>Primero configura al menos una sucursal</h2>
+              <span>
+                Mientras no exista una sucursal activa, GymOS oculta caja, socios, reportes operativos y kiosco para evitar
+                pantallas vacías o errores confusos.
+              </span>
+            </div>
+            <Link href="/onboarding">Preparar gimnasio</Link>
+          </section>
+        ) : null}
 
         {children}
       </section>

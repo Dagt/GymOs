@@ -18,6 +18,8 @@ const internalLinks = [
   { label: "Configuración", href: "/settings/organization" },
 ];
 
+const shellRoutes = ["/reception", "/pos", "/clients", "/catalog", "/dashboard", "/reports/sales"];
+
 export function GlobalSessionNav() {
   const pathname = usePathname();
   const router = useRouter();
@@ -28,13 +30,14 @@ export function GlobalSessionNav() {
     let cancelled = false;
     const stored = getStoredSession();
     const isPublicRoute = pathname === "/" || pathname === "/login" || pathname.startsWith("/kiosk");
+    const hasRouteShell = shellRoutes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 
     const timer = window.setTimeout(() => {
       if (cancelled) {
         return;
       }
       const hasShell = Boolean(document.querySelector(".admin-console"));
-      const shouldShow = Boolean(stored) && !isPublicRoute && !hasShell;
+      const shouldShow = Boolean(stored) && !isPublicRoute && !hasRouteShell && !hasShell;
       setSession(stored);
       setVisible(shouldShow);
       document.body.classList.toggle("has-global-session-nav", shouldShow);

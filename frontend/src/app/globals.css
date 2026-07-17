@@ -786,6 +786,86 @@ th {
   padding: 0.62rem 0.9rem;
 }
 
+.public-home-panel {
+  min-height: auto;
+}
+
+.public-home-hero {
+  align-items: center;
+  display: grid;
+  gap: clamp(1.5rem, 4vw, 4rem);
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.42fr);
+  padding: clamp(3rem, 7vw, 6rem) 0;
+}
+
+.public-home-hero h1 {
+  color: var(--brand-ink);
+  font-size: clamp(3.4rem, 8vw, 7rem);
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 0.95;
+  margin-top: 0.7rem;
+}
+
+.public-home-hero p:not(.home-kicker) {
+  color: var(--brand-muted);
+  font-size: clamp(1rem, 1.5vw, 1.18rem);
+  line-height: 1.65;
+  margin-top: 1.2rem;
+  max-width: 42rem;
+}
+
+.public-login-card {
+  background: #101827;
+  border-radius: 0.75rem;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18);
+  color: white;
+  display: grid;
+  gap: 0.7rem;
+  padding: 1.25rem;
+}
+
+.public-login-card p {
+  color: var(--brand-accent);
+  font-size: 0.75rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.public-login-card h2 {
+  font-size: 1.45rem;
+  font-weight: 950;
+}
+
+.public-login-card span {
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.55;
+}
+
+.public-home-highlights {
+  border-top: 1px solid var(--brand-line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  padding-top: 1.2rem;
+}
+
+.public-home-highlights span,
+.home-session-pill,
+.home-plain-button {
+  background: white;
+  border: 1px solid var(--brand-line);
+  border-radius: 999px;
+  color: var(--brand-muted);
+  font-size: 0.84rem;
+  font-weight: 850;
+  padding: 0.62rem 0.9rem;
+}
+
+.home-plain-button {
+  cursor: pointer;
+}
+
 .admin-console {
   background:
     linear-gradient(135deg, #f8fafc, #eef7f6);
@@ -1290,6 +1370,54 @@ th {
   color: #be123c;
   font-size: 0.9rem;
   line-height: 1.45;
+}
+
+.admin-setup-banner {
+  align-items: center;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+  border-radius: 0.75rem;
+  box-shadow: 0 18px 52px rgba(15, 23, 42, 0.06);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 1rem;
+}
+
+.admin-setup-banner p {
+  color: #9a3412;
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.admin-setup-banner h2 {
+  color: var(--brand-ink);
+  font-size: 1.2rem;
+  font-weight: 950;
+  margin-top: 0.15rem;
+}
+
+.admin-setup-banner span {
+  color: #7c2d12;
+  display: block;
+  line-height: 1.45;
+  margin-top: 0.35rem;
+}
+
+.admin-setup-banner a,
+.admin-setup-steps a {
+  background: var(--brand-primary);
+  border-radius: 0.5rem;
+  color: white;
+  font-weight: 900;
+  padding: 0.75rem 0.95rem;
+}
+
+.admin-setup-steps {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
 }
 
 .admin-empty-state {

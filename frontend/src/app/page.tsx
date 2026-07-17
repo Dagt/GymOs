@@ -1,110 +1,97 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { clearSession, getStoredSession, type StoredSession } from "@/lib/api";
 
-const roleEntrances = [
-  {
-    title: "Administrar gimnasio",
-    detail: "Ventas, socios, membresías, sucursales y reportes en un solo lugar.",
-    href: "/reception",
-    action: "Entrar al panel",
-    tone: "primary",
-  },
-  {
-    title: "Atender en recepción",
-    detail: "Registrar socios, cobrar, renovar membresías y consultar pagos pendientes.",
-    href: "/pos",
-    action: "Abrir caja",
-    tone: "warm",
-  },
-  {
-    title: "Pantalla para socios",
-    detail: "Autoservicio para pagos, renovaciones y cambios de membresía dentro del gimnasio.",
-    href: "/kiosk/KIOSK-MAIN",
-    action: "Abrir kiosco",
-    tone: "cool",
-  },
-];
-
-const everydaySignals = [
-  "Cobros y saldos visibles",
-  "Clientes y membresías organizados",
-  "Reportes listos para el dueño",
+const publicHighlights = [
+  "Control de socios, pagos y membresías",
+  "Reportes para administración y gerencia",
   "Marca configurable por gimnasio",
 ];
 
 export default function Home() {
+  const [session, setSession] = useState<StoredSession | null>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSession(getStoredSession());
+      setReady(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  function logout() {
+    clearSession();
+    setSession(null);
+  }
+
   return (
     <main className="home-screen">
-      <section className="home-panel">
+      <section className="home-panel public-home-panel">
         <header className="home-header">
           <div className="home-brand">
             <span>G</span>
             <strong>GymOS</strong>
           </div>
-          <nav aria-label="Accesos principales">
-            <Link href="/login">Iniciar sesión</Link>
-            <Link className="home-primary-link" href="/reception">
-              Ir al panel
-            </Link>
+          <nav aria-label="Acceso a GymOS">
+            {ready && session ? (
+              <>
+                <span className="home-session-pill">{session.user.fullName}</span>
+                <Link className="home-primary-link" href="/reception">
+                  Continuar al panel
+                </Link>
+                <button className="home-plain-button" onClick={logout} type="button">
+                  Salir
+                </button>
+              </>
+            ) : (
+              <Link className="home-primary-link" href="/login">
+                Iniciar sesión
+              </Link>
+            )}
           </nav>
         </header>
 
-        <section className="home-hero" aria-labelledby="home-title">
+        <section className="public-home-hero" aria-labelledby="home-title">
           <div>
-            <p className="home-kicker">Sistema para operar gimnasios</p>
-            <h1 id="home-title">Controla recepción, pagos, membresías y reportes sin complicar al equipo.</h1>
+            <p className="home-kicker">Sistema para gimnasios</p>
+            <h1 id="home-title">GymOS</h1>
             <p>
-              Diseñado para mostrador, administración y autoservicio. Cada usuario entra directo a lo que necesita
-              hacer, sin información técnica ni pasos innecesarios.
+              Plataforma interna para administrar la operación del gimnasio. Para entrar a caja, socios,
+              reportes o configuración necesitas iniciar sesión con una cuenta autorizada.
             </p>
             <div className="home-actions">
-              <Link className="home-cta" href="/reception">
-                Empezar a operar
-              </Link>
-              <Link className="home-secondary" href="/reports/sales">
-                Ver reportes
-              </Link>
+              {ready && session ? (
+                <Link className="home-cta" href="/reception">
+                  Entrar al panel
+                </Link>
+              ) : (
+                <Link className="home-cta" href="/login">
+                  Iniciar sesión
+                </Link>
+              )}
             </div>
           </div>
 
-          <aside className="home-preview" aria-label="Resumen de operación">
-            <div className="home-preview-top">
-              <span>Hoy</span>
-              <strong>Mostrador activo</strong>
-            </div>
-            <div className="home-preview-grid">
-              <PreviewMetric label="Cobros" value="$18,450" />
-              <PreviewMetric label="Socios activos" value="342" />
-              <PreviewMetric label="Por vencer" value="18" />
-              <PreviewMetric label="Pagos por revisar" value="7" />
-            </div>
+          <aside className="public-login-card" aria-label="Estado de acceso">
+            <p>{ready && session ? "Sesión activa" : "Acceso requerido"}</p>
+            <h2>{ready && session ? "Ya puedes continuar" : "Entra para operar"}</h2>
+            <span>
+              {ready && session
+                ? "Tu sesión sigue guardada en este navegador."
+                : "No se muestran acciones internas hasta validar usuario, rol y sucursal."}
+            </span>
           </aside>
         </section>
 
-        <section className="home-roles" aria-label="Entradas por rol">
-          {roleEntrances.map((entry) => (
-            <article className={`home-role-card ${entry.tone}`} key={entry.title}>
-              <h2>{entry.title}</h2>
-              <p>{entry.detail}</p>
-              <Link href={entry.href}>{entry.action}</Link>
-            </article>
-          ))}
-        </section>
-
-        <section className="home-signals" aria-label="Beneficios operativos">
-          {everydaySignals.map((signal) => (
-            <span key={signal}>{signal}</span>
+        <section className="public-home-highlights" aria-label="Qué incluye GymOS">
+          {publicHighlights.map((item) => (
+            <span key={item}>{item}</span>
           ))}
         </section>
       </section>
     </main>
-  );
-}
-
-function PreviewMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
   );
 }

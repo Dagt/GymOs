@@ -134,6 +134,7 @@ export default function ReceptionPage() {
   }, []);
 
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
+  const canOperate = Boolean(activeBranch);
 
   async function switchBranch(branchId: string) {
     if (!session || branchId === session.user.branchId) {
@@ -173,18 +174,56 @@ export default function ReceptionPage() {
   return (
     <AppShell
       actions={[
-        { href: "/reports/sales", label: "Ventas" },
+        ...(canOperate ? [{ href: "/reports/sales", label: "Ventas" }] : []),
         { href: "/settings/organization", label: "Personalizar" },
       ]}
       branchName={activeBranch?.name}
-      eyebrow="Inicio operativo"
+      eyebrow={canOperate ? "Inicio operativo" : "Configuración inicial"}
       organizationName={organization?.tradeName}
       session={session}
-      subtitle="Acciones principales para recepción y caja. La administración y gerencia viven en el menú lateral."
-      title="Qué hacer ahora"
+      subtitle={
+        canOperate
+          ? "Acciones principales para recepción y caja. La administración y gerencia viven en el menú lateral."
+          : "Antes de operar caja, socios, membresías o reportes, configura la primera sucursal del gimnasio."
+      }
+      title={canOperate ? "Qué hacer ahora" : "Configura tu gimnasio"}
     >
       {error ? <InlineError message={error} /> : null}
 
+      {!canOperate ? (
+        <section className="admin-content-grid">
+          <section className="admin-main-column">
+            <section className="admin-panel">
+              <div className="admin-panel-header">
+                <div>
+                  <p>Siguiente paso</p>
+                  <h2>Completa la configuración inicial</h2>
+                </div>
+              </div>
+              <div className="admin-setup-steps">
+                <Link href="/onboarding">1. Preparar gimnasio</Link>
+                <Link href="/settings/organization">2. Revisar datos y sucursales</Link>
+                <Link href="/catalog">3. Crear planes y productos</Link>
+                <Link href="/clients/import">4. Importar clientes iniciales</Link>
+              </div>
+            </section>
+          </section>
+
+          <aside className="admin-context-column">
+            <section className="admin-panel">
+              <div className="admin-panel-header">
+                <div>
+                  <p>Estado</p>
+                  <h2>Sin sucursal activa</h2>
+                </div>
+              </div>
+              <p className="admin-muted-text">
+                Cuando configures una sucursal, se activarán caja, socios, membresías, kiosco y reportes operativos.
+              </p>
+            </section>
+          </aside>
+        </section>
+      ) : (
       <section className="admin-content-grid">
         <section className="admin-main-column">
           <section className="admin-status-board" aria-label="Estado operativo">
@@ -286,6 +325,7 @@ export default function ReceptionPage() {
           </details>
         </aside>
       </section>
+      )}
     </AppShell>
   );
 }
