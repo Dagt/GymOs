@@ -71,11 +71,13 @@ public class OrganizationService {
 			jdbcClient.sql("""
 					INSERT INTO organization (
 					    id, legal_name, trade_name, tax_id, status, timezone, default_currency,
-					    contact_email, contact_phone, created_at, updated_at, created_by, updated_by, version
+					    contact_email, contact_phone, brand_name, logo_url, primary_color, accent_color, surface_color,
+					    created_at, updated_at, created_by, updated_by, version
 					)
 					VALUES (
 					    :id, :legalName, :tradeName, :taxId, 'ACTIVE', :timezone, :defaultCurrency,
-					    :contactEmail, :contactPhone, :createdAt, :updatedAt, :createdBy, :updatedBy, 0
+					    :contactEmail, :contactPhone, :brandName, :logoUrl, :primaryColor, :accentColor, :surfaceColor,
+					    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
 					)
 					""")
 					.param("id", organizationId)
@@ -86,6 +88,11 @@ public class OrganizationService {
 					.param("defaultCurrency", request.defaultCurrency().trim().toUpperCase())
 					.param("contactEmail", blankToNull(request.contactEmail()))
 					.param("contactPhone", blankToNull(request.contactPhone()))
+					.param("brandName", defaultBrandName(request.brandName(), request.tradeName()))
+					.param("logoUrl", blankToNull(request.logoUrl()))
+					.param("primaryColor", defaultColor(request.primaryColor(), "#164E63"))
+					.param("accentColor", defaultColor(request.accentColor(), "#F59E0B"))
+					.param("surfaceColor", defaultColor(request.surfaceColor(), "#F4F7FB"))
 					.param("createdAt", now)
 					.param("updatedAt", now)
 					.param("createdBy", principal.userId())
@@ -147,6 +154,11 @@ public class OrganizationService {
 				    default_currency = :defaultCurrency,
 				    contact_email = :contactEmail,
 				    contact_phone = :contactPhone,
+				    brand_name = :brandName,
+				    logo_url = :logoUrl,
+				    primary_color = :primaryColor,
+				    accent_color = :accentColor,
+				    surface_color = :surfaceColor,
 				    updated_at = :updatedAt,
 				    updated_by = :updatedBy,
 				    version = version + 1
@@ -160,6 +172,11 @@ public class OrganizationService {
 				.param("defaultCurrency", request.defaultCurrency().trim().toUpperCase())
 				.param("contactEmail", blankToNull(request.contactEmail()))
 				.param("contactPhone", blankToNull(request.contactPhone()))
+				.param("brandName", defaultBrandName(request.brandName(), request.tradeName()))
+				.param("logoUrl", blankToNull(request.logoUrl()))
+				.param("primaryColor", defaultColor(request.primaryColor(), "#164E63"))
+				.param("accentColor", defaultColor(request.accentColor(), "#F59E0B"))
+				.param("surfaceColor", defaultColor(request.surfaceColor(), "#F4F7FB"))
 				.param("updatedAt", now)
 				.param("updatedBy", principal.userId())
 				.param("organizationId", principal.organizationId())
@@ -262,5 +279,15 @@ public class OrganizationService {
 
 	private String blankToNull(String value) {
 		return value == null || value.isBlank() ? null : value.trim();
+	}
+
+	private String defaultBrandName(String brandName, String tradeName) {
+		String value = blankToNull(brandName);
+		return value == null ? tradeName.trim() : value;
+	}
+
+	private String defaultColor(String value, String fallback) {
+		String normalized = blankToNull(value);
+		return normalized == null ? fallback : normalized;
 	}
 }

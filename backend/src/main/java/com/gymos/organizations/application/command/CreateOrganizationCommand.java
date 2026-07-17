@@ -8,6 +8,11 @@ public record CreateOrganizationCommand(
 		String defaultCurrency,
 		String contactEmail,
 		String contactPhone,
+		String brandName,
+		String logoUrl,
+		String primaryColor,
+		String accentColor,
+		String surfaceColor,
 		String firstBranchName,
 		String firstBranchCode,
 		String firstBranchPhone

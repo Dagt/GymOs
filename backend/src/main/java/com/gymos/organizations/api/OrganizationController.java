@@ -31,6 +31,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/organizations")
 public class OrganizationController {
 	private final OrganizationService organizationService;
+	private static final String HEX_COLOR = "^#[0-9A-Fa-f]{6}$";
 
 	public OrganizationController(OrganizationService organizationService) {
 		this.organizationService = organizationService;
@@ -100,10 +101,28 @@ public class OrganizationController {
 			@NotBlank @Size(max = 64) String timezone,
 			@NotBlank @Pattern(regexp = "[A-Za-z]{3}") String defaultCurrency,
 			@Email @Size(max = 180) String contactEmail,
-			@Size(max = 32) String contactPhone
+			@Size(max = 32) String contactPhone,
+			@Size(max = 120) String brandName,
+			@Size(max = 500) String logoUrl,
+			@Pattern(regexp = HEX_COLOR) String primaryColor,
+			@Pattern(regexp = HEX_COLOR) String accentColor,
+			@Pattern(regexp = HEX_COLOR) String surfaceColor
 	) {
 		private UpdateOrganizationCommand toCommand() {
-			return new UpdateOrganizationCommand(legalName, tradeName, taxId, timezone, defaultCurrency, contactEmail, contactPhone);
+			return new UpdateOrganizationCommand(
+					legalName,
+					tradeName,
+					taxId,
+					timezone,
+					defaultCurrency,
+					contactEmail,
+					contactPhone,
+					brandName,
+					logoUrl,
+					primaryColor,
+					accentColor,
+					surfaceColor
+			);
 		}
 	}
 
@@ -115,6 +134,11 @@ public class OrganizationController {
 			@NotBlank @Pattern(regexp = "[A-Za-z]{3}") String defaultCurrency,
 			@Email @Size(max = 180) String contactEmail,
 			@Size(max = 32) String contactPhone,
+			@Size(max = 120) String brandName,
+			@Size(max = 500) String logoUrl,
+			@Pattern(regexp = HEX_COLOR) String primaryColor,
+			@Pattern(regexp = HEX_COLOR) String accentColor,
+			@Pattern(regexp = HEX_COLOR) String surfaceColor,
 			@NotBlank @Size(max = 120) String firstBranchName,
 			@NotBlank @Size(max = 32) String firstBranchCode,
 			@Size(max = 32) String firstBranchPhone
@@ -128,6 +152,11 @@ public class OrganizationController {
 					defaultCurrency,
 					contactEmail,
 					contactPhone,
+					brandName,
+					logoUrl,
+					primaryColor,
+					accentColor,
+					surfaceColor,
 					firstBranchName,
 					firstBranchCode,
 					firstBranchPhone

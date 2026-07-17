@@ -61,6 +61,21 @@ public class UserAdministrationRepository {
 		return count > 0;
 	}
 
+	public boolean roleHasPermission(UUID roleId, String permissionCode) {
+		Integer count = jdbcClient.sql("""
+				SELECT COUNT(*)
+				FROM role_permission rp
+				JOIN permission p ON p.id = rp.permission_id
+				WHERE rp.role_id = :roleId
+				  AND p.code = :permissionCode
+				""")
+				.param("roleId", roleId)
+				.param("permissionCode", permissionCode)
+				.query(Integer.class)
+				.single();
+		return count > 0;
+	}
+
 	public boolean branchBelongsToOrganization(UUID organizationId, UUID branchId) {
 		Integer count = jdbcClient.sql("""
 				SELECT COUNT(*)

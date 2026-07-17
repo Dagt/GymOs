@@ -22,7 +22,7 @@ public class AuthQueryRepository {
 				       p.first_name || ' ' || p.last_name AS full_name
 				FROM user_account ua
 				JOIN person p ON p.id = ua.person_id
-				WHERE LOWER(ua.username) = LOWER(:username)
+				WHERE (LOWER(ua.username) = LOWER(:username) OR LOWER(p.email) = LOWER(:username))
 				  AND ua.status = 'ACTIVE'
 				  AND ua.deleted_at IS NULL
 				""", "username", username);

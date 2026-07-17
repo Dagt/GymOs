@@ -2,8 +2,17 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
+import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired } from "@/components/AuthRequired";
+import {
+  FieldErrorMap,
+  FormError,
+  normalizePhone,
+  validateEmail,
+  validatePassword,
+  validatePhone,
+  validateRequired,
+} from "@/components/FormFields";
 import {
   createInternalUser,
   getBranches,
@@ -37,6 +46,7 @@ export default function UsersPage() {
   const [roles, setRoles] = useState<RoleOption[]>([]);
   const [users, setUsers] = useState<InternalUserSummary[]>([]);
   const [form, setForm] = useState<CreateInternalUserPayload>(emptyUserForm);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrorMap>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,7 +77,8 @@ export default function UsersPage() {
         setBranches(availableBranches);
         setRoles(availableRoles);
         setUsers(existingUsers);
-        const defaultRole = availableRoles.find((role) => role.name === "Recepcion / Caja") ?? availableRoles[0];
+        const selectableRoles = availableRoles.filter((role) => displayRoleName(role.name) !== "Administrador de plataforma");
+        const defaultRole = selectableRoles.find((role) => displayRoleName(role.name) === "Recepcion y caja") ?? selectableRoles[0];
         setForm((current) => ({ ...current, roleId: defaultRole?.id ?? "" }));
       } catch (exception) {
         if (active) {
@@ -88,17 +99,28 @@ export default function UsersPage() {
   }, []);
 
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
+  const selectableRoles = roles.filter((role) => displayRoleName(role.name) !== "Administrador de plataforma");
 
   async function submitUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session) {
       return;
     }
+    const errors = validateUserForm(form);
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      return;
+    }
     setSaving(true);
     setError(null);
     setMessage(null);
     try {
-      const created = await createInternalUser(session.accessToken, form);
+      const created = await createInternalUser(session.accessToken, {
+        ...form,
+        email: form.email?.trim() || null,
+        phone: normalizePhone(form.phone ?? ""),
+        username: form.username.trim(),
+      });
       setUsers((current) => [...current, created].sort((left, right) => left.fullName.localeCompare(right.fullName)));
       setForm({
         ...emptyUserForm,
@@ -138,7 +160,7 @@ export default function UsersPage() {
   return (
     <AppShell
       actions={[
-        { href: "/admin", label: "Gimnasios" },
+        { href: "/platform/gymnasiums", label: "Gimnasios" },
         { href: "/settings/organization", label: "Datos y sucursales" },
       ]}
       branchName={activeBranch?.name}
@@ -149,7 +171,7 @@ export default function UsersPage() {
       subtitle="Crea usuarios internos y limita lo que ven por rol y por sucursal."
       title="Equipo y accesos"
     >
-      {error ? <InlineError message={error} /> : null}
+      {error ? <FormError message={error} /> : null}
       {message ? <p className="form-message success">{message}</p> : null}
 
       <section className="team-layout">
@@ -170,15 +192,15 @@ export default function UsersPage() {
 
           <form className="mt-5 grid gap-4" onSubmit={submitUser}>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Nombre" value={form.firstName} onChange={(value) => setForm({ ...form, firstName: value })} />
-              <Field label="Apellido" value={form.lastName} onChange={(value) => setForm({ ...form, lastName: value })} />
+              <Field error={fieldErrors.firstName} label="Nombre" value={form.firstName} onChange={(value) => setForm({ ...form, firstName: value })} />
+              <Field error={fieldErrors.lastName} label="Apellido" value={form.lastName} onChange={(value) => setForm({ ...form, lastName: value })} />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Email" type="email" value={form.email ?? ""} onChange={(value) => setForm({ ...form, email: value, username: form.username || value })} />
-              <Field label="Telefono" value={form.phone ?? ""} onChange={(value) => setForm({ ...form, phone: value })} />
+              <Field error={fieldErrors.email} label="Email" type="email" value={form.email ?? ""} onChange={(value) => setForm({ ...form, email: value, username: form.username || value })} />
+              <Field error={fieldErrors.phone} help="10 a 15 digitos; puedes incluir +52." label="Telefono" value={form.phone ?? ""} onChange={(value) => setForm({ ...form, phone: value })} />
             </div>
-            <Field label="Usuario de inicio de sesion" value={form.username} onChange={(value) => setForm({ ...form, username: value })} />
-            <Field label="Contrasena temporal" type="password" value={form.temporaryPassword} onChange={(value) => setForm({ ...form, temporaryPassword: value })} />
+            <Field error={fieldErrors.username} label="Usuario de inicio de sesion" value={form.username} onChange={(value) => setForm({ ...form, username: value })} />
+            <Field error={fieldErrors.temporaryPassword} help="Minimo 8 caracteres." label="Contrasena temporal" type="password" value={form.temporaryPassword} onChange={(value) => setForm({ ...form, temporaryPassword: value })} />
 
             <label className="grid gap-2 text-sm font-medium text-[#42514a]">
               Rol
@@ -188,7 +210,7 @@ export default function UsersPage() {
                 required
                 value={form.roleId}
               >
-                {roles.map((role) => (
+                {selectableRoles.map((role) => (
                   <option key={role.id} value={role.id}>
                     {displayRoleName(role.name)}
                   </option>
@@ -212,9 +234,10 @@ export default function UsersPage() {
                   <small>{branch.code}</small>
                 </label>
               ))}
+              {fieldErrors.branchIds ? <small className="form-field-error">{fieldErrors.branchIds}</small> : null}
             </section>
 
-            <button className="form-primary-button" disabled={saving || roles.length === 0} type="submit">
+            <button className="form-primary-button" disabled={saving || selectableRoles.length === 0} type="submit">
               Crear usuario
             </button>
           </form>
@@ -225,7 +248,7 @@ export default function UsersPage() {
             <p className="app-eyebrow">Roles disponibles</p>
             <h2 className="mt-2 text-xl font-semibold">Perfiles de trabajo</h2>
             <div className="team-role-list">
-              {roles.map((role) => (
+              {selectableRoles.map((role) => (
                 <article key={role.id}>
                   <strong>{displayRoleName(role.name)}</strong>
                   <span>{roleDescription(role.name, role.description)}</span>
@@ -273,11 +296,15 @@ export default function UsersPage() {
 }
 
 function Field({
+  error,
+  help,
   label,
   value,
   onChange,
   type = "text",
 }: {
+  error?: string;
+  help?: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
@@ -293,6 +320,7 @@ function Field({
         type={type}
         value={value}
       />
+      {error ? <small className="form-field-error">{error}</small> : help ? <small>{help}</small> : null}
     </label>
   );
 }
@@ -335,4 +363,25 @@ function roleDescription(roleName: string, fallback?: string | null) {
     return "Consulta socios asignados y gestiona rutinas o servicios permitidos.";
   }
   return fallback ?? "Rol operativo";
+}
+
+function validateUserForm(form: CreateInternalUserPayload) {
+  const errors: FieldErrorMap = {};
+  addError(errors, "firstName", validateRequired(form.firstName, "Nombre"));
+  addError(errors, "lastName", validateRequired(form.lastName, "Apellido"));
+  addError(errors, "email", validateEmail(form.email ?? "", true));
+  addError(errors, "phone", validatePhone(form.phone ?? ""));
+  addError(errors, "username", validateRequired(form.username, "Usuario de inicio de sesion"));
+  addError(errors, "temporaryPassword", validatePassword(form.temporaryPassword));
+  addError(errors, "roleId", validateRequired(form.roleId, "Rol"));
+  if (form.branchIds.length === 0) {
+    errors.branchIds = "Selecciona al menos una sucursal.";
+  }
+  return errors;
+}
+
+function addError(errors: FieldErrorMap, key: string, value: string) {
+  if (value) {
+    errors[key] = value;
+  }
 }

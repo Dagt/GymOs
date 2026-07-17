@@ -53,6 +53,9 @@ public class UserAdministrationService {
 		if (!repository.roleBelongsToOrganization(principal.organizationId(), command.roleId())) {
 			throw new BusinessException("ROLE_NOT_AVAILABLE", "El rol seleccionado no esta disponible para este gimnasio.");
 		}
+		if (repository.roleHasPermission(command.roleId(), "platform.admin") && !principal.permissions().contains("platform.admin")) {
+			throw new BusinessException("ROLE_NOT_AVAILABLE", "No puedes asignar roles de plataforma desde este gimnasio.");
+		}
 		List<UUID> branchIds = command.branchIds() == null ? List.of() : command.branchIds().stream().distinct().toList();
 		for (UUID branchId : branchIds) {
 			if (!repository.branchBelongsToOrganization(principal.organizationId(), branchId)) {

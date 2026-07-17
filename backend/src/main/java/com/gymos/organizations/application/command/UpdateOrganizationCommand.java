@@ -7,6 +7,11 @@ public record UpdateOrganizationCommand(
 		String timezone,
 		String defaultCurrency,
 		String contactEmail,
-		String contactPhone
+		String contactPhone,
+		String brandName,
+		String logoUrl,
+		String primaryColor,
+		String accentColor,
+		String surfaceColor
 ) {
 }

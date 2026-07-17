@@ -503,3 +503,36 @@ Notas:
 
 - Despues de aplicar la migracion o reiniciar el backend local, los usuarios deben volver a iniciar sesion para que el JWT incluya `branch.create`, `user.read` y `user.manage`.
 - Sigue pendiente una suite amplia de pruebas automatizadas para CRUD completo de usuarios, edicion/desactivacion de usuarios y validaciones multi-tenant negativas.
+
+### Hito 7.7 - Estabilizacion frontend por consolas y marca tenant
+
+Estado: FUNCTIONAL
+
+Implementado:
+
+- Nueva consola de plataforma `/platform/gymnasiums` para Admin GymOS con layout maestro-detalle, buscador de gimnasios, detalle del tenant seleccionado, tabla compacta de sucursales y alta de gimnasio en panel lateral.
+- `/admin` queda como redireccion compatible hacia `/platform/gymnasiums`.
+- `AppShell` es el unico menu visible. `GlobalSessionNav` queda como guardia silencioso de rutas para evitar menus duplicados.
+- Modelo frontend `resolveUserConsole` separa `PLATFORM_ADMIN`, `GYM_ADMIN`, `RECEPTION` y `COACH` por permisos, no por nombre de usuario.
+- Admin GymOS siempre ve "Volver a administracion de gimnasios" cuando entra a pantallas de un gimnasio.
+- Migracion `V18__organization_branding.sql` agrega marca por gimnasio: `brand_name`, `logo_url`, `primary_color`, `accent_color`, `surface_color`.
+- Migracion `V19__platform_admin_legacy_role.sql` asigna `platform.admin` al rol legacy `Administrador` y al rol `Administrador GymOS`.
+- `TenantThemeProvider` aplica marca del gimnasio activo a gerencia, recepcion, kiosco y pantallas internas; la consola de plataforma conserva marca neutral GymOS.
+- `settings/organization` permite editar nombre visible, logo y colores del tenant.
+- Form components iniciales (`TextField`, `EmailField`, `PhoneField`, `PasswordField`, `SelectField`, `FormError`) con validacion guiada y mensajes por campo.
+- Creacion de usuarios valida telefono, email, contrasena minima, rol y sucursal antes de enviar.
+- Roles de plataforma se ocultan en creacion de usuarios de gimnasio y backend bloquea asignacion indebida con `ROLE_NOT_AVAILABLE`.
+- Login acepta username o email.
+
+Verificado localmente:
+
+- Backend: `./gradlew test` con `JAVA_HOME=C:\Program Files\Java\jdk-25.0.3`.
+- Frontend: `npm.cmd run lint`.
+- Frontend: `npm.cmd run typecheck`.
+- Frontend: `npm.cmd run build`.
+- Docker Compose: `docker compose -f infra/docker-compose.yml config`.
+
+Notas:
+
+- Despues de `V18`/`V19`, los usuarios existentes deben volver a iniciar sesion para recibir marca actualizada y `platform.admin` en el JWT si aplica.
+- El personalizador flotante local de marca fue eliminado; la marca ahora pertenece al gimnasio y se guarda en backend.

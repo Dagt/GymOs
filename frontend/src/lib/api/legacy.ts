@@ -33,6 +33,11 @@ export type OrganizationSummary = {
   defaultCurrency: string;
   contactEmail: string | null;
   contactPhone: string | null;
+  brandName: string | null;
+  logoUrl: string | null;
+  primaryColor: string | null;
+  accentColor: string | null;
+  surfaceColor: string | null;
 };
 
 export type ManagedOrganizationSummary = OrganizationSummary & {
@@ -113,6 +118,11 @@ export type OrganizationUpdatePayload = {
   defaultCurrency: string;
   contactEmail?: string | null;
   contactPhone?: string | null;
+  brandName?: string | null;
+  logoUrl?: string | null;
+  primaryColor?: string | null;
+  accentColor?: string | null;
+  surfaceColor?: string | null;
 };
 
 export type CreateOrganizationPayload = OrganizationUpdatePayload & {

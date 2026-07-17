@@ -17,7 +17,8 @@ public class OrganizationQueryRepository {
 	public Optional<OrganizationSummary> findCurrentOrganization(UUID organizationId) {
 		return jdbcClient.sql("""
 				SELECT id, legal_name, trade_name, tax_id, status, timezone,
-				       default_currency, contact_email, contact_phone
+				       default_currency, contact_email, contact_phone,
+				       brand_name, logo_url, primary_color, accent_color, surface_color
 				FROM organization
 				WHERE id = :organizationId
 				  AND deleted_at IS NULL
@@ -32,7 +33,12 @@ public class OrganizationQueryRepository {
 						resultSet.getString("timezone"),
 						resultSet.getString("default_currency"),
 						resultSet.getString("contact_email"),
-						resultSet.getString("contact_phone")
+						resultSet.getString("contact_phone"),
+						resultSet.getString("brand_name"),
+						resultSet.getString("logo_url"),
+						resultSet.getString("primary_color"),
+						resultSet.getString("accent_color"),
+						resultSet.getString("surface_color")
 				))
 				.optional();
 	}
@@ -41,6 +47,7 @@ public class OrganizationQueryRepository {
 		return jdbcClient.sql("""
 				SELECT o.id, o.legal_name, o.trade_name, o.tax_id, o.status, o.timezone,
 				       o.default_currency, o.contact_email, o.contact_phone,
+				       o.brand_name, o.logo_url, o.primary_color, o.accent_color, o.surface_color,
 				       COUNT(DISTINCT b.id) AS branch_count,
 				       COUNT(DISTINCT CASE WHEN b.status = 'ACTIVE' THEN b.id END) AS active_branch_count
 				FROM organization o
@@ -55,7 +62,8 @@ public class OrganizationQueryRepository {
 				        AND accessible_branch.deleted_at IS NULL
 				  )
 				GROUP BY o.id, o.legal_name, o.trade_name, o.tax_id, o.status, o.timezone,
-				         o.default_currency, o.contact_email, o.contact_phone
+				         o.default_currency, o.contact_email, o.contact_phone,
+				         o.brand_name, o.logo_url, o.primary_color, o.accent_color, o.surface_color
 				ORDER BY LOWER(o.trade_name)
 				""")
 				.param("userId", userId)
@@ -69,6 +77,11 @@ public class OrganizationQueryRepository {
 						resultSet.getString("default_currency"),
 						resultSet.getString("contact_email"),
 						resultSet.getString("contact_phone"),
+						resultSet.getString("brand_name"),
+						resultSet.getString("logo_url"),
+						resultSet.getString("primary_color"),
+						resultSet.getString("accent_color"),
+						resultSet.getString("surface_color"),
 						resultSet.getInt("branch_count"),
 						resultSet.getInt("active_branch_count")
 				))
@@ -152,6 +165,11 @@ public class OrganizationQueryRepository {
 			String defaultCurrency,
 			String contactEmail,
 			String contactPhone,
+			String brandName,
+			String logoUrl,
+			String primaryColor,
+			String accentColor,
+			String surfaceColor,
 			int branchCount,
 			int activeBranchCount
 	) {
@@ -166,7 +184,12 @@ public class OrganizationQueryRepository {
 			String timezone,
 			String defaultCurrency,
 			String contactEmail,
-			String contactPhone
+			String contactPhone,
+			String brandName,
+			String logoUrl,
+			String primaryColor,
+			String accentColor,
+			String surfaceColor
 	) {
 	}
 

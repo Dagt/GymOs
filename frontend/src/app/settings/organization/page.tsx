@@ -166,7 +166,7 @@ export default function OrganizationSettingsPage() {
   return (
     <AppShell
       actions={[
-        { href: "/admin", label: "Gimnasios" },
+        { href: "/platform/gymnasiums", label: "Gimnasios" },
         { href: "/users", label: "Equipo y accesos" },
       ]}
       branchName={activeBranch?.name}
@@ -215,6 +215,15 @@ export default function OrganizationSettingsPage() {
               <Field label="Telefono" value={organizationForm.contactPhone ?? ""} onChange={(value) => setOrganizationForm({ ...organizationForm, contactPhone: value })} />
             </div>
             <Field label="Email de contacto" type="email" value={organizationForm.contactEmail ?? ""} onChange={(value) => setOrganizationForm({ ...organizationForm, contactEmail: value })} />
+            <hr className="border-[#dbe4ee]" />
+            <p className="app-eyebrow">Marca del gimnasio</p>
+            <Field label="Nombre visible de marca" value={organizationForm.brandName ?? ""} onChange={(value) => setOrganizationForm({ ...organizationForm, brandName: value })} />
+            <Field label="URL del logo" value={organizationForm.logoUrl ?? ""} onChange={(value) => setOrganizationForm({ ...organizationForm, logoUrl: value })} />
+            <div className="grid gap-4 sm:grid-cols-3">
+              <Field label="Color principal" type="color" value={organizationForm.primaryColor ?? "#164E63"} onChange={(value) => setOrganizationForm({ ...organizationForm, primaryColor: value })} />
+              <Field label="Color acento" type="color" value={organizationForm.accentColor ?? "#F59E0B"} onChange={(value) => setOrganizationForm({ ...organizationForm, accentColor: value })} />
+              <Field label="Color fondo" type="color" value={organizationForm.surfaceColor ?? "#F4F7FB"} onChange={(value) => setOrganizationForm({ ...organizationForm, surfaceColor: value })} />
+            </div>
             <button className="form-primary-button" disabled={saving} type="submit">
               Guardar gimnasio
             </button>
@@ -309,6 +318,11 @@ function toOrganizationForm(organization: OrganizationSummary): OrganizationUpda
     defaultCurrency: organization.defaultCurrency,
     contactEmail: organization.contactEmail ?? "",
     contactPhone: organization.contactPhone ?? "",
+    brandName: organization.brandName ?? organization.tradeName,
+    logoUrl: organization.logoUrl ?? "",
+    primaryColor: organization.primaryColor ?? "#164E63",
+    accentColor: organization.accentColor ?? "#F59E0B",
+    surfaceColor: organization.surfaceColor ?? "#F4F7FB",
   };
 }
 
