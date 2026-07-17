@@ -48,7 +48,7 @@ const setupSections = [
   {
     title: "Configuración inicial",
     links: [
-      { label: "Gimnasios", href: "/onboarding", hint: "Alta y preparación" },
+      { label: "Gimnasios", href: "/admin", hint: "Elegir o preparar" },
       { label: "Datos y sucursales", href: "/settings/organization", hint: "Base operativa" },
     ],
   },
@@ -60,6 +60,7 @@ export function AppShell({
   children,
   eyebrow,
   organizationName,
+  mode,
   session,
   subtitle,
   title,
@@ -68,6 +69,7 @@ export function AppShell({
   branchName?: string | null;
   children: ReactNode;
   eyebrow: string;
+  mode?: "setup" | "operation";
   organizationName?: string | null;
   session: StoredSession;
   subtitle?: string;
@@ -75,7 +77,7 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const hasBranch = Boolean(branchName || session.user.branchId);
+  const hasBranch = mode === "operation" ? true : mode === "setup" ? false : Boolean(branchName || session.user.branchId);
   const role = resolveUserRole(session.user.permissions, session.user.username, hasBranch);
   const visibleBranch = branchName ?? (session.user.branchId ? "Sucursal seleccionada" : "Sin sucursal");
   const sections = hasBranch ? navigationSections : setupSections;
@@ -147,7 +149,7 @@ export function AppShell({
               <strong>{visibleBranch}</strong>
             </div>
             {actions.map((action) => (
-              hasBranch || action.href === "/onboarding" || action.href === "/settings/organization" ? (
+              hasBranch || action.href === "/admin" || action.href === "/onboarding" || action.href === "/settings/organization" ? (
                 <Link href={action.href} key={action.href}>
                   {action.label}
                 </Link>
@@ -160,13 +162,14 @@ export function AppShell({
           <section className="admin-setup-banner">
             <div>
               <p>Configuración pendiente</p>
-              <h2>Primero configura al menos una sucursal</h2>
+              <h2>Primero elige o prepara una sucursal operativa</h2>
               <span>
-                Mientras no exista una sucursal activa, GymOS oculta caja, socios, reportes operativos y kiosco. El
-                dueño o gerente del gimnasio podrá completar productos, coaches y operación diaria después.
+                Mientras no exista una sucursal activa en tu sesión, GymOS mantiene caja, socios, reportes operativos
+                y kiosco fuera del primer plano. El dueño o gerente del gimnasio puede completar la operación diaria
+                después.
               </span>
             </div>
-            <Link href="/onboarding">Preparar gimnasio</Link>
+            <Link href="/admin">Ir a gimnasios</Link>
           </section>
         ) : null}
 

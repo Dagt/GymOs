@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { clearSession, getStoredSession, type StoredSession } from "@/lib/api";
+import { getPostLoginPath } from "@/lib/session-routing";
 
 const publicHighlights = [
   "Control de socios, pagos y membresías",
@@ -27,6 +28,8 @@ export default function Home() {
     setSession(null);
   }
 
+  const sessionDestination = session ? getPostLoginPath(session.user) : "/login";
+
   return (
     <main className="home-screen">
       <section className="home-panel public-home-panel">
@@ -39,7 +42,7 @@ export default function Home() {
             {ready && session ? (
               <>
                 <span className="home-session-pill">{session.user.fullName}</span>
-                <Link className="home-primary-link" href="/reception">
+                <Link className="home-primary-link" href={sessionDestination}>
                   Continuar al panel
                 </Link>
                 <button className="home-plain-button" onClick={logout} type="button">
@@ -64,7 +67,7 @@ export default function Home() {
             </p>
             <div className="home-actions">
               {ready && session ? (
-                <Link className="home-cta" href="/reception">
+                <Link className="home-cta" href={sessionDestination}>
                   Entrar al panel
                 </Link>
               ) : (

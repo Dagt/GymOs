@@ -5,7 +5,8 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { clearSession, getStoredSession, type StoredSession } from "@/lib/api";
 
-const internalLinks = [
+const operationLinks = [
+  { label: "Gimnasios", href: "/admin" },
   { label: "Recepción", href: "/reception" },
   { label: "Caja / POS", href: "/pos" },
   { label: "Socios", href: "/clients" },
@@ -15,10 +16,16 @@ const internalLinks = [
   { label: "Inventario", href: "/inventory" },
   { label: "Reportes", href: "/reports/sales" },
   { label: "Panel ejecutivo", href: "/dashboard" },
-  { label: "Configuración", href: "/settings/organization" },
+  { label: "Datos y sucursales", href: "/settings/organization" },
 ];
 
-const shellRoutes = ["/reception", "/pos", "/clients", "/catalog", "/dashboard", "/reports/sales"];
+const setupLinks = [
+  { label: "Gimnasios", href: "/admin" },
+  { label: "Datos y sucursales", href: "/settings/organization" },
+  { label: "Preparar piloto", href: "/onboarding" },
+];
+
+const shellRoutes = ["/admin", "/reception", "/pos", "/clients", "/catalog", "/dashboard", "/reports/sales", "/settings/organization"];
 
 export function GlobalSessionNav() {
   const pathname = usePathname();
@@ -62,6 +69,8 @@ export function GlobalSessionNav() {
     return null;
   }
 
+  const links = session.user.branchId ? operationLinks : setupLinks;
+
   return (
     <aside className="global-session-nav" aria-label="Menú global">
       <div className="global-session-brand">
@@ -73,7 +82,7 @@ export function GlobalSessionNav() {
       </div>
 
       <nav>
-        {internalLinks.map((item) => (
+        {links.map((item) => (
           <Link className={isActive(pathname, item.href) ? "active" : undefined} href={item.href} key={item.href}>
             {item.label}
           </Link>
@@ -82,7 +91,9 @@ export function GlobalSessionNav() {
 
       <footer>
         <span>{session.user.fullName}</span>
-        <button onClick={logout} type="button">Salir</button>
+        <button onClick={logout} type="button">
+          Salir
+        </button>
       </footer>
     </aside>
   );
@@ -91,7 +102,7 @@ export function GlobalSessionNav() {
 function resolveRole(session: StoredSession) {
   const permissions = new Set(session.user.permissions);
   if (session.user.username.toLowerCase().includes("admin") || permissions.has("organization.update")) {
-    return "Administrador";
+    return session.user.branchId ? "Administrador" : "Administrador GymOS";
   }
   if (permissions.has("report.sales.read") || permissions.has("catalog.manage")) {
     return "Dueño / Gerencia";
@@ -108,3 +119,4 @@ function isActive(pathname: string, href: string) {
   }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
+

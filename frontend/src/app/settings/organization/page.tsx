@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import { AppNavigation } from "@/components/AppNavigation";
+import { AppShell, LoadingScreen } from "@/components/AppShell";
 import {
   getBranches,
   getCurrentOrganization,
@@ -33,13 +33,11 @@ export default function OrganizationSettingsPage() {
 
     async function loadInitial() {
       const storedSession = getStoredSession();
-      if (!active) {
-        return;
-      }
       if (!storedSession) {
         setLoading(false);
         return;
       }
+
       setSession(storedSession);
       setLoading(true);
       setError(null);
@@ -61,7 +59,7 @@ export default function OrganizationSettingsPage() {
         }
       } catch (exception) {
         if (active) {
-          setError(exception instanceof Error ? exception.message : "No fue posible cargar configuracion.");
+          setError(exception instanceof Error ? exception.message : "No fue posible cargar configuración.");
         }
       } finally {
         if (active) {
@@ -89,9 +87,9 @@ export default function OrganizationSettingsPage() {
       const response = await updateOrganization(session.accessToken, organizationForm);
       setOrganization(response);
       setOrganizationForm(toOrganizationForm(response));
-      setMessage("Organizacion actualizada.");
+      setMessage("Organización actualizada.");
     } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible actualizar organizacion.");
+      setError(exception instanceof Error ? exception.message : "No fue posible actualizar organización.");
     } finally {
       setSaving(false);
     }
@@ -117,7 +115,7 @@ export default function OrganizationSettingsPage() {
     }
   }
 
-  function selectBranch(branchId: string) {
+  function selectEditableBranch(branchId: string) {
     setSelectedBranchId(branchId);
     const branch = branches.find((item) => item.id === branchId);
     if (branch) {
@@ -130,36 +128,47 @@ export default function OrganizationSettingsPage() {
   }
 
   if (loading || !organizationForm || !branchForm) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-        <p className="rounded-md border border-[#d8ddd2] bg-white px-4 py-3 text-sm text-[#42514a]">
-          Cargando configuracion...
-        </p>
-      </main>
-    );
+    return <LoadingScreen text="Cargando datos y sucursales..." />;
   }
 
+  const activeBranch = branches.find((branch) => branch.id === session.user.branchId) ?? null;
+  const selectedBranch = branches.find((branch) => branch.id === selectedBranchId) ?? null;
+
   return (
-    <main className="app-shell text-[#111815]">
-      <div className="app-shell-inner">
-      <header className="app-topbar">
-          <div className="app-title-block">
-            <p className="app-eyebrow">Administracion</p>
-            <h1 className="app-title">Configuración del gimnasio</h1>
-            <p className="app-subtitle">
-              Datos comerciales, sucursal operativa y preparacion para demos o pilotos.
-            </p>
-          </div>
-          <span className="app-pill">
-            {organization?.status ?? "ACTIVE"}
-          </span>
-      </header>
+    <AppShell
+      actions={[{ href: "/admin", label: "Gimnasios" }]}
+      branchName={activeBranch?.name}
+      eyebrow="Administración"
+      mode={activeBranch ? "operation" : "setup"}
+      organizationName={organization?.tradeName}
+      session={session}
+      subtitle="Edita el gimnasio actual y sus sucursales. La selección de contexto operativo se hace desde Gimnasios."
+      title="Datos y sucursales"
+    >
+      <section className="settings-summary">
+        <article>
+          <span>Gimnasio actual</span>
+          <strong>{organization?.tradeName}</strong>
+          <p>{organization?.legalName}</p>
+        </article>
+        <article>
+          <span>Sucursal editada</span>
+          <strong>{selectedBranch?.name ?? "Sin sucursal"}</strong>
+          <p>{activeBranch ? "También es la sucursal activa de tu sesión." : "Aún no has elegido una sucursal para operar."}</p>
+        </article>
+        <article>
+          <span>Estado</span>
+          <strong>{organization?.status ?? "ACTIVE"}</strong>
+          <p>Disponible para configuración y pilotos.</p>
+        </article>
+      </section>
 
-      <AppNavigation />
-
-      <section className="grid gap-6 lg:grid-cols-2">
+      <section className="settings-forms-grid">
         <section className="app-card p-5">
-          <h2 className="text-xl font-semibold">Organizacion</h2>
+          <h2 className="text-xl font-semibold">Gimnasio</h2>
+          <p className="mt-2 text-sm leading-6 text-[#5d6b63]">
+            Estos datos identifican al gimnasio o cadena que estás administrando.
+          </p>
           <form className="mt-5 grid gap-4" onSubmit={submitOrganization}>
             <Field label="Nombre legal" value={organizationForm.legalName} onChange={(value) => setOrganizationForm({ ...organizationForm, legalName: value })} />
             <Field label="Nombre comercial" value={organizationForm.tradeName} onChange={(value) => setOrganizationForm({ ...organizationForm, tradeName: value })} />
@@ -167,27 +176,26 @@ export default function OrganizationSettingsPage() {
               <Field label="Tax ID / RFC" value={organizationForm.taxId ?? ""} onChange={(value) => setOrganizationForm({ ...organizationForm, taxId: value })} />
               <Field label="Moneda" value={organizationForm.defaultCurrency} onChange={(value) => setOrganizationForm({ ...organizationForm, defaultCurrency: value })} />
               <Field label="Zona horaria" value={organizationForm.timezone} onChange={(value) => setOrganizationForm({ ...organizationForm, timezone: value })} />
-              <Field label="Telefono" value={organizationForm.contactPhone ?? ""} onChange={(value) => setOrganizationForm({ ...organizationForm, contactPhone: value })} />
+              <Field label="Teléfono" value={organizationForm.contactPhone ?? ""} onChange={(value) => setOrganizationForm({ ...organizationForm, contactPhone: value })} />
             </div>
             <Field label="Email de contacto" type="email" value={organizationForm.contactEmail ?? ""} onChange={(value) => setOrganizationForm({ ...organizationForm, contactEmail: value })} />
-            <button
-              className="h-11 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30] disabled:opacity-60"
-              disabled={saving}
-              type="submit"
-            >
-              Guardar organizacion
+            <button className="form-primary-button" disabled={saving} type="submit">
+              Guardar gimnasio
             </button>
           </form>
         </section>
 
         <section className="app-card p-5">
           <h2 className="text-xl font-semibold">Sucursal</h2>
+          <p className="mt-2 text-sm leading-6 text-[#5d6b63]">
+            Edita una sucursal. Para usarla como contexto operativo, vuelve a Gimnasios y selecciónala.
+          </p>
           <form className="mt-5 grid gap-4" onSubmit={submitBranch}>
             <label className="grid gap-2 text-sm font-medium text-[#42514a]">
               Sucursal editable
               <select
                 className="h-11 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm outline-none transition focus:border-[#51735f]"
-                onChange={(event) => selectBranch(event.target.value)}
+                onChange={(event) => selectEditableBranch(event.target.value)}
                 value={selectedBranchId}
               >
                 {branches.map((branch) => (
@@ -199,41 +207,29 @@ export default function OrganizationSettingsPage() {
             </label>
             <Field label="Nombre" value={branchForm.name} onChange={(value) => setBranchForm({ ...branchForm, name: value })} />
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Codigo" value={branchForm.code} onChange={(value) => setBranchForm({ ...branchForm, code: value })} />
-              <Field label="Telefono" value={branchForm.phone ?? ""} onChange={(value) => setBranchForm({ ...branchForm, phone: value })} />
+              <Field label="Código" value={branchForm.code} onChange={(value) => setBranchForm({ ...branchForm, code: value })} />
+              <Field label="Teléfono" value={branchForm.phone ?? ""} onChange={(value) => setBranchForm({ ...branchForm, phone: value })} />
             </div>
             <Field label="Zona horaria" value={branchForm.timezone} onChange={(value) => setBranchForm({ ...branchForm, timezone: value })} />
-            <button
-              className="h-11 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30] disabled:opacity-60"
-              disabled={saving}
-              type="submit"
-            >
+            <button className="form-primary-button" disabled={saving} type="submit">
               Guardar sucursal
             </button>
           </form>
         </section>
 
-        {error ? (
-          <p className="rounded-md border border-[#e5b7b7] bg-[#fff4f4] px-3 py-2 text-sm text-[#8c2f2f] lg:col-span-2">
-            {error}
-          </p>
-        ) : null}
-        {message ? (
-          <p className="rounded-md border border-[#bad9c4] bg-[#eff8f1] px-3 py-2 text-sm text-[#31563c] lg:col-span-2">
-            {message}
-          </p>
-        ) : null}
-        <section className="app-card p-5 lg:col-span-2">
+        {error ? <p className="form-message error">{error}</p> : null}
+        {message ? <p className="form-message success">{message}</p> : null}
+
+        <section className="app-card p-5 settings-brand-note">
           <p className="app-eyebrow">Marca visual</p>
           <h2 className="mt-2 app-card-title">Colores y logo por cliente</h2>
           <p className="mt-3 app-card-copy">
-            El boton Marca permite ajustar nombre visible, logo y colores para presentar GymOS con la identidad
-            del gimnasio durante demos y pilotos.
+            El botón Marca permite ajustar nombre visible, logo y colores para presentar GymOS con la identidad del
+            gimnasio durante demos y pilotos.
           </p>
         </section>
       </section>
-      </div>
-    </main>
+    </AppShell>
   );
 }
 
@@ -291,9 +287,10 @@ function AuthRequired() {
           className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
           href="/login"
         >
-          Iniciar sesion
+          Iniciar sesión
         </Link>
       </section>
     </main>
   );
 }
+

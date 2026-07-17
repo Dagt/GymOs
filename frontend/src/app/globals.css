@@ -862,6 +862,172 @@ th {
   padding: 0.62rem 0.9rem;
 }
 
+.login-screen {
+  background:
+    radial-gradient(circle at 18% 12%, color-mix(in srgb, var(--brand-accent) 18%, transparent), transparent 22rem),
+    linear-gradient(135deg, #f8fafc, #edf7f6);
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: clamp(1rem, 3vw, 2rem);
+}
+
+.login-card {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: minmax(0, 0.9fr) minmax(22rem, 1fr);
+  max-width: 72rem;
+  width: 100%;
+}
+
+.login-hero,
+.login-form-panel {
+  border: 1px solid var(--brand-line);
+  border-radius: 1rem;
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.12);
+}
+
+.login-hero {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--brand-primary) 92%, #0f172a), #0f172a);
+  color: white;
+  display: grid;
+  min-height: 32rem;
+  padding: clamp(1.5rem, 4vw, 2.4rem);
+}
+
+.login-hero p,
+.login-form-header p {
+  color: var(--brand-accent);
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.login-hero h1 {
+  align-self: end;
+  font-size: clamp(3rem, 6vw, 5.4rem);
+  font-weight: 950;
+  letter-spacing: 0;
+  line-height: 0.92;
+  max-width: 34rem;
+}
+
+.login-hero span {
+  color: rgba(255, 255, 255, 0.76);
+  display: block;
+  font-size: 1rem;
+  line-height: 1.65;
+  margin-top: 1rem;
+  max-width: 34rem;
+}
+
+.login-hero div {
+  align-self: end;
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 1.5rem;
+}
+
+.login-hero small {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 0.65rem;
+  color: rgba(255, 255, 255, 0.82);
+  font-weight: 850;
+  padding: 0.78rem 0.9rem;
+}
+
+.login-form-panel {
+  align-self: center;
+  background: rgba(255, 255, 255, 0.94);
+  padding: clamp(1.25rem, 3vw, 2rem);
+}
+
+.login-form-header {
+  align-items: start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.login-form-header h2 {
+  color: var(--brand-ink);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 950;
+  margin-top: 0.2rem;
+}
+
+.login-form-header span {
+  color: var(--brand-muted);
+  display: block;
+  line-height: 1.55;
+  margin-top: 0.45rem;
+}
+
+.login-form-header a {
+  border: 1px solid var(--brand-line);
+  border-radius: 0.6rem;
+  color: var(--brand-ink);
+  font-weight: 850;
+  padding: 0.7rem 0.9rem;
+}
+
+.login-form-panel form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.login-form-panel label {
+  color: var(--brand-muted);
+  display: grid;
+  font-size: 0.86rem;
+  font-weight: 850;
+  gap: 0.45rem;
+}
+
+.login-form-panel input {
+  border: 1px solid var(--brand-line);
+  border-radius: 0.65rem;
+  color: var(--brand-ink);
+  font-size: 1rem;
+  font-weight: 760;
+  height: 3.25rem;
+  outline: none;
+  padding: 0 0.9rem;
+}
+
+.login-form-panel button,
+.form-primary-button {
+  background: var(--brand-primary);
+  border-radius: 0.65rem;
+  color: white;
+  font-weight: 900;
+  min-height: 3rem;
+  padding: 0 1rem;
+}
+
+.login-error,
+.form-message {
+  border-radius: 0.65rem;
+  font-size: 0.9rem;
+  font-weight: 750;
+  padding: 0.8rem 0.9rem;
+}
+
+.login-error,
+.form-message.error {
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+  color: #9f1239;
+}
+
+.form-message.success {
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  color: #166534;
+}
+
 .home-plain-button {
   cursor: pointer;
 }
@@ -1420,6 +1586,24 @@ th {
   margin-top: 1rem;
 }
 
+.admin-setup-steps a {
+  align-items: center;
+  background: white;
+  border: 1px solid var(--brand-line);
+  border-left: 0.45rem solid var(--brand-primary);
+  color: var(--brand-ink);
+  display: flex;
+  min-height: 4.4rem;
+  padding: 0.9rem 1rem;
+}
+
+.admin-setup-steps a:hover,
+.admin-link-grid a:hover,
+.admin-command-actions a:hover {
+  border-color: color-mix(in srgb, var(--brand-primary) 36%, white);
+  transform: translateY(-1px);
+}
+
 .admin-advanced-setup {
   border-top: 1px solid var(--brand-line);
   margin-top: 1rem;
@@ -1451,6 +1635,167 @@ th {
   background: white;
   border: 1px solid var(--brand-line);
   color: var(--brand-ink);
+}
+
+.admin-home-grid {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: minmax(0, 1fr) minmax(19rem, 25rem);
+}
+
+.admin-home-main,
+.admin-home-side {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.admin-hero-card {
+  align-items: center;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--brand-primary) 12%, white), white);
+  border: 1px solid var(--brand-line);
+  border-radius: 0.85rem;
+  box-shadow: 0 18px 52px rgba(15, 23, 42, 0.08);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 1.15rem;
+}
+
+.admin-hero-card p,
+.admin-route-list span,
+.settings-summary span {
+  color: var(--brand-muted);
+  font-size: 0.78rem;
+  font-weight: 850;
+}
+
+.admin-hero-card h2 {
+  color: var(--brand-ink);
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  font-weight: 950;
+  margin-top: 0.2rem;
+}
+
+.admin-hero-card span {
+  color: var(--brand-muted);
+  display: block;
+  margin-top: 0.35rem;
+}
+
+.admin-hero-card a,
+.admin-secondary-link {
+  background: var(--brand-primary);
+  border-radius: 0.65rem;
+  color: white;
+  display: inline-flex;
+  font-weight: 900;
+  justify-content: center;
+  min-height: 2.9rem;
+  padding: 0.8rem 1rem;
+}
+
+.admin-branch-cards {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 1rem;
+}
+
+.admin-branch-cards article,
+.admin-empty-card,
+.settings-summary article {
+  background: white;
+  border: 1px solid var(--brand-line);
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 0.85rem;
+  padding: 1rem;
+}
+
+.admin-branch-cards article.active {
+  background: var(--brand-primary-soft);
+  border-color: color-mix(in srgb, var(--brand-primary) 36%, white);
+}
+
+.admin-branch-cards p {
+  color: var(--brand-primary);
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.admin-branch-cards h3,
+.admin-empty-card strong,
+.settings-summary strong {
+  color: var(--brand-ink);
+  font-size: 1.15rem;
+  font-weight: 950;
+}
+
+.admin-branch-cards span,
+.admin-empty-card span,
+.settings-summary p {
+  color: var(--brand-muted);
+  line-height: 1.45;
+}
+
+.admin-branch-cards button {
+  border: 1px solid var(--brand-line);
+  border-radius: 0.6rem;
+  color: var(--brand-primary);
+  font-weight: 900;
+  min-height: 2.65rem;
+}
+
+.admin-branch-cards button:not(:disabled) {
+  background: var(--brand-primary);
+  color: white;
+}
+
+.admin-empty-card {
+  grid-column: 1 / -1;
+}
+
+.admin-empty-card a {
+  color: var(--brand-primary);
+  font-weight: 900;
+}
+
+.admin-route-list {
+  display: grid;
+  gap: 0.8rem;
+  list-style: none;
+  margin-top: 1rem;
+}
+
+.admin-route-list li {
+  border-left: 0.25rem solid var(--brand-primary);
+  display: grid;
+  gap: 0.2rem;
+  padding-left: 0.8rem;
+}
+
+.admin-route-list strong {
+  color: var(--brand-ink);
+  font-weight: 950;
+}
+
+.settings-summary {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.settings-forms-grid {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.settings-brand-note,
+.form-message {
+  grid-column: 1 / -1;
 }
 
 .admin-empty-state {
@@ -1588,9 +1933,12 @@ body.has-global-session-nav {
   .home-roles,
   .admin-console,
   .admin-content-grid,
+  .admin-home-grid,
   .admin-focus-grid,
   .admin-status-board,
-  .admin-report-strip {
+  .admin-report-strip,
+  .settings-summary,
+  .settings-forms-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1645,7 +1993,9 @@ body.has-global-session-nav {
 @media (max-width: 640px) {
   .home-header,
   .home-header nav,
-  .admin-command-actions {
+  .admin-command-actions,
+  .login-form-header,
+  .admin-hero-card {
     align-items: stretch;
     flex-direction: column;
   }
@@ -1660,6 +2010,16 @@ body.has-global-session-nav {
 
   .admin-workspace {
     padding: 0.8rem;
+  }
+
+  .login-card,
+  .admin-branch-cards,
+  .admin-advanced-setup div {
+    grid-template-columns: 1fr;
+  }
+
+  .login-hero {
+    min-height: 25rem;
   }
 }
 
