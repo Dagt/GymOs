@@ -192,8 +192,8 @@ export function AppShell({
 
         <nav aria-label="Menu principal">
           {sections.map((section) => (
-            <section className="admin-nav-section" key={section.title}>
-              <p>{section.title}</p>
+            <details className="admin-nav-section" key={section.title} open={sections.length === 1 || section.links.some((item) => isActive(pathname, item.href))}>
+              <summary>{section.title}</summary>
               {section.links.map((item) => (
                 <Link
                   aria-current={isActive(pathname, item.href) ? "page" : undefined}
@@ -205,7 +205,7 @@ export function AppShell({
                   <span>{item.hint}</span>
                 </Link>
               ))}
-            </section>
+            </details>
           ))}
         </nav>
 

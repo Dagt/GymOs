@@ -43,6 +43,8 @@ Nota implementada Hito 7.9:
   3. Crear una o varias sucursales con `POST /organizations/current/branches`.
   4. Crear usuarios del cliente en `/users/internal`.
 - `GET /organizations` devuelve todos los gimnasios para usuarios con `platform.admin`; usuarios tenant siguen viendo solo su organizacion accesible.
+- `GET /organizations/{organizationId}/branches` devuelve las sucursales del gimnasio seleccionado para `platform.admin`, sin cambiar la organizacion ni sucursal activa de la sesion.
+- La organizacion tecnica base del usuario Admin GymOS no se lista como gimnasio cliente en el CRM de plataforma.
 - En `supportMode`, `GET /organizations/current/branches` permite a Admin GymOS ver las sucursales del gimnasio seleccionado aunque no sea trabajador del tenant.
 
 Request:

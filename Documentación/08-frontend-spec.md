@@ -242,9 +242,11 @@ Administracion de gimnasios:
 Correccion Hito 7.9:
 - El alta de gimnasio en `/platform/gymnasiums` ya no mezcla la primera sucursal en el mismo formulario.
 - La sucursal se crea desde una accion independiente `Crear sucursal` dentro del gimnasio seleccionado.
+- La tabla de sucursales del CRM se carga con `GET /organizations/{organizationId}/branches`, por gimnasio seleccionado, sin depender del tenant activo en la sesion.
 - Los botones `Datos, marca y sucursales` y `Equipo y accesos` deben entrar primero en modo soporte cuando el gimnasio seleccionado no es el contexto activo, y despues navegar a la pantalla correspondiente.
 - Si un gimnasio todavia no tiene sucursales, el detalle muestra un estado vacio claro y mantiene disponible la accion de crear sucursal.
 - El Admin GymOS puede crear tenants completos sin dejarlos "a medias"; sucursales, usuarios y marca avanzada son pasos explicitos del detalle del cliente.
+- El menu lateral usa secciones plegables; la seccion activa queda abierta y las demas permanecen compactas para reducir saturacion visual.
 
 Modo soporte:
 - Admin GymOS entra a un gimnasio con `supportMode = true`.

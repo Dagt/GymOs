@@ -61,6 +61,14 @@ public class OrganizationController {
 		return organizationService.branches(principal);
 	}
 
+	@GetMapping("/{organizationId}/branches")
+	List<BranchSummary> organizationBranches(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID organizationId
+	) {
+		return organizationService.branchesForOrganization(principal, organizationId);
+	}
+
 	@PutMapping("/current")
 	OrganizationSummary updateOrganization(
 			@AuthenticationPrincipal GymOsPrincipal principal,

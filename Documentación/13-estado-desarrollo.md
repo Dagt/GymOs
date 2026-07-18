@@ -593,7 +593,10 @@ Implementado:
 - `/platform/gymnasiums` inicia modo soporte automaticamente antes de abrir `Datos, marca y sucursales` o `Equipo y accesos` para el gimnasio seleccionado.
 - En modo soporte, Admin GymOS puede listar, crear y actualizar sucursales del tenant aunque no tenga `user_branch_access` como trabajador del gimnasio.
 - `GET /organizations` lista todos los gimnasios para `platform.admin`, incluyendo tenants sin sucursales.
+- `GET /organizations/{organizationId}/branches` lista sucursales del gimnasio seleccionado desde el CRM sin depender del contexto activo de soporte.
+- La organizacion tecnica base del Admin GymOS queda oculta del CRM para que una base limpia inicie con cero gimnasios cliente.
 - El detalle de un gimnasio sin sucursales muestra estado vacio accionable en lugar de una tabla confusa.
+- El menu lateral de `AppShell` queda plegado por secciones para evitar que dueño/soporte vean todas las funciones expandidas al mismo tiempo.
 
 Verificado localmente:
 
@@ -603,4 +606,5 @@ Verificado localmente:
 - Frontend: `npm.cmd run build`.
 - Docker Compose: `docker compose -f infra/docker-compose.yml up -d --build`.
 - Smoke API: Admin GymOS crea gimnasio con `branchCount = 0`, entra en `supportMode`, crea sucursal y `GET /organizations/current/branches` devuelve la nueva sucursal.
+- Smoke API: `GET /organizations/{organizationId}/branches` devuelve las sucursales correctas para cada gimnasio seleccionado.
 - Frontend local: `GET http://localhost:3000/platform/gymnasiums` devuelve 200.

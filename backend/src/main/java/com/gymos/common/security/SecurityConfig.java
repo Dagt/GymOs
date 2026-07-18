@@ -51,6 +51,7 @@ public class SecurityConfig {
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/organizations/current/branches").hasAuthority("branch.create")
 						.requestMatchers("/api/v1/organizations/current/branches/*").hasAuthority("branch.update")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/organizations/current/branches").hasAuthority("branch.read")
+						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/organizations/*/branches").hasAuthority("platform.admin")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/organizations/current").hasAuthority("organization.read")
 						.requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/v1/organizations/current").hasAuthority("organization.update")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/onboarding/**").hasAuthority("onboarding.manage")

@@ -20,7 +20,7 @@ import {
 import {
   createBranch,
   createOrganization,
-  getBranches,
+  getOrganizationBranches,
   getOrganizations,
   getStoredSession,
   selectBranch,
@@ -60,6 +60,7 @@ export default function PlatformGymnasiumsPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
   const [organizations, setOrganizations] = useState<ManagedOrganizationSummary[]>([]);
   const [branches, setBranches] = useState<BranchSummary[]>([]);
+  const [branchesLoading, setBranchesLoading] = useState(false);
   const [selectedOrganizationId, setSelectedOrganizationId] = useState("");
   const [query, setQuery] = useState("");
   const [showCreate, setShowCreate] = useState(false);
@@ -73,6 +74,7 @@ export default function PlatformGymnasiumsPage() {
   const [selectingId, setSelectingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const accessToken = session?.accessToken;
 
   useEffect(() => {
     let active = true;
@@ -86,15 +88,10 @@ export default function PlatformGymnasiumsPage() {
       setSession(stored);
       try {
         const availableOrganizations = await getOrganizations(stored.accessToken);
-        let availableBranches: BranchSummary[] = [];
-        if (stored.user.supportMode || stored.user.branchId) {
-          availableBranches = await getBranches(stored.accessToken);
-        }
         if (!active) {
           return;
         }
         setOrganizations(availableOrganizations);
-        setBranches(availableBranches);
         setSelectedOrganizationId(stored.user.organizationId || availableOrganizations[0]?.id || "");
       } catch (exception) {
         if (active) {
@@ -112,6 +109,40 @@ export default function PlatformGymnasiumsPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadBranchesForSelection() {
+      if (!accessToken || !selectedOrganizationId) {
+        setBranches([]);
+        return;
+      }
+      setBranchesLoading(true);
+      setError(null);
+      try {
+        const selectedBranches = await getOrganizationBranches(accessToken, selectedOrganizationId);
+        if (active) {
+          setBranches(selectedBranches);
+        }
+      } catch (exception) {
+        if (active) {
+          setBranches([]);
+          setError(exception instanceof Error ? exception.message : "No fue posible cargar sucursales del gimnasio seleccionado.");
+        }
+      } finally {
+        if (active) {
+          setBranchesLoading(false);
+        }
+      }
+    }
+
+    void loadBranchesForSelection();
+
+    return () => {
+      active = false;
+    };
+  }, [accessToken, selectedOrganizationId]);
 
   const filteredOrganizations = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -142,7 +173,7 @@ export default function PlatformGymnasiumsPage() {
       storeSession(nextSession);
       setSession(nextSession);
       setSelectedOrganizationId(organizationId);
-      const availableBranches = await getBranches(nextSession.accessToken);
+      const availableBranches = await getOrganizationBranches(nextSession.accessToken, organizationId);
       setBranches(availableBranches);
       setMessage("Modo soporte iniciado para este gimnasio.");
       return nextSession;
@@ -249,11 +280,12 @@ export default function PlatformGymnasiumsPage() {
     setError(null);
     setMessage(null);
     try {
-      const created = await createBranch(nextSession.accessToken, {
+      await createBranch(nextSession.accessToken, {
         ...branchForm,
         phone: normalizePhone(branchForm.phone ?? ""),
       });
-      setBranches((current) => [...current, created].sort((left, right) => left.name.localeCompare(right.name)));
+      const selectedBranches = await getOrganizationBranches(nextSession.accessToken, selectedOrganization.id);
+      setBranches(selectedBranches);
       setOrganizations((current) =>
         current.map((organization) =>
           organization.id === selectedOrganization.id
@@ -369,14 +401,15 @@ export default function PlatformGymnasiumsPage() {
                 <div className="admin-panel-header">
                   <div>
                     <p>Sucursales</p>
-                    <h2>{selectedIsActive ? "Sucursales para soporte" : "Entra en soporte para ver sucursales"}</h2>
+                    <h2>{selectedIsActive ? "Sucursales para soporte" : "Sucursales registradas"}</h2>
                   </div>
                   <button className="admin-text-button" disabled={selectingId !== null} onClick={openBranchDrawer} type="button">
                     Crear sucursal
                   </button>
                 </div>
-                {selectedIsActive ? (
-                  branches.length > 0 ? (
+                {branchesLoading ? (
+                  <p className="admin-muted-text">Cargando sucursales...</p>
+                ) : branches.length > 0 ? (
                     <div className="platform-table">
                       <div className="platform-table-row header">
                         <span>Codigo</span>
@@ -389,20 +422,17 @@ export default function PlatformGymnasiumsPage() {
                           <span>{branch.code}</span>
                           <strong>{branch.name}</strong>
                           <span>{branch.phone || "Sin telefono"}</span>
-                          <button disabled={selectingId !== null || branch.id === session.user.branchId} onClick={() => activateBranch(branch.id)} type="button">
-                            {branch.id === session.user.branchId ? "En soporte" : "Entrar"}
+                          <button disabled={selectingId !== null || !selectedIsActive || branch.id === session.user.branchId} onClick={() => activateBranch(branch.id)} type="button">
+                            {branch.id === session.user.branchId ? "En soporte" : selectedIsActive ? "Entrar" : "Activa soporte"}
                           </button>
                         </div>
                       ))}
                     </div>
-                  ) : (
+                ) : (
                     <section className="admin-empty-card">
                       <strong>Este gimnasio todavia no tiene sucursales</strong>
                       <span>Crea al menos una sucursal para poder seleccionar contexto operativo, usuarios y recepcion.</span>
                     </section>
-                  )
-                ) : (
-                  <p className="admin-muted-text">Para administrar sucursales o usuarios, primero entra en modo soporte sobre este gimnasio.</p>
                 )}
               </section>
 

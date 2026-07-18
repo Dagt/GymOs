@@ -98,6 +98,7 @@ public class OrganizationQueryRepository {
 				FROM organization o
 				LEFT JOIN branch b ON b.organization_id = o.id AND b.deleted_at IS NULL
 				WHERE o.deleted_at IS NULL
+				  AND o.id <> '11111111-1111-1111-1111-111111111111'
 				GROUP BY o.id, o.legal_name, o.trade_name, o.tax_id, o.status, o.timezone,
 				         o.default_currency, o.contact_email, o.contact_phone,
 				         o.brand_name, o.logo_url, o.primary_color, o.accent_color, o.surface_color

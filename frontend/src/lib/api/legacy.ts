@@ -1074,6 +1074,10 @@ export async function getBranches(accessToken: string): Promise<BranchSummary[]>
   return apiFetch<BranchSummary[]>("/organizations/current/branches", accessToken);
 }
 
+export async function getOrganizationBranches(accessToken: string, organizationId: string): Promise<BranchSummary[]> {
+  return apiFetch<BranchSummary[]>(`/organizations/${organizationId}/branches`, accessToken);
+}
+
 export async function createBranch(
   accessToken: string,
   payload: CreateBranchPayload,

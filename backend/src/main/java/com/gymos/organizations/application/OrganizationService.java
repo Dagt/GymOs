@@ -63,6 +63,15 @@ public class OrganizationService {
 		return organizationQueryRepository.findBranchesForUser(principal.userId(), principal.organizationId());
 	}
 
+	@Transactional(readOnly = true)
+	public List<BranchSummary> branchesForOrganization(GymOsPrincipal principal, UUID organizationId) {
+		requirePrincipal(principal);
+		if (!principal.platformAdmin()) {
+			throw new BusinessException("PLATFORM_ACCESS_REQUIRED", "Solo Admin GymOS puede consultar sucursales por gimnasio.");
+		}
+		return organizationQueryRepository.findBranchesForOrganization(organizationId);
+	}
+
 	@Transactional
 	public ManagedOrganizationSummary createOrganization(
 			GymOsPrincipal principal,
