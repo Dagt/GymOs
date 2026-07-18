@@ -564,11 +564,18 @@ Implementado:
 - `/reception` queda centrado en mostrador y elimina configuracion administrativa del cuerpo principal.
 - Roles visibles en `/users`: Admin GymOS, Dueño del gimnasio, Gerente, Recepcion y Coach.
 
-Verificado parcialmente durante implementacion:
+Verificado para integracion a `main`:
 
-- Backend auth tests especificos.
-- Frontend typecheck.
+- Backend: `./gradlew test` con Java 25.
+- Frontend: `npm.cmd run lint`.
+- Frontend: `npm.cmd run typecheck`.
+- Frontend: `npm.cmd run build`.
+- Docker Compose: `docker compose -f infra/docker-compose.yml config`.
+- Docker runtime local: backend, frontend, PostgreSQL, Redis y MinIO levantados.
+- Flyway local: migracion `V20` aplicada y schema en version 20.
+- Smoke auth: Admin GymOS inicia como `PLATFORM_OWNER`, entra a soporte como `TENANT_OWNER` con `supportMode = true` y `/users/roles` no expone `Administrador GymOS` dentro del tenant.
 
-Rama de trabajo:
+Ramas:
 
-- `feature/platform-tenant-role-ux-correction`.
+- `main`: version estable integrada.
+- `feature/platform-tenant-role-ux-correction`: rama de auditoria de la correccion.
