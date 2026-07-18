@@ -239,6 +239,13 @@ Administracion de gimnasios:
 - La creacion de gimnasio se realiza en panel dedicado; no debe vivir como formulario permanente que alarga la pagina.
 - El lenguaje de "piloto" y "alta rapida" no pertenece al flujo principal de administracion.
 
+Correccion Hito 7.9:
+- El alta de gimnasio en `/platform/gymnasiums` ya no mezcla la primera sucursal en el mismo formulario.
+- La sucursal se crea desde una accion independiente `Crear sucursal` dentro del gimnasio seleccionado.
+- Los botones `Datos, marca y sucursales` y `Equipo y accesos` deben entrar primero en modo soporte cuando el gimnasio seleccionado no es el contexto activo, y despues navegar a la pantalla correspondiente.
+- Si un gimnasio todavia no tiene sucursales, el detalle muestra un estado vacio claro y mantiene disponible la accion de crear sucursal.
+- El Admin GymOS puede crear tenants completos sin dejarlos "a medias"; sucursales, usuarios y marca avanzada son pasos explicitos del detalle del cliente.
+
 Modo soporte:
 - Admin GymOS entra a un gimnasio con `supportMode = true`.
 - El shell muestra banda "Modo soporte GymOS".

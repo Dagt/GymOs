@@ -139,8 +139,8 @@ public class OrganizationController {
 			@Pattern(regexp = HEX_COLOR) String primaryColor,
 			@Pattern(regexp = HEX_COLOR) String accentColor,
 			@Pattern(regexp = HEX_COLOR) String surfaceColor,
-			@NotBlank @Size(max = 120) String firstBranchName,
-			@NotBlank @Size(max = 32) String firstBranchCode,
+			@Size(max = 120) String firstBranchName,
+			@Size(max = 32) String firstBranchCode,
 			@Size(max = 32) String firstBranchPhone
 	) {
 		private CreateOrganizationCommand toCommand() {

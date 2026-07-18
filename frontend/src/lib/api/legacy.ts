@@ -132,8 +132,8 @@ export type OrganizationUpdatePayload = {
 };
 
 export type CreateOrganizationPayload = OrganizationUpdatePayload & {
-  firstBranchName: string;
-  firstBranchCode: string;
+  firstBranchName?: string | null;
+  firstBranchCode?: string | null;
   firstBranchPhone?: string | null;
 };
 

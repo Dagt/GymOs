@@ -33,6 +33,18 @@ Nota implementada Hito 7.6:
 
 `POST /organizations/current/branches` crea una nueva sucursal activa para la organizacion actual y asigna acceso al administrador que la crea. Requiere permiso `branch.create`. Esto habilita gimnasios con multiples sucursales desde la configuracion administrativa.
 
+Nota implementada Hito 7.9:
+
+- `POST /organizations` permite crear un gimnasio/tenant completo sin forzar una sucursal inicial.
+- Los campos legacy `firstBranchName`, `firstBranchCode` y `firstBranchPhone` quedan opcionales por compatibilidad.
+- El flujo recomendado para Admin GymOS es:
+  1. Crear gimnasio cliente con datos comerciales, contacto y marca base.
+  2. Entrar al gimnasio en modo soporte.
+  3. Crear una o varias sucursales con `POST /organizations/current/branches`.
+  4. Crear usuarios del cliente en `/users/internal`.
+- `GET /organizations` devuelve todos los gimnasios para usuarios con `platform.admin`; usuarios tenant siguen viendo solo su organizacion accesible.
+- En `supportMode`, `GET /organizations/current/branches` permite a Admin GymOS ver las sucursales del gimnasio seleccionado aunque no sea trabajador del tenant.
+
 Request:
 
 ```json

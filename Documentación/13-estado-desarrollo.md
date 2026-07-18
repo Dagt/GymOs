@@ -449,6 +449,7 @@ Estado general: IN_PROGRESS
 | 7.5 Preparacion del piloto | PLANNED | Manuales, feedback, soporte y pricing pendientes. |
 | 7.6 Administracion multi-sucursal y equipo | FUNCTIONAL | API/UI para crear multiples sucursales, crear usuarios internos, asignar rol y asignar sucursales; navegacion filtrada por permisos. |
 | 7.8 Separacion SaaS/tenant por rol | FUNCTIONAL | Admin GymOS, dueño, gerente, recepcion y coach separados por `console`; soporte auditable y migracion V20. |
+| 7.9 Correccion CRM plataforma | FUNCTIONAL | Alta de gimnasio separada de sucursales; botones de detalle navegan con soporte activo; creacion de sucursal funcional desde CRM. |
 
 ### Matriz de modulos
 
@@ -579,3 +580,27 @@ Ramas:
 
 - `main`: version estable integrada.
 - `feature/platform-tenant-role-ux-correction`: rama de auditoria de la correccion.
+
+### Hito 7.9 - Correccion CRM plataforma y sucursales
+
+Estado: FUNCTIONAL
+
+Implementado:
+
+- `POST /organizations` ya no obliga a capturar `firstBranchName`, `firstBranchCode` ni `firstBranchPhone`.
+- Admin GymOS puede crear un gimnasio/tenant con datos comerciales, contacto y marca base sin crear una sucursal en el mismo formulario.
+- La creacion de sucursal queda como accion independiente dentro del detalle del gimnasio seleccionado en `/platform/gymnasiums`.
+- `/platform/gymnasiums` inicia modo soporte automaticamente antes de abrir `Datos, marca y sucursales` o `Equipo y accesos` para el gimnasio seleccionado.
+- En modo soporte, Admin GymOS puede listar, crear y actualizar sucursales del tenant aunque no tenga `user_branch_access` como trabajador del gimnasio.
+- `GET /organizations` lista todos los gimnasios para `platform.admin`, incluyendo tenants sin sucursales.
+- El detalle de un gimnasio sin sucursales muestra estado vacio accionable en lugar de una tabla confusa.
+
+Verificado localmente:
+
+- Backend: `.\gradlew.bat test --no-daemon` con Java 25.
+- Frontend: `npm.cmd run typecheck`.
+- Frontend: `npm.cmd run lint`.
+- Frontend: `npm.cmd run build`.
+- Docker Compose: `docker compose -f infra/docker-compose.yml up -d --build`.
+- Smoke API: Admin GymOS crea gimnasio con `branchCount = 0`, entra en `supportMode`, crea sucursal y `GET /organizations/current/branches` devuelve la nueva sucursal.
+- Frontend local: `GET http://localhost:3000/platform/gymnasiums` devuelve 200.

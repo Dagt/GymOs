@@ -88,6 +88,45 @@ public class OrganizationQueryRepository {
 				.list();
 	}
 
+	public List<ManagedOrganizationSummary> findAllOrganizations() {
+		return jdbcClient.sql("""
+				SELECT o.id, o.legal_name, o.trade_name, o.tax_id, o.status, o.timezone,
+				       o.default_currency, o.contact_email, o.contact_phone,
+				       o.brand_name, o.logo_url, o.primary_color, o.accent_color, o.surface_color,
+				       COUNT(DISTINCT b.id) AS branch_count,
+				       COUNT(DISTINCT CASE WHEN b.status = 'ACTIVE' THEN b.id END) AS active_branch_count
+				FROM organization o
+				LEFT JOIN branch b ON b.organization_id = o.id AND b.deleted_at IS NULL
+				WHERE o.deleted_at IS NULL
+				GROUP BY o.id, o.legal_name, o.trade_name, o.tax_id, o.status, o.timezone,
+				         o.default_currency, o.contact_email, o.contact_phone,
+				         o.brand_name, o.logo_url, o.primary_color, o.accent_color, o.surface_color
+				ORDER BY LOWER(o.trade_name)
+				""")
+				.query(this::managedOrganizationSummary)
+				.list();
+	}
+
+	public Optional<ManagedOrganizationSummary> findManagedOrganization(UUID organizationId) {
+		return jdbcClient.sql("""
+				SELECT o.id, o.legal_name, o.trade_name, o.tax_id, o.status, o.timezone,
+				       o.default_currency, o.contact_email, o.contact_phone,
+				       o.brand_name, o.logo_url, o.primary_color, o.accent_color, o.surface_color,
+				       COUNT(DISTINCT b.id) AS branch_count,
+				       COUNT(DISTINCT CASE WHEN b.status = 'ACTIVE' THEN b.id END) AS active_branch_count
+				FROM organization o
+				LEFT JOIN branch b ON b.organization_id = o.id AND b.deleted_at IS NULL
+				WHERE o.id = :organizationId
+				  AND o.deleted_at IS NULL
+				GROUP BY o.id, o.legal_name, o.trade_name, o.tax_id, o.status, o.timezone,
+				         o.default_currency, o.contact_email, o.contact_phone,
+				         o.brand_name, o.logo_url, o.primary_color, o.accent_color, o.surface_color
+				""")
+				.param("organizationId", organizationId)
+				.query(this::managedOrganizationSummary)
+				.optional();
+	}
+
 	public List<BranchSummary> findBranchesForUser(UUID userId, UUID organizationId) {
 		return jdbcClient.sql("""
 				SELECT b.id, b.name, b.code, b.status, b.timezone, b.phone, uba.access_scope
@@ -110,6 +149,33 @@ public class OrganizationQueryRepository {
 						resultSet.getString("access_scope")
 				))
 				.list();
+	}
+
+	public List<BranchSummary> findBranchesForOrganization(UUID organizationId) {
+		return jdbcClient.sql("""
+				SELECT b.id, b.name, b.code, b.status, b.timezone, b.phone, 'SUPPORT' AS access_scope
+				FROM branch b
+				WHERE b.organization_id = :organizationId
+				  AND b.deleted_at IS NULL
+				ORDER BY b.name
+				""")
+				.param("organizationId", organizationId)
+				.query(this::branchSummary)
+				.list();
+	}
+
+	public Optional<BranchSummary> findBranch(UUID organizationId, UUID branchId) {
+		return jdbcClient.sql("""
+				SELECT b.id, b.name, b.code, b.status, b.timezone, b.phone, 'SUPPORT' AS access_scope
+				FROM branch b
+				WHERE b.organization_id = :organizationId
+				  AND b.id = :branchId
+				  AND b.deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.query(this::branchSummary)
+				.optional();
 	}
 
 	public Optional<BranchSummary> findBranchForUser(UUID userId, UUID organizationId, UUID branchId) {
@@ -153,6 +219,39 @@ public class OrganizationQueryRepository {
 				.query(Integer.class)
 				.single();
 		return count > 0;
+	}
+
+	private ManagedOrganizationSummary managedOrganizationSummary(java.sql.ResultSet resultSet, int rowNumber) throws java.sql.SQLException {
+		return new ManagedOrganizationSummary(
+				resultSet.getObject("id", UUID.class),
+				resultSet.getString("legal_name"),
+				resultSet.getString("trade_name"),
+				resultSet.getString("tax_id"),
+				resultSet.getString("status"),
+				resultSet.getString("timezone"),
+				resultSet.getString("default_currency"),
+				resultSet.getString("contact_email"),
+				resultSet.getString("contact_phone"),
+				resultSet.getString("brand_name"),
+				resultSet.getString("logo_url"),
+				resultSet.getString("primary_color"),
+				resultSet.getString("accent_color"),
+				resultSet.getString("surface_color"),
+				resultSet.getInt("branch_count"),
+				resultSet.getInt("active_branch_count")
+		);
+	}
+
+	private BranchSummary branchSummary(java.sql.ResultSet resultSet, int rowNumber) throws java.sql.SQLException {
+		return new BranchSummary(
+				resultSet.getObject("id", UUID.class),
+				resultSet.getString("name"),
+				resultSet.getString("code"),
+				resultSet.getString("status"),
+				resultSet.getString("timezone"),
+				resultSet.getString("phone"),
+				resultSet.getString("access_scope")
+		);
 	}
 
 	public record ManagedOrganizationSummary(

@@ -38,6 +38,9 @@ public class OrganizationService {
 	@Transactional(readOnly = true)
 	public List<ManagedOrganizationSummary> organizations(GymOsPrincipal principal) {
 		requirePrincipal(principal);
+		if (principal.platformAdmin()) {
+			return organizationQueryRepository.findAllOrganizations();
+		}
 		return organizationQueryRepository.findOrganizationsForUser(principal.userId());
 	}
 
@@ -54,6 +57,9 @@ public class OrganizationService {
 	@Transactional(readOnly = true)
 	public List<BranchSummary> branches(GymOsPrincipal principal) {
 		requirePrincipal(principal);
+		if (principal.platformAdmin() && principal.supportMode()) {
+			return organizationQueryRepository.findBranchesForOrganization(principal.organizationId());
+		}
 		return organizationQueryRepository.findBranchesForUser(principal.userId(), principal.organizationId());
 	}
 
@@ -66,7 +72,9 @@ public class OrganizationService {
 		requirePrincipal(principal);
 		OffsetDateTime now = OffsetDateTime.now();
 		UUID organizationId = UUID.randomUUID();
-		UUID branchId = UUID.randomUUID();
+		if (hasPartialBranchRequest(request)) {
+			throw new BusinessException("BRANCH_DATA_INCOMPLETE", "Captura nombre y codigo de sucursal, o crea la sucursal despues.");
+		}
 		try {
 			jdbcClient.sql("""
 					INSERT INTO organization (
@@ -98,42 +106,43 @@ public class OrganizationService {
 					.param("createdBy", principal.userId())
 					.param("updatedBy", principal.userId())
 					.update();
-			jdbcClient.sql("""
-					INSERT INTO branch (
-					    id, organization_id, name, code, timezone, status, phone,
-					    created_at, updated_at, created_by, updated_by, version
-					)
-					VALUES (
-					    :branchId, :organizationId, :name, :code, :timezone, 'ACTIVE', :phone,
-					    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
-					)
-					""")
-					.param("branchId", branchId)
-					.param("organizationId", organizationId)
-					.param("name", request.firstBranchName().trim())
-					.param("code", request.firstBranchCode().trim().toUpperCase())
-					.param("timezone", request.timezone().trim())
-					.param("phone", blankToNull(request.firstBranchPhone()))
-					.param("createdAt", now)
-					.param("updatedAt", now)
-					.param("createdBy", principal.userId())
-					.param("updatedBy", principal.userId())
-					.update();
+			if (hasBranchRequest(request)) {
+				UUID branchId = UUID.randomUUID();
+				jdbcClient.sql("""
+						INSERT INTO branch (
+						    id, organization_id, name, code, timezone, status, phone,
+						    created_at, updated_at, created_by, updated_by, version
+						)
+						VALUES (
+						    :branchId, :organizationId, :name, :code, :timezone, 'ACTIVE', :phone,
+						    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
+						)
+						""")
+						.param("branchId", branchId)
+						.param("organizationId", organizationId)
+						.param("name", request.firstBranchName().trim())
+						.param("code", request.firstBranchCode().trim().toUpperCase())
+						.param("timezone", request.timezone().trim())
+						.param("phone", blankToNull(request.firstBranchPhone()))
+						.param("createdAt", now)
+						.param("updatedAt", now)
+						.param("createdBy", principal.userId())
+						.param("updatedBy", principal.userId())
+						.update();
+				jdbcClient.sql("""
+						INSERT INTO user_branch_access (user_id, branch_id, access_scope)
+						VALUES (:userId, :branchId, 'ADMIN')
+						ON CONFLICT DO NOTHING
+						""")
+						.param("userId", principal.userId())
+						.param("branchId", branchId)
+						.update();
+			}
 		} catch (DuplicateKeyException exception) {
 			throw new BusinessException("ORGANIZATION_ALREADY_EXISTS", "Ya existe un gimnasio con esos datos.");
 		}
-		jdbcClient.sql("""
-				INSERT INTO user_branch_access (user_id, branch_id, access_scope)
-				VALUES (:userId, :branchId, 'ADMIN')
-				ON CONFLICT DO NOTHING
-				""")
-				.param("userId", principal.userId())
-				.param("branchId", branchId)
-				.update();
-		auditService.recordSystem(organizationId, branchId, principal.userId(), "ORGANIZATION_CREATED", "ORGANIZATION", organizationId, "ADMIN", null, correlationId);
-		return organizationQueryRepository.findOrganizationsForUser(principal.userId()).stream()
-				.filter(organization -> organization.id().equals(organizationId))
-				.findFirst()
+		auditService.recordSystem(organizationId, null, principal.userId(), "ORGANIZATION_CREATED", "ORGANIZATION", organizationId, "ADMIN", null, correlationId);
+		return organizationQueryRepository.findManagedOrganization(organizationId)
 				.orElseThrow(() -> new BusinessException("ORGANIZATION_NOT_FOUND", "El gimnasio creado no esta disponible."));
 	}
 
@@ -228,6 +237,10 @@ public class OrganizationService {
 				.param("branchId", branchId)
 				.update();
 		auditService.record(principal, "BRANCH_CREATED", "BRANCH", branchId, "ADMIN", null, correlationId);
+		if (principal.platformAdmin() && principal.supportMode()) {
+			return organizationQueryRepository.findBranch(principal.organizationId(), branchId)
+					.orElseThrow(() -> new BusinessException("BRANCH_NOT_FOUND", "La sucursal no esta disponible."));
+		}
 		return organizationQueryRepository.findBranchForUser(principal.userId(), principal.organizationId(), branchId)
 				.orElseThrow(() -> new BusinessException("BRANCH_NOT_FOUND", "La sucursal no esta disponible."));
 	}
@@ -240,7 +253,7 @@ public class OrganizationService {
 			String correlationId
 	) {
 		requirePrincipal(principal);
-		if (!organizationQueryRepository.userHasBranchAccess(principal.userId(), principal.organizationId(), branchId)) {
+		if (!principal.platformAdmin() && !organizationQueryRepository.userHasBranchAccess(principal.userId(), principal.organizationId(), branchId)) {
 			throw new BusinessException("BRANCH_ACCESS_DENIED", "No tienes acceso a la sucursal solicitada.");
 		}
 		OffsetDateTime now = OffsetDateTime.now();
@@ -267,6 +280,10 @@ public class OrganizationService {
 				.param("organizationId", principal.organizationId())
 				.update();
 		auditService.record(principal, "BRANCH_UPDATED", "BRANCH", branchId, "RECEPTION", null, correlationId);
+		if (principal.platformAdmin() && principal.supportMode()) {
+			return organizationQueryRepository.findBranch(principal.organizationId(), branchId)
+					.orElseThrow(() -> new BusinessException("BRANCH_NOT_FOUND", "La sucursal no esta disponible."));
+		}
 		return organizationQueryRepository.findBranchForUser(principal.userId(), principal.organizationId(), branchId)
 				.orElseThrow(() -> new BusinessException("BRANCH_NOT_FOUND", "La sucursal no esta disponible."));
 	}
@@ -289,5 +306,16 @@ public class OrganizationService {
 	private String defaultColor(String value, String fallback) {
 		String normalized = blankToNull(value);
 		return normalized == null ? fallback : normalized;
+	}
+
+	private boolean hasBranchRequest(CreateOrganizationCommand request) {
+		return blankToNull(request.firstBranchName()) != null
+				&& blankToNull(request.firstBranchCode()) != null;
+	}
+
+	private boolean hasPartialBranchRequest(CreateOrganizationCommand request) {
+		boolean hasName = blankToNull(request.firstBranchName()) != null;
+		boolean hasCode = blankToNull(request.firstBranchCode()) != null;
+		return hasName != hasCode;
 	}
 }

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
@@ -14,10 +13,12 @@ import {
   normalizePhone,
   validateBranchCode,
   validateEmail,
+  validateHexColor,
   validatePhone,
   validateRequired,
 } from "@/components/FormFields";
 import {
+  createBranch,
   createOrganization,
   getBranches,
   getOrganizations,
@@ -26,6 +27,7 @@ import {
   selectOrganization,
   storeSession,
   type BranchSummary,
+  type CreateBranchPayload,
   type CreateOrganizationPayload,
   type ManagedOrganizationSummary,
   type StoredSession,
@@ -44,9 +46,13 @@ const emptyOrganizationForm: CreateOrganizationPayload = {
   primaryColor: "#164E63",
   accentColor: "#F59E0B",
   surfaceColor: "#F4F7FB",
-  firstBranchName: "",
-  firstBranchCode: "",
-  firstBranchPhone: "",
+};
+
+const emptyBranchForm: CreateBranchPayload = {
+  name: "",
+  code: "",
+  timezone: "America/Mexico_City",
+  phone: "",
 };
 
 export default function PlatformGymnasiumsPage() {
@@ -57,8 +63,11 @@ export default function PlatformGymnasiumsPage() {
   const [selectedOrganizationId, setSelectedOrganizationId] = useState("");
   const [query, setQuery] = useState("");
   const [showCreate, setShowCreate] = useState(false);
+  const [showCreateBranch, setShowCreateBranch] = useState(false);
   const [form, setForm] = useState<CreateOrganizationPayload>(emptyOrganizationForm);
+  const [branchForm, setBranchForm] = useState<CreateBranchPayload>(emptyBranchForm);
   const [fieldErrors, setFieldErrors] = useState<FieldErrorMap>({});
+  const [branchFieldErrors, setBranchFieldErrors] = useState<FieldErrorMap>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [selectingId, setSelectingId] = useState<string | null>(null);
@@ -76,16 +85,17 @@ export default function PlatformGymnasiumsPage() {
       }
       setSession(stored);
       try {
-        const [availableOrganizations, availableBranches] = await Promise.all([
-          getOrganizations(stored.accessToken),
-          getBranches(stored.accessToken),
-        ]);
+        const availableOrganizations = await getOrganizations(stored.accessToken);
+        let availableBranches: BranchSummary[] = [];
+        if (stored.user.supportMode || stored.user.branchId) {
+          availableBranches = await getBranches(stored.accessToken);
+        }
         if (!active) {
           return;
         }
         setOrganizations(availableOrganizations);
         setBranches(availableBranches);
-        setSelectedOrganizationId(stored.user.organizationId);
+        setSelectedOrganizationId(stored.user.organizationId || availableOrganizations[0]?.id || "");
       } catch (exception) {
         if (active) {
           setError(exception instanceof Error ? exception.message : "No fue posible cargar gimnasios.");
@@ -115,11 +125,14 @@ export default function PlatformGymnasiumsPage() {
 
   const selectedOrganization = organizations.find((item) => item.id === selectedOrganizationId) ?? organizations[0] ?? null;
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
-  const selectedIsActive = Boolean(session && selectedOrganization?.id === session.user.organizationId);
+  const selectedIsActive = Boolean(session && selectedOrganization?.id === session.user.organizationId && session.user.supportMode);
 
-  async function activateOrganization(organizationId: string) {
+  async function ensureSupport(organizationId: string): Promise<StoredSession | null> {
     if (!session) {
-      return;
+      return null;
+    }
+    if (session.user.organizationId === organizationId && session.user.supportMode) {
+      return session;
     }
     setSelectingId(organizationId);
     setError(null);
@@ -128,17 +141,21 @@ export default function PlatformGymnasiumsPage() {
       const nextSession = await selectOrganization(session.accessToken, organizationId);
       storeSession(nextSession);
       setSession(nextSession);
-      const [availableBranches] = await Promise.all([
-        getBranches(nextSession.accessToken),
-      ]);
-      setBranches(availableBranches);
       setSelectedOrganizationId(organizationId);
+      const availableBranches = await getBranches(nextSession.accessToken);
+      setBranches(availableBranches);
       setMessage("Modo soporte iniciado para este gimnasio.");
+      return nextSession;
     } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible cambiar de gimnasio.");
+      setError(exception instanceof Error ? exception.message : "No fue posible entrar en soporte.");
+      return null;
     } finally {
       setSelectingId(null);
     }
+  }
+
+  async function activateOrganization(organizationId: string) {
+    await ensureSupport(organizationId);
   }
 
   async function activateBranch(branchId: string) {
@@ -160,6 +177,28 @@ export default function PlatformGymnasiumsPage() {
     }
   }
 
+  async function goToTenantSection(path: string) {
+    if (!selectedOrganization) {
+      return;
+    }
+    const nextSession = await ensureSupport(selectedOrganization.id);
+    if (nextSession) {
+      router.push(path);
+    }
+  }
+
+  async function openBranchDrawer() {
+    if (!selectedOrganization) {
+      return;
+    }
+    const nextSession = await ensureSupport(selectedOrganization.id);
+    if (nextSession) {
+      setBranchForm(emptyBranchForm);
+      setBranchFieldErrors({});
+      setShowCreateBranch(true);
+    }
+  }
+
   async function submitOrganization(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session) {
@@ -177,16 +216,60 @@ export default function PlatformGymnasiumsPage() {
       const payload = {
         ...form,
         contactPhone: normalizePhone(form.contactPhone ?? ""),
-        firstBranchPhone: normalizePhone(form.firstBranchPhone ?? ""),
       };
       const created = await createOrganization(session.accessToken, payload);
       setOrganizations((current) => [...current, created].sort((left, right) => left.tradeName.localeCompare(right.tradeName)));
       setForm(emptyOrganizationForm);
       setShowCreate(false);
       setSelectedOrganizationId(created.id);
-      setMessage("Gimnasio creado. Seleccionalo para trabajar en el.");
+      setBranches([]);
+      setMessage("Gimnasio creado. Ahora crea sus sucursales, marca y usuarios desde su detalle.");
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible crear el gimnasio.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function submitBranch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session || !selectedOrganization) {
+      return;
+    }
+    const nextSession = await ensureSupport(selectedOrganization.id);
+    if (!nextSession) {
+      return;
+    }
+    const errors = validateBranch(branchForm);
+    setBranchFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const created = await createBranch(nextSession.accessToken, {
+        ...branchForm,
+        phone: normalizePhone(branchForm.phone ?? ""),
+      });
+      setBranches((current) => [...current, created].sort((left, right) => left.name.localeCompare(right.name)));
+      setOrganizations((current) =>
+        current.map((organization) =>
+          organization.id === selectedOrganization.id
+            ? {
+                ...organization,
+                branchCount: organization.branchCount + 1,
+                activeBranchCount: organization.activeBranchCount + 1,
+              }
+            : organization,
+        ),
+      );
+      setBranchForm(emptyBranchForm);
+      setShowCreateBranch(false);
+      setMessage("Sucursal creada. Ya puedes seleccionarla o asignar usuarios.");
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible crear la sucursal.");
     } finally {
       setSaving(false);
     }
@@ -246,7 +329,11 @@ export default function PlatformGymnasiumsPage() {
               >
                 <span>{item.status}</span>
                 <strong>{item.tradeName}</strong>
-                <small>{item.activeBranchCount} sucursales activas</small>
+                <small>
+                  {item.activeBranchCount === 0
+                    ? "Sin sucursales activas"
+                    : `${item.activeBranchCount} sucursales activas`}
+                </small>
               </button>
             ))}
           </div>
@@ -284,35 +371,48 @@ export default function PlatformGymnasiumsPage() {
                     <p>Sucursales</p>
                     <h2>{selectedIsActive ? "Sucursales para soporte" : "Entra en soporte para ver sucursales"}</h2>
                   </div>
-                  {selectedIsActive ? <Link href="/settings/organization">Crear sucursal</Link> : null}
+                  <button className="admin-text-button" disabled={selectingId !== null} onClick={openBranchDrawer} type="button">
+                    Crear sucursal
+                  </button>
                 </div>
                 {selectedIsActive ? (
-                  <div className="platform-table">
-                    <div className="platform-table-row header">
-                      <span>Codigo</span>
-                      <span>Sucursal</span>
-                      <span>Telefono</span>
-                      <span>Accion</span>
-                    </div>
-                    {branches.map((branch) => (
-                      <div className="platform-table-row" key={branch.id}>
-                        <span>{branch.code}</span>
-                        <strong>{branch.name}</strong>
-                        <span>{branch.phone || "Sin telefono"}</span>
-                        <button disabled={selectingId !== null || branch.id === session.user.branchId} onClick={() => activateBranch(branch.id)} type="button">
-                          {branch.id === session.user.branchId ? "En soporte" : "Entrar"}
-                        </button>
+                  branches.length > 0 ? (
+                    <div className="platform-table">
+                      <div className="platform-table-row header">
+                        <span>Codigo</span>
+                        <span>Sucursal</span>
+                        <span>Telefono</span>
+                        <span>Accion</span>
                       </div>
-                    ))}
-                  </div>
+                      {branches.map((branch) => (
+                        <div className="platform-table-row" key={branch.id}>
+                          <span>{branch.code}</span>
+                          <strong>{branch.name}</strong>
+                          <span>{branch.phone || "Sin telefono"}</span>
+                          <button disabled={selectingId !== null || branch.id === session.user.branchId} onClick={() => activateBranch(branch.id)} type="button">
+                            {branch.id === session.user.branchId ? "En soporte" : "Entrar"}
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <section className="admin-empty-card">
+                      <strong>Este gimnasio todavia no tiene sucursales</strong>
+                      <span>Crea al menos una sucursal para poder seleccionar contexto operativo, usuarios y recepcion.</span>
+                    </section>
+                  )
                 ) : (
                   <p className="admin-muted-text">Para administrar sucursales o usuarios, primero entra en modo soporte sobre este gimnasio.</p>
                 )}
               </section>
 
               <div className="platform-actions">
-                <Link className="admin-secondary-link" href="/settings/organization">Datos, marca y sucursales</Link>
-                <Link className="admin-secondary-link" href="/users">Equipo y accesos</Link>
+                <button className="admin-secondary-link" disabled={selectingId !== null} onClick={() => goToTenantSection("/settings/organization")} type="button">
+                  Datos, marca y sucursales
+                </button>
+                <button className="admin-secondary-link" disabled={selectingId !== null} onClick={() => goToTenantSection("/users")} type="button">
+                  Equipo y accesos
+                </button>
               </div>
             </>
           ) : (
@@ -335,15 +435,41 @@ export default function PlatformGymnasiumsPage() {
               <button onClick={() => setShowCreate(false)} type="button">Cerrar</button>
             </header>
             <form className="grid gap-4" onSubmit={submitOrganization}>
-              <TextField error={fieldErrors.tradeName} label="Nombre comercial" name="tradeName" value={form.tradeName} onChange={(value) => setForm({ ...form, tradeName: value })} />
+              <TextField error={fieldErrors.tradeName} label="Nombre comercial" name="tradeName" value={form.tradeName} onChange={(value) => setForm({ ...form, tradeName: value, brandName: form.brandName || value })} />
               <TextField error={fieldErrors.legalName} label="Nombre legal" name="legalName" value={form.legalName} onChange={(value) => setForm({ ...form, legalName: value })} />
               <TextField label="RFC / Tax ID" name="taxId" required={false} value={form.taxId ?? ""} onChange={(value) => setForm({ ...form, taxId: value })} />
               <EmailField error={fieldErrors.contactEmail} label="Email contacto" name="contactEmail" value={form.contactEmail ?? ""} onChange={(value) => setForm({ ...form, contactEmail: value })} />
               <PhoneField error={fieldErrors.contactPhone} label="Telefono contacto" name="contactPhone" value={form.contactPhone ?? ""} onChange={(value) => setForm({ ...form, contactPhone: value })} />
-              <TextField error={fieldErrors.firstBranchName} label="Primera sucursal" name="firstBranchName" value={form.firstBranchName} onChange={(value) => setForm({ ...form, firstBranchName: value })} />
-              <TextField error={fieldErrors.firstBranchCode} label="Codigo sucursal" name="firstBranchCode" value={form.firstBranchCode} onChange={(value) => setForm({ ...form, firstBranchCode: value })} />
-              <PhoneField error={fieldErrors.firstBranchPhone} label="Telefono sucursal" name="firstBranchPhone" value={form.firstBranchPhone ?? ""} onChange={(value) => setForm({ ...form, firstBranchPhone: value })} />
+              <hr className="border-[#dbe4ee]" />
+              <TextField error={fieldErrors.brandName} label="Nombre visible de marca" name="brandName" required={false} value={form.brandName ?? ""} onChange={(value) => setForm({ ...form, brandName: value })} />
+              <TextField label="URL del logo" name="logoUrl" required={false} value={form.logoUrl ?? ""} onChange={(value) => setForm({ ...form, logoUrl: value })} />
+              <div className="platform-color-grid">
+                <TextField error={fieldErrors.primaryColor} label="Color principal" name="primaryColor" value={form.primaryColor ?? "#164E63"} onChange={(value) => setForm({ ...form, primaryColor: value })} />
+                <TextField error={fieldErrors.accentColor} label="Color acento" name="accentColor" value={form.accentColor ?? "#F59E0B"} onChange={(value) => setForm({ ...form, accentColor: value })} />
+                <TextField error={fieldErrors.surfaceColor} label="Color fondo" name="surfaceColor" value={form.surfaceColor ?? "#F4F7FB"} onChange={(value) => setForm({ ...form, surfaceColor: value })} />
+              </div>
               <button className="form-primary-button" disabled={saving} type="submit">Crear gimnasio</button>
+            </form>
+          </div>
+        </aside>
+      ) : null}
+
+      {showCreateBranch ? (
+        <aside className="platform-drawer" aria-label="Nueva sucursal">
+          <div className="platform-drawer-card">
+            <header>
+              <div>
+                <p className="app-eyebrow">{selectedOrganization?.tradeName}</p>
+                <h2>Crear sucursal</h2>
+              </div>
+              <button onClick={() => setShowCreateBranch(false)} type="button">Cerrar</button>
+            </header>
+            <form className="grid gap-4" onSubmit={submitBranch}>
+              <TextField error={branchFieldErrors.name} label="Nombre de sucursal" name="branchName" value={branchForm.name} onChange={(value) => setBranchForm({ ...branchForm, name: value })} />
+              <TextField error={branchFieldErrors.code} label="Codigo corto" name="branchCode" value={branchForm.code} onChange={(value) => setBranchForm({ ...branchForm, code: value })} />
+              <PhoneField error={branchFieldErrors.phone} label="Telefono sucursal" name="branchPhone" value={branchForm.phone ?? ""} onChange={(value) => setBranchForm({ ...branchForm, phone: value })} />
+              <TextField error={branchFieldErrors.timezone} label="Zona horaria" name="branchTimezone" value={branchForm.timezone} onChange={(value) => setBranchForm({ ...branchForm, timezone: value })} />
+              <button className="form-primary-button" disabled={saving} type="submit">Crear sucursal</button>
             </form>
           </div>
         </aside>
@@ -358,9 +484,18 @@ function validateOrganization(form: CreateOrganizationPayload) {
   addError(errors, "legalName", validateRequired(form.legalName, "Nombre legal"));
   addError(errors, "contactEmail", validateEmail(form.contactEmail ?? ""));
   addError(errors, "contactPhone", validatePhone(form.contactPhone ?? ""));
-  addError(errors, "firstBranchName", validateRequired(form.firstBranchName, "Primera sucursal"));
-  addError(errors, "firstBranchCode", validateBranchCode(form.firstBranchCode));
-  addError(errors, "firstBranchPhone", validatePhone(form.firstBranchPhone ?? ""));
+  addError(errors, "primaryColor", validateHexColor(form.primaryColor ?? "", "Color principal", true));
+  addError(errors, "accentColor", validateHexColor(form.accentColor ?? "", "Color acento", true));
+  addError(errors, "surfaceColor", validateHexColor(form.surfaceColor ?? "", "Color fondo", true));
+  return errors;
+}
+
+function validateBranch(form: CreateBranchPayload) {
+  const errors: FieldErrorMap = {};
+  addError(errors, "name", validateRequired(form.name, "Nombre de sucursal"));
+  addError(errors, "code", validateBranchCode(form.code));
+  addError(errors, "timezone", validateRequired(form.timezone, "Zona horaria"));
+  addError(errors, "phone", validatePhone(form.phone ?? ""));
   return errors;
 }
 
