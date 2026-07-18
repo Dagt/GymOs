@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import { getCurrentOrganization, getStoredSession, type OrganizationSummary } from "@/lib/api";
-import { isPlatformAdmin } from "@/lib/role-model";
+import { isPlatformAdmin, isSupportMode } from "@/lib/role-model";
 
 type ThemeConfig = {
   name: string;
@@ -29,7 +29,7 @@ export function TenantThemeProvider() {
     const session = getStoredSession();
     const isPlatformRoute = pathname.startsWith("/platform");
 
-    if (!session || isPlatformRoute || isPlatformAdmin(session.user)) {
+    if (!session || isPlatformRoute || (isPlatformAdmin(session.user) && !isSupportMode(session.user))) {
       applyTheme(defaultTheme);
       return;
     }

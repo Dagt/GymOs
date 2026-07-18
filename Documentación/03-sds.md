@@ -1,4 +1,4 @@
-# 3. Software Design Specification
+﻿# 3. Software Design Specification
 
 ## 3.1 Estilo arquitectónico
 
@@ -220,8 +220,8 @@ Decisiones implementadas:
 
 Decisiones implementadas:
 - El frontend se organiza por consolas de trabajo, no por una unica administracion generica.
-- `PLATFORM_ADMIN` administra gimnasios y tenants desde `/platform/gymnasiums`.
-- `GYM_ADMIN` y gerencia entran a `/dashboard`.
+- `PLATFORM_OWNER` administra gimnasios cliente y soporte desde `/platform/gymnasiums`.
+- `TENANT_OWNER` entra a `/dashboard`; `TENANT_MANAGER` entra a `/operations`.
 - Recepcion entra a `/reception` y solo ve herramientas operativas permitidas.
 - Coaches entran a `/coaches`.
 - El ruteo post-login se resuelve por permisos en `role-model`, no por nombres de usuario.
@@ -230,3 +230,17 @@ Decisiones implementadas:
 - La marca del gimnasio se aplica por tenant con `TenantThemeProvider`; la plataforma conserva marca neutral.
 - La administracion de muchos gimnasios y sucursales usa un patron maestro-detalle para evitar saturacion visual.
 - Los formularios comunes aplican validacion previa al envio y muestran errores de backend con codigo y `correlationId`.
+
+## 3.20 Separacion SaaS plataforma/tenant
+
+Decisiones implementadas:
+- Admin GymOS representa al dueno/operador SaaS de la plataforma, no a un trabajador del gimnasio.
+- Admin GymOS inicia en `/platform/gymnasiums`, un CRM de gimnasios cliente.
+- El acceso de plataforma a un gimnasio se realiza como modo soporte auditable, no como impersonacion silenciosa.
+- `platform.admin` queda reservado para el rol `Administrador GymOS`.
+- Dueño del gimnasio administra solo su tenant y entra a una consola enfocada en metricas, negocio, sucursales y equipo.
+- Gerente queda separado visualmente del dueño y entra a `/operations`, con foco en operacion diaria.
+- Recepcion queda acotada a mostrador por gimnasio/sucursal: clientes, ventas, pagos, membresias y reservas.
+- Coach queda acotado a clientes/rutinas/seguimiento autorizado.
+- La sesion expone `platformAdmin`, `supportMode` y `console` para que el frontend no infiera rol por nombre de usuario.
+- Las acciones ejecutadas con `supportMode` se registran en auditoria con origen `PLATFORM_SUPPORT`.

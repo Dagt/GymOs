@@ -26,8 +26,9 @@ public class AuditService {
 		UUID organizationId = actor == null ? null : actor.organizationId();
 		UUID branchId = actor == null ? null : actor.branchId();
 		UUID actorUserId = actor == null ? null : actor.userId();
-		String actorRole = actor == null ? "SYSTEM" : "USER";
-		insert(organizationId, branchId, actorUserId, actorRole, action, entityType, entityId, origin, reason, correlationId);
+		String actorRole = actor == null ? "SYSTEM" : actor.supportMode() ? "PLATFORM_SUPPORT" : "USER";
+		String auditOrigin = actor != null && actor.supportMode() ? "PLATFORM_SUPPORT" : origin;
+		insert(organizationId, branchId, actorUserId, actorRole, action, entityType, entityId, auditOrigin, reason, correlationId);
 	}
 
 	public void recordSystem(

@@ -11,7 +11,6 @@ import {
   selectBranch,
   storeSession,
   type BranchSummary,
-  type CurrentUser,
   type OrganizationSummary,
   type StoredSession,
 } from "@/lib/api";
@@ -45,14 +44,6 @@ const focusActions = [
     label: "Abrir kiosco",
     accent: "kiosk",
   },
-];
-
-const adminShortcuts = [
-  { label: "Catálogo", href: "/catalog" },
-  { label: "Beneficios", href: "/benefits" },
-  { label: "Marca y datos", href: "/settings/organization" },
-  { label: "Preparar gimnasio", href: "/onboarding" },
-  { label: "Importar clientes", href: "/clients/import" },
 ];
 
 const operationGroups = [
@@ -175,18 +166,17 @@ export default function ReceptionPage() {
     <AppShell
       actions={[
         ...(canOperate ? [{ href: "/reports/sales", label: "Ventas" }] : []),
-        { href: "/settings/organization", label: canOperate ? "Personalizar" : "Datos y sucursales" },
       ]}
       branchName={activeBranch?.name}
-      eyebrow={canOperate ? "Inicio operativo" : "Administrador de plataforma"}
+      eyebrow="Recepcion"
       organizationName={organization?.tradeName}
       session={session}
       subtitle={
         canOperate
-          ? "Acciones principales para recepción y caja. La administración y gerencia viven en el menú lateral."
-          : "Gestiona altas de gimnasios y deja lista la base operativa. Productos, coaches, inventario y operación diaria vendrán después."
+          ? "Clientes, ventas, pagos, membresias y reservas de la sucursal activa."
+          : "Selecciona una sucursal para operar recepcion."
       }
-      title={canOperate ? "Qué hacer ahora" : "Panel de administración"}
+      title={canOperate ? "Mostrador" : "Recepcion sin sucursal"}
     >
       {error ? <InlineError message={error} /> : null}
 
@@ -315,23 +305,14 @@ export default function ReceptionPage() {
           <section className="admin-panel">
             <div className="admin-panel-header">
               <div>
-                <p>Administración</p>
-                <h2>Configuración frecuente</h2>
+                <p>Turno</p>
+                <h2>Trabajo de mostrador</h2>
               </div>
             </div>
-            <div className="admin-link-grid single">
-              {adminShortcuts.map((item) => (
-                <Link href={item.href} key={item.href}>
-                  {item.label}
-                </Link>
-              ))}
-            </div>
+            <p className="admin-muted-text">
+              Las opciones administrativas del gimnasio viven en las consolas de dueño o gerencia. Aqui solo aparecen tareas de atencion.
+            </p>
           </section>
-
-          <details className="admin-panel admin-details">
-            <summary>Permisos del usuario</summary>
-            <PermissionList user={session.user} />
-          </details>
         </aside>
       </section>
       )}
@@ -345,19 +326,5 @@ function ReportMetric({ label, value, tone }: { label: string; value: string; to
       <span>{label}</span>
       <strong>{value}</strong>
     </article>
-  );
-}
-
-function PermissionList({ user }: { user: CurrentUser }) {
-  if (user.permissions.length === 0) {
-    return <p className="admin-muted-text">Sin permisos asignados.</p>;
-  }
-
-  return (
-    <div className="admin-permission-list">
-      {user.permissions.map((permission) => (
-        <span key={permission}>{permission}</span>
-      ))}
-    </div>
   );
 }

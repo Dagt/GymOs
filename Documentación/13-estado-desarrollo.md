@@ -1,4 +1,4 @@
-# 13. Estado de Desarrollo
+﻿# 13. Estado de Desarrollo
 
 Estado: en progreso  
 Fecha: 15 de julio de 2026
@@ -448,6 +448,7 @@ Estado general: IN_PROGRESS
 | 7.4 Cierre funcional minimo | FUNCTIONAL | Beneficios, paquetes de visitas, reembolsos manuales, reservas pagadas por venta vinculada y scheduler interno funcionales parcialmente. |
 | 7.5 Preparacion del piloto | PLANNED | Manuales, feedback, soporte y pricing pendientes. |
 | 7.6 Administracion multi-sucursal y equipo | FUNCTIONAL | API/UI para crear multiples sucursales, crear usuarios internos, asignar rol y asignar sucursales; navegacion filtrada por permisos. |
+| 7.8 Separacion SaaS/tenant por rol | FUNCTIONAL | Admin GymOS, dueño, gerente, recepcion y coach separados por `console`; soporte auditable y migracion V20. |
 
 ### Matriz de modulos
 
@@ -484,7 +485,7 @@ Implementado:
 
 - Migracion `V17__team_roles_and_branch_creation.sql`.
 - Permisos nuevos: `branch.create`, `user.read`, `user.manage`.
-- Roles semilla: `Administrador GymOS`, `Dueno / Gerencia`, `Recepcion / Caja`, `Coach`, `Operacion`.
+- Roles semilla: `Administrador GymOS`, `Dueno del gimnasio`, `Recepcion`, `Coach`, `Operacion`.
 - Endpoint `POST /api/v1/organizations/current/branches` para crear multiples sucursales en la organizacion actual.
 - Endpoints `GET /api/v1/users/roles`, `GET /api/v1/users/internal`, `POST /api/v1/users/internal`.
 - Pantalla frontend `/settings/organization` separada por datos del gimnasio, creacion de sucursales, edicion de sucursales y acceso a equipo.
@@ -513,7 +514,7 @@ Implementado:
 - Nueva consola de plataforma `/platform/gymnasiums` para Admin GymOS con layout maestro-detalle, buscador de gimnasios, detalle del tenant seleccionado, tabla compacta de sucursales y alta de gimnasio en panel lateral.
 - `/admin` queda como redireccion compatible hacia `/platform/gymnasiums`.
 - `AppShell` es el unico menu visible. `GlobalSessionNav` queda como guardia silencioso de rutas para evitar menus duplicados.
-- Modelo frontend `resolveUserConsole` separa `PLATFORM_ADMIN`, `GYM_ADMIN`, `RECEPTION` y `COACH` por permisos, no por nombre de usuario.
+- Modelo frontend `resolveUserConsole` separa `PLATFORM_OWNER`, `TENANT_OWNER`, `TENANT_MANAGER`, `RECEPTION` y `COACH` por sesion, permisos y modo soporte.
 - Admin GymOS siempre ve "Volver a administracion de gimnasios" cuando entra a pantallas de un gimnasio.
 - Migracion `V18__organization_branding.sql` agrega marca por gimnasio: `brand_name`, `logo_url`, `primary_color`, `accent_color`, `surface_color`.
 - Migracion `V19__platform_admin_legacy_role.sql` asigna `platform.admin` al rol legacy `Administrador` y al rol `Administrador GymOS`.
@@ -540,3 +541,34 @@ Notas:
 - El personalizador flotante local de marca fue eliminado; la marca ahora pertenece al gimnasio y se guarda en backend.
 - Documentacion sincronizada en SDS, modelo de datos, contratos API, casos de uso y especificacion frontend.
 - Rama estable esperada: `main`. Rama de trabajo equivalente para auditoria: `feature/frontend-architecture-stabilization`.
+
+### Hito 7.8 - Separacion SaaS plataforma/tenant
+
+Estado: FUNCTIONAL
+
+Implementado:
+
+- Migracion `V20__platform_and_tenant_role_separation.sql`.
+- `platform.admin` queda reservado para `Administrador GymOS`; el rol tenant `Dueno del gimnasio` no recibe permisos de plataforma.
+- La sesion expone `roles`, `platformAdmin`, `supportMode` y `console`.
+- Consolas frontend:
+  - `PLATFORM_OWNER` -> `/platform/gymnasiums`.
+  - `TENANT_OWNER` -> `/dashboard`.
+  - `TENANT_MANAGER` -> `/operations`.
+  - `RECEPTION` -> `/reception`.
+  - `COACH` -> `/coaches`.
+- Admin GymOS entra a gimnasios cliente en modo soporte auditable con banda visible `Modo soporte GymOS`.
+- Las acciones con `supportMode` se registran como `PLATFORM_SUPPORT` en auditoria.
+- `/platform/gymnasiums` queda descrito como CRM SaaS de gimnasios cliente.
+- `/operations` queda como consola de gerencia para operacion diaria.
+- `/reception` queda centrado en mostrador y elimina configuracion administrativa del cuerpo principal.
+- Roles visibles en `/users`: Admin GymOS, Dueño del gimnasio, Gerente, Recepcion y Coach.
+
+Verificado parcialmente durante implementacion:
+
+- Backend auth tests especificos.
+- Frontend typecheck.
+
+Rama de trabajo:
+
+- `feature/platform-tenant-role-ux-correction`.

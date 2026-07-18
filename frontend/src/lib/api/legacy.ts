@@ -7,7 +7,13 @@ export type CurrentUser = {
   username: string;
   fullName: string;
   permissions: string[];
+  roles: string[];
+  platformAdmin: boolean;
+  supportMode: boolean;
+  console: UserConsole;
 };
+
+export type UserConsole = "PLATFORM_OWNER" | "TENANT_OWNER" | "TENANT_MANAGER" | "RECEPTION" | "COACH";
 
 export type AuthResponse = {
   accessToken: string;
@@ -1769,15 +1775,50 @@ export function getStoredSession(): StoredSession | null {
   }
 
   try {
+    const parsed = JSON.parse(currentUser) as CurrentUser;
     return {
       accessToken,
       refreshToken,
-      user: JSON.parse(currentUser) as CurrentUser,
+      user: normalizeCurrentUser(parsed),
     };
   } catch {
     clearSession();
     return null;
   }
+}
+
+function normalizeCurrentUser(user: CurrentUser): CurrentUser {
+  const permissions = user.permissions ?? [];
+  const roles = user.roles ?? [];
+  const platformAdmin = user.platformAdmin ?? permissions.includes("platform.admin");
+  return {
+    ...user,
+    permissions,
+    roles,
+    platformAdmin,
+    supportMode: user.supportMode ?? false,
+    console: user.console ?? inferConsole(permissions, roles, platformAdmin),
+  };
+}
+
+function inferConsole(permissions: string[], roles: string[], platformAdmin: boolean): UserConsole {
+  if (platformAdmin) {
+    return "PLATFORM_OWNER";
+  }
+  const normalizedRoles = roles.map((role) => role.toLowerCase());
+  if (normalizedRoles.some((role) => role.includes("dueno") || role.includes("owner") || role.includes("administrador"))) {
+    return "TENANT_OWNER";
+  }
+  if (normalizedRoles.some((role) => role.includes("gerente"))) {
+    return "TENANT_MANAGER";
+  }
+  if (permissions.includes("sale.create") || permissions.includes("payment.manual.create") || permissions.includes("client.create")) {
+    return "RECEPTION";
+  }
+  if (permissions.includes("coach.read") || permissions.includes("workout.manage")) {
+    return "COACH";
+  }
+  return "TENANT_MANAGER";
 }
 
 export function clearSession() {

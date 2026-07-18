@@ -85,7 +85,7 @@ public class DevelopmentSeedConfig {
 					.update();
 			jdbcClient.sql("""
 					INSERT INTO role (id, organization_id, name, description, system_role, created_at, updated_at, version)
-					VALUES (:id, :organizationId, 'Administrador', 'Administrador inicial de organizacion', true, :now, :now, 0)
+					VALUES (:id, :organizationId, 'Dueno del gimnasio', 'Administrador principal del gimnasio demo', true, :now, :now, 0)
 					ON CONFLICT (id) DO NOTHING
 					""")
 					.param("id", ROLE_ID)
@@ -95,6 +95,15 @@ public class DevelopmentSeedConfig {
 			jdbcClient.sql("INSERT INTO user_role (user_id, role_id) VALUES (:userId, :roleId) ON CONFLICT DO NOTHING")
 					.param("userId", USER_ID)
 					.param("roleId", ROLE_ID)
+					.update();
+			jdbcClient.sql("""
+					INSERT INTO user_role (user_id, role_id)
+					SELECT :userId, r.id
+					FROM role r
+					WHERE r.name = 'Administrador GymOS'
+					ON CONFLICT DO NOTHING
+					""")
+					.param("userId", USER_ID)
 					.update();
 			jdbcClient.sql("INSERT INTO user_branch_access (user_id, branch_id, access_scope) VALUES (:userId, :branchId, 'BRANCH') ON CONFLICT DO NOTHING")
 					.param("userId", USER_ID)

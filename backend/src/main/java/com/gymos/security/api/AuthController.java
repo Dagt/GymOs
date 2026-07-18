@@ -86,7 +86,11 @@ public class AuthController {
 				result.branchId(),
 				result.username(),
 				result.fullName(),
-				result.permissions()
+				result.permissions(),
+				result.roles(),
+				result.platformAdmin(),
+				result.supportMode(),
+				result.console()
 		);
 	}
 
@@ -125,7 +129,11 @@ public class AuthController {
 			UUID branchId,
 			String username,
 			String fullName,
-			Set<String> permissions
+			Set<String> permissions,
+			Set<String> roles,
+			boolean platformAdmin,
+			boolean supportMode,
+			String console
 	) {
 	}
 }

@@ -77,8 +77,8 @@ export default function UsersPage() {
         setBranches(availableBranches);
         setRoles(availableRoles);
         setUsers(existingUsers);
-        const selectableRoles = availableRoles.filter((role) => displayRoleName(role.name) !== "Administrador de plataforma");
-        const defaultRole = selectableRoles.find((role) => displayRoleName(role.name) === "Recepcion y caja") ?? selectableRoles[0];
+        const selectableRoles = availableRoles.filter((role) => displayRoleName(role.name) !== "Admin GymOS");
+        const defaultRole = selectableRoles.find((role) => displayRoleName(role.name) === "Recepcion") ?? selectableRoles[0];
         setForm((current) => ({ ...current, roleId: defaultRole?.id ?? "" }));
       } catch (exception) {
         if (active) {
@@ -99,7 +99,7 @@ export default function UsersPage() {
   }, []);
 
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
-  const selectableRoles = roles.filter((role) => displayRoleName(role.name) !== "Administrador de plataforma");
+  const selectableRoles = roles.filter((role) => displayRoleName(role.name) !== "Admin GymOS");
 
   async function submitUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -177,9 +177,9 @@ export default function UsersPage() {
       <section className="team-layout">
         <section className="app-card p-5">
           <p className="app-eyebrow">Nuevo usuario</p>
-          <h2 className="mt-2 text-xl font-semibold">Crear acceso interno</h2>
+          <h2 className="mt-2 text-xl font-semibold">Crear usuario del gimnasio</h2>
           <p className="mt-2 text-sm leading-6 text-[#5d6b63]">
-            El rol define el menu y las acciones. Las sucursales definen donde puede operar.
+            Crea dueños, gerentes, recepcionistas o coaches. Cada usuario entrara a su propia consola.
           </p>
 
           {branches.length === 0 ? (
@@ -272,7 +272,7 @@ export default function UsersPage() {
           {users.length === 0 ? (
             <section className="admin-empty-card">
               <strong>No hay usuarios internos creados</strong>
-              <span>Crea cuentas para recepcion, gerencia, coaches u operacion.</span>
+              <span>Crea cuentas para dueños, gerentes, recepcion y coaches.</span>
             </section>
           ) : null}
 
@@ -328,16 +328,19 @@ function Field({
 function displayRoleName(roleName: string) {
   const normalized = roleName.toLowerCase();
   if (normalized.includes("admin") && normalized.includes("gymos")) {
-    return "Administrador de plataforma";
+    return "Admin GymOS";
   }
   if (normalized === "administrador" || normalized.includes("owner")) {
-    return "Administrador del gimnasio";
+    return "Dueño del gimnasio";
   }
-  if (normalized.includes("gerencia") || normalized.includes("gerente") || normalized.includes("dueno")) {
-    return "Gerencia del gimnasio";
+  if (normalized.includes("dueno")) {
+    return "Dueño del gimnasio";
+  }
+  if (normalized.includes("gerencia") || normalized.includes("gerente")) {
+    return "Gerente";
   }
   if (normalized.includes("recepcion") || normalized.includes("caja")) {
-    return "Recepcion y caja";
+    return "Recepcion";
   }
   if (normalized.includes("coach")) {
     return "Coach";
@@ -347,16 +350,16 @@ function displayRoleName(roleName: string) {
 
 function roleDescription(roleName: string, fallback?: string | null) {
   const label = displayRoleName(roleName);
-  if (label === "Administrador de plataforma") {
-    return "Crea gimnasios, cambia de gimnasio y prepara configuracion base.";
+  if (label === "Admin GymOS") {
+    return "Crea gimnasios cliente y entra en modo soporte auditable.";
   }
-  if (label === "Administrador del gimnasio") {
-    return "Administra sucursales, usuarios, permisos y configuracion del gimnasio.";
+  if (label === "Dueño del gimnasio") {
+    return "Administra su gimnasio, sucursales, equipo, configuracion y metricas.";
   }
-  if (label === "Gerencia del gimnasio") {
-    return "Consulta reportes, ventas y operacion para tomar decisiones.";
+  if (label === "Gerente") {
+    return "Gestiona operacion diaria, equipo autorizado, inventario, agenda y reportes.";
   }
-  if (label === "Recepcion y caja") {
+  if (label === "Recepcion") {
     return "Registra socios, cobra ventas, renueva membresias y atiende mostrador.";
   }
   if (label === "Coach") {

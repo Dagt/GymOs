@@ -1,6 +1,6 @@
-import type { CurrentUser } from "@/lib/api";
+import type { CurrentUser, UserConsole } from "@/lib/api";
 
-export type UserConsole = "PLATFORM_ADMIN" | "GYM_ADMIN" | "RECEPTION" | "COACH";
+export type { UserConsole };
 
 export type ConsoleProfile = {
   console: UserConsole;
@@ -10,51 +10,69 @@ export type ConsoleProfile = {
 };
 
 export function resolveUserConsole(user: CurrentUser): UserConsole {
-  const permissions = new Set(user.permissions);
-
-  if (permissions.has("platform.admin")) {
-    return "PLATFORM_ADMIN";
+  if (isKnownConsole(user.console)) {
+    return user.console;
   }
-  if (permissions.has("sale.create") || permissions.has("payment.manual.create") || permissions.has("client.create")) {
+  if (user.platformAdmin && !user.supportMode) {
+    return "PLATFORM_OWNER";
+  }
+  const roles = user.roles.map((role) => role.toLowerCase());
+  if (roles.some((role) => role.includes("dueno") || role.includes("owner") || role.includes("administrador"))) {
+    return "TENANT_OWNER";
+  }
+  if (roles.some((role) => role.includes("gerente"))) {
+    return "TENANT_MANAGER";
+  }
+  if (hasAny(user, ["sale.create", "payment.manual.create", "client.create"])) {
     return "RECEPTION";
   }
-  if (permissions.has("coach.read") || permissions.has("workout.manage")) {
+  if (hasAny(user, ["coach.read", "workout.manage"])) {
     return "COACH";
   }
-  return "GYM_ADMIN";
+  return "TENANT_MANAGER";
 }
 
 export function getConsoleProfile(user: CurrentUser): ConsoleProfile {
   const console = resolveUserConsole(user);
-  if (console === "PLATFORM_ADMIN") {
+  if (console === "PLATFORM_OWNER") {
     return {
       console,
-      label: "Administrador de plataforma",
-      description: "Crea gimnasios, cambia de gimnasio y prepara configuracion base.",
+      label: "Admin GymOS",
+      description: "Vende, crea, configura y da soporte a gimnasios cliente.",
       homePath: "/platform/gymnasiums",
+    };
+  }
+  if (console === "TENANT_OWNER") {
+    return {
+      console,
+      label: user.supportMode ? "Soporte GymOS" : "Dueño del gimnasio",
+      description: user.supportMode
+        ? "Estas dentro de este gimnasio para apoyar al cliente."
+        : "Metricas, sucursales, equipo y decisiones del negocio.",
+      homePath: "/dashboard",
+    };
+  }
+  if (console === "TENANT_MANAGER") {
+    return {
+      console,
+      label: "Gerente",
+      description: "Operacion diaria, pendientes, equipo y administracion autorizada.",
+      homePath: "/operations",
     };
   }
   if (console === "RECEPTION") {
     return {
       console,
-      label: "Recepcion y caja",
-      description: "Atiende socios, cobra ventas y opera el mostrador.",
+      label: "Recepcion",
+      description: "Clientes, ventas, pagos, membresias y reservas por sucursal.",
       homePath: "/reception",
-    };
-  }
-  if (console === "COACH") {
-    return {
-      console,
-      label: "Coach",
-      description: "Consulta socios asignados y gestiona rutinas o servicios permitidos.",
-      homePath: "/coaches",
     };
   }
   return {
     console,
-    label: "Gerencia del gimnasio",
-    description: "Consulta reportes y administra la operacion del gimnasio.",
-    homePath: "/dashboard",
+    label: "Coach",
+    description: "Clientes asignados, rutinas y seguimiento de entrenamiento.",
+    homePath: "/coaches",
   };
 }
 
@@ -63,7 +81,11 @@ export function getPostLoginPath(user: CurrentUser) {
 }
 
 export function isPlatformAdmin(user: CurrentUser) {
-  return resolveUserConsole(user) === "PLATFORM_ADMIN";
+  return user.platformAdmin || user.permissions.includes("platform.admin");
+}
+
+export function isSupportMode(user: CurrentUser) {
+  return Boolean(user.supportMode);
 }
 
 export function canAccessRoute(user: CurrentUser, pathname: string) {
@@ -72,28 +94,41 @@ export function canAccessRoute(user: CurrentUser, pathname: string) {
     return true;
   }
   if (pathname.startsWith("/platform")) {
-    return console === "PLATFORM_ADMIN";
+    return isPlatformAdmin(user);
   }
-  if (console === "PLATFORM_ADMIN") {
-    return true;
+  if (isPlatformAdmin(user) && user.supportMode) {
+    return tenantOwnerRoutes.some((route) => matches(pathname, route));
+  }
+  if (console === "PLATFORM_OWNER") {
+    return pathname.startsWith("/platform");
+  }
+  if (console === "TENANT_OWNER") {
+    return tenantOwnerRoutes.some((route) => matches(pathname, route));
+  }
+  if (console === "TENANT_MANAGER") {
+    return managerRoutes.some((route) => matches(pathname, route));
   }
   if (console === "RECEPTION") {
     return receptionRoutes.some((route) => matches(pathname, route));
   }
-  if (console === "COACH") {
-    return coachRoutes.some((route) => matches(pathname, route));
-  }
-  return gymAdminRoutes.some((route) => matches(pathname, route));
+  return coachRoutes.some((route) => matches(pathname, route));
+}
+
+function hasAny(user: CurrentUser, permissions: string[]) {
+  return permissions.some((permission) => user.permissions.includes(permission));
+}
+
+function isKnownConsole(value: string): value is UserConsole {
+  return ["PLATFORM_OWNER", "TENANT_OWNER", "TENANT_MANAGER", "RECEPTION", "COACH"].includes(value);
 }
 
 function matches(pathname: string, route: string) {
   return pathname === route || pathname.startsWith(`${route}/`);
 }
 
-const receptionRoutes = ["/reception", "/pos", "/clients", "/sales", "/reports/sales", "/benefits"];
-const coachRoutes = ["/coaches", "/clients"];
-const gymAdminRoutes = [
+const tenantOwnerRoutes = [
   "/dashboard",
+  "/operations",
   "/reports",
   "/settings/organization",
   "/users",
@@ -104,6 +139,32 @@ const gymAdminRoutes = [
   "/benefits",
   "/automations",
   "/clients",
+  "/clients/import",
   "/coaches",
   "/wellness",
+  "/reception",
+  "/pos",
+  "/sales",
 ];
+
+const managerRoutes = [
+  "/operations",
+  "/dashboard",
+  "/reports",
+  "/users",
+  "/catalog",
+  "/access",
+  "/bookings",
+  "/inventory",
+  "/benefits",
+  "/automations",
+  "/clients",
+  "/coaches",
+  "/wellness",
+  "/reception",
+  "/pos",
+  "/sales",
+];
+
+const receptionRoutes = ["/reception", "/pos", "/clients", "/sales", "/reports/sales", "/bookings", "/benefits"];
+const coachRoutes = ["/coaches", "/clients"];

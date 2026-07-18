@@ -521,3 +521,26 @@ Notas de integridad:
 - Los colores deben validarse como `#RRGGBB` desde API/frontend.
 - La marca pertenece a la organizacion, no a la sesion local ni al navegador.
 - El panel de plataforma no toma la marca del tenant; usa identidad neutral de GymOS para evitar confusion entre administracion SaaS y operacion del gimnasio.
+
+## Hito 7.8 - Separacion de roles plataforma/tenant
+
+Migracion:
+
+- `V20__platform_and_tenant_role_separation.sql`
+
+Cambios:
+
+- Revoca `platform.admin` del rol legacy `Administrador`/`Dueno del gimnasio`.
+- Mantiene `platform.admin` solo para `Administrador GymOS`.
+- Normaliza roles operativos:
+  - `Administrador GymOS`: dueno/operador SaaS.
+  - `Dueno del gimnasio`: cliente directo; administra su tenant.
+  - `Gerente`: operacion diaria y administracion limitada.
+  - `Recepcion`: mostrador por sucursal.
+  - `Coach`: entrenamiento, rutinas y seguimiento.
+- La cuenta local `admin@gymos.local` recibe rol `Administrador GymOS` desde seed local para bases nuevas.
+
+Notas:
+
+- Los roles de tenant nunca deben otorgar `platform.admin`.
+- El acceso de soporte no depende de `user_branch_access`; se controla por `platform.admin` y se marca en el token como `supportMode`.

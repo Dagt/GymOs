@@ -61,8 +61,9 @@ export default function LoginPage() {
             GymOS identifica tu rol y te lleva a administracion de plataforma, gerencia o recepcion sin pasos extra.
           </span>
           <div>
-            <small>Administrador de plataforma</small>
-            <small>Gerencia del gimnasio</small>
+            <small>Admin GymOS</small>
+            <small>Dueño del gimnasio</small>
+            <small>Gerente</small>
             <small>Recepcion y caja</small>
           </div>
         </div>

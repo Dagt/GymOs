@@ -34,7 +34,8 @@ public class UserAdministrationService {
 	@Transactional(readOnly = true)
 	public List<RoleOption> roles(GymOsPrincipal principal) {
 		requirePrincipal(principal);
-		return repository.findRoles(principal.organizationId());
+		boolean includePlatformRoles = principal.platformAdmin() && !principal.supportMode();
+		return repository.findRoles(principal.organizationId(), includePlatformRoles);
 	}
 
 	@Transactional(readOnly = true)
@@ -53,8 +54,8 @@ public class UserAdministrationService {
 		if (!repository.roleBelongsToOrganization(principal.organizationId(), command.roleId())) {
 			throw new BusinessException("ROLE_NOT_AVAILABLE", "El rol seleccionado no esta disponible para este gimnasio.");
 		}
-		if (repository.roleHasPermission(command.roleId(), "platform.admin") && !principal.permissions().contains("platform.admin")) {
-			throw new BusinessException("ROLE_NOT_AVAILABLE", "No puedes asignar roles de plataforma desde este gimnasio.");
+		if (repository.roleHasPermission(command.roleId(), "platform.admin")) {
+			throw new BusinessException("ROLE_NOT_AVAILABLE", "No puedes asignar roles de plataforma desde un gimnasio.");
 		}
 		List<UUID> branchIds = command.branchIds() == null ? List.of() : command.branchIds().stream().distinct().toList();
 		for (UUID branchId : branchIds) {

@@ -4,7 +4,13 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { clearSession, type StoredSession } from "@/lib/api";
-import { getConsoleProfile, isPlatformAdmin, resolveUserConsole, type UserConsole } from "@/lib/role-model";
+import {
+  getConsoleProfile,
+  isPlatformAdmin,
+  isSupportMode,
+  resolveUserConsole,
+  type UserConsole,
+} from "@/lib/role-model";
 
 type ShellAction = {
   href: string;
@@ -23,91 +29,104 @@ type NavigationSection = {
   links: NavigationLink[];
 };
 
-const navigationSections: NavigationSection[] = [
+const platformSections: NavigationSection[] = [
   {
-    title: "Recepcion",
+    title: "Negocio GymOS",
     links: [
-      { label: "Inicio operativo", href: "/reception", hint: "Resumen del dia", permissions: ["sale.create", "client.create", "report.sales.read"] },
-      { label: "Caja / POS", href: "/pos", hint: "Ventas y pagos", permissions: ["sale.create"] },
-      { label: "Socios", href: "/clients", hint: "Altas y fichas", permissions: ["client.read"] },
-      { label: "Kiosco", href: "/kiosk/KIOSK-MAIN", hint: "Autoservicio", permissions: ["selfservice.terminal.manage"] },
-    ],
-  },
-  {
-    title: "Administracion",
-    links: [
-      { label: "Catalogo", href: "/catalog", hint: "Planes y productos", permissions: ["catalog.read"] },
-      { label: "Accesos", href: "/access", hint: "Pases y visitas", permissions: ["access.read"] },
-      { label: "Reservas", href: "/bookings", hint: "Agenda", permissions: ["booking.read"] },
-      { label: "Inventario", href: "/inventory", hint: "Stock", permissions: ["inventory.read"] },
-      { label: "Beneficios", href: "/benefits", hint: "Promos y reglas", permissions: ["benefit.read"] },
-      { label: "Equipo", href: "/users", hint: "Usuarios y roles", permissions: ["user.read"] },
-      { label: "Datos y sucursales", href: "/settings/organization", hint: "Marca y sedes", permissions: ["organization.update", "branch.update"] },
-    ],
-  },
-  {
-    title: "Gerencia",
-    links: [
-      { label: "Panel ejecutivo", href: "/dashboard", hint: "Indicadores", permissions: ["report.owner.read", "report.sales.read"] },
-      { label: "Ventas", href: "/reports/sales", hint: "Reportes", permissions: ["report.sales.read"] },
-      { label: "Automatizaciones", href: "/automations", hint: "Reglas", permissions: ["automation.read"] },
-      { label: "Importar clientes", href: "/clients/import", hint: "Carga inicial", permissions: ["client.import"] },
-      { label: "Servicios", href: "/wellness", hint: "Bienestar", permissions: ["professional.read"] },
+      { label: "Gimnasios cliente", href: "/platform/gymnasiums", hint: "CRM, tenants y soporte", permissions: ["platform.admin"] },
     ],
   },
 ];
 
-const platformSections: NavigationSection[] = [
+const ownerSections: NavigationSection[] = [
   {
-    title: "Plataforma",
+    title: "Direccion",
     links: [
-      { label: "Gimnasios", href: "/platform/gymnasiums", hint: "Tenants y sucursales", permissions: ["platform.admin"] },
+      { label: "Metricas del negocio", href: "/dashboard", hint: "Ingresos, socios y salud", permissions: ["report.owner.read", "report.sales.read"] },
+      { label: "Ventas y pagos", href: "/reports/sales", hint: "Reportes financieros", permissions: ["report.sales.read"] },
+      { label: "Coaches y rutinas", href: "/coaches", hint: "Equipo y seguimiento", permissions: ["coach.read", "report.coaches.read"] },
     ],
   },
   {
-    title: "Gimnasio activo",
+    title: "Administracion del gimnasio",
     links: [
-      { label: "Panel ejecutivo", href: "/dashboard", hint: "Indicadores", permissions: ["report.owner.read", "report.sales.read"] },
-      { label: "Equipo", href: "/users", hint: "Usuarios y roles", permissions: ["user.read"] },
-      { label: "Datos y sucursales", href: "/settings/organization", hint: "Marca y sedes", permissions: ["organization.update", "branch.update"] },
+      { label: "Operacion", href: "/operations", hint: "Pendientes y herramientas", permissions: ["operations.read", "inventory.read", "booking.read"] },
+      { label: "Equipo y accesos", href: "/users", hint: "Dueños, gerentes y staff", permissions: ["user.read"] },
+      { label: "Datos y sucursales", href: "/settings/organization", hint: "Marca, sedes y contacto", permissions: ["organization.update", "branch.update"] },
+      { label: "Catalogo", href: "/catalog", hint: "Planes y productos", permissions: ["catalog.read"] },
+      { label: "Inventario", href: "/inventory", hint: "Stock y movimientos", permissions: ["inventory.read"] },
+      { label: "Reservas", href: "/bookings", hint: "Agenda y recursos", permissions: ["booking.read"] },
+      { label: "Servicios", href: "/wellness", hint: "Bienestar", permissions: ["professional.read"] },
+      { label: "Automatizaciones", href: "/automations", hint: "Reglas y avisos", permissions: ["automation.read"] },
+    ],
+  },
+  {
+    title: "Mostrador",
+    links: [
+      { label: "Recepcion", href: "/reception", hint: "Inicio operativo", permissions: ["client.read", "sale.create"] },
+      { label: "Caja / POS", href: "/pos", hint: "Ventas y pagos", permissions: ["sale.create"] },
+      { label: "Socios", href: "/clients", hint: "Altas y fichas", permissions: ["client.read"] },
+      { label: "Accesos", href: "/access", hint: "Visitas y pases", permissions: ["access.read", "visit.read"] },
+      { label: "Beneficios", href: "/benefits", hint: "Promos y reglas", permissions: ["benefit.read"] },
+    ],
+  },
+];
+
+const managerSections: NavigationSection[] = [
+  {
+    title: "Gerencia",
+    links: [
+      { label: "Operacion", href: "/operations", hint: "Pendientes diarios", permissions: ["operations.read", "booking.read", "inventory.read"] },
+      { label: "Indicadores", href: "/dashboard", hint: "Resumen ejecutivo", permissions: ["report.owner.read", "report.sales.read"] },
+      { label: "Ventas", href: "/reports/sales", hint: "Pagos y saldos", permissions: ["report.sales.read"] },
+    ],
+  },
+  {
+    title: "Administracion diaria",
+    links: [
+      { label: "Equipo", href: "/users", hint: "Usuarios autorizados", permissions: ["user.read"] },
+      { label: "Catalogo", href: "/catalog", hint: "Planes y productos", permissions: ["catalog.read"] },
+      { label: "Inventario", href: "/inventory", hint: "Stock", permissions: ["inventory.read"] },
+      { label: "Reservas", href: "/bookings", hint: "Agenda", permissions: ["booking.read"] },
+      { label: "Coaches", href: "/coaches", hint: "Rutinas", permissions: ["coach.read"] },
+    ],
+  },
+  {
+    title: "Mostrador",
+    links: [
+      { label: "Recepcion", href: "/reception", hint: "Apoyo operativo", permissions: ["client.read", "sale.create"] },
+      { label: "Caja / POS", href: "/pos", hint: "Ventas", permissions: ["sale.create"] },
+      { label: "Socios", href: "/clients", hint: "Clientes", permissions: ["client.read"] },
     ],
   },
 ];
 
 const receptionSections: NavigationSection[] = [
   {
-    title: "Recepcion",
+    title: "Mostrador",
     links: [
-      { label: "Inicio operativo", href: "/reception", hint: "Resumen del dia", permissions: ["sale.create", "client.create", "report.sales.read"] },
+      { label: "Inicio recepcion", href: "/reception", hint: "Acciones del dia", permissions: ["client.read", "sale.create"] },
       { label: "Caja / POS", href: "/pos", hint: "Ventas y pagos", permissions: ["sale.create"] },
       { label: "Socios", href: "/clients", hint: "Altas y fichas", permissions: ["client.read"] },
-      { label: "Ventas", href: "/reports/sales", hint: "Pagos y saldos", permissions: ["report.sales.read"] },
+      { label: "Reservas", href: "/bookings", hint: "Agenda", permissions: ["booking.read"] },
+      { label: "Ventas", href: "/reports/sales", hint: "Pagos pendientes", permissions: ["report.sales.read"] },
+      { label: "Beneficios", href: "/benefits", hint: "Aplicacion", permissions: ["benefit.read"] },
     ],
   },
 ];
 
 const coachSections: NavigationSection[] = [
   {
-    title: "Coach",
+    title: "Entrenamiento",
     links: [
-      { label: "Rutinas", href: "/coaches", hint: "Entrenamiento", permissions: ["coach.read", "workout.read"] },
-      { label: "Socios", href: "/clients", hint: "Consulta", permissions: ["client.read"] },
-    ],
-  },
-];
-
-const setupSections: NavigationSection[] = [
-  {
-    title: "Configuracion inicial",
-    links: [
-      { label: "Gimnasios", href: "/platform/gymnasiums", hint: "Elegir o preparar" },
-      { label: "Datos y sucursales", href: "/settings/organization", hint: "Base operativa", permissions: ["organization.update", "branch.update"] },
-      { label: "Equipo y accesos", href: "/users", hint: "Usuarios por rol", permissions: ["user.read"] },
+      { label: "Rutinas", href: "/coaches", hint: "Planes y asignaciones", permissions: ["coach.read", "workout.read"] },
+      { label: "Socios", href: "/clients", hint: "Consulta autorizada", permissions: ["client.read"] },
     ],
   },
 ];
 
 export function AppShell({
+  actions = [],
   branchName,
   children,
   eyebrow,
@@ -132,11 +151,11 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const consoleType = resolveUserConsole(session.user);
-  const hasBranch = mode === "operation" ? true : mode === "setup" ? false : Boolean(branchName || session.user.branchId);
   const role = getConsoleProfile(session.user);
+  const hasBranch = mode === "operation" ? true : mode === "setup" ? false : Boolean(branchName || session.user.branchId);
   const visibleBranch = branchName ?? (session.user.branchId ? "Sucursal seleccionada" : "Sin sucursal");
   const permissionSet = new Set(session.user.permissions);
-  const sections = sectionsForConsole(consoleType, hasBranch, variant)
+  const sections = sectionsForConsole(consoleType, variant)
     .map((section) => ({
       ...section,
       links: section.links.filter((link) => canSeeLink(permissionSet, link)),
@@ -149,13 +168,13 @@ export function AppShell({
   }
 
   return (
-    <main className="admin-console">
+    <main className={`admin-console ${isSupportMode(session.user) ? "support-mode" : ""}`}>
       <aside className="admin-sidebar">
         <div className="admin-sidebar-brand">
           <span>G</span>
           <div>
-            <strong>{organizationName ?? "GymOS"}</strong>
-            <small>{visibleBranch}</small>
+            <strong>{variant === "platform" ? "GymOS Plataforma" : organizationName ?? "GymOS"}</strong>
+            <small>{variant === "platform" ? "CRM de gimnasios" : visibleBranch}</small>
           </div>
         </div>
 
@@ -200,6 +219,13 @@ export function AppShell({
       </aside>
 
       <section className="admin-workspace">
+        {isSupportMode(session.user) ? (
+          <section className="support-banner" role="status">
+            <strong>Modo soporte GymOS</strong>
+            <span>Estas operando dentro de este gimnasio para apoyar al cliente. Las acciones quedan auditadas.</span>
+          </section>
+        ) : null}
+
         <header className="admin-command-bar">
           <div>
             <p>{eyebrow}</p>
@@ -211,25 +237,32 @@ export function AppShell({
               <span>Perfil</span>
               <strong>{role.label}</strong>
             </div>
-            <div className="admin-role-chip">
-              <span>Sucursal</span>
-              <strong>{visibleBranch}</strong>
-            </div>
+            {variant !== "platform" ? (
+              <div className="admin-role-chip">
+                <span>Sucursal</span>
+                <strong>{visibleBranch}</strong>
+              </div>
+            ) : null}
+            {actions.map((action) => (
+              <Link className="app-button-secondary" href={action.href} key={action.href}>
+                {action.label}
+              </Link>
+            ))}
           </div>
         </header>
 
-        {!hasBranch && !pathname.startsWith("/platform") ? (
+        {!hasBranch && variant !== "platform" ? (
           <section className="admin-setup-banner">
             <div>
               <p>Configuracion pendiente</p>
-              <h2>Primero elige o prepara una sucursal operativa</h2>
+              <h2>Primero selecciona una sucursal operativa</h2>
               <span>
-                Mientras no exista una sucursal activa en tu sesion, GymOS mantiene caja, socios, reportes operativos
-                y kiosco fuera del primer plano. El dueno o gerente del gimnasio puede completar la operacion diaria
-                despues.
+                Caja, recepcion, membresias, reservas y kiosco necesitan una sucursal activa para operar sin mezclar sedes.
               </span>
             </div>
-            <Link href="/platform/gymnasiums">Ir a gimnasios</Link>
+            <Link href={isPlatformAdmin(session.user) ? "/platform/gymnasiums" : "/settings/organization"}>
+              {isPlatformAdmin(session.user) ? "Ir a gimnasios" : "Ir a sucursales"}
+            </Link>
           </section>
         ) : null}
 
@@ -259,6 +292,22 @@ export function InlineError({ message }: { message: string }) {
   );
 }
 
+function sectionsForConsole(consoleType: UserConsole, variant?: "platform" | "tenant") {
+  if (variant === "platform" || consoleType === "PLATFORM_OWNER") {
+    return platformSections;
+  }
+  if (consoleType === "TENANT_OWNER") {
+    return ownerSections;
+  }
+  if (consoleType === "TENANT_MANAGER") {
+    return managerSections;
+  }
+  if (consoleType === "RECEPTION") {
+    return receptionSections;
+  }
+  return coachSections;
+}
+
 function canSeeLink(permissions: Set<string>, link: NavigationLink) {
   if (!link.permissions || link.permissions.length === 0) {
     return true;
@@ -266,25 +315,6 @@ function canSeeLink(permissions: Set<string>, link: NavigationLink) {
   return link.permissions.some((permission) => permissions.has(permission));
 }
 
-function sectionsForConsole(consoleType: UserConsole, hasBranch: boolean, variant?: "platform" | "tenant") {
-  if (consoleType === "PLATFORM_ADMIN") {
-    return variant === "platform" ? platformSections.slice(0, 1) : platformSections;
-  }
-  if (!hasBranch) {
-    return setupSections;
-  }
-  if (consoleType === "RECEPTION") {
-    return receptionSections;
-  }
-  if (consoleType === "COACH") {
-    return coachSections;
-  }
-  return navigationSections.filter((section) => section.title !== "Recepcion");
-}
-
 function isActive(pathname: string, href: string) {
-  if (href === "/reception") {
-    return pathname === href;
-  }
   return pathname === href || pathname.startsWith(`${href}/`);
 }

@@ -1,4 +1,4 @@
-# 6. Contratos API
+﻿# 6. Contratos API
 
 Base path: `/api/v1`
 
@@ -81,8 +81,8 @@ Request:
 Roles semilla Hito 7.6:
 
 - `Administrador GymOS`
-- `Dueno / Gerencia`
-- `Recepcion / Caja`
+- `Dueno del gimnasio`
+- `Recepcion`
 - `Coach`
 - `Operacion`
 
@@ -680,10 +680,61 @@ Reglas:
 El frontend debe filtrar roles por contexto:
 
 - Plataforma puede crear accesos de administracion de plataforma cuando corresponda.
-- Un gimnasio no debe ofrecer "Administrador de plataforma" como rol operativo del tenant.
+- Un gimnasio no debe ofrecer `Administrador GymOS` como rol operativo del tenant.
 - Recepcionistas, coaches, gerentes y administradores de gimnasio entran a consolas distintas segun permisos.
 
 Errores esperados:
 
 - `VALIDATION_ERROR`: campos invalidos, telefono/correo/contrasena no aceptados o sucursal requerida.
 - `FORBIDDEN`: intento de asignar un rol de plataforma sin permiso.
+
+## Hito 7.8 - Modo soporte y consolas por rol
+
+### Sesion actual
+
+`AuthResponse.user` y `GET /api/v1/auth/me` agregan campos de contexto frontend:
+
+```json
+{
+  "permissions": ["platform.admin"],
+  "roles": ["Administrador GymOS"],
+  "platformAdmin": true,
+  "supportMode": false,
+  "console": "PLATFORM_OWNER"
+}
+```
+
+Valores posibles de `console`:
+
+- `PLATFORM_OWNER`
+- `TENANT_OWNER`
+- `TENANT_MANAGER`
+- `RECEPTION`
+- `COACH`
+
+### Soporte de plataforma
+
+`POST /api/v1/auth/select-organization`:
+
+- Para usuarios con `platform.admin`, permite entrar a cualquier gimnasio como soporte aunque no exista `user_branch_access`.
+- Emite token con `supportMode = true`.
+- Selecciona la primera sucursal activa del gimnasio cuando exista.
+- Audita `PLATFORM_SUPPORT_STARTED` con origen `PLATFORM_SUPPORT`.
+
+`POST /api/v1/auth/select-branch`:
+
+- Para usuarios normales, mantiene validacion por `user_branch_access`.
+- Para Admin GymOS en `supportMode`, permite elegir sucursales del tenant activo.
+- Audita `BRANCH_SELECTED` con origen `PLATFORM_SUPPORT` cuando aplique.
+
+### Usuarios internos
+
+`GET /api/v1/users/roles`:
+
+- En contexto tenant o soporte devuelve roles del gimnasio: `Dueno del gimnasio`, `Gerente`, `Recepcion`, `Coach`.
+- No devuelve `Administrador GymOS` cuando se administran usuarios de un gimnasio.
+
+`POST /api/v1/users/internal`:
+
+- Rechaza cualquier rol con `platform.admin` con `ROLE_NOT_AVAILABLE`.
+- Los usuarios creados entran a su consola segun permisos/rol.

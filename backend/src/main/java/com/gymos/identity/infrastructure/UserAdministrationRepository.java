@@ -17,25 +17,53 @@ public class UserAdministrationRepository {
 		this.jdbcClient = jdbcClient;
 	}
 
-	public List<RoleOption> findRoles(UUID organizationId) {
+	public List<RoleOption> findRoles(UUID organizationId, boolean includePlatformRoles) {
 		return jdbcClient.sql("""
-				SELECT r.id, r.name, r.description, r.system_role, COUNT(rp.permission_id) AS permission_count
-				FROM role r
-				LEFT JOIN role_permission rp ON rp.role_id = r.id
-				WHERE r.deleted_at IS NULL
-				  AND (r.organization_id = :organizationId OR r.system_role = TRUE)
-				GROUP BY r.id, r.name, r.description, r.system_role
-				ORDER BY CASE r.name
+				WITH visible_roles AS (
+				    SELECT
+				        r.id,
+				        r.name,
+				        r.description,
+				        r.system_role,
+				        COUNT(rp.permission_id) AS permission_count,
+				        ROW_NUMBER() OVER (
+				            PARTITION BY r.name
+				            ORDER BY CASE WHEN r.system_role = TRUE THEN 0 ELSE 1 END, r.created_at
+				        ) AS row_number
+				    FROM role r
+				    LEFT JOIN role_permission rp ON rp.role_id = r.id
+				    WHERE r.deleted_at IS NULL
+				      AND (r.organization_id = :organizationId OR r.system_role = TRUE)
+				      AND (
+				          :includePlatformRoles = TRUE
+				          OR NOT EXISTS (
+				              SELECT 1
+				              FROM role_permission platform_rp
+				              JOIN permission platform_permission ON platform_permission.id = platform_rp.permission_id
+				              WHERE platform_rp.role_id = r.id
+				                AND platform_permission.code = 'platform.admin'
+				          )
+				      )
+				    GROUP BY r.id, r.name, r.description, r.system_role, r.created_at
+				)
+				SELECT id, name, description, system_role, permission_count
+				FROM visible_roles
+				WHERE row_number = 1
+				ORDER BY CASE name
 				    WHEN 'Administrador GymOS' THEN 1
 				    WHEN 'Administrador' THEN 2
+				    WHEN 'Dueno del gimnasio' THEN 3
 				    WHEN 'Dueno / Gerencia' THEN 3
-				    WHEN 'Recepcion / Caja' THEN 4
+				    WHEN 'Gerente' THEN 4
+				    WHEN 'Recepcion' THEN 5
+				    WHEN 'Recepcion / Caja' THEN 5
 				    WHEN 'Coach' THEN 5
 				    WHEN 'Operacion' THEN 6
 				    ELSE 99
-				END, r.name
+				END, name
 				""")
 				.param("organizationId", organizationId)
+				.param("includePlatformRoles", includePlatformRoles)
 				.query((resultSet, rowNumber) -> new RoleOption(
 						resultSet.getObject("id", UUID.class),
 						resultSet.getString("name"),

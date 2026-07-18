@@ -70,6 +70,36 @@ public class AuthQueryRepository {
 		return count > 0;
 	}
 
+	public boolean branchBelongsToOrganization(UUID branchId, UUID organizationId) {
+		Integer count = jdbcClient.sql("""
+				SELECT COUNT(*)
+				FROM branch
+				WHERE id = :branchId
+				  AND organization_id = :organizationId
+				  AND deleted_at IS NULL
+				""")
+				.param("branchId", branchId)
+				.param("organizationId", organizationId)
+				.query(Integer.class)
+				.single();
+		return count > 0;
+	}
+
+	public Optional<UUID> firstActiveBranch(UUID organizationId) {
+		return jdbcClient.sql("""
+				SELECT id
+				FROM branch
+				WHERE organization_id = :organizationId
+				  AND status = 'ACTIVE'
+				  AND deleted_at IS NULL
+				ORDER BY name
+				LIMIT 1
+				""")
+				.param("organizationId", organizationId)
+				.query(UUID.class)
+				.optional();
+	}
+
 	public Optional<UUID> firstAccessibleBranch(UUID userId, UUID organizationId) {
 		return jdbcClient.sql("""
 				SELECT b.id
@@ -97,7 +127,8 @@ public class AuthQueryRepository {
 						resultSet.getString("username"),
 						resultSet.getString("password_hash"),
 						resultSet.getString("full_name"),
-						findPermissions(resultSet.getObject("id", UUID.class))
+						findPermissions(resultSet.getObject("id", UUID.class)),
+						findRoles(resultSet.getObject("id", UUID.class))
 				))
 				.optional();
 	}
@@ -116,16 +147,31 @@ public class AuthQueryRepository {
 				.list());
 	}
 
+	private Set<String> findRoles(UUID userId) {
+		return new LinkedHashSet<>(jdbcClient.sql("""
+				SELECT DISTINCT r.name
+				FROM user_role ur
+				JOIN role r ON r.id = ur.role_id
+				WHERE ur.user_id = :userId
+				  AND r.deleted_at IS NULL
+				ORDER BY r.name
+				""")
+				.param("userId", userId)
+				.query(String.class)
+				.list());
+	}
+
 	public record AuthenticatedUser(
 			UUID userId,
 			UUID organizationId,
 			String username,
 			String passwordHash,
 			String fullName,
-			Set<String> permissions
+			Set<String> permissions,
+			Set<String> roles
 	) {
 		public GymOsPrincipal toPrincipal(UUID branchId) {
-			return new GymOsPrincipal(userId, organizationId, branchId, username, fullName, permissions);
+			return new GymOsPrincipal(userId, organizationId, branchId, username, fullName, permissions, roles, false);
 		}
 	}
 }

@@ -44,6 +44,8 @@ public class JwtService {
 		payload.put("branchId", principal.branchId() == null ? null : principal.branchId().toString());
 		payload.put("fullName", principal.fullName());
 		payload.put("permissions", principal.permissions().stream().sorted().toList());
+		payload.put("roles", principal.roles().stream().sorted().toList());
+		payload.put("supportMode", principal.supportMode());
 		payload.put("iat", now.getEpochSecond());
 		payload.put("exp", now.plusSeconds(properties.accessTokenSeconds()).getEpochSecond());
 		return sign(payload);
@@ -61,6 +63,8 @@ public class JwtService {
 			}
 			@SuppressWarnings("unchecked")
 			List<String> permissions = (List<String>) payload.get("permissions");
+			@SuppressWarnings("unchecked")
+			List<String> roles = (List<String>) payload.get("roles");
 			String branchId = (String) payload.get("branchId");
 			return Optional.of(new GymOsPrincipal(
 					UUID.fromString((String) payload.get("sub")),
@@ -68,7 +72,9 @@ public class JwtService {
 					branchId == null ? null : UUID.fromString(branchId),
 					(String) payload.get("username"),
 					(String) payload.get("fullName"),
-					permissions == null ? Set.of() : Set.copyOf(permissions)
+					permissions == null ? Set.of() : Set.copyOf(permissions),
+					roles == null ? Set.of() : Set.copyOf(roles),
+					Boolean.TRUE.equals(payload.get("supportMode"))
 			));
 		} catch (Exception exception) {
 			return Optional.empty();

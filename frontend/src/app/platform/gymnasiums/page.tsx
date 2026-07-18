@@ -133,7 +133,7 @@ export default function PlatformGymnasiumsPage() {
       ]);
       setBranches(availableBranches);
       setSelectedOrganizationId(organizationId);
-      setMessage("Gimnasio seleccionado.");
+      setMessage("Modo soporte iniciado para este gimnasio.");
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible cambiar de gimnasio.");
     } finally {
@@ -212,8 +212,8 @@ export default function PlatformGymnasiumsPage() {
       mode="setup"
       organizationName="GymOS"
       session={session}
-      subtitle="Administra tenants, elige gimnasio activo y prepara la base operativa sin mezclarla con caja o recepcion."
-      title="Administracion de gimnasios"
+      subtitle="Tus clientes, sus sucursales, marca, usuarios y acceso de soporte en un solo lugar."
+      title="CRM de gimnasios cliente"
       variant="platform"
     >
       {error ? <FormError message={error} /> : null}
@@ -224,7 +224,7 @@ export default function PlatformGymnasiumsPage() {
           <div className="platform-list-header">
             <div>
               <p className="app-eyebrow">Gimnasios</p>
-              <h2>{organizations.length} registrados</h2>
+              <h2>{organizations.length} clientes registrados</h2>
             </div>
             <button className="app-button" onClick={() => setShowCreate(true)} type="button">
               Nuevo gimnasio
@@ -257,7 +257,7 @@ export default function PlatformGymnasiumsPage() {
             <>
               <header className="platform-detail-header">
                 <div>
-                  <p className="app-eyebrow">{selectedIsActive ? "Gimnasio activo" : "Gimnasio seleccionado"}</p>
+                  <p className="app-eyebrow">{selectedIsActive ? "En soporte ahora" : "Cliente seleccionado"}</p>
                   <h2>{selectedOrganization.tradeName}</h2>
                   <span>{selectedOrganization.legalName}</span>
                 </div>
@@ -267,7 +267,7 @@ export default function PlatformGymnasiumsPage() {
                   onClick={() => activateOrganization(selectedOrganization.id)}
                   type="button"
                 >
-                  {selectedIsActive ? "Activo" : "Usar gimnasio"}
+                  {selectedIsActive ? "Soporte activo" : "Entrar en soporte"}
                 </button>
               </header>
 
@@ -282,7 +282,7 @@ export default function PlatformGymnasiumsPage() {
                 <div className="admin-panel-header">
                   <div>
                     <p>Sucursales</p>
-                    <h2>{selectedIsActive ? "Contexto operativo" : "Selecciona el gimnasio para ver sucursales"}</h2>
+                    <h2>{selectedIsActive ? "Sucursales para soporte" : "Entra en soporte para ver sucursales"}</h2>
                   </div>
                   {selectedIsActive ? <Link href="/settings/organization">Crear sucursal</Link> : null}
                 </div>
@@ -300,13 +300,13 @@ export default function PlatformGymnasiumsPage() {
                         <strong>{branch.name}</strong>
                         <span>{branch.phone || "Sin telefono"}</span>
                         <button disabled={selectingId !== null || branch.id === session.user.branchId} onClick={() => activateBranch(branch.id)} type="button">
-                          {branch.id === session.user.branchId ? "Activa" : "Usar"}
+                          {branch.id === session.user.branchId ? "En soporte" : "Entrar"}
                         </button>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="admin-muted-text">Para administrar sucursales, primero usa este gimnasio como contexto activo.</p>
+                  <p className="admin-muted-text">Para administrar sucursales o usuarios, primero entra en modo soporte sobre este gimnasio.</p>
                 )}
               </section>
 

@@ -9,6 +9,10 @@ public record CurrentUserResult(
 		UUID branchId,
 		String username,
 		String fullName,
-		Set<String> permissions
+		Set<String> permissions,
+		Set<String> roles,
+		boolean platformAdmin,
+		boolean supportMode,
+		String console
 ) {
 }

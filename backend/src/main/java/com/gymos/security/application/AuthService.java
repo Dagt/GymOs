@@ -76,13 +76,36 @@ public class AuthService {
 		if (principal == null) {
 			throw new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesion para continuar.");
 		}
-		if (!authQueryRepository.userHasBranchAccess(principal.userId(), branchId)) {
+		boolean supportAccess = principal.platformAdmin()
+				&& principal.supportMode()
+				&& authQueryRepository.branchBelongsToOrganization(branchId, principal.organizationId());
+		if (!supportAccess && !authQueryRepository.userHasBranchAccess(principal.userId(), branchId)) {
 			throw new BusinessException("BRANCH_ACCESS_DENIED", "No tienes acceso a la sucursal solicitada.");
 		}
 		AuthenticatedUser user = authQueryRepository.findActiveUserById(principal.userId())
 				.orElseThrow(() -> new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesion para continuar."));
-		AuthResult response = issue(user.toPrincipal(branchId));
-		auditService.recordSystem(principal.organizationId(), branchId, principal.userId(), "BRANCH_SELECTED", "BRANCH", branchId, "BACKOFFICE", null, correlationId);
+		GymOsPrincipal selectedPrincipal = new GymOsPrincipal(
+				user.userId(),
+				principal.organizationId(),
+				branchId,
+				user.username(),
+				user.fullName(),
+				user.permissions(),
+				user.roles(),
+				principal.supportMode()
+		);
+		AuthResult response = issue(selectedPrincipal);
+		auditService.recordSystem(
+				principal.organizationId(),
+				branchId,
+				principal.userId(),
+				"BRANCH_SELECTED",
+				"BRANCH",
+				branchId,
+				principal.supportMode() ? "PLATFORM_SUPPORT" : "BACKOFFICE",
+				null,
+				correlationId
+		);
 		return response;
 	}
 
@@ -91,22 +114,37 @@ public class AuthService {
 		if (principal == null) {
 			throw new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesion para continuar.");
 		}
-		if (!authQueryRepository.userHasOrganizationAccess(principal.userId(), organizationId)) {
+		boolean supportAccess = principal.platformAdmin();
+		if (!supportAccess && !authQueryRepository.userHasOrganizationAccess(principal.userId(), organizationId)) {
 			throw new BusinessException("ORGANIZATION_ACCESS_DENIED", "No tienes acceso al gimnasio solicitado.");
 		}
 		AuthenticatedUser user = authQueryRepository.findActiveUserById(principal.userId())
 				.orElseThrow(() -> new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesion para continuar."));
-		UUID branchId = authQueryRepository.firstAccessibleBranch(principal.userId(), organizationId).orElse(null);
+		UUID branchId = supportAccess
+				? authQueryRepository.firstActiveBranch(organizationId).orElse(null)
+				: authQueryRepository.firstAccessibleBranch(principal.userId(), organizationId).orElse(null);
 		GymOsPrincipal selectedPrincipal = new GymOsPrincipal(
 				user.userId(),
 				organizationId,
 				branchId,
 				user.username(),
 				user.fullName(),
-				user.permissions()
+				user.permissions(),
+				user.roles(),
+				supportAccess
 		);
 		AuthResult response = issue(selectedPrincipal);
-		auditService.recordSystem(organizationId, branchId, principal.userId(), "ORGANIZATION_SELECTED", "ORGANIZATION", organizationId, "BACKOFFICE", null, correlationId);
+		auditService.recordSystem(
+				organizationId,
+				branchId,
+				principal.userId(),
+				supportAccess ? "PLATFORM_SUPPORT_STARTED" : "ORGANIZATION_SELECTED",
+				"ORGANIZATION",
+				organizationId,
+				supportAccess ? "PLATFORM_SUPPORT" : "BACKOFFICE",
+				null,
+				correlationId
+		);
 		return response;
 	}
 
@@ -131,8 +169,39 @@ public class AuthService {
 				principal.branchId(),
 				principal.username(),
 				principal.fullName(),
-				principal.permissions()
+				principal.permissions(),
+				principal.roles(),
+				principal.platformAdmin(),
+				principal.supportMode(),
+				console(principal)
 		);
+	}
+
+	private String console(GymOsPrincipal principal) {
+		if (principal.platformAdmin() && !principal.supportMode()) {
+			return "PLATFORM_OWNER";
+		}
+		if (hasRole(principal, "dueno") || hasRole(principal, "owner") || hasRole(principal, "administrador")) {
+			return "TENANT_OWNER";
+		}
+		if (hasRole(principal, "gerente")) {
+			return "TENANT_MANAGER";
+		}
+		if (principal.permissions().contains("sale.create")
+				|| principal.permissions().contains("payment.manual.create")
+				|| principal.permissions().contains("client.create")) {
+			return "RECEPTION";
+		}
+		if (principal.permissions().contains("coach.read") || principal.permissions().contains("workout.manage")) {
+			return "COACH";
+		}
+		return "TENANT_MANAGER";
+	}
+
+	private boolean hasRole(GymOsPrincipal principal, String fragment) {
+		return principal.roles().stream()
+				.map(role -> role.toLowerCase(java.util.Locale.ROOT))
+				.anyMatch(role -> role.contains(fragment));
 	}
 
 	private String refreshKey(String refreshToken) {
