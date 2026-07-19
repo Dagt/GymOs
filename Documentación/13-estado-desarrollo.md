@@ -600,6 +600,9 @@ Implementado:
 - El menu lateral oculta modulos operativos cuando no hay sucursal seleccionada y conserva solo configuracion de tenant.
 - Admin GymOS puede suspender/reactivar gimnasios cliente; usuarios tenant de gimnasios suspendidos o inactivos no pueden iniciar sesion.
 - `/users` permite suspender/reactivar usuarios internos sin borrado fisico.
+- Login y refresh de usuarios tenant asignan automaticamente la primera sucursal activa permitida, evitando que gerentes/recepcionistas/coaches entren sin sucursal cuando ya tienen acceso asignado.
+- `AppShell` recupera sesiones guardadas sin sucursal intentando re-seleccionar la organizacion actual y centraliza la navegacion lateral sin botones superiores redundantes.
+- `/inventory`, `/bookings` y `/coaches` quedan integradas al `AppShell`, por lo que conservan menu lateral, marca tenant, perfil y sucursal igual que el resto de la consola.
 
 Verificado localmente:
 

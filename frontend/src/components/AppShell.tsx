@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import type { ReactNode } from "react";
-import { clearSession, type StoredSession } from "@/lib/api";
+import { useEffect, type ReactNode } from "react";
+import { clearSession, selectOrganization, storeSession, type StoredSession } from "@/lib/api";
 import {
   getConsoleProfile,
   isPlatformAdmin,
@@ -162,6 +162,29 @@ export function AppShell({
       links: section.links.filter((link) => canSeeLink(permissionSet, link) && canUseWithoutBranch(hasBranch, link)),
     }))
     .filter((section) => section.links.length > 0);
+  const visibleActions = variant === "platform" ? actions : [];
+
+  useEffect(() => {
+    if (hasBranch || variant === "platform" || isPlatformAdmin(session.user) || !session.user.organizationId) {
+      return;
+    }
+    let cancelled = false;
+    async function recoverBranchContext() {
+      try {
+        const nextSession = await selectOrganization(session.accessToken, session.user.organizationId);
+        if (!cancelled && nextSession.user.branchId) {
+          storeSession(nextSession);
+          window.location.reload();
+        }
+      } catch {
+        // The setup banner remains visible when the user truly has no branch access.
+      }
+    }
+    void recoverBranchContext();
+    return () => {
+      cancelled = true;
+    };
+  }, [hasBranch, session, variant]);
 
   function logout() {
     clearSession();
@@ -244,7 +267,7 @@ export function AppShell({
                 <strong>{visibleBranch}</strong>
               </div>
             ) : null}
-            {actions.map((action) => (
+            {visibleActions.map((action) => (
               <Link className="app-button-secondary" href={action.href} key={action.href}>
                 {action.label}
               </Link>

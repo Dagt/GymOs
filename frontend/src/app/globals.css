@@ -1133,7 +1133,12 @@ th {
 
 .admin-sidebar-brand > span {
   align-items: center;
-  background: linear-gradient(135deg, var(--brand-accent), #22c55e);
+  background:
+    var(--brand-logo-url),
+    linear-gradient(135deg, var(--brand-accent), #22c55e);
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
   border-radius: 0.5rem;
   color: #0f172a;
   display: inline-flex;

@@ -668,6 +668,10 @@ Comportamiento:
 
 `POST /api/v1/auth/login` acepta `username` con nombre de usuario interno o email de la persona asociada. La respuesta mantiene el contrato existente de usuario, permisos, organizacion y sucursal.
 
+Para usuarios tenant sin `platform.admin`, `branchId` se resuelve automaticamente con la primera sucursal activa a la que el usuario tenga acceso por `user_branch_access`. Si el usuario no tiene sucursales asignadas, `branchId` queda `null` y el frontend muestra estado de configuracion pendiente.
+
+`POST /api/v1/auth/refresh` aplica la misma resolucion de sucursal por defecto para evitar que una sesion renovada pierda contexto operativo.
+
 El frontend decide la consola inicial por permisos:
 
 - `platform.admin` -> `/platform/gymnasiums`

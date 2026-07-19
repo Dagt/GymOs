@@ -248,6 +248,9 @@ Correccion Hito 7.9:
 - El Admin GymOS puede crear tenants completos sin dejarlos "a medias"; sucursales, usuarios y marca avanzada son pasos explicitos del detalle del cliente.
 - El menu lateral usa secciones plegables; la seccion activa queda abierta y las demas permanecen compactas para reducir saturacion visual.
 - En pantallas de configuracion sin sucursal activa, el menu lateral oculta modulos operativos que requieren sucursal y conserva solo opciones de configuracion seguras.
+- El login y refresh de usuarios tenant reciben la primera sucursal accesible cuando existe; si una sesion guardada queda sin sucursal, `AppShell` intenta recuperar el contexto con `select-organization`.
+- Las pantallas operativas de gerencia (`/inventory`, `/bookings`, `/coaches`) usan el mismo `AppShell` lateral que dashboard, ventas, usuarios y catalogo.
+- En consolas tenant no se muestran acciones superiores redundantes; la navegacion principal queda centralizada en el menu lateral. `Caja / POS` forma parte del menu del gerente cuando tiene permiso `sale.create`.
 - El CRM muestra estado comercial del gimnasio y accion para suspender/reactivar.
 - `/users` muestra estado de cada cuenta y accion para suspender/reactivar usuarios internos.
 
@@ -261,6 +264,7 @@ Marca por gimnasio:
 - `TenantThemeProvider` aplica tokens CSS desde la organizacion activa.
 - Campos soportados: `brandName`, `logoUrl`, `primaryColor`, `accentColor`, `surfaceColor`.
 - Plataforma usa tema neutral; tenant usa su propia marca en dueño, gerencia, recepcion, coaches, kiosco y pantallas internas.
+- La marca lateral usa los colores del tenant y muestra el logo configurado cuando `logoUrl` existe.
 
 Formularios:
 - Los campos compartidos viven en `frontend/src/components/forms/FormFields.tsx`.

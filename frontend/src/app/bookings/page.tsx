@@ -1,11 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { AppShell, LoadingScreen } from "@/components/AppShell";
+import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   createBooking,
   createResource,
+  getBranches,
   getBookings,
+  getCurrentOrganization,
   getResourceAvailability,
   getResources,
   getStoredSession,
@@ -13,14 +16,18 @@ import {
   searchClients,
   transitionBooking,
   type AvailabilitySlot,
+  type BranchSummary,
   type BookingSummary,
   type ClientSummary,
+  type OrganizationSummary,
   type ResourceSummary,
   type StoredSession,
 } from "@/lib/api";
 
 export default function BookingsPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
+  const [organization, setOrganization] = useState<OrganizationSummary | null>(null);
+  const [branches, setBranches] = useState<BranchSummary[]>([]);
   const [resources, setResources] = useState<ResourceSummary[]>([]);
   const [bookings, setBookings] = useState<BookingSummary[]>([]);
   const [clients, setClients] = useState<ClientSummary[]>([]);
@@ -54,7 +61,9 @@ export default function BookingsPage() {
       }
       setSession(stored);
       try {
-        const [loadedResources, loadedBookings, loadedClients] = await Promise.all([
+        const [loadedOrganization, loadedBranches, loadedResources, loadedBookings, loadedClients] = await Promise.all([
+          getCurrentOrganization(stored.accessToken),
+          getBranches(stored.accessToken),
           getResources(stored.accessToken),
           getBookings(stored.accessToken, date),
           searchClients(stored.accessToken, "", "ACTIVE"),
@@ -62,6 +71,8 @@ export default function BookingsPage() {
         if (!active) {
           return;
         }
+        setOrganization(loadedOrganization);
+        setBranches(loadedBranches);
         setResources(loadedResources);
         setBookings(loadedBookings);
         setClients(loadedClients);
@@ -109,6 +120,7 @@ export default function BookingsPage() {
     () => resources.find((resource) => resource.id === resourceId) ?? null,
     [resources, resourceId],
   );
+  const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
 
   async function refresh(stored = session) {
     if (!stored) {
@@ -217,41 +229,29 @@ export default function BookingsPage() {
   }
 
   if (loading) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-        <p className="rounded-md border border-[#d8ddd2] bg-white px-4 py-3 text-sm">Cargando reservas...</p>
-      </main>
-    );
+    return <LoadingScreen text="Cargando reservas..." />;
   }
 
   if (!session) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-        <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6">
-          <h1 className="text-2xl font-semibold">Necesitas iniciar sesión</h1>
-          <Link className="mt-5 inline-flex h-11 items-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white" href="/login">
-            Iniciar sesion
-          </Link>
-        </section>
-      </main>
+      <AuthRequiredCard
+        message="Necesitas iniciar sesion para administrar reservas."
+        title="Inicia sesion"
+      />
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f7f2] text-[#111815]">
-      <header className="border-b border-[#d8ddd2] bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-5">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-[#51735f]">Operacion</p>
-            <h1 className="mt-1 text-3xl font-semibold">Recursos y reservas</h1>
-          </div>
-          <Link className="rounded-md border border-[#cdd5ca] px-4 py-2 text-sm font-semibold" href="/reception">
-            Recepcion
-          </Link>
-        </div>
-      </header>
-
-      <section className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[0.9fr_1.3fr]">
+    <AppShell
+      branchName={activeBranch?.name}
+      eyebrow="Operacion"
+      mode={activeBranch ? "operation" : undefined}
+      organizationName={organization?.brandName || organization?.tradeName}
+      session={session}
+      subtitle="Agenda, recursos, confirmaciones y pagos vinculados."
+      title="Recursos y reservas"
+    >
+      <section className="grid gap-6 lg:grid-cols-[0.9fr_1.3fr]">
         <aside className="grid gap-5">
           {error ? <p className="rounded-md border border-[#e5b7b7] bg-[#fff4f4] px-3 py-2 text-sm text-[#8c2f2f]">{error}</p> : null}
           {message ? <p className="rounded-md border border-[#b8d9c3] bg-[#f0fbf3] px-3 py-2 text-sm text-[#2d6843]">{message}</p> : null}
@@ -388,7 +388,7 @@ export default function BookingsPage() {
           </div>
         </section>
       </section>
-    </main>
+    </AppShell>
   );
 }
 

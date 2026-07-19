@@ -1,19 +1,24 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { AppShell, LoadingScreen } from "@/components/AppShell";
+import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   assignWorkout,
   createCoach,
   createWorkout,
+  getBranches,
   getCoachReport,
   getCoaches,
+  getCurrentOrganization,
   getStoredSession,
   getWorkouts,
   searchClients,
+  type BranchSummary,
   type CoachReport,
   type CoachSummary,
   type ClientSummary,
+  type OrganizationSummary,
   type StoredSession,
   type WorkoutSummary,
 } from "@/lib/api";
@@ -32,6 +37,8 @@ const defaultWorkoutJson = JSON.stringify({
 
 export default function CoachesPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
+  const [organization, setOrganization] = useState<OrganizationSummary | null>(null);
+  const [branches, setBranches] = useState<BranchSummary[]>([]);
   const [coaches, setCoaches] = useState<CoachSummary[]>([]);
   const [workouts, setWorkouts] = useState<WorkoutSummary[]>([]);
   const [clients, setClients] = useState<ClientSummary[]>([]);
@@ -71,7 +78,9 @@ export default function CoachesPage() {
       }
       setSession(stored);
       try {
-        const [loadedCoaches, loadedWorkouts, loadedReport] = await Promise.all([
+        const [loadedOrganization, loadedBranches, loadedCoaches, loadedWorkouts, loadedReport] = await Promise.all([
+          getCurrentOrganization(stored.accessToken),
+          getBranches(stored.accessToken),
           getCoaches(stored.accessToken),
           getWorkouts(stored.accessToken),
           getCoachReport(stored.accessToken),
@@ -79,6 +88,8 @@ export default function CoachesPage() {
         if (!active) {
           return;
         }
+        setOrganization(loadedOrganization);
+        setBranches(loadedBranches);
         setCoaches(loadedCoaches);
         setWorkouts(loadedWorkouts);
         setReport(loadedReport);
@@ -106,6 +117,7 @@ export default function CoachesPage() {
     () => workouts.find((workout) => workout.id === assignmentWorkoutId) ?? null,
     [assignmentWorkoutId, workouts],
   );
+  const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
 
   async function refresh(activeSession = session) {
     if (!activeSession) {
@@ -219,43 +231,29 @@ export default function CoachesPage() {
   }
 
   if (loading) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-        <p className="rounded-md border border-[#d8ddd2] bg-white px-4 py-3 text-sm text-[#42514a]">
-          Cargando coaches...
-        </p>
-      </main>
-    );
+    return <LoadingScreen text="Cargando coaches..." />;
   }
 
   if (!session) {
-    return <AuthRequired />;
+    return (
+      <AuthRequiredCard
+        message="Necesitas iniciar sesion para administrar coaches y rutinas."
+        title="Inicia sesion"
+      />
+    );
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f7f2] text-[#111815]">
-      <header className="border-b border-[#d8ddd2] bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <Link className="text-sm font-semibold text-[#51735f]" href="/reception">
-              Recepcion
-            </Link>
-            <h1 className="mt-1 text-3xl font-semibold">Coaches y rutinas</h1>
-            <p className="mt-1 text-sm text-[#5d6b63]">
-              Entrenadores, planes versionados y asignaciones a clientes.
-            </p>
-          </div>
-          <button
-            className="h-10 rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f]"
-            onClick={() => refresh()}
-            type="button"
-          >
-            Actualizar
-          </button>
-        </div>
-      </header>
-
-      <section className="mx-auto grid max-w-7xl gap-6 px-6 py-6">
+    <AppShell
+      branchName={activeBranch?.name}
+      eyebrow="Gerencia"
+      mode={activeBranch ? "operation" : undefined}
+      organizationName={organization?.brandName || organization?.tradeName}
+      session={session}
+      subtitle="Entrenadores, planes versionados y asignaciones a clientes."
+      title="Coaches y rutinas"
+    >
+      <section className="grid gap-6">
         <section className="grid gap-4 md:grid-cols-4">
           <Metric label="Coaches" value={report?.coachCount ?? 0} />
           <Metric label="Rutinas" value={report?.workoutCount ?? 0} />
@@ -377,7 +375,7 @@ export default function CoachesPage() {
           </div>
         </section>
       </section>
-    </main>
+    </AppShell>
   );
 }
 
@@ -387,19 +385,6 @@ function Metric({ label, value }: { label: string; value: number }) {
       <p className="text-sm font-medium text-[#5d6b63]">{label}</p>
       <p className="mt-2 text-3xl font-semibold">{value}</p>
     </article>
-  );
-}
-
-function AuthRequired() {
-  return (
-    <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-      <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">Necesitas iniciar sesión</h1>
-        <Link className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]" href="/login">
-          Iniciar sesion
-        </Link>
-      </section>
-    </main>
   );
 }
 

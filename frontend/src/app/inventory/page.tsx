@@ -1,17 +1,22 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { AppShell, LoadingScreen } from "@/components/AppShell";
+import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   createInventoryMovement,
+  getBranches,
+  getCurrentOrganization,
   getInventoryMovements,
   getInventoryStock,
   getLowInventoryStock,
   getStoredSession,
+  type BranchSummary,
   type InventoryMovement,
   type InventoryMovementPayload,
   type InventoryMovementType,
   type InventoryStock,
+  type OrganizationSummary,
   type StoredSession,
 } from "@/lib/api";
 
@@ -27,6 +32,8 @@ const movementTypes: Array<{ value: InventoryMovementType; label: string }> = [
 
 export default function InventoryPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
+  const [organization, setOrganization] = useState<OrganizationSummary | null>(null);
+  const [branches, setBranches] = useState<BranchSummary[]>([]);
   const [stock, setStock] = useState<InventoryStock[]>([]);
   const [lowStock, setLowStock] = useState<InventoryStock[]>([]);
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
@@ -55,7 +62,9 @@ export default function InventoryPage() {
       }
       setSession(stored);
       try {
-        const [loadedStock, loadedLowStock, loadedMovements] = await Promise.all([
+        const [loadedOrganization, loadedBranches, loadedStock, loadedLowStock, loadedMovements] = await Promise.all([
+          getCurrentOrganization(stored.accessToken),
+          getBranches(stored.accessToken),
           getInventoryStock(stored.accessToken),
           getLowInventoryStock(stored.accessToken),
           getInventoryMovements(stored.accessToken),
@@ -63,6 +72,8 @@ export default function InventoryPage() {
         if (!active) {
           return;
         }
+        setOrganization(loadedOrganization);
+        setBranches(loadedBranches);
         setStock(loadedStock);
         setLowStock(loadedLowStock);
         setMovements(loadedMovements);
@@ -90,6 +101,7 @@ export default function InventoryPage() {
     () => stock.find((item) => item.productId === selectedProductId) ?? null,
     [selectedProductId, stock],
   );
+  const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
 
   async function refresh(activeSession = session, productId = selectedProductId) {
     if (!activeSession) {
@@ -136,53 +148,29 @@ export default function InventoryPage() {
   }
 
   if (loading) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-        <p className="rounded-md border border-[#d8ddd2] bg-white px-4 py-3 text-sm text-[#42514a]">
-          Cargando inventario...
-        </p>
-      </main>
-    );
+    return <LoadingScreen text="Cargando inventario..." />;
   }
 
   if (!session) {
     return (
-      <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-        <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6 shadow-sm">
-          <p className="text-sm font-semibold uppercase tracking-wide text-[#51735f]">GymOS</p>
-          <h1 className="mt-3 text-2xl font-semibold">Necesitas iniciar sesión</h1>
-          <Link
-            className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
-            href="/login"
-          >
-            Iniciar sesion
-          </Link>
-        </section>
-      </main>
+      <AuthRequiredCard
+        message="Necesitas iniciar sesion para administrar inventario."
+        title="Inicia sesion"
+      />
     );
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f7f2] text-[#111815]">
-      <header className="border-b border-[#d8ddd2] bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-[#51735f]">Operacion</p>
-            <h1 className="mt-1 text-3xl font-semibold">Inventario</h1>
-            <p className="mt-1 text-sm text-[#5d6b63]">
-              Existencias, movimientos, ajustes y alertas.
-            </p>
-          </div>
-          <Link
-            className="inline-flex h-10 items-center justify-center rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f]"
-            href="/reception"
-          >
-            Recepcion
-          </Link>
-        </div>
-      </header>
-
-      <section className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[1fr_1.25fr]">
+    <AppShell
+      branchName={activeBranch?.name}
+      eyebrow="Operacion"
+      mode={activeBranch ? "operation" : undefined}
+      organizationName={organization?.brandName || organization?.tradeName}
+      session={session}
+      subtitle="Existencias, movimientos, ajustes y alertas."
+      title="Inventario"
+    >
+      <section className="grid gap-6 lg:grid-cols-[1fr_1.25fr]">
         <aside className="grid gap-6">
           <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
             <div className="flex items-start justify-between gap-3">
@@ -383,7 +371,7 @@ export default function InventoryPage() {
           </section>
         </section>
       </section>
-    </main>
+    </AppShell>
   );
 }
 

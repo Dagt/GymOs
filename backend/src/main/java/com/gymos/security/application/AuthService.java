@@ -48,7 +48,7 @@ public class AuthService {
 		if (!user.permissions().contains("platform.admin") && !authQueryRepository.organizationIsActive(user.organizationId())) {
 			throw new BusinessException("ORGANIZATION_SUSPENDED", "El gimnasio no tiene acceso activo a la plataforma.");
 		}
-		GymOsPrincipal principal = user.toPrincipal(null);
+		GymOsPrincipal principal = user.toPrincipal(defaultBranchFor(user));
 		AuthResult response = issue(principal);
 		auditService.recordSystem(principal.organizationId(), null, principal.userId(), "AUTH_LOGIN", "USER", principal.userId(), "BACKOFFICE", null, correlationId);
 		return response;
@@ -65,7 +65,7 @@ public class AuthService {
 		if (!user.permissions().contains("platform.admin") && !authQueryRepository.organizationIsActive(user.organizationId())) {
 			throw new BusinessException("ORGANIZATION_SUSPENDED", "El gimnasio no tiene acceso activo a la plataforma.");
 		}
-		return issue(user.toPrincipal(null));
+		return issue(user.toPrincipal(defaultBranchFor(user)));
 	}
 
 	@Transactional
@@ -166,6 +166,13 @@ public class AuthService {
 		redisTemplate.opsForValue().set(refreshKey(refreshToken), principal.userId().toString(), Duration.ofDays(7));
 		JwtService.TokenPair tokens = jwtService.issueTokens(principal, refreshToken);
 		return new AuthResult(tokens.accessToken(), tokens.refreshToken(), "Bearer", tokens.expiresIn(), toResponse(principal));
+	}
+
+	private UUID defaultBranchFor(AuthenticatedUser user) {
+		if (user.permissions().contains("platform.admin")) {
+			return null;
+		}
+		return authQueryRepository.firstAccessibleBranch(user.userId(), user.organizationId()).orElse(null);
 	}
 
 	private CurrentUserResult toResponse(GymOsPrincipal principal) {
