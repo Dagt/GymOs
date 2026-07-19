@@ -609,6 +609,8 @@ Implementado:
 - El tema tenant aplica `accentColor` y `surfaceColor` en elementos visibles: fondo, chips, estados activos, botones secundarios y detalles de marca.
 - Login con credenciales invalidas muestra `Usuario o contrasena incorrectos` en lugar de un error generico.
 - Backend y frontend impiden que gerentes creen o asignen roles `Dueno del gimnasio` o `Gerente`; el backend responde `ROLE_NOT_ALLOWED` ante intentos manuales.
+- `/reception` carga sucursales de forma independiente a la lectura administrativa de organizacion, por lo que recepcionistas no quedan bloqueados por permisos de tenant.
+- El inicio de recepcion queda como dashboard operativo rapido; el estado sin sucursal ya no muestra alta/preparacion de gimnasio ni enlaces administrativos.
 
 ## Correccion UX/validaciones administrativas - 19 de julio de 2026
 

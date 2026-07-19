@@ -286,3 +286,5 @@ Formularios:
 - `AppShell` resuelve el nombre real de la sucursal activa cuando una pagina no carga la lista de sucursales por si misma, evitando mostrar solo "Sucursal seleccionada".
 - Beneficios, accesos y automatizaciones deben renderizarse dentro del shell lateral unificado.
 - Los errores de backend deben mostrar mensaje, codigo y `correlationId` cuando existan.
+- `/reception` no debe depender de permisos administrativos como lectura completa de organizacion. Si el usuario tiene `branchId`, debe mostrar dashboard operativo aunque no pueda consultar `/organizations/current`.
+- El estado sin sucursal para recepcion no debe mostrar onboarding, alta de gimnasio ni configuracion de tenant; solo selector de sucursal permitida o instruccion de pedir acceso al dueño/gerente.

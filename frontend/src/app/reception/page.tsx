@@ -17,7 +17,7 @@ import {
 
 const focusActions = [
   {
-    title: "Cobrar venta o membresía",
+    title: "Cobrar venta o membresia",
     detail: "Productos, planes, renovaciones y pagos manuales desde caja.",
     href: "/pos",
     label: "Abrir caja",
@@ -25,7 +25,7 @@ const focusActions = [
   },
   {
     title: "Buscar o registrar socio",
-    detail: "Alta rápida, ficha, membresías, beneficios y notas.",
+    detail: "Alta rapida, ficha, membresias, beneficios y notas.",
     href: "/clients",
     label: "Ir a socios",
     accent: "people",
@@ -48,19 +48,17 @@ const focusActions = [
 
 const operationGroups = [
   {
-    title: "Operación física",
+    title: "Operacion fisica",
     items: [
-      { label: "Control de acceso", href: "/access" },
       { label: "Reservas", href: "/bookings" },
-      { label: "Inventario", href: "/inventory" },
+      { label: "Beneficios", href: "/benefits" },
     ],
   },
   {
-    title: "Servicios y comunicación",
+    title: "Consulta rapida",
     items: [
-      { label: "Coaches", href: "/coaches" },
-      { label: "Bienestar", href: "/wellness" },
-      { label: "Automatizaciones", href: "/automations" },
+      { label: "Ventas recientes", href: "/reports/sales" },
+      { label: "Socios", href: "/clients" },
     ],
   },
 ];
@@ -68,7 +66,7 @@ const operationGroups = [
 const daySignals = [
   { label: "Caja", value: "Lista", tone: "green" },
   { label: "Pagos", value: "Por revisar", tone: "amber" },
-  { label: "Kiosco", value: "Disponible", tone: "blue" },
+  { label: "Sucursal", value: "Activa", tone: "blue" },
 ];
 
 export default function ReceptionPage() {
@@ -84,32 +82,26 @@ export default function ReceptionPage() {
 
     async function loadReception() {
       const storedSession = getStoredSession();
-      if (!active) {
-        return;
-      }
-
       if (!storedSession) {
         setLoading(false);
         return;
       }
 
       setSession(storedSession);
-
+      setError(null);
       try {
-        const [currentOrganization, availableBranches] = await Promise.all([
-          getCurrentOrganization(storedSession.accessToken),
-          getBranches(storedSession.accessToken),
-        ]);
+        const availableBranches = await getBranches(storedSession.accessToken);
+        const currentOrganization = await getCurrentOrganization(storedSession.accessToken).catch(() => null);
         if (!active) {
           return;
         }
-        setOrganization(currentOrganization);
         setBranches(availableBranches);
+        setOrganization(currentOrganization);
       } catch (exception) {
         if (!active) {
           return;
         }
-        setError(exception instanceof Error ? exception.message : "No fue posible cargar recepción.");
+        setError(exception instanceof Error ? exception.message : "No fue posible cargar recepcion.");
       } finally {
         if (active) {
           setLoading(false);
@@ -118,14 +110,14 @@ export default function ReceptionPage() {
     }
 
     void loadReception();
-
     return () => {
       active = false;
     };
   }, []);
 
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
-  const canOperate = Boolean(activeBranch);
+  const canOperate = Boolean(session?.user.branchId);
+  const visibleBranchName = activeBranch?.name ?? (session?.user.branchId ? "Sucursal activa" : null);
 
   async function switchBranch(branchId: string) {
     if (!session || branchId === session.user.branchId) {
@@ -150,173 +142,193 @@ export default function ReceptionPage() {
   }
 
   if (loading) {
-    return <LoadingScreen text="Cargando panel operativo..." />;
+    return <LoadingScreen text="Cargando panel de recepcion..." />;
   }
 
   if (!session) {
     return (
       <AuthRequired
         message="El panel carga tu sucursal, tus permisos y las acciones disponibles para tu rol."
-        title="Inicia sesión para administrar el gimnasio"
+        title="Inicia sesion para atender recepcion"
       />
     );
   }
 
   return (
     <AppShell
-      actions={[
-        ...(canOperate ? [{ href: "/reports/sales", label: "Ventas" }] : []),
-      ]}
-      branchName={activeBranch?.name}
+      actions={[]}
+      branchName={visibleBranchName}
       eyebrow="Recepcion"
       organizationName={organization?.tradeName}
       session={session}
       subtitle={
         canOperate
-          ? "Clientes, ventas, pagos, membresias y reservas de la sucursal activa."
-          : "Selecciona una sucursal para operar recepcion."
+          ? "Atajos de mostrador para clientes, ventas, pagos, membresias y reservas."
+          : "Tu usuario no tiene una sucursal operativa activa."
       }
-      title={canOperate ? "Mostrador" : "Recepcion sin sucursal"}
+      title={canOperate ? "Dashboard de recepcion" : "Recepcion sin sucursal"}
     >
-      {error ? <InlineError message={error} /> : null}
+      {error && !canOperate ? <InlineError message={error} /> : null}
 
       {!canOperate ? (
+        <ReceptionBranchSetup
+          branches={branches}
+          session={session}
+          switchingBranchId={switchingBranchId}
+          onSwitchBranch={switchBranch}
+        />
+      ) : (
         <section className="admin-content-grid">
           <section className="admin-main-column">
+            <section className="admin-status-board" aria-label="Estado operativo">
+              {daySignals.map((signal) => (
+                <ReportMetric key={signal.label} label={signal.label} value={signal.value} tone={signal.tone} />
+              ))}
+            </section>
+
+            <section className="admin-focus-grid" aria-label="Acciones principales">
+              {focusActions.map((action) => (
+                <Link className={`admin-action-card ${action.accent}`} href={action.href} key={action.href}>
+                  <span>{action.title}</span>
+                  <p>{action.detail}</p>
+                  <strong>{action.label}</strong>
+                </Link>
+              ))}
+            </section>
+
             <section className="admin-panel">
               <div className="admin-panel-header">
                 <div>
-                  <p>Siguiente paso</p>
-                  <h2>Empieza por lo indispensable</h2>
+                  <p>Turno actual</p>
+                  <h2>Acciones frecuentes</h2>
                 </div>
               </div>
-              <div className="admin-setup-steps">
-                <Link href="/onboarding">1. Alta o preparación del gimnasio</Link>
-                <Link href="/settings/organization">2. Datos, marca y primera sucursal</Link>
+              <div className="admin-report-strip">
+                <ReportMetric label="Ventas del dia" value="$0.00" tone="green" />
+                <ReportMetric label="Pagos pendientes" value="Por revisar" tone="amber" />
+                <ReportMetric label="Socios" value="Atencion" tone="blue" />
               </div>
-              <details className="admin-advanced-setup">
-                <summary>Opciones avanzadas para apoyar al dueño</summary>
-                <p>
-                  Úsalas sólo si quieres dejar cargada información inicial. El dueño o gerente puede completarla después.
-                </p>
-                <div>
-                  <Link href="/catalog">Catálogo de planes y productos</Link>
-                  <Link href="/clients/import">Importar clientes iniciales</Link>
-                </div>
-              </details>
             </section>
+
+            <details className="admin-panel admin-details">
+              <summary>Mas herramientas de recepcion</summary>
+              <div className="admin-module-groups">
+                {operationGroups.map((group) => (
+                  <section key={group.title}>
+                    <h3>{group.title}</h3>
+                    <div className="admin-link-grid">
+                      {group.items.map((item) => (
+                        <Link href={item.href} key={item.href}>
+                          {item.label}
+                        </Link>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+              </div>
+            </details>
           </section>
 
           <aside className="admin-context-column">
             <section className="admin-panel">
               <div className="admin-panel-header">
                 <div>
-                  <p>Estado</p>
-                  <h2>Sin sucursal activa</h2>
+                  <p>Sucursal actual</p>
+                  <h2>{visibleBranchName}</h2>
+                </div>
+              </div>
+              <div className="admin-branch-list">
+                {branches.map((branch) => (
+                  <button
+                    className={branch.id === session.user.branchId ? "active" : undefined}
+                    disabled={switchingBranchId !== null}
+                    key={branch.id}
+                    onClick={() => switchBranch(branch.id)}
+                    type="button"
+                  >
+                    <strong>{branch.name}</strong>
+                    <span>{branch.code}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <section className="admin-panel">
+              <div className="admin-panel-header">
+                <div>
+                  <p>Alcance</p>
+                  <h2>Mostrador</h2>
                 </div>
               </div>
               <p className="admin-muted-text">
-                Cuando configures una sucursal, GymOS mostrará caja, socios, membresías, kiosco y reportes operativos
-                para el equipo del gimnasio.
+                Esta consola esta enfocada en atencion diaria. La administracion de gimnasios, sucursales y usuarios queda en dueno o gerencia.
               </p>
             </section>
           </aside>
         </section>
-      ) : (
-      <section className="admin-content-grid">
-        <section className="admin-main-column">
-          <section className="admin-status-board" aria-label="Estado operativo">
-            {daySignals.map((signal) => (
-              <ReportMetric key={signal.label} label={signal.label} value={signal.value} tone={signal.tone} />
-            ))}
-          </section>
-
-          <section className="admin-focus-grid" aria-label="Acciones principales">
-            {focusActions.map((action) => (
-              <Link className={`admin-action-card ${action.accent}`} href={action.href} key={action.href}>
-                <span>{action.title}</span>
-                <p>{action.detail}</p>
-                <strong>{action.label}</strong>
-              </Link>
-            ))}
-          </section>
-
-          <section className="admin-panel">
-            <div className="admin-panel-header">
-              <div>
-                <p>Reportes rápidos</p>
-                <h2>Vista para decisiones</h2>
-              </div>
-              <Link href="/dashboard">Panel ejecutivo</Link>
-            </div>
-            <div className="admin-report-strip">
-              <ReportMetric label="Ventas del día" value="$0.00" tone="green" />
-              <ReportMetric label="Pagos pendientes" value="Por revisar" tone="amber" />
-              <ReportMetric label="Membresías" value="Activas" tone="blue" />
-            </div>
-          </section>
-
-          <details className="admin-panel admin-details">
-            <summary>Más herramientas operativas</summary>
-            <div className="admin-module-groups">
-              {operationGroups.map((group) => (
-                <section key={group.title}>
-                  <h3>{group.title}</h3>
-                  <div className="admin-link-grid">
-                    {group.items.map((item) => (
-                      <Link href={item.href} key={item.href}>
-                        {item.label}
-                      </Link>
-                    ))}
-                  </div>
-                </section>
-              ))}
-            </div>
-          </details>
-        </section>
-
-        <aside className="admin-context-column">
-          <section className="admin-panel">
-            <div className="admin-panel-header">
-              <div>
-                <p>Sucursal actual</p>
-                <h2>{activeBranch?.name ?? "Selecciona una sucursal"}</h2>
-              </div>
-            </div>
-            <div className="admin-branch-list">
-              {branches.length === 0 ? (
-                <p className="admin-muted-text">No se pudieron cargar sucursales. Revisa conexión o permisos.</p>
-              ) : null}
-              {branches.map((branch) => (
-                <button
-                  className={branch.id === session.user.branchId ? "active" : undefined}
-                  disabled={switchingBranchId !== null}
-                  key={branch.id}
-                  onClick={() => switchBranch(branch.id)}
-                  type="button"
-                >
-                  <strong>{branch.name}</strong>
-                  <span>{branch.code}</span>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="admin-panel">
-            <div className="admin-panel-header">
-              <div>
-                <p>Turno</p>
-                <h2>Trabajo de mostrador</h2>
-              </div>
-            </div>
-            <p className="admin-muted-text">
-              Las opciones administrativas del gimnasio viven en las consolas de dueño o gerencia. Aqui solo aparecen tareas de atencion.
-            </p>
-          </section>
-        </aside>
-      </section>
       )}
     </AppShell>
+  );
+}
+
+function ReceptionBranchSetup({
+  branches,
+  session,
+  switchingBranchId,
+  onSwitchBranch,
+}: {
+  branches: BranchSummary[];
+  session: StoredSession;
+  switchingBranchId: string | null;
+  onSwitchBranch: (branchId: string) => void;
+}) {
+  return (
+    <section className="admin-content-grid">
+      <section className="admin-main-column">
+        <section className="admin-panel">
+          <div className="admin-panel-header">
+            <div>
+              <p>Contexto operativo</p>
+              <h2>Selecciona una sucursal permitida</h2>
+            </div>
+          </div>
+          <p className="admin-muted-text">
+            Recepcion no configura gimnasios. Si no aparece una sucursal, pide al dueno o gerente que revise tu acceso.
+          </p>
+          <div className="admin-branch-list">
+            {branches.length === 0 ? (
+              <p className="admin-muted-text">No tienes sucursales asignadas a este usuario.</p>
+            ) : null}
+            {branches.map((branch) => (
+              <button
+                className={branch.id === session.user.branchId ? "active" : undefined}
+                disabled={switchingBranchId !== null}
+                key={branch.id}
+                onClick={() => onSwitchBranch(branch.id)}
+                type="button"
+              >
+                <strong>{branch.name}</strong>
+                <span>{branch.code}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      </section>
+
+      <aside className="admin-context-column">
+        <section className="admin-panel">
+          <div className="admin-panel-header">
+            <div>
+              <p>Acceso de recepcion</p>
+              <h2>Mostrador</h2>
+            </div>
+          </div>
+          <p className="admin-muted-text">
+            Tu consola solo muestra tareas de mostrador. La administracion de gimnasios, sucursales y usuarios queda fuera de recepcion.
+          </p>
+        </section>
+      </aside>
+    </section>
   );
 }
 
