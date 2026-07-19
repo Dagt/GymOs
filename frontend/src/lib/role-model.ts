@@ -10,11 +10,14 @@ export type ConsoleProfile = {
 };
 
 export function resolveUserConsole(user: CurrentUser): UserConsole {
-  if (isKnownConsole(user.console)) {
-    return user.console;
-  }
   if (user.platformAdmin && !user.supportMode) {
     return "PLATFORM_OWNER";
+  }
+  if (isPlatformAdmin(user) && !user.supportMode) {
+    return "PLATFORM_OWNER";
+  }
+  if (isKnownConsole(user.console)) {
+    return user.console;
   }
   const roles = user.roles.map((role) => role.toLowerCase());
   if (roles.some((role) => role.includes("dueno") || role.includes("owner") || role.includes("administrador"))) {
@@ -77,6 +80,9 @@ export function getConsoleProfile(user: CurrentUser): ConsoleProfile {
 }
 
 export function getPostLoginPath(user: CurrentUser) {
+  if (isPlatformAdmin(user) && !user.supportMode) {
+    return "/platform/gymnasiums";
+  }
   return getConsoleProfile(user).homePath;
 }
 
@@ -95,6 +101,9 @@ export function canAccessRoute(user: CurrentUser, pathname: string) {
   }
   if (pathname.startsWith("/platform")) {
     return isPlatformAdmin(user);
+  }
+  if (isPlatformAdmin(user) && !user.supportMode) {
+    return false;
   }
   if (isPlatformAdmin(user) && user.supportMode) {
     return tenantOwnerRoutes.some((route) => matches(pathname, route));

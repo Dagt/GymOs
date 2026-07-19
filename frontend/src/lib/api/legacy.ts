@@ -1028,21 +1028,21 @@ export async function login(username: string, password: string): Promise<AuthRes
     throw new Error(error?.message ?? "No fue posible iniciar sesión.");
   }
 
-  return response.json();
+  return normalizeAuthResponse(await response.json());
 }
 
 export async function selectBranch(accessToken: string, branchId: string): Promise<AuthResponse> {
-  return apiFetch<AuthResponse>("/auth/select-branch", accessToken, {
+  return normalizeAuthResponse(await apiFetch<AuthResponse>("/auth/select-branch", accessToken, {
     method: "POST",
     body: JSON.stringify({ branchId }),
-  });
+  }));
 }
 
 export async function selectOrganization(accessToken: string, organizationId: string): Promise<AuthResponse> {
-  return apiFetch<AuthResponse>("/auth/select-organization", accessToken, {
+  return normalizeAuthResponse(await apiFetch<AuthResponse>("/auth/select-organization", accessToken, {
     method: "POST",
     body: JSON.stringify({ organizationId }),
-  });
+  }));
 }
 
 export async function logout(accessToken: string, refreshToken: string): Promise<void> {
@@ -1786,9 +1786,10 @@ export async function verifyClientBenefit(
 }
 
 export function storeSession(session: AuthResponse) {
-  window.localStorage.setItem("gymos.accessToken", session.accessToken);
-  window.localStorage.setItem("gymos.refreshToken", session.refreshToken);
-  window.localStorage.setItem("gymos.currentUser", JSON.stringify(session.user));
+  const normalized = normalizeAuthResponse(session);
+  window.localStorage.setItem("gymos.accessToken", normalized.accessToken);
+  window.localStorage.setItem("gymos.refreshToken", normalized.refreshToken);
+  window.localStorage.setItem("gymos.currentUser", JSON.stringify(normalized.user));
 }
 
 export function getStoredSession(): StoredSession | null {
@@ -1816,20 +1817,40 @@ export function getStoredSession(): StoredSession | null {
 function normalizeCurrentUser(user: CurrentUser): CurrentUser {
   const permissions = user.permissions ?? [];
   const roles = user.roles ?? [];
-  const platformAdmin = user.platformAdmin ?? permissions.includes("platform.admin");
+  const platformAdmin = Boolean(user.platformAdmin || permissions.includes("platform.admin"));
+  const supportMode = Boolean(user.supportMode);
   return {
     ...user,
     permissions,
     roles,
     platformAdmin,
-    supportMode: user.supportMode ?? false,
-    console: user.console ?? inferConsole(permissions, roles, platformAdmin),
+    supportMode,
+    console: inferConsole(permissions, roles, platformAdmin, supportMode, user.console),
   };
 }
 
-function inferConsole(permissions: string[], roles: string[], platformAdmin: boolean): UserConsole {
-  if (platformAdmin) {
+function normalizeAuthResponse(session: AuthResponse): AuthResponse {
+  return {
+    ...session,
+    user: normalizeCurrentUser(session.user),
+  };
+}
+
+function inferConsole(
+  permissions: string[],
+  roles: string[],
+  platformAdmin: boolean,
+  supportMode: boolean,
+  currentConsole?: UserConsole,
+): UserConsole {
+  if (platformAdmin && !supportMode) {
     return "PLATFORM_OWNER";
+  }
+  if (platformAdmin && supportMode) {
+    return "TENANT_OWNER";
+  }
+  if (currentConsole && isKnownConsole(currentConsole)) {
+    return currentConsole;
   }
   const normalizedRoles = roles.map((role) => role.toLowerCase());
   if (normalizedRoles.some((role) => role.includes("dueno") || role.includes("owner") || role.includes("administrador"))) {
@@ -1845,6 +1866,10 @@ function inferConsole(permissions: string[], roles: string[], platformAdmin: boo
     return "COACH";
   }
   return "TENANT_MANAGER";
+}
+
+function isKnownConsole(value: string): value is UserConsole {
+  return ["PLATFORM_OWNER", "TENANT_OWNER", "TENANT_MANAGER", "RECEPTION", "COACH"].includes(value);
 }
 
 export function clearSession() {
