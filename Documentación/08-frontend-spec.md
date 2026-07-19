@@ -78,6 +78,13 @@ Secciones:
 
 Debe permitir alta rápida y alta completa.
 
+Correccion implementada:
+- El formulario de socios usa nombre, apellido paterno y apellido materno.
+- La fecha de nacimiento se captura visualmente como `dd/mm/aaaa` y se envia a la API como `YYYY-MM-DD`.
+- El genero es un desplegable con solo `Hombre` y `Mujer`.
+- El alta de socio incluye plan inicial y metodo de pago; si el pago queda validado, la membresia se activa por el flujo existente de ventas.
+- La ficha del socio usa el mismo `AppShell` lateral que el resto del sistema y separa datos personales, membresias y actividad.
+
 ## 8.4 Ficha de cliente
 
 Pestañas:
@@ -197,6 +204,7 @@ Implementacion frontend:
 Reglas de producto:
 - La personalizacion visual ya pertenece al gimnasio/tenant y se persiste en backend.
 - El panel de Administrador GymOS conserva marca neutral de plataforma; gerencia, recepcion, coaches y kiosco usan la marca del gimnasio activo.
+- La marca tambien viaja en `CurrentUser` para que roles sin permiso de administracion puedan ver logo, color principal, acento y fondo del gimnasio activo.
 - Ninguna regla de negocio se mueve al frontend.
 - Los formularios deben usar etiquetas de negocio entendibles para recepcion y administracion.
 

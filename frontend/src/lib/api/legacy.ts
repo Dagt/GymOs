@@ -11,6 +11,12 @@ export type CurrentUser = {
   platformAdmin: boolean;
   supportMode: boolean;
   console: UserConsole;
+  organizationName?: string | null;
+  brandName?: string | null;
+  logoUrl?: string | null;
+  primaryColor?: string | null;
+  accentColor?: string | null;
+  surfaceColor?: string | null;
 };
 
 export type UserConsole = "PLATFORM_OWNER" | "TENANT_OWNER" | "TENANT_MANAGER" | "RECEPTION" | "COACH";
@@ -65,6 +71,7 @@ export type ClientSummary = {
   id: string;
   firstName: string;
   lastName: string;
+  maternalLastName?: string | null;
   phone: string | null;
   email: string | null;
   status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
@@ -77,6 +84,7 @@ export type ClientDetail = {
   personId: string;
   firstName: string;
   lastName: string;
+  maternalLastName?: string | null;
   birthDate: string | null;
   gender: string | null;
   phone: string | null;
@@ -104,6 +112,7 @@ export type ClientDetailResponse = {
 export type ClientPayload = {
   firstName: string;
   lastName: string;
+  maternalLastName?: string | null;
   birthDate?: string | null;
   gender?: string | null;
   phone?: string | null;
@@ -168,6 +177,7 @@ export type InternalUserSummary = {
 export type CreateInternalUserPayload = {
   firstName: string;
   lastName: string;
+  maternalLastName?: string | null;
   email?: string | null;
   phone?: string | null;
   username: string;
@@ -1053,6 +1063,10 @@ export async function selectOrganization(accessToken: string, organizationId: st
   }));
 }
 
+export async function getCurrentUser(accessToken: string): Promise<CurrentUser> {
+  return normalizeCurrentUser(await apiFetch<CurrentUser>("/auth/me", accessToken));
+}
+
 export async function logout(accessToken: string, refreshToken: string): Promise<void> {
   await apiFetch<void>("/auth/logout", accessToken, {
     method: "POST",
@@ -1809,6 +1823,10 @@ export function storeSession(session: AuthResponse) {
   window.localStorage.setItem("gymos.accessToken", normalized.accessToken);
   window.localStorage.setItem("gymos.refreshToken", normalized.refreshToken);
   window.localStorage.setItem("gymos.currentUser", JSON.stringify(normalized.user));
+}
+
+export function storeCurrentUser(user: CurrentUser) {
+  window.localStorage.setItem("gymos.currentUser", JSON.stringify(normalizeCurrentUser(user)));
 }
 
 export function getStoredSession(): StoredSession | null {

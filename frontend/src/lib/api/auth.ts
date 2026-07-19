@@ -1,1 +1,1 @@
-export { clearSession, getStoredSession, login, logout, selectBranch, selectOrganization, storeSession } from "./legacy";
+export { clearSession, getCurrentUser, getStoredSession, login, logout, selectBranch, selectOrganization, storeCurrentUser, storeSession } from "./legacy";

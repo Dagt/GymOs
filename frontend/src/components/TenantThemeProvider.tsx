@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { getCurrentOrganization, getStoredSession, type OrganizationSummary } from "@/lib/api";
+import { getCurrentOrganization, getCurrentUser, getStoredSession, storeCurrentUser, type CurrentUser, type OrganizationSummary } from "@/lib/api";
 import { isPlatformAdmin, isSupportMode } from "@/lib/role-model";
 
 type ThemeConfig = {
@@ -34,18 +34,29 @@ export function TenantThemeProvider() {
       return;
     }
 
+    applyTheme(themeFromUser(session.user));
+
     async function loadTenantTheme() {
       if (!session) {
         return;
       }
+      let themedUser = session.user;
       try {
+        if (!session.user.primaryColor && !session.user.logoUrl && !session.user.brandName) {
+          const currentUser = await getCurrentUser(session.accessToken);
+          themedUser = currentUser;
+          storeCurrentUser(currentUser);
+          if (!cancelled) {
+            applyTheme(themeFromUser(currentUser));
+          }
+        }
         const organization = await getCurrentOrganization(session.accessToken);
         if (!cancelled) {
           applyTheme(themeFromOrganization(organization));
         }
       } catch {
         if (!cancelled) {
-          applyTheme(defaultTheme);
+          applyTheme(themeFromUser(themedUser));
         }
       }
     }
@@ -67,6 +78,16 @@ export function themeFromOrganization(organization: OrganizationSummary): ThemeC
     primary: organization.primaryColor || defaultTheme.primary,
     accent: organization.accentColor || defaultTheme.accent,
     surface: organization.surfaceColor || defaultTheme.surface,
+  };
+}
+
+function themeFromUser(user: CurrentUser): ThemeConfig {
+  return {
+    name: user.brandName || user.organizationName || defaultTheme.name,
+    logoUrl: user.logoUrl || "",
+    primary: user.primaryColor || defaultTheme.primary,
+    accent: user.accentColor || defaultTheme.accent,
+    surface: user.surfaceColor || defaultTheme.surface,
   };
 }
 

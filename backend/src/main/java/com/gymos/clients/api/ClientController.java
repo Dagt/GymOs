@@ -36,6 +36,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ClientController {
 	private final ClientService clientService;
 	private final ClientImportService clientImportService;
+	private static final String MX_PHONE = "^\\+52\\d{10}$";
 
 	public ClientController(ClientService clientService, ClientImportService clientImportService) {
 		this.clientService = clientService;
@@ -96,31 +97,33 @@ public class ClientController {
 	public record ClientCreateRequest(
 			@NotBlank @Size(max = 120) String firstName,
 			@NotBlank @Size(max = 120) String lastName,
+			@Size(max = 120) String maternalLastName,
 			LocalDate birthDate,
-			@Size(max = 32) String gender,
-			@Size(max = 32) String phone,
+			@Pattern(regexp = "MALE|FEMALE") String gender,
+			@Pattern(regexp = MX_PHONE) String phone,
 			@Email @Size(max = 180) String email,
 			@Size(max = 512) String photoReference,
 			@Size(max = 2000) String notes
-	) {
+		) {
 		private CreateClientCommand toCommand() {
-			return new CreateClientCommand(firstName, lastName, birthDate, gender, phone, email, photoReference, notes);
+			return new CreateClientCommand(firstName, lastName, maternalLastName, birthDate, gender, phone, email, photoReference, notes);
 		}
 	}
 
 	public record ClientUpdateRequest(
 			@NotBlank @Size(max = 120) String firstName,
 			@NotBlank @Size(max = 120) String lastName,
+			@Size(max = 120) String maternalLastName,
 			LocalDate birthDate,
-			@Size(max = 32) String gender,
-			@Size(max = 32) String phone,
+			@Pattern(regexp = "MALE|FEMALE") String gender,
+			@Pattern(regexp = MX_PHONE) String phone,
 			@Email @Size(max = 180) String email,
 			@Size(max = 512) String photoReference,
 			@NotBlank @Pattern(regexp = "ACTIVE|INACTIVE|SUSPENDED") String status,
 			@Size(max = 2000) String notes
-	) {
+		) {
 		private UpdateClientCommand toCommand() {
-			return new UpdateClientCommand(firstName, lastName, birthDate, gender, phone, email, photoReference, status, notes);
+			return new UpdateClientCommand(firstName, lastName, maternalLastName, birthDate, gender, phone, email, photoReference, status, notes);
 		}
 	}
 

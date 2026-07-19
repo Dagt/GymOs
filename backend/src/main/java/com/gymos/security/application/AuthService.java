@@ -176,6 +176,8 @@ public class AuthService {
 	}
 
 	private CurrentUserResult toResponse(GymOsPrincipal principal) {
+		AuthQueryRepository.OrganizationTheme theme = authQueryRepository.organizationTheme(principal.organizationId())
+				.orElse(new AuthQueryRepository.OrganizationTheme("GymOS", null, null, "#164E63", "#F59E0B", "#F4F7FB"));
 		return new CurrentUserResult(
 				principal.userId(),
 				principal.organizationId(),
@@ -186,7 +188,13 @@ public class AuthService {
 				principal.roles(),
 				principal.platformAdmin(),
 				principal.supportMode(),
-				console(principal)
+				console(principal),
+				theme.organizationName(),
+				theme.brandName(),
+				theme.logoUrl(),
+				theme.primaryColor(),
+				theme.accentColor(),
+				theme.surfaceColor()
 		);
 	}
 

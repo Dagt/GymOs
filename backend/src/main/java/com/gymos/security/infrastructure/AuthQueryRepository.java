@@ -19,7 +19,7 @@ public class AuthQueryRepository {
 	public Optional<AuthenticatedUser> findActiveUserByUsername(String username) {
 		return findUser("""
 				SELECT ua.id, ua.organization_id, ua.username, ua.password_hash,
-				       p.first_name || ' ' || p.last_name AS full_name
+				       TRIM(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) AS full_name
 				FROM user_account ua
 				JOIN person p ON p.id = ua.person_id
 				WHERE (LOWER(ua.username) = LOWER(:username) OR LOWER(p.email) = LOWER(:username))
@@ -31,7 +31,7 @@ public class AuthQueryRepository {
 	public Optional<AuthenticatedUser> findActiveUserById(UUID userId) {
 		return findUser("""
 				SELECT ua.id, ua.organization_id, ua.username, ua.password_hash,
-				       p.first_name || ' ' || p.last_name AS full_name
+				       TRIM(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) AS full_name
 				FROM user_account ua
 				JOIN person p ON p.id = ua.person_id
 				WHERE ua.id = :userId
@@ -132,6 +132,25 @@ public class AuthQueryRepository {
 				.optional();
 	}
 
+	public Optional<OrganizationTheme> organizationTheme(UUID organizationId) {
+		return jdbcClient.sql("""
+				SELECT trade_name, brand_name, logo_url, primary_color, accent_color, surface_color
+				FROM organization
+				WHERE id = :organizationId
+				  AND deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.query((resultSet, rowNumber) -> new OrganizationTheme(
+						resultSet.getString("trade_name"),
+						resultSet.getString("brand_name"),
+						resultSet.getString("logo_url"),
+						resultSet.getString("primary_color"),
+						resultSet.getString("accent_color"),
+						resultSet.getString("surface_color")
+				))
+				.optional();
+	}
+
 	private Optional<AuthenticatedUser> findUser(String sql, String parameterName, Object parameterValue) {
 		return jdbcClient.sql(sql)
 				.param(parameterName, parameterValue)
@@ -187,5 +206,15 @@ public class AuthQueryRepository {
 		public GymOsPrincipal toPrincipal(UUID branchId) {
 			return new GymOsPrincipal(userId, organizationId, branchId, username, fullName, permissions, roles, false);
 		}
+	}
+
+	public record OrganizationTheme(
+			String organizationName,
+			String brandName,
+			String logoUrl,
+			String primaryColor,
+			String accentColor,
+			String surfaceColor
+	) {
 	}
 }

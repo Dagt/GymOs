@@ -87,7 +87,7 @@ public class ClientRepository {
 	public Optional<ClientDetail> findDetail(UUID organizationId, UUID clientId) {
 		return jdbcClient.sql("""
 				SELECT c.id AS client_id, c.status AS client_status, c.joined_at, c.notes,
-				       p.id AS person_id, p.first_name, p.last_name, p.birth_date, p.gender,
+				       p.id AS person_id, p.first_name, p.last_name, p.maternal_last_name, p.birth_date, p.gender,
 				       p.phone, p.email, p.photo_reference, p.status AS person_status,
 				       c.created_at, c.updated_at
 				FROM client c
@@ -104,6 +104,7 @@ public class ClientRepository {
 						resultSet.getObject("person_id", UUID.class),
 						resultSet.getString("first_name"),
 						resultSet.getString("last_name"),
+						resultSet.getString("maternal_last_name"),
 						resultSet.getObject("birth_date", LocalDate.class),
 						resultSet.getString("gender"),
 						resultSet.getString("phone"),
@@ -126,7 +127,7 @@ public class ClientRepository {
 	) {
 		String normalizedIdentifier = identifier == null ? "" : identifier.trim().toLowerCase();
 		return jdbcClient.sql("""
-				SELECT c.id AS client_id, p.first_name || ' ' || p.last_name AS full_name
+				SELECT c.id AS client_id, TRIM(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) AS full_name
 				FROM client c
 				JOIN person p ON p.id = c.person_id
 				WHERE c.organization_id = :organizationId
@@ -162,7 +163,7 @@ public class ClientRepository {
 
 	public Optional<SelfServiceClientRecord> selfServiceProfile(UUID organizationId, UUID clientId) {
 		return jdbcClient.sql("""
-				SELECT c.id AS client_id, p.first_name || ' ' || p.last_name AS full_name
+				SELECT c.id AS client_id, TRIM(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) AS full_name
 				FROM client c
 				JOIN person p ON p.id = c.person_id
 				WHERE c.organization_id = :organizationId
@@ -184,7 +185,7 @@ public class ClientRepository {
 		String normalizedQuery = query == null || query.isBlank() ? null : "%" + query.trim().toLowerCase() + "%";
 		String normalizedStatus = status == null || status.isBlank() ? null : status.trim().toUpperCase();
 		StringBuilder sql = new StringBuilder("""
-				SELECT c.id AS client_id, p.first_name, p.last_name, p.phone, p.email,
+				SELECT c.id AS client_id, p.first_name, p.last_name, p.maternal_last_name, p.phone, p.email,
 				       c.status AS client_status, c.joined_at, c.updated_at
 				FROM client c
 				JOIN person p ON p.id = c.person_id
@@ -198,7 +199,7 @@ public class ClientRepository {
 		if (normalizedQuery != null) {
 			sql.append("""
 					AND (
-					    LOWER(p.first_name || ' ' || p.last_name) LIKE :query
+					    LOWER(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) LIKE :query
 					    OR LOWER(COALESCE(p.email, '')) LIKE :query
 					    OR LOWER(COALESCE(p.phone, '')) LIKE :query
 					)
@@ -222,6 +223,7 @@ public class ClientRepository {
 						resultSet.getObject("client_id", UUID.class),
 						resultSet.getString("first_name"),
 						resultSet.getString("last_name"),
+						resultSet.getString("maternal_last_name"),
 						resultSet.getString("phone"),
 						resultSet.getString("email"),
 						resultSet.getString("client_status"),
@@ -256,6 +258,7 @@ public class ClientRepository {
 			UUID id,
 			String firstName,
 			String lastName,
+			String maternalLastName,
 			String phone,
 			String email,
 			String status,
@@ -263,7 +266,7 @@ public class ClientRepository {
 			OffsetDateTime updatedAt
 	) {
 		public String fullName() {
-			return firstName + " " + lastName;
+			return (firstName + " " + lastName + " " + (maternalLastName == null ? "" : maternalLastName)).trim();
 		}
 	}
 
@@ -272,6 +275,7 @@ public class ClientRepository {
 			UUID personId,
 			String firstName,
 			String lastName,
+			String maternalLastName,
 			LocalDate birthDate,
 			String gender,
 			String phone,
@@ -284,7 +288,7 @@ public class ClientRepository {
 			OffsetDateTime updatedAt
 	) {
 		public String fullName() {
-			return firstName + " " + lastName;
+			return (firstName + " " + lastName + " " + (maternalLastName == null ? "" : maternalLastName)).trim();
 		}
 	}
 

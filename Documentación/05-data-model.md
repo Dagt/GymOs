@@ -45,7 +45,8 @@ Todas las tablas principales deben incluir:
 
 ### person
 - first_name
-- last_name
+- last_name (apellido paterno)
+- maternal_last_name
 - birth_date
 - gender
 - phone

@@ -170,6 +170,7 @@ public class UserAdministrationRepository {
 			UUID organizationId,
 			String firstName,
 			String lastName,
+			String maternalLastName,
 			String email,
 			String phone,
 			UUID actorUserId,
@@ -178,11 +179,11 @@ public class UserAdministrationRepository {
 		UUID personId = UUID.randomUUID();
 		jdbcClient.sql("""
 				INSERT INTO person (
-				    id, organization_id, first_name, last_name, email, phone, status,
+				    id, organization_id, first_name, last_name, maternal_last_name, email, phone, status,
 				    created_at, updated_at, created_by, updated_by, version
 				)
 				VALUES (
-				    :id, :organizationId, :firstName, :lastName, :email, :phone, 'ACTIVE',
+				    :id, :organizationId, :firstName, :lastName, :maternalLastName, :email, :phone, 'ACTIVE',
 				    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
 				)
 				""")
@@ -190,6 +191,7 @@ public class UserAdministrationRepository {
 				.param("organizationId", organizationId)
 				.param("firstName", firstName)
 				.param("lastName", lastName)
+				.param("maternalLastName", maternalLastName)
 				.param("email", email)
 				.param("phone", phone)
 				.param("createdAt", now)
@@ -262,7 +264,7 @@ public class UserAdministrationRepository {
 		return jdbcClient.sql("""
 				SELECT
 				    u.id,
-				    CONCAT(p.first_name, ' ', p.last_name) AS full_name,
+				    TRIM(CONCAT(p.first_name, ' ', p.last_name, ' ', COALESCE(p.maternal_last_name, ''))) AS full_name,
 				    u.username,
 				    p.email,
 				    p.phone,
@@ -277,7 +279,7 @@ public class UserAdministrationRepository {
 				LEFT JOIN branch b ON b.id = uba.branch_id AND b.deleted_at IS NULL
 				WHERE u.organization_id = :organizationId
 				  AND u.deleted_at IS NULL
-				GROUP BY u.id, p.first_name, p.last_name, u.username, p.email, p.phone, u.status
+				GROUP BY u.id, p.first_name, p.last_name, p.maternal_last_name, u.username, p.email, p.phone, u.status
 				ORDER BY p.first_name, p.last_name, u.username
 				""")
 				.param("organizationId", organizationId)

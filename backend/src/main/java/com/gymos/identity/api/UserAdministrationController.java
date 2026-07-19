@@ -80,6 +80,7 @@ public class UserAdministrationController {
 	public record CreateInternalUserRequest(
 			@NotBlank @Size(max = 120) String firstName,
 			@NotBlank @Size(max = 120) String lastName,
+			@Size(max = 120) String maternalLastName,
 			@Email @Size(max = 180) String email,
 			@NotBlank @jakarta.validation.constraints.Pattern(regexp = MX_PHONE) String phone,
 			@NotBlank @Size(max = 120) String username,
@@ -88,7 +89,7 @@ public class UserAdministrationController {
 			List<UUID> branchIds
 	) {
 		private CreateInternalUserCommand toCommand() {
-			return new CreateInternalUserCommand(firstName, lastName, email, phone, username, temporaryPassword, roleId, branchIds);
+			return new CreateInternalUserCommand(firstName, lastName, maternalLastName, email, phone, username, temporaryPassword, roleId, branchIds);
 		}
 	}
 

@@ -46,12 +46,12 @@ public class ClientService implements ClientLookupOperations {
 		UUID clientId = UUID.randomUUID();
 		jdbcClient.sql("""
 				INSERT INTO person (
-				    id, organization_id, first_name, last_name, birth_date, gender,
+				    id, organization_id, first_name, last_name, maternal_last_name, birth_date, gender,
 				    phone, email, photo_reference, status, created_at, updated_at,
 				    created_by, updated_by, version
 				)
 				VALUES (
-				    :id, :organizationId, :firstName, :lastName, :birthDate, :gender,
+				    :id, :organizationId, :firstName, :lastName, :maternalLastName, :birthDate, :gender,
 				    :phone, :email, :photoReference, 'ACTIVE', :createdAt, :updatedAt,
 				    :createdBy, :updatedBy, 0
 				)
@@ -60,6 +60,7 @@ public class ClientService implements ClientLookupOperations {
 				.param("organizationId", principal.organizationId())
 				.param("firstName", request.firstName().trim())
 				.param("lastName", request.lastName().trim())
+				.param("maternalLastName", blankToNull(request.maternalLastName()))
 				.param("birthDate", request.birthDate())
 				.param("gender", blankToNull(request.gender()))
 				.param("phone", phone)
@@ -128,6 +129,7 @@ public class ClientService implements ClientLookupOperations {
 				UPDATE person
 				SET first_name = :firstName,
 				    last_name = :lastName,
+				    maternal_last_name = :maternalLastName,
 				    birth_date = :birthDate,
 				    gender = :gender,
 				    phone = :phone,
@@ -142,6 +144,7 @@ public class ClientService implements ClientLookupOperations {
 				""")
 				.param("firstName", request.firstName().trim())
 				.param("lastName", request.lastName().trim())
+				.param("maternalLastName", blankToNull(request.maternalLastName()))
 				.param("birthDate", request.birthDate())
 				.param("gender", blankToNull(request.gender()))
 				.param("phone", phone)

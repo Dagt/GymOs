@@ -13,6 +13,12 @@ public record CurrentUserResult(
 		Set<String> roles,
 		boolean platformAdmin,
 		boolean supportMode,
-		String console
+		String console,
+		String organizationName,
+		String brandName,
+		String logoUrl,
+		String primaryColor,
+		String accentColor,
+		String surfaceColor
 ) {
 }

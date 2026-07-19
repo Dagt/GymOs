@@ -33,6 +33,7 @@ import {
 const emptyUserForm: CreateInternalUserPayload = {
   firstName: "",
   lastName: "",
+  maternalLastName: "",
   email: "",
   phone: "",
   username: "",
@@ -249,7 +250,8 @@ export default function UsersPage() {
           <form className="mt-5 grid gap-4" onSubmit={submitUser}>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field error={fieldErrors.firstName} label="Nombre" value={form.firstName} onChange={(value) => setForm({ ...form, firstName: value })} />
-              <Field error={fieldErrors.lastName} label="Apellido" value={form.lastName} onChange={(value) => setForm({ ...form, lastName: value })} />
+              <Field error={fieldErrors.lastName} label="Apellido paterno" value={form.lastName} onChange={(value) => setForm({ ...form, lastName: value })} />
+              <Field error={fieldErrors.maternalLastName} label="Apellido materno" required={false} value={form.maternalLastName ?? ""} onChange={(value) => setForm({ ...form, maternalLastName: value })} />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field error={fieldErrors.email} label="Email" type="email" value={form.email ?? ""} onChange={(value) => setForm({ ...form, email: value, username: form.username || value })} />
@@ -394,6 +396,7 @@ function Field({
   error,
   help,
   label,
+  required = true,
   value,
   onChange,
   type = "text",
@@ -401,6 +404,7 @@ function Field({
   error?: string;
   help?: string;
   label: string;
+  required?: boolean;
   value: string;
   onChange: (value: string) => void;
   type?: string;
@@ -411,7 +415,7 @@ function Field({
       <input
         className="h-11 rounded-md border border-[#cdd5ca] px-3 text-sm outline-none transition focus:border-[#51735f]"
         onChange={(event) => onChange(event.target.value)}
-        required={label !== "Telefono" && label !== "Email"}
+        required={required && label !== "Telefono" && label !== "Email"}
         type={type}
         value={value}
       />
@@ -493,7 +497,7 @@ function roleDescription(roleName: string, fallback?: string | null) {
 function validateUserForm(form: CreateInternalUserPayload) {
   const errors: FieldErrorMap = {};
   addError(errors, "firstName", validateRequired(form.firstName, "Nombre"));
-  addError(errors, "lastName", validateRequired(form.lastName, "Apellido"));
+  addError(errors, "lastName", validateRequired(form.lastName, "Apellido paterno"));
   addError(errors, "email", validateEmail(form.email ?? "", true));
   addError(errors, "phone", validatePhone(form.phone ?? "", true));
   addError(errors, "username", validateRequired(form.username, "Usuario de inicio de sesion"));

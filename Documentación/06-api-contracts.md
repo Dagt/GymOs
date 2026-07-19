@@ -12,6 +12,17 @@ Base path: `/api/v1`
 - `GET /auth/me`
 - `POST /auth/select-branch`
 
+`CurrentUser` devuelve tambien contexto visual minimo del tenant activo:
+
+- `organizationName`
+- `brandName`
+- `logoUrl`
+- `primaryColor`
+- `accentColor`
+- `surfaceColor`
+
+Estos campos permiten que recepcion, gerencia, dueno y coaches apliquen marca del gimnasio sin necesitar permisos administrativos de `GET /organizations/current`.
+
 ## 6.1.1 Organizaciones y sucursales
 
 - `POST /organizations`
@@ -95,6 +106,7 @@ Request:
 {
   "firstName": "Ana",
   "lastName": "Lopez",
+  "maternalLastName": "Perez",
   "email": "ana@example.com",
   "phone": "+520000000000",
   "username": "ana@example.com",
@@ -103,6 +115,8 @@ Request:
   "branchIds": ["uuid"]
 }
 ```
+
+`firstName`, `lastName` y `maternalLastName` representan nombre, apellido paterno y apellido materno. `lastName` se conserva como apellido paterno por compatibilidad con contratos anteriores.
 
 Roles semilla Hito 7.6:
 
@@ -179,6 +193,17 @@ Cambio Hito 3.5 final:
 - `PATCH /clients/{id}/status`
 - `GET /clients/{id}/timeline`
 - `GET /clients/{id}/summary`
+
+Contrato implementado para alta/edicion de socio:
+
+- `firstName`: nombre.
+- `lastName`: apellido paterno.
+- `maternalLastName`: apellido materno opcional.
+- `birthDate`: ISO `YYYY-MM-DD` en API; frontend lo captura como `dd/mm/aaaa`.
+- `gender`: solo `MALE` o `FEMALE`.
+- `phone`: formato `+52` seguido de 10 digitos.
+
+El alta de socio en frontend puede crear, despues del `POST /clients`, una venta de plan inicial usando `POST /sales` con un producto vinculado a `membership_plan`. La activacion de membresia sigue dependiendo de que el pago quede completado.
 
 ## 6.4 Productos
 

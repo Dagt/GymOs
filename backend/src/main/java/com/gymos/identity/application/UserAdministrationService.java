@@ -76,6 +76,7 @@ public class UserAdministrationService {
 					principal.organizationId(),
 					command.firstName().trim(),
 					command.lastName().trim(),
+					blankToNull(command.maternalLastName()),
 					blankToNull(command.email()),
 					blankToNull(command.phone()),
 					principal.userId(),

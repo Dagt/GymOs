@@ -221,7 +221,7 @@ export function AppShell({
         <div className="admin-sidebar-brand">
           <span>G</span>
           <div>
-            <strong>{variant === "platform" ? "GymOS Plataforma" : organizationName ?? "GymOS"}</strong>
+            <strong>{variant === "platform" ? "GymOS Plataforma" : organizationName ?? session.user.brandName ?? session.user.organizationName ?? "GymOS"}</strong>
             <small>{variant === "platform" ? "CRM de gimnasios" : visibleBranch}</small>
           </div>
         </div>

@@ -114,6 +114,38 @@ export function SelectField({
   );
 }
 
+export function DateField(props: BaseProps) {
+  return (
+    <FieldFrame error={props.error} help={props.help ?? "Formato: dd/mm/aaaa."} label={props.label} name={props.name} required={props.required ?? false}>
+      <input
+        aria-invalid={Boolean(props.error)}
+        className="app-input"
+        id={props.name}
+        inputMode="numeric"
+        name={props.name}
+        onChange={(event) => props.onChange(dateDisplayToIso(event.target.value))}
+        placeholder={props.placeholder ?? "31/12/1990"}
+        required={props.required ?? false}
+        value={isoDateToDisplay(props.value)}
+      />
+    </FieldFrame>
+  );
+}
+
+export function GenderField(props: Omit<BaseProps, "placeholder">) {
+  return (
+    <SelectField
+      {...props}
+      options={[
+        { label: "Selecciona genero", value: "" },
+        { label: "Hombre", value: "MALE" },
+        { label: "Mujer", value: "FEMALE" },
+      ]}
+      required={props.required ?? false}
+    />
+  );
+}
+
 export function FormError({ message }: { message: string }) {
   const [main, details] = splitDetails(message);
   return (
@@ -191,6 +223,20 @@ export function validatePassword(value: string) {
   return value.length >= 8 ? "" : "La contrasena temporal debe tener al menos 8 caracteres.";
 }
 
+export function validateIsoDate(value: string, label: string, required = false) {
+  if (!value.trim()) {
+    return required ? `${label} es obligatorio.` : "";
+  }
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? "" : `${label} debe tener formato dd/mm/aaaa.`;
+}
+
+export function validateGender(value: string, required = false) {
+  if (!value.trim()) {
+    return required ? "Genero es obligatorio." : "";
+  }
+  return value === "MALE" || value === "FEMALE" ? "" : "Selecciona Hombre o Mujer.";
+}
+
 export function validateBranchCode(value: string) {
   if (!value.trim()) {
     return "Codigo de sucursal es obligatorio.";
@@ -221,4 +267,26 @@ export function normalizePhone(value: string) {
 
 export function normalizeRfc(value: string) {
   return value.replace(/[^A-Za-z0-9Ññ&]/g, "").toUpperCase();
+}
+
+function isoDateToDisplay(value: string) {
+  if (!value) {
+    return "";
+  }
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) {
+    return value;
+  }
+  return `${match[3]}/${match[2]}/${match[1]}`;
+}
+
+function dateDisplayToIso(value: string) {
+  const digits = value.replace(/\D/g, "").slice(0, 8);
+  if (digits.length < 8) {
+    return value;
+  }
+  const day = digits.slice(0, 2);
+  const month = digits.slice(2, 4);
+  const year = digits.slice(4, 8);
+  return `${year}-${month}-${day}`;
 }

@@ -6,6 +6,7 @@ import java.util.UUID;
 public record CreateInternalUserCommand(
 		String firstName,
 		String lastName,
+		String maternalLastName,
 		String email,
 		String phone,
 		String username,

@@ -646,3 +646,17 @@ Verificado localmente:
 - Smoke API: Admin GymOS crea gimnasio con `branchCount = 0`, entra en `supportMode`, crea sucursal y `GET /organizations/current/branches` devuelve la nueva sucursal.
 - Smoke API: `GET /organizations/{organizationId}/branches` devuelve las sucursales correctas para cada gimnasio seleccionado.
 - Frontend local: `GET http://localhost:3000/platform/gymnasiums` devuelve 200.
+- `AppShell` resuelve el nombre real de la sucursal activa cuando la pagina no la carga directamente.
+
+## Correccion socios, marca por rol y formularios - 19 de julio de 2026
+
+Implementado:
+
+- `CurrentUser` devuelve marca del tenant activo: `organizationName`, `brandName`, `logoUrl`, `primaryColor`, `accentColor` y `surfaceColor`.
+- `TenantThemeProvider` aplica la marca desde la sesion para roles sin permiso administrativo y usa `/auth/me` para refrescar sesiones locales antiguas.
+- Migracion `V21__tenant_theme_and_person_names.sql` agrega `person.maternal_last_name`.
+- Clientes y usuarios internos usan `lastName` como apellido paterno y `maternalLastName` como apellido materno.
+- `/clients` captura fecha de nacimiento como `dd/mm/aaaa`, genero como desplegable `Hombre/Mujer`, plan inicial y metodo de pago.
+- El alta de socio crea una venta de membresia inicial con `POST /sales` cuando se selecciona plan; la activacion sigue dependiendo del pago completado.
+- `/clients/[clientId]` usa el `AppShell` lateral del sistema y separa datos personales, membresias y actividad.
+- Backend valida telefono mexicano en socios con `+52` seguido de 10 digitos y genero `MALE|FEMALE`.

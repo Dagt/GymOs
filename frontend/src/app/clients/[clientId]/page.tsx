@@ -3,6 +3,23 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { AppShell, LoadingScreen } from "@/components/AppShell";
+import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
+import {
+  DateField,
+  EmailField,
+  FieldErrorMap,
+  FormError,
+  GenderField,
+  PhoneField,
+  TextField,
+  normalizePhone,
+  validateEmail,
+  validateGender,
+  validateIsoDate,
+  validatePhone,
+  validateRequired,
+} from "@/components/FormFields";
 import {
   changeMembershipPlan,
   getClient,
@@ -12,9 +29,9 @@ import {
   renewMembership,
   updateClient,
   type ChangeMembershipPlanPayload,
-  type ClientMembershipSummary,
   type ClientDetail,
   type ClientDetailResponse,
+  type ClientMembershipSummary,
   type ClientUpdatePayload,
   type PlanSummary,
   type RenewMembershipPayload,
@@ -28,6 +45,7 @@ export default function ClientDetailPage() {
   const [memberships, setMemberships] = useState<ClientMembershipSummary[]>([]);
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [form, setForm] = useState<ClientUpdatePayload | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrorMap>({});
   const [renewMethod, setRenewMethod] = useState<RenewMembershipPayload["method"]>("CASH");
   const [renewReference, setRenewReference] = useState("");
   const [renewValidateNow, setRenewValidateNow] = useState(true);
@@ -44,9 +62,6 @@ export default function ClientDetailPage() {
 
     async function loadInitial() {
       const storedSession = getStoredSession();
-      if (!active) {
-        return;
-      }
       if (!storedSession) {
         setLoading(false);
         return;
@@ -63,14 +78,15 @@ export default function ClientDetailPage() {
         if (!active) {
           return;
         }
+        const activePlans = loadedPlans.filter((plan) => plan.status === "ACTIVE");
         setData(response);
         setMemberships(loadedMemberships);
-        setPlans(loadedPlans.filter((plan) => plan.status === "ACTIVE"));
-        setTargetPlanId((current) => current || loadedPlans.find((plan) => plan.status === "ACTIVE")?.id || "");
+        setPlans(activePlans);
+        setTargetPlanId((current) => current || activePlans[0]?.id || "");
         setForm(toForm(response.client));
       } catch (exception) {
         if (active) {
-          setError(exception instanceof Error ? exception.message : "No fue posible cargar cliente.");
+          setError(exception instanceof Error ? exception.message : "No fue posible cargar socio.");
         }
       } finally {
         if (active) {
@@ -91,14 +107,27 @@ export default function ClientDetailPage() {
     if (!session || !form) {
       return;
     }
+    const errors = validateClientUpdate(form);
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
-      const response = await updateClient(session.accessToken, params.clientId, form);
+      const response = await updateClient(session.accessToken, params.clientId, {
+        ...form,
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        maternalLastName: form.maternalLastName?.trim() || null,
+        phone: normalizePhone(form.phone ?? ""),
+        email: form.email?.trim() || null,
+      });
       setData(response);
       setForm(toForm(response.client));
+      setMessage("Datos del socio actualizados.");
     } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible actualizar cliente.");
+      setError(exception instanceof Error ? exception.message : "No fue posible actualizar socio.");
     } finally {
       setSaving(false);
     }
@@ -116,17 +145,17 @@ export default function ClientDetailPage() {
         method: renewMethod,
         reference: renewReference,
         validateNow: renewValidateNow,
-        notes: "Renovacion desde ficha de cliente",
+        notes: "Renovacion desde ficha de socio",
       });
       setMemberships(await getClientMemberships(session.accessToken, params.clientId));
       setRenewReference("");
       setMessage(
         response.membership
-          ? `Membresia renovada desde ${formatDay(response.membership.startsOn)} hasta ${formatDay(response.membership.endsOn)}.`
+          ? `Membresia renovada hasta ${formatDay(response.membership.endsOn)}.`
           : `Venta ${response.saleNumber} creada con pago pendiente.`,
       );
     } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible renovar membresía.");
+      setError(exception instanceof Error ? exception.message : "No fue posible renovar membresia.");
     } finally {
       setRenewingMembershipId(null);
     }
@@ -145,14 +174,14 @@ export default function ClientDetailPage() {
         method: renewMethod,
         reference: renewReference,
         validateNow: renewValidateNow,
-        notes: "Cambio de plan desde ficha de cliente",
+        notes: "Cambio de plan desde ficha de socio",
       };
       const response = await changeMembershipPlan(session.accessToken, activeMembership.id, payload);
       setMemberships(await getClientMemberships(session.accessToken, params.clientId));
       setRenewReference("");
       setMessage(
         response.membership
-          ? `Plan cambiado a ${response.membership.planName}. Vigencia hasta ${formatDay(response.membership.endsOn)}.`
+          ? `Plan cambiado a ${response.membership.planName}.`
           : `Venta ${response.saleNumber} creada.`,
       );
     } catch (exception) {
@@ -171,214 +200,142 @@ export default function ClientDetailPage() {
   }
 
   if (loading || !form || !data) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-        <p className="rounded-md border border-[#d8ddd2] bg-white px-4 py-3 text-sm text-[#42514a]">
-          Cargando ficha...
-        </p>
-      </main>
-    );
+    return <LoadingScreen text="Cargando ficha de socio..." />;
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f7f2] text-[#111815]">
-      <header className="border-b border-[#d8ddd2] bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <Link className="text-sm font-semibold text-[#51735f]" href="/clients">
-              Clientes
-            </Link>
-            <h1 className="mt-1 text-3xl font-semibold">
-              {data.client.firstName} {data.client.lastName}
-            </h1>
-            <p className="mt-1 text-sm text-[#5d6b63]">
-              Cliente desde {formatDate(data.client.joinedAt)} - {data.client.status}
-            </p>
-          </div>
-          <Link
-            className="inline-flex h-11 items-center justify-center rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f]"
-            href="/reception"
-          >
-            Recepcion
-          </Link>
-        </div>
-      </header>
+    <AppShell
+      actions={[]}
+      eyebrow="Socios"
+      session={session}
+      subtitle={`Cliente desde ${formatDate(data.client.joinedAt)} - ${statusLabel(data.client.status)}`}
+      title={clientFullName(data.client)}
+    >
+      {error ? <FormError message={error} /> : null}
+      {message ? <p className="form-message success">{message}</p> : null}
 
-      <section className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[1.2fr_0.8fr]">
+      <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <section className="grid gap-6">
-          <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-semibold">Ficha base</h2>
+          <section className="app-card p-5">
+            <p className="app-eyebrow">Datos personales</p>
+            <h2 className="mt-2 text-xl font-semibold">Ficha del socio</h2>
             <form className="mt-5 grid gap-4" onSubmit={submit}>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Nombre" value={form.firstName ?? ""} onChange={(value) => updateField("firstName", value)} />
-                <Field label="Apellido" value={form.lastName ?? ""} onChange={(value) => updateField("lastName", value)} />
-                <Field label="Telefono" value={form.phone ?? ""} onChange={(value) => updateField("phone", value)} />
-                <Field label="Email" type="email" value={form.email ?? ""} onChange={(value) => updateField("email", value)} />
-                <Field label="Fecha de nacimiento" type="date" value={form.birthDate ?? ""} onChange={(value) => updateField("birthDate", value)} />
-                <Field label="Genero" value={form.gender ?? ""} onChange={(value) => updateField("gender", value)} />
+                <TextField error={fieldErrors.firstName} label="Nombre" name="firstName" value={form.firstName ?? ""} onChange={(value) => updateField("firstName", value)} />
+                <TextField error={fieldErrors.lastName} label="Apellido paterno" name="lastName" value={form.lastName ?? ""} onChange={(value) => updateField("lastName", value)} />
+                <TextField error={fieldErrors.maternalLastName} label="Apellido materno" name="maternalLastName" required={false} value={form.maternalLastName ?? ""} onChange={(value) => updateField("maternalLastName", value)} />
+                <PhoneField error={fieldErrors.phone} label="Telefono" name="phone" required value={form.phone ?? ""} onChange={(value) => updateField("phone", value)} />
+                <EmailField error={fieldErrors.email} label="Email" name="email" value={form.email ?? ""} onChange={(value) => updateField("email", value)} />
+                <DateField error={fieldErrors.birthDate} label="Fecha de nacimiento" name="birthDate" value={form.birthDate ?? ""} onChange={(value) => updateField("birthDate", value)} />
+                <GenderField error={fieldErrors.gender} label="Genero" name="gender" value={form.gender ?? ""} onChange={(value) => updateField("gender", value)} />
               </div>
-              <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-                Estado
-                <select
-                  className="h-11 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm outline-none transition focus:border-[#51735f]"
-                  onChange={(event) => updateField("status", event.target.value)}
-                  value={form.status}
-                >
-                  <option value="ACTIVE">ACTIVE</option>
-                  <option value="INACTIVE">INACTIVE</option>
-                  <option value="SUSPENDED">SUSPENDED</option>
+              <label className="form-field" htmlFor="status">
+                <span>Estado</span>
+                <select className="app-input" id="status" onChange={(event) => updateField("status", event.target.value)} value={form.status}>
+                  <option value="ACTIVE">Activo</option>
+                  <option value="INACTIVE">Inactivo</option>
+                  <option value="SUSPENDED">Suspendido</option>
                 </select>
               </label>
-              <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-                Notas
-                <textarea
-                  className="min-h-28 rounded-md border border-[#cdd5ca] px-3 py-2 text-sm outline-none transition focus:border-[#51735f]"
-                  onChange={(event) => updateField("notes", event.target.value)}
-                  value={form.notes ?? ""}
-                />
+              <label className="form-field" htmlFor="notes">
+                <span>Notas</span>
+                <textarea className="app-input min-h-28 py-2" id="notes" onChange={(event) => updateField("notes", event.target.value)} value={form.notes ?? ""} />
               </label>
-              {error ? (
-                <p className="rounded-md border border-[#e5b7b7] bg-[#fff4f4] px-3 py-2 text-sm text-[#8c2f2f]">
-                  {error}
-                </p>
-              ) : null}
-              <button
-                className="h-11 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30] disabled:opacity-60"
-                disabled={saving}
-                type="submit"
-              >
-                {saving ? "Guardando..." : "Guardar cambios"}
+              <button className="form-primary-button" disabled={saving} type="submit">
+                {saving ? "Guardando..." : "Guardar datos"}
               </button>
             </form>
           </section>
 
-          <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <section className="app-card p-5">
+            <div className="admin-panel-header">
               <div>
-                <h2 className="text-xl font-semibold">Membresias</h2>
-                <p className="mt-1 text-sm text-[#5d6b63]">Planes activos e historicos del cliente.</p>
+                <p>Membresias</p>
+                <h2>Plan actual e historial</h2>
               </div>
-              <Link className="text-sm font-semibold text-[#51735f]" href="/pos">
-                Nueva venta
-              </Link>
             </div>
-            <div className="mt-4 grid gap-3 rounded-md border border-[#d8ddd2] bg-[#f6f7f2] p-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-                  Metodo
-                  <select
-                    className="h-10 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm"
-                    onChange={(event) => setRenewMethod(event.target.value as RenewMembershipPayload["method"])}
-                    value={renewMethod}
-                  >
-                    <option value="CASH">Efectivo</option>
-                    <option value="TRANSFER">Transferencia</option>
-                    <option value="CARD_MANUAL">Tarjeta manual</option>
-                  </select>
-                </label>
-                <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-                  Referencia
-                  <input
-                    className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm"
-                    onChange={(event) => setRenewReference(event.target.value)}
-                    value={renewReference}
-                  />
-                </label>
-              </div>
-              <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-                Nuevo plan
-                <select
-                  className="h-10 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm"
-                  onChange={(event) => setTargetPlanId(event.target.value)}
-                  value={targetPlanId}
-                >
-                  {plans.map((plan) => (
-                    <option key={plan.id} value={plan.id}>
-                      {plan.name} - {formatMoney(plan.priceCents, plan.currency)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="flex items-center gap-2 text-sm font-medium text-[#42514a]">
-                <input
-                  checked={renewValidateNow}
-                  onChange={(event) => setRenewValidateNow(event.target.checked)}
-                  type="checkbox"
+            {memberships.length === 0 ? (
+              <section className="admin-empty-card">
+                <strong>Sin membresia registrada</strong>
+                <span>Registra una membresia inicial desde el alta de socio o desde caja seleccionando este socio.</span>
+                <Link href="/pos">Abrir caja / POS</Link>
+              </section>
+            ) : (
+              <section className="grid gap-4">
+                <MembershipControls
+                  plans={plans}
+                  renewMethod={renewMethod}
+                  renewReference={renewReference}
+                  renewValidateNow={renewValidateNow}
+                  targetPlanId={targetPlanId}
+                  onMethodChange={setRenewMethod}
+                  onReferenceChange={setRenewReference}
+                  onTargetPlanChange={setTargetPlanId}
+                  onValidateNowChange={setRenewValidateNow}
                 />
-                Validar pago ahora
-              </label>
-            </div>
-            {message ? (
-              <p className="mt-4 rounded-md border border-[#bad9c4] bg-[#eff8f1] px-3 py-2 text-sm text-[#31563c]">
-                {message}
-              </p>
-            ) : null}
-            <div className="mt-4 grid gap-3">
-              {memberships.length === 0 ? (
-                <p className="text-sm text-[#5d6b63]">Sin membresías registradas.</p>
-              ) : null}
-              {memberships.map((membership) => (
-                <article className="rounded-md border border-[#d8ddd2] px-4 py-3" key={membership.id}>
-                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <p className="font-semibold">{membership.planName}</p>
-                      <p className="mt-1 text-sm text-[#5d6b63]">
-                        {membershipStatusLabel(membership.status)} - {formatDay(membership.startsOn)} a {formatDay(membership.endsOn)}
-                      </p>
-                      <p className="mt-1 text-xs text-[#6f7a73]">
-                        Gracia hasta {formatDay(membership.graceEndsOn)}
-                      </p>
+                {memberships.map((membership) => (
+                  <article className="rounded-md border border-[#d8ddd2] px-4 py-3" key={membership.id}>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="font-semibold">{membership.planName}</p>
+                        <p className="mt-1 text-sm text-[#5d6b63]">
+                          {membershipStatusLabel(membership.status)} - {formatDay(membership.startsOn)} a {formatDay(membership.endsOn)}
+                        </p>
+                        <p className="mt-1 text-xs text-[#6f7a73]">Gracia hasta {formatDay(membership.graceEndsOn)}</p>
+                      </div>
+                      <Link className="text-sm font-semibold text-[var(--brand-primary)]" href={`/sales/${membership.saleId}`}>
+                        {membership.saleNumber}
+                      </Link>
                     </div>
-                    <Link className="text-sm font-semibold text-[#51735f]" href={`/sales/${membership.saleId}`}>
-                      {membership.saleNumber}
-                    </Link>
-                  </div>
-                  <button
-                    className="mt-3 h-10 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30] disabled:opacity-60"
-                    disabled={renewingMembershipId !== null || changingMembershipId !== null || membership.status !== "ACTIVE"}
-                    onClick={() => renew(membership)}
-                    type="button"
-                  >
-                    {renewingMembershipId === membership.id ? "Renovando..." : "Renovar"}
-                  </button>
-                  <button
-                    className="mt-2 h-10 rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f] disabled:opacity-60"
-                    disabled={
-                      renewingMembershipId !== null
-                      || changingMembershipId !== null
-                      || membership.status !== "ACTIVE"
-                      || !targetPlanId
-                      || targetPlanId === membership.planId
-                    }
-                    onClick={() => changePlan(membership)}
-                    type="button"
-                  >
-                    {changingMembershipId === membership.id ? "Cambiando..." : "Cambiar plan"}
-                  </button>
-                </article>
-              ))}
-            </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        className="app-button"
+                        disabled={renewingMembershipId !== null || changingMembershipId !== null || membership.status !== "ACTIVE"}
+                        onClick={() => renew(membership)}
+                        type="button"
+                      >
+                        {renewingMembershipId === membership.id ? "Renovando..." : "Renovar"}
+                      </button>
+                      <button
+                        className="app-button-secondary"
+                        disabled={
+                          renewingMembershipId !== null
+                          || changingMembershipId !== null
+                          || membership.status !== "ACTIVE"
+                          || !targetPlanId
+                          || targetPlanId === membership.planId
+                        }
+                        onClick={() => changePlan(membership)}
+                        type="button"
+                      >
+                        {changingMembershipId === membership.id ? "Cambiando..." : "Cambiar plan"}
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </section>
+            )}
           </section>
         </section>
 
-        <aside className="grid gap-6">
-          <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-semibold">Resumen</h2>
+        <aside className="grid gap-6 content-start">
+          <section className="app-card p-5">
+            <p className="app-eyebrow">Resumen</p>
+            <h2 className="mt-2 text-xl font-semibold">Contacto y estado</h2>
             <dl className="mt-4 grid gap-3 text-sm">
-              <Metric label="Teléfono" value={data.client.phone ?? "Sin teléfono"} />
+              <Metric label="Telefono" value={data.client.phone ?? "Sin telefono"} />
               <Metric label="Email" value={data.client.email ?? "Sin email"} />
               <Metric label="Actualizado" value={formatDate(data.client.updatedAt)} />
             </dl>
           </section>
 
-          <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-semibold">Timeline</h2>
+          <section className="app-card p-5">
+            <p className="app-eyebrow">Actividad</p>
+            <h2 className="mt-2 text-xl font-semibold">Timeline</h2>
             <div className="mt-4 grid gap-3">
-              {data.timeline.length === 0 ? (
-                <p className="text-sm text-[#5d6b63]">Sin eventos registrados.</p>
-              ) : null}
+              {data.timeline.length === 0 ? <p className="text-sm text-[#5d6b63]">Sin eventos registrados.</p> : null}
               {data.timeline.map((entry) => (
-                <article className="border-l-2 border-[#51735f] pl-3" key={`${entry.action}-${entry.occurredAt}`}>
+                <article className="border-l-2 border-[var(--brand-accent)] pl-3" key={`${entry.action}-${entry.occurredAt}`}>
                   <p className="text-sm font-semibold">{entry.action}</p>
                   <p className="mt-1 text-xs text-[#6f7a73]">
                     {formatDate(entry.occurredAt)} - {entry.origin ?? "Sistema"}
@@ -389,7 +346,59 @@ export default function ClientDetailPage() {
           </section>
         </aside>
       </section>
-    </main>
+    </AppShell>
+  );
+}
+
+function MembershipControls({
+  plans,
+  renewMethod,
+  renewReference,
+  renewValidateNow,
+  targetPlanId,
+  onMethodChange,
+  onReferenceChange,
+  onTargetPlanChange,
+  onValidateNowChange,
+}: {
+  plans: PlanSummary[];
+  renewMethod: RenewMembershipPayload["method"];
+  renewReference: string;
+  renewValidateNow: boolean;
+  targetPlanId: string;
+  onMethodChange: (value: RenewMembershipPayload["method"]) => void;
+  onReferenceChange: (value: string) => void;
+  onTargetPlanChange: (value: string) => void;
+  onValidateNowChange: (value: boolean) => void;
+}) {
+  return (
+    <section className="rounded-md border border-[#d8ddd2] bg-[color-mix(in_srgb,var(--brand-accent)_10%,white)] p-4">
+      <div className="grid gap-3 sm:grid-cols-2">
+        <label className="form-field" htmlFor="renewMethod">
+          <span>Metodo de pago</span>
+          <select className="app-input" id="renewMethod" onChange={(event) => onMethodChange(event.target.value as RenewMembershipPayload["method"])} value={renewMethod}>
+            <option value="CASH">Efectivo</option>
+            <option value="TRANSFER">Transferencia</option>
+            <option value="CARD_MANUAL">Tarjeta manual</option>
+          </select>
+        </label>
+        <TextField label="Referencia" name="renewReference" required={false} value={renewReference} onChange={onReferenceChange} />
+      </div>
+      <label className="form-field mt-3" htmlFor="targetPlanId">
+        <span>Plan para cambio</span>
+        <select className="app-input" id="targetPlanId" onChange={(event) => onTargetPlanChange(event.target.value)} value={targetPlanId}>
+          {plans.map((plan) => (
+            <option key={plan.id} value={plan.id}>
+              {plan.name} - {formatMoney(plan.priceCents, plan.currency)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="mt-3 flex items-center gap-2 text-sm font-medium text-[#42514a]">
+        <input checked={renewValidateNow} onChange={(event) => onValidateNowChange(event.target.checked)} type="checkbox" />
+        Validar pago ahora
+      </label>
+    </section>
   );
 }
 
@@ -397,6 +406,7 @@ function toForm(client: ClientDetail): ClientUpdatePayload {
   return {
     firstName: client.firstName,
     lastName: client.lastName,
+    maternalLastName: client.maternalLastName ?? "",
     birthDate: client.birthDate ?? "",
     gender: client.gender ?? "",
     phone: client.phone ?? "",
@@ -407,28 +417,21 @@ function toForm(client: ClientDetail): ClientUpdatePayload {
   };
 }
 
-function Field({
-  label,
-  value,
-  onChange,
-  type = "text",
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  type?: string;
-}) {
-  return (
-    <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-      {label}
-      <input
-        className="h-11 rounded-md border border-[#cdd5ca] px-3 text-sm outline-none transition focus:border-[#51735f]"
-        onChange={(event) => onChange(event.target.value)}
-        type={type}
-        value={value}
-      />
-    </label>
-  );
+function validateClientUpdate(form: ClientUpdatePayload) {
+  const errors: FieldErrorMap = {};
+  addError(errors, "firstName", validateRequired(form.firstName, "Nombre"));
+  addError(errors, "lastName", validateRequired(form.lastName, "Apellido paterno"));
+  addError(errors, "phone", validatePhone(form.phone ?? "", true));
+  addError(errors, "email", validateEmail(form.email ?? "", false));
+  addError(errors, "birthDate", validateIsoDate(form.birthDate ?? "", "Fecha de nacimiento", false));
+  addError(errors, "gender", validateGender(form.gender ?? "", false));
+  return errors;
+}
+
+function addError(errors: FieldErrorMap, key: string, value: string) {
+  if (value) {
+    errors[key] = value;
+  }
 }
 
 function Metric({ label, value }: { label: string; value: string }) {
@@ -442,18 +445,15 @@ function Metric({ label, value }: { label: string; value: string }) {
 
 function AuthRequired() {
   return (
-    <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-      <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">Necesitas iniciar sesión</h1>
-        <Link
-          className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
-          href="/login"
-        >
-          Iniciar sesion
-        </Link>
-      </section>
-    </main>
+    <AuthRequiredCard
+      message="La ficha de socio contiene informacion sensible y requiere una cuenta autorizada."
+      title="Inicia sesion para consultar socios"
+    />
   );
+}
+
+function clientFullName(client: ClientDetail) {
+  return `${client.firstName} ${client.lastName} ${client.maternalLastName ?? ""}`.trim();
 }
 
 function formatDate(value: string) {
@@ -465,9 +465,20 @@ function formatDate(value: string) {
 
 function formatDay(value: string) {
   return new Intl.DateTimeFormat("es-MX", {
-    dateStyle: "medium",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
     timeZone: "UTC",
   }).format(new Date(`${value}T00:00:00Z`));
+}
+
+function statusLabel(status: string) {
+  const labels: Record<string, string> = {
+    ACTIVE: "Activo",
+    INACTIVE: "Inactivo",
+    SUSPENDED: "Suspendido",
+  };
+  return labels[status] ?? status;
 }
 
 function membershipStatusLabel(status: string) {
