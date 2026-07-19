@@ -244,6 +244,11 @@ Correccion Hito 7.9:
 - La sucursal se crea desde una accion independiente `Crear sucursal` dentro del gimnasio seleccionado.
 - La tabla de sucursales del CRM se carga con `GET /organizations/{organizationId}/branches`, por gimnasio seleccionado, sin depender del tenant activo en la sesion.
 - Los botones `Datos, marca y sucursales` y `Equipo y accesos` deben entrar primero en modo soporte cuando el gimnasio seleccionado no es el contexto activo, y despues navegar a la pantalla correspondiente.
+- El CRM debe limpiar la tabla de sucursales al cambiar de gimnasio y recargarla explicitamente para evitar mostrar sucursales stale de otro tenant.
+- En modo soporte, la accion de una sucursal siempre debe permitir abrir herramientas; si la sucursal ya es la activa se muestra como entrada a soporte, no como boton inutil bloqueado.
+- Las herramientas de soporte del CRM se separan visualmente de la administracion del cliente: metricas, ventas y pagos, caja/POS y socios requieren sucursal activa.
+- Si el gimnasio tiene una sola sucursal y Admin GymOS abre una herramienta operativa desde el CRM, el frontend selecciona esa sucursal automaticamente antes de navegar.
+- Si el gimnasio tiene varias sucursales y no hay sucursal activa, el frontend debe pedir seleccionar una sucursal antes de abrir herramientas operativas.
 - Si un gimnasio todavia no tiene sucursales, el detalle muestra un estado vacio claro y mantiene disponible la accion de crear sucursal.
 - El Admin GymOS puede crear tenants completos sin dejarlos "a medias"; sucursales, usuarios y marca avanzada son pasos explicitos del detalle del cliente.
 - El menu lateral usa secciones plegables; la seccion activa queda abierta y las demas permanecen compactas para reducir saturacion visual.

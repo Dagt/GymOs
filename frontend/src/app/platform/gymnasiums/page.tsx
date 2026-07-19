@@ -95,7 +95,12 @@ export default function PlatformGymnasiumsPage() {
           return;
         }
         setOrganizations(availableOrganizations);
-        setSelectedOrganizationId(stored.user.organizationId || availableOrganizations[0]?.id || "");
+        setSelectedOrganizationId((current) => {
+          const preferredId = current || stored.user.organizationId;
+          return availableOrganizations.some((organization) => organization.id === preferredId)
+            ? preferredId
+            : availableOrganizations[0]?.id || "";
+        });
       } catch (exception) {
         if (active) {
           setError(exception instanceof Error ? exception.message : "No fue posible cargar gimnasios.");
@@ -121,6 +126,7 @@ export default function PlatformGymnasiumsPage() {
         setBranches([]);
         return;
       }
+      setBranches([]);
       setBranchesLoading(true);
       setError(null);
       try {
@@ -157,28 +163,36 @@ export default function PlatformGymnasiumsPage() {
     );
   }, [organizations, query]);
 
-  const selectedOrganization = organizations.find((item) => item.id === selectedOrganizationId) ?? organizations[0] ?? null;
+  const selectedOrganization = organizations.find((item) => item.id === selectedOrganizationId) ?? null;
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
   const selectedIsActive = Boolean(session && selectedOrganization?.id === session.user.organizationId && session.user.supportMode);
+
+  async function refreshBranches(accessToken: string, organizationId: string): Promise<BranchSummary[]> {
+    const availableBranches = await getOrganizationBranches(accessToken, organizationId);
+    setBranches(availableBranches);
+    return availableBranches;
+  }
 
   async function ensureSupport(organizationId: string): Promise<StoredSession | null> {
     if (!session) {
       return null;
     }
-    if (session.user.organizationId === organizationId && session.user.supportMode) {
-      return session;
-    }
     setSelectingId(organizationId);
     setError(null);
     setMessage(null);
     try {
-      const nextSession = await selectOrganization(session.accessToken, organizationId);
-      storeSession(nextSession);
-      setSession(nextSession);
+      let nextSession: StoredSession = session;
+      if (session.user.organizationId !== organizationId || !session.user.supportMode) {
+        const supportResponse = await selectOrganization(session.accessToken, organizationId);
+        storeSession(supportResponse);
+        setSession(supportResponse);
+        nextSession = supportResponse;
+      }
       setSelectedOrganizationId(organizationId);
-      const availableBranches = await getOrganizationBranches(nextSession.accessToken, organizationId);
-      setBranches(availableBranches);
-      setMessage("Modo soporte iniciado para este gimnasio.");
+      await refreshBranches(nextSession.accessToken, organizationId);
+      if (!session.user.supportMode || session.user.organizationId !== organizationId) {
+        setMessage("Modo soporte iniciado para este gimnasio.");
+      }
       return nextSession;
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible entrar en soporte.");
@@ -189,21 +203,43 @@ export default function PlatformGymnasiumsPage() {
   }
 
   async function activateOrganization(organizationId: string) {
-    await ensureSupport(organizationId);
+    const nextSession = await ensureSupport(organizationId);
+    if (!nextSession) {
+      return;
+    }
+    const availableBranches = await refreshBranches(nextSession.accessToken, organizationId);
+    if (!nextSession.user.branchId && availableBranches.length === 1) {
+      await activateBranch(availableBranches[0].id, false);
+    }
   }
 
-  async function activateBranch(branchId: string) {
-    if (!session) {
+  async function activateBranch(branchId: string, navigate = true) {
+    if (!session || !selectedOrganization) {
       return;
     }
     setSelectingId(branchId);
     setError(null);
     setMessage(null);
     try {
-      const nextSession = await selectBranch(session.accessToken, branchId);
+      const supportSession = await ensureSupport(selectedOrganization.id);
+      if (!supportSession) {
+        return;
+      }
+      if (supportSession.user.branchId === branchId) {
+        if (navigate) {
+          router.push("/dashboard");
+        }
+        return;
+      }
+      const nextSession = await selectBranch(supportSession.accessToken, branchId);
       storeSession(nextSession);
       setSession(nextSession);
-      router.push("/dashboard");
+      await refreshBranches(nextSession.accessToken, selectedOrganization.id);
+      if (navigate) {
+        router.push("/dashboard");
+      } else {
+        setMessage("Sucursal lista para soporte.");
+      }
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible seleccionar sucursal.");
     } finally {
@@ -211,12 +247,36 @@ export default function PlatformGymnasiumsPage() {
     }
   }
 
-  async function goToTenantSection(path: string) {
+  async function ensureBranchForTools(currentSession: StoredSession, organizationId: string): Promise<StoredSession | null> {
+    const availableBranches = await refreshBranches(currentSession.accessToken, organizationId);
+    if (availableBranches.length === 0) {
+      setError("Este gimnasio no tiene sucursales. Crea una sucursal antes de abrir herramientas operativas.");
+      return null;
+    }
+    if (currentSession.user.branchId && availableBranches.some((branch) => branch.id === currentSession.user.branchId)) {
+      return currentSession;
+    }
+    if (availableBranches.length === 1) {
+      const nextSession = await selectBranch(currentSession.accessToken, availableBranches[0].id);
+      storeSession(nextSession);
+      setSession(nextSession);
+      await refreshBranches(nextSession.accessToken, organizationId);
+      return nextSession;
+    }
+    setError("Selecciona una sucursal para entrar a las herramientas operativas de soporte.");
+    return null;
+  }
+
+  async function goToTenantSection(path: string, requiresBranch = false) {
     if (!selectedOrganization) {
       return;
     }
     const nextSession = await ensureSupport(selectedOrganization.id);
-    if (nextSession) {
+    if (!nextSession) {
+      return;
+    }
+    const readySession = requiresBranch ? await ensureBranchForTools(nextSession, selectedOrganization.id) : nextSession;
+    if (readySession) {
       router.push(path);
     }
   }
@@ -411,13 +471,8 @@ export default function PlatformGymnasiumsPage() {
                   <h2>{selectedOrganization.tradeName}</h2>
                   <span>{selectedOrganization.legalName}</span>
                 </div>
-                <button
-                  className="app-button"
-                  disabled={selectingId !== null || selectedIsActive}
-                  onClick={() => activateOrganization(selectedOrganization.id)}
-                  type="button"
-                >
-                  {selectedIsActive ? "Soporte activo" : "Entrar en soporte"}
+                <button className="app-button" disabled={selectingId !== null} onClick={() => activateOrganization(selectedOrganization.id)} type="button">
+                  {selectedIsActive ? "Actualizar soporte" : "Entrar en soporte"}
                 </button>
               </header>
 
@@ -464,8 +519,8 @@ export default function PlatformGymnasiumsPage() {
                           <span>{branch.code}</span>
                           <strong>{branch.name}</strong>
                           <span>{branch.phone || "Sin telefono"}</span>
-                          <button disabled={selectingId !== null || !selectedIsActive || branch.id === session.user.branchId} onClick={() => activateBranch(branch.id)} type="button">
-                            {branch.id === session.user.branchId ? "En soporte" : selectedIsActive ? "Entrar" : "Activa soporte"}
+                          <button disabled={selectingId !== null} onClick={() => activateBranch(branch.id)} type="button">
+                            {branch.id === session.user.branchId && selectedIsActive ? "Abrir soporte" : "Entrar"}
                           </button>
                         </div>
                       ))}
@@ -479,12 +534,30 @@ export default function PlatformGymnasiumsPage() {
               </section>
 
               <div className="platform-actions">
-                <button className="admin-secondary-link" disabled={selectingId !== null} onClick={() => goToTenantSection("/settings/organization")} type="button">
-                  Datos, marca y sucursales
-                </button>
-                <button className="admin-secondary-link" disabled={selectingId !== null} onClick={() => goToTenantSection("/users")} type="button">
-                  Equipo y accesos
-                </button>
+                <div className="platform-action-group">
+                  <span>Administracion del cliente</span>
+                  <button className="admin-secondary-link" disabled={selectingId !== null} onClick={() => goToTenantSection("/settings/organization")} type="button">
+                    Datos, marca y sucursales
+                  </button>
+                  <button className="admin-secondary-link" disabled={selectingId !== null} onClick={() => goToTenantSection("/users")} type="button">
+                    Equipo y accesos
+                  </button>
+                </div>
+                <div className="platform-action-group">
+                  <span>Herramientas de soporte</span>
+                  <button className="admin-secondary-link" disabled={selectingId !== null} onClick={() => goToTenantSection("/dashboard", true)} type="button">
+                    Metricas
+                  </button>
+                  <button className="admin-secondary-link" disabled={selectingId !== null} onClick={() => goToTenantSection("/reports/sales", true)} type="button">
+                    Ventas y pagos
+                  </button>
+                  <button className="admin-secondary-link" disabled={selectingId !== null} onClick={() => goToTenantSection("/pos", true)} type="button">
+                    Caja / POS
+                  </button>
+                  <button className="admin-secondary-link" disabled={selectingId !== null} onClick={() => goToTenantSection("/clients", true)} type="button">
+                    Socios
+                  </button>
+                </div>
               </div>
             </>
           ) : (

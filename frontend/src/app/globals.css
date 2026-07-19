@@ -1946,9 +1946,29 @@ th {
 }
 
 .platform-actions {
+  display: grid;
+  gap: 0.85rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 1rem;
+}
+
+.platform-action-group {
+  align-content: start;
+  background: #f8fafc;
+  border: 1px solid var(--brand-line);
+  border-radius: 0.8rem;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 0.7rem;
+  padding: 0.8rem;
+}
+
+.platform-action-group span {
+  color: var(--brand-muted);
+  flex-basis: 100%;
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
 }
 
 .support-banner {
@@ -2723,6 +2743,7 @@ body.has-global-session-nav {
 
   .login-card,
   .admin-branch-cards,
+  .platform-actions,
   .platform-facts,
   .admin-advanced-setup div {
     grid-template-columns: 1fr;

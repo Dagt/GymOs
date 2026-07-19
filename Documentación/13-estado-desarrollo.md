@@ -601,6 +601,10 @@ Implementado:
 - Admin GymOS puede suspender/reactivar gimnasios cliente; usuarios tenant de gimnasios suspendidos o inactivos no pueden iniciar sesion.
 - `/users` permite suspender/reactivar usuarios internos sin borrado fisico.
 - Login y refresh de usuarios tenant asignan automaticamente la primera sucursal activa permitida, evitando que gerentes/recepcionistas/coaches entren sin sucursal cuando ya tienen acceso asignado.
+- El CRM de plataforma recarga sucursales por gimnasio seleccionado y limpia resultados anteriores para evitar estados stale al volver de soporte o despues de reiniciar sesion.
+- Desde `/platform/gymnasiums`, Admin GymOS puede abrir herramientas de soporte del tenant: metricas, ventas y pagos, caja/POS y socios.
+- Si el tenant tiene una sola sucursal, el CRM selecciona esa sucursal automaticamente al abrir herramientas operativas; si tiene varias, exige seleccionar la sucursal para evitar operar en una sede incorrecta.
+- La sucursal activa en soporte ya no queda como accion bloqueada; el boton permite abrir las herramientas del soporte para esa sucursal.
 
 ## Correccion UX/validaciones administrativas - 19 de julio de 2026
 
