@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired } from "@/components/AuthRequired";
 import {
+  clearSession,
   getBranches,
   getCurrentOrganization,
   getStoredSession,
@@ -44,22 +46,19 @@ const focusActions = [
     label: "Abrir kiosco",
     accent: "kiosk",
   },
-];
-
-const operationGroups = [
   {
-    title: "Operacion fisica",
-    items: [
-      { label: "Reservas", href: "/bookings" },
-      { label: "Beneficios", href: "/benefits" },
-    ],
+    title: "Reservas",
+    detail: "Agenda recursos, registra reservas y vincula pagos cuando aplique.",
+    href: "/bookings",
+    label: "Ver agenda",
+    accent: "bookings",
   },
   {
-    title: "Consulta rapida",
-    items: [
-      { label: "Ventas recientes", href: "/reports/sales" },
-      { label: "Socios", href: "/clients" },
-    ],
+    title: "Beneficios",
+    detail: "Consulta beneficios aplicables para socios y promociones activas.",
+    href: "/benefits",
+    label: "Ver beneficios",
+    accent: "benefits",
   },
 ];
 
@@ -70,6 +69,7 @@ const daySignals = [
 ];
 
 export default function ReceptionPage() {
+  const router = useRouter();
   const [session, setSession] = useState<StoredSession | null>(null);
   const [organization, setOrganization] = useState<OrganizationSummary | null>(null);
   const [branches, setBranches] = useState<BranchSummary[]>([]);
@@ -91,10 +91,22 @@ export default function ReceptionPage() {
       setError(null);
       try {
         const availableBranches = await getBranches(storedSession.accessToken);
-        const currentOrganization = await getCurrentOrganization(storedSession.accessToken).catch(() => null);
+        let effectiveSession: StoredSession = storedSession;
+        const onlyBranch = availableBranches.length === 1 ? availableBranches[0] : null;
+        if (!storedSession.user.branchId && onlyBranch) {
+          const nextSession = await selectBranch(storedSession.accessToken, onlyBranch.id);
+          storeSession(nextSession);
+          effectiveSession = {
+            accessToken: nextSession.accessToken,
+            refreshToken: nextSession.refreshToken,
+            user: nextSession.user,
+          };
+        }
+        const currentOrganization = await getCurrentOrganization(effectiveSession.accessToken).catch(() => null);
         if (!active) {
           return;
         }
+        setSession(effectiveSession);
         setBranches(availableBranches);
         setOrganization(currentOrganization);
       } catch (exception) {
@@ -118,6 +130,13 @@ export default function ReceptionPage() {
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
   const canOperate = Boolean(session?.user.branchId);
   const visibleBranchName = activeBranch?.name ?? (session?.user.branchId ? "Sucursal activa" : null);
+  const receptionOrganizationName =
+    organization?.tradeName ?? session?.user.brandName ?? session?.user.organizationName ?? "GymOS";
+
+  function logout() {
+    clearSession();
+    router.push("/login");
+  }
 
   async function switchBranch(branchId: string) {
     if (!session || branchId === session.user.branchId) {
@@ -159,7 +178,9 @@ export default function ReceptionPage() {
       actions={[]}
       branchName={visibleBranchName}
       eyebrow="Recepcion"
-      organizationName={organization?.tradeName}
+      hideSidebar={canOperate}
+      mode={canOperate ? "operation" : undefined}
+      organizationName={receptionOrganizationName}
       session={session}
       subtitle={
         canOperate
@@ -178,15 +199,36 @@ export default function ReceptionPage() {
           onSwitchBranch={switchBranch}
         />
       ) : (
-        <section className="admin-content-grid">
+        <section className="reception-home">
+          <section className="reception-identity-panel">
+            <div className="reception-brand-mark" aria-hidden="true">
+              G
+            </div>
+            <div>
+              <p>{receptionOrganizationName}</p>
+              <h2>{visibleBranchName}</h2>
+              <span>
+                Entraste como Recepcion. Usuario: {session.user.fullName} ({session.user.username}).
+              </span>
+            </div>
+            <div className="reception-scope-card">
+              <span>Alcance</span>
+              <strong>Mostrador</strong>
+              <small>Clientes, ventas, pagos, membresias y reservas de la sucursal activa.</small>
+            </div>
+            <button onClick={logout} type="button">
+              Salir
+            </button>
+          </section>
+
           <section className="admin-main-column">
-            <section className="admin-status-board" aria-label="Estado operativo">
+            <section className="admin-status-board reception-status-board" aria-label="Estado operativo">
               {daySignals.map((signal) => (
                 <ReportMetric key={signal.label} label={signal.label} value={signal.value} tone={signal.tone} />
               ))}
             </section>
 
-            <section className="admin-focus-grid" aria-label="Acciones principales">
+            <section className="admin-focus-grid reception-action-grid" aria-label="Acciones de recepcion">
               {focusActions.map((action) => (
                 <Link className={`admin-action-card ${action.accent}`} href={action.href} key={action.href}>
                   <span>{action.title}</span>
@@ -209,62 +251,7 @@ export default function ReceptionPage() {
                 <ReportMetric label="Socios" value="Atencion" tone="blue" />
               </div>
             </section>
-
-            <details className="admin-panel admin-details">
-              <summary>Mas herramientas de recepcion</summary>
-              <div className="admin-module-groups">
-                {operationGroups.map((group) => (
-                  <section key={group.title}>
-                    <h3>{group.title}</h3>
-                    <div className="admin-link-grid">
-                      {group.items.map((item) => (
-                        <Link href={item.href} key={item.href}>
-                          {item.label}
-                        </Link>
-                      ))}
-                    </div>
-                  </section>
-                ))}
-              </div>
-            </details>
           </section>
-
-          <aside className="admin-context-column">
-            <section className="admin-panel">
-              <div className="admin-panel-header">
-                <div>
-                  <p>Sucursal actual</p>
-                  <h2>{visibleBranchName}</h2>
-                </div>
-              </div>
-              <div className="admin-branch-list">
-                {branches.map((branch) => (
-                  <button
-                    className={branch.id === session.user.branchId ? "active" : undefined}
-                    disabled={switchingBranchId !== null}
-                    key={branch.id}
-                    onClick={() => switchBranch(branch.id)}
-                    type="button"
-                  >
-                    <strong>{branch.name}</strong>
-                    <span>{branch.code}</span>
-                  </button>
-                ))}
-              </div>
-            </section>
-
-            <section className="admin-panel">
-              <div className="admin-panel-header">
-                <div>
-                  <p>Alcance</p>
-                  <h2>Mostrador</h2>
-                </div>
-              </div>
-              <p className="admin-muted-text">
-                Esta consola esta enfocada en atencion diaria. La administracion de gimnasios, sucursales y usuarios queda en dueno o gerencia.
-              </p>
-            </section>
-          </aside>
         </section>
       )}
     </AppShell>

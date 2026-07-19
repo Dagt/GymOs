@@ -50,21 +50,22 @@ Funciones esperadas:
 
 Pantalla principal con accesos directos:
 
-- Nuevo cliente.
-- Inscripción.
-- Renovación.
-- Venta rápida.
-- Reserva.
-- Buscar cliente.
-- Acceso manual.
-- Pagos por validar.
-- Kioscos activos.
+- Caja / POS para ventas, pagos y membresias.
+- Buscar o registrar socio.
+- Revisar ventas y pagos pendientes.
+- Reservas.
+- Beneficios.
+- Kiosco o pantalla para socios.
 
 Debe mostrar:
-- clientes por vencer hoy
-- reservas próximas
-- pagos pendientes
-- alertas operativas
+- nombre y logo del gimnasio
+- sucursal activa
+- rol, nombre de usuario y alcance
+- salida de sesion visible
+- senales rapidas del turno
+- acciones operativas principales en una sola cuadricula
+
+La portada `/reception` es una consola rapida de mostrador. No debe duplicar la navegacion lateral en esa primera pantalla ni esconder acciones en una seccion secundaria de "mas herramientas". Las pantallas internas como POS, socios, reservas y ventas si pueden usar `AppShell` lateral para navegacion entre modulos.
 
 ## 8.3 Alta de cliente
 
@@ -296,3 +297,6 @@ Formularios:
 - Los errores de backend deben mostrar mensaje, codigo y `correlationId` cuando existan.
 - `/reception` no debe depender de permisos administrativos como lectura completa de organizacion. Si el usuario tiene `branchId`, debe mostrar dashboard operativo aunque no pueda consultar `/organizations/current`.
 - El estado sin sucursal para recepcion no debe mostrar onboarding, alta de gimnasio ni configuracion de tenant; solo selector de sucursal permitida o instruccion de pedir acceso al dueño/gerente.
+- Si un usuario de recepcion tiene exactamente una sucursal permitida pero la sesion guardada no trae `branchId`, el frontend debe seleccionarla automaticamente antes de pintar la consola.
+- La portada de recepcion usa `AppShell` sin menu lateral y muestra una tarjeta superior con marca, sucursal, perfil, usuario, alcance y cierre de sesion.
+- Las acciones de recepcion se agrupan en la misma cuadricula: caja/POS, socios, ventas, kiosco, reservas y beneficios. No se usa una seccion desplegable secundaria para herramientas normales de mostrador.

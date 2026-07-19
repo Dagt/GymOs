@@ -129,6 +129,7 @@ export function AppShell({
   branchName,
   children,
   eyebrow,
+  hideSidebar = false,
   organizationName,
   mode,
   session,
@@ -140,6 +141,7 @@ export function AppShell({
   branchName?: string | null;
   children: ReactNode;
   eyebrow: string;
+  hideSidebar?: boolean;
   mode?: "setup" | "operation";
   organizationName?: string | null;
   session: StoredSession;
@@ -216,7 +218,8 @@ export function AppShell({
   }
 
   return (
-    <main className={`admin-console ${isSupportMode(session.user) ? "support-mode" : ""}`}>
+    <main className={`admin-console ${hideSidebar ? "no-sidebar" : ""} ${isSupportMode(session.user) ? "support-mode" : ""}`}>
+      {!hideSidebar ? (
       <aside className="admin-sidebar">
         <div className="admin-sidebar-brand">
           <span>G</span>
@@ -265,6 +268,7 @@ export function AppShell({
           </button>
         </div>
       </aside>
+      ) : null}
 
       <section className="admin-workspace">
         {isSupportMode(session.user) ? (

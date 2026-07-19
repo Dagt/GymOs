@@ -1110,6 +1110,10 @@ th {
   min-height: 100vh;
 }
 
+.admin-console.no-sidebar {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .admin-sidebar {
   background:
     linear-gradient(180deg, #0f172a, color-mix(in srgb, var(--brand-primary) 42%, #0f172a));
@@ -1483,6 +1487,14 @@ th {
   background: #f59e0b;
 }
 
+.admin-action-card.bookings::after {
+  background: var(--brand-accent);
+}
+
+.admin-action-card.benefits::after {
+  background: color-mix(in srgb, var(--brand-primary) 56%, var(--brand-accent));
+}
+
 .admin-action-card span {
   font-size: 1.4rem;
   font-weight: 950;
@@ -1656,6 +1668,110 @@ th {
   color: #be123c;
   font-size: 0.9rem;
   line-height: 1.45;
+}
+
+.reception-home {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.reception-identity-panel {
+  align-items: center;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--brand-primary) 12%, white), rgba(255, 255, 255, 0.94)),
+    white;
+  border: 1px solid var(--brand-line);
+  border-radius: 0.85rem;
+  box-shadow: 0 18px 52px rgba(15, 23, 42, 0.08);
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: auto minmax(0, 1fr) minmax(15rem, 22rem) auto;
+  padding: 1rem;
+}
+
+.reception-brand-mark {
+  align-items: center;
+  background:
+    var(--brand-logo-url),
+    linear-gradient(135deg, var(--brand-accent), color-mix(in srgb, var(--brand-primary) 45%, white));
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  border-radius: 0.75rem;
+  color: #0f172a;
+  display: inline-flex;
+  font-size: 1.15rem;
+  font-weight: 950;
+  height: 4rem;
+  justify-content: center;
+  width: 4rem;
+}
+
+.reception-identity-panel p {
+  color: var(--brand-primary);
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.reception-identity-panel h2 {
+  color: var(--brand-ink);
+  font-size: clamp(1.45rem, 2vw, 2rem);
+  font-weight: 950;
+  margin-top: 0.15rem;
+}
+
+.reception-identity-panel span,
+.reception-scope-card small {
+  color: var(--brand-muted);
+  display: block;
+  line-height: 1.45;
+  margin-top: 0.25rem;
+}
+
+.reception-scope-card {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid var(--brand-line);
+  border-left: 0.25rem solid var(--brand-accent);
+  border-radius: 0.65rem;
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.8rem;
+}
+
+.reception-scope-card span {
+  color: var(--brand-muted);
+  font-size: 0.7rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.reception-scope-card strong {
+  color: var(--brand-ink);
+  font-size: 1rem;
+  font-weight: 950;
+}
+
+.reception-identity-panel button {
+  background: var(--brand-primary);
+  border-bottom: 0.22rem solid var(--brand-accent);
+  border-radius: 0.55rem;
+  color: white;
+  font-weight: 950;
+  min-height: 2.8rem;
+  padding: 0 1.2rem;
+}
+
+.reception-action-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.reception-action-grid .admin-action-card {
+  min-height: 10.8rem;
+}
+
+.reception-status-board .admin-report-metric {
+  border: 1px solid color-mix(in srgb, var(--brand-line) 72%, white);
 }
 
 .admin-setup-banner {
@@ -2752,6 +2868,8 @@ body.has-global-session-nav {
   .operations-card-grid,
   .settings-summary,
   .settings-forms-grid,
+  .reception-identity-panel,
+  .reception-action-grid,
   .team-layout {
     grid-template-columns: 1fr;
   }
@@ -2782,6 +2900,10 @@ body.has-global-session-nav {
   .admin-command-bar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .reception-identity-panel {
+    align-items: stretch;
   }
 
   body.has-global-session-nav {

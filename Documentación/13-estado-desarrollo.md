@@ -1,7 +1,23 @@
 ﻿# 13. Estado de Desarrollo
 
 Estado: en progreso  
-Fecha: 15 de julio de 2026
+Fecha: 19 de julio de 2026
+
+## Correccion frontend recepcion - 19 de julio de 2026
+
+Implementado:
+
+- La portada `/reception` ahora funciona como dashboard rapido de mostrador sin menu lateral duplicado.
+- La pantalla muestra marca, logo, sucursal activa, perfil, usuario, alcance y salida de sesion en una tarjeta superior.
+- Las acciones de recepcion quedan en una sola cuadricula: caja/POS, socios, ventas, kiosco, reservas y beneficios.
+- Se elimino la seccion secundaria "Mas herramientas de recepcion" para evitar duplicidad y saturacion.
+- Si el usuario de recepcion tiene una sola sucursal permitida y la sesion guardada no trae `branchId`, el frontend selecciona automaticamente esa sucursal.
+
+Verificado:
+
+- `npm.cmd run lint`
+- `npm.cmd run typecheck`
+- `npm.cmd run build`
 
 ## Hito 0 - Base tecnica vendible
 
