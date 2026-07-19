@@ -246,9 +246,7 @@ Correccion Hito 7.9:
 - Los botones `Datos, marca y sucursales` y `Equipo y accesos` deben entrar primero en modo soporte cuando el gimnasio seleccionado no es el contexto activo, y despues navegar a la pantalla correspondiente.
 - El CRM debe limpiar la tabla de sucursales al cambiar de gimnasio y recargarla explicitamente para evitar mostrar sucursales stale de otro tenant.
 - En modo soporte, la accion de una sucursal siempre debe permitir abrir herramientas; si la sucursal ya es la activa se muestra como entrada a soporte, no como boton inutil bloqueado.
-- Las herramientas de soporte del CRM se separan visualmente de la administracion del cliente: metricas, ventas y pagos, caja/POS y socios requieren sucursal activa.
-- Si el gimnasio tiene una sola sucursal y Admin GymOS abre una herramienta operativa desde el CRM, el frontend selecciona esa sucursal automaticamente antes de navegar.
-- Si el gimnasio tiene varias sucursales y no hay sucursal activa, el frontend debe pedir seleccionar una sucursal antes de abrir herramientas operativas.
+- El CRM no debe duplicar herramientas operativas debajo del detalle; para entrar a administracion o soporte operativo se usa la accion de la sucursal.
 - Si un gimnasio todavia no tiene sucursales, el detalle muestra un estado vacio claro y mantiene disponible la accion de crear sucursal.
 - El Admin GymOS puede crear tenants completos sin dejarlos "a medias"; sucursales, usuarios y marca avanzada son pasos explicitos del detalle del cliente.
 - El menu lateral usa secciones plegables; la seccion activa queda abierta y las demas permanecen compactas para reducir saturacion visual.
@@ -270,6 +268,10 @@ Marca por gimnasio:
 - Campos soportados: `brandName`, `logoUrl`, `primaryColor`, `accentColor`, `surfaceColor`.
 - Plataforma usa tema neutral; tenant usa su propia marca en dueño, gerencia, recepcion, coaches, kiosco y pantallas internas.
 - La marca lateral usa los colores del tenant y muestra el logo configurado cuando `logoUrl` existe.
+- El logo se carga desde un selector de archivo, no escribiendo una URL manualmente.
+- Los logos cargados desde frontend local se guardan en `frontend/public/tenants/<slug-del-gimnasio>/logo.*` y se exponen como `/tenants/<slug-del-gimnasio>/logo.*`.
+- Docker Compose monta `frontend/public/tenants` en el contenedor frontend para preservar logos cargados durante pruebas locales.
+- `primaryColor` se usa en acciones principales y titulos; `accentColor` se usa en bordes activos, chips, botones secundarios y detalles de marca; `surfaceColor` se usa como fondo real de la consola tenant.
 
 Formularios:
 - Los campos compartidos viven en `frontend/src/components/forms/FormFields.tsx`.
@@ -279,6 +281,7 @@ Formularios:
   - Telefonos de gimnasio, sucursal y usuario interno en formato `+52` mas 10 digitos; si el usuario captura 10 digitos, el frontend antepone `+52`.
   - Confirmacion modal nativa antes de suspender/reactivar gimnasios o usuarios.
 - Al crear un usuario con rol `Dueno del gimnasio`, el frontend asigna automaticamente todas las sucursales existentes del tenant. Gerentes, recepcionistas y coaches siguen seleccionando sucursales concretas.
+- Un gerente no ve ni puede seleccionar `Dueno del gimnasio` ni `Gerente` al crear o modificar usuarios; solo puede asignar roles operativos permitidos.
 - `/users` permite cambiar el rol de usuarios existentes desde la tabla, excepto la propia cuenta del usuario autenticado.
 - `AppShell` resuelve el nombre real de la sucursal activa cuando una pagina no carga la lista de sucursales por si misma, evitando mostrar solo "Sucursal seleccionada".
 - Beneficios, accesos y automatizaciones deben renderizarse dentro del shell lateral unificado.

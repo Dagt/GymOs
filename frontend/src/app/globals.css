@@ -22,8 +22,7 @@
 }
 
 body {
-  background:
-    linear-gradient(135deg, var(--brand-surface), #eef6f7 50%, #f8fafc);
+  background: var(--brand-surface);
   color: var(--foreground);
   font-family: "Inter", "Segoe UI", Arial, Helvetica, sans-serif;
 }
@@ -204,8 +203,8 @@ th {
 }
 
 .app-button-secondary {
-  background: white;
-  border: 1px solid var(--brand-line);
+  background: color-mix(in srgb, var(--brand-accent) 10%, white);
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 38%, var(--brand-line));
   color: var(--brand-ink);
 }
 
@@ -1070,6 +1069,7 @@ th {
 .login-form-panel button,
 .form-primary-button {
   background: var(--brand-primary);
+  border-bottom: 0.25rem solid var(--brand-accent);
   border-radius: 0.65rem;
   color: white;
   font-weight: 900;
@@ -1103,8 +1103,7 @@ th {
 }
 
 .admin-console {
-  background:
-    linear-gradient(135deg, #f8fafc, #eef7f6);
+  background: var(--brand-surface);
   color: var(--brand-ink);
   display: grid;
   grid-template-columns: 17rem minmax(0, 1fr);
@@ -1135,7 +1134,7 @@ th {
   align-items: center;
   background:
     var(--brand-logo-url),
-    linear-gradient(135deg, var(--brand-accent), #22c55e);
+    linear-gradient(135deg, var(--brand-accent), color-mix(in srgb, var(--brand-primary) 35%, white));
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
@@ -1270,7 +1269,8 @@ th {
 }
 
 .admin-sidebar nav a.active {
-  background: white;
+  background: color-mix(in srgb, var(--brand-accent) 13%, white);
+  border-left: 0.25rem solid var(--brand-accent);
   color: #0f172a;
 }
 
@@ -1359,8 +1359,8 @@ th {
 }
 
 .admin-role-chip {
-  background: color-mix(in srgb, var(--brand-primary-soft) 65%, white);
-  border: 1px solid color-mix(in srgb, var(--brand-primary) 16%, white);
+  background: color-mix(in srgb, var(--brand-accent) 10%, white);
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 30%, var(--brand-line));
   border-radius: 0.5rem;
   display: grid;
   gap: 0.08rem;
@@ -1946,9 +1946,9 @@ th {
 }
 
 .platform-actions {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.85rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 1rem;
 }
 
@@ -1961,6 +1961,78 @@ th {
   flex-wrap: wrap;
   gap: 0.7rem;
   padding: 0.8rem;
+}
+
+.platform-action-group:only-child {
+  max-width: 44rem;
+}
+
+.logo-upload-field {
+  align-items: center;
+  background: color-mix(in srgb, var(--brand-accent) 9%, white);
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 32%, var(--brand-line));
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  padding: 0.85rem;
+}
+
+.logo-upload-field div:first-child {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.logo-upload-field span {
+  color: var(--brand-muted);
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.logo-upload-field strong {
+  color: var(--brand-ink);
+  font-weight: 950;
+}
+
+.logo-upload-field small {
+  color: var(--brand-muted);
+}
+
+.logo-upload-field img,
+.logo-upload-placeholder {
+  background: white;
+  border: 1px solid var(--brand-line);
+  border-radius: 0.55rem;
+  height: 3.5rem;
+  object-fit: contain;
+  padding: 0.35rem;
+  width: 3.5rem;
+}
+
+.logo-upload-placeholder {
+  align-items: center;
+  color: var(--brand-muted);
+  display: flex;
+  font-size: 0.7rem;
+  font-weight: 950;
+  justify-content: center;
+}
+
+.logo-upload-field label {
+  background: var(--brand-primary);
+  border-bottom: 0.2rem solid var(--brand-accent);
+  border-radius: 0.55rem;
+  color: white;
+  cursor: pointer;
+  font-size: 0.86rem;
+  font-weight: 900;
+  padding: 0.75rem 0.9rem;
+  text-align: center;
+}
+
+.logo-upload-field input {
+  display: none;
 }
 
 .platform-action-group span {
@@ -2432,13 +2504,26 @@ button.admin-secondary-link:disabled {
 
 .team-user-table article {
   align-items: center;
-  background: white;
+  background: color-mix(in srgb, var(--brand-surface) 28%, white);
   border: 1px solid var(--brand-line);
   border-radius: 0.75rem;
   display: grid;
   gap: 1rem;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto;
-  padding: 0.95rem;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(18rem, auto);
+  padding: 1rem;
+  position: relative;
+}
+
+.team-user-table article::before {
+  background: var(--brand-accent);
+  border-radius: 999px;
+  content: "";
+  height: calc(100% - 1.4rem);
+  left: 0.45rem;
+  opacity: 0.85;
+  position: absolute;
+  top: 0.7rem;
+  width: 0.22rem;
 }
 
 .team-user-table article > div {
@@ -2449,10 +2534,13 @@ button.admin-secondary-link:disabled {
 
 .team-user-actions {
   align-items: center;
-  display: flex;
-  flex-wrap: wrap;
+  background: white;
+  border: 1px solid var(--brand-line);
+  border-radius: 0.65rem;
+  display: grid;
   gap: 0.6rem;
-  justify-content: flex-end;
+  grid-template-columns: minmax(11rem, 1fr) auto auto;
+  padding: 0.65rem;
 }
 
 .team-role-control {
@@ -2491,7 +2579,7 @@ button.admin-secondary-link:disabled {
 }
 
 .team-user-actions button {
-  background: var(--brand-primary);
+  background: color-mix(in srgb, var(--brand-primary) 92%, black);
   border-radius: 0.5rem;
   color: white;
   font-size: 0.8rem;
@@ -2501,16 +2589,22 @@ button.admin-secondary-link:disabled {
 }
 
 .team-user-actions button.danger-action {
-  background: #991b1b;
+  background: #7f1d1d;
 }
 
 .team-user-actions button.safe-action {
   background: #166534;
+  border-bottom: 0.2rem solid var(--brand-accent);
 }
 
 .team-user-actions button:disabled {
   cursor: not-allowed;
   opacity: 0.65;
+}
+
+.team-role-control select:focus {
+  border-color: var(--brand-accent) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-accent) 18%, transparent);
 }
 
 .admin-empty-state {
@@ -2751,6 +2845,11 @@ body.has-global-session-nav {
 
   .platform-table-row {
     align-items: start;
+    grid-template-columns: 1fr;
+  }
+
+  .logo-upload-field {
+    align-items: stretch;
     grid-template-columns: 1fr;
   }
 

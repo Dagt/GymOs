@@ -79,7 +79,7 @@ export default function UsersPage() {
         setBranches(availableBranches);
         setRoles(availableRoles);
         setUsers(existingUsers);
-        const selectableRoles = availableRoles.filter((role) => displayRoleName(role.name) !== "Admin GymOS");
+        const selectableRoles = availableRoles.filter((role) => canShowRoleForSession(stored.user.roles, role.name, stored.user.platformAdmin));
         const defaultRole = selectableRoles.find((role) => displayRoleName(role.name) === "Recepcion") ?? selectableRoles[0];
         setForm((current) => ({ ...current, roleId: defaultRole?.id ?? "" }));
       } catch (exception) {
@@ -101,9 +101,9 @@ export default function UsersPage() {
   }, []);
 
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
-  const selectableRoles = roles.filter((role) => displayRoleName(role.name) !== "Admin GymOS");
+  const selectableRoles = roles.filter((role) => canShowRoleForSession(session?.user.roles ?? [], role.name, Boolean(session?.user.platformAdmin)));
   const selectedRoleLabel = displayRoleName(selectableRoles.find((role) => role.id === form.roleId)?.name ?? "");
-  const ownerRoleSelected = selectedRoleLabel === "Dueño del gimnasio" || selectedRoleLabel === "DueÃ±o del gimnasio";
+  const ownerRoleSelected = selectedRoleLabel === "Dueno del gimnasio";
 
   async function submitUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -268,7 +268,7 @@ export default function UsersPage() {
                   setForm({
                     ...form,
                     roleId: nextRoleId,
-                    branchIds: nextLabel === "Dueño del gimnasio" || nextLabel === "DueÃ±o del gimnasio"
+                    branchIds: nextLabel === "Dueno del gimnasio"
                       ? branches.map((branch) => branch.id)
                       : form.branchIds,
                   });
@@ -289,7 +289,7 @@ export default function UsersPage() {
                 <strong>Sucursales permitidas</strong>
                 <span>
                   {ownerRoleSelected
-                    ? "El dueño del gimnasio recibe acceso a todas las sucursales actuales."
+                    ? "El dueno del gimnasio recibe acceso a todas las sucursales actuales."
                     : "Selecciona todas las sedes donde este usuario puede trabajar."}
                 </span>
               </div>
@@ -421,15 +421,15 @@ function Field({
 }
 
 function displayRoleName(roleName: string) {
-  const normalized = roleName.toLowerCase();
+  const normalized = normalizeRoleName(roleName);
   if (normalized.includes("admin") && normalized.includes("gymos")) {
     return "Admin GymOS";
   }
   if (normalized === "administrador" || normalized.includes("owner")) {
-    return "Dueño del gimnasio";
+    return "Dueno del gimnasio";
   }
   if (normalized.includes("dueno")) {
-    return "Dueño del gimnasio";
+    return "Dueno del gimnasio";
   }
   if (normalized.includes("gerencia") || normalized.includes("gerente")) {
     return "Gerente";
@@ -443,12 +443,39 @@ function displayRoleName(roleName: string) {
   return roleName;
 }
 
+function canShowRoleForSession(currentRoles: string[], roleName: string, platformAdmin: boolean) {
+  const label = displayRoleName(roleName);
+  if (label === "Admin GymOS") {
+    return false;
+  }
+  if (platformAdmin) {
+    return true;
+  }
+  const currentLabels = currentRoles.map(displayRoleName);
+  const isTenantOwner = currentLabels.includes("Dueno del gimnasio");
+  const isTenantManager = currentLabels.includes("Gerente");
+  if (isTenantOwner) {
+    return label !== "Dueno del gimnasio";
+  }
+  if (isTenantManager) {
+    return label === "Recepcion" || label === "Coach";
+  }
+  return label === "Recepcion" || label === "Coach";
+}
+
+function normalizeRoleName(roleName: string) {
+  return roleName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
 function roleDescription(roleName: string, fallback?: string | null) {
   const label = displayRoleName(roleName);
   if (label === "Admin GymOS") {
     return "Crea gimnasios cliente y entra en modo soporte auditable.";
   }
-  if (label === "Dueño del gimnasio") {
+  if (label === "Dueno del gimnasio") {
     return "Administra su gimnasio, sucursales, equipo, configuracion y metricas.";
   }
   if (label === "Gerente") {

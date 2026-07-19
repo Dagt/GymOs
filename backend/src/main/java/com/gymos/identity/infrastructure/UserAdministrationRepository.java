@@ -104,6 +104,19 @@ public class UserAdministrationRepository {
 		return count > 0;
 	}
 
+	public String roleName(UUID roleId) {
+		return jdbcClient.sql("""
+				SELECT name
+				FROM role
+				WHERE id = :roleId
+				  AND deleted_at IS NULL
+				""")
+				.param("roleId", roleId)
+				.query(String.class)
+				.optional()
+				.orElse("");
+	}
+
 	public boolean branchBelongsToOrganization(UUID organizationId, UUID branchId) {
 		Integer count = jdbcClient.sql("""
 				SELECT COUNT(*)

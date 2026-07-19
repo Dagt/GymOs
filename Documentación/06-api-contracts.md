@@ -779,8 +779,10 @@ Valores posibles de `console`:
 
 - En contexto tenant o soporte devuelve roles del gimnasio: `Dueno del gimnasio`, `Gerente`, `Recepcion`, `Coach`.
 - No devuelve `Administrador GymOS` cuando se administran usuarios de un gimnasio.
+- Para gerentes, la lista queda limitada a roles operativos permitidos; no devuelve `Dueno del gimnasio` ni `Gerente`.
 
 `POST /api/v1/users/internal`:
 
 - Rechaza cualquier rol con `platform.admin` con `ROLE_NOT_AVAILABLE`.
+- Rechaza roles no asignables por el perfil actual con `ROLE_NOT_ALLOWED`; por ejemplo, un gerente no puede crear dueños ni otros gerentes.
 - Los usuarios creados entran a su consola segun permisos/rol.

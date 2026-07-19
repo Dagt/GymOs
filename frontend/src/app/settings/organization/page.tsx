@@ -13,6 +13,7 @@ import {
   validateRequired,
   validateRfc,
 } from "@/components/FormFields";
+import { LogoUploadField } from "@/components/LogoUploadField";
 import {
   createBranch,
   getBranches,
@@ -254,7 +255,12 @@ export default function OrganizationSettingsPage() {
             <hr className="border-[#dbe4ee]" />
             <p className="app-eyebrow">Marca del gimnasio</p>
             <Field label="Nombre visible de marca" value={organizationForm.brandName ?? ""} onChange={(value) => setOrganizationForm({ ...organizationForm, brandName: value })} />
-            <Field label="URL del logo" value={organizationForm.logoUrl ?? ""} onChange={(value) => setOrganizationForm({ ...organizationForm, logoUrl: value })} />
+            <LogoUploadField
+              disabled={saving}
+              logoUrl={organizationForm.logoUrl}
+              tenantName={organizationForm.tradeName || organizationForm.brandName || organizationForm.legalName}
+              onChange={(logoUrl) => setOrganizationForm({ ...organizationForm, logoUrl })}
+            />
             <div className="grid gap-4 sm:grid-cols-3">
               <Field label="Color principal" type="color" value={organizationForm.primaryColor ?? "#164E63"} onChange={(value) => setOrganizationForm({ ...organizationForm, primaryColor: value })} />
               <Field label="Color acento" type="color" value={organizationForm.accentColor ?? "#F59E0B"} onChange={(value) => setOrganizationForm({ ...organizationForm, accentColor: value })} />

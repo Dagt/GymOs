@@ -1015,17 +1015,25 @@ export type CreateSalePayload = {
 };
 
 export async function login(username: string, password: string): Promise<AuthResponse> {
-  const response = await fetch(`${API_BASE_URL}/auth/login`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ username, password }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ username, password }),
+    });
+  } catch {
+    throw new Error(`No se pudo conectar con el servidor (${API_BASE_URL}). Revisa que el backend este encendido.`);
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => null);
-    throw new Error(error?.message ?? "No fue posible iniciar sesión.");
+    if (response.status === 401) {
+      throw new Error("Usuario o contrasena incorrectos.");
+    }
+    throw new Error(formatApiError(response, "/auth/login", error));
   }
 
   return normalizeAuthResponse(await response.json());

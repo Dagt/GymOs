@@ -19,6 +19,7 @@ import {
   validateRfc,
   validateRequired,
 } from "@/components/FormFields";
+import { LogoUploadField } from "@/components/LogoUploadField";
 import {
   createBranch,
   createOrganization,
@@ -247,27 +248,7 @@ export default function PlatformGymnasiumsPage() {
     }
   }
 
-  async function ensureBranchForTools(currentSession: StoredSession, organizationId: string): Promise<StoredSession | null> {
-    const availableBranches = await refreshBranches(currentSession.accessToken, organizationId);
-    if (availableBranches.length === 0) {
-      setError("Este gimnasio no tiene sucursales. Crea una sucursal antes de abrir herramientas operativas.");
-      return null;
-    }
-    if (currentSession.user.branchId && availableBranches.some((branch) => branch.id === currentSession.user.branchId)) {
-      return currentSession;
-    }
-    if (availableBranches.length === 1) {
-      const nextSession = await selectBranch(currentSession.accessToken, availableBranches[0].id);
-      storeSession(nextSession);
-      setSession(nextSession);
-      await refreshBranches(nextSession.accessToken, organizationId);
-      return nextSession;
-    }
-    setError("Selecciona una sucursal para entrar a las herramientas operativas de soporte.");
-    return null;
-  }
-
-  async function goToTenantSection(path: string, requiresBranch = false) {
+  async function goToTenantSection(path: string) {
     if (!selectedOrganization) {
       return;
     }
@@ -275,10 +256,7 @@ export default function PlatformGymnasiumsPage() {
     if (!nextSession) {
       return;
     }
-    const readySession = requiresBranch ? await ensureBranchForTools(nextSession, selectedOrganization.id) : nextSession;
-    if (readySession) {
-      router.push(path);
-    }
+    router.push(path);
   }
 
   async function openBranchDrawer() {
@@ -543,21 +521,6 @@ export default function PlatformGymnasiumsPage() {
                     Equipo y accesos
                   </button>
                 </div>
-                <div className="platform-action-group">
-                  <span>Herramientas de soporte</span>
-                  <button className="admin-secondary-link" disabled={selectingId !== null} onClick={() => goToTenantSection("/dashboard", true)} type="button">
-                    Metricas
-                  </button>
-                  <button className="admin-secondary-link" disabled={selectingId !== null} onClick={() => goToTenantSection("/reports/sales", true)} type="button">
-                    Ventas y pagos
-                  </button>
-                  <button className="admin-secondary-link" disabled={selectingId !== null} onClick={() => goToTenantSection("/pos", true)} type="button">
-                    Caja / POS
-                  </button>
-                  <button className="admin-secondary-link" disabled={selectingId !== null} onClick={() => goToTenantSection("/clients", true)} type="button">
-                    Socios
-                  </button>
-                </div>
               </div>
             </>
           ) : (
@@ -587,7 +550,12 @@ export default function PlatformGymnasiumsPage() {
               <PhoneField error={fieldErrors.contactPhone} label="Telefono contacto" name="contactPhone" required value={form.contactPhone ?? ""} onChange={(value) => setForm({ ...form, contactPhone: value })} />
               <hr className="border-[#dbe4ee]" />
               <TextField error={fieldErrors.brandName} label="Nombre visible de marca" name="brandName" required={false} value={form.brandName ?? ""} onChange={(value) => setForm({ ...form, brandName: value })} />
-              <TextField label="URL del logo" name="logoUrl" required={false} value={form.logoUrl ?? ""} onChange={(value) => setForm({ ...form, logoUrl: value })} />
+              <LogoUploadField
+                disabled={saving}
+                logoUrl={form.logoUrl}
+                tenantName={form.tradeName || form.brandName || form.legalName}
+                onChange={(logoUrl) => setForm({ ...form, logoUrl })}
+              />
               <div className="platform-color-grid">
                 <TextField error={fieldErrors.primaryColor} label="Color principal" name="primaryColor" value={form.primaryColor ?? "#164E63"} onChange={(value) => setForm({ ...form, primaryColor: value })} />
                 <TextField error={fieldErrors.accentColor} label="Color acento" name="accentColor" value={form.accentColor ?? "#F59E0B"} onChange={(value) => setForm({ ...form, accentColor: value })} />

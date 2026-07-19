@@ -7,8 +7,10 @@ import com.gymos.identity.application.command.CreateInternalUserCommand;
 import com.gymos.identity.application.result.InternalUserSummary;
 import com.gymos.identity.application.result.RoleOption;
 import com.gymos.identity.infrastructure.UserAdministrationRepository;
+import java.text.Normalizer;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -35,7 +37,9 @@ public class UserAdministrationService {
 	public List<RoleOption> roles(GymOsPrincipal principal) {
 		requirePrincipal(principal);
 		boolean includePlatformRoles = principal.platformAdmin() && !principal.supportMode();
-		return repository.findRoles(principal.organizationId(), includePlatformRoles);
+		return repository.findRoles(principal.organizationId(), includePlatformRoles).stream()
+				.filter(role -> canAssignRole(principal, role.name()))
+				.toList();
 	}
 
 	@Transactional(readOnly = true)
@@ -57,6 +61,7 @@ public class UserAdministrationService {
 		if (repository.roleHasPermission(command.roleId(), "platform.admin")) {
 			throw new BusinessException("ROLE_NOT_AVAILABLE", "No puedes asignar roles de plataforma desde un gimnasio.");
 		}
+		requireAssignableRole(principal, command.roleId());
 		List<UUID> branchIds = command.branchIds() == null ? List.of() : command.branchIds().stream().distinct().toList();
 		for (UUID branchId : branchIds) {
 			if (!repository.branchBelongsToOrganization(principal.organizationId(), branchId)) {
@@ -142,6 +147,7 @@ public class UserAdministrationService {
 		if (repository.roleHasPermission(roleId, "platform.admin")) {
 			throw new BusinessException("ROLE_NOT_AVAILABLE", "No puedes asignar roles de plataforma desde un gimnasio.");
 		}
+		requireAssignableRole(principal, roleId);
 		repository.replaceRoles(userId, roleId);
 		auditService.record(principal, "INTERNAL_USER_ROLE_UPDATED", "USER", userId, "ADMIN", roleId.toString(), correlationId);
 		return repository.findUsers(principal.organizationId()).stream()
@@ -166,5 +172,57 @@ public class UserAdministrationService {
 			throw new BusinessException("USER_STATUS_NOT_AVAILABLE", "Usa un estado valido: ACTIVE, SUSPENDED o INACTIVE.");
 		}
 		return normalized;
+	}
+
+	private void requireAssignableRole(GymOsPrincipal principal, UUID roleId) {
+		String roleName = repository.roleName(roleId);
+		if (!canAssignRole(principal, roleName)) {
+			throw new BusinessException("ROLE_NOT_ALLOWED", "Tu perfil no puede asignar ese rol.");
+		}
+	}
+
+	private boolean canAssignRole(GymOsPrincipal principal, String targetRoleName) {
+		String target = normalizeRoleName(targetRoleName);
+		if (target.contains("admin") && target.contains("gymos")) {
+			return false;
+		}
+		if (principal.platformAdmin()) {
+			return true;
+		}
+		boolean targetIsOwner = isOwnerRole(target);
+		boolean targetIsReception = target.contains("recepcion") || target.contains("caja");
+		boolean targetIsCoach = target.contains("coach");
+		if (isPrincipalOwner(principal)) {
+			return !targetIsOwner;
+		}
+		if (isPrincipalManager(principal)) {
+			return targetIsReception || targetIsCoach;
+		}
+		return false;
+	}
+
+	private boolean isPrincipalOwner(GymOsPrincipal principal) {
+		return principal.roles().stream()
+				.map(this::normalizeRoleName)
+				.anyMatch(this::isOwnerRole);
+	}
+
+	private boolean isPrincipalManager(GymOsPrincipal principal) {
+		return principal.roles().stream()
+				.map(this::normalizeRoleName)
+				.anyMatch(role -> role.contains("gerente") || role.contains("gerencia"));
+	}
+
+	private boolean isOwnerRole(String roleName) {
+		return roleName.equals("administrador")
+				|| roleName.contains("dueno")
+				|| roleName.contains("owner");
+	}
+
+	private String normalizeRoleName(String value) {
+		String normalized = value == null ? "" : value.trim();
+		return Normalizer.normalize(normalized, Normalizer.Form.NFD)
+				.replaceAll("\\p{M}", "")
+				.toLowerCase(Locale.ROOT);
 	}
 }
