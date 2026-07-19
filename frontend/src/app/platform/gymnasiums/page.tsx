@@ -11,10 +11,12 @@ import {
   PhoneField,
   TextField,
   normalizePhone,
+  normalizeRfc,
   validateBranchCode,
   validateEmail,
   validateHexColor,
   validatePhone,
+  validateRfc,
   validateRequired,
 } from "@/components/FormFields";
 import {
@@ -247,6 +249,7 @@ export default function PlatformGymnasiumsPage() {
     try {
       const payload = {
         ...form,
+        taxId: normalizeRfc(form.taxId ?? ""),
         contactPhone: normalizePhone(form.contactPhone ?? ""),
       };
       const created = await createOrganization(session.accessToken, payload);
@@ -313,6 +316,14 @@ export default function PlatformGymnasiumsPage() {
       return;
     }
     const nextStatus = selectedOrganization.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE";
+    const confirmed = window.confirm(
+      nextStatus === "ACTIVE"
+        ? `¿Quieres reactivar ${selectedOrganization.tradeName}? Sus usuarios podran volver a operar.`
+        : `¿Quieres suspender ${selectedOrganization.tradeName}? Sus usuarios no podran iniciar sesion mientras este suspendido.`,
+    );
+    if (!confirmed) {
+      return;
+    }
     setSaving(true);
     setError(null);
     setMessage(null);
@@ -498,9 +509,9 @@ export default function PlatformGymnasiumsPage() {
             <form className="grid gap-4" onSubmit={submitOrganization}>
               <TextField error={fieldErrors.tradeName} label="Nombre comercial" name="tradeName" value={form.tradeName} onChange={(value) => setForm({ ...form, tradeName: value, brandName: form.brandName || value })} />
               <TextField error={fieldErrors.legalName} label="Nombre legal" name="legalName" value={form.legalName} onChange={(value) => setForm({ ...form, legalName: value })} />
-              <TextField label="RFC / Tax ID" name="taxId" required={false} value={form.taxId ?? ""} onChange={(value) => setForm({ ...form, taxId: value })} />
-              <EmailField error={fieldErrors.contactEmail} label="Email contacto" name="contactEmail" value={form.contactEmail ?? ""} onChange={(value) => setForm({ ...form, contactEmail: value })} />
-              <PhoneField error={fieldErrors.contactPhone} label="Telefono contacto" name="contactPhone" value={form.contactPhone ?? ""} onChange={(value) => setForm({ ...form, contactPhone: value })} />
+              <TextField error={fieldErrors.taxId} label="RFC" name="taxId" value={form.taxId ?? ""} onChange={(value) => setForm({ ...form, taxId: normalizeRfc(value) })} />
+              <EmailField error={fieldErrors.contactEmail} label="Email contacto" name="contactEmail" required value={form.contactEmail ?? ""} onChange={(value) => setForm({ ...form, contactEmail: value })} />
+              <PhoneField error={fieldErrors.contactPhone} label="Telefono contacto" name="contactPhone" required value={form.contactPhone ?? ""} onChange={(value) => setForm({ ...form, contactPhone: value })} />
               <hr className="border-[#dbe4ee]" />
               <TextField error={fieldErrors.brandName} label="Nombre visible de marca" name="brandName" required={false} value={form.brandName ?? ""} onChange={(value) => setForm({ ...form, brandName: value })} />
               <TextField label="URL del logo" name="logoUrl" required={false} value={form.logoUrl ?? ""} onChange={(value) => setForm({ ...form, logoUrl: value })} />
@@ -543,8 +554,9 @@ function validateOrganization(form: CreateOrganizationPayload) {
   const errors: FieldErrorMap = {};
   addError(errors, "tradeName", validateRequired(form.tradeName, "Nombre comercial"));
   addError(errors, "legalName", validateRequired(form.legalName, "Nombre legal"));
-  addError(errors, "contactEmail", validateEmail(form.contactEmail ?? ""));
-  addError(errors, "contactPhone", validatePhone(form.contactPhone ?? ""));
+  addError(errors, "taxId", validateRfc(form.taxId ?? "", true));
+  addError(errors, "contactEmail", validateEmail(form.contactEmail ?? "", true));
+  addError(errors, "contactPhone", validatePhone(form.contactPhone ?? "", true));
   addError(errors, "primaryColor", validateHexColor(form.primaryColor ?? "", "Color principal", true));
   addError(errors, "accentColor", validateHexColor(form.accentColor ?? "", "Color acento", true));
   addError(errors, "surfaceColor", validateHexColor(form.surfaceColor ?? "", "Color fondo", true));
@@ -556,7 +568,7 @@ function validateBranch(form: CreateBranchPayload) {
   addError(errors, "name", validateRequired(form.name, "Nombre de sucursal"));
   addError(errors, "code", validateBranchCode(form.code));
   addError(errors, "timezone", validateRequired(form.timezone, "Zona horaria"));
-  addError(errors, "phone", validatePhone(form.phone ?? ""));
+  addError(errors, "phone", validatePhone(form.phone ?? "", true));
   return errors;
 }
 

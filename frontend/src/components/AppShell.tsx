@@ -2,8 +2,8 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, type ReactNode } from "react";
-import { clearSession, selectOrganization, storeSession, type StoredSession } from "@/lib/api";
+import { useEffect, useState, type ReactNode } from "react";
+import { clearSession, getBranches, selectOrganization, storeSession, type StoredSession } from "@/lib/api";
 import {
   getConsoleProfile,
   isPlatformAdmin,
@@ -64,7 +64,6 @@ const ownerSections: NavigationSection[] = [
   {
     title: "Mostrador",
     links: [
-      { label: "Recepcion", href: "/reception", hint: "Inicio operativo", permissions: ["client.read", "sale.create"] },
       { label: "Caja / POS", href: "/pos", hint: "Ventas y pagos", permissions: ["sale.create"] },
       { label: "Socios", href: "/clients", hint: "Altas y fichas", permissions: ["client.read"] },
       { label: "Accesos", href: "/access", hint: "Visitas y pases", permissions: ["access.read", "visit.read"] },
@@ -95,7 +94,6 @@ const managerSections: NavigationSection[] = [
   {
     title: "Mostrador",
     links: [
-      { label: "Recepcion", href: "/reception", hint: "Apoyo operativo", permissions: ["client.read", "sale.create"] },
       { label: "Caja / POS", href: "/pos", hint: "Ventas", permissions: ["sale.create"] },
       { label: "Socios", href: "/clients", hint: "Clientes", permissions: ["client.read"] },
     ],
@@ -151,10 +149,14 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [resolvedBranch, setResolvedBranch] = useState<{ branchId: string; name: string } | null>(null);
   const consoleType = resolveUserConsole(session.user);
   const role = getConsoleProfile(session.user);
   const hasBranch = mode === "operation" ? true : mode === "setup" ? false : Boolean(branchName || session.user.branchId);
-  const visibleBranch = branchName ?? (session.user.branchId ? "Sucursal seleccionada" : "Sin sucursal");
+  const visibleBranch =
+    branchName
+    ?? (resolvedBranch?.branchId === session.user.branchId ? resolvedBranch.name : null)
+    ?? (session.user.branchId ? "Sucursal seleccionada" : "Sin sucursal");
   const permissionSet = new Set(session.user.permissions);
   const sections = sectionsForConsole(consoleType, variant)
     .map((section) => ({
@@ -163,6 +165,28 @@ export function AppShell({
     }))
     .filter((section) => section.links.length > 0);
   const visibleActions = variant === "platform" ? actions : [];
+
+  useEffect(() => {
+    if (!session.user.branchId || branchName) {
+      return;
+    }
+    let cancelled = false;
+    async function resolveBranchName() {
+      try {
+        const branches = await getBranches(session.accessToken);
+        const branch = branches.find((item) => item.id === session.user.branchId);
+        if (!cancelled && branch) {
+          setResolvedBranch({ branchId: branch.id, name: branch.name });
+        }
+      } catch {
+        // The shell falls back to a neutral label if branch lookup is unavailable.
+      }
+    }
+    void resolveBranchName();
+    return () => {
+      cancelled = true;
+    };
+  }, [branchName, session.accessToken, session.user.branchId]);
 
   useEffect(() => {
     if (hasBranch || variant === "platform" || isPlatformAdmin(session.user) || !session.user.organizationId) {

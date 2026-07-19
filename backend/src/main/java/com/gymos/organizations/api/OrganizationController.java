@@ -33,6 +33,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class OrganizationController {
 	private final OrganizationService organizationService;
 	private static final String HEX_COLOR = "^#[0-9A-Fa-f]{6}$";
+	private static final String MX_RFC = "^[A-ZÑ&]{4}\\d{6}[A-Z0-9]{3}$";
+	private static final String MX_PHONE = "^\\+52\\d{10}$";
 
 	public OrganizationController(OrganizationService organizationService) {
 		this.organizationService = organizationService;
@@ -116,11 +118,11 @@ public class OrganizationController {
 	public record OrganizationUpdateRequest(
 			@NotBlank @Size(max = 180) String legalName,
 			@NotBlank @Size(max = 120) String tradeName,
-			@Size(max = 64) String taxId,
+			@NotBlank @Pattern(regexp = MX_RFC) String taxId,
 			@NotBlank @Size(max = 64) String timezone,
 			@NotBlank @Pattern(regexp = "[A-Za-z]{3}") String defaultCurrency,
-			@Email @Size(max = 180) String contactEmail,
-			@Size(max = 32) String contactPhone,
+			@NotBlank @Email @Size(max = 180) String contactEmail,
+			@NotBlank @Pattern(regexp = MX_PHONE) String contactPhone,
 			@Size(max = 120) String brandName,
 			@Size(max = 500) String logoUrl,
 			@Pattern(regexp = HEX_COLOR) String primaryColor,
@@ -148,11 +150,11 @@ public class OrganizationController {
 	public record OrganizationCreateRequest(
 			@NotBlank @Size(max = 180) String legalName,
 			@NotBlank @Size(max = 120) String tradeName,
-			@Size(max = 64) String taxId,
+			@NotBlank @Pattern(regexp = MX_RFC) String taxId,
 			@NotBlank @Size(max = 64) String timezone,
 			@NotBlank @Pattern(regexp = "[A-Za-z]{3}") String defaultCurrency,
-			@Email @Size(max = 180) String contactEmail,
-			@Size(max = 32) String contactPhone,
+			@NotBlank @Email @Size(max = 180) String contactEmail,
+			@NotBlank @Pattern(regexp = MX_PHONE) String contactPhone,
 			@Size(max = 120) String brandName,
 			@Size(max = 500) String logoUrl,
 			@Pattern(regexp = HEX_COLOR) String primaryColor,
@@ -160,7 +162,7 @@ public class OrganizationController {
 			@Pattern(regexp = HEX_COLOR) String surfaceColor,
 			@Size(max = 120) String firstBranchName,
 			@Size(max = 32) String firstBranchCode,
-			@Size(max = 32) String firstBranchPhone
+			@Pattern(regexp = MX_PHONE) String firstBranchPhone
 	) {
 		private CreateOrganizationCommand toCommand() {
 			return new CreateOrganizationCommand(
@@ -187,7 +189,7 @@ public class OrganizationController {
 			@NotBlank @Size(max = 120) String name,
 			@NotBlank @Size(max = 32) String code,
 			@NotBlank @Size(max = 64) String timezone,
-			@Size(max = 32) String phone
+			@NotBlank @Pattern(regexp = MX_PHONE) String phone
 	) {
 		private UpdateBranchCommand toCommand() {
 			return new UpdateBranchCommand(name, code, timezone, phone);
@@ -198,7 +200,7 @@ public class OrganizationController {
 			@NotBlank @Size(max = 120) String name,
 			@NotBlank @Size(max = 32) String code,
 			@NotBlank @Size(max = 64) String timezone,
-			@Size(max = 32) String phone
+			@NotBlank @Pattern(regexp = MX_PHONE) String phone
 	) {
 		private CreateBranchCommand toCommand() {
 			return new CreateBranchCommand(name, code, timezone, phone);

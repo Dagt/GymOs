@@ -4,6 +4,16 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
 import {
+  FieldErrorMap,
+  normalizePhone,
+  normalizeRfc,
+  validateBranchCode,
+  validateEmail,
+  validatePhone,
+  validateRequired,
+  validateRfc,
+} from "@/components/FormFields";
+import {
   createBranch,
   getBranches,
   getCurrentOrganization,
@@ -35,6 +45,7 @@ export default function OrganizationSettingsPage() {
   const [newBranchForm, setNewBranchForm] = useState<CreateBranchPayload>(emptyBranchForm);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<FieldErrorMap>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -92,11 +103,20 @@ export default function OrganizationSettingsPage() {
     if (!session || !organizationForm) {
       return;
     }
+    const errors = validateOrganizationForm(organizationForm);
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      return;
+    }
     setSaving(true);
     setError(null);
     setMessage(null);
     try {
-      const response = await updateOrganization(session.accessToken, organizationForm);
+      const response = await updateOrganization(session.accessToken, {
+        ...organizationForm,
+        taxId: normalizeRfc(organizationForm.taxId ?? ""),
+        contactPhone: normalizePhone(organizationForm.contactPhone ?? ""),
+      });
       setOrganization(response);
       setOrganizationForm(toOrganizationForm(response));
       setMessage("Datos del gimnasio actualizados.");
@@ -112,11 +132,19 @@ export default function OrganizationSettingsPage() {
     if (!session || !branchForm || !selectedBranchId) {
       return;
     }
+    const errors = validateBranchForm(branchForm, "branch");
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      return;
+    }
     setSaving(true);
     setError(null);
     setMessage(null);
     try {
-      const response = await updateBranch(session.accessToken, selectedBranchId, branchForm);
+      const response = await updateBranch(session.accessToken, selectedBranchId, {
+        ...branchForm,
+        phone: normalizePhone(branchForm.phone ?? ""),
+      });
       setBranches((current) => current.map((branch) => (branch.id === response.id ? response : branch)));
       setBranchForm(toBranchForm(response));
       setMessage("Sucursal actualizada.");
@@ -132,11 +160,19 @@ export default function OrganizationSettingsPage() {
     if (!session) {
       return;
     }
+    const errors = validateBranchForm(newBranchForm, "newBranch");
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      return;
+    }
     setSaving(true);
     setError(null);
     setMessage(null);
     try {
-      const response = await createBranch(session.accessToken, newBranchForm);
+      const response = await createBranch(session.accessToken, {
+        ...newBranchForm,
+        phone: normalizePhone(newBranchForm.phone ?? ""),
+      });
       setBranches((current) => [...current, response].sort((left, right) => left.name.localeCompare(right.name)));
       setSelectedBranchId(response.id);
       setBranchForm(toBranchForm(response));
@@ -206,15 +242,15 @@ export default function OrganizationSettingsPage() {
             Esta informacion identifica al gimnasio o cadena que estas administrando.
           </p>
           <form className="mt-5 grid gap-4" onSubmit={submitOrganization}>
-            <Field label="Nombre legal" value={organizationForm.legalName} onChange={(value) => setOrganizationForm({ ...organizationForm, legalName: value })} />
-            <Field label="Nombre comercial" value={organizationForm.tradeName} onChange={(value) => setOrganizationForm({ ...organizationForm, tradeName: value })} />
+            <Field error={fieldErrors.legalName} label="Nombre legal" value={organizationForm.legalName} onChange={(value) => setOrganizationForm({ ...organizationForm, legalName: value })} />
+            <Field error={fieldErrors.tradeName} label="Nombre comercial" value={organizationForm.tradeName} onChange={(value) => setOrganizationForm({ ...organizationForm, tradeName: value })} />
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="RFC / Tax ID" value={organizationForm.taxId ?? ""} onChange={(value) => setOrganizationForm({ ...organizationForm, taxId: value })} />
-              <Field label="Moneda" value={organizationForm.defaultCurrency} onChange={(value) => setOrganizationForm({ ...organizationForm, defaultCurrency: value })} />
-              <Field label="Zona horaria" value={organizationForm.timezone} onChange={(value) => setOrganizationForm({ ...organizationForm, timezone: value })} />
-              <Field label="Telefono" value={organizationForm.contactPhone ?? ""} onChange={(value) => setOrganizationForm({ ...organizationForm, contactPhone: value })} />
+              <Field error={fieldErrors.taxId} label="RFC" value={organizationForm.taxId ?? ""} onChange={(value) => setOrganizationForm({ ...organizationForm, taxId: normalizeRfc(value) })} />
+              <Field error={fieldErrors.defaultCurrency} label="Moneda" value={organizationForm.defaultCurrency} onChange={(value) => setOrganizationForm({ ...organizationForm, defaultCurrency: value })} />
+              <Field error={fieldErrors.timezone} label="Zona horaria" value={organizationForm.timezone} onChange={(value) => setOrganizationForm({ ...organizationForm, timezone: value })} />
+              <Field error={fieldErrors.contactPhone} help="Se guardara como +52 seguido de 10 digitos." label="Telefono" value={organizationForm.contactPhone ?? ""} onChange={(value) => setOrganizationForm({ ...organizationForm, contactPhone: value })} />
             </div>
-            <Field label="Email de contacto" type="email" value={organizationForm.contactEmail ?? ""} onChange={(value) => setOrganizationForm({ ...organizationForm, contactEmail: value })} />
+            <Field error={fieldErrors.contactEmail} label="Email de contacto" type="email" value={organizationForm.contactEmail ?? ""} onChange={(value) => setOrganizationForm({ ...organizationForm, contactEmail: value })} />
             <hr className="border-[#dbe4ee]" />
             <p className="app-eyebrow">Marca del gimnasio</p>
             <Field label="Nombre visible de marca" value={organizationForm.brandName ?? ""} onChange={(value) => setOrganizationForm({ ...organizationForm, brandName: value })} />
@@ -237,12 +273,12 @@ export default function OrganizationSettingsPage() {
             Cada sucursal puede tener usuarios, caja, reportes y operacion propios.
           </p>
           <form className="mt-5 grid gap-4" onSubmit={submitNewBranch}>
-            <Field label="Nombre de sucursal" value={newBranchForm.name} onChange={(value) => setNewBranchForm({ ...newBranchForm, name: value })} />
+            <Field error={fieldErrors.newBranchName} label="Nombre de sucursal" value={newBranchForm.name} onChange={(value) => setNewBranchForm({ ...newBranchForm, name: value })} />
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Codigo corto" value={newBranchForm.code} onChange={(value) => setNewBranchForm({ ...newBranchForm, code: value })} />
-              <Field label="Telefono" value={newBranchForm.phone ?? ""} onChange={(value) => setNewBranchForm({ ...newBranchForm, phone: value })} />
+              <Field error={fieldErrors.newBranchCode} label="Codigo corto" value={newBranchForm.code} onChange={(value) => setNewBranchForm({ ...newBranchForm, code: value })} />
+              <Field error={fieldErrors.newBranchPhone} help="Se guardara como +52 seguido de 10 digitos." label="Telefono" value={newBranchForm.phone ?? ""} onChange={(value) => setNewBranchForm({ ...newBranchForm, phone: value })} />
             </div>
-            <Field label="Zona horaria" value={newBranchForm.timezone} onChange={(value) => setNewBranchForm({ ...newBranchForm, timezone: value })} />
+            <Field error={fieldErrors.newBranchTimezone} label="Zona horaria" value={newBranchForm.timezone} onChange={(value) => setNewBranchForm({ ...newBranchForm, timezone: value })} />
             <button className="form-primary-button" disabled={saving} type="submit">
               Crear sucursal
             </button>
@@ -274,12 +310,12 @@ export default function OrganizationSettingsPage() {
               </label>
               {branchForm ? (
                 <>
-                  <Field label="Nombre" value={branchForm.name} onChange={(value) => setBranchForm({ ...branchForm, name: value })} />
+                  <Field error={fieldErrors.branchName} label="Nombre" value={branchForm.name} onChange={(value) => setBranchForm({ ...branchForm, name: value })} />
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Codigo" value={branchForm.code} onChange={(value) => setBranchForm({ ...branchForm, code: value })} />
-                    <Field label="Telefono" value={branchForm.phone ?? ""} onChange={(value) => setBranchForm({ ...branchForm, phone: value })} />
+                    <Field error={fieldErrors.branchCode} label="Codigo" value={branchForm.code} onChange={(value) => setBranchForm({ ...branchForm, code: value })} />
+                    <Field error={fieldErrors.branchPhone} help="Se guardara como +52 seguido de 10 digitos." label="Telefono" value={branchForm.phone ?? ""} onChange={(value) => setBranchForm({ ...branchForm, phone: value })} />
                   </div>
-                  <Field label="Zona horaria" value={branchForm.timezone} onChange={(value) => setBranchForm({ ...branchForm, timezone: value })} />
+                  <Field error={fieldErrors.branchTimezone} label="Zona horaria" value={branchForm.timezone} onChange={(value) => setBranchForm({ ...branchForm, timezone: value })} />
                   <button className="form-primary-button" disabled={saving} type="submit">
                     Guardar sucursal
                   </button>
@@ -336,11 +372,15 @@ function toBranchForm(branch: BranchSummary): BranchUpdatePayload {
 }
 
 function Field({
+  error,
+  help,
   label,
   value,
   onChange,
   type = "text",
 }: {
+  error?: string;
+  help?: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
@@ -355,8 +395,36 @@ function Field({
         type={type}
         value={value}
       />
+      {error ? <small className="form-field-error">{error}</small> : help ? <small>{help}</small> : null}
     </label>
   );
+}
+
+function validateOrganizationForm(form: OrganizationUpdatePayload) {
+  const errors: FieldErrorMap = {};
+  addError(errors, "legalName", validateRequired(form.legalName, "Nombre legal"));
+  addError(errors, "tradeName", validateRequired(form.tradeName, "Nombre comercial"));
+  addError(errors, "taxId", validateRfc(form.taxId ?? "", true));
+  addError(errors, "defaultCurrency", validateRequired(form.defaultCurrency, "Moneda"));
+  addError(errors, "timezone", validateRequired(form.timezone, "Zona horaria"));
+  addError(errors, "contactPhone", validatePhone(form.contactPhone ?? "", true));
+  addError(errors, "contactEmail", validateEmail(form.contactEmail ?? "", true));
+  return errors;
+}
+
+function validateBranchForm(form: BranchUpdatePayload | CreateBranchPayload, prefix: "branch" | "newBranch") {
+  const errors: FieldErrorMap = {};
+  addError(errors, `${prefix}Name`, validateRequired(form.name, "Nombre de sucursal"));
+  addError(errors, `${prefix}Code`, validateBranchCode(form.code));
+  addError(errors, `${prefix}Phone`, validatePhone(form.phone ?? "", true));
+  addError(errors, `${prefix}Timezone`, validateRequired(form.timezone, "Zona horaria"));
+  return errors;
+}
+
+function addError(errors: FieldErrorMap, key: string, value: string) {
+  if (value) {
+    errors[key] = value;
+  }
 }
 
 function AuthRequired() {

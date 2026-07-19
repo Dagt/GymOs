@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
+import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   createAutomation,
   createNotification,
@@ -155,29 +156,31 @@ export default function AutomationsPage() {
   }
 
   if (loading) {
-    return <Centered text="Cargando automatizaciones..." />;
+    return <LoadingScreen text="Cargando automatizaciones..." />;
   }
 
   if (!session) {
-    return <AuthRequired />;
+    return (
+      <AuthRequiredCard
+        message="Las automatizaciones requieren permisos administrativos del gimnasio."
+        title="Inicia sesion para ver automatizaciones"
+      />
+    );
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f7f2] text-[#111815]">
-      <header className="border-b border-[#d8ddd2] bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <Link className="text-sm font-semibold text-[#51735f]" href="/reception">Recepcion</Link>
-            <h1 className="mt-1 text-3xl font-semibold">Automatizaciones</h1>
-            <p className="mt-1 text-sm text-[#5d6b63]">Reglas configurables, ejecuciones y notificaciones internas.</p>
-          </div>
-          <button className="h-10 rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a]" onClick={() => refresh()} type="button">Actualizar</button>
-        </div>
-      </header>
+    <AppShell
+      actions={[{ href: "/operations", label: "Operacion" }]}
+      eyebrow="Administracion"
+      session={session}
+      subtitle="Reglas configurables, ejecuciones y notificaciones internas."
+      title="Automatizaciones"
+    >
+      <button className="app-button-secondary self-start" onClick={() => refresh()} type="button">Actualizar</button>
 
-      <section className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[1fr_1fr]">
+      <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
         <section className="grid gap-6">
-          {error ? <Notice tone="error" text={error} /> : null}
+          {error ? <InlineError message={error} /> : null}
           {message ? <Notice tone="ok" text={message} /> : null}
           <form className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm" onSubmit={submitRule}>
             <h2 className="text-xl font-semibold">Nueva regla</h2>
@@ -246,21 +249,13 @@ export default function AutomationsPage() {
           </section>
         </section>
       </section>
-    </main>
+    </AppShell>
   );
 }
 
 function Notice({ tone, text }: { tone: "ok" | "error"; text: string }) {
   const styles = tone === "ok" ? "border-[#bad9c4] bg-[#eff8f1] text-[#31563c]" : "border-[#e5b7b7] bg-[#fff4f4] text-[#8c2f2f]";
   return <p className={`rounded-md border px-3 py-2 text-sm ${styles}`}>{text}</p>;
-}
-
-function Centered({ text }: { text: string }) {
-  return <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]"><p className="rounded-md border border-[#d8ddd2] bg-white px-4 py-3 text-sm text-[#42514a]">{text}</p></main>;
-}
-
-function AuthRequired() {
-  return <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]"><Link className="rounded-md bg-[#13251c] px-4 py-3 text-sm font-semibold text-white" href="/login">Iniciar sesion</Link></main>;
 }
 
 function formatDateTime(value: string) {

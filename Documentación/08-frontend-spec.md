@@ -269,4 +269,12 @@ Marca por gimnasio:
 Formularios:
 - Los campos compartidos viven en `frontend/src/components/forms/FormFields.tsx`.
 - Validaciones frontend minimas: email, telefono, contrasena de al menos 8 caracteres, codigo de sucursal, moneda, zona horaria y colores hexadecimales.
+- Validaciones obligatorias para altas administrativas:
+  - RFC mexicano de gimnasio con 4 letras, 6 numeros y 3 caracteres alfanumericos.
+  - Telefonos de gimnasio, sucursal y usuario interno en formato `+52` mas 10 digitos; si el usuario captura 10 digitos, el frontend antepone `+52`.
+  - Confirmacion modal nativa antes de suspender/reactivar gimnasios o usuarios.
+- Al crear un usuario con rol `Dueno del gimnasio`, el frontend asigna automaticamente todas las sucursales existentes del tenant. Gerentes, recepcionistas y coaches siguen seleccionando sucursales concretas.
+- `/users` permite cambiar el rol de usuarios existentes desde la tabla, excepto la propia cuenta del usuario autenticado.
+- `AppShell` resuelve el nombre real de la sucursal activa cuando una pagina no carga la lista de sucursales por si misma, evitando mostrar solo "Sucursal seleccionada".
+- Beneficios, accesos y automatizaciones deben renderizarse dentro del shell lateral unificado.
 - Los errores de backend deben mostrar mensaje, codigo y `correlationId` cuando existan.

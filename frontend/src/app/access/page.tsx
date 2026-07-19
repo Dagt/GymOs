@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { AppShell, LoadingScreen } from "@/components/AppShell";
 import {
   consumeVisitPass,
   createTemporaryPass,
@@ -260,13 +261,7 @@ export default function AccessPage() {
   }
 
   if (loading) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-        <p className="rounded-md border border-[#d8ddd2] bg-white px-4 py-3 text-sm text-[#42514a]">
-          Cargando accesos...
-        </p>
-      </main>
-    );
+    return <LoadingScreen text="Cargando accesos..." />;
   }
 
   if (!session) {
@@ -287,7 +282,12 @@ export default function AccessPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f7f2] text-[#111815]">
+    <AppShell
+      eyebrow="Operacion"
+      session={session}
+      subtitle="Pases, visitas, apertura manual y bitacora de accesos."
+      title="Control de acceso"
+    >
       <header className="border-b border-[#d8ddd2] bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
@@ -647,7 +647,7 @@ export default function AccessPage() {
           </section>
         </section>
       </section>
-    </main>
+    </AppShell>
   );
 }
 

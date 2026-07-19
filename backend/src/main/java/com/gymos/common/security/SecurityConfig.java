@@ -46,6 +46,7 @@ public class SecurityConfig {
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/internal").hasAuthority("user.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/users/internal").hasAuthority("user.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/users/internal/*/status").hasAuthority("user.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/users/internal/*/role").hasAuthority("user.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/auth/select-organization").hasAuthority("organization.read")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/organizations").hasAuthority("organization.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/organizations").hasAuthority("organization.update")

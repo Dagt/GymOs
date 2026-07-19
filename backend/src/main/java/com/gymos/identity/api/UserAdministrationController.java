@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/users")
 public class UserAdministrationController {
 	private final UserAdministrationService service;
+	private static final String MX_PHONE = "^\\+52\\d{10}$";
 
 	public UserAdministrationController(UserAdministrationService service) {
 		this.service = service;
@@ -61,6 +62,16 @@ public class UserAdministrationController {
 		return service.updateStatus(principal, userId, request.status(), correlationId(servletRequest));
 	}
 
+	@PatchMapping("/internal/{userId}/role")
+	InternalUserSummary updateRole(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID userId,
+			@Valid @RequestBody UpdateInternalUserRoleRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return service.updateRole(principal, userId, request.roleId(), correlationId(servletRequest));
+	}
+
 	private String correlationId(HttpServletRequest request) {
 		Object value = request.getAttribute(Correlation.ATTRIBUTE);
 		return value == null ? "unknown" : value.toString();
@@ -70,7 +81,7 @@ public class UserAdministrationController {
 			@NotBlank @Size(max = 120) String firstName,
 			@NotBlank @Size(max = 120) String lastName,
 			@Email @Size(max = 180) String email,
-			@Size(max = 32) String phone,
+			@NotBlank @jakarta.validation.constraints.Pattern(regexp = MX_PHONE) String phone,
 			@NotBlank @Size(max = 120) String username,
 			@NotBlank @Size(min = 8, max = 120) String temporaryPassword,
 			@NotNull UUID roleId,
@@ -83,6 +94,11 @@ public class UserAdministrationController {
 
 	public record UpdateInternalUserStatusRequest(
 			@NotBlank String status
+	) {
+	}
+
+	public record UpdateInternalUserRoleRequest(
+			@NotNull UUID roleId
 	) {
 	}
 }

@@ -2428,10 +2428,46 @@ button.admin-secondary-link:disabled {
 }
 
 .team-user-actions {
-  align-items: end;
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: flex-end;
+}
+
+.team-role-control {
   display: grid;
-  gap: 0.45rem;
-  justify-items: end;
+  gap: 0.25rem;
+  min-width: 13rem;
+}
+
+.team-role-control span {
+  color: var(--brand-muted);
+  font-size: 0.7rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.team-role-control select {
+  background: white;
+  border: 1px solid var(--brand-line);
+  border-radius: 0.5rem;
+  min-height: 2.25rem;
+  padding: 0 0.65rem;
+}
+
+.status-pill {
+  background: #f1f5f9;
+  border-radius: 999px;
+  color: #475569;
+  font-size: 0.7rem;
+  font-weight: 900;
+  padding: 0.35rem 0.6rem;
+}
+
+.status-pill.active {
+  background: #dcfce7;
+  color: #166534;
 }
 
 .team-user-actions button {
@@ -2442,6 +2478,14 @@ button.admin-secondary-link:disabled {
   font-weight: 900;
   min-height: 2.1rem;
   padding: 0 0.75rem;
+}
+
+.team-user-actions button.danger-action {
+  background: #991b1b;
+}
+
+.team-user-actions button.safe-action {
+  background: #166534;
 }
 
 .team-user-actions button:disabled {

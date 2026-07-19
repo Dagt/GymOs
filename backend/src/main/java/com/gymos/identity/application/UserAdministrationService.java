@@ -122,6 +122,34 @@ public class UserAdministrationService {
 				.orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "El usuario no esta disponible."));
 	}
 
+	@Transactional
+	public InternalUserSummary updateRole(
+			GymOsPrincipal principal,
+			UUID userId,
+			UUID roleId,
+			String correlationId
+	) {
+		requirePrincipal(principal);
+		if (principal.userId().equals(userId)) {
+			throw new BusinessException("SELF_ROLE_CHANGE_NOT_ALLOWED", "No puedes cambiar el rol de tu propia cuenta.");
+		}
+		if (!repository.userBelongsToOrganization(principal.organizationId(), userId)) {
+			throw new BusinessException("USER_NOT_FOUND", "El usuario no pertenece a este gimnasio.");
+		}
+		if (!repository.roleBelongsToOrganization(principal.organizationId(), roleId)) {
+			throw new BusinessException("ROLE_NOT_AVAILABLE", "El rol seleccionado no esta disponible para este gimnasio.");
+		}
+		if (repository.roleHasPermission(roleId, "platform.admin")) {
+			throw new BusinessException("ROLE_NOT_AVAILABLE", "No puedes asignar roles de plataforma desde un gimnasio.");
+		}
+		repository.replaceRoles(userId, roleId);
+		auditService.record(principal, "INTERNAL_USER_ROLE_UPDATED", "USER", userId, "ADMIN", roleId.toString(), correlationId);
+		return repository.findUsers(principal.organizationId()).stream()
+				.filter(user -> user.id().equals(userId))
+				.findFirst()
+				.orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "El usuario no esta disponible."));
+	}
+
 	private void requirePrincipal(GymOsPrincipal principal) {
 		if (principal == null) {
 			throw new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesion para continuar.");

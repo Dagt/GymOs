@@ -490,8 +490,10 @@ Flujo:
 1. Usuario abre Equipo y accesos.
 2. Frontend muestra solo roles validos para el contexto.
 3. Usuario captura nombre, apellido, email, telefono, usuario, contrasena temporal, rol y sucursal.
-4. Frontend valida campos antes de enviar.
-5. Backend crea persona, cuenta, rol y acceso de sucursal.
+4. Frontend valida email, telefono `+52` mas 10 digitos y contrasena minima antes de enviar.
+5. Si el rol es `Dueno del gimnasio`, el frontend asigna automaticamente todas las sucursales existentes.
+6. Backend valida que rol y sucursales pertenezcan al tenant y que el rol no sea de plataforma.
+7. Backend crea persona, cuenta, rol y acceso de sucursal.
 
 Resultado esperado:
 - Un gimnasio no ofrece el rol `Administrador GymOS` como rol operativo.
@@ -512,20 +514,43 @@ Flujo de gimnasio:
 1. Admin GymOS abre `/platform/gymnasiums`.
 2. Selecciona el gimnasio cliente.
 3. Cambia el estado comercial a `SUSPENDED` o `INACTIVE`.
-4. Backend conserva el registro para auditoria, pero bloquea login y refresh de usuarios tenant.
-5. Admin GymOS puede reactivar el gimnasio cambiandolo a `ACTIVE`.
+4. Frontend solicita confirmacion explicita.
+5. Backend conserva el registro para auditoria, pero bloquea login y refresh de usuarios tenant.
+6. Admin GymOS puede reactivar el gimnasio cambiandolo a `ACTIVE`.
 
 Flujo de usuario:
 1. Usuario autorizado abre `/users`.
 2. Localiza una cuenta del gimnasio.
 3. Cambia el estado a `SUSPENDED` o la reactiva a `ACTIVE`.
-4. Backend impide suspender la propia cuenta.
+4. Frontend solicita confirmacion explicita.
+5. Backend impide suspender la propia cuenta.
 
 Resultado esperado:
 - No se borran gimnasios ni usuarios desde el flujo operativo principal.
 - Suspender un gimnasio bloquea a sus dueños, gerentes, recepcionistas y coaches.
 - Admin GymOS conserva acceso de plataforma y soporte.
 - Las acciones quedan auditadas.
+
+## UC-032 Cambiar rol de usuario interno
+
+Actor: Admin GymOS en soporte, dueÃ±o del gimnasio o gerente con permiso `user.manage`.
+
+Precondiciones:
+- Usuario autenticado con permiso `user.manage`.
+- Usuario interno existente en el mismo tenant.
+- Rol destino disponible para el contexto tenant.
+
+Flujo:
+1. Usuario abre `/users`.
+2. Selecciona el nuevo rol en la tabla de usuarios existentes.
+3. Frontend solicita confirmacion.
+4. Backend valida que el usuario pertenezca al tenant.
+5. Backend valida que el rol no contenga `platform.admin`.
+6. Backend reemplaza el rol principal y audita `INTERNAL_USER_ROLE_UPDATED`.
+
+Reglas:
+- No se permite cambiar el propio rol.
+- No se permite asignar `Administrador GymOS` desde contexto de gimnasio.
 
 ## Anexo Hito 3.5 final
 

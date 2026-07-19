@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
+import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   createBenefit,
   getBenefits,
@@ -84,29 +85,27 @@ export default function BenefitsPage() {
   }
 
   if (loading) {
-    return <main className="admin-empty-state"><section><p>GymOS</p><h1>Cargando beneficios...</h1></section></main>;
+    return <LoadingScreen text="Cargando beneficios..." />;
   }
 
   if (!session) {
-    return <main className="admin-empty-state"><section><p>GymOS</p><h1>Inicia sesion</h1><Link href="/login">Entrar</Link></section></main>;
+    return (
+      <AuthRequiredCard
+        message="Los beneficios requieren una cuenta con permisos para administrar promociones o descuentos."
+        title="Inicia sesion para ver beneficios"
+      />
+    );
   }
 
   return (
-    <main className="app-shell text-[#111815]">
-      <div className="app-shell-inner">
-        <header className="app-topbar">
-          <div className="app-title-block">
-            <p className="app-eyebrow">Administracion</p>
-            <h1 className="app-title">Beneficios</h1>
-            <p className="app-subtitle">Configura descuentos y elegibilidad para estudiantes, convenios o promociones.</p>
-          </div>
-          <div className="app-actions">
-            <Link className="app-button-secondary" href="/reception">Panel</Link>
-            <Link className="app-button" href="/clients">Asignar a cliente</Link>
-          </div>
-        </header>
-
-        {error ? <p className="admin-alert">{error}</p> : null}
+    <AppShell
+      actions={[{ href: "/clients", label: "Asignar a cliente" }]}
+      eyebrow="Administracion"
+      session={session}
+      subtitle="Configura descuentos y elegibilidad para estudiantes, convenios o promociones."
+      title="Beneficios"
+    >
+        {error ? <InlineError message={error} /> : null}
 
         <section className="grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
           <section className="app-card p-5">
@@ -164,8 +163,7 @@ export default function BenefitsPage() {
             </div>
           </section>
         </section>
-      </div>
-    </main>
+    </AppShell>
   );
 }
 

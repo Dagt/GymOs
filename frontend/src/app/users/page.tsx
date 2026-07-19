@@ -20,6 +20,7 @@ import {
   getInternalUsers,
   getStoredSession,
   getUserRoles,
+  updateInternalUserRole,
   updateInternalUserStatus,
   type BranchSummary,
   type CreateInternalUserPayload,
@@ -101,6 +102,8 @@ export default function UsersPage() {
 
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
   const selectableRoles = roles.filter((role) => displayRoleName(role.name) !== "Admin GymOS");
+  const selectedRoleLabel = displayRoleName(selectableRoles.find((role) => role.id === form.roleId)?.name ?? "");
+  const ownerRoleSelected = selectedRoleLabel === "Dueño del gimnasio" || selectedRoleLabel === "DueÃ±o del gimnasio";
 
   async function submitUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -121,12 +124,13 @@ export default function UsersPage() {
         email: form.email?.trim() || null,
         phone: normalizePhone(form.phone ?? ""),
         username: form.username.trim(),
+        branchIds: ownerRoleSelected ? branches.map((branch) => branch.id) : form.branchIds,
       });
       setUsers((current) => [...current, created].sort((left, right) => left.fullName.localeCompare(right.fullName)));
       setForm({
         ...emptyUserForm,
         roleId: form.roleId,
-        branchIds: branches.length === 1 ? [branches[0].id] : [],
+        branchIds: ownerRoleSelected ? branches.map((branch) => branch.id) : branches.length === 1 ? [branches[0].id] : [],
       });
       setMessage("Usuario creado. Ya puede iniciar sesion con su usuario y contrasena temporal.");
     } catch (exception) {
@@ -150,6 +154,14 @@ export default function UsersPage() {
       return;
     }
     const nextStatus = user.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE";
+    const confirmed = window.confirm(
+      nextStatus === "ACTIVE"
+        ? `¿Quieres reactivar a ${user.fullName}? Podra volver a iniciar sesion.`
+        : `¿Quieres suspender a ${user.fullName}? No podra iniciar sesion mientras este suspendido.`,
+    );
+    if (!confirmed) {
+      return;
+    }
     setSaving(true);
     setError(null);
     setMessage(null);
@@ -159,6 +171,30 @@ export default function UsersPage() {
       setMessage(nextStatus === "ACTIVE" ? "Usuario reactivado." : "Usuario suspendido. Ya no podra iniciar sesion.");
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible cambiar el estado del usuario.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function changeUserRole(user: InternalUserSummary, roleId: string) {
+    if (!session || !roleId) {
+      return;
+    }
+    const role = selectableRoles.find((item) => item.id === roleId);
+    const roleLabel = role ? displayRoleName(role.name) : "el rol seleccionado";
+    const confirmed = window.confirm(`¿Quieres cambiar el rol de ${user.fullName} a ${roleLabel}?`);
+    if (!confirmed) {
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const updated = await updateInternalUserRole(session.accessToken, user.id, roleId);
+      setUsers((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      setMessage("Rol de usuario actualizado.");
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible cambiar el rol del usuario.");
     } finally {
       setSaving(false);
     }
@@ -217,7 +253,7 @@ export default function UsersPage() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field error={fieldErrors.email} label="Email" type="email" value={form.email ?? ""} onChange={(value) => setForm({ ...form, email: value, username: form.username || value })} />
-              <Field error={fieldErrors.phone} help="10 a 15 digitos; puedes incluir +52." label="Telefono" value={form.phone ?? ""} onChange={(value) => setForm({ ...form, phone: value })} />
+              <Field error={fieldErrors.phone} help="Se guardara como +52 seguido de 10 digitos." label="Telefono" value={form.phone ?? ""} onChange={(value) => setForm({ ...form, phone: value })} />
             </div>
             <Field error={fieldErrors.username} label="Usuario de inicio de sesion" value={form.username} onChange={(value) => setForm({ ...form, username: value })} />
             <Field error={fieldErrors.temporaryPassword} help="Minimo 8 caracteres." label="Contrasena temporal" type="password" value={form.temporaryPassword} onChange={(value) => setForm({ ...form, temporaryPassword: value })} />
@@ -226,7 +262,17 @@ export default function UsersPage() {
               Rol
               <select
                 className="h-11 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm outline-none transition focus:border-[#51735f]"
-                onChange={(event) => setForm({ ...form, roleId: event.target.value })}
+                onChange={(event) => {
+                  const nextRoleId = event.target.value;
+                  const nextLabel = displayRoleName(selectableRoles.find((role) => role.id === nextRoleId)?.name ?? "");
+                  setForm({
+                    ...form,
+                    roleId: nextRoleId,
+                    branchIds: nextLabel === "Dueño del gimnasio" || nextLabel === "DueÃ±o del gimnasio"
+                      ? branches.map((branch) => branch.id)
+                      : form.branchIds,
+                  });
+                }}
                 required
                 value={form.roleId}
               >
@@ -241,12 +287,17 @@ export default function UsersPage() {
             <section className="team-branch-selector">
               <div>
                 <strong>Sucursales permitidas</strong>
-                <span>Selecciona todas las sedes donde este usuario puede trabajar.</span>
+                <span>
+                  {ownerRoleSelected
+                    ? "El dueño del gimnasio recibe acceso a todas las sucursales actuales."
+                    : "Selecciona todas las sedes donde este usuario puede trabajar."}
+                </span>
               </div>
               {branches.map((branch) => (
                 <label key={branch.id}>
                   <input
-                    checked={form.branchIds.includes(branch.id)}
+                    checked={ownerRoleSelected || form.branchIds.includes(branch.id)}
+                    disabled={ownerRoleSelected}
                     onChange={(event) => updateBranchAccess(branch.id, event.target.checked)}
                     type="checkbox"
                   />
@@ -307,9 +358,24 @@ export default function UsersPage() {
                 <small>{user.branches.join(", ") || "Sin sucursal"}</small>
               </div>
               <div className="team-user-actions">
-                <p>{user.status}</p>
+                <label className="team-role-control">
+                  <span>Rol</span>
+                  <select
+                    defaultValue={roleIdForUser(user, selectableRoles)}
+                    disabled={saving || user.id === session.user.userId}
+                    onChange={(event) => changeUserRole(user, event.target.value)}
+                  >
+                    <option value="">Seleccionar rol</option>
+                    {selectableRoles.map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {displayRoleName(role.name)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className={user.status === "ACTIVE" ? "status-pill active" : "status-pill"}>{user.status}</p>
                 {user.id !== session.user.userId ? (
-                  <button disabled={saving} onClick={() => toggleUserStatus(user)} type="button">
+                  <button className={user.status === "ACTIVE" ? "danger-action" : "safe-action"} disabled={saving} onClick={() => toggleUserStatus(user)} type="button">
                     {user.status === "ACTIVE" ? "Suspender" : "Reactivar"}
                   </button>
                 ) : (
@@ -402,7 +468,7 @@ function validateUserForm(form: CreateInternalUserPayload) {
   addError(errors, "firstName", validateRequired(form.firstName, "Nombre"));
   addError(errors, "lastName", validateRequired(form.lastName, "Apellido"));
   addError(errors, "email", validateEmail(form.email ?? "", true));
-  addError(errors, "phone", validatePhone(form.phone ?? ""));
+  addError(errors, "phone", validatePhone(form.phone ?? "", true));
   addError(errors, "username", validateRequired(form.username, "Usuario de inicio de sesion"));
   addError(errors, "temporaryPassword", validatePassword(form.temporaryPassword));
   addError(errors, "roleId", validateRequired(form.roleId, "Rol"));
@@ -416,4 +482,9 @@ function addError(errors: FieldErrorMap, key: string, value: string) {
   if (value) {
     errors[key] = value;
   }
+}
+
+function roleIdForUser(user: InternalUserSummary, roles: RoleOption[]) {
+  const currentRoleLabel = displayRoleName(user.roles[0] ?? "");
+  return roles.find((role) => displayRoleName(role.name) === currentRoleLabel)?.id ?? "";
 }

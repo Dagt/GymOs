@@ -226,6 +226,13 @@ public class UserAdministrationRepository {
 				.update();
 	}
 
+	public void replaceRoles(UUID userId, UUID roleId) {
+		jdbcClient.sql("DELETE FROM user_role WHERE user_id = :userId")
+				.param("userId", userId)
+				.update();
+		assignRole(userId, roleId);
+	}
+
 	public void assignBranch(UUID userId, UUID branchId, String accessScope) {
 		jdbcClient.sql("""
 				INSERT INTO user_branch_access (user_id, branch_id, access_scope)

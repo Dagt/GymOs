@@ -50,7 +50,7 @@ export function EmailField(props: BaseProps) {
 
 export function PhoneField(props: BaseProps) {
   return (
-    <FieldFrame error={props.error} help={props.help ?? "10 a 15 digitos; puedes incluir +52."} label={props.label} name={props.name} required={props.required ?? false}>
+    <FieldFrame error={props.error} help={props.help ?? "Se guardara como +52 seguido de 10 digitos."} label={props.label} name={props.name} required={props.required ?? false}>
       <input
         aria-invalid={Boolean(props.error)}
         className="app-input"
@@ -58,7 +58,7 @@ export function PhoneField(props: BaseProps) {
         inputMode="tel"
         name={props.name}
         onChange={(event) => props.onChange(event.target.value)}
-        placeholder={props.placeholder ?? "+524931234567"}
+        placeholder={props.placeholder ?? "+524921234567"}
         required={props.required ?? false}
         value={props.value}
       />
@@ -175,7 +175,16 @@ export function validatePhone(value: string, required = false) {
     return required ? "Telefono es obligatorio." : "";
   }
   const normalized = normalizePhone(value);
-  return /^\+?\d{10,15}$/.test(normalized) ? "" : "Usa un telefono de 10 a 15 digitos.";
+  return /^\+52\d{10}$/.test(normalized) ? "" : "Usa +52 seguido de 10 digitos.";
+}
+
+export function validateRfc(value: string, required = false) {
+  if (!value.trim()) {
+    return required ? "RFC es obligatorio." : "";
+  }
+  return /^[A-ZÑ&]{4}\d{6}[A-Z0-9]{3}$/.test(normalizeRfc(value))
+    ? ""
+    : "El RFC debe tener 4 letras, 6 numeros y 3 caracteres alfanumericos.";
 }
 
 export function validatePassword(value: string) {
@@ -197,7 +206,19 @@ export function validateHexColor(value: string, label: string, required = false)
 }
 
 export function normalizePhone(value: string) {
-  const trimmed = value.trim();
-  const prefix = trimmed.startsWith("+") ? "+" : "";
-  return `${prefix}${trimmed.replace(/\D/g, "")}`;
+  const digits = value.replace(/\D/g, "");
+  if (!digits) {
+    return "";
+  }
+  if (digits.length === 10) {
+    return `+52${digits}`;
+  }
+  if (digits.length === 12 && digits.startsWith("52")) {
+    return `+${digits}`;
+  }
+  return value.trim().startsWith("+") ? `+${digits}` : digits;
+}
+
+export function normalizeRfc(value: string) {
+  return value.replace(/[^A-Za-z0-9Ññ&]/g, "").toUpperCase();
 }

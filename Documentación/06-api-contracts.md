@@ -70,15 +70,24 @@ Errores:
 - `GET /users/internal`
 - `POST /users/internal`
 - `PATCH /users/internal/{userId}/status`
+- `PATCH /users/internal/{userId}/role`
 
 Permisos:
 
 - `user.read` para listar roles y usuarios internos.
-- `user.manage` para crear usuarios internos y suspender/reactivar cuentas.
+- `user.manage` para crear usuarios internos, cambiar roles y suspender/reactivar cuentas.
 
 `POST /users/internal` crea persona, cuenta de usuario, rol y accesos a sucursales dentro de la organizacion actual. No devuelve contrasenas ni hashes.
 
 `PATCH /users/internal/{userId}/status` cambia el estado de una cuenta interna. Estados validos: `ACTIVE`, `SUSPENDED`, `INACTIVE`. Una cuenta suspendida o inactiva no puede iniciar sesion. No se permite suspender la propia cuenta.
+
+`PATCH /users/internal/{userId}/role` cambia el rol principal de una cuenta interna dentro del gimnasio actual. No se permite cambiar el propio rol ni asignar roles con `platform.admin` desde contexto tenant o soporte.
+
+Validaciones de contacto:
+
+- RFC de organizacion: 4 letras, 6 numeros y 3 caracteres alfanumericos (`AAAA000000XXX`).
+- Telefono de organizacion, sucursal y usuario interno: formato mexicano `+52` seguido de 10 digitos.
+- Frontend normaliza telefonos de 10 digitos anteponiendo `+52`; backend rechaza formatos invalidos.
 
 Request:
 
@@ -125,6 +134,7 @@ Estado comercial de gimnasio cliente:
 - Estados validos: `ACTIVE`, `SUSPENDED`, `INACTIVE`.
 - Usuarios tenant de una organizacion `SUSPENDED` o `INACTIVE` no pueden iniciar sesion ni refrescar sesion.
 - Admin GymOS conserva acceso para soporte y reactivacion.
+- El frontend debe solicitar confirmacion explicita antes de suspender o reactivar un gimnasio cliente.
 
 ## 6.1.2 Kiosco de autoservicio
 

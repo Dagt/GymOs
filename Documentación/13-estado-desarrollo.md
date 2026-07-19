@@ -601,6 +601,28 @@ Implementado:
 - Admin GymOS puede suspender/reactivar gimnasios cliente; usuarios tenant de gimnasios suspendidos o inactivos no pueden iniciar sesion.
 - `/users` permite suspender/reactivar usuarios internos sin borrado fisico.
 - Login y refresh de usuarios tenant asignan automaticamente la primera sucursal activa permitida, evitando que gerentes/recepcionistas/coaches entren sin sucursal cuando ya tienen acceso asignado.
+
+## Correccion UX/validaciones administrativas - 19 de julio de 2026
+
+Implementado:
+
+- Validacion frontend y backend de RFC mexicano para gimnasios: 4 letras, 6 numeros y 3 caracteres alfanumericos.
+- Validacion frontend y backend de telefonos de gimnasio, sucursal y usuarios internos en formato `+52` mas 10 digitos.
+- Normalizacion frontend de telefonos de 10 digitos para anteponer `+52`.
+- Confirmacion antes de suspender o reactivar gimnasios cliente.
+- Confirmacion antes de suspender o reactivar usuarios internos.
+- Endpoint `PATCH /api/v1/users/internal/{userId}/role` para cambiar rol de usuarios existentes dentro del tenant.
+- UI de `/users` permite gestionar rol y estado de usuarios existentes; no permite cambiar el propio rol ni suspender la propia cuenta.
+- Al crear un usuario `Dueno del gimnasio`, la UI asigna automaticamente todas las sucursales existentes.
+- `AppShell` resuelve el nombre real de la sucursal activa cuando la pagina no la carga directamente.
+- Menu lateral de dueño/soporte/gerencia elimina la entrada redundante a `/reception`; se mantiene acceso directo a `Caja / POS` y `Socios`.
+- Beneficios, accesos y automatizaciones quedan integrados al shell lateral unificado.
+
+Verificado:
+
+- Frontend lint.
+- Frontend typecheck.
+- Backend tests con Java 25.
 - `AppShell` recupera sesiones guardadas sin sucursal intentando re-seleccionar la organizacion actual y centraliza la navegacion lateral sin botones superiores redundantes.
 - `/inventory`, `/bookings` y `/coaches` quedan integradas al `AppShell`, por lo que conservan menu lateral, marca tenant, perfil y sucursal igual que el resto de la consola.
 

@@ -1138,6 +1138,17 @@ export async function updateInternalUserStatus(
   });
 }
 
+export async function updateInternalUserRole(
+  accessToken: string,
+  userId: string,
+  roleId: string,
+): Promise<InternalUserSummary> {
+  return apiFetch<InternalUserSummary>(`/users/internal/${userId}/role`, accessToken, {
+    method: "PATCH",
+    body: JSON.stringify({ roleId }),
+  });
+}
+
 export async function updateBranch(
   accessToken: string,
   branchId: string,
