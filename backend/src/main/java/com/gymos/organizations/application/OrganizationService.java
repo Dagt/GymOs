@@ -297,6 +297,27 @@ public class OrganizationService {
 				.orElseThrow(() -> new BusinessException("BRANCH_NOT_FOUND", "La sucursal no esta disponible."));
 	}
 
+	@Transactional
+	public ManagedOrganizationSummary updateOrganizationStatus(
+			GymOsPrincipal principal,
+			UUID organizationId,
+			String status,
+			String correlationId
+	) {
+		requirePrincipal(principal);
+		if (!principal.platformAdmin()) {
+			throw new BusinessException("PLATFORM_ACCESS_REQUIRED", "Solo Admin GymOS puede cambiar el estado de un gimnasio cliente.");
+		}
+		if (organizationId.equals(UUID.fromString("11111111-1111-1111-1111-111111111111"))) {
+			throw new BusinessException("PLATFORM_ORGANIZATION_LOCKED", "La organizacion tecnica de plataforma no se puede suspender.");
+		}
+		String normalizedStatus = normalizeOrganizationStatus(status);
+		organizationQueryRepository.updateOrganizationStatus(organizationId, normalizedStatus, principal.userId(), OffsetDateTime.now());
+		auditService.recordSystem(organizationId, null, principal.userId(), "ORGANIZATION_STATUS_UPDATED", "ORGANIZATION", organizationId, "PLATFORM_ADMIN", normalizedStatus, correlationId);
+		return organizationQueryRepository.findManagedOrganization(organizationId)
+				.orElseThrow(() -> new BusinessException("ORGANIZATION_NOT_FOUND", "El gimnasio no esta disponible."));
+	}
+
 	private void requirePrincipal(GymOsPrincipal principal) {
 		if (principal == null) {
 			throw new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesion para continuar.");
@@ -326,5 +347,13 @@ public class OrganizationService {
 		boolean hasName = blankToNull(request.firstBranchName()) != null;
 		boolean hasCode = blankToNull(request.firstBranchCode()) != null;
 		return hasName != hasCode;
+	}
+
+	private String normalizeOrganizationStatus(String status) {
+		String normalized = status == null ? "" : status.trim().toUpperCase();
+		if (!List.of("ACTIVE", "SUSPENDED", "INACTIVE").contains(normalized)) {
+			throw new BusinessException("ORGANIZATION_STATUS_NOT_AVAILABLE", "Usa un estado valido: ACTIVE, SUSPENDED o INACTIVE.");
+		}
+		return normalized;
 	}
 }

@@ -597,6 +597,9 @@ Implementado:
 - La organizacion tecnica base del Admin GymOS queda oculta del CRM para que una base limpia inicie con cero gimnasios cliente.
 - El detalle de un gimnasio sin sucursales muestra estado vacio accionable en lugar de una tabla confusa.
 - El menu lateral de `AppShell` queda plegado por secciones para evitar que dueño/soporte vean todas las funciones expandidas al mismo tiempo.
+- El menu lateral oculta modulos operativos cuando no hay sucursal seleccionada y conserva solo configuracion de tenant.
+- Admin GymOS puede suspender/reactivar gimnasios cliente; usuarios tenant de gimnasios suspendidos o inactivos no pueden iniciar sesion.
+- `/users` permite suspender/reactivar usuarios internos sin borrado fisico.
 
 Verificado localmente:
 

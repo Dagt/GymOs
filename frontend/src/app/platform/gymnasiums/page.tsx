@@ -26,6 +26,7 @@ import {
   selectBranch,
   selectOrganization,
   storeSession,
+  updateOrganizationStatus,
   type BranchSummary,
   type CreateBranchPayload,
   type CreateOrganizationPayload,
@@ -307,6 +308,25 @@ export default function PlatformGymnasiumsPage() {
     }
   }
 
+  async function toggleOrganizationStatus() {
+    if (!session || !selectedOrganization) {
+      return;
+    }
+    const nextStatus = selectedOrganization.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE";
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const updated = await updateOrganizationStatus(session.accessToken, selectedOrganization.id, nextStatus);
+      setOrganizations((current) => current.map((organization) => (organization.id === updated.id ? updated : organization)));
+      setMessage(nextStatus === "ACTIVE" ? "Gimnasio reactivado." : "Gimnasio suspendido. Sus usuarios tenant no podran iniciar sesion.");
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible cambiar el estado del gimnasio.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) {
     return <LoadingScreen text="Cargando administracion de gimnasios..." />;
   }
@@ -396,6 +416,17 @@ export default function PlatformGymnasiumsPage() {
                 <article><span>Sucursales</span><strong>{selectedOrganization.branchCount}</strong></article>
                 <article><span>Marca</span><strong>{selectedOrganization.brandName || selectedOrganization.tradeName}</strong></article>
               </div>
+
+              <section className="platform-status-panel">
+                <div>
+                  <span>Estado comercial</span>
+                  <strong>{selectedOrganization.status}</strong>
+                  <p>{selectedOrganization.status === "ACTIVE" ? "El gimnasio puede operar normalmente." : "El acceso de usuarios tenant queda bloqueado mientras este suspendido o inactivo."}</p>
+                </div>
+                <button className="app-button-secondary" disabled={saving} onClick={toggleOrganizationStatus} type="button">
+                  {selectedOrganization.status === "ACTIVE" ? "Suspender gimnasio" : "Reactivar gimnasio"}
+                </button>
+              </section>
 
               <section className="admin-panel">
                 <div className="admin-panel-header">

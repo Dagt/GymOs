@@ -20,6 +20,7 @@ import {
   getInternalUsers,
   getStoredSession,
   getUserRoles,
+  updateInternalUserStatus,
   type BranchSummary,
   type CreateInternalUserPayload,
   type InternalUserSummary,
@@ -142,6 +143,25 @@ export default function UsersPage() {
         ? [...new Set([...current.branchIds, branchId])]
         : current.branchIds.filter((item) => item !== branchId),
     }));
+  }
+
+  async function toggleUserStatus(user: InternalUserSummary) {
+    if (!session) {
+      return;
+    }
+    const nextStatus = user.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE";
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const updated = await updateInternalUserStatus(session.accessToken, user.id, nextStatus);
+      setUsers((current) => current.map((item) => (item.id === updated.id ? updated : item)));
+      setMessage(nextStatus === "ACTIVE" ? "Usuario reactivado." : "Usuario suspendido. Ya no podra iniciar sesion.");
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible cambiar el estado del usuario.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (loading) {
@@ -286,7 +306,16 @@ export default function UsersPage() {
                 <span>{user.roles.map(displayRoleName).join(", ") || "Sin rol"}</span>
                 <small>{user.branches.join(", ") || "Sin sucursal"}</small>
               </div>
-              <p>{user.status}</p>
+              <div className="team-user-actions">
+                <p>{user.status}</p>
+                {user.id !== session.user.userId ? (
+                  <button disabled={saving} onClick={() => toggleUserStatus(user)} type="button">
+                    {user.status === "ACTIVE" ? "Suspender" : "Reactivar"}
+                  </button>
+                ) : (
+                  <small>Tu cuenta</small>
+                )}
+              </div>
             </article>
           ))}
         </div>

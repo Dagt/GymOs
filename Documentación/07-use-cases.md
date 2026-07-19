@@ -499,6 +499,34 @@ Resultado esperado:
 - Un recepcionista creado inicia sesion en recepcion y no ve administracion de plataforma.
 - Si faltan campos o hay permisos invalidos, se muestra error claro con codigo y `correlationId`.
 
+## UC-031 Suspender acceso comercial y usuarios internos
+
+Actor: Admin GymOS; dueño del gimnasio o gerente con permiso para equipo.
+
+Precondiciones:
+- Existe un gimnasio cliente y usuarios internos.
+- Admin GymOS tiene permiso `platform.admin`.
+- El usuario tenant que gestiona equipo tiene permiso `user.manage`.
+
+Flujo de gimnasio:
+1. Admin GymOS abre `/platform/gymnasiums`.
+2. Selecciona el gimnasio cliente.
+3. Cambia el estado comercial a `SUSPENDED` o `INACTIVE`.
+4. Backend conserva el registro para auditoria, pero bloquea login y refresh de usuarios tenant.
+5. Admin GymOS puede reactivar el gimnasio cambiandolo a `ACTIVE`.
+
+Flujo de usuario:
+1. Usuario autorizado abre `/users`.
+2. Localiza una cuenta del gimnasio.
+3. Cambia el estado a `SUSPENDED` o la reactiva a `ACTIVE`.
+4. Backend impide suspender la propia cuenta.
+
+Resultado esperado:
+- No se borran gimnasios ni usuarios desde el flujo operativo principal.
+- Suspender un gimnasio bloquea a sus dueños, gerentes, recepcionistas y coaches.
+- Admin GymOS conserva acceso de plataforma y soporte.
+- Las acciones quedan auditadas.
+
 ## Anexo Hito 3.5 final
 
 Ver `Documentación/07-use-cases-hito-3-5-final.md` para la definicion vigente de verificacion segura de kiosco, idempotencia por hash de solicitud y eventos por modulo propietario.

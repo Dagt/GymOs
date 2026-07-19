@@ -119,6 +119,40 @@ public class UserAdministrationRepository {
 		return count > 0;
 	}
 
+	public boolean userBelongsToOrganization(UUID organizationId, UUID userId) {
+		Integer count = jdbcClient.sql("""
+				SELECT COUNT(*)
+				FROM user_account
+				WHERE id = :userId
+				  AND organization_id = :organizationId
+				  AND deleted_at IS NULL
+				""")
+				.param("userId", userId)
+				.param("organizationId", organizationId)
+				.query(Integer.class)
+				.single();
+		return count > 0;
+	}
+
+	public void updateUserStatus(UUID organizationId, UUID userId, String status, UUID actorUserId, OffsetDateTime now) {
+		jdbcClient.sql("""
+				UPDATE user_account
+				SET status = :status,
+				    updated_at = :updatedAt,
+				    updated_by = :updatedBy,
+				    version = version + 1
+				WHERE id = :userId
+				  AND organization_id = :organizationId
+				  AND deleted_at IS NULL
+				""")
+				.param("status", status)
+				.param("updatedAt", now)
+				.param("updatedBy", actorUserId)
+				.param("userId", userId)
+				.param("organizationId", organizationId)
+				.update();
+	}
+
 	public UUID createPerson(
 			UUID organizationId,
 			String firstName,

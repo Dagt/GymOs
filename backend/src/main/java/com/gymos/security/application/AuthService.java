@@ -45,6 +45,9 @@ public class AuthService {
 		authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(username, password));
 		AuthenticatedUser user = authQueryRepository.findActiveUserByUsername(username)
 				.orElseThrow(() -> new BusinessException("INVALID_CREDENTIALS", "Usuario o password invalidos."));
+		if (!user.permissions().contains("platform.admin") && !authQueryRepository.organizationIsActive(user.organizationId())) {
+			throw new BusinessException("ORGANIZATION_SUSPENDED", "El gimnasio no tiene acceso activo a la plataforma.");
+		}
 		GymOsPrincipal principal = user.toPrincipal(null);
 		AuthResult response = issue(principal);
 		auditService.recordSystem(principal.organizationId(), null, principal.userId(), "AUTH_LOGIN", "USER", principal.userId(), "BACKOFFICE", null, correlationId);
@@ -59,6 +62,9 @@ public class AuthService {
 		}
 		AuthenticatedUser user = authQueryRepository.findActiveUserById(UUID.fromString(userId))
 				.orElseThrow(() -> new BusinessException("REFRESH_TOKEN_INVALID", "La sesion ya no es valida."));
+		if (!user.permissions().contains("platform.admin") && !authQueryRepository.organizationIsActive(user.organizationId())) {
+			throw new BusinessException("ORGANIZATION_SUSPENDED", "El gimnasio no tiene acceso activo a la plataforma.");
+		}
 		return issue(user.toPrincipal(null));
 	}
 

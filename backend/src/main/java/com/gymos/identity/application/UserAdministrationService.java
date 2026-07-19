@@ -99,6 +99,29 @@ public class UserAdministrationService {
 				.orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "El usuario creado no esta disponible."));
 	}
 
+	@Transactional
+	public InternalUserSummary updateStatus(
+			GymOsPrincipal principal,
+			UUID userId,
+			String status,
+			String correlationId
+	) {
+		requirePrincipal(principal);
+		String normalizedStatus = normalizeStatus(status);
+		if (principal.userId().equals(userId) && !"ACTIVE".equals(normalizedStatus)) {
+			throw new BusinessException("SELF_STATUS_CHANGE_NOT_ALLOWED", "No puedes suspender tu propia cuenta.");
+		}
+		if (!repository.userBelongsToOrganization(principal.organizationId(), userId)) {
+			throw new BusinessException("USER_NOT_FOUND", "El usuario no pertenece a este gimnasio.");
+		}
+		repository.updateUserStatus(principal.organizationId(), userId, normalizedStatus, principal.userId(), OffsetDateTime.now());
+		auditService.record(principal, "INTERNAL_USER_STATUS_UPDATED", "USER", userId, "ADMIN", normalizedStatus, correlationId);
+		return repository.findUsers(principal.organizationId()).stream()
+				.filter(user -> user.id().equals(userId))
+				.findFirst()
+				.orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "El usuario no esta disponible."));
+	}
+
 	private void requirePrincipal(GymOsPrincipal principal) {
 		if (principal == null) {
 			throw new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesion para continuar.");
@@ -107,5 +130,13 @@ public class UserAdministrationService {
 
 	private String blankToNull(String value) {
 		return value == null || value.isBlank() ? null : value.trim();
+	}
+
+	private String normalizeStatus(String status) {
+		String normalized = status == null ? "" : status.trim().toUpperCase();
+		if (!List.of("ACTIVE", "SUSPENDED", "INACTIVE").contains(normalized)) {
+			throw new BusinessException("USER_STATUS_NOT_AVAILABLE", "Usa un estado valido: ACTIVE, SUSPENDED o INACTIVE.");
+		}
+		return normalized;
 	}
 }

@@ -1,1 +1,1 @@
-export { createInternalUser, getInternalUsers, getUserRoles } from "./legacy";
+export { createInternalUser, getInternalUsers, getUserRoles, updateInternalUserStatus } from "./legacy";

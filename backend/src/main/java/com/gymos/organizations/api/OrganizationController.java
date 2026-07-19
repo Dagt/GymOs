@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -95,6 +96,16 @@ public class OrganizationController {
 			HttpServletRequest servletRequest
 	) {
 		return organizationService.updateBranch(principal, branchId, request.toCommand(), correlationId(servletRequest));
+	}
+
+	@PatchMapping("/{organizationId}/status")
+	ManagedOrganizationSummary updateOrganizationStatus(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID organizationId,
+			@Valid @RequestBody OrganizationStatusRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return organizationService.updateOrganizationStatus(principal, organizationId, request.status(), correlationId(servletRequest));
 	}
 
 	private String correlationId(HttpServletRequest request) {
@@ -192,5 +203,10 @@ public class OrganizationController {
 		private CreateBranchCommand toCommand() {
 			return new CreateBranchCommand(name, code, timezone, phone);
 		}
+	}
+
+	public record OrganizationStatusRequest(
+			@NotBlank String status
+	) {
 	}
 }

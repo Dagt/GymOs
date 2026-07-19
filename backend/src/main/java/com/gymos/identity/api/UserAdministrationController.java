@@ -16,6 +16,8 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -49,6 +51,16 @@ public class UserAdministrationController {
 		return service.createUser(principal, request.toCommand(), correlationId(servletRequest));
 	}
 
+	@PatchMapping("/internal/{userId}/status")
+	InternalUserSummary updateStatus(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID userId,
+			@Valid @RequestBody UpdateInternalUserStatusRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return service.updateStatus(principal, userId, request.status(), correlationId(servletRequest));
+	}
+
 	private String correlationId(HttpServletRequest request) {
 		Object value = request.getAttribute(Correlation.ATTRIBUTE);
 		return value == null ? "unknown" : value.toString();
@@ -67,5 +79,10 @@ public class UserAdministrationController {
 		private CreateInternalUserCommand toCommand() {
 			return new CreateInternalUserCommand(firstName, lastName, email, phone, username, temporaryPassword, roleId, branchIds);
 		}
+	}
+
+	public record UpdateInternalUserStatusRequest(
+			@NotBlank String status
+	) {
 	}
 }

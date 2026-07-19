@@ -85,6 +85,20 @@ public class AuthQueryRepository {
 		return count > 0;
 	}
 
+	public boolean organizationIsActive(UUID organizationId) {
+		Integer count = jdbcClient.sql("""
+				SELECT COUNT(*)
+				FROM organization
+				WHERE id = :organizationId
+				  AND status = 'ACTIVE'
+				  AND deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.query(Integer.class)
+				.single();
+		return count > 0;
+	}
+
 	public Optional<UUID> firstActiveBranch(UUID organizationId) {
 		return jdbcClient.sql("""
 				SELECT id

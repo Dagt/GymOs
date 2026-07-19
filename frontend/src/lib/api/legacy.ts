@@ -1060,6 +1060,17 @@ export async function getOrganizations(accessToken: string): Promise<ManagedOrga
   return apiFetch<ManagedOrganizationSummary[]>("/organizations", accessToken);
 }
 
+export async function updateOrganizationStatus(
+  accessToken: string,
+  organizationId: string,
+  status: "ACTIVE" | "SUSPENDED" | "INACTIVE",
+): Promise<ManagedOrganizationSummary> {
+  return apiFetch<ManagedOrganizationSummary>(`/organizations/${organizationId}/status`, accessToken, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
+
 export async function createOrganization(
   accessToken: string,
   payload: CreateOrganizationPayload,
@@ -1113,6 +1124,17 @@ export async function createInternalUser(
   return apiFetch<InternalUserSummary>("/users/internal", accessToken, {
     method: "POST",
     body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function updateInternalUserStatus(
+  accessToken: string,
+  userId: string,
+  status: "ACTIVE" | "SUSPENDED" | "INACTIVE",
+): Promise<InternalUserSummary> {
+  return apiFetch<InternalUserSummary>(`/users/internal/${userId}/status`, accessToken, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
   });
 }
 

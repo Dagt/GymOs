@@ -5,6 +5,7 @@ export {
   getCurrentOrganization,
   getOrganizationBranches,
   getOrganizations,
+  updateOrganizationStatus,
   updateBranch,
   updateOrganization,
 } from "./legacy";

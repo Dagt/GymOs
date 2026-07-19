@@ -69,13 +69,16 @@ Errores:
 - `GET /users/roles`
 - `GET /users/internal`
 - `POST /users/internal`
+- `PATCH /users/internal/{userId}/status`
 
 Permisos:
 
 - `user.read` para listar roles y usuarios internos.
-- `user.manage` para crear usuarios internos.
+- `user.manage` para crear usuarios internos y suspender/reactivar cuentas.
 
 `POST /users/internal` crea persona, cuenta de usuario, rol y accesos a sucursales dentro de la organizacion actual. No devuelve contrasenas ni hashes.
+
+`PATCH /users/internal/{userId}/status` cambia el estado de una cuenta interna. Estados validos: `ACTIVE`, `SUSPENDED`, `INACTIVE`. Una cuenta suspendida o inactiva no puede iniciar sesion. No se permite suspender la propia cuenta.
 
 Request:
 
@@ -107,6 +110,21 @@ Errores:
 - `USER_ALREADY_EXISTS`
 - `AUTHENTICATION_REQUIRED`
 - `PERMISSION_DENIED`
+
+## 6.1.1.2 Roles tenant y estado comercial
+
+Diferencia de roles:
+
+- `Dueno del gimnasio`: cliente directo del SaaS. Administra su tenant completo, sucursales, usuarios, marca, catalogo y metricas de negocio. No administra otros gimnasios ni la plataforma GymOS.
+- `Gerente`: delegado operativo del gimnasio. Gestiona operacion diaria, equipo autorizado, inventario, agenda, recepcion y reportes permitidos, sin acceso a administracion de plataforma.
+
+Estado comercial de gimnasio cliente:
+
+- `PATCH /organizations/{organizationId}/status`
+- Permiso: `platform.admin`.
+- Estados validos: `ACTIVE`, `SUSPENDED`, `INACTIVE`.
+- Usuarios tenant de una organizacion `SUSPENDED` o `INACTIVE` no pueden iniciar sesion ni refrescar sesion.
+- Admin GymOS conserva acceso para soporte y reactivacion.
 
 ## 6.1.2 Kiosco de autoservicio
 

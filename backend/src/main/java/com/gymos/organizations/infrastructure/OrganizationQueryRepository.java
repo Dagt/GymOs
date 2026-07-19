@@ -3,6 +3,7 @@ package com.gymos.organizations.infrastructure;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.time.OffsetDateTime;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
@@ -220,6 +221,23 @@ public class OrganizationQueryRepository {
 				.query(Integer.class)
 				.single();
 		return count > 0;
+	}
+
+	public void updateOrganizationStatus(UUID organizationId, String status, UUID actorUserId, OffsetDateTime now) {
+		jdbcClient.sql("""
+				UPDATE organization
+				SET status = :status,
+				    updated_at = :updatedAt,
+				    updated_by = :updatedBy,
+				    version = version + 1
+				WHERE id = :organizationId
+				  AND deleted_at IS NULL
+				""")
+				.param("status", status)
+				.param("updatedAt", now)
+				.param("updatedBy", actorUserId)
+				.param("organizationId", organizationId)
+				.update();
 	}
 
 	private ManagedOrganizationSummary managedOrganizationSummary(java.sql.ResultSet resultSet, int rowNumber) throws java.sql.SQLException {

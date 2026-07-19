@@ -22,6 +22,7 @@ type NavigationLink = {
   href: string;
   hint: string;
   permissions?: string[];
+  requiresBranch?: boolean;
 };
 
 type NavigationSection = {
@@ -158,7 +159,7 @@ export function AppShell({
   const sections = sectionsForConsole(consoleType, variant)
     .map((section) => ({
       ...section,
-      links: section.links.filter((link) => canSeeLink(permissionSet, link)),
+      links: section.links.filter((link) => canSeeLink(permissionSet, link) && canUseWithoutBranch(hasBranch, link)),
     }))
     .filter((section) => section.links.length > 0);
 
@@ -313,6 +314,10 @@ function canSeeLink(permissions: Set<string>, link: NavigationLink) {
     return true;
   }
   return link.permissions.some((permission) => permissions.has(permission));
+}
+
+function canUseWithoutBranch(hasBranch: boolean, link: NavigationLink) {
+  return hasBranch || link.requiresBranch === false || link.href === "/users" || link.href === "/settings/organization";
 }
 
 function isActive(pathname: string, href: string) {
