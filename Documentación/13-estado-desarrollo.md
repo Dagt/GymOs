@@ -19,6 +19,23 @@ Verificado:
 - `npm.cmd run typecheck`
 - `npm.cmd run build`
 
+## Correccion catalogo y formularios - 19 de julio de 2026
+
+Implementado:
+
+- `/catalog` separa productos/servicios de planes de membresia.
+- El formulario de producto ya no permite crear membresias incompletas como producto comun.
+- El formulario de plan de membresia crea el producto tecnico `MEMBERSHIP_PLAN` y despues el registro `membership_plan` con duracion y dias de gracia.
+- El listado de productos oculta productos tecnicos de membresia para no mezclarlos con suplementos, ropa o servicios.
+- El listado de planes avisa cuando existen productos `MEMBERSHIP_PLAN` sin plan asociado.
+- Los campos de formularios compartidos mantienen altura consistente aunque un campo vecino tenga texto de ayuda.
+
+Verificado:
+
+- `npm.cmd run lint`
+- `npm.cmd run typecheck`
+- `npm.cmd run build`
+
 ## Hito 0 - Base tecnica vendible
 
 Implementado:

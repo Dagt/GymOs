@@ -237,11 +237,24 @@ th {
 }
 
 .form-field {
+  align-content: start;
   display: grid;
   gap: 0.45rem;
   color: var(--brand-muted);
   font-size: 0.88rem;
   font-weight: 750;
+}
+
+.form-field input.app-input,
+.form-field select.app-input {
+  height: 2.75rem;
+  min-height: 2.75rem;
+}
+
+.form-field textarea.app-input {
+  min-height: 6rem;
+  padding-bottom: 0.75rem;
+  padding-top: 0.75rem;
 }
 
 .form-field > span {

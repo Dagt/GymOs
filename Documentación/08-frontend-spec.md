@@ -118,6 +118,13 @@ Resumen:
 - Confirmación.
 - Recibo.
 
+Regla de catalogo:
+- Productos y servicios de mostrador se capturan en el formulario de producto.
+- Las membresias se capturan en un formulario separado de plan de membresia.
+- Al crear un plan, el frontend crea primero el producto tecnico `MEMBERSHIP_PLAN` y despues el registro `membership_plan` con duracion y dias de gracia.
+- La UI no debe presentar membresias junto a suplementos, ropa u otros productos fisicos, aunque el modelo de ventas use un producto tecnico para poder cobrarlas en POS.
+- El alta de socio solo muestra planes reales de `GET /catalog/plans`; un producto `MEMBERSHIP_PLAN` sin `membership_plan` no debe considerarse una membresia seleccionable.
+
 ## 8.6 Reservas
 
 Vista:

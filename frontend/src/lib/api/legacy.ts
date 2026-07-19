@@ -226,6 +226,14 @@ export type ProductPayload = {
   status: "ACTIVE" | "INACTIVE";
 };
 
+export type PlanPayload = {
+  productId: string;
+  durationDays: number;
+  graceDays: number;
+  benefitsJson?: string | null;
+  status: "ACTIVE" | "INACTIVE";
+};
+
 export type SaleSummary = {
   id: string;
   saleNumber: string;
@@ -1361,6 +1369,16 @@ export async function createProduct(
 
 export async function getPlans(accessToken: string): Promise<PlanSummary[]> {
   return apiFetch<PlanSummary[]>("/catalog/plans", accessToken);
+}
+
+export async function createPlan(
+  accessToken: string,
+  payload: PlanPayload,
+): Promise<PlanSummary> {
+  return apiFetch<PlanSummary>("/catalog/plans", accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
 }
 
 export async function getRecentSales(accessToken: string): Promise<SaleSummary[]> {
