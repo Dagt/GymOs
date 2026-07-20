@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import BookingsNotesEnhancer from "./BookingsNotesEnhancer";
+import BookingsRoleLayoutEnhancer from "./BookingsRoleLayoutEnhancer";
 import styles from "./bookings-layout.module.css";
 
 export default function BookingsLayout({ children }: { children: ReactNode }) {
@@ -7,6 +8,7 @@ export default function BookingsLayout({ children }: { children: ReactNode }) {
     <div className={styles.shell}>
       {children}
       <BookingsNotesEnhancer />
+      <BookingsRoleLayoutEnhancer />
     </div>
   );
 }
