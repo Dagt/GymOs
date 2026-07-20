@@ -14,6 +14,54 @@
   min-width: 0;
 }
 
+/* Compact the month navigation without changing its behavior. */
+.shell :global(.rounded-2xl.shadow-inner) {
+  gap: 0.45rem !important;
+  padding: 0.5rem !important;
+  border-radius: 0.75rem !important;
+}
+
+.shell :global(.rounded-2xl.shadow-inner button),
+.shell :global(.rounded-2xl.shadow-inner input) {
+  height: 2.25rem !important;
+  min-height: 2.25rem !important;
+  border-radius: 0.55rem !important;
+  font-size: 0.75rem !important;
+}
+
+.shell :global(.rounded-2xl.shadow-inner button[aria-label]) {
+  width: 2.25rem !important;
+  font-size: 1rem !important;
+}
+
+.shell :global(.rounded-2xl.shadow-inner p:first-child) {
+  font-size: 0.58rem !important;
+  line-height: 0.7rem !important;
+}
+
+.shell :global(.rounded-2xl.shadow-inner p:last-child) {
+  font-size: 0.8rem !important;
+  line-height: 1rem !important;
+}
+
+/* Compact resource selector chips and their color dots. */
+.shell :global(.mt-5.flex.flex-wrap.gap-2) {
+  margin-top: 0.75rem !important;
+  gap: 0.35rem !important;
+}
+
+.shell :global(.mt-5.flex.flex-wrap.gap-2 > button) {
+  min-height: 2rem !important;
+  padding: 0.3rem 0.55rem !important;
+  gap: 0.35rem !important;
+  font-size: 0.72rem !important;
+}
+
+.shell :global(.mt-5.flex.flex-wrap.gap-2 > button > span) {
+  width: 0.55rem !important;
+  height: 0.55rem !important;
+}
+
 /* Keep the monthly calendar compact without changing its structure. */
 .shell :global(.grid-cols-7 > button) {
   min-height: 4.75rem !important;
@@ -54,20 +102,25 @@
   scroll-snap-align: none !important;
 }
 
-/* The horizontal-scroll instruction is no longer applicable. */
 .shell :global(p:has(+ .snap-x)) {
   display: none !important;
 }
 
-/* Show approximately three compact reservations per resource. */
+/* Show approximately three reservations and keep scrolling functional but invisible. */
 .shell :global(.max-h-\[24rem\]) {
   max-height: 13.5rem !important;
   overflow-y: auto !important;
-  padding-right: 0.3rem !important;
-  scrollbar-gutter: stable;
+  padding-right: 0 !important;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-/* Compact each individual reservation card and its typography. */
+.shell :global(.max-h-\[24rem\]::-webkit-scrollbar) {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
 .shell :global(.snap-start > div > article) {
   padding: 0.5rem 0.625rem !important;
 }
@@ -88,12 +141,29 @@
   line-height: 0.9rem !important;
 }
 
-.shell :global(.snap-start > div > article > button) {
-  height: 1.75rem !important;
-  margin-top: 0.45rem !important;
-  padding-left: 0.5rem !important;
-  padding-right: 0.5rem !important;
-  font-size: 0.65rem !important;
+.shell :global(.booking-card-actions) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+
+.shell :global(.booking-card-actions button),
+.shell :global(.booking-note-button) {
+  height: 1.65rem !important;
+  margin-top: 0 !important;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 0.45rem;
+  padding: 0 0.35rem !important;
+  color: white;
+  font-size: 0.62rem !important;
+  font-weight: 700;
+  background: transparent;
+}
+
+.shell :global(.booking-note-button:disabled) {
+  cursor: default;
+  opacity: 0.45;
 }
 
 @media (min-width: 768px) {
