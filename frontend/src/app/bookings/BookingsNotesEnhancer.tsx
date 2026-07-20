@@ -17,34 +17,51 @@ export default function BookingsNotesEnhancer() {
       .filter((booking) => booking.status !== "CANCELLED")
       .sort((a, b) => a.startsAt.localeCompare(b.startsAt));
 
+    const usedBookingIds = new Set<string>();
     const resourceCards = Array.from(document.querySelectorAll<HTMLElement>("article.snap-start"));
+
     for (const resourceCard of resourceCards) {
       const resourceName = resourceCard.querySelector("p")?.textContent?.trim() ?? "";
       const matching = bookings.filter((booking) => booking.resourceName === resourceName);
       const cards = Array.from(resourceCard.querySelectorAll<HTMLElement>("article[style]"));
+
       cards.forEach((card, index) => {
-        const booking = matching[index];
-        if (!booking || card.querySelector("[data-booking-note-button]")) return;
+        if (card.querySelector("[data-booking-note-button]")) return;
+
+        const cardText = card.textContent ?? "";
+        const booking = matching.find((candidate) => {
+          if (usedBookingIds.has(candidate.id)) return false;
+          return cardText.includes(candidate.clientName)
+            && cardText.includes(formatTime(candidate.startsAt))
+            && cardText.includes(formatTime(candidate.endsAt));
+        }) ?? matching.find((candidate) => !usedBookingIds.has(candidate.id)) ?? matching[index];
+
+        if (booking) usedBookingIds.add(booking.id);
+
         const cancel = Array.from(card.querySelectorAll("button")).find((button) => button.textContent?.toLowerCase().includes("cancelar"));
         if (cancel) cancel.textContent = "Cancelar";
+
         const actions = document.createElement("div");
         actions.className = "booking-card-actions";
+        actions.dataset.bookingActions = "true";
+
         if (cancel?.parentElement) {
           cancel.parentElement.insertBefore(actions, cancel);
           actions.appendChild(cancel);
         } else {
           card.appendChild(actions);
         }
+
         const noteButton = document.createElement("button");
         noteButton.type = "button";
         noteButton.dataset.bookingNoteButton = "true";
         noteButton.className = "booking-note-button";
         noteButton.textContent = "Ver nota";
-        noteButton.disabled = !booking.notes?.trim();
-        noteButton.title = booking.notes?.trim() ? "Ver nota de la reserva" : "Esta reserva no tiene nota";
+        noteButton.disabled = !booking?.notes?.trim();
+        noteButton.title = booking?.notes?.trim() ? "Ver nota de la reserva" : "Esta reserva no tiene nota";
         noteButton.onclick = () => setDialog({
-          clientName: booking.clientName,
-          note: booking.notes?.trim() || "Esta reserva no tiene una nota registrada.",
+          clientName: booking?.clientName ?? "Reserva",
+          note: booking?.notes?.trim() || "Esta reserva no tiene una nota registrada.",
         });
         actions.appendChild(noteButton);
       });
@@ -79,4 +96,8 @@ export default function BookingsNotesEnhancer() {
       </div>
     </div>
   );
+}
+
+function formatTime(value: string) {
+  return new Intl.DateTimeFormat("es-MX", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 }
