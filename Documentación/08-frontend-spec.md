@@ -240,7 +240,7 @@ Objetivo:
 Consolas:
 - `PLATFORM_OWNER`: entra a `/platform/gymnasiums`. Administra CRM de gimnasios cliente, configuracion base y soporte auditable.
 - `TENANT_OWNER`: entra a `/dashboard`. Ve metricas, salud del negocio, sucursales, equipo y administracion de su gimnasio.
-- El dueño no debe recibir sucursal operativa automaticamente al iniciar sesion; usa el selector del shell para escoger la sucursal antes de crear recursos, socios u operaciones locales.
+- El dueño recibe automaticamente la primera sucursal activa permitida al iniciar sesion; puede cambiar de sucursal desde el selector del shell antes de crear recursos, socios u operaciones locales.
 - `TENANT_MANAGER`: entra a `/operations`. Gestiona operacion diaria, pendientes, agenda, inventario y equipo autorizado; no ve `/settings/organization`.
 - `RECEPTION`: entra a `/reception`. Ve recepcion, POS, socios, ventas y reportes operativos permitidos.
 - `COACH`: entra a `/coaches`. Ve coaches, rutinas y asignaciones permitidas.
@@ -289,7 +289,7 @@ Marca por gimnasio:
 - Campos soportados: `brandName`, `logoUrl`, `primaryColor`, `accentColor`, `surfaceColor`.
 - Plataforma usa tema neutral; tenant usa su propia marca en dueño, gerencia, recepcion, coaches, kiosco y pantallas internas.
 - La marca lateral usa los colores del tenant y muestra el logo configurado cuando `logoUrl` existe.
-- Si la sucursal activa tiene marca propia, el shell, el kiosco y las pantallas operativas priorizan esa marca sobre la del gimnasio.
+- Las sucursales no tienen marca propia; todas heredan logo y colores configurados en el gimnasio.
 - El logo se carga desde un selector de archivo, no escribiendo una URL manualmente.
 - Los logos cargados desde frontend local se guardan en `frontend/public/tenants/<slug-del-gimnasio>/logo.*` y se exponen como `/tenants/<slug-del-gimnasio>/logo.*`.
 - Docker Compose monta `frontend/public/tenants` en el contenedor frontend para preservar logos cargados durante pruebas locales.
@@ -316,5 +316,5 @@ Formularios:
 - Las acciones de recepcion se agrupan en la misma cuadricula: caja/POS, socios, ventas, kiosco, reservas y beneficios. No se usa una seccion desplegable secundaria para herramientas normales de mostrador.
 - La paleta de recepcion debe derivar de la marca del tenant (`primaryColor`, `accentColor`, `surfaceColor`) y no de colores fijos por modulo.
 - El dashboard de recepcion prioriza una banda visual con el color principal y acciones asimetricas; evita verse como una lista plana de tarjetas independientes.
-- El kiosco muestra primero logo, nombre y colores de la sucursal especifica vinculada al terminal; si la sucursal no tiene marca propia, hereda la del gimnasio.
-- `/settings/organization` permite configurar marca especifica por sucursal.
+- El kiosco muestra logo, nombre y colores del gimnasio propietario del terminal.
+- `/settings/organization` permite configurar marca solo en la seccion del gimnasio; la seccion de sucursales solo administra datos operativos de cada sede.

@@ -120,12 +120,10 @@ public class OrganizationService {
 				jdbcClient.sql("""
 					INSERT INTO branch (
 						    id, organization_id, name, code, timezone, status, phone,
-						    brand_name, logo_url, primary_color, accent_color, surface_color,
 						    created_at, updated_at, created_by, updated_by, version
 						)
 						VALUES (
 						    :branchId, :organizationId, :name, :code, :timezone, 'ACTIVE', :phone,
-						    :brandName, :logoUrl, :primaryColor, :accentColor, :surfaceColor,
 						    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
 						)
 						""")
@@ -135,11 +133,6 @@ public class OrganizationService {
 						.param("code", request.firstBranchCode().trim().toUpperCase())
 						.param("timezone", request.timezone().trim())
 						.param("phone", blankToNull(request.firstBranchPhone()))
-						.param("brandName", request.firstBranchName().trim())
-						.param("logoUrl", blankToNull(request.logoUrl()))
-						.param("primaryColor", defaultColor(request.primaryColor(), "#164E63"))
-						.param("accentColor", defaultColor(request.accentColor(), "#F59E0B"))
-						.param("surfaceColor", defaultColor(request.surfaceColor(), "#F4F7FB"))
 						.param("createdAt", now)
 						.param("updatedAt", now)
 						.param("createdBy", principal.userId())
@@ -223,12 +216,10 @@ public class OrganizationService {
 			jdbcClient.sql("""
 					INSERT INTO branch (
 					    id, organization_id, name, code, timezone, status, phone,
-					    brand_name, logo_url, primary_color, accent_color, surface_color,
 					    created_at, updated_at, created_by, updated_by, version
 					)
 					VALUES (
 					    :branchId, :organizationId, :name, :code, :timezone, 'ACTIVE', :phone,
-					    :brandName, :logoUrl, :primaryColor, :accentColor, :surfaceColor,
 					    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
 					)
 					""")
@@ -238,11 +229,6 @@ public class OrganizationService {
 					.param("code", request.code().trim().toUpperCase())
 					.param("timezone", request.timezone().trim())
 					.param("phone", blankToNull(request.phone()))
-					.param("brandName", defaultBranchBrandName(request.brandName(), request.name()))
-					.param("logoUrl", blankToNull(request.logoUrl()))
-					.param("primaryColor", blankToNull(request.primaryColor()))
-					.param("accentColor", blankToNull(request.accentColor()))
-					.param("surfaceColor", blankToNull(request.surfaceColor()))
 					.param("createdAt", now)
 					.param("updatedAt", now)
 					.param("createdBy", principal.userId())
@@ -286,11 +272,6 @@ public class OrganizationService {
 				    code = :code,
 				    timezone = :timezone,
 				    phone = :phone,
-				    brand_name = :brandName,
-				    logo_url = :logoUrl,
-				    primary_color = :primaryColor,
-				    accent_color = :accentColor,
-				    surface_color = :surfaceColor,
 				    updated_at = :updatedAt,
 				    updated_by = :updatedBy,
 				    version = version + 1
@@ -302,11 +283,6 @@ public class OrganizationService {
 				.param("code", request.code().trim().toUpperCase())
 				.param("timezone", request.timezone().trim())
 				.param("phone", blankToNull(request.phone()))
-				.param("brandName", defaultBranchBrandName(request.brandName(), request.name()))
-				.param("logoUrl", blankToNull(request.logoUrl()))
-				.param("primaryColor", blankToNull(request.primaryColor()))
-				.param("accentColor", blankToNull(request.accentColor()))
-				.param("surfaceColor", blankToNull(request.surfaceColor()))
 				.param("updatedAt", now)
 				.param("updatedBy", principal.userId())
 				.param("branchId", branchId)
@@ -355,11 +331,6 @@ public class OrganizationService {
 	private String defaultBrandName(String brandName, String tradeName) {
 		String value = blankToNull(brandName);
 		return value == null ? tradeName.trim() : value;
-	}
-
-	private String defaultBranchBrandName(String brandName, String branchName) {
-		String value = blankToNull(brandName);
-		return value == null ? branchName.trim() : value;
 	}
 
 	private String defaultColor(String value, String fallback) {

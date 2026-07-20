@@ -44,7 +44,7 @@ Nota implementada Hito 7.6:
 
 `POST /organizations/current/branches` crea una nueva sucursal activa para la organizacion actual y asigna acceso al administrador que la crea. Requiere permiso `branch.create`. Esto habilita gimnasios con multiples sucursales desde la configuracion administrativa.
 
-Las sucursales aceptan marca opcional: `brandName`, `logoUrl`, `primaryColor`, `accentColor`, `surfaceColor`. Si una sucursal no define estos campos, hereda la marca del gimnasio.
+La marca se configura exclusivamente en la organizacion/gimnasio (`brandName`, `logoUrl`, `primaryColor`, `accentColor`, `surfaceColor`). Las sucursales no aceptan marca propia y heredan siempre el logo y colores del gimnasio.
 
 Nota implementada Hito 7.9:
 
@@ -168,7 +168,7 @@ Estado comercial de gimnasio cliente:
 
 Los endpoints de autoservicio sólo exponen acciones permitidas para clientes en una sesión temporal de kiosco. Las reglas de pagos, membresías, beneficios y permisos se validan en backend.
 
-La sesion publica de kiosco prioriza marca de la sucursal asociada al terminal: nombre visible, logo y colores. Si no existe marca local, usa la del gimnasio.
+La sesion publica de kiosco usa logo, nombre visible y colores del gimnasio al que pertenece el terminal. La sucursal vinculada define el contexto operativo del kiosco, no una marca visual propia.
 
 Nota implementada Hito 3: las acciones de renovacion y cambio de plan reciben `{membershipId}` en la ruta concreta:
 - `POST /self-service/sessions/{sessionId}/membership-renewals/{membershipId}`
@@ -218,9 +218,8 @@ Visibilidad por sucursal:
 
 Autenticacion y sucursal activa:
 
-- `Dueno del gimnasio` entra sin `branchId` por defecto para evitar altas accidentales en una sola sucursal.
+- `Dueno del gimnasio`, gerente, recepcion y coach reciben la primera sucursal activa permitida cuando existe para evitar pantallas operativas sin contexto.
 - `POST /auth/select-branch` establece la sucursal operativa para flujos locales como recursos, socios, inventario, reservas, caja y recepcion.
-- Gerente, recepcion y coach siguen recibiendo la primera sucursal permitida cuando aplica para operar directo.
 
 ## 6.4 Productos
 
@@ -523,6 +522,8 @@ Permisos por endpoint interno:
 - `onboarding.manage`
 - `client.import`
 
+Nota: `Recepcion` conserva `resource.read`, `booking.read` y `booking.manage` para hacer reservaciones, pero no recibe `resource.manage`; la creacion/modificacion de recursos reservables queda para perfiles administrativos.
+
 Errores agregados o formalizados:
 - `IDEMPOTENCY_KEY_REUSED`
 - `PAYMENT_ALREADY_COMPLETED`
@@ -790,7 +791,7 @@ Endpoints afectados:
 Reglas:
 
 - `primaryColor`, `accentColor` y `surfaceColor` deben usar formato hexadecimal `#RRGGBB`.
-- La marca se guarda por organizacion y opcionalmente por sucursal. Gerencia, recepcion, coaches, kiosco y pantallas internas usan la sucursal activa cuando existe marca local; si no, heredan la marca del tenant.
+- La marca se guarda por organizacion/gimnasio. Gerencia, recepcion, coaches, kiosco y pantallas internas usan siempre la marca del tenant activo.
 - La consola de Administrador GymOS conserva marca neutral de plataforma.
 
 ### Usuarios internos

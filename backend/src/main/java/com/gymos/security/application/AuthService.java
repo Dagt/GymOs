@@ -172,16 +172,11 @@ public class AuthService {
 		if (user.permissions().contains("platform.admin")) {
 			return null;
 		}
-		if (isTenantOwner(user)) {
-			return null;
-		}
 		return authQueryRepository.firstAccessibleBranch(user.userId(), organizationId).orElse(null);
 	}
 
 	private CurrentUserResult toResponse(GymOsPrincipal principal) {
-		AuthQueryRepository.OrganizationTheme theme = (principal.branchId() == null
-				? authQueryRepository.organizationTheme(principal.organizationId())
-				: authQueryRepository.themeForBranch(principal.organizationId(), principal.branchId()))
+		AuthQueryRepository.OrganizationTheme theme = authQueryRepository.organizationTheme(principal.organizationId())
 				.orElse(new AuthQueryRepository.OrganizationTheme("GymOS", null, null, "#164E63", "#F59E0B", "#F4F7FB"));
 		return new CurrentUserResult(
 				principal.userId(),
@@ -228,12 +223,6 @@ public class AuthService {
 		return principal.roles().stream()
 				.map(role -> role.toLowerCase(java.util.Locale.ROOT))
 				.anyMatch(role -> role.contains(fragment));
-	}
-
-	private boolean isTenantOwner(AuthenticatedUser user) {
-		return user.roles().stream()
-				.map(role -> role.toLowerCase(java.util.Locale.ROOT))
-				.anyMatch(role -> role.contains("dueno") || role.contains("owner") || role.contains("administrador"));
 	}
 
 	private String refreshKey(String refreshToken) {

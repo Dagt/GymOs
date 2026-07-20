@@ -19,12 +19,7 @@ public class SelfServiceRepository {
 	public Optional<TerminalRecord> terminal(String terminalCode) {
 		return jdbcClient.sql("""
 				SELECT sst.id, sst.organization_id, sst.branch_id, sst.name, sst.device_code, sst.status,
-				       o.trade_name,
-				       COALESCE(b.brand_name, o.brand_name, b.name) AS brand_name,
-				       COALESCE(b.logo_url, o.logo_url) AS logo_url,
-				       COALESCE(b.primary_color, o.primary_color) AS primary_color,
-				       COALESCE(b.accent_color, o.accent_color) AS accent_color,
-				       COALESCE(b.surface_color, o.surface_color) AS surface_color
+				       o.trade_name, o.brand_name, o.logo_url, o.primary_color, o.accent_color, o.surface_color
 				FROM self_service_terminal sst
 				JOIN organization o ON o.id = sst.organization_id
 				JOIN branch b ON b.id = sst.branch_id

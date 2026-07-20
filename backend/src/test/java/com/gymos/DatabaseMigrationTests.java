@@ -67,14 +67,18 @@ class DatabaseMigrationTests {
 			assertThat(tableExists(connection, "notification_template")).isTrue();
 			assertThat(tableExists(connection, "resource_allowed_membership_plan")).isTrue();
 			assertThat(columnExists(connection, "client", "home_branch_id")).isTrue();
-			assertThat(columnExists(connection, "branch", "brand_name")).isTrue();
-			assertThat(columnExists(connection, "branch", "logo_url")).isTrue();
-			assertThat(columnExists(connection, "branch", "primary_color")).isTrue();
 			assertThat(columnExists(connection, "membership", "auto_renew")).isTrue();
 			assertThat(columnExists(connection, "membership", "cancelled_at")).isTrue();
 			assertThat(columnExists(connection, "membership_plan", "multi_branch_access")).isTrue();
 			assertThat(columnExists(connection, "automation_rule", "trigger_type")).isTrue();
 			assertThat(columnExists(connection, "automation_rule", "next_run_at")).isTrue();
+			assertThat(columnExists(connection, "branch", "brand_name")).isFalse();
+			assertThat(columnExists(connection, "branch", "logo_url")).isFalse();
+			assertThat(columnExists(connection, "branch", "primary_color")).isFalse();
+			assertThat(columnExists(connection, "branch", "accent_color")).isFalse();
+			assertThat(columnExists(connection, "branch", "surface_color")).isFalse();
+			assertThat(roleHasPermission(connection, "Recepcion", "resource.manage")).isFalse();
+			assertThat(roleHasPermission(connection, "Recepcion", "booking.manage")).isTrue();
 		}
 	}
 
@@ -130,6 +134,23 @@ class DatabaseMigrationTests {
 				  AND indexname = ?
 				""")) {
 			statement.setString(1, indexName);
+			try (var resultSet = statement.executeQuery()) {
+				return resultSet.next();
+			}
+		}
+	}
+
+	private boolean roleHasPermission(java.sql.Connection connection, String roleName, String permissionCode) throws Exception {
+		try (var statement = connection.prepareStatement("""
+				SELECT 1
+				FROM role r
+				JOIN role_permission rp ON rp.role_id = r.id
+				JOIN permission p ON p.id = rp.permission_id
+				WHERE r.name = ?
+				  AND p.code = ?
+				""")) {
+			statement.setString(1, roleName);
+			statement.setString(2, permissionCode);
 			try (var resultSet = statement.executeQuery()) {
 				return resultSet.next();
 			}

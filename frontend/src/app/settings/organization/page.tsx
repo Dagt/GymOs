@@ -34,11 +34,6 @@ const emptyBranchForm: CreateBranchPayload = {
   code: "",
   timezone: "America/Mexico_City",
   phone: "",
-  brandName: "",
-  logoUrl: "",
-  primaryColor: "",
-  accentColor: "",
-  surfaceColor: "",
 };
 
 export default function OrganizationSettingsPage() {
@@ -290,20 +285,6 @@ export default function OrganizationSettingsPage() {
               <Field error={fieldErrors.newBranchPhone} help="Se guardara como +52 seguido de 10 digitos." label="Telefono" value={newBranchForm.phone ?? ""} onChange={(value) => setNewBranchForm({ ...newBranchForm, phone: value })} />
             </div>
             <Field error={fieldErrors.newBranchTimezone} label="Zona horaria" value={newBranchForm.timezone} onChange={(value) => setNewBranchForm({ ...newBranchForm, timezone: value })} />
-            <hr className="border-[#dbe4ee]" />
-            <p className="app-eyebrow">Marca de sucursal</p>
-            <Field label="Nombre visible" value={newBranchForm.brandName ?? ""} onChange={(value) => setNewBranchForm({ ...newBranchForm, brandName: value })} />
-            <LogoUploadField
-              disabled={saving}
-              logoUrl={newBranchForm.logoUrl}
-              tenantName={`${organizationForm?.tradeName ?? "gimnasio"}-${newBranchForm.name || newBranchForm.code || "sucursal"}`}
-              onChange={(logoUrl) => setNewBranchForm({ ...newBranchForm, logoUrl })}
-            />
-            <div className="grid gap-4 sm:grid-cols-3">
-              <Field label="Color principal" type="color" value={newBranchForm.primaryColor || organizationForm?.primaryColor || "#164E63"} onChange={(value) => setNewBranchForm({ ...newBranchForm, primaryColor: value })} />
-              <Field label="Color acento" type="color" value={newBranchForm.accentColor || organizationForm?.accentColor || "#F59E0B"} onChange={(value) => setNewBranchForm({ ...newBranchForm, accentColor: value })} />
-              <Field label="Color fondo" type="color" value={newBranchForm.surfaceColor || organizationForm?.surfaceColor || "#F4F7FB"} onChange={(value) => setNewBranchForm({ ...newBranchForm, surfaceColor: value })} />
-            </div>
             <button className="form-primary-button" disabled={saving} type="submit">
               Crear sucursal
             </button>
@@ -341,20 +322,6 @@ export default function OrganizationSettingsPage() {
                     <Field error={fieldErrors.branchPhone} help="Se guardara como +52 seguido de 10 digitos." label="Telefono" value={branchForm.phone ?? ""} onChange={(value) => setBranchForm({ ...branchForm, phone: value })} />
                   </div>
                   <Field error={fieldErrors.branchTimezone} label="Zona horaria" value={branchForm.timezone} onChange={(value) => setBranchForm({ ...branchForm, timezone: value })} />
-                  <hr className="border-[#dbe4ee]" />
-                  <p className="app-eyebrow">Marca de sucursal</p>
-                  <Field label="Nombre visible" value={branchForm.brandName ?? ""} onChange={(value) => setBranchForm({ ...branchForm, brandName: value })} />
-                  <LogoUploadField
-                    disabled={saving}
-                    logoUrl={branchForm.logoUrl}
-                    tenantName={`${organizationForm?.tradeName ?? "gimnasio"}-${branchForm.name || branchForm.code}`}
-                    onChange={(logoUrl) => setBranchForm({ ...branchForm, logoUrl })}
-                  />
-                  <div className="grid gap-4 sm:grid-cols-3">
-                    <Field label="Color principal" type="color" value={branchForm.primaryColor || organizationForm?.primaryColor || "#164E63"} onChange={(value) => setBranchForm({ ...branchForm, primaryColor: value })} />
-                    <Field label="Color acento" type="color" value={branchForm.accentColor || organizationForm?.accentColor || "#F59E0B"} onChange={(value) => setBranchForm({ ...branchForm, accentColor: value })} />
-                    <Field label="Color fondo" type="color" value={branchForm.surfaceColor || organizationForm?.surfaceColor || "#F4F7FB"} onChange={(value) => setBranchForm({ ...branchForm, surfaceColor: value })} />
-                  </div>
                   <button className="form-primary-button" disabled={saving} type="submit">
                     Guardar sucursal
                   </button>
@@ -407,11 +374,6 @@ function toBranchForm(branch: BranchSummary): BranchUpdatePayload {
     code: branch.code,
     timezone: branch.timezone,
     phone: branch.phone ?? "",
-    brandName: branch.brandName ?? branch.name,
-    logoUrl: branch.logoUrl ?? "",
-    primaryColor: branch.primaryColor ?? "",
-    accentColor: branch.accentColor ?? "",
-    surfaceColor: branch.surfaceColor ?? "",
   };
 }
 

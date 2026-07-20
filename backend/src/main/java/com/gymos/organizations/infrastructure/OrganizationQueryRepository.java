@@ -131,8 +131,7 @@ public class OrganizationQueryRepository {
 
 	public List<BranchSummary> findBranchesForUser(UUID userId, UUID organizationId) {
 		return jdbcClient.sql("""
-				SELECT b.id, b.name, b.code, b.status, b.timezone, b.phone, uba.access_scope,
-				       b.brand_name, b.logo_url, b.primary_color, b.accent_color, b.surface_color
+				SELECT b.id, b.name, b.code, b.status, b.timezone, b.phone, uba.access_scope
 				FROM user_branch_access uba
 				JOIN branch b ON b.id = uba.branch_id
 				WHERE uba.user_id = :userId
@@ -148,8 +147,7 @@ public class OrganizationQueryRepository {
 
 	public List<BranchSummary> findBranchesForOrganization(UUID organizationId) {
 		return jdbcClient.sql("""
-				SELECT b.id, b.name, b.code, b.status, b.timezone, b.phone, 'SUPPORT' AS access_scope,
-				       b.brand_name, b.logo_url, b.primary_color, b.accent_color, b.surface_color
+				SELECT b.id, b.name, b.code, b.status, b.timezone, b.phone, 'SUPPORT' AS access_scope
 				FROM branch b
 				WHERE b.organization_id = :organizationId
 				  AND b.deleted_at IS NULL
@@ -162,8 +160,7 @@ public class OrganizationQueryRepository {
 
 	public Optional<BranchSummary> findBranch(UUID organizationId, UUID branchId) {
 		return jdbcClient.sql("""
-				SELECT b.id, b.name, b.code, b.status, b.timezone, b.phone, 'SUPPORT' AS access_scope,
-				       b.brand_name, b.logo_url, b.primary_color, b.accent_color, b.surface_color
+				SELECT b.id, b.name, b.code, b.status, b.timezone, b.phone, 'SUPPORT' AS access_scope
 				FROM branch b
 				WHERE b.organization_id = :organizationId
 				  AND b.id = :branchId
@@ -177,8 +174,7 @@ public class OrganizationQueryRepository {
 
 	public Optional<BranchSummary> findBranchForUser(UUID userId, UUID organizationId, UUID branchId) {
 		return jdbcClient.sql("""
-				SELECT b.id, b.name, b.code, b.status, b.timezone, b.phone, uba.access_scope,
-				       b.brand_name, b.logo_url, b.primary_color, b.accent_color, b.surface_color
+				SELECT b.id, b.name, b.code, b.status, b.timezone, b.phone, uba.access_scope
 				FROM user_branch_access uba
 				JOIN branch b ON b.id = uba.branch_id
 				WHERE uba.user_id = :userId
@@ -257,12 +253,7 @@ public class OrganizationQueryRepository {
 				resultSet.getString("status"),
 				resultSet.getString("timezone"),
 				resultSet.getString("phone"),
-				resultSet.getString("access_scope"),
-				resultSet.getString("brand_name"),
-				resultSet.getString("logo_url"),
-				resultSet.getString("primary_color"),
-				resultSet.getString("accent_color"),
-				resultSet.getString("surface_color")
+				resultSet.getString("access_scope")
 		);
 	}
 
@@ -311,12 +302,7 @@ public class OrganizationQueryRepository {
 			String status,
 			String timezone,
 			String phone,
-			String accessScope,
-			String brandName,
-			String logoUrl,
-			String primaryColor,
-			String accentColor,
-			String surfaceColor
+			String accessScope
 	) {
 	}
 }

@@ -127,6 +127,9 @@ export default function BookingsPage() {
     [resources, resourceId],
   );
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
+  const isReceptionUser = session?.user.console === "RECEPTION"
+    || session?.user.roles.some((role) => role.toLowerCase().includes("recepcion"));
+  const canManageResources = Boolean(session?.user.permissions.includes("resource.manage") && !isReceptionUser);
 
   async function refresh(stored = session) {
     if (!stored) {
@@ -305,39 +308,41 @@ export default function BookingsPage() {
             </button>
           </form>
 
-          <form className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm" onSubmit={submitResource}>
-            <h2 className="text-xl font-semibold">Alta rapida de recurso</h2>
-            <input className="mt-4 h-11 w-full rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setResourceName(event.target.value)} placeholder="Nombre del recurso" required value={resourceName} />
-            <fieldset className="mt-4 grid gap-2">
-              <legend className="text-sm font-semibold">Planes que pueden reservarlo</legend>
-              <p className="text-xs text-[#6f7a73]">Sin seleccionar planes, el recurso queda abierto para cualquier socio activo.</p>
-              <div className="grid gap-2">
-                {plans.map((plan) => (
-                  <label className="flex items-start gap-2 rounded-md border border-[#d8ddd2] px-3 py-2 text-sm" key={plan.id}>
-                    <input
-                      className="mt-1 h-4 w-4 accent-[var(--brand-primary)]"
-                      checked={resourceAllowedPlanIds.includes(plan.id)}
-                      onChange={(event) => {
-                        setResourceAllowedPlanIds((current) => (
-                          event.target.checked
-                            ? [...current, plan.id]
-                            : current.filter((planId) => planId !== plan.id)
-                        ));
-                      }}
-                      type="checkbox"
-                    />
-                    <span>
-                      <strong className="block">{plan.name}</strong>
-                      <span className="text-xs text-[#6f7a73]">{plan.multiBranchAccess ? "Multi-sucursal" : "Sucursal de venta"}</span>
-                    </span>
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-            <button className="mt-4 h-11 w-full rounded-md border border-[#51735f] px-4 text-sm font-semibold text-[#13251c]" disabled={saving} type="submit">
-              Crear recurso
-            </button>
-          </form>
+          {canManageResources ? (
+            <form className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm" onSubmit={submitResource}>
+              <h2 className="text-xl font-semibold">Alta rapida de recurso</h2>
+              <input className="mt-4 h-11 w-full rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setResourceName(event.target.value)} placeholder="Nombre del recurso" required value={resourceName} />
+              <fieldset className="mt-4 grid gap-2">
+                <legend className="text-sm font-semibold">Planes que pueden reservarlo</legend>
+                <p className="text-xs text-[#6f7a73]">Sin seleccionar planes, el recurso queda abierto para cualquier socio activo.</p>
+                <div className="grid gap-2">
+                  {plans.map((plan) => (
+                    <label className="flex items-start gap-2 rounded-md border border-[#d8ddd2] px-3 py-2 text-sm" key={plan.id}>
+                      <input
+                        className="mt-1 h-4 w-4 accent-[var(--brand-primary)]"
+                        checked={resourceAllowedPlanIds.includes(plan.id)}
+                        onChange={(event) => {
+                          setResourceAllowedPlanIds((current) => (
+                            event.target.checked
+                              ? [...current, plan.id]
+                              : current.filter((planId) => planId !== plan.id)
+                          ));
+                        }}
+                        type="checkbox"
+                      />
+                      <span>
+                        <strong className="block">{plan.name}</strong>
+                        <span className="text-xs text-[#6f7a73]">{plan.multiBranchAccess ? "Multi-sucursal" : "Sucursal de venta"}</span>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <button className="mt-4 h-11 w-full rounded-md border border-[#51735f] px-4 text-sm font-semibold text-[#13251c]" disabled={saving} type="submit">
+                Crear recurso
+              </button>
+            </form>
+          ) : null}
 
           <form className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm" onSubmit={submitBookingPayment}>
             <h2 className="text-xl font-semibold">Pago de reserva</h2>

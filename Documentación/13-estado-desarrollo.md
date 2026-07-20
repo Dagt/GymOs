@@ -3,6 +3,22 @@
 Estado: en progreso  
 Fecha: 19 de julio de 2026
 
+## Correccion permisos recepcion y marca de gimnasio - 20 de julio de 2026
+
+Implementado:
+
+- Migracion `V27__reception_booking_scope_and_gym_branding.sql`.
+- El rol `Recepcion` conserva lectura de recursos y gestion de reservas, pero pierde `resource.manage`; ya no puede crear recursos reservables.
+- `/bookings` oculta el alta rapida de recursos para recepcion, manteniendo el flujo de reservas.
+- La marca visual queda exclusivamente en el gimnasio: sucursales, kiosco, recepcion y consolas internas heredan `brandName`, `logoUrl`, `primaryColor`, `accentColor` y `surfaceColor` desde `organization`.
+- El dueño del gimnasio vuelve a iniciar con la primera sucursal activa permitida para evitar el error `BRANCH_REQUIRED` en el dashboard.
+
+Verificado:
+
+- `npm.cmd run lint`
+- `npm.cmd run typecheck`
+- `./gradlew.bat test`
+
 ## Correccion frontend recepcion - 19 de julio de 2026
 
 Implementado:
@@ -733,13 +749,11 @@ Implementado:
 - `client.home_branch_id` guarda la sucursal donde se dio de alta o importo el socio.
 - `GET /clients`, `GET /clients/{id}` y `PATCH /clients/{id}` filtran por sucursal activa: plan normal visible solo en sucursal de alta o membresia local; plan multi-sucursal visible en todas las sucursales.
 
-## Correccion marca por sucursal y seleccion explicita - 20 de julio de 2026
+## Correccion revertida: marca por sucursal y seleccion explicita - 20 de julio de 2026
 
 Implementado:
 
 - Migracion `V26__branch_branding_and_owner_branch_selection.sql`.
-- Las sucursales pueden tener nombre visible, logo y colores propios; si no se configuran, heredan la marca del gimnasio.
-- El kiosco usa la marca de la sucursal vinculada al terminal antes que la marca general del gimnasio.
-- La sesion del dueño inicia sin sucursal por defecto para evitar crear socios, recursos u operaciones en una sede accidental.
-- `AppShell` agrega selector de sucursal operativa para elegir explicitamente el contexto de trabajo.
+- Esta decision quedo reemplazada por `V27`: la marca vuelve a vivir solo en el gimnasio y el dueño recibe una sucursal operativa por defecto.
+- `AppShell` conserva selector de sucursal operativa para cambiar explicitamente el contexto de trabajo cuando el gimnasio tiene multiples sedes.
 - `/reception` se rediseña con franja de marca, comando principal de caja, carril de acciones y panel de turno para reducir la sensacion de tablero plano lleno de tarjetas.

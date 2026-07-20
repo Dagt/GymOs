@@ -4,11 +4,6 @@ public record CreateBranchCommand(
 		String name,
 		String code,
 		String timezone,
-		String phone,
-		String brandName,
-		String logoUrl,
-		String primaryColor,
-		String accentColor,
-		String surfaceColor
+		String phone
 ) {
 }
