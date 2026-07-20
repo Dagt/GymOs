@@ -139,7 +139,7 @@ Errores:
 Diferencia de roles:
 
 - `Dueno del gimnasio`: cliente directo del SaaS. Administra su tenant completo, sucursales, usuarios, marca, catalogo y metricas de negocio. No administra otros gimnasios ni la plataforma GymOS.
-- `Gerente`: delegado operativo del gimnasio. Gestiona operacion diaria, equipo autorizado, inventario, agenda, recepcion y reportes permitidos, sin acceso a administracion de plataforma.
+- `Gerente`: delegado operativo del gimnasio. Gestiona operacion diaria, equipo autorizado, inventario, agenda, recepcion y reportes permitidos. No administra plataforma, datos fiscales/comerciales del gimnasio ni altas/ediciones de sucursales.
 
 Estado comercial de gimnasio cliente:
 
@@ -205,6 +205,13 @@ Contrato implementado para alta/edicion de socio:
 
 El alta de socio en frontend puede crear, despues del `POST /clients`, una venta de plan inicial usando `POST /sales` con un producto vinculado a `membership_plan`. La activacion de membresia sigue dependiendo de que el pago quede completado.
 
+Visibilidad por sucursal:
+
+- `POST /clients` y `POST /clients/imports` guardan la sucursal activa como `home_branch_id`.
+- `GET /clients`, `GET /clients/{id}` y `PATCH /clients/{id}` requieren sucursal activa y solo operan sobre socios visibles desde esa sucursal.
+- Un socio con plan no multi-sucursal se ve en su sucursal de alta y en sucursales donde tenga membresia activa local.
+- Un socio con membresia activa de plan `multiBranchAccess=true` se ve desde todas las sucursales activas del gimnasio sin duplicar registros.
+
 ## 6.4 Productos
 
 - `GET /catalog/products`
@@ -240,7 +247,7 @@ El alta de socio en frontend puede crear, despues del `POST /clients`, una venta
 }
 ```
 
-`multiBranchAccess=true` marca el plan como valido para todas las sucursales activas del gimnasio. La venta y la membresia conservan la sucursal donde se originaron, pero las consultas de acceso, kiosco y detalle de membresias aceptan esa membresia desde cualquier sucursal del mismo tenant.
+`multiBranchAccess=true` marca el plan como valido para todas las sucursales activas del gimnasio. La venta y la membresia conservan la sucursal donde se originaron, pero las consultas de socios, acceso, kiosco y detalle de membresias aceptan esa membresia desde cualquier sucursal del mismo tenant.
 
 `PATCH /catalog/plans/{planId}` permite gestionar planes ya creados sin cambiar el SKU: nombre, descripcion, precio, moneda, duracion, gracia, beneficios, `multiBranchAccess` y estado.
 
@@ -485,7 +492,7 @@ Eventos internos publicos:
 
 Permisos por endpoint interno:
 - `organization.read`, `organization.update`
-- `branch.read`, `branch.update`
+- `branch.read`, `branch.create`, `branch.update`
 - `client.read`, `client.create`, `client.update`
 - `catalog.read`, `catalog.manage`
 - `sale.read`, `sale.create`

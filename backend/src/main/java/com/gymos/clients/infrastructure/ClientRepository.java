@@ -84,7 +84,7 @@ public class ClientRepository {
 		return count > 0;
 	}
 
-	public Optional<ClientDetail> findDetail(UUID organizationId, UUID clientId) {
+	public Optional<ClientDetail> findDetail(UUID organizationId, UUID branchId, UUID clientId) {
 		return jdbcClient.sql("""
 				SELECT c.id AS client_id, c.status AS client_status, c.joined_at, c.notes,
 				       p.id AS person_id, p.first_name, p.last_name, p.maternal_last_name, p.birth_date, p.gender,
@@ -96,8 +96,25 @@ public class ClientRepository {
 				  AND c.id = :clientId
 				  AND c.deleted_at IS NULL
 				  AND p.deleted_at IS NULL
+				  AND (
+				      c.home_branch_id = :branchId
+				      OR EXISTS (
+				          SELECT 1
+				          FROM membership m
+				          JOIN membership_plan mp ON mp.id = m.plan_id
+				          WHERE m.organization_id = c.organization_id
+				            AND m.client_id = c.id
+				            AND m.status = 'ACTIVE'
+				            AND m.deleted_at IS NULL
+				            AND (
+				                m.branch_id = :branchId
+				                OR mp.multi_branch_access = true
+				            )
+				      )
+				  )
 				""")
 				.param("organizationId", organizationId)
+				.param("branchId", branchId)
 				.param("clientId", clientId)
 				.query((resultSet, rowNumber) -> new ClientDetail(
 						resultSet.getObject("client_id", UUID.class),
@@ -189,7 +206,7 @@ public class ClientRepository {
 				.optional();
 	}
 
-	public List<ClientSummary> search(UUID organizationId, String query, String status, int limit) {
+	public List<ClientSummary> search(UUID organizationId, UUID branchId, String query, String status, int limit) {
 		String normalizedQuery = query == null || query.isBlank() ? null : "%" + query.trim().toLowerCase() + "%";
 		String normalizedStatus = status == null || status.isBlank() ? null : status.trim().toUpperCase();
 		StringBuilder sql = new StringBuilder("""
@@ -200,6 +217,22 @@ public class ClientRepository {
 				WHERE c.organization_id = :organizationId
 				  AND c.deleted_at IS NULL
 				  AND p.deleted_at IS NULL
+				  AND (
+				      c.home_branch_id = :branchId
+				      OR EXISTS (
+				          SELECT 1
+				          FROM membership m
+				          JOIN membership_plan mp ON mp.id = m.plan_id
+				          WHERE m.organization_id = c.organization_id
+				            AND m.client_id = c.id
+				            AND m.status = 'ACTIVE'
+				            AND m.deleted_at IS NULL
+				            AND (
+				                m.branch_id = :branchId
+				                OR mp.multi_branch_access = true
+				            )
+				      )
+				  )
 				""");
 		if (normalizedStatus != null) {
 			sql.append(" AND c.status = :status\n");
@@ -219,6 +252,7 @@ public class ClientRepository {
 				""");
 		var spec = jdbcClient.sql(sql.toString())
 				.param("organizationId", organizationId)
+				.param("branchId", branchId)
 				.param("limit", limit)
 				;
 		if (normalizedStatus != null) {

@@ -177,6 +177,7 @@ Regla:
 Regla:
 - `multi_branch_access=false`: la membresia da acceso en la sucursal donde se vendio/activo.
 - `multi_branch_access=true`: la membresia se considera valida en todas las sucursales activas del mismo gimnasio. Renovaciones y cambios de plan conservan una sola membresia origen/destino; la agregacion o remocion de acceso multi-sucursal se resuelve por el plan vigente.
+- La busqueda y ficha de socios se filtran por sucursal activa: un socio normal se ve en su `home_branch_id`; si tiene membresia activa multi-sucursal se ve en todas las sucursales del gimnasio.
 
 ### resource_allowed_membership_plan
 - resource_id
@@ -487,6 +488,7 @@ Migraciones nuevas:
 - `V15__hito6_productization_onboarding_imports.sql`: agrega bitacora de importacion inicial de clientes y permisos `onboarding.manage` y `client.import`.
 - `V23__membership_plan_multi_branch_access.sql`: agrega `membership_plan.multi_branch_access` para planes con acceso a todas las sucursales del tenant.
 - `V24__resource_allowed_membership_plans.sql`: agrega planes permitidos por recurso para restringir reservas segun membresia vigente.
+- `V25__manager_permissions_and_client_branch_visibility.sql`: agrega `client.home_branch_id`, filtra socios por sucursal/plan multi-sucursal y revoca permisos de administracion de datos/sucursales al rol `Gerente`.
  
 ## Hito 7 - Tablas V16
 
@@ -567,6 +569,7 @@ Cambios:
   - `Recepcion`: mostrador por sucursal.
   - `Coach`: entrenamiento, rutinas y seguimiento.
 - La cuenta local `admin@gymos.local` recibe rol `Administrador GymOS` desde seed local para bases nuevas.
+- `Gerente` conserva operacion diaria, reportes, inventario, agenda, equipo autorizado y lectura de sucursal para contexto operativo, pero no puede actualizar datos del gimnasio ni crear/modificar sucursales.
 
 Notas:
 

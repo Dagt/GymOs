@@ -43,6 +43,7 @@ public class ClientImportService {
 
 	public ClientImportResult importCsv(GymOsPrincipal principal, ImportClientsCommand command, String correlationId) {
 		requirePrincipal(principal);
+		requireBranch(principal);
 		if (command.csvText() == null || command.csvText().isBlank()) {
 			throw new BusinessException("CLIENT_IMPORT_EMPTY", "El archivo de importacion no tiene contenido.");
 		}
@@ -190,16 +191,17 @@ public class ClientImportService {
 				.update();
 		jdbcClient.sql("""
 				INSERT INTO client (
-				    id, organization_id, person_id, status, joined_at, notes,
+				    id, organization_id, home_branch_id, person_id, status, joined_at, notes,
 				    created_at, updated_at, created_by, updated_by, version
 				)
 				VALUES (
-				    :id, :organizationId, :personId, 'ACTIVE', :joinedAt, :notes,
+				    :id, :organizationId, :homeBranchId, :personId, 'ACTIVE', :joinedAt, :notes,
 				    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
 				)
 				""")
 				.param("id", clientId)
 				.param("organizationId", principal.organizationId())
+				.param("homeBranchId", principal.branchId())
 				.param("personId", personId)
 				.param("joinedAt", now)
 				.param("notes", normalize(row.notes()))
@@ -399,6 +401,12 @@ public class ClientImportService {
 	private void requirePrincipal(GymOsPrincipal principal) {
 		if (principal == null) {
 			throw new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesion para continuar.");
+		}
+	}
+
+	private void requireBranch(GymOsPrincipal principal) {
+		if (principal.branchId() == null) {
+			throw new BusinessException("BRANCH_REQUIRED", "Selecciona una sucursal para importar socios.");
 		}
 	}
 

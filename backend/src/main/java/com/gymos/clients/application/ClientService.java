@@ -37,6 +37,7 @@ public class ClientService implements ClientLookupOperations {
 	@Transactional
 	public ClientDetailResult create(GymOsPrincipal principal, CreateClientCommand request, String correlationId) {
 		requirePrincipal(principal);
+		requireBranch(principal);
 		String email = blankToNull(request.email());
 		String phone = blankToNull(request.phone());
 		ensureUniqueContact(principal.organizationId(), email, phone, null);
@@ -73,16 +74,17 @@ public class ClientService implements ClientLookupOperations {
 				.update();
 		jdbcClient.sql("""
 				INSERT INTO client (
-				    id, organization_id, person_id, status, joined_at, notes,
+				    id, organization_id, home_branch_id, person_id, status, joined_at, notes,
 				    created_at, updated_at, created_by, updated_by, version
 				)
 				VALUES (
-				    :id, :organizationId, :personId, 'ACTIVE', :joinedAt, :notes,
+				    :id, :organizationId, :homeBranchId, :personId, 'ACTIVE', :joinedAt, :notes,
 				    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
 				)
 				""")
 				.param("id", clientId)
 				.param("organizationId", principal.organizationId())
+				.param("homeBranchId", principal.branchId())
 				.param("personId", personId)
 				.param("joinedAt", now)
 				.param("notes", blankToNull(request.notes()))
@@ -98,13 +100,15 @@ public class ClientService implements ClientLookupOperations {
 	@Transactional(readOnly = true)
 	public List<ClientSummary> search(GymOsPrincipal principal, String query, String status) {
 		requirePrincipal(principal);
-		return clientRepository.search(principal.organizationId(), query, status, 50);
+		requireBranch(principal);
+		return clientRepository.search(principal.organizationId(), principal.branchId(), query, status, 50);
 	}
 
 	@Transactional(readOnly = true)
 	public ClientDetailResult detail(GymOsPrincipal principal, UUID clientId) {
 		requirePrincipal(principal);
-		ClientDetail client = clientRepository.findDetail(principal.organizationId(), clientId)
+		requireBranch(principal);
+		ClientDetail client = clientRepository.findDetail(principal.organizationId(), principal.branchId(), clientId)
 				.orElseThrow(() -> new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible."));
 		List<ClientTimelineEntry> timeline = clientRepository.timeline(principal.organizationId(), clientId);
 		return new ClientDetailResult(client, timeline);
@@ -118,7 +122,8 @@ public class ClientService implements ClientLookupOperations {
 			String correlationId
 	) {
 		requirePrincipal(principal);
-		ClientDetail existing = clientRepository.findDetail(principal.organizationId(), clientId)
+		requireBranch(principal);
+		ClientDetail existing = clientRepository.findDetail(principal.organizationId(), principal.branchId(), clientId)
 				.orElseThrow(() -> new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible."));
 		String email = blankToNull(request.email());
 		String phone = blankToNull(request.phone());
@@ -211,6 +216,12 @@ public class ClientService implements ClientLookupOperations {
 	private void requirePrincipal(GymOsPrincipal principal) {
 		if (principal == null) {
 			throw new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesion para continuar.");
+		}
+	}
+
+	private void requireBranch(GymOsPrincipal principal) {
+		if (principal.branchId() == null) {
+			throw new BusinessException("BRANCH_REQUIRED", "Selecciona una sucursal para continuar.");
 		}
 	}
 

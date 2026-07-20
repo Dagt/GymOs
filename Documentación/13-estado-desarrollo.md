@@ -722,3 +722,13 @@ Implementado:
 - `/catalog` permite editar planes creados: precio, duracion, gracia, beneficios, estado y alcance multi-sucursal.
 - La sesion publica del kiosco devuelve marca del gimnasio y `/kiosk/[terminalCode]` muestra logo/nombre del tenant.
 - El dashboard de recepcion usa una banda con color principal, metricas integradas y acciones asimetricas para acercarse al lenguaje visual del menu lateral.
+
+## Correccion gerente y visibilidad multi-sucursal - 20 de julio de 2026
+
+Implementado:
+
+- Migracion `V25__manager_permissions_and_client_branch_visibility.sql`.
+- El rol `Gerente` pierde permisos de edicion de datos del gimnasio y sucursales: `organization.update`, `branch.create` y `branch.update`.
+- La ruta `/settings/organization` queda fuera de la consola de gerente; el menu no muestra `Datos y sucursales` para ese perfil.
+- `client.home_branch_id` guarda la sucursal donde se dio de alta o importo el socio.
+- `GET /clients`, `GET /clients/{id}` y `PATCH /clients/{id}` filtran por sucursal activa: plan normal visible solo en sucursal de alta o membresia local; plan multi-sucursal visible en todas las sucursales.

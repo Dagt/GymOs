@@ -85,6 +85,7 @@ Correccion implementada:
 - El genero es un desplegable con solo `Hombre` y `Mujer`.
 - El alta de socio incluye plan inicial y metodo de pago; si el pago queda validado, la membresia se activa por el flujo existente de ventas.
 - La ficha del socio usa el mismo `AppShell` lateral que el resto del sistema y separa datos personales, membresias y actividad.
+- La lista y ficha de socios respetan la sucursal activa: socios con plan normal no aparecen globalmente; socios con membresia activa multi-sucursal aparecen en todas las sucursales del gimnasio.
 
 ## 8.4 Ficha de cliente
 
@@ -239,7 +240,7 @@ Objetivo:
 Consolas:
 - `PLATFORM_OWNER`: entra a `/platform/gymnasiums`. Administra CRM de gimnasios cliente, configuracion base y soporte auditable.
 - `TENANT_OWNER`: entra a `/dashboard`. Ve metricas, salud del negocio, sucursales, equipo y administracion de su gimnasio.
-- `TENANT_MANAGER`: entra a `/operations`. Gestiona operacion diaria, pendientes, agenda, inventario y equipo autorizado.
+- `TENANT_MANAGER`: entra a `/operations`. Gestiona operacion diaria, pendientes, agenda, inventario y equipo autorizado; no ve `/settings/organization`.
 - `RECEPTION`: entra a `/reception`. Ve recepcion, POS, socios, ventas y reportes operativos permitidos.
 - `COACH`: entra a `/coaches`. Ve coaches, rutinas y asignaciones permitidas.
 
@@ -301,6 +302,7 @@ Formularios:
   - Confirmacion modal nativa antes de suspender/reactivar gimnasios o usuarios.
 - Al crear un usuario con rol `Dueno del gimnasio`, el frontend asigna automaticamente todas las sucursales existentes del tenant. Gerentes, recepcionistas y coaches siguen seleccionando sucursales concretas.
 - Un gerente no ve ni puede seleccionar `Dueno del gimnasio` ni `Gerente` al crear o modificar usuarios; solo puede asignar roles operativos permitidos.
+- Un gerente no ve la entrada `Datos y sucursales` y `canAccessRoute` no permite abrir `/settings/organization` con esa consola.
 - `/users` permite cambiar el rol de usuarios existentes desde la tabla, excepto la propia cuenta del usuario autenticado.
 - `AppShell` resuelve el nombre real de la sucursal activa cuando una pagina no carga la lista de sucursales por si misma, evitando mostrar solo "Sucursal seleccionada".
 - Beneficios, accesos y automatizaciones deben renderizarse dentro del shell lateral unificado.
