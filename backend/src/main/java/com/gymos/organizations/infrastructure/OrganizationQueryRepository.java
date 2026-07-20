@@ -131,7 +131,8 @@ public class OrganizationQueryRepository {
 
 	public List<BranchSummary> findBranchesForUser(UUID userId, UUID organizationId) {
 		return jdbcClient.sql("""
-				SELECT b.id, b.name, b.code, b.status, b.timezone, b.phone, uba.access_scope
+				SELECT b.id, b.name, b.code, b.status, b.timezone, b.phone, uba.access_scope,
+				       b.brand_name, b.logo_url, b.primary_color, b.accent_color, b.surface_color
 				FROM user_branch_access uba
 				JOIN branch b ON b.id = uba.branch_id
 				WHERE uba.user_id = :userId
@@ -141,21 +142,14 @@ public class OrganizationQueryRepository {
 				""")
 				.param("userId", userId)
 				.param("organizationId", organizationId)
-				.query((resultSet, rowNumber) -> new BranchSummary(
-						resultSet.getObject("id", UUID.class),
-						resultSet.getString("name"),
-						resultSet.getString("code"),
-						resultSet.getString("status"),
-						resultSet.getString("timezone"),
-						resultSet.getString("phone"),
-						resultSet.getString("access_scope")
-				))
+				.query(this::branchSummary)
 				.list();
 	}
 
 	public List<BranchSummary> findBranchesForOrganization(UUID organizationId) {
 		return jdbcClient.sql("""
-				SELECT b.id, b.name, b.code, b.status, b.timezone, b.phone, 'SUPPORT' AS access_scope
+				SELECT b.id, b.name, b.code, b.status, b.timezone, b.phone, 'SUPPORT' AS access_scope,
+				       b.brand_name, b.logo_url, b.primary_color, b.accent_color, b.surface_color
 				FROM branch b
 				WHERE b.organization_id = :organizationId
 				  AND b.deleted_at IS NULL
@@ -168,7 +162,8 @@ public class OrganizationQueryRepository {
 
 	public Optional<BranchSummary> findBranch(UUID organizationId, UUID branchId) {
 		return jdbcClient.sql("""
-				SELECT b.id, b.name, b.code, b.status, b.timezone, b.phone, 'SUPPORT' AS access_scope
+				SELECT b.id, b.name, b.code, b.status, b.timezone, b.phone, 'SUPPORT' AS access_scope,
+				       b.brand_name, b.logo_url, b.primary_color, b.accent_color, b.surface_color
 				FROM branch b
 				WHERE b.organization_id = :organizationId
 				  AND b.id = :branchId
@@ -182,7 +177,8 @@ public class OrganizationQueryRepository {
 
 	public Optional<BranchSummary> findBranchForUser(UUID userId, UUID organizationId, UUID branchId) {
 		return jdbcClient.sql("""
-				SELECT b.id, b.name, b.code, b.status, b.timezone, b.phone, uba.access_scope
+				SELECT b.id, b.name, b.code, b.status, b.timezone, b.phone, uba.access_scope,
+				       b.brand_name, b.logo_url, b.primary_color, b.accent_color, b.surface_color
 				FROM user_branch_access uba
 				JOIN branch b ON b.id = uba.branch_id
 				WHERE uba.user_id = :userId
@@ -193,15 +189,7 @@ public class OrganizationQueryRepository {
 				.param("userId", userId)
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
-				.query((resultSet, rowNumber) -> new BranchSummary(
-						resultSet.getObject("id", UUID.class),
-						resultSet.getString("name"),
-						resultSet.getString("code"),
-						resultSet.getString("status"),
-						resultSet.getString("timezone"),
-						resultSet.getString("phone"),
-						resultSet.getString("access_scope")
-				))
+				.query(this::branchSummary)
 				.optional();
 	}
 
@@ -269,7 +257,12 @@ public class OrganizationQueryRepository {
 				resultSet.getString("status"),
 				resultSet.getString("timezone"),
 				resultSet.getString("phone"),
-				resultSet.getString("access_scope")
+				resultSet.getString("access_scope"),
+				resultSet.getString("brand_name"),
+				resultSet.getString("logo_url"),
+				resultSet.getString("primary_color"),
+				resultSet.getString("accent_color"),
+				resultSet.getString("surface_color")
 		);
 	}
 
@@ -318,7 +311,12 @@ public class OrganizationQueryRepository {
 			String status,
 			String timezone,
 			String phone,
-			String accessScope
+			String accessScope,
+			String brandName,
+			String logoUrl,
+			String primaryColor,
+			String accentColor,
+			String surfaceColor
 	) {
 	}
 }

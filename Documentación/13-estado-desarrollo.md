@@ -732,3 +732,14 @@ Implementado:
 - La ruta `/settings/organization` queda fuera de la consola de gerente; el menu no muestra `Datos y sucursales` para ese perfil.
 - `client.home_branch_id` guarda la sucursal donde se dio de alta o importo el socio.
 - `GET /clients`, `GET /clients/{id}` y `PATCH /clients/{id}` filtran por sucursal activa: plan normal visible solo en sucursal de alta o membresia local; plan multi-sucursal visible en todas las sucursales.
+
+## Correccion marca por sucursal y seleccion explicita - 20 de julio de 2026
+
+Implementado:
+
+- Migracion `V26__branch_branding_and_owner_branch_selection.sql`.
+- Las sucursales pueden tener nombre visible, logo y colores propios; si no se configuran, heredan la marca del gimnasio.
+- El kiosco usa la marca de la sucursal vinculada al terminal antes que la marca general del gimnasio.
+- La sesion del dueño inicia sin sucursal por defecto para evitar crear socios, recursos u operaciones en una sede accidental.
+- `AppShell` agrega selector de sucursal operativa para elegir explicitamente el contexto de trabajo.
+- `/reception` se rediseña con franja de marca, comando principal de caja, carril de acciones y panel de turno para reducir la sensacion de tablero plano lleno de tarjetas.

@@ -1419,6 +1419,31 @@ th {
   white-space: nowrap;
 }
 
+.admin-branch-switcher {
+  background: color-mix(in srgb, var(--brand-primary) 8%, white);
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 18%, var(--brand-line));
+  border-radius: 0.65rem;
+  display: grid;
+  gap: 0.15rem;
+  min-width: 12rem;
+  padding: 0.45rem 0.6rem;
+}
+
+.admin-branch-switcher span {
+  color: var(--brand-muted);
+  font-size: 0.68rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.admin-branch-switcher select {
+  background: transparent;
+  color: var(--brand-ink);
+  font-size: 0.88rem;
+  font-weight: 850;
+  outline: none;
+}
+
 .admin-search-box {
   align-items: center;
   background: white;
@@ -1833,6 +1858,212 @@ th {
 
 .reception-status-board .admin-report-metric {
   border: 1px solid color-mix(in srgb, var(--brand-primary) 14%, var(--brand-line));
+}
+
+.reception-command-layout {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 24rem);
+}
+
+.reception-action-rail {
+  display: grid;
+  gap: 1rem;
+}
+
+.reception-primary-command {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--brand-primary) 96%, black), color-mix(in srgb, var(--brand-primary) 58%, var(--brand-accent))),
+    var(--brand-primary);
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 82%, black);
+  border-radius: 0.9rem;
+  box-shadow: 0 24px 70px color-mix(in srgb, var(--brand-primary) 26%, transparent);
+  color: white;
+  display: grid;
+  min-height: 16rem;
+  overflow: hidden;
+  padding: clamp(1.2rem, 3vw, 1.8rem);
+  position: relative;
+}
+
+.reception-primary-command::after {
+  background:
+    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12)),
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.08) 0 1px, transparent 1px 20px);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.reception-primary-command > * {
+  position: relative;
+  z-index: 1;
+}
+
+.reception-primary-command span,
+.reception-shift-panel p,
+.reception-wide-strip p {
+  color: color-mix(in srgb, var(--brand-accent) 78%, white);
+  font-size: 0.76rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.reception-primary-command strong {
+  align-self: center;
+  font-size: clamp(2.2rem, 5vw, 4.1rem);
+  font-weight: 950;
+  line-height: 0.95;
+  max-width: 44rem;
+}
+
+.reception-primary-command p {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 1rem;
+  line-height: 1.55;
+  max-width: 36rem;
+}
+
+.reception-primary-command b {
+  align-self: end;
+  background: white;
+  border-bottom: 0.22rem solid var(--brand-accent);
+  border-radius: 0.55rem;
+  color: var(--brand-primary);
+  display: inline-flex;
+  font-weight: 950;
+  justify-content: center;
+  min-height: 3rem;
+  padding: 0.8rem 1rem;
+  width: fit-content;
+}
+
+.reception-secondary-commands {
+  display: grid;
+  gap: 0.8rem;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.reception-command {
+  background: white;
+  border: 1px solid var(--brand-line);
+  border-top: 0.3rem solid var(--brand-primary);
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 0.7rem;
+  min-height: 8.5rem;
+  padding: 0.9rem;
+  transition: border-color 160ms ease, transform 160ms ease;
+}
+
+.reception-command:hover {
+  border-color: color-mix(in srgb, var(--brand-primary) 36%, var(--brand-line));
+  transform: translateY(-2px);
+}
+
+.reception-command span {
+  color: var(--brand-ink);
+  font-size: 1rem;
+  font-weight: 950;
+  line-height: 1.15;
+}
+
+.reception-command strong {
+  align-self: end;
+  color: var(--brand-primary);
+  font-size: 0.85rem;
+  font-weight: 950;
+}
+
+.reception-command.kiosk {
+  background: color-mix(in srgb, var(--brand-accent) 12%, white);
+  border-top-color: var(--brand-accent);
+}
+
+.reception-shift-panel,
+.reception-wide-strip {
+  background: white;
+  border: 1px solid var(--brand-line);
+  border-radius: 0.85rem;
+  box-shadow: 0 18px 52px rgba(15, 23, 42, 0.08);
+}
+
+.reception-shift-panel {
+  align-self: start;
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.reception-shift-panel h2,
+.reception-wide-strip h2 {
+  color: var(--brand-ink);
+  font-size: 1.35rem;
+  font-weight: 950;
+  line-height: 1.1;
+  margin-top: 0.2rem;
+}
+
+.reception-signal-list {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.reception-signal-list .admin-report-metric {
+  min-height: 4.8rem;
+}
+
+.reception-next-panel {
+  background: var(--brand-primary);
+  border-radius: 0.7rem;
+  color: white;
+  display: grid;
+  gap: 0.35rem;
+  padding: 1rem;
+}
+
+.reception-next-panel span {
+  color: color-mix(in srgb, var(--brand-accent) 78%, white);
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.reception-next-panel strong {
+  font-size: 1.05rem;
+  font-weight: 950;
+  line-height: 1.2;
+}
+
+.reception-wide-strip {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  grid-column: 1 / -1;
+  justify-content: space-between;
+  padding: 1rem;
+}
+
+.reception-wide-strip div:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.reception-wide-strip a {
+  background: var(--brand-primary-soft);
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 18%, var(--brand-line));
+  border-radius: 0.55rem;
+  color: var(--brand-primary);
+  font-weight: 900;
+  padding: 0.7rem 0.9rem;
+}
+
+.reception-brand-mark.image {
+  background: white;
+  object-fit: contain;
+  padding: 0.35rem;
 }
 
 .admin-setup-banner {
@@ -2930,7 +3161,9 @@ body.has-global-session-nav {
   .settings-summary,
   .settings-forms-grid,
   .reception-identity-panel,
+  .reception-command-layout,
   .reception-action-grid,
+  .reception-secondary-commands,
   .team-layout {
     grid-template-columns: 1fr;
   }
@@ -2965,6 +3198,11 @@ body.has-global-session-nav {
 
   .reception-identity-panel {
     align-items: stretch;
+  }
+
+  .reception-wide-strip {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   body.has-global-session-nav {

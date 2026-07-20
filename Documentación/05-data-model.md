@@ -489,6 +489,7 @@ Migraciones nuevas:
 - `V23__membership_plan_multi_branch_access.sql`: agrega `membership_plan.multi_branch_access` para planes con acceso a todas las sucursales del tenant.
 - `V24__resource_allowed_membership_plans.sql`: agrega planes permitidos por recurso para restringir reservas segun membresia vigente.
 - `V25__manager_permissions_and_client_branch_visibility.sql`: agrega `client.home_branch_id`, filtra socios por sucursal/plan multi-sucursal y revoca permisos de administracion de datos/sucursales al rol `Gerente`.
+- `V26__branch_branding_and_owner_branch_selection.sql`: agrega marca opcional por sucursal (`brand_name`, `logo_url`, colores) y soporta que el dueño entre sin sucursal operativa por defecto.
  
 ## Hito 7 - Tablas V16
 
@@ -570,6 +571,7 @@ Cambios:
   - `Coach`: entrenamiento, rutinas y seguimiento.
 - La cuenta local `admin@gymos.local` recibe rol `Administrador GymOS` desde seed local para bases nuevas.
 - `Gerente` conserva operacion diaria, reportes, inventario, agenda, equipo autorizado y lectura de sucursal para contexto operativo, pero no puede actualizar datos del gimnasio ni crear/modificar sucursales.
+- `Dueno del gimnasio` inicia sin sucursal operativa por defecto. Debe seleccionar explicitamente una sucursal cuando vaya a crear recursos, socios u operaciones con alcance local.
 
 Notas:
 

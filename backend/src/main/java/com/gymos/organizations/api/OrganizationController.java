@@ -189,10 +189,15 @@ public class OrganizationController {
 			@NotBlank @Size(max = 120) String name,
 			@NotBlank @Size(max = 32) String code,
 			@NotBlank @Size(max = 64) String timezone,
-			@NotBlank @Pattern(regexp = MX_PHONE) String phone
+			@NotBlank @Pattern(regexp = MX_PHONE) String phone,
+			@Size(max = 120) String brandName,
+			@Size(max = 512) String logoUrl,
+			@Pattern(regexp = HEX_COLOR) String primaryColor,
+			@Pattern(regexp = HEX_COLOR) String accentColor,
+			@Pattern(regexp = HEX_COLOR) String surfaceColor
 	) {
 		private UpdateBranchCommand toCommand() {
-			return new UpdateBranchCommand(name, code, timezone, phone);
+			return new UpdateBranchCommand(name, code, timezone, phone, brandName, logoUrl, primaryColor, accentColor, surfaceColor);
 		}
 	}
 
@@ -200,10 +205,15 @@ public class OrganizationController {
 			@NotBlank @Size(max = 120) String name,
 			@NotBlank @Size(max = 32) String code,
 			@NotBlank @Size(max = 64) String timezone,
-			@NotBlank @Pattern(regexp = MX_PHONE) String phone
+			@NotBlank @Pattern(regexp = MX_PHONE) String phone,
+			@Size(max = 120) String brandName,
+			@Size(max = 512) String logoUrl,
+			@Pattern(regexp = HEX_COLOR) String primaryColor,
+			@Pattern(regexp = HEX_COLOR) String accentColor,
+			@Pattern(regexp = HEX_COLOR) String surfaceColor
 	) {
 		private CreateBranchCommand toCommand() {
-			return new CreateBranchCommand(name, code, timezone, phone);
+			return new CreateBranchCommand(name, code, timezone, phone, brandName, logoUrl, primaryColor, accentColor, surfaceColor);
 		}
 	}
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
-import { clearSession, getBranches, selectOrganization, storeSession, type StoredSession } from "@/lib/api";
+import { clearSession, getBranches, selectBranch, selectOrganization, storeSession, type StoredSession } from "@/lib/api";
 import {
   getConsoleProfile,
   isPlatformAdmin,
@@ -152,6 +152,8 @@ export function AppShell({
   const pathname = usePathname();
   const router = useRouter();
   const [resolvedBranch, setResolvedBranch] = useState<{ branchId: string; name: string } | null>(null);
+  const [availableBranches, setAvailableBranches] = useState<{ branchId: string; name: string }[]>([]);
+  const [switchingBranch, setSwitchingBranch] = useState(false);
   const consoleType = resolveUserConsole(session.user);
   const role = getConsoleProfile(session.user);
   const hasBranch = mode === "operation" ? true : mode === "setup" ? false : Boolean(branchName || session.user.branchId);
@@ -169,16 +171,22 @@ export function AppShell({
   const visibleActions = variant === "platform" ? actions : [];
 
   useEffect(() => {
-    if (!session.user.branchId || branchName) {
+    if (variant === "platform" || (isPlatformAdmin(session.user) && !isSupportMode(session.user))) {
       return;
     }
     let cancelled = false;
     async function resolveBranchName() {
       try {
         const branches = await getBranches(session.accessToken);
-        const branch = branches.find((item) => item.id === session.user.branchId);
-        if (!cancelled && branch) {
-          setResolvedBranch({ branchId: branch.id, name: branch.name });
+        if (cancelled) {
+          return;
+        }
+        setAvailableBranches(branches.map((item) => ({ branchId: item.id, name: item.name })));
+        if (!branchName && session.user.branchId) {
+          const branch = branches.find((item) => item.id === session.user.branchId);
+          if (branch) {
+            setResolvedBranch({ branchId: branch.id, name: branch.name });
+          }
         }
       } catch {
         // The shell falls back to a neutral label if branch lookup is unavailable.
@@ -188,10 +196,10 @@ export function AppShell({
     return () => {
       cancelled = true;
     };
-  }, [branchName, session.accessToken, session.user.branchId]);
+  }, [branchName, session.accessToken, session.user, session.user.branchId, variant]);
 
   useEffect(() => {
-    if (hasBranch || variant === "platform" || isPlatformAdmin(session.user) || !session.user.organizationId) {
+    if (hasBranch || variant === "platform" || isPlatformAdmin(session.user) || consoleType === "TENANT_OWNER" || !session.user.organizationId) {
       return;
     }
     let cancelled = false;
@@ -210,11 +218,25 @@ export function AppShell({
     return () => {
       cancelled = true;
     };
-  }, [hasBranch, session, variant]);
+  }, [consoleType, hasBranch, session, variant]);
 
   function logout() {
     clearSession();
     router.push("/login");
+  }
+
+  async function changeBranch(branchId: string) {
+    if (!branchId || branchId === session.user.branchId || switchingBranch) {
+      return;
+    }
+    setSwitchingBranch(true);
+    try {
+      const selectedSession = await selectBranch(session.accessToken, branchId);
+      storeSession(selectedSession);
+      window.location.reload();
+    } finally {
+      setSwitchingBranch(false);
+    }
   }
 
   return (
@@ -294,6 +316,19 @@ export function AppShell({
                 <span>Sucursal</span>
                 <strong>{visibleBranch}</strong>
               </div>
+            ) : null}
+            {variant !== "platform" && availableBranches.length > 0 ? (
+              <label className="admin-branch-switcher">
+                <span>Operar en</span>
+                <select disabled={switchingBranch} onChange={(event) => changeBranch(event.target.value)} value={session.user.branchId ?? ""}>
+                  <option value="">Sin sucursal</option>
+                  {availableBranches.map((branch) => (
+                    <option key={branch.branchId} value={branch.branchId}>
+                      {branch.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
             ) : null}
             {visibleActions.map((action) => (
               <Link className="app-button-secondary" href={action.href} key={action.href}>

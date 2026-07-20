@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
@@ -201,9 +202,13 @@ export default function ReceptionPage() {
       ) : (
         <section className="reception-home">
           <section className="reception-identity-panel">
-            <div className="reception-brand-mark" aria-hidden="true">
-              G
-            </div>
+            {session.user.logoUrl ? (
+              <Image alt={session.user.brandName ?? receptionOrganizationName} className="reception-brand-mark image" height={72} src={session.user.logoUrl} unoptimized width={72} />
+            ) : (
+              <div className="reception-brand-mark" aria-hidden="true">
+                {(session.user.brandName ?? receptionOrganizationName).slice(0, 1)}
+              </div>
+            )}
             <div>
               <p>{receptionOrganizationName}</p>
               <h2>{visibleBranchName}</h2>
@@ -221,34 +226,49 @@ export default function ReceptionPage() {
             </button>
           </section>
 
-          <section className="admin-main-column">
-            <section className="admin-status-board reception-status-board" aria-label="Estado operativo">
-              {daySignals.map((signal) => (
-                <ReportMetric key={signal.label} label={signal.label} value={signal.value} tone={signal.tone} />
-              ))}
-            </section>
-
-            <section className="admin-focus-grid reception-action-grid" aria-label="Acciones de recepcion">
-              {focusActions.map((action) => (
-                <Link className={`admin-action-card ${action.accent}`} href={action.href} key={action.href}>
-                  <span>{action.title}</span>
-                  <p>{action.detail}</p>
-                  <strong>{action.label}</strong>
-                </Link>
-              ))}
-            </section>
-
-            <section className="admin-panel">
-              <div className="admin-panel-header">
-                <div>
-                  <p>Turno actual</p>
-                  <h2>Acciones frecuentes</h2>
-                </div>
+          <section className="reception-command-layout">
+            <section className="reception-action-rail" aria-label="Acciones de recepcion">
+              <Link className="reception-primary-command" href="/pos">
+                <span>Caja lista</span>
+                <strong>Cobrar venta o membresia</strong>
+                <p>Productos, planes, renovaciones y pagos manuales desde mostrador.</p>
+                <b>Abrir caja</b>
+              </Link>
+              <div className="reception-secondary-commands">
+                {focusActions.slice(1).map((action) => (
+                  <Link className={`reception-command ${action.accent}`} href={action.href} key={action.href}>
+                    <span>{action.title}</span>
+                    <strong>{action.label}</strong>
+                  </Link>
+                ))}
               </div>
-              <div className="admin-report-strip">
-                <ReportMetric label="Ventas del dia" value="$0.00" tone="green" />
-                <ReportMetric label="Pagos pendientes" value="Por revisar" tone="amber" />
-                <ReportMetric label="Socios" value="Atencion" tone="blue" />
+            </section>
+
+            <aside className="reception-shift-panel">
+              <div>
+                <p>Turno actual</p>
+                <h2>Mostrador en operacion</h2>
+              </div>
+              <div className="reception-signal-list">
+                {daySignals.map((signal) => (
+                  <ReportMetric key={signal.label} label={signal.label} value={signal.value} tone={signal.tone} />
+                ))}
+              </div>
+              <div className="reception-next-panel">
+                <span>Siguiente accion</span>
+                <strong>Buscar socio o cobrar membresia</strong>
+              </div>
+            </aside>
+
+            <section className="reception-wide-strip">
+              <div>
+                <p>Operacion rapida</p>
+                <h2>Reservas, beneficios y ventas sin salir del flujo de mostrador</h2>
+              </div>
+              <div>
+                <Link href="/bookings">Agenda</Link>
+                <Link href="/benefits">Beneficios</Link>
+                <Link href="/reports/sales">Ventas</Link>
               </div>
             </section>
           </section>

@@ -48,7 +48,7 @@ public class AuthService {
 		if (!user.permissions().contains("platform.admin") && !authQueryRepository.organizationIsActive(user.organizationId())) {
 			throw new BusinessException("ORGANIZATION_SUSPENDED", "El gimnasio no tiene acceso activo a la plataforma.");
 		}
-		GymOsPrincipal principal = user.toPrincipal(defaultBranchFor(user));
+		GymOsPrincipal principal = user.toPrincipal(defaultBranchFor(user, user.organizationId()));
 		AuthResult response = issue(principal);
 		auditService.recordSystem(principal.organizationId(), null, principal.userId(), "AUTH_LOGIN", "USER", principal.userId(), "BACKOFFICE", null, correlationId);
 		return response;
@@ -65,7 +65,7 @@ public class AuthService {
 		if (!user.permissions().contains("platform.admin") && !authQueryRepository.organizationIsActive(user.organizationId())) {
 			throw new BusinessException("ORGANIZATION_SUSPENDED", "El gimnasio no tiene acceso activo a la plataforma.");
 		}
-		return issue(user.toPrincipal(defaultBranchFor(user)));
+		return issue(user.toPrincipal(defaultBranchFor(user, user.organizationId())));
 	}
 
 	@Transactional
@@ -128,7 +128,7 @@ public class AuthService {
 				.orElseThrow(() -> new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesion para continuar."));
 		UUID branchId = supportAccess
 				? authQueryRepository.firstActiveBranch(organizationId).orElse(null)
-				: authQueryRepository.firstAccessibleBranch(principal.userId(), organizationId).orElse(null);
+				: defaultBranchFor(user, organizationId);
 		GymOsPrincipal selectedPrincipal = new GymOsPrincipal(
 				user.userId(),
 				organizationId,
@@ -168,15 +168,20 @@ public class AuthService {
 		return new AuthResult(tokens.accessToken(), tokens.refreshToken(), "Bearer", tokens.expiresIn(), toResponse(principal));
 	}
 
-	private UUID defaultBranchFor(AuthenticatedUser user) {
+	private UUID defaultBranchFor(AuthenticatedUser user, UUID organizationId) {
 		if (user.permissions().contains("platform.admin")) {
 			return null;
 		}
-		return authQueryRepository.firstAccessibleBranch(user.userId(), user.organizationId()).orElse(null);
+		if (isTenantOwner(user)) {
+			return null;
+		}
+		return authQueryRepository.firstAccessibleBranch(user.userId(), organizationId).orElse(null);
 	}
 
 	private CurrentUserResult toResponse(GymOsPrincipal principal) {
-		AuthQueryRepository.OrganizationTheme theme = authQueryRepository.organizationTheme(principal.organizationId())
+		AuthQueryRepository.OrganizationTheme theme = (principal.branchId() == null
+				? authQueryRepository.organizationTheme(principal.organizationId())
+				: authQueryRepository.themeForBranch(principal.organizationId(), principal.branchId()))
 				.orElse(new AuthQueryRepository.OrganizationTheme("GymOS", null, null, "#164E63", "#F59E0B", "#F4F7FB"));
 		return new CurrentUserResult(
 				principal.userId(),
@@ -223,6 +228,12 @@ public class AuthService {
 		return principal.roles().stream()
 				.map(role -> role.toLowerCase(java.util.Locale.ROOT))
 				.anyMatch(role -> role.contains(fragment));
+	}
+
+	private boolean isTenantOwner(AuthenticatedUser user) {
+		return user.roles().stream()
+				.map(role -> role.toLowerCase(java.util.Locale.ROOT))
+				.anyMatch(role -> role.contains("dueno") || role.contains("owner") || role.contains("administrador"));
 	}
 
 	private String refreshKey(String refreshToken) {

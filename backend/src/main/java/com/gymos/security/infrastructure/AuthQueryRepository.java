@@ -151,6 +151,34 @@ public class AuthQueryRepository {
 				.optional();
 	}
 
+	public Optional<OrganizationTheme> themeForBranch(UUID organizationId, UUID branchId) {
+		return jdbcClient.sql("""
+				SELECT o.trade_name,
+				       COALESCE(b.brand_name, o.brand_name, b.name) AS brand_name,
+				       COALESCE(b.logo_url, o.logo_url) AS logo_url,
+				       COALESCE(b.primary_color, o.primary_color) AS primary_color,
+				       COALESCE(b.accent_color, o.accent_color) AS accent_color,
+				       COALESCE(b.surface_color, o.surface_color) AS surface_color
+				FROM branch b
+				JOIN organization o ON o.id = b.organization_id
+				WHERE b.id = :branchId
+				  AND b.organization_id = :organizationId
+				  AND b.deleted_at IS NULL
+				  AND o.deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.query((resultSet, rowNumber) -> new OrganizationTheme(
+						resultSet.getString("trade_name"),
+						resultSet.getString("brand_name"),
+						resultSet.getString("logo_url"),
+						resultSet.getString("primary_color"),
+						resultSet.getString("accent_color"),
+						resultSet.getString("surface_color")
+				))
+				.optional();
+	}
+
 	private Optional<AuthenticatedUser> findUser(String sql, String parameterName, Object parameterValue) {
 		return jdbcClient.sql(sql)
 				.param(parameterName, parameterValue)

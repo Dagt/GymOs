@@ -65,6 +65,11 @@ export type BranchSummary = {
   timezone: string;
   phone: string | null;
   accessScope: string;
+  brandName: string | null;
+  logoUrl: string | null;
+  primaryColor: string | null;
+  accentColor: string | null;
+  surfaceColor: string | null;
 };
 
 export type ClientSummary = {
@@ -151,6 +156,11 @@ export type BranchUpdatePayload = {
   code: string;
   timezone: string;
   phone?: string | null;
+  brandName?: string | null;
+  logoUrl?: string | null;
+  primaryColor?: string | null;
+  accentColor?: string | null;
+  surfaceColor?: string | null;
 };
 
 export type CreateBranchPayload = BranchUpdatePayload;
