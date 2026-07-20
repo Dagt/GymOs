@@ -1,0 +1,22 @@
+.shell {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.shell :global(.admin-console),
+.shell :global(.admin-workspace),
+.shell :global(.admin-workspace > *),
+.shell :global(.admin-workspace section) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.shell :global(.grid-cols-7) {
+  width: 100%;
+  min-width: 0;
+}
+
+.shell :global(.overflow-x-auto) {
+  max-width: 100%;
+}
