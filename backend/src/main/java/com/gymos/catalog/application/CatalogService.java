@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.catalog.application.command.CreateMembershipPlanCommand;
 import com.gymos.catalog.application.command.CreatePlanCommand;
 import com.gymos.catalog.application.command.ProductCommand;
+import com.gymos.catalog.application.command.UpdateMembershipPlanCommand;
 import com.gymos.catalog.infrastructure.CatalogRepository;
 import com.gymos.catalog.infrastructure.CatalogRepository.PlanSummary;
 import com.gymos.catalog.infrastructure.CatalogRepository.ProductSummary;
@@ -159,6 +160,65 @@ public class CatalogService {
 				),
 				correlationId
 		);
+	}
+
+	@Transactional
+	public PlanSummary updateMembershipPlan(GymOsPrincipal principal, UUID planId, UpdateMembershipPlanCommand request, String correlationId) {
+		requirePrincipal(principal);
+		PlanSummary existing = catalogRepository.plan(principal.organizationId(), planId)
+				.orElseThrow(() -> new BusinessException("PLAN_NOT_FOUND", "El plan no esta disponible."));
+		OffsetDateTime now = OffsetDateTime.now();
+		jdbcClient.sql("""
+				UPDATE catalog_product
+				SET name = :name,
+				    description = :description,
+				    price_cents = :priceCents,
+				    currency = :currency,
+				    status = :status,
+				    updated_at = :updatedAt,
+				    updated_by = :updatedBy,
+				    version = version + 1
+				WHERE organization_id = :organizationId
+				  AND id = :productId
+				  AND deleted_at IS NULL
+				""")
+				.param("name", request.name().trim())
+				.param("description", blankToNull(request.description()))
+				.param("priceCents", request.priceCents())
+				.param("currency", request.currency().trim().toUpperCase())
+				.param("status", request.status().trim().toUpperCase())
+				.param("updatedAt", now)
+				.param("updatedBy", principal.userId())
+				.param("organizationId", principal.organizationId())
+				.param("productId", existing.productId())
+				.update();
+		jdbcClient.sql("""
+				UPDATE membership_plan
+				SET duration_days = :durationDays,
+				    grace_days = :graceDays,
+				    benefits_json = CAST(:benefitsJson AS jsonb),
+				    multi_branch_access = :multiBranchAccess,
+				    status = :status,
+				    updated_at = :updatedAt,
+				    updated_by = :updatedBy,
+				    version = version + 1
+				WHERE organization_id = :organizationId
+				  AND id = :planId
+				  AND deleted_at IS NULL
+				""")
+				.param("durationDays", request.durationDays())
+				.param("graceDays", request.graceDays())
+				.param("benefitsJson", benefitsTextToJson(request.benefits()))
+				.param("multiBranchAccess", request.multiBranchAccess())
+				.param("status", request.status().trim().toUpperCase())
+				.param("updatedAt", now)
+				.param("updatedBy", principal.userId())
+				.param("organizationId", principal.organizationId())
+				.param("planId", planId)
+				.update();
+		auditService.record(principal, "PLAN_UPDATED", "MEMBERSHIP_PLAN", planId, "BACKOFFICE", null, correlationId);
+		return catalogRepository.plan(principal.organizationId(), planId)
+				.orElseThrow(() -> new BusinessException("PLAN_NOT_FOUND", "El plan no esta disponible."));
 	}
 
 	private void requirePrincipal(GymOsPrincipal principal) {

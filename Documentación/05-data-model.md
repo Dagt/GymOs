@@ -178,6 +178,16 @@ Regla:
 - `multi_branch_access=false`: la membresia da acceso en la sucursal donde se vendio/activo.
 - `multi_branch_access=true`: la membresia se considera valida en todas las sucursales activas del mismo gimnasio. Renovaciones y cambios de plan conservan una sola membresia origen/destino; la agregacion o remocion de acceso multi-sucursal se resuelve por el plan vigente.
 
+### resource_allowed_membership_plan
+- resource_id
+- plan_id
+- organization_id
+- created_at
+
+Regla:
+- Si un recurso no tiene filas en esta tabla, cualquier socio activo puede reservarlo.
+- Si existen planes permitidos, el socio necesita una membresia activa de alguno de esos planes. La validacion respeta `membership_plan.multi_branch_access`.
+
 ### benefit
 - name
 - type
@@ -476,6 +486,7 @@ Migraciones nuevas:
 - `V14__hito5_wellness_notifications_automations.sql`: agrega profesionales de bienestar, servicios, disponibilidad, notificaciones, automatizaciones y dashboard del dueno.
 - `V15__hito6_productization_onboarding_imports.sql`: agrega bitacora de importacion inicial de clientes y permisos `onboarding.manage` y `client.import`.
 - `V23__membership_plan_multi_branch_access.sql`: agrega `membership_plan.multi_branch_access` para planes con acceso a todas las sucursales del tenant.
+- `V24__resource_allowed_membership_plans.sql`: agrega planes permitidos por recurso para restringir reservas segun membresia vigente.
  
 ## Hito 7 - Tablas V16
 

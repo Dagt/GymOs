@@ -708,3 +708,17 @@ Implementado:
 - Las consultas de acceso, kiosco, verificacion de autoservicio y detalle de membresias consideran validas las membresias multi-sucursal desde cualquier sucursal del mismo gimnasio.
 - Cambiar de plan cancela la membresia anterior aunque se opere desde otra sucursal cuando el plan anterior era multi-sucursal, y activa el nuevo alcance segun el plan destino.
 - La portada de recepcion deja de usar colores fijos por modulo y deriva sus tarjetas/metricas de la marca del tenant.
+
+## Reservas por plan, gestion de planes y kiosco con marca - 19 de julio de 2026
+
+Implementado:
+
+- Migracion `V24__resource_allowed_membership_plans.sql` para asociar recursos con planes de membresia permitidos.
+- `POST /api/v1/resources` acepta `allowedPlanIds` y valida que correspondan a planes activos.
+- `POST /api/v1/bookings` bloquea reservas cuando el socio no tiene una membresia activa permitida para el recurso.
+- `/bookings` permite seleccionar planes permitidos al crear un recurso y no falla por falta de permiso `organization.read` en recepcion.
+- `/coaches` ya no falla por falta de permiso `organization.read`; usa la marca de sesion cuando la organizacion no es consultable.
+- `PATCH /api/v1/catalog/plans/{planId}` permite gestionar planes existentes.
+- `/catalog` permite editar planes creados: precio, duracion, gracia, beneficios, estado y alcance multi-sucursal.
+- La sesion publica del kiosco devuelve marca del gimnasio y `/kiosk/[terminalCode]` muestra logo/nombre del tenant.
+- El dashboard de recepcion usa una banda con color principal, metricas integradas y acciones asimetricas para acercarse al lenguaje visual del menu lateral.

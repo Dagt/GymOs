@@ -218,6 +218,7 @@ El alta de socio en frontend puede crear, despues del `POST /clients`, una venta
 - `GET /catalog/plans`
 - `POST /catalog/plans`
 - `POST /catalog/membership-plans`
+- `PATCH /catalog/plans/{planId}`
 - `GET /plans/{id}`
 - `PATCH /plans/{id}`
 - `POST /plans/{id}/archive`
@@ -240,6 +241,8 @@ El alta de socio en frontend puede crear, despues del `POST /clients`, una venta
 ```
 
 `multiBranchAccess=true` marca el plan como valido para todas las sucursales activas del gimnasio. La venta y la membresia conservan la sucursal donde se originaron, pero las consultas de acceso, kiosco y detalle de membresias aceptan esa membresia desde cualquier sucursal del mismo tenant.
+
+`PATCH /catalog/plans/{planId}` permite gestionar planes ya creados sin cambiar el SKU: nombre, descripcion, precio, moneda, duracion, gracia, beneficios, `multiBranchAccess` y estado.
 
 Errores relevantes:
 
@@ -326,8 +329,10 @@ Nota implementada Hito 4:
 
 Nota implementada Hito 4:
 - `POST /resources` crea recursos activos con capacidad, duracion de slot y horario.
+- `POST /resources` acepta `allowedPlanIds`; si se envian planes, solo socios con membresia activa de alguno de esos planes pueden reservar el recurso.
 - `GET /resources/{resourceId}/availability?date=YYYY-MM-DD` devuelve slots con capacidad, reservados y disponibilidad.
 - `POST /bookings` crea reserva en estado `RESERVED`.
+- `POST /bookings` responde `BOOKING_PLAN_NOT_ALLOWED` cuando el recurso esta restringido y el socio no tiene una membresia permitida.
 - Acciones implementadas: `confirm`, `check-in`, `complete` y `cancel`.
 
 ## 6.12 Accesos

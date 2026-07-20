@@ -18,11 +18,13 @@ public class SelfServiceRepository {
 
 	public Optional<TerminalRecord> terminal(String terminalCode) {
 		return jdbcClient.sql("""
-				SELECT id, organization_id, branch_id, name, device_code, status
-				FROM self_service_terminal
-				WHERE device_code = :terminalCode
-				  AND status = 'ACTIVE'
-				  AND deleted_at IS NULL
+				SELECT sst.id, sst.organization_id, sst.branch_id, sst.name, sst.device_code, sst.status,
+				       o.trade_name, o.brand_name, o.logo_url, o.primary_color, o.accent_color, o.surface_color
+				FROM self_service_terminal sst
+				JOIN organization o ON o.id = sst.organization_id
+				WHERE sst.device_code = :terminalCode
+				  AND sst.status = 'ACTIVE'
+				  AND sst.deleted_at IS NULL
 				""")
 				.param("terminalCode", terminalCode)
 				.query((resultSet, rowNumber) -> new TerminalRecord(
@@ -31,7 +33,13 @@ public class SelfServiceRepository {
 						resultSet.getObject("branch_id", UUID.class),
 						resultSet.getString("name"),
 						resultSet.getString("device_code"),
-						resultSet.getString("status")
+						resultSet.getString("status"),
+						resultSet.getString("trade_name"),
+						resultSet.getString("brand_name"),
+						resultSet.getString("logo_url"),
+						resultSet.getString("primary_color"),
+						resultSet.getString("accent_color"),
+						resultSet.getString("surface_color")
 				))
 				.optional();
 	}
@@ -233,7 +241,7 @@ public class SelfServiceRepository {
 				.list();
 	}
 
-	public record TerminalRecord(UUID id, UUID organizationId, UUID branchId, String name, String deviceCode, String status) {
+	public record TerminalRecord(UUID id, UUID organizationId, UUID branchId, String name, String deviceCode, String status, String tradeName, String brandName, String logoUrl, String primaryColor, String accentColor, String surfaceColor) {
 	}
 
 	public record SessionRecord(

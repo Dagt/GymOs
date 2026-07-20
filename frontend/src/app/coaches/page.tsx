@@ -79,7 +79,7 @@ export default function CoachesPage() {
       setSession(stored);
       try {
         const [loadedOrganization, loadedBranches, loadedCoaches, loadedWorkouts, loadedReport] = await Promise.all([
-          getCurrentOrganization(stored.accessToken),
+          getCurrentOrganization(stored.accessToken).catch(() => null),
           getBranches(stored.accessToken),
           getCoaches(stored.accessToken),
           getWorkouts(stored.accessToken),
@@ -248,7 +248,7 @@ export default function CoachesPage() {
       branchName={activeBranch?.name}
       eyebrow="Gerencia"
       mode={activeBranch ? "operation" : undefined}
-      organizationName={organization?.brandName || organization?.tradeName}
+      organizationName={organization?.brandName || organization?.tradeName || session.user.brandName || session.user.organizationName}
       session={session}
       subtitle="Entrenadores, planes versionados y asignaciones a clientes."
       title="Coaches y rutinas"

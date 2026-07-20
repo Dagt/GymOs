@@ -130,6 +130,38 @@ public class CatalogRepository {
 				.list();
 	}
 
+	public Optional<PlanSummary> plan(UUID organizationId, UUID planId) {
+		return jdbcClient.sql("""
+				SELECT mp.id, mp.product_id, cp.sku, cp.name, cp.price_cents, cp.currency,
+				       mp.duration_days, mp.grace_days, mp.benefits_json::text AS benefits_json,
+				       mp.multi_branch_access, mp.status, mp.created_at, mp.updated_at
+				FROM membership_plan mp
+				JOIN catalog_product cp ON cp.id = mp.product_id
+				WHERE mp.organization_id = :organizationId
+				  AND mp.id = :planId
+				  AND mp.deleted_at IS NULL
+				  AND cp.deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("planId", planId)
+				.query((resultSet, rowNumber) -> new PlanSummary(
+						resultSet.getObject("id", UUID.class),
+						resultSet.getObject("product_id", UUID.class),
+						resultSet.getString("sku"),
+						resultSet.getString("name"),
+						resultSet.getLong("price_cents"),
+						resultSet.getString("currency"),
+						resultSet.getInt("duration_days"),
+						resultSet.getInt("grace_days"),
+						resultSet.getString("benefits_json"),
+						resultSet.getBoolean("multi_branch_access"),
+						resultSet.getString("status"),
+						resultSet.getObject("created_at", OffsetDateTime.class),
+						resultSet.getObject("updated_at", OffsetDateTime.class)
+				))
+				.optional();
+	}
+
 	public record ProductSummary(
 			UUID id,
 			String sku,

@@ -249,6 +249,8 @@ export type MembershipPlanPayload = {
   status: "ACTIVE" | "INACTIVE";
 };
 
+export type UpdateMembershipPlanPayload = Omit<MembershipPlanPayload, "sku">;
+
 export type SaleSummary = {
   id: string;
   saleNumber: string;
@@ -439,6 +441,12 @@ export type KioskSessionResponse = {
   sessionId: string;
   sessionToken: string;
   terminalName: string;
+  organizationName: string | null;
+  brandName: string | null;
+  logoUrl: string | null;
+  primaryColor: string | null;
+  accentColor: string | null;
+  surfaceColor: string | null;
   expiresAt: string;
   verified: boolean;
 };
@@ -670,6 +678,8 @@ export type ResourceSummary = {
   opensAt: string;
   closesAt: string;
   notes: string | null;
+  allowedPlanIds: string[];
+  allowedPlanNames: string;
 };
 
 export type BookingSummary = {
@@ -704,6 +714,7 @@ export type CreateResourcePayload = {
   opensAt?: string | null;
   closesAt?: string | null;
   notes?: string | null;
+  allowedPlanIds?: string[];
 };
 
 export type CreateBookingPayload = {
@@ -1402,6 +1413,17 @@ export async function createMembershipPlan(
 ): Promise<PlanSummary> {
   return apiFetch<PlanSummary>("/catalog/membership-plans", accessToken, {
     method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function updateMembershipPlan(
+  accessToken: string,
+  planId: string,
+  payload: UpdateMembershipPlanPayload,
+): Promise<PlanSummary> {
+  return apiFetch<PlanSummary>(`/catalog/plans/${planId}`, accessToken, {
+    method: "PATCH",
     body: JSON.stringify(normalizePayload(payload)),
   });
 }

@@ -17,6 +17,7 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -51,12 +52,17 @@ public class BookingService {
 		}
 		int capacity = Math.max(1, command.capacity());
 		int slotMinutes = Math.max(15, command.slotMinutes());
+		List<UUID> allowedPlanIds = command.allowedPlanIds() == null ? List.of() : new ArrayList<>(new LinkedHashSet<>(command.allowedPlanIds()));
+		if (!allowedPlanIds.isEmpty() && bookingRepository.activePlanCount(principal.organizationId(), allowedPlanIds) != allowedPlanIds.size()) {
+			throw new BusinessException("RESOURCE_ALLOWED_PLAN_INVALID", "Selecciona solo planes activos del gimnasio.");
+		}
 		UUID resourceId = bookingRepository.createResource(
 				principal.organizationId(),
 				principal.branchId(),
 				principal.userId(),
 				new CreateResourceData(command.name().trim(), command.resourceType().trim().toUpperCase(), capacity, slotMinutes, opensAt, closesAt, blankToNull(command.notes()))
 		);
+		bookingRepository.replaceAllowedPlans(principal.organizationId(), resourceId, allowedPlanIds);
 		auditService.record(principal, "RESOURCE_CREATED", "RESOURCE", resourceId, "RECEPTION", null, correlationId);
 		return bookingRepository.resource(principal.organizationId(), principal.branchId(), resourceId).orElseThrow();
 	}
@@ -97,6 +103,9 @@ public class BookingService {
 		ResourceRecord resource = activeResource(principal, command.resourceId());
 		if (!bookingRepository.clientExists(principal.organizationId(), command.clientId())) {
 			throw new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta activo.");
+		}
+		if (!bookingRepository.hasEligibleMembershipForResource(principal.organizationId(), principal.branchId(), command.resourceId(), command.clientId(), LocalDate.now())) {
+			throw new BusinessException("BOOKING_PLAN_NOT_ALLOWED", "El socio no tiene una membresia permitida para reservar este recurso.");
 		}
 		if (command.startsAt() == null || command.endsAt() == null || !command.endsAt().isAfter(command.startsAt())) {
 			throw new BusinessException("BOOKING_RANGE_INVALID", "La reserva requiere un rango valido.");

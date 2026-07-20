@@ -120,7 +120,19 @@ public class SelfServiceController {
 	}
 
 	private CreateSessionResponse toResponse(CreateSessionResult result) {
-		return new CreateSessionResponse(result.sessionId(), result.sessionToken(), result.terminalName(), result.expiresAt(), result.verified());
+		return new CreateSessionResponse(
+				result.sessionId(),
+				result.sessionToken(),
+				result.terminalName(),
+				result.organizationName(),
+				result.brandName(),
+				result.logoUrl(),
+				result.primaryColor(),
+				result.accentColor(),
+				result.surfaceColor(),
+				result.expiresAt(),
+				result.verified()
+		);
 	}
 
 	private SelfServiceSummaryResponse toResponse(SelfServiceSummaryResult result) {
@@ -175,6 +187,12 @@ public class SelfServiceController {
 			UUID sessionId,
 			String sessionToken,
 			String terminalName,
+			String organizationName,
+			String brandName,
+			String logoUrl,
+			String primaryColor,
+			String accentColor,
+			String surfaceColor,
 			OffsetDateTime expiresAt,
 			boolean verified
 	) {

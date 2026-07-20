@@ -82,7 +82,19 @@ public class SelfServiceService {
 				tokenHash(sessionToken)
 		);
 		auditService.recordSystem(terminal.organizationId(), terminal.branchId(), null, "SELF_SERVICE_SESSION_STARTED", "SELF_SERVICE_SESSION", sessionId, "SELF_SERVICE_KIOSK", terminal.deviceCode(), correlationId);
-		return new CreateSessionResult(sessionId, sessionToken, terminal.name(), now.plusMinutes(SESSION_MINUTES), false);
+		return new CreateSessionResult(
+				sessionId,
+				sessionToken,
+				terminal.name(),
+				terminal.tradeName(),
+				terminal.brandName(),
+				terminal.logoUrl(),
+				terminal.primaryColor(),
+				terminal.accentColor(),
+				terminal.surfaceColor(),
+				now.plusMinutes(SESSION_MINUTES),
+				false
+		);
 	}
 
 	@Transactional

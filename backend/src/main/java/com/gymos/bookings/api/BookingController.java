@@ -126,10 +126,11 @@ public class BookingController {
 			@Min(15) int slotMinutes,
 			LocalTime opensAt,
 			LocalTime closesAt,
-			@Size(max = 2000) String notes
+			@Size(max = 2000) String notes,
+			List<UUID> allowedPlanIds
 	) {
 		private CreateResourceCommand toCommand() {
-			return new CreateResourceCommand(name, resourceType, capacity, slotMinutes, opensAt, closesAt, notes);
+			return new CreateResourceCommand(name, resourceType, capacity, slotMinutes, opensAt, closesAt, notes, allowedPlanIds == null ? List.of() : allowedPlanIds);
 		}
 	}
 

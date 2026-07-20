@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { FormEvent, useEffect, useState } from "react";
+import { CSSProperties, FormEvent, useEffect, useState } from "react";
 import {
   changeMembershipPlanFromKiosk,
   createKioskSession,
@@ -147,13 +147,28 @@ export default function KioskPage() {
   }
 
   return (
-    <main className="kiosk-screen text-white">
+    <main
+      className="kiosk-screen text-white"
+      style={{
+        "--brand-primary": session?.primaryColor ?? undefined,
+        "--brand-accent": session?.accentColor ?? undefined,
+        "--brand-surface": session?.surfaceColor ?? undefined,
+      } as CSSProperties}
+    >
       <section className="kiosk-shell">
         <header className="kiosk-header">
-          <div>
+          <div className="kiosk-brand-row">
+            {session?.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img alt={session.brandName ?? session.organizationName ?? "Gimnasio"} className="kiosk-logo" src={session.logoUrl} />
+            ) : (
+              <span className="kiosk-logo-fallback">{(session?.brandName ?? session?.organizationName ?? "G").slice(0, 1)}</span>
+            )}
+            <div>
             <p>Autoservicio</p>
-            <h1>{session?.terminalName ?? params.terminalCode}</h1>
+            <h1>{session?.brandName ?? session?.organizationName ?? session?.terminalName ?? params.terminalCode}</h1>
             <span>Renueva, revisa pagos o cambia tu membresía sin pasar por mostrador.</span>
+            </div>
           </div>
           <aside>
             <strong>Sesión segura</strong>

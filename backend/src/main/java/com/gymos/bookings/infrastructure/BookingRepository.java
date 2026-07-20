@@ -3,6 +3,7 @@ package com.gymos.bookings.infrastructure;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,12 +20,19 @@ public class BookingRepository {
 
 	public List<ResourceRecord> resources(UUID organizationId, UUID branchId) {
 		return jdbcClient.sql("""
-				SELECT id, name, resource_type, capacity, slot_minutes, status, opens_at, closes_at, notes
-				FROM resource
-				WHERE organization_id = :organizationId
-				  AND branch_id = :branchId
-				  AND deleted_at IS NULL
-				ORDER BY name
+				SELECT r.id, r.name, r.resource_type, r.capacity, r.slot_minutes, r.status,
+				       r.opens_at, r.closes_at, r.notes,
+				       COALESCE(string_agg(rap.plan_id::text, ',' ORDER BY cp.name) FILTER (WHERE rap.plan_id IS NOT NULL), '') AS allowed_plan_ids,
+				       COALESCE(string_agg(cp.name, ', ' ORDER BY cp.name) FILTER (WHERE rap.plan_id IS NOT NULL), '') AS allowed_plan_names
+				FROM resource r
+				LEFT JOIN resource_allowed_membership_plan rap ON rap.resource_id = r.id
+				LEFT JOIN membership_plan mp ON mp.id = rap.plan_id AND mp.deleted_at IS NULL
+				LEFT JOIN catalog_product cp ON cp.id = mp.product_id AND cp.deleted_at IS NULL
+				WHERE r.organization_id = :organizationId
+				  AND r.branch_id = :branchId
+				  AND r.deleted_at IS NULL
+				GROUP BY r.id
+				ORDER BY r.name
 				""")
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
@@ -34,12 +42,19 @@ public class BookingRepository {
 
 	public Optional<ResourceRecord> resource(UUID organizationId, UUID branchId, UUID resourceId) {
 		return jdbcClient.sql("""
-				SELECT id, name, resource_type, capacity, slot_minutes, status, opens_at, closes_at, notes
-				FROM resource
-				WHERE organization_id = :organizationId
-				  AND branch_id = :branchId
-				  AND id = :resourceId
-				  AND deleted_at IS NULL
+				SELECT r.id, r.name, r.resource_type, r.capacity, r.slot_minutes, r.status,
+				       r.opens_at, r.closes_at, r.notes,
+				       COALESCE(string_agg(rap.plan_id::text, ',' ORDER BY cp.name) FILTER (WHERE rap.plan_id IS NOT NULL), '') AS allowed_plan_ids,
+				       COALESCE(string_agg(cp.name, ', ' ORDER BY cp.name) FILTER (WHERE rap.plan_id IS NOT NULL), '') AS allowed_plan_names
+				FROM resource r
+				LEFT JOIN resource_allowed_membership_plan rap ON rap.resource_id = r.id
+				LEFT JOIN membership_plan mp ON mp.id = rap.plan_id AND mp.deleted_at IS NULL
+				LEFT JOIN catalog_product cp ON cp.id = mp.product_id AND cp.deleted_at IS NULL
+				WHERE r.organization_id = :organizationId
+				  AND r.branch_id = :branchId
+				  AND r.id = :resourceId
+				  AND r.deleted_at IS NULL
+				GROUP BY r.id
 				""")
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
@@ -77,6 +92,92 @@ public class BookingRepository {
 				.param("updatedBy", actorUserId)
 				.update();
 		return resourceId;
+	}
+
+	public int activePlanCount(UUID organizationId, List<UUID> planIds) {
+		if (planIds == null || planIds.isEmpty()) {
+			return 0;
+		}
+		Integer count = jdbcClient.sql("""
+				SELECT COUNT(*)
+				FROM membership_plan mp
+				JOIN catalog_product cp ON cp.id = mp.product_id
+				WHERE mp.organization_id = :organizationId
+				  AND mp.id IN (:planIds)
+				  AND mp.status = 'ACTIVE'
+				  AND cp.status = 'ACTIVE'
+				  AND mp.deleted_at IS NULL
+				  AND cp.deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("planIds", planIds)
+				.query(Integer.class)
+				.single();
+		return count;
+	}
+
+	public void replaceAllowedPlans(UUID organizationId, UUID resourceId, List<UUID> planIds) {
+		jdbcClient.sql("""
+				DELETE FROM resource_allowed_membership_plan
+				WHERE organization_id = :organizationId
+				  AND resource_id = :resourceId
+				""")
+				.param("organizationId", organizationId)
+				.param("resourceId", resourceId)
+				.update();
+		if (planIds == null || planIds.isEmpty()) {
+			return;
+		}
+		for (UUID planId : planIds) {
+			jdbcClient.sql("""
+					INSERT INTO resource_allowed_membership_plan (resource_id, plan_id, organization_id, created_at)
+					VALUES (:resourceId, :planId, :organizationId, :createdAt)
+					ON CONFLICT DO NOTHING
+					""")
+					.param("resourceId", resourceId)
+					.param("planId", planId)
+					.param("organizationId", organizationId)
+					.param("createdAt", OffsetDateTime.now())
+					.update();
+		}
+	}
+
+	public boolean hasEligibleMembershipForResource(UUID organizationId, UUID branchId, UUID resourceId, UUID clientId, LocalDate today) {
+		Integer restrictions = jdbcClient.sql("""
+				SELECT COUNT(*)
+				FROM resource_allowed_membership_plan
+				WHERE organization_id = :organizationId
+				  AND resource_id = :resourceId
+				""")
+				.param("organizationId", organizationId)
+				.param("resourceId", resourceId)
+				.query(Integer.class)
+				.single();
+		if (restrictions == 0) {
+			return true;
+		}
+		Integer count = jdbcClient.sql("""
+				SELECT COUNT(*)
+				FROM membership m
+				JOIN membership_plan mp ON mp.id = m.plan_id
+				JOIN resource_allowed_membership_plan rap ON rap.plan_id = m.plan_id
+				WHERE m.organization_id = :organizationId
+				  AND rap.resource_id = :resourceId
+				  AND m.client_id = :clientId
+				  AND (m.branch_id = :branchId OR mp.multi_branch_access = true)
+				  AND m.status = 'ACTIVE'
+				  AND m.starts_on <= :today
+				  AND m.grace_ends_on >= :today
+				  AND m.deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("resourceId", resourceId)
+				.param("clientId", clientId)
+				.param("branchId", branchId)
+				.param("today", today)
+				.query(Integer.class)
+				.single();
+		return count > 0;
 	}
 
 	public boolean clientExists(UUID organizationId, UUID clientId) {
@@ -278,8 +379,21 @@ public class BookingRepository {
 				resultSet.getString("status"),
 				resultSet.getObject("opens_at", LocalTime.class),
 				resultSet.getObject("closes_at", LocalTime.class),
-				resultSet.getString("notes")
+				resultSet.getString("notes"),
+				parseUuidList(resultSet.getString("allowed_plan_ids")),
+				resultSet.getString("allowed_plan_names")
 		);
+	}
+
+	private List<UUID> parseUuidList(String value) {
+		if (value == null || value.isBlank()) {
+			return List.of();
+		}
+		return Arrays.stream(value.split(","))
+				.map(String::trim)
+				.filter(item -> !item.isBlank())
+				.map(UUID::fromString)
+				.toList();
 	}
 
 	private BookingRecord mapBooking(java.sql.ResultSet resultSet, int rowNumber) throws java.sql.SQLException {
@@ -306,7 +420,7 @@ public class BookingRepository {
 	public record CreateBookingData(UUID resourceId, UUID clientId, OffsetDateTime startsAt, OffsetDateTime endsAt, String notes) {
 	}
 
-	public record ResourceRecord(UUID id, String name, String resourceType, int capacity, int slotMinutes, String status, LocalTime opensAt, LocalTime closesAt, String notes) {
+	public record ResourceRecord(UUID id, String name, String resourceType, int capacity, int slotMinutes, String status, LocalTime opensAt, LocalTime closesAt, String notes, List<UUID> allowedPlanIds, String allowedPlanNames) {
 	}
 
 	public record BookingRecord(

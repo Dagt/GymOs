@@ -9,6 +9,7 @@ import {
   getPlans,
   getProducts,
   getStoredSession,
+  updateMembershipPlan,
   type MembershipPlanPayload,
   type PlanSummary,
   type ProductPayload,
@@ -59,6 +60,7 @@ export default function CatalogPage() {
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [form, setForm] = useState<ProductPayload>(emptyProduct);
   const [planForm, setPlanForm] = useState<PlanDraft>(emptyPlan);
+  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
   const [price, setPrice] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -139,7 +141,7 @@ export default function CatalogPage() {
     setError(null);
     setMessage(null);
     try {
-      await createMembershipPlan(session.accessToken, {
+      const payload = {
         sku: planForm.sku.trim(),
         name: planForm.name.trim(),
         description: planForm.description.trim() || null,
@@ -150,7 +152,12 @@ export default function CatalogPage() {
         benefits: planForm.benefitsJson.trim() || null,
         multiBranchAccess: planForm.multiBranchAccess,
         status: planForm.status,
-      });
+      };
+      if (editingPlanId) {
+        await updateMembershipPlan(session.accessToken, editingPlanId, payload);
+      } else {
+        await createMembershipPlan(session.accessToken, payload);
+      }
       const [loadedProducts, loadedPlans] = await Promise.all([
         getProducts(session.accessToken),
         getPlans(session.accessToken),
@@ -158,7 +165,8 @@ export default function CatalogPage() {
       setProducts(loadedProducts);
       setPlans(loadedPlans);
       setPlanForm(emptyPlan);
-      setMessage("Plan de membresia creado.");
+      setEditingPlanId(null);
+      setMessage(editingPlanId ? "Plan de membresia actualizado." : "Plan de membresia creado.");
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible crear plan.");
     } finally {
@@ -285,8 +293,20 @@ export default function CatalogPage() {
               </select>
             </label>
             <button className="app-button h-11" disabled={saving} type="submit">
-              {saving ? "Guardando..." : "Crear plan de membresia"}
+              {saving ? "Guardando..." : editingPlanId ? "Guardar cambios del plan" : "Crear plan de membresia"}
             </button>
+            {editingPlanId ? (
+              <button
+                className="app-button-secondary h-11"
+                onClick={() => {
+                  setEditingPlanId(null);
+                  setPlanForm(emptyPlan);
+                }}
+                type="button"
+              >
+                Cancelar edicion
+              </button>
+            ) : null}
           </form>
         </section>
 
@@ -332,6 +352,27 @@ export default function CatalogPage() {
                   <p className="mt-2 text-xs font-semibold text-[var(--brand-primary)]">
                     {plan.multiBranchAccess ? "Acceso multi-sucursal" : "Acceso por sucursal de venta"}
                   </p>
+                  <button
+                    className="mt-3 h-9 rounded-md border border-[#cdd5ca] px-3 text-xs font-semibold text-[var(--brand-primary)]"
+                    onClick={() => {
+                      setEditingPlanId(plan.id);
+                      setPlanForm({
+                        sku: plan.sku,
+                        name: plan.name,
+                        description: "",
+                        price: String(plan.priceCents / 100),
+                        currency: plan.currency,
+                        durationDays: String(plan.durationDays),
+                        graceDays: String(plan.graceDays),
+                        benefitsJson: benefitsToText(plan.benefitsJson),
+                        multiBranchAccess: plan.multiBranchAccess,
+                        status: plan.status,
+                      });
+                    }}
+                    type="button"
+                  >
+                    Editar plan
+                  </button>
                 </article>
               ))}
             </div>
@@ -384,4 +425,19 @@ function formatMoney(cents: number, currency: string) {
     style: "currency",
     currency,
   }).format(cents / 100);
+}
+
+function benefitsToText(value: string | null) {
+  if (!value) {
+    return "";
+  }
+  try {
+    const parsed = JSON.parse(value) as { included?: unknown };
+    if (Array.isArray(parsed.included)) {
+      return parsed.included.filter((item): item is string => typeof item === "string").join(", ");
+    }
+  } catch {
+    return value;
+  }
+  return value;
 }

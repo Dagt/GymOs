@@ -9,6 +9,7 @@ import {
   getBranches,
   getBookings,
   getCurrentOrganization,
+  getPlans,
   getResourceAvailability,
   getResources,
   getStoredSession,
@@ -20,6 +21,7 @@ import {
   type BookingSummary,
   type ClientSummary,
   type OrganizationSummary,
+  type PlanSummary,
   type ResourceSummary,
   type StoredSession,
 } from "@/lib/api";
@@ -31,6 +33,7 @@ export default function BookingsPage() {
   const [resources, setResources] = useState<ResourceSummary[]>([]);
   const [bookings, setBookings] = useState<BookingSummary[]>([]);
   const [clients, setClients] = useState<ClientSummary[]>([]);
+  const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [availability, setAvailability] = useState<AvailabilitySlot[]>([]);
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [resourceId, setResourceId] = useState("");
@@ -39,6 +42,7 @@ export default function BookingsPage() {
   const [endsAt, setEndsAt] = useState("");
   const [notes, setNotes] = useState("");
   const [resourceName, setResourceName] = useState("");
+  const [resourceAllowedPlanIds, setResourceAllowedPlanIds] = useState<string[]>([]);
   const [paymentBookingId, setPaymentBookingId] = useState("");
   const [paymentSaleId, setPaymentSaleId] = useState("");
   const [paymentStatus, setPaymentStatus] = useState<"PENDING" | "PAID" | "EXPIRED" | "CANCELLED">("PAID");
@@ -61,12 +65,13 @@ export default function BookingsPage() {
       }
       setSession(stored);
       try {
-        const [loadedOrganization, loadedBranches, loadedResources, loadedBookings, loadedClients] = await Promise.all([
-          getCurrentOrganization(stored.accessToken),
+        const [loadedOrganization, loadedBranches, loadedResources, loadedBookings, loadedClients, loadedPlans] = await Promise.all([
+          getCurrentOrganization(stored.accessToken).catch(() => null),
           getBranches(stored.accessToken),
           getResources(stored.accessToken),
           getBookings(stored.accessToken, date),
           searchClients(stored.accessToken, "", "ACTIVE"),
+          getPlans(stored.accessToken),
         ]);
         if (!active) {
           return;
@@ -76,6 +81,7 @@ export default function BookingsPage() {
         setResources(loadedResources);
         setBookings(loadedBookings);
         setClients(loadedClients);
+        setPlans(loadedPlans);
         setResourceId(loadedResources[0]?.id ?? "");
         setClientId(loadedClients[0]?.id ?? "");
       } catch (exception) {
@@ -176,10 +182,12 @@ export default function BookingsPage() {
         slotMinutes: 60,
         opensAt: "08:00",
         closesAt: "20:00",
+        allowedPlanIds: resourceAllowedPlanIds,
       });
       await refresh();
       setResourceId(created.id);
       setResourceName("");
+      setResourceAllowedPlanIds([]);
       setMessage("Recurso creado.");
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible crear recurso.");
@@ -246,7 +254,7 @@ export default function BookingsPage() {
       branchName={activeBranch?.name}
       eyebrow="Operacion"
       mode={activeBranch ? "operation" : undefined}
-      organizationName={organization?.brandName || organization?.tradeName}
+      organizationName={organization?.brandName || organization?.tradeName || session.user.brandName || session.user.organizationName}
       session={session}
       subtitle="Agenda, recursos, confirmaciones y pagos vinculados."
       title="Recursos y reservas"
@@ -300,6 +308,32 @@ export default function BookingsPage() {
           <form className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm" onSubmit={submitResource}>
             <h2 className="text-xl font-semibold">Alta rapida de recurso</h2>
             <input className="mt-4 h-11 w-full rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setResourceName(event.target.value)} placeholder="Nombre del recurso" required value={resourceName} />
+            <fieldset className="mt-4 grid gap-2">
+              <legend className="text-sm font-semibold">Planes que pueden reservarlo</legend>
+              <p className="text-xs text-[#6f7a73]">Sin seleccionar planes, el recurso queda abierto para cualquier socio activo.</p>
+              <div className="grid gap-2">
+                {plans.map((plan) => (
+                  <label className="flex items-start gap-2 rounded-md border border-[#d8ddd2] px-3 py-2 text-sm" key={plan.id}>
+                    <input
+                      className="mt-1 h-4 w-4 accent-[var(--brand-primary)]"
+                      checked={resourceAllowedPlanIds.includes(plan.id)}
+                      onChange={(event) => {
+                        setResourceAllowedPlanIds((current) => (
+                          event.target.checked
+                            ? [...current, plan.id]
+                            : current.filter((planId) => planId !== plan.id)
+                        ));
+                      }}
+                      type="checkbox"
+                    />
+                    <span>
+                      <strong className="block">{plan.name}</strong>
+                      <span className="text-xs text-[#6f7a73]">{plan.multiBranchAccess ? "Multi-sucursal" : "Sucursal de venta"}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
             <button className="mt-4 h-11 w-full rounded-md border border-[#51735f] px-4 text-sm font-semibold text-[#13251c]" disabled={saving} type="submit">
               Crear recurso
             </button>
@@ -340,6 +374,11 @@ export default function BookingsPage() {
         <section className="grid gap-5">
           <div className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
             <h2 className="text-xl font-semibold">Disponibilidad {activeResource ? `- ${activeResource.name}` : ""}</h2>
+            {activeResource?.allowedPlanNames ? (
+              <p className="mt-2 text-sm text-[#5d6b63]">Reservable por: {activeResource.allowedPlanNames}</p>
+            ) : (
+              <p className="mt-2 text-sm text-[#5d6b63]">Reservable por cualquier socio activo.</p>
+            )}
             <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
               {availability.map((slot) => (
                 <button
