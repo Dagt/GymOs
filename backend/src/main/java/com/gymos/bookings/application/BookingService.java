@@ -110,6 +110,9 @@ public class BookingService {
 		if (command.startsAt() == null || command.endsAt() == null || !command.endsAt().isAfter(command.startsAt())) {
 			throw new BusinessException("BOOKING_RANGE_INVALID", "La reserva requiere un rango valido.");
 		}
+		if (!command.startsAt().isAfter(OffsetDateTime.now())) {
+			throw new BusinessException("BOOKING_START_IN_PAST", "No puedes crear una reserva en una hora que ya paso.");
+		}
 		LocalTime startsTime = command.startsAt().toLocalTime();
 		LocalTime endsTime = command.endsAt().toLocalTime();
 		if (startsTime.isBefore(resource.opensAt()) || endsTime.isAfter(resource.closesAt())) {
