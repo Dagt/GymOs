@@ -24,6 +24,7 @@ import {
 } from "@/lib/api";
 
 type WeekdayKey = "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
+type BookingAction = "confirm" | "check-in" | "complete" | "cancel";
 type Notice = { title: string; message: string; tone: "error" | "success" };
 
 type ResourceDay = {
@@ -41,7 +42,6 @@ type StoredSchedule = {
 };
 
 const resourceColors = ["#166534", "#0f766e", "#1d4ed8", "#7c3aed", "#be123c", "#b45309"];
-const bookingActions: Array<"confirm" | "check-in" | "complete" | "cancel"> = ["confirm", "check-in", "complete", "cancel"];
 const weekdays: ResourceDay[] = [
   { key: "MONDAY", label: "Lunes", shortLabel: "L", enabled: true, opensAt: "06:00", closesAt: "22:00" },
   { key: "TUESDAY", label: "Martes", shortLabel: "M", enabled: true, opensAt: "06:00", closesAt: "22:00" },
@@ -244,12 +244,18 @@ export default function BookingsPage() {
     }
   }
 
-  async function runAction(bookingId: string, action: "confirm" | "check-in" | "complete" | "cancel") {
+  async function runAction(bookingId: string, action: BookingAction) {
     if (!session) return;
     try {
       await transitionBooking(session.accessToken, bookingId, action);
       await refresh();
-      setNotice({ title: "Reserva actualizada", message: action === "cancel" ? "La reserva fue cancelada y ya no aparece en la agenda." : "El estado de la reserva se actualizó.", tone: "success" });
+      setNotice({
+        title: "Reserva actualizada",
+        message: action === "cancel"
+          ? "La reserva fue cancelada y ya no aparece en la agenda."
+          : "El estado operativo de la reserva se actualizó.",
+        tone: "success",
+      });
     } catch (exception) {
       showError(exception, "No fue posible actualizar la reserva.");
     }
@@ -266,6 +272,16 @@ export default function BookingsPage() {
     setCalendarDate(value);
     setStartDate(value);
     setStartTime("");
+  }
+
+  function updateResourceDay(key: WeekdayKey, patch: Partial<ResourceDay>) {
+    setResourceSchedule((current) => current.map((day) => day.key === key ? { ...day, ...patch } : day));
+  }
+
+  function moveCalendarMonth(months: number) {
+    const date = parseDateInput(calendarDate);
+    date.setMonth(date.getMonth() + months);
+    selectCalendarDate(toDateInput(date));
   }
 
   if (loading) return <LoadingScreen text="Cargando reservas..." />;
@@ -398,16 +414,23 @@ export default function BookingsPage() {
         </aside>
 
         <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div><h2 className="text-xl font-semibold">Agenda mensual</h2><p className="mt-1 text-sm text-[#5d6b63]">Selecciona un día para ver sus reservas por recurso.</p></div>
-            <div className="flex flex-wrap items-center gap-2">
-              <button className="h-10 rounded-md border border-[var(--brand-primary)] px-3 text-sm font-semibold text-[var(--brand-primary)]" onClick={() => moveCalendarMonth(-1)} type="button">Anterior</button>
-              <input className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => selectCalendarDate(event.target.value)} type="date" value={calendarDate} />
-              <button className="h-10 rounded-md bg-[var(--brand-primary)] px-4 text-sm font-semibold text-white shadow-sm" onClick={goToToday} type="button">Hoy</button>
-              <button className="h-10 rounded-md border border-[var(--brand-primary)] px-3 text-sm font-semibold text-[var(--brand-primary)]" onClick={() => moveCalendarMonth(1)} type="button">Siguiente</button>
+          <div className="flex flex-col gap-4 border-b border-[#e5e9e3] pb-5 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">Agenda mensual</h2>
+              <p className="mt-1 text-sm text-[#5d6b63]">Selecciona un día para ver sus reservas por recurso.</p>
+            </div>
+            <div className="inline-flex flex-wrap items-center gap-2 rounded-xl border border-[#d8ddd2] bg-[#f8faf8] p-2 shadow-inner">
+              <button aria-label="Mes anterior" className="h-10 w-10 rounded-lg border border-[#cdd5ca] bg-white text-lg font-bold text-[var(--brand-primary)] shadow-sm hover:bg-[var(--brand-surface)]" onClick={() => moveCalendarMonth(-1)} type="button">‹</button>
+              <div className="min-w-40 px-2 text-center">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#647067]">Mes visible</p>
+                <p className="text-sm font-bold capitalize text-[#243229]">{formatMonthLabel(calendarDate)}</p>
+              </div>
+              <input aria-label="Seleccionar fecha" className="h-10 rounded-lg border border-[#cdd5ca] bg-white px-3 text-sm" onChange={(event) => selectCalendarDate(event.target.value)} type="date" value={calendarDate} />
+              <button className="h-10 rounded-lg bg-[var(--brand-primary)] px-4 text-sm font-semibold text-white shadow-sm" onClick={goToToday} type="button">Hoy</button>
+              <button aria-label="Mes siguiente" className="h-10 w-10 rounded-lg border border-[#cdd5ca] bg-white text-lg font-bold text-[var(--brand-primary)] shadow-sm hover:bg-[var(--brand-surface)]" onClick={() => moveCalendarMonth(1)} type="button">›</button>
             </div>
           </div>
-          <div className="mt-4 rounded-md border border-[#d8ddd2] bg-[#f8faf8] px-3 py-2 text-sm font-semibold text-[#34443a]">{formatMonthLabel(calendarDate)}</div>
+
           <div className="mt-5 flex flex-wrap gap-2">
             {resources.map((resource, index) => (
               <button className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${resource.id === resourceId ? "border-[var(--brand-primary)] bg-[var(--brand-surface)]" : "border-[#d8ddd2]"}`} key={resource.id} onClick={() => setResourceId(resource.id)} type="button">
@@ -445,24 +468,31 @@ export default function BookingsPage() {
               </div>
 
               <section className="rounded-lg border border-[#d8ddd2] bg-[#fbfcfa] p-4">
-                <div><h3 className="text-lg font-semibold">{formatLongDate(startDate)}</h3><p className="text-sm text-[#5d6b63]">Detalle del día seleccionado.</p></div>
-                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  {resources.map((resource, index) => {
-                    const resourceBookings = selectedDateBookings.filter((booking) => booking.resourceId === resource.id);
-                    const hours = resourceHoursForDay(resource, dateToWeekday(startDate));
-                    const suggestedTime = hours ? suggestedStartTime(startDate, hours.opensAt, hours.closesAt) : null;
-                    return (
-                      <article className="rounded-md border border-[#d8ddd2] bg-white p-3" key={resource.id}>
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="min-w-0"><p className="truncate text-sm font-semibold"><span className="mr-2 inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: resourceColor(index) }} />{resource.name}</p><p className="mt-0.5 text-xs text-[#647067]">{hours ? `${hours.opensAt} - ${hours.closesAt}` : "Cerrado"}</p></div>
-                          {hours ? <button className="rounded-md border border-[var(--brand-primary)] px-2 py-1 text-xs font-semibold text-[var(--brand-primary)] disabled:cursor-not-allowed disabled:opacity-50" disabled={selectedDateIsPast || !suggestedTime} onClick={() => { setResourceId(resource.id); setStartTime(suggestedTime ?? ""); }} type="button">Reservar</button> : null}
-                        </div>
-                        <div className="mt-3 grid gap-2">
-                          {resourceBookings.length === 0 ? <p className="rounded-md bg-[#f8faf8] px-2 py-2 text-xs text-[#647067]">Sin reservas</p> : resourceBookings.map((booking) => <BookingCard booking={booking} color={resourceColor(index)} key={booking.id} onRunAction={runAction} />)}
-                        </div>
-                      </article>
-                    );
-                  })}
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-semibold">{formatLongDate(startDate)}</h3>
+                    <p className="text-sm text-[#5d6b63]">Detalle del día seleccionado.</p>
+                  </div>
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#5d6b63] shadow-sm">{selectedDateBookings.length} reserva{selectedDateBookings.length === 1 ? "" : "s"}</span>
+                </div>
+                <div className="mt-4 max-h-[34rem] overflow-y-auto pr-2">
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {resources.map((resource, index) => {
+                      const resourceBookings = selectedDateBookings.filter((booking) => booking.resourceId === resource.id);
+                      const hours = resourceHoursForDay(resource, dateToWeekday(startDate));
+                      return (
+                        <article className="self-start rounded-md border border-[#d8ddd2] bg-white p-3" key={resource.id}>
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold"><span className="mr-2 inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: resourceColor(index) }} />{resource.name}</p>
+                            <p className="mt-0.5 text-xs text-[#647067]">{hours ? `${hours.opensAt} - ${hours.closesAt}` : "Cerrado"}</p>
+                          </div>
+                          <div className="mt-3 grid gap-2">
+                            {resourceBookings.length === 0 ? <p className="rounded-md bg-[#f8faf8] px-2 py-2 text-xs text-[#647067]">Sin reservas</p> : resourceBookings.map((booking) => <BookingCard booking={booking} color={resourceColor(index)} key={booking.id} onRunAction={runAction} />)}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
                 </div>
               </section>
             </div>
@@ -471,16 +501,6 @@ export default function BookingsPage() {
       </section>
     </AppShell>
   );
-
-  function updateResourceDay(key: WeekdayKey, patch: Partial<ResourceDay>) {
-    setResourceSchedule((current) => current.map((day) => day.key === key ? { ...day, ...patch } : day));
-  }
-
-  function moveCalendarMonth(months: number) {
-    const date = parseDateInput(calendarDate);
-    date.setMonth(date.getMonth() + months);
-    selectCalendarDate(toDateInput(date));
-  }
 }
 
 function NoticeModal({ notice, onClose }: { notice: Notice; onClose: () => void }) {
@@ -497,21 +517,49 @@ function NoticeModal({ notice, onClose }: { notice: Notice; onClose: () => void 
   );
 }
 
-function BookingCard({ booking, color, onRunAction }: { booking: BookingSummary; color: string; onRunAction: (bookingId: string, action: "confirm" | "check-in" | "complete" | "cancel") => void }) {
+function BookingCard({ booking, color, onRunAction }: { booking: BookingSummary; color: string; onRunAction: (bookingId: string, action: BookingAction) => void }) {
+  const nextAction = nextBookingAction(booking.status);
   return (
-    <article className="rounded-md px-3 py-2 text-white shadow-sm" style={{ backgroundColor: color }}>
-      <p className="text-[11px] font-semibold uppercase opacity-80">{booking.status}</p>
-      <p className="mt-1 truncate text-sm font-semibold">{booking.clientName}</p>
-      <p className="text-xs opacity-90">{formatTime(booking.startsAt)} - {formatTime(booking.endsAt)}</p>
-      <div className="mt-2 flex flex-wrap gap-1">{bookingActions.map((action) => <ActionButton action={action} booking={booking} key={action} onRun={onRunAction} />)}</div>
+    <article className="rounded-md px-3 py-3 text-white shadow-sm" style={{ backgroundColor: color }}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">{bookingStatusLabel(booking.status)}</p>
+          <p className="mt-1 truncate text-sm font-semibold">{booking.clientName}</p>
+          <p className="text-xs opacity-90">{formatTime(booking.startsAt)} - {formatTime(booking.endsAt)}</p>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {nextAction ? (
+          <button className="h-8 rounded-md bg-white px-3 text-xs font-semibold text-[#243229] shadow-sm" onClick={() => onRunAction(booking.id, nextAction.action)} type="button">
+            {nextAction.label}
+          </button>
+        ) : null}
+        {booking.status !== "COMPLETED" && booking.status !== "CANCELLED" ? (
+          <button className="h-8 rounded-md border border-white/50 px-3 text-xs font-semibold text-white hover:bg-white/10" onClick={() => onRunAction(booking.id, "cancel")} type="button">
+            Cancelar
+          </button>
+        ) : null}
+      </div>
     </article>
   );
 }
 
-function ActionButton({ action, booking, onRun }: { action: "confirm" | "check-in" | "complete" | "cancel"; booking: BookingSummary; onRun: (bookingId: string, action: "confirm" | "check-in" | "complete" | "cancel") => void }) {
-  const labels = { confirm: "Confirmar", "check-in": "Check-in", complete: "Completar", cancel: "Cancelar" };
-  const disabled = booking.status === "COMPLETED" || booking.status === "CANCELLED";
-  return <button className="h-7 rounded border border-white/40 px-2 text-[11px] font-semibold text-white disabled:opacity-50" disabled={disabled} onClick={() => onRun(booking.id, action)} type="button">{labels[action]}</button>;
+function nextBookingAction(status: string): { action: Exclude<BookingAction, "cancel">; label: string } | null {
+  if (status === "RESERVED") return { action: "confirm", label: "Confirmar asistencia" };
+  if (status === "CONFIRMED") return { action: "check-in", label: "Registrar entrada" };
+  if (status === "CHECKED_IN") return { action: "complete", label: "Finalizar uso" };
+  return null;
+}
+
+function bookingStatusLabel(status: string) {
+  const labels: Record<string, string> = {
+    RESERVED: "Reservada",
+    CONFIRMED: "Confirmada",
+    CHECKED_IN: "En uso",
+    COMPLETED: "Completada",
+    CANCELLED: "Cancelada",
+  };
+  return labels[status] ?? status;
 }
 
 async function getCalendarBookings(accessToken: string, dates: Array<{ date: string }>) {
@@ -554,6 +602,7 @@ function parseResourceSchedule(resource: ResourceSummary) {
 
 function friendlyBookingError(raw: string, fallback: string) {
   const normalized = raw.toLowerCase();
+  if (normalized.includes("booking_client_conflict") || normalized.includes("otra reserva") || normalized.includes("socio ya tiene")) return "El socio ya tiene otra reserva que coincide con este horario. Elige una hora diferente.";
   if (normalized.includes("booking_conflict") || normalized.includes("no tiene disponibilidad") || normalized.includes("conflict")) return "El recurso ya está ocupado en ese horario. Elige otra hora o un recurso diferente.";
   if (normalized.includes("booking_plan_not_allowed") || normalized.includes("membresia permitida") || normalized.includes("membresía permitida")) return "El socio no tiene una membresía válida para reservar este recurso. Selecciona otro recurso o revisa su plan.";
   if (normalized.includes("booking_outside_resource_hours") || normalized.includes("fuera del horario")) return "La hora seleccionada está fuera del horario operativo del recurso.";
@@ -569,17 +618,6 @@ function friendlyBookingError(raw: string, fallback: string) {
   return clean && clean.length <= 180 ? clean : fallback;
 }
 
-function suggestedStartTime(date: string, opensAt: string, closesAt: string) {
-  if (date !== toDateInput(new Date())) return opensAt;
-  const now = new Date();
-  const rounded = new Date(now);
-  rounded.setSeconds(0, 0);
-  rounded.setMinutes(Math.ceil(rounded.getMinutes() / 5) * 5);
-  const candidate = currentTimeInput(rounded);
-  const resolved = timeToMinutes(candidate) > timeToMinutes(opensAt) ? candidate : opensAt;
-  return timeToMinutes(resolved) < timeToMinutes(closesAt) ? resolved : null;
-}
-
 function isPastDateTime(date: string, time: string) {
   if (!date || !isValidTimeInput(time)) return false;
   return new Date(`${date}T${time}`).getTime() <= Date.now();
@@ -587,11 +625,9 @@ function isPastDateTime(date: string, time: string) {
 
 function currentTimeInput(date = new Date()) {
   const rounded = new Date(date);
-
   rounded.setSeconds(0, 0);
   rounded.setMinutes(Math.ceil(rounded.getMinutes() / 5) * 5);
-
-  return `${String(rounded.getHours()).padStart(2, "0")}:${String(rounded.getMinutes(), ).padStart(2, "0")}`;
+  return `${String(rounded.getHours()).padStart(2, "0")}:${String(rounded.getMinutes()).padStart(2, "0")}`;
 }
 
 function addMinutes(localDateTime: string, minutes: number) {
