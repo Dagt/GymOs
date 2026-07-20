@@ -163,6 +163,10 @@ export function AppShell({
     ?? (session.user.branchId ? "Sucursal seleccionada" : "Sin sucursal");
   const permissionSet = new Set(session.user.permissions);
   const showStaticBranchChip = variant !== "platform" && !isPlatformAdmin(session.user) && consoleType !== "TENANT_OWNER";
+  const isSingleBranchOperationalUser =
+    (consoleType === "TENANT_MANAGER" || consoleType === "RECEPTION" || consoleType === "COACH")
+    && availableBranches.length <= 1;
+  const showBranchSwitcher = variant !== "platform" && availableBranches.length > 0 && !isSingleBranchOperationalUser;
   const sections = sectionsForConsole(consoleType, variant)
     .map((section) => ({
       ...section,
@@ -318,7 +322,7 @@ export function AppShell({
                 <strong>{visibleBranch}</strong>
               </div>
             ) : null}
-            {variant !== "platform" && availableBranches.length > 0 ? (
+            {showBranchSwitcher ? (
               <label className="admin-branch-switcher">
                 <span>Operar en</span>
                 <select disabled={switchingBranch} onChange={(event) => changeBranch(event.target.value)} value={session.user.branchId ?? ""}>

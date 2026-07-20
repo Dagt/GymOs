@@ -23,8 +23,37 @@ import {
   type StoredSession,
 } from "@/lib/api";
 
+type WeekdayKey = "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
+
+type ResourceDay = {
+  key: WeekdayKey;
+  label: string;
+  shortLabel: string;
+  enabled: boolean;
+  opensAt: string;
+  closesAt: string;
+};
+
+type StoredSchedule = {
+  schedule?: Array<{
+    day: WeekdayKey;
+    opensAt: string;
+    closesAt: string;
+  }>;
+  description?: string | null;
+};
+
 const resourceColors = ["#166534", "#0f766e", "#1d4ed8", "#7c3aed", "#be123c", "#b45309"];
 const bookingActions: Array<"confirm" | "check-in" | "complete" | "cancel"> = ["confirm", "check-in", "complete", "cancel"];
+const weekdays: ResourceDay[] = [
+  { key: "MONDAY", label: "Lunes", shortLabel: "L", enabled: true, opensAt: "06:00", closesAt: "22:00" },
+  { key: "TUESDAY", label: "Martes", shortLabel: "M", enabled: true, opensAt: "06:00", closesAt: "22:00" },
+  { key: "WEDNESDAY", label: "Miercoles", shortLabel: "M", enabled: true, opensAt: "06:00", closesAt: "22:00" },
+  { key: "THURSDAY", label: "Jueves", shortLabel: "J", enabled: true, opensAt: "06:00", closesAt: "22:00" },
+  { key: "FRIDAY", label: "Viernes", shortLabel: "V", enabled: true, opensAt: "06:00", closesAt: "22:00" },
+  { key: "SATURDAY", label: "Sabado", shortLabel: "S", enabled: false, opensAt: "08:00", closesAt: "14:00" },
+  { key: "SUNDAY", label: "Domingo", shortLabel: "D", enabled: false, opensAt: "08:00", closesAt: "14:00" },
+];
 
 export default function BookingsPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
@@ -35,23 +64,23 @@ export default function BookingsPage() {
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [clientResults, setClientResults] = useState<ClientSummary[]>([]);
   const [clientQuery, setClientQuery] = useState("");
-  const [calendarDate, setCalendarDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [calendarDate, setCalendarDate] = useState(() => toDateInput(new Date()));
   const [resourceId, setResourceId] = useState("");
   const [clientId, setClientId] = useState("");
-  const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [startDate, setStartDate] = useState(() => toDateInput(new Date()));
   const [startTime, setStartTime] = useState("");
   const [notes, setNotes] = useState("");
   const [resourceName, setResourceName] = useState("");
-  const [resourceType, setResourceType] = useState("ROOM");
-  const [resourceCapacity, setResourceCapacity] = useState(1);
-  const [resourceDuration, setResourceDuration] = useState(60);
-  const [resourceOpensAt, setResourceOpensAt] = useState("06:00");
-  const [resourceClosesAt, setResourceClosesAt] = useState("22:00");
+  const [durationValue, setDurationValue] = useState(60);
+  const [durationUnit, setDurationUnit] = useState<"MINUTES" | "HOURS">("MINUTES");
+  const [resourceSchedule, setResourceSchedule] = useState<ResourceDay[]>(() => weekdays.map((day) => ({ ...day })));
   const [resourceAllowedPlanIds, setResourceAllowedPlanIds] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const weekDates = useMemo(() => buildWeekDates(calendarDate), [calendarDate]);
 
   useEffect(() => {
     let active = true;
@@ -71,7 +100,7 @@ export default function BookingsPage() {
           getCurrentOrganization(stored.accessToken).catch(() => null),
           getBranches(stored.accessToken),
           getResources(stored.accessToken),
-          getBookings(stored.accessToken, calendarDate),
+          getWeekBookings(stored.accessToken, weekDates),
           getPlans(stored.accessToken),
         ]);
         if (!active) {
@@ -98,7 +127,7 @@ export default function BookingsPage() {
     return () => {
       active = false;
     };
-  }, [calendarDate]);
+  }, [weekDates]);
 
   useEffect(() => {
     if (!session) {
@@ -133,23 +162,22 @@ export default function BookingsPage() {
     [resources, resourceId],
   );
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
-  const visibleClientResults = clientQuery.trim().length >= 2 ? clientResults : [];
   const selectedClient = clientResults.find((client) => client.id === clientId) ?? null;
   const isReceptionUser = session?.user.console === "RECEPTION"
     || session?.user.roles.some((role) => role.toLowerCase().includes("recepcion"));
   const canManageResources = Boolean(session?.user.permissions.includes("resource.manage") && !isReceptionUser);
+  const durationMinutes = Math.max(1, durationUnit === "HOURS" ? durationValue * 60 : durationValue);
   const computedEnd = activeResource && startDate && startTime
     ? addMinutes(`${startDate}T${startTime}`, activeResource.slotMinutes)
     : "";
-  const calendarHours = useMemo(() => buildCalendarHours(resources), [resources]);
 
-  async function refresh(stored = session, date = calendarDate) {
+  async function refresh(stored = session, dates = weekDates) {
     if (!stored) {
       return;
     }
     const [loadedResources, loadedBookings] = await Promise.all([
       getResources(stored.accessToken),
-      getBookings(stored.accessToken, date),
+      getWeekBookings(stored.accessToken, dates),
     ]);
     setResources(loadedResources);
     setBookings(loadedBookings);
@@ -174,8 +202,9 @@ export default function BookingsPage() {
         endsAt,
         notes,
       });
+      const nextWeek = buildWeekDates(startDate);
       setCalendarDate(startDate);
-      await refresh(session, startDate);
+      await refresh(session, nextWeek);
       setMessage("Reserva creada.");
       setNotes("");
       setStartTime("");
@@ -191,24 +220,40 @@ export default function BookingsPage() {
     if (!session) {
       return;
     }
+    const enabledDays = resourceSchedule.filter((day) => day.enabled);
+    if (enabledDays.length === 0) {
+      setError("Selecciona al menos un dia operativo para el recurso.");
+      return;
+    }
+    if (enabledDays.some((day) => timeToMinutes(day.opensAt) >= timeToMinutes(day.closesAt))) {
+      setError("Cada dia operativo debe cerrar despues de abrir.");
+      return;
+    }
     setSaving(true);
     setError(null);
     setMessage(null);
     try {
+      const opensAt = minutesToTime(Math.min(...enabledDays.map((day) => timeToMinutes(day.opensAt))));
+      const closesAt = minutesToTime(Math.max(...enabledDays.map((day) => timeToMinutes(day.closesAt))));
       const created = await createResource(session.accessToken, {
         name: resourceName,
-        resourceType,
-        capacity: resourceCapacity,
-        slotMinutes: resourceDuration,
-        opensAt: resourceOpensAt,
-        closesAt: resourceClosesAt,
+        resourceType: "ROOM",
+        capacity: 1,
+        slotMinutes: durationMinutes,
+        opensAt,
+        closesAt,
+        notes: JSON.stringify({
+          schedule: enabledDays.map((day) => ({ day: day.key, opensAt: day.opensAt, closesAt: day.closesAt })),
+          description: null,
+        } satisfies StoredSchedule),
         allowedPlanIds: resourceAllowedPlanIds,
       });
       await refresh();
       setResourceId(created.id);
       setResourceName("");
-      setResourceCapacity(1);
-      setResourceDuration(60);
+      setDurationValue(60);
+      setDurationUnit("MINUTES");
+      setResourceSchedule(weekdays.map((day) => ({ ...day })));
       setResourceAllowedPlanIds([]);
       setMessage("Recurso creado.");
     } catch (exception) {
@@ -253,10 +298,10 @@ export default function BookingsPage() {
       mode={activeBranch ? "operation" : undefined}
       organizationName={organization?.brandName || organization?.tradeName || session.user.brandName || session.user.organizationName}
       session={session}
-      subtitle="Agenda visual por recurso y reservaciones incluidas en membresias."
+      subtitle="Agenda semanal por recurso y reservaciones incluidas en membresias."
       title="Recursos y reservas"
     >
-      <section className="grid gap-6 xl:grid-cols-[420px_minmax(0,1fr)]">
+      <section className="grid gap-6 xl:grid-cols-[410px_minmax(0,1fr)]">
         <aside className="grid content-start gap-5">
           {error ? <p className="rounded-md border border-[#e5b7b7] bg-[#fff4f4] px-3 py-2 text-sm text-[#8c2f2f]">{error}</p> : null}
           {message ? <p className="rounded-md border border-[#b8d9c3] bg-[#f0fbf3] px-3 py-2 text-sm text-[#2d6843]">{message}</p> : null}
@@ -265,7 +310,7 @@ export default function BookingsPage() {
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-xl font-semibold">Nueva reserva</h2>
-                <p className="mt-1 text-sm text-[#5d6b63]">El fin se calcula con la duracion del recurso.</p>
+                <p className="mt-1 text-sm text-[#5d6b63]">Busca al socio, elige recurso y captura solo el inicio.</p>
               </div>
               {activeResource ? (
                 <span className="rounded-md bg-[var(--brand-surface)] px-3 py-2 text-xs font-semibold text-[var(--brand-primary)]">
@@ -300,13 +345,16 @@ export default function BookingsPage() {
                 onChange={(event) => {
                   setClientQuery(event.target.value);
                   setClientId("");
+                  if (event.target.value.trim().length < 2) {
+                    setClientResults([]);
+                  }
                 }}
                 placeholder="Nombre, telefono o email"
                 value={clientQuery}
               />
             </label>
             <div className="mt-2 grid gap-2">
-              {visibleClientResults.map((client) => (
+              {clientQuery.trim().length >= 2 && clientResults.map((client) => (
                 <button
                   className={`rounded-md border px-3 py-2 text-left text-sm ${client.id === clientId ? "border-[var(--brand-primary)] bg-[var(--brand-surface)]" : "border-[#d8ddd2] bg-white"}`}
                   key={client.id}
@@ -320,7 +368,7 @@ export default function BookingsPage() {
                   <span className="text-xs text-[#647067]">{client.phone || client.email || "Socio activo"}</span>
                 </button>
               ))}
-              {clientQuery.trim().length >= 2 && visibleClientResults.length === 0 && !clientId ? (
+              {clientQuery.trim().length >= 2 && clientResults.length === 0 && !clientId ? (
                 <p className="rounded-md border border-[#d8ddd2] bg-[#f8faf8] px-3 py-2 text-xs text-[#647067]">Sin coincidencias.</p>
               ) : null}
               {selectedClient ? (
@@ -346,7 +394,7 @@ export default function BookingsPage() {
               Notas
               <textarea className="min-h-20 rounded-md border border-[#cdd5ca] px-3 py-2" onChange={(event) => setNotes(event.target.value)} value={notes} />
             </label>
-            <button className="mt-5 h-11 w-full rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white disabled:opacity-60" disabled={saving || !resourceId || !clientId || !startTime} type="submit">
+            <button className="mt-5 h-11 w-full rounded-md bg-[var(--brand-primary)] px-4 text-sm font-semibold text-white shadow-sm disabled:opacity-60" disabled={saving || !resourceId || !clientId || !startTime} type="submit">
               Crear reserva
             </button>
           </form>
@@ -355,41 +403,53 @@ export default function BookingsPage() {
             <form className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm" onSubmit={submitResource}>
               <h2 className="text-xl font-semibold">Crear recurso</h2>
               <input className="mt-4 h-11 w-full rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setResourceName(event.target.value)} placeholder="Nombre del recurso" required value={resourceName} />
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <label className="grid gap-2 text-sm font-medium">
-                  Tipo
-                  <select className="h-11 rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setResourceType(event.target.value)} value={resourceType}>
-                    <option value="ROOM">Sala / area</option>
-                    <option value="CLASS_AREA">Area de clase</option>
-                    <option value="EQUIPMENT">Equipo</option>
-                  </select>
-                </label>
-                <label className="grid gap-2 text-sm font-medium">
-                  Capacidad
-                  <input className="h-11 rounded-md border border-[#cdd5ca] px-3" min={1} onChange={(event) => setResourceCapacity(Number(event.target.value))} type="number" value={resourceCapacity} />
-                </label>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_130px]">
                 <label className="grid gap-2 text-sm font-medium">
                   Duracion
-                  <select className="h-11 rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setResourceDuration(Number(event.target.value))} value={resourceDuration}>
-                    <option value={30}>30 minutos</option>
-                    <option value={45}>45 minutos</option>
-                    <option value={60}>60 minutos</option>
-                    <option value={90}>90 minutos</option>
-                    <option value={120}>120 minutos</option>
+                  <input
+                    className="h-11 rounded-md border border-[#cdd5ca] px-3"
+                    min={1}
+                    onChange={(event) => setDurationValue(Number(event.target.value))}
+                    type="number"
+                    value={durationValue}
+                  />
+                </label>
+                <label className="grid gap-2 text-sm font-medium">
+                  Unidad
+                  <select className="h-11 rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setDurationUnit(event.target.value as "MINUTES" | "HOURS")} value={durationUnit}>
+                    <option value="MINUTES">Minutos</option>
+                    <option value="HOURS">Horas</option>
                   </select>
                 </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <label className="grid gap-2 text-sm font-medium">
-                    Abre
-                    <input className="h-11 rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setResourceOpensAt(event.target.value)} type="time" value={resourceOpensAt} />
-                  </label>
-                  <label className="grid gap-2 text-sm font-medium">
-                    Cierra
-                    <input className="h-11 rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setResourceClosesAt(event.target.value)} type="time" value={resourceClosesAt} />
-                  </label>
-                </div>
               </div>
-              <fieldset className="mt-4 grid gap-2">
+
+              <fieldset className="mt-5 grid gap-2">
+                <legend className="text-sm font-semibold">Dias y horarios operativos</legend>
+                <div className="grid gap-2">
+                  {resourceSchedule.map((day) => (
+                    <div className="grid grid-cols-[36px_1fr_92px_92px] items-center gap-2 rounded-md border border-[#d8ddd2] px-3 py-2 text-sm" key={day.key}>
+                      <label className="flex h-8 w-8 items-center justify-center rounded-md border border-[#cdd5ca]">
+                        <input
+                          aria-label={day.label}
+                          checked={day.enabled}
+                          className="h-4 w-4 accent-[var(--brand-primary)]"
+                          onChange={(event) => updateResourceDay(day.key, { enabled: event.target.checked })}
+                          type="checkbox"
+                        />
+                      </label>
+                      <span>
+                        <strong className="block">{day.shortLabel}</strong>
+                        <span className="text-xs text-[#647067]">{day.label}</span>
+                      </span>
+                      <input className="h-10 rounded-md border border-[#cdd5ca] px-2" disabled={!day.enabled} onChange={(event) => updateResourceDay(day.key, { opensAt: event.target.value })} type="time" value={day.opensAt} />
+                      <input className="h-10 rounded-md border border-[#cdd5ca] px-2" disabled={!day.enabled} onChange={(event) => updateResourceDay(day.key, { closesAt: event.target.value })} type="time" value={day.closesAt} />
+                    </div>
+                  ))}
+                </div>
+              </fieldset>
+
+              <fieldset className="mt-5 grid gap-2">
                 <legend className="text-sm font-semibold">Membresias que pueden reservar</legend>
                 <p className="text-xs text-[#6f7a73]">Sin seleccionar planes, el recurso queda abierto para cualquier socio activo.</p>
                 <div className="grid gap-2">
@@ -415,7 +475,7 @@ export default function BookingsPage() {
                   ))}
                 </div>
               </fieldset>
-              <button className="mt-4 h-11 w-full rounded-md border border-[#51735f] px-4 text-sm font-semibold text-[#13251c]" disabled={saving} type="submit">
+              <button className="mt-5 h-11 w-full rounded-md border border-[var(--brand-primary)] bg-[var(--brand-primary)] px-4 text-sm font-semibold text-white shadow-sm disabled:opacity-60" disabled={saving} type="submit">
                 Crear recurso
               </button>
             </form>
@@ -425,15 +485,19 @@ export default function BookingsPage() {
         <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 className="text-xl font-semibold">Agenda por recurso</h2>
-              <p className="mt-1 text-sm text-[#5d6b63]">Reservas del dia, separadas por recurso y color.</p>
+              <h2 className="text-xl font-semibold">Agenda semanal</h2>
+              <p className="mt-1 text-sm text-[#5d6b63]">Vista compacta por dia y recurso.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <button className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm font-semibold" onClick={() => moveCalendarDate(-1)} type="button">Anterior</button>
+              <button className="h-10 rounded-md border border-[var(--brand-primary)] px-3 text-sm font-semibold text-[var(--brand-primary)]" onClick={() => moveCalendarWeek(-1)} type="button">Anterior</button>
               <input className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => setCalendarDate(event.target.value)} type="date" value={calendarDate} />
-              <button className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm font-semibold" onClick={() => setCalendarDate(new Date().toISOString().slice(0, 10))} type="button">Hoy</button>
-              <button className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm font-semibold" onClick={() => moveCalendarDate(1)} type="button">Siguiente</button>
+              <button className="h-10 rounded-md border border-[var(--brand-primary)] px-3 text-sm font-semibold text-[var(--brand-primary)]" onClick={() => setCalendarDate(toDateInput(new Date()))} type="button">Hoy</button>
+              <button className="h-10 rounded-md border border-[var(--brand-primary)] px-3 text-sm font-semibold text-[var(--brand-primary)]" onClick={() => moveCalendarWeek(1)} type="button">Siguiente</button>
             </div>
+          </div>
+
+          <div className="mt-4 rounded-md border border-[#d8ddd2] bg-[#f8faf8] px-3 py-2 text-sm font-semibold text-[#34443a]">
+            Semana del {formatShortDate(weekDates[0].date)} al {formatShortDate(weekDates[6].date)}
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2">
@@ -455,33 +519,62 @@ export default function BookingsPage() {
               No hay recursos reservables en esta sucursal.
             </p>
           ) : (
-            <div className="mt-5 overflow-x-auto">
-              <div className="min-w-[760px] rounded-lg border border-[#d8ddd2]">
-                <div className="grid" style={{ gridTemplateColumns: `82px repeat(${resources.length}, minmax(150px, 1fr))` }}>
-                  <div className="border-b border-r border-[#d8ddd2] bg-[#f8faf8] px-3 py-3 text-xs font-semibold uppercase text-[#647067]">Hora</div>
-                  {resources.map((resource, index) => (
-                    <div className="border-b border-r border-[#d8ddd2] bg-[#f8faf8] px-3 py-3 text-sm font-semibold last:border-r-0" key={resource.id}>
-                      <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: resourceColor(index) }} />
-                      {resource.name}
-                    </div>
-                  ))}
-                  {calendarHours.map((hour) => (
-                    <TimeRow
-                      bookings={bookings}
-                      hour={hour}
-                      key={hour}
-                      resources={resources}
-                      selectedDate={calendarDate}
-                      onPickSlot={(pickedResourceId, pickedDateTime) => {
-                        setResourceId(pickedResourceId);
-                        setStartDate(pickedDateTime.slice(0, 10));
-                        setStartTime(pickedDateTime.slice(11, 16));
-                      }}
-                      onRunAction={runAction}
-                    />
-                  ))}
-                </div>
-              </div>
+            <div className="mt-5 grid gap-3 lg:grid-cols-7">
+              {weekDates.map((day) => (
+                <section className="min-h-[260px] rounded-lg border border-[#d8ddd2] bg-[#fbfcfa] p-3" key={day.date}>
+                  <button
+                    className={`w-full rounded-md border px-2 py-2 text-left ${startDate === day.date ? "border-[var(--brand-primary)] bg-[var(--brand-surface)]" : "border-transparent"}`}
+                    onClick={() => setStartDate(day.date)}
+                    type="button"
+                  >
+                    <span className="block text-xs font-semibold uppercase text-[#647067]">{day.label}</span>
+                    <strong className="text-lg">{day.dayOfMonth}</strong>
+                  </button>
+                  <div className="mt-3 grid gap-3">
+                    {resources.map((resource, index) => {
+                      const dayBookings = bookings
+                        .filter((booking) => booking.resourceId === resource.id && bookingDate(booking.startsAt) === day.date)
+                        .sort((first, second) => first.startsAt.localeCompare(second.startsAt));
+                      const hours = resourceHoursForDay(resource, day.weekday);
+                      return (
+                        <article className="rounded-md border border-[#d8ddd2] bg-white p-2" key={`${day.date}-${resource.id}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-semibold">
+                                <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: resourceColor(index) }} />
+                                {resource.name}
+                              </p>
+                              <p className="mt-0.5 text-xs text-[#647067]">{hours ? `${hours.opensAt} - ${hours.closesAt}` : "Cerrado"}</p>
+                            </div>
+                            {hours ? (
+                              <button
+                                className="rounded-md border border-[var(--brand-primary)] px-2 py-1 text-xs font-semibold text-[var(--brand-primary)]"
+                                onClick={() => {
+                                  setResourceId(resource.id);
+                                  setStartDate(day.date);
+                                  setStartTime(hours.opensAt);
+                                }}
+                                type="button"
+                              >
+                                Reservar
+                              </button>
+                            ) : null}
+                          </div>
+                          <div className="mt-2 grid gap-2">
+                            {dayBookings.length === 0 ? (
+                              <p className="rounded-md bg-[#f8faf8] px-2 py-2 text-xs text-[#647067]">Sin reservas</p>
+                            ) : (
+                              dayBookings.map((booking) => (
+                                <BookingCard booking={booking} color={resourceColor(index)} key={booking.id} onRunAction={runAction} />
+                              ))
+                            )}
+                          </div>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </section>
+              ))}
             </div>
           )}
         </section>
@@ -489,69 +582,39 @@ export default function BookingsPage() {
     </AppShell>
   );
 
-  function moveCalendarDate(days: number) {
-    const date = new Date(`${calendarDate}T00:00`);
-    date.setDate(date.getDate() + days);
+  function updateResourceDay(key: WeekdayKey, patch: Partial<ResourceDay>) {
+    setResourceSchedule((current) => current.map((day) => day.key === key ? { ...day, ...patch } : day));
+  }
+
+  function moveCalendarWeek(weeks: number) {
+    const date = parseDateInput(calendarDate);
+    date.setDate(date.getDate() + weeks * 7);
     const value = toDateInput(date);
     setCalendarDate(value);
     setStartDate(value);
   }
 }
 
-function TimeRow({
-  bookings,
-  hour,
-  resources,
-  selectedDate,
-  onPickSlot,
+function BookingCard({
+  booking,
+  color,
   onRunAction,
 }: {
-  bookings: BookingSummary[];
-  hour: string;
-  resources: ResourceSummary[];
-  selectedDate: string;
-  onPickSlot: (resourceId: string, startsAt: string) => void;
+  booking: BookingSummary;
+  color: string;
   onRunAction: (bookingId: string, action: "confirm" | "check-in" | "complete" | "cancel") => void;
 }) {
   return (
-    <>
-      <div className="min-h-24 border-r border-t border-[#d8ddd2] bg-[#fbfcfa] px-3 py-3 text-xs font-semibold text-[#647067]">
-        {formatHourLabel(hour)}
+    <article className="rounded-md px-3 py-2 text-white shadow-sm" style={{ backgroundColor: color }}>
+      <p className="text-[11px] font-semibold uppercase opacity-80">{booking.status}</p>
+      <p className="mt-1 truncate text-sm font-semibold">{booking.clientName}</p>
+      <p className="text-xs opacity-90">{formatTime(booking.startsAt)} - {formatTime(booking.endsAt)}</p>
+      <div className="mt-2 flex flex-wrap gap-1">
+        {bookingActions.map((action) => (
+          <ActionButton action={action} booking={booking} key={action} onRun={onRunAction} />
+        ))}
       </div>
-      {resources.map((resource, index) => {
-        const hourBookings = bookings.filter((booking) => booking.resourceId === resource.id && startsInHour(booking.startsAt, hour));
-        const disabled = !isWithinResourceHours(resource, hour);
-        return (
-          <div className={`min-h-24 border-r border-t border-[#d8ddd2] p-2 last:border-r-0 ${disabled ? "bg-[#f6f3ef]" : "bg-white"}`} key={`${hour}-${resource.id}`}>
-            {hourBookings.length === 0 ? (
-              <button
-                className="h-full min-h-16 w-full rounded-md border border-dashed border-[#d8ddd2] text-xs font-semibold text-[#8a948d] transition hover:border-[var(--brand-primary)] hover:text-[var(--brand-primary)] disabled:cursor-not-allowed disabled:opacity-40"
-                disabled={disabled}
-                onClick={() => onPickSlot(resource.id, `${selectedDate}T${hour}`)}
-                type="button"
-              >
-                Disponible
-              </button>
-            ) : (
-              <div className="grid gap-2">
-                {hourBookings.map((booking) => (
-                  <article className="rounded-md px-3 py-2 text-white shadow-sm" key={booking.id} style={{ backgroundColor: resourceColor(index) }}>
-                    <p className="text-xs font-semibold uppercase opacity-80">{booking.status}</p>
-                    <p className="mt-1 text-sm font-semibold">{booking.clientName}</p>
-                    <p className="text-xs opacity-90">{formatTime(booking.startsAt)} - {formatTime(booking.endsAt)}</p>
-                    <div className="mt-2 flex flex-wrap gap-1">
-                      {bookingActions.map((action) => (
-                        <ActionButton action={action} booking={booking} key={action} onRun={onRunAction} />
-                      ))}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </>
+    </article>
   );
 }
 
@@ -565,31 +628,52 @@ function ActionButton({ action, booking, onRun }: { action: "confirm" | "check-i
   );
 }
 
-function buildCalendarHours(resources: ResourceSummary[]) {
-  if (resources.length === 0) {
-    return [];
-  }
-  const first = Math.min(...resources.map((resource) => timeToMinutes(resource.opensAt || "06:00")));
-  const last = Math.max(...resources.map((resource) => timeToMinutes(resource.closesAt || "22:00")));
-  const hours: string[] = [];
-  for (let cursor = roundDownToHour(first); cursor < last; cursor += 60) {
-    hours.push(minutesToTime(cursor));
-  }
-  return hours;
+async function getWeekBookings(accessToken: string, dates: Array<{ date: string }>) {
+  const lists = await Promise.all(dates.map((day) => getBookings(accessToken, day.date)));
+  return lists.flat();
 }
 
-function startsInHour(value: string, hour: string) {
-  const starts = new Date(value);
-  const row = timeToMinutes(hour);
-  const minutes = starts.getHours() * 60 + starts.getMinutes();
-  return minutes >= row && minutes < row + 60;
+function buildWeekDates(anchor: string) {
+  const start = parseDateInput(anchor);
+  const mondayOffset = (start.getDay() + 6) % 7;
+  start.setDate(start.getDate() - mondayOffset);
+  return weekdays.map((weekday, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    return {
+      date: toDateInput(date),
+      dayOfMonth: date.getDate(),
+      label: weekday.label,
+      weekday: weekday.key,
+    };
+  });
 }
 
-function isWithinResourceHours(resource: ResourceSummary, hour: string) {
-  const row = timeToMinutes(hour);
-  const opens = timeToMinutes(resource.opensAt || "00:00");
-  const closes = timeToMinutes(resource.closesAt || "23:59");
-  return row >= opens && row < closes;
+function resourceHoursForDay(resource: ResourceSummary, weekday: WeekdayKey) {
+  const schedule = parseResourceSchedule(resource);
+  const scheduleDay = schedule?.find((day) => day.day === weekday);
+  if (scheduleDay) {
+    return { opensAt: scheduleDay.opensAt, closesAt: scheduleDay.closesAt };
+  }
+  if (schedule) {
+    return null;
+  }
+  return { opensAt: resource.opensAt || "06:00", closesAt: resource.closesAt || "22:00" };
+}
+
+function parseResourceSchedule(resource: ResourceSummary) {
+  if (!resource.notes) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(resource.notes) as StoredSchedule;
+    if (!Array.isArray(parsed.schedule)) {
+      return null;
+    }
+    return parsed.schedule.filter((day) => day.day && day.opensAt && day.closesAt);
+  } catch {
+    return null;
+  }
 }
 
 function addMinutes(localDateTime: string, minutes: number) {
@@ -606,16 +690,20 @@ function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 }
 
-function formatHourLabel(value: string) {
-  return new Intl.DateTimeFormat("es-MX", { hour: "2-digit", minute: "2-digit" }).format(new Date(`2026-01-01T${value}`));
+function formatShortDate(value: string) {
+  return new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "short" }).format(parseDateInput(value));
+}
+
+function bookingDate(value: string) {
+  return toDateInput(new Date(value));
 }
 
 function resourceColor(index: number) {
   return resourceColors[index % resourceColors.length];
 }
 
-function roundDownToHour(minutes: number) {
-  return Math.floor(minutes / 60) * 60;
+function parseDateInput(value: string) {
+  return new Date(`${value}T00:00:00`);
 }
 
 function timeToMinutes(value: string) {

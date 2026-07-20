@@ -353,6 +353,7 @@ Nota implementada Hito 4:
 - `POST /bookings` responde `BOOKING_PLAN_NOT_ALLOWED` cuando el recurso esta restringido y el socio no tiene una membresia permitida.
 - Acciones implementadas: `confirm`, `check-in`, `complete` y `cancel`.
 - UX implementada en `/bookings`: la reserva se crea buscando socio por texto, seleccionando recurso, dia y hora de inicio; la hora final se calcula con `slotMinutes` del recurso.
+- UX implementada en `/bookings`: la creacion de recurso captura duracion manual y horario por dia operativo. Mientras no exista tabla dedicada de horario por recurso/dia, la UI serializa ese horario en `resource.notes` y mantiene `opensAt`/`closesAt` como rango operativo agregado para compatibilidad con la API vigente.
 - La UI base no muestra pago de reserva porque las reservas operativas se consideran incluidas en la membresia permitida. El endpoint tecnico de pago vinculado queda reservado para casos especiales o evolucion posterior.
 
 ## 6.12 Accesos

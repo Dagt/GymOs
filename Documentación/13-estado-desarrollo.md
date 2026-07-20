@@ -8,7 +8,7 @@ Fecha: 19 de julio de 2026
 Implementado:
 
 - En perfiles `Administrador GymOS` en soporte y `Dueno del gimnasio`, el encabezado oculta la tarjeta estatica `Sucursal` cuando ya existe selector `Operar en`.
-- Gerente, recepcion y coach conservan tarjeta `Sucursal` y selector `Operar en`.
+- Gerente, recepcion y coach conservan tarjeta `Sucursal`; si solo tienen una sucursal asignada, no se muestra selector redundante `Operar en`.
 - El kiosco envia contexto de organizacion/sucursal cuando se abre desde una sesion autenticada.
 - Migracion `V28__tenant_default_kiosk_terminals.sql` crea `KIOSK-MAIN` para gimnasios con sucursal activa que aun no tenian terminal.
 - El backend resuelve primero terminal por sucursal, luego por gimnasio, antes de usar la resolucion publica por codigo.
@@ -24,10 +24,10 @@ Verificado:
 
 Implementado:
 
-- `/bookings` reemplaza el flujo anterior por una agenda diaria por recurso, con columnas por recurso y bloques de reserva con color propio.
+- `/bookings` reemplaza el flujo anterior por una agenda semanal compacta con tarjetas por dia y recurso.
 - Nueva reserva usa busqueda de socio por texto en lugar de desplegable con todos los clientes.
 - El formulario solo captura recurso, socio, dia/hora de inicio y notas; la hora final se calcula con la duracion (`slotMinutes`) del recurso.
-- La creacion de recurso permite definir tipo, capacidad, duracion y horario operativo.
+- La creacion de recurso oculta campos tecnicos de tipo/capacidad, permite duracion manual en minutos u horas y captura dias L M M J V S D con horario por dia.
 - Se elimina la seccion visible de pago de reserva del flujo base; las reservas se gobiernan por membresias permitidas.
 - Disponibilidad y agenda quedan integradas en un solo calendario visual.
 
