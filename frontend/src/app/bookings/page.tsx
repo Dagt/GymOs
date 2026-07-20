@@ -760,7 +760,7 @@ function formatDateTime(value: string) {
   if (Number.isNaN(date.getTime())) {
     return "Hora invalida";
   }
-  return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", hour: "2-digit", minute: "2-digit" }).format(date);
+  return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeStyle: "short", }).format(date);
 }
 
 function formatLongDate(value: string) {
