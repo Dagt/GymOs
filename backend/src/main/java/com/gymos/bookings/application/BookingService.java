@@ -1,5 +1,7 @@
 package com.gymos.bookings.application;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.audit.api.AuditService;
 import com.gymos.bookings.application.command.CreateBookingCommand;
 import com.gymos.bookings.application.command.CreateResourceCommand;
@@ -10,15 +12,17 @@ import com.gymos.bookings.infrastructure.BookingRepository.BookingRecord;
 import com.gymos.bookings.infrastructure.BookingRepository.CreateBookingData;
 import com.gymos.bookings.infrastructure.BookingRepository.CreateResourceData;
 import com.gymos.bookings.infrastructure.BookingRepository.ResourceRecord;
+import com.gymos.bookings.infrastructure.ClientBookingConflictRepository;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -27,12 +31,20 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class BookingService {
 	private static final Set<String> ACTIVE_STATUSES = Set.of("RESERVED", "CONFIRMED", "CHECKED_IN");
+	private static final ZoneId BOOKING_ZONE = ZoneId.of("America/Mexico_City");
+	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
 	private final BookingRepository bookingRepository;
+	private final ClientBookingConflictRepository clientBookingConflictRepository;
 	private final AuditService auditService;
 
-	public BookingService(BookingRepository bookingRepository, AuditService auditService) {
+	public BookingService(
+			BookingRepository bookingRepository,
+			ClientBookingConflictRepository clientBookingConflictRepository,
+			AuditService auditService
+	) {
 		this.bookingRepository = bookingRepository;
+		this.clientBookingConflictRepository = clientBookingConflictRepository;
 		this.auditService = auditService;
 	}
 
@@ -70,12 +82,16 @@ public class BookingService {
 	@Transactional(readOnly = true)
 	public List<AvailabilitySlot> availability(GymOsPrincipal principal, UUID resourceId, LocalDate date) {
 		requireBranch(principal);
-		LocalDate resolvedDate = date == null ? LocalDate.now() : date;
+		LocalDate resolvedDate = date == null ? LocalDate.now(BOOKING_ZONE) : date;
 		ResourceRecord resource = activeResource(principal, resourceId);
+		Optional<ResourceHours> hours = resourceHoursForDay(resource, resolvedDate);
+		if (hours.isEmpty()) {
+			return List.of();
+		}
 		List<AvailabilitySlot> slots = new ArrayList<>();
-		LocalTime cursor = resource.opensAt();
-		while (!cursor.plusMinutes(resource.slotMinutes()).isAfter(resource.closesAt())) {
-			OffsetDateTime startsAt = resolvedDate.atTime(cursor).atOffset(ZoneOffset.UTC);
+		LocalTime cursor = hours.get().opensAt();
+		while (!cursor.plusMinutes(resource.slotMinutes()).isAfter(hours.get().closesAt())) {
+			OffsetDateTime startsAt = resolvedDate.atTime(cursor).atZone(BOOKING_ZONE).toOffsetDateTime();
 			OffsetDateTime endsAt = startsAt.plusMinutes(resource.slotMinutes());
 			int reserved = bookingRepository.overlappingBookings(principal.organizationId(), principal.branchId(), resourceId, startsAt, endsAt);
 			slots.add(new AvailabilitySlot(startsAt, endsAt, reserved, resource.capacity(), reserved < resource.capacity()));
@@ -87,7 +103,7 @@ public class BookingService {
 	@Transactional(readOnly = true)
 	public List<BookingRecord> bookings(GymOsPrincipal principal, LocalDate date, int limit) {
 		requireBranch(principal);
-		return bookingRepository.bookings(principal.organizationId(), principal.branchId(), date == null ? LocalDate.now() : date, Math.max(1, Math.min(limit, 200)));
+		return bookingRepository.bookings(principal.organizationId(), principal.branchId(), date == null ? LocalDate.now(BOOKING_ZONE) : date, Math.max(1, Math.min(limit, 200)));
 	}
 
 	@Transactional(readOnly = true)
@@ -104,17 +120,40 @@ public class BookingService {
 		if (!bookingRepository.clientExists(principal.organizationId(), command.clientId())) {
 			throw new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta activo.");
 		}
-		if (!bookingRepository.hasEligibleMembershipForResource(principal.organizationId(), principal.branchId(), command.resourceId(), command.clientId(), LocalDate.now())) {
+		if (!bookingRepository.hasEligibleMembershipForResource(principal.organizationId(), principal.branchId(), command.resourceId(), command.clientId(), LocalDate.now(BOOKING_ZONE))) {
 			throw new BusinessException("BOOKING_PLAN_NOT_ALLOWED", "El socio no tiene una membresia permitida para reservar este recurso.");
 		}
 		if (command.startsAt() == null || command.endsAt() == null || !command.endsAt().isAfter(command.startsAt())) {
 			throw new BusinessException("BOOKING_RANGE_INVALID", "La reserva requiere un rango valido.");
 		}
-		LocalTime startsTime = command.startsAt().toLocalTime();
-		LocalTime endsTime = command.endsAt().toLocalTime();
-		if (startsTime.isBefore(resource.opensAt()) || endsTime.isAfter(resource.closesAt())) {
-			throw new BusinessException("BOOKING_OUTSIDE_RESOURCE_HOURS", "La reserva esta fuera del horario del recurso.");
+		if (!command.startsAt().isAfter(OffsetDateTime.now())) {
+			throw new BusinessException("BOOKING_START_IN_PAST", "No puedes crear una reserva en una hora que ya paso.");
 		}
+
+		OffsetDateTime localStart = command.startsAt().atZoneSameInstant(BOOKING_ZONE).toOffsetDateTime();
+		OffsetDateTime localEnd = command.endsAt().atZoneSameInstant(BOOKING_ZONE).toOffsetDateTime();
+		if (!localStart.toLocalDate().equals(localEnd.toLocalDate())) {
+			throw new BusinessException("BOOKING_RANGE_INVALID", "La reserva debe iniciar y terminar el mismo dia.");
+		}
+		ResourceHours hours = resourceHoursForDay(resource, localStart.toLocalDate())
+				.orElseThrow(() -> new BusinessException("BOOKING_OUTSIDE_RESOURCE_HOURS", "El recurso no opera el dia seleccionado."));
+		if (localStart.toLocalTime().isBefore(hours.opensAt()) || localEnd.toLocalTime().isAfter(hours.closesAt())) {
+			throw new BusinessException("BOOKING_OUTSIDE_RESOURCE_HOURS", "La reserva esta fuera del horario operativo del recurso para ese dia.");
+		}
+
+		if (clientBookingConflictRepository.hasOverlappingBooking(
+				principal.organizationId(),
+				principal.branchId(),
+				command.clientId(),
+				command.startsAt(),
+				command.endsAt()
+		)) {
+			throw new BusinessException(
+					"BOOKING_CLIENT_CONFLICT",
+					"El socio ya tiene otra reserva que coincide con este horario."
+			);
+		}
+
 		int reserved = bookingRepository.overlappingBookings(principal.organizationId(), principal.branchId(), command.resourceId(), command.startsAt(), command.endsAt());
 		if (reserved >= resource.capacity()) {
 			throw new BusinessException("BOOKING_CONFLICT", "El recurso no tiene disponibilidad en ese horario.");
@@ -168,6 +207,29 @@ public class BookingService {
 		return detail(principal, bookingId);
 	}
 
+	private Optional<ResourceHours> resourceHoursForDay(ResourceRecord resource, LocalDate date) {
+		if (resource.notes() == null || resource.notes().isBlank()) {
+			return Optional.of(new ResourceHours(resource.opensAt(), resource.closesAt()));
+		}
+		try {
+			JsonNode schedule = OBJECT_MAPPER.readTree(resource.notes()).path("schedule");
+			if (!schedule.isArray()) {
+				return Optional.of(new ResourceHours(resource.opensAt(), resource.closesAt()));
+			}
+			String weekday = date.getDayOfWeek().name();
+			for (JsonNode item : schedule) {
+				if (weekday.equalsIgnoreCase(item.path("day").asText())) {
+					LocalTime opensAt = LocalTime.parse(item.path("opensAt").asText());
+					LocalTime closesAt = LocalTime.parse(item.path("closesAt").asText());
+					return Optional.of(new ResourceHours(opensAt, closesAt));
+				}
+			}
+			return Optional.empty();
+		} catch (Exception ignored) {
+			return Optional.of(new ResourceHours(resource.opensAt(), resource.closesAt()));
+		}
+	}
+
 	private ResourceRecord activeResource(GymOsPrincipal principal, UUID resourceId) {
 		ResourceRecord resource = bookingRepository.resource(principal.organizationId(), principal.branchId(), resourceId)
 				.orElseThrow(() -> new BusinessException("RESOURCE_NOT_FOUND", "El recurso no existe o no esta disponible."));
@@ -188,5 +250,8 @@ public class BookingService {
 
 	private String blankToNull(String value) {
 		return value == null || value.isBlank() ? null : value.trim();
+	}
+
+	private record ResourceHours(LocalTime opensAt, LocalTime closesAt) {
 	}
 }
