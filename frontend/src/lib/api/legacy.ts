@@ -210,6 +210,7 @@ export type PlanSummary = {
   durationDays: number;
   graceDays: number;
   benefitsJson: string | null;
+  multiBranchAccess: boolean;
   status: "ACTIVE" | "INACTIVE";
   createdAt: string;
   updatedAt: string;
@@ -231,6 +232,20 @@ export type PlanPayload = {
   durationDays: number;
   graceDays: number;
   benefitsJson?: string | null;
+  multiBranchAccess?: boolean;
+  status: "ACTIVE" | "INACTIVE";
+};
+
+export type MembershipPlanPayload = {
+  sku: string;
+  name: string;
+  description?: string | null;
+  priceCents: number;
+  currency: string;
+  durationDays: number;
+  graceDays: number;
+  benefits?: string | null;
+  multiBranchAccess?: boolean;
   status: "ACTIVE" | "INACTIVE";
 };
 
@@ -1376,6 +1391,16 @@ export async function createPlan(
   payload: PlanPayload,
 ): Promise<PlanSummary> {
   return apiFetch<PlanSummary>("/catalog/plans", accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function createMembershipPlan(
+  accessToken: string,
+  payload: MembershipPlanPayload,
+): Promise<PlanSummary> {
+  return apiFetch<PlanSummary>("/catalog/membership-plans", accessToken, {
     method: "POST",
     body: JSON.stringify(normalizePayload(payload)),
   });

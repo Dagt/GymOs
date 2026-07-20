@@ -143,7 +143,15 @@ public class ClientRepository {
 				      SELECT 1
 				      FROM membership m
 				      WHERE m.organization_id = c.organization_id
-				        AND m.branch_id = :branchId
+				        AND (
+				            m.branch_id = :branchId
+				            OR EXISTS (
+				                SELECT 1
+				                FROM membership_plan mp
+				                WHERE mp.id = m.plan_id
+				                  AND mp.multi_branch_access = true
+				            )
+				        )
 				        AND m.client_id = c.id
 				        AND m.deleted_at IS NULL
 				  )

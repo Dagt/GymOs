@@ -1,6 +1,9 @@
 package com.gymos.catalog.application;
 
 import com.gymos.audit.api.AuditService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gymos.catalog.application.command.CreateMembershipPlanCommand;
 import com.gymos.catalog.application.command.CreatePlanCommand;
 import com.gymos.catalog.application.command.ProductCommand;
 import com.gymos.catalog.infrastructure.CatalogRepository;
@@ -9,7 +12,9 @@ import com.gymos.catalog.infrastructure.CatalogRepository.ProductSummary;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import java.time.OffsetDateTime;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -20,11 +25,13 @@ public class CatalogService {
 	private final JdbcClient jdbcClient;
 	private final CatalogRepository catalogRepository;
 	private final AuditService auditService;
+	private final ObjectMapper objectMapper;
 
-	public CatalogService(JdbcClient jdbcClient, CatalogRepository catalogRepository, AuditService auditService) {
+	public CatalogService(JdbcClient jdbcClient, CatalogRepository catalogRepository, AuditService auditService, ObjectMapper objectMapper) {
 		this.jdbcClient = jdbcClient;
 		this.catalogRepository = catalogRepository;
 		this.auditService = auditService;
+		this.objectMapper = objectMapper;
 	}
 
 	@Transactional(readOnly = true)
@@ -91,11 +98,11 @@ public class CatalogService {
 		jdbcClient.sql("""
 				INSERT INTO membership_plan (
 				    id, organization_id, product_id, duration_days, grace_days, benefits_json,
-				    status, created_at, updated_at, created_by, updated_by, version
+				    multi_branch_access, status, created_at, updated_at, created_by, updated_by, version
 				)
 				VALUES (
 				    :id, :organizationId, :productId, :durationDays, :graceDays, CAST(:benefitsJson AS jsonb),
-				    :status, :createdAt, :updatedAt, :createdBy, :updatedBy, 0
+				    :multiBranchAccess, :status, :createdAt, :updatedAt, :createdBy, :updatedBy, 0
 				)
 				""")
 				.param("id", planId)
@@ -103,7 +110,8 @@ public class CatalogService {
 				.param("productId", request.productId())
 				.param("durationDays", request.durationDays())
 				.param("graceDays", request.graceDays())
-				.param("benefitsJson", blankToNull(request.benefitsJson()) == null ? "{}" : request.benefitsJson())
+				.param("benefitsJson", normalizeBenefitsJson(request.benefitsJson()))
+				.param("multiBranchAccess", request.multiBranchAccess())
 				.param("status", request.status().trim().toUpperCase())
 				.param("createdAt", now)
 				.param("updatedAt", now)
@@ -117,6 +125,42 @@ public class CatalogService {
 				.orElseThrow(() -> new BusinessException("PLAN_NOT_FOUND", "El plan no esta disponible."));
 	}
 
+	@Transactional
+	public PlanSummary createMembershipPlan(GymOsPrincipal principal, CreateMembershipPlanCommand request, String correlationId) {
+		requirePrincipal(principal);
+		String sku = request.sku().trim().toUpperCase();
+		if (catalogRepository.skuExists(principal.organizationId(), sku, null)) {
+			throw new BusinessException("PRODUCT_SKU_ALREADY_EXISTS", "Ya existe un producto o plan con ese codigo.");
+		}
+
+		ProductSummary product = createProduct(
+				principal,
+				new ProductCommand(
+						sku,
+						request.name(),
+						request.description(),
+						"MEMBERSHIP_PLAN",
+						request.priceCents(),
+						request.currency(),
+						true,
+						request.status()
+				),
+				correlationId
+		);
+		return createPlan(
+				principal,
+				new CreatePlanCommand(
+						product.id(),
+						request.durationDays(),
+						request.graceDays(),
+						benefitsTextToJson(request.benefits()),
+						request.multiBranchAccess(),
+						request.status()
+				),
+				correlationId
+		);
+	}
+
 	private void requirePrincipal(GymOsPrincipal principal) {
 		if (principal == null) {
 			throw new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesion para continuar.");
@@ -125,5 +169,37 @@ public class CatalogService {
 
 	private String blankToNull(String value) {
 		return value == null || value.isBlank() ? null : value.trim();
+	}
+
+	private String normalizeBenefitsJson(String value) {
+		String normalized = blankToNull(value);
+		if (normalized == null) {
+			return "{}";
+		}
+		try {
+			objectMapper.readTree(normalized);
+			return normalized;
+		} catch (JsonProcessingException exception) {
+			throw new BusinessException("INVALID_PLAN_BENEFITS", "Los beneficios del plan no tienen formato valido.");
+		}
+	}
+
+	private String benefitsTextToJson(String benefits) {
+		String normalized = blankToNull(benefits);
+		if (normalized == null) {
+			return "{}";
+		}
+		if (normalized.startsWith("{") || normalized.startsWith("[")) {
+			return normalizeBenefitsJson(normalized);
+		}
+		List<String> included = Arrays.stream(normalized.split("[,\\n]"))
+				.map(String::trim)
+				.filter(value -> !value.isBlank())
+				.toList();
+		try {
+			return objectMapper.writeValueAsString(Map.of("included", included));
+		} catch (JsonProcessingException exception) {
+			throw new BusinessException("INVALID_PLAN_BENEFITS", "No fue posible guardar los beneficios del plan.");
+		}
 	}
 }

@@ -103,7 +103,7 @@ public class CatalogRepository {
 		return jdbcClient.sql("""
 				SELECT mp.id, mp.product_id, cp.sku, cp.name, cp.price_cents, cp.currency,
 				       mp.duration_days, mp.grace_days, mp.benefits_json::text AS benefits_json,
-				       mp.status, mp.created_at, mp.updated_at
+				       mp.multi_branch_access, mp.status, mp.created_at, mp.updated_at
 				FROM membership_plan mp
 				JOIN catalog_product cp ON cp.id = mp.product_id
 				WHERE mp.organization_id = :organizationId
@@ -122,6 +122,7 @@ public class CatalogRepository {
 						resultSet.getInt("duration_days"),
 						resultSet.getInt("grace_days"),
 						resultSet.getString("benefits_json"),
+						resultSet.getBoolean("multi_branch_access"),
 						resultSet.getString("status"),
 						resultSet.getObject("created_at", OffsetDateTime.class),
 						resultSet.getObject("updated_at", OffsetDateTime.class)
@@ -154,6 +155,7 @@ public class CatalogRepository {
 			int durationDays,
 			int graceDays,
 			String benefitsJson,
+			boolean multiBranchAccess,
 			String status,
 			OffsetDateTime createdAt,
 			OffsetDateTime updatedAt

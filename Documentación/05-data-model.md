@@ -128,6 +128,9 @@ Regla:
 - joined_at
 - notes
 
+Regla:
+- El socio pertenece a la organizacion/tenant, no se duplica por sucursal. Las ventas, membresias, accesos, reservas y pases conservan `branch_id` cuando la operacion es local a una sucursal.
+
 ### product
 - sku
 - name
@@ -162,6 +165,18 @@ Regla:
 - client_id + status
 - end_date + status
 - plan_id
+
+### membership_plan
+- product_id
+- duration_days
+- grace_days
+- benefits_json
+- multi_branch_access
+- status
+
+Regla:
+- `multi_branch_access=false`: la membresia da acceso en la sucursal donde se vendio/activo.
+- `multi_branch_access=true`: la membresia se considera valida en todas las sucursales activas del mismo gimnasio. Renovaciones y cambios de plan conservan una sola membresia origen/destino; la agregacion o remocion de acceso multi-sucursal se resuelve por el plan vigente.
 
 ### benefit
 - name
@@ -460,6 +475,7 @@ Migraciones nuevas:
 - `V13__hito5_coaches_workouts.sql`: agrega coaches, rutinas versionadas, asignaciones a clientes, permisos y datos demo de coaching.
 - `V14__hito5_wellness_notifications_automations.sql`: agrega profesionales de bienestar, servicios, disponibilidad, notificaciones, automatizaciones y dashboard del dueno.
 - `V15__hito6_productization_onboarding_imports.sql`: agrega bitacora de importacion inicial de clientes y permisos `onboarding.manage` y `client.import`.
+- `V23__membership_plan_multi_branch_access.sql`: agrega `membership_plan.multi_branch_access` para planes con acceso a todas las sucursales del tenant.
  
 ## Hito 7 - Tablas V16
 

@@ -157,7 +157,7 @@ public class SelfServiceRepository {
 				JOIN membership_plan mp ON mp.id = m.plan_id
 				JOIN catalog_product cp ON cp.id = mp.product_id
 				WHERE m.organization_id = :organizationId
-				  AND m.branch_id = :branchId
+				  AND (m.branch_id = :branchId OR mp.multi_branch_access = true)
 				  AND m.client_id = :clientId
 				  AND m.deleted_at IS NULL
 				ORDER BY m.starts_on DESC, m.activated_at DESC

@@ -217,9 +217,35 @@ El alta de socio en frontend puede crear, despues del `POST /clients`, una venta
 
 - `GET /catalog/plans`
 - `POST /catalog/plans`
+- `POST /catalog/membership-plans`
 - `GET /plans/{id}`
 - `PATCH /plans/{id}`
 - `POST /plans/{id}/archive`
+
+`POST /catalog/membership-plans` es el contrato recomendado para altas desde frontend. Crea de forma atomica el producto tecnico `MEMBERSHIP_PLAN` y su `membership_plan`; si falla la validacion o persistencia, no debe quedar un producto de membresia sin duracion. Acepta beneficios como texto libre y backend los normaliza a JSON:
+
+```json
+{
+  "sku": "MENSUAL",
+  "name": "Membresia mensual",
+  "description": "Acceso general",
+  "priceCents": 70000,
+  "currency": "MXN",
+  "durationDays": 30,
+  "graceDays": 3,
+  "benefits": "Acceso general, clases grupales",
+  "multiBranchAccess": false,
+  "status": "ACTIVE"
+}
+```
+
+`multiBranchAccess=true` marca el plan como valido para todas las sucursales activas del gimnasio. La venta y la membresia conservan la sucursal donde se originaron, pero las consultas de acceso, kiosco y detalle de membresias aceptan esa membresia desde cualquier sucursal del mismo tenant.
+
+Errores relevantes:
+
+- `PRODUCT_SKU_ALREADY_EXISTS`
+- `INVALID_PLAN_BENEFITS`
+- `VALIDATION_ERROR`
 
 ## 6.6 Membresías
 
@@ -232,6 +258,7 @@ El alta de socio en frontend puede crear, despues del `POST /clients`, una venta
 - Nota implementada: `POST /memberships/{id}/renew` crea una venta de renovacion, registra pago manual y activa una nueva membresia acumulativa cuando el pago queda completado.
 - Nota implementada: `POST /memberships/{id}/change-plan` crea una venta de cambio de plan, exige pago completado, cancela la membresia anterior y activa la nueva.
 - Nota implementada: una venta pagada que incluya un producto vinculado a `membership_plan` activa una membresia.
+- Nota implementada: si la membresia origen o destino pertenece a un plan con `multiBranchAccess`, el acceso del socio se agrega o remueve para todas las sucursales por regla de consulta, sin duplicar registros por sucursal.
 
 La activación ocurre como consecuencia de pago completado.
 

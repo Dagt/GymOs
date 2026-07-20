@@ -4,12 +4,12 @@ import { FormEvent, useEffect, useState } from "react";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
-  createPlan,
+  createMembershipPlan,
   createProduct,
   getPlans,
   getProducts,
   getStoredSession,
-  type PlanPayload,
+  type MembershipPlanPayload,
   type PlanSummary,
   type ProductPayload,
   type ProductSummary,
@@ -36,7 +36,8 @@ type PlanDraft = {
   durationDays: string;
   graceDays: string;
   benefitsJson: string;
-  status: PlanPayload["status"];
+  multiBranchAccess: boolean;
+  status: MembershipPlanPayload["status"];
 };
 
 const emptyPlan: PlanDraft = {
@@ -48,6 +49,7 @@ const emptyPlan: PlanDraft = {
   durationDays: "30",
   graceDays: "0",
   benefitsJson: "",
+  multiBranchAccess: false,
   status: "ACTIVE",
 };
 
@@ -137,21 +139,16 @@ export default function CatalogPage() {
     setError(null);
     setMessage(null);
     try {
-      const createdProduct = await createProduct(session.accessToken, {
+      await createMembershipPlan(session.accessToken, {
         sku: planForm.sku.trim(),
         name: planForm.name.trim(),
         description: planForm.description.trim() || null,
-        productType: "MEMBERSHIP_PLAN",
         priceCents: Math.round(Number(planForm.price || "0") * 100),
         currency: planForm.currency.trim().toUpperCase() || "MXN",
-        taxable: true,
-        status: planForm.status,
-      });
-      await createPlan(session.accessToken, {
-        productId: createdProduct.id,
         durationDays: Number(planForm.durationDays || "30"),
         graceDays: Number(planForm.graceDays || "0"),
-        benefitsJson: planForm.benefitsJson.trim() || null,
+        benefits: planForm.benefitsJson.trim() || null,
+        multiBranchAccess: planForm.multiBranchAccess,
         status: planForm.status,
       });
       const [loadedProducts, loadedPlans] = await Promise.all([
@@ -178,9 +175,6 @@ export default function CatalogPage() {
   }
 
   const sellableProducts = products.filter((product) => product.productType !== "MEMBERSHIP_PLAN");
-  const membershipProductsWithoutPlan = products.filter(
-    (product) => product.productType === "MEMBERSHIP_PLAN" && !plans.some((plan) => plan.productId === product.id),
-  );
 
   return (
     <AppShell
@@ -265,10 +259,25 @@ export default function CatalogPage() {
               />
             </label>
             <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+              Alcance
+              <span className="flex items-start gap-3 rounded-md border border-[#cdd5ca] bg-white px-3 py-3 text-sm text-[#42514a]">
+                <input
+                  className="mt-1 h-4 w-4 accent-[var(--brand-primary)]"
+                  checked={planForm.multiBranchAccess}
+                  onChange={(event) => setPlanForm({ ...planForm, multiBranchAccess: event.target.checked })}
+                  type="checkbox"
+                />
+                <span>
+                  <strong className="block text-[#111815]">Acceso multi-sucursal</strong>
+                  Disponible para entrar con esta membresia en todas las sucursales activas del gimnasio.
+                </span>
+              </span>
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-[#42514a]">
               Estado
               <select
                 className="h-11 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm"
-                onChange={(event) => setPlanForm({ ...planForm, status: event.target.value as PlanPayload["status"] })}
+                onChange={(event) => setPlanForm({ ...planForm, status: event.target.value as MembershipPlanPayload["status"] })}
                 value={planForm.status}
               >
                 <option value="ACTIVE">Activo</option>
@@ -320,16 +329,11 @@ export default function CatalogPage() {
                   <p className="mt-1 text-sm text-[#5d6b63]">
                     {plan.durationDays} días - gracia {plan.graceDays} - {formatMoney(plan.priceCents, plan.currency)}
                   </p>
+                  <p className="mt-2 text-xs font-semibold text-[var(--brand-primary)]">
+                    {plan.multiBranchAccess ? "Acceso multi-sucursal" : "Acceso por sucursal de venta"}
+                  </p>
                 </article>
               ))}
-              {membershipProductsWithoutPlan.length > 0 ? (
-                <section className="rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  <strong>Hay {membershipProductsWithoutPlan.length} membresia creada como producto sin duracion.</strong>
-                  <p className="mt-1">
-                    Para que aparezca en el alta de socios, crea el plan desde el formulario de nuevo plan de membresia.
-                  </p>
-                </section>
-              ) : null}
             </div>
           </section>
         </section>

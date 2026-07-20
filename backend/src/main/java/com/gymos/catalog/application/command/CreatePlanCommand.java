@@ -7,6 +7,7 @@ public record CreatePlanCommand(
 		int durationDays,
 		int graceDays,
 		String benefitsJson,
+		boolean multiBranchAccess,
 		String status
 ) {
 }

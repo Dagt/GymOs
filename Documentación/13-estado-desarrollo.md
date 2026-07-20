@@ -25,13 +25,16 @@ Implementado:
 
 - `/catalog` separa productos/servicios de planes de membresia.
 - El formulario de producto ya no permite crear membresias incompletas como producto comun.
-- El formulario de plan de membresia crea el producto tecnico `MEMBERSHIP_PLAN` y despues el registro `membership_plan` con duracion y dias de gracia.
+- El formulario de plan de membresia usa `POST /catalog/membership-plans` para crear en una sola transaccion el producto tecnico `MEMBERSHIP_PLAN` y el registro `membership_plan` con duracion y dias de gracia.
+- Los beneficios escritos como texto se normalizan en backend a JSON valido para evitar fallos PostgreSQL y productos tecnicos incompletos.
 - El listado de productos oculta productos tecnicos de membresia para no mezclarlos con suplementos, ropa o servicios.
-- El listado de planes avisa cuando existen productos `MEMBERSHIP_PLAN` sin plan asociado.
+- La migracion `V22__cleanup_orphan_membership_products.sql` marca como eliminados los productos `MEMBERSHIP_PLAN` antiguos que quedaron sin plan asociado y sin ventas.
 - Los campos de formularios compartidos mantienen altura consistente aunque un campo vecino tenga texto de ayuda.
+- Los botones primarios dentro del sistema usan `primaryColor` del tenant y muestran `accentColor` como acento visual consistente.
 
 Verificado:
 
+- `./gradlew.bat test`
 - `npm.cmd run lint`
 - `npm.cmd run typecheck`
 - `npm.cmd run build`
@@ -693,3 +696,15 @@ Implementado:
 - El alta de socio crea una venta de membresia inicial con `POST /sales` cuando se selecciona plan; la activacion sigue dependiendo del pago completado.
 - `/clients/[clientId]` usa el `AppShell` lateral del sistema y separa datos personales, membresias y actividad.
 - Backend valida telefono mexicano en socios con `+52` seguido de 10 digitos y genero `MALE|FEMALE`.
+
+## Correccion catalogo de membresias y acceso multi-sucursal - 19 de julio de 2026
+
+Implementado:
+
+- `POST /api/v1/catalog/membership-plans` crea producto tecnico y plan de membresia en una sola transaccion.
+- Migracion `V22__cleanup_orphan_membership_products.sql` marca como borrados productos `MEMBERSHIP_PLAN` huerfanos que no tienen plan ni ventas.
+- Migracion `V23__membership_plan_multi_branch_access.sql` agrega `membership_plan.multi_branch_access`.
+- `/catalog` muestra un checkbox `Acceso multi-sucursal` al crear planes y etiqueta el alcance en la lista.
+- Las consultas de acceso, kiosco, verificacion de autoservicio y detalle de membresias consideran validas las membresias multi-sucursal desde cualquier sucursal del mismo gimnasio.
+- Cambiar de plan cancela la membresia anterior aunque se opere desde otra sucursal cuando el plan anterior era multi-sucursal, y activa el nuevo alcance segun el plan destino.
+- La portada de recepcion deja de usar colores fijos por modulo y deriva sus tarjetas/metricas de la marca del tenant.

@@ -41,7 +41,7 @@ public class MembershipRepository {
 				JOIN catalog_product cp ON cp.id = mp.product_id
 				JOIN sale s ON s.id = m.sale_id
 				WHERE m.organization_id = :organizationId
-				  AND m.branch_id = :branchId
+				  AND (m.branch_id = :branchId OR mp.multi_branch_access = true)
 				  AND m.client_id = :clientId
 				  AND m.deleted_at IS NULL
 				ORDER BY m.starts_on DESC, m.activated_at DESC
@@ -75,7 +75,7 @@ public class MembershipRepository {
 				JOIN catalog_product cp ON cp.id = mp.product_id
 				JOIN sale s ON s.id = m.sale_id
 				WHERE m.organization_id = :organizationId
-				  AND m.branch_id = :branchId
+				  AND (m.branch_id = :branchId OR mp.multi_branch_access = true)
 				  AND m.id = :membershipId
 				  AND m.deleted_at IS NULL
 				""")
@@ -136,7 +136,7 @@ public class MembershipRepository {
 	public Optional<PlanForRenewal> planForRenewal(UUID organizationId, UUID planId) {
 		return jdbcClient.sql("""
 				SELECT mp.id AS plan_id, mp.product_id, cp.name AS plan_name,
-				       mp.duration_days, mp.grace_days, cp.price_cents, cp.currency
+				       mp.duration_days, mp.grace_days, mp.multi_branch_access, cp.price_cents, cp.currency
 				FROM membership_plan mp
 				JOIN catalog_product cp ON cp.id = mp.product_id
 				WHERE mp.organization_id = :organizationId
@@ -154,6 +154,7 @@ public class MembershipRepository {
 						resultSet.getString("plan_name"),
 						resultSet.getInt("duration_days"),
 						resultSet.getInt("grace_days"),
+						resultSet.getBoolean("multi_branch_access"),
 						resultSet.getLong("price_cents"),
 						resultSet.getString("currency")
 				))
@@ -163,7 +164,7 @@ public class MembershipRepository {
 	public Optional<PlanForRenewal> planForProduct(UUID organizationId, UUID productId) {
 		return jdbcClient.sql("""
 				SELECT mp.id AS plan_id, mp.product_id, cp.name AS plan_name,
-				       mp.duration_days, mp.grace_days, cp.price_cents, cp.currency
+				       mp.duration_days, mp.grace_days, mp.multi_branch_access, cp.price_cents, cp.currency
 				FROM membership_plan mp
 				JOIN catalog_product cp ON cp.id = mp.product_id
 				WHERE mp.organization_id = :organizationId
@@ -181,6 +182,7 @@ public class MembershipRepository {
 						resultSet.getString("plan_name"),
 						resultSet.getInt("duration_days"),
 						resultSet.getInt("grace_days"),
+						resultSet.getBoolean("multi_branch_access"),
 						resultSet.getLong("price_cents"),
 						resultSet.getString("currency")
 				))
@@ -276,7 +278,15 @@ public class MembershipRepository {
 				    updated_at = :updatedAt,
 				    version = version + 1
 				WHERE organization_id = :organizationId
-				  AND branch_id = :branchId
+				  AND (
+				      branch_id = :branchId
+				      OR EXISTS (
+				          SELECT 1
+				          FROM membership_plan mp
+				          WHERE mp.id = membership.plan_id
+				            AND mp.multi_branch_access = true
+				      )
+				  )
 				  AND id = :membershipId
 				  AND status = 'ACTIVE'
 				  AND deleted_at IS NULL
@@ -309,6 +319,7 @@ public class MembershipRepository {
 			String planName,
 			int durationDays,
 			int graceDays,
+			boolean multiBranchAccess,
 			long priceCents,
 			String currency
 	) {

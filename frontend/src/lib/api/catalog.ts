@@ -1,1 +1,1 @@
-export { createPlan, createProduct, getPlans, getProducts } from "./legacy";
+export { createMembershipPlan, createPlan, createProduct, getPlans, getProducts } from "./legacy";

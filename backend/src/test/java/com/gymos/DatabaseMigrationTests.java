@@ -67,6 +67,7 @@ class DatabaseMigrationTests {
 			assertThat(tableExists(connection, "notification_template")).isTrue();
 			assertThat(columnExists(connection, "membership", "auto_renew")).isTrue();
 			assertThat(columnExists(connection, "membership", "cancelled_at")).isTrue();
+			assertThat(columnExists(connection, "membership_plan", "multi_branch_access")).isTrue();
 			assertThat(columnExists(connection, "automation_rule", "trigger_type")).isTrue();
 			assertThat(columnExists(connection, "automation_rule", "next_run_at")).isTrue();
 		}

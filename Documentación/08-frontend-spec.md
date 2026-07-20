@@ -121,7 +121,9 @@ Resumen:
 Regla de catalogo:
 - Productos y servicios de mostrador se capturan en el formulario de producto.
 - Las membresias se capturan en un formulario separado de plan de membresia.
-- Al crear un plan, el frontend crea primero el producto tecnico `MEMBERSHIP_PLAN` y despues el registro `membership_plan` con duracion y dias de gracia.
+- Al crear un plan, el frontend debe usar `POST /catalog/membership-plans`; el backend crea en una sola transaccion el producto tecnico `MEMBERSHIP_PLAN` y el registro `membership_plan` con duracion y dias de gracia.
+- Los beneficios pueden capturarse como texto separado por comas o saltos de linea; el backend los guarda como JSON valido.
+- El formulario de plan incluye `Acceso multi-sucursal`; cuando esta activo, esa membresia permite entrada en todas las sucursales del gimnasio sin duplicar al socio ni el plan.
 - La UI no debe presentar membresias junto a suplementos, ropa u otros productos fisicos, aunque el modelo de ventas use un producto tecnico para poder cobrarlas en POS.
 - El alta de socio solo muestra planes reales de `GET /catalog/plans`; un producto `MEMBERSHIP_PLAN` sin `membership_plan` no debe considerarse una membresia seleccionable.
 
@@ -307,3 +309,4 @@ Formularios:
 - Si un usuario de recepcion tiene exactamente una sucursal permitida pero la sesion guardada no trae `branchId`, el frontend debe seleccionarla automaticamente antes de pintar la consola.
 - La portada de recepcion usa `AppShell` sin menu lateral y muestra una tarjeta superior con marca, sucursal, perfil, usuario, alcance y cierre de sesion.
 - Las acciones de recepcion se agrupan en la misma cuadricula: caja/POS, socios, ventas, kiosco, reservas y beneficios. No se usa una seccion desplegable secundaria para herramientas normales de mostrador.
+- La paleta de recepcion debe derivar de la marca del tenant (`primaryColor`, `accentColor`, `surfaceColor`) y no de colores fijos por modulo.

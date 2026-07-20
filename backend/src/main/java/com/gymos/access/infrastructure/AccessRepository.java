@@ -120,7 +120,7 @@ public class AccessRepository {
 				JOIN membership_plan mp ON mp.id = m.plan_id
 				JOIN catalog_product cp ON cp.id = mp.product_id
 				WHERE m.organization_id = :organizationId
-				  AND m.branch_id = :branchId
+				  AND (m.branch_id = :branchId OR mp.multi_branch_access = true)
 				  AND m.client_id = :clientId
 				  AND m.status = 'ACTIVE'
 				  AND m.starts_on <= :today

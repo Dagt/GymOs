@@ -63,6 +63,7 @@ textarea:focus {
 .bg-\[\#13251c\],
 .hover\:bg-\[\#243d30\]:hover {
   background-color: var(--brand-primary) !important;
+  border-bottom: 0.2rem solid var(--brand-accent) !important;
 }
 
 .text-\[\#13251c\],
@@ -199,6 +200,7 @@ th {
 
 .app-button {
   background: var(--brand-primary);
+  border-bottom: 0.2rem solid var(--brand-accent);
   color: white;
 }
 
@@ -1329,6 +1331,20 @@ th {
   padding: clamp(1rem, 3vw, 2rem);
 }
 
+.admin-workspace .app-button,
+.admin-workspace .form-primary-button,
+.admin-workspace button[type="submit"] {
+  background: var(--brand-primary) !important;
+  border-bottom: 0.22rem solid var(--brand-accent) !important;
+  color: white !important;
+}
+
+.admin-workspace .app-button-secondary {
+  background: color-mix(in srgb, var(--brand-accent) 12%, white) !important;
+  border-color: color-mix(in srgb, var(--brand-accent) 44%, var(--brand-line)) !important;
+  color: var(--brand-ink) !important;
+}
+
 .admin-command-bar,
 .admin-panel,
 .admin-action-card {
@@ -1465,7 +1481,10 @@ th {
 }
 
 .admin-action-card {
-  background: white;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), color-mix(in srgb, var(--brand-surface) 38%, white));
+  border: 1px solid var(--brand-line);
+  border-left: 0.25rem solid color-mix(in srgb, var(--brand-primary) 72%, var(--brand-accent));
+  border-radius: 0.5rem;
   display: grid;
   min-height: 11.5rem;
   padding: 1.15rem;
@@ -1474,38 +1493,7 @@ th {
 }
 
 .admin-action-card::after {
-  border-radius: 999px;
-  content: "";
-  height: 8rem;
-  opacity: 0.18;
-  position: absolute;
-  right: -3rem;
-  top: -3rem;
-  width: 8rem;
-}
-
-.admin-action-card.money::after {
-  background: #22c55e;
-}
-
-.admin-action-card.people::after {
-  background: #38bdf8;
-}
-
-.admin-action-card.report::after {
-  background: #8b5cf6;
-}
-
-.admin-action-card.kiosk::after {
-  background: #f59e0b;
-}
-
-.admin-action-card.bookings::after {
-  background: var(--brand-accent);
-}
-
-.admin-action-card.benefits::after {
-  background: color-mix(in srgb, var(--brand-primary) 56%, var(--brand-accent));
+  content: none;
 }
 
 .admin-action-card span {
@@ -1562,6 +1550,8 @@ th {
 }
 
 .admin-report-metric {
+  background: color-mix(in srgb, var(--brand-primary) 7%, white);
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 14%, var(--brand-line));
   border-radius: 0.5rem;
   display: grid;
   gap: 0.3rem;
@@ -1570,15 +1560,15 @@ th {
 }
 
 .admin-report-metric.green {
-  background: #ecfdf5;
+  background: color-mix(in srgb, var(--brand-primary) 8%, white);
 }
 
 .admin-report-metric.amber {
-  background: #fffbeb;
+  background: color-mix(in srgb, var(--brand-accent) 12%, white);
 }
 
 .admin-report-metric.blue {
-  background: #eff6ff;
+  background: color-mix(in srgb, var(--brand-primary) 6%, var(--brand-accent-soft));
 }
 
 .admin-report-metric span {
@@ -1691,7 +1681,7 @@ th {
 .reception-identity-panel {
   align-items: center;
   background:
-    linear-gradient(135deg, color-mix(in srgb, var(--brand-primary) 12%, white), rgba(255, 255, 255, 0.94)),
+    linear-gradient(135deg, color-mix(in srgb, var(--brand-primary) 10%, white), color-mix(in srgb, var(--brand-accent) 7%, white)),
     white;
   border: 1px solid var(--brand-line);
   border-radius: 0.85rem;
@@ -1706,12 +1696,12 @@ th {
   align-items: center;
   background:
     var(--brand-logo-url),
-    linear-gradient(135deg, var(--brand-accent), color-mix(in srgb, var(--brand-primary) 45%, white));
+    linear-gradient(135deg, var(--brand-primary), color-mix(in srgb, var(--brand-accent) 72%, white));
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
   border-radius: 0.75rem;
-  color: #0f172a;
+  color: white;
   display: inline-flex;
   font-size: 1.15rem;
   font-weight: 950;
@@ -1784,7 +1774,7 @@ th {
 }
 
 .reception-status-board .admin-report-metric {
-  border: 1px solid color-mix(in srgb, var(--brand-line) 72%, white);
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 14%, var(--brand-line));
 }
 
 .admin-setup-banner {
