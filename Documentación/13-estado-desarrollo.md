@@ -24,12 +24,13 @@ Verificado:
 
 Implementado:
 
-- `/bookings` reemplaza el flujo anterior por una agenda semanal compacta con tarjetas por dia y recurso.
+- `/bookings` reemplaza el flujo anterior por calendario mensual con detalle del dia seleccionado por recurso.
 - Nueva reserva usa busqueda de socio por texto en lugar de desplegable con todos los clientes.
 - El formulario solo captura recurso, socio, dia/hora de inicio y notas; la hora final se calcula con la duracion (`slotMinutes`) del recurso.
 - La creacion de recurso oculta campos tecnicos de tipo/capacidad, permite duracion manual en minutos u horas y captura dias L M M J V S D con horario por dia.
 - Se elimina la seccion visible de pago de reserva del flujo base; las reservas se gobiernan por membresias permitidas.
 - Disponibilidad y agenda quedan integradas en un solo calendario visual.
+- El campo de hora valida formato `HH:mm` antes de calcular la hora final para evitar errores al capturar minutos.
 
 Verificado:
 

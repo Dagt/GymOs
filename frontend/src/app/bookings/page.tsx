@@ -80,7 +80,12 @@ export default function BookingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const weekDates = useMemo(() => buildWeekDates(calendarDate), [calendarDate]);
+  const monthDates = useMemo(() => buildMonthDates(calendarDate), [calendarDate]);
+  const selectedDateBookings = useMemo(
+    () => bookings.filter((booking) => bookingDate(booking.startsAt) === startDate)
+      .sort((first, second) => first.startsAt.localeCompare(second.startsAt)),
+    [bookings, startDate],
+  );
 
   useEffect(() => {
     let active = true;
@@ -100,7 +105,7 @@ export default function BookingsPage() {
           getCurrentOrganization(stored.accessToken).catch(() => null),
           getBranches(stored.accessToken),
           getResources(stored.accessToken),
-          getWeekBookings(stored.accessToken, weekDates),
+          getCalendarBookings(stored.accessToken, monthDates),
           getPlans(stored.accessToken),
         ]);
         if (!active) {
@@ -127,7 +132,7 @@ export default function BookingsPage() {
     return () => {
       active = false;
     };
-  }, [weekDates]);
+  }, [monthDates]);
 
   useEffect(() => {
     if (!session) {
@@ -167,17 +172,17 @@ export default function BookingsPage() {
     || session?.user.roles.some((role) => role.toLowerCase().includes("recepcion"));
   const canManageResources = Boolean(session?.user.permissions.includes("resource.manage") && !isReceptionUser);
   const durationMinutes = Math.max(1, durationUnit === "HOURS" ? durationValue * 60 : durationValue);
-  const computedEnd = activeResource && startDate && startTime
+  const computedEnd = activeResource && startDate && isValidTimeInput(startTime)
     ? addMinutes(`${startDate}T${startTime}`, activeResource.slotMinutes)
     : "";
 
-  async function refresh(stored = session, dates = weekDates) {
+  async function refresh(stored = session, dates = monthDates) {
     if (!stored) {
       return;
     }
     const [loadedResources, loadedBookings] = await Promise.all([
       getResources(stored.accessToken),
-      getWeekBookings(stored.accessToken, dates),
+      getCalendarBookings(stored.accessToken, dates),
     ]);
     setResources(loadedResources);
     setBookings(loadedBookings);
@@ -186,7 +191,7 @@ export default function BookingsPage() {
 
   async function submitBooking(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!session || !activeResource || !clientId || !startTime || !computedEnd) {
+    if (!session || !activeResource || !clientId || !isValidTimeInput(startTime) || !computedEnd) {
       return;
     }
     setSaving(true);
@@ -202,9 +207,9 @@ export default function BookingsPage() {
         endsAt,
         notes,
       });
-      const nextWeek = buildWeekDates(startDate);
+      const nextMonth = buildMonthDates(startDate);
       setCalendarDate(startDate);
-      await refresh(session, nextWeek);
+      await refresh(session, nextMonth);
       setMessage("Reserva creada.");
       setNotes("");
       setStartTime("");
@@ -298,7 +303,7 @@ export default function BookingsPage() {
       mode={activeBranch ? "operation" : undefined}
       organizationName={organization?.brandName || organization?.tradeName || session.user.brandName || session.user.organizationName}
       session={session}
-      subtitle="Agenda semanal por recurso y reservaciones incluidas en membresias."
+      subtitle="Agenda mensual con detalle diario y reservaciones incluidas en membresias."
       title="Recursos y reservas"
     >
       <section className="grid gap-6 xl:grid-cols-[410px_minmax(0,1fr)]">
@@ -383,7 +388,7 @@ export default function BookingsPage() {
               </label>
               <label className="grid gap-2 text-sm font-medium">
                 Hora
-                <input className="h-11 rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setStartTime(event.target.value)} required type="time" value={startTime} />
+                <input className="h-11 rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setStartTime(event.target.value)} required step={300} type="time" value={startTime} />
               </label>
             </div>
             <div className="mt-3 rounded-md border border-[#d8ddd2] bg-[#f8faf8] px-3 py-2 text-sm">
@@ -394,7 +399,7 @@ export default function BookingsPage() {
               Notas
               <textarea className="min-h-20 rounded-md border border-[#cdd5ca] px-3 py-2" onChange={(event) => setNotes(event.target.value)} value={notes} />
             </label>
-            <button className="mt-5 h-11 w-full rounded-md bg-[var(--brand-primary)] px-4 text-sm font-semibold text-white shadow-sm disabled:opacity-60" disabled={saving || !resourceId || !clientId || !startTime} type="submit">
+            <button className="mt-5 h-11 w-full rounded-md bg-[var(--brand-primary)] px-4 text-sm font-semibold text-white shadow-sm disabled:opacity-60" disabled={saving || !resourceId || !clientId || !isValidTimeInput(startTime)} type="submit">
               Crear reserva
             </button>
           </form>
@@ -485,19 +490,19 @@ export default function BookingsPage() {
         <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h2 className="text-xl font-semibold">Agenda semanal</h2>
-              <p className="mt-1 text-sm text-[#5d6b63]">Vista compacta por dia y recurso.</p>
+              <h2 className="text-xl font-semibold">Agenda mensual</h2>
+              <p className="mt-1 text-sm text-[#5d6b63]">Selecciona un dia para ver sus reservas por recurso.</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <button className="h-10 rounded-md border border-[var(--brand-primary)] px-3 text-sm font-semibold text-[var(--brand-primary)]" onClick={() => moveCalendarWeek(-1)} type="button">Anterior</button>
+              <button className="h-10 rounded-md border border-[var(--brand-primary)] px-3 text-sm font-semibold text-[var(--brand-primary)]" onClick={() => moveCalendarMonth(-1)} type="button">Anterior</button>
               <input className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => setCalendarDate(event.target.value)} type="date" value={calendarDate} />
               <button className="h-10 rounded-md border border-[var(--brand-primary)] px-3 text-sm font-semibold text-[var(--brand-primary)]" onClick={() => setCalendarDate(toDateInput(new Date()))} type="button">Hoy</button>
-              <button className="h-10 rounded-md border border-[var(--brand-primary)] px-3 text-sm font-semibold text-[var(--brand-primary)]" onClick={() => moveCalendarWeek(1)} type="button">Siguiente</button>
+              <button className="h-10 rounded-md border border-[var(--brand-primary)] px-3 text-sm font-semibold text-[var(--brand-primary)]" onClick={() => moveCalendarMonth(1)} type="button">Siguiente</button>
             </div>
           </div>
 
           <div className="mt-4 rounded-md border border-[#d8ddd2] bg-[#f8faf8] px-3 py-2 text-sm font-semibold text-[#34443a]">
-            Semana del {formatShortDate(weekDates[0].date)} al {formatShortDate(weekDates[6].date)}
+            {formatMonthLabel(calendarDate)}
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2">
@@ -519,62 +524,111 @@ export default function BookingsPage() {
               No hay recursos reservables en esta sucursal.
             </p>
           ) : (
-            <div className="mt-5 grid gap-3 lg:grid-cols-7">
-              {weekDates.map((day) => (
-                <section className="min-h-[260px] rounded-lg border border-[#d8ddd2] bg-[#fbfcfa] p-3" key={day.date}>
+            <div className="mt-5 grid gap-5">
+              <div className="grid grid-cols-7 overflow-hidden rounded-lg border border-[#d8ddd2]">
+                {weekdays.map((day) => (
+                  <div className="border-b border-r border-[#d8ddd2] bg-[#f8faf8] px-3 py-2 text-center text-xs font-semibold uppercase text-[#647067] last:border-r-0" key={day.key}>
+                    {day.shortLabel}
+                  </div>
+                ))}
+                {monthDates.map((day) => {
+                  const dayBookings = bookings.filter((booking) => bookingDate(booking.startsAt) === day.date);
+                  const activeResourceCount = new Set(dayBookings.map((booking) => booking.resourceId)).size;
+                  return (
+                    <button
+                      className={`min-h-24 border-r border-t border-[#d8ddd2] p-2 text-left transition last:border-r-0 ${day.inCurrentMonth ? "bg-white" : "bg-[#f6f3ef] text-[#9aa39d]"} ${startDate === day.date ? "outline outline-2 outline-[var(--brand-primary)]" : "hover:bg-[var(--brand-surface)]"}`}
+                      key={day.date}
+                      onClick={() => {
+                        setStartDate(day.date);
+                        setCalendarDate(day.date);
+                      }}
+                      type="button"
+                    >
+                      <span className="text-sm font-semibold">{day.dayOfMonth}</span>
+                      {dayBookings.length > 0 ? (
+                        <span className="mt-2 block rounded-md bg-[var(--brand-surface)] px-2 py-1 text-xs font-semibold text-[var(--brand-primary)]">
+                          {dayBookings.length} reserva{dayBookings.length === 1 ? "" : "s"}
+                        </span>
+                      ) : (
+                        <span className="mt-2 block text-xs text-[#8a948d]">Libre</span>
+                      )}
+                      {activeResourceCount > 0 ? (
+                        <span className="mt-2 flex gap-1">
+                          {resources.slice(0, 4).map((resource, index) => (
+                            dayBookings.some((booking) => booking.resourceId === resource.id)
+                              ? <span className="h-2 w-2 rounded-full" key={resource.id} style={{ backgroundColor: resourceColor(index) }} />
+                              : null
+                          ))}
+                        </span>
+                      ) : null}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <section className="rounded-lg border border-[#d8ddd2] bg-[#fbfcfa] p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold">{formatLongDate(startDate)}</h3>
+                    <p className="text-sm text-[#5d6b63]">Detalle del dia seleccionado.</p>
+                  </div>
                   <button
-                    className={`w-full rounded-md border px-2 py-2 text-left ${startDate === day.date ? "border-[var(--brand-primary)] bg-[var(--brand-surface)]" : "border-transparent"}`}
-                    onClick={() => setStartDate(day.date)}
+                    className="h-10 rounded-md border border-[var(--brand-primary)] px-3 text-sm font-semibold text-[var(--brand-primary)]"
+                    onClick={() => {
+                      const resource = activeResource ?? resources[0];
+                      const hours = resource ? resourceHoursForDay(resource, dateToWeekday(startDate)) : null;
+                      if (resource) {
+                        setResourceId(resource.id);
+                      }
+                      setStartTime(hours?.opensAt ?? "");
+                    }}
                     type="button"
                   >
-                    <span className="block text-xs font-semibold uppercase text-[#647067]">{day.label}</span>
-                    <strong className="text-lg">{day.dayOfMonth}</strong>
+                    Usar este dia
                   </button>
-                  <div className="mt-3 grid gap-3">
-                    {resources.map((resource, index) => {
-                      const dayBookings = bookings
-                        .filter((booking) => booking.resourceId === resource.id && bookingDate(booking.startsAt) === day.date)
-                        .sort((first, second) => first.startsAt.localeCompare(second.startsAt));
-                      const hours = resourceHoursForDay(resource, day.weekday);
-                      return (
-                        <article className="rounded-md border border-[#d8ddd2] bg-white p-2" key={`${day.date}-${resource.id}`}>
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-semibold">
-                                <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: resourceColor(index) }} />
-                                {resource.name}
-                              </p>
-                              <p className="mt-0.5 text-xs text-[#647067]">{hours ? `${hours.opensAt} - ${hours.closesAt}` : "Cerrado"}</p>
-                            </div>
-                            {hours ? (
-                              <button
-                                className="rounded-md border border-[var(--brand-primary)] px-2 py-1 text-xs font-semibold text-[var(--brand-primary)]"
-                                onClick={() => {
-                                  setResourceId(resource.id);
-                                  setStartDate(day.date);
-                                  setStartTime(hours.opensAt);
-                                }}
-                                type="button"
-                              >
-                                Reservar
-                              </button>
-                            ) : null}
+                </div>
+
+                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                  {resources.map((resource, index) => {
+                    const resourceBookings = selectedDateBookings.filter((booking) => booking.resourceId === resource.id);
+                    const hours = resourceHoursForDay(resource, dateToWeekday(startDate));
+                    return (
+                      <article className="rounded-md border border-[#d8ddd2] bg-white p-3" key={resource.id}>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold">
+                              <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: resourceColor(index) }} />
+                              {resource.name}
+                            </p>
+                            <p className="mt-0.5 text-xs text-[#647067]">{hours ? `${hours.opensAt} - ${hours.closesAt}` : "Cerrado"}</p>
                           </div>
-                          <div className="mt-2 grid gap-2">
-                            {dayBookings.length === 0 ? (
-                              <p className="rounded-md bg-[#f8faf8] px-2 py-2 text-xs text-[#647067]">Sin reservas</p>
-                            ) : (
-                              dayBookings.map((booking) => (
-                                <BookingCard booking={booking} color={resourceColor(index)} key={booking.id} onRunAction={runAction} />
-                              ))
-                            )}
-                          </div>
-                        </article>
-                      );
-                    })}
-                  </div>
-                </section>
-              ))}
+                          {hours ? (
+                            <button
+                              className="rounded-md border border-[var(--brand-primary)] px-2 py-1 text-xs font-semibold text-[var(--brand-primary)]"
+                              onClick={() => {
+                                setResourceId(resource.id);
+                                setStartTime(hours.opensAt);
+                              }}
+                              type="button"
+                            >
+                              Reservar
+                            </button>
+                          ) : null}
+                        </div>
+                        <div className="mt-3 grid gap-2">
+                          {resourceBookings.length === 0 ? (
+                            <p className="rounded-md bg-[#f8faf8] px-2 py-2 text-xs text-[#647067]">Sin reservas</p>
+                          ) : (
+                            resourceBookings.map((booking) => (
+                              <BookingCard booking={booking} color={resourceColor(index)} key={booking.id} onRunAction={runAction} />
+                            ))
+                          )}
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              </section>
             </div>
           )}
         </section>
@@ -586,9 +640,9 @@ export default function BookingsPage() {
     setResourceSchedule((current) => current.map((day) => day.key === key ? { ...day, ...patch } : day));
   }
 
-  function moveCalendarWeek(weeks: number) {
+  function moveCalendarMonth(months: number) {
     const date = parseDateInput(calendarDate);
-    date.setDate(date.getDate() + weeks * 7);
+    date.setMonth(date.getMonth() + months);
     const value = toDateInput(date);
     setCalendarDate(value);
     setStartDate(value);
@@ -628,21 +682,25 @@ function ActionButton({ action, booking, onRun }: { action: "confirm" | "check-i
   );
 }
 
-async function getWeekBookings(accessToken: string, dates: Array<{ date: string }>) {
+async function getCalendarBookings(accessToken: string, dates: Array<{ date: string }>) {
   const lists = await Promise.all(dates.map((day) => getBookings(accessToken, day.date)));
   return lists.flat();
 }
 
-function buildWeekDates(anchor: string) {
-  const start = parseDateInput(anchor);
-  const mondayOffset = (start.getDay() + 6) % 7;
-  start.setDate(start.getDate() - mondayOffset);
-  return weekdays.map((weekday, index) => {
-    const date = new Date(start);
-    date.setDate(start.getDate() + index);
+function buildMonthDates(anchor: string) {
+  const month = parseDateInput(anchor);
+  const firstOfMonth = new Date(month.getFullYear(), month.getMonth(), 1);
+  const gridStart = new Date(firstOfMonth);
+  const mondayOffset = (firstOfMonth.getDay() + 6) % 7;
+  gridStart.setDate(firstOfMonth.getDate() - mondayOffset);
+  return Array.from({ length: 42 }, (_, index) => {
+    const weekday = weekdays[index % 7];
+    const date = new Date(gridStart);
+    date.setDate(gridStart.getDate() + index);
     return {
       date: toDateInput(date),
       dayOfMonth: date.getDate(),
+      inCurrentMonth: date.getMonth() === month.getMonth(),
       label: weekday.label,
       weekday: weekday.key,
     };
@@ -690,8 +748,12 @@ function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 }
 
-function formatShortDate(value: string) {
-  return new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "short" }).format(parseDateInput(value));
+function formatLongDate(value: string) {
+  return new Intl.DateTimeFormat("es-MX", { dateStyle: "full" }).format(parseDateInput(value));
+}
+
+function formatMonthLabel(value: string) {
+  return new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric" }).format(parseDateInput(value));
 }
 
 function bookingDate(value: string) {
@@ -704,6 +766,14 @@ function resourceColor(index: number) {
 
 function parseDateInput(value: string) {
   return new Date(`${value}T00:00:00`);
+}
+
+function dateToWeekday(value: string): WeekdayKey {
+  return weekdays[(parseDateInput(value).getDay() + 6) % 7].key;
+}
+
+function isValidTimeInput(value: string) {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
 }
 
 function timeToMinutes(value: string) {

@@ -186,14 +186,14 @@ Pantallas implementadas hasta Hito 5:
 - `/clients/import`: importacion inicial CSV con dry-run, duplicados y resultado por fila.
 
 Reservas:
-- `/bookings` usa agenda semanal compacta, con tarjetas por dia y recurso y color estable por cada recurso.
+- `/bookings` usa calendario mensual tipo agenda comun; al seleccionar un dia muestra el detalle diario por recurso y color estable.
 - Nueva reserva no debe usar un desplegable de todos los socios; debe buscar por nombre, telefono o email.
 - La duracion se define al crear el recurso y la reserva solo captura dia/hora de inicio; la hora final se calcula automaticamente.
 - El alta de recurso no expone tipo ni capacidad al usuario; internamente el recurso se crea con capacidad operativa base.
 - La duracion de recurso se captura manualmente en minutos u horas.
 - Los recursos capturan dias operativos L M M J V S D con horario de apertura y cierre por dia.
 - La pantalla no muestra seccion de pago de reserva en el flujo base, porque el acceso depende de membresias permitidas.
-- Disponibilidad y agenda del dia se integran en el calendario semanal visual, evitando listas largas por hora.
+- Disponibilidad y agenda se integran en calendario mensual con detalle del dia seleccionado, evitando listas largas por hora.
 
 ## 8.10 Diseño visual
 
