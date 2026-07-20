@@ -162,6 +162,7 @@ export function AppShell({
     ?? (resolvedBranch?.branchId === session.user.branchId ? resolvedBranch.name : null)
     ?? (session.user.branchId ? "Sucursal seleccionada" : "Sin sucursal");
   const permissionSet = new Set(session.user.permissions);
+  const showStaticBranchChip = variant !== "platform" && !isPlatformAdmin(session.user) && consoleType !== "TENANT_OWNER";
   const sections = sectionsForConsole(consoleType, variant)
     .map((section) => ({
       ...section,
@@ -311,7 +312,7 @@ export function AppShell({
               <span>Perfil</span>
               <strong>{role.label}</strong>
             </div>
-            {variant !== "platform" ? (
+            {showStaticBranchChip ? (
               <div className="admin-role-chip">
                 <span>Sucursal</span>
                 <strong>{visibleBranch}</strong>

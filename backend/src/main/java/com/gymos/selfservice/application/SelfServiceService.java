@@ -63,10 +63,10 @@ public class SelfServiceService {
 	}
 
 	@Transactional
-	public CreateSessionResult createSession(String terminalCode, String originIp, String correlationId) {
+	public CreateSessionResult createSession(String terminalCode, UUID organizationId, UUID branchId, String originIp, String correlationId) {
 		rateLimiter.check("kiosk:create:ip:" + originIp, 30, Duration.ofMinutes(1));
 		rateLimiter.check("kiosk:create:terminal:" + terminalCode, 20, Duration.ofMinutes(1));
-		TerminalRecord terminal = repository.terminal(terminalCode)
+		TerminalRecord terminal = repository.terminal(terminalCode, organizationId, branchId)
 				.orElseThrow(() -> new BusinessException("SELF_SERVICE_TERMINAL_NOT_FOUND", "El kiosco no esta disponible."));
 		OffsetDateTime now = OffsetDateTime.now();
 		UUID sessionId = UUID.randomUUID();

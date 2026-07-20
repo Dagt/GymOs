@@ -3,6 +3,23 @@
 Estado: en progreso  
 Fecha: 19 de julio de 2026
 
+## Correccion encabezado y kiosco tenant - 20 de julio de 2026
+
+Implementado:
+
+- En perfiles `Administrador GymOS` en soporte y `Dueno del gimnasio`, el encabezado oculta la tarjeta estatica `Sucursal` cuando ya existe selector `Operar en`.
+- Gerente, recepcion y coach conservan tarjeta `Sucursal` y selector `Operar en`.
+- El kiosco envia contexto de organizacion/sucursal cuando se abre desde una sesion autenticada.
+- Migracion `V28__tenant_default_kiosk_terminals.sql` crea `KIOSK-MAIN` para gimnasios con sucursal activa que aun no tenian terminal.
+- El backend resuelve primero terminal por sucursal, luego por gimnasio, antes de usar la resolucion publica por codigo.
+
+Verificado:
+
+- `npm.cmd run lint`
+- `npm.cmd run typecheck`
+- `./gradlew.bat test`
+- Smoke API kiosco con headers devuelve `Appex Hub Deportivo`.
+
 ## Correccion UX reservas - 20 de julio de 2026
 
 Implementado:

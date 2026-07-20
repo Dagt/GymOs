@@ -43,8 +43,13 @@ public class SelfServiceController {
 	}
 
 	@PostMapping("/terminals/{terminalCode}/sessions")
-	CreateSessionResponse createSession(@PathVariable String terminalCode, HttpServletRequest servletRequest) {
-		return toResponse(selfServiceService.createSession(terminalCode, servletRequest.getRemoteAddr(), correlationId(servletRequest)));
+	CreateSessionResponse createSession(
+			@PathVariable String terminalCode,
+			@RequestHeader(name = "X-GymOS-Organization-Id", required = false) UUID organizationId,
+			@RequestHeader(name = "X-GymOS-Branch-Id", required = false) UUID branchId,
+			HttpServletRequest servletRequest
+	) {
+		return toResponse(selfServiceService.createSession(terminalCode, organizationId, branchId, servletRequest.getRemoteAddr(), correlationId(servletRequest)));
 	}
 
 	@PostMapping("/sessions/{sessionId}/verify")

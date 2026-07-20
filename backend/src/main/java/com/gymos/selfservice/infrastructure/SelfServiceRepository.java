@@ -16,7 +16,19 @@ public class SelfServiceRepository {
 		this.jdbcClient = jdbcClient;
 	}
 
-	public Optional<TerminalRecord> terminal(String terminalCode) {
+	public Optional<TerminalRecord> terminal(String terminalCode, UUID organizationId, UUID branchId) {
+		if (organizationId != null && branchId != null) {
+			Optional<TerminalRecord> terminal = terminalForBranchContext(terminalCode, organizationId, branchId);
+			if (terminal.isPresent()) {
+				return terminal;
+			}
+		}
+		if (organizationId != null) {
+			Optional<TerminalRecord> terminal = terminalForOrganizationContext(terminalCode, organizationId);
+			if (terminal.isPresent()) {
+				return terminal;
+			}
+		}
 		return jdbcClient.sql("""
 				SELECT sst.id, sst.organization_id, sst.branch_id, sst.name, sst.device_code, sst.status,
 				       o.trade_name, o.brand_name, o.logo_url, o.primary_color, o.accent_color, o.surface_color
@@ -29,6 +41,74 @@ public class SelfServiceRepository {
 				  AND b.deleted_at IS NULL
 				""")
 				.param("terminalCode", terminalCode)
+				.query((resultSet, rowNumber) -> new TerminalRecord(
+						resultSet.getObject("id", UUID.class),
+						resultSet.getObject("organization_id", UUID.class),
+						resultSet.getObject("branch_id", UUID.class),
+						resultSet.getString("name"),
+						resultSet.getString("device_code"),
+						resultSet.getString("status"),
+						resultSet.getString("trade_name"),
+						resultSet.getString("brand_name"),
+						resultSet.getString("logo_url"),
+						resultSet.getString("primary_color"),
+						resultSet.getString("accent_color"),
+						resultSet.getString("surface_color")
+				))
+				.optional();
+	}
+
+	private Optional<TerminalRecord> terminalForBranchContext(String terminalCode, UUID organizationId, UUID branchId) {
+		return jdbcClient.sql("""
+				SELECT sst.id, sst.organization_id, sst.branch_id, sst.name, sst.device_code, sst.status,
+				       o.trade_name, o.brand_name, o.logo_url, o.primary_color, o.accent_color, o.surface_color
+				FROM self_service_terminal sst
+				JOIN organization o ON o.id = sst.organization_id
+				JOIN branch b ON b.id = sst.branch_id
+				WHERE sst.device_code = :terminalCode
+				  AND sst.organization_id = :organizationId
+				  AND sst.branch_id = :branchId
+				  AND sst.status = 'ACTIVE'
+				  AND sst.deleted_at IS NULL
+				  AND b.deleted_at IS NULL
+				""")
+				.param("terminalCode", terminalCode)
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.query((resultSet, rowNumber) -> new TerminalRecord(
+						resultSet.getObject("id", UUID.class),
+						resultSet.getObject("organization_id", UUID.class),
+						resultSet.getObject("branch_id", UUID.class),
+						resultSet.getString("name"),
+						resultSet.getString("device_code"),
+						resultSet.getString("status"),
+						resultSet.getString("trade_name"),
+						resultSet.getString("brand_name"),
+						resultSet.getString("logo_url"),
+						resultSet.getString("primary_color"),
+						resultSet.getString("accent_color"),
+						resultSet.getString("surface_color")
+				))
+				.optional();
+	}
+
+	private Optional<TerminalRecord> terminalForOrganizationContext(String terminalCode, UUID organizationId) {
+		return jdbcClient.sql("""
+				SELECT sst.id, sst.organization_id, sst.branch_id, sst.name, sst.device_code, sst.status,
+				       o.trade_name, o.brand_name, o.logo_url, o.primary_color, o.accent_color, o.surface_color
+				FROM self_service_terminal sst
+				JOIN organization o ON o.id = sst.organization_id
+				JOIN branch b ON b.id = sst.branch_id
+				WHERE sst.device_code = :terminalCode
+				  AND sst.organization_id = :organizationId
+				  AND sst.status = 'ACTIVE'
+				  AND sst.deleted_at IS NULL
+				  AND b.deleted_at IS NULL
+				ORDER BY CASE WHEN b.status = 'ACTIVE' THEN 0 ELSE 1 END, b.name
+				LIMIT 1
+				""")
+				.param("terminalCode", terminalCode)
+				.param("organizationId", organizationId)
 				.query((resultSet, rowNumber) -> new TerminalRecord(
 						resultSet.getObject("id", UUID.class),
 						resultSet.getObject("organization_id", UUID.class),

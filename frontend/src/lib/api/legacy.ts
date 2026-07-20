@@ -1304,9 +1304,20 @@ export async function changeMembershipPlan(
   });
 }
 
-export async function createKioskSession(terminalCode: string): Promise<KioskSessionResponse> {
+export type KioskSessionContext = {
+  organizationId?: string | null;
+  branchId?: string | null;
+};
+
+export async function createKioskSession(terminalCode: string, context: KioskSessionContext = {}): Promise<KioskSessionResponse> {
+  const headers: HeadersInit = {};
+  if (context.organizationId && context.branchId) {
+    headers["X-GymOS-Organization-Id"] = context.organizationId;
+    headers["X-GymOS-Branch-Id"] = context.branchId;
+  }
   return publicApiFetch<KioskSessionResponse>(`/self-service/terminals/${terminalCode}/sessions`, {
     method: "POST",
+    headers,
   });
 }
 

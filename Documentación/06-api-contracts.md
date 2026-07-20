@@ -170,6 +170,8 @@ Los endpoints de autoservicio sólo exponen acciones permitidas para clientes en
 
 La sesion publica de kiosco usa logo, nombre visible y colores del gimnasio al que pertenece el terminal. La sucursal vinculada define el contexto operativo del kiosco, no una marca visual propia.
 
+Cuando el frontend abre `/kiosk/{terminalCode}` desde una sesion autenticada, envia `X-GymOS-Organization-Id` y `X-GymOS-Branch-Id` para resolver correctamente codigos comunes como `KIOSK-MAIN` dentro del gimnasio activo.
+
 Nota implementada Hito 3: las acciones de renovacion y cambio de plan reciben `{membershipId}` en la ruta concreta:
 - `POST /self-service/sessions/{sessionId}/membership-renewals/{membershipId}`
 - `POST /self-service/sessions/{sessionId}/membership-change-requests/{membershipId}`

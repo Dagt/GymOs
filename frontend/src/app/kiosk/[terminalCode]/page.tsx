@@ -6,6 +6,7 @@ import {
   changeMembershipPlanFromKiosk,
   createKioskSession,
   endKioskSession,
+  getStoredSession,
   getKioskMembershipOptions,
   getKioskSummary,
   renewMembershipFromKiosk,
@@ -37,7 +38,11 @@ export default function KioskPage() {
       setLoading(true);
       setError(null);
       try {
-        const created = await createKioskSession(params.terminalCode);
+        const stored = getStoredSession();
+        const created = await createKioskSession(params.terminalCode, {
+          organizationId: stored?.user.organizationId,
+          branchId: stored?.user.branchId,
+        });
         if (active) {
           setSession(created);
         }
