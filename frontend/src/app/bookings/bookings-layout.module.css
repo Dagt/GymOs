@@ -166,6 +166,37 @@
   opacity: 0.45;
 }
 
+/* Reception and managers do not create resources: use the vacant second row. */
+.shell :global(.bookings-operational-layout) {
+  align-items: stretch;
+}
+
+.shell :global(.bookings-operational-layout > aside),
+.shell :global(.bookings-operational-agenda) {
+  height: 100%;
+}
+
+.shell :global(.bookings-operational-agenda) {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.shell :global(.bookings-operational-agenda > .mt-5.grid.gap-5) {
+  flex: 1;
+  min-height: 0;
+}
+
+.shell :global(.bookings-full-width-detail) {
+  grid-column: 1 / -1;
+  width: 100%;
+  margin-top: 0 !important;
+}
+
+.shell :global(.bookings-full-width-detail .snap-x) {
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)) !important;
+}
+
 @media (min-width: 768px) {
   .shell :global(.snap-x) {
     grid-template-columns: repeat(2, minmax(0, 1fr));
