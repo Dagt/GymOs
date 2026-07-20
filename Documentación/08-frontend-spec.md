@@ -185,6 +185,13 @@ Pantallas implementadas hasta Hito 5:
 - `/onboarding`: checklist vendible y setup piloto de organizacion, sucursal, catalogo base y kiosco.
 - `/clients/import`: importacion inicial CSV con dry-run, duplicados y resultado por fila.
 
+Reservas:
+- `/bookings` usa agenda diaria por recurso, con columnas por recurso y color estable por cada uno.
+- Nueva reserva no debe usar un desplegable de todos los socios; debe buscar por nombre, telefono o email.
+- La duracion se define al crear el recurso y la reserva solo captura dia/hora de inicio; la hora final se calcula automaticamente.
+- La pantalla no muestra seccion de pago de reserva en el flujo base, porque el acceso depende de membresias permitidas.
+- Disponibilidad y agenda del dia se integran en el mismo calendario visual.
+
 ## 8.10 Diseño visual
 
 - Interfaz limpia.

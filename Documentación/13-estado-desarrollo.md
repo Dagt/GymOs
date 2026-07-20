@@ -3,6 +3,22 @@
 Estado: en progreso  
 Fecha: 19 de julio de 2026
 
+## Correccion UX reservas - 20 de julio de 2026
+
+Implementado:
+
+- `/bookings` reemplaza el flujo anterior por una agenda diaria por recurso, con columnas por recurso y bloques de reserva con color propio.
+- Nueva reserva usa busqueda de socio por texto en lugar de desplegable con todos los clientes.
+- El formulario solo captura recurso, socio, dia/hora de inicio y notas; la hora final se calcula con la duracion (`slotMinutes`) del recurso.
+- La creacion de recurso permite definir tipo, capacidad, duracion y horario operativo.
+- Se elimina la seccion visible de pago de reserva del flujo base; las reservas se gobiernan por membresias permitidas.
+- Disponibilidad y agenda quedan integradas en un solo calendario visual.
+
+Verificado:
+
+- `npm.cmd run lint`
+- `npm.cmd run typecheck`
+
 ## Correccion permisos recepcion y marca de gimnasio - 20 de julio de 2026
 
 Implementado:
