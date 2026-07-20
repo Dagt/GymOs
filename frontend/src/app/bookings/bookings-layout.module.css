@@ -14,7 +14,30 @@
   min-width: 0;
 }
 
-/* Restore the selected-day detail to the previous responsive grid. */
+/* Keep the monthly calendar compact without changing its structure. */
+.shell :global(.grid-cols-7 > button) {
+  min-height: 4.75rem !important;
+  padding: 0.4rem !important;
+}
+
+.shell :global(.grid-cols-7 > button .h-8) {
+  height: 1.65rem !important;
+  min-width: 1.65rem !important;
+  padding-left: 0.35rem !important;
+  padding-right: 0.35rem !important;
+  font-size: 0.75rem !important;
+}
+
+.shell :global(.grid-cols-7 > button .mt-2) {
+  margin-top: 0.3rem !important;
+}
+
+.shell :global(.grid-cols-7 > button .text-xs) {
+  font-size: 0.68rem !important;
+  line-height: 0.9rem !important;
+}
+
+/* Restore the selected-day detail to a responsive resource grid. */
 .shell :global(.snap-x) {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr);
@@ -31,10 +54,46 @@
   scroll-snap-align: none !important;
 }
 
+/* The horizontal-scroll instruction is no longer applicable. */
+.shell :global(p:has(+ .snap-x)) {
+  display: none !important;
+}
+
+/* Show approximately three compact reservations per resource. */
 .shell :global(.max-h-\[24rem\]) {
-  max-height: none !important;
-  overflow-y: visible !important;
-  padding-right: 0 !important;
+  max-height: 13.5rem !important;
+  overflow-y: auto !important;
+  padding-right: 0.3rem !important;
+  scrollbar-gutter: stable;
+}
+
+/* Compact each individual reservation card and its typography. */
+.shell :global(.snap-start > div > article) {
+  padding: 0.5rem 0.625rem !important;
+}
+
+.shell :global(.snap-start > div > article > p:first-child) {
+  font-size: 0.58rem !important;
+  line-height: 0.75rem !important;
+}
+
+.shell :global(.snap-start > div > article > p:nth-child(2)) {
+  margin-top: 0.15rem !important;
+  font-size: 0.75rem !important;
+  line-height: 1rem !important;
+}
+
+.shell :global(.snap-start > div > article > p:nth-child(3)) {
+  font-size: 0.68rem !important;
+  line-height: 0.9rem !important;
+}
+
+.shell :global(.snap-start > div > article > button) {
+  height: 1.75rem !important;
+  margin-top: 0.45rem !important;
+  padding-left: 0.5rem !important;
+  padding-right: 0.5rem !important;
+  font-size: 0.65rem !important;
 }
 
 @media (min-width: 768px) {
