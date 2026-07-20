@@ -172,6 +172,7 @@ export default function BookingsPage() {
     || session?.user.roles.some((role) => role.toLowerCase().includes("recepcion"));
   const canManageResources = Boolean(session?.user.permissions.includes("resource.manage") && !isReceptionUser);
   const durationMinutes = Math.max(1, durationUnit === "HOURS" ? durationValue * 60 : durationValue);
+  const selectedDateIsPast = isPastDate(startDate);
   const computedEnd = activeResource && startDate && isValidTimeInput(startTime)
     ? addMinutes(`${startDate}T${startTime}`, activeResource.slotMinutes)
     : "";
@@ -191,7 +192,7 @@ export default function BookingsPage() {
 
   async function submitBooking(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!session || !activeResource || !clientId || !isValidTimeInput(startTime) || !computedEnd) {
+    if (!session || !activeResource || selectedDateIsPast || !clientId || !isValidTimeInput(startTime) || !computedEnd) {
       return;
     }
     setSaving(true);
@@ -310,6 +311,11 @@ export default function BookingsPage() {
         <aside className="grid content-start gap-5">
           {error ? <p className="rounded-md border border-[#e5b7b7] bg-[#fff4f4] px-3 py-2 text-sm text-[#8c2f2f]">{error}</p> : null}
           {message ? <p className="rounded-md border border-[#b8d9c3] bg-[#f0fbf3] px-3 py-2 text-sm text-[#2d6843]">{message}</p> : null}
+          {selectedDateIsPast ? (
+            <p className="rounded-md border border-[#d8ddd2] bg-[#f8faf8] px-3 py-2 text-sm text-[#5d6b63]">
+              Este dia ya paso. Puedes consultar el detalle historico, pero no crear nuevas reservas.
+            </p>
+          ) : null}
 
           <form className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm" onSubmit={submitBooking}>
             <div className="flex items-start justify-between gap-3">
@@ -399,7 +405,7 @@ export default function BookingsPage() {
               Notas
               <textarea className="min-h-20 rounded-md border border-[#cdd5ca] px-3 py-2" onChange={(event) => setNotes(event.target.value)} value={notes} />
             </label>
-            <button className="mt-5 h-11 w-full rounded-md bg-[var(--brand-primary)] px-4 text-sm font-semibold text-white shadow-sm disabled:opacity-60" disabled={saving || !resourceId || !clientId || !isValidTimeInput(startTime)} type="submit">
+            <button className="mt-5 h-11 w-full rounded-md bg-[var(--brand-primary)] px-4 text-sm font-semibold text-white shadow-sm disabled:opacity-60" disabled={saving || selectedDateIsPast || !resourceId || !clientId || !isValidTimeInput(startTime)} type="submit">
               Crear reserva
             </button>
           </form>
@@ -573,7 +579,8 @@ export default function BookingsPage() {
                     <p className="text-sm text-[#5d6b63]">Detalle del dia seleccionado.</p>
                   </div>
                   <button
-                    className="h-10 rounded-md border border-[var(--brand-primary)] px-3 text-sm font-semibold text-[var(--brand-primary)]"
+                    className="h-10 rounded-md border border-[var(--brand-primary)] px-3 text-sm font-semibold text-[var(--brand-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+                    disabled={selectedDateIsPast}
                     onClick={() => {
                       const resource = activeResource ?? resources[0];
                       const hours = resource ? resourceHoursForDay(resource, dateToWeekday(startDate)) : null;
@@ -584,7 +591,7 @@ export default function BookingsPage() {
                     }}
                     type="button"
                   >
-                    Usar este dia
+                    {selectedDateIsPast ? "Dia historico" : "Usar este dia"}
                   </button>
                 </div>
 
@@ -604,7 +611,8 @@ export default function BookingsPage() {
                           </div>
                           {hours ? (
                             <button
-                              className="rounded-md border border-[var(--brand-primary)] px-2 py-1 text-xs font-semibold text-[var(--brand-primary)]"
+                              className="rounded-md border border-[var(--brand-primary)] px-2 py-1 text-xs font-semibold text-[var(--brand-primary)] disabled:cursor-not-allowed disabled:opacity-50"
+                              disabled={selectedDateIsPast}
                               onClick={() => {
                                 setResourceId(resource.id);
                                 setStartTime(hours.opensAt);
@@ -711,12 +719,12 @@ function resourceHoursForDay(resource: ResourceSummary, weekday: WeekdayKey) {
   const schedule = parseResourceSchedule(resource);
   const scheduleDay = schedule?.find((day) => day.day === weekday);
   if (scheduleDay) {
-    return { opensAt: scheduleDay.opensAt, closesAt: scheduleDay.closesAt };
+    return { opensAt: normalizeTimeInput(scheduleDay.opensAt), closesAt: normalizeTimeInput(scheduleDay.closesAt) };
   }
   if (schedule) {
     return null;
   }
-  return { opensAt: resource.opensAt || "06:00", closesAt: resource.closesAt || "22:00" };
+  return { opensAt: normalizeTimeInput(resource.opensAt || "06:00"), closesAt: normalizeTimeInput(resource.closesAt || "22:00") };
 }
 
 function parseResourceSchedule(resource: ResourceSummary) {
@@ -736,6 +744,9 @@ function parseResourceSchedule(resource: ResourceSummary) {
 
 function addMinutes(localDateTime: string, minutes: number) {
   const date = new Date(localDateTime);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
   date.setMinutes(date.getMinutes() + minutes);
   return toLocalDateTimeInput(date);
 }
@@ -745,7 +756,11 @@ function formatTime(value: string) {
 }
 
 function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Hora invalida";
+  }
+  return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", hour: "2-digit", minute: "2-digit" }).format(date);
 }
 
 function formatLongDate(value: string) {
@@ -768,12 +783,21 @@ function parseDateInput(value: string) {
   return new Date(`${value}T00:00:00`);
 }
 
+function isPastDate(value: string) {
+  return parseDateInput(value).getTime() < parseDateInput(toDateInput(new Date())).getTime();
+}
+
 function dateToWeekday(value: string): WeekdayKey {
   return weekdays[(parseDateInput(value).getDay() + 6) % 7].key;
 }
 
 function isValidTimeInput(value: string) {
-  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(normalizeTimeInput(value));
+}
+
+function normalizeTimeInput(value: string) {
+  const match = value.match(/^([01]\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?$/);
+  return match ? `${match[1]}:${match[2]}` : value;
 }
 
 function timeToMinutes(value: string) {

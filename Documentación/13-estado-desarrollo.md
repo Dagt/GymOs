@@ -31,6 +31,7 @@ Implementado:
 - Se elimina la seccion visible de pago de reserva del flujo base; las reservas se gobiernan por membresias permitidas.
 - Disponibilidad y agenda quedan integradas en un solo calendario visual.
 - El campo de hora valida formato `HH:mm` antes de calcular la hora final para evitar errores al capturar minutos.
+- Los horarios de recursos se normalizan a `HH:mm` aunque la API devuelva segundos, y los dias pasados solo permiten consulta historica sin crear reservas.
 
 Verificado:
 
