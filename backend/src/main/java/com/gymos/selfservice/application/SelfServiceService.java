@@ -1,6 +1,11 @@
 package com.gymos.selfservice.application;
 
 import com.gymos.audit.api.AuditService;
+import com.gymos.bookings.application.BookingService;
+import com.gymos.bookings.application.command.CreateBookingCommand;
+import com.gymos.bookings.infrastructure.BookingRepository.AvailabilitySlot;
+import com.gymos.bookings.infrastructure.BookingRepository.BookingRecord;
+import com.gymos.bookings.infrastructure.BookingRepository.ResourceRecord;
 import com.gymos.clients.api.operations.ClientLookupOperations;
 import com.gymos.clients.api.operations.SelfServiceClientProfile;
 import com.gymos.clients.api.operations.VerifyClientIdentityCommand;
@@ -27,6 +32,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Base64;
 import java.util.List;
@@ -45,6 +51,7 @@ public class SelfServiceService {
 	private final SelfServiceRepository repository;
 	private final MembershipOperations membershipOperations;
 	private final ClientLookupOperations clientLookupOperations;
+	private final BookingService bookingService;
 	private final AuditService auditService;
 	private final RateLimiter rateLimiter;
 
@@ -52,12 +59,14 @@ public class SelfServiceService {
 			SelfServiceRepository repository,
 			MembershipOperations membershipOperations,
 			ClientLookupOperations clientLookupOperations,
+			BookingService bookingService,
 			AuditService auditService,
 			RateLimiter rateLimiter
 	) {
 		this.repository = repository;
 		this.membershipOperations = membershipOperations;
 		this.clientLookupOperations = clientLookupOperations;
+		this.bookingService = bookingService;
 		this.auditService = auditService;
 		this.rateLimiter = rateLimiter;
 	}
@@ -71,30 +80,9 @@ public class SelfServiceService {
 		OffsetDateTime now = OffsetDateTime.now();
 		UUID sessionId = UUID.randomUUID();
 		String sessionToken = randomToken();
-		repository.createSession(
-				sessionId,
-				terminal.organizationId(),
-				terminal.branchId(),
-				terminal.id(),
-				now,
-				now.plusMinutes(SESSION_MINUTES),
-				originIp,
-				tokenHash(sessionToken)
-		);
+		repository.createSession(sessionId, terminal.organizationId(), terminal.branchId(), terminal.id(), now, now.plusMinutes(SESSION_MINUTES), originIp, tokenHash(sessionToken));
 		auditService.recordSystem(terminal.organizationId(), terminal.branchId(), null, "SELF_SERVICE_SESSION_STARTED", "SELF_SERVICE_SESSION", sessionId, "SELF_SERVICE_KIOSK", terminal.deviceCode(), correlationId);
-		return new CreateSessionResult(
-				sessionId,
-				sessionToken,
-				terminal.name(),
-				terminal.tradeName(),
-				terminal.brandName(),
-				terminal.logoUrl(),
-				terminal.primaryColor(),
-				terminal.accentColor(),
-				terminal.surfaceColor(),
-				now.plusMinutes(SESSION_MINUTES),
-				false
-		);
+		return new CreateSessionResult(sessionId, sessionToken, terminal.name(), terminal.tradeName(), terminal.brandName(), terminal.logoUrl(), terminal.primaryColor(), terminal.accentColor(), terminal.surfaceColor(), now.plusMinutes(SESSION_MINUTES), false);
 	}
 
 	@Transactional
@@ -103,13 +91,7 @@ public class SelfServiceService {
 		rateLimiter.check("kiosk:verify:session:" + sessionId, 10, Duration.ofMinutes(1));
 		SessionRecord session = activeSession(sessionId, sessionToken);
 		ensureNotBlocked(session);
-		var client = clientLookupOperations.verifyForSelfService(new VerifyClientIdentityCommand(
-						session.organizationId(),
-						session.branchId(),
-						request.identifier(),
-						request.birthDate()
-				))
-				.orElse(null);
+		var client = clientLookupOperations.verifyForSelfService(new VerifyClientIdentityCommand(session.organizationId(), session.branchId(), request.identifier(), request.birthDate())).orElse(null);
 		if (client == null) {
 			recordFailedVerification(session, correlationId);
 			throw new BusinessException("SELF_SERVICE_VERIFICATION_FAILED", "No fue posible verificar la sesion con los datos proporcionados.");
@@ -126,19 +108,35 @@ public class SelfServiceService {
 		SelfServiceClientProfile client = clientLookupOperations.selfServiceProfile(session.organizationId(), session.clientId()).orElse(null);
 		List<MembershipRecord> memberships = repository.memberships(session.organizationId(), session.branchId(), session.clientId());
 		List<PendingPaymentRecord> pendingPayments = repository.pendingPayments(session.organizationId(), session.branchId(), session.clientId());
-		return new SelfServiceSummaryResult(
-				session.id(),
-				session.expiresAt(),
-				client == null ? "Cliente" : client.displayName(),
-				memberships,
-				pendingPayments
-		);
+		return new SelfServiceSummaryResult(session.id(), session.expiresAt(), client == null ? "Cliente" : client.displayName(), memberships, pendingPayments);
 	}
 
 	@Transactional(readOnly = true)
 	public List<PlanOptionRecord> membershipOptions(UUID sessionId, String sessionToken) {
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
 		return repository.planOptions(session.organizationId());
+	}
+
+	@Transactional(readOnly = true)
+	public List<ResourceRecord> bookingResources(UUID sessionId, String sessionToken) {
+		SessionRecord session = verifiedSession(sessionId, sessionToken);
+		return bookingService.resources(kioskPrincipal(session));
+	}
+
+	@Transactional(readOnly = true)
+	public List<AvailabilitySlot> bookingAvailability(UUID sessionId, String sessionToken, UUID resourceId, LocalDate date) {
+		SessionRecord session = verifiedSession(sessionId, sessionToken);
+		return bookingService.availability(kioskPrincipal(session), resourceId, date);
+	}
+
+	@Transactional
+	public BookingRecord createBooking(UUID sessionId, String sessionToken, UUID resourceId, OffsetDateTime startsAt, OffsetDateTime endsAt, String notes, String correlationId, String originIp) {
+		rateLimiter.check("kiosk:booking:ip:" + originIp, 30, Duration.ofMinutes(1));
+		rateLimiter.check("kiosk:booking:session:" + sessionId, 10, Duration.ofMinutes(1));
+		SessionRecord session = verifiedSession(sessionId, sessionToken);
+		BookingRecord booking = bookingService.createBooking(kioskPrincipal(session), new CreateBookingCommand(resourceId, session.clientId(), startsAt, endsAt, notes), correlationId);
+		auditService.recordSystem(session.organizationId(), session.branchId(), null, "SELF_SERVICE_BOOKING_CREATED", "BOOKING", booking.id(), "SELF_SERVICE_KIOSK", null, correlationId);
+		return booking;
 	}
 
 	@Transactional
@@ -162,28 +160,7 @@ public class SelfServiceService {
 	}
 
 	private SelfServiceMembershipSaleResult toResponse(MembershipSaleOperationResult result) {
-		return new SelfServiceMembershipSaleResult(
-				result.saleId(),
-				result.saleNumber(),
-				result.saleStatus(),
-				result.totalCents(),
-				result.paidCents(),
-				result.balanceCents(),
-				result.currency(),
-				result.membership() == null ? null : new SelfServiceMembershipSummaryResult(
-						result.membership().id(),
-						result.membership().clientId(),
-						result.membership().planId(),
-						result.membership().planName(),
-						result.membership().saleId(),
-						result.membership().saleNumber(),
-						result.membership().status(),
-						result.membership().activatedAt(),
-						result.membership().startsOn(),
-						result.membership().endsOn(),
-						result.membership().graceEndsOn()
-				)
-		);
+		return new SelfServiceMembershipSaleResult(result.saleId(), result.saleNumber(), result.saleStatus(), result.totalCents(), result.paidCents(), result.balanceCents(), result.currency(), result.membership() == null ? null : new SelfServiceMembershipSummaryResult(result.membership().id(), result.membership().clientId(), result.membership().planId(), result.membership().planName(), result.membership().saleId(), result.membership().saleNumber(), result.membership().status(), result.membership().activatedAt(), result.membership().startsOn(), result.membership().endsOn(), result.membership().graceEndsOn()));
 	}
 
 	@Transactional
@@ -195,28 +172,19 @@ public class SelfServiceService {
 
 	private SessionRecord verifiedSession(UUID sessionId, String sessionToken) {
 		SessionRecord session = activeSession(sessionId, sessionToken);
-		if (session.clientId() == null) {
-			throw new BusinessException("SELF_SERVICE_SESSION_NOT_VERIFIED", "Primero verifica tu identidad.");
-		}
+		if (session.clientId() == null) throw new BusinessException("SELF_SERVICE_SESSION_NOT_VERIFIED", "Primero verifica tu identidad.");
 		return session;
 	}
 
 	private SessionRecord activeSession(UUID sessionId, String sessionToken) {
-		SessionRecord session = repository.session(sessionId)
-				.orElseThrow(() -> new BusinessException("SELF_SERVICE_SESSION_NOT_FOUND", "La sesion no existe."));
-		if (session.sessionTokenHash() == null || sessionToken == null || !MessageDigest.isEqual(session.sessionTokenHash().getBytes(StandardCharsets.UTF_8), tokenHash(sessionToken).getBytes(StandardCharsets.UTF_8))) {
-			throw new BusinessException("SELF_SERVICE_SESSION_INVALID", "La sesion del kiosco no es valida.");
-		}
-		if (!"ACTIVE".equals(session.status()) || session.expiresAt().isBefore(OffsetDateTime.now())) {
-			throw new BusinessException("SELF_SERVICE_SESSION_EXPIRED", "La sesion del kiosco expiro.");
-		}
+		SessionRecord session = repository.session(sessionId).orElseThrow(() -> new BusinessException("SELF_SERVICE_SESSION_NOT_FOUND", "La sesion no existe."));
+		if (session.sessionTokenHash() == null || sessionToken == null || !MessageDigest.isEqual(session.sessionTokenHash().getBytes(StandardCharsets.UTF_8), tokenHash(sessionToken).getBytes(StandardCharsets.UTF_8))) throw new BusinessException("SELF_SERVICE_SESSION_INVALID", "La sesion del kiosco no es valida.");
+		if (!"ACTIVE".equals(session.status()) || session.expiresAt().isBefore(OffsetDateTime.now())) throw new BusinessException("SELF_SERVICE_SESSION_EXPIRED", "La sesion del kiosco expiro.");
 		return session;
 	}
 
 	private void ensureNotBlocked(SessionRecord session) {
-		if (session.blockedUntil() != null && session.blockedUntil().isAfter(OffsetDateTime.now())) {
-			throw new BusinessException("SELF_SERVICE_SESSION_BLOCKED", "Demasiados intentos. Espera un momento y vuelve a intentar.");
-		}
+		if (session.blockedUntil() != null && session.blockedUntil().isAfter(OffsetDateTime.now())) throw new BusinessException("SELF_SERVICE_SESSION_BLOCKED", "Demasiados intentos. Espera un momento y vuelve a intentar.");
 	}
 
 	private void recordFailedVerification(SessionRecord session, String correlationId) {
@@ -232,17 +200,11 @@ public class SelfServiceService {
 	}
 
 	private String randomToken() {
-		byte[] bytes = new byte[32];
-		SECURE_RANDOM.nextBytes(bytes);
-		return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+		byte[] bytes = new byte[32]; SECURE_RANDOM.nextBytes(bytes); return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
 	}
 
 	private String tokenHash(String token) {
-		try {
-			byte[] digest = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
-			return Base64.getEncoder().encodeToString(digest);
-		} catch (NoSuchAlgorithmException exception) {
-			throw new IllegalStateException("SHA-256 is required", exception);
-		}
+		try { return Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8))); }
+		catch (NoSuchAlgorithmException exception) { throw new IllegalStateException("SHA-256 is required", exception); }
 	}
 }
