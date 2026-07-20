@@ -1,7 +1,5 @@
 .shell {
-  min-width: 0;
-  max-width: 100%;
-  overflow-x: hidden;
+  display: contents;
 }
 
 .shell :global(.admin-console),
@@ -9,7 +7,6 @@
 .shell :global(.admin-workspace > *),
 .shell :global(.admin-workspace section) {
   min-width: 0;
-  max-width: 100%;
 }
 
 .shell :global(.grid-cols-7) {
@@ -17,6 +14,37 @@
   min-width: 0;
 }
 
-.shell :global(.overflow-x-auto) {
-  max-width: 100%;
+/* Restore the selected-day detail to the previous responsive grid. */
+.shell :global(.snap-x) {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.75rem;
+  overflow-x: visible !important;
+  padding-bottom: 0 !important;
+  scroll-snap-type: none !important;
+}
+
+.shell :global(.snap-start) {
+  width: auto !important;
+  min-width: 0;
+  max-width: none !important;
+  scroll-snap-align: none !important;
+}
+
+.shell :global(.max-h-\[24rem\]) {
+  max-height: none !important;
+  overflow-y: visible !important;
+  padding-right: 0 !important;
+}
+
+@media (min-width: 768px) {
+  .shell :global(.snap-x) {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1280px) {
+  .shell :global(.snap-x) {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
