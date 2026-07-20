@@ -77,6 +77,7 @@ export default function BookingsPage() {
   const [saving, setSaving] = useState(false);
 
   const today = toDateInput(new Date());
+  const minimumBookingTime = startDate === today ? currentTimeInput() : undefined;
   const activeBookings = useMemo(() => bookings.filter((booking) => booking.status !== "CANCELLED"), [bookings]);
   const monthDates = useMemo(() => buildMonthDates(calendarDate), [calendarDate]);
   const selectedDateBookings = useMemo(
@@ -345,7 +346,7 @@ export default function BookingsPage() {
               </label>
               <label className="grid gap-2 text-sm font-medium">
                 Hora
-                <input className={`h-11 rounded-md border px-3 ${selectedStartIsPast ? "border-red-500 bg-red-50" : "border-[#cdd5ca]"}`} min={startDate === today ? currentTimeInput() : undefined} onChange={(event) => setStartTime(event.target.value)} required step={300} type="time" value={startTime} />
+                <input className={`h-11 rounded-md border px-3 ${selectedStartIsPast ? "border-red-500 bg-red-50" : "border-[#cdd5ca]"}`} min={minimumBookingTime} onChange={(event) => setStartTime(event.target.value)} required step={300} type="time" value={startTime} />
               </label>
             </div>
             {selectedStartIsPast ? <p className="mt-2 text-sm font-medium text-red-700">Selecciona una hora posterior a la hora actual.</p> : null}
@@ -585,7 +586,12 @@ function isPastDateTime(date: string, time: string) {
 }
 
 function currentTimeInput(date = new Date()) {
-  return `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  const rounded = new Date(date);
+
+  rounded.setSeconds(0, 0);
+  rounded.setMinutes(Math.ceil(rounded.getMinutes() / 5) * 5);
+
+  return `${String(rounded.getHours()).padStart(2, "0")}:${String(rounded.getMinutes(), ).padStart(2, "0")}`;
 }
 
 function addMinutes(localDateTime: string, minutes: number) {
