@@ -12,6 +12,7 @@ import com.gymos.bookings.infrastructure.BookingRepository.BookingRecord;
 import com.gymos.bookings.infrastructure.BookingRepository.CreateBookingData;
 import com.gymos.bookings.infrastructure.BookingRepository.CreateResourceData;
 import com.gymos.bookings.infrastructure.BookingRepository.ResourceRecord;
+import com.gymos.bookings.infrastructure.ClientBookingConflictRepository;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import java.time.LocalDate;
@@ -34,10 +35,16 @@ public class BookingService {
 	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
 	private final BookingRepository bookingRepository;
+	private final ClientBookingConflictRepository clientBookingConflictRepository;
 	private final AuditService auditService;
 
-	public BookingService(BookingRepository bookingRepository, AuditService auditService) {
+	public BookingService(
+			BookingRepository bookingRepository,
+			ClientBookingConflictRepository clientBookingConflictRepository,
+			AuditService auditService
+	) {
 		this.bookingRepository = bookingRepository;
+		this.clientBookingConflictRepository = clientBookingConflictRepository;
 		this.auditService = auditService;
 	}
 
@@ -132,6 +139,19 @@ public class BookingService {
 				.orElseThrow(() -> new BusinessException("BOOKING_OUTSIDE_RESOURCE_HOURS", "El recurso no opera el dia seleccionado."));
 		if (localStart.toLocalTime().isBefore(hours.opensAt()) || localEnd.toLocalTime().isAfter(hours.closesAt())) {
 			throw new BusinessException("BOOKING_OUTSIDE_RESOURCE_HOURS", "La reserva esta fuera del horario operativo del recurso para ese dia.");
+		}
+
+		if (clientBookingConflictRepository.hasOverlappingBooking(
+				principal.organizationId(),
+				principal.branchId(),
+				command.clientId(),
+				command.startsAt(),
+				command.endsAt()
+		)) {
+			throw new BusinessException(
+					"BOOKING_CLIENT_CONFLICT",
+					"El socio ya tiene otra reserva que coincide con este horario."
+			);
 		}
 
 		int reserved = bookingRepository.overlappingBookings(principal.organizationId(), principal.branchId(), command.resourceId(), command.startsAt(), command.endsAt());
