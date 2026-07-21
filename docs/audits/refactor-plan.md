@@ -230,7 +230,7 @@ Objetivos:
 
 ## Fase 8 — Limpieza transversal
 
-Estado: `PLANNED`
+Estado: `IN_PROGRESS`
 
 - Código muerto.
 - Imports y tipos duplicados.
@@ -238,6 +238,13 @@ Estado: `PLANNED`
 - Errores y mensajes inconsistentes.
 - Utilidades duplicadas de fecha, moneda y UUID.
 - Documentación desactualizada.
+
+Avance:
+
+- `AppShell` centraliza la marca visible de la consola, incluyendo logo del tenant cuando existe.
+- `AppDrawer` queda como patrón común para mover formularios densos a paneles laterales reutilizables.
+- La administración de gimnasios usa `AppDrawer` para alta de gimnasio y sucursal, retirando drawers específicos de la página.
+- `AppNavigation` fue eliminado por no tener consumidores y para evitar modelos paralelos de navegación.
 
 ## Fase 9 — Verificación final
 

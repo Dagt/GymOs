@@ -792,3 +792,14 @@ Implementado:
 - Esta decision quedo reemplazada por `V27`: la marca vuelve a vivir solo en el gimnasio y el dueño recibe una sucursal operativa por defecto.
 - `AppShell` conserva selector de sucursal operativa para cambiar explicitamente el contexto de trabajo cuando el gimnasio tiene multiples sedes.
 - `/reception` se rediseña con franja de marca, comando principal de caja, carril de acciones y panel de turno para reducir la sensacion de tablero plano lleno de tarjetas.
+
+## Base visual y simplificacion de shell - 21 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `AppShell` resuelve la marca visible desde un solo lugar y muestra el logo del gimnasio en el menu lateral cuando el tenant lo tiene configurado.
+- La consola de plataforma conserva marca neutral de GymOS; las consolas tenant usan nombre, logo y sucursal activa del gimnasio.
+- Se agrego `AppDrawer` como componente comun para mover formularios densos a paneles laterales reutilizables.
+- `/platform/gymnasiums` usa `AppDrawer` para alta de gimnasio y alta de sucursal, evitando drawers propios de la pagina.
+- Se retiro `AppNavigation`, que ya no tenia consumidores, para mantener un solo modelo de navegacion visible.
+- La siguiente etapa recomendada es migrar formularios permanentes de `/users`, `/catalog`, `/clients` y `/settings/organization` a drawers/modales por caso de uso.

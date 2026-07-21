@@ -12,6 +12,8 @@
   --brand-card: rgba(255, 255, 255, 0.9);
   --brand-primary-soft: color-mix(in srgb, var(--brand-primary) 11%, white);
   --brand-accent-soft: color-mix(in srgb, var(--brand-accent) 14%, white);
+  --brand-primary-border: color-mix(in srgb, var(--brand-primary) 30%, var(--brand-line));
+  --brand-accent-border: color-mix(in srgb, var(--brand-accent) 42%, var(--brand-line));
 }
 
 @theme inline {
@@ -1166,6 +1168,18 @@ th {
   width: 2.6rem;
 }
 
+.admin-sidebar-brand > span.with-logo {
+  background: white;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  overflow: hidden;
+}
+
+.admin-sidebar-brand > span img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
 .admin-sidebar-brand div {
   display: grid;
   min-width: 0;
@@ -1218,7 +1232,7 @@ th {
 }
 
 .admin-nav-section {
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 0.65rem;
   display: grid;
   gap: 0.3rem;
@@ -1231,6 +1245,8 @@ th {
 
 .admin-nav-section summary {
   align-items: center;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 0.5rem;
   cursor: pointer;
   display: flex;
   justify-content: space-between;
@@ -1355,7 +1371,9 @@ th {
 
 .admin-command-bar {
   align-items: center;
-  background: rgba(255, 255, 255, 0.9);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.94), color-mix(in srgb, var(--brand-accent) 6%, white)),
+    radial-gradient(circle at 96% 0%, color-mix(in srgb, var(--brand-primary) 10%, transparent), transparent 18rem);
   display: flex;
   gap: 1rem;
   justify-content: space-between;
@@ -1392,8 +1410,8 @@ th {
 }
 
 .admin-role-chip {
-  background: color-mix(in srgb, var(--brand-accent) 10%, white);
-  border: 1px solid color-mix(in srgb, var(--brand-accent) 30%, var(--brand-line));
+  background: color-mix(in srgb, var(--brand-accent) 12%, white);
+  border: 1px solid var(--brand-accent-border);
   border-radius: 0.5rem;
   display: grid;
   gap: 0.08rem;
@@ -1421,7 +1439,7 @@ th {
 
 .admin-branch-switcher {
   background: color-mix(in srgb, var(--brand-primary) 8%, white);
-  border: 1px solid color-mix(in srgb, var(--brand-primary) 18%, var(--brand-line));
+  border: 1px solid var(--brand-primary-border);
   border-radius: 0.65rem;
   display: grid;
   gap: 0.15rem;
@@ -1479,6 +1497,81 @@ th {
   color: var(--brand-ink);
   font-weight: 850;
   padding: 0.75rem 0.9rem;
+}
+
+.app-drawer {
+  inset: 0;
+  padding: clamp(0.75rem, 2vw, 1rem);
+  position: fixed;
+  z-index: 80;
+}
+
+.app-drawer-backdrop {
+  background: rgba(15, 23, 42, 0.45);
+  inset: 0;
+  position: absolute;
+}
+
+.app-drawer-card {
+  background: var(--brand-card);
+  border: 1px solid var(--brand-line);
+  border-radius: 0.85rem;
+  box-shadow: 0 28px 90px rgba(15, 23, 42, 0.22);
+  display: grid;
+  gap: 1rem;
+  margin-left: auto;
+  max-height: calc(100vh - 2rem);
+  max-width: 34rem;
+  overflow: auto;
+  padding: 1rem;
+  position: relative;
+  width: min(100%, 34rem);
+}
+
+.app-drawer-card header {
+  align-items: start;
+  border-bottom: 1px solid var(--brand-line);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding-bottom: 0.85rem;
+}
+
+.app-drawer-card header p {
+  color: var(--brand-primary);
+  font-size: 0.72rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.app-drawer-card header h2 {
+  color: var(--brand-ink);
+  font-size: 1.35rem;
+  font-weight: 950;
+  margin-top: 0.2rem;
+}
+
+.app-drawer-card header span {
+  color: var(--brand-muted);
+  display: block;
+  line-height: 1.45;
+  margin-top: 0.35rem;
+}
+
+.app-drawer-card header button {
+  background: white;
+  border: 1px solid var(--brand-line);
+  border-radius: 0.55rem;
+  color: var(--brand-ink);
+  flex: 0 0 auto;
+  font-weight: 900;
+  min-height: 2.35rem;
+  padding: 0 0.75rem;
+}
+
+.app-drawer-body {
+  display: grid;
+  gap: 1rem;
 }
 
 .admin-content-grid {
@@ -2184,8 +2277,7 @@ th {
 }
 
 .platform-list-panel,
-.platform-detail-panel,
-.platform-drawer-card {
+.platform-detail-panel {
   background: rgba(255, 255, 255, 0.92);
   border: 1px solid var(--brand-line);
   border-radius: 0.85rem;
@@ -2203,8 +2295,7 @@ th {
 }
 
 .platform-list-header,
-.platform-detail-header,
-.platform-drawer-card header {
+.platform-detail-header {
   align-items: center;
   display: flex;
   gap: 1rem;
@@ -2212,8 +2303,7 @@ th {
 }
 
 .platform-list-header h2,
-.platform-detail-header h2,
-.platform-drawer-card h2 {
+.platform-detail-header h2 {
   font-size: 1.35rem;
   font-weight: 950;
 }
@@ -2597,31 +2687,6 @@ th {
   color: var(--brand-primary);
   font-size: 0.88rem;
   font-weight: 950;
-}
-
-.platform-drawer {
-  background: rgba(15, 23, 42, 0.42);
-  inset: 0;
-  padding: 1rem;
-  position: fixed;
-  z-index: 50;
-}
-
-.platform-drawer-card {
-  display: grid;
-  gap: 1rem;
-  margin-left: auto;
-  max-height: calc(100vh - 2rem);
-  max-width: 30rem;
-  overflow: auto;
-}
-
-.platform-drawer-card header button {
-  border: 1px solid var(--brand-line);
-  border-radius: 0.5rem;
-  font-weight: 850;
-  min-height: 2.4rem;
-  padding: 0 0.75rem;
 }
 
 .admin-hero-card {

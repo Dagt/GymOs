@@ -48,6 +48,7 @@ Para cada dominio se registrarán: contratos, reglas, dependencias, deuda, cober
 - Transporte HTTP común y clientes por dominio.
 - Fachada legacy de `frontend/src/lib/api` eliminada; revisar clientes especiales fuera del paquete API antes de nuevas unificaciones.
 - Estado, errores y permisos consistentes.
+- Shell lateral único con marca tenant y componentes comunes para paneles/modales antes de seguir dividiendo páginas grandes.
 - Sin manipulación directa del DOM para implementar lógica de producto.
 - Accesibilidad, navegación por teclado, i18n y formato regional.
 - Pruebas de utilidades, componentes críticos y flujos operativos.

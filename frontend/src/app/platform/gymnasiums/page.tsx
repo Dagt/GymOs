@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { AppDrawer } from "@/components/AppDrawer";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired } from "@/components/AuthRequired";
 import {
@@ -532,16 +533,12 @@ export default function PlatformGymnasiumsPage() {
         </section>
       </section>
 
-      {showCreate ? (
-        <aside className="platform-drawer" aria-label="Nuevo gimnasio">
-          <div className="platform-drawer-card">
-            <header>
-              <div>
-                <p className="app-eyebrow">Nuevo gimnasio</p>
-                <h2>Alta de gimnasio</h2>
-              </div>
-              <button onClick={() => setShowCreate(false)} type="button">Cerrar</button>
-            </header>
+      <AppDrawer
+        description="Registra el tenant y su marca. Las sucursales se crean despues desde el detalle del gimnasio."
+        onClose={() => setShowCreate(false)}
+        open={showCreate}
+        title="Alta de gimnasio"
+      >
             <form className="grid gap-4" onSubmit={submitOrganization}>
               <TextField error={fieldErrors.tradeName} label="Nombre comercial" name="tradeName" value={form.tradeName} onChange={(value) => setForm({ ...form, tradeName: value, brandName: form.brandName || value })} />
               <TextField error={fieldErrors.legalName} label="Nombre legal" name="legalName" value={form.legalName} onChange={(value) => setForm({ ...form, legalName: value })} />
@@ -563,20 +560,14 @@ export default function PlatformGymnasiumsPage() {
               </div>
               <button className="form-primary-button" disabled={saving} type="submit">Crear gimnasio</button>
             </form>
-          </div>
-        </aside>
-      ) : null}
+      </AppDrawer>
 
-      {showCreateBranch ? (
-        <aside className="platform-drawer" aria-label="Nueva sucursal">
-          <div className="platform-drawer-card">
-            <header>
-              <div>
-                <p className="app-eyebrow">{selectedOrganization?.tradeName}</p>
-                <h2>Crear sucursal</h2>
-              </div>
-              <button onClick={() => setShowCreateBranch(false)} type="button">Cerrar</button>
-            </header>
+      <AppDrawer
+        description={selectedOrganization ? `Nueva sede para ${selectedOrganization.tradeName}.` : "Nueva sede del gimnasio seleccionado."}
+        onClose={() => setShowCreateBranch(false)}
+        open={showCreateBranch}
+        title="Crear sucursal"
+      >
             <form className="grid gap-4" onSubmit={submitBranch}>
               <TextField error={branchFieldErrors.name} label="Nombre de sucursal" name="branchName" value={branchForm.name} onChange={(value) => setBranchForm({ ...branchForm, name: value })} />
               <TextField error={branchFieldErrors.code} label="Codigo corto" name="branchCode" value={branchForm.code} onChange={(value) => setBranchForm({ ...branchForm, code: value })} />
@@ -584,9 +575,7 @@ export default function PlatformGymnasiumsPage() {
               <TextField error={branchFieldErrors.timezone} label="Zona horaria" name="branchTimezone" value={branchForm.timezone} onChange={(value) => setBranchForm({ ...branchForm, timezone: value })} />
               <button className="form-primary-button" disabled={saving} type="submit">Crear sucursal</button>
             </form>
-          </div>
-        </aside>
-      ) : null}
+      </AppDrawer>
     </AppShell>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { clearSession, getBranches, selectBranch, selectOrganization, storeSession, type StoredSession } from "@/lib/api";
@@ -15,6 +16,12 @@ import {
 type ShellAction = {
   href: string;
   label: string;
+};
+
+type ShellBrand = {
+  logoUrl?: string | null;
+  name: string;
+  scope: string;
 };
 
 type NavigationLink = {
@@ -174,6 +181,12 @@ export function AppShell({
     }))
     .filter((section) => section.links.length > 0);
   const visibleActions = variant === "platform" ? actions : [];
+  const brand = resolveShellBrand({
+    organizationName,
+    session,
+    variant,
+    visibleBranch,
+  });
 
   useEffect(() => {
     if (variant === "platform" || (isPlatformAdmin(session.user) && !isSupportMode(session.user))) {
@@ -249,10 +262,12 @@ export function AppShell({
       {!hideSidebar ? (
       <aside className="admin-sidebar">
         <div className="admin-sidebar-brand">
-          <span>G</span>
+          <span className={brand.logoUrl ? "with-logo" : undefined}>
+            {brand.logoUrl ? <Image alt="" height={48} src={brand.logoUrl} unoptimized width={48} /> : "G"}
+          </span>
           <div>
-            <strong>{variant === "platform" ? "GymOS Plataforma" : organizationName ?? session.user.brandName ?? session.user.organizationName ?? "GymOS"}</strong>
-            <small>{variant === "platform" ? "CRM de gimnasios" : visibleBranch}</small>
+            <strong>{brand.name}</strong>
+            <small>{brand.scope}</small>
           </div>
         </div>
 
@@ -413,4 +428,30 @@ function canUseWithoutBranch(hasBranch: boolean, link: NavigationLink) {
 
 function isActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function resolveShellBrand({
+  organizationName,
+  session,
+  variant,
+  visibleBranch,
+}: {
+  organizationName?: string | null;
+  session: StoredSession;
+  variant?: "platform" | "tenant";
+  visibleBranch: string;
+}): ShellBrand {
+  if (variant === "platform" || (isPlatformAdmin(session.user) && !isSupportMode(session.user))) {
+    return {
+      logoUrl: null,
+      name: "GymOS Plataforma",
+      scope: "CRM de gimnasios",
+    };
+  }
+
+  return {
+    logoUrl: session.user.logoUrl,
+    name: organizationName ?? session.user.brandName ?? session.user.organizationName ?? "GymOS",
+    scope: visibleBranch,
+  };
 }
