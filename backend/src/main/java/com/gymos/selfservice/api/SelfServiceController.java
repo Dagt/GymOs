@@ -1,8 +1,8 @@
 package com.gymos.selfservice.api;
 
-import com.gymos.bookings.infrastructure.BookingRepository.AvailabilitySlot;
-import com.gymos.bookings.infrastructure.BookingRepository.BookingRecord;
-import com.gymos.bookings.infrastructure.BookingRepository.ResourceRecord;
+import com.gymos.bookings.api.operations.BookingOperations.BookingAvailability;
+import com.gymos.bookings.api.operations.BookingOperations.BookingResource;
+import com.gymos.bookings.api.operations.BookingOperations.BookingResult;
 import com.gymos.common.api.Correlation;
 import com.gymos.memberships.api.operations.ChangeMembershipPlanOperationCommand;
 import com.gymos.memberships.api.operations.RenewMembershipOperationCommand;
@@ -64,17 +64,17 @@ public class SelfServiceController {
 	}
 
 	@GetMapping("/sessions/{sessionId}/booking-resources")
-	List<ResourceRecord> bookingResources(@PathVariable UUID sessionId, @RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken) {
+	List<BookingResource> bookingResources(@PathVariable UUID sessionId, @RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken) {
 		return selfServiceService.bookingResources(sessionId, sessionToken);
 	}
 
 	@GetMapping("/sessions/{sessionId}/booking-availability")
-	List<AvailabilitySlot> bookingAvailability(@PathVariable UUID sessionId, @RequestParam UUID resourceId, @RequestParam LocalDate date, @RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken) {
+	List<BookingAvailability> bookingAvailability(@PathVariable UUID sessionId, @RequestParam UUID resourceId, @RequestParam LocalDate date, @RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken) {
 		return selfServiceService.bookingAvailability(sessionId, sessionToken, resourceId, date);
 	}
 
 	@PostMapping("/sessions/{sessionId}/bookings")
-	BookingRecord createBooking(@PathVariable UUID sessionId, @Valid @RequestBody CreateBookingRequest request, @RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken, HttpServletRequest servletRequest) {
+	BookingResult createBooking(@PathVariable UUID sessionId, @Valid @RequestBody CreateBookingRequest request, @RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken, HttpServletRequest servletRequest) {
 		return selfServiceService.createBooking(sessionId, sessionToken, request.resourceId(), request.startsAt(), request.endsAt(), request.notes(), correlationId(servletRequest), servletRequest.getRemoteAddr());
 	}
 
