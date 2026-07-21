@@ -76,7 +76,7 @@ class SalesBranchIsolationTests {
 
 		assertThatThrownBy(() -> salesService.requestRefund(principal, saleId, command, "test-correlation"))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
-						assertThat(exception.code()).isEqualTo("SALE_NOT_FOUND"));
+						assertThat(exception.code()).isEqualTo("SALE_BRANCH_MISMATCH"));
 
 		verify(salesRepository).saleHeader(organizationId, saleId);
 		verifyNoInteractions(jdbcClient, auditService, objectStorageService, eventPublisher);
