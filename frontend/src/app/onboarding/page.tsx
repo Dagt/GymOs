@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { AppShell, LoadingScreen } from "@/components/AppShell";
+import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   applyPilotSetup,
   getBranches,
@@ -30,7 +32,7 @@ const defaultPlan = {
 const defaultProduct = {
   sku: "AGUA-PILOTO",
   name: "Botella de agua",
-  description: "Producto básico para venta rápida en recepción.",
+  description: "Producto basico para venta rapida en recepcion.",
   productType: "PHYSICAL" as const,
   priceCents: 2500,
   currency: "MXN",
@@ -134,55 +136,43 @@ export default function OnboardingPage() {
     }
   }
 
-  if (!session) {
-    return <AuthRequired />;
+  if (!session && !loading) {
+    return <AuthRequiredCard message="Necesitas una sesion activa para preparar el onboarding." title="Inicia sesion para continuar" />;
   }
 
-  if (loading || !organization || !branch || !checklist) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-        <p className="rounded-md border border-[#d8ddd2] bg-white px-4 py-3 text-sm text-[#42514a]">
-          Cargando onboarding...
-        </p>
-      </main>
-    );
+  if (loading || !session || !organization || !branch || !checklist) {
+    return <LoadingScreen text="Cargando onboarding..." />;
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f7f2] text-[#111815]">
-      <header className="border-b border-[#d8ddd2] bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <Link className="text-sm font-semibold text-[#51735f]" href="/reception">
-              Recepcion
-            </Link>
-            <h1 className="mt-1 text-3xl font-semibold">Onboarding piloto</h1>
-            <p className="mt-1 text-sm text-[#5d6b63]">
-              Configura datos comerciales minimos para mostrar y operar GymOS con un gimnasio real.
-            </p>
-          </div>
-          <span className="rounded-md border border-[#d8ddd2] bg-white px-3 py-2 text-sm text-[#42514a]">
-            {checklist.readyForPilot ? "Listo para piloto" : "Setup incompleto"}
-          </span>
-        </div>
-      </header>
-
-      <section className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[0.9fr_1.3fr]">
+    <AppShell
+      actions={[]}
+      eyebrow="Configuracion"
+      session={session}
+      subtitle="Configura datos comerciales minimos para mostrar y operar GymOS con un gimnasio real."
+      title="Onboarding operativo"
+    >
+      <section className="grid gap-6 lg:grid-cols-[0.9fr_1.3fr]">
         <aside className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-semibold">Checklist vendible</h2>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="app-eyebrow">Checklist</p>
+              <h2 className="mt-2 text-xl font-semibold">Base operativa</h2>
+            </div>
+            <span className="rounded-md border border-[#d8ddd2] bg-white px-3 py-2 text-sm text-[#42514a]">
+              {checklist.readyForPilot ? "Listo" : "Incompleto"}
+            </span>
+          </div>
           <div className="mt-5 grid gap-3">
             <ChecklistItem done={checklist.organizationProfileComplete} label="Organizacion con contacto" value={organization.tradeName} />
-            <ChecklistItem done={checklist.branchConfigured} label="Sucursal con teléfono" value={branch.name} />
+            <ChecklistItem done={checklist.branchConfigured} label="Sucursal con telefono" value={branch.name} />
             <ChecklistItem done={checklist.hasMembershipPlans} label="Planes activos" value={`${checklist.activePlanCount}`} />
             <ChecklistItem done={checklist.hasRetailProducts} label="Productos vendibles" value={`${checklist.activeProductCount}`} />
             <ChecklistItem done={checklist.hasKioskTerminal} label="Kiosco activo" value={`${checklist.activeKioskCount}`} />
-            <ChecklistItem done={checklist.hasClients} label="Clientes cargados" value={`${checklist.clientCount}`} />
+            <ChecklistItem done={checklist.hasClients} label="Socios cargados" value={`${checklist.clientCount}`} />
           </div>
-          <Link
-            className="mt-5 inline-flex h-10 items-center justify-center rounded-md border border-[#cdd5ca] px-4 text-sm font-semibold text-[#13251c] transition hover:bg-[#eef2ea]"
-            href="/clients/import"
-          >
-            Importar clientes
+          <Link className="app-button-secondary mt-5" href="/clients/import">
+            Importar socios
           </Link>
         </aside>
 
@@ -216,12 +206,8 @@ export default function OnboardingPage() {
               <Field label="Codigo kiosco" value={kioskTerminalCode} onChange={setKioskTerminalCode} />
               <Field label="Nombre kiosco" value={kioskName} onChange={setKioskName} />
             </div>
-            <button
-              className="mt-5 h-11 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30] disabled:opacity-60"
-              disabled={saving}
-              type="submit"
-            >
-              Aplicar setup piloto
+            <button className="form-primary-button mt-5" disabled={saving} type="submit">
+              Aplicar setup operativo
             </button>
           </section>
 
@@ -234,7 +220,7 @@ export default function OnboardingPage() {
           ) : null}
         </form>
       </section>
-    </main>
+    </AppShell>
   );
 }
 
@@ -286,20 +272,4 @@ function Message({ tone, text }: { tone: "success" | "error"; text: string }) {
     ? "border-[#bad9c4] bg-[#eff8f1] text-[#31563c]"
     : "border-[#e5b7b7] bg-[#fff4f4] text-[#8c2f2f]";
   return <p className={`rounded-md border px-3 py-2 text-sm ${className}`}>{text}</p>;
-}
-
-function AuthRequired() {
-  return (
-    <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-      <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">Necesitas iniciar sesión</h1>
-        <Link
-          className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
-          href="/login"
-        >
-          Iniciar sesion
-        </Link>
-      </section>
-    </main>
-  );
 }

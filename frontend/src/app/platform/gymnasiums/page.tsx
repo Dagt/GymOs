@@ -6,21 +6,11 @@ import { AppDrawer } from "@/components/AppDrawer";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired } from "@/components/AuthRequired";
 import {
-  EmailField,
   FieldErrorMap,
   FormError,
-  PhoneField,
-  TextField,
   normalizePhone,
   normalizeRfc,
-  validateBranchCode,
-  validateEmail,
-  validateHexColor,
-  validatePhone,
-  validateRfc,
-  validateRequired,
 } from "@/components/FormFields";
-import { LogoUploadField } from "@/components/LogoUploadField";
 import {
   createBranch,
   createOrganization,
@@ -37,28 +27,14 @@ import {
   type ManagedOrganizationSummary,
   type StoredSession,
 } from "@/lib/api";
-
-const emptyOrganizationForm: CreateOrganizationPayload = {
-  legalName: "",
-  tradeName: "",
-  taxId: "",
-  timezone: "America/Mexico_City",
-  defaultCurrency: "MXN",
-  contactEmail: "",
-  contactPhone: "",
-  brandName: "",
-  logoUrl: "",
-  primaryColor: "#164E63",
-  accentColor: "#F59E0B",
-  surfaceColor: "#F4F7FB",
-};
-
-const emptyBranchForm: CreateBranchPayload = {
-  name: "",
-  code: "",
-  timezone: "America/Mexico_City",
-  phone: "",
-};
+import {
+  BranchForm,
+  OrganizationForm,
+  emptyBranchForm,
+  emptyOrganizationForm,
+  validateBranch,
+  validateOrganization,
+} from "./PlatformGymnasiumForms";
 
 export default function PlatformGymnasiumsPage() {
   const router = useRouter();
@@ -539,27 +515,13 @@ export default function PlatformGymnasiumsPage() {
         open={showCreate}
         title="Alta de gimnasio"
       >
-            <form className="grid gap-4" onSubmit={submitOrganization}>
-              <TextField error={fieldErrors.tradeName} label="Nombre comercial" name="tradeName" value={form.tradeName} onChange={(value) => setForm({ ...form, tradeName: value, brandName: form.brandName || value })} />
-              <TextField error={fieldErrors.legalName} label="Nombre legal" name="legalName" value={form.legalName} onChange={(value) => setForm({ ...form, legalName: value })} />
-              <TextField error={fieldErrors.taxId} label="RFC" name="taxId" value={form.taxId ?? ""} onChange={(value) => setForm({ ...form, taxId: normalizeRfc(value) })} />
-              <EmailField error={fieldErrors.contactEmail} label="Email contacto" name="contactEmail" required value={form.contactEmail ?? ""} onChange={(value) => setForm({ ...form, contactEmail: value })} />
-              <PhoneField error={fieldErrors.contactPhone} label="Telefono contacto" name="contactPhone" required value={form.contactPhone ?? ""} onChange={(value) => setForm({ ...form, contactPhone: value })} />
-              <hr className="border-[#dbe4ee]" />
-              <TextField error={fieldErrors.brandName} label="Nombre visible de marca" name="brandName" required={false} value={form.brandName ?? ""} onChange={(value) => setForm({ ...form, brandName: value })} />
-              <LogoUploadField
-                disabled={saving}
-                logoUrl={form.logoUrl}
-                tenantName={form.tradeName || form.brandName || form.legalName}
-                onChange={(logoUrl) => setForm({ ...form, logoUrl })}
-              />
-              <div className="platform-color-grid">
-                <TextField error={fieldErrors.primaryColor} label="Color principal" name="primaryColor" value={form.primaryColor ?? "#164E63"} onChange={(value) => setForm({ ...form, primaryColor: value })} />
-                <TextField error={fieldErrors.accentColor} label="Color acento" name="accentColor" value={form.accentColor ?? "#F59E0B"} onChange={(value) => setForm({ ...form, accentColor: value })} />
-                <TextField error={fieldErrors.surfaceColor} label="Color fondo" name="surfaceColor" value={form.surfaceColor ?? "#F4F7FB"} onChange={(value) => setForm({ ...form, surfaceColor: value })} />
-              </div>
-              <button className="form-primary-button" disabled={saving} type="submit">Crear gimnasio</button>
-            </form>
+        <OrganizationForm
+          errors={fieldErrors}
+          form={form}
+          onChange={setForm}
+          onSubmit={submitOrganization}
+          saving={saving}
+        />
       </AppDrawer>
 
       <AppDrawer
@@ -568,42 +530,14 @@ export default function PlatformGymnasiumsPage() {
         open={showCreateBranch}
         title="Crear sucursal"
       >
-            <form className="grid gap-4" onSubmit={submitBranch}>
-              <TextField error={branchFieldErrors.name} label="Nombre de sucursal" name="branchName" value={branchForm.name} onChange={(value) => setBranchForm({ ...branchForm, name: value })} />
-              <TextField error={branchFieldErrors.code} label="Codigo corto" name="branchCode" value={branchForm.code} onChange={(value) => setBranchForm({ ...branchForm, code: value })} />
-              <PhoneField error={branchFieldErrors.phone} label="Telefono sucursal" name="branchPhone" value={branchForm.phone ?? ""} onChange={(value) => setBranchForm({ ...branchForm, phone: value })} />
-              <TextField error={branchFieldErrors.timezone} label="Zona horaria" name="branchTimezone" value={branchForm.timezone} onChange={(value) => setBranchForm({ ...branchForm, timezone: value })} />
-              <button className="form-primary-button" disabled={saving} type="submit">Crear sucursal</button>
-            </form>
+        <BranchForm
+          errors={branchFieldErrors}
+          form={branchForm}
+          onChange={setBranchForm}
+          onSubmit={submitBranch}
+          saving={saving}
+        />
       </AppDrawer>
     </AppShell>
   );
-}
-
-function validateOrganization(form: CreateOrganizationPayload) {
-  const errors: FieldErrorMap = {};
-  addError(errors, "tradeName", validateRequired(form.tradeName, "Nombre comercial"));
-  addError(errors, "legalName", validateRequired(form.legalName, "Nombre legal"));
-  addError(errors, "taxId", validateRfc(form.taxId ?? "", true));
-  addError(errors, "contactEmail", validateEmail(form.contactEmail ?? "", true));
-  addError(errors, "contactPhone", validatePhone(form.contactPhone ?? "", true));
-  addError(errors, "primaryColor", validateHexColor(form.primaryColor ?? "", "Color principal", true));
-  addError(errors, "accentColor", validateHexColor(form.accentColor ?? "", "Color acento", true));
-  addError(errors, "surfaceColor", validateHexColor(form.surfaceColor ?? "", "Color fondo", true));
-  return errors;
-}
-
-function validateBranch(form: CreateBranchPayload) {
-  const errors: FieldErrorMap = {};
-  addError(errors, "name", validateRequired(form.name, "Nombre de sucursal"));
-  addError(errors, "code", validateBranchCode(form.code));
-  addError(errors, "timezone", validateRequired(form.timezone, "Zona horaria"));
-  addError(errors, "phone", validatePhone(form.phone ?? "", true));
-  return errors;
-}
-
-function addError(errors: FieldErrorMap, key: string, value: string) {
-  if (value) {
-    errors[key] = value;
-  }
 }

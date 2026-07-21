@@ -1,9 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import type { FormEvent } from "react";
 import { useEffect, useState } from "react";
+import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
+import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   addManualPayment,
   getSale,
@@ -16,9 +17,7 @@ import {
   type StoredSession,
 } from "@/lib/api";
 import {
-  AuthRequired,
   SaleItemsSection,
-  SaleLoadingState,
   SaleMembershipsSection,
   SalePaymentsSection,
   SaleRefundsSection,
@@ -168,26 +167,19 @@ export default function SaleDetailPage() {
     }
   }
 
-  if (!session) return <AuthRequired />;
-  if (loading || !data) return <SaleLoadingState />;
+  if (loading) return <LoadingScreen text="Cargando venta..." />;
+  if (!session) return <AuthRequiredCard message="Necesitas una sesion activa para consultar ventas." title="Inicia sesion para ver esta venta" />;
+  if (!data) return <LoadingScreen text="Preparando detalle de venta..." />;
 
   return (
-    <main className="min-h-screen bg-[#f6f7f2] text-[#111815]">
-      <header className="border-b border-[#d8ddd2] bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <Link className="text-sm font-semibold text-[#51735f]" href="/pos">POS</Link>
-            <h1 className="mt-1 text-3xl font-semibold">{data.sale.saleNumber}</h1>
-            <p className="mt-1 text-sm text-[#5d6b63]">{data.sale.clientName} - {data.sale.status}</p>
-          </div>
-          <div className="rounded-md border border-[#d8ddd2] bg-white px-4 py-3 text-right">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[#51735f]">Saldo</p>
-            <p className="text-2xl font-semibold">{formatMoney(data.sale.balanceCents, data.sale.currency)}</p>
-          </div>
-        </div>
-      </header>
-
-      <section className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[1fr_1fr]">
+    <AppShell
+      actions={[]}
+      eyebrow="Venta"
+      session={session}
+      subtitle={`${data.sale.clientName} - ${data.sale.status} - Saldo ${formatMoney(data.sale.balanceCents, data.sale.currency)}`}
+      title={data.sale.saleNumber}
+    >
+      <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
         <SaleItemsSection data={data} />
         <SalePaymentsSection
           data={data}
@@ -205,9 +197,9 @@ export default function SaleDetailPage() {
         />
         <SaleRefundsSection data={data} form={refundForm} onFormChange={setRefundForm} onSubmit={submitRefund} />
         <SaleMembershipsSection data={data} />
-        {error ? <p className="rounded-md border border-[#e5b7b7] bg-[#fff4f4] px-3 py-2 text-sm text-[#8c2f2f] lg:col-span-2">{error}</p> : null}
+        {error ? <InlineError message={error} /> : null}
       </section>
-    </main>
+    </AppShell>
   );
 }
 

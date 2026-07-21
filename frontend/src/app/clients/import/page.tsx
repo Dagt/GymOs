@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
 import { ChangeEvent, FormEvent, useEffect, useState } from "react";
+import { AppShell, LoadingScreen } from "@/components/AppShell";
+import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   getStoredSession,
   importClientsCsv,
@@ -67,49 +68,29 @@ export default function ClientImportPage() {
     try {
       setResult(await importClientsCsv(session.accessToken, fileName, csvText, dryRun));
     } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible importar clientes.");
+      setError(exception instanceof Error ? exception.message : "No fue posible importar socios.");
     } finally {
       setLoading(false);
     }
   }
 
   if (checkingSession) {
-    return (
-      <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-        <p className="rounded-md border border-[#d8ddd2] bg-white px-4 py-3 text-sm text-[#42514a]">
-          Cargando importacion...
-        </p>
-      </main>
-    );
+    return <LoadingScreen text="Cargando importacion..." />;
   }
 
   if (!session) {
-    return <AuthRequired />;
+    return <AuthRequiredCard message="Necesitas una sesion activa para importar socios." title="Inicia sesion para importar socios" />;
   }
 
   return (
-    <main className="min-h-screen bg-[#f6f7f2] text-[#111815]">
-      <header className="border-b border-[#d8ddd2] bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <Link className="text-sm font-semibold text-[#51735f]" href="/reception">
-              Recepcion
-            </Link>
-            <h1 className="mt-1 text-3xl font-semibold">Importar clientes</h1>
-            <p className="mt-1 text-sm text-[#5d6b63]">
-              Carga inicial por CSV con validacion previa, duplicados y resultado por fila.
-            </p>
-          </div>
-          <Link
-            className="inline-flex h-10 items-center justify-center rounded-md border border-[#cdd5ca] px-4 text-sm font-semibold text-[#13251c] transition hover:bg-[#eef2ea]"
-            href="/onboarding"
-          >
-            Onboarding
-          </Link>
-        </div>
-      </header>
-
-      <section className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[0.9fr_1.4fr]">
+    <AppShell
+      actions={[]}
+      eyebrow="Socios"
+      session={session}
+      subtitle="Carga inicial por CSV con validacion previa, duplicados y resultado por fila."
+      title="Importar socios"
+    >
+      <section className="grid gap-6 lg:grid-cols-[0.9fr_1.4fr]">
         <form className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm" onSubmit={submit}>
           <h2 className="text-xl font-semibold">Archivo CSV</h2>
           <div className="mt-5 grid gap-4">
@@ -140,14 +121,14 @@ export default function ClientImportPage() {
             </label>
             <label className="flex items-center gap-3 text-sm font-medium text-[#42514a]">
               <input checked={dryRun} onChange={(event) => setDryRun(event.target.checked)} type="checkbox" />
-              Validar sin crear clientes
+              Validar sin crear socios
             </label>
             <button
               className="h-11 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30] disabled:opacity-60"
               disabled={loading}
               type="submit"
             >
-              {dryRun ? "Validar CSV" : "Importar clientes"}
+              {dryRun ? "Validar CSV" : "Importar socios"}
             </button>
           </div>
         </form>
@@ -174,7 +155,7 @@ export default function ClientImportPage() {
                     <tr className="text-left text-[#5d6b63]">
                       <th className="border-b border-[#d8ddd2] py-2 pr-4">Fila</th>
                       <th className="border-b border-[#d8ddd2] py-2 pr-4">Estado</th>
-                      <th className="border-b border-[#d8ddd2] py-2 pr-4">Cliente</th>
+                      <th className="border-b border-[#d8ddd2] py-2 pr-4">Socio</th>
                       <th className="border-b border-[#d8ddd2] py-2 pr-4">Contacto</th>
                       <th className="border-b border-[#d8ddd2] py-2 pr-4">Detalle</th>
                     </tr>
@@ -202,7 +183,7 @@ export default function ClientImportPage() {
           ) : null}
         </section>
       </section>
-    </main>
+    </AppShell>
   );
 }
 
@@ -230,20 +211,4 @@ function Message({ tone, text }: { tone: "success" | "error"; text: string }) {
     ? "border-[#bad9c4] bg-[#eff8f1] text-[#31563c]"
     : "border-[#e5b7b7] bg-[#fff4f4] text-[#8c2f2f]";
   return <p className={`mt-5 rounded-md border px-3 py-2 text-sm ${className}`}>{text}</p>;
-}
-
-function AuthRequired() {
-  return (
-    <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-      <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6 shadow-sm">
-        <h1 className="text-2xl font-semibold">Necesitas iniciar sesión</h1>
-        <Link
-          className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
-          href="/login"
-        >
-          Iniciar sesion
-        </Link>
-      </section>
-    </main>
-  );
 }

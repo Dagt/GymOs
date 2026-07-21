@@ -257,7 +257,15 @@ Avance adicional del bloque visual:
 - `clients/[clientId]/page.tsx` usa `AppDrawer` para editar datos del socio y ejecutar renovacion o cambio de plan sin saturar la ficha.
 - `inventory/page.tsx` usa `AppDrawer` para registrar movimientos; la pantalla principal queda como tablero de existencias, alertas e historial.
 - `automations/page.tsx` usa `AppDrawer` para nueva regla y notificacion manual; la pantalla principal queda como centro de monitoreo.
-- `access/page.tsx` se alinea al `AppShell` unificado y deja de mostrar encabezado visual duplicado.
+- `access/page.tsx` se alinea al `AppShell` unificado, deja de mostrar encabezado visual duplicado y queda separado en `AccessSections.tsx` por responsabilidades visuales.
+- `sales/[saleId]/page.tsx`, `clients/import/page.tsx` y `onboarding/page.tsx` migran a `AppShell`, eliminando contenedores y encabezados propios heredados.
+- `platform/gymnasiums/page.tsx` extrae formularios y validaciones de gimnasio/sucursal a `PlatformGymnasiumForms.tsx`, manteniendo la logica de CRM en la pagina y reduciendo acoplamiento.
+
+Pendiente del bloque visual antes de pasar al backend profundo:
+
+- Reducir `users/page.tsx`, `catalog/page.tsx`, `clients/page.tsx` y `settings/organization/page.tsx` con el mismo criterio: estado/use cases en pagina, secciones visuales en componentes especificos.
+- Revisar helpers visuales exportados que ya no tienen consumidores tras migrar pantallas heredadas.
+- Mantener las rutas existentes y validar `typecheck`, `lint` y `build` en cada corte.
 
 ## Fase 9 — Verificación final
 

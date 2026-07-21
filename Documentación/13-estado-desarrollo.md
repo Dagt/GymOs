@@ -810,6 +810,8 @@ Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
 - `/clients/[clientId]` mueve edicion de datos personales, renovacion y cambio de plan a `AppDrawer`; la ficha principal queda como lectura, membresias e historial.
 - `/inventory` mueve registro de movimientos a `AppDrawer`; la pagina principal queda enfocada en existencias, alertas y movimientos recientes.
 - `/automations` mueve nueva regla y notificacion manual a `AppDrawer`; la pagina principal queda enfocada en reglas, estado y notificaciones.
-- `/access` queda alineada al `AppShell` unificado y elimina el encabezado visual duplicado que hacia que pareciera una pantalla separada.
+- `/access` queda alineada al `AppShell` unificado, elimina el encabezado visual duplicado y separa su UI en `AccessSections.tsx` para aislar dispositivos, clientes, decisiones, pases y bitacora.
+- `/sales/[saleId]`, `/clients/import` y `/onboarding` dejan de usar contenedores propios y renderizan dentro de `AppShell`, manteniendo una sola base visual para pantallas heredadas.
+- `/platform/gymnasiums` extrae formularios y validaciones de alta de gimnasio/sucursal a `PlatformGymnasiumForms.tsx`; la pagina principal conserva el maestro-detalle y queda menos acoplada al formulario.
 - Se retiro `AppNavigation`, que ya no tenia consumidores, para mantener un solo modelo de navegacion visible.
-- La siguiente etapa recomendada es revisar paginas heredadas con contenedores propios, especialmente detalle de venta, importacion de socios y onboarding.
+- La siguiente etapa recomendada es continuar con paginas grandes de gestion: `users`, `catalog`, `clients`, `settings/organization` y la limpieza final de helpers visuales ya obsoletos.
