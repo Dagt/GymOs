@@ -163,9 +163,58 @@ export type {
   LinkBookingPaymentPayload,
   ResourceSummary,
 } from "./api/booking-types";
-export * from "./api/coaching";
-export * from "./api/wellness";
-export * from "./api/automations";
+export {
+  assignWorkout,
+  createCoach,
+  createWorkout,
+  getClientWorkouts,
+  getCoachReport,
+  getCoaches,
+  getWorkouts,
+} from "./api/coaching";
+export type {
+  AssignWorkoutPayload,
+  CoachReport,
+  CoachSummary,
+  CreateCoachPayload,
+  CreateWorkoutPayload,
+  WorkoutAssignment,
+  WorkoutDetail,
+  WorkoutSummary,
+  WorkoutVersion,
+} from "./api/coaching-types";
+export {
+  createProfessional,
+  createProfessionalAvailability,
+  createProfessionalService,
+  getProfessionalAvailability,
+  getProfessionalServices,
+  getProfessionals,
+} from "./api/wellness";
+export type {
+  CreateProfessionalAvailabilityPayload,
+  CreateProfessionalPayload,
+  CreateProfessionalServicePayload,
+  ProfessionalAvailability,
+  ProfessionalServiceSummary,
+  ProfessionalSummary,
+} from "./api/wellness-types";
+export {
+  createAutomation,
+  createNotification,
+  executeAutomation,
+  getAutomationExecutions,
+  getAutomations,
+  getNotifications,
+  setAutomationStatus,
+} from "./api/automations";
+export type {
+  AutomationExecution,
+  AutomationRule,
+  CreateAutomationPayload,
+  CreateNotificationPayload,
+  NotificationLog,
+} from "./api/automation-types";
 export * from "./api/reporting";
 export * from "./api/onboarding";
 export {
