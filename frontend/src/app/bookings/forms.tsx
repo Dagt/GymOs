@@ -2,16 +2,7 @@
 
 import type { FormEvent } from "react";
 import type { ClientSummary, PlanSummary, ResourceSummary } from "@/lib/api";
-
-export type BookingWeekdayKey = "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
-export type BookingResourceDay = {
-  key: BookingWeekdayKey;
-  label: string;
-  shortLabel: string;
-  enabled: boolean;
-  opensAt: string;
-  closesAt: string;
-};
+import type { ResourceDay as BookingResourceDay, WeekdayKey as BookingWeekdayKey } from "./booking-utils";
 
 type DurationUnit = "MINUTES" | "HOURS";
 

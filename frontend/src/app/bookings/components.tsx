@@ -1,6 +1,7 @@
 "use client";
 
 import type { BookingSummary, ResourceSummary } from "@/lib/api";
+import { bookingDate, formatLongDate, formatMonthLabel } from "./booking-utils";
 
 export type BookingNotice = { title: string; message: string; tone: "error" | "success" };
 export type BookingNoteDialog = { clientName: string; note: string };
@@ -314,24 +315,4 @@ function bookingStatusLabel(status: string) {
 
 function formatTime(value: string) {
   return new Intl.DateTimeFormat("es-MX", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
-}
-
-function formatLongDate(value: string) {
-  return new Intl.DateTimeFormat("es-MX", { dateStyle: "full" }).format(parseDateInput(value));
-}
-
-function formatMonthLabel(value: string) {
-  return new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric" }).format(parseDateInput(value));
-}
-
-function bookingDate(value: string) {
-  return toDateInput(new Date(value));
-}
-
-function parseDateInput(value: string) {
-  return new Date(`${value}T00:00:00`);
-}
-
-function toDateInput(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }

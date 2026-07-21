@@ -10,8 +10,9 @@ Implementado:
 - `/bookings/page.tsx` conserva la orquestacion de datos, estado y casos de uso de reservas.
 - Se extrae UI presentacional de reservas a `frontend/src/app/bookings/components.tsx`: modales, resumen del dia, calendario mensual y detalle por recurso.
 - Se extraen formularios drawer de nueva reserva y nuevo recurso a `frontend/src/app/bookings/forms.tsx`.
+- Se extraen helpers compartidos de fechas, horarios, colores de recursos y serializacion de horarios a `frontend/src/app/bookings/booking-utils.ts`.
 - El resumen de recursos queda reutilizable y mantiene tarjetas compactas en dos columnas con scroll interno invisible.
-- El refactor no cambia contratos HTTP ni reglas de negocio; prepara una siguiente extraccion segura de helpers de fecha/horario.
+- El refactor no cambia contratos HTTP ni reglas de negocio; reduce duplicacion entre la pagina, el calendario y los formularios.
 
 Verificado:
 
