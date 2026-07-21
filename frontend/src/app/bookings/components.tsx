@@ -107,6 +107,7 @@ export function BookingSummaryPanel({
 export function BookingsMonthCalendar({
   activeBookings,
   calendarDate,
+  className = "",
   getResourceColor,
   monthDates,
   onGoToToday,
@@ -121,6 +122,7 @@ export function BookingsMonthCalendar({
 }: {
   activeBookings: BookingSummary[];
   calendarDate: string;
+  className?: string;
   getResourceColor: (index: number) => string;
   monthDates: MonthDate[];
   onGoToToday: () => void;
@@ -134,7 +136,7 @@ export function BookingsMonthCalendar({
   weekdays: WeekdayLabel[];
 }) {
   return (
-    <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+    <section className={`rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm ${className}`}>
       <div className="border-b border-[#e5e9e3] pb-5">
         <div>
           <h2 className="text-xl font-semibold">Agenda mensual</h2>

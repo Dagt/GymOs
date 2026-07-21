@@ -9,9 +9,11 @@ import {
   BookingNoteModal,
   BookingNoticeModal,
   BookingSummaryPanel,
+  BookingsMonthCalendar,
   type BookingNoteDialog,
   type BookingNotice,
 } from "./components";
+import { BookingDrawerForm, ResourceDrawerForm } from "./forms";
 import {
   createBooking,
   createResource,
@@ -330,27 +332,32 @@ export default function BookingsPage() {
             open={showBookingDrawer}
             title="Nueva reserva"
           >
-          <form className="grid gap-4" onSubmit={submitBooking}>
-            <div className="flex items-start justify-between gap-3">
-              <p className="text-sm text-[#5d6b63]">Captura los datos de la reserva. El sistema validara disponibilidad y membresia antes de guardar.</p>
-              {activeResource ? <span className="rounded-md bg-[var(--brand-surface)] px-3 py-2 text-xs font-semibold text-[var(--brand-primary)]">{activeResource.slotMinutes} min</span> : null}
-            </div>
-            <label className="mt-4 grid gap-2 text-sm font-medium">Recurso<select className="h-11 rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setResourceId(event.target.value)} value={resourceId}>{resources.map((resource) => <option key={resource.id} value={resource.id}>{resource.name}</option>)}</select></label>
-            <p className="mt-3 rounded-md border border-[#d8ddd2] bg-[#f8faf8] px-3 py-2 text-xs text-[#5d6b63]">{activeResource?.allowedPlanNames ? <>Reservable por: <strong>{activeResource.allowedPlanNames}</strong></> : "Reservable por cualquier socio activo."}</p>
-            <label className="mt-4 grid gap-2 text-sm font-medium">Buscar socio<input className="h-11 rounded-md border border-[#cdd5ca] px-3" onChange={(event) => { setClientQuery(event.target.value); setClientId(""); }} placeholder="Nombre, teléfono o email" value={clientQuery} /></label>
-            <div className="mt-2 grid gap-2">
-              {clientResults.map((client) => <button className={`rounded-md border px-3 py-2 text-left text-sm ${client.id === clientId ? "border-[var(--brand-primary)] bg-[var(--brand-surface)]" : "border-[#d8ddd2] bg-white"}`} key={client.id} onClick={() => { setClientId(client.id); setClientQuery(`${client.firstName} ${client.lastName}`); }} type="button"><strong className="block">{client.firstName} {client.lastName}</strong><span className="text-xs text-[#647067]">{client.phone || client.email || "Socio activo"}</span></button>)}
-              {selectedClient ? <p className="text-xs font-semibold text-[var(--brand-primary)]">Seleccionado: {selectedClient.firstName} {selectedClient.lastName}</p> : null}
-            </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_0.8fr]">
-              <label className="grid gap-2 text-sm font-medium">Día de inicio<input className="h-11 rounded-md border border-[#cdd5ca] px-3" min={today} onChange={(event) => selectCalendarDate(event.target.value)} required type="date" value={startDate} /></label>
-              <label className="grid gap-2 text-sm font-medium">Hora<input className={`h-11 rounded-md border px-3 ${selectedStartIsPast ? "border-red-500 bg-red-50" : "border-[#cdd5ca]"}`} min={minimumBookingTime} onChange={(event) => setStartTime(event.target.value)} required step={300} type="time" value={startTime} /></label>
-            </div>
-            {selectedStartIsPast ? <p className="mt-2 text-sm font-medium text-red-700">Selecciona una hora posterior a la hora actual.</p> : null}
-            <div className="mt-3 rounded-md border border-[#d8ddd2] bg-[#f8faf8] px-3 py-2 text-sm"><span className="block text-xs font-semibold uppercase text-[#647067]">Fin calculado</span><strong>{computedEnd ? formatDateTime(computedEnd) : "Selecciona recurso, día y hora"}</strong></div>
-            <label className="mt-4 grid gap-2 text-sm font-medium">Notas<textarea className="min-h-20 rounded-md border border-[#cdd5ca] px-3 py-2" onChange={(event) => setNotes(event.target.value)} value={notes} /></label>
-            <button className="mt-5 h-11 w-full rounded-md bg-[var(--brand-primary)] px-4 text-sm font-semibold text-white shadow-sm disabled:opacity-60" disabled={saving || selectedDateIsPast || selectedStartIsPast || !resourceId || !clientId || !isValidTimeInput(startTime)} type="submit">Crear reserva</button>
-          </form>
+          <BookingDrawerForm
+            activeResource={activeResource}
+            clientQuery={clientQuery}
+            clientResults={clientResults}
+            computedEnd={computedEnd}
+            formatDateTime={formatDateTime}
+            isValidTimeInput={isValidTimeInput}
+            minimumBookingTime={minimumBookingTime}
+            notes={notes}
+            onClientQueryChange={(value) => { setClientQuery(value); setClientId(""); }}
+            onNotesChange={setNotes}
+            onSelectCalendarDate={selectCalendarDate}
+            onSelectClient={(client) => { setClientId(client.id); setClientQuery(`${client.firstName} ${client.lastName}`); }}
+            onSelectResource={setResourceId}
+            onStartTimeChange={setStartTime}
+            onSubmit={submitBooking}
+            resourceId={resourceId}
+            resources={resources}
+            saving={saving}
+            selectedClient={selectedClient}
+            selectedDateIsPast={selectedDateIsPast}
+            selectedStartIsPast={selectedStartIsPast}
+            startDate={startDate}
+            startTime={startTime}
+            today={today}
+          />
           </AppDrawer>
 
           {canManageResources ? (
@@ -360,48 +367,41 @@ export default function BookingsPage() {
               open={showResourceDrawer}
               title="Crear recurso"
             >
-            <form className="grid gap-4" onSubmit={submitResource}>
-              <p className="text-sm text-[#5d6b63]">Configura una cancha, salon, area o recurso que pueda reservarse desde esta sucursal.</p>
-              <input className="h-11 w-full rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setResourceName(event.target.value)} placeholder="Nombre del recurso" required value={resourceName} />
-              <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_130px]"><label className="grid gap-2 text-sm font-medium">Duración<input className="h-11 rounded-md border border-[#cdd5ca] px-3" min={1} onChange={(event) => setDurationValue(Number(event.target.value))} type="number" value={durationValue} /></label><label className="grid gap-2 text-sm font-medium">Unidad<select className="h-11 rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setDurationUnit(event.target.value as "MINUTES" | "HOURS")} value={durationUnit}><option value="MINUTES">Minutos</option><option value="HOURS">Horas</option></select></label></div>
-              <fieldset className="mt-5 grid gap-2"><legend className="text-sm font-semibold">Días y horarios operativos</legend>{resourceSchedule.map((day) => <div className="grid grid-cols-[36px_1fr_92px_92px] items-center gap-2 rounded-md border border-[#d8ddd2] px-3 py-2 text-sm" key={day.key}><input aria-label={day.label} checked={day.enabled} className="h-4 w-4 accent-[var(--brand-primary)]" onChange={(event) => updateResourceDay(day.key, { enabled: event.target.checked })} type="checkbox" /><span><strong className="block">{day.shortLabel}</strong><span className="text-xs text-[#647067]">{day.label}</span></span><input className="h-10 rounded-md border border-[#cdd5ca] px-2" disabled={!day.enabled} onChange={(event) => updateResourceDay(day.key, { opensAt: event.target.value })} type="time" value={day.opensAt} /><input className="h-10 rounded-md border border-[#cdd5ca] px-2" disabled={!day.enabled} onChange={(event) => updateResourceDay(day.key, { closesAt: event.target.value })} type="time" value={day.closesAt} /></div>)}</fieldset>
-              <fieldset className="mt-5 grid gap-2"><legend className="text-sm font-semibold">Membresías que pueden reservar</legend><p className="text-xs text-[#6f7a73]">Sin seleccionar planes, el recurso queda abierto para cualquier socio activo.</p>{plans.map((plan) => <label className="flex items-start gap-2 rounded-md border border-[#d8ddd2] px-3 py-2 text-sm" key={plan.id}><input className="mt-1 h-4 w-4 accent-[var(--brand-primary)]" checked={resourceAllowedPlanIds.includes(plan.id)} onChange={(event) => setResourceAllowedPlanIds((current) => event.target.checked ? [...current, plan.id] : current.filter((id) => id !== plan.id))} type="checkbox" /><span><strong className="block">{plan.name}</strong><span className="text-xs text-[#6f7a73]">{plan.multiBranchAccess ? "Multi-sucursal" : "Sucursal de venta"}</span></span></label>)}</fieldset>
-              <button className="mt-5 h-11 w-full rounded-md bg-[var(--brand-primary)] px-4 text-sm font-semibold text-white shadow-sm disabled:opacity-60" disabled={saving} type="submit">Crear recurso</button>
-            </form>
+            <ResourceDrawerForm
+              durationUnit={durationUnit}
+              durationValue={durationValue}
+              onAllowedPlanIdsChange={setResourceAllowedPlanIds}
+              onDurationUnitChange={setDurationUnit}
+              onDurationValueChange={setDurationValue}
+              onResourceNameChange={setResourceName}
+              onSubmit={submitResource}
+              onUpdateResourceDay={updateResourceDay}
+              plans={plans}
+              resourceAllowedPlanIds={resourceAllowedPlanIds}
+              resourceName={resourceName}
+              resourceSchedule={resourceSchedule}
+              saving={saving}
+            />
             </AppDrawer>
           ) : null}
         </aside>
 
-        <section className={`rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm ${canManageResources ? "" : "bookings-operational-agenda"}`}>
-          <div className="border-b border-[#e5e9e3] pb-5">
-            <div><h2 className="text-xl font-semibold">Agenda mensual</h2><p className="mt-1 text-sm text-[#5d6b63]">Selecciona un día para ver sus reservas por recurso.</p></div>
-            <div className="mt-4 grid gap-3 rounded-2xl border border-[#d8ddd2] bg-[#f8faf8] p-3 shadow-inner sm:grid-cols-[44px_minmax(170px,1fr)_44px] lg:grid-cols-[44px_minmax(180px,1fr)_auto_auto_44px] lg:items-center">
-              <button aria-label="Mes anterior" className="h-11 w-11 rounded-xl border border-[#cdd5ca] bg-white text-xl font-bold text-[var(--brand-primary)] shadow-sm hover:bg-[var(--brand-surface)]" onClick={() => moveCalendarMonth(-1)} type="button">‹</button>
-              <div className="text-center lg:text-left"><p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#647067]">Mes visible</p><p className="text-base font-bold capitalize text-[#243229]">{formatMonthLabel(calendarDate)}</p></div>
-              <button aria-label="Mes siguiente" className="h-11 w-11 rounded-xl border border-[#cdd5ca] bg-white text-xl font-bold text-[var(--brand-primary)] shadow-sm hover:bg-[var(--brand-surface)] lg:order-5" onClick={() => moveCalendarMonth(1)} type="button">›</button>
-              <input aria-label="Seleccionar fecha" className="h-11 rounded-xl border border-[#cdd5ca] bg-white px-3 text-sm sm:col-span-2 lg:col-span-1" onChange={(event) => selectCalendarDate(event.target.value)} type="date" value={calendarDate} />
-              <button className="h-11 rounded-xl bg-[var(--brand-primary)] px-5 text-sm font-semibold text-white shadow-sm sm:col-span-3 lg:col-span-1" onClick={goToToday} type="button">Ir a hoy</button>
-            </div>
-          </div>
-
-          <div className="mt-5 flex flex-wrap gap-2">{resources.map((resource, index) => <button className={`inline-flex items-center gap-2 rounded-md border px-3 py-2 text-sm ${resource.id === resourceId ? "border-[var(--brand-primary)] bg-[var(--brand-surface)]" : "border-[#d8ddd2]"}`} key={resource.id} onClick={() => setResourceId(resource.id)} type="button"><span className="h-3 w-3 rounded-full" style={{ backgroundColor: resourceColor(index) }} />{resource.name}</button>)}</div>
-
-          {resources.length === 0 ? <p className="mt-6 rounded-md border border-[#d8ddd2] bg-[#f8faf8] px-3 py-6 text-center text-sm text-[#5d6b63]">No hay recursos reservables en esta sucursal.</p> : (
-            <div className="mt-5 grid gap-5">
-              <div className="grid grid-cols-7 overflow-hidden rounded-lg border border-[#d8ddd2]">
-                {weekdays.map((day) => <div className="border-b border-r border-[#d8ddd2] bg-[#f8faf8] px-3 py-2 text-center text-xs font-semibold uppercase text-[#647067] last:border-r-0" key={day.key}>{day.shortLabel}</div>)}
-                {monthDates.map((day) => {
-                  const dayBookings = activeBookings.filter((booking) => bookingDate(booking.startsAt) === day.date);
-                  const activeResourceCount = new Set(dayBookings.map((booking) => booking.resourceId)).size;
-                  const isSelected = startDate === day.date;
-                  const isToday = today === day.date;
-                  return <button aria-current={isToday ? "date" : undefined} className={`relative min-h-24 border-r border-t p-2 text-left transition last:border-r-0 ${day.inCurrentMonth ? "bg-white" : "bg-[#f6f3ef] text-[#9aa39d]"} ${isSelected ? "z-10 border-[var(--brand-primary)] bg-[var(--brand-surface)] ring-4 ring-[var(--brand-primary)] ring-offset-[-4px]" : isToday ? "border-2 border-[#1d4ed8] bg-[#eff6ff] shadow-inner" : "border-[#d8ddd2] hover:bg-[var(--brand-surface)]"}`} key={day.date} onClick={() => selectCalendarDate(day.date)} type="button"><div className="flex items-center justify-between gap-1"><span className={`inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-sm font-bold ${isSelected ? "bg-[var(--brand-primary)] text-white" : isToday ? "bg-[#1d4ed8] text-white" : ""}`}>{day.dayOfMonth}</span>{isToday ? <span className="rounded-full bg-[#dbeafe] px-2 py-0.5 text-[10px] font-bold uppercase text-[#1d4ed8]">Hoy</span> : null}</div>{dayBookings.length > 0 ? <span className="mt-2 block rounded-md bg-white/80 px-2 py-1 text-xs font-semibold text-[var(--brand-primary)]">{dayBookings.length} reserva{dayBookings.length === 1 ? "" : "s"}</span> : <span className="mt-2 block text-xs text-[#8a948d]">Libre</span>}{activeResourceCount > 0 ? <span className="mt-2 flex gap-1">{resources.slice(0, 4).map((resource, index) => dayBookings.some((booking) => booking.resourceId === resource.id) ? <span className="h-2 w-2 rounded-full" key={resource.id} style={{ backgroundColor: resourceColor(index) }} /> : null)}</span> : null}</button>;
-                })}
-              </div>
-
-           </div>
-          )}
-        </section>
+        <BookingsMonthCalendar
+          activeBookings={activeBookings}
+          calendarDate={calendarDate}
+          className={canManageResources ? "" : "bookings-operational-agenda"}
+          getResourceColor={resourceColor}
+          monthDates={monthDates}
+          onGoToToday={goToToday}
+          onMoveMonth={moveCalendarMonth}
+          onSelectDate={selectCalendarDate}
+          onSelectResource={setResourceId}
+          resourceId={resourceId}
+          resources={resources}
+          selectedDate={startDate}
+          today={today}
+          weekdays={weekdays}
+        />
         {resources.length > 0 ? (
           <BookingDayDetail
             bookings={selectedDateBookings}
@@ -472,7 +472,6 @@ function isPastDateTime(date: string, time: string) { return Boolean(date && isV
 function currentTimeInput(date = new Date()) { const rounded = new Date(date); rounded.setSeconds(0, 0); rounded.setMinutes(Math.ceil(rounded.getMinutes() / 5) * 5); return `${String(rounded.getHours()).padStart(2, "0")}:${String(rounded.getMinutes()).padStart(2, "0")}`; }
 function addMinutes(value: string, minutes: number) { const date = new Date(value); if (Number.isNaN(date.getTime())) return ""; date.setMinutes(date.getMinutes() + minutes); return toLocalDateTimeInput(date); }
 function formatDateTime(value: string) { const date = new Date(value); return Number.isNaN(date.getTime()) ? "Hora inválida" : new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeStyle: "short" }).format(date); }
-function formatMonthLabel(value: string) { return new Intl.DateTimeFormat("es-MX", { month: "long", year: "numeric" }).format(parseDateInput(value)); }
 function bookingDate(value: string) { return toDateInput(new Date(value)); }
 function resourceColor(index: number) { return resourceColors[index % resourceColors.length]; }
 function parseDateInput(value: string) { return new Date(`${value}T00:00:00`); }
