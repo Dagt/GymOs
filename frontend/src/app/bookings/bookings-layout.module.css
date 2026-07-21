@@ -175,6 +175,31 @@
   opacity: 0.72;
 }
 
+.shell :global(.bookings-resource-summary-scroll) {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  max-height: 20.5rem;
+  overflow-y: auto;
+  padding-right: 0.1rem;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.shell :global(.bookings-resource-summary-scroll::-webkit-scrollbar) {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
+.shell :global(.bookings-resource-summary-card) {
+  min-width: 0;
+  border: 1px solid #d8ddd2;
+  border-radius: 0.6rem;
+  background: white;
+  padding: 0.6rem;
+}
+
 /* Reception and managers do not create resources: use the vacant second row. */
 .shell :global(.bookings-operational-layout) {
   align-items: stretch;

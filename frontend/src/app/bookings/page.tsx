@@ -156,7 +156,6 @@ export default function BookingsPage() {
       hours: resourceHoursForDay(resource, selectedWeekday),
       id: resource.id,
       name: resource.name,
-      noteCount: resourceBookings.filter((booking) => booking.notes?.trim()).length,
       slotMinutes: resource.slotMinutes,
     };
   });
@@ -379,30 +378,23 @@ export default function BookingsPage() {
                   {noteCount > 0 ? `${noteCount} reserva${noteCount === 1 ? "" : "s"} con nota.` : "Sin notas registradas en las reservas del dia."}
                 </p>
               </article>
-              <div className="grid gap-2">
+              <div className="bookings-resource-summary-scroll">
                 {selectedDayResourceSummary.length === 0 ? (
-                  <p className="rounded-md border border-[#d8ddd2] bg-white px-3 py-3 text-sm text-[#647067]">No hay recursos configurados.</p>
+                  <p className="col-span-2 rounded-md border border-[#d8ddd2] bg-white px-3 py-3 text-sm text-[#647067]">No hay recursos configurados.</p>
                 ) : null}
                 {selectedDayResourceSummary.map((resource) => (
-                  <article className="rounded-md border border-[#d8ddd2] bg-white px-3 py-3" key={resource.id}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">
-                          <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: resource.color }} />
-                          {resource.name}
-                        </p>
-                        <p className="mt-1 text-xs text-[#647067]">
-                          {resource.hours ? `${resource.hours.opensAt} - ${resource.hours.closesAt}` : "Cerrado"}
-                        </p>
-                      </div>
-                      <span className="shrink-0 rounded-full bg-[var(--brand-surface)] px-2 py-1 text-xs font-semibold text-[var(--brand-primary)]">
+                  <article className="bookings-resource-summary-card" key={resource.id}>
+                    <div className="flex items-start justify-between gap-2">
+                      <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: resource.color }} />
+                      <strong className="min-w-0 flex-1 truncate text-xs">{resource.name}</strong>
+                      <span className="shrink-0 rounded-full bg-[var(--brand-surface)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--brand-primary)]">
                         {resource.bookingCount}
                       </span>
                     </div>
-                    <p className="mt-2 text-xs text-[#647067]">
-                      {resource.slotMinutes} min por reserva
-                      {resource.noteCount > 0 ? ` · ${resource.noteCount} con nota` : ""}
+                    <p className="mt-1 truncate text-[11px] text-[#647067]">
+                      {resource.hours ? `${resource.hours.opensAt} - ${resource.hours.closesAt}` : "Cerrado"}
                     </p>
+                    <p className="mt-0.5 text-[11px] text-[#647067]">{resource.slotMinutes} min</p>
                   </article>
                 ))}
               </div>
