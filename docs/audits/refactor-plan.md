@@ -248,6 +248,8 @@ Avance:
 - `catalog/page.tsx` usa `AppDrawer` para alta de productos, alta de planes y edición de planes.
 - `clients/page.tsx` usa `AppDrawer` para registrar socios con membresia inicial y pago, dejando la pantalla principal para busqueda y consulta.
 - `settings/organization/page.tsx` usa `AppDrawer` para editar gimnasio, crear sucursales y editar sucursales, dejando la pantalla principal como resumen operativo.
+- `bookings/page.tsx` usa `AppDrawer` para crear reservas y recursos, dejando la pantalla principal enfocada en calendario y resumen diario.
+- `benefits/page.tsx` usa `AppDrawer` para crear beneficios, dejando la pantalla principal enfocada en consulta y estados vacios.
 - `AppNavigation` fue eliminado por no tener consumidores y para evitar modelos paralelos de navegación.
 
 ## Fase 9 — Verificación final

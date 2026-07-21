@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { AppDrawer } from "@/components/AppDrawer";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
@@ -62,6 +63,8 @@ export default function BookingsPage() {
   const [notice, setNotice] = useState<Notice | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showBookingDrawer, setShowBookingDrawer] = useState(false);
+  const [showResourceDrawer, setShowResourceDrawer] = useState(false);
 
   const today = toDateInput(new Date());
   const minimumBookingTime = startDate === today ? currentTimeInput() : undefined;
@@ -177,6 +180,7 @@ export default function BookingsPage() {
       setNotice({ title: "Reserva creada", message: "La reserva se registró correctamente.", tone: "success" });
       setNotes("");
       setStartTime("");
+      setShowBookingDrawer(false);
     } catch (error) {
       showError(error, "No fue posible crear la reserva.");
     } finally {
@@ -216,6 +220,7 @@ export default function BookingsPage() {
       setResourceSchedule(weekdays.map((day) => ({ ...day })));
       setResourceAllowedPlanIds([]);
       setNotice({ title: "Recurso creado", message: "El recurso ya está disponible para reservar.", tone: "success" });
+      setShowResourceDrawer(false);
     } catch (error) {
       showError(error, "No fue posible crear el recurso.");
     } finally {
@@ -273,7 +278,53 @@ export default function BookingsPage() {
         <aside className="grid content-start gap-5">
           {selectedDateIsPast ? <p className="rounded-md border border-[#d8ddd2] bg-[#f8faf8] px-3 py-2 text-sm text-[#5d6b63]">Este día ya pasó. Puedes consultar el detalle histórico, pero no crear nuevas reservas.</p> : null}
 
-          <form className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm" onSubmit={submitBooking}>
+          <section className="app-card p-5">
+            <p className="app-eyebrow">Acciones</p>
+            <h2 className="app-card-title">Agenda del dia</h2>
+            <p className="app-card-copy">
+              Selecciona un dia en el calendario y abre solo la accion que necesitas.
+            </p>
+            <div className="mt-5 grid gap-3">
+              <button className="app-button" disabled={selectedDateIsPast || resources.length === 0} onClick={() => setShowBookingDrawer(true)} type="button">
+                Nueva reserva
+              </button>
+              {canManageResources ? (
+                <button className="admin-secondary-link" onClick={() => setShowResourceDrawer(true)} type="button">
+                  Crear recurso
+                </button>
+              ) : null}
+            </div>
+          </section>
+
+          <section className="app-card p-5">
+            <p className="app-eyebrow">Resumen</p>
+            <h2 className="app-card-title">{formatLongDate(startDate)}</h2>
+            <div className="mt-4 grid gap-3">
+              <article className="rounded-md border border-[#d8ddd2] bg-white px-3 py-3">
+                <span className="text-xs font-semibold uppercase text-[#647067]">Reservas</span>
+                <strong className="mt-1 block text-2xl">{selectedDateBookings.length}</strong>
+              </article>
+              <article className="rounded-md border border-[#d8ddd2] bg-white px-3 py-3">
+                <span className="text-xs font-semibold uppercase text-[#647067]">Recursos</span>
+                <strong className="mt-1 block text-2xl">{resources.length}</strong>
+              </article>
+              {activeResource ? (
+                <article className="rounded-md border border-[#d8ddd2] bg-white px-3 py-3">
+                  <span className="text-xs font-semibold uppercase text-[#647067]">Recurso activo</span>
+                  <strong className="mt-1 block">{activeResource.name}</strong>
+                  <p className="mt-1 text-xs text-[#647067]">{activeResource.slotMinutes} min por reserva</p>
+                </article>
+              ) : null}
+            </div>
+          </section>
+
+          <AppDrawer
+            description="Busca al socio, elige el recurso y confirma el horario de inicio."
+            onClose={() => setShowBookingDrawer(false)}
+            open={showBookingDrawer}
+            title="Nueva reserva"
+          >
+          <form className="grid gap-4" onSubmit={submitBooking}>
             <div className="flex items-start justify-between gap-3">
               <div><h2 className="text-xl font-semibold">Nueva reserva</h2><p className="mt-1 text-sm text-[#5d6b63]">Busca al socio, elige recurso y captura el inicio.</p></div>
               {activeResource ? <span className="rounded-md bg-[var(--brand-surface)] px-3 py-2 text-xs font-semibold text-[var(--brand-primary)]">{activeResource.slotMinutes} min</span> : null}
@@ -294,9 +345,16 @@ export default function BookingsPage() {
             <label className="mt-4 grid gap-2 text-sm font-medium">Notas<textarea className="min-h-20 rounded-md border border-[#cdd5ca] px-3 py-2" onChange={(event) => setNotes(event.target.value)} value={notes} /></label>
             <button className="mt-5 h-11 w-full rounded-md bg-[var(--brand-primary)] px-4 text-sm font-semibold text-white shadow-sm disabled:opacity-60" disabled={saving || selectedDateIsPast || selectedStartIsPast || !resourceId || !clientId || !isValidTimeInput(startTime)} type="submit">Crear reserva</button>
           </form>
+          </AppDrawer>
 
           {canManageResources ? (
-            <form className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm" onSubmit={submitResource}>
+            <AppDrawer
+              description="Define horarios, duracion y membresias permitidas para un recurso reservable."
+              onClose={() => setShowResourceDrawer(false)}
+              open={showResourceDrawer}
+              title="Crear recurso"
+            >
+            <form className="grid gap-4" onSubmit={submitResource}>
               <h2 className="text-xl font-semibold">Crear recurso</h2>
               <input className="mt-4 h-11 w-full rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setResourceName(event.target.value)} placeholder="Nombre del recurso" required value={resourceName} />
               <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_130px]"><label className="grid gap-2 text-sm font-medium">Duración<input className="h-11 rounded-md border border-[#cdd5ca] px-3" min={1} onChange={(event) => setDurationValue(Number(event.target.value))} type="number" value={durationValue} /></label><label className="grid gap-2 text-sm font-medium">Unidad<select className="h-11 rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setDurationUnit(event.target.value as "MINUTES" | "HOURS")} value={durationUnit}><option value="MINUTES">Minutos</option><option value="HOURS">Horas</option></select></label></div>
@@ -304,6 +362,7 @@ export default function BookingsPage() {
               <fieldset className="mt-5 grid gap-2"><legend className="text-sm font-semibold">Membresías que pueden reservar</legend><p className="text-xs text-[#6f7a73]">Sin seleccionar planes, el recurso queda abierto para cualquier socio activo.</p>{plans.map((plan) => <label className="flex items-start gap-2 rounded-md border border-[#d8ddd2] px-3 py-2 text-sm" key={plan.id}><input className="mt-1 h-4 w-4 accent-[var(--brand-primary)]" checked={resourceAllowedPlanIds.includes(plan.id)} onChange={(event) => setResourceAllowedPlanIds((current) => event.target.checked ? [...current, plan.id] : current.filter((id) => id !== plan.id))} type="checkbox" /><span><strong className="block">{plan.name}</strong><span className="text-xs text-[#6f7a73]">{plan.multiBranchAccess ? "Multi-sucursal" : "Sucursal de venta"}</span></span></label>)}</fieldset>
               <button className="mt-5 h-11 w-full rounded-md bg-[var(--brand-primary)] px-4 text-sm font-semibold text-white shadow-sm disabled:opacity-60" disabled={saving} type="submit">Crear recurso</button>
             </form>
+            </AppDrawer>
           ) : null}
         </aside>
 

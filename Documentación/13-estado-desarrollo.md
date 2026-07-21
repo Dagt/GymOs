@@ -805,5 +805,7 @@ Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
 - `/catalog` mueve nuevo producto, nuevo plan y edicion de plan a `AppDrawer`; la pagina principal queda enfocada en listas de productos/servicios y planes.
 - `/clients` mueve el registro completo de socio, membresia inicial y pago de entrada a `AppDrawer`; la pagina principal queda enfocada en busqueda y lista.
 - `/settings/organization` mueve edicion de gimnasio, alta de sucursal y edicion de sucursal a `AppDrawer`; la pagina principal queda como resumen de marca, sedes y acceso a equipo.
+- `/bookings` mueve nueva reserva y creacion de recurso a `AppDrawer`; la pagina principal queda enfocada en calendario, resumen diario y recursos.
+- `/benefits` mueve nuevo beneficio a `AppDrawer`; la pagina principal queda enfocada en beneficios configurados y estado vacio claro.
 - Se retiro `AppNavigation`, que ya no tenia consumidores, para mantener un solo modelo de navegacion visible.
-- La siguiente etapa recomendada es revisar paginas operativas aun saturadas, especialmente reservas, beneficios y fichas de socio.
+- La siguiente etapa recomendada es revisar paginas operativas aun saturadas, especialmente fichas de socio, accesos, automatizaciones e inventario.
