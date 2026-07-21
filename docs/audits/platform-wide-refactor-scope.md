@@ -46,7 +46,7 @@ Para cada dominio se registrarán: contratos, reglas, dependencias, deuda, cober
 
 - División por dominio y componentes con responsabilidad acotada.
 - Transporte HTTP común y clientes por dominio.
-- Eliminación gradual de fachada legacy.
+- Fachada legacy de `frontend/src/lib/api` eliminada; revisar clientes especiales fuera del paquete API antes de nuevas unificaciones.
 - Estado, errores y permisos consistentes.
 - Sin manipulación directa del DOM para implementar lógica de producto.
 - Accesibilidad, navegación por teclado, i18n y formato regional.

@@ -217,16 +217,16 @@ Por cada servicio:
 
 ## Fase 7 — Cliente API frontend por dominios
 
-Estado: `PLANNED`
+Estado: `DONE`
 
 Objetivos:
 
 - Transporte HTTP común.
 - Clientes de dominio pequeños.
 - Tipos junto al dominio correspondiente.
-- Fachada temporal para compatibilidad.
-- Migración gradual de imports.
-- Eliminar `legacy` sólo cuando no existan consumidores.
+- Fachada temporal para compatibilidad: retirada.
+- Migración gradual de imports: completada para `frontend/src/lib/api`.
+- `frontend/src/lib/api/legacy.ts` eliminado al no existir consumidores de código.
 
 ## Fase 8 — Limpieza transversal
 

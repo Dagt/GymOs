@@ -43,7 +43,7 @@ Los estados iniciales son conservadores: `UNKNOWN` significa que todavía no exi
 | Reporting | FUNCTIONAL | PARTIAL | PARTIAL | UNKNOWN | PARTIAL | PARTIAL | NOT_READY | P1 | Alto riesgo de consultas sin filtros tenant. Revisar exportaciones y datos agregados. |
 | Audit | FUNCTIONAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT_READY | P0 | Validar cobertura de eventos críticos, actor, correlation ID e inmutabilidad. |
 | Frontend shell / navigation | FUNCTIONAL | PARTIAL | PARTIAL | N/A | PARTIAL | PARTIAL | NOT_READY | P1 | Revisar permisos visuales, accesibilidad, rutas, sesión y duplicación de layouts. |
-| Frontend API layer | FUNCTIONAL | NON_COMPLIANT | PARTIAL | N/A | PARTIAL | PARTIAL | NOT_READY | P1 | Cliente legacy y clientes aislados duplican transporte, errores y base URL. |
+| Frontend API layer | FUNCTIONAL | PARTIAL | PARTIAL | N/A | PARTIAL | PARTIAL | PARTIAL | P1 | Fachada legacy eliminada; quedan clientes especiales y cobertura frontend por revisar. |
 | Frontend forms / validation | FUNCTIONAL | PARTIAL | PARTIAL | N/A | PARTIAL | PARTIAL | NOT_READY | P1 | Revisar validación consistente, formatos regionales y mensajes de error. |
 | Database / Flyway | FUNCTIONAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | PARTIAL | NOT_READY | P0 | Verificar migración desde cero, upgrades, índices, constraints y compatibilidad. |
 | Docker / local environment | FUNCTIONAL | PARTIAL | PARTIAL | N/A | PARTIAL | PARTIAL | NOT_READY | P0 | Debe ser reproducible para validación local antes de cualquier PR. |

@@ -211,16 +211,16 @@ Regla: antes de un cambio estructural amplio se debe corregir o clasificar cada 
 ### RF-010 — Cliente API frontend fragmentado de forma inconsistente
 
 - Severidad: `MEDIUM`
-- Clasificación: `REQUIRES_TESTS_FIRST`
+- Clasificación: `MITIGATED`
 - Evidencia:
   - Kiosco de reservas usa un cliente HTTP propio en `frontend/src/lib/kiosk-bookings.ts`.
-  - El resto del frontend conserva un cliente general/legacy.
+  - El cliente general `frontend/src/lib/api/legacy.ts` fue eliminado y reemplazado por clientes de dominio.
 - Riesgo:
-  - Duplicación de base URL, headers, parsing y errores.
+  - Aún puede existir duplicación puntual en clientes externos al paquete `frontend/src/lib/api`.
 - Solución:
-  - Crear transporte HTTP común.
+  - Mantener transporte HTTP común en `frontend/src/lib/api/client.ts`.
   - Mantener clientes de dominio pequeños sobre ese transporte.
-  - No unificar contratos de autenticación normal y self-service; sólo reutilizar infraestructura HTTP.
+  - Revisar clientes especiales como kiosco/reservas antes de unificar infraestructura HTTP.
 
 ### RF-011 — Ausencia de pruebas frontend suficientes
 
