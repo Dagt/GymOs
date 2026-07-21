@@ -20,7 +20,23 @@ export type {
   OrganizationSummary,
   OrganizationUpdatePayload,
 } from "./api/organization-types";
-export * from "./api/clients";
+export {
+  createClient,
+  getClient,
+  importClientsCsv,
+  searchClients,
+  updateClient,
+} from "./api/clients";
+export type {
+  ClientDetail,
+  ClientDetailResponse,
+  ClientImportResult,
+  ClientImportRow,
+  ClientPayload,
+  ClientSummary,
+  ClientTimelineEntry,
+  ClientUpdatePayload,
+} from "./api/client-types";
 export * from "./api/catalog";
 export * from "./api/benefits";
 export {
