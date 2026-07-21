@@ -6,34 +6,28 @@ export async function apiFetch<T>(
   init: RequestInit = {},
 ): Promise<T> {
   const isFormData = init.body instanceof FormData;
-  let response: Response;
+  return request<T>(path, {
+    ...init,
+    headers: {
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
+      Authorization: `Bearer ${accessToken}`,
+      ...init.headers,
+    },
+  });
+}
 
-  try {
-    response = await fetch(`${API_BASE_URL}${path}`, {
-      ...init,
-      headers: {
-        ...(isFormData ? {} : { "Content-Type": "application/json" }),
-        Authorization: `Bearer ${accessToken}`,
-        ...init.headers,
-      },
-    });
-  } catch {
-    throw new Error(
-      `No se pudo conectar con el servidor (${API_BASE_URL}). Revisa que el backend esté encendido y que la URL de API sea correcta.`,
-    );
-  }
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => null);
-    throw new Error(formatApiError(response, path, error));
-  }
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  const text = await response.text();
-  return (text ? JSON.parse(text) : undefined) as T;
+export async function publicApiFetch<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T> {
+  const isFormData = init.body instanceof FormData;
+  return request<T>(path, {
+    ...init,
+    headers: {
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
+      ...init.headers,
+    },
+  });
 }
 
 export function normalizePayload<T extends Record<string, unknown>>(payload: T): T {
@@ -56,6 +50,30 @@ export function withIdempotency<T extends { idempotencyKey?: string | null }>(
     ...payload,
     idempotencyKey: operationKey(...parts),
   };
+}
+
+async function request<T>(path: string, init: RequestInit): Promise<T> {
+  let response: Response;
+
+  try {
+    response = await fetch(`${API_BASE_URL}${path}`, init);
+  } catch {
+    throw new Error(
+      `No se pudo conectar con el servidor (${API_BASE_URL}). Revisa que el backend esté encendido y que la URL de API sea correcta.`,
+    );
+  }
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new Error(formatApiError(response, path, error));
+  }
+
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
+  const text = await response.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 function operationKey(...parts: string[]) {
