@@ -123,6 +123,9 @@ public class AuthService {
 		if (principal == null) {
 			throw new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesion para continuar.");
 		}
+		if (!authQueryRepository.organizationIsActive(organizationId)) {
+			throw new BusinessException("ORGANIZATION_SUSPENDED", "El gimnasio no tiene acceso activo a la plataforma.");
+		}
 		boolean supportAccess = principal.platformAdmin();
 		if (!supportAccess && !authQueryRepository.userHasOrganizationAccess(principal.userId(), organizationId)) {
 			throw new BusinessException("ORGANIZATION_ACCESS_DENIED", "No tienes acceso al gimnasio solicitado.");
@@ -177,7 +180,7 @@ public class AuthService {
 
 	private GymOsPrincipal restorePrincipal(AuthenticatedUser user, RefreshSession session) {
 		boolean platformAdmin = user.permissions().contains("platform.admin");
-		if (!platformAdmin && !authQueryRepository.organizationIsActive(session.organizationId())) {
+		if ((!platformAdmin || session.supportMode()) && !authQueryRepository.organizationIsActive(session.organizationId())) {
 			throw new BusinessException("ORGANIZATION_SUSPENDED", "El gimnasio no tiene acceso activo a la plataforma.");
 		}
 		if (!platformAdmin && !authQueryRepository.userHasOrganizationAccess(user.userId(), session.organizationId())) {
