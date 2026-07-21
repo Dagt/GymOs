@@ -6,7 +6,7 @@ import type {
   SaleRefundPayload,
   SalesReportResponse,
   SaleSummary,
-} from "./legacy";
+} from "./sales-types";
 
 export async function getRecentSales(accessToken: string): Promise<SaleSummary[]> {
   return apiFetch<SaleSummary[]>("/sales", accessToken);
