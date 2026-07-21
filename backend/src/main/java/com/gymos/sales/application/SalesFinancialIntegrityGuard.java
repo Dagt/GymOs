@@ -34,8 +34,7 @@ class SalesFinancialIntegrityGuard {
 		if (key != null && integrityRepository.paymentSaleByIdempotencyKey(principal.organizationId(), key).isPresent()) {
 			return;
 		}
-		var sale = salesRepository.saleHeader(principal.organizationId(), saleId)
-				.orElseThrow(() -> new BusinessException("SALE_NOT_FOUND", "La venta no existe o no esta disponible."));
+		var sale = SalesRecordResolver.requireSale(salesRepository, principal.organizationId(), saleId);
 		if (request.amountCents() > sale.balanceCents()) {
 			throw new BusinessException("PAYMENT_EXCEEDS_BALANCE", "El pago no puede superar el saldo pendiente de la venta.");
 		}
@@ -46,15 +45,16 @@ class SalesFinancialIntegrityGuard {
 		if (principal == null) {
 			return;
 		}
-		var payment = salesRepository.payment(principal.organizationId(), paymentId)
-				.orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "El pago no existe o no esta disponible."));
+		var payment = SalesRecordResolver.requirePayment(salesRepository, principal.organizationId(), paymentId);
 		if ("COMPLETED".equals(payment.status())) {
 			return;
 		}
-		UUID saleId = salesRepository.saleIdForPayment(principal.organizationId(), paymentId)
-				.orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "El pago no existe o no esta disponible."));
-		var sale = salesRepository.saleHeader(principal.organizationId(), saleId)
-				.orElseThrow(() -> new BusinessException("SALE_NOT_FOUND", "La venta no existe o no esta disponible."));
+		UUID saleId = SalesRecordResolver.requireSaleIdForPayment(
+				salesRepository,
+				principal.organizationId(),
+				paymentId
+		);
+		var sale = SalesRecordResolver.requireSale(salesRepository, principal.organizationId(), saleId);
 		if (payment.amountCents() > sale.balanceCents()) {
 			throw new BusinessException("PAYMENT_EXCEEDS_BALANCE", "El pago no puede superar el saldo pendiente de la venta.");
 		}
@@ -69,8 +69,11 @@ class SalesFinancialIntegrityGuard {
 		if (key != null && salesRepository.refundByIdempotencyKey(principal.organizationId(), key).isPresent()) {
 			return;
 		}
-		var payment = salesRepository.payment(principal.organizationId(), request.paymentId())
-				.orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "El pago no existe o no esta disponible."));
+		var payment = SalesRecordResolver.requirePayment(
+				salesRepository,
+				principal.organizationId(),
+				request.paymentId()
+		);
 		long refunded = integrityRepository.processedRefundTotalForPayment(principal.organizationId(), request.paymentId());
 		if (refunded + request.amountCents() > payment.amountCents()) {
 			throw new BusinessException("REFUND_EXCEEDS_PAYMENT", "Los reembolsos acumulados no pueden superar el pago seleccionado.");
