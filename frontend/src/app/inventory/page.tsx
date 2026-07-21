@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { AppDrawer } from "@/components/AppDrawer";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
@@ -47,6 +48,7 @@ export default function InventoryPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showMovementDrawer, setShowMovementDrawer] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -140,6 +142,7 @@ export default function InventoryPage() {
       setReorderPoint(String(updated.reorderPoint));
       setMessage(`${updated.productName}: existencia actual ${updated.quantityOnHand}.`);
       await refresh(session, selectedProductId);
+      setShowMovementDrawer(false);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible registrar movimiento.");
     } finally {
@@ -251,91 +254,24 @@ export default function InventoryPage() {
           ) : null}
 
           <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-semibold">Movimiento</h2>
-            <p className="mt-1 text-sm text-[#5d6b63]">
-              {selectedStock ? selectedStock.productName : "Selecciona producto"}
-            </p>
-            <form className="mt-5 grid gap-4" onSubmit={submitMovement}>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-                  Producto
-                  <select
-                    className="h-10 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm"
-                    onChange={(event) => {
-                      const nextId = event.target.value;
-                      setSelectedProductId(nextId);
-                      const nextStock = stock.find((item) => item.productId === nextId);
-                      setReorderPoint(String(nextStock?.reorderPoint ?? 0));
-                    }}
-                    value={selectedProductId}
-                  >
-                    {stock.map((item) => (
-                      <option key={item.productId} value={item.productId}>
-                        {item.productName}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-                  Tipo
-                  <select
-                    className="h-10 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm"
-                    onChange={(event) => setMovementType(event.target.value as InventoryMovementType)}
-                    value={movementType}
-                  >
-                    {movementTypes.map((type) => (
-                      <option key={type.value} value={type.value}>{type.label}</option>
-                    ))}
-                  </select>
-                </label>
-                <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-                  Cantidad
-                  <input
-                    className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm"
-                    min={1}
-                    onChange={(event) => setQuantity(Number(event.target.value))}
-                    type="number"
-                    value={quantity}
-                  />
-                </label>
-                <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-                  Costo unitario
-                  <input
-                    className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm"
-                    min={0}
-                    onChange={(event) => setUnitCostCents(event.target.value)}
-                    step="0.01"
-                    type="number"
-                    value={unitCostCents}
-                  />
-                </label>
-                <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-                  Minimo
-                  <input
-                    className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm"
-                    min={0}
-                    onChange={(event) => setReorderPoint(event.target.value)}
-                    type="number"
-                    value={reorderPoint}
-                  />
-                </label>
+            <div className="admin-panel-header">
+              <div>
+                <p>Movimiento</p>
+                <h2>{selectedStock ? selectedStock.productName : "Selecciona producto"}</h2>
               </div>
-              <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-                Motivo
-                <textarea
-                  className="min-h-24 rounded-md border border-[#cdd5ca] px-3 py-2 text-sm"
-                  onChange={(event) => setReason(event.target.value)}
-                  value={reason}
-                />
-              </label>
-              <button
-                className="h-11 rounded-md bg-[#13251c] px-5 text-sm font-semibold text-white transition hover:bg-[#243d30] disabled:opacity-60"
-                disabled={saving || !selectedProductId || !reason.trim()}
-                type="submit"
-              >
-                {saving ? "Registrando..." : "Registrar movimiento"}
+              <button className="app-button" disabled={!selectedProductId} onClick={() => setShowMovementDrawer(true)} type="button">
+                Registrar movimiento
               </button>
-            </form>
+            </div>
+            {selectedStock ? (
+              <dl className="mt-5 grid gap-3 sm:grid-cols-3">
+                <Metric label="Existencia" value={String(selectedStock.quantityOnHand)} />
+                <Metric label="Minimo" value={String(selectedStock.reorderPoint)} />
+                <Metric label="Costo promedio" value={selectedStock.averageCostCents == null ? "N/A" : formatMoney(selectedStock.averageCostCents, selectedStock.currency)} />
+              </dl>
+            ) : (
+              <p className="mt-4 text-sm text-[#5d6b63]">Selecciona un producto para registrar entradas, ajustes o mermas.</p>
+            )}
           </section>
 
           <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
@@ -371,7 +307,105 @@ export default function InventoryPage() {
           </section>
         </section>
       </section>
+
+      <AppDrawer
+        description="Registra entradas, ajustes, mermas o devoluciones para el producto seleccionado."
+        onClose={() => setShowMovementDrawer(false)}
+        open={showMovementDrawer}
+        title="Registrar movimiento"
+      >
+        <form className="grid gap-4" onSubmit={submitMovement}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+              Producto
+              <select
+                className="h-10 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm"
+                onChange={(event) => {
+                  const nextId = event.target.value;
+                  setSelectedProductId(nextId);
+                  const nextStock = stock.find((item) => item.productId === nextId);
+                  setReorderPoint(String(nextStock?.reorderPoint ?? 0));
+                }}
+                value={selectedProductId}
+              >
+                {stock.map((item) => (
+                  <option key={item.productId} value={item.productId}>
+                    {item.productName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+              Tipo
+              <select
+                className="h-10 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm"
+                onChange={(event) => setMovementType(event.target.value as InventoryMovementType)}
+                value={movementType}
+              >
+                {movementTypes.map((type) => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+              Cantidad
+              <input
+                className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm"
+                min={1}
+                onChange={(event) => setQuantity(Number(event.target.value))}
+                type="number"
+                value={quantity}
+              />
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+              Costo unitario
+              <input
+                className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm"
+                min={0}
+                onChange={(event) => setUnitCostCents(event.target.value)}
+                step="0.01"
+                type="number"
+                value={unitCostCents}
+              />
+            </label>
+            <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+              Minimo
+              <input
+                className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm"
+                min={0}
+                onChange={(event) => setReorderPoint(event.target.value)}
+                type="number"
+                value={reorderPoint}
+              />
+            </label>
+          </div>
+          <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+            Motivo
+            <textarea
+              className="min-h-24 rounded-md border border-[#cdd5ca] px-3 py-2 text-sm"
+              onChange={(event) => setReason(event.target.value)}
+              value={reason}
+            />
+          </label>
+          <button
+            className="form-primary-button"
+            disabled={saving || !selectedProductId || !reason.trim()}
+            type="submit"
+          >
+            {saving ? "Registrando..." : "Registrar movimiento"}
+          </button>
+        </form>
+      </AppDrawer>
     </AppShell>
+  );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <dt className="font-medium text-[#6f7a73]">{label}</dt>
+      <dd className="mt-1 font-semibold">{value}</dd>
+    </div>
   );
 }
 

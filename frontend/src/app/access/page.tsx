@@ -283,12 +283,13 @@ export default function AccessPage() {
 
   return (
     <AppShell
+      actions={[{ href: "/reception", label: "Recepcion" }]}
       eyebrow="Operacion"
       session={session}
       subtitle="Pases, visitas, apertura manual y bitacora de accesos."
       title="Control de acceso"
     >
-      <header className="border-b border-[#d8ddd2] bg-white">
+      <header className="hidden">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-sm font-semibold uppercase tracking-wide text-[#51735f]">Operacion</p>
@@ -306,7 +307,7 @@ export default function AccessPage() {
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-7xl gap-6 px-6 py-6 lg:grid-cols-[0.95fr_1.4fr]">
+      <section className="grid gap-6 lg:grid-cols-[0.95fr_1.4fr]">
         <aside className="grid gap-6">
           <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
             <h2 className="text-xl font-semibold">Dispositivo</h2>

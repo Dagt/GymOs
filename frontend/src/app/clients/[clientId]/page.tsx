@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { AppDrawer } from "@/components/AppDrawer";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
@@ -56,6 +57,11 @@ export default function ClientDetailPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showEditDrawer, setShowEditDrawer] = useState(false);
+  const [membershipAction, setMembershipAction] = useState<{
+    membership: ClientMembershipSummary;
+    type: "renew" | "change";
+  } | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -125,6 +131,7 @@ export default function ClientDetailPage() {
       });
       setData(response);
       setForm(toForm(response.client));
+      setShowEditDrawer(false);
       setMessage("Datos del socio actualizados.");
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible actualizar socio.");
@@ -149,6 +156,7 @@ export default function ClientDetailPage() {
       });
       setMemberships(await getClientMemberships(session.accessToken, params.clientId));
       setRenewReference("");
+      setMembershipAction(null);
       setMessage(
         response.membership
           ? `Membresia renovada hasta ${formatDay(response.membership.endsOn)}.`
@@ -179,6 +187,7 @@ export default function ClientDetailPage() {
       const response = await changeMembershipPlan(session.accessToken, activeMembership.id, payload);
       setMemberships(await getClientMemberships(session.accessToken, params.clientId));
       setRenewReference("");
+      setMembershipAction(null);
       setMessage(
         response.membership
           ? `Plan cambiado a ${response.membership.planName}.`
@@ -217,34 +226,26 @@ export default function ClientDetailPage() {
       <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
         <section className="grid gap-6">
           <section className="app-card p-5">
-            <p className="app-eyebrow">Datos personales</p>
-            <h2 className="mt-2 text-xl font-semibold">Ficha del socio</h2>
-            <form className="mt-5 grid gap-4" onSubmit={submit}>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <TextField error={fieldErrors.firstName} label="Nombre" name="firstName" value={form.firstName ?? ""} onChange={(value) => updateField("firstName", value)} />
-                <TextField error={fieldErrors.lastName} label="Apellido paterno" name="lastName" value={form.lastName ?? ""} onChange={(value) => updateField("lastName", value)} />
-                <TextField error={fieldErrors.maternalLastName} label="Apellido materno" name="maternalLastName" required={false} value={form.maternalLastName ?? ""} onChange={(value) => updateField("maternalLastName", value)} />
-                <PhoneField error={fieldErrors.phone} label="Telefono" name="phone" required value={form.phone ?? ""} onChange={(value) => updateField("phone", value)} />
-                <EmailField error={fieldErrors.email} label="Email" name="email" value={form.email ?? ""} onChange={(value) => updateField("email", value)} />
-                <DateField error={fieldErrors.birthDate} label="Fecha de nacimiento" name="birthDate" value={form.birthDate ?? ""} onChange={(value) => updateField("birthDate", value)} />
-                <GenderField error={fieldErrors.gender} label="Genero" name="gender" value={form.gender ?? ""} onChange={(value) => updateField("gender", value)} />
+            <div className="admin-panel-header">
+              <div>
+                <p>Datos personales</p>
+                <h2>Ficha del socio</h2>
               </div>
-              <label className="form-field" htmlFor="status">
-                <span>Estado</span>
-                <select className="app-input" id="status" onChange={(event) => updateField("status", event.target.value)} value={form.status}>
-                  <option value="ACTIVE">Activo</option>
-                  <option value="INACTIVE">Inactivo</option>
-                  <option value="SUSPENDED">Suspendido</option>
-                </select>
-              </label>
-              <label className="form-field" htmlFor="notes">
-                <span>Notas</span>
-                <textarea className="app-input min-h-28 py-2" id="notes" onChange={(event) => updateField("notes", event.target.value)} value={form.notes ?? ""} />
-              </label>
-              <button className="form-primary-button" disabled={saving} type="submit">
-                {saving ? "Guardando..." : "Guardar datos"}
+              <button className="app-button" onClick={() => setShowEditDrawer(true)} type="button">
+                Editar datos
               </button>
-            </form>
+            </div>
+            <dl className="mt-5 grid gap-4 sm:grid-cols-2">
+              <Metric label="Nombre" value={data.client.firstName} />
+              <Metric label="Apellido paterno" value={data.client.lastName} />
+              <Metric label="Apellido materno" value={data.client.maternalLastName ?? "Sin registrar"} />
+              <Metric label="Telefono" value={data.client.phone ?? "Sin telefono"} />
+              <Metric label="Email" value={data.client.email ?? "Sin email"} />
+              <Metric label="Nacimiento" value={data.client.birthDate ? formatDay(data.client.birthDate) : "Sin registrar"} />
+              <Metric label="Genero" value={data.client.gender ? genderLabel(data.client.gender) : "Sin registrar"} />
+              <Metric label="Estado" value={statusLabel(data.client.status)} />
+            </dl>
+            {data.client.notes ? <p className="mt-5 rounded-md border border-[#d8ddd2] bg-white px-4 py-3 text-sm text-[#5d6b63]">{data.client.notes}</p> : null}
           </section>
 
           <section className="app-card p-5">
@@ -262,17 +263,6 @@ export default function ClientDetailPage() {
               </section>
             ) : (
               <section className="grid gap-4">
-                <MembershipControls
-                  plans={plans}
-                  renewMethod={renewMethod}
-                  renewReference={renewReference}
-                  renewValidateNow={renewValidateNow}
-                  targetPlanId={targetPlanId}
-                  onMethodChange={setRenewMethod}
-                  onReferenceChange={setRenewReference}
-                  onTargetPlanChange={setTargetPlanId}
-                  onValidateNowChange={setRenewValidateNow}
-                />
                 {memberships.map((membership) => (
                   <article className="rounded-md border border-[#d8ddd2] px-4 py-3" key={membership.id}>
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -291,7 +281,7 @@ export default function ClientDetailPage() {
                       <button
                         className="app-button"
                         disabled={renewingMembershipId !== null || changingMembershipId !== null || membership.status !== "ACTIVE"}
-                        onClick={() => renew(membership)}
+                        onClick={() => setMembershipAction({ membership, type: "renew" })}
                         type="button"
                       >
                         {renewingMembershipId === membership.id ? "Renovando..." : "Renovar"}
@@ -302,10 +292,11 @@ export default function ClientDetailPage() {
                           renewingMembershipId !== null
                           || changingMembershipId !== null
                           || membership.status !== "ACTIVE"
-                          || !targetPlanId
-                          || targetPlanId === membership.planId
                         }
-                        onClick={() => changePlan(membership)}
+                        onClick={() => {
+                          setTargetPlanId((current) => current && current !== membership.planId ? current : plans.find((plan) => plan.id !== membership.planId)?.id || "");
+                          setMembershipAction({ membership, type: "change" });
+                        }}
                         type="button"
                       >
                         {changingMembershipId === membership.id ? "Cambiando..." : "Cambiar plan"}
@@ -346,11 +337,104 @@ export default function ClientDetailPage() {
           </section>
         </aside>
       </section>
+
+      <AppDrawer
+        description="Actualiza datos personales, contacto, estado y notas internas del socio."
+        onClose={() => setShowEditDrawer(false)}
+        open={showEditDrawer}
+        title="Editar datos del socio"
+      >
+        <form className="grid gap-4" onSubmit={submit}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TextField error={fieldErrors.firstName} label="Nombre" name="firstName" value={form.firstName ?? ""} onChange={(value) => updateField("firstName", value)} />
+            <TextField error={fieldErrors.lastName} label="Apellido paterno" name="lastName" value={form.lastName ?? ""} onChange={(value) => updateField("lastName", value)} />
+            <TextField error={fieldErrors.maternalLastName} label="Apellido materno" name="maternalLastName" required={false} value={form.maternalLastName ?? ""} onChange={(value) => updateField("maternalLastName", value)} />
+            <PhoneField error={fieldErrors.phone} label="Telefono" name="phone" required value={form.phone ?? ""} onChange={(value) => updateField("phone", value)} />
+            <EmailField error={fieldErrors.email} label="Email" name="email" value={form.email ?? ""} onChange={(value) => updateField("email", value)} />
+            <DateField error={fieldErrors.birthDate} label="Fecha de nacimiento" name="birthDate" value={form.birthDate ?? ""} onChange={(value) => updateField("birthDate", value)} />
+            <GenderField error={fieldErrors.gender} label="Genero" name="gender" value={form.gender ?? ""} onChange={(value) => updateField("gender", value)} />
+          </div>
+          <label className="form-field" htmlFor="status">
+            <span>Estado</span>
+            <select className="app-input" id="status" onChange={(event) => updateField("status", event.target.value)} value={form.status}>
+              <option value="ACTIVE">Activo</option>
+              <option value="INACTIVE">Inactivo</option>
+              <option value="SUSPENDED">Suspendido</option>
+            </select>
+          </label>
+          <label className="form-field" htmlFor="notes">
+            <span>Notas</span>
+            <textarea className="app-input min-h-28 py-2" id="notes" onChange={(event) => updateField("notes", event.target.value)} value={form.notes ?? ""} />
+          </label>
+          <button className="form-primary-button" disabled={saving} type="submit">
+            {saving ? "Guardando..." : "Guardar datos"}
+          </button>
+        </form>
+      </AppDrawer>
+
+      <AppDrawer
+        description={
+          membershipAction?.type === "change"
+            ? "Selecciona el nuevo plan, registra el pago y aplica el cambio de membresia."
+            : "Registra el pago de renovacion y define si se valida de inmediato o queda pendiente."
+        }
+        onClose={() => setMembershipAction(null)}
+        open={Boolean(membershipAction)}
+        title={membershipAction?.type === "change" ? "Cambiar plan" : "Renovar membresia"}
+      >
+        {membershipAction ? (
+          <form
+            className="grid gap-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (membershipAction.type === "change") {
+                void changePlan(membershipAction.membership);
+              } else {
+                void renew(membershipAction.membership);
+              }
+            }}
+          >
+            <section className="rounded-md border border-[#d8ddd2] bg-white p-4">
+              <p className="app-eyebrow">Membresia actual</p>
+              <h3 className="mt-2 text-lg font-semibold">{membershipAction.membership.planName}</h3>
+              <p className="mt-1 text-sm text-[#5d6b63]">
+                {membershipStatusLabel(membershipAction.membership.status)} - {formatDay(membershipAction.membership.startsOn)} a {formatDay(membershipAction.membership.endsOn)}
+              </p>
+            </section>
+            <MembershipControls
+              mode={membershipAction.type}
+              plans={plans}
+              renewMethod={renewMethod}
+              renewReference={renewReference}
+              renewValidateNow={renewValidateNow}
+              targetPlanId={targetPlanId}
+              onMethodChange={setRenewMethod}
+              onReferenceChange={setRenewReference}
+              onTargetPlanChange={setTargetPlanId}
+              onValidateNowChange={setRenewValidateNow}
+            />
+            <button
+              className="form-primary-button"
+              disabled={
+                renewingMembershipId !== null
+                || changingMembershipId !== null
+                || (membershipAction.type === "change" && (!targetPlanId || targetPlanId === membershipAction.membership.planId))
+              }
+              type="submit"
+            >
+              {membershipAction.type === "change"
+                ? changingMembershipId === membershipAction.membership.id ? "Cambiando..." : "Cambiar plan"
+                : renewingMembershipId === membershipAction.membership.id ? "Renovando..." : "Renovar membresia"}
+            </button>
+          </form>
+        ) : null}
+      </AppDrawer>
     </AppShell>
   );
 }
 
 function MembershipControls({
+  mode,
   plans,
   renewMethod,
   renewReference,
@@ -361,6 +445,7 @@ function MembershipControls({
   onTargetPlanChange,
   onValidateNowChange,
 }: {
+  mode: "renew" | "change";
   plans: PlanSummary[];
   renewMethod: RenewMembershipPayload["method"];
   renewReference: string;
@@ -384,16 +469,18 @@ function MembershipControls({
         </label>
         <TextField label="Referencia" name="renewReference" required={false} value={renewReference} onChange={onReferenceChange} />
       </div>
-      <label className="form-field mt-3" htmlFor="targetPlanId">
-        <span>Plan para cambio</span>
-        <select className="app-input" id="targetPlanId" onChange={(event) => onTargetPlanChange(event.target.value)} value={targetPlanId}>
-          {plans.map((plan) => (
-            <option key={plan.id} value={plan.id}>
-              {plan.name} - {formatMoney(plan.priceCents, plan.currency)}
-            </option>
-          ))}
-        </select>
-      </label>
+      {mode === "change" ? (
+        <label className="form-field mt-3" htmlFor="targetPlanId">
+          <span>Plan nuevo</span>
+          <select className="app-input" id="targetPlanId" onChange={(event) => onTargetPlanChange(event.target.value)} value={targetPlanId}>
+            {plans.map((plan) => (
+              <option key={plan.id} value={plan.id}>
+                {plan.name} - {formatMoney(plan.priceCents, plan.currency)}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : null}
       <label className="mt-3 flex items-center gap-2 text-sm font-medium text-[#42514a]">
         <input checked={renewValidateNow} onChange={(event) => onValidateNowChange(event.target.checked)} type="checkbox" />
         Validar pago ahora
@@ -479,6 +566,14 @@ function statusLabel(status: string) {
     SUSPENDED: "Suspendido",
   };
   return labels[status] ?? status;
+}
+
+function genderLabel(gender: string) {
+  const labels: Record<string, string> = {
+    FEMALE: "Mujer",
+    MALE: "Hombre",
+  };
+  return labels[gender] ?? gender;
 }
 
 function membershipStatusLabel(status: string) {

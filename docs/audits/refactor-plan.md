@@ -252,6 +252,13 @@ Avance:
 - `benefits/page.tsx` usa `AppDrawer` para crear beneficios, dejando la pantalla principal enfocada en consulta y estados vacios.
 - `AppNavigation` fue eliminado por no tener consumidores y para evitar modelos paralelos de navegación.
 
+Avance adicional del bloque visual:
+
+- `clients/[clientId]/page.tsx` usa `AppDrawer` para editar datos del socio y ejecutar renovacion o cambio de plan sin saturar la ficha.
+- `inventory/page.tsx` usa `AppDrawer` para registrar movimientos; la pantalla principal queda como tablero de existencias, alertas e historial.
+- `automations/page.tsx` usa `AppDrawer` para nueva regla y notificacion manual; la pantalla principal queda como centro de monitoreo.
+- `access/page.tsx` se alinea al `AppShell` unificado y deja de mostrar encabezado visual duplicado.
+
 ## Fase 9 — Verificación final
 
 Estado: `PLANNED`
