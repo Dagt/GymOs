@@ -31,10 +31,12 @@ class SalesPaymentBranchGuard {
 		if (principal == null || principal.branchId() == null) {
 			return;
 		}
-		UUID saleId = salesRepository.saleIdForPayment(principal.organizationId(), paymentId)
-				.orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "El pago no existe o no esta disponible."));
-		var sale = salesRepository.saleHeader(principal.organizationId(), saleId)
-				.orElseThrow(() -> new BusinessException("SALE_NOT_FOUND", "La venta no existe o no esta disponible."));
+		UUID saleId = SalesRecordResolver.requireSaleIdForPayment(
+				salesRepository,
+				principal.organizationId(),
+				paymentId
+		);
+		var sale = SalesRecordResolver.requireSale(salesRepository, principal.organizationId(), saleId);
 		if (!principal.branchId().equals(sale.branchId())) {
 			throw new BusinessException("SALE_BRANCH_MISMATCH", "La venta pertenece a otra sucursal.");
 		}
