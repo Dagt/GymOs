@@ -1,14 +1,4 @@
-export type MembershipDetail = {
-  id: string;
-  clientId: string;
-  planId: string;
-  planName: string;
-  status: "ACTIVE" | "EXPIRED" | "CANCELLED";
-  activatedAt: string;
-  startsOn: string;
-  endsOn: string;
-  graceEndsOn: string;
-};
+import type { MembershipDetail } from "./sales-types";
 
 export type ClientMembershipSummary = MembershipDetail & {
   saleId: string;
