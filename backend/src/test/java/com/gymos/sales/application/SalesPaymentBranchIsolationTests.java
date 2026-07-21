@@ -124,6 +124,7 @@ class SalesPaymentBranchIsolationTests {
 				eventPublisher
 		);
 		AspectJProxyFactory proxyFactory = new AspectJProxyFactory(target);
+		proxyFactory.setProxyTargetClass(true);
 		proxyFactory.addAspect(new SalesPaymentBranchGuard(salesRepository));
 		SalesService service = proxyFactory.getProxy();
 
