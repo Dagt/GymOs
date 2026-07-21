@@ -246,6 +246,8 @@ Avance:
 - La administración de gimnasios usa `AppDrawer` para alta de gimnasio y sucursal, retirando drawers específicos de la página.
 - `users/page.tsx` usa `AppDrawer` para alta de usuarios y reduce duplicación visual de roles.
 - `catalog/page.tsx` usa `AppDrawer` para alta de productos, alta de planes y edición de planes.
+- `clients/page.tsx` usa `AppDrawer` para registrar socios con membresia inicial y pago, dejando la pantalla principal para busqueda y consulta.
+- `settings/organization/page.tsx` usa `AppDrawer` para editar gimnasio, crear sucursales y editar sucursales, dejando la pantalla principal como resumen operativo.
 - `AppNavigation` fue eliminado por no tener consumidores y para evitar modelos paralelos de navegación.
 
 ## Fase 9 — Verificación final

@@ -803,5 +803,7 @@ Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
 - `/platform/gymnasiums` usa `AppDrawer` para alta de gimnasio y alta de sucursal, evitando drawers propios de la pagina.
 - `/users` mueve el alta de usuario interno a `AppDrawer`; la pagina principal queda enfocada en roles, alcance operativo y usuarios existentes.
 - `/catalog` mueve nuevo producto, nuevo plan y edicion de plan a `AppDrawer`; la pagina principal queda enfocada en listas de productos/servicios y planes.
+- `/clients` mueve el registro completo de socio, membresia inicial y pago de entrada a `AppDrawer`; la pagina principal queda enfocada en busqueda y lista.
+- `/settings/organization` mueve edicion de gimnasio, alta de sucursal y edicion de sucursal a `AppDrawer`; la pagina principal queda como resumen de marca, sedes y acceso a equipo.
 - Se retiro `AppNavigation`, que ya no tenia consumidores, para mantener un solo modelo de navegacion visible.
-- La siguiente etapa recomendada es migrar formularios permanentes de `/clients` y `/settings/organization` a drawers/modales por caso de uso.
+- La siguiente etapa recomendada es revisar paginas operativas aun saturadas, especialmente reservas, beneficios y fichas de socio.

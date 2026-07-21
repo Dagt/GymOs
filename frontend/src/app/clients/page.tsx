@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { AppDrawer } from "@/components/AppDrawer";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
@@ -66,6 +67,7 @@ export default function ClientsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showCreateClient, setShowCreateClient] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -177,6 +179,7 @@ export default function ClientsPage() {
       setCreatedClientId(response.client.id);
       setForm({ ...emptyForm, planId: plans[0]?.id || "" });
       await loadClients(session, query);
+      setShowCreateClient(false);
       setMessage(selectedPlan ? "Socio registrado con membresia inicial." : "Socio registrado sin membresia inicial.");
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible registrar socio.");
@@ -220,74 +223,18 @@ export default function ClientsPage() {
       {error ? <FormError message={error} /> : null}
       {message ? <p className="form-message success">{message}</p> : null}
 
-      <section className="grid gap-6 lg:grid-cols-[1fr_1.2fr]">
-        <section className="app-card p-5">
-          <p className="app-eyebrow">Nuevo socio</p>
-          <h2 className="mt-2 text-xl font-semibold">Registro y membresia inicial</h2>
-          <p className="mt-2 text-sm leading-6 text-[#5d6b63]">
-            Captura datos personales y selecciona el plan con el que entra al gimnasio.
-          </p>
-
-          <form className="mt-5 grid gap-4" onSubmit={submitCreate}>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <TextField error={fieldErrors.firstName} label="Nombre" name="firstName" value={form.firstName} onChange={(value) => updateForm("firstName", value)} />
-              <TextField error={fieldErrors.lastName} label="Apellido paterno" name="lastName" value={form.lastName} onChange={(value) => updateForm("lastName", value)} />
-              <TextField error={fieldErrors.maternalLastName} label="Apellido materno" name="maternalLastName" required={false} value={form.maternalLastName ?? ""} onChange={(value) => updateForm("maternalLastName", value)} />
-              <PhoneField error={fieldErrors.phone} label="Telefono" name="phone" required value={form.phone ?? ""} onChange={(value) => updateForm("phone", value)} />
-              <EmailField error={fieldErrors.email} label="Email" name="email" value={form.email ?? ""} onChange={(value) => updateForm("email", value)} />
-              <DateField error={fieldErrors.birthDate} label="Fecha de nacimiento" name="birthDate" value={form.birthDate ?? ""} onChange={(value) => updateForm("birthDate", value)} />
-              <GenderField error={fieldErrors.gender} label="Genero" name="gender" value={form.gender ?? ""} onChange={(value) => updateForm("gender", value)} />
-            </div>
-
-            <label className="form-field" htmlFor="planId">
-              <span>Plan inicial{plans.length > 0 ? <b>*</b> : null}</span>
-              <select className="app-input" id="planId" onChange={(event) => updateForm("planId", event.target.value)} value={form.planId}>
-                {plans.length === 0 ? <option value="">No hay planes activos</option> : null}
-                {plans.map((plan) => (
-                  <option key={plan.id} value={plan.id}>
-                    {plan.name} - {formatMoney(plan.priceCents, plan.currency)}
-                  </option>
-                ))}
-              </select>
-              {fieldErrors.planId ? <small className="form-field-error">{fieldErrors.planId}</small> : null}
-            </label>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <label className="form-field" htmlFor="paymentMethod">
-                <span>Metodo de pago</span>
-                <select className="app-input" id="paymentMethod" onChange={(event) => updateForm("paymentMethod", event.target.value)} value={form.paymentMethod}>
-                  <option value="CASH">Efectivo</option>
-                  <option value="TRANSFER">Transferencia</option>
-                  <option value="CARD_MANUAL">Tarjeta manual</option>
-                </select>
-              </label>
-              <TextField label="Referencia de pago" name="paymentReference" required={false} value={form.paymentReference} onChange={(value) => updateForm("paymentReference", value)} />
-            </div>
-
-            <label className="flex items-center gap-2 text-sm font-medium text-[#42514a]">
-              <input checked={form.validateNow} onChange={(event) => updateForm("validateNow", event.target.checked)} type="checkbox" />
-              Validar pago ahora
-            </label>
-
-            <label className="form-field" htmlFor="notes">
-              <span>Notas</span>
-              <textarea
-                className="app-input min-h-24 py-2"
-                id="notes"
-                onChange={(event) => updateForm("notes", event.target.value)}
-                value={form.notes ?? ""}
-              />
-            </label>
-
-            {createdClientId ? (
-              <Link className="text-sm font-semibold text-[var(--brand-primary)]" href={`/clients/${createdClientId}`}>
-                Socio registrado. Abrir ficha.
-              </Link>
-            ) : null}
-            <button className="form-primary-button" disabled={saving} type="submit">
-              {saving ? "Guardando..." : "Registrar socio"}
-            </button>
-          </form>
+      <section className="grid gap-6">
+        <section className="catalog-toolbar app-card p-5">
+          <div>
+            <p className="app-eyebrow">Recepcion de socios</p>
+            <h2 className="app-card-title">Busqueda y alta en el mismo flujo</h2>
+            <p className="app-card-copy">
+              La lista queda disponible para consulta rapida. El registro completo con membresia inicial se abre en un panel lateral.
+            </p>
+          </div>
+          <button className="app-button" onClick={() => setShowCreateClient(true)} type="button">
+            Registrar socio
+          </button>
         </section>
 
         <section className="app-card p-5">
@@ -318,6 +265,74 @@ export default function ClientsPage() {
           </div>
         </section>
       </section>
+
+      <AppDrawer
+        description="Captura datos personales, membresia inicial y pago de entrada desde recepcion."
+        onClose={() => setShowCreateClient(false)}
+        open={showCreateClient}
+        title="Registrar socio"
+      >
+        <form className="grid gap-4" onSubmit={submitCreate}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TextField error={fieldErrors.firstName} label="Nombre" name="firstName" value={form.firstName} onChange={(value) => updateForm("firstName", value)} />
+            <TextField error={fieldErrors.lastName} label="Apellido paterno" name="lastName" value={form.lastName} onChange={(value) => updateForm("lastName", value)} />
+            <TextField error={fieldErrors.maternalLastName} label="Apellido materno" name="maternalLastName" required={false} value={form.maternalLastName ?? ""} onChange={(value) => updateForm("maternalLastName", value)} />
+            <PhoneField error={fieldErrors.phone} label="Telefono" name="phone" required value={form.phone ?? ""} onChange={(value) => updateForm("phone", value)} />
+            <EmailField error={fieldErrors.email} label="Email" name="email" value={form.email ?? ""} onChange={(value) => updateForm("email", value)} />
+            <DateField error={fieldErrors.birthDate} label="Fecha de nacimiento" name="birthDate" value={form.birthDate ?? ""} onChange={(value) => updateForm("birthDate", value)} />
+            <GenderField error={fieldErrors.gender} label="Genero" name="gender" value={form.gender ?? ""} onChange={(value) => updateForm("gender", value)} />
+          </div>
+
+          <label className="form-field" htmlFor="planId">
+            <span>Plan inicial{plans.length > 0 ? <b>*</b> : null}</span>
+            <select className="app-input" id="planId" onChange={(event) => updateForm("planId", event.target.value)} value={form.planId}>
+              {plans.length === 0 ? <option value="">No hay planes activos</option> : null}
+              {plans.map((plan) => (
+                <option key={plan.id} value={plan.id}>
+                  {plan.name} - {formatMoney(plan.priceCents, plan.currency)}
+                </option>
+              ))}
+            </select>
+            {fieldErrors.planId ? <small className="form-field-error">{fieldErrors.planId}</small> : null}
+          </label>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="form-field" htmlFor="paymentMethod">
+              <span>Metodo de pago</span>
+              <select className="app-input" id="paymentMethod" onChange={(event) => updateForm("paymentMethod", event.target.value)} value={form.paymentMethod}>
+                <option value="CASH">Efectivo</option>
+                <option value="TRANSFER">Transferencia</option>
+                <option value="CARD_MANUAL">Tarjeta manual</option>
+              </select>
+            </label>
+            <TextField label="Referencia de pago" name="paymentReference" required={false} value={form.paymentReference} onChange={(value) => updateForm("paymentReference", value)} />
+          </div>
+
+          <label className="flex items-center gap-2 text-sm font-medium text-[#42514a]">
+            <input checked={form.validateNow} onChange={(event) => updateForm("validateNow", event.target.checked)} type="checkbox" />
+            Validar pago ahora
+          </label>
+
+          <label className="form-field" htmlFor="notes">
+            <span>Notas</span>
+            <textarea
+              className="app-input min-h-24 py-2"
+              id="notes"
+              onChange={(event) => updateForm("notes", event.target.value)}
+              value={form.notes ?? ""}
+            />
+          </label>
+
+          {createdClientId ? (
+            <Link className="text-sm font-semibold text-[var(--brand-primary)]" href={`/clients/${createdClientId}`}>
+              Socio registrado. Abrir ficha.
+            </Link>
+          ) : null}
+          <button className="form-primary-button" disabled={saving} type="submit">
+            {saving ? "Guardando..." : "Registrar socio"}
+          </button>
+        </form>
+      </AppDrawer>
     </AppShell>
   );
 }
