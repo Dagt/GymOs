@@ -83,7 +83,17 @@ export type {
   SaleStatusBreakdown,
   SaleSummary,
 } from "./api/sales-types";
-export * from "./api/memberships";
+export {
+  changeMembershipPlan,
+  getClientMemberships,
+  renewMembership,
+} from "./api/memberships";
+export type {
+  ChangeMembershipPlanPayload,
+  ClientMembershipSummary,
+  RenewMembershipPayload,
+  RenewMembershipResponse,
+} from "./api/membership-types";
 export * from "./api/selfservice";
 export * from "./api/access";
 export * from "./api/inventory";
