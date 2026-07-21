@@ -5,13 +5,16 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
+import com.tngtech.archunit.core.importer.ImportOption;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.modulith.core.ApplicationModules;
 
 class ArchitectureTests {
-	private final JavaClasses classes = new ClassFileImporter().importPackages("com.gymos");
+	private final JavaClasses classes = new ClassFileImporter()
+			.withImportOption(new ImportOption.DoNotIncludeTests())
+			.importPackages("com.gymos");
 
 	@Test
 	void verifiesModulithBoundaries() {
