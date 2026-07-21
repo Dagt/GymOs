@@ -133,8 +133,36 @@ export type {
   TemporaryPassPayload,
   VisitPass,
 } from "./api/access-types";
-export * from "./api/inventory";
-export * from "./api/bookings";
+export {
+  createInventoryMovement,
+  getInventoryMovements,
+  getInventoryStock,
+  getLowInventoryStock,
+} from "./api/inventory";
+export type {
+  InventoryMovement,
+  InventoryMovementPayload,
+  InventoryMovementType,
+  InventoryStock,
+} from "./api/inventory-types";
+export {
+  createBooking,
+  createResource,
+  getBookings,
+  getResourceAvailability,
+  getResources,
+  linkBookingPayment,
+  transitionBooking,
+} from "./api/bookings";
+export type {
+  AvailabilitySlot,
+  BookingSummary,
+  BookingTransition,
+  CreateBookingPayload,
+  CreateResourcePayload,
+  LinkBookingPaymentPayload,
+  ResourceSummary,
+} from "./api/booking-types";
 export * from "./api/coaching";
 export * from "./api/wellness";
 export * from "./api/automations";
