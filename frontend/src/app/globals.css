@@ -2966,6 +2966,10 @@ button.admin-secondary-link:disabled {
   margin-top: 1rem;
 }
 
+.team-role-list.compact {
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+
 .team-role-list article {
   background: white;
   border: 1px solid var(--brand-line);
@@ -2973,6 +2977,34 @@ button.admin-secondary-link:disabled {
   display: grid;
   gap: 0.35rem;
   padding: 0.9rem;
+}
+
+.team-context-list {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.team-context-list article {
+  background: color-mix(in srgb, var(--brand-primary-soft) 45%, white);
+  border: 1px solid var(--brand-primary-border);
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 0.3rem;
+  padding: 0.9rem;
+}
+
+.team-context-list span {
+  color: var(--brand-muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.team-context-list strong {
+  color: var(--brand-ink);
+  font-size: 1.1rem;
+  font-weight: 950;
 }
 
 .team-user-table article {
@@ -3078,6 +3110,21 @@ button.admin-secondary-link:disabled {
 .team-role-control select:focus {
   border-color: var(--brand-accent) !important;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-accent) 18%, transparent);
+}
+
+.catalog-toolbar {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.catalog-toolbar > div:last-child {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  justify-content: flex-end;
 }
 
 .admin-empty-state {

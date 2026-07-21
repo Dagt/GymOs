@@ -801,5 +801,7 @@ Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
 - La consola de plataforma conserva marca neutral de GymOS; las consolas tenant usan nombre, logo y sucursal activa del gimnasio.
 - Se agrego `AppDrawer` como componente comun para mover formularios densos a paneles laterales reutilizables.
 - `/platform/gymnasiums` usa `AppDrawer` para alta de gimnasio y alta de sucursal, evitando drawers propios de la pagina.
+- `/users` mueve el alta de usuario interno a `AppDrawer`; la pagina principal queda enfocada en roles, alcance operativo y usuarios existentes.
+- `/catalog` mueve nuevo producto, nuevo plan y edicion de plan a `AppDrawer`; la pagina principal queda enfocada en listas de productos/servicios y planes.
 - Se retiro `AppNavigation`, que ya no tenia consumidores, para mantener un solo modelo de navegacion visible.
-- La siguiente etapa recomendada es migrar formularios permanentes de `/users`, `/catalog`, `/clients` y `/settings/organization` a drawers/modales por caso de uso.
+- La siguiente etapa recomendada es migrar formularios permanentes de `/clients` y `/settings/organization` a drawers/modales por caso de uso.

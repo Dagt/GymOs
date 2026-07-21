@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { AppDrawer } from "@/components/AppDrawer";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
@@ -66,6 +67,8 @@ export default function CatalogPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [showProductDrawer, setShowProductDrawer] = useState(false);
+  const [showPlanDrawer, setShowPlanDrawer] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -124,6 +127,7 @@ export default function CatalogPage() {
       setPlans(await getPlans(session.accessToken));
       setForm(emptyProduct);
       setPrice("");
+      setShowProductDrawer(false);
       setMessage("Producto creado.");
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible crear producto.");
@@ -166,6 +170,7 @@ export default function CatalogPage() {
       setPlans(loadedPlans);
       setPlanForm(emptyPlan);
       setEditingPlanId(null);
+      setShowPlanDrawer(false);
       setMessage(editingPlanId ? "Plan de membresia actualizado." : "Plan de membresia creado.");
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible crear plan.");
@@ -202,117 +207,30 @@ export default function CatalogPage() {
         </p>
       ) : null}
 
-      <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-        <section className="grid gap-6">
-        <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
-          <p className="app-eyebrow">Productos y servicios</p>
-          <h2 className="mt-2 text-xl font-semibold">Nuevo producto de venta</h2>
-          <p className="mt-2 text-sm leading-6 text-[#5d6b63]">
-            Articulos de mostrador y servicios. Las membresias se crean como planes en el formulario siguiente.
-          </p>
-          <form className="mt-5 grid gap-4" onSubmit={submit}>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="SKU" value={form.sku} onChange={(value) => setForm({ ...form, sku: value })} />
-              <Field label="Nombre" value={form.name} onChange={(value) => setForm({ ...form, name: value })} />
-              <Field label="Precio" type="number" value={price} onChange={setPrice} />
-              <Field label="Moneda" value={form.currency} onChange={(value) => setForm({ ...form, currency: value })} />
-            </div>
-            <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-              Tipo
-              <select
-                className="h-11 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm"
-                onChange={(event) => setForm({ ...form, productType: event.target.value as ProductPayload["productType"] })}
-                value={form.productType}
-              >
-                <option value="PHYSICAL">Producto físico</option>
-                <option value="SERVICE">Servicio</option>
-              </select>
-            </label>
-            <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-              Descripción
-              <textarea
-                className="min-h-24 rounded-md border border-[#cdd5ca] px-3 py-2 text-sm outline-none transition focus:border-[#51735f]"
-                onChange={(event) => setForm({ ...form, description: event.target.value })}
-                value={form.description ?? ""}
-              />
-            </label>
-            <button className="app-button h-11" disabled={saving} type="submit">
-              {saving ? "Guardando..." : "Crear producto"}
+      <section className="grid gap-6">
+        <section className="catalog-toolbar app-card p-5">
+          <div>
+            <p className="app-eyebrow">Gestion del catalogo</p>
+            <h2 className="app-card-title">Planes separados de productos de venta</h2>
+            <p className="app-card-copy">
+              Usa productos para mostrador y servicios. Usa planes para membresias con duracion, acceso multi-sucursal y alta de socios.
+            </p>
+          </div>
+          <div>
+            <button className="app-button-secondary" onClick={() => setShowProductDrawer(true)} type="button">
+              Nuevo producto
             </button>
-          </form>
-        </section>
-
-        <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
-          <p className="app-eyebrow">Membresias</p>
-          <h2 className="mt-2 text-xl font-semibold">Nuevo plan de membresia</h2>
-          <p className="mt-2 text-sm leading-6 text-[#5d6b63]">
-            Esto crea el producto interno y el plan con duracion; por eso aparecera en el alta de socios.
-          </p>
-          <form className="mt-5 grid gap-4" onSubmit={submitPlan}>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Codigo del plan" value={planForm.sku} onChange={(value) => setPlanForm({ ...planForm, sku: value })} />
-              <Field label="Nombre del plan" value={planForm.name} onChange={(value) => setPlanForm({ ...planForm, name: value })} />
-              <Field label="Precio" type="number" value={planForm.price} onChange={(value) => setPlanForm({ ...planForm, price: value })} />
-              <Field label="Moneda" value={planForm.currency} onChange={(value) => setPlanForm({ ...planForm, currency: value })} />
-              <Field label="Duracion en dias" type="number" value={planForm.durationDays} onChange={(value) => setPlanForm({ ...planForm, durationDays: value })} />
-              <Field label="Dias de gracia" type="number" value={planForm.graceDays} onChange={(value) => setPlanForm({ ...planForm, graceDays: value })} />
-            </div>
-            <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-              Beneficios incluidos
-              <textarea
-                className="min-h-20 rounded-md border border-[#cdd5ca] px-3 py-2 text-sm outline-none transition focus:border-[#51735f]"
-                onChange={(event) => setPlanForm({ ...planForm, benefitsJson: event.target.value })}
-                placeholder="Ej. Acceso general, clases grupales, estacionamiento."
-                value={planForm.benefitsJson}
-              />
-            </label>
-            <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-              Alcance
-              <span className="flex items-start gap-3 rounded-md border border-[#cdd5ca] bg-white px-3 py-3 text-sm text-[#42514a]">
-                <input
-                  className="mt-1 h-4 w-4 accent-[var(--brand-primary)]"
-                  checked={planForm.multiBranchAccess}
-                  onChange={(event) => setPlanForm({ ...planForm, multiBranchAccess: event.target.checked })}
-                  type="checkbox"
-                />
-                <span>
-                  <strong className="block text-[#111815]">Acceso multi-sucursal</strong>
-                  Disponible para entrar con esta membresia en todas las sucursales activas del gimnasio.
-                </span>
-              </span>
-            </label>
-            <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-              Estado
-              <select
-                className="h-11 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm"
-                onChange={(event) => setPlanForm({ ...planForm, status: event.target.value as MembershipPlanPayload["status"] })}
-                value={planForm.status}
-              >
-                <option value="ACTIVE">Activo</option>
-                <option value="INACTIVE">Inactivo</option>
-              </select>
-            </label>
-            <button className="app-button h-11" disabled={saving} type="submit">
-              {saving ? "Guardando..." : editingPlanId ? "Guardar cambios del plan" : "Crear plan de membresia"}
+            <button className="app-button" onClick={() => {
+              setEditingPlanId(null);
+              setPlanForm(emptyPlan);
+              setShowPlanDrawer(true);
+            }} type="button">
+              Nuevo plan
             </button>
-            {editingPlanId ? (
-              <button
-                className="app-button-secondary h-11"
-                onClick={() => {
-                  setEditingPlanId(null);
-                  setPlanForm(emptyPlan);
-                }}
-                type="button"
-              >
-                Cancelar edicion
-              </button>
-            ) : null}
-          </form>
+          </div>
         </section>
 
-        </section>
-
-        <section className="grid gap-6">
+        <section className="grid gap-6 lg:grid-cols-2">
           <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-xl font-semibold">Productos y servicios</h2>
@@ -368,6 +286,7 @@ export default function CatalogPage() {
                         multiBranchAccess: plan.multiBranchAccess,
                         status: plan.status,
                       });
+                      setShowPlanDrawer(true);
                     }}
                     type="button"
                   >
@@ -379,6 +298,104 @@ export default function CatalogPage() {
           </section>
         </section>
       </section>
+
+      <AppDrawer
+        description="Articulos de mostrador o servicios vendibles. Las membresias se crean como planes."
+        onClose={() => setShowProductDrawer(false)}
+        open={showProductDrawer}
+        title="Nuevo producto de venta"
+      >
+        <form className="grid gap-4" onSubmit={submit}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="SKU" value={form.sku} onChange={(value) => setForm({ ...form, sku: value })} />
+            <Field label="Nombre" value={form.name} onChange={(value) => setForm({ ...form, name: value })} />
+            <Field label="Precio" type="number" value={price} onChange={setPrice} />
+            <Field label="Moneda" value={form.currency} onChange={(value) => setForm({ ...form, currency: value })} />
+          </div>
+          <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+            Tipo
+            <select
+              className="app-input"
+              onChange={(event) => setForm({ ...form, productType: event.target.value as ProductPayload["productType"] })}
+              value={form.productType}
+            >
+              <option value="PHYSICAL">Producto fisico</option>
+              <option value="SERVICE">Servicio</option>
+            </select>
+          </label>
+          <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+            Descripcion
+            <textarea
+              className="app-input min-h-24"
+              onChange={(event) => setForm({ ...form, description: event.target.value })}
+              value={form.description ?? ""}
+            />
+          </label>
+          <button className="app-button h-11" disabled={saving} type="submit">
+            {saving ? "Guardando..." : "Crear producto"}
+          </button>
+        </form>
+      </AppDrawer>
+
+      <AppDrawer
+        description="Crea o edita membresias con duracion. Estos planes aparecen en el alta de socios."
+        onClose={() => {
+          setShowPlanDrawer(false);
+          setEditingPlanId(null);
+          setPlanForm(emptyPlan);
+        }}
+        open={showPlanDrawer}
+        title={editingPlanId ? "Editar plan de membresia" : "Nuevo plan de membresia"}
+      >
+        <form className="grid gap-4" onSubmit={submitPlan}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Codigo del plan" value={planForm.sku} onChange={(value) => setPlanForm({ ...planForm, sku: value })} />
+            <Field label="Nombre del plan" value={planForm.name} onChange={(value) => setPlanForm({ ...planForm, name: value })} />
+            <Field label="Precio" type="number" value={planForm.price} onChange={(value) => setPlanForm({ ...planForm, price: value })} />
+            <Field label="Moneda" value={planForm.currency} onChange={(value) => setPlanForm({ ...planForm, currency: value })} />
+            <Field label="Duracion en dias" type="number" value={planForm.durationDays} onChange={(value) => setPlanForm({ ...planForm, durationDays: value })} />
+            <Field label="Dias de gracia" type="number" value={planForm.graceDays} onChange={(value) => setPlanForm({ ...planForm, graceDays: value })} />
+          </div>
+          <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+            Beneficios incluidos
+            <textarea
+              className="app-input min-h-20"
+              onChange={(event) => setPlanForm({ ...planForm, benefitsJson: event.target.value })}
+              placeholder="Ej. Acceso general, clases grupales, estacionamiento."
+              value={planForm.benefitsJson}
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+            Alcance
+            <span className="flex items-start gap-3 rounded-md border border-[#cdd5ca] bg-white px-3 py-3 text-sm text-[#42514a]">
+              <input
+                className="mt-1 h-4 w-4 accent-[var(--brand-primary)]"
+                checked={planForm.multiBranchAccess}
+                onChange={(event) => setPlanForm({ ...planForm, multiBranchAccess: event.target.checked })}
+                type="checkbox"
+              />
+              <span>
+                <strong className="block text-[#111815]">Acceso multi-sucursal</strong>
+                Disponible para entrar con esta membresia en todas las sucursales activas del gimnasio.
+              </span>
+            </span>
+          </label>
+          <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+            Estado
+            <select
+              className="app-input"
+              onChange={(event) => setPlanForm({ ...planForm, status: event.target.value as MembershipPlanPayload["status"] })}
+              value={planForm.status}
+            >
+              <option value="ACTIVE">Activo</option>
+              <option value="INACTIVE">Inactivo</option>
+            </select>
+          </label>
+          <button className="app-button h-11" disabled={saving} type="submit">
+            {saving ? "Guardando..." : editingPlanId ? "Guardar cambios del plan" : "Crear plan de membresia"}
+          </button>
+        </form>
+      </AppDrawer>
     </AppShell>
   );
 }

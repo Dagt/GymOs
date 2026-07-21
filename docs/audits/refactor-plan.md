@@ -244,6 +244,8 @@ Avance:
 - `AppShell` centraliza la marca visible de la consola, incluyendo logo del tenant cuando existe.
 - `AppDrawer` queda como patrón común para mover formularios densos a paneles laterales reutilizables.
 - La administración de gimnasios usa `AppDrawer` para alta de gimnasio y sucursal, retirando drawers específicos de la página.
+- `users/page.tsx` usa `AppDrawer` para alta de usuarios y reduce duplicación visual de roles.
+- `catalog/page.tsx` usa `AppDrawer` para alta de productos, alta de planes y edición de planes.
 - `AppNavigation` fue eliminado por no tener consumidores y para evitar modelos paralelos de navegación.
 
 ## Fase 9 — Verificación final

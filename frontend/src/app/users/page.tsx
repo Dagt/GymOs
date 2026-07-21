@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { AppDrawer } from "@/components/AppDrawer";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired } from "@/components/AuthRequired";
 import {
@@ -54,6 +55,7 @@ export default function UsersPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [showCreateUser, setShowCreateUser] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -133,6 +135,7 @@ export default function UsersPage() {
         roleId: form.roleId,
         branchIds: ownerRoleSelected ? branches.map((branch) => branch.id) : branches.length === 1 ? [branches[0].id] : [],
       });
+      setShowCreateUser(false);
       setMessage("Usuario creado. Ya puede iniciar sesion con su usuario y contrasena temporal.");
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible crear el usuario.");
@@ -233,10 +236,17 @@ export default function UsersPage() {
 
       <section className="team-layout">
         <section className="app-card p-5">
-          <p className="app-eyebrow">Nuevo usuario</p>
-          <h2 className="mt-2 text-xl font-semibold">Crear usuario del gimnasio</h2>
+          <div className="admin-panel-header">
+            <div>
+              <p>Equipo</p>
+              <h2>Usuarios por rol</h2>
+            </div>
+            <button className="app-button" disabled={selectableRoles.length === 0 || branches.length === 0} onClick={() => setShowCreateUser(true)} type="button">
+              Crear usuario
+            </button>
+          </div>
           <p className="mt-2 text-sm leading-6 text-[#5d6b63]">
-            Crea dueños, gerentes, recepcionistas o coaches. Cada usuario entrara a su propia consola.
+            Administra accesos internos sin mezclar gimnasios ni sucursales. Los formularios de alta se abren en panel lateral para mantener esta vista limpia.
           </p>
 
           {branches.length === 0 ? (
@@ -247,87 +257,38 @@ export default function UsersPage() {
             </section>
           ) : null}
 
-          <form className="mt-5 grid gap-4" onSubmit={submitUser}>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field error={fieldErrors.firstName} label="Nombre" value={form.firstName} onChange={(value) => setForm({ ...form, firstName: value })} />
-              <Field error={fieldErrors.lastName} label="Apellido paterno" value={form.lastName} onChange={(value) => setForm({ ...form, lastName: value })} />
-              <Field error={fieldErrors.maternalLastName} label="Apellido materno" required={false} value={form.maternalLastName ?? ""} onChange={(value) => setForm({ ...form, maternalLastName: value })} />
-            </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field error={fieldErrors.email} label="Email" type="email" value={form.email ?? ""} onChange={(value) => setForm({ ...form, email: value, username: form.username || value })} />
-              <Field error={fieldErrors.phone} help="Se guardara como +52 seguido de 10 digitos." label="Telefono" value={form.phone ?? ""} onChange={(value) => setForm({ ...form, phone: value })} />
-            </div>
-            <Field error={fieldErrors.username} label="Usuario de inicio de sesion" value={form.username} onChange={(value) => setForm({ ...form, username: value })} />
-            <Field error={fieldErrors.temporaryPassword} help="Minimo 8 caracteres." label="Contrasena temporal" type="password" value={form.temporaryPassword} onChange={(value) => setForm({ ...form, temporaryPassword: value })} />
-
-            <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-              Rol
-              <select
-                className="h-11 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm outline-none transition focus:border-[#51735f]"
-                onChange={(event) => {
-                  const nextRoleId = event.target.value;
-                  const nextLabel = displayRoleName(selectableRoles.find((role) => role.id === nextRoleId)?.name ?? "");
-                  setForm({
-                    ...form,
-                    roleId: nextRoleId,
-                    branchIds: nextLabel === "Dueno del gimnasio"
-                      ? branches.map((branch) => branch.id)
-                      : form.branchIds,
-                  });
-                }}
-                required
-                value={form.roleId}
-              >
-                {selectableRoles.map((role) => (
-                  <option key={role.id} value={role.id}>
-                    {displayRoleName(role.name)}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <section className="team-branch-selector">
-              <div>
-                <strong>Sucursales permitidas</strong>
-                <span>
-                  {ownerRoleSelected
-                    ? "El dueno del gimnasio recibe acceso a todas las sucursales actuales."
-                    : "Selecciona todas las sedes donde este usuario puede trabajar."}
-                </span>
-              </div>
-              {branches.map((branch) => (
-                <label key={branch.id}>
-                  <input
-                    checked={ownerRoleSelected || form.branchIds.includes(branch.id)}
-                    disabled={ownerRoleSelected}
-                    onChange={(event) => updateBranchAccess(branch.id, event.target.checked)}
-                    type="checkbox"
-                  />
-                  <span>{branch.name}</span>
-                  <small>{branch.code}</small>
-                </label>
-              ))}
-              {fieldErrors.branchIds ? <small className="form-field-error">{fieldErrors.branchIds}</small> : null}
-            </section>
-
-            <button className="form-primary-button" disabled={saving || selectableRoles.length === 0} type="submit">
-              Crear usuario
-            </button>
-          </form>
+          <div className="team-role-list compact">
+            {selectableRoles.map((role) => (
+              <article key={role.id}>
+                <strong>{displayRoleName(role.name)}</strong>
+                <span>{roleDescription(role.name, role.description)}</span>
+                <small>{role.permissionCount} permisos</small>
+              </article>
+            ))}
+          </div>
         </section>
 
         <section className="team-side">
           <section className="app-card p-5">
-            <p className="app-eyebrow">Roles disponibles</p>
-            <h2 className="mt-2 text-xl font-semibold">Perfiles de trabajo</h2>
-            <div className="team-role-list">
-              {selectableRoles.map((role) => (
-                <article key={role.id}>
-                  <strong>{displayRoleName(role.name)}</strong>
-                  <span>{roleDescription(role.name, role.description)}</span>
-                  <small>{role.permissionCount} permisos</small>
-                </article>
-              ))}
+            <p className="app-eyebrow">Contexto</p>
+            <h2 className="mt-2 text-xl font-semibold">Alcance operativo</h2>
+            <div className="team-context-list">
+              <article>
+                <span>Gimnasio</span>
+                <strong>{organization?.tradeName ?? session.user.organizationName ?? "GymOS"}</strong>
+              </article>
+              <article>
+                <span>Sucursales</span>
+                <strong>{branches.length}</strong>
+              </article>
+              <article>
+                <span>Usuarios activos</span>
+                <strong>{users.filter((user) => user.status === "ACTIVE").length}</strong>
+              </article>
+              <article>
+                <span>Roles disponibles</span>
+                <strong>{selectableRoles.length}</strong>
+              </article>
             </div>
           </section>
         </section>
@@ -388,6 +349,81 @@ export default function UsersPage() {
           ))}
         </div>
       </section>
+
+      <AppDrawer
+        description="Crea la cuenta y define desde que sucursales podra operar. Cada usuario entrara a su consola segun su rol."
+        onClose={() => setShowCreateUser(false)}
+        open={showCreateUser}
+        title="Crear usuario del gimnasio"
+      >
+        <form className="grid gap-4" onSubmit={submitUser}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field error={fieldErrors.firstName} label="Nombre" value={form.firstName} onChange={(value) => setForm({ ...form, firstName: value })} />
+            <Field error={fieldErrors.lastName} label="Apellido paterno" value={form.lastName} onChange={(value) => setForm({ ...form, lastName: value })} />
+            <Field error={fieldErrors.maternalLastName} label="Apellido materno" required={false} value={form.maternalLastName ?? ""} onChange={(value) => setForm({ ...form, maternalLastName: value })} />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field error={fieldErrors.email} label="Email" type="email" value={form.email ?? ""} onChange={(value) => setForm({ ...form, email: value, username: form.username || value })} />
+            <Field error={fieldErrors.phone} help="Se guardara como +52 seguido de 10 digitos." label="Telefono" value={form.phone ?? ""} onChange={(value) => setForm({ ...form, phone: value })} />
+          </div>
+          <Field error={fieldErrors.username} label="Usuario de inicio de sesion" value={form.username} onChange={(value) => setForm({ ...form, username: value })} />
+          <Field error={fieldErrors.temporaryPassword} help="Minimo 8 caracteres." label="Contrasena temporal" type="password" value={form.temporaryPassword} onChange={(value) => setForm({ ...form, temporaryPassword: value })} />
+
+          <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+            Rol
+            <select
+              className="app-input"
+              onChange={(event) => {
+                const nextRoleId = event.target.value;
+                const nextLabel = displayRoleName(selectableRoles.find((role) => role.id === nextRoleId)?.name ?? "");
+                setForm({
+                  ...form,
+                  roleId: nextRoleId,
+                  branchIds: nextLabel === "Dueno del gimnasio"
+                    ? branches.map((branch) => branch.id)
+                    : form.branchIds,
+                });
+              }}
+              required
+              value={form.roleId}
+            >
+              {selectableRoles.map((role) => (
+                <option key={role.id} value={role.id}>
+                  {displayRoleName(role.name)}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <section className="team-branch-selector">
+            <div>
+              <strong>Sucursales permitidas</strong>
+              <span>
+                {ownerRoleSelected
+                  ? "El dueno del gimnasio recibe acceso a todas las sucursales actuales."
+                  : "Selecciona todas las sedes donde este usuario puede trabajar."}
+              </span>
+            </div>
+            {branches.map((branch) => (
+              <label key={branch.id}>
+                <input
+                  checked={ownerRoleSelected || form.branchIds.includes(branch.id)}
+                  disabled={ownerRoleSelected}
+                  onChange={(event) => updateBranchAccess(branch.id, event.target.checked)}
+                  type="checkbox"
+                />
+                <span>{branch.name}</span>
+                <small>{branch.code}</small>
+              </label>
+            ))}
+            {fieldErrors.branchIds ? <small className="form-field-error">{fieldErrors.branchIds}</small> : null}
+          </section>
+
+          <button className="form-primary-button" disabled={saving || selectableRoles.length === 0} type="submit">
+            Crear usuario
+          </button>
+        </form>
+      </AppDrawer>
     </AppShell>
   );
 }
