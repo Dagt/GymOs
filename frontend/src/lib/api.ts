@@ -94,8 +94,45 @@ export type {
   RenewMembershipPayload,
   RenewMembershipResponse,
 } from "./api/membership-types";
-export * from "./api/selfservice";
-export * from "./api/access";
+export {
+  changeMembershipPlanFromKiosk,
+  createKioskSession,
+  endKioskSession,
+  getKioskMembershipOptions,
+  getKioskSummary,
+  renewMembershipFromKiosk,
+  verifyKioskSession,
+} from "./api/selfservice";
+export type {
+  KioskMembership,
+  KioskPendingPayment,
+  KioskPlanOption,
+  KioskSessionContext,
+  KioskSessionResponse,
+  KioskSummaryResponse,
+} from "./api/selfservice-types";
+export {
+  consumeVisitPass,
+  createTemporaryPass,
+  createVisitPass,
+  getAccessDevices,
+  getAccessLogs,
+  getVisitPasses,
+  manualOpenAccess,
+  requestAccess,
+} from "./api/access";
+export type {
+  AccessDecision,
+  AccessDevice,
+  AccessLog,
+  AccessRequestPayload,
+  ConsumeVisitPassPayload,
+  CreateVisitPassPayload,
+  ManualOpenPayload,
+  TemporaryPass,
+  TemporaryPassPayload,
+  VisitPass,
+} from "./api/access-types";
 export * from "./api/inventory";
 export * from "./api/bookings";
 export * from "./api/coaching";
