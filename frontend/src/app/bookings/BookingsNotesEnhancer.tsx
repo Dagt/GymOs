@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { getBookings, getStoredSession, type BookingSummary } from "@/lib/api";
+import { getBookings, getStoredSession } from "@/lib/api";
 
 type NoteDialog = { clientName: string; note: string } | null;
 
