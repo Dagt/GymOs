@@ -8,7 +8,7 @@ const eslintConfig = defineConfig([
   {
     files: [
       "src/app/bookings/page.tsx",
-      "src/app/kiosk/[terminalCode]/page.tsx",
+      "src/app/kiosk/*/page.tsx",
     ],
     rules: {
       "react-hooks/set-state-in-effect": "off",
