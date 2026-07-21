@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.gymos.audit.api.AuditService;
@@ -53,23 +54,58 @@ class SalesPaymentBranchIsolationTests {
 	@Test
 	void uploadingReceiptToPaymentFromAnotherBranchIsDeniedBeforeStorageOrMutation() {
 		Fixture fixture = fixture();
-		UUID paymentId = UUID.randomUUID();
 		MultipartFile file = mock(MultipartFile.class);
 		when(file.isEmpty()).thenReturn(false);
-		when(fixture.salesRepository().saleIdForPayment(fixture.organizationId(), paymentId))
-				.thenReturn(Optional.of(fixture.saleId()));
 
 		assertThatThrownBy(() -> fixture.service().uploadReceipt(
 				fixture.principal(),
-				paymentId,
+				fixture.paymentId(),
 				file,
 				"test-correlation"
 		))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.code()).isEqualTo("SALE_BRANCH_MISMATCH"));
 
-		verify(fixture.salesRepository()).saleIdForPayment(fixture.organizationId(), paymentId);
+		verify(fixture.salesRepository()).saleIdForPayment(fixture.organizationId(), fixture.paymentId());
 		verify(fixture.salesRepository()).saleHeader(fixture.organizationId(), fixture.saleId());
+		verifyNoMoreInteractions(fixture.salesRepository());
+		verifyNoInteractions(fixture.jdbcClient(), fixture.auditService(), fixture.objectStorageService(), fixture.eventPublisher());
+	}
+
+	@Test
+	void validatingPaymentFromAnotherBranchIsDeniedBeforeReadingOrMutatingPayment() {
+		Fixture fixture = fixture();
+
+		assertThatThrownBy(() -> fixture.service().validatePayment(
+				fixture.principal(),
+				fixture.paymentId(),
+				"test-correlation"
+		))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.code()).isEqualTo("SALE_BRANCH_MISMATCH"));
+
+		verify(fixture.salesRepository()).saleIdForPayment(fixture.organizationId(), fixture.paymentId());
+		verify(fixture.salesRepository()).saleHeader(fixture.organizationId(), fixture.saleId());
+		verifyNoMoreInteractions(fixture.salesRepository());
+		verifyNoInteractions(fixture.jdbcClient(), fixture.auditService(), fixture.objectStorageService(), fixture.eventPublisher());
+	}
+
+	@Test
+	void rejectingPaymentFromAnotherBranchIsDeniedBeforeReadingOrMutatingPayment() {
+		Fixture fixture = fixture();
+
+		assertThatThrownBy(() -> fixture.service().rejectPayment(
+				fixture.principal(),
+				fixture.paymentId(),
+				"duplicate",
+				"test-correlation"
+		))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.code()).isEqualTo("SALE_BRANCH_MISMATCH"));
+
+		verify(fixture.salesRepository()).saleIdForPayment(fixture.organizationId(), fixture.paymentId());
+		verify(fixture.salesRepository()).saleHeader(fixture.organizationId(), fixture.saleId());
+		verifyNoMoreInteractions(fixture.salesRepository());
 		verifyNoInteractions(fixture.jdbcClient(), fixture.auditService(), fixture.objectStorageService(), fixture.eventPublisher());
 	}
 
@@ -91,13 +127,14 @@ class SalesPaymentBranchIsolationTests {
 		UUID activeBranchId = UUID.randomUUID();
 		UUID foreignBranchId = UUID.randomUUID();
 		UUID saleId = UUID.randomUUID();
+		UUID paymentId = UUID.randomUUID();
 		GymOsPrincipal principal = new GymOsPrincipal(
 				UUID.randomUUID(),
 				organizationId,
 				activeBranchId,
 				"manager@gymos.local",
 				"Branch Manager",
-				Set.of("payment.create", "payment.receipt.upload")
+				Set.of("payment.create", "payment.receipt.upload", "payment.validate", "payment.reject")
 		);
 		OffsetDateTime now = OffsetDateTime.now();
 		SaleHeader foreignSale = new SaleHeader(
@@ -118,6 +155,7 @@ class SalesPaymentBranchIsolationTests {
 				now,
 				now
 		);
+		when(salesRepository.saleIdForPayment(organizationId, paymentId)).thenReturn(Optional.of(saleId));
 		when(salesRepository.saleHeader(organizationId, saleId)).thenReturn(Optional.of(foreignSale));
 
 		return new Fixture(
@@ -129,7 +167,8 @@ class SalesPaymentBranchIsolationTests {
 				eventPublisher,
 				principal,
 				organizationId,
-				saleId
+				saleId,
+				paymentId
 		);
 	}
 
@@ -142,7 +181,8 @@ class SalesPaymentBranchIsolationTests {
 			ApplicationEventPublisher eventPublisher,
 			GymOsPrincipal principal,
 			UUID organizationId,
-			UUID saleId
+			UUID saleId,
+			UUID paymentId
 	) {
 	}
 }
