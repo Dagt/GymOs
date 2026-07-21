@@ -104,12 +104,12 @@ export default function SaleDetailPage() {
   async function reject(paymentId: string) {
     if (!session) return;
     setRejectingPaymentId(paymentId);
-    await runAction(
+    const succeeded = await runAction(
       () => rejectPayment(session.accessToken, paymentId, rejectReason || "Comprobante no valido"),
       "No fue posible rechazar pago.",
       () => setRejectingPaymentId(null),
     );
-    setRejectReason("");
+    if (succeeded) setRejectReason("");
   }
 
   async function submitPayment(event: FormEvent<HTMLFormElement>) {
@@ -118,7 +118,7 @@ export default function SaleDetailPage() {
     const amountCents = paymentForm.amount.trim()
       ? Math.round(Number(paymentForm.amount) * 100)
       : data.sale.balanceCents;
-    await runAction(
+    const succeeded = await runAction(
       () => addManualPayment(session.accessToken, data.sale.id, {
         method: paymentForm.method,
         amountCents,
@@ -129,7 +129,9 @@ export default function SaleDetailPage() {
       }),
       "No fue posible registrar pago.",
     );
-    setPaymentForm((current) => ({ ...current, amount: "", reference: "" }));
+    if (succeeded) {
+      setPaymentForm((current) => ({ ...current, amount: "", reference: "" }));
+    }
   }
 
   async function submitRefund(event: FormEvent<HTMLFormElement>) {
@@ -138,7 +140,7 @@ export default function SaleDetailPage() {
     const amountCents = refundForm.amount.trim()
       ? Math.round(Number(refundForm.amount) * 100)
       : estimatedRefundableCents(data);
-    await runAction(
+    const succeeded = await runAction(
       () => requestSaleRefund(session.accessToken, data.sale.id, {
         paymentId: refundForm.paymentId || null,
         amountCents,
@@ -146,7 +148,7 @@ export default function SaleDetailPage() {
       }),
       "No fue posible registrar reembolso.",
     );
-    setRefundForm(INITIAL_REFUND_FORM);
+    if (succeeded) setRefundForm(INITIAL_REFUND_FORM);
   }
 
   async function runAction(
@@ -157,8 +159,10 @@ export default function SaleDetailPage() {
     setError(null);
     try {
       setData(await action());
+      return true;
     } catch (exception) {
       setError(messageFrom(exception, fallbackMessage));
+      return false;
     } finally {
       after?.();
     }
