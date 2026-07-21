@@ -803,7 +803,7 @@ Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
 - `/platform/gymnasiums` usa `AppDrawer` para alta de gimnasio y alta de sucursal, evitando drawers propios de la pagina.
 - `/users` mueve el alta de usuario interno a `AppDrawer` y separa la UI de roles, contexto y tabla en `UsersSections.tsx`; `page.tsx` queda como orquestador de sesion, carga, alta, suspension y cambio de rol.
 - `/catalog` mueve nuevo producto, nuevo plan y edicion de plan a `AppDrawer`; ademas separa toolbar, listas, drawers y helpers de formato/draft en archivos del modulo `catalog`.
-- `/clients` mueve el registro completo de socio, membresia inicial y pago de entrada a `AppDrawer`; la pagina principal queda enfocada en busqueda y lista.
+- `/clients` mueve el registro completo de socio, membresia inicial y pago de entrada a `AppDrawer`; ademas separa busqueda, lista, drawer y helpers de validacion/formato en archivos del modulo `clients`.
 - `/settings/organization` mueve edicion de gimnasio, alta de sucursal y edicion de sucursal a `AppDrawer`; la pagina principal queda como resumen de marca, sedes y acceso a equipo.
 - `/bookings` mueve nueva reserva y creacion de recurso a `AppDrawer`; la pagina principal queda enfocada en calendario, resumen diario y recursos.
 - `/bookings` elimina enhancers DOM de notas/layout; las notas de reserva se muestran desde React en cada tarjeta y el detalle diario ocupa el ancho inferior cuando recepcion o gerencia no administran recursos.
@@ -815,4 +815,4 @@ Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
 - `/sales/[saleId]`, `/clients/import` y `/onboarding` dejan de usar contenedores propios y renderizan dentro de `AppShell`, manteniendo una sola base visual para pantallas heredadas.
 - `/platform/gymnasiums` extrae formularios y validaciones de alta de gimnasio/sucursal a `PlatformGymnasiumForms.tsx`; la pagina principal conserva el maestro-detalle y queda menos acoplada al formulario.
 - Se retiro `AppNavigation`, que ya no tenia consumidores, para mantener un solo modelo de navegacion visible.
-- La siguiente etapa recomendada es continuar con paginas grandes de gestion: `clients`, `settings/organization` y la limpieza final de helpers visuales ya obsoletos.
+- La siguiente etapa recomendada es continuar con `settings/organization` y la limpieza final de helpers visuales ya obsoletos.
