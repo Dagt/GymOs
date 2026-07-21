@@ -12,6 +12,13 @@ La rama contiene el mismo código funcional que `feature/bookings-experience-and
 
 Reducir complejidad, duplicación y acoplamiento sin cambiar contratos, reglas de negocio, permisos, diseño aprobado ni comportamiento observable.
 
+## Política de integración
+
+- La rama se mantendrá como espacio de trabajo hasta completar validación local.
+- No se abrirá un pull request hasta que el usuario pruebe localmente que no se rompió diseño, lógica ni funcionalidad.
+- El PR borrador #4 fue cerrado deliberadamente el 21 de julio de 2026.
+- Los resultados de CI se usarán como diagnóstico, no como autorización de integración.
+
 ## Criterios de clasificación
 
 - `BLOCKER`: impide refactorizar con seguridad.
@@ -21,6 +28,21 @@ Reducir complejidad, duplicación y acoplamiento sin cambiar contratos, reglas d
 - `SAFE_REFACTOR`: puede cambiarse con riesgo bajo.
 - `REQUIRES_TESTS_FIRST`: requiere cobertura antes de tocarse.
 - `DO_NOT_TOUCH_YET`: no debe modificarse hasta resolver dependencias.
+
+## Línea base de validación
+
+Ejecución de GitHub Actions asociada al primer bloque de auditoría:
+
+- Pruebas frontend añadidas: `PASS`.
+- Frontend lint: `FAIL`.
+- Frontend typecheck: no ejecutado por dependencia del lint.
+- Frontend build: no ejecutado por dependencia del lint.
+- Backend tests: `FAIL`.
+- Docker: no ejecutado porque backend y frontend no quedaron verdes.
+
+Estos fallos se consideran parte de la línea base hasta identificar su causa exacta. No se atribuirán automáticamente al refactor.
+
+Regla: antes de un cambio estructural amplio se debe corregir o clasificar cada fallo como `PREEXISTING` o `INTRODUCED`.
 
 ## Hallazgos iniciales
 
@@ -215,29 +237,37 @@ Reducir complejidad, duplicación y acoplamiento sin cambiar contratos, reglas d
   - Filtrado de canceladas.
   - Navegación de calendario y botón “Ir a hoy”.
 
-### RF-012 — Línea base de CI no confirmada en la rama
+### RF-012 — Línea base de CI roja
 
 - Severidad: `BLOCKER`
 - Clasificación: `DO_NOT_TOUCH_YET` para cambios amplios
-- Situación:
-  - La rama coincide funcionalmente con el trabajo mergeado, pero no se ha ejecutado desde este entorno `backend test`, `frontend lint`, `typecheck`, `build` ni Docker.
+- Estado confirmado:
+  - Pruebas frontend: pasan.
+  - Lint frontend: falla.
+  - Suite backend: falla.
+  - Typecheck, build y Docker quedan bloqueados.
 - Acción:
-  - Ejecutar la línea base local o mediante PR antes de refactors amplios.
-  - Registrar fallos preexistentes por separado.
+  - Identificar el error exacto de lint.
+  - Identificar las pruebas backend fallidas.
+  - Clasificar cada fallo como preexistente o introducido.
+  - No ejecutar refactors estructurales amplios mientras la línea base siga roja.
 
 ## Primer objetivo recomendado
 
 El primer bloque debe ser frontend de reservas y kiosco porque concentra deuda reciente, visible y eliminable sin cambiar contratos:
 
-1. Añadir pruebas de utilidades y componentes críticos.
-2. Integrar nota y layout directamente en React.
-3. Eliminar enhancers y observadores.
-4. Reemplazar CSS frágil por clases semánticas.
-5. Integrar directamente el campo `DD/MM/AAAA`.
-6. Ejecutar regresión visual y funcional.
+1. Completar pruebas de utilidades y componentes críticos.
+2. Corregir o clasificar los fallos de línea base.
+3. Integrar nota y layout directamente en React.
+4. Eliminar enhancers y observadores.
+5. Reemplazar CSS frágil por clases semánticas.
+6. Integrar directamente el campo `DD/MM/AAAA`.
+7. Ejecutar regresión visual y funcional.
+
+En paralelo continuará la matriz transversal de todos los módulos de la plataforma.
 
 ## Estado
 
 Auditoría inicial: `IN_PROGRESS`.
 
-No se ha modificado todavía lógica funcional de producción en esta rama.
+Se añadieron pruebas y documentación, pero no se ha modificado todavía lógica funcional de producción en esta rama.
