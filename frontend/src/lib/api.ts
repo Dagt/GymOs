@@ -37,7 +37,22 @@ export type {
   ClientTimelineEntry,
   ClientUpdatePayload,
 } from "./api/client-types";
-export * from "./api/catalog";
+export {
+  createMembershipPlan,
+  createPlan,
+  createProduct,
+  getPlans,
+  getProducts,
+  updateMembershipPlan,
+} from "./api/catalog";
+export type {
+  MembershipPlanPayload,
+  PlanPayload,
+  PlanSummary,
+  ProductPayload,
+  ProductSummary,
+  UpdateMembershipPlanPayload,
+} from "./api/catalog-types";
 export * from "./api/benefits";
 export {
   addManualPayment,
