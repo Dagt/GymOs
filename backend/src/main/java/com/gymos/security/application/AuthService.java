@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AuthService {
 	private static final String REFRESH_PREFIX = "gymos:refresh:";
+	private static final String SESSION_SEPARATOR = "|";
 
 	private final AuthenticationManager authenticationManager;
 	private final AuthQueryRepository authQueryRepository;
@@ -56,16 +57,15 @@ public class AuthService {
 
 	@Transactional(readOnly = true)
 	public AuthResult refresh(String refreshToken) {
-		String userId = redisTemplate.opsForValue().get(refreshKey(refreshToken));
-		if (userId == null) {
+		String storedSession = redisTemplate.opsForValue().getAndDelete(refreshKey(refreshToken));
+		if (storedSession == null) {
 			throw new BusinessException("REFRESH_TOKEN_INVALID", "La sesion ya no es valida.");
 		}
-		AuthenticatedUser user = authQueryRepository.findActiveUserById(UUID.fromString(userId))
+		RefreshSession session = parseRefreshSession(storedSession);
+		AuthenticatedUser user = authQueryRepository.findActiveUserById(session.userId())
 				.orElseThrow(() -> new BusinessException("REFRESH_TOKEN_INVALID", "La sesion ya no es valida."));
-		if (!user.permissions().contains("platform.admin") && !authQueryRepository.organizationIsActive(user.organizationId())) {
-			throw new BusinessException("ORGANIZATION_SUSPENDED", "El gimnasio no tiene acceso activo a la plataforma.");
-		}
-		return issue(user.toPrincipal(defaultBranchFor(user, user.organizationId())));
+		GymOsPrincipal principal = restorePrincipal(user, session);
+		return issue(principal);
 	}
 
 	@Transactional
@@ -73,7 +73,10 @@ public class AuthService {
 		if (principal == null) {
 			throw new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesion para continuar.");
 		}
-		redisTemplate.delete(refreshKey(refreshToken));
+		String storedSession = redisTemplate.opsForValue().get(refreshKey(refreshToken));
+		if (storedSession != null && parseRefreshSession(storedSession).userId().equals(principal.userId())) {
+			redisTemplate.delete(refreshKey(refreshToken));
+		}
 		auditService.record(principal, "AUTH_LOGOUT", "USER", principal.userId(), "BACKOFFICE", null, correlationId);
 	}
 
@@ -163,9 +166,67 @@ public class AuthService {
 
 	private AuthResult issue(GymOsPrincipal principal) {
 		String refreshToken = UUID.randomUUID().toString();
-		redisTemplate.opsForValue().set(refreshKey(refreshToken), principal.userId().toString(), Duration.ofDays(7));
+		redisTemplate.opsForValue().set(
+				refreshKey(refreshToken),
+				new RefreshSession(principal.userId(), principal.organizationId(), principal.branchId(), principal.supportMode()).serialize(),
+				Duration.ofDays(7)
+		);
 		JwtService.TokenPair tokens = jwtService.issueTokens(principal, refreshToken);
 		return new AuthResult(tokens.accessToken(), tokens.refreshToken(), "Bearer", tokens.expiresIn(), toResponse(principal));
+	}
+
+	private GymOsPrincipal restorePrincipal(AuthenticatedUser user, RefreshSession session) {
+		boolean platformAdmin = user.permissions().contains("platform.admin");
+		if (!platformAdmin && !authQueryRepository.organizationIsActive(session.organizationId())) {
+			throw new BusinessException("ORGANIZATION_SUSPENDED", "El gimnasio no tiene acceso activo a la plataforma.");
+		}
+		if (!platformAdmin && !authQueryRepository.userHasOrganizationAccess(user.userId(), session.organizationId())) {
+			throw new BusinessException("REFRESH_TOKEN_INVALID", "La sesion ya no es valida.");
+		}
+		if (session.supportMode() && !platformAdmin) {
+			throw new BusinessException("REFRESH_TOKEN_INVALID", "La sesion ya no es valida.");
+		}
+		if (session.branchId() != null) {
+			boolean branchAllowed = session.supportMode()
+					? authQueryRepository.branchBelongsToOrganization(session.branchId(), session.organizationId())
+					: authQueryRepository.userHasBranchAccess(user.userId(), session.branchId());
+			if (!branchAllowed) {
+				throw new BusinessException("REFRESH_TOKEN_INVALID", "La sesion ya no es valida.");
+			}
+		}
+		return new GymOsPrincipal(
+				user.userId(),
+				session.organizationId(),
+				session.branchId(),
+				user.username(),
+				user.fullName(),
+				user.permissions(),
+				user.roles(),
+				session.supportMode()
+		);
+	}
+
+	private RefreshSession parseRefreshSession(String storedSession) {
+		try {
+			if (!storedSession.contains(SESSION_SEPARATOR)) {
+				UUID userId = UUID.fromString(storedSession);
+				AuthenticatedUser user = authQueryRepository.findActiveUserById(userId)
+						.orElseThrow(() -> new IllegalArgumentException("Unknown user"));
+				return new RefreshSession(userId, user.organizationId(), defaultBranchFor(user, user.organizationId()), false);
+			}
+			String[] parts = storedSession.split("\\|", -1);
+			if (parts.length != 4) {
+				throw new IllegalArgumentException("Invalid refresh session");
+			}
+			return new RefreshSession(
+					UUID.fromString(parts[0]),
+					UUID.fromString(parts[1]),
+					parts[2].isBlank() ? null : UUID.fromString(parts[2]),
+					Boolean.parseBoolean(parts[3])
+			);
+		} catch (RuntimeException exception) {
+			throw new BusinessException("REFRESH_TOKEN_INVALID", "La sesion ya no es valida.");
+		}
 	}
 
 	private UUID defaultBranchFor(AuthenticatedUser user, UUID organizationId) {
@@ -227,5 +288,14 @@ public class AuthService {
 
 	private String refreshKey(String refreshToken) {
 		return REFRESH_PREFIX + refreshToken;
+	}
+
+	private record RefreshSession(UUID userId, UUID organizationId, UUID branchId, boolean supportMode) {
+		private String serialize() {
+			return userId + SESSION_SEPARATOR
+					+ organizationId + SESSION_SEPARATOR
+					+ (branchId == null ? "" : branchId) + SESSION_SEPARATOR
+					+ supportMode;
+		}
 	}
 }
