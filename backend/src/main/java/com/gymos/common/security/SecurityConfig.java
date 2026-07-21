@@ -49,7 +49,7 @@ public class SecurityConfig {
 						.requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/users/internal/*/role").hasAuthority("user.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/auth/select-organization").hasAuthority("organization.read")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/organizations").hasAuthority("organization.read")
-						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/organizations").hasAuthority("organization.update")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/organizations").hasAuthority("platform.admin")
 						.requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/organizations/*/status").hasAuthority("platform.admin")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/organizations/current/branches").hasAuthority("branch.create")
 						.requestMatchers("/api/v1/organizations/current/branches/*").hasAuthority("branch.update")
