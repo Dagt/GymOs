@@ -806,6 +806,7 @@ Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
 - `/clients` mueve el registro completo de socio, membresia inicial y pago de entrada a `AppDrawer`; la pagina principal queda enfocada en busqueda y lista.
 - `/settings/organization` mueve edicion de gimnasio, alta de sucursal y edicion de sucursal a `AppDrawer`; la pagina principal queda como resumen de marca, sedes y acceso a equipo.
 - `/bookings` mueve nueva reserva y creacion de recurso a `AppDrawer`; la pagina principal queda enfocada en calendario, resumen diario y recursos.
+- `/bookings` elimina enhancers DOM de notas/layout; las notas de reserva se muestran desde React en cada tarjeta y el detalle diario ocupa el ancho inferior cuando recepcion o gerencia no administran recursos.
 - `/benefits` mueve nuevo beneficio a `AppDrawer`; la pagina principal queda enfocada en beneficios configurados y estado vacio claro.
 - `/clients/[clientId]` mueve edicion de datos personales, renovacion y cambio de plan a `AppDrawer`; la ficha principal queda como lectura, membresias e historial.
 - `/inventory` mueve registro de movimientos a `AppDrawer`; la pagina principal queda enfocada en existencias, alertas y movimientos recientes.

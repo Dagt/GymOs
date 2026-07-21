@@ -26,6 +26,7 @@ import {
 
 type WeekdayKey = "MONDAY" | "TUESDAY" | "WEDNESDAY" | "THURSDAY" | "FRIDAY" | "SATURDAY" | "SUNDAY";
 type Notice = { title: string; message: string; tone: "error" | "success" };
+type NoteDialog = { clientName: string; note: string } | null;
 type ResourceDay = { key: WeekdayKey; label: string; shortLabel: string; enabled: boolean; opensAt: string; closesAt: string };
 type StoredSchedule = { schedule?: Array<{ day: WeekdayKey; opensAt: string; closesAt: string }>; description?: string | null };
 
@@ -61,6 +62,7 @@ export default function BookingsPage() {
   const [resourceSchedule, setResourceSchedule] = useState<ResourceDay[]>(() => weekdays.map((day) => ({ ...day })));
   const [resourceAllowedPlanIds, setResourceAllowedPlanIds] = useState<string[]>([]);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const [noteDialog, setNoteDialog] = useState<NoteDialog>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showBookingDrawer, setShowBookingDrawer] = useState(false);
@@ -124,11 +126,15 @@ export default function BookingsPage() {
   }, [clientQuery, session]);
 
   useEffect(() => {
-    if (!notice) return;
-    const close = (event: KeyboardEvent) => { if (event.key === "Escape") setNotice(null); };
+    if (!notice && !noteDialog) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setNotice(null);
+      setNoteDialog(null);
+    };
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
-  }, [notice]);
+  }, [notice, noteDialog]);
 
   const activeResource = resources.find((resource) => resource.id === resourceId) ?? null;
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
@@ -260,6 +266,56 @@ export default function BookingsPage() {
     setResourceSchedule((current) => current.map((day) => day.key === key ? { ...day, ...patch } : day));
   }
 
+  function renderDayDetail(className = "") {
+    return (
+      <section className={`rounded-lg border border-[#d8ddd2] bg-[#fbfcfa] p-4 ${className}`}>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-semibold">{formatLongDate(startDate)}</h3>
+            <p className="text-sm text-[#5d6b63]">Detalle del dia seleccionado.</p>
+          </div>
+          <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#5d6b63] shadow-sm">
+            {selectedDateBookings.length} reserva{selectedDateBookings.length === 1 ? "" : "s"}
+          </span>
+        </div>
+        <p className="mt-3 text-xs text-[#647067]">Consulta todos los recursos y sus reservas del dia.</p>
+        <div className="mt-4 flex snap-x gap-4 overflow-x-auto pb-3">
+          {resources.map((resource, index) => {
+            const resourceBookings = selectedDateBookings.filter((booking) => booking.resourceId === resource.id);
+            const hours = resourceHoursForDay(resource, dateToWeekday(startDate));
+            return (
+              <article className="w-[290px] shrink-0 snap-start rounded-xl border border-[#d8ddd2] bg-white p-3 shadow-sm sm:w-[320px]" key={resource.id}>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">
+                    <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: resourceColor(index) }} />
+                    {resource.name}
+                  </p>
+                  <p className="mt-0.5 text-xs text-[#647067]">{hours ? `${hours.opensAt} - ${hours.closesAt}` : "Cerrado"}</p>
+                </div>
+                <div className="mt-3 max-h-[24rem] space-y-2 overflow-y-auto pr-1">
+                  {resourceBookings.length === 0 ? (
+                    <p className="rounded-md bg-[#f8faf8] px-2 py-3 text-center text-xs text-[#647067]">Sin reservas</p>
+                  ) : resourceBookings.map((booking) => (
+                    <BookingCard
+                      booking={booking}
+                      color={resourceColor(index)}
+                      key={booking.id}
+                      onCancel={cancelBooking}
+                      onShowNote={(selectedBooking) => setNoteDialog({
+                        clientName: selectedBooking.clientName,
+                        note: selectedBooking.notes?.trim() || "Esta reserva no tiene una nota registrada.",
+                      })}
+                    />
+                  ))}
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      </section>
+    );
+  }
+
   if (loading) return <LoadingScreen text="Cargando reservas..." />;
   if (!session) return <AuthRequiredCard message="Necesitas iniciar sesión para administrar reservas." title="Inicia sesión" />;
 
@@ -274,7 +330,8 @@ export default function BookingsPage() {
       title="Recursos y reservas"
     >
       {notice ? <NoticeModal notice={notice} onClose={() => setNotice(null)} /> : null}
-      <section className="grid gap-6 xl:grid-cols-[410px_minmax(0,1fr)]">
+      {noteDialog ? <BookingNoteModal dialog={noteDialog} onClose={() => setNoteDialog(null)} /> : null}
+      <section className={`grid gap-6 xl:grid-cols-[410px_minmax(0,1fr)] ${canManageResources ? "" : "bookings-operational-layout"}`}>
         <aside className="grid content-start gap-5">
           {selectedDateIsPast ? <p className="rounded-md border border-[#d8ddd2] bg-[#f8faf8] px-3 py-2 text-sm text-[#5d6b63]">Este día ya pasó. Puedes consultar el detalle histórico, pero no crear nuevas reservas.</p> : null}
 
@@ -326,7 +383,7 @@ export default function BookingsPage() {
           >
           <form className="grid gap-4" onSubmit={submitBooking}>
             <div className="flex items-start justify-between gap-3">
-              <div><h2 className="text-xl font-semibold">Nueva reserva</h2><p className="mt-1 text-sm text-[#5d6b63]">Busca al socio, elige recurso y captura el inicio.</p></div>
+              <p className="text-sm text-[#5d6b63]">Captura los datos de la reserva. El sistema validara disponibilidad y membresia antes de guardar.</p>
               {activeResource ? <span className="rounded-md bg-[var(--brand-surface)] px-3 py-2 text-xs font-semibold text-[var(--brand-primary)]">{activeResource.slotMinutes} min</span> : null}
             </div>
             <label className="mt-4 grid gap-2 text-sm font-medium">Recurso<select className="h-11 rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setResourceId(event.target.value)} value={resourceId}>{resources.map((resource) => <option key={resource.id} value={resource.id}>{resource.name}</option>)}</select></label>
@@ -355,8 +412,8 @@ export default function BookingsPage() {
               title="Crear recurso"
             >
             <form className="grid gap-4" onSubmit={submitResource}>
-              <h2 className="text-xl font-semibold">Crear recurso</h2>
-              <input className="mt-4 h-11 w-full rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setResourceName(event.target.value)} placeholder="Nombre del recurso" required value={resourceName} />
+              <p className="text-sm text-[#5d6b63]">Configura una cancha, salon, area o recurso que pueda reservarse desde esta sucursal.</p>
+              <input className="h-11 w-full rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setResourceName(event.target.value)} placeholder="Nombre del recurso" required value={resourceName} />
               <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_130px]"><label className="grid gap-2 text-sm font-medium">Duración<input className="h-11 rounded-md border border-[#cdd5ca] px-3" min={1} onChange={(event) => setDurationValue(Number(event.target.value))} type="number" value={durationValue} /></label><label className="grid gap-2 text-sm font-medium">Unidad<select className="h-11 rounded-md border border-[#cdd5ca] px-3" onChange={(event) => setDurationUnit(event.target.value as "MINUTES" | "HOURS")} value={durationUnit}><option value="MINUTES">Minutos</option><option value="HOURS">Horas</option></select></label></div>
               <fieldset className="mt-5 grid gap-2"><legend className="text-sm font-semibold">Días y horarios operativos</legend>{resourceSchedule.map((day) => <div className="grid grid-cols-[36px_1fr_92px_92px] items-center gap-2 rounded-md border border-[#d8ddd2] px-3 py-2 text-sm" key={day.key}><input aria-label={day.label} checked={day.enabled} className="h-4 w-4 accent-[var(--brand-primary)]" onChange={(event) => updateResourceDay(day.key, { enabled: event.target.checked })} type="checkbox" /><span><strong className="block">{day.shortLabel}</strong><span className="text-xs text-[#647067]">{day.label}</span></span><input className="h-10 rounded-md border border-[#cdd5ca] px-2" disabled={!day.enabled} onChange={(event) => updateResourceDay(day.key, { opensAt: event.target.value })} type="time" value={day.opensAt} /><input className="h-10 rounded-md border border-[#cdd5ca] px-2" disabled={!day.enabled} onChange={(event) => updateResourceDay(day.key, { closesAt: event.target.value })} type="time" value={day.closesAt} /></div>)}</fieldset>
               <fieldset className="mt-5 grid gap-2"><legend className="text-sm font-semibold">Membresías que pueden reservar</legend><p className="text-xs text-[#6f7a73]">Sin seleccionar planes, el recurso queda abierto para cualquier socio activo.</p>{plans.map((plan) => <label className="flex items-start gap-2 rounded-md border border-[#d8ddd2] px-3 py-2 text-sm" key={plan.id}><input className="mt-1 h-4 w-4 accent-[var(--brand-primary)]" checked={resourceAllowedPlanIds.includes(plan.id)} onChange={(event) => setResourceAllowedPlanIds((current) => event.target.checked ? [...current, plan.id] : current.filter((id) => id !== plan.id))} type="checkbox" /><span><strong className="block">{plan.name}</strong><span className="text-xs text-[#6f7a73]">{plan.multiBranchAccess ? "Multi-sucursal" : "Sucursal de venta"}</span></span></label>)}</fieldset>
@@ -366,7 +423,7 @@ export default function BookingsPage() {
           ) : null}
         </aside>
 
-        <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+        <section className={`rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm ${canManageResources ? "" : "bookings-operational-agenda"}`}>
           <div className="border-b border-[#e5e9e3] pb-5">
             <div><h2 className="text-xl font-semibold">Agenda mensual</h2><p className="mt-1 text-sm text-[#5d6b63]">Selecciona un día para ver sus reservas por recurso.</p></div>
             <div className="mt-4 grid gap-3 rounded-2xl border border-[#d8ddd2] bg-[#f8faf8] p-3 shadow-inner sm:grid-cols-[44px_minmax(170px,1fr)_44px] lg:grid-cols-[44px_minmax(180px,1fr)_auto_auto_44px] lg:items-center">
@@ -393,20 +450,11 @@ export default function BookingsPage() {
                 })}
               </div>
 
-              <section className="rounded-lg border border-[#d8ddd2] bg-[#fbfcfa] p-4">
-                <div className="flex items-start justify-between gap-4"><div><h3 className="text-lg font-semibold">{formatLongDate(startDate)}</h3><p className="text-sm text-[#5d6b63]">Detalle del día seleccionado.</p></div><span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-[#5d6b63] shadow-sm">{selectedDateBookings.length} reserva{selectedDateBookings.length === 1 ? "" : "s"}</span></div>
-                <p className="mt-3 text-xs text-[#647067]">Desliza horizontalmente para consultar todos los recursos.</p>
-                <div className="mt-4 flex snap-x gap-4 overflow-x-auto pb-3">
-                  {resources.map((resource, index) => {
-                    const resourceBookings = selectedDateBookings.filter((booking) => booking.resourceId === resource.id);
-                    const hours = resourceHoursForDay(resource, dateToWeekday(startDate));
-                    return <article className="w-[290px] shrink-0 snap-start rounded-xl border border-[#d8ddd2] bg-white p-3 shadow-sm sm:w-[320px]" key={resource.id}><div className="min-w-0"><p className="truncate text-sm font-semibold"><span className="mr-2 inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: resourceColor(index) }} />{resource.name}</p><p className="mt-0.5 text-xs text-[#647067]">{hours ? `${hours.opensAt} - ${hours.closesAt}` : "Cerrado"}</p></div><div className="mt-3 max-h-[24rem] space-y-2 overflow-y-auto pr-1">{resourceBookings.length === 0 ? <p className="rounded-md bg-[#f8faf8] px-2 py-3 text-center text-xs text-[#647067]">Sin reservas</p> : resourceBookings.map((booking) => <BookingCard booking={booking} color={resourceColor(index)} key={booking.id} onCancel={cancelBooking} />)}</div></article>;
-                  })}
-                </div>
-              </section>
-            </div>
+              {canManageResources ? renderDayDetail() : null}
+           </div>
           )}
         </section>
+        {!canManageResources && resources.length > 0 ? renderDayDetail("bookings-full-width-detail") : null}
       </section>
     </AppShell>
   );
@@ -417,8 +465,43 @@ function NoticeModal({ notice, onClose }: { notice: Notice; onClose: () => void 
   return <div aria-modal="true" className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={onClose} role="dialog"><div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}><div className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full text-2xl font-bold ${isError ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>{isError ? "!" : "✓"}</div><h2 className="mt-4 text-center text-xl font-bold text-[#243229]">{notice.title}</h2><p className="mt-2 text-center text-sm leading-6 text-[#5d6b63]">{notice.message}</p><button autoFocus className={`mt-6 h-11 w-full rounded-md px-4 text-sm font-semibold text-white ${isError ? "bg-red-700" : "bg-[var(--brand-primary)]"}`} onClick={onClose} type="button">Aceptar</button></div></div>;
 }
 
-function BookingCard({ booking, color, onCancel }: { booking: BookingSummary; color: string; onCancel: (bookingId: string) => void }) {
-  return <article className="rounded-md px-3 py-3 text-white shadow-sm" style={{ backgroundColor: color }}><p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">{bookingStatusLabel(booking.status)}</p><p className="mt-1 truncate text-sm font-semibold">{booking.clientName}</p><p className="text-xs opacity-90">{formatTime(booking.startsAt)} - {formatTime(booking.endsAt)}</p>{booking.status !== "COMPLETED" && booking.status !== "CANCELLED" ? <button className="mt-3 h-8 w-full rounded-md border border-white/60 px-3 text-xs font-semibold text-white hover:bg-white/10" onClick={() => onCancel(booking.id)} type="button">Cancelar reserva</button> : null}</article>;
+function BookingNoteModal({ dialog, onClose }: { dialog: NonNullable<NoteDialog>; onClose: () => void }) {
+  return (
+    <div aria-modal="true" className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={onClose} role="dialog">
+      <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" onClick={(event) => event.stopPropagation()}>
+        <p className="text-center text-xs font-semibold uppercase tracking-[0.14em] text-[var(--brand-primary)]">Nota de la reserva</p>
+        <h2 className="mt-2 text-center text-xl font-bold text-[#243229]">{dialog.clientName}</h2>
+        <p className="mt-4 whitespace-pre-wrap rounded-lg border border-[#d8ddd2] bg-[#f8faf8] p-4 text-sm leading-6 text-[#243229]">{dialog.note}</p>
+        <button autoFocus className="mt-6 h-10 w-full rounded-md bg-[var(--brand-primary)] px-4 text-sm font-semibold text-white" onClick={onClose} type="button">Cerrar</button>
+      </div>
+    </div>
+  );
+}
+
+function BookingCard({
+  booking,
+  color,
+  onCancel,
+  onShowNote,
+}: {
+  booking: BookingSummary;
+  color: string;
+  onCancel: (bookingId: string) => void;
+  onShowNote: (booking: BookingSummary) => void;
+}) {
+  const canCancel = booking.status !== "COMPLETED" && booking.status !== "CANCELLED";
+  const hasNote = Boolean(booking.notes?.trim());
+  return (
+    <article className="rounded-md px-3 py-3 text-white shadow-sm" style={{ backgroundColor: color }}>
+      <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">{bookingStatusLabel(booking.status)}</p>
+      <p className="mt-1 truncate text-sm font-semibold">{booking.clientName}</p>
+      <p className="text-xs opacity-90">{formatTime(booking.startsAt)} - {formatTime(booking.endsAt)}</p>
+      <div className={`booking-card-actions ${canCancel ? "" : "grid-cols-1"}`}>
+        {canCancel ? <button onClick={() => onCancel(booking.id)} type="button">Cancelar</button> : null}
+        <button disabled={!hasNote} onClick={() => onShowNote(booking)} title={hasNote ? "Ver nota de la reserva" : "Esta reserva no tiene nota"} type="button">Ver nota</button>
+      </div>
+    </article>
+  );
 }
 
 function bookingStatusLabel(status: string) {
