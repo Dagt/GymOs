@@ -3,6 +3,21 @@
 Estado: en progreso  
 Fecha: 19 de julio de 2026
 
+## Refactor frontend reservas - 21 de julio de 2026
+
+Implementado:
+
+- `/bookings/page.tsx` conserva la orquestacion de datos, estado y casos de uso de reservas.
+- Se extrae UI presentacional de reservas a `frontend/src/app/bookings/components.tsx`: modales, resumen del dia y detalle por recurso.
+- El resumen de recursos queda reutilizable y mantiene tarjetas compactas en dos columnas con scroll interno invisible.
+- El refactor no cambia contratos HTTP ni reglas de negocio; prepara una siguiente extraccion segura del calendario y formularios drawer.
+
+Verificado:
+
+- `npm.cmd run typecheck`
+- `npm.cmd run lint`
+- `npm.cmd run build`
+
 ## Correccion encabezado y kiosco tenant - 20 de julio de 2026
 
 Implementado:
