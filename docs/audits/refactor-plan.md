@@ -245,7 +245,7 @@ Avance:
 - `AppDrawer` queda como patrón común para mover formularios densos a paneles laterales reutilizables.
 - La administración de gimnasios usa `AppDrawer` para alta de gimnasio y sucursal, retirando drawers específicos de la página.
 - `users/page.tsx` usa `AppDrawer` para alta de usuarios y separa UI/validaciones de roles en `UsersSections.tsx` y `UsersRoleHelpers.ts`.
-- `catalog/page.tsx` usa `AppDrawer` para alta de productos, alta de planes y edición de planes.
+- `catalog/page.tsx` usa `AppDrawer` para alta de productos, alta de planes y edición de planes; las secciones visuales y helpers de drafts/formato quedan en `CatalogSections.tsx` y `CatalogHelpers.ts`.
 - `clients/page.tsx` usa `AppDrawer` para registrar socios con membresia inicial y pago, dejando la pantalla principal para busqueda y consulta.
 - `settings/organization/page.tsx` usa `AppDrawer` para editar gimnasio, crear sucursales y editar sucursales, dejando la pantalla principal como resumen operativo.
 - `bookings/page.tsx` usa `AppDrawer` para crear reservas y recursos, dejando la pantalla principal enfocada en calendario y resumen diario.
@@ -261,10 +261,11 @@ Avance adicional del bloque visual:
 - `sales/[saleId]/page.tsx`, `clients/import/page.tsx` y `onboarding/page.tsx` migran a `AppShell`, eliminando contenedores y encabezados propios heredados.
 - `platform/gymnasiums/page.tsx` extrae formularios y validaciones de gimnasio/sucursal a `PlatformGymnasiumForms.tsx`, manteniendo la logica de CRM en la pagina y reduciendo acoplamiento.
 - `users/page.tsx` queda reducido a carga, estado de formulario y operaciones de usuarios; las secciones visuales y helpers de permisos quedan en archivos dedicados del mismo modulo frontend.
+- `catalog/page.tsx` queda reducido a carga, creacion de productos, creacion/edicion de planes y refresco de listas; toolbar, listas y drawers quedan en componentes dedicados.
 
 Pendiente del bloque visual antes de pasar al backend profundo:
 
-- Reducir `catalog/page.tsx`, `clients/page.tsx` y `settings/organization/page.tsx` con el mismo criterio: estado/use cases en pagina, secciones visuales en componentes especificos.
+- Reducir `clients/page.tsx` y `settings/organization/page.tsx` con el mismo criterio: estado/use cases en pagina, secciones visuales en componentes especificos.
 - Revisar helpers visuales exportados que ya no tienen consumidores tras migrar pantallas heredadas.
 - Mantener las rutas existentes y validar `typecheck`, `lint` y `build` en cada corte.
 
