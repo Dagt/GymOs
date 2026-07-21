@@ -24,7 +24,22 @@ Un frente sólo podrá marcarse como `VERIFIED` cuando exista evidencia en códi
 - Protección frente a reutilización y fijación de sesión.
 - Ausencia de credenciales o secretos en logs y respuestas.
 
-Estado: `PENDING_CODE_REVIEW`
+Estado: `PARTIAL_CODE_REVIEW`
+
+Evidencia revisada:
+
+- `JwtAuthenticationFilter` sólo construye el contexto autenticado cuando `JwtService` valida el bearer token.
+- El principal autenticado contiene `userId`, `organizationId`, `branchId`, permisos, roles y modo de soporte.
+- `organizationId` y `branchId` usados por el backend provienen de claims firmados, no de headers de tenant enviados por el navegador.
+- La firma HMAC se compara en tiempo constante y los tokens alterados se rechazan.
+- La expiración del access token se valida al parsearlo.
+- Se añadieron pruebas de caracterización para conservación de claims de tenant, alteración de firma y firma con un secreto diferente.
+
+Pendiente:
+
+- Revisar refresh tokens, rotación, revocación y cierre de sesión.
+- Confirmar que el secreto por defecto de desarrollo nunca sea aceptado en perfiles de producción.
+- Revisar expiración y revocación de sesiones de kiosco.
 
 ### 2. Autorización
 
@@ -33,7 +48,20 @@ Estado: `PENDING_CODE_REVIEW`
 - Diferenciación entre administrador de plataforma, dueño, gerente, recepción y socio.
 - Denegación por defecto para operaciones no declaradas.
 
-Estado: `PENDING_CODE_REVIEW`
+Estado: `PARTIAL_CODE_REVIEW`
+
+Evidencia revisada:
+
+- `SecurityConfig` aplica permisos granulares por método y ruta para usuarios, organizaciones, sucursales, onboarding, clientes, catálogo, beneficios, membresías, ventas, pagos, accesos, inventario, recursos, reservas, coaching, profesionales, notificaciones, automatizaciones y reportes.
+- Las rutas no declaradas terminan en `anyRequest().authenticated()`, por lo que la configuración no es una denegación completa por defecto: un endpoint nuevo puede quedar accesible a cualquier usuario autenticado si no se agrega explícitamente a la matriz.
+- Los endpoints `/api/v1/self-service/**` son públicos a nivel de Spring Security y dependen completamente de la validación de sesión propia del módulo.
+- La creación de recursos está protegida por `resource.manage` en backend; ocultar el formulario en frontend no es la única barrera.
+
+Hallazgo P0-S01:
+
+- Clasificación: `REQUIRES_TESTS_FIRST`.
+- Riesgo: un endpoint interno nuevo olvidado en `SecurityConfig` queda sólo como `authenticated()`.
+- Propuesta: añadir una prueba de matriz endpoint-permiso y evaluar una política `denyAll` para rutas internas no declaradas en un bloque separado, después de inventariar todos los endpoints.
 
 ### 3. Aislamiento por organización
 
@@ -54,11 +82,27 @@ Se revisarán especialmente:
 
 Estado: `PENDING_QUERY_REVIEW`
 
+Fuente de confianza confirmada para endpoints autenticados:
+
+- El `organizationId` del principal se obtiene del access token firmado.
+- No basta con esta fuente: cada repositorio y mutación debe usar ese valor en sus consultas. La revisión SQL sigue pendiente módulo por módulo.
+
 ### 4. Aislamiento por sucursal
 
 Cuando el dominio sea específico de una sede, la operación debe acotarse también por `branch_id`. Debe definirse explícitamente qué datos son globales para la organización y cuáles pertenecen a una sucursal.
 
-Estado: `PENDING_DOMAIN_CLASSIFICATION`
+Estado: `PARTIAL_REVIEW`
+
+Evidencia existente:
+
+- La selección de sucursal verifica `userHasBranchAccess(userId, branchId)` antes de emitir un contexto con otra sucursal.
+- Existe una prueba negativa para selección de una sucursal sin acceso.
+
+Pendiente:
+
+- Verificar que la consulta de acceso también compruebe pertenencia a la organización activa.
+- Clasificar cada dominio como organizacional o específico de sucursal.
+- Revisar queries que sólo filtran por organización cuando deberían incluir sucursal.
 
 ### 5. Kiosco y autoservicio
 
@@ -69,6 +113,11 @@ Estado: `PENDING_DOMAIN_CLASSIFICATION`
 - Rate limiting y expiración deben aplicarse a verificaciones y mutaciones.
 
 Estado: `PARTIAL_REVIEW`
+
+Riesgo de configuración:
+
+- Todo `/api/v1/self-service/**` está marcado `permitAll`; por ello, cada endpoint del controlador debe exigir y validar el token de sesión de autoservicio cuando corresponda.
+- Esta revisión se hará endpoint por endpoint y deberá incluir pruebas de sesión ausente, inválida, expirada y asociada a otra terminal.
 
 ### 6. Pagos, membresías e idempotencia
 
@@ -99,6 +148,13 @@ Estado: `PENDING_CODE_REVIEW`
 7. Repetir una solicitud idempotente no debe duplicar el efecto.
 8. Tokens expirados, alterados o de otra terminal deben rechazarse.
 
+Cobertura localizada hasta ahora:
+
+- `AuthServiceTests.selectingBranchWithoutUserAccessIsDenied`.
+- `JwtServiceTests.accessTokenPreservesAuthenticatedTenantAndAuthorities`.
+- `JwtServiceTests.alteredAccessTokenIsRejected`.
+- `JwtServiceTests.tokenSignedWithAnotherSecretIsRejected`.
+
 ## Método de revisión
 
 Por cada módulo:
@@ -113,7 +169,7 @@ Por cada módulo:
 
 ## Próximo recorrido
 
-1. Identity y configuración de seguridad.
+1. Refresh tokens, revocación y selección de organización/sucursal.
 2. Organizations y resolución de tenant.
 3. Sales, payments y memberships.
 4. Self-service y kiosco.
