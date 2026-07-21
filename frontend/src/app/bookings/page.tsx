@@ -147,6 +147,21 @@ export default function BookingsPage() {
   const computedEnd = activeResource && startDate && isValidTimeInput(startTime)
     ? addMinutes(`${startDate}T${startTime}`, activeResource.slotMinutes)
     : "";
+  const selectedWeekday = dateToWeekday(startDate);
+  const selectedDayResourceSummary = resources.map((resource, index) => {
+    const resourceBookings = selectedDateBookings.filter((booking) => booking.resourceId === resource.id);
+    return {
+      bookingCount: resourceBookings.length,
+      color: resourceColor(index),
+      hours: resourceHoursForDay(resource, selectedWeekday),
+      id: resource.id,
+      name: resource.name,
+      noteCount: resourceBookings.filter((booking) => booking.notes?.trim()).length,
+      slotMinutes: resource.slotMinutes,
+    };
+  });
+  const openResourceCount = selectedDayResourceSummary.filter((resource) => resource.hours).length;
+  const noteCount = selectedDateBookings.filter((booking) => booking.notes?.trim()).length;
 
   async function refresh(stored = session, dates = monthDates) {
     if (!stored) return;
@@ -358,20 +373,39 @@ export default function BookingsPage() {
             <h2 className="app-card-title">{formatLongDate(startDate)}</h2>
             <div className="mt-4 grid gap-3">
               <article className="rounded-md border border-[#d8ddd2] bg-white px-3 py-3">
-                <span className="text-xs font-semibold uppercase text-[#647067]">Reservas</span>
-                <strong className="mt-1 block text-2xl">{selectedDateBookings.length}</strong>
+                <span className="text-xs font-semibold uppercase text-[#647067]">Operacion del dia</span>
+                <strong className="mt-1 block text-lg">{openResourceCount} de {resources.length} recursos abiertos</strong>
+                <p className="mt-1 text-xs text-[#647067]">
+                  {noteCount > 0 ? `${noteCount} reserva${noteCount === 1 ? "" : "s"} con nota.` : "Sin notas registradas en las reservas del dia."}
+                </p>
               </article>
-              <article className="rounded-md border border-[#d8ddd2] bg-white px-3 py-3">
-                <span className="text-xs font-semibold uppercase text-[#647067]">Recursos</span>
-                <strong className="mt-1 block text-2xl">{resources.length}</strong>
-              </article>
-              {activeResource ? (
-                <article className="rounded-md border border-[#d8ddd2] bg-white px-3 py-3">
-                  <span className="text-xs font-semibold uppercase text-[#647067]">Recurso activo</span>
-                  <strong className="mt-1 block">{activeResource.name}</strong>
-                  <p className="mt-1 text-xs text-[#647067]">{activeResource.slotMinutes} min por reserva</p>
-                </article>
-              ) : null}
+              <div className="grid gap-2">
+                {selectedDayResourceSummary.length === 0 ? (
+                  <p className="rounded-md border border-[#d8ddd2] bg-white px-3 py-3 text-sm text-[#647067]">No hay recursos configurados.</p>
+                ) : null}
+                {selectedDayResourceSummary.map((resource) => (
+                  <article className="rounded-md border border-[#d8ddd2] bg-white px-3 py-3" key={resource.id}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">
+                          <span className="mr-2 inline-block h-2.5 w-2.5 rounded-full" style={{ backgroundColor: resource.color }} />
+                          {resource.name}
+                        </p>
+                        <p className="mt-1 text-xs text-[#647067]">
+                          {resource.hours ? `${resource.hours.opensAt} - ${resource.hours.closesAt}` : "Cerrado"}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-[var(--brand-surface)] px-2 py-1 text-xs font-semibold text-[var(--brand-primary)]">
+                        {resource.bookingCount}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs text-[#647067]">
+                      {resource.slotMinutes} min por reserva
+                      {resource.noteCount > 0 ? ` · ${resource.noteCount} con nota` : ""}
+                    </p>
+                  </article>
+                ))}
+              </div>
             </div>
           </section>
 
@@ -450,11 +484,10 @@ export default function BookingsPage() {
                 })}
               </div>
 
-              {canManageResources ? renderDayDetail() : null}
            </div>
           )}
         </section>
-        {!canManageResources && resources.length > 0 ? renderDayDetail("bookings-full-width-detail") : null}
+        {resources.length > 0 ? renderDayDetail("bookings-full-width-detail") : null}
       </section>
     </AppShell>
   );
@@ -498,7 +531,15 @@ function BookingCard({
       <p className="text-xs opacity-90">{formatTime(booking.startsAt)} - {formatTime(booking.endsAt)}</p>
       <div className={`booking-card-actions ${canCancel ? "" : "grid-cols-1"}`}>
         {canCancel ? <button onClick={() => onCancel(booking.id)} type="button">Cancelar</button> : null}
-        <button disabled={!hasNote} onClick={() => onShowNote(booking)} title={hasNote ? "Ver nota de la reserva" : "Esta reserva no tiene nota"} type="button">Ver nota</button>
+        <button
+          className={`booking-note-button ${hasNote ? "has-note" : "no-note"}`}
+          disabled={!hasNote}
+          onClick={() => onShowNote(booking)}
+          title={hasNote ? "Ver nota de la reserva" : "Esta reserva no tiene nota"}
+          type="button"
+        >
+          {hasNote ? "Ver nota" : "Sin nota"}
+        </button>
       </div>
     </article>
   );
