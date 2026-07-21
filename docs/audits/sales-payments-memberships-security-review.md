@@ -111,8 +111,23 @@ Pendiente:
 - prueba concurrente de dos renovaciones con la misma llave;
 - confirmar restricción única en venta y pago;
 - revisar el comportamiento cuando el cliente no proporciona llave de idempotencia;
-- comprobar que eventos duplicados no generen dos membresías;
 - definir transacción y recuperación cuando se crea venta/pago pero falla la activación posterior.
+
+### Idempotencia del consumidor de membresías
+
+`MembershipService.onPaymentCompleted` intenta registrar primero `organizationId + eventKey + eventType` mediante `MembershipRepository.markEventProcessed`. Si la inserción provoca `DuplicateKeyException`, el repositorio devuelve `false` y el consumidor termina antes de consultar planes, cancelar membresías, insertar una membresía, auditar o emitir eventos derivados.
+
+Estado: `CHARACTERIZED`.
+
+Se añadió una prueba para fijar el comportamiento secuencial de eventos duplicados. Todavía debe verificarse en el esquema final que `processed_domain_event` tenga una restricción única compatible con el alcance esperado. También debe confirmarse una segunda barrera de unicidad para la membresía creada, idealmente por `organization_id + sale_id + plan_id` o por `organization_id + source_payment_event_key`, para proteger ejecuciones concurrentes o futuras rutas que omitan el registro de evento.
+
+Hallazgo `P0-SPM-06`:
+
+- Severidad: `HIGH`.
+- Clasificación: `DATABASE_VERIFICATION_REQUIRED`.
+- Riesgo: la idempotencia del consumidor depende de una restricción única no confirmada en este recorrido.
+- Riesgo adicional: `bySaleAndPlan` usa el patrón consultar-antes-de-insertar; dos ejecuciones concurrentes necesitan una restricción única en base de datos para impedir dos membresías.
+- Acción: revisar migraciones completas, añadir prueba de integración PostgreSQL y tratar explícitamente una colisión concurrente devolviendo la membresía ya existente.
 
 ### Clave generada cuando el cliente no envía idempotencia
 
@@ -133,23 +148,30 @@ Hallazgo `P0-SPM-04`:
 
 Verifica que el servicio consulta una membresía usando simultáneamente organización, sucursal e identificador, devuelve `MEMBERSHIP_NOT_FOUND` y no llama ventas, auditoría ni publicación de eventos cuando el recurso no pertenece al contexto.
 
+`MembershipEventIdempotencyTests.duplicatePaymentCompletedEventIsIgnoredBeforeMembershipMutation`
+
+Verifica que un `PaymentCompletedV1` ya registrado se ignora antes de consultar planes, insertar o cancelar membresías, registrar auditoría o publicar eventos derivados.
+
 ### Reembolsos de ventas
 
 `SalesBranchIsolationTests.refundForSaleFromAnotherBranchIsDeniedBeforeAnyMutation`
 
 Verifica que una solicitud de reembolso sobre una venta perteneciente a otra sucursal de la misma organización devuelve `SALE_NOT_FOUND` antes de acceder a SQL de escritura, almacenamiento, auditoría o eventos.
 
+`SalesRefundIdempotencyTests.reusedRefundKeyWithDifferentAmountIsRejectedBeforeMutation`
+
+Verifica que una llave de reembolso existente no pueda reutilizarse con un importe diferente y que el rechazo ocurra antes de cualquier efecto secundario.
+
 ## Próximos pasos del bloque
 
-1. Localizar las restricciones finales de idempotencia de `sale` y `payment`.
-2. Añadir pruebas de reutilización de llave con payload diferente.
+1. Localizar las restricciones finales de idempotencia de `sale`, `payment` y `processed_domain_event`.
+2. Confirmar una restricción única para membresías derivadas de una venta/evento.
 3. Definir alcance de lectura y mutación de ventas por rol/sucursal.
 4. Centralizar resolución de venta y pago con el alcance aprobado.
 5. Añadir pruebas negativas para validar, rechazar y cargar comprobantes entre sucursales.
 6. Añadir prueba de reembolsos acumulados por pago y corregir el cálculo.
-7. Añadir prueba concurrente de reembolsos sobre el mismo saldo.
-8. Revisar activación de membresías ante eventos duplicados y fallos parciales.
-9. Ejecutar suite backend local antes de cambiar contratos o SQL crítico.
+7. Añadir pruebas concurrentes de reembolsos y activación de membresías.
+8. Ejecutar suite backend local antes de cambiar contratos o SQL crítico.
 
 ## Validación requerida
 
