@@ -7,8 +7,8 @@ import com.tngtech.archunit.core.domain.JavaClasses;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
-import org.springframework.modulith.core.ApplicationModules;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.modulith.core.ApplicationModules;
 
 class ArchitectureTests {
 	private final JavaClasses classes = new ClassFileImporter().importPackages("com.gymos");
@@ -63,7 +63,7 @@ class ArchitectureTests {
 	}
 
 	@Test
-	void jdbcClientUsageInApplicationIsExplicitlyTracked() {
+	void jdbcClientUsageInApplicationMatchesTheExplicitAllowlist() {
 		Set<String> allowedApplicationServices = Set.of(
 				"com.gymos.catalog.application.CatalogService",
 				"com.gymos.clients.application.ClientImportService",
@@ -80,7 +80,7 @@ class ArchitectureTests {
 				.map(javaClass -> javaClass.getName())
 				.collect(java.util.stream.Collectors.toSet());
 
-		assertThat(actual).isSubsetOf(allowedApplicationServices);
+		assertThat(actual).isEqualTo(allowedApplicationServices);
 	}
 
 	@Test
