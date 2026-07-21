@@ -1,11 +1,10 @@
 package com.gymos.selfservice.application;
 
 import com.gymos.audit.api.AuditService;
-import com.gymos.bookings.application.BookingService;
-import com.gymos.bookings.application.command.CreateBookingCommand;
-import com.gymos.bookings.infrastructure.BookingRepository.AvailabilitySlot;
-import com.gymos.bookings.infrastructure.BookingRepository.BookingRecord;
-import com.gymos.bookings.infrastructure.BookingRepository.ResourceRecord;
+import com.gymos.bookings.api.operations.BookingOperations;
+import com.gymos.bookings.api.operations.BookingOperations.BookingAvailability;
+import com.gymos.bookings.api.operations.BookingOperations.BookingResource;
+import com.gymos.bookings.api.operations.BookingOperations.BookingResult;
 import com.gymos.clients.api.operations.ClientLookupOperations;
 import com.gymos.clients.api.operations.SelfServiceClientProfile;
 import com.gymos.clients.api.operations.VerifyClientIdentityCommand;
@@ -51,7 +50,7 @@ public class SelfServiceService {
 	private final SelfServiceRepository repository;
 	private final MembershipOperations membershipOperations;
 	private final ClientLookupOperations clientLookupOperations;
-	private final BookingService bookingService;
+	private final BookingOperations bookingOperations;
 	private final AuditService auditService;
 	private final RateLimiter rateLimiter;
 
@@ -59,14 +58,14 @@ public class SelfServiceService {
 			SelfServiceRepository repository,
 			MembershipOperations membershipOperations,
 			ClientLookupOperations clientLookupOperations,
-			BookingService bookingService,
+			BookingOperations bookingOperations,
 			AuditService auditService,
 			RateLimiter rateLimiter
 	) {
 		this.repository = repository;
 		this.membershipOperations = membershipOperations;
 		this.clientLookupOperations = clientLookupOperations;
-		this.bookingService = bookingService;
+		this.bookingOperations = bookingOperations;
 		this.auditService = auditService;
 		this.rateLimiter = rateLimiter;
 	}
@@ -118,23 +117,32 @@ public class SelfServiceService {
 	}
 
 	@Transactional(readOnly = true)
-	public List<ResourceRecord> bookingResources(UUID sessionId, String sessionToken) {
+	public List<BookingResource> bookingResources(UUID sessionId, String sessionToken) {
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
-		return bookingService.resources(kioskPrincipal(session));
+		return bookingOperations.resources(session.organizationId(), session.branchId());
 	}
 
 	@Transactional(readOnly = true)
-	public List<AvailabilitySlot> bookingAvailability(UUID sessionId, String sessionToken, UUID resourceId, LocalDate date) {
+	public List<BookingAvailability> bookingAvailability(UUID sessionId, String sessionToken, UUID resourceId, LocalDate date) {
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
-		return bookingService.availability(kioskPrincipal(session), resourceId, date);
+		return bookingOperations.availability(session.organizationId(), session.branchId(), resourceId, date);
 	}
 
 	@Transactional
-	public BookingRecord createBooking(UUID sessionId, String sessionToken, UUID resourceId, OffsetDateTime startsAt, OffsetDateTime endsAt, String notes, String correlationId, String originIp) {
+	public BookingResult createBooking(UUID sessionId, String sessionToken, UUID resourceId, OffsetDateTime startsAt, OffsetDateTime endsAt, String notes, String correlationId, String originIp) {
 		rateLimiter.check("kiosk:booking:ip:" + originIp, 30, Duration.ofMinutes(1));
 		rateLimiter.check("kiosk:booking:session:" + sessionId, 10, Duration.ofMinutes(1));
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
-		BookingRecord booking = bookingService.createBooking(kioskPrincipal(session), new CreateBookingCommand(resourceId, session.clientId(), startsAt, endsAt, notes), correlationId);
+		BookingResult booking = bookingOperations.createBooking(
+				session.organizationId(),
+				session.branchId(),
+				session.clientId(),
+				resourceId,
+				startsAt,
+				endsAt,
+				notes,
+				correlationId
+		);
 		auditService.recordSystem(session.organizationId(), session.branchId(), null, "SELF_SERVICE_BOOKING_CREATED", "BOOKING", booking.id(), "SELF_SERVICE_KIOSK", null, correlationId);
 		return booking;
 	}
