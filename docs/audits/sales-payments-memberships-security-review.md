@@ -64,6 +64,8 @@ Hallazgo `P0-SPM-02`:
 - Riesgo: validación, rechazo o carga de comprobante cruzada entre sucursales de una misma organización.
 - Acción: inventariar `addPayment`, `uploadReceipt`, `validatePayment`, `rejectPayment` y `requestRefund`, y exigir una única función de resolución de venta/pago con alcance explícito.
 
+La solicitud de reembolso sí contiene una comprobación explícita entre `principal.branchId()` y `sale.branchId()`. Se añadió una prueba para conservar este comportamiento y garantizar que no se produzcan mutaciones, auditoría ni eventos antes del rechazo.
+
 ### Idempotencia de ventas y pagos
 
 La aplicación compara una llave y un hash de solicitud para evitar que una misma llave se reutilice con contenido diferente. Esto es mejor que devolver silenciosamente una operación previa incompatible.
@@ -75,6 +77,21 @@ Riesgo residual `P0-SPM-03`:
 - La secuencia consulta primero y después inserta. Ante dos solicitudes concurrentes, la protección definitiva depende de índices únicos en PostgreSQL y del tratamiento de `DuplicateKeyException`.
 - La migración revisada confirma índice único para reembolsos, pero en este recorrido todavía no se confirmó la restricción equivalente de `sale.idempotency_key` y `payment.idempotency_key` en el esquema final.
 - Debe verificarse además que la llave tenga el alcance correcto: organización, operación y, cuando aplique, sucursal.
+
+### Reembolsos acumulados
+
+La implementación calcula correctamente el total ya reembolsado de una venta y evita que el acumulado supere `sale.paidCents()`.
+
+Sin embargo, cuando el reembolso se vincula a un pago concreto sólo comprueba que cada solicitud individual no supere `payment.amountCents()`. No descuenta los reembolsos procesados anteriormente sobre ese mismo pago.
+
+Hallazgo `P0-SPM-05`:
+
+- Severidad: `HIGH`.
+- Clasificación: `REQUIRES_TESTS_FIRST`.
+- Escenario: una venta tiene dos pagos completados de 500 cada uno. El pago A puede recibir dos reembolsos de 500 mientras el total global de la venta siga permitiéndolo, aunque el segundo reembolso debería corresponder al pago B.
+- Riesgo: trazabilidad contable incorrecta por pago y conciliación inconsistente con el medio de cobro original.
+- Corrección propuesta: calcular `processedRefundTotal(organizationId, saleId, paymentId)` cuando exista `paymentId` y validar contra `payment.amountCents() - refundedForPayment`.
+- Concurrencia: la comprobación debe ejecutarse con bloqueo o restricción/transacción capaz de impedir dos reembolsos simultáneos que excedan el saldo del pago o de la venta.
 
 ### Ventas de renovación y cambio de plan
 
@@ -108,11 +125,19 @@ Hallazgo `P0-SPM-04`:
 - Propuesta: exigir `Idempotency-Key` en mutaciones monetarias desde clientes controlados, o definir una llave estable de operación con ventana/estado claramente documentados.
 - No restaurar una llave permanente `operation:membershipId`, porque impediría renovaciones legítimas futuras.
 
-## Prueba añadida
+## Pruebas añadidas
+
+### Membresías
 
 `MembershipTenantIsolationTests.membershipFromAnotherOrganizationOrBranchIsNotVisible`
 
-La prueba verifica que el servicio consulta una membresía usando simultáneamente organización, sucursal e identificador, devuelve `MEMBERSHIP_NOT_FOUND` y no llama ventas, auditoría ni publicación de eventos cuando el recurso no pertenece al contexto.
+Verifica que el servicio consulta una membresía usando simultáneamente organización, sucursal e identificador, devuelve `MEMBERSHIP_NOT_FOUND` y no llama ventas, auditoría ni publicación de eventos cuando el recurso no pertenece al contexto.
+
+### Reembolsos de ventas
+
+`SalesBranchIsolationTests.refundForSaleFromAnotherBranchIsDeniedBeforeAnyMutation`
+
+Verifica que una solicitud de reembolso sobre una venta perteneciente a otra sucursal de la misma organización devuelve `SALE_NOT_FOUND` antes de acceder a SQL de escritura, almacenamiento, auditoría o eventos.
 
 ## Próximos pasos del bloque
 
@@ -120,10 +145,11 @@ La prueba verifica que el servicio consulta una membresía usando simultáneamen
 2. Añadir pruebas de reutilización de llave con payload diferente.
 3. Definir alcance de lectura y mutación de ventas por rol/sucursal.
 4. Centralizar resolución de venta y pago con el alcance aprobado.
-5. Añadir pruebas negativas entre sucursales.
-6. Revisar reembolsos parciales, límites acumulados y concurrencia.
-7. Revisar activación de membresías ante eventos duplicados y fallos parciales.
-8. Ejecutar suite backend local antes de cambiar contratos o SQL crítico.
+5. Añadir pruebas negativas para validar, rechazar y cargar comprobantes entre sucursales.
+6. Añadir prueba de reembolsos acumulados por pago y corregir el cálculo.
+7. Añadir prueba concurrente de reembolsos sobre el mismo saldo.
+8. Revisar activación de membresías ante eventos duplicados y fallos parciales.
+9. Ejecutar suite backend local antes de cambiar contratos o SQL crítico.
 
 ## Validación requerida
 
