@@ -33,3 +33,5 @@ test-results/
 
 # Local runtime data
 infra/.data/
+frontend/public/tenants/*
+!frontend/public/tenants/.gitkeep

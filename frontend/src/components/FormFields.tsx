@@ -150,6 +150,23 @@ export function TextAreaField(props: BaseProps & { rows?: number }) {
   );
 }
 
+export function ColorField(props: BaseProps) {
+  return (
+    <FieldFrame error={props.error} help={props.help} label={props.label} name={props.name} required={props.required ?? true}>
+      <input
+        aria-invalid={Boolean(props.error)}
+        className="app-input h-12 p-1"
+        id={props.name}
+        name={props.name}
+        onChange={(event) => props.onChange(event.target.value)}
+        required={props.required ?? true}
+        type="color"
+        value={props.value}
+      />
+    </FieldFrame>
+  );
+}
+
 export function DateField(props: BaseProps) {
   return (
     <FieldFrame error={props.error} help={props.help ?? "Formato: dd/mm/aaaa."} label={props.label} name={props.name} required={props.required ?? false}>

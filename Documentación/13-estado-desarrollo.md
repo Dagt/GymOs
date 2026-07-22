@@ -862,5 +862,8 @@ Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
 - `/platform/gymnasiums` extrae formularios y validaciones de alta de gimnasio/sucursal a `PlatformGymnasiumForms.tsx`; la pagina principal conserva el maestro-detalle y queda menos acoplada al formulario.
 - `/catalog` reutiliza `TextField`, `NumberField`, `TextAreaField` y `SelectField` para producto y plan, eliminando inputs locales duplicados.
 - `CatalogHelpers.ts` centraliza el armado de payloads de productos y planes para que `page.tsx` solo orqueste sesion, carga, guardado y estado de drawers.
+- `/settings/organization` separa helpers, validaciones, resumen, tarjetas y drawers en `OrganizationSettingsHelpers.ts` y `OrganizationSettingsSections.tsx`.
+- `FormFields.tsx` agrega `ColorField` para reutilizar la edicion de marca sin inputs locales por pantalla.
+- Los logos cargados en `frontend/public/tenants/*` se tratan como datos locales/runtime y quedan fuera de Git, conservando solo `.gitkeep`.
 - Se retiro `AppNavigation`, que ya no tenia consumidores, para mantener un solo modelo de navegacion visible.
-- La siguiente etapa recomendada es continuar con `settings/organization` y la limpieza final de helpers visuales ya obsoletos.
+- La siguiente etapa recomendada es continuar con `clients/[clientId]` o `clients/page.tsx`, priorizando helpers de estado y formularios compartidos.

@@ -2,19 +2,8 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
-import { AppDrawer } from "@/components/AppDrawer";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
-import {
-  FieldErrorMap,
-  normalizePhone,
-  normalizeRfc,
-  validateBranchCode,
-  validateEmail,
-  validatePhone,
-  validateRequired,
-  validateRfc,
-} from "@/components/FormFields";
-import { LogoUploadField } from "@/components/LogoUploadField";
+import { type FieldErrorMap } from "@/components/FormFields";
 import {
   createBranch,
   getBranches,
@@ -29,13 +18,24 @@ import {
   type OrganizationUpdatePayload,
   type StoredSession,
 } from "@/lib/api";
-
-const emptyBranchForm: CreateBranchPayload = {
-  name: "",
-  code: "",
-  timezone: "America/Mexico_City",
-  phone: "",
-};
+import {
+  emptyBranchForm,
+  normalizeBranchForm,
+  normalizeOrganizationForm,
+  toBranchForm,
+  toOrganizationForm,
+  validateBranchForm,
+  validateOrganizationForm,
+} from "./OrganizationSettingsHelpers";
+import {
+  BranchesOverviewCard,
+  EditBranchDrawer,
+  NewBranchDrawer,
+  OrganizationDrawer,
+  OrganizationOverviewCard,
+  SettingsSummary,
+  TeamAccessCard,
+} from "./OrganizationSettingsSections";
 
 export default function OrganizationSettingsPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
@@ -117,11 +117,7 @@ export default function OrganizationSettingsPage() {
     setError(null);
     setMessage(null);
     try {
-      const response = await updateOrganization(session.accessToken, {
-        ...organizationForm,
-        taxId: normalizeRfc(organizationForm.taxId ?? ""),
-        contactPhone: normalizePhone(organizationForm.contactPhone ?? ""),
-      });
+      const response = await updateOrganization(session.accessToken, normalizeOrganizationForm(organizationForm));
       setOrganization(response);
       setOrganizationForm(toOrganizationForm(response));
       setShowOrganizationDrawer(false);
@@ -147,10 +143,7 @@ export default function OrganizationSettingsPage() {
     setError(null);
     setMessage(null);
     try {
-      const response = await updateBranch(session.accessToken, selectedBranchId, {
-        ...branchForm,
-        phone: normalizePhone(branchForm.phone ?? ""),
-      });
+      const response = await updateBranch(session.accessToken, selectedBranchId, normalizeBranchForm(branchForm));
       setBranches((current) => current.map((branch) => (branch.id === response.id ? response : branch)));
       setBranchForm(toBranchForm(response));
       setShowEditBranchDrawer(false);
@@ -176,10 +169,7 @@ export default function OrganizationSettingsPage() {
     setError(null);
     setMessage(null);
     try {
-      const response = await createBranch(session.accessToken, {
-        ...newBranchForm,
-        phone: normalizePhone(newBranchForm.phone ?? ""),
-      });
+      const response = await createBranch(session.accessToken, normalizeBranchForm(newBranchForm));
       setBranches((current) => [...current, response].sort((left, right) => left.name.localeCompare(right.name)));
       setSelectedBranchId(response.id);
       setBranchForm(toBranchForm(response));
@@ -197,6 +187,16 @@ export default function OrganizationSettingsPage() {
     setSelectedBranchId(branchId);
     const branch = branches.find((item) => item.id === branchId);
     setBranchForm(branch ? toBranchForm(branch) : null);
+  }
+
+  function openOrganizationDrawer() {
+    setFieldErrors({});
+    setShowOrganizationDrawer(true);
+  }
+
+  function openNewBranchDrawer() {
+    setFieldErrors({});
+    setShowNewBranchDrawer(true);
   }
 
   function openEditBranch(branchId: string) {
@@ -227,284 +227,56 @@ export default function OrganizationSettingsPage() {
       subtitle="Administra la cadena o gimnasio, crea varias sucursales y prepara el acceso del equipo."
       title="Datos y sucursales"
     >
-      <section className="settings-summary">
-        <article>
-          <span>Gimnasio actual</span>
-          <strong>{organization?.tradeName}</strong>
-          <p>{organization?.legalName}</p>
-        </article>
-        <article>
-          <span>Sucursales</span>
-          <strong>{branches.length}</strong>
-          <p>{branches.length === 1 ? "Una sucursal registrada." : "Sucursales registradas para este gimnasio."}</p>
-        </article>
-        <article>
-          <span>Sucursal operativa</span>
-          <strong>{activeBranch?.name ?? "Sin seleccionar"}</strong>
-          <p>Se elige desde Gimnasios para entrar al contexto de trabajo.</p>
-        </article>
-      </section>
+      <SettingsSummary
+        activeBranchName={activeBranch?.name}
+        branchCount={branches.length}
+        legalName={organization?.legalName}
+        tradeName={organization?.tradeName}
+      />
 
       {error ? <p className="form-message error">{error}</p> : null}
       {message ? <p className="form-message success">{message}</p> : null}
 
       <section className="settings-forms-grid">
-        <section className="app-card p-5">
-          <div className="admin-panel-header">
-            <div>
-              <p>Gimnasio</p>
-              <h2>Datos y marca</h2>
-            </div>
-            <button className="app-button" onClick={() => {
-              setFieldErrors({});
-              setShowOrganizationDrawer(true);
-            }} type="button">
-              Editar gimnasio
-            </button>
-          </div>
-          <div className="settings-summary mt-5">
-            <article>
-              <span>Marca</span>
-              <strong>{organizationForm.brandName || organizationForm.tradeName}</strong>
-              <p>{organizationForm.contactEmail}</p>
-            </article>
-            <article>
-              <span>Moneda</span>
-              <strong>{organizationForm.defaultCurrency}</strong>
-              <p>{organizationForm.timezone}</p>
-            </article>
-            <article>
-              <span>RFC</span>
-              <strong>{organizationForm.taxId || "Sin RFC"}</strong>
-              <p>{organizationForm.contactPhone || "Sin telefono"}</p>
-            </article>
-          </div>
-        </section>
-
-        <section className="app-card p-5">
-          <div className="admin-panel-header">
-            <div>
-              <p>Sucursales</p>
-              <h2>Sedes registradas</h2>
-            </div>
-            <button className="app-button" onClick={() => {
-              setFieldErrors({});
-              setShowNewBranchDrawer(true);
-            }} type="button">
-              Crear sucursal
-            </button>
-          </div>
-          <div className="team-role-list">
-            {branches.length === 0 ? (
-              <section className="admin-empty-card">
-                <strong>Aun no hay sucursales</strong>
-                <span>Crea la primera para poder operar caja, recepcion y reportes.</span>
-              </section>
-            ) : null}
-            {branches.map((branch) => (
-              <article key={branch.id}>
-                <strong>{branch.name}</strong>
-                <span>{branch.code} - {branch.phone || "Sin telefono"}</span>
-                <button className="admin-text-button" onClick={() => openEditBranch(branch.id)} type="button">
-                  Editar sucursal
-                </button>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className="app-card p-5">
-          <p className="app-eyebrow">Equipo</p>
-          <h2 className="mt-2 text-xl font-semibold">Usuarios y permisos</h2>
-          <p className="mt-2 text-sm leading-6 text-[#5d6b63]">
-            Crea cuentas para recepcion, gerencia, coaches y operacion. Cada usuario vera una experiencia segun sus permisos.
-          </p>
-          <div className="mt-5 grid gap-3">
-            <Link className="admin-secondary-link" href="/users">
-              Abrir equipo y accesos
-            </Link>
-            <p className="text-sm leading-6 text-[#5d6b63]">
-              Primero crea las sucursales necesarias. Despues asigna a cada persona solo las sucursales que debe usar.
-            </p>
-          </div>
-        </section>
+        <OrganizationOverviewCard form={organizationForm} onEdit={openOrganizationDrawer} />
+        <BranchesOverviewCard branches={branches} onEditBranch={openEditBranch} onNewBranch={openNewBranchDrawer} />
+        <TeamAccessCard />
       </section>
 
-      <AppDrawer
-        description="Actualiza datos comerciales, contacto y marca visual que veran duenos, gerentes, recepcion y kiosco."
-        onClose={() => setShowOrganizationDrawer(false)}
+      <OrganizationDrawer
+        errors={fieldErrors}
+        form={organizationForm}
         open={showOrganizationDrawer}
-        title="Editar gimnasio"
-      >
-        <form className="grid gap-4" onSubmit={submitOrganization}>
-          <Field error={fieldErrors.legalName} label="Nombre legal" value={organizationForm.legalName} onChange={(value) => setOrganizationForm({ ...organizationForm, legalName: value })} />
-          <Field error={fieldErrors.tradeName} label="Nombre comercial" value={organizationForm.tradeName} onChange={(value) => setOrganizationForm({ ...organizationForm, tradeName: value })} />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field error={fieldErrors.taxId} label="RFC" value={organizationForm.taxId ?? ""} onChange={(value) => setOrganizationForm({ ...organizationForm, taxId: normalizeRfc(value) })} />
-            <Field error={fieldErrors.defaultCurrency} label="Moneda" value={organizationForm.defaultCurrency} onChange={(value) => setOrganizationForm({ ...organizationForm, defaultCurrency: value })} />
-            <Field error={fieldErrors.timezone} label="Zona horaria" value={organizationForm.timezone} onChange={(value) => setOrganizationForm({ ...organizationForm, timezone: value })} />
-            <Field error={fieldErrors.contactPhone} help="Se guardara como +52 seguido de 10 digitos." label="Telefono" value={organizationForm.contactPhone ?? ""} onChange={(value) => setOrganizationForm({ ...organizationForm, contactPhone: value })} />
-          </div>
-          <Field error={fieldErrors.contactEmail} label="Email de contacto" type="email" value={organizationForm.contactEmail ?? ""} onChange={(value) => setOrganizationForm({ ...organizationForm, contactEmail: value })} />
-          <hr className="border-[#dbe4ee]" />
-          <p className="app-eyebrow">Marca del gimnasio</p>
-          <Field label="Nombre visible de marca" value={organizationForm.brandName ?? ""} onChange={(value) => setOrganizationForm({ ...organizationForm, brandName: value })} />
-          <LogoUploadField
-            disabled={saving}
-            logoUrl={organizationForm.logoUrl}
-            tenantName={organizationForm.tradeName || organizationForm.brandName || organizationForm.legalName}
-            onChange={(logoUrl) => setOrganizationForm({ ...organizationForm, logoUrl })}
-          />
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="Color principal" type="color" value={organizationForm.primaryColor ?? "#164E63"} onChange={(value) => setOrganizationForm({ ...organizationForm, primaryColor: value })} />
-            <Field label="Color acento" type="color" value={organizationForm.accentColor ?? "#F59E0B"} onChange={(value) => setOrganizationForm({ ...organizationForm, accentColor: value })} />
-            <Field label="Color fondo" type="color" value={organizationForm.surfaceColor ?? "#F4F7FB"} onChange={(value) => setOrganizationForm({ ...organizationForm, surfaceColor: value })} />
-          </div>
-          <button className="form-primary-button" disabled={saving} type="submit">
-            Guardar gimnasio
-          </button>
-        </form>
-      </AppDrawer>
+        saving={saving}
+        onChange={setOrganizationForm}
+        onClose={() => setShowOrganizationDrawer(false)}
+        onSubmit={submitOrganization}
+      />
 
-      <AppDrawer
-        description="Crea una sede operativa para caja, recepcion, usuarios y reportes."
-        onClose={() => setShowNewBranchDrawer(false)}
+      <NewBranchDrawer
+        errors={fieldErrors}
+        form={newBranchForm}
         open={showNewBranchDrawer}
-        title="Crear sucursal"
-      >
-        <form className="grid gap-4" onSubmit={submitNewBranch}>
-          <Field error={fieldErrors.newBranchName} label="Nombre de sucursal" value={newBranchForm.name} onChange={(value) => setNewBranchForm({ ...newBranchForm, name: value })} />
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field error={fieldErrors.newBranchCode} label="Codigo corto" value={newBranchForm.code} onChange={(value) => setNewBranchForm({ ...newBranchForm, code: value })} />
-            <Field error={fieldErrors.newBranchPhone} help="Se guardara como +52 seguido de 10 digitos." label="Telefono" value={newBranchForm.phone ?? ""} onChange={(value) => setNewBranchForm({ ...newBranchForm, phone: value })} />
-          </div>
-          <Field error={fieldErrors.newBranchTimezone} label="Zona horaria" value={newBranchForm.timezone} onChange={(value) => setNewBranchForm({ ...newBranchForm, timezone: value })} />
-          <button className="form-primary-button" disabled={saving} type="submit">
-            Crear sucursal
-          </button>
-        </form>
-      </AppDrawer>
+        saving={saving}
+        onChange={setNewBranchForm}
+        onClose={() => setShowNewBranchDrawer(false)}
+        onSubmit={submitNewBranch}
+      />
 
-      <AppDrawer
-        description="Edita nombre, codigo, telefono y zona horaria de la sucursal seleccionada."
-        onClose={() => setShowEditBranchDrawer(false)}
+      <EditBranchDrawer
+        branchId={selectedBranchId}
+        branches={branches}
+        errors={fieldErrors}
+        form={branchForm}
         open={showEditBranchDrawer}
-        title="Editar sucursal"
-      >
-        <form className="grid gap-4" onSubmit={submitBranch}>
-          <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-            Sucursal
-            <select
-              className="app-input"
-              onChange={(event) => selectEditableBranch(event.target.value)}
-              value={selectedBranchId}
-            >
-              {branches.map((branch) => (
-                <option key={branch.id} value={branch.id}>
-                  {branch.name} ({branch.code})
-                </option>
-              ))}
-            </select>
-          </label>
-          {branchForm ? (
-            <>
-              <Field error={fieldErrors.branchName} label="Nombre" value={branchForm.name} onChange={(value) => setBranchForm({ ...branchForm, name: value })} />
-              <div className="grid gap-4 sm:grid-cols-2">
-                <Field error={fieldErrors.branchCode} label="Codigo" value={branchForm.code} onChange={(value) => setBranchForm({ ...branchForm, code: value })} />
-                <Field error={fieldErrors.branchPhone} help="Se guardara como +52 seguido de 10 digitos." label="Telefono" value={branchForm.phone ?? ""} onChange={(value) => setBranchForm({ ...branchForm, phone: value })} />
-              </div>
-              <Field error={fieldErrors.branchTimezone} label="Zona horaria" value={branchForm.timezone} onChange={(value) => setBranchForm({ ...branchForm, timezone: value })} />
-              <button className="form-primary-button" disabled={saving} type="submit">
-                Guardar sucursal
-              </button>
-            </>
-          ) : null}
-        </form>
-      </AppDrawer>
+        saving={saving}
+        onBranchSelect={selectEditableBranch}
+        onChange={setBranchForm}
+        onClose={() => setShowEditBranchDrawer(false)}
+        onSubmit={submitBranch}
+      />
     </AppShell>
   );
-}
-
-function toOrganizationForm(organization: OrganizationSummary): OrganizationUpdatePayload {
-  return {
-    legalName: organization.legalName,
-    tradeName: organization.tradeName,
-    taxId: organization.taxId ?? "",
-    timezone: organization.timezone,
-    defaultCurrency: organization.defaultCurrency,
-    contactEmail: organization.contactEmail ?? "",
-    contactPhone: organization.contactPhone ?? "",
-    brandName: organization.brandName ?? organization.tradeName,
-    logoUrl: organization.logoUrl ?? "",
-    primaryColor: organization.primaryColor ?? "#164E63",
-    accentColor: organization.accentColor ?? "#F59E0B",
-    surfaceColor: organization.surfaceColor ?? "#F4F7FB",
-  };
-}
-
-function toBranchForm(branch: BranchSummary): BranchUpdatePayload {
-  return {
-    name: branch.name,
-    code: branch.code,
-    timezone: branch.timezone,
-    phone: branch.phone ?? "",
-  };
-}
-
-function Field({
-  error,
-  help,
-  label,
-  value,
-  onChange,
-  type = "text",
-}: {
-  error?: string;
-  help?: string;
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  type?: string;
-}) {
-  return (
-    <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-      {label}
-      <input
-        className="h-11 rounded-md border border-[#cdd5ca] px-3 text-sm outline-none transition focus:border-[#51735f]"
-        onChange={(event) => onChange(event.target.value)}
-        type={type}
-        value={value}
-      />
-      {error ? <small className="form-field-error">{error}</small> : help ? <small>{help}</small> : null}
-    </label>
-  );
-}
-
-function validateOrganizationForm(form: OrganizationUpdatePayload) {
-  const errors: FieldErrorMap = {};
-  addError(errors, "legalName", validateRequired(form.legalName, "Nombre legal"));
-  addError(errors, "tradeName", validateRequired(form.tradeName, "Nombre comercial"));
-  addError(errors, "taxId", validateRfc(form.taxId ?? "", true));
-  addError(errors, "defaultCurrency", validateRequired(form.defaultCurrency, "Moneda"));
-  addError(errors, "timezone", validateRequired(form.timezone, "Zona horaria"));
-  addError(errors, "contactPhone", validatePhone(form.contactPhone ?? "", true));
-  addError(errors, "contactEmail", validateEmail(form.contactEmail ?? "", true));
-  return errors;
-}
-
-function validateBranchForm(form: BranchUpdatePayload | CreateBranchPayload, prefix: "branch" | "newBranch") {
-  const errors: FieldErrorMap = {};
-  addError(errors, `${prefix}Name`, validateRequired(form.name, "Nombre de sucursal"));
-  addError(errors, `${prefix}Code`, validateBranchCode(form.code));
-  addError(errors, `${prefix}Phone`, validatePhone(form.phone ?? "", true));
-  addError(errors, `${prefix}Timezone`, validateRequired(form.timezone, "Zona horaria"));
-  return errors;
-}
-
-function addError(errors: FieldErrorMap, key: string, value: string) {
-  if (value) {
-    errors[key] = value;
-  }
 }
 
 function AuthRequired() {
