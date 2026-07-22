@@ -34,6 +34,20 @@ Verificado:
 - `npm.cmd run lint`
 - `npm.cmd run build`
 
+## Refactor frontend equipo y accesos - 21 de julio de 2026
+
+Implementado:
+
+- `frontend/src/app/users/UsersSections.tsx` reemplaza inputs locales del drawer de creacion de usuarios por `TextField`, `EmailField`, `PhoneField`, `PasswordField` y `SelectField`.
+- Se elimina el componente `Field` duplicado para mantener estilos, validaciones y mensajes alineados con los formularios comunes de GymOS.
+- El refactor no cambia contratos HTTP ni permisos; conserva creacion, suspension y cambio de rol de usuarios internos.
+
+Verificado:
+
+- `npm.cmd run typecheck`
+- `npm.cmd run lint`
+- `npm.cmd run build`
+
 ## Correccion encabezado y kiosco tenant - 20 de julio de 2026
 
 Implementado:

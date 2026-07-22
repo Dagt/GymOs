@@ -1,7 +1,14 @@
 import Link from "next/link";
 import { FormEvent } from "react";
 import { AppDrawer } from "@/components/AppDrawer";
-import type { FieldErrorMap } from "@/components/FormFields";
+import {
+  EmailField,
+  type FieldErrorMap,
+  PasswordField,
+  PhoneField,
+  SelectField,
+  TextField,
+} from "@/components/FormFields";
 import type {
   BranchSummary,
   CreateInternalUserPayload,
@@ -206,42 +213,34 @@ export function CreateUserDrawer({
     >
       <form className="grid gap-4" onSubmit={onSubmit}>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field error={errors.firstName} label="Nombre" value={form.firstName} onChange={(value) => onFormChange({ ...form, firstName: value })} />
-          <Field error={errors.lastName} label="Apellido paterno" value={form.lastName} onChange={(value) => onFormChange({ ...form, lastName: value })} />
-          <Field error={errors.maternalLastName} label="Apellido materno" required={false} value={form.maternalLastName ?? ""} onChange={(value) => onFormChange({ ...form, maternalLastName: value })} />
+          <TextField error={errors.firstName} label="Nombre" name="firstName" value={form.firstName} onChange={(value) => onFormChange({ ...form, firstName: value })} />
+          <TextField error={errors.lastName} label="Apellido paterno" name="lastName" value={form.lastName} onChange={(value) => onFormChange({ ...form, lastName: value })} />
+          <TextField error={errors.maternalLastName} label="Apellido materno" name="maternalLastName" required={false} value={form.maternalLastName ?? ""} onChange={(value) => onFormChange({ ...form, maternalLastName: value })} />
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field error={errors.email} label="Email" type="email" value={form.email ?? ""} onChange={(value) => onFormChange({ ...form, email: value, username: form.username || value })} />
-          <Field error={errors.phone} help="Se guardara como +52 seguido de 10 digitos." label="Telefono" value={form.phone ?? ""} onChange={(value) => onFormChange({ ...form, phone: value })} />
+          <EmailField error={errors.email} label="Email" name="email" required value={form.email ?? ""} onChange={(value) => onFormChange({ ...form, email: value, username: form.username || value })} />
+          <PhoneField error={errors.phone} label="Telefono" name="phone" required value={form.phone ?? ""} onChange={(value) => onFormChange({ ...form, phone: value })} />
         </div>
-        <Field error={errors.username} label="Usuario de inicio de sesion" value={form.username} onChange={(value) => onFormChange({ ...form, username: value })} />
-        <Field error={errors.temporaryPassword} help="Minimo 8 caracteres." label="Contrasena temporal" type="password" value={form.temporaryPassword} onChange={(value) => onFormChange({ ...form, temporaryPassword: value })} />
+        <TextField error={errors.username} label="Usuario de inicio de sesion" name="username" value={form.username} onChange={(value) => onFormChange({ ...form, username: value })} />
+        <PasswordField error={errors.temporaryPassword} label="Contrasena temporal" name="temporaryPassword" value={form.temporaryPassword} onChange={(value) => onFormChange({ ...form, temporaryPassword: value })} />
 
-        <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-          Rol
-          <select
-            className="app-input"
-            onChange={(event) => {
-              const nextRoleId = event.target.value;
-              const nextLabel = displayRoleName(roles.find((role) => role.id === nextRoleId)?.name ?? "");
-              onFormChange({
-                ...form,
-                roleId: nextRoleId,
-                branchIds: nextLabel === "Dueno del gimnasio"
-                  ? branches.map((branch) => branch.id)
-                  : form.branchIds,
-              });
-            }}
-            required
-            value={form.roleId}
-          >
-            {roles.map((role) => (
-              <option key={role.id} value={role.id}>
-                {displayRoleName(role.name)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SelectField
+          error={errors.roleId}
+          label="Rol"
+          name="roleId"
+          options={roles.map((role) => ({ label: displayRoleName(role.name), value: role.id }))}
+          value={form.roleId}
+          onChange={(nextRoleId) => {
+            const nextLabel = displayRoleName(roles.find((role) => role.id === nextRoleId)?.name ?? "");
+            onFormChange({
+              ...form,
+              roleId: nextRoleId,
+              branchIds: nextLabel === "Dueno del gimnasio"
+                ? branches.map((branch) => branch.id)
+                : form.branchIds,
+            });
+          }}
+        />
 
         <section className="team-branch-selector">
           <div>
@@ -272,37 +271,5 @@ export function CreateUserDrawer({
         </button>
       </form>
     </AppDrawer>
-  );
-}
-
-function Field({
-  error,
-  help,
-  label,
-  required = true,
-  value,
-  onChange,
-  type = "text",
-}: {
-  error?: string;
-  help?: string;
-  label: string;
-  required?: boolean;
-  value: string;
-  onChange: (value: string) => void;
-  type?: string;
-}) {
-  return (
-    <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-      {label}
-      <input
-        className="h-11 rounded-md border border-[#cdd5ca] px-3 text-sm outline-none transition focus:border-[#51735f]"
-        onChange={(event) => onChange(event.target.value)}
-        required={required && label !== "Telefono" && label !== "Email"}
-        type={type}
-        value={value}
-      />
-      {error ? <small className="form-field-error">{error}</small> : help ? <small>{help}</small> : null}
-    </label>
   );
 }
