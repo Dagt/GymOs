@@ -120,9 +120,6 @@ public class BookingService {
 		if (!bookingRepository.clientExists(principal.organizationId(), command.clientId())) {
 			throw new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta activo.");
 		}
-		if (!bookingRepository.hasEligibleMembershipForResource(principal.organizationId(), principal.branchId(), command.resourceId(), command.clientId(), LocalDate.now(BOOKING_ZONE))) {
-			throw new BusinessException("BOOKING_PLAN_NOT_ALLOWED", "El socio no tiene una membresia permitida para reservar este recurso.");
-		}
 		if (command.startsAt() == null || command.endsAt() == null || !command.endsAt().isAfter(command.startsAt())) {
 			throw new BusinessException("BOOKING_RANGE_INVALID", "La reserva requiere un rango valido.");
 		}
@@ -132,6 +129,15 @@ public class BookingService {
 
 		OffsetDateTime localStart = command.startsAt().atZoneSameInstant(BOOKING_ZONE).toOffsetDateTime();
 		OffsetDateTime localEnd = command.endsAt().atZoneSameInstant(BOOKING_ZONE).toOffsetDateTime();
+		if (!bookingRepository.hasEligibleMembershipForResource(
+				principal.organizationId(),
+				principal.branchId(),
+				command.resourceId(),
+				command.clientId(),
+				localStart.toLocalDate()
+		)) {
+			throw new BusinessException("BOOKING_PLAN_NOT_ALLOWED", "El socio no tiene una membresia permitida para reservar este recurso.");
+		}
 		if (!localStart.toLocalDate().equals(localEnd.toLocalDate())) {
 			throw new BusinessException("BOOKING_RANGE_INVALID", "La reserva debe iniciar y terminar el mismo dia.");
 		}
@@ -184,7 +190,7 @@ public class BookingService {
 			throw new BusinessException("BOOKING_NOT_CONFIRMABLE", "La reserva no puede confirmarse.");
 		}
 		bookingRepository.updateStatus(principal.organizationId(), principal.branchId(), bookingId, targetStatus, principal.userId());
-		auditService.record(principal, "BOOKING_" + targetStatus, "BOOKING", bookingId, "RECEPTION", null, correlationId);
+		auditService.record(principal, "BOOKING_" + targetStatus, "BOOKING", bookingId, "RECEPTION", targetStatus, correlationId);
 		return detail(principal, bookingId);
 	}
 
