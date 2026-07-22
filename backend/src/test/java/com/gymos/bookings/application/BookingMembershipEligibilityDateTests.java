@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.audit.api.AuditService;
 import com.gymos.bookings.application.command.CreateBookingCommand;
+import com.gymos.bookings.infrastructure.BookingEligibilityRepository;
 import com.gymos.bookings.infrastructure.BookingRepository;
 import com.gymos.bookings.infrastructure.BookingRepository.BookingRecord;
 import com.gymos.bookings.infrastructure.BookingRepository.ResourceRecord;
@@ -29,14 +30,16 @@ class BookingMembershipEligibilityDateTests {
 	@Test
 	void validatesMembershipAgainstLocalBookingDateInsteadOfCurrentDate() {
 		BookingRepository bookingRepository = mock(BookingRepository.class);
+		BookingEligibilityRepository eligibilityRepository = mock(BookingEligibilityRepository.class);
 		ClientBookingConflictRepository conflictRepository = mock(ClientBookingConflictRepository.class);
 		AuditService auditService = mock(AuditService.class);
 		ResourceScheduleResolver scheduleResolver = new ResourceScheduleResolver(new ObjectMapper());
 		BookingService service = new BookingService(
 				bookingRepository,
+				eligibilityRepository,
 				conflictRepository,
-				auditService,
-				scheduleResolver
+				scheduleResolver,
+				auditService
 		);
 
 		UUID organizationId = UUID.randomUUID();
@@ -90,8 +93,8 @@ class BookingMembershipEligibilityDateTests {
 		);
 
 		when(bookingRepository.resource(organizationId, branchId, resourceId)).thenReturn(Optional.of(resource));
-		when(bookingRepository.clientExists(organizationId, clientId)).thenReturn(true);
-		when(bookingRepository.hasEligibleMembershipForResource(
+		when(eligibilityRepository.clientExists(organizationId, clientId)).thenReturn(true);
+		when(eligibilityRepository.hasEligibleMembershipForResource(
 				organizationId,
 				branchId,
 				resourceId,
@@ -110,7 +113,7 @@ class BookingMembershipEligibilityDateTests {
 		);
 
 		assertEquals(bookingId, result.id());
-		verify(bookingRepository).hasEligibleMembershipForResource(
+		verify(eligibilityRepository).hasEligibleMembershipForResource(
 				organizationId,
 				branchId,
 				resourceId,
