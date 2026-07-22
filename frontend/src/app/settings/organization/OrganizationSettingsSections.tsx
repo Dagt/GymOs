@@ -54,7 +54,7 @@ type OrganizationOverviewCardProps = {
 
 export function OrganizationOverviewCard({ form, onEdit }: OrganizationOverviewCardProps) {
   return (
-    <section className="app-card p-5">
+    <section className="app-card self-start p-5">
       <div className="admin-panel-header">
         <div>
           <p>Gimnasio</p>
@@ -65,20 +65,20 @@ export function OrganizationOverviewCard({ form, onEdit }: OrganizationOverviewC
         </button>
       </div>
       <div className="settings-summary mt-5">
-        <article>
+        <article className="min-w-0">
           <span>Marca</span>
-          <strong>{form.brandName || form.tradeName}</strong>
-          <p>{form.contactEmail}</p>
+          <strong className="break-words">{form.brandName || form.tradeName}</strong>
+          <p className="break-all">{form.contactEmail}</p>
         </article>
-        <article>
+        <article className="min-w-0">
           <span>Moneda</span>
           <strong>{form.defaultCurrency}</strong>
-          <p>{form.timezone}</p>
+          <p className="break-words">{form.timezone}</p>
         </article>
-        <article>
+        <article className="min-w-0">
           <span>RFC</span>
-          <strong>{form.taxId || "Sin RFC"}</strong>
-          <p>{form.contactPhone || "Sin telefono"}</p>
+          <strong className="break-words">{form.taxId || "Sin RFC"}</strong>
+          <p className="break-words">{form.contactPhone || "Sin telefono"}</p>
         </article>
       </div>
     </section>
@@ -93,7 +93,7 @@ type BranchesOverviewCardProps = {
 
 export function BranchesOverviewCard({ branches, onEditBranch, onNewBranch }: BranchesOverviewCardProps) {
   return (
-    <section className="app-card p-5">
+    <section className="app-card self-start p-5">
       <div className="admin-panel-header">
         <div>
           <p>Sucursales</p>
@@ -111,9 +111,9 @@ export function BranchesOverviewCard({ branches, onEditBranch, onNewBranch }: Br
           </section>
         ) : null}
         {branches.map((branch) => (
-          <article key={branch.id}>
-            <strong>{branch.name}</strong>
-            <span>{branch.code} - {branch.phone || "Sin telefono"}</span>
+          <article className="min-w-0" key={branch.id}>
+            <strong className="break-words">{branch.name}</strong>
+            <span className="break-words">{branch.code} - {branch.phone || "Sin telefono"}</span>
             <button className="admin-text-button" onClick={() => onEditBranch(branch.id)} type="button">
               Editar sucursal
             </button>
@@ -126,19 +126,21 @@ export function BranchesOverviewCard({ branches, onEditBranch, onNewBranch }: Br
 
 export function TeamAccessCard() {
   return (
-    <section className="app-card p-5">
-      <p className="app-eyebrow">Equipo</p>
-      <h2 className="mt-2 text-xl font-semibold">Usuarios y permisos</h2>
-      <p className="mt-2 text-sm leading-6 text-[#5d6b63]">
-        Crea cuentas para recepcion, gerencia, coaches y operacion. Cada usuario vera una experiencia segun sus permisos.
-      </p>
-      <div className="mt-5 grid gap-3">
-        <Link className="admin-secondary-link" href="/users">
+    <section className="app-card p-5" style={{ gridColumn: "1 / -1" }}>
+      <div className="grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_auto]">
+        <div className="min-w-0">
+          <p className="app-eyebrow">Equipo</p>
+          <h2 className="mt-2 text-xl font-semibold">Usuarios y permisos</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#5d6b63]">
+            Crea cuentas para recepcion, gerencia, coaches y operacion. Cada usuario vera una experiencia segun sus permisos.
+          </p>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-[#5d6b63]">
+            Primero crea las sucursales necesarias. Despues asigna a cada persona solo las sucursales que debe usar.
+          </p>
+        </div>
+        <Link className="admin-secondary-link w-full md:w-auto" href="/users">
           Abrir equipo y accesos
         </Link>
-        <p className="text-sm leading-6 text-[#5d6b63]">
-          Primero crea las sucursales necesarias. Despues asigna a cada persona solo las sucursales que debe usar.
-        </p>
       </div>
     </section>
   );
