@@ -4,8 +4,6 @@ import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.storage.ObjectStorageService;
-import com.gymos.sales.api.events.PaymentCompletedLineItemV1;
-import com.gymos.sales.api.events.PaymentCompletedV1;
 import com.gymos.sales.api.events.PaymentRecordedV1;
 import com.gymos.sales.api.events.PaymentRejectedV1;
 import com.gymos.sales.api.events.SaleCreatedV1;
@@ -17,6 +15,8 @@ import com.gymos.sales.application.command.ManualPaymentCommand;
 import com.gymos.sales.application.command.RequestRefundCommand;
 import com.gymos.sales.application.result.SaleDetailResult;
 import com.gymos.sales.application.result.SalesReportResult;
+import com.gymos.sales.infrastructure.SaleCommandRepository;
+import com.gymos.sales.infrastructure.SalePaymentCompletionRepository;
 import com.gymos.sales.infrastructure.SalesRepository;
 import com.gymos.sales.infrastructure.SalesRepository.PaymentDetail;
 import com.gymos.sales.infrastructure.SalesRepository.SaleHeader;
@@ -29,9 +29,9 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
@@ -44,12 +44,32 @@ public class SalesService implements SalesOperations {
 
 	private final JdbcClient jdbcClient;
 	private final SalesRepository salesRepository;
-	private final SaleLineResolver saleLineResolver;
+	private final SaleCreationService saleCreationService;
+	private final SalePaymentCompletionService paymentCompletionService;
 	private final AuditService auditService;
 	private final ObjectStorageService objectStorageService;
 	private final ApplicationEventPublisher eventPublisher;
 
+	@Autowired
 	public SalesService(
+			JdbcClient jdbcClient,
+			SalesRepository salesRepository,
+			SaleCreationService saleCreationService,
+			SalePaymentCompletionService paymentCompletionService,
+			AuditService auditService,
+			ObjectStorageService objectStorageService,
+			ApplicationEventPublisher eventPublisher
+	) {
+		this.jdbcClient = jdbcClient;
+		this.salesRepository = salesRepository;
+		this.saleCreationService = saleCreationService;
+		this.paymentCompletionService = paymentCompletionService;
+		this.auditService = auditService;
+		this.objectStorageService = objectStorageService;
+		this.eventPublisher = eventPublisher;
+	}
+
+	SalesService(
 			JdbcClient jdbcClient,
 			SalesRepository salesRepository,
 			SaleLineResolver saleLineResolver,
@@ -57,12 +77,25 @@ public class SalesService implements SalesOperations {
 			ObjectStorageService objectStorageService,
 			ApplicationEventPublisher eventPublisher
 	) {
-		this.jdbcClient = jdbcClient;
-		this.salesRepository = salesRepository;
-		this.saleLineResolver = saleLineResolver;
-		this.auditService = auditService;
-		this.objectStorageService = objectStorageService;
-		this.eventPublisher = eventPublisher;
+		this(
+				jdbcClient,
+				salesRepository,
+				new SaleCreationService(
+						salesRepository,
+						saleLineResolver,
+						new SaleCommandRepository(jdbcClient),
+						auditService,
+						eventPublisher
+				),
+				new SalePaymentCompletionService(
+						salesRepository,
+						new SalePaymentCompletionRepository(jdbcClient),
+						eventPublisher
+				),
+				auditService,
+				objectStorageService,
+				eventPublisher
+		);
 	}
 
 	@Transactional(readOnly = true)
@@ -115,108 +148,15 @@ public class SalesService implements SalesOperations {
 	@Transactional
 	public SaleDetailResult create(GymOsPrincipal principal, CreateSaleCommand request, String correlationId) {
 		requireBranch(principal);
-		String idempotencyHash = saleRequestHash(request);
-		if (request.idempotencyKey() != null && !request.idempotencyKey().isBlank()) {
-			String key = request.idempotencyKey().trim();
-			var existing = salesRepository.saleHeaderByIdempotencyKey(principal.organizationId(), key);
-			if (existing.isPresent()) {
-				ensureSameIdempotencyRequest(
-						salesRepository.saleRequestHashByIdempotencyKey(principal.organizationId(), key).orElse(null),
-						idempotencyHash
-				);
-				return detail(principal, existing.get().id());
-			}
+		var creation = saleCreationService.create(principal, request, correlationId);
+		if (!creation.created()) {
+			return detail(principal, creation.saleId());
 		}
-		if (request.clientId() != null && !salesRepository.clientExists(principal.organizationId(), request.clientId())) {
-			throw new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible.");
-		}
-
-		var resolvedSale = saleLineResolver.resolve(
-				principal.organizationId(),
-				request.clientId(),
-				request.items(),
-				request.discountCents()
-		);
-		OffsetDateTime now = OffsetDateTime.now();
-		UUID saleId = UUID.randomUUID();
-		String saleNumber = "S-" + now.format(SALE_NUMBER_FORMAT) + "-" + saleId.toString().substring(0, 6).toUpperCase();
-
-		jdbcClient.sql("""
-				INSERT INTO sale (
-				    id, organization_id, branch_id, client_id, sale_number, status,
-				    subtotal_cents, discount_cents, total_cents, paid_cents, balance_cents,
-				    currency, notes, sold_at, created_at, updated_at, created_by, updated_by, version,
-				    idempotency_key, idempotency_request_hash
-				)
-				VALUES (
-				    :id, :organizationId, :branchId, :clientId, :saleNumber, 'PENDING_PAYMENT',
-				    :subtotalCents, :discountCents, :totalCents, 0, :balanceCents,
-				    :currency, :notes, :soldAt, :createdAt, :updatedAt, :createdBy, :updatedBy, 0,
-				    :idempotencyKey, :idempotencyRequestHash
-				)
-				""")
-				.param("id", saleId)
-				.param("organizationId", principal.organizationId())
-				.param("branchId", principal.branchId())
-				.param("clientId", request.clientId())
-				.param("saleNumber", saleNumber)
-				.param("subtotalCents", resolvedSale.subtotalCents())
-				.param("discountCents", resolvedSale.discountCents())
-				.param("totalCents", resolvedSale.totalCents())
-				.param("balanceCents", resolvedSale.totalCents())
-				.param("currency", resolvedSale.currency())
-				.param("notes", blankToNull(request.notes()))
-				.param("soldAt", now)
-				.param("createdAt", now)
-				.param("updatedAt", now)
-				.param("createdBy", principal.userId())
-				.param("updatedBy", principal.userId())
-				.param("idempotencyKey", blankToNull(request.idempotencyKey()))
-				.param("idempotencyRequestHash", idempotencyHash)
-				.update();
-
-		for (var line : resolvedSale.lines()) {
-			jdbcClient.sql("""
-					INSERT INTO sale_item (
-					    id, sale_id, organization_id, product_id, item_type, name, quantity,
-					    unit_price_cents, discount_cents, total_cents, created_at
-					)
-					VALUES (
-					    :id, :saleId, :organizationId, :productId, :itemType, :name, :quantity,
-					    :unitPriceCents, :discountCents, :totalCents, :createdAt
-					)
-					""")
-					.param("id", UUID.randomUUID())
-					.param("saleId", saleId)
-					.param("organizationId", principal.organizationId())
-					.param("productId", line.productId())
-					.param("itemType", line.itemType())
-					.param("name", line.name())
-					.param("quantity", line.quantity())
-					.param("unitPriceCents", line.unitPriceCents())
-					.param("discountCents", line.discountCents())
-					.param("totalCents", line.totalCents())
-					.param("createdAt", now)
-					.update();
-		}
-
-		auditService.record(principal, "SALE_CREATED", "SALE", saleId, "POS", null, correlationId);
-		eventPublisher.publishEvent(new SaleCreatedV1(
-				"sale-created:" + saleId,
-				principal.organizationId(),
-				principal.branchId(),
-				saleId,
-				saleNumber,
-				null,
-				resolvedSale.totalCents(),
-				resolvedSale.currency(),
-				now
-		));
 		if (request.payment() != null) {
-			addPaymentInternal(principal, saleId, request.payment(), correlationId);
+			addPaymentInternal(principal, creation.saleId(), request.payment(), correlationId);
 		}
-		recalculateSale(principal.organizationId(), saleId, principal.userId());
-		return detail(principal, saleId);
+		paymentCompletionService.recalculate(principal.organizationId(), creation.saleId(), principal.userId());
+		return detail(principal, creation.saleId());
 	}
 
 	@Override
@@ -409,7 +349,7 @@ public class SalesService implements SalesOperations {
 		eventPublisher.publishEvent(new SaleCreatedV1("sale-created:" + saleId, organizationId, branchId, saleId, saleNumber, businessContext, priceCents, currency, now));
 		eventPublisher.publishEvent(new PaymentRecordedV1("payment-recorded:" + paymentId, organizationId, branchId, saleId, paymentId, normalizedMethod, paymentStatus, priceCents, currency, now));
 		if (completed) {
-			publishPaymentCompletedIfNeeded(organizationId, saleId);
+			paymentCompletionService.publishIfNeeded(organizationId, saleId);
 		}
 		SaleHeader sale = salesRepository.saleHeader(organizationId, saleId).orElseThrow();
 		return toMembershipSaleResult(sale);
@@ -425,7 +365,7 @@ public class SalesService implements SalesOperations {
 		requireBranch(principal);
 		ensureSale(principal, saleId);
 		addPaymentInternal(principal, saleId, request, correlationId);
-		recalculateSale(principal.organizationId(), saleId, principal.userId());
+		paymentCompletionService.recalculate(principal.organizationId(), saleId, principal.userId());
 		return detail(principal, saleId);
 	}
 
@@ -503,7 +443,7 @@ public class SalesService implements SalesOperations {
 				.param("paymentId", paymentId)
 				.update();
 		auditService.record(principal, "PAYMENT_VALIDATED", "PAYMENT", paymentId, "POS", null, correlationId);
-		recalculateSale(principal.organizationId(), saleId, principal.userId());
+		paymentCompletionService.recalculate(principal.organizationId(), saleId, principal.userId());
 		return detail(principal, saleId);
 	}
 
@@ -545,7 +485,7 @@ public class SalesService implements SalesOperations {
 				.update();
 		auditService.record(principal, "PAYMENT_REJECTED", "PAYMENT", paymentId, "POS", reason, correlationId);
 		eventPublisher.publishEvent(new PaymentRejectedV1("payment-rejected:" + paymentId, principal.organizationId(), principal.branchId(), saleId, paymentId, reason, OffsetDateTime.now()));
-		recalculateSale(principal.organizationId(), saleId, principal.userId());
+		paymentCompletionService.recalculate(principal.organizationId(), saleId, principal.userId());
 		return detail(principal, saleId);
 	}
 
@@ -703,121 +643,6 @@ public class SalesService implements SalesOperations {
 				.orElse(null);
 	}
 
-	private void recalculateSale(UUID organizationId, UUID saleId, UUID userId) {
-		SaleHeader sale = salesRepository.saleHeader(organizationId, saleId)
-				.orElseThrow(() -> new BusinessException("SALE_NOT_FOUND", "La venta no existe o no esta disponible."));
-		Long paid = jdbcClient.sql("""
-				SELECT COALESCE(SUM(amount_cents), 0)
-				FROM payment
-				WHERE organization_id = :organizationId
-				  AND sale_id = :saleId
-				  AND status = 'COMPLETED'
-				  AND deleted_at IS NULL
-				""")
-				.param("organizationId", organizationId)
-				.param("saleId", saleId)
-				.query(Long.class)
-				.single();
-		long balance = Math.max(0, sale.totalCents() - paid);
-		String status = paid >= sale.totalCents() ? "PAID" : (paid > 0 ? "PARTIALLY_PAID" : "PENDING_PAYMENT");
-		jdbcClient.sql("""
-				UPDATE sale
-				SET status = :status,
-				    paid_cents = :paidCents,
-				    balance_cents = :balanceCents,
-				    updated_at = :updatedAt,
-				    updated_by = :updatedBy,
-				    version = version + 1
-				WHERE organization_id = :organizationId
-				  AND id = :saleId
-				  AND deleted_at IS NULL
-				""")
-				.param("status", status)
-				.param("paidCents", paid)
-				.param("balanceCents", balance)
-				.param("updatedAt", OffsetDateTime.now())
-				.param("updatedBy", userId)
-				.param("organizationId", organizationId)
-				.param("saleId", saleId)
-				.update();
-		if ("PAID".equals(status)) {
-			publishPaymentCompletedIfNeeded(organizationId, saleId);
-		}
-	}
-
-	private void publishPaymentCompletedIfNeeded(UUID organizationId, UUID saleId) {
-		OffsetDateTime now = OffsetDateTime.now();
-		int updated = jdbcClient.sql("""
-				UPDATE sale
-				SET payment_completed_at = :paymentCompletedAt
-				WHERE organization_id = :organizationId
-				  AND id = :saleId
-				  AND payment_completed_at IS NULL
-				  AND deleted_at IS NULL
-				""")
-				.param("paymentCompletedAt", now)
-				.param("organizationId", organizationId)
-				.param("saleId", saleId)
-				.update();
-		if (updated == 0) {
-			return;
-		}
-		eventPublisher.publishEvent(paymentCompletedEvent(organizationId, saleId, now));
-	}
-
-	private PaymentCompletedV1 paymentCompletedEvent(UUID organizationId, UUID saleId, OffsetDateTime occurredAt) {
-		SaleHeader sale = salesRepository.saleHeader(organizationId, saleId)
-				.orElseThrow(() -> new BusinessException("SALE_NOT_FOUND", "La venta no existe o no esta disponible."));
-		SaleContext context = saleContext(organizationId, saleId);
-		return new PaymentCompletedV1(
-				"payment-completed:" + saleId,
-				organizationId,
-				sale.branchId(),
-				saleId,
-				sale.clientId(),
-				sale.saleNumber(),
-				context.businessContext(),
-				context.contextMembershipId(),
-				context.contextTargetPlanId(),
-				paymentCompletedItems(organizationId, saleId),
-				occurredAt
-		);
-	}
-
-	private SaleContext saleContext(UUID organizationId, UUID saleId) {
-		return jdbcClient.sql("""
-				SELECT business_context, context_membership_id, context_target_plan_id
-				FROM sale
-				WHERE organization_id = :organizationId
-				  AND id = :saleId
-				""")
-				.param("organizationId", organizationId)
-				.param("saleId", saleId)
-				.query((resultSet, rowNumber) -> new SaleContext(
-						resultSet.getString("business_context"),
-						resultSet.getObject("context_membership_id", UUID.class),
-						resultSet.getObject("context_target_plan_id", UUID.class)
-				))
-				.single();
-	}
-
-	private List<PaymentCompletedLineItemV1> paymentCompletedItems(UUID organizationId, UUID saleId) {
-		return new ArrayList<>(jdbcClient.sql("""
-				SELECT product_id, item_type, quantity
-				FROM sale_item
-				WHERE organization_id = :organizationId
-				  AND sale_id = :saleId
-				""")
-				.param("organizationId", organizationId)
-				.param("saleId", saleId)
-				.query((resultSet, rowNumber) -> new PaymentCompletedLineItemV1(
-						resultSet.getObject("product_id", UUID.class),
-						resultSet.getString("item_type"),
-						resultSet.getInt("quantity")
-				))
-				.list());
-	}
-
 	private com.gymos.sales.api.operations.MembershipSaleResult toMembershipSaleResult(SaleHeader sale) {
 		return new com.gymos.sales.api.operations.MembershipSaleResult(
 				sale.id(),
@@ -829,9 +654,6 @@ public class SalesService implements SalesOperations {
 				sale.currency(),
 				"PAID".equals(sale.status())
 		);
-	}
-
-	private record SaleContext(String businessContext, UUID contextMembershipId, UUID contextTargetPlanId) {
 	}
 
 	private SaleHeader ensureSale(GymOsPrincipal principal, UUID saleId) {
@@ -864,31 +686,6 @@ public class SalesService implements SalesOperations {
 		if (existingHash != null && requestedHash != null && !existingHash.equals(requestedHash)) {
 			throw new BusinessException("IDEMPOTENCY_KEY_REUSED", "La llave de idempotencia ya fue usada con una solicitud diferente.");
 		}
-	}
-
-	private String saleRequestHash(CreateSaleCommand request) {
-		StringBuilder value = new StringBuilder()
-				.append("client=").append(request.clientId()).append('|')
-				.append("discount=").append(request.discountCents()).append('|')
-				.append("notes=").append(normalized(request.notes())).append('|');
-		request.items().stream()
-				.sorted(java.util.Comparator.comparing(item -> item.productId().toString()))
-				.forEach(item -> value
-						.append("item=").append(item.productId())
-						.append(',').append(item.quantity())
-						.append(',').append(item.discountCents())
-						.append('|'));
-		if (request.payment() != null) {
-			value.append("payment=").append(paymentRequestHash(
-					request.payment().method(),
-					request.payment().amountCents(),
-					request.payment().reference(),
-					request.payment().receiptObjectKey(),
-					request.payment().validateNow(),
-					request.payment().notes()
-			));
-		}
-		return sha256(value.toString());
 	}
 
 	private String membershipSaleRequestHash(
