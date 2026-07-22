@@ -105,14 +105,10 @@ export default function OrganizationSettingsPage() {
 
   async function submitOrganization(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!session || !organizationForm) {
-      return;
-    }
+    if (!session || !organizationForm) return;
     const errors = validateOrganizationForm(organizationForm);
     setFieldErrors(errors);
-    if (Object.keys(errors).length > 0) {
-      return;
-    }
+    if (Object.keys(errors).length > 0) return;
     setSaving(true);
     setError(null);
     setMessage(null);
@@ -131,14 +127,10 @@ export default function OrganizationSettingsPage() {
 
   async function submitBranch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!session || !branchForm || !selectedBranchId) {
-      return;
-    }
+    if (!session || !branchForm || !selectedBranchId) return;
     const errors = validateBranchForm(branchForm, "branch");
     setFieldErrors(errors);
-    if (Object.keys(errors).length > 0) {
-      return;
-    }
+    if (Object.keys(errors).length > 0) return;
     setSaving(true);
     setError(null);
     setMessage(null);
@@ -157,14 +149,10 @@ export default function OrganizationSettingsPage() {
 
   async function submitNewBranch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!session) {
-      return;
-    }
+    if (!session) return;
     const errors = validateBranchForm(newBranchForm, "newBranch");
     setFieldErrors(errors);
-    if (Object.keys(errors).length > 0) {
-      return;
-    }
+    if (Object.keys(errors).length > 0) return;
     setSaving(true);
     setError(null);
     setMessage(null);
@@ -205,13 +193,8 @@ export default function OrganizationSettingsPage() {
     setShowEditBranchDrawer(true);
   }
 
-  if (!session) {
-    return <AuthRequired />;
-  }
-
-  if (loading) {
-    return <LoadingScreen text="Cargando datos y sucursales..." />;
-  }
+  if (!session) return <AuthRequired />;
+  if (loading) return <LoadingScreen text="Cargando datos y sucursales..." />;
 
   if (!organizationForm) {
     return (
@@ -224,9 +207,7 @@ export default function OrganizationSettingsPage() {
         subtitle="Administra la cadena o gimnasio, crea varias sucursales y prepara el acceso del equipo."
         title="Datos y sucursales"
       >
-        <p className="form-message error">
-          {error ?? "No fue posible cargar los datos del gimnasio. Cierra sesion y vuelve a iniciar si el problema persiste."}
-        </p>
+        <p className="form-message error">{error ?? "No fue posible cargar los datos del gimnasio."}</p>
       </AppShell>
     );
   }
@@ -251,44 +232,17 @@ export default function OrganizationSettingsPage() {
       {error ? <p className="form-message error">{error}</p> : null}
       {message ? <p className="form-message success">{message}</p> : null}
 
-      <section className="settings-forms-grid">
-        <OrganizationOverviewCard form={organizationForm} onEdit={openOrganizationDrawer} />
+      <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <div className="grid min-w-0 gap-5">
+          <OrganizationOverviewCard form={organizationForm} onEdit={openOrganizationDrawer} />
+          <TeamAccessCard />
+        </div>
         <BranchesOverviewCard branches={branches} onEditBranch={openEditBranch} onNewBranch={openNewBranchDrawer} />
-        <TeamAccessCard />
       </section>
 
-      <OrganizationDrawer
-        errors={fieldErrors}
-        form={organizationForm}
-        open={showOrganizationDrawer}
-        saving={saving}
-        onChange={setOrganizationForm}
-        onClose={() => setShowOrganizationDrawer(false)}
-        onSubmit={submitOrganization}
-      />
-
-      <NewBranchDrawer
-        errors={fieldErrors}
-        form={newBranchForm}
-        open={showNewBranchDrawer}
-        saving={saving}
-        onChange={setNewBranchForm}
-        onClose={() => setShowNewBranchDrawer(false)}
-        onSubmit={submitNewBranch}
-      />
-
-      <EditBranchDrawer
-        branchId={selectedBranchId}
-        branches={branches}
-        errors={fieldErrors}
-        form={branchForm}
-        open={showEditBranchDrawer}
-        saving={saving}
-        onBranchSelect={selectEditableBranch}
-        onChange={setBranchForm}
-        onClose={() => setShowEditBranchDrawer(false)}
-        onSubmit={submitBranch}
-      />
+      <OrganizationDrawer errors={fieldErrors} form={organizationForm} open={showOrganizationDrawer} saving={saving} onChange={setOrganizationForm} onClose={() => setShowOrganizationDrawer(false)} onSubmit={submitOrganization} />
+      <NewBranchDrawer errors={fieldErrors} form={newBranchForm} open={showNewBranchDrawer} saving={saving} onChange={setNewBranchForm} onClose={() => setShowNewBranchDrawer(false)} onSubmit={submitNewBranch} />
+      <EditBranchDrawer branchId={selectedBranchId} branches={branches} errors={fieldErrors} form={branchForm} open={showEditBranchDrawer} saving={saving} onBranchSelect={selectEditableBranch} onChange={setBranchForm} onClose={() => setShowEditBranchDrawer(false)} onSubmit={submitBranch} />
     </AppShell>
   );
 }
@@ -298,10 +252,7 @@ function AuthRequired() {
     <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
       <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6 shadow-sm">
         <h1 className="text-2xl font-semibold">Necesitas iniciar sesion</h1>
-        <Link
-          className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]"
-          href="/login"
-        >
+        <Link className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]" href="/login">
           Iniciar sesion
         </Link>
       </section>
