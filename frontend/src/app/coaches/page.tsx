@@ -1,11 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   assignWorkout,
-  createCoach,
   createWorkout,
   getBranches,
   getCoachReport,
@@ -43,10 +43,6 @@ export default function CoachesPage() {
   const [workouts, setWorkouts] = useState<WorkoutSummary[]>([]);
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [report, setReport] = useState<CoachReport | null>(null);
-  const [coachName, setCoachName] = useState("");
-  const [coachEmail, setCoachEmail] = useState("");
-  const [coachPhone, setCoachPhone] = useState("");
-  const [coachSpecialties, setCoachSpecialties] = useState("fuerza, hipertrofia");
   const [workoutTitle, setWorkoutTitle] = useState("");
   const [workoutGoal, setWorkoutGoal] = useState("");
   const [workoutLevel, setWorkoutLevel] = useState<"BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "GENERAL">("GENERAL");
@@ -133,33 +129,6 @@ export default function CoachesPage() {
     setReport(nextReport);
     setWorkoutCoachId((current) => current || nextCoaches[0]?.id || "");
     setAssignmentWorkoutId((current) => current || nextWorkouts[0]?.id || "");
-  }
-
-  async function submitCoach(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!session) {
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const created = await createCoach(session.accessToken, {
-        displayName: coachName,
-        email: coachEmail,
-        phone: coachPhone,
-        specialties: coachSpecialties.split(",").map((value) => value.trim()).filter(Boolean),
-      });
-      setCoachName("");
-      setCoachEmail("");
-      setCoachPhone("");
-      setMessage(`Coach ${created.displayName} creado.`);
-      await refresh(session);
-    } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible crear coach.");
-    } finally {
-      setSaving(false);
-    }
   }
 
   async function submitWorkout(event: FormEvent<HTMLFormElement>) {
@@ -272,36 +241,39 @@ export default function CoachesPage() {
           </p>
         ) : null}
 
-        <section className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
+        <section className="grid items-start gap-6 lg:grid-cols-[0.85fr_1.15fr]">
           <section className="grid gap-6">
-            <form className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm" onSubmit={submitCoach}>
-              <h2 className="text-xl font-semibold">Nuevo coach</h2>
-              <div className="mt-4 grid gap-3">
-                <input className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => setCoachName(event.target.value)} placeholder="Nombre publico" value={coachName} />
-                <input className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => setCoachEmail(event.target.value)} placeholder="Correo" type="email" value={coachEmail} />
-                <input className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => setCoachPhone(event.target.value)} placeholder="Telefono" value={coachPhone} />
-                <input className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => setCoachSpecialties(event.target.value)} placeholder="Especialidades separadas por coma" value={coachSpecialties} />
-              </div>
-              <button className="mt-4 h-10 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30] disabled:opacity-60" disabled={saving || !coachName.trim()} type="submit">
-                Crear coach
-              </button>
-            </form>
+            <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+              <p className="app-eyebrow">Gestion de cuentas</p>
+              <h2 className="mt-2 text-xl font-semibold">Coaches del equipo</h2>
+              <p className="mt-2 text-sm leading-6 text-[#5d6b63]">
+                Las cuentas, roles y sucursales permitidas se administran desde Equipo y accesos. Esta pantalla se concentra en rutinas y asignaciones.
+              </p>
+              <Link className="admin-secondary-link mt-4 w-full sm:w-auto" href="/users">
+                Abrir equipo y accesos
+              </Link>
+            </section>
 
             <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
               <h2 className="text-xl font-semibold">Coaches activos</h2>
               <div className="mt-4 grid gap-3">
+                {coaches.length === 0 ? (
+                  <article className="rounded-md border border-dashed border-[#cdd5ca] p-4 text-sm leading-6 text-[#5d6b63]">
+                    No hay coaches disponibles. Crea o asigna el rol correspondiente desde Equipo y accesos.
+                  </article>
+                ) : null}
                 {coaches.map((coach) => (
-                  <article className="rounded-md border border-[#d8ddd2] p-4" key={coach.id}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="font-semibold">{coach.displayName}</p>
-                        <p className="mt-1 text-sm text-[#5d6b63]">{coach.email ?? coach.phone ?? "Sin contacto"}</p>
+                  <article className="min-w-0 rounded-md border border-[#d8ddd2] p-4" key={coach.id}>
+                    <div className="flex min-w-0 items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="break-words font-semibold">{coach.displayName}</p>
+                        <p className="mt-1 break-all text-sm text-[#5d6b63]">{coach.email ?? coach.phone ?? "Sin contacto"}</p>
                       </div>
-                      <span className="rounded-md bg-[#eef7f0] px-2 py-1 text-xs font-semibold text-[#31543d]">
+                      <span className="shrink-0 rounded-md bg-[#eef7f0] px-2 py-1 text-xs font-semibold text-[#31543d]">
                         {coach.status}
                       </span>
                     </div>
-                    <p className="mt-3 text-xs text-[#6f7a73]">{formatSpecialties(coach.specialtiesJson)}</p>
+                    <p className="mt-3 break-words text-xs text-[#6f7a73]">{formatSpecialties(coach.specialtiesJson)}</p>
                   </article>
                 ))}
               </div>
