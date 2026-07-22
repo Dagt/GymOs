@@ -15,10 +15,10 @@ import com.gymos.bookings.infrastructure.BookingRepository.ResourceRecord;
 import com.gymos.bookings.infrastructure.ClientBookingConflictRepository;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.common.time.BusinessTime;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -31,7 +31,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class BookingService {
 	private static final Set<String> ACTIVE_STATUSES = Set.of("RESERVED", "CONFIRMED", "CHECKED_IN");
-	private static final ZoneId BOOKING_ZONE = ZoneId.of("America/Mexico_City");
 	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
 	private final BookingRepository bookingRepository;
@@ -82,7 +81,7 @@ public class BookingService {
 	@Transactional(readOnly = true)
 	public List<AvailabilitySlot> availability(GymOsPrincipal principal, UUID resourceId, LocalDate date) {
 		requireBranch(principal);
-		LocalDate resolvedDate = date == null ? LocalDate.now(BOOKING_ZONE) : date;
+		LocalDate resolvedDate = date == null ? BusinessTime.today() : date;
 		ResourceRecord resource = activeResource(principal, resourceId);
 		Optional<ResourceHours> hours = resourceHoursForDay(resource, resolvedDate);
 		if (hours.isEmpty()) {
@@ -91,7 +90,7 @@ public class BookingService {
 		List<AvailabilitySlot> slots = new ArrayList<>();
 		LocalTime cursor = hours.get().opensAt();
 		while (!cursor.plusMinutes(resource.slotMinutes()).isAfter(hours.get().closesAt())) {
-			OffsetDateTime startsAt = resolvedDate.atTime(cursor).atZone(BOOKING_ZONE).toOffsetDateTime();
+			OffsetDateTime startsAt = resolvedDate.atTime(cursor).atZone(BusinessTime.DEFAULT_ZONE).toOffsetDateTime();
 			OffsetDateTime endsAt = startsAt.plusMinutes(resource.slotMinutes());
 			int reserved = bookingRepository.overlappingBookings(principal.organizationId(), principal.branchId(), resourceId, startsAt, endsAt);
 			slots.add(new AvailabilitySlot(startsAt, endsAt, reserved, resource.capacity(), reserved < resource.capacity()));
@@ -103,7 +102,7 @@ public class BookingService {
 	@Transactional(readOnly = true)
 	public List<BookingRecord> bookings(GymOsPrincipal principal, LocalDate date, int limit) {
 		requireBranch(principal);
-		return bookingRepository.bookings(principal.organizationId(), principal.branchId(), date == null ? LocalDate.now(BOOKING_ZONE) : date, Math.max(1, Math.min(limit, 200)));
+		return bookingRepository.bookings(principal.organizationId(), principal.branchId(), date == null ? BusinessTime.today() : date, Math.max(1, Math.min(limit, 200)));
 	}
 
 	@Transactional(readOnly = true)
@@ -127,8 +126,8 @@ public class BookingService {
 			throw new BusinessException("BOOKING_START_IN_PAST", "No puedes crear una reserva en una hora que ya paso.");
 		}
 
-		OffsetDateTime localStart = command.startsAt().atZoneSameInstant(BOOKING_ZONE).toOffsetDateTime();
-		OffsetDateTime localEnd = command.endsAt().atZoneSameInstant(BOOKING_ZONE).toOffsetDateTime();
+		OffsetDateTime localStart = command.startsAt().atZoneSameInstant(BusinessTime.DEFAULT_ZONE).toOffsetDateTime();
+		OffsetDateTime localEnd = command.endsAt().atZoneSameInstant(BusinessTime.DEFAULT_ZONE).toOffsetDateTime();
 		if (!bookingRepository.hasEligibleMembershipForResource(
 				principal.organizationId(),
 				principal.branchId(),
