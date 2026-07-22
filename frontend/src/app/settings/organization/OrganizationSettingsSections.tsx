@@ -54,7 +54,7 @@ type OrganizationOverviewCardProps = {
 
 export function OrganizationOverviewCard({ form, onEdit }: OrganizationOverviewCardProps) {
   return (
-    <section className="app-card p-5" style={{ gridColumn: "1 / -1" }}>
+    <section className="app-card p-5">
       <div className="admin-panel-header">
         <div>
           <p>Gimnasio</p>
@@ -93,8 +93,8 @@ type BranchesOverviewCardProps = {
 
 export function BranchesOverviewCard({ branches, onEditBranch, onNewBranch }: BranchesOverviewCardProps) {
   return (
-    <section className="app-card p-5" style={{ gridColumn: "1 / -1" }}>
-      <div className="admin-panel-header">
+    <section className="app-card flex min-h-0 flex-col overflow-hidden p-5 xl:h-full">
+      <div className="admin-panel-header shrink-0">
         <div>
           <p>Sucursales</p>
           <h2>Sedes registradas</h2>
@@ -103,7 +103,7 @@ export function BranchesOverviewCard({ branches, onEditBranch, onNewBranch }: Br
           Crear sucursal
         </button>
       </div>
-      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="mt-5 grid min-h-0 gap-4 xl:flex-1 xl:grid-cols-1 xl:content-start xl:overflow-y-auto xl:[scrollbar-width:none] xl:[&::-webkit-scrollbar]:hidden">
         {branches.length === 0 ? (
           <section className="admin-empty-card">
             <strong>Aun no hay sucursales</strong>
@@ -126,7 +126,7 @@ export function BranchesOverviewCard({ branches, onEditBranch, onNewBranch }: Br
 
 export function TeamAccessCard() {
   return (
-    <section className="app-card p-5" style={{ gridColumn: "1 / -1" }}>
+    <section className="app-card p-5">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
           <p className="app-eyebrow">Equipo</p>
