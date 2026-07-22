@@ -232,12 +232,16 @@ export default function OrganizationSettingsPage() {
       {error ? <p className="form-message error">{error}</p> : null}
       {message ? <p className="form-message success">{message}</p> : null}
 
-      <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <div className="grid min-w-0 gap-5">
+      <section className="grid gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] xl:grid-rows-[auto_auto]">
+        <div className="min-w-0 xl:col-start-1 xl:row-start-1">
           <OrganizationOverviewCard form={organizationForm} onEdit={openOrganizationDrawer} />
+        </div>
+        <div className="min-w-0 xl:col-start-1 xl:row-start-2">
           <TeamAccessCard />
         </div>
-        <BranchesOverviewCard branches={branches} onEditBranch={openEditBranch} onNewBranch={openNewBranchDrawer} />
+        <div className="min-h-0 min-w-0 overflow-hidden xl:col-start-2 xl:row-span-2 xl:row-start-1">
+          <BranchesOverviewCard branches={branches} onEditBranch={openEditBranch} onNewBranch={openNewBranchDrawer} />
+        </div>
       </section>
 
       <OrganizationDrawer errors={fieldErrors} form={organizationForm} open={showOrganizationDrawer} saving={saving} onChange={setOrganizationForm} onClose={() => setShowOrganizationDrawer(false)} onSubmit={submitOrganization} />
