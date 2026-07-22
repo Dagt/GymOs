@@ -860,5 +860,7 @@ Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
 - `/access` queda alineada al `AppShell` unificado, elimina el encabezado visual duplicado y separa su UI en `AccessSections.tsx` para aislar dispositivos, clientes, decisiones, pases y bitacora.
 - `/sales/[saleId]`, `/clients/import` y `/onboarding` dejan de usar contenedores propios y renderizan dentro de `AppShell`, manteniendo una sola base visual para pantallas heredadas.
 - `/platform/gymnasiums` extrae formularios y validaciones de alta de gimnasio/sucursal a `PlatformGymnasiumForms.tsx`; la pagina principal conserva el maestro-detalle y queda menos acoplada al formulario.
+- `/catalog` reutiliza `TextField`, `NumberField`, `TextAreaField` y `SelectField` para producto y plan, eliminando inputs locales duplicados.
+- `CatalogHelpers.ts` centraliza el armado de payloads de productos y planes para que `page.tsx` solo orqueste sesion, carga, guardado y estado de drawers.
 - Se retiro `AppNavigation`, que ya no tenia consumidores, para mantener un solo modelo de navegacion visible.
 - La siguiente etapa recomendada es continuar con `settings/organization` y la limpieza final de helpers visuales ya obsoletos.

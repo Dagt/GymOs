@@ -84,6 +84,24 @@ export function PasswordField(props: BaseProps) {
   );
 }
 
+export function NumberField(props: BaseProps & { min?: string }) {
+  return (
+    <FieldFrame error={props.error} help={props.help} label={props.label} name={props.name} required={props.required ?? true}>
+      <input
+        aria-invalid={Boolean(props.error)}
+        className="app-input"
+        id={props.name}
+        min={props.min ?? "0"}
+        name={props.name}
+        onChange={(event) => props.onChange(event.target.value)}
+        required={props.required ?? true}
+        type="number"
+        value={props.value}
+      />
+    </FieldFrame>
+  );
+}
+
 export function SelectField({
   error,
   label,
@@ -110,6 +128,24 @@ export function SelectField({
           </option>
         ))}
       </select>
+    </FieldFrame>
+  );
+}
+
+export function TextAreaField(props: BaseProps & { rows?: number }) {
+  return (
+    <FieldFrame error={props.error} help={props.help} label={props.label} name={props.name} required={props.required ?? false}>
+      <textarea
+        aria-invalid={Boolean(props.error)}
+        className="app-input min-h-20"
+        id={props.name}
+        name={props.name}
+        onChange={(event) => props.onChange(event.target.value)}
+        placeholder={props.placeholder}
+        required={props.required ?? false}
+        rows={props.rows}
+        value={props.value}
+      />
     </FieldFrame>
   );
 }

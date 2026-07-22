@@ -1,5 +1,11 @@
 import type { FormEvent } from "react";
 import { AppDrawer } from "@/components/AppDrawer";
+import {
+  NumberField,
+  SelectField,
+  TextAreaField,
+  TextField,
+} from "@/components/FormFields";
 import type {
   MembershipPlanPayload,
   PlanSummary,
@@ -134,30 +140,22 @@ export function ProductDrawer({
     >
       <form className="grid gap-4" onSubmit={onSubmit}>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="SKU" value={form.sku} onChange={(value) => onFormChange({ ...form, sku: value })} />
-          <Field label="Nombre" value={form.name} onChange={(value) => onFormChange({ ...form, name: value })} />
-          <Field label="Precio" type="number" value={price} onChange={onPriceChange} />
-          <Field label="Moneda" value={form.currency} onChange={(value) => onFormChange({ ...form, currency: value })} />
+          <TextField label="SKU" name="productSku" value={form.sku} onChange={(value) => onFormChange({ ...form, sku: value })} />
+          <TextField label="Nombre" name="productName" value={form.name} onChange={(value) => onFormChange({ ...form, name: value })} />
+          <NumberField label="Precio" name="productPrice" value={price} onChange={onPriceChange} />
+          <TextField label="Moneda" name="productCurrency" value={form.currency} onChange={(value) => onFormChange({ ...form, currency: value })} />
         </div>
-        <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-          Tipo
-          <select
-            className="app-input"
-            onChange={(event) => onFormChange({ ...form, productType: event.target.value as ProductPayload["productType"] })}
-            value={form.productType}
-          >
-            <option value="PHYSICAL">Producto fisico</option>
-            <option value="SERVICE">Servicio</option>
-          </select>
-        </label>
-        <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-          Descripcion
-          <textarea
-            className="app-input min-h-24"
-            onChange={(event) => onFormChange({ ...form, description: event.target.value })}
-            value={form.description ?? ""}
-          />
-        </label>
+        <SelectField
+          label="Tipo"
+          name="productType"
+          options={[
+            { label: "Producto fisico", value: "PHYSICAL" },
+            { label: "Servicio", value: "SERVICE" },
+          ]}
+          value={form.productType}
+          onChange={(value) => onFormChange({ ...form, productType: value as ProductPayload["productType"] })}
+        />
+        <TextAreaField label="Descripcion" name="productDescription" value={form.description ?? ""} onChange={(value) => onFormChange({ ...form, description: value })} />
         <button className="app-button h-11" disabled={saving} type="submit">
           {saving ? "Guardando..." : "Crear producto"}
         </button>
@@ -194,22 +192,20 @@ export function PlanDrawer({
     >
       <form className="grid gap-4" onSubmit={onSubmit}>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Codigo del plan" value={form.sku} onChange={(value) => onFormChange({ ...form, sku: value })} />
-          <Field label="Nombre del plan" value={form.name} onChange={(value) => onFormChange({ ...form, name: value })} />
-          <Field label="Precio" type="number" value={form.price} onChange={(value) => onFormChange({ ...form, price: value })} />
-          <Field label="Moneda" value={form.currency} onChange={(value) => onFormChange({ ...form, currency: value })} />
-          <Field label="Duracion en dias" type="number" value={form.durationDays} onChange={(value) => onFormChange({ ...form, durationDays: value })} />
-          <Field label="Dias de gracia" type="number" value={form.graceDays} onChange={(value) => onFormChange({ ...form, graceDays: value })} />
+          <TextField label="Codigo del plan" name="planSku" value={form.sku} onChange={(value) => onFormChange({ ...form, sku: value })} />
+          <TextField label="Nombre del plan" name="planName" value={form.name} onChange={(value) => onFormChange({ ...form, name: value })} />
+          <NumberField label="Precio" name="planPrice" value={form.price} onChange={(value) => onFormChange({ ...form, price: value })} />
+          <TextField label="Moneda" name="planCurrency" value={form.currency} onChange={(value) => onFormChange({ ...form, currency: value })} />
+          <NumberField label="Duracion en dias" name="planDurationDays" value={form.durationDays} onChange={(value) => onFormChange({ ...form, durationDays: value })} />
+          <NumberField label="Dias de gracia" name="planGraceDays" value={form.graceDays} onChange={(value) => onFormChange({ ...form, graceDays: value })} />
         </div>
-        <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-          Beneficios incluidos
-          <textarea
-            className="app-input min-h-20"
-            onChange={(event) => onFormChange({ ...form, benefitsJson: event.target.value })}
-            placeholder="Ej. Acceso general, clases grupales, estacionamiento."
-            value={form.benefitsJson}
-          />
-        </label>
+        <TextAreaField
+          label="Beneficios incluidos"
+          name="planBenefits"
+          placeholder="Ej. Acceso general, clases grupales, estacionamiento."
+          value={form.benefitsJson}
+          onChange={(value) => onFormChange({ ...form, benefitsJson: value })}
+        />
         <label className="grid gap-2 text-sm font-medium text-[#42514a]">
           Alcance
           <span className="flex items-start gap-3 rounded-md border border-[#cdd5ca] bg-white px-3 py-3 text-sm text-[#42514a]">
@@ -225,49 +221,20 @@ export function PlanDrawer({
             </span>
           </span>
         </label>
-        <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-          Estado
-          <select
-            className="app-input"
-            onChange={(event) => onFormChange({ ...form, status: event.target.value as MembershipPlanPayload["status"] })}
-            value={form.status}
-          >
-            <option value="ACTIVE">Activo</option>
-            <option value="INACTIVE">Inactivo</option>
-          </select>
-        </label>
+        <SelectField
+          label="Estado"
+          name="planStatus"
+          options={[
+            { label: "Activo", value: "ACTIVE" },
+            { label: "Inactivo", value: "INACTIVE" },
+          ]}
+          value={form.status}
+          onChange={(value) => onFormChange({ ...form, status: value as MembershipPlanPayload["status"] })}
+        />
         <button className="app-button h-11" disabled={saving} type="submit">
           {saving ? "Guardando..." : editingPlanId ? "Guardar cambios del plan" : "Crear plan de membresia"}
         </button>
       </form>
     </AppDrawer>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  required = true,
-  type = "text",
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  required?: boolean;
-  type?: string;
-}) {
-  return (
-    <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-      {label}
-      <input
-        className="h-11 rounded-md border border-[#cdd5ca] px-3 text-sm outline-none transition focus:border-[#51735f]"
-        min={type === "number" ? "0" : undefined}
-        onChange={(event) => onChange(event.target.value)}
-        required={required}
-        type={type}
-        value={value}
-      />
-    </label>
   );
 }

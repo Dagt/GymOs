@@ -41,6 +41,32 @@ export const emptyPlan: PlanDraft = {
   status: "ACTIVE",
 };
 
+export function productDraftToPayload(form: ProductPayload, price: string): ProductPayload {
+  return {
+    ...form,
+    currency: form.currency.trim().toUpperCase() || "MXN",
+    priceCents: Math.round(Number(price || "0") * 100),
+    sku: form.sku.trim(),
+    name: form.name.trim(),
+    description: form.description?.trim() || null,
+  };
+}
+
+export function planDraftToPayload(plan: PlanDraft): MembershipPlanPayload {
+  return {
+    sku: plan.sku.trim(),
+    name: plan.name.trim(),
+    description: plan.description.trim() || null,
+    priceCents: Math.round(Number(plan.price || "0") * 100),
+    currency: plan.currency.trim().toUpperCase() || "MXN",
+    durationDays: Number(plan.durationDays || "30"),
+    graceDays: Number(plan.graceDays || "0"),
+    benefits: plan.benefitsJson.trim() || null,
+    multiBranchAccess: plan.multiBranchAccess,
+    status: plan.status,
+  };
+}
+
 export function planToDraft(plan: PlanSummary): PlanDraft {
   return {
     sku: plan.sku,

@@ -10,7 +10,6 @@ import {
   getProducts,
   getStoredSession,
   updateMembershipPlan,
-  type MembershipPlanPayload,
   type PlanSummary,
   type ProductPayload,
   type ProductSummary,
@@ -23,7 +22,7 @@ import {
   ProductDrawer,
   ProductList,
 } from "./CatalogSections";
-import { emptyPlan, emptyProduct, planToDraft, type PlanDraft } from "./CatalogHelpers";
+import { emptyPlan, emptyProduct, planDraftToPayload, planToDraft, productDraftToPayload, type PlanDraft } from "./CatalogHelpers";
 
 export default function CatalogPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
@@ -86,10 +85,7 @@ export default function CatalogPage() {
     setError(null);
     setMessage(null);
     try {
-      await createProduct(session.accessToken, {
-        ...form,
-        priceCents: Math.round(Number(price || "0") * 100),
-      });
+      await createProduct(session.accessToken, productDraftToPayload(form, price));
       const [loadedProducts, loadedPlans] = await loadCatalog(session.accessToken);
       setProducts(loadedProducts);
       setPlans(loadedPlans);
@@ -113,18 +109,7 @@ export default function CatalogPage() {
     setError(null);
     setMessage(null);
     try {
-      const payload: MembershipPlanPayload = {
-        sku: planForm.sku.trim(),
-        name: planForm.name.trim(),
-        description: planForm.description.trim() || null,
-        priceCents: Math.round(Number(planForm.price || "0") * 100),
-        currency: planForm.currency.trim().toUpperCase() || "MXN",
-        durationDays: Number(planForm.durationDays || "30"),
-        graceDays: Number(planForm.graceDays || "0"),
-        benefits: planForm.benefitsJson.trim() || null,
-        multiBranchAccess: planForm.multiBranchAccess,
-        status: planForm.status,
-      };
+      const payload = planDraftToPayload(planForm);
       if (editingPlanId) {
         await updateMembershipPlan(session.accessToken, editingPlanId, payload);
       } else {
