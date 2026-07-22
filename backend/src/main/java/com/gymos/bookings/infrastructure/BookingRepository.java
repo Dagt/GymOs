@@ -94,28 +94,6 @@ public class BookingRepository {
 		return resourceId;
 	}
 
-	public int activePlanCount(UUID organizationId, List<UUID> planIds) {
-		if (planIds == null || planIds.isEmpty()) {
-			return 0;
-		}
-		Integer count = jdbcClient.sql("""
-				SELECT COUNT(*)
-				FROM membership_plan mp
-				JOIN catalog_product cp ON cp.id = mp.product_id
-				WHERE mp.organization_id = :organizationId
-				  AND mp.id IN (:planIds)
-				  AND mp.status = 'ACTIVE'
-				  AND cp.status = 'ACTIVE'
-				  AND mp.deleted_at IS NULL
-				  AND cp.deleted_at IS NULL
-				""")
-				.param("organizationId", organizationId)
-				.param("planIds", planIds)
-				.query(Integer.class)
-				.single();
-		return count;
-	}
-
 	public void replaceAllowedPlans(UUID organizationId, UUID resourceId, List<UUID> planIds) {
 		jdbcClient.sql("""
 				DELETE FROM resource_allowed_membership_plan
@@ -140,60 +118,6 @@ public class BookingRepository {
 					.param("createdAt", OffsetDateTime.now())
 					.update();
 		}
-	}
-
-	public boolean hasEligibleMembershipForResource(UUID organizationId, UUID branchId, UUID resourceId, UUID clientId, LocalDate today) {
-		Integer restrictions = jdbcClient.sql("""
-				SELECT COUNT(*)
-				FROM resource_allowed_membership_plan
-				WHERE organization_id = :organizationId
-				  AND resource_id = :resourceId
-				""")
-				.param("organizationId", organizationId)
-				.param("resourceId", resourceId)
-				.query(Integer.class)
-				.single();
-		if (restrictions == 0) {
-			return true;
-		}
-		Integer count = jdbcClient.sql("""
-				SELECT COUNT(*)
-				FROM membership m
-				JOIN membership_plan mp ON mp.id = m.plan_id
-				JOIN resource_allowed_membership_plan rap ON rap.plan_id = m.plan_id
-				WHERE m.organization_id = :organizationId
-				  AND rap.resource_id = :resourceId
-				  AND m.client_id = :clientId
-				  AND (m.branch_id = :branchId OR mp.multi_branch_access = true)
-				  AND m.status = 'ACTIVE'
-				  AND m.starts_on <= :today
-				  AND m.grace_ends_on >= :today
-				  AND m.deleted_at IS NULL
-				""")
-				.param("organizationId", organizationId)
-				.param("resourceId", resourceId)
-				.param("clientId", clientId)
-				.param("branchId", branchId)
-				.param("today", today)
-				.query(Integer.class)
-				.single();
-		return count > 0;
-	}
-
-	public boolean clientExists(UUID organizationId, UUID clientId) {
-		Integer count = jdbcClient.sql("""
-				SELECT COUNT(*)
-				FROM client
-				WHERE organization_id = :organizationId
-				  AND id = :clientId
-				  AND status = 'ACTIVE'
-				  AND deleted_at IS NULL
-				""")
-				.param("organizationId", organizationId)
-				.param("clientId", clientId)
-				.query(Integer.class)
-				.single();
-		return count > 0;
 	}
 
 	public int overlappingBookings(UUID organizationId, UUID branchId, UUID resourceId, OffsetDateTime startsAt, OffsetDateTime endsAt) {
@@ -248,17 +172,7 @@ public class BookingRepository {
 	}
 
 	public Optional<BookingRecord> booking(UUID organizationId, UUID branchId, UUID bookingId) {
-		return jdbcClient.sql("""
-				SELECT b.id, b.resource_id, r.name AS resource_name, b.client_id,
-				       p.first_name || ' ' || p.last_name AS client_name,
-				       b.status, b.starts_at, b.ends_at, b.notes,
-				       bp.id AS booking_payment_id, bp.sale_id, bp.status AS payment_status, s.sale_number
-				FROM booking b
-				JOIN resource r ON r.id = b.resource_id
-				JOIN client c ON c.id = b.client_id
-				JOIN person p ON p.id = c.person_id
-				LEFT JOIN booking_payment bp ON bp.booking_id = b.id AND bp.organization_id = b.organization_id
-				LEFT JOIN sale s ON s.id = bp.sale_id
+		return jdbcClient.sql(bookingSelect() + """
 				WHERE b.organization_id = :organizationId
 				  AND b.branch_id = :branchId
 				  AND b.id = :bookingId
@@ -274,17 +188,7 @@ public class BookingRepository {
 	public List<BookingRecord> bookings(UUID organizationId, UUID branchId, LocalDate date, int limit) {
 		OffsetDateTime from = date.atStartOfDay().atOffset(java.time.ZoneOffset.UTC);
 		OffsetDateTime to = date.plusDays(1).atStartOfDay().atOffset(java.time.ZoneOffset.UTC);
-		return jdbcClient.sql("""
-				SELECT b.id, b.resource_id, r.name AS resource_name, b.client_id,
-				       p.first_name || ' ' || p.last_name AS client_name,
-				       b.status, b.starts_at, b.ends_at, b.notes,
-				       bp.id AS booking_payment_id, bp.sale_id, bp.status AS payment_status, s.sale_number
-				FROM booking b
-				JOIN resource r ON r.id = b.resource_id
-				JOIN client c ON c.id = b.client_id
-				JOIN person p ON p.id = c.person_id
-				LEFT JOIN booking_payment bp ON bp.booking_id = b.id AND bp.organization_id = b.organization_id
-				LEFT JOIN sale s ON s.id = bp.sale_id
+		return jdbcClient.sql(bookingSelect() + """
 				WHERE b.organization_id = :organizationId
 				  AND b.branch_id = :branchId
 				  AND b.starts_at >= :from
@@ -367,6 +271,21 @@ public class BookingRepository {
 				.param("createdAt", now)
 				.param("updatedAt", now)
 				.update();
+	}
+
+	private String bookingSelect() {
+		return """
+				SELECT b.id, b.resource_id, r.name AS resource_name, b.client_id,
+				       p.first_name || ' ' || p.last_name AS client_name,
+				       b.status, b.starts_at, b.ends_at, b.notes,
+				       bp.id AS booking_payment_id, bp.sale_id, bp.status AS payment_status, s.sale_number
+				FROM booking b
+				JOIN resource r ON r.id = b.resource_id
+				JOIN client c ON c.id = b.client_id
+				JOIN person p ON p.id = c.person_id
+				LEFT JOIN booking_payment bp ON bp.booking_id = b.id AND bp.organization_id = b.organization_id
+				LEFT JOIN sale s ON s.id = bp.sale_id
+				""";
 	}
 
 	private ResourceRecord mapResource(java.sql.ResultSet resultSet, int rowNumber) throws java.sql.SQLException {
