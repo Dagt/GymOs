@@ -163,45 +163,6 @@ public class SalesRepository {
 		return total == null ? 0 : total;
 	}
 
-	public UUID createProcessedRefund(
-			UUID organizationId,
-			UUID branchId,
-			UUID saleId,
-			UUID paymentId,
-			long amountCents,
-			String currency,
-			String reason,
-			String idempotencyKey,
-			UUID requestedBy
-	) {
-		OffsetDateTime now = OffsetDateTime.now();
-		UUID refundId = UUID.randomUUID();
-		jdbcClient.sql("""
-				INSERT INTO sale_refund (
-				    id, organization_id, branch_id, sale_id, payment_id, status, amount_cents,
-				    currency, reason, idempotency_key, requested_by, requested_at, processed_at,
-				    created_at, updated_at, version
-				)
-				VALUES (
-				    :id, :organizationId, :branchId, :saleId, :paymentId, 'PROCESSED', :amountCents,
-				    :currency, :reason, :idempotencyKey, :requestedBy, :now, :now, :now, :now, 0
-				)
-				""")
-				.param("id", refundId)
-				.param("organizationId", organizationId)
-				.param("branchId", branchId)
-				.param("saleId", saleId)
-				.param("paymentId", paymentId)
-				.param("amountCents", amountCents)
-				.param("currency", currency)
-				.param("reason", reason)
-				.param("idempotencyKey", idempotencyKey)
-				.param("requestedBy", requestedBy)
-				.param("now", now)
-				.update();
-		return refundId;
-	}
-
 	public Optional<PaymentDetail> payment(UUID organizationId, UUID paymentId) {
 		return jdbcClient.sql("""
 				SELECT id, method, status, amount_cents, currency, reference,

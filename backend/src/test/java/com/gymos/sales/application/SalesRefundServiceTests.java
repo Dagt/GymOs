@@ -11,6 +11,7 @@ import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.sales.application.command.RequestRefundCommand;
+import com.gymos.sales.infrastructure.SalesRefundCommandRepository;
 import com.gymos.sales.infrastructure.SalesRepository;
 import com.gymos.sales.model.RefundDetail;
 import com.gymos.sales.model.SaleHeader;
@@ -24,8 +25,9 @@ class SalesRefundServiceTests {
 	@Test
 	void processesRefundWithinAvailableBalance() {
 		SalesRepository salesRepository = mock(SalesRepository.class);
+		SalesRefundCommandRepository commandRepository = mock(SalesRefundCommandRepository.class);
 		AuditService auditService = mock(AuditService.class);
-		SalesRefundService service = new SalesRefundService(salesRepository, auditService);
+		SalesRefundService service = new SalesRefundService(salesRepository, commandRepository, auditService);
 		UUID organizationId = UUID.randomUUID();
 		UUID branchId = UUID.randomUUID();
 		UUID saleId = UUID.randomUUID();
@@ -34,21 +36,23 @@ class SalesRefundServiceTests {
 		SaleHeader sale = sale(saleId, branchId, 5_000);
 		when(salesRepository.saleHeader(organizationId, saleId)).thenReturn(Optional.of(sale));
 		when(salesRepository.processedRefundTotal(organizationId, saleId)).thenReturn(1_000L);
-		when(salesRepository.createProcessedRefund(
+		when(commandRepository.createProcessed(
 				organizationId, branchId, saleId, null, 2_000, "MXN", "Solicitud", "refund-key", principal.userId()
 		)).thenReturn(refundId);
 
 		UUID result = service.process(principal, saleId, new RequestRefundCommand(null, 2_000, "Solicitud", "refund-key"), "correlation");
 
 		assertThat(result).isEqualTo(saleId);
+		verify(commandRepository).createProcessed(organizationId, branchId, saleId, null, 2_000, "MXN", "Solicitud", "refund-key", principal.userId());
 		verify(auditService).record(principal, "SALE_REFUND_PROCESSED", "SALE_REFUND", refundId, "POS", "Solicitud", "correlation");
 	}
 
 	@Test
 	void reusedKeyWithDifferentAmountIsRejectedBeforeMutation() {
 		SalesRepository salesRepository = mock(SalesRepository.class);
+		SalesRefundCommandRepository commandRepository = mock(SalesRefundCommandRepository.class);
 		AuditService auditService = mock(AuditService.class);
-		SalesRefundService service = new SalesRefundService(salesRepository, auditService);
+		SalesRefundService service = new SalesRefundService(salesRepository, commandRepository, auditService);
 		UUID organizationId = UUID.randomUUID();
 		UUID branchId = UUID.randomUUID();
 		UUID saleId = UUID.randomUUID();
@@ -65,7 +69,7 @@ class SalesRefundServiceTests {
 		)).isInstanceOfSatisfying(BusinessException.class, exception ->
 				assertThat(exception.code()).isEqualTo("IDEMPOTENCY_KEY_REUSED"));
 
-		verify(salesRepository, never()).createProcessedRefund(
+		verify(commandRepository, never()).createProcessed(
 				org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
 				org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any(),
 				org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()
@@ -78,9 +82,7 @@ class SalesRefundServiceTests {
 
 	private SaleHeader sale(UUID saleId, UUID branchId, long paidCents) {
 		OffsetDateTime now = OffsetDateTime.now();
-		return new SaleHeader(
-				saleId, "S-TEST", branchId, UUID.randomUUID(), "Cliente", "PAID",
-				5_000, 0, 5_000, paidCents, Math.max(0, 5_000 - paidCents), "MXN", null, now, now, now
-		);
+		return new SaleHeader(saleId, "S-TEST", branchId, UUID.randomUUID(), "Cliente", "PAID",
+				5_000, 0, 5_000, paidCents, Math.max(0, 5_000 - paidCents), "MXN", null, now, now, now);
 	}
 }
