@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
@@ -241,43 +240,30 @@ export default function CoachesPage() {
           </p>
         ) : null}
 
-        <section className="grid items-start gap-6 lg:grid-cols-[0.85fr_1.15fr]">
-          <section className="grid gap-6">
-            <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
-              <p className="app-eyebrow">Gestion de cuentas</p>
-              <h2 className="mt-2 text-xl font-semibold">Coaches del equipo</h2>
-              <p className="mt-2 text-sm leading-6 text-[#5d6b63]">
-                Las cuentas, roles y sucursales permitidas se administran desde Equipo y accesos. Esta pantalla se concentra en rutinas y asignaciones.
-              </p>
-              <Link className="admin-secondary-link mt-4 w-full sm:w-auto" href="/users">
-                Abrir equipo y accesos
-              </Link>
-            </section>
-
-            <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
-              <h2 className="text-xl font-semibold">Coaches activos</h2>
-              <div className="mt-4 grid gap-3">
-                {coaches.length === 0 ? (
-                  <article className="rounded-md border border-dashed border-[#cdd5ca] p-4 text-sm leading-6 text-[#5d6b63]">
-                    No hay coaches disponibles. Crea o asigna el rol correspondiente desde Equipo y accesos.
-                  </article>
-                ) : null}
-                {coaches.map((coach) => (
-                  <article className="min-w-0 rounded-md border border-[#d8ddd2] p-4" key={coach.id}>
-                    <div className="flex min-w-0 items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="break-words font-semibold">{coach.displayName}</p>
-                        <p className="mt-1 break-all text-sm text-[#5d6b63]">{coach.email ?? coach.phone ?? "Sin contacto"}</p>
-                      </div>
-                      <span className="shrink-0 rounded-md bg-[#eef7f0] px-2 py-1 text-xs font-semibold text-[#31543d]">
-                        {coach.status}
-                      </span>
+        <section className="grid items-start gap-6 lg:grid-cols-[0.8fr_1.2fr]">
+          <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+            <h2 className="text-xl font-semibold">Coaches activos</h2>
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
+              {coaches.length === 0 ? (
+                <article className="rounded-md border border-dashed border-[#cdd5ca] p-4 text-sm leading-6 text-[#5d6b63]">
+                  No hay perfiles operativos de coach disponibles en esta sucursal.
+                </article>
+              ) : null}
+              {coaches.map((coach) => (
+                <article className="min-w-0 rounded-md border border-[#d8ddd2] p-4" key={coach.id}>
+                  <div className="flex min-w-0 items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="break-words font-semibold">{coach.displayName}</p>
+                      <p className="mt-1 break-all text-sm text-[#5d6b63]">{coach.email ?? coach.phone ?? "Sin contacto"}</p>
                     </div>
-                    <p className="mt-3 break-words text-xs text-[#6f7a73]">{formatSpecialties(coach.specialtiesJson)}</p>
-                  </article>
-                ))}
-              </div>
-            </section>
+                    <span className="shrink-0 rounded-md bg-[#eef7f0] px-2 py-1 text-xs font-semibold text-[#31543d]">
+                      {coach.status}
+                    </span>
+                  </div>
+                  <p className="mt-3 break-words text-xs text-[#6f7a73]">{formatSpecialties(coach.specialtiesJson)}</p>
+                </article>
+              ))}
+            </div>
           </section>
 
           <section className="grid gap-6">
