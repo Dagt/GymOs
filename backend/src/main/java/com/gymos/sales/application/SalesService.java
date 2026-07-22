@@ -19,7 +19,6 @@ import com.gymos.sales.application.result.SaleDetailResult;
 import com.gymos.sales.application.result.SalesReportResult;
 import com.gymos.sales.infrastructure.SalesRepository;
 import com.gymos.sales.infrastructure.SalesRepository.PaymentDetail;
-import com.gymos.sales.infrastructure.SalesRepository.ProductForSale;
 import com.gymos.sales.infrastructure.SalesRepository.SaleHeader;
 import com.gymos.sales.infrastructure.SalesRepository.SaleSummary;
 import java.io.IOException;
@@ -45,6 +44,7 @@ public class SalesService implements SalesOperations {
 
 	private final JdbcClient jdbcClient;
 	private final SalesRepository salesRepository;
+	private final SaleLineResolver saleLineResolver;
 	private final AuditService auditService;
 	private final ObjectStorageService objectStorageService;
 	private final ApplicationEventPublisher eventPublisher;
@@ -52,12 +52,14 @@ public class SalesService implements SalesOperations {
 	public SalesService(
 			JdbcClient jdbcClient,
 			SalesRepository salesRepository,
+			SaleLineResolver saleLineResolver,
 			AuditService auditService,
 			ObjectStorageService objectStorageService,
 			ApplicationEventPublisher eventPublisher
 	) {
 		this.jdbcClient = jdbcClient;
 		this.salesRepository = salesRepository;
+		this.saleLineResolver = saleLineResolver;
 		this.auditService = auditService;
 		this.objectStorageService = objectStorageService;
 		this.eventPublisher = eventPublisher;
@@ -128,48 +130,16 @@ public class SalesService implements SalesOperations {
 		if (request.clientId() != null && !salesRepository.clientExists(principal.organizationId(), request.clientId())) {
 			throw new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible.");
 		}
-		if (request.items().isEmpty()) {
-			throw new BusinessException("SALE_EMPTY", "La venta necesita al menos un item.");
-		}
 
+		var resolvedSale = saleLineResolver.resolve(
+				principal.organizationId(),
+				request.clientId(),
+				request.items(),
+				request.discountCents()
+		);
 		OffsetDateTime now = OffsetDateTime.now();
 		UUID saleId = UUID.randomUUID();
 		String saleNumber = "S-" + now.format(SALE_NUMBER_FORMAT) + "-" + saleId.toString().substring(0, 6).toUpperCase();
-		long subtotal = 0;
-		long itemDiscounts = 0;
-		String currency = null;
-		boolean containsMembershipPlan = false;
-
-		for (var item : request.items()) {
-			ProductForSale product = salesRepository.productForSale(principal.organizationId(), item.productId())
-					.orElseThrow(() -> new BusinessException("PRODUCT_NOT_FOUND", "Un producto no existe o no esta activo."));
-			if ("MEMBERSHIP_PLAN".equals(product.productType())) {
-				containsMembershipPlan = true;
-			}
-			if (currency == null) {
-				currency = product.currency();
-			}
-			if (!currency.equals(product.currency())) {
-				throw new BusinessException("SALE_MIXED_CURRENCY", "Todos los items deben usar la misma moneda.");
-			}
-			long lineSubtotal = product.priceCents() * item.quantity();
-			long discount = Math.max(0, item.discountCents());
-			if (discount > lineSubtotal) {
-				throw new BusinessException("SALE_ITEM_DISCOUNT_INVALID", "El descuento de un item no puede superar su subtotal.");
-			}
-			subtotal += lineSubtotal;
-			itemDiscounts += discount;
-		}
-
-		long headerDiscount = Math.max(0, request.discountCents());
-		long totalDiscount = itemDiscounts + headerDiscount;
-		if (totalDiscount > subtotal) {
-			throw new BusinessException("SALE_DISCOUNT_INVALID", "El descuento total no puede superar el subtotal.");
-		}
-		if (containsMembershipPlan && request.clientId() == null) {
-			throw new BusinessException("SALE_CLIENT_REQUIRED_FOR_PLAN", "Una venta de membresia necesita un cliente.");
-		}
-		long total = subtotal - totalDiscount;
 
 		jdbcClient.sql("""
 				INSERT INTO sale (
@@ -190,11 +160,11 @@ public class SalesService implements SalesOperations {
 				.param("branchId", principal.branchId())
 				.param("clientId", request.clientId())
 				.param("saleNumber", saleNumber)
-				.param("subtotalCents", subtotal)
-				.param("discountCents", totalDiscount)
-				.param("totalCents", total)
-				.param("balanceCents", total)
-				.param("currency", currency)
+				.param("subtotalCents", resolvedSale.subtotalCents())
+				.param("discountCents", resolvedSale.discountCents())
+				.param("totalCents", resolvedSale.totalCents())
+				.param("balanceCents", resolvedSale.totalCents())
+				.param("currency", resolvedSale.currency())
 				.param("notes", blankToNull(request.notes()))
 				.param("soldAt", now)
 				.param("createdAt", now)
@@ -205,10 +175,7 @@ public class SalesService implements SalesOperations {
 				.param("idempotencyRequestHash", idempotencyHash)
 				.update();
 
-		for (var item : request.items()) {
-			ProductForSale product = salesRepository.productForSale(principal.organizationId(), item.productId()).orElseThrow();
-			long lineSubtotal = product.priceCents() * item.quantity();
-			long discount = Math.max(0, item.discountCents());
+		for (var line : resolvedSale.lines()) {
 			jdbcClient.sql("""
 					INSERT INTO sale_item (
 					    id, sale_id, organization_id, product_id, item_type, name, quantity,
@@ -222,19 +189,29 @@ public class SalesService implements SalesOperations {
 					.param("id", UUID.randomUUID())
 					.param("saleId", saleId)
 					.param("organizationId", principal.organizationId())
-					.param("productId", product.id())
-					.param("itemType", product.productType())
-					.param("name", product.name())
-					.param("quantity", item.quantity())
-					.param("unitPriceCents", product.priceCents())
-					.param("discountCents", discount)
-					.param("totalCents", lineSubtotal - discount)
+					.param("productId", line.productId())
+					.param("itemType", line.itemType())
+					.param("name", line.name())
+					.param("quantity", line.quantity())
+					.param("unitPriceCents", line.unitPriceCents())
+					.param("discountCents", line.discountCents())
+					.param("totalCents", line.totalCents())
 					.param("createdAt", now)
 					.update();
 		}
 
 		auditService.record(principal, "SALE_CREATED", "SALE", saleId, "POS", null, correlationId);
-		eventPublisher.publishEvent(new SaleCreatedV1("sale-created:" + saleId, principal.organizationId(), principal.branchId(), saleId, saleNumber, null, total, currency, now));
+		eventPublisher.publishEvent(new SaleCreatedV1(
+				"sale-created:" + saleId,
+				principal.organizationId(),
+				principal.branchId(),
+				saleId,
+				saleNumber,
+				null,
+				resolvedSale.totalCents(),
+				resolvedSale.currency(),
+				now
+		));
 		if (request.payment() != null) {
 			addPaymentInternal(principal, saleId, request.payment(), correlationId);
 		}
