@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { type FieldErrorMap } from "@/components/FormFields";
 import {
@@ -53,6 +53,8 @@ export default function OrganizationSettingsPage() {
   const [showOrganizationDrawer, setShowOrganizationDrawer] = useState(false);
   const [showNewBranchDrawer, setShowNewBranchDrawer] = useState(false);
   const [showEditBranchDrawer, setShowEditBranchDrawer] = useState(false);
+  const [branchPanelHeight, setBranchPanelHeight] = useState<number | null>(null);
+  const settingsColumnRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -72,9 +74,8 @@ export default function OrganizationSettingsPage() {
           getCurrentOrganization(storedSession.accessToken),
           getBranches(storedSession.accessToken),
         ]);
-        if (!active) {
-          return;
-        }
+        if (!active) return;
+
         setOrganization(currentOrganization);
         setBranches(availableBranches);
         setOrganizationForm(toOrganizationForm(currentOrganization));
@@ -88,18 +89,37 @@ export default function OrganizationSettingsPage() {
           setError(exception instanceof Error ? exception.message : "No fue posible cargar configuracion.");
         }
       } finally {
-        if (active) {
-          setLoading(false);
-        }
+        if (active) setLoading(false);
       }
     }
 
     void loadInitial();
-
     return () => {
       active = false;
     };
   }, []);
+
+  useLayoutEffect(() => {
+    const settingsColumn = settingsColumnRef.current;
+    if (!settingsColumn) return;
+
+    const desktopQuery = window.matchMedia("(min-width: 1280px)");
+    const updateHeight = () => {
+      setBranchPanelHeight(
+        desktopQuery.matches ? Math.ceil(settingsColumn.getBoundingClientRect().height) : null,
+      );
+    };
+    const resizeObserver = new ResizeObserver(updateHeight);
+
+    resizeObserver.observe(settingsColumn);
+    desktopQuery.addEventListener("change", updateHeight);
+    updateHeight();
+
+    return () => {
+      resizeObserver.disconnect();
+      desktopQuery.removeEventListener("change", updateHeight);
+    };
+  }, [organizationForm]);
 
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
 
@@ -109,6 +129,7 @@ export default function OrganizationSettingsPage() {
     const errors = validateOrganizationForm(organizationForm);
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
+
     setSaving(true);
     setError(null);
     setMessage(null);
@@ -131,6 +152,7 @@ export default function OrganizationSettingsPage() {
     const errors = validateBranchForm(branchForm, "branch");
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
+
     setSaving(true);
     setError(null);
     setMessage(null);
@@ -153,6 +175,7 @@ export default function OrganizationSettingsPage() {
     const errors = validateBranchForm(newBranchForm, "newBranch");
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
+
     setSaving(true);
     setError(null);
     setMessage(null);
@@ -232,14 +255,15 @@ export default function OrganizationSettingsPage() {
       {error ? <p className="form-message error">{error}</p> : null}
       {message ? <p className="form-message success">{message}</p> : null}
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)] xl:grid-rows-[auto_auto]">
-        <div className="min-w-0 xl:col-start-1 xl:row-start-1">
+      <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <div className="grid min-w-0 gap-5" ref={settingsColumnRef}>
           <OrganizationOverviewCard form={organizationForm} onEdit={openOrganizationDrawer} />
-        </div>
-        <div className="min-w-0 xl:col-start-1 xl:row-start-2">
           <TeamAccessCard />
         </div>
-        <div className="min-h-0 min-w-0 overflow-hidden xl:col-start-2 xl:row-span-2 xl:row-start-1">
+        <div
+          className="min-h-0 min-w-0 overflow-hidden"
+          style={branchPanelHeight ? { height: `${branchPanelHeight}px` } : undefined}
+        >
           <BranchesOverviewCard branches={branches} onEditBranch={openEditBranch} onNewBranch={openNewBranchDrawer} />
         </div>
       </section>
