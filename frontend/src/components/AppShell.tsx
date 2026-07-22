@@ -54,6 +54,7 @@ const ownerSections: NavigationSection[] = [
     title: "Administracion del gimnasio",
     links: [
       { label: "Operacion", href: "/operations", hint: "Pendientes y herramientas", permissions: ["operations.read", "inventory.read", "booking.read"] },
+      { label: "Socios", href: "/clients", hint: "Altas, fichas y membresias", permissions: ["client.read"] },
       { label: "Equipo y accesos", href: "/users", hint: "Dueños, gerentes y staff", permissions: ["user.read"] },
       { label: "Datos y sucursales", href: "/settings/organization", hint: "Marca, sedes y contacto", permissions: ["organization.update", "branch.update"] },
       { label: "Catalogo", href: "/catalog", hint: "Planes y productos", permissions: ["catalog.read"] },
@@ -67,7 +68,6 @@ const ownerSections: NavigationSection[] = [
     title: "Mostrador",
     links: [
       { label: "Caja / POS", href: "/pos", hint: "Ventas y pagos", permissions: ["sale.create"] },
-      { label: "Socios", href: "/clients", hint: "Altas y fichas", permissions: ["client.read"] },
       { label: "Accesos", href: "/access", hint: "Visitas y pases", permissions: ["access.read", "visit.read"] },
       { label: "Beneficios", href: "/benefits", hint: "Promos y reglas", permissions: ["benefit.read"] },
     ],
@@ -86,6 +86,7 @@ const managerSections: NavigationSection[] = [
   {
     title: "Administracion diaria",
     links: [
+      { label: "Socios", href: "/clients", hint: "Altas y fichas", permissions: ["client.read"] },
       { label: "Equipo", href: "/users", hint: "Usuarios autorizados", permissions: ["user.read"] },
       { label: "Catalogo", href: "/catalog", hint: "Planes y productos", permissions: ["catalog.read"] },
       { label: "Inventario", href: "/inventory", hint: "Stock", permissions: ["inventory.read"] },
@@ -97,7 +98,6 @@ const managerSections: NavigationSection[] = [
     title: "Mostrador",
     links: [
       { label: "Caja / POS", href: "/pos", hint: "Ventas", permissions: ["sale.create"] },
-      { label: "Socios", href: "/clients", hint: "Clientes", permissions: ["client.read"] },
     ],
   },
 ];
@@ -156,7 +156,7 @@ export function AppShell({
   const [switchingBranch, setSwitchingBranch] = useState(false);
   const consoleType = resolveUserConsole(session.user);
   const role = getConsoleProfile(session.user);
-  const hasBranch = mode === "operation" ? true : mode === "setup" ? false : Boolean(branchName || session.user.branchId);
+  const hasBranch = mode === "operation" ? true : Boolean(branchName || session.user.branchId);
   const visibleBranch =
     branchName
     ?? (resolvedBranch?.branchId === session.user.branchId ? resolvedBranch.name : null)

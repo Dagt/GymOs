@@ -17,7 +17,7 @@ import type {
   RoleOption,
   StoredSession,
 } from "@/lib/api";
-import { displayRoleName, roleDescription, roleIdForUser } from "./UsersRoleHelpers";
+import { canManageUserForSession, displayRoleName, roleDescription, roleIdForUser } from "./UsersRoleHelpers";
 
 export function TeamOverview({
   branches,
@@ -137,43 +137,47 @@ export function UsersTable({
           </section>
         ) : null}
 
-        {users.map((user) => (
-          <article key={user.id}>
-            <div>
-              <strong>{user.fullName}</strong>
-              <span>{user.username}</span>
-            </div>
-            <div>
-              <span>{user.roles.map(displayRoleName).join(", ") || "Sin rol"}</span>
-              <small>{user.branches.join(", ") || "Sin sucursal"}</small>
-            </div>
-            <div className="team-user-actions">
-              <label className="team-role-control">
-                <span>Rol</span>
-                <select
-                  defaultValue={roleIdForUser(user, roles)}
-                  disabled={saving || user.id === session.user.userId}
-                  onChange={(event) => onChangeRole(user, event.target.value)}
-                >
-                  <option value="">Seleccionar rol</option>
-                  {roles.map((role) => (
-                    <option key={role.id} value={role.id}>
-                      {displayRoleName(role.name)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <p className={user.status === "ACTIVE" ? "status-pill active" : "status-pill"}>{user.status}</p>
-              {user.id !== session.user.userId ? (
-                <button className={user.status === "ACTIVE" ? "danger-action" : "safe-action"} disabled={saving} onClick={() => onToggleStatus(user)} type="button">
-                  {user.status === "ACTIVE" ? "Suspender" : "Reactivar"}
-                </button>
-              ) : (
-                <small>Tu cuenta</small>
-              )}
-            </div>
-          </article>
-        ))}
+        {users.map((user) => {
+          const canManage = user.id !== session.user.userId
+            && canManageUserForSession(session.user.roles, user.roles, Boolean(session.user.platformAdmin));
+          return (
+            <article key={user.id}>
+              <div>
+                <strong>{user.fullName}</strong>
+                <span>{user.username}</span>
+              </div>
+              <div>
+                <span>{user.roles.map(displayRoleName).join(", ") || "Sin rol"}</span>
+                <small>{user.branches.join(", ") || "Sin sucursal"}</small>
+              </div>
+              <div className="team-user-actions">
+                <label className="team-role-control">
+                  <span>Rol</span>
+                  <select
+                    defaultValue={roleIdForUser(user, roles)}
+                    disabled={saving || !canManage}
+                    onChange={(event) => onChangeRole(user, event.target.value)}
+                  >
+                    <option value="">Seleccionar rol</option>
+                    {roles.map((role) => (
+                      <option key={role.id} value={role.id}>
+                        {displayRoleName(role.name)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <p className={user.status === "ACTIVE" ? "status-pill active" : "status-pill"}>{user.status}</p>
+                {canManage ? (
+                  <button className={user.status === "ACTIVE" ? "danger-action" : "safe-action"} disabled={saving} onClick={() => onToggleStatus(user)} type="button">
+                    {user.status === "ACTIVE" ? "Suspender" : "Reactivar"}
+                  </button>
+                ) : (
+                  <small>{user.id === session.user.userId ? "Tu cuenta" : "Solo lectura"}</small>
+                )}
+              </div>
+            </article>
+          );
+        })}
       </div>
     </section>
   );

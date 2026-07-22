@@ -44,7 +44,7 @@ export default function OperationsPage() {
       setSession(stored);
       try {
         const [currentOrganization, availableBranches, ownerDashboard] = await Promise.all([
-          getCurrentOrganization(stored.accessToken),
+          getCurrentOrganization(stored.accessToken).catch(() => null),
           getBranches(stored.accessToken),
           getOwnerDashboard(stored.accessToken),
         ]);

@@ -61,7 +61,7 @@ export default function WellnessPage() {
       setSession(stored);
       try {
         const [loadedOrganization, loadedBranches, loadedProfessionals] = await Promise.all([
-          getCurrentOrganization(stored.accessToken),
+          getCurrentOrganization(stored.accessToken).catch(() => null),
           getBranches(stored.accessToken),
           getProfessionals(stored.accessToken),
         ]);

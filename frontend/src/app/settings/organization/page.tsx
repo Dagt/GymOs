@@ -209,8 +209,26 @@ export default function OrganizationSettingsPage() {
     return <AuthRequired />;
   }
 
-  if (loading || !organizationForm) {
+  if (loading) {
     return <LoadingScreen text="Cargando datos y sucursales..." />;
+  }
+
+  if (!organizationForm) {
+    return (
+      <AppShell
+        branchName={activeBranch?.name}
+        eyebrow="Administracion"
+        mode={activeBranch ? "operation" : "setup"}
+        organizationName={session.user.organizationName}
+        session={session}
+        subtitle="Administra la cadena o gimnasio, crea varias sucursales y prepara el acceso del equipo."
+        title="Datos y sucursales"
+      >
+        <p className="form-message error">
+          {error ?? "No fue posible cargar los datos del gimnasio. Cierra sesion y vuelve a iniciar si el problema persiste."}
+        </p>
+      </AppShell>
+    );
   }
 
   return (

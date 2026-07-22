@@ -50,6 +50,23 @@ export function canShowRoleForSession(currentRoles: string[], roleName: string, 
   return label === "Recepcion" || label === "Coach";
 }
 
+export function canSeeUserForSession(currentRoles: string[], targetRoles: string[], platformAdmin: boolean) {
+  if (platformAdmin || isTenantOwner(currentRoles)) {
+    return true;
+  }
+  if (isTenantManager(currentRoles)) {
+    return !targetRoles.some((role) => {
+      const label = displayRoleName(role);
+      return label === "Dueno del gimnasio" || label === "Gerente";
+    });
+  }
+  return false;
+}
+
+export function canManageUserForSession(currentRoles: string[], targetRoles: string[], platformAdmin: boolean) {
+  return canSeeUserForSession(currentRoles, targetRoles, platformAdmin);
+}
+
 export function roleDescription(roleName: string, fallback?: string | null) {
   const label = displayRoleName(roleName);
   if (label === "Admin GymOS") {
@@ -95,6 +112,14 @@ function normalizeRoleName(roleName: string) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
+}
+
+function isTenantOwner(currentRoles: string[]) {
+  return currentRoles.map(displayRoleName).includes("Dueno del gimnasio");
+}
+
+function isTenantManager(currentRoles: string[]) {
+  return currentRoles.map(displayRoleName).includes("Gerente");
 }
 
 function addError(errors: FieldErrorMap, key: string, value: string) {

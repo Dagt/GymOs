@@ -45,7 +45,9 @@ public class UserAdministrationService {
 	@Transactional(readOnly = true)
 	public List<InternalUserSummary> users(GymOsPrincipal principal) {
 		requirePrincipal(principal);
-		return repository.findUsers(principal.organizationId());
+		return repository.findUsers(principal.organizationId()).stream()
+				.filter(user -> canViewUser(principal, user))
+				.toList();
 	}
 
 	@Transactional
@@ -120,10 +122,11 @@ public class UserAdministrationService {
 		if (!repository.userBelongsToOrganization(principal.organizationId(), userId)) {
 			throw new BusinessException("USER_NOT_FOUND", "El usuario no pertenece a este gimnasio.");
 		}
+		InternalUserSummary targetUser = requireManageableUser(principal, userId);
 		repository.updateUserStatus(principal.organizationId(), userId, normalizedStatus, principal.userId(), OffsetDateTime.now());
 		auditService.record(principal, "INTERNAL_USER_STATUS_UPDATED", "USER", userId, "ADMIN", normalizedStatus, correlationId);
 		return repository.findUsers(principal.organizationId()).stream()
-				.filter(user -> user.id().equals(userId))
+				.filter(user -> user.id().equals(targetUser.id()))
 				.findFirst()
 				.orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "El usuario no esta disponible."));
 	}
@@ -142,6 +145,7 @@ public class UserAdministrationService {
 		if (!repository.userBelongsToOrganization(principal.organizationId(), userId)) {
 			throw new BusinessException("USER_NOT_FOUND", "El usuario no pertenece a este gimnasio.");
 		}
+		InternalUserSummary targetUser = requireManageableUser(principal, userId);
 		if (!repository.roleBelongsToOrganization(principal.organizationId(), roleId)) {
 			throw new BusinessException("ROLE_NOT_AVAILABLE", "El rol seleccionado no esta disponible para este gimnasio.");
 		}
@@ -152,9 +156,20 @@ public class UserAdministrationService {
 		repository.replaceRoles(userId, roleId);
 		auditService.record(principal, "INTERNAL_USER_ROLE_UPDATED", "USER", userId, "ADMIN", roleId.toString(), correlationId);
 		return repository.findUsers(principal.organizationId()).stream()
-				.filter(user -> user.id().equals(userId))
+				.filter(user -> user.id().equals(targetUser.id()))
 				.findFirst()
 				.orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "El usuario no esta disponible."));
+	}
+
+	private InternalUserSummary requireManageableUser(GymOsPrincipal principal, UUID userId) {
+		InternalUserSummary user = repository.findUsers(principal.organizationId()).stream()
+				.filter(candidate -> candidate.id().equals(userId))
+				.findFirst()
+				.orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "El usuario no esta disponible."));
+		if (!canManageUser(principal, user.roles())) {
+			throw new BusinessException("USER_NOT_MANAGEABLE", "Tu perfil no puede administrar ese usuario.");
+		}
+		return user;
 	}
 
 	private void requirePrincipal(GymOsPrincipal principal) {
@@ -202,6 +217,30 @@ public class UserAdministrationService {
 		return false;
 	}
 
+	private boolean canViewUser(GymOsPrincipal principal, InternalUserSummary targetUser) {
+		if (principal.platformAdmin() || isPrincipalOwner(principal)) {
+			return true;
+		}
+		if (isPrincipalManager(principal)) {
+			return targetUser.roles().stream()
+					.map(this::normalizeRoleName)
+					.noneMatch(role -> isOwnerRole(role) || isManagerRole(role));
+		}
+		return principal.userId().equals(targetUser.id());
+	}
+
+	private boolean canManageUser(GymOsPrincipal principal, List<String> targetRoles) {
+		if (principal.platformAdmin() || isPrincipalOwner(principal)) {
+			return true;
+		}
+		if (isPrincipalManager(principal)) {
+			return targetRoles.stream()
+					.map(this::normalizeRoleName)
+					.noneMatch(role -> isOwnerRole(role) || isManagerRole(role));
+		}
+		return false;
+	}
+
 	private boolean isPrincipalOwner(GymOsPrincipal principal) {
 		return principal.roles().stream()
 				.map(this::normalizeRoleName)
@@ -211,7 +250,11 @@ public class UserAdministrationService {
 	private boolean isPrincipalManager(GymOsPrincipal principal) {
 		return principal.roles().stream()
 				.map(this::normalizeRoleName)
-				.anyMatch(role -> role.contains("gerente") || role.contains("gerencia"));
+				.anyMatch(this::isManagerRole);
+	}
+
+	private boolean isManagerRole(String roleName) {
+		return roleName.contains("gerente") || roleName.contains("gerencia");
 	}
 
 	private boolean isOwnerRole(String roleName) {

@@ -65,7 +65,7 @@ export default function InventoryPage() {
       setSession(stored);
       try {
         const [loadedOrganization, loadedBranches, loadedStock, loadedLowStock, loadedMovements] = await Promise.all([
-          getCurrentOrganization(stored.accessToken),
+          getCurrentOrganization(stored.accessToken).catch(() => null),
           getBranches(stored.accessToken),
           getInventoryStock(stored.accessToken),
           getLowInventoryStock(stored.accessToken),

@@ -25,7 +25,7 @@ import {
   type StoredSession,
 } from "@/lib/api";
 import { CreateUserDrawer, TeamContextCard, TeamOverview, UsersTable } from "./UsersSections";
-import { canShowRoleForSession, displayRoleName, validateUserForm } from "./UsersRoleHelpers";
+import { canSeeUserForSession, canShowRoleForSession, displayRoleName, validateUserForm } from "./UsersRoleHelpers";
 
 const emptyUserForm: CreateInternalUserPayload = {
   firstName: "",
@@ -66,7 +66,7 @@ export default function UsersPage() {
       setError(null);
       try {
         const [currentOrganization, availableBranches, availableRoles, existingUsers] = await Promise.all([
-          getCurrentOrganization(stored.accessToken),
+          getCurrentOrganization(stored.accessToken).catch(() => null),
           getBranches(stored.accessToken),
           getUserRoles(stored.accessToken),
           getInternalUsers(stored.accessToken),
@@ -101,6 +101,7 @@ export default function UsersPage() {
 
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
   const selectableRoles = roles.filter((role) => canShowRoleForSession(session?.user.roles ?? [], role.name, Boolean(session?.user.platformAdmin)));
+  const visibleUsers = users.filter((user) => canSeeUserForSession(session?.user.roles ?? [], user.roles, Boolean(session?.user.platformAdmin)));
   const selectedRoleLabel = displayRoleName(selectableRoles.find((role) => role.id === form.roleId)?.name ?? "");
   const ownerRoleSelected = selectedRoleLabel === "Dueno del gimnasio";
 
@@ -228,14 +229,14 @@ export default function UsersPage() {
 
       <section className="team-layout">
         <TeamOverview branches={branches} roles={selectableRoles} onCreateUser={() => setShowCreateUser(true)} />
-        <TeamContextCard branches={branches} organization={organization} roles={selectableRoles} session={session} users={users} />
+        <TeamContextCard branches={branches} organization={organization} roles={selectableRoles} session={session} users={visibleUsers} />
       </section>
 
       <UsersTable
         roles={selectableRoles}
         saving={saving}
         session={session}
-        users={users}
+        users={visibleUsers}
         onChangeRole={changeUserRole}
         onToggleStatus={toggleUserStatus}
       />
