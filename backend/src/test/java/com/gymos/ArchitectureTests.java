@@ -72,8 +72,7 @@ class ArchitectureTests {
 				"com.gymos.clients.application.ClientImportService",
 				"com.gymos.clients.application.ClientService",
 				"com.gymos.onboarding.application.OnboardingService",
-				"com.gymos.organizations.application.OrganizationService",
-				"com.gymos.sales.application.SalesService"
+				"com.gymos.organizations.application.OrganizationService"
 		);
 
 		Set<String> actual = classes.stream()

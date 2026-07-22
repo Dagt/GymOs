@@ -2,6 +2,8 @@ package com.gymos.sales.application;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -36,8 +38,8 @@ class SalesPaymentServiceTests {
 		fixture.service().record(fixture.principal(), fixture.saleId(), command, "correlation");
 
 		verify(fixture.commandRepository()).create(any());
-		verify(fixture.auditService()).record(fixture.principal(), "PAYMENT_RECORDED", "PAYMENT", any(), org.mockito.ArgumentMatchers.eq("POS"), org.mockito.ArgumentMatchers.isNull(), org.mockito.ArgumentMatchers.eq("correlation"));
-		verify(fixture.eventPublisher()).publishEvent(any());
+		verify(fixture.auditService()).record(eq(fixture.principal()), eq("PAYMENT_RECORDED"), eq("PAYMENT"), any(), eq("POS"), isNull(), eq("correlation"));
+		verify(fixture.eventPublisher()).publishEvent(any(Object.class));
 	}
 
 	@Test

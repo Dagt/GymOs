@@ -870,3 +870,58 @@ Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
 - Se elimina CSS muerto de `.global-session-nav`, dejando una sola base visual para plataforma, soporte, dueno, gerencia, recepcion y coach.
 - Se retiro `AppNavigation`, que ya no tenia consumidores, para mantener un solo modelo de navegacion visible.
 - La siguiente etapa recomendada es continuar con `clients/[clientId]` o `clients/page.tsx`, priorizando helpers de estado y formularios compartidos.
+
+## Saneamiento AppShell y navegacion por consola - 22 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `AppShell.tsx` deja de contener las tablas completas de navegacion por rol y delega el modelo declarativo a `frontend/src/components/app-shell-model.ts`.
+- El modelo de shell centraliza:
+  - secciones visibles por consola (`PLATFORM_OWNER`, `TENANT_OWNER`, `TENANT_MANAGER`, `RECEPTION`, `COACH`);
+  - filtrado por permisos;
+  - reglas de navegacion segura cuando no existe sucursal activa;
+  - marca neutral de plataforma contra marca tenant/soporte;
+  - deteccion de ruta activa.
+- Se agregan pruebas de frontend para asegurar que:
+  - el dueno del gimnasio conserva acceso a metricas, socios, equipo y datos/sucursales;
+  - recepcion queda limitada a mostrador y no ve configuracion/equipo;
+  - usuarios tenant sin sucursal solo ven enlaces seguros de configuracion;
+  - plataforma conserva marca neutral fuera de soporte.
+- `AppShell.tsx` queda como orquestador visual y de sesion: carga sucursales, recupera contexto cuando aplica, muestra sidebar, encabezado, modo soporte y banner de sucursal pendiente.
+
+Verificado:
+
+- Frontend: `npm.cmd run test`.
+- Frontend: `npm.cmd run typecheck`.
+- Frontend: `npm.cmd run lint`.
+- Frontend: `npm.cmd run build`.
+- Backend: pruebas focalizadas de arquitectura, membresias y reservas por fecha de negocio.
+- Docker: `docker compose -f infra/docker-compose.yml up -d --build`.
+- Smoke local: frontend responde en `http://localhost:3000` y backend queda `UP` en `http://localhost:8080/actuator/health`.
+
+## Saneamiento de validaciones, roles y kiosco - 22 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- Se extrajeron las validaciones puras de `FormFields.tsx` hacia `frontend/src/components/form-validation.ts`.
+- `FormFields.tsx` conserva la API publica mediante re-exports, pero deja de mezclar componentes React con reglas puras de validacion.
+- `UsersRoleHelpers.ts` usa el modulo puro de validacion, lo que permite probar reglas de roles sin cargar JSX ni componentes visuales.
+- Se agregan pruebas de reglas de equipo y accesos para asegurar que:
+  - ningun usuario tenant pueda crear `Admin GymOS`;
+  - el dueno pueda crear roles operativos, pero no otro dueno;
+  - el gerente no pueda ver ni administrar duenos ni otros gerentes;
+  - Admin GymOS conserve visibilidad y gestion de soporte.
+- El kiosco reemplaza `<img>` por `next/image` con `unoptimized`, eliminando la advertencia de lint sin cambiar la ruta de logos tenant.
+- Se corrigio la base remota de backend tras el refactor de sales:
+  - `common.time` queda expuesto como interfaz publica de Spring Modulith;
+  - la prueba de arquitectura de `JdbcClient` refleja que `SalesService` ya no depende de acceso SQL directo;
+  - los tests de sales usan los records movidos a `com.gymos.sales.model`;
+  - las verificaciones Mockito de eventos/auditoria quedan alineadas con los nuevos servicios.
+
+Verificado:
+
+- Frontend: `npm.cmd run test` con 25 pruebas.
+- Frontend: `npm.cmd run typecheck`.
+- Frontend: `npm.cmd run lint`.
+- Frontend: `npm.cmd run build`.
+- Backend: `./gradlew.bat test` completo. Resultado exitoso; queda warning no bloqueante de apagado de Spring Modulith en pruebas H2 por `event_publication`, recomendado para el bloque backend profundo.

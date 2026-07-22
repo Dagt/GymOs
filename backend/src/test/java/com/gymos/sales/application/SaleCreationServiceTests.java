@@ -95,7 +95,7 @@ class SaleCreationServiceTests {
 			assertThat(item.totalCents()).isEqualTo(1_900);
 		});
 		verify(auditService).record(principal, "SALE_CREATED", "SALE", result.saleId(), "POS", null, "correlation");
-		verify(eventPublisher).publishEvent(any());
+		verify(eventPublisher).publishEvent(any(Object.class));
 	}
 
 	@Test

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useParams } from "next/navigation";
 import { CSSProperties, FormEvent, useEffect, useMemo, useState } from "react";
 import {
@@ -183,7 +184,11 @@ export default function KioskPage() {
       <section className="kiosk-shell">
         <header className="kiosk-header">
           <div className="kiosk-brand-row">
-            {session?.logoUrl ? <img alt={session.brandName ?? session.organizationName ?? "Gimnasio"} className="kiosk-logo" src={session.logoUrl} /> : <span className="kiosk-logo-fallback">{(session?.brandName ?? session?.organizationName ?? "G").slice(0, 1)}</span>}
+            {session?.logoUrl ? (
+              <Image alt={session.brandName ?? session.organizationName ?? "Gimnasio"} className="kiosk-logo" height={72} src={session.logoUrl} unoptimized width={72} />
+            ) : (
+              <span className="kiosk-logo-fallback">{(session?.brandName ?? session?.organizationName ?? "G").slice(0, 1)}</span>
+            )}
             <div><p>Autoservicio</p><h1>{session?.brandName ?? session?.organizationName ?? session?.terminalName ?? params.terminalCode}</h1><span>Consulta tu membresía y reserva recursos para ti.</span></div>
           </div>
           <aside><strong>Sesión segura</strong><span>Expira {session ? formatTime(session.expiresAt) : "N/A"}</span></aside>

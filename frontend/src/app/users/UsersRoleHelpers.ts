@@ -4,7 +4,7 @@ import {
   validatePassword,
   validatePhone,
   validateRequired,
-} from "@/components/FormFields";
+} from "../../components/form-validation.ts";
 import type { CreateInternalUserPayload, InternalUserSummary, RoleOption } from "@/lib/api";
 
 export function displayRoleName(roleName: string) {
