@@ -5,6 +5,7 @@ import com.gymos.bookings.application.ResourceScheduleResolver.ResourceHours;
 import com.gymos.bookings.application.command.CreateBookingCommand;
 import com.gymos.bookings.application.command.CreateResourceCommand;
 import com.gymos.bookings.application.command.LinkBookingPaymentCommand;
+import com.gymos.bookings.infrastructure.BookingEligibilityRepository;
 import com.gymos.bookings.infrastructure.BookingRepository;
 import com.gymos.bookings.infrastructure.BookingRepository.AvailabilitySlot;
 import com.gymos.bookings.infrastructure.BookingRepository.BookingRecord;
@@ -31,17 +32,20 @@ public class BookingService {
 	private static final Set<String> ACTIVE_STATUSES = Set.of("RESERVED", "CONFIRMED", "CHECKED_IN");
 
 	private final BookingRepository bookingRepository;
+	private final BookingEligibilityRepository bookingEligibilityRepository;
 	private final ClientBookingConflictRepository clientBookingConflictRepository;
 	private final ResourceScheduleResolver resourceScheduleResolver;
 	private final AuditService auditService;
 
 	public BookingService(
 			BookingRepository bookingRepository,
+			BookingEligibilityRepository bookingEligibilityRepository,
 			ClientBookingConflictRepository clientBookingConflictRepository,
 			ResourceScheduleResolver resourceScheduleResolver,
 			AuditService auditService
 	) {
 		this.bookingRepository = bookingRepository;
+		this.bookingEligibilityRepository = bookingEligibilityRepository;
 		this.clientBookingConflictRepository = clientBookingConflictRepository;
 		this.resourceScheduleResolver = resourceScheduleResolver;
 		this.auditService = auditService;
@@ -64,7 +68,7 @@ public class BookingService {
 		int capacity = Math.max(1, command.capacity());
 		int slotMinutes = Math.max(15, command.slotMinutes());
 		List<UUID> allowedPlanIds = command.allowedPlanIds() == null ? List.of() : new ArrayList<>(new LinkedHashSet<>(command.allowedPlanIds()));
-		if (!allowedPlanIds.isEmpty() && bookingRepository.activePlanCount(principal.organizationId(), allowedPlanIds) != allowedPlanIds.size()) {
+		if (!allowedPlanIds.isEmpty() && bookingEligibilityRepository.activePlanCount(principal.organizationId(), allowedPlanIds) != allowedPlanIds.size()) {
 			throw new BusinessException("RESOURCE_ALLOWED_PLAN_INVALID", "Selecciona solo planes activos del gimnasio.");
 		}
 		UUID resourceId = bookingRepository.createResource(
@@ -116,7 +120,7 @@ public class BookingService {
 	public BookingRecord createBooking(GymOsPrincipal principal, CreateBookingCommand command, String correlationId) {
 		requireBranch(principal);
 		ResourceRecord resource = activeResource(principal, command.resourceId());
-		if (!bookingRepository.clientExists(principal.organizationId(), command.clientId())) {
+		if (!bookingEligibilityRepository.clientExists(principal.organizationId(), command.clientId())) {
 			throw new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta activo.");
 		}
 		if (command.startsAt() == null || command.endsAt() == null || !command.endsAt().isAfter(command.startsAt())) {
@@ -128,7 +132,7 @@ public class BookingService {
 
 		OffsetDateTime localStart = command.startsAt().atZoneSameInstant(BusinessTime.DEFAULT_ZONE).toOffsetDateTime();
 		OffsetDateTime localEnd = command.endsAt().atZoneSameInstant(BusinessTime.DEFAULT_ZONE).toOffsetDateTime();
-		if (!bookingRepository.hasEligibleMembershipForResource(
+		if (!bookingEligibilityRepository.hasEligibleMembershipForResource(
 				principal.organizationId(),
 				principal.branchId(),
 				command.resourceId(),
