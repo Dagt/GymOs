@@ -64,7 +64,13 @@ export function canSeeUserForSession(currentRoles: string[], targetRoles: string
 }
 
 export function canManageUserForSession(currentRoles: string[], targetRoles: string[], platformAdmin: boolean) {
-  return canSeeUserForSession(currentRoles, targetRoles, platformAdmin);
+  if (platformAdmin) {
+    return true;
+  }
+  if (targetRoles.some((role) => displayRoleName(role) === "Dueno del gimnasio")) {
+    return false;
+  }
+  return canSeeUserForSession(currentRoles, targetRoles, false);
 }
 
 export function roleDescription(roleName: string, fallback?: string | null) {
