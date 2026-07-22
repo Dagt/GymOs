@@ -15,10 +15,10 @@ import com.gymos.bookings.infrastructure.BookingRepository.BookingRecord;
 import com.gymos.bookings.infrastructure.BookingRepository.ResourceRecord;
 import com.gymos.bookings.infrastructure.ClientBookingConflictRepository;
 import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.common.time.BusinessTime;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -54,9 +54,12 @@ class BookingMembershipEligibilityDateTests {
 				Set.of()
 		);
 
-		OffsetDateTime startsAt = OffsetDateTime.of(2026, 7, 22, 10, 0, 0, 0, ZoneOffset.ofHours(-6));
+		LocalDate bookingDate = BusinessTime.today().plusDays(1);
+		OffsetDateTime startsAt = bookingDate
+				.atTime(10, 0)
+				.atZone(BusinessTime.DEFAULT_ZONE)
+				.toOffsetDateTime();
 		OffsetDateTime endsAt = startsAt.plusHours(1);
-		LocalDate bookingDate = LocalDate.of(2026, 7, 22);
 		ResourceRecord resource = new ResourceRecord(
 				resourceId,
 				"Cancha 1",
