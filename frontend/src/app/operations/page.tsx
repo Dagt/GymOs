@@ -88,10 +88,6 @@ export default function OperationsPage() {
 
   return (
     <AppShell
-      actions={[
-        { href: "/dashboard", label: "Metricas" },
-        { href: "/reception", label: "Mostrador" },
-      ]}
       branchName={activeBranch?.name}
       eyebrow="Gerencia"
       organizationName={organization?.tradeName}

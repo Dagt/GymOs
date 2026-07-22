@@ -92,10 +92,6 @@ export default function SalesReportPage() {
 
   return (
     <AppShell
-      actions={[
-        { href: "/pos", label: "Abrir POS" },
-        { href: "/dashboard", label: "Panel ejecutivo" },
-      ]}
       eyebrow="Gerencia"
       session={session}
       subtitle="Resumen operativo de ventas, saldos y pagos manuales."

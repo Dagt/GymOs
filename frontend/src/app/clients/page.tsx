@@ -150,7 +150,6 @@ export default function ClientsPage() {
 
   return (
     <AppShell
-      actions={[]}
       eyebrow="Socios"
       session={session}
       subtitle="Registro completo de socios, membresia inicial y busqueda para recepcion."

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { GlobalSessionNav } from "@/components/GlobalSessionNav";
+import { SessionRouteGuard } from "@/components/SessionRouteGuard";
 import { TenantThemeProvider } from "@/components/TenantThemeProvider";
 import "./globals.css";
 
@@ -19,7 +19,7 @@ export default function RootLayout({
       className="h-full antialiased"
     >
       <body className="min-h-full flex flex-col">
-        <GlobalSessionNav />
+        <SessionRouteGuard />
         {children}
         <TenantThemeProvider />
       </body>

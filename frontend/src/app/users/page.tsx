@@ -215,10 +215,6 @@ export default function UsersPage() {
 
   return (
     <AppShell
-      actions={[
-        { href: "/platform/gymnasiums", label: "Gimnasios" },
-        { href: "/settings/organization", label: "Datos y sucursales" },
-      ]}
       branchName={activeBranch?.name}
       eyebrow="Administracion"
       mode={activeBranch ? "operation" : "setup"}

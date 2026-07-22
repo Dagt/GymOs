@@ -77,10 +77,6 @@ export default function OwnerDashboardPage() {
 
   return (
     <AppShell
-      actions={[
-        { href: "/reports/sales", label: "Reporte de ventas" },
-        { href: "/reception", label: "Ir a operación" },
-      ]}
       eyebrow="Gerencia"
       session={session}
       subtitle="Indicadores claros para revisar ingresos, membresías, operación diaria y pendientes de la sucursal activa."

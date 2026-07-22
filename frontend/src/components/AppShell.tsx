@@ -13,11 +13,6 @@ import {
   type UserConsole,
 } from "@/lib/role-model";
 
-type ShellAction = {
-  href: string;
-  label: string;
-};
-
 type ShellBrand = {
   logoUrl?: string | null;
   name: string;
@@ -132,7 +127,6 @@ const coachSections: NavigationSection[] = [
 ];
 
 export function AppShell({
-  actions = [],
   branchName,
   children,
   eyebrow,
@@ -144,7 +138,6 @@ export function AppShell({
   title,
   variant,
 }: {
-  actions?: ShellAction[];
   branchName?: string | null;
   children: ReactNode;
   eyebrow: string;
@@ -180,7 +173,6 @@ export function AppShell({
       links: section.links.filter((link) => canSeeLink(permissionSet, link) && canUseWithoutBranch(hasBranch, link)),
     }))
     .filter((section) => section.links.length > 0);
-  const visibleActions = variant === "platform" ? actions : [];
   const brand = resolveShellBrand({
     organizationName,
     session,
@@ -350,11 +342,6 @@ export function AppShell({
                 </select>
               </label>
             ) : null}
-            {visibleActions.map((action) => (
-              <Link className="app-button-secondary" href={action.href} key={action.href}>
-                {action.label}
-              </Link>
-            ))}
           </div>
         </header>
 

@@ -173,7 +173,6 @@ export default function SaleDetailPage() {
 
   return (
     <AppShell
-      actions={[]}
       eyebrow="Venta"
       session={session}
       subtitle={`${data.sale.clientName} - ${data.sale.status} - Saldo ${formatMoney(data.sale.balanceCents, data.sale.currency)}`}

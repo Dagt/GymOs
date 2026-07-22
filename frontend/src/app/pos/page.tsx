@@ -170,10 +170,6 @@ export default function PosPage() {
 
   return (
     <AppShell
-      actions={[
-        { href: "/reports/sales", label: "Reportes" },
-        { href: "/catalog", label: "Catálogo" },
-      ]}
       eyebrow="Recepción / Caja"
       session={session}
       subtitle="Venta rápida con pago manual y validación interna."

@@ -5,7 +5,7 @@ import { useEffect } from "react";
 import { getStoredSession } from "@/lib/api";
 import { canAccessRoute, getPostLoginPath } from "@/lib/role-model";
 
-export function GlobalSessionNav() {
+export function SessionRouteGuard() {
   const pathname = usePathname();
   const router = useRouter();
 

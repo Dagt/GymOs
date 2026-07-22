@@ -176,7 +176,6 @@ export default function ReceptionPage() {
 
   return (
     <AppShell
-      actions={[]}
       branchName={visibleBranchName}
       eyebrow="Recepcion"
       hideSidebar={canOperate}

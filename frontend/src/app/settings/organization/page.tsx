@@ -215,10 +215,6 @@ export default function OrganizationSettingsPage() {
 
   return (
     <AppShell
-      actions={[
-        { href: "/platform/gymnasiums", label: "Gimnasios" },
-        { href: "/users", label: "Equipo y accesos" },
-      ]}
       branchName={activeBranch?.name}
       eyebrow="Administracion"
       mode={activeBranch ? "operation" : "setup"}

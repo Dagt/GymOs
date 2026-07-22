@@ -102,7 +102,6 @@ export default function BenefitsPage() {
 
   return (
     <AppShell
-      actions={[{ href: "/clients", label: "Asignar a cliente" }]}
       eyebrow="Administracion"
       session={session}
       subtitle="Configura descuentos y elegibilidad para estudiantes, convenios o promociones."

@@ -865,5 +865,8 @@ Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
 - `/settings/organization` separa helpers, validaciones, resumen, tarjetas y drawers en `OrganizationSettingsHelpers.ts` y `OrganizationSettingsSections.tsx`.
 - `FormFields.tsx` agrega `ColorField` para reutilizar la edicion de marca sin inputs locales por pantalla.
 - Los logos cargados en `frontend/public/tenants/*` se tratan como datos locales/runtime y quedan fuera de Git, conservando solo `.gitkeep`.
+- `GlobalSessionNav` se reemplaza por `SessionRouteGuard`: conserva la proteccion/redireccion por rol sin introducir una segunda navegacion.
+- `AppShell` deja de aceptar `actions` superiores; las paginas tenant ya no declaran botones de encabezado duplicados y la navegacion queda concentrada en el menu lateral.
+- Se elimina CSS muerto de `.global-session-nav`, dejando una sola base visual para plataforma, soporte, dueno, gerencia, recepcion y coach.
 - Se retiro `AppNavigation`, que ya no tenia consumidores, para mantener un solo modelo de navegacion visible.
 - La siguiente etapa recomendada es continuar con `clients/[clientId]` o `clients/page.tsx`, priorizando helpers de estado y formularios compartidos.

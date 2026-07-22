@@ -175,7 +175,6 @@ export default function AutomationsPage() {
 
   return (
     <AppShell
-      actions={[{ href: "/operations", label: "Operacion" }]}
       eyebrow="Administracion"
       session={session}
       subtitle="Reglas configurables, ejecuciones y notificaciones internas."

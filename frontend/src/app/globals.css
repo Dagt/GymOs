@@ -1489,7 +1489,6 @@ th {
   outline: none;
 }
 
-.admin-command-actions a,
 .admin-link-grid a {
   background: white;
   border: 1px solid var(--brand-line);
@@ -2219,8 +2218,7 @@ th {
 }
 
 .admin-setup-steps a:hover,
-.admin-link-grid a:hover,
-.admin-command-actions a:hover {
+.admin-link-grid a:hover {
   border-color: color-mix(in srgb, var(--brand-primary) 36%, white);
   transform: translateY(-1px);
 }
@@ -3172,91 +3170,6 @@ button.admin-secondary-link:disabled {
   padding: 0.8rem 1rem;
 }
 
-.global-session-nav {
-  background: linear-gradient(180deg, #0f172a, color-mix(in srgb, var(--brand-primary) 40%, #0f172a));
-  bottom: 0;
-  color: white;
-  display: grid;
-  gap: 1rem;
-  grid-template-rows: auto 1fr auto;
-  left: 0;
-  overflow-y: auto;
-  padding: 1rem;
-  position: fixed;
-  top: 0;
-  width: 16rem;
-  z-index: 65;
-}
-
-.global-session-brand {
-  align-items: center;
-  display: flex;
-  gap: 0.7rem;
-}
-
-.global-session-brand > span {
-  align-items: center;
-  background: linear-gradient(135deg, var(--brand-accent), #22c55e);
-  border-radius: 0.5rem;
-  color: #0f172a;
-  display: inline-flex;
-  font-weight: 950;
-  height: 2.45rem;
-  justify-content: center;
-  width: 2.45rem;
-}
-
-.global-session-brand div {
-  display: grid;
-}
-
-.global-session-brand small {
-  color: rgba(255, 255, 255, 0.62);
-  font-size: 0.76rem;
-}
-
-.global-session-nav nav {
-  display: grid;
-  gap: 0.35rem;
-}
-
-.global-session-nav nav a {
-  border-radius: 0.5rem;
-  color: rgba(255, 255, 255, 0.74);
-  font-weight: 850;
-  padding: 0.75rem 0.85rem;
-}
-
-.global-session-nav nav a:hover,
-.global-session-nav nav a.active {
-  background: white;
-  color: #0f172a;
-}
-
-.global-session-nav footer {
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-  display: grid;
-  gap: 0.7rem;
-  padding-top: 1rem;
-}
-
-.global-session-nav footer span {
-  color: rgba(255, 255, 255, 0.74);
-  font-size: 0.84rem;
-}
-
-.global-session-nav footer button {
-  background: white;
-  border-radius: 0.5rem;
-  color: #0f172a;
-  font-weight: 900;
-  min-height: 2.45rem;
-}
-
-body.has-global-session-nav {
-  padding-left: 16rem;
-}
-
 @media (max-width: 980px) {
   .home-hero,
   .home-roles,
@@ -3317,33 +3230,6 @@ body.has-global-session-nav {
     flex-direction: column;
   }
 
-  body.has-global-session-nav {
-    padding-left: 0;
-    padding-top: 4.4rem;
-  }
-
-  .global-session-nav {
-    align-items: center;
-    bottom: auto;
-    display: flex;
-    height: 4.4rem;
-    overflow-x: auto;
-    overflow-y: hidden;
-    right: 0;
-    width: auto;
-  }
-
-  .global-session-nav nav {
-    display: flex;
-    min-width: max-content;
-  }
-
-  .global-session-nav footer {
-    border-top: 0;
-    display: flex;
-    margin-left: auto;
-    padding-top: 0;
-  }
 }
 
 @media (max-width: 640px) {

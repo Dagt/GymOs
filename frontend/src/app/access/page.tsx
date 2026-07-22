@@ -298,7 +298,6 @@ export default function AccessPage() {
 
   return (
     <AppShell
-      actions={[{ href: "/reception", label: "Recepcion" }]}
       eyebrow="Operacion"
       session={session}
       subtitle="Pases, visitas, apertura manual y bitacora de accesos."

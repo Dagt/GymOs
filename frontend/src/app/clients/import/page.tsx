@@ -84,7 +84,6 @@ export default function ClientImportPage() {
 
   return (
     <AppShell
-      actions={[]}
       eyebrow="Socios"
       session={session}
       subtitle="Carga inicial por CSV con validacion previa, duplicados y resultado por fila."

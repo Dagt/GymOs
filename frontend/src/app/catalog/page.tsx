@@ -157,10 +157,6 @@ export default function CatalogPage() {
 
   return (
     <AppShell
-      actions={[
-        { href: "/pos", label: "Abrir POS" },
-        { href: "/reception", label: "Inicio operativo" },
-      ]}
       eyebrow="Administracion"
       session={session}
       subtitle="Productos, servicios y planes disponibles para vender desde recepcion."

@@ -146,7 +146,6 @@ export default function OnboardingPage() {
 
   return (
     <AppShell
-      actions={[]}
       eyebrow="Configuracion"
       session={session}
       subtitle="Configura datos comerciales minimos para mostrar y operar GymOS con un gimnasio real."

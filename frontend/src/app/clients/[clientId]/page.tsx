@@ -214,7 +214,6 @@ export default function ClientDetailPage() {
 
   return (
     <AppShell
-      actions={[]}
       eyebrow="Socios"
       session={session}
       subtitle={`Cliente desde ${formatDate(data.client.joinedAt)} - ${statusLabel(data.client.status)}`}
