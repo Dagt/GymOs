@@ -54,7 +54,7 @@ type OrganizationOverviewCardProps = {
 
 export function OrganizationOverviewCard({ form, onEdit }: OrganizationOverviewCardProps) {
   return (
-    <section className="app-card self-start p-5">
+    <section className="app-card p-5" style={{ gridColumn: "1 / -1" }}>
       <div className="admin-panel-header">
         <div>
           <p>Gimnasio</p>
@@ -64,21 +64,21 @@ export function OrganizationOverviewCard({ form, onEdit }: OrganizationOverviewC
           Editar gimnasio
         </button>
       </div>
-      <div className="settings-summary mt-5">
-        <article className="min-w-0">
-          <span>Marca</span>
-          <strong className="break-words">{form.brandName || form.tradeName}</strong>
-          <p className="break-all">{form.contactEmail}</p>
+      <div className="mt-5 grid gap-4 md:grid-cols-3">
+        <article className="min-w-0 rounded-xl border border-[#dbe4ee] bg-white p-4">
+          <span className="text-xs font-semibold uppercase text-[#64748b]">Marca</span>
+          <strong className="mt-2 block break-words text-lg">{form.brandName || form.tradeName}</strong>
+          <p className="mt-2 break-all text-sm text-[#64748b]">{form.contactEmail}</p>
         </article>
-        <article className="min-w-0">
-          <span>Moneda</span>
-          <strong>{form.defaultCurrency}</strong>
-          <p className="break-words">{form.timezone}</p>
+        <article className="min-w-0 rounded-xl border border-[#dbe4ee] bg-white p-4">
+          <span className="text-xs font-semibold uppercase text-[#64748b]">Moneda</span>
+          <strong className="mt-2 block text-lg">{form.defaultCurrency}</strong>
+          <p className="mt-2 break-words text-sm text-[#64748b]">{form.timezone}</p>
         </article>
-        <article className="min-w-0">
-          <span>RFC</span>
-          <strong className="break-words">{form.taxId || "Sin RFC"}</strong>
-          <p className="break-words">{form.contactPhone || "Sin telefono"}</p>
+        <article className="min-w-0 rounded-xl border border-[#dbe4ee] bg-white p-4">
+          <span className="text-xs font-semibold uppercase text-[#64748b]">RFC</span>
+          <strong className="mt-2 block break-words text-lg">{form.taxId || "Sin RFC"}</strong>
+          <p className="mt-2 break-words text-sm text-[#64748b]">{form.contactPhone || "Sin telefono"}</p>
         </article>
       </div>
     </section>
@@ -93,7 +93,7 @@ type BranchesOverviewCardProps = {
 
 export function BranchesOverviewCard({ branches, onEditBranch, onNewBranch }: BranchesOverviewCardProps) {
   return (
-    <section className="app-card self-start p-5">
+    <section className="app-card p-5" style={{ gridColumn: "1 / -1" }}>
       <div className="admin-panel-header">
         <div>
           <p>Sucursales</p>
@@ -103,7 +103,7 @@ export function BranchesOverviewCard({ branches, onEditBranch, onNewBranch }: Br
           Crear sucursal
         </button>
       </div>
-      <div className="team-role-list">
+      <div className="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         {branches.length === 0 ? (
           <section className="admin-empty-card">
             <strong>Aun no hay sucursales</strong>
@@ -111,10 +111,10 @@ export function BranchesOverviewCard({ branches, onEditBranch, onNewBranch }: Br
           </section>
         ) : null}
         {branches.map((branch) => (
-          <article className="min-w-0" key={branch.id}>
-            <strong className="break-words">{branch.name}</strong>
-            <span className="break-words">{branch.code} - {branch.phone || "Sin telefono"}</span>
-            <button className="admin-text-button" onClick={() => onEditBranch(branch.id)} type="button">
+          <article className="min-w-0 rounded-xl border border-[#dbe4ee] bg-white p-4" key={branch.id}>
+            <strong className="block break-words">{branch.name}</strong>
+            <span className="mt-2 block break-words text-sm text-[#64748b]">{branch.code} - {branch.phone || "Sin telefono"}</span>
+            <button className="admin-text-button mt-4" onClick={() => onEditBranch(branch.id)} type="button">
               Editar sucursal
             </button>
           </article>
@@ -127,18 +127,15 @@ export function BranchesOverviewCard({ branches, onEditBranch, onNewBranch }: Br
 export function TeamAccessCard() {
   return (
     <section className="app-card p-5" style={{ gridColumn: "1 / -1" }}>
-      <div className="grid items-start gap-5 md:grid-cols-[minmax(0,1fr)_auto]">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
           <p className="app-eyebrow">Equipo</p>
           <h2 className="mt-2 text-xl font-semibold">Usuarios y permisos</h2>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#5d6b63]">
-            Crea cuentas para recepcion, gerencia, coaches y operacion. Cada usuario vera una experiencia segun sus permisos.
-          </p>
-          <p className="mt-3 max-w-3xl text-sm leading-6 text-[#5d6b63]">
-            Primero crea las sucursales necesarias. Despues asigna a cada persona solo las sucursales que debe usar.
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-[#5d6b63]">
+            Crea cuentas para recepcion, gerencia, coaches y operacion, y limita las sucursales que puede usar cada persona.
           </p>
         </div>
-        <Link className="admin-secondary-link w-full md:w-auto" href="/users">
+        <Link className="admin-secondary-link shrink-0" href="/users">
           Abrir equipo y accesos
         </Link>
       </div>
