@@ -119,6 +119,7 @@ class SalesPaymentBranchIsolationTests {
 		SalesService target = new SalesService(
 				jdbcClient,
 				salesRepository,
+				new SaleLineResolver(salesRepository),
 				auditService,
 				objectStorageService,
 				eventPublisher
