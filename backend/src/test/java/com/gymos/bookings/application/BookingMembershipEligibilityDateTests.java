@@ -1,0 +1,118 @@
+package com.gymos.bookings.application;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gymos.audit.api.AuditService;
+import com.gymos.bookings.application.command.CreateBookingCommand;
+import com.gymos.bookings.infrastructure.BookingRepository;
+import com.gymos.bookings.infrastructure.BookingRepository.BookingRecord;
+import com.gymos.bookings.infrastructure.BookingRepository.ResourceRecord;
+import com.gymos.bookings.infrastructure.ClientBookingConflictRepository;
+import com.gymos.common.security.GymOsPrincipal;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import org.junit.jupiter.api.Test;
+
+class BookingMembershipEligibilityDateTests {
+	@Test
+	void validatesMembershipAgainstLocalBookingDateInsteadOfCurrentDate() {
+		BookingRepository bookingRepository = mock(BookingRepository.class);
+		ClientBookingConflictRepository conflictRepository = mock(ClientBookingConflictRepository.class);
+		AuditService auditService = mock(AuditService.class);
+		ResourceScheduleResolver scheduleResolver = new ResourceScheduleResolver(new ObjectMapper());
+		BookingService service = new BookingService(
+				bookingRepository,
+				conflictRepository,
+				auditService,
+				scheduleResolver
+		);
+
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		UUID userId = UUID.randomUUID();
+		UUID resourceId = UUID.randomUUID();
+		UUID clientId = UUID.randomUUID();
+		UUID bookingId = UUID.randomUUID();
+		GymOsPrincipal principal = new GymOsPrincipal(
+				userId,
+				organizationId,
+				branchId,
+				"manager",
+				"Manager",
+				Set.of()
+		);
+
+		OffsetDateTime startsAt = OffsetDateTime.of(2026, 7, 22, 10, 0, 0, 0, ZoneOffset.ofHours(-6));
+		OffsetDateTime endsAt = startsAt.plusHours(1);
+		LocalDate bookingDate = LocalDate.of(2026, 7, 22);
+		ResourceRecord resource = new ResourceRecord(
+				resourceId,
+				"Cancha 1",
+				"COURT",
+				1,
+				60,
+				"ACTIVE",
+				LocalTime.of(6, 0),
+				LocalTime.of(22, 0),
+				null,
+				List.of(),
+				""
+		);
+		BookingRecord created = new BookingRecord(
+				bookingId,
+				resourceId,
+				resource.name(),
+				clientId,
+				"Socio nuevo",
+				"RESERVED",
+				startsAt,
+				endsAt,
+				null,
+				null,
+				null,
+				null,
+				null
+		);
+
+		when(bookingRepository.resource(organizationId, branchId, resourceId)).thenReturn(Optional.of(resource));
+		when(bookingRepository.clientExists(organizationId, clientId)).thenReturn(true);
+		when(bookingRepository.hasEligibleMembershipForResource(
+				organizationId,
+				branchId,
+				resourceId,
+				clientId,
+				bookingDate
+		)).thenReturn(true);
+		when(conflictRepository.hasOverlappingBooking(organizationId, branchId, clientId, startsAt, endsAt)).thenReturn(false);
+		when(bookingRepository.overlappingBookings(organizationId, branchId, resourceId, startsAt, endsAt)).thenReturn(0);
+		when(bookingRepository.createBooking(eq(organizationId), eq(branchId), eq(userId), any())).thenReturn(bookingId);
+		when(bookingRepository.booking(organizationId, branchId, bookingId)).thenReturn(Optional.of(created));
+
+		BookingRecord result = service.createBooking(
+				principal,
+				new CreateBookingCommand(resourceId, clientId, startsAt, endsAt, null),
+				"correlation-id"
+		);
+
+		assertEquals(bookingId, result.id());
+		verify(bookingRepository).hasEligibleMembershipForResource(
+				organizationId,
+				branchId,
+				resourceId,
+				clientId,
+				bookingDate
+		);
+	}
+}
