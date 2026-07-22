@@ -251,12 +251,12 @@ public class MembershipService implements MembershipOperations {
 			PlanForRenewal plan,
 			String action
 	) {
-		LocalDate today = LocalDate.now();
+		LocalDate businessDate = MembershipBusinessDate.from(event.occurredAt());
 		LocalDate latestEnd = membershipRepository.latestMembershipEnd(event.organizationId(), event.clientId(), plan.planId())
 				.orElse(null);
-		LocalDate startsOn = latestEnd != null && !latestEnd.isBefore(today) ? latestEnd.plusDays(1) : today;
+		LocalDate startsOn = latestEnd != null && !latestEnd.isBefore(businessDate) ? latestEnd.plusDays(1) : businessDate;
 		if ("MEMBERSHIP_PLAN_CHANGED".equals(action)) {
-			startsOn = today;
+			startsOn = businessDate;
 		}
 		LocalDate endsOn = startsOn.plusDays(plan.durationDays() - 1L);
 		LocalDate graceEndsOn = endsOn.plusDays(plan.graceDays());
