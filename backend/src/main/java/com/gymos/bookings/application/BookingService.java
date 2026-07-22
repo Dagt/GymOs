@@ -1,8 +1,7 @@
 package com.gymos.bookings.application;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.audit.api.AuditService;
+import com.gymos.bookings.application.ResourceScheduleResolver.ResourceHours;
 import com.gymos.bookings.application.command.CreateBookingCommand;
 import com.gymos.bookings.application.command.CreateResourceCommand;
 import com.gymos.bookings.application.command.LinkBookingPaymentCommand;
@@ -22,7 +21,6 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -31,19 +29,21 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class BookingService {
 	private static final Set<String> ACTIVE_STATUSES = Set.of("RESERVED", "CONFIRMED", "CHECKED_IN");
-	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
 	private final BookingRepository bookingRepository;
 	private final ClientBookingConflictRepository clientBookingConflictRepository;
+	private final ResourceScheduleResolver resourceScheduleResolver;
 	private final AuditService auditService;
 
 	public BookingService(
 			BookingRepository bookingRepository,
 			ClientBookingConflictRepository clientBookingConflictRepository,
+			ResourceScheduleResolver resourceScheduleResolver,
 			AuditService auditService
 	) {
 		this.bookingRepository = bookingRepository;
 		this.clientBookingConflictRepository = clientBookingConflictRepository;
+		this.resourceScheduleResolver = resourceScheduleResolver;
 		this.auditService = auditService;
 	}
 
@@ -83,7 +83,7 @@ public class BookingService {
 		requireBranch(principal);
 		LocalDate resolvedDate = date == null ? BusinessTime.today() : date;
 		ResourceRecord resource = activeResource(principal, resourceId);
-		Optional<ResourceHours> hours = resourceHoursForDay(resource, resolvedDate);
+		var hours = resourceScheduleResolver.resolve(resource, resolvedDate);
 		if (hours.isEmpty()) {
 			return List.of();
 		}
@@ -140,7 +140,7 @@ public class BookingService {
 		if (!localStart.toLocalDate().equals(localEnd.toLocalDate())) {
 			throw new BusinessException("BOOKING_RANGE_INVALID", "La reserva debe iniciar y terminar el mismo dia.");
 		}
-		ResourceHours hours = resourceHoursForDay(resource, localStart.toLocalDate())
+		ResourceHours hours = resourceScheduleResolver.resolve(resource, localStart.toLocalDate())
 				.orElseThrow(() -> new BusinessException("BOOKING_OUTSIDE_RESOURCE_HOURS", "El recurso no opera el dia seleccionado."));
 		if (localStart.toLocalTime().isBefore(hours.opensAt()) || localEnd.toLocalTime().isAfter(hours.closesAt())) {
 			throw new BusinessException("BOOKING_OUTSIDE_RESOURCE_HOURS", "La reserva esta fuera del horario operativo del recurso para ese dia.");
@@ -212,29 +212,6 @@ public class BookingService {
 		return detail(principal, bookingId);
 	}
 
-	private Optional<ResourceHours> resourceHoursForDay(ResourceRecord resource, LocalDate date) {
-		if (resource.notes() == null || resource.notes().isBlank()) {
-			return Optional.of(new ResourceHours(resource.opensAt(), resource.closesAt()));
-		}
-		try {
-			JsonNode schedule = OBJECT_MAPPER.readTree(resource.notes()).path("schedule");
-			if (!schedule.isArray()) {
-				return Optional.of(new ResourceHours(resource.opensAt(), resource.closesAt()));
-			}
-			String weekday = date.getDayOfWeek().name();
-			for (JsonNode item : schedule) {
-				if (weekday.equalsIgnoreCase(item.path("day").asText())) {
-					LocalTime opensAt = LocalTime.parse(item.path("opensAt").asText());
-					LocalTime closesAt = LocalTime.parse(item.path("closesAt").asText());
-					return Optional.of(new ResourceHours(opensAt, closesAt));
-				}
-			}
-			return Optional.empty();
-		} catch (Exception ignored) {
-			return Optional.of(new ResourceHours(resource.opensAt(), resource.closesAt()));
-		}
-	}
-
 	private ResourceRecord activeResource(GymOsPrincipal principal, UUID resourceId) {
 		ResourceRecord resource = bookingRepository.resource(principal.organizationId(), principal.branchId(), resourceId)
 				.orElseThrow(() -> new BusinessException("RESOURCE_NOT_FOUND", "El recurso no existe o no esta disponible."));
@@ -255,8 +232,5 @@ public class BookingService {
 
 	private String blankToNull(String value) {
 		return value == null || value.isBlank() ? null : value.trim();
-	}
-
-	private record ResourceHours(LocalTime opensAt, LocalTime closesAt) {
 	}
 }
