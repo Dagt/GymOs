@@ -33,6 +33,7 @@ class SalesBranchIsolationTests {
 		SalesService salesService = new SalesService(
 				jdbcClient,
 				salesRepository,
+				new SaleLineResolver(salesRepository),
 				auditService,
 				objectStorageService,
 				eventPublisher
