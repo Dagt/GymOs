@@ -31,10 +31,9 @@ class SalesRefundIdempotencyTests {
 		AuditService auditService = mock(AuditService.class);
 		ObjectStorageService objectStorageService = mock(ObjectStorageService.class);
 		ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
-		SalesService salesService = new SalesService(
+		SalesService salesService = SalesServiceTestFactory.create(
 				jdbcClient,
 				salesRepository,
-				new SaleLineResolver(salesRepository),
 				auditService,
 				objectStorageService,
 				eventPublisher

@@ -116,10 +116,9 @@ class SalesPaymentBranchIsolationTests {
 		AuditService auditService = mock(AuditService.class);
 		ObjectStorageService objectStorageService = mock(ObjectStorageService.class);
 		ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
-		SalesService target = new SalesService(
+		SalesService target = SalesServiceTestFactory.create(
 				jdbcClient,
 				salesRepository,
-				new SaleLineResolver(salesRepository),
 				auditService,
 				objectStorageService,
 				eventPublisher

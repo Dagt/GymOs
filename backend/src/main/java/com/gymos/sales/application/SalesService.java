@@ -1,9 +1,7 @@
 package com.gymos.sales.application;
 
-import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
-import com.gymos.common.storage.ObjectStorageService;
 import com.gymos.sales.api.operations.CreateMembershipPlanChangeSaleCommand;
 import com.gymos.sales.api.operations.CreateMembershipRenewalSaleCommand;
 import com.gymos.sales.api.operations.MembershipSaleResult;
@@ -13,10 +11,6 @@ import com.gymos.sales.application.command.ManualPaymentCommand;
 import com.gymos.sales.application.command.RequestRefundCommand;
 import com.gymos.sales.application.result.SaleDetailResult;
 import com.gymos.sales.application.result.SalesReportResult;
-import com.gymos.sales.infrastructure.MembershipSaleCommandRepository;
-import com.gymos.sales.infrastructure.SaleCommandRepository;
-import com.gymos.sales.infrastructure.SalePaymentCompletionRepository;
-import com.gymos.sales.infrastructure.SalesPaymentCommandRepository;
 import com.gymos.sales.infrastructure.SalesReadRepository;
 import com.gymos.sales.infrastructure.SalesReportRepository;
 import com.gymos.sales.infrastructure.SalesRepository;
@@ -27,9 +21,6 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -37,19 +28,18 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class SalesService implements SalesOperations {
 	private final SalesRepository salesRepository;
-	private final SalesReadRepository readRepository;
-	private final SalesReportRepository reportRepository;
+	private final SalesReadRepository salesReadRepository;
+	private final SalesReportRepository salesReportRepository;
 	private final SaleCreationService saleCreationService;
 	private final SalesPaymentService paymentService;
 	private final SalesRefundService refundService;
 	private final MembershipSalesService membershipSalesService;
 	private final SalePaymentCompletionService completionService;
 
-	@Autowired
 	public SalesService(
 			SalesRepository salesRepository,
-			SalesReadRepository readRepository,
-			SalesReportRepository reportRepository,
+			SalesReadRepository salesReadRepository,
+			SalesReportRepository salesReportRepository,
 			SaleCreationService saleCreationService,
 			SalesPaymentService paymentService,
 			SalesRefundService refundService,
@@ -57,8 +47,8 @@ public class SalesService implements SalesOperations {
 			SalePaymentCompletionService completionService
 	) {
 		this.salesRepository = salesRepository;
-		this.readRepository = readRepository;
-		this.reportRepository = reportRepository;
+		this.salesReadRepository = salesReadRepository;
+		this.salesReportRepository = salesReportRepository;
 		this.saleCreationService = saleCreationService;
 		this.paymentService = paymentService;
 		this.refundService = refundService;
@@ -66,80 +56,10 @@ public class SalesService implements SalesOperations {
 		this.completionService = completionService;
 	}
 
-	SalesService(
-			JdbcClient jdbcClient,
-			SalesRepository salesRepository,
-			SaleLineResolver saleLineResolver,
-			AuditService auditService,
-			ObjectStorageService objectStorageService,
-			ApplicationEventPublisher eventPublisher
-	) {
-		this(
-				salesRepository,
-				new SalesReadRepository(jdbcClient),
-				new SalesReportRepository(jdbcClient),
-				new SaleCreationService(
-						salesRepository,
-						saleLineResolver,
-						new SaleCommandRepository(jdbcClient),
-						auditService,
-						eventPublisher
-				),
-				paymentService(jdbcClient, salesRepository, auditService, objectStorageService, eventPublisher),
-				new SalesRefundService(salesRepository, auditService),
-				membershipSalesService(jdbcClient, salesRepository, auditService, eventPublisher),
-				completionService(jdbcClient, salesRepository, eventPublisher)
-		);
-	}
-
-	private static SalePaymentCompletionService completionService(
-			JdbcClient jdbcClient,
-			SalesRepository salesRepository,
-			ApplicationEventPublisher eventPublisher
-	) {
-		return new SalePaymentCompletionService(
-				salesRepository,
-				new SalePaymentCompletionRepository(jdbcClient),
-				eventPublisher
-		);
-	}
-
-	private static SalesPaymentService paymentService(
-			JdbcClient jdbcClient,
-			SalesRepository salesRepository,
-			AuditService auditService,
-			ObjectStorageService objectStorageService,
-			ApplicationEventPublisher eventPublisher
-	) {
-		return new SalesPaymentService(
-				salesRepository,
-				new SalesPaymentCommandRepository(jdbcClient),
-				completionService(jdbcClient, salesRepository, eventPublisher),
-				auditService,
-				objectStorageService,
-				eventPublisher
-		);
-	}
-
-	private static MembershipSalesService membershipSalesService(
-			JdbcClient jdbcClient,
-			SalesRepository salesRepository,
-			AuditService auditService,
-			ApplicationEventPublisher eventPublisher
-	) {
-		return new MembershipSalesService(
-				salesRepository,
-				new MembershipSaleCommandRepository(jdbcClient),
-				completionService(jdbcClient, salesRepository, eventPublisher),
-				auditService,
-				eventPublisher
-		);
-	}
-
 	@Transactional(readOnly = true)
 	public List<SaleSummary> recent(GymOsPrincipal principal) {
 		requireBranch(principal);
-		return readRepository.recentSales(principal.organizationId(), principal.branchId());
+		return salesReadRepository.recentSales(principal.organizationId(), principal.branchId());
 	}
 
 	@Transactional(readOnly = true)
@@ -155,16 +75,16 @@ public class SalesService implements SalesOperations {
 		}
 		OffsetDateTime from = resolvedFrom.atStartOfDay().atOffset(ZoneOffset.UTC);
 		OffsetDateTime toExclusive = resolvedTo.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
-		var sales = reportRepository.salesTotals(principal.organizationId(), principal.branchId(), from, toExclusive);
+		var sales = salesReportRepository.salesReportTotals(principal.organizationId(), principal.branchId(), from, toExclusive);
 		return new SalesReportResult(
 				resolvedFrom,
 				resolvedTo,
 				sales.currency(),
 				sales,
-				reportRepository.paymentTotals(principal.organizationId(), principal.branchId(), from, toExclusive),
-				reportRepository.salesByStatus(principal.organizationId(), principal.branchId(), from, toExclusive),
-				reportRepository.paymentsByMethod(principal.organizationId(), principal.branchId(), from, toExclusive),
-				readRepository.recentSales(principal.organizationId(), principal.branchId())
+				salesReportRepository.paymentReportTotals(principal.organizationId(), principal.branchId(), from, toExclusive),
+				salesReportRepository.salesByStatus(principal.organizationId(), principal.branchId(), from, toExclusive),
+				salesReportRepository.paymentsByMethod(principal.organizationId(), principal.branchId(), from, toExclusive),
+				salesReadRepository.recentSales(principal.organizationId(), principal.branchId())
 		);
 	}
 
@@ -175,10 +95,10 @@ public class SalesService implements SalesOperations {
 				.orElseThrow(() -> new BusinessException("SALE_NOT_FOUND", "La venta no existe o no esta disponible."));
 		return new SaleDetailResult(
 				sale,
-				readRepository.saleItems(principal.organizationId(), saleId),
-				readRepository.payments(principal.organizationId(), saleId),
-				readRepository.refunds(principal.organizationId(), saleId),
-				readRepository.membershipsForSale(principal.organizationId(), saleId)
+				salesReadRepository.saleItems(principal.organizationId(), saleId),
+				salesReadRepository.payments(principal.organizationId(), saleId),
+				salesReadRepository.refunds(principal.organizationId(), saleId),
+				salesReadRepository.membershipsForSale(principal.organizationId(), saleId)
 		);
 	}
 
