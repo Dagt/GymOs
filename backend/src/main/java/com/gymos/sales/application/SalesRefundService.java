@@ -5,8 +5,8 @@ import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.sales.application.command.RequestRefundCommand;
 import com.gymos.sales.infrastructure.SalesRepository;
-import com.gymos.sales.infrastructure.SalesRepository.PaymentDetail;
-import com.gymos.sales.infrastructure.SalesRepository.SaleHeader;
+import com.gymos.sales.model.PaymentDetail;
+import com.gymos.sales.model.SaleHeader;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 

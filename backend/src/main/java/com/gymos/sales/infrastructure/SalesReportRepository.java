@@ -1,10 +1,9 @@
 package com.gymos.sales.infrastructure;
 
-import static com.gymos.sales.infrastructure.SalesRepository.PaymentMethodBreakdown;
-import static com.gymos.sales.infrastructure.SalesRepository.PaymentReportTotals;
-import static com.gymos.sales.infrastructure.SalesRepository.SaleStatusBreakdown;
-import static com.gymos.sales.infrastructure.SalesRepository.SalesReportTotals;
-
+import com.gymos.sales.model.PaymentMethodBreakdown;
+import com.gymos.sales.model.PaymentReportTotals;
+import com.gymos.sales.model.SaleStatusBreakdown;
+import com.gymos.sales.model.SalesReportTotals;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;

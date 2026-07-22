@@ -14,8 +14,8 @@ import com.gymos.sales.application.result.SalesReportResult;
 import com.gymos.sales.infrastructure.SalesReadRepository;
 import com.gymos.sales.infrastructure.SalesReportRepository;
 import com.gymos.sales.infrastructure.SalesRepository;
-import com.gymos.sales.infrastructure.SalesRepository.SaleHeader;
-import com.gymos.sales.infrastructure.SalesRepository.SaleSummary;
+import com.gymos.sales.model.SaleHeader;
+import com.gymos.sales.model.SaleSummary;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -75,13 +75,13 @@ public class SalesService implements SalesOperations {
 		}
 		OffsetDateTime from = resolvedFrom.atStartOfDay().atOffset(ZoneOffset.UTC);
 		OffsetDateTime toExclusive = resolvedTo.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
-		var sales = salesReportRepository.salesReportTotals(principal.organizationId(), principal.branchId(), from, toExclusive);
+		var sales = salesReportRepository.salesTotals(principal.organizationId(), principal.branchId(), from, toExclusive);
 		return new SalesReportResult(
 				resolvedFrom,
 				resolvedTo,
 				sales.currency(),
 				sales,
-				salesReportRepository.paymentReportTotals(principal.organizationId(), principal.branchId(), from, toExclusive),
+				salesReportRepository.paymentTotals(principal.organizationId(), principal.branchId(), from, toExclusive),
 				salesReportRepository.salesByStatus(principal.organizationId(), principal.branchId(), from, toExclusive),
 				salesReportRepository.paymentsByMethod(principal.organizationId(), principal.branchId(), from, toExclusive),
 				salesReadRepository.recentSales(principal.organizationId(), principal.branchId())

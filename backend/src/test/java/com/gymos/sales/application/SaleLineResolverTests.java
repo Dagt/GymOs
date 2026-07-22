@@ -11,7 +11,7 @@ import com.gymos.common.api.BusinessException;
 import com.gymos.sales.application.SaleLineResolver.ResolvedSale;
 import com.gymos.sales.application.command.SaleItemCommand;
 import com.gymos.sales.infrastructure.SalesRepository;
-import com.gymos.sales.infrastructure.SalesRepository.ProductForSale;
+import com.gymos.sales.model.ProductForSale;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;

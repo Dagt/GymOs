@@ -15,7 +15,7 @@ import com.gymos.sales.infrastructure.SaleCommandRepository;
 import com.gymos.sales.infrastructure.SaleCommandRepository.SaleItemRecord;
 import com.gymos.sales.infrastructure.SaleCommandRepository.SaleRecord;
 import com.gymos.sales.infrastructure.SalesRepository;
-import com.gymos.sales.infrastructure.SalesRepository.SaleHeader;
+import com.gymos.sales.model.SaleHeader;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;

@@ -2,8 +2,8 @@ package com.gymos.sales.application;
 
 import com.gymos.common.api.BusinessException;
 import com.gymos.sales.infrastructure.SalesRepository;
-import com.gymos.sales.infrastructure.SalesRepository.PaymentDetail;
-import com.gymos.sales.infrastructure.SalesRepository.SaleHeader;
+import com.gymos.sales.model.PaymentDetail;
+import com.gymos.sales.model.SaleHeader;
 import java.util.UUID;
 
 final class SalesRecordResolver {

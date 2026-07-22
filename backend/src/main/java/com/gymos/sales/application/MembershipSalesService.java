@@ -10,7 +10,7 @@ import com.gymos.sales.api.operations.MembershipSaleResult;
 import com.gymos.sales.infrastructure.MembershipSaleCommandRepository;
 import com.gymos.sales.infrastructure.MembershipSaleCommandRepository.MembershipSaleRecord;
 import com.gymos.sales.infrastructure.SalesRepository;
-import com.gymos.sales.infrastructure.SalesRepository.SaleHeader;
+import com.gymos.sales.model.SaleHeader;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;

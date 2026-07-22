@@ -3,7 +3,7 @@ package com.gymos.sales.application;
 import com.gymos.common.api.BusinessException;
 import com.gymos.sales.application.command.SaleItemCommand;
 import com.gymos.sales.infrastructure.SalesRepository;
-import com.gymos.sales.infrastructure.SalesRepository.ProductForSale;
+import com.gymos.sales.model.ProductForSale;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;

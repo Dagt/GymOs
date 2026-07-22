@@ -1,5 +1,10 @@
 package com.gymos.sales.infrastructure;
 
+import com.gymos.sales.model.MembershipPlanForSale;
+import com.gymos.sales.model.PaymentDetail;
+import com.gymos.sales.model.ProductForSale;
+import com.gymos.sales.model.RefundDetail;
+import com.gymos.sales.model.SaleHeader;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -313,17 +318,4 @@ public class SalesRepository {
 				resultSet.getObject("updated_at", OffsetDateTime.class)
 		);
 	}
-
-	public record MembershipPlanForSale(UUID planId, UUID productId, int durationDays, int graceDays) {}
-	public record MembershipDetail(UUID id, UUID clientId, UUID planId, String planName, String status, OffsetDateTime activatedAt, LocalDate startsOn, LocalDate endsOn, LocalDate graceEndsOn) {}
-	public record ProductForSale(UUID id, String name, String productType, long priceCents, String currency) {}
-	public record SaleSummary(UUID id, String saleNumber, UUID clientId, String clientName, String status, long totalCents, long paidCents, long balanceCents, String currency, OffsetDateTime soldAt) {}
-	public record SalesReportTotals(String currency, long saleCount, long subtotalCents, long discountCents, long totalCents, long paidCents, long balanceCents, long paidSales, long partiallyPaidSales, long pendingSales) {}
-	public record PaymentReportTotals(long paymentCount, long completedPayments, long pendingPayments, long rejectedPayments, long completedCents, long pendingCents, long rejectedCents) {}
-	public record SaleStatusBreakdown(String status, long saleCount, long totalCents, long paidCents, long balanceCents) {}
-	public record PaymentMethodBreakdown(String method, long paymentCount, long totalCents, long completedCents, long pendingCents, long rejectedCents) {}
-	public record SaleHeader(UUID id, String saleNumber, UUID branchId, UUID clientId, String clientName, String status, long subtotalCents, long discountCents, long totalCents, long paidCents, long balanceCents, String currency, String notes, OffsetDateTime soldAt, OffsetDateTime createdAt, OffsetDateTime updatedAt) {}
-	public record SaleItemDetail(UUID id, UUID productId, String itemType, String name, int quantity, long unitPriceCents, long discountCents, long totalCents, OffsetDateTime createdAt) {}
-	public record PaymentDetail(UUID id, String method, String status, long amountCents, String currency, String reference, String receiptObjectKey, OffsetDateTime receivedAt, OffsetDateTime validatedAt, String notes) {}
-	public record RefundDetail(UUID id, UUID saleId, UUID paymentId, String status, long amountCents, String currency, String reason, String idempotencyKey, UUID requestedBy, OffsetDateTime requestedAt, OffsetDateTime processedAt, OffsetDateTime createdAt, OffsetDateTime updatedAt) {}
 }

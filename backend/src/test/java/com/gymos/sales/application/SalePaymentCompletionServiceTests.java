@@ -11,7 +11,7 @@ import com.gymos.sales.api.events.PaymentCompletedV1;
 import com.gymos.sales.infrastructure.SalePaymentCompletionRepository;
 import com.gymos.sales.infrastructure.SalePaymentCompletionRepository.SaleContext;
 import com.gymos.sales.infrastructure.SalesRepository;
-import com.gymos.sales.infrastructure.SalesRepository.SaleHeader;
+import com.gymos.sales.model.SaleHeader;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;

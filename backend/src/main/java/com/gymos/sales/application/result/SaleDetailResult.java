@@ -1,10 +1,10 @@
 package com.gymos.sales.application.result;
 
-import com.gymos.sales.infrastructure.SalesRepository.MembershipDetail;
-import com.gymos.sales.infrastructure.SalesRepository.PaymentDetail;
-import com.gymos.sales.infrastructure.SalesRepository.RefundDetail;
-import com.gymos.sales.infrastructure.SalesRepository.SaleHeader;
-import com.gymos.sales.infrastructure.SalesRepository.SaleItemDetail;
+import com.gymos.sales.model.MembershipDetail;
+import com.gymos.sales.model.PaymentDetail;
+import com.gymos.sales.model.RefundDetail;
+import com.gymos.sales.model.SaleHeader;
+import com.gymos.sales.model.SaleItemDetail;
 import java.util.List;
 
 public record SaleDetailResult(

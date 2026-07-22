@@ -14,7 +14,7 @@ import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.storage.ObjectStorageService;
 import com.gymos.sales.application.command.ManualPaymentCommand;
 import com.gymos.sales.infrastructure.SalesRepository;
-import com.gymos.sales.infrastructure.SalesRepository.SaleHeader;
+import com.gymos.sales.model.SaleHeader;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.Set;

@@ -1,11 +1,10 @@
 package com.gymos.sales.infrastructure;
 
-import static com.gymos.sales.infrastructure.SalesRepository.MembershipDetail;
-import static com.gymos.sales.infrastructure.SalesRepository.PaymentDetail;
-import static com.gymos.sales.infrastructure.SalesRepository.RefundDetail;
-import static com.gymos.sales.infrastructure.SalesRepository.SaleItemDetail;
-import static com.gymos.sales.infrastructure.SalesRepository.SaleSummary;
-
+import com.gymos.sales.model.MembershipDetail;
+import com.gymos.sales.model.PaymentDetail;
+import com.gymos.sales.model.RefundDetail;
+import com.gymos.sales.model.SaleItemDetail;
+import com.gymos.sales.model.SaleSummary;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
