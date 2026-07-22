@@ -17,6 +17,8 @@ import com.gymos.sales.infrastructure.MembershipSaleCommandRepository;
 import com.gymos.sales.infrastructure.SaleCommandRepository;
 import com.gymos.sales.infrastructure.SalePaymentCompletionRepository;
 import com.gymos.sales.infrastructure.SalesPaymentCommandRepository;
+import com.gymos.sales.infrastructure.SalesReadRepository;
+import com.gymos.sales.infrastructure.SalesReportRepository;
 import com.gymos.sales.infrastructure.SalesRepository;
 import com.gymos.sales.infrastructure.SalesRepository.SaleHeader;
 import com.gymos.sales.infrastructure.SalesRepository.SaleSummary;
@@ -35,6 +37,8 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 public class SalesService implements SalesOperations {
 	private final SalesRepository salesRepository;
+	private final SalesReadRepository readRepository;
+	private final SalesReportRepository reportRepository;
 	private final SaleCreationService saleCreationService;
 	private final SalesPaymentService paymentService;
 	private final SalesRefundService refundService;
@@ -44,6 +48,8 @@ public class SalesService implements SalesOperations {
 	@Autowired
 	public SalesService(
 			SalesRepository salesRepository,
+			SalesReadRepository readRepository,
+			SalesReportRepository reportRepository,
 			SaleCreationService saleCreationService,
 			SalesPaymentService paymentService,
 			SalesRefundService refundService,
@@ -51,6 +57,8 @@ public class SalesService implements SalesOperations {
 			SalePaymentCompletionService completionService
 	) {
 		this.salesRepository = salesRepository;
+		this.readRepository = readRepository;
+		this.reportRepository = reportRepository;
 		this.saleCreationService = saleCreationService;
 		this.paymentService = paymentService;
 		this.refundService = refundService;
@@ -68,6 +76,8 @@ public class SalesService implements SalesOperations {
 	) {
 		this(
 				salesRepository,
+				new SalesReadRepository(jdbcClient),
+				new SalesReportRepository(jdbcClient),
 				new SaleCreationService(
 						salesRepository,
 						saleLineResolver,
@@ -129,7 +139,7 @@ public class SalesService implements SalesOperations {
 	@Transactional(readOnly = true)
 	public List<SaleSummary> recent(GymOsPrincipal principal) {
 		requireBranch(principal);
-		return salesRepository.recentSales(principal.organizationId(), principal.branchId());
+		return readRepository.recentSales(principal.organizationId(), principal.branchId());
 	}
 
 	@Transactional(readOnly = true)
@@ -145,16 +155,16 @@ public class SalesService implements SalesOperations {
 		}
 		OffsetDateTime from = resolvedFrom.atStartOfDay().atOffset(ZoneOffset.UTC);
 		OffsetDateTime toExclusive = resolvedTo.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
-		var sales = salesRepository.salesReportTotals(principal.organizationId(), principal.branchId(), from, toExclusive);
+		var sales = reportRepository.salesTotals(principal.organizationId(), principal.branchId(), from, toExclusive);
 		return new SalesReportResult(
 				resolvedFrom,
 				resolvedTo,
 				sales.currency(),
 				sales,
-				salesRepository.paymentReportTotals(principal.organizationId(), principal.branchId(), from, toExclusive),
-				salesRepository.salesByStatus(principal.organizationId(), principal.branchId(), from, toExclusive),
-				salesRepository.paymentsByMethod(principal.organizationId(), principal.branchId(), from, toExclusive),
-				salesRepository.recentSales(principal.organizationId(), principal.branchId())
+				reportRepository.paymentTotals(principal.organizationId(), principal.branchId(), from, toExclusive),
+				reportRepository.salesByStatus(principal.organizationId(), principal.branchId(), from, toExclusive),
+				reportRepository.paymentsByMethod(principal.organizationId(), principal.branchId(), from, toExclusive),
+				readRepository.recentSales(principal.organizationId(), principal.branchId())
 		);
 	}
 
@@ -165,10 +175,10 @@ public class SalesService implements SalesOperations {
 				.orElseThrow(() -> new BusinessException("SALE_NOT_FOUND", "La venta no existe o no esta disponible."));
 		return new SaleDetailResult(
 				sale,
-				salesRepository.saleItems(principal.organizationId(), saleId),
-				salesRepository.payments(principal.organizationId(), saleId),
-				salesRepository.refunds(principal.organizationId(), saleId),
-				salesRepository.membershipsForSale(principal.organizationId(), saleId)
+				readRepository.saleItems(principal.organizationId(), saleId),
+				readRepository.payments(principal.organizationId(), saleId),
+				readRepository.refunds(principal.organizationId(), saleId),
+				readRepository.membershipsForSale(principal.organizationId(), saleId)
 		);
 	}
 
