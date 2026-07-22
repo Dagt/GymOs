@@ -70,7 +70,7 @@ class SaleLineResolverTests {
 				0
 		));
 
-		assertEquals("SALE_MIXED_CURRENCY", exception.getCode());
+		assertEquals("SALE_MIXED_CURRENCY", exception.code());
 	}
 
 	@Test
@@ -90,6 +90,6 @@ class SaleLineResolverTests {
 				0
 		));
 
-		assertEquals("SALE_CLIENT_REQUIRED_FOR_PLAN", exception.getCode());
+		assertEquals("SALE_CLIENT_REQUIRED_FOR_PLAN", exception.code());
 	}
 }
