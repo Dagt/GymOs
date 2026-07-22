@@ -20,6 +20,20 @@ Verificado:
 - `npm.cmd run lint`
 - `npm.cmd run build`
 
+## Refactor frontend plataforma - 21 de julio de 2026
+
+Implementado:
+
+- `/platform/gymnasiums/page.tsx` conserva carga de datos, seleccion de tenant, soporte, alta y suspension.
+- Se extrae la lista de gimnasios y el panel de detalle/sucursales a `frontend/src/app/platform/gymnasiums/PlatformGymnasiumPanels.tsx`.
+- El refactor no cambia rutas ni contratos HTTP; prepara mejoras posteriores de edicion, soporte y escalabilidad visual.
+
+Verificado:
+
+- `npm.cmd run typecheck`
+- `npm.cmd run lint`
+- `npm.cmd run build`
+
 ## Correccion encabezado y kiosco tenant - 20 de julio de 2026
 
 Implementado:
