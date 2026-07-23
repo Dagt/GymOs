@@ -93,12 +93,17 @@ public class CatalogProductCommandRepository implements CatalogProductCommandPor
 
 	@Override
 	public int changeStatus(UUID organizationId, UUID productId, String status, UUID userId, OffsetDateTime now) {
-		return updateLifecycle(organizationId, productId, status, null, userId, now);
+		return updateLifecycle(organizationId, productId, status, null, userId, now, false);
 	}
 
 	@Override
 	public int archive(UUID organizationId, UUID productId, UUID userId, OffsetDateTime now) {
-		return updateLifecycle(organizationId, productId, "INACTIVE", now, userId, now);
+		return updateLifecycle(organizationId, productId, "INACTIVE", now, userId, now, false);
+	}
+
+	@Override
+	public int restore(UUID organizationId, UUID productId, String status, UUID userId, OffsetDateTime now) {
+		return updateLifecycle(organizationId, productId, status, null, userId, now, true);
 	}
 
 	@Override
@@ -138,15 +143,16 @@ public class CatalogProductCommandRepository implements CatalogProductCommandPor
 
 	private int updateLifecycle(
 			UUID organizationId, UUID productId, String status, OffsetDateTime archivedAt,
-			UUID userId, OffsetDateTime now
+			UUID userId, OffsetDateTime now, boolean restoring
 	) {
+		String archivePredicate = restoring ? "archived_at IS NOT NULL" : "archived_at IS NULL";
 		return jdbcClient.sql("""
 				UPDATE catalog_product
 				SET status = :status, archived_at = :archivedAt, archived_by = :archivedBy,
 				    updated_at = :now, updated_by = :userId, version = version + 1
 				WHERE organization_id = :organizationId AND id = :productId
-				  AND deleted_at IS NULL AND archived_at IS NULL
-				""")
+				  AND deleted_at IS NULL AND %s
+				""".formatted(archivePredicate))
 				.param("status", status).param("archivedAt", archivedAt)
 				.param("archivedBy", archivedAt == null ? null : userId)
 				.param("now", now).param("userId", userId)
