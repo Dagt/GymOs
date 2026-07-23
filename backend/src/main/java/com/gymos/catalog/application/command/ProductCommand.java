@@ -26,7 +26,8 @@ public record ProductCommand(
 		OffsetDateTime promotionStartsAt,
 		OffsetDateTime promotionEndsAt,
 		UUID categoryId,
-		List<String> tags
+		List<String> tags,
+		Long version
 ) {
 	public ProductCommand(
 			String sku, String name, String description, String productType, long priceCents,
@@ -36,7 +37,7 @@ public record ProductCommand(
 	) {
 		this(sku, name, description, productType, defaultSubtype(productType), priceCents, currency,
 				taxable, status, barcode, brand, presentation, unitOfMeasure, inventoryTracked,
-				displayOrder, null, null, null, null, null, categoryId, tags);
+				displayOrder, null, null, null, null, null, categoryId, tags, null);
 	}
 
 	private static String defaultSubtype(String productType) {
