@@ -24,6 +24,44 @@ export type ProductSummary = {
   updatedAt: string;
 };
 
+export type CatalogSummary = {
+  activeProducts: number;
+  activeServices: number;
+  activePlans: number;
+  inactiveProducts: number;
+  archivedProducts: number;
+  inventoryTrackedProducts: number;
+  uncategorizedProducts: number;
+  productsWithoutBarcode: number;
+  productsWithoutImage: number;
+  lowStockProducts: number;
+};
+
+export type ProductDependencies = {
+  saleItems: number;
+  inventoryMovements: number;
+  branchesWithStock: number;
+  activeMembershipPlans: number;
+  activeProductsInCategory: number;
+};
+
+export type ProductHistoryEntry = {
+  id: string;
+  action: string;
+  actorUserId: string | null;
+  actorRole: string;
+  reason: string | null;
+  origin: string;
+  correlationId: string;
+  occurredAt: string;
+};
+
+export type ProductDetail = {
+  product: ProductSummary;
+  dependencies: ProductDependencies;
+  history: ProductHistoryEntry[];
+};
+
 export type PlanSummary = {
   id: string;
   productId: string;
