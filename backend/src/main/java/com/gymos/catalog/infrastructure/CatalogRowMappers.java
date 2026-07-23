@@ -3,8 +3,8 @@ package com.gymos.catalog.infrastructure;
 import com.gymos.catalog.application.query.PlanView;
 import com.gymos.catalog.application.query.ProductSummaryView;
 import java.time.OffsetDateTime;
-import java.util.UUID;
 import java.util.List;
+import java.util.UUID;
 import org.springframework.jdbc.core.RowMapper;
 
 final class CatalogRowMappers {
@@ -32,6 +32,8 @@ final class CatalogRowMappers {
 				resultSet.getObject("category_id", UUID.class),
 				resultSet.getString("category_name"),
 				tags(resultSet.getString("tags_csv")),
+				resultSet.getObject("archived_at", OffsetDateTime.class) != null,
+				resultSet.getObject("archived_at", OffsetDateTime.class),
 				resultSet.getObject("created_at", OffsetDateTime.class),
 				resultSet.getObject("updated_at", OffsetDateTime.class)
 		);
