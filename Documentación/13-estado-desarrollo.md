@@ -3,6 +3,34 @@
 Estado: en progreso  
 Fecha: 19 de julio de 2026
 
+## Saneamiento cliente, catalogo y activacion de membresias - 22 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `clients/[clientId]/ClientDetailSections.tsx` deja de concentrar toda la UI visual de ficha de socio.
+- La ficha de socio queda separada en componentes presentacionales:
+  - `ClientProfileCard.tsx` para datos personales;
+  - `MembershipHistory.tsx` para historial, renovacion y cambio de plan;
+  - `ClientSummaryAside.tsx` para contacto y timeline;
+  - `ClientDetailDrawers.tsx` para paneles laterales de edicion y acciones;
+  - `ClientDetailMetric.tsx` para metricas compactas reutilizables.
+- `/catalog` extrae la orquestacion a `useCatalogController.ts`: carga de catalogo, alta de producto, alta/edicion de planes, mensajes, drawers y productos vendibles.
+- `catalog/page.tsx` queda como composicion de alto nivel con toolbar, listas y drawers; ya no mezcla estado remoto con estructura visual.
+- `memberships.application` separa el consumo de `PaymentCompletedV1` en `MembershipActivationService`.
+- `MembershipService` queda enfocado en casos de uso invocados por usuarios/API interna: consulta, renovacion y cambio de plan.
+- La activacion, renovacion por evento, cambio de plan por evento, auditoria y publicacion de eventos versionados quedan encapsulados en un servicio transaccional dedicado.
+- Los tests de idempotencia de eventos apuntan ahora a `MembershipActivationService`, manteniendo cobertura sobre reprocesamiento de pagos.
+
+Verificado:
+
+- Frontend: `npm.cmd run typecheck`.
+- Frontend: `npm.cmd run lint`.
+- Backend: `./gradlew.bat test`.
+
+Observacion:
+
+- Backend pasa completo. Persiste un warning no bloqueante de apagado de Spring Modulith en pruebas H2 cuando intenta consultar `event_publication` despues de cerrar una base efimera; sigue recomendado resolverlo en el bloque backend profundo de infraestructura/test configuration.
+
 ## Refactor frontend reservas - 21 de julio de 2026
 
 Implementado:

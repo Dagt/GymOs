@@ -244,3 +244,12 @@ Decisiones implementadas:
 - Coach queda acotado a clientes/rutinas/seguimiento autorizado.
 - La sesion expone `platformAdmin`, `supportMode` y `console` para que el frontend no infiera rol por nombre de usuario.
 - Las acciones ejecutadas con `supportMode` se registran en auditoria con origen `PLATFORM_SUPPORT`.
+
+## 3.21 Criterio de saneamiento continuo
+
+Decisiones implementadas:
+- Las paginas frontend grandes deben evolucionar hacia una pagina orquestadora pequena, un hook controlador por ruta cuando haya estado remoto significativo y componentes presentacionales por seccion.
+- Los drawers reutilizan `AppDrawer`; los formularios densos no deben permanecer como bloques permanentes que saturen la pantalla principal.
+- La logica de validacion y armado de payloads debe vivir en helpers o hooks del modulo, no mezclada con JSX.
+- Los servicios application de backend deben dividirse por caso de uso cuando concentren responsabilidades heterogeneas. La activacion de membresias por pagos completados se separa de `MembershipService` en `MembershipActivationService`.
+- Los consumidores de eventos deben permanecer idempotentes y transaccionales, con pruebas orientadas al consumidor dedicado.

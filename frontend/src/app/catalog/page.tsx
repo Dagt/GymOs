@@ -1,20 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
-import {
-  createMembershipPlan,
-  createProduct,
-  getPlans,
-  getProducts,
-  getStoredSession,
-  updateMembershipPlan,
-  type PlanSummary,
-  type ProductPayload,
-  type ProductSummary,
-  type StoredSession,
-} from "@/lib/api";
 import {
   CatalogToolbar,
   PlanDrawer,
@@ -22,184 +9,64 @@ import {
   ProductDrawer,
   ProductList,
 } from "./CatalogSections";
-import { emptyPlan, emptyProduct, planDraftToPayload, planToDraft, productDraftToPayload, type PlanDraft } from "./CatalogHelpers";
+import { useCatalogController } from "./useCatalogController";
 
 export default function CatalogPage() {
-  const [session, setSession] = useState<StoredSession | null>(null);
-  const [products, setProducts] = useState<ProductSummary[]>([]);
-  const [plans, setPlans] = useState<PlanSummary[]>([]);
-  const [form, setForm] = useState<ProductPayload>(emptyProduct);
-  const [planForm, setPlanForm] = useState<PlanDraft>(emptyPlan);
-  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
-  const [price, setPrice] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [showProductDrawer, setShowProductDrawer] = useState(false);
-  const [showPlanDrawer, setShowPlanDrawer] = useState(false);
+  const controller = useCatalogController();
 
-  useEffect(() => {
-    let active = true;
-
-    async function loadInitial() {
-      const storedSession = getStoredSession();
-      if (!active) {
-        return;
-      }
-      if (!storedSession) {
-        setLoading(false);
-        return;
-      }
-      setSession(storedSession);
-      try {
-        const [loadedProducts, loadedPlans] = await loadCatalog(storedSession.accessToken);
-        if (!active) {
-          return;
-        }
-        setProducts(loadedProducts);
-        setPlans(loadedPlans);
-      } catch (exception) {
-        if (active) {
-          setError(exception instanceof Error ? exception.message : "No fue posible cargar catalogo.");
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void loadInitial();
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  async function submitProduct(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!session) {
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    setMessage(null);
-    try {
-      await createProduct(session.accessToken, productDraftToPayload(form, price));
-      const [loadedProducts, loadedPlans] = await loadCatalog(session.accessToken);
-      setProducts(loadedProducts);
-      setPlans(loadedPlans);
-      setForm(emptyProduct);
-      setPrice("");
-      setShowProductDrawer(false);
-      setMessage("Producto creado.");
-    } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible crear producto.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function submitPlan(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!session) {
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const payload = planDraftToPayload(planForm);
-      if (editingPlanId) {
-        await updateMembershipPlan(session.accessToken, editingPlanId, payload);
-      } else {
-        await createMembershipPlan(session.accessToken, payload);
-      }
-      const [loadedProducts, loadedPlans] = await loadCatalog(session.accessToken);
-      setProducts(loadedProducts);
-      setPlans(loadedPlans);
-      resetPlanDrawer();
-      setMessage(editingPlanId ? "Plan de membresia actualizado." : "Plan de membresia creado.");
-    } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible guardar plan.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function openPlanCreation() {
-    setEditingPlanId(null);
-    setPlanForm(emptyPlan);
-    setShowPlanDrawer(true);
-  }
-
-  function openPlanEdition(plan: PlanSummary) {
-    setEditingPlanId(plan.id);
-    setPlanForm(planToDraft(plan));
-    setShowPlanDrawer(true);
-  }
-
-  function resetPlanDrawer() {
-    setPlanForm(emptyPlan);
-    setEditingPlanId(null);
-    setShowPlanDrawer(false);
-  }
-
-  if (loading && !session) {
+  if (controller.loading && !controller.session) {
     return <LoadingScreen text="Cargando catalogo..." />;
   }
 
-  if (!session) {
+  if (!controller.session) {
     return <AuthRequired />;
   }
-
-  const sellableProducts = products.filter((product) => product.productType !== "MEMBERSHIP_PLAN");
 
   return (
     <AppShell
       eyebrow="Administracion"
-      session={session}
+      session={controller.session}
       subtitle="Productos, servicios y planes disponibles para vender desde recepcion."
       title="Catalogo"
     >
-      {error ? <InlineError message={error} /> : null}
-      {message ? (
+      {controller.error ? <InlineError message={controller.error} /> : null}
+      {controller.message ? (
         <p className="rounded-md border border-[#bad9c4] bg-[#eff8f1] px-3 py-2 text-sm text-[#31563c]">
-          {message}
+          {controller.message}
         </p>
       ) : null}
 
       <section className="grid gap-6">
         <CatalogToolbar
-          onNewPlan={openPlanCreation}
-          onNewProduct={() => setShowProductDrawer(true)}
+          onNewPlan={controller.openPlanCreation}
+          onNewProduct={() => controller.setShowProductDrawer(true)}
         />
 
         <section className="grid gap-6 lg:grid-cols-2">
-          <ProductList loading={loading} products={sellableProducts} />
-          <PlanList plans={plans} onEditPlan={openPlanEdition} />
+          <ProductList loading={controller.loading} products={controller.sellableProducts} />
+          <PlanList plans={controller.plans} onEditPlan={controller.openPlanEdition} />
         </section>
       </section>
 
       <ProductDrawer
-        form={form}
-        open={showProductDrawer}
-        price={price}
-        saving={saving}
-        onClose={() => setShowProductDrawer(false)}
-        onFormChange={setForm}
-        onPriceChange={setPrice}
-        onSubmit={submitProduct}
+        form={controller.form}
+        open={controller.showProductDrawer}
+        price={controller.price}
+        saving={controller.saving}
+        onClose={() => controller.setShowProductDrawer(false)}
+        onFormChange={controller.setForm}
+        onPriceChange={controller.setPrice}
+        onSubmit={controller.submitProduct}
       />
 
       <PlanDrawer
-        editingPlanId={editingPlanId}
-        form={planForm}
-        open={showPlanDrawer}
-        saving={saving}
-        onClose={resetPlanDrawer}
-        onFormChange={setPlanForm}
-        onSubmit={submitPlan}
+        editingPlanId={controller.editingPlanId}
+        form={controller.planForm}
+        open={controller.showPlanDrawer}
+        saving={controller.saving}
+        onClose={controller.resetPlanDrawer}
+        onFormChange={controller.setPlanForm}
+        onSubmit={controller.submitPlan}
       />
     </AppShell>
   );
@@ -212,11 +79,4 @@ function AuthRequired() {
       title="Inicia sesion para ver el catalogo"
     />
   );
-}
-
-function loadCatalog(accessToken: string) {
-  return Promise.all([
-    getProducts(accessToken),
-    getPlans(accessToken),
-  ]);
 }

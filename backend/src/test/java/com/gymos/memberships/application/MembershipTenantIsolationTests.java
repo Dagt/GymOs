@@ -15,7 +15,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.context.ApplicationEventPublisher;
 
 class MembershipTenantIsolationTests {
 	@Test
@@ -23,12 +22,11 @@ class MembershipTenantIsolationTests {
 		MembershipRepository membershipRepository = mock(MembershipRepository.class);
 		SalesOperations salesOperations = mock(SalesOperations.class);
 		AuditService auditService = mock(AuditService.class);
-		ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+		MembershipActivationService activationService = mock(MembershipActivationService.class);
 		MembershipService service = new MembershipService(
 				membershipRepository,
 				salesOperations,
-				auditService,
-				eventPublisher
+				activationService
 		);
 
 		UUID organizationId = UUID.randomUUID();
@@ -49,6 +47,6 @@ class MembershipTenantIsolationTests {
 						org.assertj.core.api.Assertions.assertThat(exception.code()).isEqualTo("MEMBERSHIP_NOT_FOUND"));
 
 		verify(membershipRepository).byId(organizationId, branchId, membershipId);
-		verifyNoInteractions(salesOperations, auditService, eventPublisher);
+		verifyNoInteractions(salesOperations, auditService, activationService);
 	}
 }

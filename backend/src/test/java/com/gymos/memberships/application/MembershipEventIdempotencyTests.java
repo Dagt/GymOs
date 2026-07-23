@@ -8,7 +8,6 @@ import static org.mockito.Mockito.when;
 import com.gymos.audit.api.AuditService;
 import com.gymos.memberships.infrastructure.MembershipRepository;
 import com.gymos.sales.api.events.PaymentCompletedV1;
-import com.gymos.sales.api.operations.SalesOperations;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -19,12 +18,10 @@ class MembershipEventIdempotencyTests {
 	@Test
 	void duplicatePaymentCompletedEventIsIgnoredBeforeMembershipMutation() {
 		MembershipRepository membershipRepository = mock(MembershipRepository.class);
-		SalesOperations salesOperations = mock(SalesOperations.class);
 		AuditService auditService = mock(AuditService.class);
 		ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
-		MembershipService membershipService = new MembershipService(
+		MembershipActivationService activationService = new MembershipActivationService(
 				membershipRepository,
-				salesOperations,
 				auditService,
 				eventPublisher
 		);
@@ -50,13 +47,13 @@ class MembershipEventIdempotencyTests {
 				PaymentCompletedV1.class.getSimpleName()
 		)).thenReturn(false);
 
-		membershipService.onPaymentCompleted(duplicateEvent);
+		activationService.processPaymentCompleted(duplicateEvent);
 
 		verify(membershipRepository).markEventProcessed(
 				organizationId,
 				eventKey,
 				PaymentCompletedV1.class.getSimpleName()
 		);
-		verifyNoInteractions(salesOperations, auditService, eventPublisher);
+		verifyNoInteractions(auditService, eventPublisher);
 	}
 }
