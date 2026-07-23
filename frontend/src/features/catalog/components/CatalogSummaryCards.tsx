@@ -1,15 +1,12 @@
-import type { ProductSummary } from "@/lib/api";
+import type { CatalogSummary } from "@/lib/api/catalog-types";
 
-export function CatalogSummaryCards({ products }: { products: ProductSummary[] }) {
+export function CatalogSummaryCards({ summary }: { summary: CatalogSummary | null }) {
   const metrics = [
-    ["Activos", products.filter((product) => product.status === "ACTIVE").length],
-    ["Fisicos", products.filter((product) => product.productType === "PHYSICAL").length],
-    ["Servicios", products.filter((product) => product.productType === "SERVICE").length],
-    ["Con inventario", products.filter((product) => product.inventoryTracked).length],
-    [
-      "Incompletos",
-      products.filter((product) => !product.categoryId || (!product.barcode && product.productType === "PHYSICAL")).length,
-    ],
+    ["Productos activos", summary?.activeProducts ?? 0],
+    ["Servicios activos", summary?.activeServices ?? 0],
+    ["Planes activos", summary?.activePlans ?? 0],
+    ["Stock bajo", summary?.lowStockProducts ?? 0],
+    ["Incompletos", (summary?.uncategorizedProducts ?? 0) + (summary?.productsWithoutBarcode ?? 0) + (summary?.productsWithoutImage ?? 0)],
   ];
   return (
     <section aria-label="Resumen del catalogo" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
