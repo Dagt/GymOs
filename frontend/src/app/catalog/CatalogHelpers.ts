@@ -21,6 +21,7 @@ export const emptyProduct: ProductPayload = {
   displayOrder: 0,
   imageObjectKey: null,
   categoryId: null,
+  tags: [],
 };
 
 export function productToDraft(product: import("@/lib/api").ProductSummary): ProductPayload {
@@ -41,6 +42,7 @@ export function productToDraft(product: import("@/lib/api").ProductSummary): Pro
     displayOrder: product.displayOrder,
     imageObjectKey: product.imageObjectKey,
     categoryId: product.categoryId,
+    tags: product.tags,
   };
 }
 

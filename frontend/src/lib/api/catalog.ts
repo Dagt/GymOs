@@ -64,6 +64,28 @@ export async function archiveProduct(accessToken: string, productId: string): Pr
   return apiFetch<void>(`/catalog/products/${productId}`, accessToken, { method: "DELETE" });
 }
 
+export async function uploadProductImage(
+  accessToken: string,
+  productId: string,
+  file: File,
+): Promise<ProductSummary> {
+  const body = new FormData();
+  body.append("file", file);
+  return apiFetch<ProductSummary>(`/catalog/products/${productId}/image`, accessToken, {
+    method: "POST",
+    body,
+  });
+}
+
+export async function removeProductImage(
+  accessToken: string,
+  productId: string,
+): Promise<ProductSummary> {
+  return apiFetch<ProductSummary>(`/catalog/products/${productId}/image`, accessToken, {
+    method: "DELETE",
+  });
+}
+
 export async function getCatalogCategories(
   accessToken: string,
   includeInactive = false,
@@ -93,6 +115,13 @@ export async function updateCatalogCategory(
     method: "PATCH",
     body: JSON.stringify(normalizePayload(payload)),
   });
+}
+
+export async function archiveCatalogCategory(
+  accessToken: string,
+  categoryId: string,
+): Promise<void> {
+  return apiFetch<void>(`/catalog/categories/${categoryId}`, accessToken, { method: "DELETE" });
 }
 
 export async function getPlans(accessToken: string): Promise<PlanSummary[]> {

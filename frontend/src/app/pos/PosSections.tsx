@@ -15,16 +15,30 @@ export type PaymentMethod = "CASH" | "TRANSFER" | "CARD_MANUAL";
 
 export function ProductGrid({
   loading,
+  productQuery,
   products,
   onAddProduct,
+  onProductQueryChange,
 }: {
   loading: boolean;
+  productQuery: string;
   products: ProductSummary[];
   onAddProduct: (product: ProductSummary) => void;
+  onProductQueryChange: (value: string) => void;
 }) {
   return (
     <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
       <h2 className="text-xl font-semibold">Productos</h2>
+      <label className="mt-4 grid gap-1 text-sm font-medium">
+        Buscar o escanear
+        <input
+          autoComplete="off"
+          className="h-10 rounded-md border border-[#cdd5ca] px-3"
+          onChange={(event) => onProductQueryChange(event.target.value)}
+          placeholder="Nombre, SKU o codigo de barras"
+          value={productQuery}
+        />
+      </label>
       <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {loading ? <p className="text-sm text-[#5d6b63]">Cargando catalogo...</p> : null}
         {products.map((product) => (

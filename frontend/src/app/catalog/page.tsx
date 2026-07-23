@@ -13,6 +13,7 @@ import { CatalogFilters } from "@/features/catalog/components/CatalogFilters";
 import { CatalogProductDrawer } from "@/features/catalog/components/CatalogProductDrawer";
 import { CatalogProductTable } from "@/features/catalog/components/CatalogProductTable";
 import { CatalogSummaryCards } from "@/features/catalog/components/CatalogSummaryCards";
+import { CatalogCategoryManager } from "@/features/catalog/components/CatalogCategoryManager";
 
 export default function CatalogPage() {
   return (
@@ -49,6 +50,7 @@ function CatalogContent() {
 
       <section className="grid gap-6">
         <CatalogToolbar
+          canCreate={controller.canCreate}
           onNewPlan={controller.openPlanCreation}
           onNewProduct={controller.openProductCreation}
         />
@@ -64,6 +66,9 @@ function CatalogContent() {
           onUpdate={controller.catalogFilters.update}
         />
         <CatalogProductTable
+          canArchive={controller.canArchive}
+          canManageStatus={controller.canManageStatus}
+          canUpdate={controller.canUpdate}
           loading={controller.loading}
           products={controller.products}
           saving={controller.saving}
@@ -76,6 +81,13 @@ function CatalogContent() {
           totalPages={controller.totalPages}
           onPageChange={(page) => controller.catalogFilters.update("page", String(page))}
         />
+        {controller.canManageCategories ? (
+          <CatalogCategoryManager
+            accessToken={controller.session.accessToken}
+            categories={controller.categories}
+            onChanged={controller.reloadCatalog}
+          />
+        ) : null}
         <section className="grid gap-6">
           <PlanList plans={controller.plans} onEditPlan={controller.openPlanEdition} />
         </section>
@@ -87,10 +99,12 @@ function CatalogContent() {
         form={controller.form}
         open={controller.showProductDrawer}
         price={controller.price}
+        image={controller.productImage}
         saving={controller.saving}
         onClose={controller.resetProductDrawer}
         onFormChange={controller.setForm}
         onPriceChange={controller.setPrice}
+        onImageChange={controller.setProductImage}
         onSubmit={controller.submitProduct}
       />
 

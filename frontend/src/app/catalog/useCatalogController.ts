@@ -4,14 +4,13 @@ import { FormEvent, useEffect, useState } from "react";
 import {
   archiveProduct,
   changeProductStatus,
-  createMembershipPlan,
   createProduct,
   getCatalogCategories,
   getPlans,
   getStoredSession,
   searchProducts,
+  uploadProductImage,
   updateProduct,
-  updateMembershipPlan,
   type CatalogCategory,
   type PlanSummary,
   type ProductPayload,
@@ -19,15 +18,12 @@ import {
   type StoredSession,
 } from "@/lib/api";
 import {
-  emptyPlan,
   emptyProduct,
-  planDraftToPayload,
-  planToDraft,
   productDraftToPayload,
   productToDraft,
-  type PlanDraft,
 } from "./CatalogHelpers";
 import { useCatalogFilters } from "@/features/catalog/hooks/useCatalogFilters";
+import { useCatalogPlanEditor } from "@/features/catalog/hooks/useCatalogPlanEditor";
 
 export function useCatalogController() {
   const [session, setSession] = useState<StoredSession | null>(null);
@@ -37,18 +33,17 @@ export function useCatalogController() {
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [form, setForm] = useState<ProductPayload>(emptyProduct);
-  const [planForm, setPlanForm] = useState<PlanDraft>(emptyPlan);
-  const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [price, setPrice] = useState("");
+  const [productImage, setProductImage] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showProductDrawer, setShowProductDrawer] = useState(false);
-  const [showPlanDrawer, setShowPlanDrawer] = useState(false);
   const catalogFilters = useCatalogFilters();
   const filtersKey = JSON.stringify(catalogFilters.filters);
+  const planEditor = useCatalogPlanEditor(session, reloadCatalog);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -101,8 +96,12 @@ export function useCatalogController() {
     setMessage(null);
     try {
       const payload = productDraftToPayload(form, price);
-      if (editingProductId) await updateProduct(session.accessToken, editingProductId, payload);
-      else await createProduct(session.accessToken, payload);
+      const saved = editingProductId
+        ? await updateProduct(session.accessToken, editingProductId, payload)
+        : await createProduct(session.accessToken, payload);
+      if (productImage) {
+        await uploadProductImage(session.accessToken, saved.id, productImage);
+      }
       await reloadCatalog();
       resetProductDrawer();
       setMessage(editingProductId ? "Producto actualizado." : "Producto creado.");
@@ -113,39 +112,11 @@ export function useCatalogController() {
     }
   }
 
-  async function submitPlan(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!session) return;
-    setSaving(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const payload = planDraftToPayload(planForm);
-      if (editingPlanId) {
-        await updateMembershipPlan(session.accessToken, editingPlanId, payload);
-      } else {
-        await createMembershipPlan(session.accessToken, payload);
-      }
-      await reloadCatalog();
-      resetPlanDrawer();
-      setMessage(editingPlanId ? "Plan de membresia actualizado." : "Plan de membresia creado.");
-    } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible guardar plan.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  function openPlanCreation() {
-    setEditingPlanId(null);
-    setPlanForm(emptyPlan);
-    setShowPlanDrawer(true);
-  }
-
   function openProductCreation() {
     setEditingProductId(null);
     setForm(emptyProduct);
     setPrice("");
+    setProductImage(null);
     setShowProductDrawer(true);
   }
 
@@ -153,6 +124,7 @@ export function useCatalogController() {
     setEditingProductId(product.id);
     setForm(productToDraft(product));
     setPrice(String(product.priceCents / 100));
+    setProductImage(null);
     setShowProductDrawer(true);
   }
 
@@ -160,6 +132,7 @@ export function useCatalogController() {
     setEditingProductId(null);
     setForm(emptyProduct);
     setPrice("");
+    setProductImage(null);
     setShowProductDrawer(false);
   }
 
@@ -195,50 +168,46 @@ export function useCatalogController() {
     }
   }
 
-  function openPlanEdition(plan: PlanSummary) {
-    setEditingPlanId(plan.id);
-    setPlanForm(planToDraft(plan));
-    setShowPlanDrawer(true);
-  }
-
-  function resetPlanDrawer() {
-    setPlanForm(emptyPlan);
-    setEditingPlanId(null);
-    setShowPlanDrawer(false);
-  }
-
   return {
     archiveCatalogProduct,
     catalogFilters,
     categories,
     editingProductId,
-    editingPlanId,
-    error,
+    editingPlanId: planEditor.editingId,
+    error: error ?? planEditor.error,
     form,
     loading,
-    message,
-    openPlanCreation,
-    openPlanEdition,
+    message: message ?? planEditor.message,
+    openPlanCreation: planEditor.create,
+    openPlanEdition: planEditor.edit,
     openProductCreation,
     openProductEdition,
-    planForm,
+    planForm: planEditor.form,
     plans,
     price,
-    saving,
+    productImage,
+    saving: saving || planEditor.saving,
     products,
     session,
     setForm,
-    setPlanForm,
+    setPlanForm: planEditor.setForm,
     setPrice,
-    showPlanDrawer,
+    setProductImage,
+    showPlanDrawer: planEditor.open,
     showProductDrawer,
-    submitPlan,
+    submitPlan: planEditor.submit,
     submitProduct,
-    resetPlanDrawer,
+    resetPlanDrawer: planEditor.close,
     resetProductDrawer,
+    reloadCatalog,
     toggleProductStatus,
     totalPages,
     totalProducts,
+    canArchive: hasPermission(session, "catalog.archive"),
+    canCreate: hasPermission(session, "catalog.create"),
+    canManageStatus: hasPermission(session, "catalog.status.manage"),
+    canManageCategories: hasPermission(session, "catalog.category.manage"),
+    canUpdate: hasPermission(session, "catalog.update"),
   };
 }
 
@@ -248,4 +217,11 @@ function loadCatalog(accessToken: string, filters: import("@/lib/api").ProductSe
     getPlans(accessToken),
     getCatalogCategories(accessToken),
   ]);
+}
+
+function hasPermission(session: StoredSession | null, permission: string) {
+  return Boolean(
+    session?.user.permissions.includes(permission)
+      || session?.user.permissions.includes("catalog.manage"),
+  );
 }

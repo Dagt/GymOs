@@ -28,6 +28,7 @@ export default function PosPage() {
   const [products, setProducts] = useState<ProductSummary[]>([]);
   const [sales, setSales] = useState<SaleSummary[]>([]);
   const [clientQuery, setClientQuery] = useState("");
+  const [productQuery, setProductQuery] = useState("");
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [selectedClient, setSelectedClient] = useState<ClientSummary | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -84,6 +85,15 @@ export default function PosPage() {
     () => cart.reduce((sum, item) => sum + item.product.priceCents * item.quantity, 0),
     [cart],
   );
+  const visibleProducts = useMemo(() => {
+    const query = productQuery.trim().toLowerCase();
+    if (!query) return products;
+    return products.filter((product) =>
+      product.name.toLowerCase().includes(query)
+      || product.sku.toLowerCase().includes(query)
+      || product.barcode?.toLowerCase() === query,
+    );
+  }, [productQuery, products]);
 
   function addProduct(product: ProductSummary) {
     setCart((current) => {
@@ -183,7 +193,13 @@ export default function PosPage() {
 
       <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <section className="grid gap-6">
-          <ProductGrid loading={loading} onAddProduct={addProduct} products={products} />
+          <ProductGrid
+            loading={loading}
+            productQuery={productQuery}
+            products={visibleProducts}
+            onAddProduct={addProduct}
+            onProductQueryChange={setProductQuery}
+          />
           <RecentSalesList sales={sales} />
         </section>
 

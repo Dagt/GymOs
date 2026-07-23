@@ -5,6 +5,9 @@ type CatalogProductTableProps = {
   loading: boolean;
   products: ProductSummary[];
   saving: boolean;
+  canArchive: boolean;
+  canManageStatus: boolean;
+  canUpdate: boolean;
   onArchive: (product: ProductSummary) => void;
   onEdit: (product: ProductSummary) => void;
   onToggleStatus: (product: ProductSummary) => void;
@@ -14,6 +17,9 @@ export function CatalogProductTable({
   loading,
   products,
   saving,
+  canArchive,
+  canManageStatus,
+  canUpdate,
   onArchive,
   onEdit,
   onToggleStatus,
@@ -67,13 +73,15 @@ export function CatalogProductTable({
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
-                      <Action label="Editar" onClick={() => onEdit(product)} />
-                      <Action
+                      {canUpdate ? <Action label="Editar" onClick={() => onEdit(product)} /> : null}
+                      {canManageStatus ? <Action
                         disabled={saving}
                         label={product.status === "ACTIVE" ? "Desactivar" : "Activar"}
                         onClick={() => onToggleStatus(product)}
-                      />
-                      <Action danger disabled={saving} label="Archivar" onClick={() => onArchive(product)} />
+                      /> : null}
+                      {canArchive ? (
+                        <Action danger disabled={saving} label="Archivar" onClick={() => onArchive(product)} />
+                      ) : null}
                     </div>
                   </td>
                 </tr>

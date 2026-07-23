@@ -9,10 +9,12 @@ type CatalogProductDrawerProps = {
   form: ProductPayload;
   open: boolean;
   price: string;
+  image: File | null;
   saving: boolean;
   onClose: () => void;
   onFormChange: (form: ProductPayload) => void;
   onPriceChange: (value: string) => void;
+  onImageChange: (file: File | null) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
@@ -22,10 +24,12 @@ export function CatalogProductDrawer({
   form,
   open,
   price,
+  image,
   saving,
   onClose,
   onFormChange,
   onPriceChange,
+  onImageChange,
   onSubmit,
 }: CatalogProductDrawerProps) {
   return (
@@ -46,6 +50,14 @@ export function CatalogProductDrawer({
           <TextField label="Presentacion" name="productPresentation" value={form.presentation ?? ""} onChange={(presentation) => change({ presentation })} />
           <TextField label="Unidad" name="productUnit" value={form.unitOfMeasure ?? ""} onChange={(unitOfMeasure) => change({ unitOfMeasure })} />
         </div>
+        <TextField
+          label="Etiquetas (separadas por coma)"
+          name="productTags"
+          value={form.tags.join(", ")}
+          onChange={(value) => change({
+            tags: value.split(",").map((tag) => tag.trim()).filter(Boolean),
+          })}
+        />
         <SelectField
           label="Tipo"
           name="productType"
@@ -77,6 +89,18 @@ export function CatalogProductDrawer({
           <span>
             <strong className="block">Controlar existencias</strong>
             El POS descontara inventario al completar una venta.
+          </span>
+        </label>
+        <label className="grid gap-2 text-sm font-medium">
+          Imagen principal
+          <input
+            accept="image/jpeg,image/png,image/webp"
+            className="rounded-md border border-[#cdd5ca] p-2"
+            onChange={(event) => onImageChange(event.target.files?.[0] ?? null)}
+            type="file"
+          />
+          <span className="text-xs font-normal text-[#5d6b63]">
+            {image ? image.name : "JPG, PNG o WebP; maximo 5 MB."}
           </span>
         </label>
         <button className="app-button h-11" disabled={saving} type="submit">

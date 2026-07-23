@@ -15,11 +15,12 @@ import type {
 import { formatMoney, type PlanDraft } from "./CatalogHelpers";
 
 type CatalogToolbarProps = {
+  canCreate: boolean;
   onNewPlan: () => void;
   onNewProduct: () => void;
 };
 
-export function CatalogToolbar({ onNewPlan, onNewProduct }: CatalogToolbarProps) {
+export function CatalogToolbar({ canCreate, onNewPlan, onNewProduct }: CatalogToolbarProps) {
   return (
     <section className="catalog-toolbar app-card p-5">
       <div>
@@ -30,12 +31,16 @@ export function CatalogToolbar({ onNewPlan, onNewProduct }: CatalogToolbarProps)
         </p>
       </div>
       <div>
-        <button className="app-button-secondary" onClick={onNewProduct} type="button">
-          Nuevo producto
-        </button>
-        <button className="app-button" onClick={onNewPlan} type="button">
-          Nuevo plan
-        </button>
+        {canCreate ? (
+          <>
+            <button className="app-button-secondary" onClick={onNewProduct} type="button">
+              Nuevo producto
+            </button>
+            <button className="app-button" onClick={onNewPlan} type="button">
+              Nuevo plan
+            </button>
+          </>
+        ) : null}
       </div>
     </section>
   );

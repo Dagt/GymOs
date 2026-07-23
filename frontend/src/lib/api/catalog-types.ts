@@ -17,6 +17,7 @@ export type ProductSummary = {
   imageObjectKey: string | null;
   categoryId: string | null;
   categoryName: string | null;
+  tags: string[];
   createdAt: string;
   updatedAt: string;
 };
@@ -54,6 +55,7 @@ export type ProductPayload = {
   displayOrder: number;
   imageObjectKey?: string | null;
   categoryId?: string | null;
+  tags: string[];
 };
 
 export type ProductPage = {
