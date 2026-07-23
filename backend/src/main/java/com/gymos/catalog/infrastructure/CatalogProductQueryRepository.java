@@ -18,7 +18,7 @@ class CatalogProductQueryRepository {
 			cp.supplier_name, cp.reference_cost_cents, cp.promotional_price_cents,
 			cp.promotion_starts_at, cp.promotion_ends_at,
 			category.id AS category_id, category.name AS category_name, tags.tags_csv,
-			cp.archived_at, cp.created_at, cp.updated_at
+			cp.archived_at, cp.created_at, cp.updated_at, cp.version
 			""";
 	private static final String CATEGORY_JOIN = """
 			LEFT JOIN LATERAL (
