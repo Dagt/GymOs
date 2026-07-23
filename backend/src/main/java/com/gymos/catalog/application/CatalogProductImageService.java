@@ -5,6 +5,7 @@ import com.gymos.catalog.application.command.UploadProductImageCommand;
 import com.gymos.catalog.application.port.CatalogImageStoragePort;
 import com.gymos.catalog.application.port.CatalogProductCommandPort;
 import com.gymos.catalog.application.port.CatalogProductQueryPort;
+import com.gymos.catalog.application.port.CatalogStorageCleanupPort;
 import com.gymos.catalog.application.query.ProductSummaryView;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
@@ -24,13 +25,15 @@ class CatalogProductImageService {
 	private final CatalogProductQueryPort products;
 	private final CatalogProductCommandPort commands;
 	private final CatalogImageStoragePort storage;
+	private final CatalogStorageCleanupPort cleanups;
 	private final AuditService auditService;
 
 	CatalogProductImageService(CatalogProductQueryPort products, CatalogProductCommandPort commands,
-			CatalogImageStoragePort storage, AuditService auditService) {
+			CatalogImageStoragePort storage, CatalogStorageCleanupPort cleanups, AuditService auditService) {
 		this.products = products;
 		this.commands = commands;
 		this.storage = storage;
+		this.cleanups = cleanups;
 		this.auditService = auditService;
 	}
 
@@ -40,54 +43,48 @@ class CatalogProductImageService {
 		validate(command);
 		String newKey = objectKey(principal.organizationId(), productId, command.filename());
 		storage.store(newKey, command.contentType(), command.size(), command.content());
-		registerUploadSynchronization(newKey, product.imageObjectKey());
-		if (commands.updateImageKey(principal.organizationId(), productId, newKey, principal.userId(), OffsetDateTime.now()) != 1) {
+		registerUploadRollback(newKey);
+		OffsetDateTime now = OffsetDateTime.now();
+		if (commands.updateImageKey(principal.organizationId(), productId, newKey, principal.userId(), now) != 1) {
 			throw notFound();
 		}
+		cleanups.enqueue(product.imageObjectKey(), now);
 		auditService.record(principal, "PRODUCT_IMAGE_UPDATED", "CATALOG_PRODUCT", productId, "BACKOFFICE", null, correlationId);
-		return require(principal.organizationId(), productId);
+		return require(principal.organizationId(), productId).visibleTo(principal.permissions());
 	}
 
 	ProductSummaryView remove(GymOsPrincipal principal, UUID productId, String correlationId) {
 		CatalogAccessGuard.requirePrincipal(principal);
 		ProductSummaryView product = require(principal.organizationId(), productId);
-		if (product.imageObjectKey() == null) return product;
-		if (commands.updateImageKey(principal.organizationId(), productId, null, principal.userId(), OffsetDateTime.now()) != 1) {
+		if (product.imageObjectKey() == null) return product.visibleTo(principal.permissions());
+		OffsetDateTime now = OffsetDateTime.now();
+		if (commands.updateImageKey(principal.organizationId(), productId, null, principal.userId(), now) != 1) {
 			throw notFound();
 		}
-		deleteAfterCommit(product.imageObjectKey());
+		cleanups.enqueue(product.imageObjectKey(), now);
 		auditService.record(principal, "PRODUCT_IMAGE_REMOVED", "CATALOG_PRODUCT", productId, "BACKOFFICE", null, correlationId);
-		return require(principal.organizationId(), productId);
+		return require(principal.organizationId(), productId).visibleTo(principal.permissions());
 	}
 
-	private void registerUploadSynchronization(String newKey, String previousKey) {
+	private void registerUploadRollback(String newKey) {
 		if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-			storage.delete(newKey);
+			cleanupNewUpload(newKey);
 			throw new IllegalStateException("La actualizacion de imagen requiere una transaccion activa.");
 		}
 		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
 			@Override
-			public void afterCommit() {
-				if (previousKey != null) storage.delete(previousKey);
-			}
-
-			@Override
 			public void afterCompletion(int status) {
-				if (status != STATUS_COMMITTED) storage.delete(newKey);
+				if (status != STATUS_COMMITTED) cleanupNewUpload(newKey);
 			}
 		});
 	}
 
-	private void deleteAfterCommit(String objectKey) {
-		if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-			throw new IllegalStateException("La eliminacion de imagen requiere una transaccion activa.");
+	private void cleanupNewUpload(String objectKey) {
+		try {
+			storage.delete(objectKey);
+		} catch (RuntimeException exception) {
+			cleanups.enqueue(objectKey, OffsetDateTime.now());
 		}
-		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-			@Override
-			public void afterCommit() {
-				storage.delete(objectKey);
-			}
-		});
 	}
 
 	private void validate(UploadProductImageCommand command) {
