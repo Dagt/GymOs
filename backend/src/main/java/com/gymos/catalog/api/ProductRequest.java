@@ -23,7 +23,6 @@ public record ProductRequest(
 		@Size(max = 40) String unitOfMeasure,
 		boolean inventoryTracked,
 		@Min(0) int displayOrder,
-		@Size(max = 500) String imageObjectKey,
 		UUID categoryId,
 		@Size(max = 20) List<@Size(max = 80) String> tags
 ) {
@@ -31,7 +30,7 @@ public record ProductRequest(
 		return new ProductCommand(
 				sku, name, description, productType, priceCents, currency, taxable, status,
 				barcode, brand, presentation, unitOfMeasure, inventoryTracked, displayOrder,
-				imageObjectKey, categoryId, tags
+				categoryId, tags
 		);
 	}
 }
