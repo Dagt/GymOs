@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -109,11 +110,7 @@ class CatalogProductServiceTests {
 		ProductSummaryView updated = costedProduct(productId);
 		when(products.findProduct(updater.organizationId(), productId)).thenReturn(Optional.of(existing), Optional.of(updated));
 		when(commands.update(any())).thenReturn(1);
-		ProductCommand request = new ProductCommand(
-				"SKU-1", "Producto actualizado", null, "PHYSICAL", "GENERAL_PRODUCT", 1_000,
-				"MXN", true, "ACTIVE", "750123", null, null, null, true, 0,
-				"Proveedor malicioso", 1L, 900L, null, null, null, List.of()
-		);
+		ProductCommand request = command(existing.version());
 
 		service.updateProduct(updater, productId, request, "test");
 
@@ -121,6 +118,27 @@ class CatalogProductServiceTests {
 		verify(commands).update(mutation.capture());
 		assertThat(mutation.getValue().supplierName()).isEqualTo(existing.supplierName());
 		assertThat(mutation.getValue().referenceCostCents()).isEqualTo(existing.referenceCostCents());
+		assertThat(mutation.getValue().expectedVersion()).isEqualTo(existing.version());
+	}
+
+	@Test
+	void staleVersionIsRejectedBeforeMutation() {
+		UUID productId = UUID.randomUUID();
+		ProductSummaryView existing = costedProduct(productId);
+		when(products.findProduct(principal.organizationId(), productId)).thenReturn(Optional.of(existing));
+
+		assertThatThrownBy(() -> service.updateProduct(principal, productId, command(existing.version() + 1), "test"))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.code()).isEqualTo("PRODUCT_CONCURRENT_MODIFICATION"));
+		verify(commands, never()).update(any());
+	}
+
+	private ProductCommand command(long version) {
+		return new ProductCommand(
+				"SKU-1", "Producto actualizado", null, "PHYSICAL", "GENERAL_PRODUCT", 1_000,
+				"MXN", true, "ACTIVE", "750123", null, null, null, true, 0,
+				"Proveedor malicioso", 1L, 900L, null, null, null, List.of(), version
+		);
 	}
 
 	private ProductSummaryView product(boolean archived, String status, String barcode) {
@@ -139,7 +157,7 @@ class CatalogProductServiceTests {
 		return new ProductSummaryView(
 				id, "SKU-1", "Producto", null, "PHYSICAL", "GENERAL_PRODUCT", 1_000, "MXN", true,
 				"ACTIVE", "750123", null, null, null, true, 0, null,
-				"Proveedor original", 700L, 900L, null, null, null, null, List.of(), false, null, now, now
+				"Proveedor original", 700L, 900L, null, null, null, null, List.of(), false, null, now, now, 0
 		);
 	}
 }
