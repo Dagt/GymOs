@@ -11,4 +11,10 @@ public interface CatalogCategoryQueryPort {
 	Optional<CategoryView> findCategory(UUID organizationId, UUID categoryId);
 
 	boolean slugExists(UUID organizationId, String slug, UUID excludedCategoryId);
+
+	boolean wouldCreateCycle(UUID organizationId, UUID categoryId, UUID parentId);
+
+	boolean hasActiveChildren(UUID organizationId, UUID categoryId);
+
+	boolean hasActiveProducts(UUID organizationId, UUID categoryId);
 }
