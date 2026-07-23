@@ -8,6 +8,7 @@ import {
   getCatalogCategories,
   getPlans,
   getStoredSession,
+  removeProductImage,
   restoreProduct,
   searchProducts,
   uploadProductImage,
@@ -34,6 +35,7 @@ export function useCatalogController() {
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [form, setForm] = useState<ProductPayload>(emptyProduct);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [existingImageObjectKey, setExistingImageObjectKey] = useState<string | null>(null);
   const [price, setPrice] = useState("");
   const [productImage, setProductImage] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +91,8 @@ export function useCatalogController() {
       let imageWarning: string | null = null;
       if (productImage) {
         try {
-          await uploadProductImage(session.accessToken, saved.id, productImage);
+          const withImage = await uploadProductImage(session.accessToken, saved.id, productImage);
+          setExistingImageObjectKey(withImage.imageObjectKey);
         } catch {
           imageWarning = "Producto guardado, pero no fue posible cargar la imagen. Puedes editarlo e intentarlo nuevamente.";
         }
@@ -102,9 +105,35 @@ export function useCatalogController() {
     } finally { setSaving(false); }
   }
 
-  function openProductCreation() { setEditingProductId(null); setForm(emptyProduct); setPrice(""); setProductImage(null); setShowProductDrawer(true); }
-  function openProductEdition(product: ProductSummary) { if (product.archived) return; setEditingProductId(product.id); setForm(productToDraft(product)); setPrice(String(product.priceCents / 100)); setProductImage(null); setShowProductDrawer(true); }
-  function resetProductDrawer() { setEditingProductId(null); setForm(emptyProduct); setPrice(""); setProductImage(null); setShowProductDrawer(false); }
+  async function removeCurrentProductImage() {
+    if (!session || !editingProductId || !existingImageObjectKey) return;
+    if (!window.confirm("Eliminar la imagen actual del producto?")) return;
+    setSaving(true); setError(null); setMessage(null);
+    try {
+      await removeProductImage(session.accessToken, editingProductId);
+      setExistingImageObjectKey(null);
+      setProductImage(null);
+      await reloadCatalog();
+      setMessage("Imagen eliminada. La limpieza del archivo se procesara de forma segura.");
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible eliminar la imagen.");
+    } finally { setSaving(false); }
+  }
+
+  function openProductCreation() {
+    setEditingProductId(null); setExistingImageObjectKey(null); setForm(emptyProduct);
+    setPrice(""); setProductImage(null); setShowProductDrawer(true);
+  }
+  function openProductEdition(product: ProductSummary) {
+    if (product.archived) return;
+    setEditingProductId(product.id); setExistingImageObjectKey(product.imageObjectKey);
+    setForm(productToDraft(product)); setPrice(String(product.priceCents / 100));
+    setProductImage(null); setShowProductDrawer(true);
+  }
+  function resetProductDrawer() {
+    setEditingProductId(null); setExistingImageObjectKey(null); setForm(emptyProduct);
+    setPrice(""); setProductImage(null); setShowProductDrawer(false);
+  }
 
   async function toggleProductStatus(product: ProductSummary) {
     if (!session || product.archived) return;
@@ -130,16 +159,19 @@ export function useCatalogController() {
 
   return {
     archiveCatalogProduct, restoreCatalogProduct, catalogFilters, categories, editingProductId,
-    editingPlanId: planEditor.editingId, error: error ?? planEditor.error, form, loading,
-    message: message ?? planEditor.message, openPlanCreation: planEditor.create, openPlanEdition: planEditor.edit,
-    openProductCreation, openProductEdition, planForm: planEditor.form, plans, price, productImage,
-    saving: saving || planEditor.saving, products, summary, session, setForm, setPlanForm: planEditor.setForm,
-    setPrice, setProductImage, showPlanDrawer: planEditor.open, showProductDrawer, submitPlan: planEditor.submit,
-    submitProduct, resetPlanDrawer: planEditor.close, resetProductDrawer, reloadCatalog, toggleProductStatus,
+    editingPlanId: planEditor.editingId, error: error ?? planEditor.error, existingImageObjectKey,
+    form, loading, message: message ?? planEditor.message, openPlanCreation: planEditor.create,
+    openPlanEdition: planEditor.edit, openProductCreation, openProductEdition,
+    planForm: planEditor.form, plans, price, productImage, removeCurrentProductImage,
+    saving: saving || planEditor.saving, products, summary, session, setForm,
+    setPlanForm: planEditor.setForm, setPrice, setProductImage, showPlanDrawer: planEditor.open,
+    showProductDrawer, submitPlan: planEditor.submit, submitProduct,
+    resetPlanDrawer: planEditor.close, resetProductDrawer, reloadCatalog, toggleProductStatus,
     totalPages, totalProducts, canArchive: hasPermission(session, "catalog.archive"),
     canCreate: hasPermission(session, "catalog.create"), canManageStatus: hasPermission(session, "catalog.status.manage"),
-    canManageCategories: hasPermission(session, "catalog.category.manage"), canUpdate: hasPermission(session, "catalog.update"),
-    canReadCosts: hasPermission(session, "catalog.cost.read"),
+    canManageCategories: hasPermission(session, "catalog.category.manage"),
+    canManageImages: hasPermission(session, "catalog.image.manage"),
+    canUpdate: hasPermission(session, "catalog.update"), canReadCosts: hasPermission(session, "catalog.cost.read"),
   };
 }
 
