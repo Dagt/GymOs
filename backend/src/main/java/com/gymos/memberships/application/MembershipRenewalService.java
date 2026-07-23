@@ -1,10 +1,8 @@
 package com.gymos.memberships.application;
 
-import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.memberships.application.command.RenewMembershipCommand;
 import com.gymos.memberships.application.result.MembershipSaleResult;
-import com.gymos.memberships.infrastructure.MembershipRepository;
 import com.gymos.memberships.infrastructure.MembershipRepository.MembershipSummary;
 import com.gymos.memberships.infrastructure.MembershipRepository.PlanForRenewal;
 import com.gymos.sales.api.operations.CreateMembershipRenewalSaleCommand;
@@ -15,12 +13,21 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 class MembershipRenewalService {
-	private final MembershipRepository membershipRepository;
+	private final MembershipOperationPolicy policy;
+	private final MembershipOperationIdempotency idempotency;
 	private final SalesOperations salesOperations;
+	private final MembershipSaleResultResolver resultResolver;
 
-	MembershipRenewalService(MembershipRepository membershipRepository, SalesOperations salesOperations) {
-		this.membershipRepository = membershipRepository;
+	MembershipRenewalService(
+			MembershipOperationPolicy policy,
+			MembershipOperationIdempotency idempotency,
+			SalesOperations salesOperations,
+			MembershipSaleResultResolver resultResolver
+	) {
+		this.policy = policy;
+		this.idempotency = idempotency;
 		this.salesOperations = salesOperations;
+		this.resultResolver = resultResolver;
 	}
 
 	@Transactional
@@ -30,14 +37,17 @@ class MembershipRenewalService {
 			RenewMembershipCommand command,
 			String correlationId
 	) {
-		MembershipAccessGuard.requireBranch(principal);
-		MembershipSummary current = membershipRepository.byId(principal.organizationId(), principal.branchId(), membershipId)
-				.orElseThrow(() -> new BusinessException("MEMBERSHIP_NOT_FOUND", "La membresia no existe o no esta disponible."));
-		if (!"ACTIVE".equals(current.status())) {
-			throw new BusinessException("MEMBERSHIP_NOT_RENEWABLE", "Solo puedes renovar una membresia activa.");
-		}
-		PlanForRenewal plan = membershipRepository.planForRenewal(principal.organizationId(), current.planId())
-				.orElseThrow(() -> new BusinessException("PLAN_NOT_AVAILABLE", "El plan de la membresia no esta disponible para renovacion."));
+		MembershipSummary current = policy.requireActiveMembership(
+				principal,
+				membershipId,
+				"MEMBERSHIP_NOT_RENEWABLE",
+				"Solo puedes renovar una membresia activa."
+		);
+		PlanForRenewal plan = policy.requirePlanForRenewal(
+				principal.organizationId(),
+				current.planId(),
+				"El plan de la membresia no esta disponible para renovacion."
+		);
 
 		var sale = salesOperations.createMembershipRenewal(new CreateMembershipRenewalSaleCommand(
 				principal.organizationId(),
@@ -54,16 +64,9 @@ class MembershipRenewalService {
 				command.reference(),
 				command.validateNow(),
 				command.notes(),
-				defaultIdempotencyKey("membership-renewal", membershipId, command.idempotencyKey()),
+				idempotency.resolve("membership-renewal", membershipId, command.idempotencyKey()),
 				correlationId
 		));
-		MembershipSummary renewed = sale.paymentCompleted()
-				? membershipRepository.bySaleAndPlan(principal.organizationId(), principal.branchId(), sale.saleId(), plan.planId()).orElse(null)
-				: null;
-		return MembershipResultMapper.toSaleResult(sale, renewed);
-	}
-
-	private String defaultIdempotencyKey(String operation, UUID membershipId, String provided) {
-		return provided == null || provided.isBlank() ? operation + ":" + membershipId + ":" + UUID.randomUUID() : provided.trim();
+		return resultResolver.resolve(principal, sale, plan);
 	}
 }

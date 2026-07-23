@@ -3,6 +3,18 @@
 Estado: en progreso  
 Fecha: 19 de julio de 2026
 
+## Saneamiento operaciones de membresia - 23 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `MembershipRenewalService` y `MembershipPlanChangeService` dejan de duplicar reglas de carga, estado activo, plan disponible, idempotencia y resolucion de resultado.
+- Se agregan servicios internos pequenos:
+  - `MembershipOperationPolicy` para validar membresia activa, plan disponible, cambio a plan distinto y pago completado requerido;
+  - `MembershipOperationIdempotency` para normalizar o generar llaves de idempotencia por operacion;
+  - `MembershipSaleResultResolver` para mapear la venta creada y, si el pago completo activo membresia, adjuntar el resumen resultante.
+- Se agrega `MembershipApplicationArchitectureTests` para evitar que las operaciones de renovacion/cambio de plan vuelvan a depender directamente de `MembershipRepository`.
+- No cambia ningun contrato HTTP ni API publica interna; se conserva el comportamiento de renovacion, cambio de plan, idempotencia y activacion por pago.
+
 ## Saneamiento reembolsos, activacion y catalogo - 23 de julio de 2026
 
 Implementado en rama `feature/code-simplification-rebasion-and-refactor`:

@@ -260,6 +260,7 @@ Decisiones implementadas:
 - Los lookups compartidos de ventas/pagos deben centralizarse en servicios internos dedicados para evitar repetir reglas de existencia, sucursal y mensajes de error entre pagos, reembolsos y futuras operaciones.
 - El flujo de reembolsos debe separar idempotencia, validacion y procesamiento. `SalesRefundService` coordina, pero no debe depender directamente de repositorios de escritura ni de auditoria.
 - La activacion de membresias por eventos debe separar calculo de vigencia y publicacion de eventos versionados para mantener idempotencia, auditoria y reglas de fechas verificables.
+- Las operaciones explicitas de membresia, como renovacion y cambio de plan, deben compartir politica de carga/estado, normalizacion de idempotencia y resolucion de resultado en componentes internos, evitando duplicar reglas entre casos de uso.
 - El modulo `catalog` debe tratar productos/servicios y planes de membresia como conceptos separados en application y frontend. Los productos tecnicos `MEMBERSHIP_PLAN` no deben aparecer como productos vendibles comunes.
 - El SQL de escritura de catalogo pertenece a infraestructura; `catalog.application` puede coordinar casos de uso, pero no debe usar `JdbcClient`.
 - Los consumidores de eventos deben permanecer idempotentes y transaccionales, con pruebas orientadas al consumidor dedicado.

@@ -1,0 +1,50 @@
+package com.gymos.memberships.application;
+
+import com.gymos.common.api.BusinessException;
+import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.memberships.infrastructure.MembershipRepository;
+import com.gymos.memberships.infrastructure.MembershipRepository.MembershipSummary;
+import com.gymos.memberships.infrastructure.MembershipRepository.PlanForRenewal;
+import java.util.UUID;
+import org.springframework.stereotype.Service;
+
+@Service
+class MembershipOperationPolicy {
+	private final MembershipRepository membershipRepository;
+
+	MembershipOperationPolicy(MembershipRepository membershipRepository) {
+		this.membershipRepository = membershipRepository;
+	}
+
+	MembershipSummary requireActiveMembership(
+			GymOsPrincipal principal,
+			UUID membershipId,
+			String statusErrorCode,
+			String statusErrorMessage
+	) {
+		MembershipAccessGuard.requireBranch(principal);
+		MembershipSummary current = membershipRepository.byId(principal.organizationId(), principal.branchId(), membershipId)
+				.orElseThrow(() -> new BusinessException("MEMBERSHIP_NOT_FOUND", "La membresia no existe o no esta disponible."));
+		if (!"ACTIVE".equals(current.status())) {
+			throw new BusinessException(statusErrorCode, statusErrorMessage);
+		}
+		return current;
+	}
+
+	PlanForRenewal requirePlanForRenewal(UUID organizationId, UUID planId, String message) {
+		return membershipRepository.planForRenewal(organizationId, planId)
+				.orElseThrow(() -> new BusinessException("PLAN_NOT_AVAILABLE", message));
+	}
+
+	void requireDifferentPlan(MembershipSummary current, UUID targetPlanId) {
+		if (current.planId().equals(targetPlanId)) {
+			throw new BusinessException("MEMBERSHIP_PLAN_UNCHANGED", "Selecciona un plan diferente.");
+		}
+	}
+
+	void requireCompletedPlanChangePayment(boolean validateNow, String method) {
+		if (!validateNow && !"CASH".equals(method.trim().toUpperCase())) {
+			throw new BusinessException("PLAN_CHANGE_REQUIRES_COMPLETED_PAYMENT", "El cambio de plan requiere pago completado.");
+		}
+	}
+}
