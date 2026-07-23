@@ -11,19 +11,19 @@ import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.organizations.application.command.UpdateBranchCommand;
+import com.gymos.organizations.infrastructure.OrganizationCommandRepository;
 import com.gymos.organizations.infrastructure.OrganizationQueryRepository;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.jdbc.core.simple.JdbcClient;
 
 class OrganizationTenantIsolationTests {
 	@Test
 	void tenantCannotUpdateBranchOutsideAuthenticatedOrganization() {
-		JdbcClient jdbcClient = mock(JdbcClient.class);
+		OrganizationCommandRepository commandRepository = mock(OrganizationCommandRepository.class);
 		OrganizationQueryRepository repository = mock(OrganizationQueryRepository.class);
 		AuditService auditService = mock(AuditService.class);
-		OrganizationService service = new OrganizationService(jdbcClient, repository, auditService);
+		OrganizationService service = new OrganizationService(commandRepository, repository, auditService);
 
 		UUID userId = UUID.randomUUID();
 		UUID organizationId = UUID.randomUUID();
@@ -48,15 +48,15 @@ class OrganizationTenantIsolationTests {
 						assertThat(exception.code()).isEqualTo("BRANCH_ACCESS_DENIED"));
 
 		verify(repository).userHasBranchAccess(userId, organizationId, foreignBranchId);
-		verifyNoInteractions(jdbcClient, auditService);
+		verifyNoInteractions(commandRepository, auditService);
 	}
 
 	@Test
 	void tenantCannotListBranchesForArbitraryOrganization() {
-		JdbcClient jdbcClient = mock(JdbcClient.class);
+		OrganizationCommandRepository commandRepository = mock(OrganizationCommandRepository.class);
 		OrganizationQueryRepository repository = mock(OrganizationQueryRepository.class);
 		AuditService auditService = mock(AuditService.class);
-		OrganizationService service = new OrganizationService(jdbcClient, repository, auditService);
+		OrganizationService service = new OrganizationService(commandRepository, repository, auditService);
 		GymOsPrincipal principal = new GymOsPrincipal(
 				UUID.randomUUID(),
 				UUID.randomUUID(),
@@ -70,6 +70,6 @@ class OrganizationTenantIsolationTests {
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.code()).isEqualTo("PLATFORM_ACCESS_REQUIRED"));
 
-		verifyNoInteractions(repository, jdbcClient, auditService);
+		verifyNoInteractions(repository, commandRepository, auditService);
 	}
 }

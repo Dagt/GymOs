@@ -66,14 +66,7 @@ class ArchitectureTests {
 	}
 
 	@Test
-	void jdbcClientUsageInApplicationMatchesTheExplicitAllowlist() {
-		Set<String> allowedApplicationServices = Set.of(
-				"com.gymos.clients.application.ClientImportService",
-				"com.gymos.clients.application.ClientService",
-				"com.gymos.onboarding.application.OnboardingService",
-				"com.gymos.organizations.application.OrganizationService"
-		);
-
+	void applicationLayerDoesNotUseJdbcClient() {
 		Set<String> actual = classes.stream()
 				.filter(javaClass -> javaClass.getPackageName().contains(".application"))
 				.filter(javaClass -> javaClass.getDirectDependenciesFromSelf().stream()
@@ -81,7 +74,7 @@ class ArchitectureTests {
 				.map(javaClass -> javaClass.getName())
 				.collect(java.util.stream.Collectors.toSet());
 
-		assertThat(actual).isEqualTo(allowedApplicationServices);
+		assertThat(actual).isEmpty();
 	}
 
 	@Test

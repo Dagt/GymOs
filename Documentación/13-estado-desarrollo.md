@@ -3,6 +3,21 @@
 Estado: en progreso  
 Fecha: 19 de julio de 2026
 
+## Saneamiento application y reservas con membresia - 23 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `clients.application` deja de usar `JdbcClient` directamente; las escrituras de alta, actualizacion e importacion viven ahora en `ClientCommandRepository` y `ClientImportRepository`.
+- `organizations.application` deja de usar `JdbcClient` directamente; altas/ediciones de organizacion, sucursal y acceso por sucursal viven en `OrganizationCommandRepository`.
+- `onboarding.application` deja de usar `JdbcClient` directamente; la preparacion piloto, productos base, planes, kiosco y checklist quedan encapsulados en `OnboardingRepository`.
+- La prueba de arquitectura `applicationLayerDoesNotUseJdbcClient` ya no depende de allowlist: cualquier nuevo uso directo de `JdbcClient` en `application` falla la suite.
+- Se agrega prueba de integracion PostgreSQL/Testcontainers `BookingMembershipPlanIntegrationTests` para cubrir el flujo catalogo -> plan de membresia -> socio con membresia activa -> recurso restringido -> reserva permitida.
+- La misma prueba valida el rechazo cuando un socio no tiene membresia activa para reservar un recurso restringido por plan.
+
+Verificado:
+
+- Backend: `./gradlew.bat clean test`.
+
 ## Saneamiento catalogo e infraestructura de pruebas - 23 de julio de 2026
 
 Implementado en rama `feature/code-simplification-rebasion-and-refactor`:

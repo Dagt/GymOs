@@ -264,5 +264,7 @@ Decisiones implementadas:
 - El modulo `catalog` debe tratar productos/servicios y planes de membresia como conceptos separados en application y frontend. Los productos tecnicos `MEMBERSHIP_PLAN` no deben aparecer como productos vendibles comunes.
 - El SQL de escritura de catalogo pertenece a infraestructura; `catalog.application` puede coordinar casos de uso, pero no debe usar `JdbcClient`.
 - `CatalogRepository` debe permanecer como fachada estable sin SQL directo; las consultas de productos, planes y SKU viven en repositorios internos especializados y comparten mapeadores JDBC.
+- La capa `application` no debe inyectar ni usar `JdbcClient`. El SQL operativo pertenece a repositorios de infraestructura del mismo modulo; la regla `applicationLayerDoesNotUseJdbcClient` bloquea regresiones.
+- Los modulos `clients`, `organizations` y `onboarding` siguen el patron fachada application + repositorio command/query: application coordina el caso de uso y auditoria, infrastructure encapsula columnas, SQL y persistencia.
 - Los consumidores de eventos deben permanecer idempotentes y transaccionales, con pruebas orientadas al consumidor dedicado.
 - La configuracion de pruebas debe conservar el ciclo de vida necesario para que Spring Modulith cierre sin falsos positivos sobre `event_publication`.
