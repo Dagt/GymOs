@@ -29,8 +29,9 @@ export function useCatalogFilters() {
     categoryId: searchParams.get("categoryId") ?? "",
     status: (searchParams.get("status") as ProductSearchParams["status"]) ?? "",
     inventoryTracked: parseBoolean(searchParams.get("inventoryTracked")),
-    page: Number(searchParams.get("page") ?? "0"),
-    size: Number(searchParams.get("size") ?? "25"),
+    includeArchived: parseBoolean(searchParams.get("includeArchived")) ?? false,
+    page: safeNumber(searchParams.get("page"), 0),
+    size: safeNumber(searchParams.get("size"), 25),
     sort: searchParams.get("sort") ?? "displayOrder,asc",
   };
 
@@ -54,4 +55,9 @@ function parseBoolean(value: string | null) {
   if (value === "true") return true;
   if (value === "false") return false;
   return undefined;
+}
+
+function safeNumber(value: string | null, fallback: number) {
+  const parsed = Number(value ?? fallback);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
 }
