@@ -21,6 +21,12 @@ import org.springframework.stereotype.Service;
 
 @Service
 class CatalogProductService {
+	private static final List<String> TYPES = List.of("PHYSICAL", "SERVICE", "MEMBERSHIP_PLAN");
+	private static final List<String> SUBTYPES = List.of(
+			"GENERAL_PRODUCT", "GENERAL_SERVICE", "VISIT_PASS", "BOOKING", "ROUTINE",
+			"CONSULTATION", "WELLNESS_SERVICE", "MEMBERSHIP"
+	);
+
 	private final CatalogProductQueryPort products;
 	private final CatalogProductCommandPort commands;
 	private final CatalogDependencyQueryPort dependencies;
@@ -49,9 +55,12 @@ class CatalogProductService {
 	ProductSummaryView productByBarcode(GymOsPrincipal principal, String barcode) {
 		CatalogAccessGuard.requirePrincipal(principal);
 		String normalized = normalizeNullable(barcode);
-		if (normalized == null) throw new BusinessException("PRODUCT_BARCODE_REQUIRED", "Proporciona un codigo de barras.");
+		if (normalized == null) {
+			throw new BusinessException("PRODUCT_BARCODE_REQUIRED", "Proporciona un codigo de barras.");
+		}
 		return products.findActiveByBarcode(principal.organizationId(), normalized)
-				.orElseThrow(() -> new BusinessException("PRODUCT_BARCODE_NOT_FOUND", "No existe un producto activo con ese codigo de barras."));
+				.orElseThrow(() -> new BusinessException(
+						"PRODUCT_BARCODE_NOT_FOUND", "No existe un producto activo con ese codigo de barras."));
 	}
 
 	ProductPageView search(GymOsPrincipal principal, ProductSearchCriteria criteria) {
@@ -93,8 +102,8 @@ class CatalogProductService {
 		if (updated != 1) throw notFound();
 		commands.replaceCategory(principal.organizationId(), productId, request.categoryId(), principal.userId(), now);
 		commands.replaceTags(principal.organizationId(), productId, tags, principal.userId(), now);
-		String changes = describeChanges(existing, request, sku, barcode, tags);
-		auditService.record(principal, "PRODUCT_UPDATED", "CATALOG_PRODUCT", productId, "BACKOFFICE", changes, correlationId);
+		auditService.record(principal, "PRODUCT_UPDATED", "CATALOG_PRODUCT", productId, "BACKOFFICE",
+				describeChanges(existing, request, sku, barcode, tags), correlationId);
 		return requireProduct(principal.organizationId(), productId);
 	}
 
@@ -102,7 +111,8 @@ class CatalogProductService {
 		CatalogAccessGuard.requirePrincipal(principal);
 		String normalizedStatus = normalizeStatus(status);
 		requireProduct(principal.organizationId(), productId);
-		if (commands.changeStatus(principal.organizationId(), productId, normalizedStatus, principal.userId(), OffsetDateTime.now()) != 1) throw notFound();
+		if (commands.changeStatus(principal.organizationId(), productId, normalizedStatus,
+				principal.userId(), OffsetDateTime.now()) != 1) throw notFound();
 		String eventType = "ACTIVE".equals(normalizedStatus) ? "PRODUCT_ACTIVATED" : "PRODUCT_DEACTIVATED";
 		auditService.record(principal, eventType, "CATALOG_PRODUCT", productId, "BACKOFFICE", normalizedStatus, correlationId);
 		return requireProduct(principal.organizationId(), productId);
@@ -111,38 +121,55 @@ class CatalogProductService {
 	void archiveProduct(GymOsPrincipal principal, UUID productId, String correlationId) {
 		CatalogAccessGuard.requirePrincipal(principal);
 		ProductSummaryView product = requireProduct(principal.organizationId(), productId);
-		if ("MEMBERSHIP_PLAN".equals(product.productType())) throw new BusinessException("PRODUCT_ARCHIVE_REQUIRES_PLAN_WORKFLOW", "Los productos de membresia se administran desde planes.");
-		if (dependencies.hasActiveMembershipPlan(principal.organizationId(), productId)) throw new BusinessException("PRODUCT_ARCHIVE_NOT_ALLOWED", "El producto tiene un plan de membresia activo.");
-		if (commands.archive(principal.organizationId(), productId, principal.userId(), OffsetDateTime.now()) != 1) throw notFound();
+		if ("MEMBERSHIP_PLAN".equals(product.productType())) {
+			throw new BusinessException("PRODUCT_ARCHIVE_REQUIRES_PLAN_WORKFLOW",
+					"Los productos de membresia se administran desde planes.");
+		}
+		if (dependencies.hasActiveMembershipPlan(principal.organizationId(), productId)) {
+			throw new BusinessException("PRODUCT_ARCHIVE_NOT_ALLOWED", "El producto tiene un plan de membresia activo.");
+		}
+		if (commands.archive(principal.organizationId(), productId, principal.userId(), OffsetDateTime.now()) != 1) {
+			throw notFound();
+		}
 		auditService.record(principal, "PRODUCT_ARCHIVED", "CATALOG_PRODUCT", productId, "BACKOFFICE", null, correlationId);
 	}
 
 	ProductSummaryView restoreProduct(GymOsPrincipal principal, UUID productId, String correlationId) {
 		CatalogAccessGuard.requirePrincipal(principal);
-		ProductSummaryView archived = products.findProductIncludingArchived(principal.organizationId(), productId).orElseThrow(this::notFound);
+		ProductSummaryView archived = products.findProductIncludingArchived(principal.organizationId(), productId)
+				.orElseThrow(this::notFound);
 		if (!archived.archived()) throw new BusinessException("PRODUCT_NOT_ARCHIVED", "El producto no esta archivado.");
 		if (products.skuExists(principal.organizationId(), archived.sku(), productId)) throw duplicateSku();
 		validateBarcodeAvailability(principal.organizationId(), archived.barcode(), productId);
-		if (commands.restore(principal.organizationId(), productId, "INACTIVE", principal.userId(), OffsetDateTime.now()) != 1) throw notFound();
-		auditService.record(principal, "PRODUCT_RESTORED", "CATALOG_PRODUCT", productId, "BACKOFFICE", "INACTIVE", correlationId);
+		if (commands.restore(principal.organizationId(), productId, "INACTIVE", principal.userId(), OffsetDateTime.now()) != 1) {
+			throw notFound();
+		}
+		auditService.record(principal, "PRODUCT_RESTORED", "CATALOG_PRODUCT", productId,
+				"BACKOFFICE", "INACTIVE", correlationId);
 		return requireProduct(principal.organizationId(), productId);
 	}
 
-	private ProductMutation mutation(GymOsPrincipal principal, UUID productId, ProductCommand request, String sku,
-			String barcode, String imageObjectKey, OffsetDateTime now) {
-		return new ProductMutation(principal.organizationId(), productId, sku, request.name().trim(),
+	private ProductMutation mutation(GymOsPrincipal principal, UUID productId, ProductCommand request,
+			String sku, String barcode, String imageObjectKey, OffsetDateTime now) {
+		return new ProductMutation(
+				principal.organizationId(), productId, sku, request.name().trim(),
 				CatalogBenefitsSerializer.blankToNull(request.description()), normalizeRequired(request.productType()),
-				request.priceCents(), normalizeRequired(request.currency()), request.taxable(), normalizeStatus(request.status()),
-				barcode, trimToNull(request.brand()), trimToNull(request.presentation()), normalizeNullable(request.unitOfMeasure()),
-				request.inventoryTracked(), request.displayOrder(), imageObjectKey, now, principal.userId());
+				normalizeRequired(request.commercialSubtype()), request.priceCents(), normalizeRequired(request.currency()),
+				request.taxable(), normalizeStatus(request.status()), barcode, trimToNull(request.brand()),
+				trimToNull(request.presentation()), normalizeNullable(request.unitOfMeasure()), request.inventoryTracked(),
+				request.displayOrder(), imageObjectKey, trimToNull(request.supplierName()), request.referenceCostCents(),
+				request.promotionalPriceCents(), request.promotionStartsAt(), request.promotionEndsAt(), now, principal.userId()
+		);
 	}
 
-	private String describeChanges(ProductSummaryView existing, ProductCommand request, String sku, String barcode, List<String> tags) {
+	private String describeChanges(ProductSummaryView existing, ProductCommand request, String sku,
+			String barcode, List<String> tags) {
 		List<String> changes = new ArrayList<>();
 		change(changes, "sku", existing.sku(), sku);
 		change(changes, "name", existing.name(), request.name().trim());
 		change(changes, "description", existing.description(), CatalogBenefitsSerializer.blankToNull(request.description()));
 		change(changes, "productType", existing.productType(), normalizeRequired(request.productType()));
+		change(changes, "commercialSubtype", existing.commercialSubtype(), normalizeRequired(request.commercialSubtype()));
 		change(changes, "priceCents", existing.priceCents(), request.priceCents());
 		change(changes, "currency", existing.currency(), normalizeRequired(request.currency()));
 		change(changes, "taxable", existing.taxable(), request.taxable());
@@ -153,32 +180,116 @@ class CatalogProductService {
 		change(changes, "unitOfMeasure", existing.unitOfMeasure(), normalizeNullable(request.unitOfMeasure()));
 		change(changes, "inventoryTracked", existing.inventoryTracked(), request.inventoryTracked());
 		change(changes, "displayOrder", existing.displayOrder(), request.displayOrder());
+		change(changes, "supplierName", existing.supplierName(), trimToNull(request.supplierName()));
+		change(changes, "referenceCostCents", existing.referenceCostCents(), request.referenceCostCents());
+		change(changes, "promotionalPriceCents", existing.promotionalPriceCents(), request.promotionalPriceCents());
+		change(changes, "promotionStartsAt", existing.promotionStartsAt(), request.promotionStartsAt());
+		change(changes, "promotionEndsAt", existing.promotionEndsAt(), request.promotionEndsAt());
 		change(changes, "categoryId", existing.categoryId(), request.categoryId());
 		change(changes, "tags", existing.tags(), tags);
 		return changes.isEmpty() ? "{}" : "{" + String.join(",", changes) + "}";
 	}
 
 	private void change(List<String> changes, String field, Object before, Object after) {
-		if (!Objects.equals(before, after)) changes.add("\"" + field + "\":{\"before\":\"" + safe(before) + "\",\"after\":\"" + safe(after) + "\"}");
+		if (!Objects.equals(before, after)) {
+			changes.add("\"" + field + "\":{\"before\":\"" + safe(before)
+					+ "\",\"after\":\"" + safe(after) + "\"}");
+		}
 	}
 
-	private String safe(Object value) { return String.valueOf(value).replace("\\", "\\\\").replace("\"", "\\\""); }
-	private ProductSummaryView requireProduct(UUID organizationId, UUID productId) { return products.findProduct(organizationId, productId).orElseThrow(this::notFound); }
 	private void validate(ProductCommand request) {
 		String type = normalizeRequired(request.productType());
-		if (!List.of("PHYSICAL", "SERVICE", "MEMBERSHIP_PLAN").contains(type)) throw new BusinessException("PRODUCT_TYPE_INVALID", "El tipo de producto no es valido.");
-		if (request.inventoryTracked() && !"PHYSICAL".equals(type)) throw new BusinessException("PRODUCT_INVENTORY_TRACKING_INVALID", "Solo los productos fisicos pueden controlar inventario.");
-		if (request.displayOrder() < 0) throw new BusinessException("PRODUCT_DISPLAY_ORDER_INVALID", "El orden de visualizacion no puede ser negativo.");
+		String subtype = normalizeRequired(request.commercialSubtype());
+		if (!TYPES.contains(type)) throw new BusinessException("PRODUCT_TYPE_INVALID", "El tipo de producto no es valido.");
+		if (!SUBTYPES.contains(subtype)) {
+			throw new BusinessException("PRODUCT_COMMERCIAL_SUBTYPE_INVALID", "El subtipo comercial no es valido.");
+		}
+		if ("MEMBERSHIP_PLAN".equals(type) != "MEMBERSHIP".equals(subtype)) {
+			throw new BusinessException("PRODUCT_COMMERCIAL_SUBTYPE_INVALID",
+					"Los planes de membresia deben usar el subtipo MEMBERSHIP y viceversa.");
+		}
+		if (request.inventoryTracked() && !"PHYSICAL".equals(type)) {
+			throw new BusinessException("PRODUCT_INVENTORY_TRACKING_INVALID",
+					"Solo los productos fisicos pueden controlar inventario.");
+		}
+		if (request.displayOrder() < 0) {
+			throw new BusinessException("PRODUCT_DISPLAY_ORDER_INVALID", "El orden de visualizacion no puede ser negativo.");
+		}
+		if (request.referenceCostCents() != null && request.referenceCostCents() < 0) {
+			throw new BusinessException("PRODUCT_REFERENCE_COST_INVALID", "El costo de referencia no puede ser negativo.");
+		}
+		if (request.promotionalPriceCents() != null) {
+			if (request.promotionalPriceCents() < 0 || request.promotionalPriceCents() > request.priceCents()) {
+				throw new BusinessException("PRODUCT_PROMOTIONAL_PRICE_INVALID",
+						"El precio promocional debe estar entre cero y el precio regular.");
+			}
+		}
+		if (request.promotionStartsAt() != null && request.promotionEndsAt() != null
+				&& !request.promotionEndsAt().isAfter(request.promotionStartsAt())) {
+			throw new BusinessException("PRODUCT_PROMOTION_DATES_INVALID",
+					"La vigencia final debe ser posterior al inicio de la promocion.");
+		}
 		String barcode = normalizeNullable(request.barcode());
-		if (barcode != null && !barcode.matches("[A-Z0-9._-]{3,128}")) throw new BusinessException("PRODUCT_BARCODE_INVALID", "El codigo de barras contiene caracteres no permitidos.");
+		if (barcode != null && !barcode.matches("[A-Z0-9._-]{3,128}")) {
+			throw new BusinessException("PRODUCT_BARCODE_INVALID", "El codigo de barras contiene caracteres no permitidos.");
+		}
 	}
-	private void validateBarcodeAvailability(UUID organizationId, String barcode, UUID excludedProductId) { if (barcode != null && products.barcodeExists(organizationId, barcode, excludedProductId)) throw new BusinessException("PRODUCT_BARCODE_ALREADY_EXISTS", "Ya existe otro producto con ese codigo de barras."); }
-	private void validateCategory(UUID organizationId, UUID categoryId) { if (categoryId != null && categories.findCategory(organizationId, categoryId).filter(category -> "ACTIVE".equals(category.status())).isEmpty()) throw new BusinessException("CATEGORY_NOT_AVAILABLE", "La categoria no existe o esta inactiva."); }
-	private List<String> normalizeTags(List<String> tags) { if (tags == null) return List.of(); List<String> normalized = tags.stream().filter(Objects::nonNull).map(String::trim).filter(tag -> !tag.isBlank()).distinct().toList(); if (normalized.size() > 20 || normalized.stream().anyMatch(tag -> tag.length() > 80 || tag.contains(","))) throw new BusinessException("PRODUCT_TAGS_INVALID", "Usa hasta 20 etiquetas sin comas."); return normalized; }
-	private void validateTransition(UUID organizationId, ProductSummaryView existing, ProductCommand request) { String nextType = normalizeRequired(request.productType()); boolean hasMovements = dependencies.hasInventoryMovements(organizationId, existing.id()); if (hasMovements && !existing.productType().equals(nextType)) throw new BusinessException("PRODUCT_TYPE_CHANGE_NOT_ALLOWED", "No se puede cambiar el tipo de un producto con movimientos de inventario."); if (hasMovements && existing.inventoryTracked() && !request.inventoryTracked()) throw new BusinessException("PRODUCT_INVENTORY_TRACKING_CHANGE_NOT_ALLOWED", "No se puede desactivar el control de inventario cuando existen movimientos."); if (dependencies.hasActiveMembershipPlan(organizationId, existing.id()) && !"MEMBERSHIP_PLAN".equals(nextType)) throw new BusinessException("PRODUCT_TYPE_CHANGE_NOT_ALLOWED", "El producto esta vinculado a un plan de membresia activo."); }
+
+	private void validateBarcodeAvailability(UUID organizationId, String barcode, UUID excludedProductId) {
+		if (barcode != null && products.barcodeExists(organizationId, barcode, excludedProductId)) {
+			throw new BusinessException("PRODUCT_BARCODE_ALREADY_EXISTS", "Ya existe otro producto con ese codigo de barras.");
+		}
+	}
+
+	private void validateCategory(UUID organizationId, UUID categoryId) {
+		if (categoryId != null && categories.findCategory(organizationId, categoryId)
+				.filter(category -> "ACTIVE".equals(category.status())).isEmpty()) {
+			throw new BusinessException("CATEGORY_NOT_AVAILABLE", "La categoria no existe o esta inactiva.");
+		}
+	}
+
+	private List<String> normalizeTags(List<String> tags) {
+		if (tags == null) return List.of();
+		List<String> normalized = tags.stream().filter(Objects::nonNull).map(String::trim)
+				.filter(tag -> !tag.isBlank()).distinct().toList();
+		if (normalized.size() > 20 || normalized.stream().anyMatch(tag -> tag.length() > 80 || tag.contains(","))) {
+			throw new BusinessException("PRODUCT_TAGS_INVALID", "Usa hasta 20 etiquetas sin comas.");
+		}
+		return normalized;
+	}
+
+	private void validateTransition(UUID organizationId, ProductSummaryView existing, ProductCommand request) {
+		String nextType = normalizeRequired(request.productType());
+		boolean hasMovements = dependencies.hasInventoryMovements(organizationId, existing.id());
+		if (hasMovements && !existing.productType().equals(nextType)) {
+			throw new BusinessException("PRODUCT_TYPE_CHANGE_NOT_ALLOWED",
+					"No se puede cambiar el tipo de un producto con movimientos de inventario.");
+		}
+		if (hasMovements && existing.inventoryTracked() && !request.inventoryTracked()) {
+			throw new BusinessException("PRODUCT_INVENTORY_TRACKING_CHANGE_NOT_ALLOWED",
+					"No se puede desactivar el control de inventario cuando existen movimientos.");
+		}
+		if (dependencies.hasActiveMembershipPlan(organizationId, existing.id()) && !"MEMBERSHIP_PLAN".equals(nextType)) {
+			throw new BusinessException("PRODUCT_TYPE_CHANGE_NOT_ALLOWED",
+					"El producto esta vinculado a un plan de membresia activo.");
+		}
+	}
+
+	private String safe(Object value) {
+		return String.valueOf(value).replace("\\", "\\\\").replace("\"", "\\\"");
+	}
+	private ProductSummaryView requireProduct(UUID organizationId, UUID productId) {
+		return products.findProduct(organizationId, productId).orElseThrow(this::notFound);
+	}
 	private String normalizeRequired(String value) { return value == null ? "" : value.trim().toUpperCase(); }
 	private String normalizeNullable(String value) { String normalized = normalizeRequired(value); return normalized.isBlank() ? null : normalized; }
-	private String normalizeStatus(String status) { String normalized = normalizeRequired(status); if (!List.of("ACTIVE", "INACTIVE").contains(normalized)) throw new BusinessException("PRODUCT_STATUS_INVALID", "El estado del producto no es valido."); return normalized; }
+	private String normalizeStatus(String status) {
+		String normalized = normalizeRequired(status);
+		if (!List.of("ACTIVE", "INACTIVE").contains(normalized)) {
+			throw new BusinessException("PRODUCT_STATUS_INVALID", "El estado del producto no es valido.");
+		}
+		return normalized;
+	}
 	private String trimToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }
 	private BusinessException duplicateSku() { return new BusinessException("PRODUCT_SKU_ALREADY_EXISTS", "Ya existe otro producto con ese SKU."); }
 	private BusinessException notFound() { return new BusinessException("PRODUCT_NOT_FOUND", "El producto no existe o fue archivado."); }
