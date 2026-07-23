@@ -70,7 +70,11 @@ class CatalogProductQueryRepository {
 		StringBuilder value = new StringBuilder(" AND cp.deleted_at IS NULL");
 		if (!criteria.includeArchived()) value.append(" AND cp.archived_at IS NULL");
 		if (hasText(criteria.query())) value.append(" AND (LOWER(cp.name) LIKE :query OR LOWER(cp.sku) LIKE :query OR LOWER(COALESCE(cp.barcode,'')) LIKE :query OR EXISTS (SELECT 1 FROM catalog_product_tag spt JOIN catalog_tag st ON st.id=spt.tag_id WHERE spt.organization_id=cp.organization_id AND spt.product_id=cp.id AND st.normalized_name LIKE :query))");
-		if (hasText(criteria.productType())) value.append(" AND cp.product_type=:productType");
+		if (hasText(criteria.productType())) {
+			value.append(" AND cp.product_type=:productType");
+		} else {
+			value.append(" AND cp.product_type <> 'MEMBERSHIP_PLAN'");
+		}
 		if (hasText(criteria.status())) value.append(" AND cp.status=:status");
 		if (criteria.inventoryTracked() != null) value.append(" AND cp.inventory_tracked=:inventoryTracked");
 		if (criteria.categoryId() != null) value.append(" AND EXISTS (SELECT 1 FROM catalog_product_category pc WHERE pc.organization_id=:organizationId AND pc.product_id=cp.id AND pc.category_id=:categoryId)");
