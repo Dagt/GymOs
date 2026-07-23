@@ -34,7 +34,8 @@ public record ProductSummaryView(
 		boolean archived,
 		OffsetDateTime archivedAt,
 		OffsetDateTime createdAt,
-		OffsetDateTime updatedAt
+		OffsetDateTime updatedAt,
+		long version
 ) {
 	public ProductSummaryView(
 			UUID id, String sku, String name, String description, String productType, long priceCents,
@@ -46,7 +47,7 @@ public record ProductSummaryView(
 		this(id, sku, name, description, productType, defaultSubtype(productType), priceCents, currency,
 				taxable, status, barcode, brand, presentation, unitOfMeasure, inventoryTracked,
 				displayOrder, imageObjectKey, null, null, null, null, null,
-				categoryId, categoryName, tags, archived, archivedAt, createdAt, updatedAt);
+				categoryId, categoryName, tags, archived, archivedAt, createdAt, updatedAt, 0);
 	}
 
 	public ProductSummaryView visibleTo(Set<String> permissions) {
@@ -59,7 +60,7 @@ public record ProductSummaryView(
 				taxable, status, barcode, brand, presentation, unitOfMeasure, inventoryTracked,
 				displayOrder, imageObjectKey, null, null, promotionalPriceCents,
 				promotionStartsAt, promotionEndsAt, categoryId, categoryName, tags,
-				archived, archivedAt, createdAt, updatedAt
+				archived, archivedAt, createdAt, updatedAt, version
 		);
 	}
 
