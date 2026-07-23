@@ -958,3 +958,31 @@ Verificado:
 
 - Frontend: `npm.cmd run typecheck`.
 - Frontend: `npm.cmd run lint`.
+
+## Saneamiento CRM de plataforma y POS - 22 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `/platform/gymnasiums` extrae la orquestacion a `usePlatformGymnasiumsController.ts`:
+  - carga de gimnasios;
+  - carga de sucursales por gimnasio seleccionado;
+  - busqueda y seleccion de tenant;
+  - entrada en modo soporte;
+  - seleccion de sucursal;
+  - alta de gimnasio;
+  - alta de sucursal;
+  - suspension/reactivacion de gimnasio.
+- `platform/gymnasiums/page.tsx` queda como composicion de `AppShell`, lista, detalle y drawers.
+- Se corrigieron textos heredados con mojibake en mensajes de confirmacion del CRM de plataforma.
+- `/pos` separa la presentacion en `PosSections.tsx`:
+  - grilla de productos;
+  - ventas recientes;
+  - busqueda/seleccion de cliente;
+  - carrito, pago y registro de venta.
+- `pos/page.tsx` queda como orquestador de sesion, carga de catalogo/ventas, carrito y guardado de venta.
+- Se corrigieron textos visibles heredados con mojibake en Caja/POS.
+
+Verificado:
+
+- Frontend: `npm.cmd run typecheck`.
+- Frontend: `npm.cmd run lint`.

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
@@ -15,11 +14,14 @@ import {
   type SaleSummary,
   type StoredSession,
 } from "@/lib/api";
-
-type CartItem = {
-  product: ProductSummary;
-  quantity: number;
-};
+import {
+  type CartItem,
+  type PaymentMethod,
+  PosCartForm,
+  PosClientSearch,
+  ProductGrid,
+  RecentSalesList,
+} from "./PosSections";
 
 export default function PosPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
@@ -29,7 +31,7 @@ export default function PosPage() {
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [selectedClient, setSelectedClient] = useState<ClientSummary | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [paymentMethod, setPaymentMethod] = useState<"CASH" | "TRANSFER" | "CARD_MANUAL">("CASH");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
   const [paymentReference, setPaymentReference] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [validateNow, setValidateNow] = useState(true);
@@ -125,9 +127,7 @@ export default function PosPage() {
     setError(null);
     setMessage(null);
     try {
-      const amountCents = paymentAmount.trim()
-        ? Math.round(Number(paymentAmount) * 100)
-        : subtotal;
+      const amountCents = paymentAmount.trim() ? Math.round(Number(paymentAmount) * 100) : subtotal;
       const sale = await createSale(session.accessToken, {
         clientId: selectedClient?.id ?? null,
         items: cart.map((item) => ({
@@ -137,14 +137,17 @@ export default function PosPage() {
         })),
         discountCents: 0,
         notes: null,
-        payment: amountCents > 0 ? {
-          method: paymentMethod,
-          amountCents,
-          reference: paymentReference,
-          receiptObjectKey: null,
-          validateNow,
-          notes: null,
-        } : null,
+        payment:
+          amountCents > 0
+            ? {
+                method: paymentMethod,
+                amountCents,
+                reference: paymentReference,
+                receiptObjectKey: null,
+                validateNow,
+                notes: null,
+              }
+            : null,
       });
       setMessage(`Venta ${sale.sale.saleNumber} registrada.`);
       setCart([]);
@@ -170,169 +173,45 @@ export default function PosPage() {
 
   return (
     <AppShell
-      eyebrow="Recepción / Caja"
+      eyebrow="Recepcion / Caja"
       session={session}
-      subtitle="Venta rápida con pago manual y validación interna."
+      subtitle="Venta rapida con pago manual y validacion interna."
       title="Caja / POS"
     >
       {error ? <InlineError message={error} /> : null}
-      {message ? (
-        <p className="rounded-md border border-[#bad9c4] bg-[#eff8f1] px-3 py-2 text-sm text-[#31563c]">
-          {message}
-        </p>
-      ) : null}
+      {message ? <Notice text={message} /> : null}
 
       <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <section className="grid gap-6">
-          <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-semibold">Productos</h2>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              {loading ? <p className="text-sm text-[#5d6b63]">Cargando catálogo...</p> : null}
-              {products.map((product) => (
-                <button
-                  className="rounded-md border border-[#d8ddd2] bg-white p-4 text-left transition hover:border-[#51735f] hover:bg-[#f6f7f2]"
-                  key={product.id}
-                  onClick={() => addProduct(product)}
-                  type="button"
-                >
-                  <span className="block text-sm font-semibold">{product.name}</span>
-                  <span className="mt-1 block text-xs text-[#6f7a73]">{product.sku}</span>
-                  <span className="mt-3 block text-lg font-semibold">
-                    {formatMoney(product.priceCents, product.currency)}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-semibold">Ventas recientes</h2>
-            <div className="mt-4 grid gap-3">
-              {sales.map((sale) => (
-                <Link
-                  className="rounded-md border border-[#d8ddd2] px-4 py-3 transition hover:border-[#51735f] hover:bg-[#f6f7f2]"
-                  href={`/sales/${sale.id}`}
-                  key={sale.id}
-                >
-                  <span className="block font-semibold">{sale.saleNumber}</span>
-                  <span className="mt-1 block text-sm text-[#5d6b63]">
-                    {sale.clientName} - {sale.status} - {formatMoney(sale.totalCents, sale.currency)}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </section>
+          <ProductGrid loading={loading} onAddProduct={addProduct} products={products} />
+          <RecentSalesList sales={sales} />
         </section>
 
         <aside className="grid gap-6">
-          <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-semibold">Cliente</h2>
-            <form className="mt-4 flex gap-2" onSubmit={submitClientSearch}>
-              <input
-                className="h-11 min-w-0 flex-1 rounded-md border border-[#cdd5ca] px-3 text-sm outline-none transition focus:border-[#51735f]"
-                onChange={(event) => setClientQuery(event.target.value)}
-                placeholder="Nombre, teléfono o email"
-                value={clientQuery}
-              />
-              <button className="app-button" type="submit">
-                Buscar
-              </button>
-            </form>
-            {selectedClient ? (
-              <p className="mt-3 rounded-md border border-[#bad9c4] bg-[#eff8f1] px-3 py-2 text-sm text-[#31563c]">
-                {selectedClient.firstName} {selectedClient.lastName}
-              </p>
-            ) : null}
-            <div className="mt-3 grid gap-2">
-              {clients.slice(0, 5).map((client) => (
-                <button
-                  className="rounded-md border border-[#d8ddd2] px-3 py-2 text-left text-sm hover:border-[#51735f]"
-                  key={client.id}
-                  onClick={() => setSelectedClient(client)}
-                  type="button"
-                >
-                  {client.firstName} {client.lastName}
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <form className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm" onSubmit={submitSale}>
-            <h2 className="text-xl font-semibold">Carrito</h2>
-            <div className="mt-4 grid gap-3">
-              {cart.length === 0 ? <p className="text-sm text-[#5d6b63]">Sin artículos.</p> : null}
-              {cart.map((item) => (
-                <div className="grid gap-2 rounded-md border border-[#d8ddd2] p-3" key={item.product.id}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="font-semibold">{item.product.name}</p>
-                      <p className="text-sm text-[#5d6b63]">
-                        {formatMoney(item.product.priceCents, item.product.currency)}
-                      </p>
-                    </div>
-                    <input
-                      className="h-10 w-20 rounded-md border border-[#cdd5ca] px-2 text-sm"
-                      min={0}
-                      onChange={(event) => setQuantity(item.product.id, Number(event.target.value))}
-                      type="number"
-                      value={item.quantity}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-5 border-t border-[#e4e8df] pt-5">
-              <div className="flex items-center justify-between text-lg font-semibold">
-                <span>Total</span>
-                <span>{formatMoney(subtotal, products[0]?.currency ?? "MXN")}</span>
-              </div>
-              <div className="mt-4 grid gap-3">
-                <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-                  Método
-                  <select
-                    className="h-11 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm"
-                    onChange={(event) => setPaymentMethod(event.target.value as "CASH" | "TRANSFER" | "CARD_MANUAL")}
-                    value={paymentMethod}
-                  >
-                    <option value="CASH">Efectivo</option>
-                    <option value="TRANSFER">Transferencia</option>
-                    <option value="CARD_MANUAL">Tarjeta manual</option>
-                  </select>
-                </label>
-                <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-                  Monto recibido
-                  <input
-                    className="h-11 rounded-md border border-[#cdd5ca] px-3 text-sm"
-                    onChange={(event) => setPaymentAmount(event.target.value)}
-                    placeholder={(subtotal / 100).toFixed(2)}
-                    type="number"
-                    value={paymentAmount}
-                  />
-                </label>
-                <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-                  Referencia
-                  <input
-                    className="h-11 rounded-md border border-[#cdd5ca] px-3 text-sm"
-                    onChange={(event) => setPaymentReference(event.target.value)}
-                    value={paymentReference}
-                  />
-                </label>
-                <label className="flex items-center gap-2 text-sm font-medium text-[#42514a]">
-                  <input
-                    checked={validateNow}
-                    onChange={(event) => setValidateNow(event.target.checked)}
-                    type="checkbox"
-                  />
-                  Validar pago ahora
-                </label>
-              </div>
-            </div>
-
-            <button className="app-button mt-5 h-11 w-full" disabled={saving || cart.length === 0} type="submit">
-              {saving ? "Registrando..." : "Registrar venta"}
-            </button>
-          </form>
+          <PosClientSearch
+            clientQuery={clientQuery}
+            clients={clients}
+            onClientQueryChange={setClientQuery}
+            onSearch={submitClientSearch}
+            onSelectClient={setSelectedClient}
+            selectedClient={selectedClient}
+          />
+          <PosCartForm
+            cart={cart}
+            currency={products[0]?.currency ?? "MXN"}
+            onPaymentAmountChange={setPaymentAmount}
+            onPaymentMethodChange={setPaymentMethod}
+            onPaymentReferenceChange={setPaymentReference}
+            onQuantityChange={setQuantity}
+            onSubmit={submitSale}
+            onValidateNowChange={setValidateNow}
+            paymentAmount={paymentAmount}
+            paymentMethod={paymentMethod}
+            paymentReference={paymentReference}
+            saving={saving}
+            subtotal={subtotal}
+            validateNow={validateNow}
+          />
         </aside>
       </section>
     </AppShell>
@@ -342,15 +221,16 @@ export default function PosPage() {
 function AuthRequired() {
   return (
     <AuthRequiredCard
-      message="El punto de venta requiere una sesión de recepción o administración."
-      title="Inicia sesión para cobrar"
+      message="El punto de venta requiere una sesion de recepcion o administracion."
+      title="Inicia sesion para cobrar"
     />
   );
 }
 
-function formatMoney(cents: number, currency: string) {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency,
-  }).format(cents / 100);
+function Notice({ text }: { text: string }) {
+  return (
+    <p className="rounded-md border border-[#bad9c4] bg-[#eff8f1] px-3 py-2 text-sm text-[#31563c]">
+      {text}
+    </p>
+  );
 }
