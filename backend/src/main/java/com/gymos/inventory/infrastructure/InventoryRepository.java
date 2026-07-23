@@ -29,7 +29,9 @@ public class InventoryRepository {
 				    AND s.deleted_at IS NULL
 				WHERE cp.organization_id = :organizationId
 				  AND cp.product_type = 'PHYSICAL'
+				  AND cp.inventory_tracked = TRUE
 				  AND cp.deleted_at IS NULL
+				  AND cp.archived_at IS NULL
 				ORDER BY cp.name
 				""")
 				.param("organizationId", organizationId)
@@ -52,7 +54,9 @@ public class InventoryRepository {
 				WHERE cp.organization_id = :organizationId
 				  AND cp.id = :productId
 				  AND cp.product_type = 'PHYSICAL'
+				  AND cp.inventory_tracked = TRUE
 				  AND cp.deleted_at IS NULL
+				  AND cp.archived_at IS NULL
 				""")
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
@@ -92,7 +96,9 @@ public class InventoryRepository {
 				    AND s.deleted_at IS NULL
 				WHERE cp.organization_id = :organizationId
 				  AND cp.product_type = 'PHYSICAL'
+				  AND cp.inventory_tracked = TRUE
 				  AND cp.deleted_at IS NULL
+				  AND cp.archived_at IS NULL
 				  AND s.reorder_point > 0
 				  AND s.quantity_on_hand <= s.reorder_point
 				ORDER BY s.quantity_on_hand, cp.name
@@ -221,7 +227,8 @@ public class InventoryRepository {
 			UUID correlationId
 	) {
 		ProductForInventory product = product(organizationId, productId).orElse(null);
-		if (product == null || !"PHYSICAL".equals(product.productType()) || !"ACTIVE".equals(product.status())) {
+		if (product == null || !"PHYSICAL".equals(product.productType())
+				|| !product.inventoryTracked() || !"ACTIVE".equals(product.status())) {
 			return StockDeductionResult.IGNORED_NON_PHYSICAL;
 		}
 		if (quantity <= 0) {
@@ -331,11 +338,12 @@ public class InventoryRepository {
 
 	public Optional<ProductForInventory> product(UUID organizationId, UUID productId) {
 		return jdbcClient.sql("""
-				SELECT id, sku, name, product_type, status
+				SELECT id, sku, name, product_type, inventory_tracked, status
 				FROM catalog_product
 				WHERE organization_id = :organizationId
 				  AND id = :productId
 				  AND deleted_at IS NULL
+				  AND archived_at IS NULL
 				""")
 				.param("organizationId", organizationId)
 				.param("productId", productId)
@@ -344,6 +352,7 @@ public class InventoryRepository {
 						resultSet.getString("sku"),
 						resultSet.getString("name"),
 						resultSet.getString("product_type"),
+						resultSet.getBoolean("inventory_tracked"),
 						resultSet.getString("status")
 				))
 				.optional();
@@ -406,7 +415,9 @@ public class InventoryRepository {
 		);
 	}
 
-	public record ProductForInventory(UUID id, String sku, String name, String productType, String status) {
+	public record ProductForInventory(
+			UUID id, String sku, String name, String productType, boolean inventoryTracked, String status
+	) {
 	}
 
 	public record StockLedgerRecord(UUID stockId, int quantityOnHand, int reorderPoint, Long averageCostCents) {

@@ -179,6 +179,13 @@ class BookingMembershipPlanIntegrationTests {
 				"MXN",
 				true,
 				"ACTIVE",
+				null,
+				null,
+				null,
+				null,
+				false,
+				0,
+				null,
 				now,
 				userId
 		));

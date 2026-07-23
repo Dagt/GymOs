@@ -22,6 +22,7 @@ class SalesCatalogLookupRepository {
 				  AND id = :productId
 				  AND status = 'ACTIVE'
 				  AND deleted_at IS NULL
+				  AND archived_at IS NULL
 				""")
 				.param("organizationId", organizationId)
 				.param("productId", productId)
