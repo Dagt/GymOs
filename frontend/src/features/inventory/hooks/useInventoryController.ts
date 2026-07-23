@@ -5,15 +5,16 @@ import {
   createInventoryMovement,
   getBranches,
   getCurrentOrganization,
-  getInventoryMovements,
-  getInventoryStock,
   getLowInventoryStock,
   getStoredSession,
+  searchInventoryMovements,
+  searchInventoryStock,
   type BranchSummary,
   type InventoryMovement,
   type InventoryMovementPayload,
   type InventoryMovementType,
   type InventoryStock,
+  type InventoryStockSearchParams,
   type OrganizationSummary,
   type StoredSession,
 } from "@/lib/api";
@@ -26,8 +27,16 @@ export function useInventoryController() {
   const [organization, setOrganization] = useState<OrganizationSummary | null>(null);
   const [branches, setBranches] = useState<BranchSummary[]>([]);
   const [stock, setStock] = useState<InventoryStock[]>([]);
+  const [stockQuery, setStockQuery] = useState("");
+  const [debouncedStockQuery, setDebouncedStockQuery] = useState("");
+  const [stockPage, setStockPage] = useState(0);
+  const [stockTotal, setStockTotal] = useState(0);
+  const [stockTotalPages, setStockTotalPages] = useState(0);
+  const [stockSort, setStockSort] = useState<NonNullable<InventoryStockSearchParams["sort"]>>("name,asc");
   const [lowStock, setLowStock] = useState<InventoryStock[]>([]);
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
+  const [movementPage, setMovementPage] = useState(0);
+  const [movementTotalPages, setMovementTotalPages] = useState(0);
   const [selectedProductId, setSelectedProductId] = useState("");
   const [movementType, setMovementType] = useState<ManualMovementType>("PURCHASE");
   const [quantity, setQuantity] = useState(1);
@@ -37,54 +46,104 @@ export function useInventoryController() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [stockLoading, setStockLoading] = useState(false);
+  const [movementLoading, setMovementLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showMovementDrawer, setShowMovementDrawer] = useState(false);
 
   useEffect(() => {
     let active = true;
-    async function load() {
+    async function loadContext() {
       const stored = getStoredSession();
       if (!active) return;
       if (!stored) { setLoading(false); return; }
       setSession(stored);
       try {
-        const [loadedOrganization, loadedBranches, loadedStock, loadedLowStock, loadedMovements] = await Promise.all([
+        const [loadedOrganization, loadedBranches, loadedLowStock] = await Promise.all([
           getCurrentOrganization(stored.accessToken).catch(() => null),
-          getBranches(stored.accessToken), getInventoryStock(stored.accessToken),
-          getLowInventoryStock(stored.accessToken), getInventoryMovements(stored.accessToken),
+          getBranches(stored.accessToken),
+          getLowInventoryStock(stored.accessToken),
         ]);
         if (!active) return;
-        setOrganization(loadedOrganization); setBranches(loadedBranches); setStock(loadedStock);
-        setLowStock(loadedLowStock); setMovements(loadedMovements);
-        setSelectedProductId(loadedStock[0]?.productId ?? "");
-        setReorderPoint(String(loadedStock[0]?.reorderPoint ?? 0));
+        setOrganization(loadedOrganization); setBranches(loadedBranches); setLowStock(loadedLowStock);
       } catch (exception) {
         if (active) setError(exception instanceof Error ? exception.message : "No fue posible cargar inventario.");
       } finally { if (active) setLoading(false); }
     }
-    void load();
+    void loadContext();
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedStockQuery(stockQuery.trim());
+      setStockPage(0);
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [stockQuery]);
+
+  useEffect(() => {
+    if (!session) return;
+    let active = true;
+    setStockLoading(true);
+    searchInventoryStock(session.accessToken, {
+      q: debouncedStockQuery, page: stockPage, size: 25, sort: stockSort,
+    })
+      .then((page) => {
+        if (!active) return;
+        setStock(page.items); setStockTotal(page.totalElements); setStockTotalPages(page.totalPages);
+        setSelectedProductId((current) => {
+          if (current && page.items.some((item) => item.productId === current)) return current;
+          const next = page.items[0]?.productId ?? "";
+          setReorderPoint(String(page.items[0]?.reorderPoint ?? 0));
+          return next;
+        });
+      })
+      .catch((exception) => { if (active) setError(exception instanceof Error ? exception.message : "No fue posible cargar existencias."); })
+      .finally(() => { if (active) setStockLoading(false); });
+    return () => { active = false; };
+  }, [debouncedStockQuery, session, stockPage, stockSort]);
+
+  useEffect(() => {
+    if (!session) return;
+    let active = true;
+    setMovementLoading(true);
+    searchInventoryMovements(session.accessToken, {
+      productId: selectedProductId || undefined, page: movementPage, size: 25,
+    })
+      .then((page) => {
+        if (!active) return;
+        setMovements(page.items); setMovementTotalPages(page.totalPages);
+      })
+      .catch((exception) => { if (active) setError(exception instanceof Error ? exception.message : "No fue posible cargar movimientos."); })
+      .finally(() => { if (active) setMovementLoading(false); });
+    return () => { active = false; };
+  }, [movementPage, selectedProductId, session]);
 
   const selectedStock = useMemo(() => stock.find((item) => item.productId === selectedProductId) ?? null, [selectedProductId, stock]);
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
 
-  async function refresh(activeSession = session, productId = selectedProductId) {
+  async function refresh(activeSession = session) {
     if (!activeSession) return;
     const [nextStock, nextLowStock, nextMovements] = await Promise.all([
-      getInventoryStock(activeSession.accessToken), getLowInventoryStock(activeSession.accessToken),
-      getInventoryMovements(activeSession.accessToken, productId || undefined),
+      searchInventoryStock(activeSession.accessToken, {
+        q: debouncedStockQuery, page: stockPage, size: 25, sort: stockSort,
+      }),
+      getLowInventoryStock(activeSession.accessToken),
+      searchInventoryMovements(activeSession.accessToken, {
+        productId: selectedProductId || undefined, page: movementPage, size: 25,
+      }),
     ]);
-    setStock(nextStock); setLowStock(nextLowStock); setMovements(nextMovements);
+    setStock(nextStock.items); setStockTotal(nextStock.totalElements); setStockTotalPages(nextStock.totalPages);
+    setLowStock(nextLowStock); setMovements(nextMovements.items); setMovementTotalPages(nextMovements.totalPages);
   }
 
   function selectProduct(product: InventoryStock) {
-    setSelectedProductId(product.productId); setReorderPoint(String(product.reorderPoint));
-    void refresh(session, product.productId);
+    setSelectedProductId(product.productId); setReorderPoint(String(product.reorderPoint)); setMovementPage(0);
   }
 
   function selectDrawerProduct(productId: string) {
-    setSelectedProductId(productId);
+    setSelectedProductId(productId); setMovementPage(0);
     const nextStock = stock.find((item) => item.productId === productId);
     setReorderPoint(String(nextStock?.reorderPoint ?? 0));
   }
@@ -104,18 +163,20 @@ export function useInventoryController() {
         reason,
       };
       const updated = await createInventoryMovement(session.accessToken, payload);
-      setReason(""); setUnitCostCents(""); setReorderPoint(String(updated.reorderPoint));
+      setReason(""); setUnitCostCents(""); setReorderPoint(String(updated.reorderPoint)); setMovementPage(0);
       setMessage(`${updated.productName}: existencia actual ${updated.quantityOnHand}.`);
-      await refresh(session, selectedProductId); setShowMovementDrawer(false);
+      await refresh(session); setShowMovementDrawer(false);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible registrar movimiento.");
     } finally { setSaving(false); }
   }
 
   return {
-    activeBranch, error, loading, lowStock, message, movementType, movements, organization,
-    quantity, reason, refresh, reorderPoint, saving, selectedProductId, selectedStock, session,
-    setMovementType, setQuantity, setReason, setReorderPoint, setShowMovementDrawer, setUnitCostCents,
-    showMovementDrawer, stock, submitMovement, selectDrawerProduct, selectProduct, unitCostCents,
+    activeBranch, error, loading, lowStock, message, movementLoading, movementPage, movementTotalPages,
+    movementType, movements, organization, quantity, reason, refresh, reorderPoint, saving,
+    selectedProductId, selectedStock, session, setMovementPage, setMovementType, setQuantity, setReason,
+    setReorderPoint, setShowMovementDrawer, setStockPage, setStockQuery, setStockSort, setUnitCostCents,
+    showMovementDrawer, stock, stockLoading, stockPage, stockQuery, stockSort, stockTotal,
+    stockTotalPages, submitMovement, selectDrawerProduct, selectProduct, unitCostCents,
   };
 }
