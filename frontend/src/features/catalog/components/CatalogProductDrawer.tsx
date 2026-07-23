@@ -15,6 +15,7 @@ const subtypeOptions = [
 
 type CatalogProductDrawerProps = {
   categories: CatalogCategory[];
+  canReadCosts: boolean;
   editing: boolean;
   form: ProductPayload;
   open: boolean;
@@ -29,7 +30,7 @@ type CatalogProductDrawerProps = {
 };
 
 export function CatalogProductDrawer({
-  categories, editing, form, open, price, image, saving, onClose,
+  categories, canReadCosts, editing, form, open, price, image, saving, onClose,
   onFormChange, onPriceChange, onImageChange, onSubmit,
 }: CatalogProductDrawerProps) {
   return (
@@ -45,12 +46,17 @@ export function CatalogProductDrawer({
           <TextField label="Nombre" name="productName" value={form.name} onChange={(name) => change({ name })} />
           <NumberField label="Precio regular" name="productPrice" value={price} onChange={onPriceChange} />
           <TextField label="Moneda" name="productCurrency" value={form.currency} onChange={(currency) => change({ currency })} />
-          <NumberField
-            label="Costo de referencia"
-            name="productReferenceCost"
-            value={moneyValue(form.referenceCostCents)}
-            onChange={(value) => change({ referenceCostCents: cents(value) })}
-          />
+          {canReadCosts ? (
+            <>
+              <NumberField
+                label="Costo de referencia"
+                name="productReferenceCost"
+                value={moneyValue(form.referenceCostCents)}
+                onChange={(value) => change({ referenceCostCents: cents(value) })}
+              />
+              <TextField label="Proveedor principal" name="productSupplier" value={form.supplierName ?? ""} onChange={(supplierName) => change({ supplierName })} />
+            </>
+          ) : null}
           <NumberField
             label="Precio promocional"
             name="productPromotionalPrice"
@@ -61,7 +67,6 @@ export function CatalogProductDrawer({
           <TextField label="Marca" name="productBrand" value={form.brand ?? ""} onChange={(brand) => change({ brand })} />
           <TextField label="Presentacion" name="productPresentation" value={form.presentation ?? ""} onChange={(presentation) => change({ presentation })} />
           <TextField label="Unidad" name="productUnit" value={form.unitOfMeasure ?? ""} onChange={(unitOfMeasure) => change({ unitOfMeasure })} />
-          <TextField label="Proveedor principal" name="productSupplier" value={form.supplierName ?? ""} onChange={(supplierName) => change({ supplierName })} />
           <NumberField label="Orden" name="productDisplayOrder" value={String(form.displayOrder)} onChange={(value) => change({ displayOrder: Number(value || 0) })} />
         </div>
 
