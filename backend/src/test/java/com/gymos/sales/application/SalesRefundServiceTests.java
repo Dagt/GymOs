@@ -10,7 +10,7 @@ import static org.mockito.Mockito.when;
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
-import com.gymos.inventory.api.operations.InventoryRefundOperations;
+import com.gymos.inventory.api.InventoryRefundOperations;
 import com.gymos.sales.application.command.RequestRefundCommand;
 import com.gymos.sales.infrastructure.SalesRefundCommandRepository;
 import com.gymos.sales.infrastructure.SalesRepository;
