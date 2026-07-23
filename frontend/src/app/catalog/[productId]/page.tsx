@@ -32,6 +32,7 @@ export default function CatalogProductDetailPage() {
   if (!detail) return <AppShell eyebrow="Catalogo" session={session} title="Producto">{error ? <InlineError message={error} /> : null}</AppShell>;
 
   const { product, dependencies, history } = detail;
+  const canReadCosts = hasPermission(session, "catalog.cost.read");
   return (
     <AppShell eyebrow="Catalogo" session={session} title={product.name}
       subtitle={`${product.sku} · ${product.categoryName ?? "Sin categoria"}`}>
@@ -49,8 +50,8 @@ export default function CatalogProductDetailPage() {
             <Detail label="Subtipo" value={product.commercialSubtype} />
             <Detail label="Precio regular" value={formatMoney(product.priceCents, product.currency)} />
             <Detail label="Precio promocional" value={product.promotionalPriceCents == null ? "Sin promocion" : formatMoney(product.promotionalPriceCents, product.currency)} />
-            <Detail label="Costo de referencia" value={product.referenceCostCents == null ? "Sin costo" : formatMoney(product.referenceCostCents, product.currency)} />
-            <Detail label="Proveedor" value={product.supplierName ?? "Sin proveedor"} />
+            {canReadCosts ? <Detail label="Costo de referencia" value={product.referenceCostCents == null ? "Sin costo" : formatMoney(product.referenceCostCents, product.currency)} /> : null}
+            {canReadCosts ? <Detail label="Proveedor" value={product.supplierName ?? "Sin proveedor"} /> : null}
             <Detail label="Codigo de barras" value={product.barcode ?? "Sin codigo"} />
             <Detail label="Marca" value={product.brand ?? "Sin marca"} />
             <Detail label="Presentacion" value={product.presentation ?? "Sin presentacion"} />
@@ -98,4 +99,10 @@ function Detail({ label, value }: { label: string; value: string }) {
 
 function formatDate(value: string | null) {
   return value ? new Date(value).toLocaleString("es-MX") : "Sin vigencia";
+}
+
+function hasPermission(session: StoredSession, permission: string) {
+  return session.user.permissions.includes(permission)
+    || session.user.permissions.includes("catalog.manage")
+    || session.user.permissions.includes("platform.admin");
 }
