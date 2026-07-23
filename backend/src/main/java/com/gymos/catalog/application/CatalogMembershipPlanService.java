@@ -51,16 +51,9 @@ class CatalogMembershipPlanService {
 		UUID planId = UUID.randomUUID();
 		OffsetDateTime now = OffsetDateTime.now();
 		commandRepository.createPlan(new PlanRecord(
-				planId,
-				principal.organizationId(),
-				request.productId(),
-				request.durationDays(),
-				request.graceDays(),
-				benefitsSerializer.normalizeJson(request.benefitsJson()),
-				request.multiBranchAccess(),
-				request.status().trim().toUpperCase(),
-				now,
-				principal.userId()
+				planId, principal.organizationId(), request.productId(), request.durationDays(), request.graceDays(),
+				benefitsSerializer.normalizeJson(request.benefitsJson()), request.multiBranchAccess(),
+				request.status().trim().toUpperCase(), now, principal.userId()
 		));
 		auditService.record(principal, "PLAN_CREATED", "MEMBERSHIP_PLAN", planId, "BACKOFFICE", null, correlationId);
 		return catalogRepository.plan(principal.organizationId(), planId)
@@ -73,30 +66,20 @@ class CatalogMembershipPlanService {
 		if (catalogRepository.skuExists(principal.organizationId(), sku, null)) {
 			throw new BusinessException("PRODUCT_SKU_ALREADY_EXISTS", "Ya existe un producto o plan con ese codigo.");
 		}
-
 		ProductSummary product = productService.createProduct(
 				principal,
 				new ProductCommand(
-						sku,
-						request.name(),
-						request.description(),
-						"MEMBERSHIP_PLAN",
-						request.priceCents(),
-						request.currency(),
-						true,
-						request.status()
+						sku, request.name(), request.description(), "MEMBERSHIP_PLAN", request.priceCents(),
+						request.currency(), true, request.status(), null, null, null, null,
+						false, 0, null, null
 				),
 				correlationId
 		);
 		return createPlan(
 				principal,
 				new CreatePlanCommand(
-						product.id(),
-						request.durationDays(),
-						request.graceDays(),
-						benefitsSerializer.textToJson(request.benefits()),
-						request.multiBranchAccess(),
-						request.status()
+						product.id(), request.durationDays(), request.graceDays(),
+						benefitsSerializer.textToJson(request.benefits()), request.multiBranchAccess(), request.status()
 				),
 				correlationId
 		);
@@ -106,28 +89,19 @@ class CatalogMembershipPlanService {
 		CatalogAccessGuard.requirePrincipal(principal);
 		PlanSummary existing = catalogRepository.plan(principal.organizationId(), planId)
 				.orElseThrow(() -> new BusinessException("PLAN_NOT_FOUND", "El plan no esta disponible."));
+		ProductSummary product = catalogRepository.product(principal.organizationId(), existing.productId())
+				.orElseThrow(() -> new BusinessException("PRODUCT_NOT_FOUND", "El producto del plan no esta disponible."));
 		OffsetDateTime now = OffsetDateTime.now();
 		commandRepository.updateProduct(new ProductUpdateRecord(
-				principal.organizationId(),
-				existing.productId(),
-				request.name().trim(),
-				CatalogBenefitsSerializer.blankToNull(request.description()),
-				request.priceCents(),
-				request.currency().trim().toUpperCase(),
-				request.status().trim().toUpperCase(),
-				now,
-				principal.userId()
+				principal.organizationId(), existing.productId(), product.sku(), request.name().trim(),
+				CatalogBenefitsSerializer.blankToNull(request.description()), "MEMBERSHIP_PLAN", request.priceCents(),
+				request.currency().trim().toUpperCase(), true, request.status().trim().toUpperCase(),
+				null, null, null, null, false, 0, null, now, principal.userId()
 		));
 		commandRepository.updatePlan(new PlanUpdateRecord(
-				principal.organizationId(),
-				planId,
-				request.durationDays(),
-				request.graceDays(),
-				benefitsSerializer.textToJson(request.benefits()),
-				request.multiBranchAccess(),
-				request.status().trim().toUpperCase(),
-				now,
-				principal.userId()
+				principal.organizationId(), planId, request.durationDays(), request.graceDays(),
+				benefitsSerializer.textToJson(request.benefits()), request.multiBranchAccess(),
+				request.status().trim().toUpperCase(), now, principal.userId()
 		));
 		auditService.record(principal, "PLAN_UPDATED", "MEMBERSHIP_PLAN", planId, "BACKOFFICE", null, correlationId);
 		return catalogRepository.plan(principal.organizationId(), planId)
