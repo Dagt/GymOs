@@ -10,6 +10,7 @@ type CatalogProductTableProps = {
   canUpdate: boolean;
   onArchive: (product: ProductSummary) => void;
   onEdit: (product: ProductSummary) => void;
+  onRestore: (product: ProductSummary) => void;
   onToggleStatus: (product: ProductSummary) => void;
 };
 
@@ -22,6 +23,7 @@ export function CatalogProductTable({
   canUpdate,
   onArchive,
   onEdit,
+  onRestore,
   onToggleStatus,
 }: CatalogProductTableProps) {
   return (
@@ -55,7 +57,7 @@ export function CatalogProductTable({
             </thead>
             <tbody className="divide-y divide-[#e3e7df]">
               {products.map((product) => (
-                <tr key={product.id}>
+                <tr className={product.archived ? "bg-[#faf7f2] opacity-80" : undefined} key={product.id}>
                   <td className="px-4 py-3">
                     <p className="font-semibold">{product.name}</p>
                     <p className="text-xs text-[#6f7a73]">
@@ -67,21 +69,27 @@ export function CatalogProductTable({
                   <td className="px-4 py-3 font-medium">{formatMoney(product.priceCents, product.currency)}</td>
                   <td className="px-4 py-3">{product.inventoryTracked ? "Controlado" : "No controlado"}</td>
                   <td className="px-4 py-3">
-                    <span className={product.status === "ACTIVE" ? "text-[#28733e]" : "text-[#8a5a22]"}>
-                      {product.status === "ACTIVE" ? "Activo" : "Inactivo"}
-                    </span>
+                    <ProductStatus product={product} />
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-2">
-                      {canUpdate ? <Action label="Editar" onClick={() => onEdit(product)} /> : null}
-                      {canManageStatus ? <Action
-                        disabled={saving}
-                        label={product.status === "ACTIVE" ? "Desactivar" : "Activar"}
-                        onClick={() => onToggleStatus(product)}
-                      /> : null}
-                      {canArchive ? (
-                        <Action danger disabled={saving} label="Archivar" onClick={() => onArchive(product)} />
-                      ) : null}
+                      {product.archived ? (
+                        canArchive ? <Action disabled={saving} label="Restaurar" onClick={() => onRestore(product)} /> : null
+                      ) : (
+                        <>
+                          {canUpdate ? <Action label="Editar" onClick={() => onEdit(product)} /> : null}
+                          {canManageStatus ? (
+                            <Action
+                              disabled={saving}
+                              label={product.status === "ACTIVE" ? "Desactivar" : "Activar"}
+                              onClick={() => onToggleStatus(product)}
+                            />
+                          ) : null}
+                          {canArchive ? (
+                            <Action danger disabled={saving} label="Archivar" onClick={() => onArchive(product)} />
+                          ) : null}
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -91,6 +99,17 @@ export function CatalogProductTable({
         </div>
       ) : null}
     </section>
+  );
+}
+
+function ProductStatus({ product }: { product: ProductSummary }) {
+  if (product.archived) {
+    return <span className="font-semibold text-[#76552e]">Archivado</span>;
+  }
+  return (
+    <span className={product.status === "ACTIVE" ? "text-[#28733e]" : "text-[#8a5a22]"}>
+      {product.status === "ACTIVE" ? "Activo" : "Inactivo"}
+    </span>
   );
 }
 
