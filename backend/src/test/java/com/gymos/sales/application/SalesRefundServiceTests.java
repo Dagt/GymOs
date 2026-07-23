@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.sales.api.events.RefundProcessedV1;
 import com.gymos.sales.application.command.RequestRefundCommand;
 import com.gymos.sales.infrastructure.SalesRefundCommandRepository;
 import com.gymos.sales.infrastructure.SalesRepository;
@@ -20,6 +21,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
 
 class SalesRefundServiceTests {
@@ -54,6 +56,52 @@ class SalesRefundServiceTests {
 		verify(commandRepository).createProcessed(organizationId, branchId, saleId, null, 2_000, "MXN", "Solicitud", "refund-key", principal.userId());
 		verify(eventPublisher, never()).publishEvent(org.mockito.ArgumentMatchers.any());
 		verify(auditService).record(principal, "SALE_REFUND_PROCESSED", "SALE_REFUND", refundId, "POS", "Solicitud", "correlation");
+	}
+
+	@Test
+	void fullRefundPublishesInventoryRestorationEvent() {
+		SalesRepository salesRepository = mock(SalesRepository.class);
+		SalesRefundCommandRepository commandRepository = mock(SalesRefundCommandRepository.class);
+		ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+		AuditService auditService = mock(AuditService.class);
+		SalesLookupService lookupService = new SalesLookupService(salesRepository);
+		SalesRefundService service = new SalesRefundService(
+				lookupService,
+				new SalesRefundIdempotencyService(salesRepository),
+				new SalesRefundValidationService(salesRepository, lookupService),
+				new SalesRefundProcessor(commandRepository, eventPublisher, auditService)
+		);
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		UUID saleId = UUID.randomUUID();
+		UUID refundId = UUID.randomUUID();
+		UUID correlationId = UUID.randomUUID();
+		GymOsPrincipal principal = principal(organizationId, branchId);
+		SaleHeader sale = sale(saleId, branchId, 5_000);
+		when(salesRepository.saleHeader(organizationId, saleId)).thenReturn(Optional.of(sale));
+		when(salesRepository.processedRefundTotal(organizationId, saleId)).thenReturn(0L);
+		when(commandRepository.createProcessed(
+				organizationId, branchId, saleId, null, 5_000, "MXN", "Reembolso total", "refund-key", principal.userId()
+		)).thenReturn(refundId);
+
+		service.process(
+				principal,
+				saleId,
+				new RequestRefundCommand(null, 5_000, "Reembolso total", "refund-key"),
+				correlationId.toString()
+		);
+
+		ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
+		verify(eventPublisher).publishEvent(eventCaptor.capture());
+		assertThat(eventCaptor.getValue()).isInstanceOfSatisfying(RefundProcessedV1.class, event -> {
+			assertThat(event.organizationId()).isEqualTo(organizationId);
+			assertThat(event.branchId()).isEqualTo(branchId);
+			assertThat(event.saleId()).isEqualTo(saleId);
+			assertThat(event.refundId()).isEqualTo(refundId);
+			assertThat(event.actorUserId()).isEqualTo(principal.userId());
+			assertThat(event.occurredAt()).isNotNull();
+			assertThat(event.correlationId()).isEqualTo(correlationId);
+		});
 	}
 
 	@Test
