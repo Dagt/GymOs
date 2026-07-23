@@ -9,6 +9,7 @@ export const emptyProduct: ProductPayload = {
   name: "",
   description: "",
   productType: "PHYSICAL",
+  commercialSubtype: "GENERAL_PRODUCT",
   priceCents: 0,
   currency: "MXN",
   taxable: true,
@@ -19,6 +20,11 @@ export const emptyProduct: ProductPayload = {
   unitOfMeasure: null,
   inventoryTracked: true,
   displayOrder: 0,
+  supplierName: null,
+  referenceCostCents: null,
+  promotionalPriceCents: null,
+  promotionStartsAt: null,
+  promotionEndsAt: null,
   categoryId: null,
   tags: [],
 };
@@ -29,6 +35,7 @@ export function productToDraft(product: import("@/lib/api").ProductSummary): Pro
     name: product.name,
     description: product.description,
     productType: product.productType,
+    commercialSubtype: product.commercialSubtype,
     priceCents: product.priceCents,
     currency: product.currency,
     taxable: product.taxable,
@@ -39,6 +46,11 @@ export function productToDraft(product: import("@/lib/api").ProductSummary): Pro
     unitOfMeasure: product.unitOfMeasure,
     inventoryTracked: product.inventoryTracked,
     displayOrder: product.displayOrder,
+    supplierName: product.supplierName,
+    referenceCostCents: product.referenceCostCents,
+    promotionalPriceCents: product.promotionalPriceCents,
+    promotionStartsAt: product.promotionStartsAt,
+    promotionEndsAt: product.promotionEndsAt,
     categoryId: product.categoryId,
     tags: product.tags,
   };
@@ -78,7 +90,16 @@ export function productDraftToPayload(form: ProductPayload, price: string): Prod
     sku: form.sku.trim(),
     name: form.name.trim(),
     description: form.description?.trim() || null,
+    supplierName: form.supplierName?.trim() || null,
+    promotionStartsAt: normalizeDateTime(form.promotionStartsAt),
+    promotionEndsAt: normalizeDateTime(form.promotionEndsAt),
   };
+}
+
+function normalizeDateTime(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 export function planDraftToPayload(plan: PlanDraft): MembershipPlanPayload {
