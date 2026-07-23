@@ -1,6 +1,5 @@
 package com.gymos.catalog.infrastructure;
 
-import com.gymos.catalog.application.port.CatalogProductQueryPort;
 import com.gymos.catalog.application.query.ProductPageView;
 import com.gymos.catalog.application.query.ProductSearchCriteria;
 import com.gymos.catalog.application.query.ProductSummaryView;
@@ -11,7 +10,7 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 @Repository
-class CatalogProductQueryRepository implements CatalogProductQueryPort {
+class CatalogProductQueryRepository {
 	private static final String PRODUCT_COLUMNS = """
 			cp.id AS id, cp.sku, cp.name, cp.description, cp.product_type, cp.price_cents, cp.currency,
 			cp.taxable, cp.status, cp.barcode, cp.brand, cp.presentation, cp.unit_of_measure,
@@ -21,129 +20,61 @@ class CatalogProductQueryRepository implements CatalogProductQueryPort {
 			""";
 	private static final String CATEGORY_JOIN = """
 			LEFT JOIN LATERAL (
-			    SELECT c.id, c.name
-			    FROM catalog_product_category pc
-			    JOIN catalog_category c ON c.id = pc.category_id
-			        AND c.organization_id = pc.organization_id
-			        AND c.deleted_at IS NULL
-			    WHERE pc.organization_id = cp.organization_id
-			      AND pc.product_id = cp.id
-			    ORDER BY c.display_order, c.name
-			    LIMIT 1
+			 SELECT c.id, c.name FROM catalog_product_category pc
+			 JOIN catalog_category c ON c.id = pc.category_id AND c.organization_id = pc.organization_id AND c.deleted_at IS NULL
+			 WHERE pc.organization_id = cp.organization_id AND pc.product_id = cp.id
+			 ORDER BY c.display_order, c.name LIMIT 1
 			) category ON TRUE
 			""";
 	private static final String TAG_JOIN = """
 			LEFT JOIN LATERAL (
-			    SELECT STRING_AGG(t.name, ',' ORDER BY t.name) AS tags_csv
-			    FROM catalog_product_tag pt
-			    JOIN catalog_tag t ON t.id = pt.tag_id
-			        AND t.organization_id = pt.organization_id
-			    WHERE pt.organization_id = cp.organization_id
-			      AND pt.product_id = cp.id
+			 SELECT STRING_AGG(t.name, ',' ORDER BY t.name) AS tags_csv
+			 FROM catalog_product_tag pt JOIN catalog_tag t ON t.id = pt.tag_id AND t.organization_id = pt.organization_id
+			 WHERE pt.organization_id = cp.organization_id AND pt.product_id = cp.id
 			) tags ON TRUE
 			""";
-
 	private final JdbcClient jdbcClient;
 
-	CatalogProductQueryRepository(JdbcClient jdbcClient) {
-		this.jdbcClient = jdbcClient;
+	CatalogProductQueryRepository(JdbcClient jdbcClient) { this.jdbcClient = jdbcClient; }
+
+	List<ProductSummaryView> list(UUID organizationId) {
+		return jdbcClient.sql(baseSelect() + " WHERE cp.organization_id=:organizationId AND cp.deleted_at IS NULL AND cp.archived_at IS NULL ORDER BY cp.display_order, cp.name")
+				.param("organizationId", organizationId).query(CatalogRowMappers.productSummary()).list();
 	}
 
-	@Override
-	public List<ProductSummaryView> listProducts(UUID organizationId) {
-		return jdbcClient.sql(baseSelect() + """
-				WHERE cp.organization_id = :organizationId
-				  AND cp.deleted_at IS NULL
-				  AND cp.archived_at IS NULL
-				ORDER BY cp.display_order, cp.name
-				""")
-				.param("organizationId", organizationId)
-				.query(CatalogRowMappers.productSummary())
-				.list();
-	}
+	Optional<ProductSummaryView> find(UUID organizationId, UUID productId) { return find(organizationId, productId, false); }
 
-	@Override
-	public Optional<ProductSummaryView> findProduct(UUID organizationId, UUID productId) {
-		return find(organizationId, productId, false);
-	}
-
-	@Override
-	public Optional<ProductSummaryView> findProductIncludingArchived(UUID organizationId, UUID productId) {
-		return find(organizationId, productId, true);
-	}
+	Optional<ProductSummaryView> findIncludingArchived(UUID organizationId, UUID productId) { return find(organizationId, productId, true); }
 
 	private Optional<ProductSummaryView> find(UUID organizationId, UUID productId, boolean includeArchived) {
-		String archivedFilter = includeArchived ? "" : "AND cp.archived_at IS NULL";
-		return jdbcClient.sql(baseSelect() + """
-				WHERE cp.organization_id = :organizationId
-				  AND cp.id = :productId
-				  AND cp.deleted_at IS NULL
-				  %s
-				""".formatted(archivedFilter))
-				.param("organizationId", organizationId)
-				.param("productId", productId)
-				.query(CatalogRowMappers.productSummary())
-				.optional();
+		String archived = includeArchived ? "" : " AND cp.archived_at IS NULL";
+		return jdbcClient.sql(baseSelect() + " WHERE cp.organization_id=:organizationId AND cp.id=:productId AND cp.deleted_at IS NULL" + archived)
+				.param("organizationId", organizationId).param("productId", productId)
+				.query(CatalogRowMappers.productSummary()).optional();
 	}
 
-	@Override
-	public ProductPageView search(UUID organizationId, ProductSearchCriteria criteria) {
+	ProductPageView search(UUID organizationId, ProductSearchCriteria criteria) {
 		String filters = filters(criteria);
-		String querySql = baseSelect() + """
-				WHERE cp.organization_id = :organizationId
-				%s
-				ORDER BY %s
-				LIMIT :size OFFSET :offset
-				""".formatted(filters, orderBy(criteria.sort()));
-		List<ProductSummaryView> items = bind(jdbcClient.sql(querySql), organizationId, criteria)
+		String sql = baseSelect() + " WHERE cp.organization_id=:organizationId " + filters + " ORDER BY " + orderBy(criteria.sort()) + " LIMIT :size OFFSET :offset";
+		List<ProductSummaryView> items = bind(jdbcClient.sql(sql), organizationId, criteria)
 				.param("size", criteria.size()).param("offset", criteria.page() * criteria.size())
 				.query(CatalogRowMappers.productSummary()).list();
-		String countSql = "SELECT COUNT(*) FROM catalog_product cp WHERE cp.organization_id = :organizationId " + filters;
-		long total = bind(jdbcClient.sql(countSql), organizationId, criteria).query(Long.class).single();
+		long total = bind(jdbcClient.sql("SELECT COUNT(*) FROM catalog_product cp WHERE cp.organization_id=:organizationId " + filters), organizationId, criteria)
+				.query(Long.class).single();
 		return ProductPageView.of(items, criteria.page(), criteria.size(), total);
 	}
 
-	@Override
-	public boolean skuExists(UUID organizationId, String sku, UUID excludedProductId) {
-		return existsBy("sku", organizationId, sku, excludedProductId);
-	}
-
-	@Override
-	public boolean barcodeExists(UUID organizationId, String barcode, UUID excludedProductId) {
-		return existsBy("barcode", organizationId, barcode, excludedProductId);
-	}
-
-	private boolean existsBy(String column, UUID organizationId, String value, UUID excludedProductId) {
-		String excluded = excludedProductId == null ? "" : "AND id <> :excludedProductId";
-		var spec = jdbcClient.sql("SELECT EXISTS (SELECT 1 FROM catalog_product WHERE organization_id = :organizationId AND "
-				+ column + " = :value AND deleted_at IS NULL AND archived_at IS NULL " + excluded + ")")
-				.param("organizationId", organizationId).param("value", value);
-		if (excludedProductId != null) spec = spec.param("excludedProductId", excludedProductId);
-		return Boolean.TRUE.equals(spec.query(Boolean.class).single());
-	}
-
-	private String baseSelect() {
-		return "SELECT " + PRODUCT_COLUMNS + " FROM catalog_product cp " + CATEGORY_JOIN + TAG_JOIN + " ";
-	}
+	private String baseSelect() { return "SELECT " + PRODUCT_COLUMNS + " FROM catalog_product cp " + CATEGORY_JOIN + TAG_JOIN; }
 
 	private String filters(ProductSearchCriteria criteria) {
-		StringBuilder filters = new StringBuilder("\n AND cp.deleted_at IS NULL");
-		if (!criteria.includeArchived()) filters.append("\n AND cp.archived_at IS NULL");
-		if (hasText(criteria.query())) filters.append("""
-				 AND (LOWER(cp.name) LIKE :query OR LOWER(cp.sku) LIKE :query
-				 OR LOWER(COALESCE(cp.barcode, '')) LIKE :query OR EXISTS (
-				 SELECT 1 FROM catalog_product_tag spt JOIN catalog_tag st ON st.id = spt.tag_id
-				 WHERE spt.organization_id = cp.organization_id AND spt.product_id = cp.id
-				 AND st.normalized_name LIKE :query))
-				""");
-		if (hasText(criteria.productType())) filters.append("\n AND cp.product_type = :productType");
-		if (hasText(criteria.status())) filters.append("\n AND cp.status = :status");
-		if (criteria.inventoryTracked() != null) filters.append("\n AND cp.inventory_tracked = :inventoryTracked");
-		if (criteria.categoryId() != null) filters.append("""
-				 AND EXISTS (SELECT 1 FROM catalog_product_category pc
-				 WHERE pc.organization_id = :organizationId AND pc.product_id = cp.id AND pc.category_id = :categoryId)
-				""");
-		return filters.toString();
+		StringBuilder value = new StringBuilder(" AND cp.deleted_at IS NULL");
+		if (!criteria.includeArchived()) value.append(" AND cp.archived_at IS NULL");
+		if (hasText(criteria.query())) value.append(" AND (LOWER(cp.name) LIKE :query OR LOWER(cp.sku) LIKE :query OR LOWER(COALESCE(cp.barcode,'')) LIKE :query OR EXISTS (SELECT 1 FROM catalog_product_tag spt JOIN catalog_tag st ON st.id=spt.tag_id WHERE spt.organization_id=cp.organization_id AND spt.product_id=cp.id AND st.normalized_name LIKE :query))");
+		if (hasText(criteria.productType())) value.append(" AND cp.product_type=:productType");
+		if (hasText(criteria.status())) value.append(" AND cp.status=:status");
+		if (criteria.inventoryTracked() != null) value.append(" AND cp.inventory_tracked=:inventoryTracked");
+		if (criteria.categoryId() != null) value.append(" AND EXISTS (SELECT 1 FROM catalog_product_category pc WHERE pc.organization_id=:organizationId AND pc.product_id=cp.id AND pc.category_id=:categoryId)");
+		return value.toString();
 	}
 
 	private JdbcClient.StatementSpec bind(JdbcClient.StatementSpec spec, UUID organizationId, ProductSearchCriteria criteria) {
@@ -168,7 +99,5 @@ class CatalogProductQueryRepository implements CatalogProductQueryPort {
 		};
 	}
 
-	private boolean hasText(String value) {
-		return value != null && !value.isBlank();
-	}
+	private boolean hasText(String value) { return value != null && !value.isBlank(); }
 }
