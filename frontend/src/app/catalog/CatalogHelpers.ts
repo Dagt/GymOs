@@ -27,6 +27,7 @@ export const emptyProduct: ProductPayload = {
   promotionEndsAt: null,
   categoryId: null,
   tags: [],
+  version: null,
 };
 
 export function productToDraft(product: import("@/lib/api").ProductSummary): ProductPayload {
@@ -53,6 +54,7 @@ export function productToDraft(product: import("@/lib/api").ProductSummary): Pro
     promotionEndsAt: product.promotionEndsAt,
     categoryId: product.categoryId,
     tags: product.tags,
+    version: product.version,
   };
 }
 
