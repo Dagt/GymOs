@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -13,6 +14,7 @@ public record ProductRequest(
 		@NotBlank @Size(max = 160) String name,
 		@Size(max = 2000) String description,
 		@NotBlank @Pattern(regexp = "PHYSICAL|SERVICE|MEMBERSHIP_PLAN") String productType,
+		@NotBlank @Pattern(regexp = "GENERAL_PRODUCT|GENERAL_SERVICE|VISIT_PASS|BOOKING|ROUTINE|CONSULTATION|WELLNESS_SERVICE|MEMBERSHIP") String commercialSubtype,
 		@Min(0) long priceCents,
 		@NotBlank @Pattern(regexp = "[A-Za-z]{3}") String currency,
 		boolean taxable,
@@ -23,13 +25,19 @@ public record ProductRequest(
 		@Size(max = 40) String unitOfMeasure,
 		boolean inventoryTracked,
 		@Min(0) int displayOrder,
+		@Size(max = 160) String supplierName,
+		@Min(0) Long referenceCostCents,
+		@Min(0) Long promotionalPriceCents,
+		OffsetDateTime promotionStartsAt,
+		OffsetDateTime promotionEndsAt,
 		UUID categoryId,
 		@Size(max = 20) List<@Size(max = 80) String> tags
 ) {
 	ProductCommand toCommand() {
 		return new ProductCommand(
-				sku, name, description, productType, priceCents, currency, taxable, status,
+				sku, name, description, productType, commercialSubtype, priceCents, currency, taxable, status,
 				barcode, brand, presentation, unitOfMeasure, inventoryTracked, displayOrder,
+				supplierName, referenceCostCents, promotionalPriceCents, promotionStartsAt, promotionEndsAt,
 				categoryId, tags
 		);
 	}
