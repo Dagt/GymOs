@@ -1,131 +1,19 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
+import { isActive, resolveShellBrand, visibleSectionsForConsole } from "@/components/app-shell-model";
 import { clearSession, getBranches, selectBranch, selectOrganization, storeSession, type StoredSession } from "@/lib/api";
-import {
-  getConsoleProfile,
-  isPlatformAdmin,
-  isSupportMode,
-  resolveUserConsole,
-  type UserConsole,
-} from "@/lib/role-model";
+import { getConsoleProfile, isPlatformAdmin, isSupportMode, resolveUserConsole } from "@/lib/role-model";
 
-type ShellAction = {
-  href: string;
-  label: string;
+type BranchOption = {
+  branchId: string;
+  name: string;
 };
-
-type NavigationLink = {
-  label: string;
-  href: string;
-  hint: string;
-  permissions?: string[];
-  requiresBranch?: boolean;
-};
-
-type NavigationSection = {
-  title: string;
-  links: NavigationLink[];
-};
-
-const platformSections: NavigationSection[] = [
-  {
-    title: "Negocio GymOS",
-    links: [
-      { label: "Gimnasios cliente", href: "/platform/gymnasiums", hint: "CRM, tenants y soporte", permissions: ["platform.admin"] },
-    ],
-  },
-];
-
-const ownerSections: NavigationSection[] = [
-  {
-    title: "Direccion",
-    links: [
-      { label: "Metricas del negocio", href: "/dashboard", hint: "Ingresos, socios y salud", permissions: ["report.owner.read", "report.sales.read"] },
-      { label: "Ventas y pagos", href: "/reports/sales", hint: "Reportes financieros", permissions: ["report.sales.read"] },
-      { label: "Coaches y rutinas", href: "/coaches", hint: "Equipo y seguimiento", permissions: ["coach.read", "report.coaches.read"] },
-    ],
-  },
-  {
-    title: "Administracion del gimnasio",
-    links: [
-      { label: "Operacion", href: "/operations", hint: "Pendientes y herramientas", permissions: ["operations.read", "inventory.read", "booking.read"] },
-      { label: "Equipo y accesos", href: "/users", hint: "Dueños, gerentes y staff", permissions: ["user.read"] },
-      { label: "Datos y sucursales", href: "/settings/organization", hint: "Marca, sedes y contacto", permissions: ["organization.update", "branch.update"] },
-      { label: "Catalogo", href: "/catalog", hint: "Planes y productos", permissions: ["catalog.read"] },
-      { label: "Inventario", href: "/inventory", hint: "Stock y movimientos", permissions: ["inventory.read"] },
-      { label: "Reservas", href: "/bookings", hint: "Agenda y recursos", permissions: ["booking.read"] },
-      { label: "Servicios", href: "/wellness", hint: "Bienestar", permissions: ["professional.read"] },
-      { label: "Automatizaciones", href: "/automations", hint: "Reglas y avisos", permissions: ["automation.read"] },
-    ],
-  },
-  {
-    title: "Mostrador",
-    links: [
-      { label: "Caja / POS", href: "/pos", hint: "Ventas y pagos", permissions: ["sale.create"] },
-      { label: "Socios", href: "/clients", hint: "Altas y fichas", permissions: ["client.read"] },
-      { label: "Accesos", href: "/access", hint: "Visitas y pases", permissions: ["access.read", "visit.read"] },
-      { label: "Beneficios", href: "/benefits", hint: "Promos y reglas", permissions: ["benefit.read"] },
-    ],
-  },
-];
-
-const managerSections: NavigationSection[] = [
-  {
-    title: "Gerencia",
-    links: [
-      { label: "Operacion", href: "/operations", hint: "Pendientes diarios", permissions: ["operations.read", "booking.read", "inventory.read"] },
-      { label: "Indicadores", href: "/dashboard", hint: "Resumen ejecutivo", permissions: ["report.owner.read", "report.sales.read"] },
-      { label: "Ventas", href: "/reports/sales", hint: "Pagos y saldos", permissions: ["report.sales.read"] },
-    ],
-  },
-  {
-    title: "Administracion diaria",
-    links: [
-      { label: "Equipo", href: "/users", hint: "Usuarios autorizados", permissions: ["user.read"] },
-      { label: "Catalogo", href: "/catalog", hint: "Planes y productos", permissions: ["catalog.read"] },
-      { label: "Inventario", href: "/inventory", hint: "Stock", permissions: ["inventory.read"] },
-      { label: "Reservas", href: "/bookings", hint: "Agenda", permissions: ["booking.read"] },
-      { label: "Coaches", href: "/coaches", hint: "Rutinas", permissions: ["coach.read"] },
-    ],
-  },
-  {
-    title: "Mostrador",
-    links: [
-      { label: "Caja / POS", href: "/pos", hint: "Ventas", permissions: ["sale.create"] },
-      { label: "Socios", href: "/clients", hint: "Clientes", permissions: ["client.read"] },
-    ],
-  },
-];
-
-const receptionSections: NavigationSection[] = [
-  {
-    title: "Mostrador",
-    links: [
-      { label: "Inicio recepcion", href: "/reception", hint: "Acciones del dia", permissions: ["client.read", "sale.create"] },
-      { label: "Caja / POS", href: "/pos", hint: "Ventas y pagos", permissions: ["sale.create"] },
-      { label: "Socios", href: "/clients", hint: "Altas y fichas", permissions: ["client.read"] },
-      { label: "Reservas", href: "/bookings", hint: "Agenda", permissions: ["booking.read"] },
-      { label: "Ventas", href: "/reports/sales", hint: "Pagos pendientes", permissions: ["report.sales.read"] },
-      { label: "Beneficios", href: "/benefits", hint: "Aplicacion", permissions: ["benefit.read"] },
-    ],
-  },
-];
-
-const coachSections: NavigationSection[] = [
-  {
-    title: "Entrenamiento",
-    links: [
-      { label: "Rutinas", href: "/coaches", hint: "Planes y asignaciones", permissions: ["coach.read", "workout.read"] },
-      { label: "Socios", href: "/clients", hint: "Consulta autorizada", permissions: ["client.read"] },
-    ],
-  },
-];
 
 export function AppShell({
-  actions = [],
   branchName,
   children,
   eyebrow,
@@ -137,7 +25,6 @@ export function AppShell({
   title,
   variant,
 }: {
-  actions?: ShellAction[];
   branchName?: string | null;
   children: ReactNode;
   eyebrow: string;
@@ -151,12 +38,13 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [resolvedBranch, setResolvedBranch] = useState<{ branchId: string; name: string } | null>(null);
-  const [availableBranches, setAvailableBranches] = useState<{ branchId: string; name: string }[]>([]);
+  const [resolvedBranch, setResolvedBranch] = useState<BranchOption | null>(null);
+  const [availableBranches, setAvailableBranches] = useState<BranchOption[]>([]);
   const [switchingBranch, setSwitchingBranch] = useState(false);
+
   const consoleType = resolveUserConsole(session.user);
   const role = getConsoleProfile(session.user);
-  const hasBranch = mode === "operation" ? true : mode === "setup" ? false : Boolean(branchName || session.user.branchId);
+  const hasBranch = mode === "operation" ? true : Boolean(branchName || session.user.branchId);
   const visibleBranch =
     branchName
     ?? (resolvedBranch?.branchId === session.user.branchId ? resolvedBranch.name : null)
@@ -167,19 +55,25 @@ export function AppShell({
     (consoleType === "TENANT_MANAGER" || consoleType === "RECEPTION" || consoleType === "COACH")
     && availableBranches.length <= 1;
   const showBranchSwitcher = variant !== "platform" && availableBranches.length > 0 && !isSingleBranchOperationalUser;
-  const sections = sectionsForConsole(consoleType, variant)
-    .map((section) => ({
-      ...section,
-      links: section.links.filter((link) => canSeeLink(permissionSet, link) && canUseWithoutBranch(hasBranch, link)),
-    }))
-    .filter((section) => section.links.length > 0);
-  const visibleActions = variant === "platform" ? actions : [];
+  const sections = visibleSectionsForConsole({
+    consoleType,
+    hasBranch,
+    permissions: permissionSet,
+    variant,
+  });
+  const brand = resolveShellBrand({
+    organizationName,
+    session,
+    variant,
+    visibleBranch,
+  });
 
   useEffect(() => {
     if (variant === "platform" || (isPlatformAdmin(session.user) && !isSupportMode(session.user))) {
       return;
     }
     let cancelled = false;
+
     async function resolveBranchName() {
       try {
         const branches = await getBranches(session.accessToken);
@@ -194,9 +88,10 @@ export function AppShell({
           }
         }
       } catch {
-        // The shell falls back to a neutral label if branch lookup is unavailable.
+        // The shell keeps a neutral branch label if lookup is unavailable.
       }
     }
+
     void resolveBranchName();
     return () => {
       cancelled = true;
@@ -208,6 +103,7 @@ export function AppShell({
       return;
     }
     let cancelled = false;
+
     async function recoverBranchContext() {
       try {
         const nextSession = await selectOrganization(session.accessToken, session.user.organizationId);
@@ -219,6 +115,7 @@ export function AppShell({
         // The setup banner remains visible when the user truly has no branch access.
       }
     }
+
     void recoverBranchContext();
     return () => {
       cancelled = true;
@@ -247,54 +144,56 @@ export function AppShell({
   return (
     <main className={`admin-console ${hideSidebar ? "no-sidebar" : ""} ${isSupportMode(session.user) ? "support-mode" : ""}`}>
       {!hideSidebar ? (
-      <aside className="admin-sidebar">
-        <div className="admin-sidebar-brand">
-          <span>G</span>
-          <div>
-            <strong>{variant === "platform" ? "GymOS Plataforma" : organizationName ?? session.user.brandName ?? session.user.organizationName ?? "GymOS"}</strong>
-            <small>{variant === "platform" ? "CRM de gimnasios" : visibleBranch}</small>
+        <aside className="admin-sidebar">
+          <div className="admin-sidebar-brand">
+            <span className={brand.logoUrl ? "with-logo" : undefined}>
+              {brand.logoUrl ? <Image alt="" height={48} src={brand.logoUrl} unoptimized width={48} /> : "G"}
+            </span>
+            <div>
+              <strong>{brand.name}</strong>
+              <small>{brand.scope}</small>
+            </div>
           </div>
-        </div>
 
-        <section className="admin-user-card" aria-label="Perfil activo">
-          <p>Entraste como</p>
-          <strong>{role.label}</strong>
-          <span>{role.description}</span>
-        </section>
+          <section className="admin-user-card" aria-label="Perfil activo">
+            <p>Entraste como</p>
+            <strong>{role.label}</strong>
+            <span>{role.description}</span>
+          </section>
 
-        {isPlatformAdmin(session.user) && !pathname.startsWith("/platform") ? (
-          <Link className="admin-platform-return" href="/platform/gymnasiums">
-            Volver a administracion de gimnasios
-          </Link>
-        ) : null}
+          {isPlatformAdmin(session.user) && !pathname.startsWith("/platform") ? (
+            <Link className="admin-platform-return" href="/platform/gymnasiums">
+              Volver a administracion de gimnasios
+            </Link>
+          ) : null}
 
-        <nav aria-label="Menu principal">
-          {sections.map((section) => (
-            <details className="admin-nav-section" key={section.title} open={sections.length === 1 || section.links.some((item) => isActive(pathname, item.href))}>
-              <summary>{section.title}</summary>
-              {section.links.map((item) => (
-                <Link
-                  aria-current={isActive(pathname, item.href) ? "page" : undefined}
-                  className={isActive(pathname, item.href) ? "active" : undefined}
-                  href={item.href}
-                  key={item.href}
-                >
-                  <strong>{item.label}</strong>
-                  <span>{item.hint}</span>
-                </Link>
-              ))}
-            </details>
-          ))}
-        </nav>
+          <nav aria-label="Menu principal">
+            {sections.map((section) => (
+              <details className="admin-nav-section" key={section.title} open={sections.length === 1 || section.links.some((item) => isActive(pathname, item.href))}>
+                <summary>{section.title}</summary>
+                {section.links.map((item) => (
+                  <Link
+                    aria-current={isActive(pathname, item.href) ? "page" : undefined}
+                    className={isActive(pathname, item.href) ? "active" : undefined}
+                    href={item.href}
+                    key={item.href}
+                  >
+                    <strong>{item.label}</strong>
+                    <span>{item.hint}</span>
+                  </Link>
+                ))}
+              </details>
+            ))}
+          </nav>
 
-        <div className="admin-sidebar-footer">
-          <span>{session.user.fullName}</span>
-          <small>{session.user.username}</small>
-          <button onClick={logout} type="button">
-            Salir
-          </button>
-        </div>
-      </aside>
+          <div className="admin-sidebar-footer">
+            <span>{session.user.fullName}</span>
+            <small>{session.user.username}</small>
+            <button onClick={logout} type="button">
+              Salir
+            </button>
+          </div>
+        </aside>
       ) : null}
 
       <section className="admin-workspace">
@@ -335,11 +234,6 @@ export function AppShell({
                 </select>
               </label>
             ) : null}
-            {visibleActions.map((action) => (
-              <Link className="app-button-secondary" href={action.href} key={action.href}>
-                {action.label}
-              </Link>
-            ))}
           </div>
         </header>
 
@@ -382,35 +276,4 @@ export function InlineError({ message }: { message: string }) {
       <span>{message}</span>
     </section>
   );
-}
-
-function sectionsForConsole(consoleType: UserConsole, variant?: "platform" | "tenant") {
-  if (variant === "platform" || consoleType === "PLATFORM_OWNER") {
-    return platformSections;
-  }
-  if (consoleType === "TENANT_OWNER") {
-    return ownerSections;
-  }
-  if (consoleType === "TENANT_MANAGER") {
-    return managerSections;
-  }
-  if (consoleType === "RECEPTION") {
-    return receptionSections;
-  }
-  return coachSections;
-}
-
-function canSeeLink(permissions: Set<string>, link: NavigationLink) {
-  if (!link.permissions || link.permissions.length === 0) {
-    return true;
-  }
-  return link.permissions.some((permission) => permissions.has(permission));
-}
-
-function canUseWithoutBranch(hasBranch: boolean, link: NavigationLink) {
-  return hasBranch || link.requiresBranch === false || link.href === "/users" || link.href === "/settings/organization";
-}
-
-function isActive(pathname: string, href: string) {
-  return pathname === href || pathname.startsWith(`${href}/`);
 }

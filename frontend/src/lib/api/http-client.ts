@@ -5,4 +5,4 @@ export {
   rejectPayment,
   uploadPaymentReceipt,
   validatePayment,
-} from "./legacy";
+} from "./sales";

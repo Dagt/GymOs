@@ -1,10 +1,10 @@
 package com.gymos.sales.application.result;
 
-import com.gymos.sales.infrastructure.SalesRepository.PaymentMethodBreakdown;
-import com.gymos.sales.infrastructure.SalesRepository.PaymentReportTotals;
-import com.gymos.sales.infrastructure.SalesRepository.SaleStatusBreakdown;
-import com.gymos.sales.infrastructure.SalesRepository.SaleSummary;
-import com.gymos.sales.infrastructure.SalesRepository.SalesReportTotals;
+import com.gymos.sales.model.PaymentMethodBreakdown;
+import com.gymos.sales.model.PaymentReportTotals;
+import com.gymos.sales.model.SaleStatusBreakdown;
+import com.gymos.sales.model.SaleSummary;
+import com.gymos.sales.model.SalesReportTotals;
 import java.time.LocalDate;
 import java.util.List;
 

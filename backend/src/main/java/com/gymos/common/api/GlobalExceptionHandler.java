@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -42,6 +43,12 @@ public class GlobalExceptionHandler {
 	ResponseEntity<ApiError> handleAccessDenied(AccessDeniedException exception, HttpServletRequest request) {
 		return ResponseEntity.status(HttpStatus.FORBIDDEN)
 				.body(ApiError.of("PERMISSION_DENIED", "No tienes permiso para realizar esta accion.", Map.of(), correlationId(request)));
+	}
+
+	@ExceptionHandler(AuthenticationException.class)
+	ResponseEntity<ApiError> handleAuthentication(AuthenticationException exception, HttpServletRequest request) {
+		return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+				.body(ApiError.of("BAD_CREDENTIALS", "Usuario o contrasena incorrectos.", Map.of(), correlationId(request)));
 	}
 
 	@ExceptionHandler(Exception.class)

@@ -130,6 +130,27 @@ Criterios:
 9. Cobrar si aplica en una iteracion posterior.
 10. Notificar en una iteracion posterior.
 
+## UC-008B Administrar recursos reservables
+
+Actor: Admin GymOS en soporte o dueno del gimnasio.
+
+Precondiciones:
+- Usuario autenticado con permiso `resource.manage`.
+- Sucursal activa.
+
+Flujo:
+1. Usuario abre la agenda de recursos y reservas.
+2. Sistema muestra recursos activos por sucursal.
+3. Usuario crea o edita nombre, capacidad, duracion, horario, notas y planes permitidos.
+4. Sistema valida que la duracion y horarios sean consistentes.
+5. Sistema guarda el recurso y actualiza restricciones de planes.
+6. Para eliminar, sistema solicita confirmacion y valida que no existan reservas activas.
+
+Criterios:
+- Gerencia y recepcion pueden reservar, pero no administrar recursos.
+- Un recurso con reservas activas no se elimina; se informa `RESOURCE_HAS_ACTIVE_BOOKINGS`.
+- La eliminacion de recurso es logica para conservar auditoria e historial.
+
 ## UC-009 Cancelar reserva
 
 1. Verificar estado.
@@ -394,6 +415,28 @@ Criterios:
 - El modulo de reservas no crea ventas por su cuenta en esta version.
 - La relacion es actualizable sin duplicar registros por reserva.
 
+## UC-025B Reserva con recurso restringido por plan
+
+Actor: Recepcionista, gerente o administrador.
+
+Precondiciones:
+- Recurso reservable activo en la sucursal.
+- El recurso puede declarar planes de membresia permitidos.
+- Socio existente en la misma organizacion.
+
+Flujo:
+1. Usuario abre la agenda de reservas.
+2. Usuario selecciona el recurso, socio, dia y hora.
+3. Sistema valida disponibilidad, horario operativo y traslapes.
+4. Si el recurso tiene planes permitidos, sistema valida que el socio tenga membresia activa y vigente con uno de esos planes.
+5. Si el plan es multi-sucursal, la membresia permite reservar en cualquier sucursal del gimnasio; si no lo es, debe coincidir con la sucursal operativa de la membresia.
+6. Sistema crea la reserva y registra auditoria.
+
+Criterios:
+- Un socio nuevo con membresia inicial activa puede reservar recursos permitidos por su plan.
+- Un socio sin membresia activa o con plan no permitido recibe rechazo semantico y no se crea reserva.
+- La validacion se cubre con PostgreSQL/Testcontainers para evitar diferencias entre SQL real y pruebas ligeras.
+
 ## UC-026 Automatizacion programada
 
 Actor: Sistema.
@@ -498,6 +541,8 @@ Flujo:
 Resultado esperado:
 - Un gimnasio no ofrece el rol `Administrador GymOS` como rol operativo.
 - El dueño puede crear gerentes, recepcionistas y coaches de su gimnasio.
+- El gerente con permiso de equipo solo puede crear recepcionistas y coaches.
+- Si el gerente tiene una sola sucursal, esa sucursal queda seleccionada y bloqueada automaticamente al crear usuarios operativos.
 - Un recepcionista creado inicia sesion en recepcion y no ve administracion de plataforma.
 - Si faltan campos o hay permisos invalidos, se muestra error claro con codigo y `correlationId`.
 
@@ -551,6 +596,7 @@ Flujo:
 Reglas:
 - No se permite cambiar el propio rol.
 - No se permite asignar `Administrador GymOS` desde contexto de gimnasio.
+- El gerente no puede ver ni administrar usuarios con rol `Dueno del gimnasio` o `Gerente`; solo usuarios operativos dentro de su alcance.
 
 ## Anexo Hito 3.5 final
 

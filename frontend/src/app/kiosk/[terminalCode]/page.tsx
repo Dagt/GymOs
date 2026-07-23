@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useParams } from "next/navigation";
 import { CSSProperties, FormEvent, useEffect, useMemo, useState } from "react";
 import {
@@ -23,6 +24,7 @@ import {
   type KioskAvailabilitySlot,
   type KioskBookingResource,
 } from "@/lib/kiosk-bookings";
+import { formatMexicanDateInput, parseMexicanDate, toDateInput } from "@/lib/date-time";
 
 export default function KioskPage() {
   const params = useParams<{ terminalCode: string }>();
@@ -30,9 +32,7 @@ export default function KioskPage() {
   const [summary, setSummary] = useState<KioskSummaryResponse | null>(null);
   const [plans, setPlans] = useState<KioskPlanOption[]>([]);
   const [identifier, setIdentifier] = useState("");
-  const [birthDay, setBirthDay] = useState("");
-  const [birthMonth, setBirthMonth] = useState("");
-  const [birthYear, setBirthYear] = useState("");
+  const [birthDateDisplay, setBirthDateDisplay] = useState("");
   const [targetPlanId, setTargetPlanId] = useState("");
   const [reference, setReference] = useState("");
   const [message, setMessage] = useState<string | null>(null);
@@ -47,10 +47,7 @@ export default function KioskPage() {
   const [bookingNotes, setBookingNotes] = useState("");
   const [bookingBusy, setBookingBusy] = useState(false);
 
-  const birthDate = useMemo(() => {
-    if (!birthYear || !birthMonth || !birthDay) return "";
-    return `${birthYear}-${birthMonth.padStart(2, "0")}-${birthDay.padStart(2, "0")}`;
-  }, [birthDay, birthMonth, birthYear]);
+  const birthDate = useMemo(() => parseMexicanDate(birthDateDisplay) ?? "", [birthDateDisplay]);
 
   useEffect(() => {
     let active = true;
@@ -76,7 +73,10 @@ export default function KioskPage() {
 
   async function verify(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!session || !birthDate) return;
+    if (!session || !birthDate) {
+      setError("Captura una fecha de nacimiento válida en formato día/mes/año.");
+      return;
+    }
     setError(null);
     setMessage(null);
     try {
@@ -169,7 +169,7 @@ export default function KioskPage() {
 
   async function end() {
     if (session) await endKioskSession(session.sessionId, session.sessionToken).catch(() => undefined);
-    setSummary(null); setIdentifier(""); setBirthDay(""); setBirthMonth(""); setBirthYear("");
+    setSummary(null); setIdentifier(""); setBirthDateDisplay("");
     setReference(""); setResources([]); setSlots([]); setSelectedSlot(null); setMessage("Sesion cerrada.");
   }
 
@@ -184,7 +184,11 @@ export default function KioskPage() {
       <section className="kiosk-shell">
         <header className="kiosk-header">
           <div className="kiosk-brand-row">
-            {session?.logoUrl ? <img alt={session.brandName ?? session.organizationName ?? "Gimnasio"} className="kiosk-logo" src={session.logoUrl} /> : <span className="kiosk-logo-fallback">{(session?.brandName ?? session?.organizationName ?? "G").slice(0, 1)}</span>}
+            {session?.logoUrl ? (
+              <Image alt={session.brandName ?? session.organizationName ?? "Gimnasio"} className="kiosk-logo" height={72} src={session.logoUrl} unoptimized width={72} />
+            ) : (
+              <span className="kiosk-logo-fallback">{(session?.brandName ?? session?.organizationName ?? "G").slice(0, 1)}</span>
+            )}
             <div><p>Autoservicio</p><h1>{session?.brandName ?? session?.organizationName ?? session?.terminalName ?? params.terminalCode}</h1><span>Consulta tu membresía y reserva recursos para ti.</span></div>
           </div>
           <aside><strong>Sesión segura</strong><span>Expira {session ? formatTime(session.expiresAt) : "N/A"}</span></aside>
@@ -197,11 +201,22 @@ export default function KioskPage() {
           <form className="kiosk-card kiosk-verify" onSubmit={verify}>
             <div className="kiosk-step"><span>1</span><div><h2>Verifica tu identidad</h2><p>Usa los datos registrados en recepción.</p></div></div>
             <input className="kiosk-input" onChange={(event) => setIdentifier(event.target.value)} placeholder="Correo o teléfono" required value={identifier} />
-            <fieldset className="kiosk-field"><legend>Fecha de nacimiento</legend><div className="grid grid-cols-3 gap-2">
-              <select aria-label="Día" className="kiosk-input compact" onChange={(event) => setBirthDay(event.target.value)} required value={birthDay}><option value="">Día</option>{Array.from({ length: 31 }, (_, i) => i + 1).map((day) => <option key={day} value={String(day)}>{day}</option>)}</select>
-              <select aria-label="Mes" className="kiosk-input compact" onChange={(event) => setBirthMonth(event.target.value)} required value={birthMonth}><option value="">Mes</option>{["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"].map((month, index) => <option key={month} value={String(index + 1)}>{month}</option>)}</select>
-              <select aria-label="Año" className="kiosk-input compact" onChange={(event) => setBirthYear(event.target.value)} required value={birthYear}><option value="">Año</option>{Array.from({ length: 100 }, (_, i) => new Date().getFullYear() - i).map((year) => <option key={year} value={String(year)}>{year}</option>)}</select>
-            </div><small>Formato mexicano: día / mes / año.</small></fieldset>
+            <label className="kiosk-field">
+              Fecha de nacimiento
+              <input
+                aria-label="Fecha de nacimiento en formato día mes año"
+                autoComplete="bday"
+                className="kiosk-input compact"
+                inputMode="numeric"
+                maxLength={10}
+                onChange={(event) => setBirthDateDisplay(formatMexicanDateInput(event.target.value))}
+                placeholder="DD/MM/AAAA"
+                required
+                type="text"
+                value={birthDateDisplay}
+              />
+              <small>Formato: día/mes/año, por ejemplo 25/08/1990.</small>
+            </label>
             <button className="kiosk-primary-action" type="submit">Continuar de forma segura</button>
           </form>
         ) : (
@@ -241,4 +256,3 @@ function formatDay(value: string) { return new Intl.DateTimeFormat("es-MX", { da
 function formatTime(value: string) { return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
 function formatSlot(value: string) { return new Intl.DateTimeFormat("es-MX", { hour: "2-digit", minute: "2-digit" }).format(new Date(value)); }
 function operationKey(...parts: string[]) { const random = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`; return [...parts, random].join(":"); }
-function toDateInput(date: Date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`; }

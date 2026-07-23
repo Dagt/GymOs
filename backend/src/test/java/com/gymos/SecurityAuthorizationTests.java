@@ -1,7 +1,9 @@
 package com.gymos;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -56,6 +58,22 @@ class SecurityAuthorizationTests {
 		mockMvc.perform(post("/api/v1/bookings/99999999-9999-9999-9999-999999999955/payments")
 						.contentType("application/json")
 						.content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(authorities = "resource.read")
+	void resourceUpdateRequiresManagePermission() throws Exception {
+		mockMvc.perform(put("/api/v1/resources/99999999-9999-9999-9999-999999999956")
+						.contentType("application/json")
+						.content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(authorities = "resource.read")
+	void resourceDeleteRequiresManagePermission() throws Exception {
+		mockMvc.perform(delete("/api/v1/resources/99999999-9999-9999-9999-999999999956"))
 				.andExpect(status().isForbidden());
 	}
 

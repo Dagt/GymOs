@@ -1,0 +1,86 @@
+package com.gymos.sales.application;
+
+import com.gymos.common.api.BusinessException;
+import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.sales.application.command.ManualPaymentCommand;
+import com.gymos.sales.application.command.RequestRefundCommand;
+import com.gymos.sales.infrastructure.SalesFinancialIntegrityRepository;
+import com.gymos.sales.infrastructure.SalesRepository;
+import java.util.UUID;
+import org.aspectj.lang.annotation.Aspect;
+import org.aspectj.lang.annotation.Before;
+import org.springframework.stereotype.Component;
+
+@Aspect
+@Component
+class SalesFinancialIntegrityGuard {
+	private final SalesRepository salesRepository;
+	private final SalesFinancialIntegrityRepository integrityRepository;
+
+	SalesFinancialIntegrityGuard(
+			SalesRepository salesRepository,
+			SalesFinancialIntegrityRepository integrityRepository
+	) {
+		this.salesRepository = salesRepository;
+		this.integrityRepository = integrityRepository;
+	}
+
+	@Before("execution(* com.gymos.sales.application.SalesService.addPayment(..)) && args(principal,saleId,request,..)")
+	void guardAddedPayment(GymOsPrincipal principal, UUID saleId, ManualPaymentCommand request) {
+		if (principal == null || request == null) {
+			return;
+		}
+		String key = normalizedKey(request.idempotencyKey());
+		if (key != null && integrityRepository.paymentSaleByIdempotencyKey(principal.organizationId(), key).isPresent()) {
+			return;
+		}
+		var sale = SalesRecordResolver.requireSale(salesRepository, principal.organizationId(), saleId);
+		if (request.amountCents() > sale.balanceCents()) {
+			throw new BusinessException("PAYMENT_EXCEEDS_BALANCE", "El pago no puede superar el saldo pendiente de la venta.");
+		}
+	}
+
+	@Before("execution(* com.gymos.sales.application.SalesService.validatePayment(..)) && args(principal,paymentId,..)")
+	void guardValidatedPayment(GymOsPrincipal principal, UUID paymentId) {
+		if (principal == null) {
+			return;
+		}
+		var payment = SalesRecordResolver.requirePayment(salesRepository, principal.organizationId(), paymentId);
+		if ("COMPLETED".equals(payment.status())) {
+			return;
+		}
+		UUID saleId = SalesRecordResolver.requireSaleIdForPayment(
+				salesRepository,
+				principal.organizationId(),
+				paymentId
+		);
+		var sale = SalesRecordResolver.requireSale(salesRepository, principal.organizationId(), saleId);
+		if (payment.amountCents() > sale.balanceCents()) {
+			throw new BusinessException("PAYMENT_EXCEEDS_BALANCE", "El pago no puede superar el saldo pendiente de la venta.");
+		}
+	}
+
+	@Before("execution(* com.gymos.sales.application.SalesService.requestRefund(..)) && args(principal,saleId,request,..)")
+	void guardRefund(GymOsPrincipal principal, UUID saleId, RequestRefundCommand request) {
+		if (principal == null || request == null || request.paymentId() == null) {
+			return;
+		}
+		String key = normalizedKey(request.idempotencyKey());
+		if (key != null && salesRepository.refundByIdempotencyKey(principal.organizationId(), key).isPresent()) {
+			return;
+		}
+		var payment = SalesRecordResolver.requirePayment(
+				salesRepository,
+				principal.organizationId(),
+				request.paymentId()
+		);
+		long refunded = integrityRepository.processedRefundTotalForPayment(principal.organizationId(), request.paymentId());
+		if (refunded + request.amountCents() > payment.amountCents()) {
+			throw new BusinessException("REFUND_EXCEEDS_PAYMENT", "Los reembolsos acumulados no pueden superar el pago seleccionado.");
+		}
+	}
+
+	private String normalizedKey(String value) {
+		return value == null || value.isBlank() ? null : value.trim();
+	}
+}

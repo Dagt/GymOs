@@ -3,6 +3,187 @@
 Estado: en progreso  
 Fecha: 19 de julio de 2026
 
+## Cierre de auditoria puntos 2-5 del refactor general - 23 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- Se agrega cobertura E2E con Playwright para validar que cada rol entra a su consola correcta:
+  - Admin GymOS a `/platform/gymnasiums`;
+  - dueno del gimnasio a `/dashboard`;
+  - gerente a `/operations`;
+  - recepcion a `/reception`;
+  - Admin GymOS en soporte con banda visible y regreso a administracion de gimnasios.
+- Las pruebas E2E mockean la API sobre `/api/v1/**` y validan menu/experiencia por permisos, no por nombre de usuario.
+- `OwnerDashboardController` deja de exponer el record de infraestructura `OwnerDashboardRecord`; el contrato REST usa `OwnerDashboardResult` de application.
+- Se agrega prueba de arquitectura para impedir que `reporting.api` dependa de `reporting.infrastructure`.
+- La revision de repositorios grandes confirma que `SalesRepository` y `CatalogRepository` quedan como fachadas delegadas, y que reporting mantiene un repositorio SQL focalizado para queries agregadas.
+- Queda documentada la regla de auditoria final: API -> application -> infrastructure, con DTOs/resultados de application en los contratos internos y externos.
+
+Verificado:
+
+- Frontend E2E: `npm.cmd run test:e2e`.
+- Frontend: `npm.cmd run test`, `npm.cmd run lint`, `npm.cmd run typecheck`, `npm.cmd run build`.
+- Backend: `./gradlew.bat test`.
+- Docker: `docker compose -f infra/docker-compose.yml up -d --build`.
+- Smoke local: frontend responde en `http://localhost:3000/login` y backend queda `UP` en `http://localhost:8080/actuator/health`.
+
+## Correccion regresion de usuarios y recursos reservables - 23 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- El rol `Gerente` recibe permisos `user.read` y `user.manage` mediante la migracion `V31__manager_can_manage_operational_staff.sql`, manteniendo las restricciones de negocio existentes: solo puede crear o administrar usuarios operativos permitidos, no duenios, otros gerentes ni administradores GymOS.
+- El formulario de usuarios bloquea y preselecciona la unica sucursal disponible cuando el gerente solo tiene alcance en una sucursal, evitando altas sin `branchIds`.
+- La lista de roles del gerente queda limitada a `Recepcion` y `Coach`; las pruebas de application validan que no pueda ver ni gestionar duenios o gerentes.
+- La persistencia de recursos reservables sale de `BookingRepository` y queda en `BookingResourceRepository`; `BookingRepository` conserva reservas, disponibilidad y pagos vinculados.
+- Se agregan `PUT /resources/{resourceId}` y `DELETE /resources/{resourceId}` para editar y eliminar recursos reservables. La eliminacion es logica y se bloquea si existen reservas activas.
+- La UI de reservas muestra acciones de editar/eliminar recurso solo a Admin GymOS en soporte o duenio del gimnasio con permiso `resource.manage`; gerencia y recepcion no pueden administrar recursos desde esa pantalla.
+- Se agregan pruebas enfocadas de recursos, elegibilidad de membresia y protecciones de usuarios internos.
+
+Verificado:
+
+- Backend focal: `./gradlew test --tests "com.gymos.bookings.application.*" --tests "com.gymos.identity.application.UserAdministrationProtectionTests"`.
+- Frontend: `npm.cmd run test`, `npm.cmd run lint`, `npm.cmd run typecheck`.
+
+## Saneamiento application y reservas con membresia - 23 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `clients.application` deja de usar `JdbcClient` directamente; las escrituras de alta, actualizacion e importacion viven ahora en `ClientCommandRepository` y `ClientImportRepository`.
+- `organizations.application` deja de usar `JdbcClient` directamente; altas/ediciones de organizacion, sucursal y acceso por sucursal viven en `OrganizationCommandRepository`.
+- `onboarding.application` deja de usar `JdbcClient` directamente; la preparacion piloto, productos base, planes, kiosco y checklist quedan encapsulados en `OnboardingRepository`.
+- La prueba de arquitectura `applicationLayerDoesNotUseJdbcClient` ya no depende de allowlist: cualquier nuevo uso directo de `JdbcClient` en `application` falla la suite.
+- Se agrega prueba de integracion PostgreSQL/Testcontainers `BookingMembershipPlanIntegrationTests` para cubrir el flujo catalogo -> plan de membresia -> socio con membresia activa -> recurso restringido -> reserva permitida.
+- La misma prueba valida el rechazo cuando un socio no tiene membresia activa para reservar un recurso restringido por plan.
+
+Verificado:
+
+- Backend: `./gradlew.bat clean test`.
+
+## Saneamiento catalogo e infraestructura de pruebas - 23 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `CatalogRepository` queda como fachada estable para los consumidores existentes del modulo `catalog`.
+- Las consultas de productos/servicios se separan en `CatalogProductQueryRepository`.
+- Las consultas de planes de membresia se separan en `CatalogPlanQueryRepository`.
+- La verificacion de SKU duplicado se separa en `CatalogSkuLookupRepository`.
+- Los mapeos JDBC compartidos quedan en `CatalogRowMappers`, evitando duplicacion entre consultas de lista y detalle.
+- Se agrega prueba de arquitectura `CatalogRepositoryArchitectureTests` para impedir que la fachada vuelva a contener SQL directo o `JdbcClient`.
+- La configuracion `application-test.yml` mantiene viva la base H2 durante el apagado del contexto (`DB_CLOSE_DELAY=-1`) y evita `create-drop`; con esto desaparece el warning no bloqueante de Spring Modulith al consultar `event_publication` durante shutdown.
+
+Verificado:
+
+- Backend: `./gradlew.bat test` completo. Resultado exitoso sin warning de `event_publication`.
+
+## Saneamiento operaciones de membresia - 23 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `MembershipRenewalService` y `MembershipPlanChangeService` dejan de duplicar reglas de carga, estado activo, plan disponible, idempotencia y resolucion de resultado.
+- Se agregan servicios internos pequenos:
+  - `MembershipOperationPolicy` para validar membresia activa, plan disponible, cambio a plan distinto y pago completado requerido;
+  - `MembershipOperationIdempotency` para normalizar o generar llaves de idempotencia por operacion;
+  - `MembershipSaleResultResolver` para mapear la venta creada y, si el pago completo activo membresia, adjuntar el resumen resultante.
+- Se agrega `MembershipApplicationArchitectureTests` para evitar que las operaciones de renovacion/cambio de plan vuelvan a depender directamente de `MembershipRepository`.
+- No cambia ningun contrato HTTP ni API publica interna; se conserva el comportamiento de renovacion, cambio de plan, idempotencia y activacion por pago.
+
+## Saneamiento reembolsos, activacion y catalogo - 23 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `SalesRefundService` queda como fachada del caso de uso y delega responsabilidades en:
+  - `SalesRefundIdempotencyService` para llaves de idempotencia y reintentos estables;
+  - `SalesRefundValidationService` para monto, pago seleccionado y saldo reembolsable;
+  - `SalesRefundProcessor` para persistencia y auditoria del reembolso procesado.
+- `MembershipActivationService` conserva el contrato transaccional de consumo de `PaymentCompletedV1`, pero delega:
+  - calculo de ventanas de activacion/renovacion en `MembershipActivationWindowCalculator`;
+  - publicacion de eventos versionados en `MembershipActivationEventPublisher`.
+- `CatalogService` queda como fachada estable del modulo catalogo.
+- La escritura SQL de productos y planes sale de application y vive en `CatalogCommandRepository`.
+- La logica de productos/servicios y la logica de planes de membresia quedan separadas en `CatalogProductService` y `CatalogMembershipPlanService`.
+- El frontend agrega un modelo explicito de catalogo (`CatalogModel.ts`) para mantener productos/servicios vendibles separados de productos tecnicos `MEMBERSHIP_PLAN`.
+- Se fortalece la prueba de arquitectura para que `catalog.application.CatalogService` ya no este autorizado a usar `JdbcClient`.
+- Se agrega prueba de arquitectura para evitar que `SalesRefundService` vuelva a concentrar repositorio, command repository y auditoria directamente.
+
+Intencion:
+
+- Mantener intactos contratos HTTP y flujos existentes.
+- Reducir acoplamiento entre application e infrastructure.
+- Evitar que productos de membresia se mezclen de nuevo con productos/servicios vendibles.
+
+## Saneamiento cliente, catalogo y activacion de membresias - 22 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `clients/[clientId]/ClientDetailSections.tsx` deja de concentrar toda la UI visual de ficha de socio.
+- La ficha de socio queda separada en componentes presentacionales:
+  - `ClientProfileCard.tsx` para datos personales;
+  - `MembershipHistory.tsx` para historial, renovacion y cambio de plan;
+  - `ClientSummaryAside.tsx` para contacto y timeline;
+  - `ClientDetailDrawers.tsx` para paneles laterales de edicion y acciones;
+  - `ClientDetailMetric.tsx` para metricas compactas reutilizables.
+- `/catalog` extrae la orquestacion a `useCatalogController.ts`: carga de catalogo, alta de producto, alta/edicion de planes, mensajes, drawers y productos vendibles.
+- `catalog/page.tsx` queda como composicion de alto nivel con toolbar, listas y drawers; ya no mezcla estado remoto con estructura visual.
+- `memberships.application` separa el consumo de `PaymentCompletedV1` en `MembershipActivationService`.
+- `MembershipService` queda enfocado en casos de uso invocados por usuarios/API interna: consulta, renovacion y cambio de plan.
+- La activacion, renovacion por evento, cambio de plan por evento, auditoria y publicacion de eventos versionados quedan encapsulados en un servicio transaccional dedicado.
+- Los tests de idempotencia de eventos apuntan ahora a `MembershipActivationService`, manteniendo cobertura sobre reprocesamiento de pagos.
+
+Verificado:
+
+- Frontend: `npm.cmd run typecheck`.
+- Frontend: `npm.cmd run lint`.
+- Backend: `./gradlew.bat test`.
+
+Observacion:
+
+- Backend pasa completo. Persiste un warning no bloqueante de apagado de Spring Modulith en pruebas H2 cuando intenta consultar `event_publication` despues de cerrar una base efimera; sigue recomendado resolverlo en el bloque backend profundo de infraestructura/test configuration.
+
+## Refactor frontend reservas - 21 de julio de 2026
+
+Implementado:
+
+- `/bookings/page.tsx` conserva la orquestacion de datos, estado y casos de uso de reservas.
+- Se extrae UI presentacional de reservas a `frontend/src/app/bookings/components.tsx`: modales, resumen del dia, calendario mensual y detalle por recurso.
+- Se extraen formularios drawer de nueva reserva y nuevo recurso a `frontend/src/app/bookings/forms.tsx`.
+- Se extraen helpers compartidos de fechas, horarios, colores de recursos y serializacion de horarios a `frontend/src/app/bookings/booking-utils.ts`.
+- El resumen de recursos queda reutilizable y mantiene tarjetas compactas en dos columnas con scroll interno invisible.
+- El refactor no cambia contratos HTTP ni reglas de negocio; reduce duplicacion entre la pagina, el calendario y los formularios.
+
+Verificado:
+
+- `npm.cmd run typecheck`
+- `npm.cmd run lint`
+- `npm.cmd run build`
+
+## Refactor frontend plataforma - 21 de julio de 2026
+
+Implementado:
+
+- `/platform/gymnasiums/page.tsx` conserva carga de datos, seleccion de tenant, soporte, alta y suspension.
+- Se extrae la lista de gimnasios y el panel de detalle/sucursales a `frontend/src/app/platform/gymnasiums/PlatformGymnasiumPanels.tsx`.
+- El refactor no cambia rutas ni contratos HTTP; prepara mejoras posteriores de edicion, soporte y escalabilidad visual.
+
+Verificado:
+
+- `npm.cmd run typecheck`
+- `npm.cmd run lint`
+- `npm.cmd run build`
+
+## Refactor frontend equipo y accesos - 21 de julio de 2026
+
+Implementado:
+
+- `frontend/src/app/users/UsersSections.tsx` reemplaza inputs locales del drawer de creacion de usuarios por `TextField`, `EmailField`, `PhoneField`, `PasswordField` y `SelectField`.
+- Se elimina el componente `Field` duplicado para mantener estilos, validaciones y mensajes alineados con los formularios comunes de GymOS.
+- El refactor no cambia contratos HTTP ni permisos; conserva creacion, suspension y cambio de rol de usuarios internos.
+
+Verificado:
+
+- `npm.cmd run typecheck`
+- `npm.cmd run lint`
+- `npm.cmd run build`
+
 ## Correccion encabezado y kiosco tenant - 20 de julio de 2026
 
 Implementado:
@@ -792,3 +973,248 @@ Implementado:
 - Esta decision quedo reemplazada por `V27`: la marca vuelve a vivir solo en el gimnasio y el dueño recibe una sucursal operativa por defecto.
 - `AppShell` conserva selector de sucursal operativa para cambiar explicitamente el contexto de trabajo cuando el gimnasio tiene multiples sedes.
 - `/reception` se rediseña con franja de marca, comando principal de caja, carril de acciones y panel de turno para reducir la sensacion de tablero plano lleno de tarjetas.
+
+## Base visual y simplificacion de shell - 21 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `AppShell` resuelve la marca visible desde un solo lugar y muestra el logo del gimnasio en el menu lateral cuando el tenant lo tiene configurado.
+- La consola de plataforma conserva marca neutral de GymOS; las consolas tenant usan nombre, logo y sucursal activa del gimnasio.
+- Se agrego `AppDrawer` como componente comun para mover formularios densos a paneles laterales reutilizables.
+- `/platform/gymnasiums` usa `AppDrawer` para alta de gimnasio y alta de sucursal, evitando drawers propios de la pagina.
+- `/users` mueve el alta de usuario interno a `AppDrawer` y separa la UI de roles, contexto y tabla en `UsersSections.tsx`; `page.tsx` queda como orquestador de sesion, carga, alta, suspension y cambio de rol.
+- `/catalog` mueve nuevo producto, nuevo plan y edicion de plan a `AppDrawer`; ademas separa toolbar, listas, drawers y helpers de formato/draft en archivos del modulo `catalog`.
+- `/clients` mueve el registro completo de socio, membresia inicial y pago de entrada a `AppDrawer`; ademas separa busqueda, lista, drawer y helpers de validacion/formato en archivos del modulo `clients`.
+- `/settings/organization` mueve edicion de gimnasio, alta de sucursal y edicion de sucursal a `AppDrawer`; la pagina principal queda como resumen de marca, sedes y acceso a equipo.
+- `/bookings` mueve nueva reserva y creacion de recurso a `AppDrawer`; la pagina principal queda enfocada en calendario, resumen diario y recursos.
+- `/bookings` elimina enhancers DOM de notas/layout; las notas de reserva se muestran desde React en cada tarjeta, el boton de nota queda visible como estado `Ver nota`/`Sin nota` y el detalle diario ocupa el ancho inferior para recepcion, gerencia, dueno y soporte.
+- `/bookings` reemplaza el resumen lateral redundante por estado operativo del dia y tarjetas compactas de recursos en dos columnas; si hay muchos recursos, el resumen usa scroll interno invisible para no empujar el calendario.
+- `/benefits` mueve nuevo beneficio a `AppDrawer`; la pagina principal queda enfocada en beneficios configurados y estado vacio claro.
+- `/clients/[clientId]` mueve edicion de datos personales, renovacion y cambio de plan a `AppDrawer`; la ficha principal queda como lectura, membresias e historial.
+- `/inventory` mueve registro de movimientos a `AppDrawer`; la pagina principal queda enfocada en existencias, alertas y movimientos recientes.
+- `/automations` mueve nueva regla y notificacion manual a `AppDrawer`; la pagina principal queda enfocada en reglas, estado y notificaciones.
+- `/access` queda alineada al `AppShell` unificado, elimina el encabezado visual duplicado y separa su UI en `AccessSections.tsx` para aislar dispositivos, clientes, decisiones, pases y bitacora.
+- `/sales/[saleId]`, `/clients/import` y `/onboarding` dejan de usar contenedores propios y renderizan dentro de `AppShell`, manteniendo una sola base visual para pantallas heredadas.
+- `/platform/gymnasiums` extrae formularios y validaciones de alta de gimnasio/sucursal a `PlatformGymnasiumForms.tsx`; la pagina principal conserva el maestro-detalle y queda menos acoplada al formulario.
+- `/catalog` reutiliza `TextField`, `NumberField`, `TextAreaField` y `SelectField` para producto y plan, eliminando inputs locales duplicados.
+- `CatalogHelpers.ts` centraliza el armado de payloads de productos y planes para que `page.tsx` solo orqueste sesion, carga, guardado y estado de drawers.
+- `/settings/organization` separa helpers, validaciones, resumen, tarjetas y drawers en `OrganizationSettingsHelpers.ts` y `OrganizationSettingsSections.tsx`.
+- `FormFields.tsx` agrega `ColorField` para reutilizar la edicion de marca sin inputs locales por pantalla.
+- Los logos cargados en `frontend/public/tenants/*` se tratan como datos locales/runtime y quedan fuera de Git, conservando solo `.gitkeep`.
+- `GlobalSessionNav` se reemplaza por `SessionRouteGuard`: conserva la proteccion/redireccion por rol sin introducir una segunda navegacion.
+- `AppShell` deja de aceptar `actions` superiores; las paginas tenant ya no declaran botones de encabezado duplicados y la navegacion queda concentrada en el menu lateral.
+- Se elimina CSS muerto de `.global-session-nav`, dejando una sola base visual para plataforma, soporte, dueno, gerencia, recepcion y coach.
+- Se retiro `AppNavigation`, que ya no tenia consumidores, para mantener un solo modelo de navegacion visible.
+- La siguiente etapa recomendada es continuar con `clients/[clientId]` o `clients/page.tsx`, priorizando helpers de estado y formularios compartidos.
+
+## Saneamiento AppShell y navegacion por consola - 22 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `AppShell.tsx` deja de contener las tablas completas de navegacion por rol y delega el modelo declarativo a `frontend/src/components/app-shell-model.ts`.
+- El modelo de shell centraliza:
+  - secciones visibles por consola (`PLATFORM_OWNER`, `TENANT_OWNER`, `TENANT_MANAGER`, `RECEPTION`, `COACH`);
+  - filtrado por permisos;
+  - reglas de navegacion segura cuando no existe sucursal activa;
+  - marca neutral de plataforma contra marca tenant/soporte;
+  - deteccion de ruta activa.
+- Se agregan pruebas de frontend para asegurar que:
+  - el dueno del gimnasio conserva acceso a metricas, socios, equipo y datos/sucursales;
+  - recepcion queda limitada a mostrador y no ve configuracion/equipo;
+  - usuarios tenant sin sucursal solo ven enlaces seguros de configuracion;
+  - plataforma conserva marca neutral fuera de soporte.
+- `AppShell.tsx` queda como orquestador visual y de sesion: carga sucursales, recupera contexto cuando aplica, muestra sidebar, encabezado, modo soporte y banner de sucursal pendiente.
+
+Verificado:
+
+- Frontend: `npm.cmd run test`.
+- Frontend: `npm.cmd run typecheck`.
+- Frontend: `npm.cmd run lint`.
+- Frontend: `npm.cmd run build`.
+- Backend: pruebas focalizadas de arquitectura, membresias y reservas por fecha de negocio.
+- Docker: `docker compose -f infra/docker-compose.yml up -d --build`.
+- Smoke local: frontend responde en `http://localhost:3000` y backend queda `UP` en `http://localhost:8080/actuator/health`.
+
+## Saneamiento de validaciones, roles y kiosco - 22 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- Se extrajeron las validaciones puras de `FormFields.tsx` hacia `frontend/src/components/form-validation.ts`.
+- `FormFields.tsx` conserva la API publica mediante re-exports, pero deja de mezclar componentes React con reglas puras de validacion.
+- `UsersRoleHelpers.ts` usa el modulo puro de validacion, lo que permite probar reglas de roles sin cargar JSX ni componentes visuales.
+- Se agregan pruebas de reglas de equipo y accesos para asegurar que:
+  - ningun usuario tenant pueda crear `Admin GymOS`;
+  - el dueno pueda crear roles operativos, pero no otro dueno;
+  - el gerente no pueda ver ni administrar duenos ni otros gerentes;
+  - Admin GymOS conserve visibilidad y gestion de soporte.
+- El kiosco reemplaza `<img>` por `next/image` con `unoptimized`, eliminando la advertencia de lint sin cambiar la ruta de logos tenant.
+- Se corrigio la base remota de backend tras el refactor de sales:
+  - `common.time` queda expuesto como interfaz publica de Spring Modulith;
+  - la prueba de arquitectura de `JdbcClient` refleja que `SalesService` ya no depende de acceso SQL directo;
+  - los tests de sales usan los records movidos a `com.gymos.sales.model`;
+  - las verificaciones Mockito de eventos/auditoria quedan alineadas con los nuevos servicios.
+
+Verificado:
+
+- Frontend: `npm.cmd run test` con 25 pruebas.
+- Frontend: `npm.cmd run typecheck`.
+- Frontend: `npm.cmd run lint`.
+- Frontend: `npm.cmd run build`.
+- Backend: `./gradlew.bat test` completo. Resultado exitoso; queda warning no bloqueante de apagado de Spring Modulith en pruebas H2 por `event_publication`, recomendado para el bloque backend profundo.
+
+## Saneamiento de paginas operativas grandes - 22 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `/inventory` separa la presentacion en `InventorySections.tsx`:
+  - existencias;
+  - alertas;
+  - resumen de movimiento;
+  - tabla de movimientos recientes;
+  - drawer de registro de movimiento.
+- `inventory/page.tsx` queda como orquestador de sesion, carga, seleccion de producto y envio de movimiento.
+- `/wellness` separa formularios y paneles en `WellnessSections.tsx`:
+  - alta de profesional;
+  - directorio de profesionales;
+  - alta de servicio;
+  - disponibilidad;
+  - resumen de servicios y horarios.
+- `wellness/page.tsx` queda como orquestador de sesion, carga, seleccion de profesional y mutaciones.
+- `/access` extrae la logica de estado y acciones a `useAccessController.ts`:
+  - busqueda de socios;
+  - seleccion de dispositivo;
+  - evaluacion de acceso;
+  - apertura manual;
+  - pases temporales;
+  - paquetes de visitas;
+  - bitacora.
+- `access/page.tsx` queda como composicion de secciones, reduciendo el acoplamiento entre flujo y UI.
+
+Verificado:
+
+- Frontend: `npm.cmd run typecheck`.
+- Frontend: `npm.cmd run lint`.
+
+## Saneamiento CRM de plataforma y POS - 22 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `/platform/gymnasiums` extrae la orquestacion a `usePlatformGymnasiumsController.ts`:
+  - carga de gimnasios;
+  - carga de sucursales por gimnasio seleccionado;
+  - busqueda y seleccion de tenant;
+  - entrada en modo soporte;
+  - seleccion de sucursal;
+  - alta de gimnasio;
+  - alta de sucursal;
+  - suspension/reactivacion de gimnasio.
+- `platform/gymnasiums/page.tsx` queda como composicion de `AppShell`, lista, detalle y drawers.
+- Se corrigieron textos heredados con mojibake en mensajes de confirmacion del CRM de plataforma.
+- `/pos` separa la presentacion en `PosSections.tsx`:
+  - grilla de productos;
+  - ventas recientes;
+  - busqueda/seleccion de cliente;
+  - carrito, pago y registro de venta.
+- `pos/page.tsx` queda como orquestador de sesion, carga de catalogo/ventas, carrito y guardado de venta.
+- Se corrigieron textos visibles heredados con mojibake en Caja/POS.
+
+Verificado:
+
+- Frontend: `npm.cmd run typecheck`.
+- Frontend: `npm.cmd run lint`.
+
+## Saneamiento reservas y socios - 22 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `/bookings` extrae la orquestacion a `useBookingsController.ts`:
+  - carga de organizacion, sucursales, recursos, reservas y planes;
+  - busqueda de socios para reservar;
+  - creacion y cancelacion de reservas;
+  - creacion de recursos;
+  - calculo de calendario, dia seleccionado, horarios y estado de drawers.
+- `bookings/page.tsx` queda como composicion de `AppShell`, panel de resumen, calendario, detalle diario y drawers.
+- `/clients` extrae la orquestacion a `useClientsController.ts`:
+  - carga y busqueda de socios;
+  - carga de planes activos;
+  - validacion y normalizacion del alta;
+  - registro de socio y venta de membresia inicial.
+- `clients/page.tsx` queda como composicion de busqueda, toolbar, listado y drawer de alta.
+- `/clients/[clientId]` se divide en:
+  - `useClientDetailController.ts` para carga, edicion, renovacion y cambio de plan;
+  - `ClientDetailHelpers.ts` para validaciones, normalizacion y formateo;
+  - `ClientDetailSections.tsx` para ficha, historial, resumen, timeline y drawers.
+- `clients/[clientId]/page.tsx` queda como composicion de alto nivel y deja de mezclar UI, estado remoto y reglas visibles.
+
+Verificado:
+
+- Frontend: `npm.cmd run typecheck`.
+
+## Saneamiento backend de membresias y ventas - 23 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `MembershipRepository` queda como fachada publica del modulo `memberships` y delega responsabilidades a repositorios internos especializados:
+  - `MembershipClientRepository`;
+  - `MembershipQueryRepository`;
+  - `MembershipPlanLookupRepository`;
+  - `MembershipEventRepository`;
+  - `MembershipCommandRepository`;
+  - `MembershipRowMappers`.
+- `SalesRepository` queda como fachada publica del modulo `sales` y delega responsabilidades a repositorios internos especializados:
+  - `SalesCatalogLookupRepository`;
+  - `SalesClientLookupRepository`;
+  - `SalesRecordLookupRepository`;
+  - `SalesIdempotencyLookupRepository`;
+  - `SalesPaymentLookupRepository`;
+  - `SalesRefundLookupRepository`;
+  - `SalesMembershipLookupRepository`;
+  - `SalesRowMappers`.
+- `SalesService` deja de construir detalles y reportes directamente:
+  - `SaleDetailQuery` concentra detalle de venta y ventas recientes;
+  - `SalesReportingQuery` concentra validacion de rango y armado del reporte de ventas.
+- Se conservaron los contratos publicos usados por servicios y pruebas para evitar cambios funcionales en ventas, pagos, reembolsos, membresias iniciales o reportes.
+- El SQL queda agrupado por responsabilidad sin mover propiedad de datos entre modulos.
+
+Verificado:
+
+- Backend: `./gradlew.bat test` completo. Resultado exitoso; persiste warning no bloqueante de shutdown de Spring Modulith en pruebas H2 por `event_publication`.
+
+## Saneamiento de fachada de ventas - 23 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `SalesService` queda como fachada estable para controladores HTTP y API interna `SalesOperations`.
+- Los flujos mutantes de POS se movieron a `SalesPointOfSaleService`: crear venta, agregar pago, validar/rechazar pago, subir comprobante y procesar reembolso.
+- `SalesAccessGuard` centraliza las validaciones de autenticacion y sucursal activa para ventas.
+- Se agrego una prueba de arquitectura para evitar que la fachada vuelva a absorber dependencias de flujos de POS.
+
+## Saneamiento de pagos en ventas - 23 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `SalesPaymentService` queda como fachada interna del flujo de pagos y delega en servicios especializados.
+- `SalesPaymentRecordingService` concentra registro de pagos manuales, idempotencia de pago y evento `PaymentRecordedV1`.
+- `SalesPaymentReceiptService` concentra carga de comprobantes, storage y auditoria de recibos.
+- `SalesPaymentLifecycleService` concentra validacion/rechazo, recalculo financiero, auditoria y evento `PaymentRejectedV1`.
+- Se agrego una prueba de arquitectura para evitar que la fachada de pagos vuelva a depender directamente de repositorios, storage, auditoria o publicador de eventos.
+
+## Saneamiento backend de servicios application - 23 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `MembershipService` queda como fachada de API/application y delega en servicios especializados:
+  - `MembershipQueryService` para consulta y aislamiento por organizacion/sucursal;
+  - `MembershipRenewalService` para renovacion;
+  - `MembershipPlanChangeService` para cambio de plan;
+  - `MembershipPaymentCompletedListener` para consumo de `PaymentCompletedV1`;
+  - `MembershipResultMapper` para conversion de resultados application/API interna;
+  - `MembershipAccessGuard` para validacion uniforme de principal y sucursal.
+- `MembershipSalesService` reemplaza el metodo con muchos parametros por un `MembershipSaleDraft` interno, manteniendo intacta la creacion de venta/pago/eventos de renovacion y cambio de plan.
+- `SalesLookupService` centraliza busqueda de venta, pago y validacion de sucursal para pagos y reembolsos.
+- `SalesPaymentService` y `SalesRefundService` reducen duplicacion de lookup/guard sin cambiar reglas de negocio, idempotencia ni auditoria.
+- Se actualizaron pruebas unitarias afectadas por los nuevos constructores internos.
+
+Verificado:
+
+- Backend: `./gradlew.bat test` completo. Resultado exitoso; persiste warning no bloqueante de shutdown de Spring Modulith en pruebas H2 por `event_publication`.

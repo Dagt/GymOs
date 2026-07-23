@@ -8,6 +8,9 @@ import com.gymos.clients.api.operations.VerifyClientIdentityCommand;
 import com.gymos.clients.application.command.CreateClientCommand;
 import com.gymos.clients.application.command.UpdateClientCommand;
 import com.gymos.clients.application.result.ClientDetailResult;
+import com.gymos.clients.infrastructure.ClientCommandRepository;
+import com.gymos.clients.infrastructure.ClientCommandRepository.CreateClientRecord;
+import com.gymos.clients.infrastructure.ClientCommandRepository.UpdateClientRecord;
 import com.gymos.clients.infrastructure.ClientRepository;
 import com.gymos.clients.infrastructure.ClientRepository.ClientDetail;
 import com.gymos.clients.infrastructure.ClientRepository.ClientSummary;
@@ -18,19 +21,18 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ClientService implements ClientLookupOperations {
-	private final JdbcClient jdbcClient;
 	private final ClientRepository clientRepository;
+	private final ClientCommandRepository commandRepository;
 	private final AuditService auditService;
 
-	public ClientService(JdbcClient jdbcClient, ClientRepository clientRepository, AuditService auditService) {
-		this.jdbcClient = jdbcClient;
+	public ClientService(ClientRepository clientRepository, ClientCommandRepository commandRepository, AuditService auditService) {
 		this.clientRepository = clientRepository;
+		this.commandRepository = commandRepository;
 		this.auditService = auditService;
 	}
 
@@ -45,54 +47,23 @@ public class ClientService implements ClientLookupOperations {
 		OffsetDateTime now = OffsetDateTime.now();
 		UUID personId = UUID.randomUUID();
 		UUID clientId = UUID.randomUUID();
-		jdbcClient.sql("""
-				INSERT INTO person (
-				    id, organization_id, first_name, last_name, maternal_last_name, birth_date, gender,
-				    phone, email, photo_reference, status, created_at, updated_at,
-				    created_by, updated_by, version
-				)
-				VALUES (
-				    :id, :organizationId, :firstName, :lastName, :maternalLastName, :birthDate, :gender,
-				    :phone, :email, :photoReference, 'ACTIVE', :createdAt, :updatedAt,
-				    :createdBy, :updatedBy, 0
-				)
-				""")
-				.param("id", personId)
-				.param("organizationId", principal.organizationId())
-				.param("firstName", request.firstName().trim())
-				.param("lastName", request.lastName().trim())
-				.param("maternalLastName", blankToNull(request.maternalLastName()))
-				.param("birthDate", request.birthDate())
-				.param("gender", blankToNull(request.gender()))
-				.param("phone", phone)
-				.param("email", email)
-				.param("photoReference", blankToNull(request.photoReference()))
-				.param("createdAt", now)
-				.param("updatedAt", now)
-				.param("createdBy", principal.userId())
-				.param("updatedBy", principal.userId())
-				.update();
-		jdbcClient.sql("""
-				INSERT INTO client (
-				    id, organization_id, home_branch_id, person_id, status, joined_at, notes,
-				    created_at, updated_at, created_by, updated_by, version
-				)
-				VALUES (
-				    :id, :organizationId, :homeBranchId, :personId, 'ACTIVE', :joinedAt, :notes,
-				    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
-				)
-				""")
-				.param("id", clientId)
-				.param("organizationId", principal.organizationId())
-				.param("homeBranchId", principal.branchId())
-				.param("personId", personId)
-				.param("joinedAt", now)
-				.param("notes", blankToNull(request.notes()))
-				.param("createdAt", now)
-				.param("updatedAt", now)
-				.param("createdBy", principal.userId())
-				.param("updatedBy", principal.userId())
-				.update();
+		commandRepository.createClient(new CreateClientRecord(
+				principal.organizationId(),
+				principal.branchId(),
+				principal.userId(),
+				personId,
+				clientId,
+				request.firstName().trim(),
+				request.lastName().trim(),
+				blankToNull(request.maternalLastName()),
+				request.birthDate(),
+				blankToNull(request.gender()),
+				phone,
+				email,
+				blankToNull(request.photoReference()),
+				blankToNull(request.notes()),
+				now
+		));
 		auditService.record(principal, "CLIENT_REGISTERED", "CLIENT", clientId, "RECEPTION", null, correlationId);
 		return detail(principal, clientId);
 	}
@@ -130,54 +101,23 @@ public class ClientService implements ClientLookupOperations {
 		ensureUniqueContact(principal.organizationId(), email, phone, existing.personId());
 
 		OffsetDateTime now = OffsetDateTime.now();
-		jdbcClient.sql("""
-				UPDATE person
-				SET first_name = :firstName,
-				    last_name = :lastName,
-				    maternal_last_name = :maternalLastName,
-				    birth_date = :birthDate,
-				    gender = :gender,
-				    phone = :phone,
-				    email = :email,
-				    photo_reference = :photoReference,
-				    updated_at = :updatedAt,
-				    updated_by = :updatedBy,
-				    version = version + 1
-				WHERE id = :personId
-				  AND organization_id = :organizationId
-				  AND deleted_at IS NULL
-				""")
-				.param("firstName", request.firstName().trim())
-				.param("lastName", request.lastName().trim())
-				.param("maternalLastName", blankToNull(request.maternalLastName()))
-				.param("birthDate", request.birthDate())
-				.param("gender", blankToNull(request.gender()))
-				.param("phone", phone)
-				.param("email", email)
-				.param("photoReference", blankToNull(request.photoReference()))
-				.param("updatedAt", now)
-				.param("updatedBy", principal.userId())
-				.param("personId", existing.personId())
-				.param("organizationId", principal.organizationId())
-				.update();
-		jdbcClient.sql("""
-				UPDATE client
-				SET status = :status,
-				    notes = :notes,
-				    updated_at = :updatedAt,
-				    updated_by = :updatedBy,
-				    version = version + 1
-				WHERE id = :clientId
-				  AND organization_id = :organizationId
-				  AND deleted_at IS NULL
-				""")
-				.param("status", request.status().trim().toUpperCase())
-				.param("notes", blankToNull(request.notes()))
-				.param("updatedAt", now)
-				.param("updatedBy", principal.userId())
-				.param("clientId", clientId)
-				.param("organizationId", principal.organizationId())
-				.update();
+		commandRepository.updateClient(new UpdateClientRecord(
+				principal.organizationId(),
+				principal.userId(),
+				existing.personId(),
+				clientId,
+				request.firstName().trim(),
+				request.lastName().trim(),
+				blankToNull(request.maternalLastName()),
+				request.birthDate(),
+				blankToNull(request.gender()),
+				phone,
+				email,
+				blankToNull(request.photoReference()),
+				request.status().trim().toUpperCase(),
+				blankToNull(request.notes()),
+				now
+		));
 		auditService.record(principal, "CLIENT_UPDATED", "CLIENT", clientId, "RECEPTION", null, correlationId);
 		return detail(principal, clientId);
 	}

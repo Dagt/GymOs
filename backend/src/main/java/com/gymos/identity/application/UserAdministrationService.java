@@ -1,12 +1,14 @@
 package com.gymos.identity.application;
 
 import com.gymos.audit.api.AuditService;
+import com.gymos.coaching.api.operations.CoachProfileProvisioning;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.identity.application.command.CreateInternalUserCommand;
 import com.gymos.identity.application.result.InternalUserSummary;
 import com.gymos.identity.application.result.RoleOption;
 import com.gymos.identity.infrastructure.UserAdministrationRepository;
+import com.gymos.identity.infrastructure.UserAdministrationRepository.UserCoachProfileData;
 import java.text.Normalizer;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -22,15 +24,18 @@ public class UserAdministrationService {
 	private final UserAdministrationRepository repository;
 	private final PasswordEncoder passwordEncoder;
 	private final AuditService auditService;
+	private final CoachProfileProvisioning coachProfileProvisioning;
 
 	public UserAdministrationService(
 			UserAdministrationRepository repository,
 			PasswordEncoder passwordEncoder,
-			AuditService auditService
+			AuditService auditService,
+			CoachProfileProvisioning coachProfileProvisioning
 	) {
 		this.repository = repository;
 		this.passwordEncoder = passwordEncoder;
 		this.auditService = auditService;
+		this.coachProfileProvisioning = coachProfileProvisioning;
 	}
 
 	@Transactional(readOnly = true)
@@ -45,7 +50,9 @@ public class UserAdministrationService {
 	@Transactional(readOnly = true)
 	public List<InternalUserSummary> users(GymOsPrincipal principal) {
 		requirePrincipal(principal);
-		return repository.findUsers(principal.organizationId());
+		return repository.findUsers(principal.organizationId()).stream()
+				.filter(user -> canViewUser(principal, user))
+				.toList();
 	}
 
 	@Transactional
@@ -61,7 +68,8 @@ public class UserAdministrationService {
 		if (repository.roleHasPermission(command.roleId(), "platform.admin")) {
 			throw new BusinessException("ROLE_NOT_AVAILABLE", "No puedes asignar roles de plataforma desde un gimnasio.");
 		}
-		requireAssignableRole(principal, command.roleId());
+		String roleName = repository.roleName(command.roleId());
+		requireAssignableRole(principal, roleName);
 		List<UUID> branchIds = command.branchIds() == null ? List.of() : command.branchIds().stream().distinct().toList();
 		for (UUID branchId : branchIds) {
 			if (!repository.branchBelongsToOrganization(principal.organizationId(), branchId)) {
@@ -98,6 +106,18 @@ public class UserAdministrationService {
 		for (UUID branchId : branchIds) {
 			repository.assignBranch(userId, branchId, "BRANCH");
 		}
+		if (isCoachRole(normalizeRoleName(roleName))) {
+			coachProfileProvisioning.synchronize(
+					principal.organizationId(),
+					userId,
+					displayName(command.firstName(), command.lastName(), command.maternalLastName()),
+					blankToNull(command.email()),
+					blankToNull(command.phone()),
+					branchIds,
+					true,
+					principal.userId()
+			);
+		}
 		auditService.record(principal, "INTERNAL_USER_CREATED", "USER", userId, "ADMIN", null, correlationId);
 		return repository.findUsers(principal.organizationId()).stream()
 				.filter(user -> user.id().equals(userId))
@@ -120,10 +140,14 @@ public class UserAdministrationService {
 		if (!repository.userBelongsToOrganization(principal.organizationId(), userId)) {
 			throw new BusinessException("USER_NOT_FOUND", "El usuario no pertenece a este gimnasio.");
 		}
+		InternalUserSummary targetUser = requireManageableUser(principal, userId);
 		repository.updateUserStatus(principal.organizationId(), userId, normalizedStatus, principal.userId(), OffsetDateTime.now());
+		if (targetUser.roles().stream().map(this::normalizeRoleName).anyMatch(this::isCoachRole)) {
+			synchronizeCoachProfile(principal, userId, "ACTIVE".equals(normalizedStatus));
+		}
 		auditService.record(principal, "INTERNAL_USER_STATUS_UPDATED", "USER", userId, "ADMIN", normalizedStatus, correlationId);
 		return repository.findUsers(principal.organizationId()).stream()
-				.filter(user -> user.id().equals(userId))
+				.filter(user -> user.id().equals(targetUser.id()))
 				.findFirst()
 				.orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "El usuario no esta disponible."));
 	}
@@ -142,19 +166,48 @@ public class UserAdministrationService {
 		if (!repository.userBelongsToOrganization(principal.organizationId(), userId)) {
 			throw new BusinessException("USER_NOT_FOUND", "El usuario no pertenece a este gimnasio.");
 		}
+		InternalUserSummary targetUser = requireManageableUser(principal, userId);
 		if (!repository.roleBelongsToOrganization(principal.organizationId(), roleId)) {
 			throw new BusinessException("ROLE_NOT_AVAILABLE", "El rol seleccionado no esta disponible para este gimnasio.");
 		}
 		if (repository.roleHasPermission(roleId, "platform.admin")) {
 			throw new BusinessException("ROLE_NOT_AVAILABLE", "No puedes asignar roles de plataforma desde un gimnasio.");
 		}
-		requireAssignableRole(principal, roleId);
+		String roleName = repository.roleName(roleId);
+		requireAssignableRole(principal, roleName);
 		repository.replaceRoles(userId, roleId);
+		synchronizeCoachProfile(principal, userId, isCoachRole(normalizeRoleName(roleName)) && "ACTIVE".equals(targetUser.status()));
 		auditService.record(principal, "INTERNAL_USER_ROLE_UPDATED", "USER", userId, "ADMIN", roleId.toString(), correlationId);
 		return repository.findUsers(principal.organizationId()).stream()
-				.filter(user -> user.id().equals(userId))
+				.filter(user -> user.id().equals(targetUser.id()))
 				.findFirst()
 				.orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "El usuario no esta disponible."));
+	}
+
+	private void synchronizeCoachProfile(GymOsPrincipal principal, UUID userId, boolean active) {
+		UserCoachProfileData data = repository.userCoachProfileData(principal.organizationId(), userId)
+				.orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "El usuario no esta disponible."));
+		coachProfileProvisioning.synchronize(
+				principal.organizationId(),
+				data.userId(),
+				data.displayName(),
+				data.email(),
+				data.phone(),
+				data.branchIds(),
+				active,
+				principal.userId()
+		);
+	}
+
+	private InternalUserSummary requireManageableUser(GymOsPrincipal principal, UUID userId) {
+		InternalUserSummary user = repository.findUsers(principal.organizationId()).stream()
+				.filter(candidate -> candidate.id().equals(userId))
+				.findFirst()
+				.orElseThrow(() -> new BusinessException("USER_NOT_FOUND", "El usuario no esta disponible."));
+		if (!canManageUser(principal, user.roles())) {
+			throw new BusinessException("USER_NOT_MANAGEABLE", "Tu perfil no puede administrar ese usuario.");
+		}
+		return user;
 	}
 
 	private void requirePrincipal(GymOsPrincipal principal) {
@@ -167,6 +220,13 @@ public class UserAdministrationService {
 		return value == null || value.isBlank() ? null : value.trim();
 	}
 
+	private String displayName(String firstName, String lastName, String maternalLastName) {
+		return String.join(" ", List.of(firstName, lastName, maternalLastName == null ? "" : maternalLastName).stream()
+				.filter(value -> value != null && !value.isBlank())
+				.map(String::trim)
+				.toList());
+	}
+
 	private String normalizeStatus(String status) {
 		String normalized = status == null ? "" : status.trim().toUpperCase();
 		if (!List.of("ACTIVE", "SUSPENDED", "INACTIVE").contains(normalized)) {
@@ -175,8 +235,7 @@ public class UserAdministrationService {
 		return normalized;
 	}
 
-	private void requireAssignableRole(GymOsPrincipal principal, UUID roleId) {
-		String roleName = repository.roleName(roleId);
+	private void requireAssignableRole(GymOsPrincipal principal, String roleName) {
 		if (!canAssignRole(principal, roleName)) {
 			throw new BusinessException("ROLE_NOT_ALLOWED", "Tu perfil no puede asignar ese rol.");
 		}
@@ -192,12 +251,45 @@ public class UserAdministrationService {
 		}
 		boolean targetIsOwner = isOwnerRole(target);
 		boolean targetIsReception = target.contains("recepcion") || target.contains("caja");
-		boolean targetIsCoach = target.contains("coach");
+		boolean targetIsCoach = isCoachRole(target);
 		if (isPrincipalOwner(principal)) {
 			return !targetIsOwner;
 		}
 		if (isPrincipalManager(principal)) {
 			return targetIsReception || targetIsCoach;
+		}
+		return false;
+	}
+
+	private boolean canViewUser(GymOsPrincipal principal, InternalUserSummary targetUser) {
+		if (principal.platformAdmin() || isPrincipalOwner(principal)) {
+			return true;
+		}
+		if (isPrincipalManager(principal)) {
+			return targetUser.roles().stream()
+					.map(this::normalizeRoleName)
+					.noneMatch(role -> isOwnerRole(role) || isManagerRole(role));
+		}
+		return principal.userId().equals(targetUser.id());
+	}
+
+	private boolean canManageUser(GymOsPrincipal principal, List<String> targetRoles) {
+		if (principal.platformAdmin()) {
+			return true;
+		}
+		boolean targetIsOwner = targetRoles.stream()
+				.map(this::normalizeRoleName)
+				.anyMatch(this::isOwnerRole);
+		if (targetIsOwner) {
+			return false;
+		}
+		if (isPrincipalOwner(principal)) {
+			return true;
+		}
+		if (isPrincipalManager(principal)) {
+			return targetRoles.stream()
+					.map(this::normalizeRoleName)
+					.noneMatch(role -> isOwnerRole(role) || isManagerRole(role));
 		}
 		return false;
 	}
@@ -211,7 +303,15 @@ public class UserAdministrationService {
 	private boolean isPrincipalManager(GymOsPrincipal principal) {
 		return principal.roles().stream()
 				.map(this::normalizeRoleName)
-				.anyMatch(role -> role.contains("gerente") || role.contains("gerencia"));
+				.anyMatch(this::isManagerRole);
+	}
+
+	private boolean isManagerRole(String roleName) {
+		return roleName.contains("gerente") || roleName.contains("gerencia");
+	}
+
+	private boolean isCoachRole(String roleName) {
+		return roleName.contains("coach");
 	}
 
 	private boolean isOwnerRole(String roleName) {

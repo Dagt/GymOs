@@ -244,3 +244,27 @@ Decisiones implementadas:
 - Coach queda acotado a clientes/rutinas/seguimiento autorizado.
 - La sesion expone `platformAdmin`, `supportMode` y `console` para que el frontend no infiera rol por nombre de usuario.
 - Las acciones ejecutadas con `supportMode` se registran en auditoria con origen `PLATFORM_SUPPORT`.
+
+## 3.21 Criterio de saneamiento continuo
+
+Decisiones implementadas:
+- Las paginas frontend grandes deben evolucionar hacia una pagina orquestadora pequena, un hook controlador por ruta cuando haya estado remoto significativo y componentes presentacionales por seccion.
+- Los drawers reutilizan `AppDrawer`; los formularios densos no deben permanecer como bloques permanentes que saturen la pantalla principal.
+- La logica de validacion y armado de payloads debe vivir en helpers o hooks del modulo, no mezclada con JSX.
+- Los servicios application de backend deben dividirse por caso de uso cuando concentren responsabilidades heterogeneas. La activacion de membresias por pagos completados se separa de `MembershipService` en `MembershipActivationService`.
+- Las fachadas application publicas, como `MembershipService`, deben conservar contratos estables para controladores y APIs internas, pero delegar la ejecucion real en servicios por caso de uso y queries dedicadas.
+- Los repositorios grandes deben mantenerse como fachadas de compatibilidad cuando ya existan muchos consumidores, pero el SQL interno debe separarse por responsabilidad: consultas, comandos, idempotencia, pagos, reembolsos, eventos y lookups de catalogo o planes.
+- `SalesService` debe operar como coordinador de casos de uso. Las consultas compuestas y reportes viven en servicios query dedicados, como `SaleDetailQuery` y `SalesReportingQuery`.
+- Los flujos de caja/POS no deben crecer dentro de `SalesService`; se concentran en `SalesPointOfSaleService` para mantener el contrato publico estable y separar orquestacion transaccional de lectura/API interna.
+- El flujo de pagos se divide por responsabilidad: registro manual, comprobantes y ciclo de vida del pago. `SalesPaymentService` debe permanecer como fachada interna del modulo, no como contenedor de todas las reglas.
+- Los lookups compartidos de ventas/pagos deben centralizarse en servicios internos dedicados para evitar repetir reglas de existencia, sucursal y mensajes de error entre pagos, reembolsos y futuras operaciones.
+- El flujo de reembolsos debe separar idempotencia, validacion y procesamiento. `SalesRefundService` coordina, pero no debe depender directamente de repositorios de escritura ni de auditoria.
+- La activacion de membresias por eventos debe separar calculo de vigencia y publicacion de eventos versionados para mantener idempotencia, auditoria y reglas de fechas verificables.
+- Las operaciones explicitas de membresia, como renovacion y cambio de plan, deben compartir politica de carga/estado, normalizacion de idempotencia y resolucion de resultado en componentes internos, evitando duplicar reglas entre casos de uso.
+- El modulo `catalog` debe tratar productos/servicios y planes de membresia como conceptos separados en application y frontend. Los productos tecnicos `MEMBERSHIP_PLAN` no deben aparecer como productos vendibles comunes.
+- El SQL de escritura de catalogo pertenece a infraestructura; `catalog.application` puede coordinar casos de uso, pero no debe usar `JdbcClient`.
+- `CatalogRepository` debe permanecer como fachada estable sin SQL directo; las consultas de productos, planes y SKU viven en repositorios internos especializados y comparten mapeadores JDBC.
+- La capa `application` no debe inyectar ni usar `JdbcClient`. El SQL operativo pertenece a repositorios de infraestructura del mismo modulo; la regla `applicationLayerDoesNotUseJdbcClient` bloquea regresiones.
+- Los modulos `clients`, `organizations` y `onboarding` siguen el patron fachada application + repositorio command/query: application coordina el caso de uso y auditoria, infrastructure encapsula columnas, SQL y persistencia.
+- Los consumidores de eventos deben permanecer idempotentes y transaccionales, con pruebas orientadas al consumidor dedicado.
+- La configuracion de pruebas debe conservar el ciclo de vida necesario para que Spring Modulith cierre sin falsos positivos sobre `event_publication`.

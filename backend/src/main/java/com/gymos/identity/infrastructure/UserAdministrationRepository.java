@@ -4,6 +4,7 @@ import com.gymos.identity.application.result.InternalUserSummary;
 import com.gymos.identity.application.result.RoleOption;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -145,6 +146,35 @@ public class UserAdministrationRepository {
 				.query(Integer.class)
 				.single();
 		return count > 0;
+	}
+
+	public Optional<UserCoachProfileData> userCoachProfileData(UUID organizationId, UUID userId) {
+		return jdbcClient.sql("""
+				SELECT
+				    u.id,
+				    TRIM(CONCAT(p.first_name, ' ', p.last_name, ' ', COALESCE(p.maternal_last_name, ''))) AS display_name,
+				    p.email,
+				    p.phone,
+				    COALESCE(array_remove(array_agg(DISTINCT uba.branch_id), NULL), ARRAY[]::uuid[]) AS branch_ids
+				FROM user_account u
+				JOIN person p ON p.id = u.person_id
+				LEFT JOIN user_branch_access uba ON uba.user_id = u.id
+				LEFT JOIN branch b ON b.id = uba.branch_id AND b.organization_id = u.organization_id AND b.deleted_at IS NULL
+				WHERE u.organization_id = :organizationId
+				  AND u.id = :userId
+				  AND u.deleted_at IS NULL
+				GROUP BY u.id, p.first_name, p.last_name, p.maternal_last_name, p.email, p.phone
+				""")
+				.param("organizationId", organizationId)
+				.param("userId", userId)
+				.query((resultSet, rowNumber) -> new UserCoachProfileData(
+						resultSet.getObject("id", UUID.class),
+						resultSet.getString("display_name"),
+						resultSet.getString("email"),
+						resultSet.getString("phone"),
+						List.of((UUID[]) resultSet.getArray("branch_ids").getArray())
+				))
+				.optional();
 	}
 
 	public void updateUserStatus(UUID organizationId, UUID userId, String status, UUID actorUserId, OffsetDateTime now) {
@@ -294,5 +324,14 @@ public class UserAdministrationRepository {
 						List.of((String[]) resultSet.getArray("branches").getArray())
 				))
 				.list();
+	}
+
+	public record UserCoachProfileData(
+			UUID userId,
+			String displayName,
+			String email,
+			String phone,
+			List<UUID> branchIds
+	) {
 	}
 }

@@ -67,6 +67,20 @@ Debe mostrar:
 
 La portada `/reception` es una consola rapida de mostrador. No debe duplicar la navegacion lateral en esa primera pantalla ni esconder acciones en una seccion secundaria de "mas herramientas". Las pantallas internas como POS, socios, reservas y ventas si pueden usar `AppShell` lateral para navegacion entre modulos.
 
+## 8.2.1 Equipo y alcance de sucursal
+
+- Si un gerente solo tiene una sucursal asignada, los formularios de alta de recepcionistas o coaches deben mostrar esa sucursal seleccionada y bloqueada.
+- El gerente no debe ver usuarios con rol `Dueno del gimnasio`, `Gerente` o `Administrador GymOS` en la gestion de equipo.
+- El dueno del gimnasio y Admin GymOS en soporte pueden ver y administrar el equipo completo del tenant, respetando que un tenant nunca crea administradores de plataforma.
+- La UI debe evitar estados donde se pueda enviar un usuario operativo sin sucursal cuando el rol requiere alcance local.
+
+## 8.2.2 Recursos reservables
+
+- La agenda permite crear reservas a perfiles operativos con `booking.manage`.
+- La creacion, edicion y eliminacion de recursos se muestra solo a Admin GymOS en soporte o dueno del gimnasio con `resource.manage`.
+- Las acciones de recurso deben vivir en el mismo lenguaje visual de la agenda y abrir panel/modal, no formularios permanentes que saturen la pagina.
+- La eliminacion de recurso siempre pide confirmacion y debe mostrar error claro si hay reservas activas.
+
 ## 8.3 Alta de cliente
 
 Secciones:
@@ -261,6 +275,8 @@ Implementacion:
 - `/admin` queda como redirect temporal hacia `/platform/gymnasiums`.
 - El menu se declara por consola, con secciones visuales y sin duplicar navegacion lateral/superior.
 - La logica de rol no usa nombres de usuario ni `username.includes("admin")`; se basa en `console`, `platformAdmin`, `supportMode` y permisos.
+- La regresion automatizada de frontend debe cubrir, como minimo, el ruteo por consola de Admin GymOS, dueno, gerente, recepcion y soporte. Estas pruebas viven en `frontend/e2e` y se ejecutan con `npm run test:e2e`.
+- Las pruebas de consola deben validar ausencia de rutas indebidas: recepcion no ve administracion de plataforma o equipo, gerente no ve CRM de gimnasios cliente y Admin GymOS fuera de soporte conserva experiencia de plataforma.
 
 Administracion de gimnasios:
 - `/platform/gymnasiums` funciona como CRM SaaS de gimnasios cliente y usa maestro-detalle para evitar listas largas de cards.

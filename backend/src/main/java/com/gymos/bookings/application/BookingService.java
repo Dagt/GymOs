@@ -1,28 +1,28 @@
 package com.gymos.bookings.application;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.audit.api.AuditService;
+import com.gymos.bookings.application.ResourceScheduleResolver.ResourceHours;
 import com.gymos.bookings.application.command.CreateBookingCommand;
 import com.gymos.bookings.application.command.CreateResourceCommand;
 import com.gymos.bookings.application.command.LinkBookingPaymentCommand;
+import com.gymos.bookings.infrastructure.BookingEligibilityRepository;
+import com.gymos.bookings.infrastructure.BookingResourceRepository;
+import com.gymos.bookings.infrastructure.BookingResourceRepository.ResourceData;
+import com.gymos.bookings.infrastructure.BookingResourceRepository.ResourceRecord;
 import com.gymos.bookings.infrastructure.BookingRepository;
 import com.gymos.bookings.infrastructure.BookingRepository.AvailabilitySlot;
 import com.gymos.bookings.infrastructure.BookingRepository.BookingRecord;
 import com.gymos.bookings.infrastructure.BookingRepository.CreateBookingData;
-import com.gymos.bookings.infrastructure.BookingRepository.CreateResourceData;
-import com.gymos.bookings.infrastructure.BookingRepository.ResourceRecord;
 import com.gymos.bookings.infrastructure.ClientBookingConflictRepository;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.common.time.BusinessTime;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -31,67 +31,87 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class BookingService {
 	private static final Set<String> ACTIVE_STATUSES = Set.of("RESERVED", "CONFIRMED", "CHECKED_IN");
-	private static final ZoneId BOOKING_ZONE = ZoneId.of("America/Mexico_City");
-	private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
 	private final BookingRepository bookingRepository;
+	private final BookingResourceRepository bookingResourceRepository;
+	private final BookingEligibilityRepository bookingEligibilityRepository;
 	private final ClientBookingConflictRepository clientBookingConflictRepository;
+	private final ResourceScheduleResolver resourceScheduleResolver;
 	private final AuditService auditService;
 
 	public BookingService(
 			BookingRepository bookingRepository,
+			BookingResourceRepository bookingResourceRepository,
+			BookingEligibilityRepository bookingEligibilityRepository,
 			ClientBookingConflictRepository clientBookingConflictRepository,
+			ResourceScheduleResolver resourceScheduleResolver,
 			AuditService auditService
 	) {
 		this.bookingRepository = bookingRepository;
+		this.bookingResourceRepository = bookingResourceRepository;
+		this.bookingEligibilityRepository = bookingEligibilityRepository;
 		this.clientBookingConflictRepository = clientBookingConflictRepository;
+		this.resourceScheduleResolver = resourceScheduleResolver;
 		this.auditService = auditService;
 	}
 
 	@Transactional(readOnly = true)
 	public List<ResourceRecord> resources(GymOsPrincipal principal) {
 		requireBranch(principal);
-		return bookingRepository.resources(principal.organizationId(), principal.branchId());
+		return bookingResourceRepository.resources(principal.organizationId(), principal.branchId());
 	}
 
 	@Transactional
 	public ResourceRecord createResource(GymOsPrincipal principal, CreateResourceCommand command, String correlationId) {
 		requireBranch(principal);
-		LocalTime opensAt = command.opensAt() == null ? LocalTime.of(6, 0) : command.opensAt();
-		LocalTime closesAt = command.closesAt() == null ? LocalTime.of(22, 0) : command.closesAt();
-		if (!closesAt.isAfter(opensAt)) {
-			throw new BusinessException("RESOURCE_HOURS_INVALID", "La hora de cierre debe ser posterior a la apertura.");
-		}
-		int capacity = Math.max(1, command.capacity());
-		int slotMinutes = Math.max(15, command.slotMinutes());
-		List<UUID> allowedPlanIds = command.allowedPlanIds() == null ? List.of() : new ArrayList<>(new LinkedHashSet<>(command.allowedPlanIds()));
-		if (!allowedPlanIds.isEmpty() && bookingRepository.activePlanCount(principal.organizationId(), allowedPlanIds) != allowedPlanIds.size()) {
-			throw new BusinessException("RESOURCE_ALLOWED_PLAN_INVALID", "Selecciona solo planes activos del gimnasio.");
-		}
-		UUID resourceId = bookingRepository.createResource(
+		ResourceMutation mutation = resourceMutation(principal, command);
+		UUID resourceId = bookingResourceRepository.createResource(
 				principal.organizationId(),
 				principal.branchId(),
 				principal.userId(),
-				new CreateResourceData(command.name().trim(), command.resourceType().trim().toUpperCase(), capacity, slotMinutes, opensAt, closesAt, blankToNull(command.notes()))
+				mutation.data()
 		);
-		bookingRepository.replaceAllowedPlans(principal.organizationId(), resourceId, allowedPlanIds);
+		bookingResourceRepository.replaceAllowedPlans(principal.organizationId(), resourceId, mutation.allowedPlanIds());
 		auditService.record(principal, "RESOURCE_CREATED", "RESOURCE", resourceId, "RECEPTION", null, correlationId);
-		return bookingRepository.resource(principal.organizationId(), principal.branchId(), resourceId).orElseThrow();
+		return bookingResourceRepository.resource(principal.organizationId(), principal.branchId(), resourceId).orElseThrow();
+	}
+
+	@Transactional
+	public ResourceRecord updateResource(GymOsPrincipal principal, UUID resourceId, CreateResourceCommand command, String correlationId) {
+		requireBranch(principal);
+		activeResource(principal, resourceId);
+		ResourceMutation mutation = resourceMutation(principal, command);
+		bookingResourceRepository.updateResource(principal.organizationId(), principal.branchId(), resourceId, principal.userId(), mutation.data());
+		bookingResourceRepository.replaceAllowedPlans(principal.organizationId(), resourceId, mutation.allowedPlanIds());
+		auditService.record(principal, "RESOURCE_UPDATED", "RESOURCE", resourceId, "RECEPTION", null, correlationId);
+		return activeResource(principal, resourceId);
+	}
+
+	@Transactional
+	public void deleteResource(GymOsPrincipal principal, UUID resourceId, String correlationId) {
+		requireBranch(principal);
+		activeResource(principal, resourceId);
+		if (bookingResourceRepository.activeBookingCount(principal.organizationId(), principal.branchId(), resourceId) > 0) {
+			throw new BusinessException("RESOURCE_HAS_ACTIVE_BOOKINGS", "No puedes eliminar un recurso con reservas vigentes.");
+		}
+		bookingResourceRepository.replaceAllowedPlans(principal.organizationId(), resourceId, List.of());
+		bookingResourceRepository.deleteResource(principal.organizationId(), principal.branchId(), resourceId, principal.userId());
+		auditService.record(principal, "RESOURCE_DELETED", "RESOURCE", resourceId, "RECEPTION", null, correlationId);
 	}
 
 	@Transactional(readOnly = true)
 	public List<AvailabilitySlot> availability(GymOsPrincipal principal, UUID resourceId, LocalDate date) {
 		requireBranch(principal);
-		LocalDate resolvedDate = date == null ? LocalDate.now(BOOKING_ZONE) : date;
+		LocalDate resolvedDate = date == null ? BusinessTime.today() : date;
 		ResourceRecord resource = activeResource(principal, resourceId);
-		Optional<ResourceHours> hours = resourceHoursForDay(resource, resolvedDate);
+		var hours = resourceScheduleResolver.resolve(resource, resolvedDate);
 		if (hours.isEmpty()) {
 			return List.of();
 		}
 		List<AvailabilitySlot> slots = new ArrayList<>();
 		LocalTime cursor = hours.get().opensAt();
 		while (!cursor.plusMinutes(resource.slotMinutes()).isAfter(hours.get().closesAt())) {
-			OffsetDateTime startsAt = resolvedDate.atTime(cursor).atZone(BOOKING_ZONE).toOffsetDateTime();
+			OffsetDateTime startsAt = resolvedDate.atTime(cursor).atZone(BusinessTime.DEFAULT_ZONE).toOffsetDateTime();
 			OffsetDateTime endsAt = startsAt.plusMinutes(resource.slotMinutes());
 			int reserved = bookingRepository.overlappingBookings(principal.organizationId(), principal.branchId(), resourceId, startsAt, endsAt);
 			slots.add(new AvailabilitySlot(startsAt, endsAt, reserved, resource.capacity(), reserved < resource.capacity()));
@@ -103,7 +123,7 @@ public class BookingService {
 	@Transactional(readOnly = true)
 	public List<BookingRecord> bookings(GymOsPrincipal principal, LocalDate date, int limit) {
 		requireBranch(principal);
-		return bookingRepository.bookings(principal.organizationId(), principal.branchId(), date == null ? LocalDate.now(BOOKING_ZONE) : date, Math.max(1, Math.min(limit, 200)));
+		return bookingRepository.bookings(principal.organizationId(), principal.branchId(), date == null ? BusinessTime.today() : date, Math.max(1, Math.min(limit, 200)));
 	}
 
 	@Transactional(readOnly = true)
@@ -117,11 +137,8 @@ public class BookingService {
 	public BookingRecord createBooking(GymOsPrincipal principal, CreateBookingCommand command, String correlationId) {
 		requireBranch(principal);
 		ResourceRecord resource = activeResource(principal, command.resourceId());
-		if (!bookingRepository.clientExists(principal.organizationId(), command.clientId())) {
+		if (!bookingEligibilityRepository.clientExists(principal.organizationId(), command.clientId())) {
 			throw new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta activo.");
-		}
-		if (!bookingRepository.hasEligibleMembershipForResource(principal.organizationId(), principal.branchId(), command.resourceId(), command.clientId(), LocalDate.now(BOOKING_ZONE))) {
-			throw new BusinessException("BOOKING_PLAN_NOT_ALLOWED", "El socio no tiene una membresia permitida para reservar este recurso.");
 		}
 		if (command.startsAt() == null || command.endsAt() == null || !command.endsAt().isAfter(command.startsAt())) {
 			throw new BusinessException("BOOKING_RANGE_INVALID", "La reserva requiere un rango valido.");
@@ -130,12 +147,21 @@ public class BookingService {
 			throw new BusinessException("BOOKING_START_IN_PAST", "No puedes crear una reserva en una hora que ya paso.");
 		}
 
-		OffsetDateTime localStart = command.startsAt().atZoneSameInstant(BOOKING_ZONE).toOffsetDateTime();
-		OffsetDateTime localEnd = command.endsAt().atZoneSameInstant(BOOKING_ZONE).toOffsetDateTime();
+		OffsetDateTime localStart = command.startsAt().atZoneSameInstant(BusinessTime.DEFAULT_ZONE).toOffsetDateTime();
+		OffsetDateTime localEnd = command.endsAt().atZoneSameInstant(BusinessTime.DEFAULT_ZONE).toOffsetDateTime();
+		if (!bookingEligibilityRepository.hasEligibleMembershipForResource(
+				principal.organizationId(),
+				principal.branchId(),
+				command.resourceId(),
+				command.clientId(),
+				localStart.toLocalDate()
+		)) {
+			throw new BusinessException("BOOKING_PLAN_NOT_ALLOWED", "El socio no tiene una membresia permitida para reservar este recurso.");
+		}
 		if (!localStart.toLocalDate().equals(localEnd.toLocalDate())) {
 			throw new BusinessException("BOOKING_RANGE_INVALID", "La reserva debe iniciar y terminar el mismo dia.");
 		}
-		ResourceHours hours = resourceHoursForDay(resource, localStart.toLocalDate())
+		ResourceHours hours = resourceScheduleResolver.resolve(resource, localStart.toLocalDate())
 				.orElseThrow(() -> new BusinessException("BOOKING_OUTSIDE_RESOURCE_HOURS", "El recurso no opera el dia seleccionado."));
 		if (localStart.toLocalTime().isBefore(hours.opensAt()) || localEnd.toLocalTime().isAfter(hours.closesAt())) {
 			throw new BusinessException("BOOKING_OUTSIDE_RESOURCE_HOURS", "La reserva esta fuera del horario operativo del recurso para ese dia.");
@@ -184,7 +210,7 @@ public class BookingService {
 			throw new BusinessException("BOOKING_NOT_CONFIRMABLE", "La reserva no puede confirmarse.");
 		}
 		bookingRepository.updateStatus(principal.organizationId(), principal.branchId(), bookingId, targetStatus, principal.userId());
-		auditService.record(principal, "BOOKING_" + targetStatus, "BOOKING", bookingId, "RECEPTION", null, correlationId);
+		auditService.record(principal, "BOOKING_" + targetStatus, "BOOKING", bookingId, "RECEPTION", targetStatus, correlationId);
 		return detail(principal, bookingId);
 	}
 
@@ -207,31 +233,8 @@ public class BookingService {
 		return detail(principal, bookingId);
 	}
 
-	private Optional<ResourceHours> resourceHoursForDay(ResourceRecord resource, LocalDate date) {
-		if (resource.notes() == null || resource.notes().isBlank()) {
-			return Optional.of(new ResourceHours(resource.opensAt(), resource.closesAt()));
-		}
-		try {
-			JsonNode schedule = OBJECT_MAPPER.readTree(resource.notes()).path("schedule");
-			if (!schedule.isArray()) {
-				return Optional.of(new ResourceHours(resource.opensAt(), resource.closesAt()));
-			}
-			String weekday = date.getDayOfWeek().name();
-			for (JsonNode item : schedule) {
-				if (weekday.equalsIgnoreCase(item.path("day").asText())) {
-					LocalTime opensAt = LocalTime.parse(item.path("opensAt").asText());
-					LocalTime closesAt = LocalTime.parse(item.path("closesAt").asText());
-					return Optional.of(new ResourceHours(opensAt, closesAt));
-				}
-			}
-			return Optional.empty();
-		} catch (Exception ignored) {
-			return Optional.of(new ResourceHours(resource.opensAt(), resource.closesAt()));
-		}
-	}
-
 	private ResourceRecord activeResource(GymOsPrincipal principal, UUID resourceId) {
-		ResourceRecord resource = bookingRepository.resource(principal.organizationId(), principal.branchId(), resourceId)
+		ResourceRecord resource = bookingResourceRepository.resource(principal.organizationId(), principal.branchId(), resourceId)
 				.orElseThrow(() -> new BusinessException("RESOURCE_NOT_FOUND", "El recurso no existe o no esta disponible."));
 		if (!"ACTIVE".equals(resource.status())) {
 			throw new BusinessException("RESOURCE_NOT_ACTIVE", "El recurso no esta activo.");
@@ -252,6 +255,30 @@ public class BookingService {
 		return value == null || value.isBlank() ? null : value.trim();
 	}
 
-	private record ResourceHours(LocalTime opensAt, LocalTime closesAt) {
+	private ResourceMutation resourceMutation(GymOsPrincipal principal, CreateResourceCommand command) {
+		LocalTime opensAt = command.opensAt() == null ? LocalTime.of(6, 0) : command.opensAt();
+		LocalTime closesAt = command.closesAt() == null ? LocalTime.of(22, 0) : command.closesAt();
+		if (!closesAt.isAfter(opensAt)) {
+			throw new BusinessException("RESOURCE_HOURS_INVALID", "La hora de cierre debe ser posterior a la apertura.");
+		}
+		int capacity = Math.max(1, command.capacity());
+		int slotMinutes = Math.max(15, command.slotMinutes());
+		List<UUID> allowedPlanIds = command.allowedPlanIds() == null ? List.of() : new ArrayList<>(new LinkedHashSet<>(command.allowedPlanIds()));
+		if (!allowedPlanIds.isEmpty() && bookingEligibilityRepository.activePlanCount(principal.organizationId(), allowedPlanIds) != allowedPlanIds.size()) {
+			throw new BusinessException("RESOURCE_ALLOWED_PLAN_INVALID", "Selecciona solo planes activos del gimnasio.");
+		}
+		ResourceData data = new ResourceData(
+				command.name().trim(),
+				command.resourceType().trim().toUpperCase(),
+				capacity,
+				slotMinutes,
+				opensAt,
+				closesAt,
+				blankToNull(command.notes())
+		);
+		return new ResourceMutation(data, allowedPlanIds);
+	}
+
+	private record ResourceMutation(ResourceData data, List<UUID> allowedPlanIds) {
 	}
 }

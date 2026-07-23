@@ -4,9 +4,9 @@ import com.gymos.bookings.application.BookingService;
 import com.gymos.bookings.application.command.CreateBookingCommand;
 import com.gymos.bookings.application.command.CreateResourceCommand;
 import com.gymos.bookings.application.command.LinkBookingPaymentCommand;
+import com.gymos.bookings.infrastructure.BookingResourceRepository.ResourceRecord;
 import com.gymos.bookings.infrastructure.BookingRepository.AvailabilitySlot;
 import com.gymos.bookings.infrastructure.BookingRepository.BookingRecord;
-import com.gymos.bookings.infrastructure.BookingRepository.ResourceRecord;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,9 +21,11 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -50,6 +52,25 @@ public class BookingController {
 			HttpServletRequest servletRequest
 	) {
 		return bookingService.createResource(principal, request.toCommand(), correlationId(servletRequest));
+	}
+
+	@PutMapping("/resources/{resourceId}")
+	ResourceRecord updateResource(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID resourceId,
+			@Valid @RequestBody CreateResourceRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return bookingService.updateResource(principal, resourceId, request.toCommand(), correlationId(servletRequest));
+	}
+
+	@DeleteMapping("/resources/{resourceId}")
+	void deleteResource(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID resourceId,
+			HttpServletRequest servletRequest
+	) {
+		bookingService.deleteResource(principal, resourceId, correlationId(servletRequest));
 	}
 
 	@GetMapping("/resources/{resourceId}/availability")

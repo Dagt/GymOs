@@ -4,6 +4,9 @@ import com.gymos.audit.api.AuditService;
 import com.gymos.clients.application.command.ImportClientsCommand;
 import com.gymos.clients.application.result.ClientImportResult;
 import com.gymos.clients.application.result.ClientImportRowResult;
+import com.gymos.clients.infrastructure.ClientImportRepository;
+import com.gymos.clients.infrastructure.ClientImportRepository.ClientImportBatchRecord;
+import com.gymos.clients.infrastructure.ClientImportRepository.ImportedClientRecord;
 import com.gymos.clients.infrastructure.ClientRepository;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
@@ -16,7 +19,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -24,18 +26,18 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class ClientImportService {
 	private static final int MAX_IMPORT_ROWS = 1_000;
 
-	private final JdbcClient jdbcClient;
+	private final ClientImportRepository importRepository;
 	private final ClientRepository clientRepository;
 	private final AuditService auditService;
 	private final TransactionTemplate transactionTemplate;
 
 	public ClientImportService(
-			JdbcClient jdbcClient,
+			ClientImportRepository importRepository,
 			ClientRepository clientRepository,
 			AuditService auditService,
 			TransactionTemplate transactionTemplate
 	) {
-		this.jdbcClient = jdbcClient;
+		this.importRepository = importRepository;
 		this.clientRepository = clientRepository;
 		this.auditService = auditService;
 		this.transactionTemplate = transactionTemplate;
@@ -74,7 +76,7 @@ public class ClientImportService {
 		int skipped = count(results, "SKIPPED");
 		int errors = count(results, "ERROR");
 		String batchStatus = errors > 0 ? (created > 0 ? "COMPLETED_WITH_ERRORS" : "FAILED") : "COMPLETED";
-		transactionTemplate.executeWithoutResult(status -> completeBatch(batchId, batchStatus, created, skipped, errors));
+		transactionTemplate.executeWithoutResult(status -> importRepository.completeBatch(batchId, batchStatus, created, skipped, errors));
 		auditService.record(principal, "CLIENT_IMPORT_COMPLETED", "CLIENT_IMPORT_BATCH", batchId, "BACKOFFICE", null, correlationId);
 
 		return new ClientImportResult(
@@ -100,11 +102,11 @@ public class ClientImportService {
 	) {
 		ClientImportRowResult result = validateRow(principal, row, dryRun, emailsInFile, phonesInFile);
 		if (!"VALID".equals(result.status())) {
-			transactionTemplate.executeWithoutResult(status -> insertRow(batchId, principal.organizationId(), result));
+			transactionTemplate.executeWithoutResult(status -> importRepository.insertRow(batchId, principal.organizationId(), result));
 			return result;
 		}
 		if (dryRun) {
-			transactionTemplate.executeWithoutResult(status -> insertRow(batchId, principal.organizationId(), result));
+			transactionTemplate.executeWithoutResult(status -> importRepository.insertRow(batchId, principal.organizationId(), result));
 			return result;
 		}
 		ClientImportRowResult created = transactionTemplate.execute(status -> {
@@ -121,7 +123,7 @@ public class ClientImportService {
 			);
 		});
 		ClientImportRowResult safeCreated = created == null ? result : created;
-		transactionTemplate.executeWithoutResult(status -> insertRow(batchId, principal.organizationId(), safeCreated));
+		transactionTemplate.executeWithoutResult(status -> importRepository.insertRow(batchId, principal.organizationId(), safeCreated));
 		return safeCreated;
 	}
 
@@ -164,53 +166,19 @@ public class ClientImportService {
 
 	private UUID insertClient(GymOsPrincipal principal, ImportedClientRow row) {
 		OffsetDateTime now = OffsetDateTime.now();
-		UUID personId = UUID.randomUUID();
-		UUID clientId = UUID.randomUUID();
-		jdbcClient.sql("""
-				INSERT INTO person (
-				    id, organization_id, first_name, last_name, birth_date, gender,
-				    phone, email, status, created_at, updated_at, created_by, updated_by, version
-				)
-				VALUES (
-				    :id, :organizationId, :firstName, :lastName, :birthDate, :gender,
-				    :phone, :email, 'ACTIVE', :createdAt, :updatedAt, :createdBy, :updatedBy, 0
-				)
-				""")
-				.param("id", personId)
-				.param("organizationId", principal.organizationId())
-				.param("firstName", row.firstName().trim())
-				.param("lastName", row.lastName().trim())
-				.param("birthDate", parseDate(row.birthDate()))
-				.param("gender", normalize(row.gender()))
-				.param("phone", normalize(row.phone()))
-				.param("email", lower(row.email()))
-				.param("createdAt", now)
-				.param("updatedAt", now)
-				.param("createdBy", principal.userId())
-				.param("updatedBy", principal.userId())
-				.update();
-		jdbcClient.sql("""
-				INSERT INTO client (
-				    id, organization_id, home_branch_id, person_id, status, joined_at, notes,
-				    created_at, updated_at, created_by, updated_by, version
-				)
-				VALUES (
-				    :id, :organizationId, :homeBranchId, :personId, 'ACTIVE', :joinedAt, :notes,
-				    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
-				)
-				""")
-				.param("id", clientId)
-				.param("organizationId", principal.organizationId())
-				.param("homeBranchId", principal.branchId())
-				.param("personId", personId)
-				.param("joinedAt", now)
-				.param("notes", normalize(row.notes()))
-				.param("createdAt", now)
-				.param("updatedAt", now)
-				.param("createdBy", principal.userId())
-				.param("updatedBy", principal.userId())
-				.update();
-		return clientId;
+		return importRepository.insertClient(new ImportedClientRecord(
+				principal.organizationId(),
+				principal.branchId(),
+				principal.userId(),
+				row.firstName().trim(),
+				row.lastName().trim(),
+				parseDate(row.birthDate()),
+				normalize(row.gender()),
+				normalize(row.phone()),
+				lower(row.email()),
+				normalize(row.notes()),
+				now
+		));
 	}
 
 	private void insertBatch(
@@ -221,71 +189,16 @@ public class ClientImportService {
 			int totalRows,
 			OffsetDateTime startedAt
 	) {
-		jdbcClient.sql("""
-				INSERT INTO client_import_batch (
-				    id, organization_id, branch_id, file_name, dry_run, status,
-				    total_rows, created_at, created_by, version
-				)
-				VALUES (
-				    :id, :organizationId, :branchId, :fileName, :dryRun, 'PROCESSING',
-				    :totalRows, :createdAt, :createdBy, 0
-				)
-				""")
-				.param("id", batchId)
-				.param("organizationId", principal.organizationId())
-				.param("branchId", principal.branchId())
-				.param("fileName", normalize(fileName))
-				.param("dryRun", dryRun)
-				.param("totalRows", totalRows)
-				.param("createdAt", startedAt)
-				.param("createdBy", principal.userId())
-				.update();
-	}
-
-	private void insertRow(UUID batchId, UUID organizationId, ClientImportRowResult row) {
-		jdbcClient.sql("""
-				INSERT INTO client_import_row (
-				    id, batch_id, organization_id, row_number, status, reason, client_id,
-				    first_name, last_name, email, phone, created_at
-				)
-				VALUES (
-				    :id, :batchId, :organizationId, :rowNumber, :status, :reason, :clientId,
-				    :firstName, :lastName, :email, :phone, :createdAt
-				)
-				""")
-				.param("id", UUID.randomUUID())
-				.param("batchId", batchId)
-				.param("organizationId", organizationId)
-				.param("rowNumber", row.rowNumber())
-				.param("status", row.status())
-				.param("reason", row.reason())
-				.param("clientId", row.clientId())
-				.param("firstName", row.firstName())
-				.param("lastName", row.lastName())
-				.param("email", row.email())
-				.param("phone", row.phone())
-				.param("createdAt", OffsetDateTime.now())
-				.update();
-	}
-
-	private void completeBatch(UUID batchId, String status, int created, int skipped, int errors) {
-		jdbcClient.sql("""
-				UPDATE client_import_batch
-				SET status = :status,
-				    created_count = :createdCount,
-				    skipped_count = :skippedCount,
-				    error_count = :errorCount,
-				    completed_at = :completedAt,
-				    version = version + 1
-				WHERE id = :batchId
-				""")
-				.param("status", status)
-				.param("createdCount", created)
-				.param("skippedCount", skipped)
-				.param("errorCount", errors)
-				.param("completedAt", OffsetDateTime.now())
-				.param("batchId", batchId)
-				.update();
+		importRepository.insertBatch(new ClientImportBatchRecord(
+				batchId,
+				principal.organizationId(),
+				principal.branchId(),
+				principal.userId(),
+				normalize(fileName),
+				dryRun,
+				totalRows,
+				startedAt
+		));
 	}
 
 	private List<ImportedClientRow> parse(String csvText) {

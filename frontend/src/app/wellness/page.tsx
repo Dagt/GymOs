@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, type ReactNode, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { AuthRequired } from "@/components/AuthRequired";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import {
@@ -18,6 +18,14 @@ import {
   type ProfessionalSummary,
   type StoredSession,
 } from "@/lib/api";
+import {
+  ProfessionalAvailabilityForm,
+  ProfessionalForm,
+  ProfessionalsDirectory,
+  ProfessionalServiceForm,
+  WellnessNotice,
+  WellnessSummaryPanels,
+} from "./WellnessSections";
 
 type Organization = Awaited<ReturnType<typeof getCurrentOrganization>>;
 type Branch = Awaited<ReturnType<typeof getBranches>>[number];
@@ -61,7 +69,7 @@ export default function WellnessPage() {
       setSession(stored);
       try {
         const [loadedOrganization, loadedBranches, loadedProfessionals] = await Promise.all([
-          getCurrentOrganization(stored.accessToken),
+          getCurrentOrganization(stored.accessToken).catch(() => null),
           getBranches(stored.accessToken),
           getProfessionals(stored.accessToken),
         ]);
@@ -74,14 +82,7 @@ export default function WellnessPage() {
         const firstId = loadedProfessionals[0]?.id ?? "";
         setSelectedProfessionalId(firstId);
         if (firstId) {
-          const [loadedServices, loadedAvailability] = await Promise.all([
-            getProfessionalServices(stored.accessToken, firstId),
-            getProfessionalAvailability(stored.accessToken, firstId),
-          ]);
-          if (active) {
-            setServices(loadedServices);
-            setAvailability(loadedAvailability);
-          }
+          await loadProfessionalDetails(stored.accessToken, firstId, () => active);
         }
       } catch (exception) {
         if (active) {
@@ -100,6 +101,21 @@ export default function WellnessPage() {
     };
   }, []);
 
+  async function loadProfessionalDetails(
+    accessToken: string,
+    professionalId: string,
+    shouldUpdate = () => true,
+  ) {
+    const [loadedServices, loadedAvailability] = await Promise.all([
+      getProfessionalServices(accessToken, professionalId),
+      getProfessionalAvailability(accessToken, professionalId),
+    ]);
+    if (shouldUpdate()) {
+      setServices(loadedServices);
+      setAvailability(loadedAvailability);
+    }
+  }
+
   async function refresh(activeSession = session, professionalId = selectedProfessionalId) {
     if (!activeSession) {
       return;
@@ -109,12 +125,7 @@ export default function WellnessPage() {
     const nextId = professionalId || loaded[0]?.id || "";
     setSelectedProfessionalId(nextId);
     if (nextId) {
-      const [loadedServices, loadedAvailability] = await Promise.all([
-        getProfessionalServices(activeSession.accessToken, nextId),
-        getProfessionalAvailability(activeSession.accessToken, nextId),
-      ]);
-      setServices(loadedServices);
-      setAvailability(loadedAvailability);
+      await loadProfessionalDetails(activeSession.accessToken, nextId);
     } else {
       setServices([]);
       setAvailability([]);
@@ -123,15 +134,9 @@ export default function WellnessPage() {
 
   async function selectProfessional(professionalId: string) {
     setSelectedProfessionalId(professionalId);
-    if (!session) {
-      return;
+    if (session) {
+      await loadProfessionalDetails(session.accessToken, professionalId);
     }
-    const [loadedServices, loadedAvailability] = await Promise.all([
-      getProfessionalServices(session.accessToken, professionalId),
-      getProfessionalAvailability(session.accessToken, professionalId),
-    ]);
-    setServices(loadedServices);
-    setAvailability(loadedAvailability);
   }
 
   async function submitProfessional(event: FormEvent<HTMLFormElement>) {
@@ -231,185 +236,58 @@ export default function WellnessPage() {
       title="Servicios de bienestar"
     >
       {error ? <InlineError message={error} /> : null}
-      {message ? <Notice tone="ok" text={message} /> : null}
+      {message ? <WellnessNotice tone="ok" text={message} /> : null}
 
       <section className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
         <aside className="grid gap-5">
-          <form className="admin-panel" onSubmit={submitProfessional}>
-            <div className="admin-panel-header">
-              <div>
-                <p>Equipo externo o interno</p>
-                <h2>Nuevo profesional</h2>
-              </div>
-            </div>
-            <div className="mt-4 grid gap-3">
-              <Field label="Nombre visible">
-                <input
-                  className="app-input"
-                  onChange={(event) => setDisplayName(event.target.value)}
-                  placeholder="Ej. Dra. Ana Lopez"
-                  value={displayName}
-                />
-              </Field>
-              <Field label="Especialidad">
-                <select
-                  className="app-input"
-                  onChange={(event) => setProfessionalType(event.target.value)}
-                  value={professionalType}
-                >
-                  <option value="NUTRITIONIST">Nutriologo</option>
-                  <option value="PHYSIOTHERAPIST">Fisioterapeuta</option>
-                  <option value="CHIROPRACTOR">Quiropractico</option>
-                  <option value="WELLNESS">Bienestar</option>
-                </select>
-              </Field>
-              <Field label="Correo">
-                <input className="app-input" onChange={(event) => setEmail(event.target.value)} placeholder="correo@ejemplo.com" value={email} />
-              </Field>
-              <Field label="Telefono">
-                <input className="app-input" onChange={(event) => setPhone(event.target.value)} placeholder="+52..." value={phone} />
-              </Field>
-            </div>
-            <button className="form-primary-button mt-4" disabled={saving || !displayName.trim()} type="submit">
-              Crear profesional
-            </button>
-          </form>
-
-          <section className="admin-panel">
-            <div className="admin-panel-header">
-              <div>
-                <p>Directorio</p>
-                <h2>Profesionales</h2>
-              </div>
-              <button className="app-button-secondary" onClick={() => refresh()} type="button">
-                Actualizar
-              </button>
-            </div>
-            <div className="mt-4 grid gap-3">
-              {professionals.length === 0 ? (
-                <p className="admin-muted-text">Aun no hay profesionales registrados para este gimnasio.</p>
-              ) : (
-                professionals.map((professional) => (
-                  <button
-                    className={`rounded-lg border p-4 text-left ${
-                      selectedProfessionalId === professional.id ? "border-[var(--brand-primary)] bg-[var(--brand-primary-soft)]" : "border-[var(--brand-line)] bg-white"
-                    }`}
-                    key={professional.id}
-                    onClick={() => selectProfessional(professional.id)}
-                    type="button"
-                  >
-                    <strong className="block text-base font-black text-[var(--brand-ink)]">{professional.displayName}</strong>
-                    <span className="mt-1 block text-sm text-[var(--brand-muted)]">
-                      {professional.professionalType} - {professional.status}
-                    </span>
-                  </button>
-                ))
-              )}
-            </div>
-          </section>
+          <ProfessionalForm
+            displayName={displayName}
+            email={email}
+            onDisplayNameChange={setDisplayName}
+            onEmailChange={setEmail}
+            onPhoneChange={setPhone}
+            onProfessionalTypeChange={setProfessionalType}
+            onSubmit={submitProfessional}
+            phone={phone}
+            professionalType={professionalType}
+            saving={saving}
+          />
+          <ProfessionalsDirectory
+            onRefresh={() => refresh()}
+            onSelectProfessional={selectProfessional}
+            professionals={professionals}
+            selectedProfessionalId={selectedProfessionalId}
+          />
         </aside>
 
         <section className="grid gap-5">
-          <form className="admin-panel" onSubmit={submitService}>
-            <div className="admin-panel-header">
-              <div>
-                <p>Catalogo del profesional</p>
-                <h2>Agregar servicio</h2>
-              </div>
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              <Field label="Nombre del servicio">
-                <input className="app-input" onChange={(event) => setServiceName(event.target.value)} placeholder="Consulta nutricional" value={serviceName} />
-              </Field>
-              <Field label="Tipo">
-                <input className="app-input" onChange={(event) => setServiceType(event.target.value)} placeholder="NUTRITION" value={serviceType} />
-              </Field>
-              <Field label="Duracion en minutos">
-                <input className="app-input" min={15} onChange={(event) => setDurationMinutes(Number(event.target.value))} type="number" value={durationMinutes} />
-              </Field>
-              <Field label="Precio">
-                <input className="app-input" min={0} onChange={(event) => setPrice(event.target.value)} step="0.01" type="number" value={price} />
-              </Field>
-            </div>
-            <button className="form-primary-button mt-4" disabled={saving || !selectedProfessionalId || !serviceName.trim()} type="submit">
-              Agregar servicio
-            </button>
-          </form>
-
-          <form className="admin-panel" onSubmit={submitAvailability}>
-            <div className="admin-panel-header">
-              <div>
-                <p>Agenda</p>
-                <h2>Agregar disponibilidad</h2>
-              </div>
-            </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <Field label="Dia de semana">
-                <input className="app-input" max={7} min={1} onChange={(event) => setDayOfWeek(Number(event.target.value))} type="number" value={dayOfWeek} />
-              </Field>
-              <Field label="Abre">
-                <input className="app-input" onChange={(event) => setOpensAt(event.target.value)} type="time" value={opensAt} />
-              </Field>
-              <Field label="Cierra">
-                <input className="app-input" onChange={(event) => setClosesAt(event.target.value)} type="time" value={closesAt} />
-              </Field>
-            </div>
-            <button className="form-primary-button mt-4" disabled={saving || !selectedProfessionalId} type="submit">
-              Agregar horario
-            </button>
-          </form>
-
-          <section className="grid gap-5 md:grid-cols-2">
-            <Panel
-              title="Servicios registrados"
-              items={services.map((service) => `${service.name} - ${formatMoney(service.priceCents, service.currency)} - ${service.durationMinutes} min`)}
-            />
-            <Panel title="Horarios registrados" items={availability.map((slot) => `Dia ${slot.dayOfWeek}: ${slot.opensAt} - ${slot.closesAt}`)} />
-          </section>
+          <ProfessionalServiceForm
+            durationMinutes={durationMinutes}
+            onDurationChange={setDurationMinutes}
+            onPriceChange={setPrice}
+            onServiceNameChange={setServiceName}
+            onServiceTypeChange={setServiceType}
+            onSubmit={submitService}
+            price={price}
+            saving={saving}
+            selectedProfessionalId={selectedProfessionalId}
+            serviceName={serviceName}
+            serviceType={serviceType}
+          />
+          <ProfessionalAvailabilityForm
+            closesAt={closesAt}
+            dayOfWeek={dayOfWeek}
+            onClosesAtChange={setClosesAt}
+            onDayOfWeekChange={setDayOfWeek}
+            onOpensAtChange={setOpensAt}
+            onSubmit={submitAvailability}
+            opensAt={opensAt}
+            saving={saving}
+            selectedProfessionalId={selectedProfessionalId}
+          />
+          <WellnessSummaryPanels availability={availability} services={services} />
         </section>
       </section>
     </AppShell>
   );
-}
-
-function Field({ children, label }: { children: ReactNode; label: string }) {
-  return (
-    <label className="grid gap-2 text-sm font-bold text-[var(--brand-muted)]">
-      {label}
-      {children}
-    </label>
-  );
-}
-
-function Panel({ title, items }: { title: string; items: string[] }) {
-  return (
-    <section className="admin-panel">
-      <div className="admin-panel-header">
-        <div>
-          <p>Resumen</p>
-          <h2>{title}</h2>
-        </div>
-      </div>
-      <div className="mt-4 grid gap-2 text-sm text-[var(--brand-muted)]">
-        {items.length === 0 ? (
-          <p>Sin registros.</p>
-        ) : (
-          items.map((item) => (
-            <p className="rounded-lg border border-[var(--brand-line)] bg-white px-3 py-2" key={item}>
-              {item}
-            </p>
-          ))
-        )}
-      </div>
-    </section>
-  );
-}
-
-function Notice({ tone, text }: { tone: "ok" | "error"; text: string }) {
-  const styles = tone === "ok" ? "border-[#bad9c4] bg-[#eff8f1] text-[#31563c]" : "border-[#e5b7b7] bg-[#fff4f4] text-[#8c2f2f]";
-  return <p className={`rounded-lg border px-3 py-2 text-sm font-semibold ${styles}`}>{text}</p>;
-}
-
-function formatMoney(cents: number, currency: string) {
-  return new Intl.NumberFormat("es-MX", { style: "currency", currency }).format(cents / 100);
 }

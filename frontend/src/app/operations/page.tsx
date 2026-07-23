@@ -44,7 +44,7 @@ export default function OperationsPage() {
       setSession(stored);
       try {
         const [currentOrganization, availableBranches, ownerDashboard] = await Promise.all([
-          getCurrentOrganization(stored.accessToken),
+          getCurrentOrganization(stored.accessToken).catch(() => null),
           getBranches(stored.accessToken),
           getOwnerDashboard(stored.accessToken),
         ]);
@@ -88,10 +88,6 @@ export default function OperationsPage() {
 
   return (
     <AppShell
-      actions={[
-        { href: "/dashboard", label: "Metricas" },
-        { href: "/reception", label: "Mostrador" },
-      ]}
       branchName={activeBranch?.name}
       eyebrow="Gerencia"
       organizationName={organization?.tradeName}
