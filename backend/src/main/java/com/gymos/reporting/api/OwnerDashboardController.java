@@ -2,7 +2,7 @@ package com.gymos.reporting.api;
 
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.reporting.application.OwnerDashboardService;
-import com.gymos.reporting.infrastructure.OwnerDashboardRepository.OwnerDashboardRecord;
+import com.gymos.reporting.application.result.OwnerDashboardResult;
 import java.time.LocalDate;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,7 +20,7 @@ public class OwnerDashboardController {
 	}
 
 	@GetMapping("/owner-dashboard")
-	OwnerDashboardRecord dashboard(
+	OwnerDashboardResult dashboard(
 			@AuthenticationPrincipal GymOsPrincipal principal,
 			@RequestParam(required = false) LocalDate fromDate,
 			@RequestParam(required = false) LocalDate toDate

@@ -3,6 +3,30 @@
 Estado: en progreso  
 Fecha: 19 de julio de 2026
 
+## Cierre de auditoria puntos 2-5 del refactor general - 23 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- Se agrega cobertura E2E con Playwright para validar que cada rol entra a su consola correcta:
+  - Admin GymOS a `/platform/gymnasiums`;
+  - dueno del gimnasio a `/dashboard`;
+  - gerente a `/operations`;
+  - recepcion a `/reception`;
+  - Admin GymOS en soporte con banda visible y regreso a administracion de gimnasios.
+- Las pruebas E2E mockean la API sobre `/api/v1/**` y validan menu/experiencia por permisos, no por nombre de usuario.
+- `OwnerDashboardController` deja de exponer el record de infraestructura `OwnerDashboardRecord`; el contrato REST usa `OwnerDashboardResult` de application.
+- Se agrega prueba de arquitectura para impedir que `reporting.api` dependa de `reporting.infrastructure`.
+- La revision de repositorios grandes confirma que `SalesRepository` y `CatalogRepository` quedan como fachadas delegadas, y que reporting mantiene un repositorio SQL focalizado para queries agregadas.
+- Queda documentada la regla de auditoria final: API -> application -> infrastructure, con DTOs/resultados de application en los contratos internos y externos.
+
+Verificado:
+
+- Frontend E2E: `npm.cmd run test:e2e`.
+- Frontend: `npm.cmd run test`, `npm.cmd run lint`, `npm.cmd run typecheck`, `npm.cmd run build`.
+- Backend: `./gradlew.bat test`.
+- Docker: `docker compose -f infra/docker-compose.yml up -d --build`.
+- Smoke local: frontend responde en `http://localhost:3000/login` y backend queda `UP` en `http://localhost:8080/actuator/health`.
+
 ## Correccion regresion de usuarios y recursos reservables - 23 de julio de 2026
 
 Implementado en rama `feature/code-simplification-rebasion-and-refactor`:

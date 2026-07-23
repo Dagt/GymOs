@@ -275,6 +275,8 @@ Implementacion:
 - `/admin` queda como redirect temporal hacia `/platform/gymnasiums`.
 - El menu se declara por consola, con secciones visuales y sin duplicar navegacion lateral/superior.
 - La logica de rol no usa nombres de usuario ni `username.includes("admin")`; se basa en `console`, `platformAdmin`, `supportMode` y permisos.
+- La regresion automatizada de frontend debe cubrir, como minimo, el ruteo por consola de Admin GymOS, dueno, gerente, recepcion y soporte. Estas pruebas viven en `frontend/e2e` y se ejecutan con `npm run test:e2e`.
+- Las pruebas de consola deben validar ausencia de rutas indebidas: recepcion no ve administracion de plataforma o equipo, gerente no ve CRM de gimnasios cliente y Admin GymOS fuera de soporte conserva experiencia de plataforma.
 
 Administracion de gimnasios:
 - `/platform/gymnasiums` funciona como CRM SaaS de gimnasios cliente y usa maestro-detalle para evitar listas largas de cards.
