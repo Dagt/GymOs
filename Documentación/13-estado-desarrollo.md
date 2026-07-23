@@ -3,6 +3,22 @@
 Estado: en progreso  
 Fecha: 19 de julio de 2026
 
+## Saneamiento catalogo e infraestructura de pruebas - 23 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `CatalogRepository` queda como fachada estable para los consumidores existentes del modulo `catalog`.
+- Las consultas de productos/servicios se separan en `CatalogProductQueryRepository`.
+- Las consultas de planes de membresia se separan en `CatalogPlanQueryRepository`.
+- La verificacion de SKU duplicado se separa en `CatalogSkuLookupRepository`.
+- Los mapeos JDBC compartidos quedan en `CatalogRowMappers`, evitando duplicacion entre consultas de lista y detalle.
+- Se agrega prueba de arquitectura `CatalogRepositoryArchitectureTests` para impedir que la fachada vuelva a contener SQL directo o `JdbcClient`.
+- La configuracion `application-test.yml` mantiene viva la base H2 durante el apagado del contexto (`DB_CLOSE_DELAY=-1`) y evita `create-drop`; con esto desaparece el warning no bloqueante de Spring Modulith al consultar `event_publication` durante shutdown.
+
+Verificado:
+
+- Backend: `./gradlew.bat test` completo. Resultado exitoso sin warning de `event_publication`.
+
 ## Saneamiento operaciones de membresia - 23 de julio de 2026
 
 Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
