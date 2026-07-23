@@ -30,7 +30,7 @@ class CatalogInsightsService {
 		ProductSummaryView product = products.findProductIncludingArchived(principal.organizationId(), productId)
 				.orElseThrow(() -> new BusinessException("PRODUCT_NOT_FOUND", "El producto no esta disponible."));
 		return new ProductDetailView(
-				product,
+				product.visibleTo(principal.permissions()),
 				insights.dependencies(principal.organizationId(), productId),
 				insights.history(principal.organizationId(), productId, historyLimit)
 		);
