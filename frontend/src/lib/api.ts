@@ -153,12 +153,18 @@ export {
   getInventoryMovements,
   getInventoryStock,
   getLowInventoryStock,
+  searchInventoryMovements,
+  searchInventoryStock,
 } from "./api/inventory";
 export type {
   InventoryMovement,
+  InventoryMovementPage,
   InventoryMovementPayload,
+  InventoryMovementSearchParams,
   InventoryMovementType,
   InventoryStock,
+  InventoryStockPage,
+  InventoryStockSearchParams,
 } from "./api/inventory-types";
 export {
   createBooking,
@@ -238,12 +244,12 @@ export * from "./api/onboarding";
 export {
   createInternalUser,
   getInternalUsers,
-  getUserRoles,
-  updateInternalUserRole,
-  updateInternalUserStatus,
+  getInternalUserRoles,
+  setInternalUserRole,
+  setInternalUserStatus,
 } from "./api/users";
 export type {
   CreateInternalUserPayload,
+  InternalUserRole,
   InternalUserSummary,
-  RoleOption,
 } from "./api/user-types";
