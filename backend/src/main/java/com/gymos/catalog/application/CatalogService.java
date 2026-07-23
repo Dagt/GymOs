@@ -6,8 +6,10 @@ import com.gymos.catalog.application.command.CreatePlanCommand;
 import com.gymos.catalog.application.command.ProductCommand;
 import com.gymos.catalog.application.command.UpdateMembershipPlanCommand;
 import com.gymos.catalog.application.command.UploadProductImageCommand;
+import com.gymos.catalog.application.query.CatalogSummaryView;
 import com.gymos.catalog.application.query.CategoryView;
 import com.gymos.catalog.application.query.PlanView;
+import com.gymos.catalog.application.query.ProductDetailView;
 import com.gymos.catalog.application.query.ProductPageView;
 import com.gymos.catalog.application.query.ProductSearchCriteria;
 import com.gymos.catalog.application.query.ProductSummaryView;
@@ -23,18 +25,24 @@ public class CatalogService {
 	private final CatalogMembershipPlanService membershipPlanService;
 	private final CatalogCategoryService categoryService;
 	private final CatalogProductImageService imageService;
+	private final CatalogInsightsService insightsService;
 
 	public CatalogService(CatalogProductService productService, CatalogMembershipPlanService membershipPlanService,
-			CatalogCategoryService categoryService, CatalogProductImageService imageService) {
+			CatalogCategoryService categoryService, CatalogProductImageService imageService,
+			CatalogInsightsService insightsService) {
 		this.productService = productService;
 		this.membershipPlanService = membershipPlanService;
 		this.categoryService = categoryService;
 		this.imageService = imageService;
+		this.insightsService = insightsService;
 	}
 
 	@Transactional(readOnly = true) public List<ProductSummaryView> products(GymOsPrincipal principal) { return productService.products(principal); }
 	@Transactional(readOnly = true) public ProductSummaryView product(GymOsPrincipal principal, UUID productId) { return productService.product(principal, productId); }
+	@Transactional(readOnly = true) public ProductSummaryView productByBarcode(GymOsPrincipal principal, String barcode) { return productService.productByBarcode(principal, barcode); }
 	@Transactional(readOnly = true) public ProductPageView searchProducts(GymOsPrincipal principal, ProductSearchCriteria criteria) { return productService.search(principal, criteria); }
+	@Transactional(readOnly = true) public CatalogSummaryView summary(GymOsPrincipal principal) { return insightsService.summary(principal); }
+	@Transactional(readOnly = true) public ProductDetailView productDetail(GymOsPrincipal principal, UUID productId, int historyLimit) { return insightsService.detail(principal, productId, historyLimit); }
 	@Transactional public ProductSummaryView createProduct(GymOsPrincipal principal, ProductCommand request, String correlationId) { return productService.createProduct(principal, request, correlationId); }
 	@Transactional public ProductSummaryView updateProduct(GymOsPrincipal principal, UUID productId, ProductCommand request, String correlationId) { return productService.updateProduct(principal, productId, request, correlationId); }
 	@Transactional public ProductSummaryView changeProductStatus(GymOsPrincipal principal, UUID productId, String status, String correlationId) { return productService.changeStatus(principal, productId, status, correlationId); }
