@@ -4,6 +4,7 @@ import com.gymos.catalog.application.query.PlanView;
 import com.gymos.catalog.application.query.ProductSummaryView;
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import java.util.List;
 import org.springframework.jdbc.core.RowMapper;
 
 final class CatalogRowMappers {
@@ -30,9 +31,14 @@ final class CatalogRowMappers {
 				resultSet.getString("image_object_key"),
 				resultSet.getObject("category_id", UUID.class),
 				resultSet.getString("category_name"),
+				tags(resultSet.getString("tags_csv")),
 				resultSet.getObject("created_at", OffsetDateTime.class),
 				resultSet.getObject("updated_at", OffsetDateTime.class)
 		);
+	}
+
+	private static List<String> tags(String value) {
+		return value == null || value.isBlank() ? List.of() : List.of(value.split(","));
 	}
 
 	static RowMapper<PlanView> planSummary() {

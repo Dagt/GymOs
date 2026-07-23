@@ -59,6 +59,7 @@ class CatalogProductService {
 		String barcode = normalizeNullable(request.barcode());
 		validateBarcodeAvailability(principal.organizationId(), barcode, null);
 		validateCategory(principal.organizationId(), request.categoryId());
+		List<String> tags = normalizeTags(request.tags());
 		UUID productId = UUID.randomUUID();
 		OffsetDateTime now = OffsetDateTime.now();
 		commands.create(new ProductMutation(
@@ -84,6 +85,7 @@ class CatalogProductService {
 		));
 		commands.replaceCategory(
 				principal.organizationId(), productId, request.categoryId(), principal.userId(), now);
+		commands.replaceTags(principal.organizationId(), productId, tags, principal.userId(), now);
 		auditService.record(principal, "PRODUCT_CREATED", "CATALOG_PRODUCT", productId, "BACKOFFICE", null, correlationId);
 		return requireProduct(principal.organizationId(), productId);
 	}
@@ -100,6 +102,7 @@ class CatalogProductService {
 		String barcode = normalizeNullable(request.barcode());
 		validateBarcodeAvailability(principal.organizationId(), barcode, productId);
 		validateCategory(principal.organizationId(), request.categoryId());
+		List<String> tags = normalizeTags(request.tags());
 		int updated = commands.update(new ProductMutation(
 				principal.organizationId(),
 				productId,
@@ -126,6 +129,8 @@ class CatalogProductService {
 		}
 		commands.replaceCategory(
 				principal.organizationId(), productId, request.categoryId(), principal.userId(), OffsetDateTime.now());
+		commands.replaceTags(
+				principal.organizationId(), productId, tags, principal.userId(), OffsetDateTime.now());
 		if (!java.util.Objects.equals(existing.categoryId(), request.categoryId())) {
 			auditService.record(
 					principal, "PRODUCT_CATEGORY_CHANGED", "CATALOG_PRODUCT", productId,
@@ -147,7 +152,8 @@ class CatalogProductService {
 		if (updated != 1) {
 			throw new BusinessException("PRODUCT_NOT_FOUND", "El producto no existe o fue archivado.");
 		}
-		auditService.record(principal, "PRODUCT_STATUS_CHANGED", "CATALOG_PRODUCT", productId, "BACKOFFICE", normalizedStatus, correlationId);
+		String eventType = "ACTIVE".equals(normalizedStatus) ? "PRODUCT_ACTIVATED" : "PRODUCT_DEACTIVATED";
+		auditService.record(principal, eventType, "CATALOG_PRODUCT", productId, "BACKOFFICE", normalizedStatus, correlationId);
 		return requireProduct(principal.organizationId(), productId);
 	}
 
@@ -197,6 +203,22 @@ class CatalogProductService {
 		if (categoryId != null && categories.findCategory(organizationId, categoryId).isEmpty()) {
 			throw new BusinessException("CATEGORY_NOT_FOUND", "La categoria no pertenece a la organizacion.");
 		}
+	}
+
+	private List<String> normalizeTags(List<String> tags) {
+		if (tags == null) {
+			return List.of();
+		}
+		List<String> normalized = tags.stream()
+				.filter(java.util.Objects::nonNull)
+				.map(String::trim)
+				.filter(tag -> !tag.isBlank())
+				.distinct()
+				.toList();
+		if (normalized.size() > 20 || normalized.stream().anyMatch(tag -> tag.length() > 80 || tag.contains(","))) {
+			throw new BusinessException("PRODUCT_TAGS_INVALID", "Usa hasta 20 etiquetas sin comas.");
+		}
+		return normalized;
 	}
 
 	private void validateTransition(UUID organizationId, ProductSummaryView existing, ProductCommand request) {

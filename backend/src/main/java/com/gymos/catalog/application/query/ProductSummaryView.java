@@ -2,6 +2,7 @@ package com.gymos.catalog.application.query;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import java.util.List;
 
 public record ProductSummaryView(
 		UUID id,
@@ -22,6 +23,7 @@ public record ProductSummaryView(
 		String imageObjectKey,
 		UUID categoryId,
 		String categoryName,
+		List<String> tags,
 		OffsetDateTime createdAt,
 		OffsetDateTime updatedAt
 ) {

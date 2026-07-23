@@ -77,7 +77,7 @@ class CatalogMembershipPlanService {
 				new ProductCommand(
 						sku, request.name(), request.description(), "MEMBERSHIP_PLAN", request.priceCents(),
 						request.currency(), true, request.status(), null, null, null, null,
-						false, 0, null, null
+						false, 0, null, null, List.of()
 				),
 				correlationId
 		);

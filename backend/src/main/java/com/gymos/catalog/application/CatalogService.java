@@ -5,6 +5,7 @@ import com.gymos.catalog.application.command.CreatePlanCommand;
 import com.gymos.catalog.application.command.ProductCommand;
 import com.gymos.catalog.application.command.UpdateMembershipPlanCommand;
 import com.gymos.catalog.application.command.CategoryCommand;
+import com.gymos.catalog.application.command.UploadProductImageCommand;
 import com.gymos.catalog.application.query.CategoryView;
 import com.gymos.catalog.application.query.PlanView;
 import com.gymos.catalog.application.query.ProductSummaryView;
@@ -21,15 +22,18 @@ public class CatalogService {
 	private final CatalogProductService productService;
 	private final CatalogMembershipPlanService membershipPlanService;
 	private final CatalogCategoryService categoryService;
+	private final CatalogProductImageService imageService;
 
 	public CatalogService(
 			CatalogProductService productService,
 			CatalogMembershipPlanService membershipPlanService,
-			CatalogCategoryService categoryService
+			CatalogCategoryService categoryService,
+			CatalogProductImageService imageService
 	) {
 		this.productService = productService;
 		this.membershipPlanService = membershipPlanService;
 		this.categoryService = categoryService;
+		this.imageService = imageService;
 	}
 
 	@Transactional(readOnly = true)
@@ -110,5 +114,24 @@ public class CatalogService {
 	@Transactional
 	public void archiveCategory(GymOsPrincipal principal, UUID categoryId, String correlationId) {
 		categoryService.archive(principal, categoryId, correlationId);
+	}
+
+	@Transactional
+	public ProductSummaryView uploadProductImage(
+			GymOsPrincipal principal,
+			UUID productId,
+			UploadProductImageCommand command,
+			String correlationId
+	) {
+		return imageService.upload(principal, productId, command, correlationId);
+	}
+
+	@Transactional
+	public ProductSummaryView removeProductImage(
+			GymOsPrincipal principal,
+			UUID productId,
+			String correlationId
+	) {
+		return imageService.remove(principal, productId, correlationId);
 	}
 }

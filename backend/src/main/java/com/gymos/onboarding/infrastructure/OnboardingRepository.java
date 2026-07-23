@@ -84,11 +84,13 @@ public class OnboardingRepository {
 		jdbcClient.sql("""
 				INSERT INTO catalog_product (
 				    id, organization_id, sku, name, description, product_type, price_cents,
-				    currency, taxable, status, created_at, updated_at, created_by, updated_by, version
+				    currency, taxable, status, inventory_tracked,
+				    created_at, updated_at, created_by, updated_by, version
 				)
 				VALUES (
 				    :id, :organizationId, :sku, :name, :description, :productType, :priceCents,
-				    :currency, :taxable, 'ACTIVE', :createdAt, :updatedAt, :createdBy, :updatedBy, 0
+				    :currency, :taxable, 'ACTIVE', :inventoryTracked,
+				    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
 				)
 				""")
 				.param("id", productId)
@@ -100,6 +102,7 @@ public class OnboardingRepository {
 				.param("priceCents", record.priceCents())
 				.param("currency", record.currency())
 				.param("taxable", record.taxable())
+				.param("inventoryTracked", "PHYSICAL".equals(record.productType()))
 				.param("createdAt", record.now())
 				.param("updatedAt", record.now())
 				.param("createdBy", record.userId())

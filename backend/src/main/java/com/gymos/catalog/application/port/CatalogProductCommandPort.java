@@ -2,6 +2,7 @@ package com.gymos.catalog.application.port;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import java.util.List;
 
 public interface CatalogProductCommandPort {
 	void create(ProductMutation mutation);
@@ -16,6 +17,22 @@ public interface CatalogProductCommandPort {
 			UUID organizationId,
 			UUID productId,
 			UUID categoryId,
+			UUID userId,
+			OffsetDateTime now
+	);
+
+	int updateImageKey(
+			UUID organizationId,
+			UUID productId,
+			String imageObjectKey,
+			UUID userId,
+			OffsetDateTime now
+	);
+
+	void replaceTags(
+			UUID organizationId,
+			UUID productId,
+			List<String> tags,
 			UUID userId,
 			OffsetDateTime now
 	);

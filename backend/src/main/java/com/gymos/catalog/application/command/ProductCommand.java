@@ -1,6 +1,7 @@
 package com.gymos.catalog.application.command;
 
 import java.util.UUID;
+import java.util.List;
 
 public record ProductCommand(
 		String sku,
@@ -18,6 +19,7 @@ public record ProductCommand(
 		boolean inventoryTracked,
 		int displayOrder,
 		String imageObjectKey,
-		UUID categoryId
+		UUID categoryId,
+		List<String> tags
 ) {
 }

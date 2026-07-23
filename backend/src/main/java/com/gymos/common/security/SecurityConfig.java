@@ -66,10 +66,22 @@ public class SecurityConfig {
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/clients").hasAuthority("client.create")
 						.requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/v1/clients/**").hasAuthority("client.update")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/catalog/**").hasAuthority("catalog.read")
-						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/catalog/**").hasAuthority("catalog.manage")
-						.requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/catalog/**").hasAuthority("catalog.manage")
-						.requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/v1/catalog/**").hasAuthority("catalog.manage")
-						.requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/v1/catalog/**").hasAuthority("catalog.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/catalog/products/*/image").hasAuthority("catalog.image.manage")
+						.requestMatchers(
+								org.springframework.http.HttpMethod.POST,
+								"/api/v1/catalog/products/*/activate",
+								"/api/v1/catalog/products/*/deactivate"
+						).hasAuthority("catalog.status.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/v1/catalog/products/*/image").hasAuthority("catalog.image.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/catalog/categories").hasAuthority("catalog.category.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/catalog/categories/*").hasAuthority("catalog.category.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/v1/catalog/categories/*").hasAuthority("catalog.category.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/catalog/products/*/status").hasAuthority("catalog.status.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/v1/catalog/products/*").hasAuthority("catalog.archive")
+						.requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/v1/catalog/products/*").hasAuthority("catalog.update")
+						.requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/catalog/products/*").hasAuthority("catalog.update")
+						.requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/catalog/plans/*").hasAuthority("catalog.update")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/catalog/**").hasAuthority("catalog.create")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/benefits/**").hasAuthority("benefit.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/benefits/**").hasAuthority("benefit.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/client-benefits/*/verify").hasAuthority("client.benefit.verify")

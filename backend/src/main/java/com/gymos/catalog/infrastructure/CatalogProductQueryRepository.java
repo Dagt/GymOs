@@ -15,7 +15,8 @@ class CatalogProductQueryRepository {
 			cp.id AS id, cp.sku, cp.name, cp.description, cp.product_type, cp.price_cents, cp.currency,
 			cp.taxable, cp.status, cp.barcode, cp.brand, cp.presentation, cp.unit_of_measure,
 			cp.inventory_tracked, cp.display_order, cp.image_object_key,
-			category.id AS category_id, category.name AS category_name, cp.created_at, cp.updated_at
+			category.id AS category_id, category.name AS category_name, tags.tags_csv,
+			cp.created_at, cp.updated_at
 			""";
 	private static final String CATEGORY_JOIN = """
 			LEFT JOIN LATERAL (
@@ -30,6 +31,16 @@ class CatalogProductQueryRepository {
 			    LIMIT 1
 			) category ON TRUE
 			""";
+	private static final String TAG_JOIN = """
+			LEFT JOIN LATERAL (
+			    SELECT STRING_AGG(t.name, ',' ORDER BY t.name) AS tags_csv
+			    FROM catalog_product_tag pt
+			    JOIN catalog_tag t ON t.id = pt.tag_id
+			        AND t.organization_id = pt.organization_id
+			    WHERE pt.organization_id = cp.organization_id
+			      AND pt.product_id = cp.id
+			) tags ON TRUE
+			""";
 
 	private final JdbcClient jdbcClient;
 
@@ -42,11 +53,12 @@ class CatalogProductQueryRepository {
 				SELECT %s
 				FROM catalog_product cp
 				%s
+				%s
 				WHERE cp.organization_id = :organizationId
 				  AND cp.deleted_at IS NULL
 				  AND cp.archived_at IS NULL
 				ORDER BY cp.display_order, cp.name
-				""".formatted(PRODUCT_COLUMNS, CATEGORY_JOIN))
+				""".formatted(PRODUCT_COLUMNS, CATEGORY_JOIN, TAG_JOIN))
 				.param("organizationId", organizationId)
 				.query(CatalogRowMappers.productSummary())
 				.list();
@@ -57,11 +69,12 @@ class CatalogProductQueryRepository {
 				SELECT %s
 				FROM catalog_product cp
 				%s
+				%s
 				WHERE cp.organization_id = :organizationId
 				  AND cp.id = :productId
 				  AND cp.deleted_at IS NULL
 				  AND cp.archived_at IS NULL
-				""".formatted(PRODUCT_COLUMNS, CATEGORY_JOIN))
+				""".formatted(PRODUCT_COLUMNS, CATEGORY_JOIN, TAG_JOIN))
 				.param("organizationId", organizationId)
 				.param("productId", productId)
 				.query(CatalogRowMappers.productSummary())
@@ -75,11 +88,12 @@ class CatalogProductQueryRepository {
 				SELECT %s
 				FROM catalog_product cp
 				%s
+				%s
 				WHERE cp.organization_id = :organizationId
 				%s
 				ORDER BY %s
 				LIMIT :size OFFSET :offset
-				""".formatted(PRODUCT_COLUMNS, CATEGORY_JOIN, filters, orderBy);
+				""".formatted(PRODUCT_COLUMNS, CATEGORY_JOIN, TAG_JOIN, filters, orderBy);
 		var query = bind(jdbcClient.sql(querySql), organizationId, criteria)
 				.param("size", criteria.size())
 				.param("offset", criteria.page() * criteria.size());
@@ -109,6 +123,14 @@ class CatalogProductQueryRepository {
 					     LOWER(cp.name) LIKE :query
 					     OR LOWER(cp.sku) LIKE :query
 					     OR LOWER(COALESCE(cp.barcode, '')) LIKE :query
+					     OR EXISTS (
+					         SELECT 1
+					         FROM catalog_product_tag search_product_tag
+					         JOIN catalog_tag search_tag ON search_tag.id = search_product_tag.tag_id
+					         WHERE search_product_tag.organization_id = cp.organization_id
+					           AND search_product_tag.product_id = cp.id
+					           AND search_tag.normalized_name LIKE :query
+					     )
 					 )
 					""");
 		}
