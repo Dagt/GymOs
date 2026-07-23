@@ -21,10 +21,10 @@ import org.springframework.stereotype.Service;
 
 @Service
 class CatalogProductService {
-	private static final List<String> TYPES = List.of("PHYSICAL", "SERVICE", "MEMBERSHIP_PLAN");
+	private static final List<String> TYPES = List.of("PHYSICAL", "SERVICE");
 	private static final List<String> SUBTYPES = List.of(
 			"GENERAL_PRODUCT", "GENERAL_SERVICE", "VISIT_PASS", "BOOKING", "ROUTINE",
-			"CONSULTATION", "WELLNESS_SERVICE", "MEMBERSHIP"
+			"CONSULTATION", "WELLNESS_SERVICE"
 	);
 
 	private final CatalogProductQueryPort products;
@@ -44,12 +44,15 @@ class CatalogProductService {
 
 	List<ProductSummaryView> products(GymOsPrincipal principal) {
 		CatalogAccessGuard.requirePrincipal(principal);
-		return products.listProducts(principal.organizationId());
+		return products.listProducts(principal.organizationId()).stream()
+				.filter(product -> !"MEMBERSHIP_PLAN".equals(product.productType()))
+				.map(product -> visible(principal, product))
+				.toList();
 	}
 
 	ProductSummaryView product(GymOsPrincipal principal, UUID productId) {
 		CatalogAccessGuard.requirePrincipal(principal);
-		return requireProduct(principal.organizationId(), productId);
+		return visible(principal, requireProduct(principal.organizationId(), productId));
 	}
 
 	ProductSummaryView productByBarcode(GymOsPrincipal principal, String barcode) {
@@ -58,14 +61,20 @@ class CatalogProductService {
 		if (normalized == null) {
 			throw new BusinessException("PRODUCT_BARCODE_REQUIRED", "Proporciona un codigo de barras.");
 		}
-		return products.findActiveByBarcode(principal.organizationId(), normalized)
+		ProductSummaryView product = products.findActiveByBarcode(principal.organizationId(), normalized)
+				.filter(candidate -> !"MEMBERSHIP_PLAN".equals(candidate.productType()))
 				.orElseThrow(() -> new BusinessException(
 						"PRODUCT_BARCODE_NOT_FOUND", "No existe un producto activo con ese codigo de barras."));
+		return visible(principal, product);
 	}
 
 	ProductPageView search(GymOsPrincipal principal, ProductSearchCriteria criteria) {
 		CatalogAccessGuard.requirePrincipal(principal);
-		return products.search(principal.organizationId(), criteria);
+		ProductPageView page = products.search(principal.organizationId(), criteria);
+		return new ProductPageView(
+				page.items().stream().map(product -> visible(principal, product)).toList(),
+				page.page(), page.size(), page.totalElements(), page.totalPages()
+		);
 	}
 
 	ProductSummaryView createProduct(GymOsPrincipal principal, ProductCommand request, String correlationId) {
@@ -79,17 +88,21 @@ class CatalogProductService {
 		List<String> tags = normalizeTags(request.tags());
 		UUID productId = UUID.randomUUID();
 		OffsetDateTime now = OffsetDateTime.now();
-		commands.create(mutation(principal, productId, request, sku, barcode, null, now));
+		commands.create(mutation(principal, productId, request, sku, barcode, null, null, now));
 		commands.replaceCategory(principal.organizationId(), productId, request.categoryId(), principal.userId(), now);
 		commands.replaceTags(principal.organizationId(), productId, tags, principal.userId(), now);
 		auditService.record(principal, "PRODUCT_CREATED", "CATALOG_PRODUCT", productId, "BACKOFFICE", null, correlationId);
-		return requireProduct(principal.organizationId(), productId);
+		return visible(principal, requireProduct(principal.organizationId(), productId));
 	}
 
 	ProductSummaryView updateProduct(GymOsPrincipal principal, UUID productId, ProductCommand request, String correlationId) {
 		CatalogAccessGuard.requirePrincipal(principal);
 		validate(request);
 		ProductSummaryView existing = requireProduct(principal.organizationId(), productId);
+		if ("MEMBERSHIP_PLAN".equals(existing.productType())) {
+			throw new BusinessException("PRODUCT_UPDATE_REQUIRES_PLAN_WORKFLOW",
+					"Los productos de membresia se administran desde planes.");
+		}
 		validateTransition(principal.organizationId(), existing, request);
 		String sku = normalizeRequired(request.sku());
 		if (products.skuExists(principal.organizationId(), sku, productId)) throw duplicateSku();
@@ -98,24 +111,28 @@ class CatalogProductService {
 		validateCategory(principal.organizationId(), request.categoryId());
 		List<String> tags = normalizeTags(request.tags());
 		OffsetDateTime now = OffsetDateTime.now();
-		int updated = commands.update(mutation(principal, productId, request, sku, barcode, existing.imageObjectKey(), now));
+		int updated = commands.update(mutation(principal, productId, request, sku, barcode, existing.imageObjectKey(), existing, now));
 		if (updated != 1) throw notFound();
 		commands.replaceCategory(principal.organizationId(), productId, request.categoryId(), principal.userId(), now);
 		commands.replaceTags(principal.organizationId(), productId, tags, principal.userId(), now);
 		auditService.record(principal, "PRODUCT_UPDATED", "CATALOG_PRODUCT", productId, "BACKOFFICE",
-				describeChanges(existing, request, sku, barcode, tags), correlationId);
-		return requireProduct(principal.organizationId(), productId);
+				describeChanges(principal, existing, request, sku, barcode, tags), correlationId);
+		return visible(principal, requireProduct(principal.organizationId(), productId));
 	}
 
 	ProductSummaryView changeStatus(GymOsPrincipal principal, UUID productId, String status, String correlationId) {
 		CatalogAccessGuard.requirePrincipal(principal);
 		String normalizedStatus = normalizeStatus(status);
-		requireProduct(principal.organizationId(), productId);
+		ProductSummaryView product = requireProduct(principal.organizationId(), productId);
+		if ("MEMBERSHIP_PLAN".equals(product.productType())) {
+			throw new BusinessException("PRODUCT_STATUS_REQUIRES_PLAN_WORKFLOW",
+					"Los productos de membresia se administran desde planes.");
+		}
 		if (commands.changeStatus(principal.organizationId(), productId, normalizedStatus,
 				principal.userId(), OffsetDateTime.now()) != 1) throw notFound();
 		String eventType = "ACTIVE".equals(normalizedStatus) ? "PRODUCT_ACTIVATED" : "PRODUCT_DEACTIVATED";
 		auditService.record(principal, eventType, "CATALOG_PRODUCT", productId, "BACKOFFICE", normalizedStatus, correlationId);
-		return requireProduct(principal.organizationId(), productId);
+		return visible(principal, requireProduct(principal.organizationId(), productId));
 	}
 
 	void archiveProduct(GymOsPrincipal principal, UUID productId, String correlationId) {
@@ -138,6 +155,10 @@ class CatalogProductService {
 		CatalogAccessGuard.requirePrincipal(principal);
 		ProductSummaryView archived = products.findProductIncludingArchived(principal.organizationId(), productId)
 				.orElseThrow(this::notFound);
+		if ("MEMBERSHIP_PLAN".equals(archived.productType())) {
+			throw new BusinessException("PRODUCT_RESTORE_REQUIRES_PLAN_WORKFLOW",
+					"Los productos de membresia se administran desde planes.");
+		}
 		if (!archived.archived()) throw new BusinessException("PRODUCT_NOT_ARCHIVED", "El producto no esta archivado.");
 		if (products.skuExists(principal.organizationId(), archived.sku(), productId)) throw duplicateSku();
 		validateBarcodeAvailability(principal.organizationId(), archived.barcode(), productId);
@@ -146,24 +167,25 @@ class CatalogProductService {
 		}
 		auditService.record(principal, "PRODUCT_RESTORED", "CATALOG_PRODUCT", productId,
 				"BACKOFFICE", "INACTIVE", correlationId);
-		return requireProduct(principal.organizationId(), productId);
+		return visible(principal, requireProduct(principal.organizationId(), productId));
 	}
 
 	private ProductMutation mutation(GymOsPrincipal principal, UUID productId, ProductCommand request,
-			String sku, String barcode, String imageObjectKey, OffsetDateTime now) {
+			String sku, String barcode, String imageObjectKey, ProductSummaryView existing, OffsetDateTime now) {
 		return new ProductMutation(
 				principal.organizationId(), productId, sku, request.name().trim(),
 				CatalogBenefitsSerializer.blankToNull(request.description()), normalizeRequired(request.productType()),
 				normalizeRequired(request.commercialSubtype()), request.priceCents(), normalizeRequired(request.currency()),
 				request.taxable(), normalizeStatus(request.status()), barcode, trimToNull(request.brand()),
 				trimToNull(request.presentation()), normalizeNullable(request.unitOfMeasure()), request.inventoryTracked(),
-				request.displayOrder(), imageObjectKey, trimToNull(request.supplierName()), request.referenceCostCents(),
-				request.promotionalPriceCents(), request.promotionStartsAt(), request.promotionEndsAt(), now, principal.userId()
+				request.displayOrder(), imageObjectKey, effectiveSupplier(principal, request, existing),
+				effectiveReferenceCost(principal, request, existing), request.promotionalPriceCents(),
+				request.promotionStartsAt(), request.promotionEndsAt(), now, principal.userId()
 		);
 	}
 
-	private String describeChanges(ProductSummaryView existing, ProductCommand request, String sku,
-			String barcode, List<String> tags) {
+	private String describeChanges(GymOsPrincipal principal, ProductSummaryView existing, ProductCommand request,
+			String sku, String barcode, List<String> tags) {
 		List<String> changes = new ArrayList<>();
 		change(changes, "sku", existing.sku(), sku);
 		change(changes, "name", existing.name(), request.name().trim());
@@ -180,8 +202,10 @@ class CatalogProductService {
 		change(changes, "unitOfMeasure", existing.unitOfMeasure(), normalizeNullable(request.unitOfMeasure()));
 		change(changes, "inventoryTracked", existing.inventoryTracked(), request.inventoryTracked());
 		change(changes, "displayOrder", existing.displayOrder(), request.displayOrder());
-		change(changes, "supplierName", existing.supplierName(), trimToNull(request.supplierName()));
-		change(changes, "referenceCostCents", existing.referenceCostCents(), request.referenceCostCents());
+		if (canReadCosts(principal)) {
+			change(changes, "supplierName", existing.supplierName(), trimToNull(request.supplierName()));
+			change(changes, "referenceCostCents", existing.referenceCostCents(), request.referenceCostCents());
+		}
 		change(changes, "promotionalPriceCents", existing.promotionalPriceCents(), request.promotionalPriceCents());
 		change(changes, "promotionStartsAt", existing.promotionStartsAt(), request.promotionStartsAt());
 		change(changes, "promotionEndsAt", existing.promotionEndsAt(), request.promotionEndsAt());
@@ -200,13 +224,18 @@ class CatalogProductService {
 	private void validate(ProductCommand request) {
 		String type = normalizeRequired(request.productType());
 		String subtype = normalizeRequired(request.commercialSubtype());
-		if (!TYPES.contains(type)) throw new BusinessException("PRODUCT_TYPE_INVALID", "El tipo de producto no es valido.");
+		if (!TYPES.contains(type)) {
+			throw new BusinessException("PRODUCT_TYPE_INVALID",
+					"Los productos de membresia deben crearse desde el flujo de planes.");
+		}
 		if (!SUBTYPES.contains(subtype)) {
 			throw new BusinessException("PRODUCT_COMMERCIAL_SUBTYPE_INVALID", "El subtipo comercial no es valido.");
 		}
-		if ("MEMBERSHIP_PLAN".equals(type) != "MEMBERSHIP".equals(subtype)) {
-			throw new BusinessException("PRODUCT_COMMERCIAL_SUBTYPE_INVALID",
-					"Los planes de membresia deben usar el subtipo MEMBERSHIP y viceversa.");
+		if ("PHYSICAL".equals(type) != "GENERAL_PRODUCT".equals(subtype)) {
+			if ("PHYSICAL".equals(type) || "GENERAL_PRODUCT".equals(subtype)) {
+				throw new BusinessException("PRODUCT_COMMERCIAL_SUBTYPE_INVALID",
+						"Los productos fisicos deben usar el subtipo GENERAL_PRODUCT.");
+			}
 		}
 		if (request.inventoryTracked() && !"PHYSICAL".equals(type)) {
 			throw new BusinessException("PRODUCT_INVENTORY_TRACKING_INVALID",
@@ -269,15 +298,27 @@ class CatalogProductService {
 			throw new BusinessException("PRODUCT_INVENTORY_TRACKING_CHANGE_NOT_ALLOWED",
 					"No se puede desactivar el control de inventario cuando existen movimientos.");
 		}
-		if (dependencies.hasActiveMembershipPlan(organizationId, existing.id()) && !"MEMBERSHIP_PLAN".equals(nextType)) {
+		if (dependencies.hasActiveMembershipPlan(organizationId, existing.id())) {
 			throw new BusinessException("PRODUCT_TYPE_CHANGE_NOT_ALLOWED",
 					"El producto esta vinculado a un plan de membresia activo.");
 		}
 	}
 
-	private String safe(Object value) {
-		return String.valueOf(value).replace("\\", "\\\\").replace("\"", "\\\"");
+	private ProductSummaryView visible(GymOsPrincipal principal, ProductSummaryView product) {
+		return product.visibleTo(principal.permissions());
 	}
+	private boolean canReadCosts(GymOsPrincipal principal) {
+		return principal.permissions().contains("catalog.cost.read")
+				|| principal.permissions().contains("catalog.manage")
+				|| principal.permissions().contains("platform.admin");
+	}
+	private String effectiveSupplier(GymOsPrincipal principal, ProductCommand request, ProductSummaryView existing) {
+		return canReadCosts(principal) ? trimToNull(request.supplierName()) : existing == null ? null : existing.supplierName();
+	}
+	private Long effectiveReferenceCost(GymOsPrincipal principal, ProductCommand request, ProductSummaryView existing) {
+		return canReadCosts(principal) ? request.referenceCostCents() : existing == null ? null : existing.referenceCostCents();
+	}
+	private String safe(Object value) { return String.valueOf(value).replace("\\", "\\\\").replace("\"", "\\\""); }
 	private ProductSummaryView requireProduct(UUID organizationId, UUID productId) {
 		return products.findProduct(organizationId, productId).orElseThrow(this::notFound);
 	}
