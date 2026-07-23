@@ -26,12 +26,12 @@ class SalesRefundProcessor {
 	}
 
 	UUID process(GymOsPrincipal principal, UUID saleId, SaleHeader sale, RequestRefundCommand request,
-			String idempotencyKey, String correlationId) {
+			long alreadyRefunded, String idempotencyKey, String correlationId) {
 		UUID refundId = commandRepository.createProcessed(
 				principal.organizationId(), principal.branchId(), saleId, request.paymentId(), request.amountCents(),
 				sale.currency(), request.reason(), idempotencyKey, principal.userId()
 		);
-		if (request.amountCents() == sale.totalCents()) {
+		if (alreadyRefunded + request.amountCents() == sale.paidCents()) {
 			eventPublisher.publishEvent(new RefundProcessedV1(
 					principal.organizationId(), principal.branchId(), saleId, refundId, principal.userId(),
 					OffsetDateTime.now(), safeCorrelationId(correlationId)
