@@ -94,6 +94,7 @@ public class CatalogProductCommandRepository implements CatalogProductCommandPor
 				  AND id = :id
 				  AND deleted_at IS NULL
 				  AND archived_at IS NULL
+				  AND version = :expectedVersion
 				""")
 				.param("sku", product.sku())
 				.param("name", product.name())
@@ -116,6 +117,7 @@ public class CatalogProductCommandRepository implements CatalogProductCommandPor
 				.param("promotionalPriceCents", product.promotionalPriceCents())
 				.param("promotionStartsAt", product.promotionStartsAt())
 				.param("promotionEndsAt", product.promotionEndsAt())
+				.param("expectedVersion", product.expectedVersion())
 				.param("now", product.now())
 				.param("userId", product.userId())
 				.param("organizationId", product.organizationId())
