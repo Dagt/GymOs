@@ -1,5 +1,6 @@
 package com.gymos.inventory.infrastructure;
 
+import com.gymos.catalog.api.CatalogProductOperations;
 import com.gymos.inventory.application.port.InventoryCommandPort;
 import com.gymos.inventory.application.port.InventoryQueryPort;
 import com.gymos.inventory.application.query.InventoryMovementView;
@@ -16,17 +17,20 @@ import org.springframework.stereotype.Repository;
 class InventoryPersistenceAdapter implements InventoryQueryPort, InventoryCommandPort {
 	private final InventoryRepository repository;
 	private final InventoryStockCommandRepository stockCommands;
+	private final CatalogProductOperations catalog;
 
-	InventoryPersistenceAdapter(InventoryRepository repository, InventoryStockCommandRepository stockCommands) {
+	InventoryPersistenceAdapter(InventoryRepository repository, InventoryStockCommandRepository stockCommands,
+			CatalogProductOperations catalog) {
 		this.repository = repository;
 		this.stockCommands = stockCommands;
+		this.catalog = catalog;
 	}
 
 	@Override public List<InventoryStockView> stock(UUID organizationId, UUID branchId) { return repository.stock(organizationId, branchId).stream().map(this::stock).toList(); }
 	@Override public Optional<InventoryStockView> stockDetail(UUID organizationId, UUID branchId, UUID productId) { return repository.stockDetail(organizationId, branchId, productId).map(this::stock); }
 	@Override public List<InventoryStockView> lowStock(UUID organizationId, UUID branchId) { return repository.lowStock(organizationId, branchId).stream().map(this::stock).toList(); }
 	@Override public List<InventoryMovementView> movements(UUID organizationId, UUID branchId, UUID productId, int limit) { return repository.movements(organizationId, branchId, productId, limit).stream().map(this::movement).toList(); }
-	@Override public Optional<InventoryProductView> product(UUID organizationId, UUID productId) { return repository.product(organizationId, productId).map(value -> new InventoryProductView(value.id(), value.sku(), value.name(), value.productType(), value.inventoryTracked(), value.status())); }
+	@Override public Optional<InventoryProductView> product(UUID organizationId, UUID productId) { return catalog.product(organizationId, productId).map(value -> new InventoryProductView(value.id(), value.sku(), value.name(), value.productType(), value.inventoryTracked(), value.status())); }
 	@Override public UUID ensureStock(UUID organizationId, UUID branchId, UUID productId, UUID actorUserId, OffsetDateTime now) { return stockCommands.ensureStock(organizationId, branchId, productId, actorUserId, now); }
 	@Override public Optional<InventoryStockLedgerView> lock(UUID organizationId, UUID branchId, UUID stockId) { return stockCommands.lock(organizationId, branchId, stockId).map(value -> new InventoryStockLedgerView(value.stockId(), value.quantityOnHand(), value.reorderPoint(), value.averageCostCents())); }
 	@Override public void update(UUID stockId, int quantityOnHand, int reorderPoint, Long averageCostCents, UUID actorUserId, OffsetDateTime now) { stockCommands.update(stockId, quantityOnHand, reorderPoint, averageCostCents, actorUserId, now); }
