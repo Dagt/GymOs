@@ -4,6 +4,7 @@ import {
   type InventoryMovement,
   type InventoryMovementType,
   type InventoryStock,
+  type InventoryStockSearchParams,
 } from "@/lib/api";
 
 type ManualMovementType = Exclude<InventoryMovementType, "SALE">;
@@ -20,25 +21,51 @@ export const movementTypes: Array<{ value: ManualMovementType; label: string }> 
 export function InventoryStatusMessages({ error, message }: { error: string | null; message: string | null }) {
   return (
     <>
-      {error ? <p className="rounded-md border border-[#e5b7b7] bg-[#fff4f4] px-3 py-2 text-sm text-[#8c2f2f]">{error}</p> : null}
+      {error ? <p className="rounded-md border border-[#e5b7b7] bg-[#fff4f4] px-3 py-2 text-sm text-[#8c2f2f]" role="alert">{error}</p> : null}
       {message ? <p className="rounded-md border border-[#bfd6c7] bg-[#f0f7f2] px-3 py-2 text-sm text-[#31543d]">{message}</p> : null}
     </>
   );
 }
 
-export function InventoryStockPanel({ selectedProductId, stock, onRefresh, onSelectProduct }: {
+export function InventoryStockPanel({ loading, page, query, selectedProductId, sort, stock, total, totalPages,
+  onPageChange, onQueryChange, onRefresh, onSelectProduct, onSortChange }: {
+  loading: boolean;
+  page: number;
+  query: string;
   selectedProductId: string;
+  sort: NonNullable<InventoryStockSearchParams["sort"]>;
   stock: InventoryStock[];
+  total: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+  onQueryChange: (value: string) => void;
   onRefresh: () => void;
   onSelectProduct: (item: InventoryStock) => void;
+  onSortChange: (value: NonNullable<InventoryStockSearchParams["sort"]>) => void;
 }) {
   return (
     <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
       <div className="flex items-start justify-between gap-3">
-        <div><h2 className="text-xl font-semibold">Existencias</h2><p className="mt-1 text-sm text-[#5d6b63]">{stock.length} productos fisicos</p></div>
+        <div><h2 className="text-xl font-semibold">Existencias</h2><p className="mt-1 text-sm text-[#5d6b63]">{total} productos fisicos</p></div>
         <button className="app-button-secondary" onClick={onRefresh} type="button">Actualizar</button>
       </div>
-      <div className="mt-4 grid gap-3">
+      <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+        <label className="grid gap-1 text-sm"><span className="font-medium">Buscar</span>
+          <input className="h-10 rounded-md border border-[#cdd5ca] px-3" placeholder="Nombre, SKU o codigo"
+            value={query} onChange={(event) => onQueryChange(event.target.value)} />
+        </label>
+        <label className="grid gap-1 text-sm"><span className="font-medium">Ordenar</span>
+          <select className="h-10 rounded-md border border-[#cdd5ca] bg-white px-3" value={sort}
+            onChange={(event) => onSortChange(event.target.value as NonNullable<InventoryStockSearchParams["sort"]>)}>
+            <option value="name,asc">Nombre A-Z</option><option value="name,desc">Nombre Z-A</option>
+            <option value="quantity,asc">Menor existencia</option><option value="quantity,desc">Mayor existencia</option>
+            <option value="updatedAt,desc">Actualizados recientemente</option>
+          </select>
+        </label>
+      </div>
+      {loading ? <div className="mt-4 grid gap-3" role="status" aria-label="Cargando existencias">{[0, 1, 2].map((row) => <div className="h-20 animate-pulse rounded-md bg-[#eef1eb]" key={row} />)}</div> : null}
+      {!loading && stock.length === 0 ? <p className="mt-4 text-sm text-[#5d6b63]">No hay productos para esta busqueda.</p> : null}
+      {!loading ? <div className="mt-4 grid gap-3">
         {stock.map((item) => (
           <button className={`rounded-md border p-4 text-left transition ${item.productId === selectedProductId ? "border-[#51735f] bg-[#eef7f0]" : "border-[#d8ddd2] bg-white hover:border-[#51735f]"}`}
             key={item.productId} onClick={() => onSelectProduct(item)} type="button">
@@ -49,7 +76,8 @@ export function InventoryStockPanel({ selectedProductId, stock, onRefresh, onSel
             <p className="mt-3 text-xs text-[#6f7a73]">Minimo {item.reorderPoint} · Costo {item.averageCostCents == null ? "N/A" : formatMoney(item.averageCostCents, item.currency)}</p>
           </button>
         ))}
-      </div>
+      </div> : null}
+      <Pagination page={page} totalPages={totalPages} onPageChange={onPageChange} label="existencias" />
     </section>
   );
 }
@@ -87,11 +115,18 @@ export function InventoryMovementSummary({ selectedStock, onOpenDrawer }: { sele
   );
 }
 
-export function InventoryMovementsTable({ movements }: { movements: InventoryMovement[] }) {
+export function InventoryMovementsTable({ loading, movements, page, totalPages, onPageChange }: {
+  loading: boolean;
+  movements: InventoryMovement[];
+  page: number;
+  totalPages: number;
+  onPageChange: (page: number) => void;
+}) {
   return (
     <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
       <h2 className="text-xl font-semibold">Movimientos recientes</h2>
-      <div className="mt-4 overflow-x-auto">
+      {loading ? <div className="mt-4 h-24 animate-pulse rounded-md bg-[#eef1eb]" role="status" aria-label="Cargando movimientos" /> : null}
+      {!loading ? <div className="mt-4 overflow-x-auto">
         <table className="w-full min-w-[760px] border-collapse text-sm">
           <thead><tr className="border-b border-[#e4e8df] text-left text-xs uppercase tracking-wide text-[#6f7a73]">
             <th className="py-3 pr-4">Fecha</th><th className="py-3 pr-4">Producto</th><th className="py-3 pr-4">Tipo</th>
@@ -105,7 +140,8 @@ export function InventoryMovementsTable({ movements }: { movements: InventoryMov
             </tr>
           ))}</tbody>
         </table>
-      </div>
+      </div> : null}
+      <Pagination page={page} totalPages={totalPages} onPageChange={onPageChange} label="movimientos" />
     </section>
   );
 }
@@ -113,23 +149,12 @@ export function InventoryMovementsTable({ movements }: { movements: InventoryMov
 export function InventoryMovementDrawer({ movementType, open, quantity, reason, reorderPoint, saving,
   selectedProductId, stock, unitCostCents, onClose, onMovementTypeChange, onProductChange,
   onQuantityChange, onReasonChange, onReorderPointChange, onSubmit, onUnitCostChange }: {
-  movementType: ManualMovementType;
-  open: boolean;
-  quantity: number;
-  reason: string;
-  reorderPoint: string;
-  saving: boolean;
-  selectedProductId: string;
-  stock: InventoryStock[];
-  unitCostCents: string;
-  onClose: () => void;
-  onMovementTypeChange: (value: ManualMovementType) => void;
-  onProductChange: (value: string) => void;
-  onQuantityChange: (value: number) => void;
-  onReasonChange: (value: string) => void;
-  onReorderPointChange: (value: string) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-  onUnitCostChange: (value: string) => void;
+  movementType: ManualMovementType; open: boolean; quantity: number; reason: string; reorderPoint: string;
+  saving: boolean; selectedProductId: string; stock: InventoryStock[]; unitCostCents: string;
+  onClose: () => void; onMovementTypeChange: (value: ManualMovementType) => void;
+  onProductChange: (value: string) => void; onQuantityChange: (value: number) => void;
+  onReasonChange: (value: string) => void; onReorderPointChange: (value: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void; onUnitCostChange: (value: string) => void;
 }) {
   return (
     <AppDrawer description="Registra entradas, ajustes, mermas o devoluciones para el producto seleccionado." onClose={onClose} open={open} title="Registrar movimiento">
@@ -148,18 +173,15 @@ export function InventoryMovementDrawer({ movementType, open, quantity, reason, 
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="grid gap-2 text-sm font-medium text-[#42514a]">{label}{children}</label>;
+function Pagination({ label, onPageChange, page, totalPages }: { label: string; onPageChange: (page: number) => void; page: number; totalPages: number; }) {
+  if (totalPages <= 1) return null;
+  return <nav aria-label={`Paginacion de ${label}`} className="mt-4 flex items-center justify-between gap-3 text-sm">
+    <button className="app-button-secondary" disabled={page <= 0} onClick={() => onPageChange(page - 1)} type="button">Anterior</button>
+    <span>Pagina {page + 1} de {totalPages}</span>
+    <button className="app-button-secondary" disabled={page + 1 >= totalPages} onClick={() => onPageChange(page + 1)} type="button">Siguiente</button>
+  </nav>;
 }
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return <div><dt className="font-medium text-[#6f7a73]">{label}</dt><dd className="mt-1 font-semibold">{value}</dd></div>;
-}
-
-function formatMoney(cents: number, currency: string) {
-  return new Intl.NumberFormat("es-MX", { style: "currency", currency }).format(cents / 100);
-}
-
-function formatDateTime(value: string) {
-  return new Intl.DateTimeFormat("es-MX", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
-}
+function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="grid gap-2 text-sm font-medium text-[#42514a]">{label}{children}</label>; }
+function Metric({ label, value }: { label: string; value: string }) { return <div><dt className="font-medium text-[#6f7a73]">{label}</dt><dd className="mt-1 font-semibold">{value}</dd></div>; }
+function formatMoney(cents: number, currency: string) { return new Intl.NumberFormat("es-MX", { style: "currency", currency }).format(cents / 100); }
+function formatDateTime(value: string) { return new Intl.DateTimeFormat("es-MX", { dateStyle: "short", timeStyle: "short" }).format(new Date(value)); }
