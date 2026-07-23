@@ -28,21 +28,14 @@ export async function searchProducts(
   return apiFetch<ProductPage>(`/catalog/products/search${suffix}`, accessToken);
 }
 
-export async function createProduct(
-  accessToken: string,
-  payload: ProductPayload,
-): Promise<ProductSummary> {
+export async function createProduct(accessToken: string, payload: ProductPayload): Promise<ProductSummary> {
   return apiFetch<ProductSummary>("/catalog/products", accessToken, {
     method: "POST",
     body: JSON.stringify(normalizePayload(payload)),
   });
 }
 
-export async function updateProduct(
-  accessToken: string,
-  productId: string,
-  payload: ProductPayload,
-): Promise<ProductSummary> {
+export async function updateProduct(accessToken: string, productId: string, payload: ProductPayload): Promise<ProductSummary> {
   return apiFetch<ProductSummary>(`/catalog/products/${productId}`, accessToken, {
     method: "PUT",
     body: JSON.stringify(normalizePayload(payload)),
@@ -64,63 +57,39 @@ export async function archiveProduct(accessToken: string, productId: string): Pr
   return apiFetch<void>(`/catalog/products/${productId}`, accessToken, { method: "DELETE" });
 }
 
-export async function uploadProductImage(
-  accessToken: string,
-  productId: string,
-  file: File,
-): Promise<ProductSummary> {
+export async function restoreProduct(accessToken: string, productId: string): Promise<ProductSummary> {
+  return apiFetch<ProductSummary>(`/catalog/products/${productId}/restore`, accessToken, { method: "POST" });
+}
+
+export async function uploadProductImage(accessToken: string, productId: string, file: File): Promise<ProductSummary> {
   const body = new FormData();
   body.append("file", file);
-  return apiFetch<ProductSummary>(`/catalog/products/${productId}/image`, accessToken, {
-    method: "POST",
-    body,
-  });
+  return apiFetch<ProductSummary>(`/catalog/products/${productId}/image`, accessToken, { method: "POST", body });
 }
 
-export async function removeProductImage(
-  accessToken: string,
-  productId: string,
-): Promise<ProductSummary> {
-  return apiFetch<ProductSummary>(`/catalog/products/${productId}/image`, accessToken, {
-    method: "DELETE",
-  });
+export async function removeProductImage(accessToken: string, productId: string): Promise<ProductSummary> {
+  return apiFetch<ProductSummary>(`/catalog/products/${productId}/image`, accessToken, { method: "DELETE" });
 }
 
-export async function getCatalogCategories(
-  accessToken: string,
-  includeInactive = false,
-): Promise<CatalogCategory[]> {
-  return apiFetch<CatalogCategory[]>(
-    `/catalog/categories?includeInactive=${includeInactive}`,
-    accessToken,
-  );
+export async function getCatalogCategories(accessToken: string, includeInactive = false): Promise<CatalogCategory[]> {
+  return apiFetch<CatalogCategory[]>(`/catalog/categories?includeInactive=${includeInactive}`, accessToken);
 }
 
-export async function createCatalogCategory(
-  accessToken: string,
-  payload: CatalogCategoryPayload,
-): Promise<CatalogCategory> {
+export async function createCatalogCategory(accessToken: string, payload: CatalogCategoryPayload): Promise<CatalogCategory> {
   return apiFetch<CatalogCategory>("/catalog/categories", accessToken, {
     method: "POST",
     body: JSON.stringify(normalizePayload(payload)),
   });
 }
 
-export async function updateCatalogCategory(
-  accessToken: string,
-  categoryId: string,
-  payload: CatalogCategoryPayload,
-): Promise<CatalogCategory> {
+export async function updateCatalogCategory(accessToken: string, categoryId: string, payload: CatalogCategoryPayload): Promise<CatalogCategory> {
   return apiFetch<CatalogCategory>(`/catalog/categories/${categoryId}`, accessToken, {
     method: "PATCH",
     body: JSON.stringify(normalizePayload(payload)),
   });
 }
 
-export async function archiveCatalogCategory(
-  accessToken: string,
-  categoryId: string,
-): Promise<void> {
+export async function archiveCatalogCategory(accessToken: string, categoryId: string): Promise<void> {
   return apiFetch<void>(`/catalog/categories/${categoryId}`, accessToken, { method: "DELETE" });
 }
 
@@ -128,31 +97,21 @@ export async function getPlans(accessToken: string): Promise<PlanSummary[]> {
   return apiFetch<PlanSummary[]>("/catalog/plans", accessToken);
 }
 
-export async function createPlan(
-  accessToken: string,
-  payload: PlanPayload,
-): Promise<PlanSummary> {
+export async function createPlan(accessToken: string, payload: PlanPayload): Promise<PlanSummary> {
   return apiFetch<PlanSummary>("/catalog/plans", accessToken, {
     method: "POST",
     body: JSON.stringify(normalizePayload(payload)),
   });
 }
 
-export async function createMembershipPlan(
-  accessToken: string,
-  payload: MembershipPlanPayload,
-): Promise<PlanSummary> {
+export async function createMembershipPlan(accessToken: string, payload: MembershipPlanPayload): Promise<PlanSummary> {
   return apiFetch<PlanSummary>("/catalog/membership-plans", accessToken, {
     method: "POST",
     body: JSON.stringify(normalizePayload(payload)),
   });
 }
 
-export async function updateMembershipPlan(
-  accessToken: string,
-  planId: string,
-  payload: UpdateMembershipPlanPayload,
-): Promise<PlanSummary> {
+export async function updateMembershipPlan(accessToken: string, planId: string, payload: UpdateMembershipPlanPayload): Promise<PlanSummary> {
   return apiFetch<PlanSummary>(`/catalog/plans/${planId}`, accessToken, {
     method: "PATCH",
     body: JSON.stringify(normalizePayload(payload)),
