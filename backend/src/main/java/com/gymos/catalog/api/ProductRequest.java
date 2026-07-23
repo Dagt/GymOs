@@ -13,8 +13,8 @@ public record ProductRequest(
 		@NotBlank @Size(max = 64) String sku,
 		@NotBlank @Size(max = 160) String name,
 		@Size(max = 2000) String description,
-		@NotBlank @Pattern(regexp = "PHYSICAL|SERVICE|MEMBERSHIP_PLAN") String productType,
-		@Pattern(regexp = "GENERAL_PRODUCT|GENERAL_SERVICE|VISIT_PASS|BOOKING|ROUTINE|CONSULTATION|WELLNESS_SERVICE|MEMBERSHIP") String commercialSubtype,
+		@NotBlank @Pattern(regexp = "PHYSICAL|SERVICE") String productType,
+		@Pattern(regexp = "GENERAL_PRODUCT|GENERAL_SERVICE|VISIT_PASS|BOOKING|ROUTINE|CONSULTATION|WELLNESS_SERVICE") String commercialSubtype,
 		@Min(0) long priceCents,
 		@NotBlank @Pattern(regexp = "[A-Za-z]{3}") String currency,
 		boolean taxable,
@@ -45,7 +45,6 @@ public record ProductRequest(
 
 	private String resolvedSubtype() {
 		if (commercialSubtype != null && !commercialSubtype.isBlank()) return commercialSubtype;
-		if ("MEMBERSHIP_PLAN".equals(productType)) return "MEMBERSHIP";
 		if ("SERVICE".equals(productType)) return "GENERAL_SERVICE";
 		return "GENERAL_PRODUCT";
 	}
