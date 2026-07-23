@@ -21,6 +21,13 @@ final class CatalogRowMappers {
 				resultSet.getString("currency"),
 				resultSet.getBoolean("taxable"),
 				resultSet.getString("status"),
+				resultSet.getString("barcode"),
+				resultSet.getString("brand"),
+				resultSet.getString("presentation"),
+				resultSet.getString("unit_of_measure"),
+				resultSet.getBoolean("inventory_tracked"),
+				resultSet.getInt("display_order"),
+				resultSet.getString("image_object_key"),
 				resultSet.getObject("created_at", OffsetDateTime.class),
 				resultSet.getObject("updated_at", OffsetDateTime.class)
 		);
