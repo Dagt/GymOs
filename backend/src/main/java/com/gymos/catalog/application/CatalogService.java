@@ -27,9 +27,29 @@ public class CatalogService {
 		return productService.products(principal);
 	}
 
+	@Transactional(readOnly = true)
+	public ProductSummary product(GymOsPrincipal principal, UUID productId) {
+		return productService.product(principal, productId);
+	}
+
 	@Transactional
 	public ProductSummary createProduct(GymOsPrincipal principal, ProductCommand request, String correlationId) {
 		return productService.createProduct(principal, request, correlationId);
+	}
+
+	@Transactional
+	public ProductSummary updateProduct(GymOsPrincipal principal, UUID productId, ProductCommand request, String correlationId) {
+		return productService.updateProduct(principal, productId, request, correlationId);
+	}
+
+	@Transactional
+	public ProductSummary changeProductStatus(GymOsPrincipal principal, UUID productId, String status, String correlationId) {
+		return productService.changeStatus(principal, productId, status, correlationId);
+	}
+
+	@Transactional
+	public void archiveProduct(GymOsPrincipal principal, UUID productId, String correlationId) {
+		productService.archiveProduct(principal, productId, correlationId);
 	}
 
 	@Transactional(readOnly = true)
