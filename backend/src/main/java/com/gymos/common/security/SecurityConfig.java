@@ -72,6 +72,7 @@ public class SecurityConfig {
 								"/api/v1/catalog/products/*/activate",
 								"/api/v1/catalog/products/*/deactivate"
 						).hasAuthority("catalog.status.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/catalog/products/*/restore").hasAuthority("catalog.archive")
 						.requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/v1/catalog/products/*/image").hasAuthority("catalog.image.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/catalog/categories").hasAuthority("catalog.category.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/catalog/categories/*").hasAuthority("catalog.category.manage")
