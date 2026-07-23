@@ -24,7 +24,7 @@ final class CatalogRowMappers {
 				resultSet.getObject("category_id", UUID.class), resultSet.getString("category_name"), tags(resultSet.getString("tags_csv")),
 				resultSet.getObject("archived_at", OffsetDateTime.class) != null,
 				resultSet.getObject("archived_at", OffsetDateTime.class), resultSet.getObject("created_at", OffsetDateTime.class),
-				resultSet.getObject("updated_at", OffsetDateTime.class)
+				resultSet.getObject("updated_at", OffsetDateTime.class), resultSet.getLong("version")
 		);
 	}
 
