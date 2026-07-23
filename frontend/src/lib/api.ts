@@ -39,18 +39,29 @@ export type {
 } from "./api/client-types";
 export {
   createMembershipPlan,
+  archiveProduct,
+  changeProductStatus,
+  createCatalogCategory,
   createPlan,
   createProduct,
   getPlans,
   getProducts,
+  getCatalogCategories,
+  searchProducts,
+  updateCatalogCategory,
+  updateProduct,
   updateMembershipPlan,
 } from "./api/catalog";
 export type {
   MembershipPlanPayload,
+  CatalogCategory,
+  CatalogCategoryPayload,
   PlanPayload,
   PlanSummary,
   ProductPayload,
   ProductSummary,
+  ProductPage,
+  ProductSearchParams,
   UpdateMembershipPlanPayload,
 } from "./api/catalog-types";
 export * from "./api/benefits";

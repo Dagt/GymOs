@@ -1,15 +1,31 @@
 import { apiFetch, normalizePayload } from "./client";
 import type {
   MembershipPlanPayload,
+  CatalogCategory,
+  CatalogCategoryPayload,
   PlanPayload,
   PlanSummary,
   ProductPayload,
   ProductSummary,
+  ProductPage,
+  ProductSearchParams,
   UpdateMembershipPlanPayload,
 } from "./catalog-types";
 
 export async function getProducts(accessToken: string): Promise<ProductSummary[]> {
   return apiFetch<ProductSummary[]>("/catalog/products", accessToken);
+}
+
+export async function searchProducts(
+  accessToken: string,
+  params: ProductSearchParams = {},
+): Promise<ProductPage> {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") search.set(key, String(value));
+  });
+  const suffix = search.size ? `?${search.toString()}` : "";
+  return apiFetch<ProductPage>(`/catalog/products/search${suffix}`, accessToken);
 }
 
 export async function createProduct(
@@ -18,6 +34,63 @@ export async function createProduct(
 ): Promise<ProductSummary> {
   return apiFetch<ProductSummary>("/catalog/products", accessToken, {
     method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function updateProduct(
+  accessToken: string,
+  productId: string,
+  payload: ProductPayload,
+): Promise<ProductSummary> {
+  return apiFetch<ProductSummary>(`/catalog/products/${productId}`, accessToken, {
+    method: "PUT",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function changeProductStatus(
+  accessToken: string,
+  productId: string,
+  status: ProductSummary["status"],
+): Promise<ProductSummary> {
+  return apiFetch<ProductSummary>(`/catalog/products/${productId}/status`, accessToken, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
+
+export async function archiveProduct(accessToken: string, productId: string): Promise<void> {
+  return apiFetch<void>(`/catalog/products/${productId}`, accessToken, { method: "DELETE" });
+}
+
+export async function getCatalogCategories(
+  accessToken: string,
+  includeInactive = false,
+): Promise<CatalogCategory[]> {
+  return apiFetch<CatalogCategory[]>(
+    `/catalog/categories?includeInactive=${includeInactive}`,
+    accessToken,
+  );
+}
+
+export async function createCatalogCategory(
+  accessToken: string,
+  payload: CatalogCategoryPayload,
+): Promise<CatalogCategory> {
+  return apiFetch<CatalogCategory>("/catalog/categories", accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function updateCatalogCategory(
+  accessToken: string,
+  categoryId: string,
+  payload: CatalogCategoryPayload,
+): Promise<CatalogCategory> {
+  return apiFetch<CatalogCategory>(`/catalog/categories/${categoryId}`, accessToken, {
+    method: "PATCH",
     body: JSON.stringify(normalizePayload(payload)),
   });
 }

@@ -8,6 +8,15 @@ export type ProductSummary = {
   currency: string;
   taxable: boolean;
   status: "ACTIVE" | "INACTIVE";
+  barcode: string | null;
+  brand: string | null;
+  presentation: string | null;
+  unitOfMeasure: string | null;
+  inventoryTracked: boolean;
+  displayOrder: number;
+  imageObjectKey: string | null;
+  categoryId: string | null;
+  categoryName: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -37,6 +46,54 @@ export type ProductPayload = {
   currency: string;
   taxable: boolean;
   status: "ACTIVE" | "INACTIVE";
+  barcode?: string | null;
+  brand?: string | null;
+  presentation?: string | null;
+  unitOfMeasure?: string | null;
+  inventoryTracked: boolean;
+  displayOrder: number;
+  imageObjectKey?: string | null;
+  categoryId?: string | null;
+};
+
+export type ProductPage = {
+  items: ProductSummary[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+};
+
+export type ProductSearchParams = {
+  q?: string;
+  type?: ProductSummary["productType"] | "";
+  categoryId?: string;
+  status?: ProductSummary["status"] | "";
+  inventoryTracked?: boolean;
+  includeArchived?: boolean;
+  page?: number;
+  size?: number;
+  sort?: string;
+};
+
+export type CatalogCategory = {
+  id: string;
+  parentId: string | null;
+  name: string;
+  slug: string;
+  description: string | null;
+  status: "ACTIVE" | "INACTIVE";
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type CatalogCategoryPayload = {
+  parentId?: string | null;
+  name: string;
+  description?: string | null;
+  status: CatalogCategory["status"];
+  displayOrder: number;
 };
 
 export type PlanPayload = {

@@ -2,12 +2,17 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import {
+  archiveProduct,
+  changeProductStatus,
   createMembershipPlan,
   createProduct,
+  getCatalogCategories,
   getPlans,
-  getProducts,
   getStoredSession,
+  searchProducts,
+  updateProduct,
   updateMembershipPlan,
+  type CatalogCategory,
   type PlanSummary,
   type ProductPayload,
   type ProductSummary,
@@ -19,17 +24,22 @@ import {
   planDraftToPayload,
   planToDraft,
   productDraftToPayload,
+  productToDraft,
   type PlanDraft,
 } from "./CatalogHelpers";
-import { sellableCatalogProducts } from "./CatalogModel";
+import { useCatalogFilters } from "@/features/catalog/hooks/useCatalogFilters";
 
 export function useCatalogController() {
   const [session, setSession] = useState<StoredSession | null>(null);
   const [products, setProducts] = useState<ProductSummary[]>([]);
+  const [totalProducts, setTotalProducts] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [categories, setCategories] = useState<CatalogCategory[]>([]);
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [form, setForm] = useState<ProductPayload>(emptyProduct);
   const [planForm, setPlanForm] = useState<PlanDraft>(emptyPlan);
   const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [price, setPrice] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -37,43 +47,50 @@ export function useCatalogController() {
   const [saving, setSaving] = useState(false);
   const [showProductDrawer, setShowProductDrawer] = useState(false);
   const [showPlanDrawer, setShowPlanDrawer] = useState(false);
+  const catalogFilters = useCatalogFilters();
+  const filtersKey = JSON.stringify(catalogFilters.filters);
 
   useEffect(() => {
-    let active = true;
-
-    async function loadInitial() {
+    queueMicrotask(() => {
       const storedSession = getStoredSession();
-      if (!active) return;
-      if (!storedSession) {
-        setLoading(false);
-        return;
-      }
       setSession(storedSession);
-      try {
-        const [loadedProducts, loadedPlans] = await loadCatalog(storedSession.accessToken);
-        if (!active) return;
-        setProducts(loadedProducts);
-        setPlans(loadedPlans);
-      } catch (exception) {
-        if (active) {
-          setError(exception instanceof Error ? exception.message : "No fue posible cargar catalogo.");
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
-    }
+      if (!storedSession) setLoading(false);
+    });
+  }, []);
 
-    void loadInitial();
+  useEffect(() => {
+    if (!session) return;
+    let active = true;
+    loadCatalog(session.accessToken, catalogFilters.filters)
+      .then(([page, loadedPlans, loadedCategories]) => {
+        if (!active) return;
+        setProducts(page.items.filter((product) => product.productType !== "MEMBERSHIP_PLAN"));
+        setTotalProducts(page.totalElements);
+        setTotalPages(page.totalPages);
+        setPlans(loadedPlans);
+        setCategories(loadedCategories);
+      })
+      .catch((exception) => {
+        if (active) setError(exception instanceof Error ? exception.message : "No fue posible cargar catalogo.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
     return () => {
       active = false;
     };
-  }, []);
+    // filtersKey is a stable snapshot of URL-backed filters.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, filtersKey]);
 
   async function reloadCatalog() {
     if (!session) return;
-    const [loadedProducts, loadedPlans] = await loadCatalog(session.accessToken);
-    setProducts(loadedProducts);
+    const [page, loadedPlans, loadedCategories] = await loadCatalog(session.accessToken, catalogFilters.filters);
+    setProducts(page.items.filter((product) => product.productType !== "MEMBERSHIP_PLAN"));
+    setTotalProducts(page.totalElements);
+    setTotalPages(page.totalPages);
     setPlans(loadedPlans);
+    setCategories(loadedCategories);
   }
 
   async function submitProduct(event: FormEvent<HTMLFormElement>) {
@@ -83,12 +100,12 @@ export function useCatalogController() {
     setError(null);
     setMessage(null);
     try {
-      await createProduct(session.accessToken, productDraftToPayload(form, price));
+      const payload = productDraftToPayload(form, price);
+      if (editingProductId) await updateProduct(session.accessToken, editingProductId, payload);
+      else await createProduct(session.accessToken, payload);
       await reloadCatalog();
-      setForm(emptyProduct);
-      setPrice("");
-      setShowProductDrawer(false);
-      setMessage("Producto creado.");
+      resetProductDrawer();
+      setMessage(editingProductId ? "Producto actualizado." : "Producto creado.");
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible crear producto.");
     } finally {
@@ -125,6 +142,59 @@ export function useCatalogController() {
     setShowPlanDrawer(true);
   }
 
+  function openProductCreation() {
+    setEditingProductId(null);
+    setForm(emptyProduct);
+    setPrice("");
+    setShowProductDrawer(true);
+  }
+
+  function openProductEdition(product: ProductSummary) {
+    setEditingProductId(product.id);
+    setForm(productToDraft(product));
+    setPrice(String(product.priceCents / 100));
+    setShowProductDrawer(true);
+  }
+
+  function resetProductDrawer() {
+    setEditingProductId(null);
+    setForm(emptyProduct);
+    setPrice("");
+    setShowProductDrawer(false);
+  }
+
+  async function toggleProductStatus(product: ProductSummary) {
+    if (!session) return;
+    setSaving(true);
+    try {
+      await changeProductStatus(
+        session.accessToken,
+        product.id,
+        product.status === "ACTIVE" ? "INACTIVE" : "ACTIVE",
+      );
+      await reloadCatalog();
+      setMessage(product.status === "ACTIVE" ? "Producto desactivado." : "Producto activado.");
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible cambiar el estado.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function archiveCatalogProduct(product: ProductSummary) {
+    if (!session || !window.confirm(`Archivar ${product.name}? Se conservara en el historial.`)) return;
+    setSaving(true);
+    try {
+      await archiveProduct(session.accessToken, product.id);
+      await reloadCatalog();
+      setMessage("Producto archivado.");
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible archivar el producto.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   function openPlanEdition(plan: PlanSummary) {
     setEditingPlanId(plan.id);
     setPlanForm(planToDraft(plan));
@@ -137,9 +207,11 @@ export function useCatalogController() {
     setShowPlanDrawer(false);
   }
 
-  const sellableProducts = sellableCatalogProducts(products);
-
   return {
+    archiveCatalogProduct,
+    catalogFilters,
+    categories,
+    editingProductId,
     editingPlanId,
     error,
     form,
@@ -147,27 +219,33 @@ export function useCatalogController() {
     message,
     openPlanCreation,
     openPlanEdition,
+    openProductCreation,
+    openProductEdition,
     planForm,
     plans,
     price,
     saving,
-    sellableProducts,
+    products,
     session,
     setForm,
     setPlanForm,
     setPrice,
-    setShowProductDrawer,
     showPlanDrawer,
     showProductDrawer,
     submitPlan,
     submitProduct,
     resetPlanDrawer,
+    resetProductDrawer,
+    toggleProductStatus,
+    totalPages,
+    totalProducts,
   };
 }
 
-function loadCatalog(accessToken: string) {
+function loadCatalog(accessToken: string, filters: import("@/lib/api").ProductSearchParams) {
   return Promise.all([
-    getProducts(accessToken),
+    searchProducts(accessToken, filters),
     getPlans(accessToken),
+    getCatalogCategories(accessToken),
   ]);
 }

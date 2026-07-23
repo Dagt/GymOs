@@ -13,7 +13,36 @@ export const emptyProduct: ProductPayload = {
   currency: "MXN",
   taxable: true,
   status: "ACTIVE",
+  barcode: null,
+  brand: null,
+  presentation: null,
+  unitOfMeasure: null,
+  inventoryTracked: true,
+  displayOrder: 0,
+  imageObjectKey: null,
+  categoryId: null,
 };
+
+export function productToDraft(product: import("@/lib/api").ProductSummary): ProductPayload {
+  return {
+    sku: product.sku,
+    name: product.name,
+    description: product.description,
+    productType: product.productType,
+    priceCents: product.priceCents,
+    currency: product.currency,
+    taxable: product.taxable,
+    status: product.status,
+    barcode: product.barcode,
+    brand: product.brand,
+    presentation: product.presentation,
+    unitOfMeasure: product.unitOfMeasure,
+    inventoryTracked: product.inventoryTracked,
+    displayOrder: product.displayOrder,
+    imageObjectKey: product.imageObjectKey,
+    categoryId: product.categoryId,
+  };
+}
 
 export type PlanDraft = {
   sku: string;
