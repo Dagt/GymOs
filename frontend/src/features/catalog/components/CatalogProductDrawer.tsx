@@ -33,6 +33,9 @@ export function CatalogProductDrawer({
   categories, canReadCosts, editing, form, open, price, image, saving, onClose,
   onFormChange, onPriceChange, onImageChange, onSubmit,
 }: CatalogProductDrawerProps) {
+  const availableCategories = categories.filter((category) =>
+    category.status === "ACTIVE" || category.id === form.categoryId,
+  );
   return (
     <AppDrawer
       description="Configura datos comerciales, clasificacion e inventario del elemento vendible."
@@ -95,7 +98,9 @@ export function CatalogProductDrawer({
           <SelectField
             label="Categoria"
             name="productCategory"
-            options={[{ label: "Sin categoria", value: "" }, ...categories.map(({ id, name }) => ({ label: name, value: id }))]}
+            options={[{ label: "Sin categoria", value: "" }, ...availableCategories.map(({ id, name, status }) => ({
+              label: status === "ACTIVE" ? name : `${name} (inactiva)`, value: id,
+            }))]}
             value={form.categoryId ?? ""}
             onChange={(categoryId) => change({ categoryId: categoryId || null })}
           />
