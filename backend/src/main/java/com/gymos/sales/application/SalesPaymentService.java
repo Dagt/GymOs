@@ -10,7 +10,6 @@ import com.gymos.sales.application.command.ManualPaymentCommand;
 import com.gymos.sales.infrastructure.SalesPaymentCommandRepository;
 import com.gymos.sales.infrastructure.SalesPaymentCommandRepository.PaymentRecord;
 import com.gymos.sales.infrastructure.SalesRepository;
-import com.gymos.sales.model.PaymentDetail;
 import com.gymos.sales.model.SaleHeader;
 import java.io.IOException;
 import java.time.OffsetDateTime;
@@ -22,16 +21,18 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 class SalesPaymentService {
 	private final SalesRepository salesRepository;
+	private final SalesLookupService lookupService;
 	private final SalesPaymentCommandRepository commandRepository;
 	private final SalePaymentCompletionService completionService;
 	private final AuditService auditService;
 	private final ObjectStorageService objectStorageService;
 	private final ApplicationEventPublisher eventPublisher;
 
-	SalesPaymentService(SalesRepository salesRepository, SalesPaymentCommandRepository commandRepository,
+	SalesPaymentService(SalesRepository salesRepository, SalesLookupService lookupService, SalesPaymentCommandRepository commandRepository,
 			SalePaymentCompletionService completionService, AuditService auditService,
 			ObjectStorageService objectStorageService, ApplicationEventPublisher eventPublisher) {
 		this.salesRepository = salesRepository;
+		this.lookupService = lookupService;
 		this.commandRepository = commandRepository;
 		this.completionService = completionService;
 		this.auditService = auditService;
@@ -40,7 +41,7 @@ class SalesPaymentService {
 	}
 
 	void record(GymOsPrincipal principal, UUID saleId, ManualPaymentCommand request, String correlationId) {
-		SaleHeader sale = ensureSale(principal, saleId);
+		SaleHeader sale = lookupService.saleForBranch(principal, saleId);
 		String requestHash = SalesIdempotency.paymentRequestHash(request);
 		String idempotencyKey = SalesIdempotency.blankToNull(request.idempotencyKey());
 		if (idempotencyKey != null) {
@@ -74,8 +75,8 @@ class SalesPaymentService {
 		if (file == null || file.isEmpty()) {
 			throw new BusinessException("PAYMENT_RECEIPT_REQUIRED", "Selecciona un archivo de comprobante.");
 		}
-		UUID saleId = saleIdForPayment(principal, paymentId);
-		SaleHeader sale = ensureSale(principal, saleId);
+		UUID saleId = lookupService.saleIdForPayment(principal, paymentId);
+		SaleHeader sale = lookupService.saleForBranch(principal, saleId);
 		String objectKey = receiptObjectKey(principal.organizationId(), saleId, paymentId, file.getOriginalFilename());
 		try {
 			objectStorageService.putReceipt(objectKey, file.getContentType(), file.getSize(), file.getInputStream());
@@ -88,9 +89,9 @@ class SalesPaymentService {
 	}
 
 	UUID validate(GymOsPrincipal principal, UUID paymentId, String correlationId) {
-		UUID saleId = saleIdForPayment(principal, paymentId);
-		ensureSale(principal, saleId);
-		PaymentDetail payment = payment(principal, paymentId);
+		UUID saleId = lookupService.saleIdForPayment(principal, paymentId);
+		lookupService.saleForBranch(principal, saleId);
+		var payment = lookupService.payment(principal, paymentId);
 		if ("COMPLETED".equals(payment.status())) return saleId;
 		commandRepository.complete(principal.organizationId(), paymentId, principal.userId(), OffsetDateTime.now());
 		auditService.record(principal, "PAYMENT_VALIDATED", "PAYMENT", paymentId, "POS", null, correlationId);
@@ -99,9 +100,9 @@ class SalesPaymentService {
 	}
 
 	UUID reject(GymOsPrincipal principal, UUID paymentId, String reason, String correlationId) {
-		UUID saleId = saleIdForPayment(principal, paymentId);
-		ensureSale(principal, saleId);
-		PaymentDetail payment = payment(principal, paymentId);
+		UUID saleId = lookupService.saleIdForPayment(principal, paymentId);
+		lookupService.saleForBranch(principal, saleId);
+		var payment = lookupService.payment(principal, paymentId);
 		if ("COMPLETED".equals(payment.status())) throw new BusinessException("PAYMENT_ALREADY_COMPLETED", "No puedes rechazar un pago completado.");
 		if ("REJECTED".equals(payment.status())) return saleId;
 		OffsetDateTime now = OffsetDateTime.now();
@@ -110,23 +111,6 @@ class SalesPaymentService {
 		eventPublisher.publishEvent(new PaymentRejectedV1("payment-rejected:" + paymentId, principal.organizationId(), principal.branchId(), saleId, paymentId, reason, now));
 		completionService.recalculate(principal.organizationId(), saleId, principal.userId());
 		return saleId;
-	}
-
-	private UUID saleIdForPayment(GymOsPrincipal principal, UUID paymentId) {
-		return salesRepository.saleIdForPayment(principal.organizationId(), paymentId)
-				.orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "El pago no existe o no esta disponible."));
-	}
-
-	private PaymentDetail payment(GymOsPrincipal principal, UUID paymentId) {
-		return salesRepository.payment(principal.organizationId(), paymentId)
-				.orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "El pago no existe o no esta disponible."));
-	}
-
-	private SaleHeader ensureSale(GymOsPrincipal principal, UUID saleId) {
-		SaleHeader sale = salesRepository.saleHeader(principal.organizationId(), saleId)
-				.orElseThrow(() -> new BusinessException("SALE_NOT_FOUND", "La venta no existe o no esta disponible."));
-		if (!sale.branchId().equals(principal.branchId())) throw new BusinessException("SALE_BRANCH_MISMATCH", "La venta pertenece a otra sucursal.");
-		return sale;
 	}
 
 	private String receiptObjectKey(UUID organizationId, UUID saleId, UUID paymentId, String originalFilename) {

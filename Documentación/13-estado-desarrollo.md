@@ -1071,3 +1071,23 @@ Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
 Verificado:
 
 - Backend: `./gradlew.bat test` completo. Resultado exitoso; persiste warning no bloqueante de shutdown de Spring Modulith en pruebas H2 por `event_publication`.
+
+## Saneamiento backend de servicios application - 23 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `MembershipService` queda como fachada de API/application y delega en servicios especializados:
+  - `MembershipQueryService` para consulta y aislamiento por organizacion/sucursal;
+  - `MembershipRenewalService` para renovacion;
+  - `MembershipPlanChangeService` para cambio de plan;
+  - `MembershipPaymentCompletedListener` para consumo de `PaymentCompletedV1`;
+  - `MembershipResultMapper` para conversion de resultados application/API interna;
+  - `MembershipAccessGuard` para validacion uniforme de principal y sucursal.
+- `MembershipSalesService` reemplaza el metodo con muchos parametros por un `MembershipSaleDraft` interno, manteniendo intacta la creacion de venta/pago/eventos de renovacion y cambio de plan.
+- `SalesLookupService` centraliza busqueda de venta, pago y validacion de sucursal para pagos y reembolsos.
+- `SalesPaymentService` y `SalesRefundService` reducen duplicacion de lookup/guard sin cambiar reglas de negocio, idempotencia ni auditoria.
+- Se actualizaron pruebas unitarias afectadas por los nuevos constructores internos.
+
+Verificado:
+
+- Backend: `./gradlew.bat test` completo. Resultado exitoso; persiste warning no bloqueante de shutdown de Spring Modulith en pruebas H2 por `event_publication`.

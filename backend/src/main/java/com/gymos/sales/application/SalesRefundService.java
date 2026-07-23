@@ -6,7 +6,6 @@ import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.sales.application.command.RequestRefundCommand;
 import com.gymos.sales.infrastructure.SalesRefundCommandRepository;
 import com.gymos.sales.infrastructure.SalesRepository;
-import com.gymos.sales.model.PaymentDetail;
 import com.gymos.sales.model.SaleHeader;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -14,17 +13,19 @@ import org.springframework.stereotype.Service;
 @Service
 class SalesRefundService {
 	private final SalesRepository salesRepository;
+	private final SalesLookupService lookupService;
 	private final SalesRefundCommandRepository commandRepository;
 	private final AuditService auditService;
 
-	SalesRefundService(SalesRepository salesRepository, SalesRefundCommandRepository commandRepository, AuditService auditService) {
+	SalesRefundService(SalesRepository salesRepository, SalesLookupService lookupService, SalesRefundCommandRepository commandRepository, AuditService auditService) {
 		this.salesRepository = salesRepository;
+		this.lookupService = lookupService;
 		this.commandRepository = commandRepository;
 		this.auditService = auditService;
 	}
 
 	UUID process(GymOsPrincipal principal, UUID saleId, RequestRefundCommand request, String correlationId) {
-		SaleHeader sale = ensureSale(principal, saleId);
+		SaleHeader sale = lookupService.saleForBranch(principal, saleId);
 		if (request.amountCents() <= 0) {
 			throw new BusinessException("REFUND_AMOUNT_INVALID", "El reembolso debe ser mayor a cero.");
 		}
@@ -57,19 +58,10 @@ class SalesRefundService {
 
 	private void validatePaymentSelection(GymOsPrincipal principal, UUID saleId, RequestRefundCommand request) {
 		if (request.paymentId() == null) return;
-		PaymentDetail payment = salesRepository.payment(principal.organizationId(), request.paymentId())
-				.orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "El pago no existe o no esta disponible."));
-		UUID paymentSaleId = salesRepository.saleIdForPayment(principal.organizationId(), request.paymentId())
-				.orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "El pago no existe o no esta disponible."));
+		var payment = lookupService.payment(principal, request.paymentId());
+		UUID paymentSaleId = lookupService.saleIdForPayment(principal, request.paymentId());
 		if (!paymentSaleId.equals(saleId)) throw new BusinessException("PAYMENT_SALE_MISMATCH", "El pago no pertenece a la venta.");
 		if (!"COMPLETED".equals(payment.status())) throw new BusinessException("PAYMENT_NOT_COMPLETED", "Solo puedes reembolsar pagos completados.");
 		if (request.amountCents() > payment.amountCents()) throw new BusinessException("REFUND_EXCEEDS_PAYMENT", "El reembolso no puede superar el pago seleccionado.");
-	}
-
-	private SaleHeader ensureSale(GymOsPrincipal principal, UUID saleId) {
-		SaleHeader sale = salesRepository.saleHeader(principal.organizationId(), saleId)
-				.orElseThrow(() -> new BusinessException("SALE_NOT_FOUND", "La venta no existe o no esta disponible."));
-		if (!sale.branchId().equals(principal.branchId())) throw new BusinessException("SALE_BRANCH_MISMATCH", "La venta pertenece a otra sucursal.");
-		return sale;
 	}
 }

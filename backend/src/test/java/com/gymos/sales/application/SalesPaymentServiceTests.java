@@ -67,7 +67,8 @@ class SalesPaymentServiceTests {
 		ObjectStorageService objectStorageService = mock(ObjectStorageService.class);
 		ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
 		SalesPaymentService service = new SalesPaymentService(
-				salesRepository, commandRepository, completionService, auditService, objectStorageService, eventPublisher
+				salesRepository, new SalesLookupService(salesRepository), commandRepository, completionService,
+				auditService, objectStorageService, eventPublisher
 		);
 		UUID organizationId = UUID.randomUUID();
 		UUID branchId = UUID.randomUUID();

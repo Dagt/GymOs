@@ -252,6 +252,8 @@ Decisiones implementadas:
 - Los drawers reutilizan `AppDrawer`; los formularios densos no deben permanecer como bloques permanentes que saturen la pantalla principal.
 - La logica de validacion y armado de payloads debe vivir en helpers o hooks del modulo, no mezclada con JSX.
 - Los servicios application de backend deben dividirse por caso de uso cuando concentren responsabilidades heterogeneas. La activacion de membresias por pagos completados se separa de `MembershipService` en `MembershipActivationService`.
+- Las fachadas application publicas, como `MembershipService`, deben conservar contratos estables para controladores y APIs internas, pero delegar la ejecucion real en servicios por caso de uso y queries dedicadas.
 - Los repositorios grandes deben mantenerse como fachadas de compatibilidad cuando ya existan muchos consumidores, pero el SQL interno debe separarse por responsabilidad: consultas, comandos, idempotencia, pagos, reembolsos, eventos y lookups de catalogo o planes.
 - `SalesService` debe operar como coordinador de casos de uso. Las consultas compuestas y reportes viven en servicios query dedicados, como `SaleDetailQuery` y `SalesReportingQuery`.
+- Los lookups compartidos de ventas/pagos deben centralizarse en servicios internos dedicados para evitar repetir reglas de existencia, sucursal y mensajes de error entre pagos, reembolsos y futuras operaciones.
 - Los consumidores de eventos deben permanecer idempotentes y transaccionales, con pruebas orientadas al consumidor dedicado.

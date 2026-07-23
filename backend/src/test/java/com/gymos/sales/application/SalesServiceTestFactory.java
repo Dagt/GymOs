@@ -21,8 +21,9 @@ final class SalesServiceTestFactory {
 			ObjectStorageService objectStorageService, ApplicationEventPublisher eventPublisher) {
 		SalePaymentCompletionService completionService = new SalePaymentCompletionService(
 				salesRepository, new SalePaymentCompletionRepository(jdbcClient), eventPublisher);
+		SalesLookupService lookupService = new SalesLookupService(salesRepository);
 		SalesPaymentService paymentService = new SalesPaymentService(
-				salesRepository, new SalesPaymentCommandRepository(jdbcClient), completionService,
+				salesRepository, lookupService, new SalesPaymentCommandRepository(jdbcClient), completionService,
 				auditService, objectStorageService, eventPublisher);
 		MembershipSalesService membershipSalesService = new MembershipSalesService(
 				salesRepository, new MembershipSaleCommandRepository(jdbcClient), completionService,
@@ -34,7 +35,7 @@ final class SalesServiceTestFactory {
 				new SaleCreationService(salesRepository, new SaleLineResolver(salesRepository),
 						new SaleCommandRepository(jdbcClient), auditService, eventPublisher),
 				paymentService,
-				new SalesRefundService(salesRepository, new SalesRefundCommandRepository(jdbcClient), auditService),
+				new SalesRefundService(salesRepository, lookupService, new SalesRefundCommandRepository(jdbcClient), auditService),
 				membershipSalesService,
 				completionService
 		);

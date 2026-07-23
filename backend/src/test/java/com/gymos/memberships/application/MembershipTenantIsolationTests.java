@@ -22,11 +22,10 @@ class MembershipTenantIsolationTests {
 		MembershipRepository membershipRepository = mock(MembershipRepository.class);
 		SalesOperations salesOperations = mock(SalesOperations.class);
 		AuditService auditService = mock(AuditService.class);
-		MembershipActivationService activationService = mock(MembershipActivationService.class);
 		MembershipService service = new MembershipService(
-				membershipRepository,
-				salesOperations,
-				activationService
+				new MembershipQueryService(membershipRepository),
+				new MembershipRenewalService(membershipRepository, salesOperations),
+				new MembershipPlanChangeService(membershipRepository, salesOperations)
 		);
 
 		UUID organizationId = UUID.randomUUID();
@@ -47,6 +46,6 @@ class MembershipTenantIsolationTests {
 						org.assertj.core.api.Assertions.assertThat(exception.code()).isEqualTo("MEMBERSHIP_NOT_FOUND"));
 
 		verify(membershipRepository).byId(organizationId, branchId, membershipId);
-		verifyNoInteractions(salesOperations, auditService, activationService);
+		verifyNoInteractions(salesOperations, auditService);
 	}
 }
