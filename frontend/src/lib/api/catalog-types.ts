@@ -39,6 +39,7 @@ export type ProductSummary = {
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  version: number;
 };
 
 export type CatalogSummary = {
@@ -118,6 +119,7 @@ export type ProductPayload = {
   promotionEndsAt?: string | null;
   categoryId?: string | null;
   tags: string[];
+  version?: number | null;
 };
 
 export type ProductPage = {
