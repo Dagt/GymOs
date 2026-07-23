@@ -19,7 +19,6 @@ export const emptyProduct: ProductPayload = {
   unitOfMeasure: null,
   inventoryTracked: true,
   displayOrder: 0,
-  imageObjectKey: null,
   categoryId: null,
   tags: [],
 };
@@ -40,7 +39,6 @@ export function productToDraft(product: import("@/lib/api").ProductSummary): Pro
     unitOfMeasure: product.unitOfMeasure,
     inventoryTracked: product.inventoryTracked,
     displayOrder: product.displayOrder,
-    imageObjectKey: product.imageObjectKey,
     categoryId: product.categoryId,
     tags: product.tags,
   };
@@ -114,16 +112,11 @@ export function planToDraft(plan: PlanSummary): PlanDraft {
 }
 
 export function formatMoney(cents: number, currency: string) {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency,
-  }).format(cents / 100);
+  return new Intl.NumberFormat("es-MX", { style: "currency", currency }).format(cents / 100);
 }
 
 export function benefitsToText(value: string | null) {
-  if (!value) {
-    return "";
-  }
+  if (!value) return "";
   try {
     const parsed = JSON.parse(value) as { included?: unknown };
     if (Array.isArray(parsed.included)) {
