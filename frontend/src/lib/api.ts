@@ -40,6 +40,7 @@ export type {
 export {
   createMembershipPlan,
   archiveProduct,
+  restoreProduct,
   archiveCatalogCategory,
   changeProductStatus,
   createCatalogCategory,
