@@ -18,13 +18,17 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -41,6 +45,11 @@ public class CatalogController {
 		return catalogService.products(principal);
 	}
 
+	@GetMapping("/products/{productId}")
+	ProductSummary product(@AuthenticationPrincipal GymOsPrincipal principal, @PathVariable UUID productId) {
+		return catalogService.product(principal, productId);
+	}
+
 	@PostMapping("/products")
 	ProductSummary createProduct(
 			@AuthenticationPrincipal GymOsPrincipal principal,
@@ -48,6 +57,36 @@ public class CatalogController {
 			HttpServletRequest servletRequest
 	) {
 		return catalogService.createProduct(principal, request.toCommand(), correlationId(servletRequest));
+	}
+
+	@PutMapping("/products/{productId}")
+	ProductSummary updateProduct(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID productId,
+			@Valid @RequestBody ProductRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return catalogService.updateProduct(principal, productId, request.toCommand(), correlationId(servletRequest));
+	}
+
+	@PatchMapping("/products/{productId}/status")
+	ProductSummary changeProductStatus(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID productId,
+			@Valid @RequestBody ProductStatusRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return catalogService.changeProductStatus(principal, productId, request.status(), correlationId(servletRequest));
+	}
+
+	@DeleteMapping("/products/{productId}")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	void archiveProduct(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID productId,
+			HttpServletRequest servletRequest
+	) {
+		catalogService.archiveProduct(principal, productId, correlationId(servletRequest));
 	}
 
 	@GetMapping("/plans")
@@ -96,11 +135,28 @@ public class CatalogController {
 			@Min(0) long priceCents,
 			@NotBlank @Pattern(regexp = "[A-Za-z]{3}") String currency,
 			boolean taxable,
-			@NotBlank @Pattern(regexp = "ACTIVE|INACTIVE") String status
+			@NotBlank @Pattern(regexp = "ACTIVE|INACTIVE") String status,
+			@Size(max = 128) String barcode,
+			@Size(max = 160) String brand,
+			@Size(max = 160) String presentation,
+			@Size(max = 40) String unitOfMeasure,
+			boolean inventoryTracked,
+			@Min(0) int displayOrder,
+			@Size(max = 500) String imageObjectKey,
+			UUID categoryId
 	) {
 		private ProductCommand toCommand() {
-			return new ProductCommand(sku, name, description, productType, priceCents, currency, taxable, status);
+			return new ProductCommand(
+					sku, name, description, productType, priceCents, currency, taxable, status,
+					barcode, brand, presentation, unitOfMeasure, inventoryTracked, displayOrder,
+					imageObjectKey, categoryId
+			);
 		}
+	}
+
+	public record ProductStatusRequest(
+			@NotBlank @Pattern(regexp = "ACTIVE|INACTIVE") String status
+	) {
 	}
 
 	public record CreatePlanRequest(
@@ -130,16 +186,8 @@ public class CatalogController {
 	) {
 		private CreateMembershipPlanCommand toCommand() {
 			return new CreateMembershipPlanCommand(
-					sku,
-					name,
-					description,
-					priceCents,
-					currency,
-					durationDays,
-					graceDays,
-					benefits,
-					multiBranchAccess,
-					status
+					sku, name, description, priceCents, currency, durationDays, graceDays,
+					benefits, multiBranchAccess, status
 			);
 		}
 	}
@@ -157,15 +205,8 @@ public class CatalogController {
 	) {
 		private UpdateMembershipPlanCommand toCommand() {
 			return new UpdateMembershipPlanCommand(
-					name,
-					description,
-					priceCents,
-					currency,
-					durationDays,
-					graceDays,
-					benefits,
-					multiBranchAccess,
-					status
+					name, description, priceCents, currency, durationDays, graceDays,
+					benefits, multiBranchAccess, status
 			);
 		}
 	}
