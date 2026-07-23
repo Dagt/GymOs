@@ -21,7 +21,7 @@ public interface CatalogProductCommandPort {
 			boolean inventoryTracked, int displayOrder, String imageObjectKey,
 			String supplierName, Long referenceCostCents, Long promotionalPriceCents,
 			OffsetDateTime promotionStartsAt, OffsetDateTime promotionEndsAt,
-			OffsetDateTime now, UUID userId
+			Long expectedVersion, OffsetDateTime now, UUID userId
 	) {
 		public ProductMutation(
 				UUID organizationId, UUID productId, String sku, String name, String description,
@@ -32,7 +32,7 @@ public interface CatalogProductCommandPort {
 		) {
 			this(organizationId, productId, sku, name, description, productType, defaultSubtype(productType),
 					priceCents, currency, taxable, status, barcode, brand, presentation, unitOfMeasure,
-					inventoryTracked, displayOrder, imageObjectKey, null, null, null, null, null, now, userId);
+					inventoryTracked, displayOrder, imageObjectKey, null, null, null, null, null, null, now, userId);
 		}
 
 		private static String defaultSubtype(String productType) {
