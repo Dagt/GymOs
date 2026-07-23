@@ -5,10 +5,10 @@ import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   createSale,
-  getProducts,
   getRecentSales,
   getStoredSession,
   searchClients,
+  searchProducts,
   type ClientSummary,
   type ProductSummary,
   type SaleSummary,
@@ -39,61 +39,55 @@ export default function PosPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [productLoading, setProductLoading] = useState(false);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     let active = true;
-
     async function loadInitial() {
       const storedSession = getStoredSession();
-      if (!active) {
-        return;
-      }
-      if (!storedSession) {
-        setLoading(false);
-        return;
-      }
+      if (!active) return;
+      if (!storedSession) { setLoading(false); return; }
       setSession(storedSession);
       try {
-        const [loadedProducts, recentSales] = await Promise.all([
-          getProducts(storedSession.accessToken),
-          getRecentSales(storedSession.accessToken),
-        ]);
-        if (!active) {
-          return;
-        }
-        setProducts(loadedProducts.filter((product) => product.status === "ACTIVE"));
-        setSales(recentSales);
+        const recentSales = await getRecentSales(storedSession.accessToken);
+        if (active) setSales(recentSales);
       } catch (exception) {
-        if (active) {
-          setError(exception instanceof Error ? exception.message : "No fue posible cargar POS.");
-        }
+        if (active) setError(exception instanceof Error ? exception.message : "No fue posible cargar POS.");
       } finally {
-        if (active) {
-          setLoading(false);
-        }
+        if (active) setLoading(false);
       }
     }
-
     void loadInitial();
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    let active = true;
+    const timer = window.setTimeout(() => {
+      setProductLoading(true);
+      searchProducts(session.accessToken, {
+        q: productQuery.trim(),
+        status: "ACTIVE",
+        page: 0,
+        size: 50,
+        sort: "name,asc",
+      })
+        .then((page) => { if (active) setProducts(page.items); })
+        .catch((exception) => { if (active) setError(exception instanceof Error ? exception.message : "No fue posible buscar productos."); })
+        .finally(() => { if (active) setProductLoading(false); });
+    }, productQuery.trim() ? 250 : 0);
     return () => {
       active = false;
+      window.clearTimeout(timer);
     };
-  }, []);
+  }, [productQuery, session]);
 
   const subtotal = useMemo(
     () => cart.reduce((sum, item) => sum + item.product.priceCents * item.quantity, 0),
     [cart],
   );
-  const visibleProducts = useMemo(() => {
-    const query = productQuery.trim().toLowerCase();
-    if (!query) return products;
-    return products.filter((product) =>
-      product.name.toLowerCase().includes(query)
-      || product.sku.toLowerCase().includes(query)
-      || product.barcode?.toLowerCase() === query,
-    );
-  }, [productQuery, products]);
 
   function addProduct(product: ProductSummary) {
     setCart((current) => {
@@ -117,9 +111,7 @@ export default function PosPage() {
 
   async function submitClientSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!session) {
-      return;
-    }
+    if (!session) return;
     setError(null);
     try {
       setClients(await searchClients(session.accessToken, clientQuery));
@@ -130,9 +122,7 @@ export default function PosPage() {
 
   async function submitSale(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!session || cart.length === 0) {
-      return;
-    }
+    if (!session || cart.length === 0) return;
     setSaving(true);
     setError(null);
     setMessage(null);
@@ -147,17 +137,14 @@ export default function PosPage() {
         })),
         discountCents: 0,
         notes: null,
-        payment:
-          amountCents > 0
-            ? {
-                method: paymentMethod,
-                amountCents,
-                reference: paymentReference,
-                receiptObjectKey: null,
-                validateNow,
-                notes: null,
-              }
-            : null,
+        payment: amountCents > 0 ? {
+          method: paymentMethod,
+          amountCents,
+          reference: paymentReference,
+          receiptObjectKey: null,
+          validateNow,
+          notes: null,
+        } : null,
       });
       setMessage(`Venta ${sale.sale.saleNumber} registrada.`);
       setCart([]);
@@ -173,13 +160,8 @@ export default function PosPage() {
     }
   }
 
-  if (loading && !session) {
-    return <LoadingScreen text="Cargando caja..." />;
-  }
-
-  if (!session) {
-    return <AuthRequired />;
-  }
+  if (loading && !session) return <LoadingScreen text="Cargando caja..." />;
+  if (!session) return <AuthRequired />;
 
   return (
     <AppShell
@@ -194,9 +176,9 @@ export default function PosPage() {
       <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
         <section className="grid gap-6">
           <ProductGrid
-            loading={loading}
+            loading={productLoading}
             productQuery={productQuery}
-            products={visibleProducts}
+            products={products}
             onAddProduct={addProduct}
             onProductQueryChange={setProductQuery}
           />
@@ -214,7 +196,7 @@ export default function PosPage() {
           />
           <PosCartForm
             cart={cart}
-            currency={products[0]?.currency ?? "MXN"}
+            currency={products[0]?.currency ?? cart[0]?.product.currency ?? "MXN"}
             onPaymentAmountChange={setPaymentAmount}
             onPaymentMethodChange={setPaymentMethod}
             onPaymentReferenceChange={setPaymentReference}
@@ -244,9 +226,5 @@ function AuthRequired() {
 }
 
 function Notice({ text }: { text: string }) {
-  return (
-    <p className="rounded-md border border-[#bad9c4] bg-[#eff8f1] px-3 py-2 text-sm text-[#31563c]">
-      {text}
-    </p>
-  );
+  return <p className="rounded-md border border-[#bad9c4] bg-[#eff8f1] px-3 py-2 text-sm text-[#31563c]">{text}</p>;
 }
