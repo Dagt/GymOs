@@ -1,9 +1,21 @@
+export type ProductType = "PHYSICAL" | "SERVICE" | "MEMBERSHIP_PLAN";
+export type CommercialSubtype =
+  | "GENERAL_PRODUCT"
+  | "GENERAL_SERVICE"
+  | "VISIT_PASS"
+  | "BOOKING"
+  | "ROUTINE"
+  | "CONSULTATION"
+  | "WELLNESS_SERVICE"
+  | "MEMBERSHIP";
+
 export type ProductSummary = {
   id: string;
   sku: string;
   name: string;
   description: string | null;
-  productType: "PHYSICAL" | "SERVICE" | "MEMBERSHIP_PLAN";
+  productType: ProductType;
+  commercialSubtype: CommercialSubtype;
   priceCents: number;
   currency: string;
   taxable: boolean;
@@ -15,6 +27,11 @@ export type ProductSummary = {
   inventoryTracked: boolean;
   displayOrder: number;
   imageObjectKey: string | null;
+  supplierName: string | null;
+  referenceCostCents: number | null;
+  promotionalPriceCents: number | null;
+  promotionStartsAt: string | null;
+  promotionEndsAt: string | null;
   categoryId: string | null;
   categoryName: string | null;
   tags: string[];
@@ -82,7 +99,8 @@ export type ProductPayload = {
   sku: string;
   name: string;
   description?: string | null;
-  productType: "PHYSICAL" | "SERVICE" | "MEMBERSHIP_PLAN";
+  productType: ProductType;
+  commercialSubtype: CommercialSubtype;
   priceCents: number;
   currency: string;
   taxable: boolean;
@@ -93,6 +111,11 @@ export type ProductPayload = {
   unitOfMeasure?: string | null;
   inventoryTracked: boolean;
   displayOrder: number;
+  supplierName?: string | null;
+  referenceCostCents?: number | null;
+  promotionalPriceCents?: number | null;
+  promotionStartsAt?: string | null;
+  promotionEndsAt?: string | null;
   categoryId?: string | null;
   tags: string[];
 };
