@@ -1,6 +1,7 @@
 package com.gymos.inventory.infrastructure;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
@@ -90,7 +91,7 @@ class InventorySalesEventListenerTests {
 				OffsetDateTime.now()
 		));
 
-		verify(saleDeductions, never()).deductPaidSaleItem(any(), any(), any(), any(), any(), any(Integer.class), any(), any());
+		verify(saleDeductions, never()).deductPaidSaleItem(any(), any(), any(), any(), any(), anyInt(), any(), any());
 		verify(auditService, never()).recordSystem(any(), any(), any(), any(), any(), any(), any(), any(), any());
 	}
 
@@ -103,7 +104,7 @@ class InventorySalesEventListenerTests {
 		));
 
 		verify(catalog, never()).product(any(), any());
-		verify(saleDeductions, never()).deductPaidSaleItem(any(), any(), any(), any(), any(), any(Integer.class), any(), any());
+		verify(saleDeductions, never()).deductPaidSaleItem(any(), any(), any(), any(), any(), anyInt(), any(), any());
 	}
 
 	@Test
