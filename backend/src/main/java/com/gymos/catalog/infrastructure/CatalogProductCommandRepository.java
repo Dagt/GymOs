@@ -20,15 +20,17 @@ public class CatalogProductCommandRepository implements CatalogProductCommandPor
 	public void create(ProductMutation product) {
 		jdbcClient.sql("""
 				INSERT INTO catalog_product (
-				    id, organization_id, sku, name, description, product_type, price_cents,
-				    currency, taxable, status, barcode, brand, presentation, unit_of_measure,
-				    inventory_tracked, display_order, image_object_key,
+				    id, organization_id, sku, name, description, product_type, commercial_subtype,
+				    price_cents, currency, taxable, status, barcode, brand, presentation, unit_of_measure,
+				    inventory_tracked, display_order, image_object_key, supplier_name, reference_cost_cents,
+				    promotional_price_cents, promotion_starts_at, promotion_ends_at,
 				    created_at, updated_at, created_by, updated_by, version
 				)
 				VALUES (
-				    :id, :organizationId, :sku, :name, :description, :productType, :priceCents,
-				    :currency, :taxable, :status, :barcode, :brand, :presentation, :unitOfMeasure,
-				    :inventoryTracked, :displayOrder, :imageObjectKey,
+				    :id, :organizationId, :sku, :name, :description, :productType, :commercialSubtype,
+				    :priceCents, :currency, :taxable, :status, :barcode, :brand, :presentation, :unitOfMeasure,
+				    :inventoryTracked, :displayOrder, :imageObjectKey, :supplierName, :referenceCostCents,
+				    :promotionalPriceCents, :promotionStartsAt, :promotionEndsAt,
 				    :now, :now, :userId, :userId, 0
 				)
 				""")
@@ -38,6 +40,7 @@ public class CatalogProductCommandRepository implements CatalogProductCommandPor
 				.param("name", product.name())
 				.param("description", product.description())
 				.param("productType", product.productType())
+				.param("commercialSubtype", product.commercialSubtype())
 				.param("priceCents", product.priceCents())
 				.param("currency", product.currency())
 				.param("taxable", product.taxable())
@@ -49,6 +52,11 @@ public class CatalogProductCommandRepository implements CatalogProductCommandPor
 				.param("inventoryTracked", product.inventoryTracked())
 				.param("displayOrder", product.displayOrder())
 				.param("imageObjectKey", product.imageObjectKey())
+				.param("supplierName", product.supplierName())
+				.param("referenceCostCents", product.referenceCostCents())
+				.param("promotionalPriceCents", product.promotionalPriceCents())
+				.param("promotionStartsAt", product.promotionStartsAt())
+				.param("promotionEndsAt", product.promotionEndsAt())
 				.param("now", product.now())
 				.param("userId", product.userId())
 				.update();
@@ -58,12 +66,30 @@ public class CatalogProductCommandRepository implements CatalogProductCommandPor
 	public int update(ProductMutation product) {
 		return jdbcClient.sql("""
 				UPDATE catalog_product
-				SET sku = :sku, name = :name, description = :description, product_type = :productType,
-				    price_cents = :priceCents, currency = :currency, taxable = :taxable, status = :status,
-				    barcode = :barcode, brand = :brand, presentation = :presentation,
-				    unit_of_measure = :unitOfMeasure, inventory_tracked = :inventoryTracked,
-				    display_order = :displayOrder, image_object_key = :imageObjectKey,
-				    updated_at = :now, updated_by = :userId, version = version + 1
+				SET sku = :sku,
+				    name = :name,
+				    description = :description,
+				    product_type = :productType,
+				    commercial_subtype = :commercialSubtype,
+				    price_cents = :priceCents,
+				    currency = :currency,
+				    taxable = :taxable,
+				    status = :status,
+				    barcode = :barcode,
+				    brand = :brand,
+				    presentation = :presentation,
+				    unit_of_measure = :unitOfMeasure,
+				    inventory_tracked = :inventoryTracked,
+				    display_order = :displayOrder,
+				    image_object_key = :imageObjectKey,
+				    supplier_name = :supplierName,
+				    reference_cost_cents = :referenceCostCents,
+				    promotional_price_cents = :promotionalPriceCents,
+				    promotion_starts_at = :promotionStartsAt,
+				    promotion_ends_at = :promotionEndsAt,
+				    updated_at = :now,
+				    updated_by = :userId,
+				    version = version + 1
 				WHERE organization_id = :organizationId
 				  AND id = :id
 				  AND deleted_at IS NULL
@@ -73,6 +99,7 @@ public class CatalogProductCommandRepository implements CatalogProductCommandPor
 				.param("name", product.name())
 				.param("description", product.description())
 				.param("productType", product.productType())
+				.param("commercialSubtype", product.commercialSubtype())
 				.param("priceCents", product.priceCents())
 				.param("currency", product.currency())
 				.param("taxable", product.taxable())
@@ -84,6 +111,11 @@ public class CatalogProductCommandRepository implements CatalogProductCommandPor
 				.param("inventoryTracked", product.inventoryTracked())
 				.param("displayOrder", product.displayOrder())
 				.param("imageObjectKey", product.imageObjectKey())
+				.param("supplierName", product.supplierName())
+				.param("referenceCostCents", product.referenceCostCents())
+				.param("promotionalPriceCents", product.promotionalPriceCents())
+				.param("promotionStartsAt", product.promotionStartsAt())
+				.param("promotionEndsAt", product.promotionEndsAt())
 				.param("now", product.now())
 				.param("userId", product.userId())
 				.param("organizationId", product.organizationId())
@@ -109,15 +141,21 @@ public class CatalogProductCommandRepository implements CatalogProductCommandPor
 	@Override
 	public void replaceCategory(UUID organizationId, UUID productId, UUID categoryId, UUID userId, OffsetDateTime now) {
 		jdbcClient.sql("DELETE FROM catalog_product_category WHERE organization_id = :organizationId AND product_id = :productId")
-				.param("organizationId", organizationId).param("productId", productId).update();
+				.param("organizationId", organizationId)
+				.param("productId", productId)
+				.update();
 		if (categoryId != null) {
 			jdbcClient.sql("""
 					INSERT INTO catalog_product_category (
 					    organization_id, product_id, category_id, created_at, created_by
 					) VALUES (:organizationId, :productId, :categoryId, :now, :userId)
 					""")
-					.param("organizationId", organizationId).param("productId", productId)
-					.param("categoryId", categoryId).param("now", now).param("userId", userId).update();
+					.param("organizationId", organizationId)
+					.param("productId", productId)
+					.param("categoryId", categoryId)
+					.param("now", now)
+					.param("userId", userId)
+					.update();
 		}
 	}
 
@@ -125,38 +163,56 @@ public class CatalogProductCommandRepository implements CatalogProductCommandPor
 	public int updateImageKey(UUID organizationId, UUID productId, String imageObjectKey, UUID userId, OffsetDateTime now) {
 		return jdbcClient.sql("""
 				UPDATE catalog_product
-				SET image_object_key = :imageObjectKey, updated_at = :now,
-				    updated_by = :userId, version = version + 1
-				WHERE organization_id = :organizationId AND id = :productId
-				  AND deleted_at IS NULL AND archived_at IS NULL
+				SET image_object_key = :imageObjectKey,
+				    updated_at = :now,
+				    updated_by = :userId,
+				    version = version + 1
+				WHERE organization_id = :organizationId
+				  AND id = :productId
+				  AND deleted_at IS NULL
+				  AND archived_at IS NULL
 				""")
-				.param("imageObjectKey", imageObjectKey).param("now", now).param("userId", userId)
-				.param("organizationId", organizationId).param("productId", productId).update();
+				.param("imageObjectKey", imageObjectKey)
+				.param("now", now)
+				.param("userId", userId)
+				.param("organizationId", organizationId)
+				.param("productId", productId)
+				.update();
 	}
 
 	@Override
 	public void replaceTags(UUID organizationId, UUID productId, List<String> tags, UUID userId, OffsetDateTime now) {
 		jdbcClient.sql("DELETE FROM catalog_product_tag WHERE organization_id = :organizationId AND product_id = :productId")
-				.param("organizationId", organizationId).param("productId", productId).update();
+				.param("organizationId", organizationId)
+				.param("productId", productId)
+				.update();
 		tags.forEach(tag -> attachTag(organizationId, productId, tag, userId, now));
 	}
 
-	private int updateLifecycle(
-			UUID organizationId, UUID productId, String status, OffsetDateTime archivedAt,
-			UUID userId, OffsetDateTime now, boolean restoring
-	) {
-		String archivePredicate = restoring ? "archived_at IS NOT NULL" : "archived_at IS NULL";
+	private int updateLifecycle(UUID organizationId, UUID productId, String status, OffsetDateTime archivedAt,
+			UUID userId, OffsetDateTime now, boolean restoring) {
+		String predicate = restoring ? "archived_at IS NOT NULL" : "archived_at IS NULL";
 		return jdbcClient.sql("""
 				UPDATE catalog_product
-				SET status = :status, archived_at = :archivedAt, archived_by = :archivedBy,
-				    updated_at = :now, updated_by = :userId, version = version + 1
-				WHERE organization_id = :organizationId AND id = :productId
-				  AND deleted_at IS NULL AND %s
-				""".formatted(archivePredicate))
-				.param("status", status).param("archivedAt", archivedAt)
+				SET status = :status,
+				    archived_at = :archivedAt,
+				    archived_by = :archivedBy,
+				    updated_at = :now,
+				    updated_by = :userId,
+				    version = version + 1
+				WHERE organization_id = :organizationId
+				  AND id = :productId
+				  AND deleted_at IS NULL
+				  AND %s
+				""".formatted(predicate))
+				.param("status", status)
+				.param("archivedAt", archivedAt)
 				.param("archivedBy", archivedAt == null ? null : userId)
-				.param("now", now).param("userId", userId)
-				.param("organizationId", organizationId).param("productId", productId).update();
+				.param("now", now)
+				.param("userId", userId)
+				.param("organizationId", organizationId)
+				.param("productId", productId)
+				.update();
 	}
 
 	private void attachTag(UUID organizationId, UUID productId, String tag, UUID userId, OffsetDateTime now) {
@@ -166,16 +222,25 @@ public class CatalogProductCommandRepository implements CatalogProductCommandPor
 				VALUES (:id, :organizationId, :name, :normalizedName, :now, :userId)
 				ON CONFLICT (organization_id, normalized_name) DO NOTHING
 				""")
-				.param("id", UUID.randomUUID()).param("organizationId", organizationId)
-				.param("name", tag).param("normalizedName", normalized)
-				.param("now", now).param("userId", userId).update();
+				.param("id", UUID.randomUUID())
+				.param("organizationId", organizationId)
+				.param("name", tag)
+				.param("normalizedName", normalized)
+				.param("now", now)
+				.param("userId", userId)
+				.update();
 		jdbcClient.sql("""
 				INSERT INTO catalog_product_tag (organization_id, product_id, tag_id, created_at, created_by)
 				SELECT :organizationId, :productId, id, :now, :userId
-				FROM catalog_tag WHERE organization_id = :organizationId AND normalized_name = :normalizedName
+				FROM catalog_tag
+				WHERE organization_id = :organizationId AND normalized_name = :normalizedName
 				ON CONFLICT DO NOTHING
 				""")
-				.param("organizationId", organizationId).param("productId", productId)
-				.param("normalizedName", normalized).param("now", now).param("userId", userId).update();
+				.param("organizationId", organizationId)
+				.param("productId", productId)
+				.param("normalizedName", normalized)
+				.param("now", now)
+				.param("userId", userId)
+				.update();
 	}
 }
