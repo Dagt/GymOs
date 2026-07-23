@@ -29,6 +29,13 @@ class SalesServiceArchitectureTests {
 	}
 
 	@Test
+	void paymentFacadeDelegatesSpecializedPaymentResponsibilities() {
+		assertThat(Arrays.stream(SalesPaymentService.class.getDeclaredFields()).map(field -> field.getType().getSimpleName()).toList())
+				.containsExactlyInAnyOrder("SalesPaymentRecordingService", "SalesPaymentReceiptService", "SalesPaymentLifecycleService")
+				.doesNotContain("SalesRepository", "SalesPaymentCommandRepository", "AuditService", "ObjectStorageService", "ApplicationEventPublisher");
+	}
+
+	@Test
 	void repositoryDoesNotDeclarePublicContractModelsOrRefundCommands() {
 		assertThat(SalesRepository.class.getDeclaredClasses()).isEmpty();
 		assertThat(Arrays.stream(SalesRepository.class.getDeclaredMethods()).map(java.lang.reflect.Method::getName).toList())

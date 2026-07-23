@@ -66,9 +66,11 @@ class SalesPaymentServiceTests {
 		AuditService auditService = mock(AuditService.class);
 		ObjectStorageService objectStorageService = mock(ObjectStorageService.class);
 		ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+		SalesLookupService lookupService = new SalesLookupService(salesRepository);
 		SalesPaymentService service = new SalesPaymentService(
-				salesRepository, new SalesLookupService(salesRepository), commandRepository, completionService,
-				auditService, objectStorageService, eventPublisher
+				new SalesPaymentRecordingService(salesRepository, lookupService, commandRepository, auditService, eventPublisher),
+				new SalesPaymentReceiptService(lookupService, commandRepository, auditService, objectStorageService),
+				new SalesPaymentLifecycleService(lookupService, commandRepository, completionService, auditService, eventPublisher)
 		);
 		UUID organizationId = UUID.randomUUID();
 		UUID branchId = UUID.randomUUID();

@@ -1081,6 +1081,16 @@ Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
 - `SalesAccessGuard` centraliza las validaciones de autenticacion y sucursal activa para ventas.
 - Se agrego una prueba de arquitectura para evitar que la fachada vuelva a absorber dependencias de flujos de POS.
 
+## Saneamiento de pagos en ventas - 23 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `SalesPaymentService` queda como fachada interna del flujo de pagos y delega en servicios especializados.
+- `SalesPaymentRecordingService` concentra registro de pagos manuales, idempotencia de pago y evento `PaymentRecordedV1`.
+- `SalesPaymentReceiptService` concentra carga de comprobantes, storage y auditoria de recibos.
+- `SalesPaymentLifecycleService` concentra validacion/rechazo, recalculo financiero, auditoria y evento `PaymentRejectedV1`.
+- Se agrego una prueba de arquitectura para evitar que la fachada de pagos vuelva a depender directamente de repositorios, storage, auditoria o publicador de eventos.
+
 ## Saneamiento backend de servicios application - 23 de julio de 2026
 
 Implementado en rama `feature/code-simplification-rebasion-and-refactor`:

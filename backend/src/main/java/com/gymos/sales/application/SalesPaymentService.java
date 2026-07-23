@@ -1,120 +1,37 @@
 package com.gymos.sales.application;
 
-import com.gymos.audit.api.AuditService;
-import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
-import com.gymos.common.storage.ObjectStorageService;
-import com.gymos.sales.api.events.PaymentRecordedV1;
-import com.gymos.sales.api.events.PaymentRejectedV1;
 import com.gymos.sales.application.command.ManualPaymentCommand;
-import com.gymos.sales.infrastructure.SalesPaymentCommandRepository;
-import com.gymos.sales.infrastructure.SalesPaymentCommandRepository.PaymentRecord;
-import com.gymos.sales.infrastructure.SalesRepository;
-import com.gymos.sales.model.SaleHeader;
-import java.io.IOException;
-import java.time.OffsetDateTime;
 import java.util.UUID;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
 class SalesPaymentService {
-	private final SalesRepository salesRepository;
-	private final SalesLookupService lookupService;
-	private final SalesPaymentCommandRepository commandRepository;
-	private final SalePaymentCompletionService completionService;
-	private final AuditService auditService;
-	private final ObjectStorageService objectStorageService;
-	private final ApplicationEventPublisher eventPublisher;
+	private final SalesPaymentRecordingService recordingService;
+	private final SalesPaymentReceiptService receiptService;
+	private final SalesPaymentLifecycleService lifecycleService;
 
-	SalesPaymentService(SalesRepository salesRepository, SalesLookupService lookupService, SalesPaymentCommandRepository commandRepository,
-			SalePaymentCompletionService completionService, AuditService auditService,
-			ObjectStorageService objectStorageService, ApplicationEventPublisher eventPublisher) {
-		this.salesRepository = salesRepository;
-		this.lookupService = lookupService;
-		this.commandRepository = commandRepository;
-		this.completionService = completionService;
-		this.auditService = auditService;
-		this.objectStorageService = objectStorageService;
-		this.eventPublisher = eventPublisher;
+	SalesPaymentService(SalesPaymentRecordingService recordingService, SalesPaymentReceiptService receiptService,
+			SalesPaymentLifecycleService lifecycleService) {
+		this.recordingService = recordingService;
+		this.receiptService = receiptService;
+		this.lifecycleService = lifecycleService;
 	}
 
 	void record(GymOsPrincipal principal, UUID saleId, ManualPaymentCommand request, String correlationId) {
-		SaleHeader sale = lookupService.saleForBranch(principal, saleId);
-		String requestHash = SalesIdempotency.paymentRequestHash(request);
-		String idempotencyKey = SalesIdempotency.blankToNull(request.idempotencyKey());
-		if (idempotencyKey != null) {
-			var existingSaleId = commandRepository.saleIdByIdempotencyKey(principal.organizationId(), idempotencyKey);
-			if (existingSaleId.isPresent()) {
-				if (!existingSaleId.get().equals(saleId)) {
-					throw new BusinessException("IDEMPOTENCY_KEY_REUSED", "La llave de idempotencia ya fue usada en otra venta.");
-				}
-				SalesIdempotency.ensureSameRequest(salesRepository.paymentRequestHashByIdempotencyKey(principal.organizationId(), idempotencyKey).orElse(null), requestHash);
-				return;
-			}
-		}
-		if (request.amountCents() <= 0) {
-			throw new BusinessException("PAYMENT_AMOUNT_INVALID", "El pago debe ser mayor a cero.");
-		}
-		String method = request.method().trim().toUpperCase();
-		String status = request.validateNow() || "CASH".equals(method) ? "COMPLETED" : "PENDING_VALIDATION";
-		OffsetDateTime now = OffsetDateTime.now();
-		UUID paymentId = UUID.randomUUID();
-		commandRepository.create(new PaymentRecord(paymentId, principal.organizationId(), principal.branchId(), saleId, sale.clientId(),
-				method, status, request.amountCents(), sale.currency(), SalesIdempotency.blankToNull(request.reference()),
-				SalesIdempotency.blankToNull(request.receiptObjectKey()), now, "COMPLETED".equals(status) ? now : null,
-				"COMPLETED".equals(status) ? principal.userId() : null, SalesIdempotency.blankToNull(request.notes()),
-				principal.userId(), idempotencyKey, requestHash));
-		auditService.record(principal, "PAYMENT_RECORDED", "PAYMENT", paymentId, "POS", null, correlationId);
-		eventPublisher.publishEvent(new PaymentRecordedV1("payment-recorded:" + paymentId, principal.organizationId(), principal.branchId(),
-				saleId, paymentId, method, status, request.amountCents(), sale.currency(), now));
+		recordingService.record(principal, saleId, request, correlationId);
 	}
 
 	UUID uploadReceipt(GymOsPrincipal principal, UUID paymentId, MultipartFile file, String correlationId) {
-		if (file == null || file.isEmpty()) {
-			throw new BusinessException("PAYMENT_RECEIPT_REQUIRED", "Selecciona un archivo de comprobante.");
-		}
-		UUID saleId = lookupService.saleIdForPayment(principal, paymentId);
-		SaleHeader sale = lookupService.saleForBranch(principal, saleId);
-		String objectKey = receiptObjectKey(principal.organizationId(), saleId, paymentId, file.getOriginalFilename());
-		try {
-			objectStorageService.putReceipt(objectKey, file.getContentType(), file.getSize(), file.getInputStream());
-		} catch (IOException exception) {
-			throw new BusinessException("PAYMENT_RECEIPT_READ_FAILED", "No fue posible leer el comprobante.");
-		}
-		commandRepository.attachReceipt(principal.organizationId(), sale.id(), paymentId, objectKey, principal.userId(), OffsetDateTime.now());
-		auditService.record(principal, "PAYMENT_RECEIPT_UPLOADED", "PAYMENT", paymentId, "POS", null, correlationId);
-		return saleId;
+		return receiptService.uploadReceipt(principal, paymentId, file, correlationId);
 	}
 
 	UUID validate(GymOsPrincipal principal, UUID paymentId, String correlationId) {
-		UUID saleId = lookupService.saleIdForPayment(principal, paymentId);
-		lookupService.saleForBranch(principal, saleId);
-		var payment = lookupService.payment(principal, paymentId);
-		if ("COMPLETED".equals(payment.status())) return saleId;
-		commandRepository.complete(principal.organizationId(), paymentId, principal.userId(), OffsetDateTime.now());
-		auditService.record(principal, "PAYMENT_VALIDATED", "PAYMENT", paymentId, "POS", null, correlationId);
-		completionService.recalculate(principal.organizationId(), saleId, principal.userId());
-		return saleId;
+		return lifecycleService.validate(principal, paymentId, correlationId);
 	}
 
 	UUID reject(GymOsPrincipal principal, UUID paymentId, String reason, String correlationId) {
-		UUID saleId = lookupService.saleIdForPayment(principal, paymentId);
-		lookupService.saleForBranch(principal, saleId);
-		var payment = lookupService.payment(principal, paymentId);
-		if ("COMPLETED".equals(payment.status())) throw new BusinessException("PAYMENT_ALREADY_COMPLETED", "No puedes rechazar un pago completado.");
-		if ("REJECTED".equals(payment.status())) return saleId;
-		OffsetDateTime now = OffsetDateTime.now();
-		commandRepository.reject(principal.organizationId(), paymentId, SalesIdempotency.blankToNull(reason), principal.userId(), now);
-		auditService.record(principal, "PAYMENT_REJECTED", "PAYMENT", paymentId, "POS", reason, correlationId);
-		eventPublisher.publishEvent(new PaymentRejectedV1("payment-rejected:" + paymentId, principal.organizationId(), principal.branchId(), saleId, paymentId, reason, now));
-		completionService.recalculate(principal.organizationId(), saleId, principal.userId());
-		return saleId;
-	}
-
-	private String receiptObjectKey(UUID organizationId, UUID saleId, UUID paymentId, String originalFilename) {
-		String filename = originalFilename == null || originalFilename.isBlank() ? "receipt.bin" : originalFilename;
-		return "receipts/" + organizationId + "/" + saleId + "/" + paymentId + "/" + System.currentTimeMillis() + "-" + filename.replaceAll("[^A-Za-z0-9._-]", "_");
+		return lifecycleService.reject(principal, paymentId, reason, correlationId);
 	}
 }

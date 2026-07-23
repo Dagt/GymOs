@@ -22,9 +22,11 @@ final class SalesServiceTestFactory {
 		SalePaymentCompletionService completionService = new SalePaymentCompletionService(
 				salesRepository, new SalePaymentCompletionRepository(jdbcClient), eventPublisher);
 		SalesLookupService lookupService = new SalesLookupService(salesRepository);
+		SalesPaymentCommandRepository paymentCommandRepository = new SalesPaymentCommandRepository(jdbcClient);
 		SalesPaymentService paymentService = new SalesPaymentService(
-				salesRepository, lookupService, new SalesPaymentCommandRepository(jdbcClient), completionService,
-				auditService, objectStorageService, eventPublisher);
+				new SalesPaymentRecordingService(salesRepository, lookupService, paymentCommandRepository, auditService, eventPublisher),
+				new SalesPaymentReceiptService(lookupService, paymentCommandRepository, auditService, objectStorageService),
+				new SalesPaymentLifecycleService(lookupService, paymentCommandRepository, completionService, auditService, eventPublisher));
 		MembershipSalesService membershipSalesService = new MembershipSalesService(
 				salesRepository, new MembershipSaleCommandRepository(jdbcClient), completionService,
 				auditService, eventPublisher);
