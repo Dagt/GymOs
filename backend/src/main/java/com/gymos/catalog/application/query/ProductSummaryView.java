@@ -1,8 +1,8 @@
 package com.gymos.catalog.application.query;
 
 import java.time.OffsetDateTime;
-import java.util.UUID;
 import java.util.List;
+import java.util.UUID;
 
 public record ProductSummaryView(
 		UUID id,
@@ -24,6 +24,8 @@ public record ProductSummaryView(
 		UUID categoryId,
 		String categoryName,
 		List<String> tags,
+		boolean archived,
+		OffsetDateTime archivedAt,
 		OffsetDateTime createdAt,
 		OffsetDateTime updatedAt
 ) {
