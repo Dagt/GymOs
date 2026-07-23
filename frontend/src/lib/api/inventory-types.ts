@@ -12,6 +12,21 @@ export type InventoryStock = {
   lowStock: boolean;
 };
 
+export type InventoryStockPage = {
+  items: InventoryStock[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+};
+
+export type InventoryStockSearchParams = {
+  q?: string;
+  page?: number;
+  size?: number;
+  sort?: "name,asc" | "name,desc" | "quantity,asc" | "quantity,desc" | "updatedAt,desc";
+};
+
 export type InventoryMovementType =
   | "INITIAL"
   | "PURCHASE"
@@ -35,6 +50,20 @@ export type InventoryMovement = {
   referenceId: string | null;
   reason: string;
   occurredAt: string;
+};
+
+export type InventoryMovementPage = {
+  items: InventoryMovement[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+};
+
+export type InventoryMovementSearchParams = {
+  productId?: string;
+  page?: number;
+  size?: number;
 };
 
 export type InventoryMovementPayload = {
