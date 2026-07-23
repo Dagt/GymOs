@@ -8,6 +8,7 @@ import { AuthRequired } from "@/components/AuthRequired";
 import { getStoredSession, type StoredSession } from "@/lib/api";
 import { getProductDetail } from "@/lib/api/catalog";
 import type { ProductDetail } from "@/lib/api/catalog-types";
+import { formatMoney } from "../CatalogHelpers";
 
 export default function CatalogProductDetailPage() {
   const params = useParams<{ productId: string }>();
@@ -45,11 +46,18 @@ export default function CatalogProductDetailPage() {
           <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
             <Detail label="Estado" value={product.archived ? "Archivado" : product.status} />
             <Detail label="Tipo" value={product.productType} />
+            <Detail label="Subtipo" value={product.commercialSubtype} />
+            <Detail label="Precio regular" value={formatMoney(product.priceCents, product.currency)} />
+            <Detail label="Precio promocional" value={product.promotionalPriceCents == null ? "Sin promocion" : formatMoney(product.promotionalPriceCents, product.currency)} />
+            <Detail label="Costo de referencia" value={product.referenceCostCents == null ? "Sin costo" : formatMoney(product.referenceCostCents, product.currency)} />
+            <Detail label="Proveedor" value={product.supplierName ?? "Sin proveedor"} />
             <Detail label="Codigo de barras" value={product.barcode ?? "Sin codigo"} />
             <Detail label="Marca" value={product.brand ?? "Sin marca"} />
             <Detail label="Presentacion" value={product.presentation ?? "Sin presentacion"} />
             <Detail label="Unidad" value={product.unitOfMeasure ?? "Sin unidad"} />
             <Detail label="Inventario" value={product.inventoryTracked ? "Controlado" : "No controlado"} />
+            <Detail label="Inicio promocion" value={formatDate(product.promotionStartsAt)} />
+            <Detail label="Fin promocion" value={formatDate(product.promotionEndsAt)} />
             <Detail label="Etiquetas" value={product.tags.join(", ") || "Sin etiquetas"} />
           </dl>
         </article>
@@ -60,6 +68,7 @@ export default function CatalogProductDetailPage() {
             <Detail label="Movimientos" value={String(dependencies.inventoryMovements)} />
             <Detail label="Sucursales con stock" value={String(dependencies.branchesWithStock)} />
             <Detail label="Planes activos" value={String(dependencies.activeMembershipPlans)} />
+            <Detail label="Productos de categoria" value={String(dependencies.activeProductsInCategory)} />
           </dl>
         </article>
       </section>
@@ -85,4 +94,8 @@ export default function CatalogProductDetailPage() {
 
 function Detail({ label, value }: { label: string; value: string }) {
   return <div><dt className="text-[#6f7a73]">{label}</dt><dd className="font-medium">{value}</dd></div>;
+}
+
+function formatDate(value: string | null) {
+  return value ? new Date(value).toLocaleString("es-MX") : "Sin vigencia";
 }
