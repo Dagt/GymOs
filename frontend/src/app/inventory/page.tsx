@@ -11,7 +11,6 @@ import {
   getInventoryStock,
   getLowInventoryStock,
   getStoredSession,
-  updateInventorySettings,
   type BranchSummary,
   type InventoryMovement,
   type InventoryMovementPayload,
@@ -20,6 +19,7 @@ import {
   type OrganizationSummary,
   type StoredSession,
 } from "@/lib/api";
+import { updateInventorySettings } from "@/lib/api/inventory";
 import {
   InventoryAlertsPanel,
   InventoryMovementDrawer,
