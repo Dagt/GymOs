@@ -51,38 +51,68 @@ class CatalogMembershipPlanService {
 		CatalogAccessGuard.requirePrincipal(principal);
 		ProductSummaryView product = products.findProduct(principal.organizationId(), request.productId())
 				.orElseThrow(() -> new BusinessException("PRODUCT_NOT_FOUND", "El producto no esta disponible."));
-		if (!"MEMBERSHIP_PLAN".equals(product.productType())) throw new BusinessException("PRODUCT_NOT_MEMBERSHIP_PLAN", "El producto debe ser de tipo MEMBERSHIP_PLAN.");
+		if (!"MEMBERSHIP_PLAN".equals(product.productType())) {
+			throw new BusinessException("PRODUCT_NOT_MEMBERSHIP_PLAN", "El producto debe ser de tipo MEMBERSHIP_PLAN.");
+		}
 		UUID planId = UUID.randomUUID();
 		OffsetDateTime now = OffsetDateTime.now();
-		planCommands.create(new PlanMutation(principal.organizationId(), planId, request.productId(), request.durationDays(), request.graceDays(),
-				benefitsSerializer.normalizeJson(request.benefitsJson()), request.multiBranchAccess(), request.status().trim().toUpperCase(), now, principal.userId()));
+		planCommands.create(new PlanMutation(
+				principal.organizationId(), planId, request.productId(), request.durationDays(), request.graceDays(),
+				benefitsSerializer.normalizeJson(request.benefitsJson()), request.multiBranchAccess(),
+				request.status().trim().toUpperCase(), now, principal.userId()
+		));
 		auditService.record(principal, "PLAN_CREATED", "MEMBERSHIP_PLAN", planId, "BACKOFFICE", null, correlationId);
-		return plans.findPlan(principal.organizationId(), planId).orElseThrow(() -> new BusinessException("PLAN_NOT_FOUND", "El plan no esta disponible."));
+		return plans.findPlan(principal.organizationId(), planId)
+				.orElseThrow(() -> new BusinessException("PLAN_NOT_FOUND", "El plan no esta disponible."));
 	}
 
 	PlanView createMembershipPlan(GymOsPrincipal principal, CreateMembershipPlanCommand request, String correlationId) {
 		CatalogAccessGuard.requirePrincipal(principal);
 		String sku = request.sku().trim().toUpperCase();
-		if (products.skuExists(principal.organizationId(), sku, null)) throw new BusinessException("PRODUCT_SKU_ALREADY_EXISTS", "Ya existe un producto o plan con ese codigo.");
-		ProductSummaryView product = productService.createProduct(principal,
-				new ProductCommand(sku, request.name(), request.description(), "MEMBERSHIP_PLAN", request.priceCents(),
-						request.currency(), true, request.status(), null, null, null, null, false, 0, null, List.of()), correlationId);
-		return createPlan(principal, new CreatePlanCommand(product.id(), request.durationDays(), request.graceDays(),
-				benefitsSerializer.textToJson(request.benefits()), request.multiBranchAccess(), request.status()), correlationId);
+		if (products.skuExists(principal.organizationId(), sku, null)) {
+			throw new BusinessException("PRODUCT_SKU_ALREADY_EXISTS", "Ya existe un producto o plan con ese codigo.");
+		}
+		ProductSummaryView product = productService.createProduct(
+				principal,
+				new ProductCommand(
+						sku, request.name(), request.description(), "MEMBERSHIP_PLAN", "MEMBERSHIP",
+						request.priceCents(), request.currency(), true, request.status(), null, null, null, null,
+						false, 0, null, null, null, null, null, null, List.of()
+				),
+				correlationId
+		);
+		return createPlan(
+				principal,
+				new CreatePlanCommand(product.id(), request.durationDays(), request.graceDays(),
+						benefitsSerializer.textToJson(request.benefits()), request.multiBranchAccess(), request.status()),
+				correlationId
+		);
 	}
 
-	PlanView updateMembershipPlan(GymOsPrincipal principal, UUID planId, UpdateMembershipPlanCommand request, String correlationId) {
+	PlanView updateMembershipPlan(GymOsPrincipal principal, UUID planId,
+			UpdateMembershipPlanCommand request, String correlationId) {
 		CatalogAccessGuard.requirePrincipal(principal);
-		PlanView existing = plans.findPlan(principal.organizationId(), planId).orElseThrow(() -> new BusinessException("PLAN_NOT_FOUND", "El plan no esta disponible."));
-		ProductSummaryView product = products.findProduct(principal.organizationId(), existing.productId()).orElseThrow(() -> new BusinessException("PRODUCT_NOT_FOUND", "El producto del plan no esta disponible."));
+		PlanView existing = plans.findPlan(principal.organizationId(), planId)
+				.orElseThrow(() -> new BusinessException("PLAN_NOT_FOUND", "El plan no esta disponible."));
+		ProductSummaryView product = products.findProduct(principal.organizationId(), existing.productId())
+				.orElseThrow(() -> new BusinessException("PRODUCT_NOT_FOUND", "El producto del plan no esta disponible."));
 		OffsetDateTime now = OffsetDateTime.now();
-		productCommands.update(new ProductMutation(principal.organizationId(), existing.productId(), product.sku(), request.name().trim(),
-				CatalogBenefitsSerializer.blankToNull(request.description()), "MEMBERSHIP_PLAN", request.priceCents(), request.currency().trim().toUpperCase(),
-				true, request.status().trim().toUpperCase(), product.barcode(), product.brand(), product.presentation(), product.unitOfMeasure(),
-				false, product.displayOrder(), product.imageObjectKey(), now, principal.userId()));
-		planCommands.update(new PlanMutation(principal.organizationId(), planId, existing.productId(), request.durationDays(), request.graceDays(),
-				benefitsSerializer.textToJson(request.benefits()), request.multiBranchAccess(), request.status().trim().toUpperCase(), now, principal.userId()));
+		productCommands.update(new ProductMutation(
+				principal.organizationId(), existing.productId(), product.sku(), request.name().trim(),
+				CatalogBenefitsSerializer.blankToNull(request.description()), "MEMBERSHIP_PLAN", "MEMBERSHIP",
+				request.priceCents(), request.currency().trim().toUpperCase(), true,
+				request.status().trim().toUpperCase(), product.barcode(), product.brand(), product.presentation(),
+				product.unitOfMeasure(), false, product.displayOrder(), product.imageObjectKey(),
+				product.supplierName(), product.referenceCostCents(), product.promotionalPriceCents(),
+				product.promotionStartsAt(), product.promotionEndsAt(), now, principal.userId()
+		));
+		planCommands.update(new PlanMutation(
+				principal.organizationId(), planId, existing.productId(), request.durationDays(), request.graceDays(),
+				benefitsSerializer.textToJson(request.benefits()), request.multiBranchAccess(),
+				request.status().trim().toUpperCase(), now, principal.userId()
+		));
 		auditService.record(principal, "PLAN_UPDATED", "MEMBERSHIP_PLAN", planId, "BACKOFFICE", null, correlationId);
-		return plans.findPlan(principal.organizationId(), planId).orElseThrow(() -> new BusinessException("PLAN_NOT_FOUND", "El plan no esta disponible."));
+		return plans.findPlan(principal.organizationId(), planId)
+				.orElseThrow(() -> new BusinessException("PLAN_NOT_FOUND", "El plan no esta disponible."));
 	}
 }
