@@ -23,5 +23,22 @@ public interface CatalogProductCommandPort {
 			OffsetDateTime promotionStartsAt, OffsetDateTime promotionEndsAt,
 			OffsetDateTime now, UUID userId
 	) {
+		public ProductMutation(
+				UUID organizationId, UUID productId, String sku, String name, String description,
+				String productType, long priceCents, String currency, boolean taxable, String status,
+				String barcode, String brand, String presentation, String unitOfMeasure,
+				boolean inventoryTracked, int displayOrder, String imageObjectKey,
+				OffsetDateTime now, UUID userId
+		) {
+			this(organizationId, productId, sku, name, description, productType, defaultSubtype(productType),
+					priceCents, currency, taxable, status, barcode, brand, presentation, unitOfMeasure,
+					inventoryTracked, displayOrder, imageObjectKey, null, null, null, null, null, now, userId);
+		}
+
+		private static String defaultSubtype(String productType) {
+			if ("MEMBERSHIP_PLAN".equalsIgnoreCase(productType)) return "MEMBERSHIP";
+			if ("SERVICE".equalsIgnoreCase(productType)) return "GENERAL_SERVICE";
+			return "GENERAL_PRODUCT";
+		}
 	}
 }
