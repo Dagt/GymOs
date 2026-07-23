@@ -1,4 +1,4 @@
-package com.gymos.inventory.application;
+package com.gymos.inventory.infrastructure;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -9,10 +9,11 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.gymos.audit.api.AuditService;
-import com.gymos.inventory.infrastructure.InventoryRepository;
+import com.gymos.inventory.api.InventoryRefundOperations;
 import com.gymos.inventory.infrastructure.InventoryRepository.StockDeductionResult;
 import com.gymos.sales.api.events.PaymentCompletedLineItemV1;
 import com.gymos.sales.api.events.PaymentCompletedV1;
+import com.gymos.sales.api.events.RefundProcessedV1;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -26,6 +27,9 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class InventorySalesEventListenerTests {
 	@Mock
 	private InventoryRepository inventoryRepository;
+
+	@Mock
+	private InventoryRefundOperations inventoryRefundOperations;
 
 	@Mock
 	private AuditService auditService;
@@ -88,5 +92,24 @@ class InventorySalesEventListenerTests {
 
 		verify(inventoryRepository, never()).deductPaidSaleItem(any(), any(), any(), any(), anyInt(), any(), any());
 		verify(auditService, never()).recordSystem(any(), any(), any(), any(), any(), any(), any(), any(), any());
+	}
+
+	@Test
+	void refundProcessedCallsRestoreFullSale() {
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		UUID saleId = UUID.randomUUID();
+		UUID refundId = UUID.randomUUID();
+		UUID actorUserId = UUID.randomUUID();
+		OffsetDateTime occurredAt = OffsetDateTime.now();
+		UUID correlationId = UUID.randomUUID();
+
+		listener.onRefundProcessed(new RefundProcessedV1(
+				organizationId, branchId, saleId, refundId, actorUserId, occurredAt, correlationId
+		));
+
+		verify(inventoryRefundOperations).restoreFullSale(
+				eq(organizationId), eq(branchId), eq(saleId), eq(refundId), eq(actorUserId), eq(occurredAt), eq(correlationId)
+		);
 	}
 }

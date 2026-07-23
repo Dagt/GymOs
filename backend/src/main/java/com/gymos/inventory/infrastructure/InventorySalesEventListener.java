@@ -1,10 +1,11 @@
-package com.gymos.inventory.application;
+package com.gymos.inventory.infrastructure;
 
 import com.gymos.audit.api.AuditService;
-import com.gymos.inventory.infrastructure.InventoryRepository;
+import com.gymos.inventory.api.InventoryRefundOperations;
 import com.gymos.inventory.infrastructure.InventoryRepository.StockDeductionResult;
 import com.gymos.sales.api.events.PaymentCompletedLineItemV1;
 import com.gymos.sales.api.events.PaymentCompletedV1;
+import com.gymos.sales.api.events.RefundProcessedV1;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.Map;
@@ -17,10 +18,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class InventorySalesEventListener {
 	private final InventoryRepository inventoryRepository;
+	private final InventoryRefundOperations inventoryRefundOperations;
 	private final AuditService auditService;
 
-	public InventorySalesEventListener(InventoryRepository inventoryRepository, AuditService auditService) {
+	public InventorySalesEventListener(
+			InventoryRepository inventoryRepository,
+			InventoryRefundOperations inventoryRefundOperations,
+			AuditService auditService
+	) {
 		this.inventoryRepository = inventoryRepository;
+		this.inventoryRefundOperations = inventoryRefundOperations;
 		this.auditService = auditService;
 	}
 
@@ -62,5 +69,19 @@ public class InventorySalesEventListener {
 				);
 			}
 		});
+	}
+
+	@EventListener
+	@Transactional
+	public void onRefundProcessed(RefundProcessedV1 event) {
+		inventoryRefundOperations.restoreFullSale(
+				event.organizationId(),
+				event.branchId(),
+				event.saleId(),
+				event.refundId(),
+				event.actorUserId(),
+				event.occurredAt(),
+				event.correlationId()
+		);
 	}
 }

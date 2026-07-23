@@ -1,10 +1,7 @@
 package com.gymos.sales.application;
 
-import static org.mockito.Mockito.mock;
-
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.storage.ObjectStorageService;
-import com.gymos.inventory.api.InventoryRefundOperations;
 import com.gymos.sales.infrastructure.MembershipSaleCommandRepository;
 import com.gymos.sales.infrastructure.SaleCommandRepository;
 import com.gymos.sales.infrastructure.SalePaymentCompletionRepository;
@@ -38,12 +35,11 @@ final class SalesServiceTestFactory {
 		SaleCreationService saleCreationService = new SaleCreationService(salesRepository, new SaleLineResolver(salesRepository),
 				new SaleCommandRepository(jdbcClient), auditService, eventPublisher);
 		SalesRefundCommandRepository refundCommandRepository = new SalesRefundCommandRepository(jdbcClient);
-		InventoryRefundOperations inventoryRefundOperations = mock(InventoryRefundOperations.class);
 		SalesRefundService refundService = new SalesRefundService(
 				lookupService,
 				new SalesRefundIdempotencyService(salesRepository),
 				new SalesRefundValidationService(salesRepository, lookupService),
-				new SalesRefundProcessor(refundCommandRepository, inventoryRefundOperations, auditService)
+				new SalesRefundProcessor(refundCommandRepository, eventPublisher, auditService)
 		);
 		SalesPointOfSaleService pointOfSaleService = new SalesPointOfSaleService(
 				saleDetailQuery, saleCreationService, paymentService, refundService, completionService);
