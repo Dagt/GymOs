@@ -7,7 +7,6 @@ public record InventoryMovementCommand(
 		String movementType,
 		int quantity,
 		Long unitCostCents,
-		Integer reorderPoint,
 		String referenceType,
 		UUID referenceId,
 		String reason
