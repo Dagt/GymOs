@@ -19,21 +19,16 @@ import com.gymos.selfservice.application.command.VerifySessionCommand;
 import com.gymos.selfservice.application.result.CreateSessionResult;
 import com.gymos.selfservice.application.result.SelfServiceMembershipSaleResult;
 import com.gymos.selfservice.application.result.SelfServiceMembershipSummaryResult;
+import com.gymos.selfservice.application.result.SelfServiceMembershipView;
+import com.gymos.selfservice.application.result.SelfServicePendingPaymentView;
+import com.gymos.selfservice.application.result.SelfServicePlanOptionView;
 import com.gymos.selfservice.application.result.SelfServiceSummaryResult;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository;
-import com.gymos.selfservice.infrastructure.SelfServiceRepository.MembershipRecord;
-import com.gymos.selfservice.infrastructure.SelfServiceRepository.PendingPaymentRecord;
-import com.gymos.selfservice.infrastructure.SelfServiceRepository.PlanOptionRecord;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.SessionRecord;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.TerminalRecord;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.util.Base64;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -45,7 +40,6 @@ public class SelfServiceService {
 	private static final int SESSION_MINUTES = 15;
 	private static final int MAX_VERIFICATION_ATTEMPTS = 5;
 	private static final Duration BLOCK_DURATION = Duration.ofMinutes(10);
-	private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 
 	private final SelfServiceRepository repository;
 	private final MembershipOperations membershipOperations;
@@ -53,6 +47,7 @@ public class SelfServiceService {
 	private final BookingOperations bookingOperations;
 	private final AuditService auditService;
 	private final RateLimiter rateLimiter;
+	private final SelfServiceSessionSecurity sessionSecurity;
 
 	public SelfServiceService(
 			SelfServiceRepository repository,
@@ -60,7 +55,8 @@ public class SelfServiceService {
 			ClientLookupOperations clientLookupOperations,
 			BookingOperations bookingOperations,
 			AuditService auditService,
-			RateLimiter rateLimiter
+			RateLimiter rateLimiter,
+			SelfServiceSessionSecurity sessionSecurity
 	) {
 		this.repository = repository;
 		this.membershipOperations = membershipOperations;
@@ -68,6 +64,7 @@ public class SelfServiceService {
 		this.bookingOperations = bookingOperations;
 		this.auditService = auditService;
 		this.rateLimiter = rateLimiter;
+		this.sessionSecurity = sessionSecurity;
 	}
 
 	@Transactional
@@ -78,8 +75,8 @@ public class SelfServiceService {
 				.orElseThrow(() -> new BusinessException("SELF_SERVICE_TERMINAL_NOT_FOUND", "El kiosco no esta disponible."));
 		OffsetDateTime now = OffsetDateTime.now();
 		UUID sessionId = UUID.randomUUID();
-		String sessionToken = randomToken();
-		repository.createSession(sessionId, terminal.organizationId(), terminal.branchId(), terminal.id(), now, now.plusMinutes(SESSION_MINUTES), originIp, tokenHash(sessionToken));
+		String sessionToken = sessionSecurity.newToken();
+		repository.createSession(sessionId, terminal.organizationId(), terminal.branchId(), terminal.id(), now, now.plusMinutes(SESSION_MINUTES), originIp, sessionSecurity.hash(sessionToken));
 		auditService.recordSystem(terminal.organizationId(), terminal.branchId(), null, "SELF_SERVICE_SESSION_STARTED", "SELF_SERVICE_SESSION", sessionId, "SELF_SERVICE_KIOSK", terminal.deviceCode(), correlationId);
 		return new CreateSessionResult(sessionId, sessionToken, terminal.name(), terminal.tradeName(), terminal.brandName(), terminal.logoUrl(), terminal.primaryColor(), terminal.accentColor(), terminal.surfaceColor(), now.plusMinutes(SESSION_MINUTES), false);
 	}
@@ -105,15 +102,21 @@ public class SelfServiceService {
 	public SelfServiceSummaryResult summary(UUID sessionId, String sessionToken) {
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
 		SelfServiceClientProfile client = clientLookupOperations.selfServiceProfile(session.organizationId(), session.clientId()).orElse(null);
-		List<MembershipRecord> memberships = repository.memberships(session.organizationId(), session.branchId(), session.clientId());
-		List<PendingPaymentRecord> pendingPayments = repository.pendingPayments(session.organizationId(), session.branchId(), session.clientId());
+		var memberships = repository.memberships(session.organizationId(), session.branchId(), session.clientId()).stream()
+				.map(record -> new SelfServiceMembershipView(record.id(), record.planId(), record.planName(), record.status(), record.startsOn(), record.endsOn(), record.graceEndsOn()))
+				.toList();
+		var pendingPayments = repository.pendingPayments(session.organizationId(), session.branchId(), session.clientId()).stream()
+				.map(record -> new SelfServicePendingPaymentView(record.id(), record.saleId(), record.saleNumber(), record.method(), record.status(), record.amountCents(), record.currency(), record.receivedAt()))
+				.toList();
 		return new SelfServiceSummaryResult(session.id(), session.expiresAt(), client == null ? "Cliente" : client.displayName(), memberships, pendingPayments);
 	}
 
 	@Transactional(readOnly = true)
-	public List<PlanOptionRecord> membershipOptions(UUID sessionId, String sessionToken) {
+	public List<SelfServicePlanOptionView> membershipOptions(UUID sessionId, String sessionToken) {
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
-		return repository.planOptions(session.organizationId());
+		return repository.planOptions(session.organizationId()).stream()
+				.map(record -> new SelfServicePlanOptionView(record.id(), record.productId(), record.name(), record.priceCents(), record.currency(), record.durationDays(), record.graceDays()))
+				.toList();
 	}
 
 	@Transactional(readOnly = true)
@@ -133,16 +136,7 @@ public class SelfServiceService {
 		rateLimiter.check("kiosk:booking:ip:" + originIp, 30, Duration.ofMinutes(1));
 		rateLimiter.check("kiosk:booking:session:" + sessionId, 10, Duration.ofMinutes(1));
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
-		BookingResult booking = bookingOperations.createBooking(
-				session.organizationId(),
-				session.branchId(),
-				session.clientId(),
-				resourceId,
-				startsAt,
-				endsAt,
-				notes,
-				correlationId
-		);
+		BookingResult booking = bookingOperations.createBooking(session.organizationId(), session.branchId(), session.clientId(), resourceId, startsAt, endsAt, notes, correlationId);
 		auditService.recordSystem(session.organizationId(), session.branchId(), null, "SELF_SERVICE_BOOKING_CREATED", "BOOKING", booking.id(), "SELF_SERVICE_KIOSK", null, correlationId);
 		return booking;
 	}
@@ -167,10 +161,6 @@ public class SelfServiceService {
 		return toResponse(response);
 	}
 
-	private SelfServiceMembershipSaleResult toResponse(MembershipSaleOperationResult result) {
-		return new SelfServiceMembershipSaleResult(result.saleId(), result.saleNumber(), result.saleStatus(), result.totalCents(), result.paidCents(), result.balanceCents(), result.currency(), result.membership() == null ? null : new SelfServiceMembershipSummaryResult(result.membership().id(), result.membership().clientId(), result.membership().planId(), result.membership().planName(), result.membership().saleId(), result.membership().saleNumber(), result.membership().status(), result.membership().activatedAt(), result.membership().startsOn(), result.membership().endsOn(), result.membership().graceEndsOn()));
-	}
-
 	@Transactional
 	public void end(UUID sessionId, String sessionToken, String correlationId) {
 		SessionRecord session = activeSession(sessionId, sessionToken);
@@ -178,21 +168,34 @@ public class SelfServiceService {
 		auditService.recordSystem(session.organizationId(), session.branchId(), null, "SELF_SERVICE_SESSION_ENDED", "SELF_SERVICE_SESSION", sessionId, "SELF_SERVICE_KIOSK", null, correlationId);
 	}
 
+	private SelfServiceMembershipSaleResult toResponse(MembershipSaleOperationResult result) {
+		return new SelfServiceMembershipSaleResult(result.saleId(), result.saleNumber(), result.saleStatus(), result.totalCents(), result.paidCents(), result.balanceCents(), result.currency(), result.membership() == null ? null : new SelfServiceMembershipSummaryResult(result.membership().id(), result.membership().clientId(), result.membership().planId(), result.membership().planName(), result.membership().saleId(), result.membership().saleNumber(), result.membership().status(), result.membership().activatedAt(), result.membership().startsOn(), result.membership().endsOn(), result.membership().graceEndsOn()));
+	}
+
 	private SessionRecord verifiedSession(UUID sessionId, String sessionToken) {
 		SessionRecord session = activeSession(sessionId, sessionToken);
-		if (session.clientId() == null) throw new BusinessException("SELF_SERVICE_SESSION_NOT_VERIFIED", "Primero verifica tu identidad.");
+		if (session.clientId() == null) {
+			throw new BusinessException("SELF_SERVICE_SESSION_NOT_VERIFIED", "Primero verifica tu identidad.");
+		}
 		return session;
 	}
 
 	private SessionRecord activeSession(UUID sessionId, String sessionToken) {
-		SessionRecord session = repository.session(sessionId).orElseThrow(() -> new BusinessException("SELF_SERVICE_SESSION_NOT_FOUND", "La sesion no existe."));
-		if (session.sessionTokenHash() == null || sessionToken == null || !MessageDigest.isEqual(session.sessionTokenHash().getBytes(StandardCharsets.UTF_8), tokenHash(sessionToken).getBytes(StandardCharsets.UTF_8))) throw new BusinessException("SELF_SERVICE_SESSION_INVALID", "La sesion del kiosco no es valida.");
-		if (!"ACTIVE".equals(session.status()) || session.expiresAt().isBefore(OffsetDateTime.now())) throw new BusinessException("SELF_SERVICE_SESSION_EXPIRED", "La sesion del kiosco expiro.");
+		SessionRecord session = repository.session(sessionId)
+				.orElseThrow(() -> new BusinessException("SELF_SERVICE_SESSION_NOT_FOUND", "La sesion no existe."));
+		if (!sessionSecurity.matches(sessionToken, session.sessionTokenHash())) {
+			throw new BusinessException("SELF_SERVICE_SESSION_INVALID", "La sesion del kiosco no es valida.");
+		}
+		if (!"ACTIVE".equals(session.status()) || session.expiresAt().isBefore(OffsetDateTime.now())) {
+			throw new BusinessException("SELF_SERVICE_SESSION_EXPIRED", "La sesion del kiosco expiro.");
+		}
 		return session;
 	}
 
 	private void ensureNotBlocked(SessionRecord session) {
-		if (session.blockedUntil() != null && session.blockedUntil().isAfter(OffsetDateTime.now())) throw new BusinessException("SELF_SERVICE_SESSION_BLOCKED", "Demasiados intentos. Espera un momento y vuelve a intentar.");
+		if (session.blockedUntil() != null && session.blockedUntil().isAfter(OffsetDateTime.now())) {
+			throw new BusinessException("SELF_SERVICE_SESSION_BLOCKED", "Demasiados intentos. Espera un momento y vuelve a intentar.");
+		}
 	}
 
 	private void recordFailedVerification(SessionRecord session, String correlationId) {
@@ -205,14 +208,5 @@ public class SelfServiceService {
 
 	private GymOsPrincipal kioskPrincipal(SessionRecord session) {
 		return new GymOsPrincipal(null, session.organizationId(), session.branchId(), "self-service-kiosk", "Kiosco", Set.of());
-	}
-
-	private String randomToken() {
-		byte[] bytes = new byte[32]; SECURE_RANDOM.nextBytes(bytes); return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-	}
-
-	private String tokenHash(String token) {
-		try { return Base64.getEncoder().encodeToString(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8))); }
-		catch (NoSuchAlgorithmException exception) { throw new IllegalStateException("SHA-256 is required", exception); }
 	}
 }
