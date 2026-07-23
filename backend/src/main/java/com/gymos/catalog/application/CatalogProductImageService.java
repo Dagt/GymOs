@@ -13,6 +13,8 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @Service
 class CatalogProductImageService {
@@ -24,77 +26,75 @@ class CatalogProductImageService {
 	private final CatalogImageStoragePort storage;
 	private final AuditService auditService;
 
-	CatalogProductImageService(
-			CatalogProductQueryPort products,
-			CatalogProductCommandPort commands,
-			CatalogImageStoragePort storage,
-			AuditService auditService
-	) {
+	CatalogProductImageService(CatalogProductQueryPort products, CatalogProductCommandPort commands,
+			CatalogImageStoragePort storage, AuditService auditService) {
 		this.products = products;
 		this.commands = commands;
 		this.storage = storage;
 		this.auditService = auditService;
 	}
 
-	ProductSummaryView upload(
-			GymOsPrincipal principal,
-			UUID productId,
-			UploadProductImageCommand command,
-			String correlationId
-	) {
+	ProductSummaryView upload(GymOsPrincipal principal, UUID productId, UploadProductImageCommand command, String correlationId) {
 		CatalogAccessGuard.requirePrincipal(principal);
 		ProductSummaryView product = require(principal.organizationId(), productId);
 		validate(command);
-		String objectKey = objectKey(principal.organizationId(), productId, command.filename());
-		storage.store(objectKey, command.contentType(), command.size(), command.content());
-		try {
-			if (commands.updateImageKey(
-					principal.organizationId(), productId, objectKey, principal.userId(), OffsetDateTime.now()) != 1) {
-				throw notFound();
-			}
-			if (product.imageObjectKey() != null) {
-				storage.delete(product.imageObjectKey());
-			}
-		} catch (RuntimeException exception) {
-			storage.delete(objectKey);
-			throw exception;
+		String newKey = objectKey(principal.organizationId(), productId, command.filename());
+		storage.store(newKey, command.contentType(), command.size(), command.content());
+		registerUploadSynchronization(newKey, product.imageObjectKey());
+		if (commands.updateImageKey(principal.organizationId(), productId, newKey, principal.userId(), OffsetDateTime.now()) != 1) {
+			throw notFound();
 		}
-		auditService.record(
-				principal, "PRODUCT_IMAGE_UPDATED", "CATALOG_PRODUCT", productId,
-				"BACKOFFICE", null, correlationId);
+		auditService.record(principal, "PRODUCT_IMAGE_UPDATED", "CATALOG_PRODUCT", productId, "BACKOFFICE", null, correlationId);
 		return require(principal.organizationId(), productId);
 	}
 
 	ProductSummaryView remove(GymOsPrincipal principal, UUID productId, String correlationId) {
 		CatalogAccessGuard.requirePrincipal(principal);
 		ProductSummaryView product = require(principal.organizationId(), productId);
-		if (product.imageObjectKey() == null) {
-			return product;
-		}
-		if (commands.updateImageKey(
-				principal.organizationId(), productId, null, principal.userId(), OffsetDateTime.now()) != 1) {
+		if (product.imageObjectKey() == null) return product;
+		if (commands.updateImageKey(principal.organizationId(), productId, null, principal.userId(), OffsetDateTime.now()) != 1) {
 			throw notFound();
 		}
-		storage.delete(product.imageObjectKey());
-		auditService.record(
-				principal, "PRODUCT_IMAGE_REMOVED", "CATALOG_PRODUCT", productId,
-				"BACKOFFICE", null, correlationId);
+		deleteAfterCommit(product.imageObjectKey());
+		auditService.record(principal, "PRODUCT_IMAGE_REMOVED", "CATALOG_PRODUCT", productId, "BACKOFFICE", null, correlationId);
 		return require(principal.organizationId(), productId);
 	}
 
+	private void registerUploadSynchronization(String newKey, String previousKey) {
+		if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+			storage.delete(newKey);
+			throw new IllegalStateException("La actualizacion de imagen requiere una transaccion activa.");
+		}
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+			@Override
+			public void afterCommit() {
+				if (previousKey != null) storage.delete(previousKey);
+			}
+
+			@Override
+			public void afterCompletion(int status) {
+				if (status != STATUS_COMMITTED) storage.delete(newKey);
+			}
+		});
+	}
+
+	private void deleteAfterCommit(String objectKey) {
+		if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+			throw new IllegalStateException("La eliminacion de imagen requiere una transaccion activa.");
+		}
+		TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+			@Override
+			public void afterCommit() {
+				storage.delete(objectKey);
+			}
+		});
+	}
+
 	private void validate(UploadProductImageCommand command) {
-		if (command.content() == null || command.size() <= 0) {
-			throw new BusinessException("PRODUCT_IMAGE_INVALID", "Selecciona una imagen.");
-		}
-		if (command.size() > MAX_IMAGE_SIZE) {
-			throw new BusinessException("PRODUCT_IMAGE_INVALID", "La imagen no puede superar 5 MB.");
-		}
-		String contentType = command.contentType() == null
-				? ""
-				: command.contentType().toLowerCase(Locale.ROOT);
-		if (!CONTENT_TYPES.contains(contentType)) {
-			throw new BusinessException("PRODUCT_IMAGE_INVALID", "Usa una imagen JPG, PNG o WebP.");
-		}
+		if (command.content() == null || command.size() <= 0) throw new BusinessException("PRODUCT_IMAGE_INVALID", "Selecciona una imagen.");
+		if (command.size() > MAX_IMAGE_SIZE) throw new BusinessException("PRODUCT_IMAGE_INVALID", "La imagen no puede superar 5 MB.");
+		String contentType = command.contentType() == null ? "" : command.contentType().toLowerCase(Locale.ROOT);
+		if (!CONTENT_TYPES.contains(contentType)) throw new BusinessException("PRODUCT_IMAGE_INVALID", "Usa una imagen JPG, PNG o WebP.");
 	}
 
 	private String objectKey(UUID organizationId, UUID productId, String filename) {
