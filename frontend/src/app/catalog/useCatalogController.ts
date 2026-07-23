@@ -79,15 +79,24 @@ export function useCatalogController() {
   async function submitProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session) return;
+    const wasEditing = Boolean(editingProductId);
     setSaving(true); setError(null); setMessage(null);
     try {
       const payload = productDraftToPayload(form, price);
       const saved = editingProductId
         ? await updateProduct(session.accessToken, editingProductId, payload)
         : await createProduct(session.accessToken, payload);
-      if (productImage) await uploadProductImage(session.accessToken, saved.id, productImage);
-      await reloadCatalog(); resetProductDrawer();
-      setMessage(editingProductId ? "Producto actualizado." : "Producto creado.");
+      let imageWarning: string | null = null;
+      if (productImage) {
+        try {
+          await uploadProductImage(session.accessToken, saved.id, productImage);
+        } catch {
+          imageWarning = "Producto guardado, pero no fue posible cargar la imagen. Puedes editarlo e intentarlo nuevamente.";
+        }
+      }
+      await reloadCatalog();
+      resetProductDrawer();
+      setMessage(imageWarning ?? (wasEditing ? "Producto actualizado." : "Producto creado."));
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible guardar el producto.");
     } finally { setSaving(false); }
@@ -130,6 +139,7 @@ export function useCatalogController() {
     totalPages, totalProducts, canArchive: hasPermission(session, "catalog.archive"),
     canCreate: hasPermission(session, "catalog.create"), canManageStatus: hasPermission(session, "catalog.status.manage"),
     canManageCategories: hasPermission(session, "catalog.category.manage"), canUpdate: hasPermission(session, "catalog.update"),
+    canReadCosts: hasPermission(session, "catalog.cost.read"),
   };
 }
 
@@ -140,5 +150,7 @@ function loadCatalog(accessToken: string, filters: import("@/lib/api").ProductSe
 }
 
 function hasPermission(session: StoredSession | null, permission: string) {
-  return Boolean(session?.user.permissions.includes(permission) || session?.user.permissions.includes("catalog.manage"));
+  return Boolean(session?.user.permissions.includes(permission)
+    || session?.user.permissions.includes("catalog.manage")
+    || session?.user.permissions.includes("platform.admin"));
 }
