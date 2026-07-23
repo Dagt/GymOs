@@ -18,6 +18,8 @@ export type ProductSummary = {
   categoryId: string | null;
   categoryName: string | null;
   tags: string[];
+  archived: boolean;
+  archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -53,7 +55,6 @@ export type ProductPayload = {
   unitOfMeasure?: string | null;
   inventoryTracked: boolean;
   displayOrder: number;
-  imageObjectKey?: string | null;
   categoryId?: string | null;
   tags: string[];
 };
