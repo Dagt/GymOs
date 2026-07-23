@@ -1,16 +1,70 @@
 package com.gymos.catalog.infrastructure;
 
+import com.gymos.catalog.application.port.CatalogPlanCommandPort;
+import com.gymos.catalog.application.port.CatalogPlanCommandPort.PlanMutation;
+import com.gymos.catalog.application.port.CatalogProductCommandPort;
+import com.gymos.catalog.application.port.CatalogProductCommandPort.ProductMutation;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public class CatalogCommandRepository {
+public class CatalogCommandRepository implements CatalogProductCommandPort, CatalogPlanCommandPort {
 	private final JdbcClient jdbcClient;
 
 	public CatalogCommandRepository(JdbcClient jdbcClient) {
 		this.jdbcClient = jdbcClient;
+	}
+
+	@Override
+	public void create(ProductMutation mutation) {
+		createProduct(new ProductRecord(
+				mutation.productId(), mutation.organizationId(), mutation.sku(), mutation.name(),
+				mutation.description(), mutation.productType(), mutation.priceCents(), mutation.currency(),
+				mutation.taxable(), mutation.status(), mutation.barcode(), mutation.brand(), mutation.presentation(),
+				mutation.unitOfMeasure(), mutation.inventoryTracked(), mutation.displayOrder(),
+				mutation.imageObjectKey(), mutation.now(), mutation.userId()
+		));
+	}
+
+	@Override
+	public int update(ProductMutation mutation) {
+		return updateProduct(new ProductUpdateRecord(
+				mutation.organizationId(), mutation.productId(), mutation.sku(), mutation.name(),
+				mutation.description(), mutation.productType(), mutation.priceCents(), mutation.currency(),
+				mutation.taxable(), mutation.status(), mutation.barcode(), mutation.brand(), mutation.presentation(),
+				mutation.unitOfMeasure(), mutation.inventoryTracked(), mutation.displayOrder(),
+				mutation.imageObjectKey(), mutation.now(), mutation.userId()
+		));
+	}
+
+	@Override
+	public int changeStatus(UUID organizationId, UUID productId, String status, UUID userId, OffsetDateTime now) {
+		return changeProductStatus(organizationId, productId, status, userId, now);
+	}
+
+	@Override
+	public int archive(UUID organizationId, UUID productId, UUID userId, OffsetDateTime now) {
+		return archiveProduct(organizationId, productId, userId, now);
+	}
+
+	@Override
+	public void create(PlanMutation mutation) {
+		createPlan(new PlanRecord(
+				mutation.planId(), mutation.organizationId(), mutation.productId(), mutation.durationDays(),
+				mutation.graceDays(), mutation.benefitsJson(), mutation.multiBranchAccess(), mutation.status(),
+				mutation.now(), mutation.userId()
+		));
+	}
+
+	@Override
+	public void update(PlanMutation mutation) {
+		updatePlan(new PlanUpdateRecord(
+				mutation.organizationId(), mutation.planId(), mutation.durationDays(), mutation.graceDays(),
+				mutation.benefitsJson(), mutation.multiBranchAccess(), mutation.status(),
+				mutation.now(), mutation.userId()
+		));
 	}
 
 	public void createProduct(ProductRecord record) {

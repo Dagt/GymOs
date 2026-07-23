@@ -4,8 +4,8 @@ import com.gymos.catalog.application.command.CreateMembershipPlanCommand;
 import com.gymos.catalog.application.command.CreatePlanCommand;
 import com.gymos.catalog.application.command.ProductCommand;
 import com.gymos.catalog.application.command.UpdateMembershipPlanCommand;
-import com.gymos.catalog.infrastructure.CatalogRepository.PlanSummary;
-import com.gymos.catalog.infrastructure.CatalogRepository.ProductSummary;
+import com.gymos.catalog.application.query.PlanView;
+import com.gymos.catalog.application.query.ProductSummaryView;
 import com.gymos.common.security.GymOsPrincipal;
 import java.util.List;
 import java.util.UUID;
@@ -23,27 +23,27 @@ public class CatalogService {
 	}
 
 	@Transactional(readOnly = true)
-	public List<ProductSummary> products(GymOsPrincipal principal) {
+	public List<ProductSummaryView> products(GymOsPrincipal principal) {
 		return productService.products(principal);
 	}
 
 	@Transactional(readOnly = true)
-	public ProductSummary product(GymOsPrincipal principal, UUID productId) {
+	public ProductSummaryView product(GymOsPrincipal principal, UUID productId) {
 		return productService.product(principal, productId);
 	}
 
 	@Transactional
-	public ProductSummary createProduct(GymOsPrincipal principal, ProductCommand request, String correlationId) {
+	public ProductSummaryView createProduct(GymOsPrincipal principal, ProductCommand request, String correlationId) {
 		return productService.createProduct(principal, request, correlationId);
 	}
 
 	@Transactional
-	public ProductSummary updateProduct(GymOsPrincipal principal, UUID productId, ProductCommand request, String correlationId) {
+	public ProductSummaryView updateProduct(GymOsPrincipal principal, UUID productId, ProductCommand request, String correlationId) {
 		return productService.updateProduct(principal, productId, request, correlationId);
 	}
 
 	@Transactional
-	public ProductSummary changeProductStatus(GymOsPrincipal principal, UUID productId, String status, String correlationId) {
+	public ProductSummaryView changeProductStatus(GymOsPrincipal principal, UUID productId, String status, String correlationId) {
 		return productService.changeStatus(principal, productId, status, correlationId);
 	}
 
@@ -53,22 +53,22 @@ public class CatalogService {
 	}
 
 	@Transactional(readOnly = true)
-	public List<PlanSummary> plans(GymOsPrincipal principal) {
+	public List<PlanView> plans(GymOsPrincipal principal) {
 		return membershipPlanService.plans(principal);
 	}
 
 	@Transactional
-	public PlanSummary createPlan(GymOsPrincipal principal, CreatePlanCommand request, String correlationId) {
+	public PlanView createPlan(GymOsPrincipal principal, CreatePlanCommand request, String correlationId) {
 		return membershipPlanService.createPlan(principal, request, correlationId);
 	}
 
 	@Transactional
-	public PlanSummary createMembershipPlan(GymOsPrincipal principal, CreateMembershipPlanCommand request, String correlationId) {
+	public PlanView createMembershipPlan(GymOsPrincipal principal, CreateMembershipPlanCommand request, String correlationId) {
 		return membershipPlanService.createMembershipPlan(principal, request, correlationId);
 	}
 
 	@Transactional
-	public PlanSummary updateMembershipPlan(GymOsPrincipal principal, UUID planId, UpdateMembershipPlanCommand request, String correlationId) {
+	public PlanView updateMembershipPlan(GymOsPrincipal principal, UUID planId, UpdateMembershipPlanCommand request, String correlationId) {
 		return membershipPlanService.updateMembershipPlan(principal, planId, request, correlationId);
 	}
 }

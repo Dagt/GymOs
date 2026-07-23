@@ -78,6 +78,14 @@ class ArchitectureTests {
 	}
 
 	@Test
+	void catalogApiAndApplicationDoNotDependOnCatalogInfrastructure() {
+		noClasses()
+				.that().resideInAnyPackage("com.gymos.catalog.api..", "com.gymos.catalog.application..")
+				.should().dependOnClassesThat().resideInAPackage("com.gymos.catalog.infrastructure..")
+				.check(classes);
+	}
+
+	@Test
 	void selfServiceUsesOnlyPublicApisFromOtherModules() {
 		var violations = classes.stream()
 				.filter(javaClass -> javaClass.getPackageName().startsWith("com.gymos.selfservice."))

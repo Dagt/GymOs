@@ -5,8 +5,8 @@ import com.gymos.catalog.application.command.CreateMembershipPlanCommand;
 import com.gymos.catalog.application.command.CreatePlanCommand;
 import com.gymos.catalog.application.command.ProductCommand;
 import com.gymos.catalog.application.command.UpdateMembershipPlanCommand;
-import com.gymos.catalog.infrastructure.CatalogRepository.PlanSummary;
-import com.gymos.catalog.infrastructure.CatalogRepository.ProductSummary;
+import com.gymos.catalog.application.query.PlanView;
+import com.gymos.catalog.application.query.ProductSummaryView;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
@@ -41,17 +41,17 @@ public class CatalogController {
 	}
 
 	@GetMapping("/products")
-	List<ProductSummary> products(@AuthenticationPrincipal GymOsPrincipal principal) {
+	List<ProductSummaryView> products(@AuthenticationPrincipal GymOsPrincipal principal) {
 		return catalogService.products(principal);
 	}
 
 	@GetMapping("/products/{productId}")
-	ProductSummary product(@AuthenticationPrincipal GymOsPrincipal principal, @PathVariable UUID productId) {
+	ProductSummaryView product(@AuthenticationPrincipal GymOsPrincipal principal, @PathVariable UUID productId) {
 		return catalogService.product(principal, productId);
 	}
 
 	@PostMapping("/products")
-	ProductSummary createProduct(
+	ProductSummaryView createProduct(
 			@AuthenticationPrincipal GymOsPrincipal principal,
 			@Valid @RequestBody ProductRequest request,
 			HttpServletRequest servletRequest
@@ -60,7 +60,7 @@ public class CatalogController {
 	}
 
 	@PutMapping("/products/{productId}")
-	ProductSummary updateProduct(
+	ProductSummaryView updateProduct(
 			@AuthenticationPrincipal GymOsPrincipal principal,
 			@PathVariable UUID productId,
 			@Valid @RequestBody ProductRequest request,
@@ -70,7 +70,7 @@ public class CatalogController {
 	}
 
 	@PatchMapping("/products/{productId}/status")
-	ProductSummary changeProductStatus(
+	ProductSummaryView changeProductStatus(
 			@AuthenticationPrincipal GymOsPrincipal principal,
 			@PathVariable UUID productId,
 			@Valid @RequestBody ProductStatusRequest request,
@@ -90,12 +90,12 @@ public class CatalogController {
 	}
 
 	@GetMapping("/plans")
-	List<PlanSummary> plans(@AuthenticationPrincipal GymOsPrincipal principal) {
+	List<PlanView> plans(@AuthenticationPrincipal GymOsPrincipal principal) {
 		return catalogService.plans(principal);
 	}
 
 	@PostMapping("/plans")
-	PlanSummary createPlan(
+	PlanView createPlan(
 			@AuthenticationPrincipal GymOsPrincipal principal,
 			@Valid @RequestBody CreatePlanRequest request,
 			HttpServletRequest servletRequest
@@ -104,7 +104,7 @@ public class CatalogController {
 	}
 
 	@PostMapping("/membership-plans")
-	PlanSummary createMembershipPlan(
+	PlanView createMembershipPlan(
 			@AuthenticationPrincipal GymOsPrincipal principal,
 			@Valid @RequestBody CreateMembershipPlanRequest request,
 			HttpServletRequest servletRequest
@@ -113,7 +113,7 @@ public class CatalogController {
 	}
 
 	@PatchMapping("/plans/{planId}")
-	PlanSummary updateMembershipPlan(
+	PlanView updateMembershipPlan(
 			@AuthenticationPrincipal GymOsPrincipal principal,
 			@PathVariable UUID planId,
 			@Valid @RequestBody UpdateMembershipPlanRequest request,

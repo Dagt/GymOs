@@ -2,11 +2,11 @@ package com.gymos.catalog.application;
 
 import com.gymos.audit.api.AuditService;
 import com.gymos.catalog.application.command.ProductCommand;
-import com.gymos.catalog.infrastructure.CatalogCommandRepository;
-import com.gymos.catalog.infrastructure.CatalogCommandRepository.ProductRecord;
-import com.gymos.catalog.infrastructure.CatalogCommandRepository.ProductUpdateRecord;
-import com.gymos.catalog.infrastructure.CatalogRepository;
-import com.gymos.catalog.infrastructure.CatalogRepository.ProductSummary;
+import com.gymos.catalog.application.port.CatalogProductCommandPort;
+import com.gymos.catalog.application.port.CatalogProductCommandPort.ProductMutation;
+import com.gymos.catalog.application.port.CatalogProductQueryPort;
+import com.gymos.catalog.application.port.CatalogDependencyQueryPort;
+import com.gymos.catalog.application.query.ProductSummaryView;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import java.time.OffsetDateTime;
@@ -16,38 +16,43 @@ import org.springframework.stereotype.Service;
 
 @Service
 class CatalogProductService {
-	private final CatalogRepository catalogRepository;
-	private final CatalogCommandRepository commandRepository;
+	private final CatalogProductQueryPort products;
+	private final CatalogProductCommandPort commands;
+	private final CatalogDependencyQueryPort dependencies;
 	private final AuditService auditService;
 
-	CatalogProductService(CatalogRepository catalogRepository, CatalogCommandRepository commandRepository, AuditService auditService) {
-		this.catalogRepository = catalogRepository;
-		this.commandRepository = commandRepository;
+	CatalogProductService(CatalogProductQueryPort products, CatalogProductCommandPort commands,
+			CatalogDependencyQueryPort dependencies, AuditService auditService) {
+		this.products = products;
+		this.commands = commands;
+		this.dependencies = dependencies;
 		this.auditService = auditService;
 	}
 
-	List<ProductSummary> products(GymOsPrincipal principal) {
+	List<ProductSummaryView> products(GymOsPrincipal principal) {
 		CatalogAccessGuard.requirePrincipal(principal);
-		return catalogRepository.products(principal.organizationId());
+		return products.listProducts(principal.organizationId());
 	}
 
-	ProductSummary product(GymOsPrincipal principal, UUID productId) {
+	ProductSummaryView product(GymOsPrincipal principal, UUID productId) {
 		CatalogAccessGuard.requirePrincipal(principal);
 		return requireProduct(principal.organizationId(), productId);
 	}
 
-	ProductSummary createProduct(GymOsPrincipal principal, ProductCommand request, String correlationId) {
+	ProductSummaryView createProduct(GymOsPrincipal principal, ProductCommand request, String correlationId) {
 		CatalogAccessGuard.requirePrincipal(principal);
 		validate(request);
 		String sku = normalizeRequired(request.sku());
-		if (catalogRepository.skuExists(principal.organizationId(), sku, null)) {
+		if (products.skuExists(principal.organizationId(), sku, null)) {
 			throw new BusinessException("PRODUCT_SKU_ALREADY_EXISTS", "Ya existe un producto con ese SKU.");
 		}
+		String barcode = normalizeNullable(request.barcode());
+		validateBarcodeAvailability(principal.organizationId(), barcode, null);
 		UUID productId = UUID.randomUUID();
 		OffsetDateTime now = OffsetDateTime.now();
-		commandRepository.createProduct(new ProductRecord(
-				productId,
+		commands.create(new ProductMutation(
 				principal.organizationId(),
+				productId,
 				sku,
 				request.name().trim(),
 				CatalogBenefitsSerializer.blankToNull(request.description()),
@@ -56,7 +61,7 @@ class CatalogProductService {
 				normalizeRequired(request.currency()),
 				request.taxable(),
 				normalizeRequired(request.status()),
-				normalizeNullable(request.barcode()),
+				barcode,
 				trimToNull(request.brand()),
 				trimToNull(request.presentation()),
 				normalizeNullable(request.unitOfMeasure()),
@@ -70,15 +75,18 @@ class CatalogProductService {
 		return requireProduct(principal.organizationId(), productId);
 	}
 
-	ProductSummary updateProduct(GymOsPrincipal principal, UUID productId, ProductCommand request, String correlationId) {
+	ProductSummaryView updateProduct(GymOsPrincipal principal, UUID productId, ProductCommand request, String correlationId) {
 		CatalogAccessGuard.requirePrincipal(principal);
 		validate(request);
-		requireProduct(principal.organizationId(), productId);
+		ProductSummaryView existing = requireProduct(principal.organizationId(), productId);
+		validateTransition(principal.organizationId(), existing, request);
 		String sku = normalizeRequired(request.sku());
-		if (catalogRepository.skuExists(principal.organizationId(), sku, productId)) {
+		if (products.skuExists(principal.organizationId(), sku, productId)) {
 			throw new BusinessException("PRODUCT_SKU_ALREADY_EXISTS", "Ya existe otro producto con ese SKU.");
 		}
-		int updated = commandRepository.updateProduct(new ProductUpdateRecord(
+		String barcode = normalizeNullable(request.barcode());
+		validateBarcodeAvailability(principal.organizationId(), barcode, productId);
+		int updated = commands.update(new ProductMutation(
 				principal.organizationId(),
 				productId,
 				sku,
@@ -89,7 +97,7 @@ class CatalogProductService {
 				normalizeRequired(request.currency()),
 				request.taxable(),
 				normalizeRequired(request.status()),
-				normalizeNullable(request.barcode()),
+				barcode,
 				trimToNull(request.brand()),
 				trimToNull(request.presentation()),
 				normalizeNullable(request.unitOfMeasure()),
@@ -106,14 +114,14 @@ class CatalogProductService {
 		return requireProduct(principal.organizationId(), productId);
 	}
 
-	ProductSummary changeStatus(GymOsPrincipal principal, UUID productId, String status, String correlationId) {
+	ProductSummaryView changeStatus(GymOsPrincipal principal, UUID productId, String status, String correlationId) {
 		CatalogAccessGuard.requirePrincipal(principal);
 		String normalizedStatus = normalizeRequired(status);
 		if (!"ACTIVE".equals(normalizedStatus) && !"INACTIVE".equals(normalizedStatus)) {
 			throw new BusinessException("PRODUCT_STATUS_INVALID", "El estado del producto no es valido.");
 		}
 		requireProduct(principal.organizationId(), productId);
-		int updated = commandRepository.changeProductStatus(
+		int updated = commands.changeStatus(
 				principal.organizationId(), productId, normalizedStatus, principal.userId(), OffsetDateTime.now());
 		if (updated != 1) {
 			throw new BusinessException("PRODUCT_NOT_FOUND", "El producto no existe o fue archivado.");
@@ -124,11 +132,14 @@ class CatalogProductService {
 
 	void archiveProduct(GymOsPrincipal principal, UUID productId, String correlationId) {
 		CatalogAccessGuard.requirePrincipal(principal);
-		ProductSummary product = requireProduct(principal.organizationId(), productId);
+		ProductSummaryView product = requireProduct(principal.organizationId(), productId);
 		if ("MEMBERSHIP_PLAN".equals(product.productType())) {
 			throw new BusinessException("PRODUCT_ARCHIVE_REQUIRES_PLAN_WORKFLOW", "Los productos de membresia se administran desde planes.");
 		}
-		int updated = commandRepository.archiveProduct(
+		if (dependencies.hasActiveMembershipPlan(principal.organizationId(), productId)) {
+			throw new BusinessException("PRODUCT_ARCHIVE_NOT_ALLOWED", "El producto tiene un plan de membresia activo.");
+		}
+		int updated = commands.archive(
 				principal.organizationId(), productId, principal.userId(), OffsetDateTime.now());
 		if (updated != 1) {
 			throw new BusinessException("PRODUCT_NOT_FOUND", "El producto no existe o ya fue archivado.");
@@ -136,8 +147,8 @@ class CatalogProductService {
 		auditService.record(principal, "PRODUCT_ARCHIVED", "CATALOG_PRODUCT", productId, "BACKOFFICE", null, correlationId);
 	}
 
-	private ProductSummary requireProduct(UUID organizationId, UUID productId) {
-		return catalogRepository.product(organizationId, productId)
+	private ProductSummaryView requireProduct(UUID organizationId, UUID productId) {
+		return products.findProduct(organizationId, productId)
 				.orElseThrow(() -> new BusinessException("PRODUCT_NOT_FOUND", "El producto no esta disponible."));
 	}
 
@@ -148,6 +159,40 @@ class CatalogProductService {
 		}
 		if (request.displayOrder() < 0) {
 			throw new BusinessException("PRODUCT_DISPLAY_ORDER_INVALID", "El orden de visualizacion no puede ser negativo.");
+		}
+		String barcode = normalizeNullable(request.barcode());
+		if (barcode != null && !barcode.matches("[A-Z0-9._-]{3,128}")) {
+			throw new BusinessException("PRODUCT_BARCODE_INVALID", "El codigo de barras contiene caracteres no permitidos.");
+		}
+	}
+
+	private void validateBarcodeAvailability(UUID organizationId, String barcode, UUID excludedProductId) {
+		if (barcode != null && products.barcodeExists(organizationId, barcode, excludedProductId)) {
+			throw new BusinessException("PRODUCT_BARCODE_ALREADY_EXISTS", "Ya existe otro producto con ese codigo de barras.");
+		}
+	}
+
+	private void validateTransition(UUID organizationId, ProductSummaryView existing, ProductCommand request) {
+		String nextType = normalizeRequired(request.productType());
+		boolean hasMovements = dependencies.hasInventoryMovements(organizationId, existing.id());
+		if (hasMovements && !existing.productType().equals(nextType)) {
+			throw new BusinessException(
+					"PRODUCT_TYPE_CHANGE_NOT_ALLOWED",
+					"No se puede cambiar el tipo de un producto con movimientos de inventario."
+			);
+		}
+		if (hasMovements && existing.inventoryTracked() && !request.inventoryTracked()) {
+			throw new BusinessException(
+					"PRODUCT_INVENTORY_TRACKING_CHANGE_NOT_ALLOWED",
+					"No se puede desactivar el control de inventario cuando existen movimientos."
+			);
+		}
+		if (dependencies.hasActiveMembershipPlan(organizationId, existing.id())
+				&& !"MEMBERSHIP_PLAN".equals(nextType)) {
+			throw new BusinessException(
+					"PRODUCT_TYPE_CHANGE_NOT_ALLOWED",
+					"El producto esta vinculado a un plan de membresia activo."
+			);
 		}
 	}
 

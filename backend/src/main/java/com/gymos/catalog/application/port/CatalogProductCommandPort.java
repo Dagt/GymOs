@@ -1,0 +1,23 @@
+package com.gymos.catalog.application.port;
+
+import java.time.OffsetDateTime;
+import java.util.UUID;
+
+public interface CatalogProductCommandPort {
+	void create(ProductMutation mutation);
+
+	int update(ProductMutation mutation);
+
+	int changeStatus(UUID organizationId, UUID productId, String status, UUID userId, OffsetDateTime now);
+
+	int archive(UUID organizationId, UUID productId, UUID userId, OffsetDateTime now);
+
+	record ProductMutation(
+			UUID organizationId, UUID productId, String sku, String name, String description,
+			String productType, long priceCents, String currency, boolean taxable, String status,
+			String barcode, String brand, String presentation, String unitOfMeasure,
+			boolean inventoryTracked, int displayOrder, String imageObjectKey,
+			OffsetDateTime now, UUID userId
+	) {
+	}
+}

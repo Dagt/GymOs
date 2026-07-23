@@ -1,6 +1,6 @@
 package com.gymos.catalog.infrastructure;
 
-import com.gymos.catalog.infrastructure.CatalogRepository.ProductSummary;
+import com.gymos.catalog.application.query.ProductSummaryView;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,7 +21,7 @@ class CatalogProductQueryRepository {
 		this.jdbcClient = jdbcClient;
 	}
 
-	List<ProductSummary> list(UUID organizationId) {
+	List<ProductSummaryView> list(UUID organizationId) {
 		return jdbcClient.sql("""
 				SELECT %s
 				FROM catalog_product
@@ -35,7 +35,7 @@ class CatalogProductQueryRepository {
 				.list();
 	}
 
-	Optional<ProductSummary> find(UUID organizationId, UUID productId) {
+	Optional<ProductSummaryView> find(UUID organizationId, UUID productId) {
 		return jdbcClient.sql("""
 				SELECT %s
 				FROM catalog_product

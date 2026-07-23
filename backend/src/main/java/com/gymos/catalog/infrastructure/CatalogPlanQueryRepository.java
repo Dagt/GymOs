@@ -1,6 +1,6 @@
 package com.gymos.catalog.infrastructure;
 
-import com.gymos.catalog.infrastructure.CatalogRepository.PlanSummary;
+import com.gymos.catalog.application.query.PlanView;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,7 +15,7 @@ class CatalogPlanQueryRepository {
 		this.jdbcClient = jdbcClient;
 	}
 
-	List<PlanSummary> list(UUID organizationId) {
+	List<PlanView> list(UUID organizationId) {
 		return jdbcClient.sql("""
 				SELECT mp.id, mp.product_id, cp.sku, cp.name, cp.price_cents, cp.currency,
 				       mp.duration_days, mp.grace_days, mp.benefits_json::text AS benefits_json,
@@ -32,7 +32,7 @@ class CatalogPlanQueryRepository {
 				.list();
 	}
 
-	Optional<PlanSummary> find(UUID organizationId, UUID planId) {
+	Optional<PlanView> find(UUID organizationId, UUID planId) {
 		return jdbcClient.sql("""
 				SELECT mp.id, mp.product_id, cp.sku, cp.name, cp.price_cents, cp.currency,
 				       mp.duration_days, mp.grace_days, mp.benefits_json::text AS benefits_json,

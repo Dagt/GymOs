@@ -1,7 +1,7 @@
 package com.gymos.catalog.infrastructure;
 
-import com.gymos.catalog.infrastructure.CatalogRepository.PlanSummary;
-import com.gymos.catalog.infrastructure.CatalogRepository.ProductSummary;
+import com.gymos.catalog.application.query.PlanView;
+import com.gymos.catalog.application.query.ProductSummaryView;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.springframework.jdbc.core.RowMapper;
@@ -10,8 +10,8 @@ final class CatalogRowMappers {
 	private CatalogRowMappers() {
 	}
 
-	static RowMapper<ProductSummary> productSummary() {
-		return (resultSet, rowNumber) -> new ProductSummary(
+	static RowMapper<ProductSummaryView> productSummary() {
+		return (resultSet, rowNumber) -> new ProductSummaryView(
 				resultSet.getObject("id", UUID.class),
 				resultSet.getString("sku"),
 				resultSet.getString("name"),
@@ -33,8 +33,8 @@ final class CatalogRowMappers {
 		);
 	}
 
-	static RowMapper<PlanSummary> planSummary() {
-		return (resultSet, rowNumber) -> new PlanSummary(
+	static RowMapper<PlanView> planSummary() {
+		return (resultSet, rowNumber) -> new PlanView(
 				resultSet.getObject("id", UUID.class),
 				resultSet.getObject("product_id", UUID.class),
 				resultSet.getString("sku"),

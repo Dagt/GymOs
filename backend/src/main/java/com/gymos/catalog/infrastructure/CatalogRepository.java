@@ -1,13 +1,16 @@
 package com.gymos.catalog.infrastructure;
 
-import java.time.OffsetDateTime;
+import com.gymos.catalog.application.port.CatalogPlanQueryPort;
+import com.gymos.catalog.application.port.CatalogProductQueryPort;
+import com.gymos.catalog.application.query.PlanView;
+import com.gymos.catalog.application.query.ProductSummaryView;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public class CatalogRepository {
+public class CatalogRepository implements CatalogProductQueryPort, CatalogPlanQueryPort {
 	private final CatalogProductQueryRepository products;
 	private final CatalogPlanQueryRepository plans;
 	private final CatalogSkuLookupRepository skus;
@@ -19,62 +22,47 @@ public class CatalogRepository {
 		this.skus = skus;
 	}
 
-	public List<ProductSummary> products(UUID organizationId) {
+	public List<ProductSummaryView> listProducts(UUID organizationId) {
 		return products.list(organizationId);
 	}
 
-	public Optional<ProductSummary> product(UUID organizationId, UUID productId) {
+	@Override
+	public Optional<ProductSummaryView> findProduct(UUID organizationId, UUID productId) {
 		return products.find(organizationId, productId);
 	}
 
+	@Override
 	public boolean skuExists(UUID organizationId, String sku, UUID excludedProductId) {
 		return skus.exists(organizationId, sku, excludedProductId);
 	}
 
-	public List<PlanSummary> plans(UUID organizationId) {
+	@Override
+	public boolean barcodeExists(UUID organizationId, String barcode, UUID excludedProductId) {
+		return skus.barcodeExists(organizationId, barcode, excludedProductId);
+	}
+
+	public List<PlanView> listPlans(UUID organizationId) {
 		return plans.list(organizationId);
 	}
 
-	public Optional<PlanSummary> plan(UUID organizationId, UUID planId) {
+	@Override
+	public Optional<PlanView> findPlan(UUID organizationId, UUID planId) {
 		return plans.find(organizationId, planId);
 	}
 
-	public record ProductSummary(
-			UUID id,
-			String sku,
-			String name,
-			String description,
-			String productType,
-			long priceCents,
-			String currency,
-			boolean taxable,
-			String status,
-			String barcode,
-			String brand,
-			String presentation,
-			String unitOfMeasure,
-			boolean inventoryTracked,
-			int displayOrder,
-			String imageObjectKey,
-			OffsetDateTime createdAt,
-			OffsetDateTime updatedAt
-	) {
+	public List<ProductSummaryView> products(UUID organizationId) {
+		return listProducts(organizationId);
 	}
 
-	public record PlanSummary(
-			UUID id,
-			UUID productId,
-			String sku,
-			String name,
-			long priceCents,
-			String currency,
-			int durationDays,
-			int graceDays,
-			String benefitsJson,
-			boolean multiBranchAccess,
-			String status,
-			OffsetDateTime createdAt,
-			OffsetDateTime updatedAt
-	) {
+	public Optional<ProductSummaryView> product(UUID organizationId, UUID productId) {
+		return findProduct(organizationId, productId);
+	}
+
+	public List<PlanView> plans(UUID organizationId) {
+		return listPlans(organizationId);
+	}
+
+	public Optional<PlanView> plan(UUID organizationId, UUID planId) {
+		return findPlan(organizationId, planId);
 	}
 }
