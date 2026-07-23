@@ -25,15 +25,21 @@ export default function InventoryPage() {
       session={controller.session} subtitle="Existencias, movimientos, ajustes y alertas." title="Inventario">
       <section className="grid gap-6 lg:grid-cols-[1fr_1.25fr]">
         <aside className="grid gap-6">
-          <InventoryStockPanel onRefresh={() => controller.refresh()} onSelectProduct={controller.selectProduct}
-            selectedProductId={controller.selectedProductId} stock={controller.stock} />
+          <InventoryStockPanel loading={controller.stockLoading} onPageChange={controller.setStockPage}
+            onQueryChange={controller.setStockQuery} onRefresh={() => controller.refresh()}
+            onSelectProduct={controller.selectProduct} onSortChange={controller.setStockSort}
+            page={controller.stockPage} query={controller.stockQuery}
+            selectedProductId={controller.selectedProductId} sort={controller.stockSort}
+            stock={controller.stock} total={controller.stockTotal} totalPages={controller.stockTotalPages} />
           <InventoryAlertsPanel lowStock={controller.lowStock} />
         </aside>
         <section className="grid gap-6">
           <InventoryStatusMessages error={controller.error} message={controller.message} />
           <InventoryMovementSummary onOpenDrawer={() => controller.setShowMovementDrawer(true)}
             selectedStock={controller.selectedStock} />
-          <InventoryMovementsTable movements={controller.movements} />
+          <InventoryMovementsTable loading={controller.movementLoading} movements={controller.movements}
+            onPageChange={controller.setMovementPage} page={controller.movementPage}
+            totalPages={controller.movementTotalPages} />
         </section>
       </section>
       <InventoryMovementDrawer movementType={controller.movementType}
