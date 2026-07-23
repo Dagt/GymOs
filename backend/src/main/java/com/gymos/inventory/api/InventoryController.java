@@ -76,7 +76,7 @@ public class InventoryController {
 
 	public record InventoryMovementRequest(
 			@NotNull UUID productId,
-			@NotBlank @Pattern(regexp = "INITIAL|PURCHASE|ADJUSTMENT_IN|ADJUSTMENT_OUT|WASTE|RETURN|SALE")
+			@NotBlank @Pattern(regexp = "INITIAL|PURCHASE|ADJUSTMENT_IN|ADJUSTMENT_OUT|WASTE|RETURN")
 			String movementType,
 			@Min(1) int quantity,
 			@Min(0) Long unitCostCents,
