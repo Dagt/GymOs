@@ -8,6 +8,7 @@ import {
   getCatalogCategories,
   getPlans,
   getStoredSession,
+  restoreProduct,
   searchProducts,
   uploadProductImage,
   updateProduct,
@@ -56,10 +57,11 @@ export function useCatalogController() {
   useEffect(() => {
     if (!session) return;
     let active = true;
+    setLoading(true);
     loadCatalog(session.accessToken, catalogFilters.filters)
       .then(([page, loadedPlans, loadedCategories]) => {
         if (!active) return;
-        setProducts(page.items.filter((product) => product.productType !== "MEMBERSHIP_PLAN"));
+        setProducts(page.items);
         setTotalProducts(page.totalElements);
         setTotalPages(page.totalPages);
         setPlans(loadedPlans);
@@ -81,7 +83,7 @@ export function useCatalogController() {
   async function reloadCatalog() {
     if (!session) return;
     const [page, loadedPlans, loadedCategories] = await loadCatalog(session.accessToken, catalogFilters.filters);
-    setProducts(page.items.filter((product) => product.productType !== "MEMBERSHIP_PLAN"));
+    setProducts(page.items);
     setTotalProducts(page.totalElements);
     setTotalPages(page.totalPages);
     setPlans(loadedPlans);
@@ -99,14 +101,12 @@ export function useCatalogController() {
       const saved = editingProductId
         ? await updateProduct(session.accessToken, editingProductId, payload)
         : await createProduct(session.accessToken, payload);
-      if (productImage) {
-        await uploadProductImage(session.accessToken, saved.id, productImage);
-      }
+      if (productImage) await uploadProductImage(session.accessToken, saved.id, productImage);
       await reloadCatalog();
       resetProductDrawer();
       setMessage(editingProductId ? "Producto actualizado." : "Producto creado.");
     } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible crear producto.");
+      setError(exception instanceof Error ? exception.message : "No fue posible guardar el producto.");
     } finally {
       setSaving(false);
     }
@@ -121,6 +121,7 @@ export function useCatalogController() {
   }
 
   function openProductEdition(product: ProductSummary) {
+    if (product.archived) return;
     setEditingProductId(product.id);
     setForm(productToDraft(product));
     setPrice(String(product.priceCents / 100));
@@ -137,32 +138,42 @@ export function useCatalogController() {
   }
 
   async function toggleProductStatus(product: ProductSummary) {
-    if (!session) return;
-    setSaving(true);
-    try {
-      await changeProductStatus(
-        session.accessToken,
-        product.id,
-        product.status === "ACTIVE" ? "INACTIVE" : "ACTIVE",
-      );
-      await reloadCatalog();
-      setMessage(product.status === "ACTIVE" ? "Producto desactivado." : "Producto activado.");
-    } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible cambiar el estado.");
-    } finally {
-      setSaving(false);
-    }
+    if (!session || product.archived) return;
+    await runMutation(
+      () => changeProductStatus(session.accessToken, product.id, product.status === "ACTIVE" ? "INACTIVE" : "ACTIVE"),
+      product.status === "ACTIVE" ? "Producto desactivado." : "Producto activado.",
+      "No fue posible cambiar el estado.",
+    );
   }
 
   async function archiveCatalogProduct(product: ProductSummary) {
-    if (!session || !window.confirm(`Archivar ${product.name}? Se conservara en el historial.`)) return;
+    if (!session || product.archived || !window.confirm(`Archivar ${product.name}? Se conservara en el historial.`)) return;
+    await runMutation(
+      () => archiveProduct(session.accessToken, product.id),
+      "Producto archivado.",
+      "No fue posible archivar el producto.",
+    );
+  }
+
+  async function restoreCatalogProduct(product: ProductSummary) {
+    if (!session || !product.archived || !window.confirm(`Restaurar ${product.name}? Quedara inactivo hasta que lo habilites.`)) return;
+    await runMutation(
+      () => restoreProduct(session.accessToken, product.id),
+      "Producto restaurado como inactivo.",
+      "No fue posible restaurar el producto.",
+    );
+  }
+
+  async function runMutation(action: () => Promise<unknown>, successMessage: string, failureMessage: string) {
     setSaving(true);
+    setError(null);
+    setMessage(null);
     try {
-      await archiveProduct(session.accessToken, product.id);
+      await action();
       await reloadCatalog();
-      setMessage("Producto archivado.");
+      setMessage(successMessage);
     } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible archivar el producto.");
+      setError(exception instanceof Error ? exception.message : failureMessage);
     } finally {
       setSaving(false);
     }
@@ -170,6 +181,7 @@ export function useCatalogController() {
 
   return {
     archiveCatalogProduct,
+    restoreCatalogProduct,
     catalogFilters,
     categories,
     editingProductId,
