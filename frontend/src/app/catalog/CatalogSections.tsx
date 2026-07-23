@@ -9,8 +9,6 @@ import {
 import type {
   MembershipPlanPayload,
   PlanSummary,
-  ProductPayload,
-  ProductSummary,
 } from "@/lib/api";
 import { formatMoney, type PlanDraft } from "./CatalogHelpers";
 
@@ -46,47 +44,13 @@ export function CatalogToolbar({ canCreate, onNewPlan, onNewProduct }: CatalogTo
   );
 }
 
-type ProductListProps = {
-  loading: boolean;
-  products: ProductSummary[];
-};
-
-export function ProductList({ loading, products }: ProductListProps) {
-  return (
-    <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-xl font-semibold">Productos y servicios</h2>
-        <span className="text-sm text-[#6f7a73]">{products.length}</span>
-      </div>
-      <div className="mt-4 grid gap-3">
-        {loading ? <p className="text-sm text-[#5d6b63]">Cargando catalogo...</p> : null}
-        {!loading && products.length === 0 ? (
-          <p className="text-sm text-[#5d6b63]">No hay productos o servicios registrados.</p>
-        ) : null}
-        {products.map((product) => (
-          <article className="rounded-md border border-[#d8ddd2] px-4 py-3" key={product.id}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="font-semibold">{product.name}</p>
-                <p className="mt-1 text-sm text-[#5d6b63]">
-                  {product.sku} - {product.productType} - {product.status}
-                </p>
-              </div>
-              <p className="font-semibold">{formatMoney(product.priceCents, product.currency)}</p>
-            </div>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 type PlanListProps = {
+  canUpdate: boolean;
   plans: PlanSummary[];
   onEditPlan: (plan: PlanSummary) => void;
 };
 
-export function PlanList({ plans, onEditPlan }: PlanListProps) {
+export function PlanList({ canUpdate, plans, onEditPlan }: PlanListProps) {
   return (
     <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
       <h2 className="text-xl font-semibold">Planes</h2>
@@ -101,71 +65,19 @@ export function PlanList({ plans, onEditPlan }: PlanListProps) {
             <p className="mt-2 text-xs font-semibold text-[var(--brand-primary)]">
               {plan.multiBranchAccess ? "Acceso multi-sucursal" : "Acceso por sucursal de venta"}
             </p>
-            <button
-              className="mt-3 h-9 rounded-md border border-[#cdd5ca] px-3 text-xs font-semibold text-[var(--brand-primary)]"
-              onClick={() => onEditPlan(plan)}
-              type="button"
-            >
-              Editar plan
-            </button>
+            {canUpdate ? (
+              <button
+                className="mt-3 h-9 rounded-md border border-[#cdd5ca] px-3 text-xs font-semibold text-[var(--brand-primary)]"
+                onClick={() => onEditPlan(plan)}
+                type="button"
+              >
+                Editar plan
+              </button>
+            ) : null}
           </article>
         ))}
       </div>
     </section>
-  );
-}
-
-type ProductDrawerProps = {
-  form: ProductPayload;
-  open: boolean;
-  price: string;
-  saving: boolean;
-  onClose: () => void;
-  onFormChange: (form: ProductPayload) => void;
-  onPriceChange: (value: string) => void;
-  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
-};
-
-export function ProductDrawer({
-  form,
-  open,
-  price,
-  saving,
-  onClose,
-  onFormChange,
-  onPriceChange,
-  onSubmit,
-}: ProductDrawerProps) {
-  return (
-    <AppDrawer
-      description="Articulos de mostrador o servicios vendibles. Las membresias se crean como planes."
-      onClose={onClose}
-      open={open}
-      title="Nuevo producto de venta"
-    >
-      <form className="grid gap-4" onSubmit={onSubmit}>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <TextField label="SKU" name="productSku" value={form.sku} onChange={(value) => onFormChange({ ...form, sku: value })} />
-          <TextField label="Nombre" name="productName" value={form.name} onChange={(value) => onFormChange({ ...form, name: value })} />
-          <NumberField label="Precio" name="productPrice" value={price} onChange={onPriceChange} />
-          <TextField label="Moneda" name="productCurrency" value={form.currency} onChange={(value) => onFormChange({ ...form, currency: value })} />
-        </div>
-        <SelectField
-          label="Tipo"
-          name="productType"
-          options={[
-            { label: "Producto fisico", value: "PHYSICAL" },
-            { label: "Servicio", value: "SERVICE" },
-          ]}
-          value={form.productType}
-          onChange={(value) => onFormChange({ ...form, productType: value as ProductPayload["productType"] })}
-        />
-        <TextAreaField label="Descripcion" name="productDescription" value={form.description ?? ""} onChange={(value) => onFormChange({ ...form, description: value })} />
-        <button className="app-button h-11" disabled={saving} type="submit">
-          {saving ? "Guardando..." : "Crear producto"}
-        </button>
-      </form>
-    </AppDrawer>
   );
 }
 
