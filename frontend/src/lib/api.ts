@@ -244,12 +244,12 @@ export * from "./api/onboarding";
 export {
   createInternalUser,
   getInternalUsers,
-  getInternalUserRoles,
-  setInternalUserRole,
-  setInternalUserStatus,
+  getUserRoles,
+  updateInternalUserRole,
+  updateInternalUserStatus,
 } from "./api/users";
 export type {
   CreateInternalUserPayload,
-  InternalUserRole,
   InternalUserSummary,
+  RoleOption,
 } from "./api/user-types";
