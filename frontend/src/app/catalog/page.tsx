@@ -74,6 +74,7 @@ function CatalogContent() {
           saving={controller.saving}
           onArchive={controller.archiveCatalogProduct}
           onEdit={controller.openProductEdition}
+          onRestore={controller.restoreCatalogProduct}
           onToggleStatus={controller.toggleProductStatus}
         />
         <CatalogPagination
@@ -89,7 +90,11 @@ function CatalogContent() {
           />
         ) : null}
         <section className="grid gap-6">
-          <PlanList plans={controller.plans} onEditPlan={controller.openPlanEdition} />
+          <PlanList
+            canUpdate={controller.canUpdate}
+            plans={controller.plans}
+            onEditPlan={controller.openPlanEdition}
+          />
         </section>
       </section>
 
