@@ -1,6 +1,8 @@
 package com.gymos.catalog.api;
 
 import com.gymos.catalog.application.CatalogService;
+import com.gymos.catalog.application.query.CatalogSummaryView;
+import com.gymos.catalog.application.query.ProductDetailView;
 import com.gymos.catalog.application.query.ProductPageView;
 import com.gymos.catalog.application.query.ProductSearchCriteria;
 import com.gymos.catalog.application.query.ProductSummaryView;
@@ -32,13 +34,17 @@ import org.springframework.web.bind.annotation.RestController;
 class CatalogProductController {
 	private final CatalogService catalogService;
 
-	CatalogProductController(CatalogService catalogService) {
-		this.catalogService = catalogService;
-	}
+	CatalogProductController(CatalogService catalogService) { this.catalogService = catalogService; }
 
 	@GetMapping
-	List<ProductSummaryView> products(@AuthenticationPrincipal GymOsPrincipal principal) {
-		return catalogService.products(principal);
+	List<ProductSummaryView> products(@AuthenticationPrincipal GymOsPrincipal principal) { return catalogService.products(principal); }
+
+	@GetMapping("/summary")
+	CatalogSummaryView summary(@AuthenticationPrincipal GymOsPrincipal principal) { return catalogService.summary(principal); }
+
+	@GetMapping("/by-barcode/{barcode}")
+	ProductSummaryView productByBarcode(@AuthenticationPrincipal GymOsPrincipal principal, @PathVariable String barcode) {
+		return catalogService.productByBarcode(principal, barcode);
 	}
 
 	@GetMapping("/{productId}")
@@ -46,19 +52,21 @@ class CatalogProductController {
 		return catalogService.product(principal, productId);
 	}
 
+	@GetMapping("/{productId}/detail")
+	ProductDetailView productDetail(@AuthenticationPrincipal GymOsPrincipal principal, @PathVariable UUID productId,
+			@RequestParam(defaultValue = "50") @Min(1) @Max(200) int historyLimit) {
+		return catalogService.productDetail(principal, productId, historyLimit);
+	}
+
 	@GetMapping("/search")
-	ProductPageView searchProducts(
-			@AuthenticationPrincipal GymOsPrincipal principal,
-			@RequestParam(required = false) String q,
-			@RequestParam(required = false) String type,
-			@RequestParam(required = false) UUID categoryId,
-			@RequestParam(required = false) String status,
+	ProductPageView searchProducts(@AuthenticationPrincipal GymOsPrincipal principal,
+			@RequestParam(required = false) String q, @RequestParam(required = false) String type,
+			@RequestParam(required = false) UUID categoryId, @RequestParam(required = false) String status,
 			@RequestParam(required = false) Boolean inventoryTracked,
 			@RequestParam(defaultValue = "false") boolean includeArchived,
 			@RequestParam(defaultValue = "0") @Min(0) int page,
 			@RequestParam(defaultValue = "25") @Min(1) @Max(100) int size,
-			@RequestParam(defaultValue = "displayOrder,asc") String sort
-	) {
+			@RequestParam(defaultValue = "displayOrder,asc") String sort) {
 		return catalogService.searchProducts(principal,
 				new ProductSearchCriteria(q, type, categoryId, status, inventoryTracked, includeArchived, page, size, sort));
 	}
