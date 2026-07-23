@@ -925,3 +925,36 @@ Verificado:
 - Frontend: `npm.cmd run lint`.
 - Frontend: `npm.cmd run build`.
 - Backend: `./gradlew.bat test` completo. Resultado exitoso; queda warning no bloqueante de apagado de Spring Modulith en pruebas H2 por `event_publication`, recomendado para el bloque backend profundo.
+
+## Saneamiento de paginas operativas grandes - 22 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `/inventory` separa la presentacion en `InventorySections.tsx`:
+  - existencias;
+  - alertas;
+  - resumen de movimiento;
+  - tabla de movimientos recientes;
+  - drawer de registro de movimiento.
+- `inventory/page.tsx` queda como orquestador de sesion, carga, seleccion de producto y envio de movimiento.
+- `/wellness` separa formularios y paneles en `WellnessSections.tsx`:
+  - alta de profesional;
+  - directorio de profesionales;
+  - alta de servicio;
+  - disponibilidad;
+  - resumen de servicios y horarios.
+- `wellness/page.tsx` queda como orquestador de sesion, carga, seleccion de profesional y mutaciones.
+- `/access` extrae la logica de estado y acciones a `useAccessController.ts`:
+  - busqueda de socios;
+  - seleccion de dispositivo;
+  - evaluacion de acceso;
+  - apertura manual;
+  - pases temporales;
+  - paquetes de visitas;
+  - bitacora.
+- `access/page.tsx` queda como composicion de secciones, reduciendo el acoplamiento entre flujo y UI.
+
+Verificado:
+
+- Frontend: `npm.cmd run typecheck`.
+- Frontend: `npm.cmd run lint`.
