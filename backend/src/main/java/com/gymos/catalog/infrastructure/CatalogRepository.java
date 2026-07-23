@@ -3,9 +3,9 @@ package com.gymos.catalog.infrastructure;
 import com.gymos.catalog.application.port.CatalogPlanQueryPort;
 import com.gymos.catalog.application.port.CatalogProductQueryPort;
 import com.gymos.catalog.application.query.PlanView;
-import com.gymos.catalog.application.query.ProductSummaryView;
 import com.gymos.catalog.application.query.ProductPageView;
 import com.gymos.catalog.application.query.ProductSearchCriteria;
+import com.gymos.catalog.application.query.ProductSummaryView;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -24,6 +24,7 @@ public class CatalogRepository implements CatalogProductQueryPort, CatalogPlanQu
 		this.skus = skus;
 	}
 
+	@Override
 	public List<ProductSummaryView> listProducts(UUID organizationId) {
 		return products.list(organizationId);
 	}
@@ -31,6 +32,11 @@ public class CatalogRepository implements CatalogProductQueryPort, CatalogPlanQu
 	@Override
 	public Optional<ProductSummaryView> findProduct(UUID organizationId, UUID productId) {
 		return products.find(organizationId, productId);
+	}
+
+	@Override
+	public Optional<ProductSummaryView> findProductIncludingArchived(UUID organizationId, UUID productId) {
+		return products.findIncludingArchived(organizationId, productId);
 	}
 
 	@Override
@@ -48,6 +54,7 @@ public class CatalogRepository implements CatalogProductQueryPort, CatalogPlanQu
 		return products.search(organizationId, criteria);
 	}
 
+	@Override
 	public List<PlanView> listPlans(UUID organizationId) {
 		return plans.list(organizationId);
 	}
@@ -57,19 +64,8 @@ public class CatalogRepository implements CatalogProductQueryPort, CatalogPlanQu
 		return plans.find(organizationId, planId);
 	}
 
-	public List<ProductSummaryView> products(UUID organizationId) {
-		return listProducts(organizationId);
-	}
-
-	public Optional<ProductSummaryView> product(UUID organizationId, UUID productId) {
-		return findProduct(organizationId, productId);
-	}
-
-	public List<PlanView> plans(UUID organizationId) {
-		return listPlans(organizationId);
-	}
-
-	public Optional<PlanView> plan(UUID organizationId, UUID planId) {
-		return findPlan(organizationId, planId);
-	}
+	public List<ProductSummaryView> products(UUID organizationId) { return listProducts(organizationId); }
+	public Optional<ProductSummaryView> product(UUID organizationId, UUID productId) { return findProduct(organizationId, productId); }
+	public List<PlanView> plans(UUID organizationId) { return listPlans(organizationId); }
+	public Optional<PlanView> plan(UUID organizationId, UUID planId) { return findPlan(organizationId, planId); }
 }
