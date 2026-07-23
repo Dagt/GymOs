@@ -84,7 +84,7 @@ class CatalogProductService {
 		if (products.skuExists(principal.organizationId(), sku, null)) throw duplicateSku();
 		String barcode = normalizeNullable(request.barcode());
 		validateBarcodeAvailability(principal.organizationId(), barcode, null);
-		validateCategory(principal.organizationId(), request.categoryId());
+		validateCategory(principal.organizationId(), request.categoryId(), null);
 		List<String> tags = normalizeTags(request.tags());
 		UUID productId = UUID.randomUUID();
 		OffsetDateTime now = OffsetDateTime.now();
@@ -112,7 +112,7 @@ class CatalogProductService {
 		if (products.skuExists(principal.organizationId(), sku, productId)) throw duplicateSku();
 		String barcode = normalizeNullable(request.barcode());
 		validateBarcodeAvailability(principal.organizationId(), barcode, productId);
-		validateCategory(principal.organizationId(), request.categoryId());
+		validateCategory(principal.organizationId(), request.categoryId(), existing.categoryId());
 		List<String> tags = normalizeTags(request.tags());
 		OffsetDateTime now = OffsetDateTime.now();
 		int updated = commands.update(mutation(principal, productId, request, sku, barcode, existing.imageObjectKey(), existing, now));
@@ -274,9 +274,11 @@ class CatalogProductService {
 		}
 	}
 
-	private void validateCategory(UUID organizationId, UUID categoryId) {
-		if (categoryId != null && categories.findCategory(organizationId, categoryId)
-				.filter(category -> "ACTIVE".equals(category.status())).isEmpty()) {
+	private void validateCategory(UUID organizationId, UUID categoryId, UUID existingCategoryId) {
+		if (categoryId == null) return;
+		var category = categories.findCategory(organizationId, categoryId)
+				.orElseThrow(() -> new BusinessException("CATEGORY_NOT_AVAILABLE", "La categoria no existe o esta inactiva."));
+		if (!"ACTIVE".equals(category.status()) && !categoryId.equals(existingCategoryId)) {
 			throw new BusinessException("CATEGORY_NOT_AVAILABLE", "La categoria no existe o esta inactiva.");
 		}
 	}
