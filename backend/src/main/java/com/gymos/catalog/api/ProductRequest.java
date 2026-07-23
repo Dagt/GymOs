@@ -31,14 +31,15 @@ public record ProductRequest(
 		OffsetDateTime promotionStartsAt,
 		OffsetDateTime promotionEndsAt,
 		UUID categoryId,
-		@Size(max = 20) List<@Size(max = 80) String> tags
+		@Size(max = 20) List<@Size(max = 80) String> tags,
+		@Min(0) Long version
 ) {
 	ProductCommand toCommand() {
 		return new ProductCommand(
 				sku, name, description, productType, resolvedSubtype(), priceCents, currency, taxable, status,
 				barcode, brand, presentation, unitOfMeasure, inventoryTracked, displayOrder,
 				supplierName, referenceCostCents, promotionalPriceCents, promotionStartsAt, promotionEndsAt,
-				categoryId, tags
+				categoryId, tags, version
 		);
 	}
 
