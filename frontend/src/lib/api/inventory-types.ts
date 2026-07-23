@@ -39,11 +39,14 @@ export type InventoryMovement = {
 
 export type InventoryMovementPayload = {
   productId: string;
-  movementType: InventoryMovementType;
+  movementType: Exclude<InventoryMovementType, "SALE">;
   quantity: number;
   unitCostCents?: number | null;
-  reorderPoint?: number | null;
   referenceType?: string | null;
   referenceId?: string | null;
   reason: string;
+};
+
+export type InventorySettingsPayload = {
+  reorderPoint: number;
 };
