@@ -1,8 +1,8 @@
 package com.gymos.catalog.application.port;
 
 import java.time.OffsetDateTime;
-import java.util.UUID;
 import java.util.List;
+import java.util.UUID;
 
 public interface CatalogProductCommandPort {
 	void create(ProductMutation mutation);
@@ -12,6 +12,8 @@ public interface CatalogProductCommandPort {
 	int changeStatus(UUID organizationId, UUID productId, String status, UUID userId, OffsetDateTime now);
 
 	int archive(UUID organizationId, UUID productId, UUID userId, OffsetDateTime now);
+
+	int restore(UUID organizationId, UUID productId, String status, UUID userId, OffsetDateTime now);
 
 	void replaceCategory(
 			UUID organizationId,
