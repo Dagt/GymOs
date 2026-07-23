@@ -255,5 +255,6 @@ Decisiones implementadas:
 - Las fachadas application publicas, como `MembershipService`, deben conservar contratos estables para controladores y APIs internas, pero delegar la ejecucion real en servicios por caso de uso y queries dedicadas.
 - Los repositorios grandes deben mantenerse como fachadas de compatibilidad cuando ya existan muchos consumidores, pero el SQL interno debe separarse por responsabilidad: consultas, comandos, idempotencia, pagos, reembolsos, eventos y lookups de catalogo o planes.
 - `SalesService` debe operar como coordinador de casos de uso. Las consultas compuestas y reportes viven en servicios query dedicados, como `SaleDetailQuery` y `SalesReportingQuery`.
+- Los flujos de caja/POS no deben crecer dentro de `SalesService`; se concentran en `SalesPointOfSaleService` para mantener el contrato publico estable y separar orquestacion transaccional de lectura/API interna.
 - Los lookups compartidos de ventas/pagos deben centralizarse en servicios internos dedicados para evitar repetir reglas de existencia, sucursal y mensajes de error entre pagos, reembolsos y futuras operaciones.
 - Los consumidores de eventos deben permanecer idempotentes y transaccionales, con pruebas orientadas al consumidor dedicado.

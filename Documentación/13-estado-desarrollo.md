@@ -1072,6 +1072,15 @@ Verificado:
 
 - Backend: `./gradlew.bat test` completo. Resultado exitoso; persiste warning no bloqueante de shutdown de Spring Modulith en pruebas H2 por `event_publication`.
 
+## Saneamiento de fachada de ventas - 23 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `SalesService` queda como fachada estable para controladores HTTP y API interna `SalesOperations`.
+- Los flujos mutantes de POS se movieron a `SalesPointOfSaleService`: crear venta, agregar pago, validar/rechazar pago, subir comprobante y procesar reembolso.
+- `SalesAccessGuard` centraliza las validaciones de autenticacion y sucursal activa para ventas.
+- Se agrego una prueba de arquitectura para evitar que la fachada vuelva a absorber dependencias de flujos de POS.
+
 ## Saneamiento backend de servicios application - 23 de julio de 2026
 
 Implementado en rama `feature/code-simplification-rebasion-and-refactor`:

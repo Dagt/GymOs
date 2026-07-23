@@ -23,6 +23,12 @@ class SalesServiceArchitectureTests {
 	}
 
 	@Test
+	void salesFacadeDoesNotOwnPointOfSaleWorkflowDependencies() {
+		assertThat(Arrays.stream(SalesService.class.getDeclaredFields()).map(field -> field.getType().getSimpleName()).toList())
+				.doesNotContain("SaleCreationService", "SalesPaymentService", "SalesRefundService", "SalePaymentCompletionService");
+	}
+
+	@Test
 	void repositoryDoesNotDeclarePublicContractModelsOrRefundCommands() {
 		assertThat(SalesRepository.class.getDeclaredClasses()).isEmpty();
 		assertThat(Arrays.stream(SalesRepository.class.getDeclaredMethods()).map(java.lang.reflect.Method::getName).toList())

@@ -29,15 +29,18 @@ final class SalesServiceTestFactory {
 				salesRepository, new MembershipSaleCommandRepository(jdbcClient), completionService,
 				auditService, eventPublisher);
 		SalesReadRepository salesReadRepository = new SalesReadRepository(jdbcClient);
+		SaleDetailQuery saleDetailQuery = new SaleDetailQuery(salesRepository, salesReadRepository);
+		SaleCreationService saleCreationService = new SaleCreationService(salesRepository, new SaleLineResolver(salesRepository),
+				new SaleCommandRepository(jdbcClient), auditService, eventPublisher);
+		SalesRefundService refundService = new SalesRefundService(salesRepository, lookupService,
+				new SalesRefundCommandRepository(jdbcClient), auditService);
+		SalesPointOfSaleService pointOfSaleService = new SalesPointOfSaleService(
+				saleDetailQuery, saleCreationService, paymentService, refundService, completionService);
 		return new SalesService(
-				new SaleDetailQuery(salesRepository, salesReadRepository),
+				saleDetailQuery,
 				new SalesReportingQuery(salesReadRepository, new SalesReportRepository(jdbcClient)),
-				new SaleCreationService(salesRepository, new SaleLineResolver(salesRepository),
-						new SaleCommandRepository(jdbcClient), auditService, eventPublisher),
-				paymentService,
-				new SalesRefundService(salesRepository, lookupService, new SalesRefundCommandRepository(jdbcClient), auditService),
-				membershipSalesService,
-				completionService
+				pointOfSaleService,
+				membershipSalesService
 		);
 	}
 }

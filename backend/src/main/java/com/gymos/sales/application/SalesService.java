@@ -1,6 +1,5 @@
 package com.gymos.sales.application;
 
-import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.sales.api.operations.CreateMembershipPlanChangeSaleCommand;
 import com.gymos.sales.api.operations.CreateMembershipRenewalSaleCommand;
@@ -23,60 +22,41 @@ import org.springframework.web.multipart.MultipartFile;
 public class SalesService implements SalesOperations {
 	private final SaleDetailQuery saleDetailQuery;
 	private final SalesReportingQuery reportingQuery;
-	private final SaleCreationService saleCreationService;
-	private final SalesPaymentService paymentService;
-	private final SalesRefundService refundService;
+	private final SalesPointOfSaleService pointOfSaleService;
 	private final MembershipSalesService membershipSalesService;
-	private final SalePaymentCompletionService completionService;
 
 	public SalesService(
 			SaleDetailQuery saleDetailQuery,
 			SalesReportingQuery reportingQuery,
-			SaleCreationService saleCreationService,
-			SalesPaymentService paymentService,
-			SalesRefundService refundService,
-			MembershipSalesService membershipSalesService,
-			SalePaymentCompletionService completionService
+			SalesPointOfSaleService pointOfSaleService,
+			MembershipSalesService membershipSalesService
 	) {
 		this.saleDetailQuery = saleDetailQuery;
 		this.reportingQuery = reportingQuery;
-		this.saleCreationService = saleCreationService;
-		this.paymentService = paymentService;
-		this.refundService = refundService;
+		this.pointOfSaleService = pointOfSaleService;
 		this.membershipSalesService = membershipSalesService;
-		this.completionService = completionService;
 	}
 
 	@Transactional(readOnly = true)
 	public List<SaleSummary> recent(GymOsPrincipal principal) {
-		requireBranch(principal);
+		SalesAccessGuard.requireBranch(principal);
 		return saleDetailQuery.recent(principal.organizationId(), principal.branchId());
 	}
 
 	@Transactional(readOnly = true)
 	public SalesReportResult report(GymOsPrincipal principal, LocalDate fromDate, LocalDate toDate) {
-		requireBranch(principal);
+		SalesAccessGuard.requireBranch(principal);
 		return reportingQuery.report(principal.organizationId(), principal.branchId(), fromDate, toDate);
 	}
 
 	@Transactional(readOnly = true)
 	public SaleDetailResult detail(GymOsPrincipal principal, UUID saleId) {
-		requirePrincipal(principal);
+		SalesAccessGuard.requirePrincipal(principal);
 		return saleDetailQuery.detail(principal.organizationId(), saleId);
 	}
 
-	@Transactional
 	public SaleDetailResult create(GymOsPrincipal principal, CreateSaleCommand request, String correlationId) {
-		requireBranch(principal);
-		var creation = saleCreationService.create(principal, request, correlationId);
-		if (!creation.created()) {
-			return detail(principal, creation.saleId());
-		}
-		if (request.payment() != null) {
-			paymentService.record(principal, creation.saleId(), request.payment(), correlationId);
-		}
-		completionService.recalculate(principal.organizationId(), creation.saleId(), principal.userId());
-		return detail(principal, creation.saleId());
+		return pointOfSaleService.create(principal, request, correlationId);
 	}
 
 	@Override
@@ -91,48 +71,23 @@ public class SalesService implements SalesOperations {
 		return membershipSalesService.changePlan(command);
 	}
 
-	@Transactional
 	public SaleDetailResult addPayment(GymOsPrincipal principal, UUID saleId, ManualPaymentCommand request, String correlationId) {
-		requireBranch(principal);
-		paymentService.record(principal, saleId, request, correlationId);
-		completionService.recalculate(principal.organizationId(), saleId, principal.userId());
-		return detail(principal, saleId);
+		return pointOfSaleService.addPayment(principal, saleId, request, correlationId);
 	}
 
-	@Transactional
 	public SaleDetailResult uploadReceipt(GymOsPrincipal principal, UUID paymentId, MultipartFile file, String correlationId) {
-		requireBranch(principal);
-		return detail(principal, paymentService.uploadReceipt(principal, paymentId, file, correlationId));
+		return pointOfSaleService.uploadReceipt(principal, paymentId, file, correlationId);
 	}
 
-	@Transactional
 	public SaleDetailResult validatePayment(GymOsPrincipal principal, UUID paymentId, String correlationId) {
-		requireBranch(principal);
-		return detail(principal, paymentService.validate(principal, paymentId, correlationId));
+		return pointOfSaleService.validatePayment(principal, paymentId, correlationId);
 	}
 
-	@Transactional
 	public SaleDetailResult rejectPayment(GymOsPrincipal principal, UUID paymentId, String reason, String correlationId) {
-		requireBranch(principal);
-		return detail(principal, paymentService.reject(principal, paymentId, reason, correlationId));
+		return pointOfSaleService.rejectPayment(principal, paymentId, reason, correlationId);
 	}
 
-	@Transactional
 	public SaleDetailResult requestRefund(GymOsPrincipal principal, UUID saleId, RequestRefundCommand request, String correlationId) {
-		requireBranch(principal);
-		return detail(principal, refundService.process(principal, saleId, request, correlationId));
-	}
-
-	private void requirePrincipal(GymOsPrincipal principal) {
-		if (principal == null) {
-			throw new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesion para continuar.");
-		}
-	}
-
-	private void requireBranch(GymOsPrincipal principal) {
-		requirePrincipal(principal);
-		if (principal.branchId() == null) {
-			throw new BusinessException("BRANCH_REQUIRED", "Selecciona una sucursal para operar.");
-		}
+		return pointOfSaleService.requestRefund(principal, saleId, request, correlationId);
 	}
 }
