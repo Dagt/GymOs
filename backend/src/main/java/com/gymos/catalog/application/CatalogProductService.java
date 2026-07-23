@@ -13,6 +13,7 @@ import com.gymos.catalog.application.query.ProductSummaryView;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -43,6 +44,14 @@ class CatalogProductService {
 	ProductSummaryView product(GymOsPrincipal principal, UUID productId) {
 		CatalogAccessGuard.requirePrincipal(principal);
 		return requireProduct(principal.organizationId(), productId);
+	}
+
+	ProductSummaryView productByBarcode(GymOsPrincipal principal, String barcode) {
+		CatalogAccessGuard.requirePrincipal(principal);
+		String normalized = normalizeNullable(barcode);
+		if (normalized == null) throw new BusinessException("PRODUCT_BARCODE_REQUIRED", "Proporciona un codigo de barras.");
+		return products.findActiveByBarcode(principal.organizationId(), normalized)
+				.orElseThrow(() -> new BusinessException("PRODUCT_BARCODE_NOT_FOUND", "No existe un producto activo con ese codigo de barras."));
 	}
 
 	ProductPageView search(GymOsPrincipal principal, ProductSearchCriteria criteria) {
@@ -84,10 +93,8 @@ class CatalogProductService {
 		if (updated != 1) throw notFound();
 		commands.replaceCategory(principal.organizationId(), productId, request.categoryId(), principal.userId(), now);
 		commands.replaceTags(principal.organizationId(), productId, tags, principal.userId(), now);
-		if (!Objects.equals(existing.categoryId(), request.categoryId())) {
-			auditService.record(principal, "PRODUCT_CATEGORY_CHANGED", "CATALOG_PRODUCT", productId, "BACKOFFICE", null, correlationId);
-		}
-		auditService.record(principal, "PRODUCT_UPDATED", "CATALOG_PRODUCT", productId, "BACKOFFICE", null, correlationId);
+		String changes = describeChanges(existing, request, sku, barcode, tags);
+		auditService.record(principal, "PRODUCT_UPDATED", "CATALOG_PRODUCT", productId, "BACKOFFICE", changes, correlationId);
 		return requireProduct(principal.organizationId(), productId);
 	}
 
@@ -130,10 +137,33 @@ class CatalogProductService {
 				request.inventoryTracked(), request.displayOrder(), imageObjectKey, now, principal.userId());
 	}
 
-	private ProductSummaryView requireProduct(UUID organizationId, UUID productId) {
-		return products.findProduct(organizationId, productId).orElseThrow(this::notFound);
+	private String describeChanges(ProductSummaryView existing, ProductCommand request, String sku, String barcode, List<String> tags) {
+		List<String> changes = new ArrayList<>();
+		change(changes, "sku", existing.sku(), sku);
+		change(changes, "name", existing.name(), request.name().trim());
+		change(changes, "description", existing.description(), CatalogBenefitsSerializer.blankToNull(request.description()));
+		change(changes, "productType", existing.productType(), normalizeRequired(request.productType()));
+		change(changes, "priceCents", existing.priceCents(), request.priceCents());
+		change(changes, "currency", existing.currency(), normalizeRequired(request.currency()));
+		change(changes, "taxable", existing.taxable(), request.taxable());
+		change(changes, "status", existing.status(), normalizeStatus(request.status()));
+		change(changes, "barcode", existing.barcode(), barcode);
+		change(changes, "brand", existing.brand(), trimToNull(request.brand()));
+		change(changes, "presentation", existing.presentation(), trimToNull(request.presentation()));
+		change(changes, "unitOfMeasure", existing.unitOfMeasure(), normalizeNullable(request.unitOfMeasure()));
+		change(changes, "inventoryTracked", existing.inventoryTracked(), request.inventoryTracked());
+		change(changes, "displayOrder", existing.displayOrder(), request.displayOrder());
+		change(changes, "categoryId", existing.categoryId(), request.categoryId());
+		change(changes, "tags", existing.tags(), tags);
+		return changes.isEmpty() ? "{}" : "{" + String.join(",", changes) + "}";
 	}
 
+	private void change(List<String> changes, String field, Object before, Object after) {
+		if (!Objects.equals(before, after)) changes.add("\"" + field + "\":{\"before\":\"" + safe(before) + "\",\"after\":\"" + safe(after) + "\"}");
+	}
+
+	private String safe(Object value) { return String.valueOf(value).replace("\\", "\\\\").replace("\"", "\\\""); }
+	private ProductSummaryView requireProduct(UUID organizationId, UUID productId) { return products.findProduct(organizationId, productId).orElseThrow(this::notFound); }
 	private void validate(ProductCommand request) {
 		String type = normalizeRequired(request.productType());
 		if (!List.of("PHYSICAL", "SERVICE", "MEMBERSHIP_PLAN").contains(type)) throw new BusinessException("PRODUCT_TYPE_INVALID", "El tipo de producto no es valido.");
@@ -142,39 +172,13 @@ class CatalogProductService {
 		String barcode = normalizeNullable(request.barcode());
 		if (barcode != null && !barcode.matches("[A-Z0-9._-]{3,128}")) throw new BusinessException("PRODUCT_BARCODE_INVALID", "El codigo de barras contiene caracteres no permitidos.");
 	}
-
-	private void validateBarcodeAvailability(UUID organizationId, String barcode, UUID excludedProductId) {
-		if (barcode != null && products.barcodeExists(organizationId, barcode, excludedProductId)) throw new BusinessException("PRODUCT_BARCODE_ALREADY_EXISTS", "Ya existe otro producto con ese codigo de barras.");
-	}
-
-	private void validateCategory(UUID organizationId, UUID categoryId) {
-		if (categoryId != null && categories.findCategory(organizationId, categoryId).filter(category -> "ACTIVE".equals(category.status())).isEmpty()) {
-			throw new BusinessException("CATEGORY_NOT_AVAILABLE", "La categoria no existe o esta inactiva.");
-		}
-	}
-
-	private List<String> normalizeTags(List<String> tags) {
-		if (tags == null) return List.of();
-		List<String> normalized = tags.stream().filter(Objects::nonNull).map(String::trim).filter(tag -> !tag.isBlank()).distinct().toList();
-		if (normalized.size() > 20 || normalized.stream().anyMatch(tag -> tag.length() > 80 || tag.contains(","))) throw new BusinessException("PRODUCT_TAGS_INVALID", "Usa hasta 20 etiquetas sin comas.");
-		return normalized;
-	}
-
-	private void validateTransition(UUID organizationId, ProductSummaryView existing, ProductCommand request) {
-		String nextType = normalizeRequired(request.productType());
-		boolean hasMovements = dependencies.hasInventoryMovements(organizationId, existing.id());
-		if (hasMovements && !existing.productType().equals(nextType)) throw new BusinessException("PRODUCT_TYPE_CHANGE_NOT_ALLOWED", "No se puede cambiar el tipo de un producto con movimientos de inventario.");
-		if (hasMovements && existing.inventoryTracked() && !request.inventoryTracked()) throw new BusinessException("PRODUCT_INVENTORY_TRACKING_CHANGE_NOT_ALLOWED", "No se puede desactivar el control de inventario cuando existen movimientos.");
-		if (dependencies.hasActiveMembershipPlan(organizationId, existing.id()) && !"MEMBERSHIP_PLAN".equals(nextType)) throw new BusinessException("PRODUCT_TYPE_CHANGE_NOT_ALLOWED", "El producto esta vinculado a un plan de membresia activo.");
-	}
-
+	private void validateBarcodeAvailability(UUID organizationId, String barcode, UUID excludedProductId) { if (barcode != null && products.barcodeExists(organizationId, barcode, excludedProductId)) throw new BusinessException("PRODUCT_BARCODE_ALREADY_EXISTS", "Ya existe otro producto con ese codigo de barras."); }
+	private void validateCategory(UUID organizationId, UUID categoryId) { if (categoryId != null && categories.findCategory(organizationId, categoryId).filter(category -> "ACTIVE".equals(category.status())).isEmpty()) throw new BusinessException("CATEGORY_NOT_AVAILABLE", "La categoria no existe o esta inactiva."); }
+	private List<String> normalizeTags(List<String> tags) { if (tags == null) return List.of(); List<String> normalized = tags.stream().filter(Objects::nonNull).map(String::trim).filter(tag -> !tag.isBlank()).distinct().toList(); if (normalized.size() > 20 || normalized.stream().anyMatch(tag -> tag.length() > 80 || tag.contains(","))) throw new BusinessException("PRODUCT_TAGS_INVALID", "Usa hasta 20 etiquetas sin comas."); return normalized; }
+	private void validateTransition(UUID organizationId, ProductSummaryView existing, ProductCommand request) { String nextType = normalizeRequired(request.productType()); boolean hasMovements = dependencies.hasInventoryMovements(organizationId, existing.id()); if (hasMovements && !existing.productType().equals(nextType)) throw new BusinessException("PRODUCT_TYPE_CHANGE_NOT_ALLOWED", "No se puede cambiar el tipo de un producto con movimientos de inventario."); if (hasMovements && existing.inventoryTracked() && !request.inventoryTracked()) throw new BusinessException("PRODUCT_INVENTORY_TRACKING_CHANGE_NOT_ALLOWED", "No se puede desactivar el control de inventario cuando existen movimientos."); if (dependencies.hasActiveMembershipPlan(organizationId, existing.id()) && !"MEMBERSHIP_PLAN".equals(nextType)) throw new BusinessException("PRODUCT_TYPE_CHANGE_NOT_ALLOWED", "El producto esta vinculado a un plan de membresia activo."); }
 	private String normalizeRequired(String value) { return value == null ? "" : value.trim().toUpperCase(); }
 	private String normalizeNullable(String value) { String normalized = normalizeRequired(value); return normalized.isBlank() ? null : normalized; }
-	private String normalizeStatus(String status) {
-		String normalized = normalizeRequired(status);
-		if (!List.of("ACTIVE", "INACTIVE").contains(normalized)) throw new BusinessException("PRODUCT_STATUS_INVALID", "El estado del producto no es valido.");
-		return normalized;
-	}
+	private String normalizeStatus(String status) { String normalized = normalizeRequired(status); if (!List.of("ACTIVE", "INACTIVE").contains(normalized)) throw new BusinessException("PRODUCT_STATUS_INVALID", "El estado del producto no es valido."); return normalized; }
 	private String trimToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }
 	private BusinessException duplicateSku() { return new BusinessException("PRODUCT_SKU_ALREADY_EXISTS", "Ya existe otro producto con ese SKU."); }
 	private BusinessException notFound() { return new BusinessException("PRODUCT_NOT_FOUND", "El producto no existe o fue archivado."); }
