@@ -140,6 +140,16 @@ Regla:
 - currency
 - active
 - inventory_tracked
+- barcode
+- brand
+- presentation
+- unit_of_measure
+- display_order
+- image_object_key
+- archived_at
+- archived_by
+- categoria principal mediante `catalog_product_category`
+- etiquetas mediante `catalog_product_tag`
 - behavior_key
 
 ### plan
