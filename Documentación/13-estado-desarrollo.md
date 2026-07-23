@@ -986,3 +986,30 @@ Verificado:
 
 - Frontend: `npm.cmd run typecheck`.
 - Frontend: `npm.cmd run lint`.
+
+## Saneamiento reservas y socios - 22 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `/bookings` extrae la orquestacion a `useBookingsController.ts`:
+  - carga de organizacion, sucursales, recursos, reservas y planes;
+  - busqueda de socios para reservar;
+  - creacion y cancelacion de reservas;
+  - creacion de recursos;
+  - calculo de calendario, dia seleccionado, horarios y estado de drawers.
+- `bookings/page.tsx` queda como composicion de `AppShell`, panel de resumen, calendario, detalle diario y drawers.
+- `/clients` extrae la orquestacion a `useClientsController.ts`:
+  - carga y busqueda de socios;
+  - carga de planes activos;
+  - validacion y normalizacion del alta;
+  - registro de socio y venta de membresia inicial.
+- `clients/page.tsx` queda como composicion de busqueda, toolbar, listado y drawer de alta.
+- `/clients/[clientId]` se divide en:
+  - `useClientDetailController.ts` para carga, edicion, renovacion y cambio de plan;
+  - `ClientDetailHelpers.ts` para validaciones, normalizacion y formateo;
+  - `ClientDetailSections.tsx` para ficha, historial, resumen, timeline y drawers.
+- `clients/[clientId]/page.tsx` queda como composicion de alto nivel y deja de mezclar UI, estado remoto y reglas visibles.
+
+Verificado:
+
+- Frontend: `npm.cmd run typecheck`.
