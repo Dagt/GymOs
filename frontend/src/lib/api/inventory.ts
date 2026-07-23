@@ -2,6 +2,7 @@ import { apiFetch, normalizePayload } from "./client";
 import type {
   InventoryMovement,
   InventoryMovementPayload,
+  InventorySettingsPayload,
   InventoryStock,
 } from "./inventory-types";
 
@@ -19,9 +20,7 @@ export async function getInventoryMovements(
   limit = 50,
 ): Promise<InventoryMovement[]> {
   const params = new URLSearchParams({ limit: String(limit) });
-  if (productId) {
-    params.set("productId", productId);
-  }
+  if (productId) params.set("productId", productId);
   return apiFetch<InventoryMovement[]>(`/inventory/movements?${params.toString()}`, accessToken);
 }
 
@@ -31,6 +30,17 @@ export async function createInventoryMovement(
 ): Promise<InventoryStock> {
   return apiFetch<InventoryStock>("/inventory/movements", accessToken, {
     method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function updateInventorySettings(
+  accessToken: string,
+  productId: string,
+  payload: InventorySettingsPayload,
+): Promise<InventoryStock> {
+  return apiFetch<InventoryStock>(`/inventory/products/${productId}/settings`, accessToken, {
+    method: "PUT",
     body: JSON.stringify(normalizePayload(payload)),
   });
 }
