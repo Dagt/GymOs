@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.inventory.api.operations.InventoryRefundOperations;
 import com.gymos.sales.application.command.RequestRefundCommand;
 import com.gymos.sales.infrastructure.SalesRefundCommandRepository;
 import com.gymos.sales.infrastructure.SalesRepository;
@@ -26,13 +27,14 @@ class SalesRefundServiceTests {
 	void processesRefundWithinAvailableBalance() {
 		SalesRepository salesRepository = mock(SalesRepository.class);
 		SalesRefundCommandRepository commandRepository = mock(SalesRefundCommandRepository.class);
+		InventoryRefundOperations inventoryRefundOperations = mock(InventoryRefundOperations.class);
 		AuditService auditService = mock(AuditService.class);
 		SalesLookupService lookupService = new SalesLookupService(salesRepository);
 		SalesRefundService service = new SalesRefundService(
 				lookupService,
 				new SalesRefundIdempotencyService(salesRepository),
 				new SalesRefundValidationService(salesRepository, lookupService),
-				new SalesRefundProcessor(commandRepository, auditService)
+				new SalesRefundProcessor(commandRepository, inventoryRefundOperations, auditService)
 		);
 		UUID organizationId = UUID.randomUUID();
 		UUID branchId = UUID.randomUUID();
@@ -50,6 +52,9 @@ class SalesRefundServiceTests {
 
 		assertThat(result).isEqualTo(saleId);
 		verify(commandRepository).createProcessed(organizationId, branchId, saleId, null, 2_000, "MXN", "Solicitud", "refund-key", principal.userId());
+		verify(inventoryRefundOperations, never()).restoreFullRefund(
+				org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+				org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
 		verify(auditService).record(principal, "SALE_REFUND_PROCESSED", "SALE_REFUND", refundId, "POS", "Solicitud", "correlation");
 	}
 
@@ -57,13 +62,14 @@ class SalesRefundServiceTests {
 	void reusedKeyWithDifferentAmountIsRejectedBeforeMutation() {
 		SalesRepository salesRepository = mock(SalesRepository.class);
 		SalesRefundCommandRepository commandRepository = mock(SalesRefundCommandRepository.class);
+		InventoryRefundOperations inventoryRefundOperations = mock(InventoryRefundOperations.class);
 		AuditService auditService = mock(AuditService.class);
 		SalesLookupService lookupService = new SalesLookupService(salesRepository);
 		SalesRefundService service = new SalesRefundService(
 				lookupService,
 				new SalesRefundIdempotencyService(salesRepository),
 				new SalesRefundValidationService(salesRepository, lookupService),
-				new SalesRefundProcessor(commandRepository, auditService)
+				new SalesRefundProcessor(commandRepository, inventoryRefundOperations, auditService)
 		);
 		UUID organizationId = UUID.randomUUID();
 		UUID branchId = UUID.randomUUID();
@@ -86,6 +92,9 @@ class SalesRefundServiceTests {
 				org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyLong(), org.mockito.ArgumentMatchers.any(),
 				org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()
 		);
+		verify(inventoryRefundOperations, never()).restoreFullRefund(
+				org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(),
+				org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any());
 	}
 
 	private GymOsPrincipal principal(UUID organizationId, UUID branchId) {
