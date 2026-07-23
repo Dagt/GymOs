@@ -2,6 +2,7 @@ package com.gymos.catalog.application.query;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 public record ProductSummaryView(
@@ -46,6 +47,20 @@ public record ProductSummaryView(
 				taxable, status, barcode, brand, presentation, unitOfMeasure, inventoryTracked,
 				displayOrder, imageObjectKey, null, null, null, null, null,
 				categoryId, categoryName, tags, archived, archivedAt, createdAt, updatedAt);
+	}
+
+	public ProductSummaryView visibleTo(Set<String> permissions) {
+		if (permissions != null && (permissions.contains("catalog.cost.read")
+				|| permissions.contains("catalog.manage") || permissions.contains("platform.admin"))) {
+			return this;
+		}
+		return new ProductSummaryView(
+				id, sku, name, description, productType, commercialSubtype, priceCents, currency,
+				taxable, status, barcode, brand, presentation, unitOfMeasure, inventoryTracked,
+				displayOrder, imageObjectKey, null, null, promotionalPriceCents,
+				promotionStartsAt, promotionEndsAt, categoryId, categoryName, tags,
+				archived, archivedAt, createdAt, updatedAt
+		);
 	}
 
 	private static String defaultSubtype(String productType) {
