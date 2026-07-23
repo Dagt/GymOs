@@ -6,9 +6,13 @@ import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.inventory.application.command.InventoryMovementCommand;
 import com.gymos.inventory.application.port.InventoryCommandPort;
 import com.gymos.inventory.application.port.InventoryQueryPort;
+import com.gymos.inventory.application.query.InventoryMovementPageView;
+import com.gymos.inventory.application.query.InventoryMovementSearchCriteria;
 import com.gymos.inventory.application.query.InventoryMovementView;
 import com.gymos.inventory.application.query.InventoryProductView;
 import com.gymos.inventory.application.query.InventoryStockLedgerView;
+import com.gymos.inventory.application.query.InventoryStockPageView;
+import com.gymos.inventory.application.query.InventoryStockSearchCriteria;
 import com.gymos.inventory.application.query.InventoryStockView;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
@@ -36,6 +40,12 @@ public class InventoryService {
 	}
 
 	@Transactional(readOnly = true)
+	public InventoryStockPageView searchStock(GymOsPrincipal principal, InventoryStockSearchCriteria criteria) {
+		requireBranch(principal);
+		return queries.searchStock(principal.organizationId(), principal.branchId(), criteria);
+	}
+
+	@Transactional(readOnly = true)
 	public InventoryStockView stockDetail(GymOsPrincipal principal, UUID productId) {
 		requireBranch(principal);
 		ensureInventoryProduct(principal.organizationId(), productId);
@@ -53,6 +63,12 @@ public class InventoryService {
 	public List<InventoryMovementView> movements(GymOsPrincipal principal, UUID productId, int limit) {
 		requireBranch(principal);
 		return queries.movements(principal.organizationId(), principal.branchId(), productId, Math.max(1, Math.min(limit, 200)));
+	}
+
+	@Transactional(readOnly = true)
+	public InventoryMovementPageView searchMovements(GymOsPrincipal principal, InventoryMovementSearchCriteria criteria) {
+		requireBranch(principal);
+		return queries.searchMovements(principal.organizationId(), principal.branchId(), criteria);
 	}
 
 	@Transactional
