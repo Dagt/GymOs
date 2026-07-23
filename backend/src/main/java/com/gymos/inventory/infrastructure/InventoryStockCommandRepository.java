@@ -15,6 +15,29 @@ public class InventoryStockCommandRepository {
 		this.jdbcClient = jdbcClient;
 	}
 
+	public Optional<UUID> stockIdentity(UUID organizationId, UUID branchId, UUID productId) {
+		return jdbcClient.sql("""
+				SELECT id FROM inventory_stock
+				WHERE organization_id=:organizationId AND branch_id=:branchId
+				  AND product_id=:productId AND deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId).param("branchId", branchId)
+				.param("productId", productId).query(UUID.class).optional();
+	}
+
+	public UUID createStock(UUID organizationId, UUID branchId, UUID productId, UUID actorUserId, OffsetDateTime now) {
+		UUID stockId = UUID.randomUUID();
+		jdbcClient.sql("""
+				INSERT INTO inventory_stock (
+				 id, organization_id, branch_id, product_id, quantity_on_hand, reorder_point,
+				 created_at, updated_at, created_by, updated_by, version)
+				VALUES (:id, :organizationId, :branchId, :productId, 0, 0, :now, :now, :actorUserId, :actorUserId, 0)
+				""")
+				.param("id", stockId).param("organizationId", organizationId).param("branchId", branchId)
+				.param("productId", productId).param("now", now).param("actorUserId", actorUserId).update();
+		return stockId;
+	}
+
 	public UUID ensureStock(UUID organizationId, UUID branchId, UUID productId, UUID actorUserId, OffsetDateTime now) {
 		UUID candidateId = UUID.randomUUID();
 		jdbcClient.sql("""
@@ -35,16 +58,7 @@ public class InventoryStockCommandRepository {
 				.param("now", now)
 				.param("actorUserId", actorUserId)
 				.update();
-		return jdbcClient.sql("""
-				SELECT id FROM inventory_stock
-				WHERE organization_id = :organizationId AND branch_id = :branchId
-				  AND product_id = :productId AND deleted_at IS NULL
-				""")
-				.param("organizationId", organizationId)
-				.param("branchId", branchId)
-				.param("productId", productId)
-				.query(UUID.class)
-				.optional()
+		return stockIdentity(organizationId, branchId, productId)
 				.orElseThrow(() -> new BusinessException("INVENTORY_STOCK_NOT_FOUND", "No fue posible preparar existencias."));
 	}
 
