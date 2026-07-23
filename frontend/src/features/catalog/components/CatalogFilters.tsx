@@ -19,6 +19,7 @@ export function CatalogFilters({
   onSearchChange,
   onUpdate,
 }: CatalogFiltersProps) {
+  const activeCategories = categories.filter((category) => category.status === "ACTIVE");
   return (
     <section aria-label="Filtros del catalogo" className="app-card grid gap-4 p-4">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
@@ -45,7 +46,7 @@ export function CatalogFilters({
           label="Categoria"
           value={filters.categoryId ?? ""}
           onChange={(value) => onUpdate("categoryId", value || null)}
-          options={[["", "Todas"], ...categories.map((category) => [category.id, category.name])]}
+          options={[["", "Todas"], ...activeCategories.map((category) => [category.id, category.name])]}
         />
         <FilterSelect
           label="Estado"
@@ -73,6 +74,7 @@ export function CatalogFilters({
           onChange={(value) => onUpdate("sort", value)}
           options={[
             ["displayOrder,asc", "Orden manual"],
+            ["name,asc", "Nombre A-Z"],
             ["name,desc", "Nombre Z-A"],
             ["createdAt,desc", "Mas recientes"],
             ["createdAt,asc", "Mas antiguos"],
