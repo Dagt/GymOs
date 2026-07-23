@@ -5,8 +5,12 @@ import com.gymos.catalog.application.command.CreateMembershipPlanCommand;
 import com.gymos.catalog.application.command.CreatePlanCommand;
 import com.gymos.catalog.application.command.ProductCommand;
 import com.gymos.catalog.application.command.UpdateMembershipPlanCommand;
+import com.gymos.catalog.application.command.CategoryCommand;
+import com.gymos.catalog.application.query.CategoryView;
 import com.gymos.catalog.application.query.PlanView;
 import com.gymos.catalog.application.query.ProductSummaryView;
+import com.gymos.catalog.application.query.ProductPageView;
+import com.gymos.catalog.application.query.ProductSearchCriteria;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
@@ -28,6 +32,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -48,6 +53,27 @@ public class CatalogController {
 	@GetMapping("/products/{productId}")
 	ProductSummaryView product(@AuthenticationPrincipal GymOsPrincipal principal, @PathVariable UUID productId) {
 		return catalogService.product(principal, productId);
+	}
+
+	@GetMapping("/products/search")
+	ProductPageView searchProducts(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@RequestParam(required = false) String q,
+			@RequestParam(required = false) String type,
+			@RequestParam(required = false) UUID categoryId,
+			@RequestParam(required = false) String status,
+			@RequestParam(required = false) Boolean inventoryTracked,
+			@RequestParam(defaultValue = "false") boolean includeArchived,
+			@RequestParam(defaultValue = "0") @Min(0) int page,
+			@RequestParam(defaultValue = "25") @Min(1) int size,
+			@RequestParam(defaultValue = "displayOrder,asc") String sort
+	) {
+		return catalogService.searchProducts(
+				principal,
+				new ProductSearchCriteria(
+						q, type, categoryId, status, inventoryTracked, includeArchived, page, size, sort
+				)
+		);
 	}
 
 	@PostMapping("/products")
@@ -122,6 +148,43 @@ public class CatalogController {
 		return catalogService.updateMembershipPlan(principal, planId, request.toCommand(), correlationId(servletRequest));
 	}
 
+	@GetMapping("/categories")
+	List<CategoryView> categories(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@RequestParam(defaultValue = "false") boolean includeInactive
+	) {
+		return catalogService.categories(principal, includeInactive);
+	}
+
+	@PostMapping("/categories")
+	CategoryView createCategory(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@Valid @RequestBody CategoryRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return catalogService.createCategory(principal, request.toCommand(), correlationId(servletRequest));
+	}
+
+	@PatchMapping("/categories/{categoryId}")
+	CategoryView updateCategory(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID categoryId,
+			@Valid @RequestBody CategoryRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return catalogService.updateCategory(principal, categoryId, request.toCommand(), correlationId(servletRequest));
+	}
+
+	@DeleteMapping("/categories/{categoryId}")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	void archiveCategory(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID categoryId,
+			HttpServletRequest servletRequest
+	) {
+		catalogService.archiveCategory(principal, categoryId, correlationId(servletRequest));
+	}
+
 	private String correlationId(HttpServletRequest request) {
 		Object value = request.getAttribute(Correlation.ATTRIBUTE);
 		return value == null ? "unknown" : value.toString();
@@ -157,6 +220,18 @@ public class CatalogController {
 	public record ProductStatusRequest(
 			@NotBlank @Pattern(regexp = "ACTIVE|INACTIVE") String status
 	) {
+	}
+
+	public record CategoryRequest(
+			UUID parentId,
+			@NotBlank @Size(max = 120) String name,
+			@Size(max = 500) String description,
+			@NotBlank @Pattern(regexp = "ACTIVE|INACTIVE") String status,
+			@Min(0) int displayOrder
+	) {
+		private CategoryCommand toCommand() {
+			return new CategoryCommand(parentId, name, description, status, displayOrder);
+		}
 	}
 
 	public record CreatePlanRequest(

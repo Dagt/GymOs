@@ -4,6 +4,8 @@ import com.gymos.catalog.application.port.CatalogPlanQueryPort;
 import com.gymos.catalog.application.port.CatalogProductQueryPort;
 import com.gymos.catalog.application.query.PlanView;
 import com.gymos.catalog.application.query.ProductSummaryView;
+import com.gymos.catalog.application.query.ProductPageView;
+import com.gymos.catalog.application.query.ProductSearchCriteria;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -39,6 +41,11 @@ public class CatalogRepository implements CatalogProductQueryPort, CatalogPlanQu
 	@Override
 	public boolean barcodeExists(UUID organizationId, String barcode, UUID excludedProductId) {
 		return skus.barcodeExists(organizationId, barcode, excludedProductId);
+	}
+
+	@Override
+	public ProductPageView search(UUID organizationId, ProductSearchCriteria criteria) {
+		return products.search(organizationId, criteria);
 	}
 
 	public List<PlanView> listPlans(UUID organizationId) {

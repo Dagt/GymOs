@@ -28,6 +28,8 @@ final class CatalogRowMappers {
 				resultSet.getBoolean("inventory_tracked"),
 				resultSet.getInt("display_order"),
 				resultSet.getString("image_object_key"),
+				resultSet.getObject("category_id", UUID.class),
+				resultSet.getString("category_name"),
 				resultSet.getObject("created_at", OffsetDateTime.class),
 				resultSet.getObject("updated_at", OffsetDateTime.class)
 		);

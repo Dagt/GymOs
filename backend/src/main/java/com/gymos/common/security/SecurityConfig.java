@@ -68,6 +68,8 @@ public class SecurityConfig {
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/catalog/**").hasAuthority("catalog.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/catalog/**").hasAuthority("catalog.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/catalog/**").hasAuthority("catalog.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/v1/catalog/**").hasAuthority("catalog.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/v1/catalog/**").hasAuthority("catalog.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/benefits/**").hasAuthority("benefit.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/benefits/**").hasAuthority("benefit.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/client-benefits/*/verify").hasAuthority("client.benefit.verify")

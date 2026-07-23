@@ -20,6 +20,8 @@ public record ProductSummaryView(
 		boolean inventoryTracked,
 		int displayOrder,
 		String imageObjectKey,
+		UUID categoryId,
+		String categoryName,
 		OffsetDateTime createdAt,
 		OffsetDateTime updatedAt
 ) {

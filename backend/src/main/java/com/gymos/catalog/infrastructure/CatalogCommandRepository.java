@@ -50,6 +50,39 @@ public class CatalogCommandRepository implements CatalogProductCommandPort, Cata
 	}
 
 	@Override
+	public void replaceCategory(
+			UUID organizationId,
+			UUID productId,
+			UUID categoryId,
+			UUID userId,
+			OffsetDateTime now
+	) {
+		jdbcClient.sql("""
+				DELETE FROM catalog_product_category
+				WHERE organization_id = :organizationId
+				  AND product_id = :productId
+				""")
+				.param("organizationId", organizationId)
+				.param("productId", productId)
+				.update();
+		if (categoryId == null) {
+			return;
+		}
+		jdbcClient.sql("""
+				INSERT INTO catalog_product_category (
+				    organization_id, product_id, category_id, created_at, created_by
+				)
+				VALUES (:organizationId, :productId, :categoryId, :now, :userId)
+				""")
+				.param("organizationId", organizationId)
+				.param("productId", productId)
+				.param("categoryId", categoryId)
+				.param("now", now)
+				.param("userId", userId)
+				.update();
+	}
+
+	@Override
 	public void create(PlanMutation mutation) {
 		createPlan(new PlanRecord(
 				mutation.planId(), mutation.organizationId(), mutation.productId(), mutation.durationDays(),

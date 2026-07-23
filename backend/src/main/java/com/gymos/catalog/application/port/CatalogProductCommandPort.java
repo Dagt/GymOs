@@ -12,6 +12,14 @@ public interface CatalogProductCommandPort {
 
 	int archive(UUID organizationId, UUID productId, UUID userId, OffsetDateTime now);
 
+	void replaceCategory(
+			UUID organizationId,
+			UUID productId,
+			UUID categoryId,
+			UUID userId,
+			OffsetDateTime now
+	);
+
 	record ProductMutation(
 			UUID organizationId, UUID productId, String sku, String name, String description,
 			String productType, long priceCents, String currency, boolean taxable, String status,

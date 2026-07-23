@@ -6,7 +6,10 @@ import com.gymos.catalog.application.port.CatalogProductCommandPort;
 import com.gymos.catalog.application.port.CatalogProductCommandPort.ProductMutation;
 import com.gymos.catalog.application.port.CatalogProductQueryPort;
 import com.gymos.catalog.application.port.CatalogDependencyQueryPort;
+import com.gymos.catalog.application.port.CatalogCategoryQueryPort;
 import com.gymos.catalog.application.query.ProductSummaryView;
+import com.gymos.catalog.application.query.ProductPageView;
+import com.gymos.catalog.application.query.ProductSearchCriteria;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import java.time.OffsetDateTime;
@@ -19,13 +22,15 @@ class CatalogProductService {
 	private final CatalogProductQueryPort products;
 	private final CatalogProductCommandPort commands;
 	private final CatalogDependencyQueryPort dependencies;
+	private final CatalogCategoryQueryPort categories;
 	private final AuditService auditService;
 
 	CatalogProductService(CatalogProductQueryPort products, CatalogProductCommandPort commands,
-			CatalogDependencyQueryPort dependencies, AuditService auditService) {
+			CatalogDependencyQueryPort dependencies, CatalogCategoryQueryPort categories, AuditService auditService) {
 		this.products = products;
 		this.commands = commands;
 		this.dependencies = dependencies;
+		this.categories = categories;
 		this.auditService = auditService;
 	}
 
@@ -39,6 +44,11 @@ class CatalogProductService {
 		return requireProduct(principal.organizationId(), productId);
 	}
 
+	ProductPageView search(GymOsPrincipal principal, ProductSearchCriteria criteria) {
+		CatalogAccessGuard.requirePrincipal(principal);
+		return products.search(principal.organizationId(), criteria);
+	}
+
 	ProductSummaryView createProduct(GymOsPrincipal principal, ProductCommand request, String correlationId) {
 		CatalogAccessGuard.requirePrincipal(principal);
 		validate(request);
@@ -48,6 +58,7 @@ class CatalogProductService {
 		}
 		String barcode = normalizeNullable(request.barcode());
 		validateBarcodeAvailability(principal.organizationId(), barcode, null);
+		validateCategory(principal.organizationId(), request.categoryId());
 		UUID productId = UUID.randomUUID();
 		OffsetDateTime now = OffsetDateTime.now();
 		commands.create(new ProductMutation(
@@ -71,6 +82,8 @@ class CatalogProductService {
 				now,
 				principal.userId()
 		));
+		commands.replaceCategory(
+				principal.organizationId(), productId, request.categoryId(), principal.userId(), now);
 		auditService.record(principal, "PRODUCT_CREATED", "CATALOG_PRODUCT", productId, "BACKOFFICE", null, correlationId);
 		return requireProduct(principal.organizationId(), productId);
 	}
@@ -86,6 +99,7 @@ class CatalogProductService {
 		}
 		String barcode = normalizeNullable(request.barcode());
 		validateBarcodeAvailability(principal.organizationId(), barcode, productId);
+		validateCategory(principal.organizationId(), request.categoryId());
 		int updated = commands.update(new ProductMutation(
 				principal.organizationId(),
 				productId,
@@ -109,6 +123,13 @@ class CatalogProductService {
 		));
 		if (updated != 1) {
 			throw new BusinessException("PRODUCT_NOT_FOUND", "El producto no existe o fue archivado.");
+		}
+		commands.replaceCategory(
+				principal.organizationId(), productId, request.categoryId(), principal.userId(), OffsetDateTime.now());
+		if (!java.util.Objects.equals(existing.categoryId(), request.categoryId())) {
+			auditService.record(
+					principal, "PRODUCT_CATEGORY_CHANGED", "CATALOG_PRODUCT", productId,
+					"BACKOFFICE", null, correlationId);
 		}
 		auditService.record(principal, "PRODUCT_UPDATED", "CATALOG_PRODUCT", productId, "BACKOFFICE", null, correlationId);
 		return requireProduct(principal.organizationId(), productId);
@@ -169,6 +190,12 @@ class CatalogProductService {
 	private void validateBarcodeAvailability(UUID organizationId, String barcode, UUID excludedProductId) {
 		if (barcode != null && products.barcodeExists(organizationId, barcode, excludedProductId)) {
 			throw new BusinessException("PRODUCT_BARCODE_ALREADY_EXISTS", "Ya existe otro producto con ese codigo de barras.");
+		}
+	}
+
+	private void validateCategory(UUID organizationId, UUID categoryId) {
+		if (categoryId != null && categories.findCategory(organizationId, categoryId).isEmpty()) {
+			throw new BusinessException("CATEGORY_NOT_FOUND", "La categoria no pertenece a la organizacion.");
 		}
 	}
 

@@ -1,6 +1,8 @@
 package com.gymos.catalog.application.port;
 
 import com.gymos.catalog.application.query.ProductSummaryView;
+import com.gymos.catalog.application.query.ProductPageView;
+import com.gymos.catalog.application.query.ProductSearchCriteria;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,4 +15,6 @@ public interface CatalogProductQueryPort {
 	boolean skuExists(UUID organizationId, String sku, UUID excludedProductId);
 
 	boolean barcodeExists(UUID organizationId, String barcode, UUID excludedProductId);
+
+	ProductPageView search(UUID organizationId, ProductSearchCriteria criteria);
 }

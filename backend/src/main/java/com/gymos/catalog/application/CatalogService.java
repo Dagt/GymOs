@@ -4,8 +4,12 @@ import com.gymos.catalog.application.command.CreateMembershipPlanCommand;
 import com.gymos.catalog.application.command.CreatePlanCommand;
 import com.gymos.catalog.application.command.ProductCommand;
 import com.gymos.catalog.application.command.UpdateMembershipPlanCommand;
+import com.gymos.catalog.application.command.CategoryCommand;
+import com.gymos.catalog.application.query.CategoryView;
 import com.gymos.catalog.application.query.PlanView;
 import com.gymos.catalog.application.query.ProductSummaryView;
+import com.gymos.catalog.application.query.ProductPageView;
+import com.gymos.catalog.application.query.ProductSearchCriteria;
 import com.gymos.common.security.GymOsPrincipal;
 import java.util.List;
 import java.util.UUID;
@@ -16,10 +20,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class CatalogService {
 	private final CatalogProductService productService;
 	private final CatalogMembershipPlanService membershipPlanService;
+	private final CatalogCategoryService categoryService;
 
-	public CatalogService(CatalogProductService productService, CatalogMembershipPlanService membershipPlanService) {
+	public CatalogService(
+			CatalogProductService productService,
+			CatalogMembershipPlanService membershipPlanService,
+			CatalogCategoryService categoryService
+	) {
 		this.productService = productService;
 		this.membershipPlanService = membershipPlanService;
+		this.categoryService = categoryService;
 	}
 
 	@Transactional(readOnly = true)
@@ -30,6 +40,11 @@ public class CatalogService {
 	@Transactional(readOnly = true)
 	public ProductSummaryView product(GymOsPrincipal principal, UUID productId) {
 		return productService.product(principal, productId);
+	}
+
+	@Transactional(readOnly = true)
+	public ProductPageView searchProducts(GymOsPrincipal principal, ProductSearchCriteria criteria) {
+		return productService.search(principal, criteria);
 	}
 
 	@Transactional
@@ -70,5 +85,30 @@ public class CatalogService {
 	@Transactional
 	public PlanView updateMembershipPlan(GymOsPrincipal principal, UUID planId, UpdateMembershipPlanCommand request, String correlationId) {
 		return membershipPlanService.updateMembershipPlan(principal, planId, request, correlationId);
+	}
+
+	@Transactional(readOnly = true)
+	public List<CategoryView> categories(GymOsPrincipal principal, boolean includeInactive) {
+		return categoryService.categories(principal, includeInactive);
+	}
+
+	@Transactional
+	public CategoryView createCategory(GymOsPrincipal principal, CategoryCommand command, String correlationId) {
+		return categoryService.create(principal, command, correlationId);
+	}
+
+	@Transactional
+	public CategoryView updateCategory(
+			GymOsPrincipal principal,
+			UUID categoryId,
+			CategoryCommand command,
+			String correlationId
+	) {
+		return categoryService.update(principal, categoryId, command, correlationId);
+	}
+
+	@Transactional
+	public void archiveCategory(GymOsPrincipal principal, UUID categoryId, String correlationId) {
+		categoryService.archive(principal, categoryId, correlationId);
 	}
 }
