@@ -21,6 +21,7 @@ import {
   productDraftToPayload,
   type PlanDraft,
 } from "./CatalogHelpers";
+import { sellableCatalogProducts } from "./CatalogModel";
 
 export function useCatalogController() {
   const [session, setSession] = useState<StoredSession | null>(null);
@@ -136,7 +137,7 @@ export function useCatalogController() {
     setShowPlanDrawer(false);
   }
 
-  const sellableProducts = products.filter((product) => product.productType !== "MEMBERSHIP_PLAN");
+  const sellableProducts = sellableCatalogProducts(products);
 
   return {
     editingPlanId,

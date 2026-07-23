@@ -2,33 +2,30 @@ package com.gymos.memberships.application;
 
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
-import com.gymos.memberships.api.events.MembershipActivatedV1;
-import com.gymos.memberships.api.events.MembershipPlanChangedV1;
-import com.gymos.memberships.api.events.MembershipRenewedV1;
 import com.gymos.memberships.infrastructure.MembershipRepository;
 import com.gymos.memberships.infrastructure.MembershipRepository.MembershipSummary;
 import com.gymos.memberships.infrastructure.MembershipRepository.PlanForRenewal;
 import com.gymos.sales.api.events.PaymentCompletedLineItemV1;
 import com.gymos.sales.api.events.PaymentCompletedV1;
-import java.time.LocalDate;
-import java.time.OffsetDateTime;
 import java.util.UUID;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 @Service
 class MembershipActivationService {
 	private final MembershipRepository membershipRepository;
 	private final AuditService auditService;
-	private final ApplicationEventPublisher eventPublisher;
+	private final MembershipActivationWindowCalculator windowCalculator;
+	private final MembershipActivationEventPublisher eventPublisher;
 
 	MembershipActivationService(
 			MembershipRepository membershipRepository,
 			AuditService auditService,
-			ApplicationEventPublisher eventPublisher
+			MembershipActivationWindowCalculator windowCalculator,
+			MembershipActivationEventPublisher eventPublisher
 	) {
 		this.membershipRepository = membershipRepository;
 		this.auditService = auditService;
+		this.windowCalculator = windowCalculator;
 		this.eventPublisher = eventPublisher;
 	}
 
@@ -92,83 +89,28 @@ class MembershipActivationService {
 			PlanForRenewal plan,
 			String action
 	) {
-		LocalDate businessDate = MembershipBusinessDate.from(event.occurredAt());
-		LocalDate latestEnd = membershipRepository.latestMembershipEnd(event.organizationId(), event.clientId(), plan.planId())
-				.orElse(null);
-		LocalDate startsOn = latestEnd != null && !latestEnd.isBefore(businessDate) ? latestEnd.plusDays(1) : businessDate;
-		if ("MEMBERSHIP_PLAN_CHANGED".equals(action)) {
-			startsOn = businessDate;
-		}
-		LocalDate endsOn = startsOn.plusDays(plan.durationDays() - 1L);
-		LocalDate graceEndsOn = endsOn.plusDays(plan.graceDays());
+		MembershipActivationWindow window = windowCalculator.calculate(event, plan, action);
 		UUID membershipId = membershipRepository.insertActiveMembership(
 				event.organizationId(),
 				event.branchId(),
 				event.clientId(),
 				plan.planId(),
 				event.saleId(),
-				startsOn,
-				endsOn,
-				graceEndsOn,
+				window.startsOn(),
+				window.endsOn(),
+				window.graceEndsOn(),
 				sourceMembershipId,
 				event.eventKey()
 		);
 		auditService.recordSystem(event.organizationId(), event.branchId(), null, action, "MEMBERSHIP", membershipId, event.businessContext(), null, event.eventKey());
 		MembershipSummary membership = membershipRepository.byId(event.organizationId(), event.branchId(), membershipId)
 				.orElseThrow(() -> new BusinessException("MEMBERSHIP_NOT_FOUND", "La membresia activada no esta disponible."));
-		publishMembershipEvent(event, sourceMembershipId, membership, action);
+		eventPublisher.publish(event, sourceMembershipId, membership, action);
 		return membership;
 	}
 
 	private void cancelForPlanChange(PaymentCompletedV1 event, MembershipSummary current) {
 		membershipRepository.cancelActiveForPlanChange(event.organizationId(), event.branchId(), current.id());
 		auditService.recordSystem(event.organizationId(), event.branchId(), null, "MEMBERSHIP_CANCELLED_BY_PLAN_CHANGE", "MEMBERSHIP", current.id(), event.businessContext(), null, event.eventKey());
-	}
-
-	private void publishMembershipEvent(PaymentCompletedV1 paymentEvent, UUID sourceMembershipId, MembershipSummary membership, String action) {
-		if ("MEMBERSHIP_RENEWED".equals(action)) {
-			eventPublisher.publishEvent(new MembershipRenewedV1(
-					paymentEvent.eventKey() + ":membership-renewed",
-					paymentEvent.organizationId(),
-					paymentEvent.branchId(),
-					paymentEvent.clientId(),
-					sourceMembershipId,
-					membership.id(),
-					membership.planId(),
-					paymentEvent.saleId(),
-					membership.startsOn(),
-					membership.endsOn(),
-					OffsetDateTime.now()
-			));
-			return;
-		}
-		if ("MEMBERSHIP_PLAN_CHANGED".equals(action)) {
-			eventPublisher.publishEvent(new MembershipPlanChangedV1(
-					paymentEvent.eventKey() + ":membership-plan-changed",
-					paymentEvent.organizationId(),
-					paymentEvent.branchId(),
-					paymentEvent.clientId(),
-					sourceMembershipId,
-					membership.id(),
-					membership.planId(),
-					paymentEvent.saleId(),
-					membership.startsOn(),
-					membership.endsOn(),
-					OffsetDateTime.now()
-			));
-			return;
-		}
-		eventPublisher.publishEvent(new MembershipActivatedV1(
-				paymentEvent.eventKey() + ":membership-activated:" + membership.planId(),
-				paymentEvent.organizationId(),
-				paymentEvent.branchId(),
-				paymentEvent.clientId(),
-				membership.id(),
-				membership.planId(),
-				paymentEvent.saleId(),
-				membership.startsOn(),
-				membership.endsOn(),
-				OffsetDateTime.now()
-		));
 	}
 }

@@ -3,6 +3,30 @@
 Estado: en progreso  
 Fecha: 19 de julio de 2026
 
+## Saneamiento reembolsos, activacion y catalogo - 23 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `SalesRefundService` queda como fachada del caso de uso y delega responsabilidades en:
+  - `SalesRefundIdempotencyService` para llaves de idempotencia y reintentos estables;
+  - `SalesRefundValidationService` para monto, pago seleccionado y saldo reembolsable;
+  - `SalesRefundProcessor` para persistencia y auditoria del reembolso procesado.
+- `MembershipActivationService` conserva el contrato transaccional de consumo de `PaymentCompletedV1`, pero delega:
+  - calculo de ventanas de activacion/renovacion en `MembershipActivationWindowCalculator`;
+  - publicacion de eventos versionados en `MembershipActivationEventPublisher`.
+- `CatalogService` queda como fachada estable del modulo catalogo.
+- La escritura SQL de productos y planes sale de application y vive en `CatalogCommandRepository`.
+- La logica de productos/servicios y la logica de planes de membresia quedan separadas en `CatalogProductService` y `CatalogMembershipPlanService`.
+- El frontend agrega un modelo explicito de catalogo (`CatalogModel.ts`) para mantener productos/servicios vendibles separados de productos tecnicos `MEMBERSHIP_PLAN`.
+- Se fortalece la prueba de arquitectura para que `catalog.application.CatalogService` ya no este autorizado a usar `JdbcClient`.
+- Se agrega prueba de arquitectura para evitar que `SalesRefundService` vuelva a concentrar repositorio, command repository y auditoria directamente.
+
+Intencion:
+
+- Mantener intactos contratos HTTP y flujos existentes.
+- Reducir acoplamiento entre application e infrastructure.
+- Evitar que productos de membresia se mezclen de nuevo con productos/servicios vendibles.
+
 ## Saneamiento cliente, catalogo y activacion de membresias - 22 de julio de 2026
 
 Implementado en rama `feature/code-simplification-rebasion-and-refactor`:

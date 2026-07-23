@@ -23,7 +23,8 @@ class MembershipEventIdempotencyTests {
 		MembershipActivationService activationService = new MembershipActivationService(
 				membershipRepository,
 				auditService,
-				eventPublisher
+				new MembershipActivationWindowCalculator(membershipRepository),
+				new MembershipActivationEventPublisher(eventPublisher)
 		);
 
 		UUID organizationId = UUID.randomUUID();

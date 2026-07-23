@@ -258,4 +258,8 @@ Decisiones implementadas:
 - Los flujos de caja/POS no deben crecer dentro de `SalesService`; se concentran en `SalesPointOfSaleService` para mantener el contrato publico estable y separar orquestacion transaccional de lectura/API interna.
 - El flujo de pagos se divide por responsabilidad: registro manual, comprobantes y ciclo de vida del pago. `SalesPaymentService` debe permanecer como fachada interna del modulo, no como contenedor de todas las reglas.
 - Los lookups compartidos de ventas/pagos deben centralizarse en servicios internos dedicados para evitar repetir reglas de existencia, sucursal y mensajes de error entre pagos, reembolsos y futuras operaciones.
+- El flujo de reembolsos debe separar idempotencia, validacion y procesamiento. `SalesRefundService` coordina, pero no debe depender directamente de repositorios de escritura ni de auditoria.
+- La activacion de membresias por eventos debe separar calculo de vigencia y publicacion de eventos versionados para mantener idempotencia, auditoria y reglas de fechas verificables.
+- El modulo `catalog` debe tratar productos/servicios y planes de membresia como conceptos separados en application y frontend. Los productos tecnicos `MEMBERSHIP_PLAN` no deben aparecer como productos vendibles comunes.
+- El SQL de escritura de catalogo pertenece a infraestructura; `catalog.application` puede coordinar casos de uso, pero no debe usar `JdbcClient`.
 - Los consumidores de eventos deben permanecer idempotentes y transaccionales, con pruebas orientadas al consumidor dedicado.

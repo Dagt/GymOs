@@ -27,7 +27,13 @@ class SalesRefundServiceTests {
 		SalesRepository salesRepository = mock(SalesRepository.class);
 		SalesRefundCommandRepository commandRepository = mock(SalesRefundCommandRepository.class);
 		AuditService auditService = mock(AuditService.class);
-		SalesRefundService service = new SalesRefundService(salesRepository, new SalesLookupService(salesRepository), commandRepository, auditService);
+		SalesLookupService lookupService = new SalesLookupService(salesRepository);
+		SalesRefundService service = new SalesRefundService(
+				lookupService,
+				new SalesRefundIdempotencyService(salesRepository),
+				new SalesRefundValidationService(salesRepository, lookupService),
+				new SalesRefundProcessor(commandRepository, auditService)
+		);
 		UUID organizationId = UUID.randomUUID();
 		UUID branchId = UUID.randomUUID();
 		UUID saleId = UUID.randomUUID();
@@ -52,7 +58,13 @@ class SalesRefundServiceTests {
 		SalesRepository salesRepository = mock(SalesRepository.class);
 		SalesRefundCommandRepository commandRepository = mock(SalesRefundCommandRepository.class);
 		AuditService auditService = mock(AuditService.class);
-		SalesRefundService service = new SalesRefundService(salesRepository, new SalesLookupService(salesRepository), commandRepository, auditService);
+		SalesLookupService lookupService = new SalesLookupService(salesRepository);
+		SalesRefundService service = new SalesRefundService(
+				lookupService,
+				new SalesRefundIdempotencyService(salesRepository),
+				new SalesRefundValidationService(salesRepository, lookupService),
+				new SalesRefundProcessor(commandRepository, auditService)
+		);
 		UUID organizationId = UUID.randomUUID();
 		UUID branchId = UUID.randomUUID();
 		UUID saleId = UUID.randomUUID();

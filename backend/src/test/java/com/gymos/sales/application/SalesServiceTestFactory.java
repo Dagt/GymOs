@@ -34,8 +34,13 @@ final class SalesServiceTestFactory {
 		SaleDetailQuery saleDetailQuery = new SaleDetailQuery(salesRepository, salesReadRepository);
 		SaleCreationService saleCreationService = new SaleCreationService(salesRepository, new SaleLineResolver(salesRepository),
 				new SaleCommandRepository(jdbcClient), auditService, eventPublisher);
-		SalesRefundService refundService = new SalesRefundService(salesRepository, lookupService,
-				new SalesRefundCommandRepository(jdbcClient), auditService);
+		SalesRefundCommandRepository refundCommandRepository = new SalesRefundCommandRepository(jdbcClient);
+		SalesRefundService refundService = new SalesRefundService(
+				lookupService,
+				new SalesRefundIdempotencyService(salesRepository),
+				new SalesRefundValidationService(salesRepository, lookupService),
+				new SalesRefundProcessor(refundCommandRepository, auditService)
+		);
 		SalesPointOfSaleService pointOfSaleService = new SalesPointOfSaleService(
 				saleDetailQuery, saleCreationService, paymentService, refundService, completionService);
 		return new SalesService(
