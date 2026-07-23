@@ -47,11 +47,13 @@ function CatalogContent() {
           <PlanList canUpdate={controller.canUpdate} plans={controller.plans} onEditPlan={controller.openPlanEdition} />
         </section>
       </section>
-      <CatalogProductDrawer categories={controller.categories} canReadCosts={controller.canReadCosts}
-        editing={Boolean(controller.editingProductId)} form={controller.form} open={controller.showProductDrawer}
-        price={controller.price} image={controller.productImage} saving={controller.saving}
-        onClose={controller.resetProductDrawer} onFormChange={controller.setForm}
-        onPriceChange={controller.setPrice} onImageChange={controller.setProductImage} onSubmit={controller.submitProduct} />
+      <CatalogProductDrawer categories={controller.categories} canManageImages={controller.canManageImages}
+        canReadCosts={controller.canReadCosts} editing={Boolean(controller.editingProductId)}
+        existingImage={Boolean(controller.existingImageObjectKey)} form={controller.form}
+        open={controller.showProductDrawer} price={controller.price} image={controller.productImage}
+        saving={controller.saving} onClose={controller.resetProductDrawer} onFormChange={controller.setForm}
+        onPriceChange={controller.setPrice} onImageChange={controller.setProductImage}
+        onRemoveImage={controller.removeCurrentProductImage} onSubmit={controller.submitProduct} />
       <PlanDrawer editingPlanId={controller.editingPlanId} form={controller.planForm} open={controller.showPlanDrawer}
         saving={controller.saving} onClose={controller.resetPlanDrawer} onFormChange={controller.setPlanForm}
         onSubmit={controller.submitPlan} />
