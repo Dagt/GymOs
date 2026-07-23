@@ -103,6 +103,10 @@ class CatalogProductService {
 			throw new BusinessException("PRODUCT_UPDATE_REQUIRES_PLAN_WORKFLOW",
 					"Los productos de membresia se administran desde planes.");
 		}
+		if (request.version() == null) {
+			throw new BusinessException("PRODUCT_VERSION_REQUIRED", "Recarga el producto antes de guardar cambios.");
+		}
+		if (request.version() != existing.version()) throw concurrentModification();
 		validateTransition(principal.organizationId(), existing, request);
 		String sku = normalizeRequired(request.sku());
 		if (products.skuExists(principal.organizationId(), sku, productId)) throw duplicateSku();
@@ -112,7 +116,7 @@ class CatalogProductService {
 		List<String> tags = normalizeTags(request.tags());
 		OffsetDateTime now = OffsetDateTime.now();
 		int updated = commands.update(mutation(principal, productId, request, sku, barcode, existing.imageObjectKey(), existing, now));
-		if (updated != 1) throw notFound();
+		if (updated != 1) throw concurrentModification();
 		commands.replaceCategory(principal.organizationId(), productId, request.categoryId(), principal.userId(), now);
 		commands.replaceTags(principal.organizationId(), productId, tags, principal.userId(), now);
 		auditService.record(principal, "PRODUCT_UPDATED", "CATALOG_PRODUCT", productId, "BACKOFFICE",
@@ -180,7 +184,7 @@ class CatalogProductService {
 				trimToNull(request.presentation()), normalizeNullable(request.unitOfMeasure()), request.inventoryTracked(),
 				request.displayOrder(), imageObjectKey, effectiveSupplier(principal, request, existing),
 				effectiveReferenceCost(principal, request, existing), request.promotionalPriceCents(),
-				request.promotionStartsAt(), request.promotionEndsAt(), now, principal.userId()
+				request.promotionStartsAt(), request.promotionEndsAt(), request.version(), now, principal.userId()
 		);
 	}
 
@@ -333,5 +337,6 @@ class CatalogProductService {
 	}
 	private String trimToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }
 	private BusinessException duplicateSku() { return new BusinessException("PRODUCT_SKU_ALREADY_EXISTS", "Ya existe otro producto con ese SKU."); }
+	private BusinessException concurrentModification() { return new BusinessException("PRODUCT_CONCURRENT_MODIFICATION", "El producto cambio mientras lo editabas. Recargalo antes de guardar."); }
 	private BusinessException notFound() { return new BusinessException("PRODUCT_NOT_FOUND", "El producto no existe o fue archivado."); }
 }
