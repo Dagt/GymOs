@@ -49,6 +49,13 @@ public class CatalogRepository {
 			String currency,
 			boolean taxable,
 			String status,
+			String barcode,
+			String brand,
+			String presentation,
+			String unitOfMeasure,
+			boolean inventoryTracked,
+			int displayOrder,
+			String imageObjectKey,
 			OffsetDateTime createdAt,
 			OffsetDateTime updatedAt
 	) {
