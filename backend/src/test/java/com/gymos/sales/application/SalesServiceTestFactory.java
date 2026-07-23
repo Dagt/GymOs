@@ -4,7 +4,7 @@ import static org.mockito.Mockito.mock;
 
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.storage.ObjectStorageService;
-import com.gymos.inventory.api.operations.InventoryRefundOperations;
+import com.gymos.inventory.api.InventoryRefundOperations;
 import com.gymos.sales.infrastructure.MembershipSaleCommandRepository;
 import com.gymos.sales.infrastructure.SaleCommandRepository;
 import com.gymos.sales.infrastructure.SalePaymentCompletionRepository;
