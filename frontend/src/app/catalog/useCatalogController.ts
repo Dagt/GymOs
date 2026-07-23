@@ -145,7 +145,7 @@ export function useCatalogController() {
 
 function loadCatalog(accessToken: string, filters: import("@/lib/api").ProductSearchParams) {
   return Promise.all([
-    searchProducts(accessToken, filters), getPlans(accessToken), getCatalogCategories(accessToken), getCatalogSummary(accessToken),
+    searchProducts(accessToken, filters), getPlans(accessToken), getCatalogCategories(accessToken, true), getCatalogSummary(accessToken),
   ]);
 }
 
