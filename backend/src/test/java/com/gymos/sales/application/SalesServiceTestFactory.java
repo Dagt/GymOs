@@ -27,10 +27,10 @@ final class SalesServiceTestFactory {
 		MembershipSalesService membershipSalesService = new MembershipSalesService(
 				salesRepository, new MembershipSaleCommandRepository(jdbcClient), completionService,
 				auditService, eventPublisher);
+		SalesReadRepository salesReadRepository = new SalesReadRepository(jdbcClient);
 		return new SalesService(
-				salesRepository,
-				new SalesReadRepository(jdbcClient),
-				new SalesReportRepository(jdbcClient),
+				new SaleDetailQuery(salesRepository, salesReadRepository),
+				new SalesReportingQuery(salesReadRepository, new SalesReportRepository(jdbcClient)),
 				new SaleCreationService(salesRepository, new SaleLineResolver(salesRepository),
 						new SaleCommandRepository(jdbcClient), auditService, eventPublisher),
 				paymentService,

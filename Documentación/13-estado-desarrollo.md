@@ -1041,3 +1041,33 @@ Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
 Verificado:
 
 - Frontend: `npm.cmd run typecheck`.
+
+## Saneamiento backend de membresias y ventas - 23 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- `MembershipRepository` queda como fachada publica del modulo `memberships` y delega responsabilidades a repositorios internos especializados:
+  - `MembershipClientRepository`;
+  - `MembershipQueryRepository`;
+  - `MembershipPlanLookupRepository`;
+  - `MembershipEventRepository`;
+  - `MembershipCommandRepository`;
+  - `MembershipRowMappers`.
+- `SalesRepository` queda como fachada publica del modulo `sales` y delega responsabilidades a repositorios internos especializados:
+  - `SalesCatalogLookupRepository`;
+  - `SalesClientLookupRepository`;
+  - `SalesRecordLookupRepository`;
+  - `SalesIdempotencyLookupRepository`;
+  - `SalesPaymentLookupRepository`;
+  - `SalesRefundLookupRepository`;
+  - `SalesMembershipLookupRepository`;
+  - `SalesRowMappers`.
+- `SalesService` deja de construir detalles y reportes directamente:
+  - `SaleDetailQuery` concentra detalle de venta y ventas recientes;
+  - `SalesReportingQuery` concentra validacion de rango y armado del reporte de ventas.
+- Se conservaron los contratos publicos usados por servicios y pruebas para evitar cambios funcionales en ventas, pagos, reembolsos, membresias iniciales o reportes.
+- El SQL queda agrupado por responsabilidad sin mover propiedad de datos entre modulos.
+
+Verificado:
+
+- Backend: `./gradlew.bat test` completo. Resultado exitoso; persiste warning no bloqueante de shutdown de Spring Modulith en pruebas H2 por `event_publication`.
