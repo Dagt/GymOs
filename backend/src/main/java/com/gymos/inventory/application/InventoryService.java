@@ -8,7 +8,8 @@ import com.gymos.inventory.infrastructure.InventoryRepository;
 import com.gymos.inventory.infrastructure.InventoryRepository.InventoryMovementRecord;
 import com.gymos.inventory.infrastructure.InventoryRepository.InventoryStockRecord;
 import com.gymos.inventory.infrastructure.InventoryRepository.ProductForInventory;
-import com.gymos.inventory.infrastructure.InventoryRepository.StockLedgerRecord;
+import com.gymos.inventory.infrastructure.InventoryStockCommandRepository;
+import com.gymos.inventory.infrastructure.InventoryStockCommandRepository.StockLedger;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -19,10 +20,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class InventoryService {
 	private final InventoryRepository inventoryRepository;
+	private final InventoryStockCommandRepository stockCommands;
 	private final AuditService auditService;
 
-	public InventoryService(InventoryRepository inventoryRepository, AuditService auditService) {
+	public InventoryService(
+			InventoryRepository inventoryRepository,
+			InventoryStockCommandRepository stockCommands,
+			AuditService auditService
+	) {
 		this.inventoryRepository = inventoryRepository;
+		this.stockCommands = stockCommands;
 		this.auditService = auditService;
 	}
 
@@ -60,9 +67,9 @@ public class InventoryService {
 		String movementType = normalizeManualMovementType(request.movementType());
 		int quantityDelta = quantityDelta(movementType, request.quantity());
 		OffsetDateTime now = OffsetDateTime.now();
-		UUID stockId = inventoryRepository.ensureStock(
+		UUID stockId = stockCommands.ensureStock(
 				principal.organizationId(), principal.branchId(), product.id(), principal.userId(), now);
-		StockLedgerRecord current = inventoryRepository.lockStock(principal.organizationId(), principal.branchId(), stockId)
+		StockLedger current = stockCommands.lock(principal.organizationId(), principal.branchId(), stockId)
 				.orElseThrow(() -> new BusinessException("INVENTORY_STOCK_NOT_FOUND", "No fue posible bloquear existencias."));
 		int quantityAfter = current.quantityOnHand() + quantityDelta;
 		if (quantityAfter < 0) {
@@ -74,7 +81,7 @@ public class InventoryService {
 			throw new BusinessException("INVENTORY_REORDER_POINT_INVALID", "El punto de reorden no puede ser negativo.");
 		}
 
-		inventoryRepository.updateStock(stockId, quantityAfter, reorderPoint, averageCost, principal.userId(), now);
+		stockCommands.update(stockId, quantityAfter, reorderPoint, averageCost, principal.userId(), now);
 		UUID movementId = inventoryRepository.createMovement(
 				principal.organizationId(), principal.branchId(), stockId, product.id(), movementType,
 				quantityDelta, current.quantityOnHand(), quantityAfter, request.unitCostCents(),
@@ -113,7 +120,7 @@ public class InventoryService {
 		};
 	}
 
-	private Long nextAverageCost(StockLedgerRecord current, int quantityDelta, Long unitCostCents) {
+	private Long nextAverageCost(StockLedger current, int quantityDelta, Long unitCostCents) {
 		if (quantityDelta <= 0 || unitCostCents == null) return current.averageCostCents();
 		if (unitCostCents < 0) throw new BusinessException("INVENTORY_UNIT_COST_INVALID", "El costo unitario no puede ser negativo.");
 		long currentCost = current.averageCostCents() == null ? unitCostCents : current.averageCostCents();
