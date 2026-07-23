@@ -11,6 +11,7 @@ import com.gymos.coaching.api.operations.CoachProfileProvisioning;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.identity.application.result.InternalUserSummary;
+import com.gymos.identity.application.result.RoleOption;
 import com.gymos.identity.infrastructure.UserAdministrationRepository;
 import com.gymos.identity.infrastructure.UserAdministrationRepository.UserCoachProfileData;
 import java.util.List;
@@ -57,6 +58,24 @@ class UserAdministrationProtectionTests {
 		);
 
 		assertEquals("USER_NOT_MANAGEABLE", exception.code());
+	}
+
+	@Test
+	void managerCanOnlyAssignReceptionAndCoachRoles() {
+		GymOsPrincipal principal = managerPrincipal();
+		UUID receptionRoleId = UUID.randomUUID();
+		UUID coachRoleId = UUID.randomUUID();
+		when(repository.findRoles(principal.organizationId(), false)).thenReturn(List.of(
+				new RoleOption(UUID.randomUUID(), "Dueno del gimnasio", "Owner", false, 50),
+				new RoleOption(UUID.randomUUID(), "Gerente", "Manager", false, 30),
+				new RoleOption(receptionRoleId, "Recepcion", "Reception", false, 20),
+				new RoleOption(coachRoleId, "Coach", "Coach", false, 10),
+				new RoleOption(UUID.randomUUID(), "Administrador GymOS", "Platform", true, 99)
+		));
+
+		List<RoleOption> roles = service.roles(principal);
+
+		assertEquals(List.of("Recepcion", "Coach"), roles.stream().map(RoleOption::name).toList());
 	}
 
 	@Test
@@ -114,6 +133,19 @@ class UserAdministrationProtectionTests {
 				"Owner",
 				Set.of("users.manage"),
 				Set.of("Dueno del gimnasio"),
+				false
+		);
+	}
+
+	private GymOsPrincipal managerPrincipal() {
+		return new GymOsPrincipal(
+				UUID.randomUUID(),
+				UUID.randomUUID(),
+				UUID.randomUUID(),
+				"manager",
+				"Manager",
+				Set.of("user.read", "user.manage"),
+				Set.of("Gerente"),
 				false
 		);
 	}

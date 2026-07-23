@@ -91,6 +91,8 @@ public class SecurityConfig {
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/inventory/**").hasAuthority("inventory.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/resources/**").hasAuthority("resource.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/resources/**").hasAuthority("resource.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/v1/resources/**").hasAuthority("resource.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/v1/resources/**").hasAuthority("resource.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/bookings/**").hasAuthority("booking.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/bookings/*/payments").hasAuthority("booking.payment.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/bookings/**").hasAuthority("booking.manage")

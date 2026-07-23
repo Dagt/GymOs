@@ -148,11 +148,13 @@ export type {
 export {
   createBooking,
   createResource,
+  deleteResource,
   getBookings,
   getResourceAvailability,
   getResources,
   linkBookingPayment,
   transitionBooking,
+  updateResource,
 } from "./api/bookings";
 export type {
   AvailabilitySlot,
@@ -162,6 +164,7 @@ export type {
   CreateResourcePayload,
   LinkBookingPaymentPayload,
   ResourceSummary,
+  UpdateResourcePayload,
 } from "./api/booking-types";
 export {
   assignWorkout,

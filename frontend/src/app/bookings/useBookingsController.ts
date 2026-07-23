@@ -27,6 +27,7 @@ import type { BookingNoteDialog, BookingNotice } from "./components";
 import {
   createBooking,
   createResource,
+  deleteResource,
   getBranches,
   getBookings,
   getCurrentOrganization,
@@ -35,6 +36,7 @@ import {
   getStoredSession,
   searchClients,
   transitionBooking,
+  updateResource,
   type BranchSummary,
   type BookingSummary,
   type ClientSummary,
@@ -70,6 +72,7 @@ export function useBookingsController() {
   const [saving, setSaving] = useState(false);
   const [showBookingDrawer, setShowBookingDrawer] = useState(false);
   const [showResourceDrawer, setShowResourceDrawer] = useState(false);
+  const [editingResourceId, setEditingResourceId] = useState<string | null>(null);
 
   const today = toDateInput(new Date());
   const minimumBookingTime = startDate === today ? currentTimeInput() : undefined;
@@ -154,8 +157,9 @@ export function useBookingsController() {
   const activeResource = resources.find((resource) => resource.id === resourceId) ?? null;
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
   const selectedClient = visibleClientResults.find((client) => client.id === clientId) ?? null;
-  const isReceptionUser = session?.user.console === "RECEPTION" || session?.user.roles.some((role) => role.toLowerCase().includes("recepcion"));
-  const canManageResources = Boolean(session?.user.permissions.includes("resource.manage") && !isReceptionUser);
+  const roleNames = session?.user.roles.map((role) => role.toLowerCase()) ?? [];
+  const isTenantOwner = roleNames.some((role) => role.includes("dueno") || role.includes("dueño"));
+  const canManageResources = Boolean(session?.user.permissions.includes("resource.manage") && (session.user.platformAdmin || isTenantOwner));
   const durationMinutes = Math.max(1, durationUnit === "HOURS" ? durationValue * 60 : durationValue);
   const selectedDateIsPast = isPastDate(startDate);
   const selectedStartIsPast = isPastDateTime(startDate, startTime);
@@ -236,7 +240,7 @@ export function useBookingsController() {
     }
     setSaving(true);
     try {
-      const created = await createResource(session.accessToken, {
+      const payload = {
         name: resourceName,
         resourceType: "ROOM",
         capacity: 1,
@@ -245,21 +249,76 @@ export function useBookingsController() {
         closesAt: minutesToTime(Math.max(...enabledDays.map((day) => timeToMinutes(day.closesAt)))),
         notes: buildResourceScheduleNotes(enabledDays),
         allowedPlanIds: resourceAllowedPlanIds,
-      });
+      };
+      const saved = editingResourceId
+        ? await updateResource(session.accessToken, editingResourceId, payload)
+        : await createResource(session.accessToken, payload);
       await refresh();
-      setResourceId(created.id);
-      setResourceName("");
-      setDurationValue(60);
-      setDurationUnit("MINUTES");
-      setResourceSchedule(weekdays.map((day) => ({ ...day })));
-      setResourceAllowedPlanIds([]);
-      setNotice({ title: "Recurso creado", message: "El recurso ya esta disponible para reservar.", tone: "success" });
+      setResourceId(saved.id);
+      resetResourceForm();
+      setNotice({
+        title: editingResourceId ? "Recurso actualizado" : "Recurso creado",
+        message: editingResourceId ? "Los cambios del recurso quedaron guardados." : "El recurso ya esta disponible para reservar.",
+        tone: "success",
+      });
       setShowResourceDrawer(false);
     } catch (error) {
       showError(error, "No fue posible crear el recurso.");
     } finally {
       setSaving(false);
     }
+  }
+
+  async function deleteReservableResource(targetResourceId: string) {
+    if (!session) return;
+    const target = resources.find((resource) => resource.id === targetResourceId);
+    const confirmed = window.confirm(`Quieres eliminar ${target?.name ?? "este recurso"}? Solo se permite si no tiene reservas vigentes.`);
+    if (!confirmed) return;
+    setSaving(true);
+    try {
+      await deleteResource(session.accessToken, targetResourceId);
+      await refresh();
+      setResourceId((current) => current === targetResourceId ? "" : current);
+      setNotice({ title: "Recurso eliminado", message: "El recurso ya no aparecera en la agenda.", tone: "success" });
+    } catch (error) {
+      showError(error, "No fue posible eliminar el recurso.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function openCreateResourceDrawer() {
+    resetResourceForm();
+    setShowResourceDrawer(true);
+  }
+
+  function openEditResourceDrawer(targetResourceId: string) {
+    const target = resources.find((resource) => resource.id === targetResourceId);
+    if (!target) return;
+    setEditingResourceId(target.id);
+    setResourceName(target.name);
+    setDurationUnit("MINUTES");
+    setDurationValue(target.slotMinutes);
+    setResourceAllowedPlanIds(target.allowedPlanIds ?? []);
+    setResourceSchedule(weekdays.map((day) => {
+      const hours = resourceHoursForDay(target, day.key);
+      return {
+        ...day,
+        enabled: Boolean(hours),
+        opensAt: hours?.opensAt ?? day.opensAt,
+        closesAt: hours?.closesAt ?? day.closesAt,
+      };
+    }));
+    setShowResourceDrawer(true);
+  }
+
+  function resetResourceForm() {
+    setEditingResourceId(null);
+    setResourceName("");
+    setDurationValue(60);
+    setDurationUnit("MINUTES");
+    setResourceSchedule(weekdays.map((day) => ({ ...day })));
+    setResourceAllowedPlanIds([]);
   }
 
   async function cancelBooking(bookingId: string) {
@@ -322,6 +381,7 @@ export function useBookingsController() {
     computedEnd,
     durationUnit,
     durationValue,
+    editingResourceId,
     formatDateTime,
     goToToday,
     isValidTimeInput,
@@ -333,6 +393,8 @@ export function useBookingsController() {
     notes,
     notice,
     openNoteDialog,
+    openCreateResourceDrawer,
+    openEditResourceDrawer,
     openResourceCount,
     organization,
     plans,
@@ -375,6 +437,7 @@ export function useBookingsController() {
     updateResourceDay,
     weekdays,
     cancelBooking,
+    deleteReservableResource,
   };
 }
 

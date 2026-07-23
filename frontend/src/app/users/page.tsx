@@ -80,7 +80,16 @@ export default function UsersPage() {
         setUsers(existingUsers);
         const selectableRoles = availableRoles.filter((role) => canShowRoleForSession(stored.user.roles, role.name, stored.user.platformAdmin));
         const defaultRole = selectableRoles.find((role) => displayRoleName(role.name) === "Recepcion") ?? selectableRoles[0];
-        setForm((current) => ({ ...current, roleId: defaultRole?.id ?? "" }));
+        const defaultRoleLabel = displayRoleName(defaultRole?.name ?? "");
+        setForm((current) => ({
+          ...current,
+          roleId: defaultRole?.id ?? "",
+          branchIds: defaultRoleLabel === "Dueno del gimnasio"
+            ? availableBranches.map((branch) => branch.id)
+            : availableBranches.length === 1
+              ? [availableBranches[0].id]
+              : current.branchIds,
+        }));
       } catch (exception) {
         if (active) {
           setError(exception instanceof Error ? exception.message : "No fue posible cargar equipo y accesos.");
@@ -104,6 +113,10 @@ export default function UsersPage() {
   const visibleUsers = users.filter((user) => canSeeUserForSession(session?.user.roles ?? [], user.roles, Boolean(session?.user.platformAdmin)));
   const selectedRoleLabel = displayRoleName(selectableRoles.find((role) => role.id === form.roleId)?.name ?? "");
   const ownerRoleSelected = selectedRoleLabel === "Dueno del gimnasio";
+  const managerSingleBranchLocked = selectedRoleLabel !== "Dueno del gimnasio"
+    && branches.length === 1
+    && (session?.user.roles ?? []).some((role) => displayRoleName(role) === "Gerente")
+    && !session?.user.platformAdmin;
 
   async function submitUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -124,7 +137,11 @@ export default function UsersPage() {
         email: form.email?.trim() || null,
         phone: normalizePhone(form.phone ?? ""),
         username: form.username.trim(),
-        branchIds: ownerRoleSelected ? branches.map((branch) => branch.id) : form.branchIds,
+        branchIds: ownerRoleSelected
+          ? branches.map((branch) => branch.id)
+          : managerSingleBranchLocked
+            ? [branches[0].id]
+            : form.branchIds,
       });
       setUsers((current) => [...current, created].sort((left, right) => left.fullName.localeCompare(right.fullName)));
       setForm({
@@ -142,12 +159,28 @@ export default function UsersPage() {
   }
 
   function updateBranchAccess(branchId: string, checked: boolean) {
+    if (managerSingleBranchLocked) {
+      return;
+    }
     setForm((current) => ({
       ...current,
       branchIds: checked
         ? [...new Set([...current.branchIds, branchId])]
         : current.branchIds.filter((item) => item !== branchId),
     }));
+  }
+
+  function openCreateUser() {
+    setFieldErrors({});
+    setForm((current) => ({
+      ...current,
+      branchIds: ownerRoleSelected
+        ? branches.map((branch) => branch.id)
+        : branches.length === 1
+          ? [branches[0].id]
+          : current.branchIds,
+    }));
+    setShowCreateUser(true);
   }
 
   async function toggleUserStatus(user: InternalUserSummary) {
@@ -228,7 +261,7 @@ export default function UsersPage() {
       {message ? <p className="form-message success">{message}</p> : null}
 
       <section className="team-layout">
-        <TeamOverview branches={branches} roles={selectableRoles} onCreateUser={() => setShowCreateUser(true)} />
+        <TeamOverview branches={branches} roles={selectableRoles} onCreateUser={openCreateUser} />
         <TeamContextCard branches={branches} organization={organization} roles={selectableRoles} session={session} users={visibleUsers} />
       </section>
 
@@ -247,6 +280,7 @@ export default function UsersPage() {
         form={form}
         open={showCreateUser}
         ownerRoleSelected={ownerRoleSelected}
+        branchSelectionLocked={managerSingleBranchLocked}
         roles={selectableRoles}
         saving={saving}
         onBranchAccessChange={updateBranchAccess}

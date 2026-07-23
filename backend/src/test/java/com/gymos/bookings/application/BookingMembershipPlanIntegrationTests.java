@@ -8,9 +8,10 @@ import com.gymos.audit.api.AuditService;
 import com.gymos.bookings.application.command.CreateBookingCommand;
 import com.gymos.bookings.application.command.CreateResourceCommand;
 import com.gymos.bookings.infrastructure.BookingEligibilityRepository;
+import com.gymos.bookings.infrastructure.BookingResourceRepository;
+import com.gymos.bookings.infrastructure.BookingResourceRepository.ResourceRecord;
 import com.gymos.bookings.infrastructure.BookingRepository;
 import com.gymos.bookings.infrastructure.BookingRepository.BookingRecord;
-import com.gymos.bookings.infrastructure.BookingRepository.ResourceRecord;
 import com.gymos.bookings.infrastructure.ClientBookingConflictRepository;
 import com.gymos.catalog.infrastructure.CatalogCommandRepository;
 import com.gymos.catalog.infrastructure.CatalogCommandRepository.PlanRecord;
@@ -67,6 +68,7 @@ class BookingMembershipPlanIntegrationTests {
 		catalogCommandRepository = new CatalogCommandRepository(jdbcClient);
 		bookingService = new BookingService(
 				new BookingRepository(jdbcClient),
+				new BookingResourceRepository(jdbcClient),
 				new BookingEligibilityRepository(jdbcClient),
 				new ClientBookingConflictRepository(jdbcClient),
 				new ResourceScheduleResolver(new ObjectMapper()),
@@ -119,6 +121,32 @@ class BookingMembershipPlanIntegrationTests {
 		))
 				.isInstanceOf(BusinessException.class)
 				.hasMessageContaining("membresia permitida");
+	}
+
+	@Test
+	void resourceCanBeUpdatedAndSoftDeleted() {
+		ResourceRecord resource = bookingService.createResource(
+				principal,
+				new CreateResourceCommand("Salon uno", "ROOM", 1, 60, LocalTime.of(6, 0), LocalTime.of(22, 0), null, java.util.List.of()),
+				"resource-update"
+		);
+
+		ResourceRecord updated = bookingService.updateResource(
+				principal,
+				resource.id(),
+				new CreateResourceCommand("Salon renovado", "ROOM", 1, 45, LocalTime.of(7, 0), LocalTime.of(21, 0), "Horario nuevo", java.util.List.of(allowedPlanId)),
+				"resource-update"
+		);
+
+		assertThat(updated.name()).isEqualTo("Salon renovado");
+		assertThat(updated.slotMinutes()).isEqualTo(45);
+		assertThat(updated.allowedPlanIds()).containsExactly(allowedPlanId);
+
+		bookingService.deleteResource(principal, resource.id(), "resource-delete");
+
+		assertThat(bookingService.resources(principal))
+				.extracting(ResourceRecord::id)
+				.doesNotContain(resource.id());
 	}
 
 	private void seedTenantCatalogAndMembers() {

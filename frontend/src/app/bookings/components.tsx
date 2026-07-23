@@ -60,10 +60,16 @@ export function BookingNoteModal({ dialog, onClose }: { dialog: BookingNoteDialo
 }
 
 export function BookingSummaryPanel({
+  canManageResources = false,
+  onDeleteResource,
+  onEditResource,
   openResourceCount,
   resources,
   selectedDate,
 }: {
+  canManageResources?: boolean;
+  onDeleteResource?: (resourceId: string) => void;
+  onEditResource?: (resourceId: string) => void;
   openResourceCount: number;
   resources: ResourceDaySummary[];
   selectedDate: string;
@@ -97,6 +103,12 @@ export function BookingSummaryPanel({
                 {resource.hours ? `${resource.hours.opensAt} - ${resource.hours.closesAt}` : "Cerrado"}
               </p>
               <p className="mt-0.5 text-[11px] text-[#647067]">{resource.slotMinutes} min</p>
+              {canManageResources ? (
+                <div className="mt-2 grid grid-cols-2 gap-1">
+                  <button className="resource-mini-action" onClick={() => onEditResource?.(resource.id)} type="button">Editar</button>
+                  <button className="resource-mini-action danger" onClick={() => onDeleteResource?.(resource.id)} type="button">Eliminar</button>
+                </div>
+              ) : null}
             </article>
           ))}
         </div>

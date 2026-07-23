@@ -335,7 +335,8 @@ Nota implementada Hito 4:
 
 - `POST /resources`
 - `GET /resources`
-- `PATCH /resources/{id}` (pendiente)
+- `PUT /resources/{id}`
+- `DELETE /resources/{id}`
 - `GET /resources/{id}/availability`
 - `POST /bookings`
 - `GET /bookings`
@@ -348,6 +349,8 @@ Nota implementada Hito 4:
 Nota implementada Hito 4:
 - `POST /resources` crea recursos activos con capacidad, duracion de slot y horario.
 - `POST /resources` acepta `allowedPlanIds`; si se envian planes, solo socios con membresia activa de alguno de esos planes pueden reservar el recurso.
+- `PUT /resources/{resourceId}` actualiza nombre, capacidad, duracion, horario, notas y planes permitidos del recurso. Requiere `resource.manage`.
+- `DELETE /resources/{resourceId}` elimina logicamente el recurso. Requiere `resource.manage` y responde `RESOURCE_HAS_ACTIVE_BOOKINGS` si existen reservas activas.
 - `GET /resources/{resourceId}/availability?date=YYYY-MM-DD` devuelve slots con capacidad, reservados y disponibilidad.
 - `POST /bookings` crea reserva en estado `RESERVED`.
 - `POST /bookings` responde `BOOKING_PLAN_NOT_ALLOWED` cuando el recurso esta restringido y el socio no tiene una membresia permitida.
@@ -528,6 +531,11 @@ Permisos por endpoint interno:
 - `client.import`
 
 Nota: `Recepcion` conserva `resource.read`, `booking.read` y `booking.manage` para hacer reservaciones, pero no recibe `resource.manage`; la creacion/modificacion de recursos reservables queda para perfiles administrativos.
+
+Nota implementada durante saneamiento:
+- `Gerente` puede recibir `user.read` y `user.manage` para administrar staff operativo, pero la API publica de usuarios filtra roles y usuarios por contexto.
+- Desde contexto de gerente solo se ofrecen roles operativos permitidos (`Recepcion` y `Coach`) y no se permite crear, modificar, suspender ni cambiar rol a `Dueno del gimnasio`, `Gerente` o `Administrador GymOS`.
+- Si el gerente tiene acceso a una sola sucursal, el frontend envia esa sucursal de forma obligatoria para nuevos usuarios operativos.
 
 Errores agregados o formalizados:
 - `IDEMPOTENCY_KEY_REUSED`

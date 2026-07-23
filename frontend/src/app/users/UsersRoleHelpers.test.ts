@@ -31,9 +31,11 @@ test("manager cannot see or manage tenant owners and other managers", () => {
   assert.equal(canSeeUserForSession(["Gerente"], ["Administrador"], false), false);
   assert.equal(canSeeUserForSession(["Gerente"], ["Gerente"], false), false);
   assert.equal(canSeeUserForSession(["Gerente"], ["Recepcion"], false), true);
+  assert.equal(canSeeUserForSession(["Gerente"], ["Coach"], false), true);
   assert.equal(canManageUserForSession(["Gerente"], ["Administrador"], false), false);
   assert.equal(canManageUserForSession(["Gerente"], ["Gerente"], false), false);
   assert.equal(canManageUserForSession(["Gerente"], ["Recepcion"], false), true);
+  assert.equal(canManageUserForSession(["Gerente"], ["Coach"], false), true);
 });
 
 test("platform administrator keeps full support visibility", () => {

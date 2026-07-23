@@ -47,6 +47,8 @@ export type CreateResourcePayload = {
   allowedPlanIds?: string[];
 };
 
+export type UpdateResourcePayload = CreateResourcePayload;
+
 export type CreateBookingPayload = {
   resourceId: string;
   clientId: string;

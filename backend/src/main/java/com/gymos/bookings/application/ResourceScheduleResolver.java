@@ -2,7 +2,7 @@ package com.gymos.bookings.application;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.gymos.bookings.infrastructure.BookingRepository.ResourceRecord;
+import com.gymos.bookings.infrastructure.BookingResourceRepository.ResourceRecord;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Optional;

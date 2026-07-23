@@ -200,6 +200,22 @@
   padding: 0.6rem;
 }
 
+.shell :global(.resource-mini-action) {
+  min-height: 1.8rem;
+  border: 1px solid #d8ddd2;
+  border-radius: 0.45rem;
+  background: var(--brand-surface);
+  color: var(--brand-primary);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.shell :global(.resource-mini-action.danger) {
+  background: #fff5f5;
+  border-color: #fecaca;
+  color: #991b1b;
+}
+
 /* Reception and managers do not create resources: use the vacant second row. */
 .shell :global(.bookings-operational-layout) {
   align-items: stretch;

@@ -125,6 +125,7 @@ export function ResourceDrawerForm({
   resourceName,
   resourceSchedule,
   saving,
+  submitLabel = "Crear recurso",
 }: {
   durationUnit: DurationUnit;
   durationValue: number;
@@ -139,6 +140,7 @@ export function ResourceDrawerForm({
   resourceName: string;
   resourceSchedule: BookingResourceDay[];
   saving: boolean;
+  submitLabel?: string;
 }) {
   return (
     <form className="grid gap-4" onSubmit={onSubmit}>
@@ -190,7 +192,7 @@ export function ResourceDrawerForm({
         ))}
       </fieldset>
       <button className="mt-5 h-11 w-full rounded-md bg-[var(--brand-primary)] px-4 text-sm font-semibold text-white shadow-sm disabled:opacity-60" disabled={saving} type="submit">
-        Crear recurso
+        {submitLabel}
       </button>
     </form>
   );

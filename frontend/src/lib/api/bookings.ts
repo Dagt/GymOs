@@ -7,6 +7,7 @@ import type {
   CreateResourcePayload,
   LinkBookingPaymentPayload,
   ResourceSummary,
+  UpdateResourcePayload,
 } from "./booking-types";
 
 export async function getResources(accessToken: string): Promise<ResourceSummary[]> {
@@ -20,6 +21,23 @@ export async function createResource(
   return apiFetch<ResourceSummary>("/resources", accessToken, {
     method: "POST",
     body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function updateResource(
+  accessToken: string,
+  resourceId: string,
+  payload: UpdateResourcePayload,
+): Promise<ResourceSummary> {
+  return apiFetch<ResourceSummary>(`/resources/${resourceId}`, accessToken, {
+    method: "PUT",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function deleteResource(accessToken: string, resourceId: string): Promise<void> {
+  await apiFetch<void>(`/resources/${resourceId}`, accessToken, {
+    method: "DELETE",
   });
 }
 

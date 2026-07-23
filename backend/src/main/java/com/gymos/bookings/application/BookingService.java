@@ -6,12 +6,13 @@ import com.gymos.bookings.application.command.CreateBookingCommand;
 import com.gymos.bookings.application.command.CreateResourceCommand;
 import com.gymos.bookings.application.command.LinkBookingPaymentCommand;
 import com.gymos.bookings.infrastructure.BookingEligibilityRepository;
+import com.gymos.bookings.infrastructure.BookingResourceRepository;
+import com.gymos.bookings.infrastructure.BookingResourceRepository.ResourceData;
+import com.gymos.bookings.infrastructure.BookingResourceRepository.ResourceRecord;
 import com.gymos.bookings.infrastructure.BookingRepository;
 import com.gymos.bookings.infrastructure.BookingRepository.AvailabilitySlot;
 import com.gymos.bookings.infrastructure.BookingRepository.BookingRecord;
 import com.gymos.bookings.infrastructure.BookingRepository.CreateBookingData;
-import com.gymos.bookings.infrastructure.BookingRepository.CreateResourceData;
-import com.gymos.bookings.infrastructure.BookingRepository.ResourceRecord;
 import com.gymos.bookings.infrastructure.ClientBookingConflictRepository;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
@@ -32,6 +33,7 @@ public class BookingService {
 	private static final Set<String> ACTIVE_STATUSES = Set.of("RESERVED", "CONFIRMED", "CHECKED_IN");
 
 	private final BookingRepository bookingRepository;
+	private final BookingResourceRepository bookingResourceRepository;
 	private final BookingEligibilityRepository bookingEligibilityRepository;
 	private final ClientBookingConflictRepository clientBookingConflictRepository;
 	private final ResourceScheduleResolver resourceScheduleResolver;
@@ -39,12 +41,14 @@ public class BookingService {
 
 	public BookingService(
 			BookingRepository bookingRepository,
+			BookingResourceRepository bookingResourceRepository,
 			BookingEligibilityRepository bookingEligibilityRepository,
 			ClientBookingConflictRepository clientBookingConflictRepository,
 			ResourceScheduleResolver resourceScheduleResolver,
 			AuditService auditService
 	) {
 		this.bookingRepository = bookingRepository;
+		this.bookingResourceRepository = bookingResourceRepository;
 		this.bookingEligibilityRepository = bookingEligibilityRepository;
 		this.clientBookingConflictRepository = clientBookingConflictRepository;
 		this.resourceScheduleResolver = resourceScheduleResolver;
@@ -54,32 +58,45 @@ public class BookingService {
 	@Transactional(readOnly = true)
 	public List<ResourceRecord> resources(GymOsPrincipal principal) {
 		requireBranch(principal);
-		return bookingRepository.resources(principal.organizationId(), principal.branchId());
+		return bookingResourceRepository.resources(principal.organizationId(), principal.branchId());
 	}
 
 	@Transactional
 	public ResourceRecord createResource(GymOsPrincipal principal, CreateResourceCommand command, String correlationId) {
 		requireBranch(principal);
-		LocalTime opensAt = command.opensAt() == null ? LocalTime.of(6, 0) : command.opensAt();
-		LocalTime closesAt = command.closesAt() == null ? LocalTime.of(22, 0) : command.closesAt();
-		if (!closesAt.isAfter(opensAt)) {
-			throw new BusinessException("RESOURCE_HOURS_INVALID", "La hora de cierre debe ser posterior a la apertura.");
-		}
-		int capacity = Math.max(1, command.capacity());
-		int slotMinutes = Math.max(15, command.slotMinutes());
-		List<UUID> allowedPlanIds = command.allowedPlanIds() == null ? List.of() : new ArrayList<>(new LinkedHashSet<>(command.allowedPlanIds()));
-		if (!allowedPlanIds.isEmpty() && bookingEligibilityRepository.activePlanCount(principal.organizationId(), allowedPlanIds) != allowedPlanIds.size()) {
-			throw new BusinessException("RESOURCE_ALLOWED_PLAN_INVALID", "Selecciona solo planes activos del gimnasio.");
-		}
-		UUID resourceId = bookingRepository.createResource(
+		ResourceMutation mutation = resourceMutation(principal, command);
+		UUID resourceId = bookingResourceRepository.createResource(
 				principal.organizationId(),
 				principal.branchId(),
 				principal.userId(),
-				new CreateResourceData(command.name().trim(), command.resourceType().trim().toUpperCase(), capacity, slotMinutes, opensAt, closesAt, blankToNull(command.notes()))
+				mutation.data()
 		);
-		bookingRepository.replaceAllowedPlans(principal.organizationId(), resourceId, allowedPlanIds);
+		bookingResourceRepository.replaceAllowedPlans(principal.organizationId(), resourceId, mutation.allowedPlanIds());
 		auditService.record(principal, "RESOURCE_CREATED", "RESOURCE", resourceId, "RECEPTION", null, correlationId);
-		return bookingRepository.resource(principal.organizationId(), principal.branchId(), resourceId).orElseThrow();
+		return bookingResourceRepository.resource(principal.organizationId(), principal.branchId(), resourceId).orElseThrow();
+	}
+
+	@Transactional
+	public ResourceRecord updateResource(GymOsPrincipal principal, UUID resourceId, CreateResourceCommand command, String correlationId) {
+		requireBranch(principal);
+		activeResource(principal, resourceId);
+		ResourceMutation mutation = resourceMutation(principal, command);
+		bookingResourceRepository.updateResource(principal.organizationId(), principal.branchId(), resourceId, principal.userId(), mutation.data());
+		bookingResourceRepository.replaceAllowedPlans(principal.organizationId(), resourceId, mutation.allowedPlanIds());
+		auditService.record(principal, "RESOURCE_UPDATED", "RESOURCE", resourceId, "RECEPTION", null, correlationId);
+		return activeResource(principal, resourceId);
+	}
+
+	@Transactional
+	public void deleteResource(GymOsPrincipal principal, UUID resourceId, String correlationId) {
+		requireBranch(principal);
+		activeResource(principal, resourceId);
+		if (bookingResourceRepository.activeBookingCount(principal.organizationId(), principal.branchId(), resourceId) > 0) {
+			throw new BusinessException("RESOURCE_HAS_ACTIVE_BOOKINGS", "No puedes eliminar un recurso con reservas vigentes.");
+		}
+		bookingResourceRepository.replaceAllowedPlans(principal.organizationId(), resourceId, List.of());
+		bookingResourceRepository.deleteResource(principal.organizationId(), principal.branchId(), resourceId, principal.userId());
+		auditService.record(principal, "RESOURCE_DELETED", "RESOURCE", resourceId, "RECEPTION", null, correlationId);
 	}
 
 	@Transactional(readOnly = true)
@@ -217,7 +234,7 @@ public class BookingService {
 	}
 
 	private ResourceRecord activeResource(GymOsPrincipal principal, UUID resourceId) {
-		ResourceRecord resource = bookingRepository.resource(principal.organizationId(), principal.branchId(), resourceId)
+		ResourceRecord resource = bookingResourceRepository.resource(principal.organizationId(), principal.branchId(), resourceId)
 				.orElseThrow(() -> new BusinessException("RESOURCE_NOT_FOUND", "El recurso no existe o no esta disponible."));
 		if (!"ACTIVE".equals(resource.status())) {
 			throw new BusinessException("RESOURCE_NOT_ACTIVE", "El recurso no esta activo.");
@@ -236,5 +253,32 @@ public class BookingService {
 
 	private String blankToNull(String value) {
 		return value == null || value.isBlank() ? null : value.trim();
+	}
+
+	private ResourceMutation resourceMutation(GymOsPrincipal principal, CreateResourceCommand command) {
+		LocalTime opensAt = command.opensAt() == null ? LocalTime.of(6, 0) : command.opensAt();
+		LocalTime closesAt = command.closesAt() == null ? LocalTime.of(22, 0) : command.closesAt();
+		if (!closesAt.isAfter(opensAt)) {
+			throw new BusinessException("RESOURCE_HOURS_INVALID", "La hora de cierre debe ser posterior a la apertura.");
+		}
+		int capacity = Math.max(1, command.capacity());
+		int slotMinutes = Math.max(15, command.slotMinutes());
+		List<UUID> allowedPlanIds = command.allowedPlanIds() == null ? List.of() : new ArrayList<>(new LinkedHashSet<>(command.allowedPlanIds()));
+		if (!allowedPlanIds.isEmpty() && bookingEligibilityRepository.activePlanCount(principal.organizationId(), allowedPlanIds) != allowedPlanIds.size()) {
+			throw new BusinessException("RESOURCE_ALLOWED_PLAN_INVALID", "Selecciona solo planes activos del gimnasio.");
+		}
+		ResourceData data = new ResourceData(
+				command.name().trim(),
+				command.resourceType().trim().toUpperCase(),
+				capacity,
+				slotMinutes,
+				opensAt,
+				closesAt,
+				blankToNull(command.notes())
+		);
+		return new ResourceMutation(data, allowedPlanIds);
+	}
+
+	private record ResourceMutation(ResourceData data, List<UUID> allowedPlanIds) {
 	}
 }

@@ -59,7 +59,7 @@ export default function BookingsPage() {
                 Nueva reserva
               </button>
               {controller.canManageResources ? (
-                <button className="admin-secondary-link" onClick={() => controller.setShowResourceDrawer(true)} type="button">
+                <button className="admin-secondary-link" onClick={controller.openCreateResourceDrawer} type="button">
                   Crear recurso
                 </button>
               ) : null}
@@ -67,6 +67,9 @@ export default function BookingsPage() {
           </section>
 
           <BookingSummaryPanel
+            canManageResources={controller.canManageResources}
+            onDeleteResource={controller.deleteReservableResource}
+            onEditResource={controller.openEditResourceDrawer}
             openResourceCount={controller.openResourceCount}
             resources={controller.selectedDayResourceSummary}
             selectedDate={controller.startDate}
@@ -183,7 +186,7 @@ function ResourceDrawer({
       description="Define horarios, duracion y membresias permitidas para un recurso reservable."
       onClose={onClose}
       open={open}
-      title="Crear recurso"
+      title={controller.editingResourceId ? "Editar recurso" : "Crear recurso"}
     >
       <ResourceDrawerForm
         durationUnit={controller.durationUnit}
@@ -199,6 +202,7 @@ function ResourceDrawer({
         resourceName={controller.resourceName}
         resourceSchedule={controller.resourceSchedule}
         saving={controller.saving}
+        submitLabel={controller.editingResourceId ? "Guardar recurso" : "Crear recurso"}
       />
     </AppDrawer>
   );

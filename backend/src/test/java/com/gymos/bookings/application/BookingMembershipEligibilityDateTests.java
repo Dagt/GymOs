@@ -11,9 +11,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.audit.api.AuditService;
 import com.gymos.bookings.application.command.CreateBookingCommand;
 import com.gymos.bookings.infrastructure.BookingEligibilityRepository;
+import com.gymos.bookings.infrastructure.BookingResourceRepository;
+import com.gymos.bookings.infrastructure.BookingResourceRepository.ResourceRecord;
 import com.gymos.bookings.infrastructure.BookingRepository;
 import com.gymos.bookings.infrastructure.BookingRepository.BookingRecord;
-import com.gymos.bookings.infrastructure.BookingRepository.ResourceRecord;
 import com.gymos.bookings.infrastructure.ClientBookingConflictRepository;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.time.BusinessTime;
@@ -30,12 +31,14 @@ class BookingMembershipEligibilityDateTests {
 	@Test
 	void validatesMembershipAgainstLocalBookingDateInsteadOfCurrentDate() {
 		BookingRepository bookingRepository = mock(BookingRepository.class);
+		BookingResourceRepository bookingResourceRepository = mock(BookingResourceRepository.class);
 		BookingEligibilityRepository eligibilityRepository = mock(BookingEligibilityRepository.class);
 		ClientBookingConflictRepository conflictRepository = mock(ClientBookingConflictRepository.class);
 		AuditService auditService = mock(AuditService.class);
 		ResourceScheduleResolver scheduleResolver = new ResourceScheduleResolver(new ObjectMapper());
 		BookingService service = new BookingService(
 				bookingRepository,
+				bookingResourceRepository,
 				eligibilityRepository,
 				conflictRepository,
 				scheduleResolver,
@@ -92,7 +95,7 @@ class BookingMembershipEligibilityDateTests {
 				null
 		);
 
-		when(bookingRepository.resource(organizationId, branchId, resourceId)).thenReturn(Optional.of(resource));
+		when(bookingResourceRepository.resource(organizationId, branchId, resourceId)).thenReturn(Optional.of(resource));
 		when(eligibilityRepository.clientExists(organizationId, clientId)).thenReturn(true);
 		when(eligibilityRepository.hasEligibleMembershipForResource(
 				organizationId,

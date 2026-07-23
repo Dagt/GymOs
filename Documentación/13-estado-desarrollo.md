@@ -3,6 +3,23 @@
 Estado: en progreso  
 Fecha: 19 de julio de 2026
 
+## Correccion regresion de usuarios y recursos reservables - 23 de julio de 2026
+
+Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
+
+- El rol `Gerente` recibe permisos `user.read` y `user.manage` mediante la migracion `V31__manager_can_manage_operational_staff.sql`, manteniendo las restricciones de negocio existentes: solo puede crear o administrar usuarios operativos permitidos, no duenios, otros gerentes ni administradores GymOS.
+- El formulario de usuarios bloquea y preselecciona la unica sucursal disponible cuando el gerente solo tiene alcance en una sucursal, evitando altas sin `branchIds`.
+- La lista de roles del gerente queda limitada a `Recepcion` y `Coach`; las pruebas de application validan que no pueda ver ni gestionar duenios o gerentes.
+- La persistencia de recursos reservables sale de `BookingRepository` y queda en `BookingResourceRepository`; `BookingRepository` conserva reservas, disponibilidad y pagos vinculados.
+- Se agregan `PUT /resources/{resourceId}` y `DELETE /resources/{resourceId}` para editar y eliminar recursos reservables. La eliminacion es logica y se bloquea si existen reservas activas.
+- La UI de reservas muestra acciones de editar/eliminar recurso solo a Admin GymOS en soporte o duenio del gimnasio con permiso `resource.manage`; gerencia y recepcion no pueden administrar recursos desde esa pantalla.
+- Se agregan pruebas enfocadas de recursos, elegibilidad de membresia y protecciones de usuarios internos.
+
+Verificado:
+
+- Backend focal: `./gradlew test --tests "com.gymos.bookings.application.*" --tests "com.gymos.identity.application.UserAdministrationProtectionTests"`.
+- Frontend: `npm.cmd run test`, `npm.cmd run lint`, `npm.cmd run typecheck`.
+
 ## Saneamiento application y reservas con membresia - 23 de julio de 2026
 
 Implementado en rama `feature/code-simplification-rebasion-and-refactor`:
