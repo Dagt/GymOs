@@ -32,12 +32,7 @@ class SalesRefundServiceTests {
 		ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
 		AuditService auditService = mock(AuditService.class);
 		SalesLookupService lookupService = new SalesLookupService(salesRepository);
-		SalesRefundService service = new SalesRefundService(
-				lookupService,
-				new SalesRefundIdempotencyService(salesRepository),
-				new SalesRefundValidationService(salesRepository, lookupService),
-				new SalesRefundProcessor(commandRepository, eventPublisher, auditService)
-		);
+		SalesRefundService service = service(salesRepository, commandRepository, eventPublisher, auditService, lookupService);
 		UUID organizationId = UUID.randomUUID();
 		UUID branchId = UUID.randomUUID();
 		UUID saleId = UUID.randomUUID();
@@ -65,12 +60,7 @@ class SalesRefundServiceTests {
 		ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
 		AuditService auditService = mock(AuditService.class);
 		SalesLookupService lookupService = new SalesLookupService(salesRepository);
-		SalesRefundService service = new SalesRefundService(
-				lookupService,
-				new SalesRefundIdempotencyService(salesRepository),
-				new SalesRefundValidationService(salesRepository, lookupService),
-				new SalesRefundProcessor(commandRepository, eventPublisher, auditService)
-		);
+		SalesRefundService service = service(salesRepository, commandRepository, eventPublisher, auditService, lookupService);
 		UUID organizationId = UUID.randomUUID();
 		UUID branchId = UUID.randomUUID();
 		UUID saleId = UUID.randomUUID();
@@ -84,24 +74,37 @@ class SalesRefundServiceTests {
 				organizationId, branchId, saleId, null, 5_000, "MXN", "Reembolso total", "refund-key", principal.userId()
 		)).thenReturn(refundId);
 
-		service.process(
-				principal,
-				saleId,
-				new RequestRefundCommand(null, 5_000, "Reembolso total", "refund-key"),
-				correlationId.toString()
-		);
+		service.process(principal, saleId,
+				new RequestRefundCommand(null, 5_000, "Reembolso total", "refund-key"), correlationId.toString());
 
-		ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
-		verify(eventPublisher).publishEvent(eventCaptor.capture());
-		assertThat(eventCaptor.getValue()).isInstanceOfSatisfying(RefundProcessedV1.class, event -> {
-			assertThat(event.organizationId()).isEqualTo(organizationId);
-			assertThat(event.branchId()).isEqualTo(branchId);
-			assertThat(event.saleId()).isEqualTo(saleId);
-			assertThat(event.refundId()).isEqualTo(refundId);
-			assertThat(event.actorUserId()).isEqualTo(principal.userId());
-			assertThat(event.occurredAt()).isNotNull();
-			assertThat(event.correlationId()).isEqualTo(correlationId);
-		});
+		assertRestorationEvent(eventPublisher, organizationId, branchId, saleId, refundId, principal.userId(), correlationId);
+	}
+
+	@Test
+	void accumulatedPartialRefundsPublishRestorationWhenPaidBalanceReachesZero() {
+		SalesRepository salesRepository = mock(SalesRepository.class);
+		SalesRefundCommandRepository commandRepository = mock(SalesRefundCommandRepository.class);
+		ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
+		AuditService auditService = mock(AuditService.class);
+		SalesLookupService lookupService = new SalesLookupService(salesRepository);
+		SalesRefundService service = service(salesRepository, commandRepository, eventPublisher, auditService, lookupService);
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		UUID saleId = UUID.randomUUID();
+		UUID refundId = UUID.randomUUID();
+		UUID correlationId = UUID.randomUUID();
+		GymOsPrincipal principal = principal(organizationId, branchId);
+		SaleHeader sale = sale(saleId, branchId, 5_000);
+		when(salesRepository.saleHeader(organizationId, saleId)).thenReturn(Optional.of(sale));
+		when(salesRepository.processedRefundTotal(organizationId, saleId)).thenReturn(3_000L);
+		when(commandRepository.createProcessed(
+				organizationId, branchId, saleId, null, 2_000, "MXN", "Cierre acumulado", "refund-key", principal.userId()
+		)).thenReturn(refundId);
+
+		service.process(principal, saleId,
+				new RequestRefundCommand(null, 2_000, "Cierre acumulado", "refund-key"), correlationId.toString());
+
+		assertRestorationEvent(eventPublisher, organizationId, branchId, saleId, refundId, principal.userId(), correlationId);
 	}
 
 	@Test
@@ -111,12 +114,7 @@ class SalesRefundServiceTests {
 		ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
 		AuditService auditService = mock(AuditService.class);
 		SalesLookupService lookupService = new SalesLookupService(salesRepository);
-		SalesRefundService service = new SalesRefundService(
-				lookupService,
-				new SalesRefundIdempotencyService(salesRepository),
-				new SalesRefundValidationService(salesRepository, lookupService),
-				new SalesRefundProcessor(commandRepository, eventPublisher, auditService)
-		);
+		SalesRefundService service = service(salesRepository, commandRepository, eventPublisher, auditService, lookupService);
 		UUID organizationId = UUID.randomUUID();
 		UUID branchId = UUID.randomUUID();
 		UUID saleId = UUID.randomUUID();
@@ -139,6 +137,31 @@ class SalesRefundServiceTests {
 				org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()
 		);
 		verify(eventPublisher, never()).publishEvent(org.mockito.ArgumentMatchers.any());
+	}
+
+	private SalesRefundService service(SalesRepository salesRepository, SalesRefundCommandRepository commandRepository,
+			ApplicationEventPublisher eventPublisher, AuditService auditService, SalesLookupService lookupService) {
+		return new SalesRefundService(
+				lookupService,
+				new SalesRefundIdempotencyService(salesRepository),
+				new SalesRefundValidationService(salesRepository, lookupService),
+				new SalesRefundProcessor(commandRepository, eventPublisher, auditService)
+		);
+	}
+
+	private void assertRestorationEvent(ApplicationEventPublisher eventPublisher, UUID organizationId, UUID branchId,
+			UUID saleId, UUID refundId, UUID actorUserId, UUID correlationId) {
+		ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
+		verify(eventPublisher).publishEvent(eventCaptor.capture());
+		assertThat(eventCaptor.getValue()).isInstanceOfSatisfying(RefundProcessedV1.class, event -> {
+			assertThat(event.organizationId()).isEqualTo(organizationId);
+			assertThat(event.branchId()).isEqualTo(branchId);
+			assertThat(event.saleId()).isEqualTo(saleId);
+			assertThat(event.refundId()).isEqualTo(refundId);
+			assertThat(event.actorUserId()).isEqualTo(actorUserId);
+			assertThat(event.occurredAt()).isNotNull();
+			assertThat(event.correlationId()).isEqualTo(correlationId);
+		});
 	}
 
 	private GymOsPrincipal principal(UUID organizationId, UUID branchId) {
