@@ -18,7 +18,7 @@ class SalesRefundValidationService {
 		this.lookupService = lookupService;
 	}
 
-	void validate(GymOsPrincipal principal, UUID saleId, SaleHeader sale, RequestRefundCommand request) {
+	long validate(GymOsPrincipal principal, UUID saleId, SaleHeader sale, RequestRefundCommand request) {
 		if (request.amountCents() <= 0) {
 			throw new BusinessException("REFUND_AMOUNT_INVALID", "El reembolso debe ser mayor a cero.");
 		}
@@ -28,6 +28,7 @@ class SalesRefundValidationService {
 		if (request.amountCents() > refundable) {
 			throw new BusinessException("REFUND_EXCEEDS_REFUNDABLE_BALANCE", "El reembolso supera el saldo pagado disponible.");
 		}
+		return alreadyRefunded;
 	}
 
 	private void validatePaymentSelection(GymOsPrincipal principal, UUID saleId, RequestRefundCommand request) {
