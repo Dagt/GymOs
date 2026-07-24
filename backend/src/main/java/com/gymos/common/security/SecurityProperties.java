@@ -2,6 +2,7 @@ package com.gymos.common.security;
 
 import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
 @ConfigurationProperties(prefix = "gymos.security")
 public record SecurityProperties(
@@ -15,6 +16,7 @@ public record SecurityProperties(
 		this(corsAllowedOrigins, jwtSecret, accessTokenSeconds, 57_600, refreshTokenDays);
 	}
 
+	@ConstructorBinding
 	public SecurityProperties {
 		if (corsAllowedOrigins == null || corsAllowedOrigins.isEmpty()) {
 			corsAllowedOrigins = List.of("http://localhost:3000");
