@@ -28,7 +28,7 @@ export function ClientSearchBar({ query, onQueryChange, onSubmit }: SearchBarPro
       <input
         className="app-input min-w-0 flex-1"
         onChange={(event) => onQueryChange(event.target.value)}
-        placeholder="Nombre, telefono o email"
+        placeholder="Nombre, teléfono o email"
         value={query}
       />
       <button className="app-button" type="submit">
@@ -39,22 +39,29 @@ export function ClientSearchBar({ query, onQueryChange, onSubmit }: SearchBarPro
 }
 
 type ClientToolbarProps = {
+  canCreate: boolean;
   onCreateClient: () => void;
 };
 
-export function ClientToolbar({ onCreateClient }: ClientToolbarProps) {
+export function ClientToolbar({ canCreate, onCreateClient }: ClientToolbarProps) {
   return (
     <section className="catalog-toolbar app-card p-5">
       <div>
-        <p className="app-eyebrow">Recepcion de socios</p>
-        <h2 className="app-card-title">Busqueda y alta en el mismo flujo</h2>
+        <p className="app-eyebrow">Recepción de socios</p>
+        <h2 className="app-card-title">Consulta y alta de socios</h2>
         <p className="app-card-copy">
-          La lista queda disponible para consulta rapida. El registro completo con membresia inicial se abre en un panel lateral.
+          El socio se registra primero. La membresía inicial es opcional y se procesa como una operación separada.
         </p>
       </div>
-      <button className="app-button" onClick={onCreateClient} type="button">
-        Registrar socio
-      </button>
+      {canCreate ? (
+        <button className="app-button" onClick={onCreateClient} type="button">
+          Registrar socio
+        </button>
+      ) : (
+        <span className="rounded-lg border border-[#e4d5af] bg-[#fffaf0] px-3 py-2 text-sm text-[#76551f]">
+          Tu perfil permite consultar, pero no registrar socios.
+        </span>
+      )}
     </section>
   );
 }
@@ -69,7 +76,7 @@ export function ClientList({ clients, loading }: ClientListProps) {
     <section className="app-card p-5">
       <div className="flex items-center justify-between gap-3">
         <div>
-          <p className="app-eyebrow">Busqueda</p>
+          <p className="app-eyebrow">Búsqueda</p>
           <h2 className="mt-2 text-xl font-semibold">Socios registrados</h2>
         </div>
         <span className="text-sm text-[#6f7a73]">{clients.length} socios</span>
@@ -87,7 +94,7 @@ export function ClientList({ clients, loading }: ClientListProps) {
           >
             <span className="block font-semibold">{clientFullName(client)}</span>
             <span className="mt-1 block text-sm text-[#5d6b63]">
-              {client.phone ?? "Sin telefono"} - {client.email ?? "Sin email"} - {client.status}
+              {client.phone ?? "Sin teléfono"} - {client.email ?? "Sin email"} - {client.status}
             </span>
           </Link>
         ))}
@@ -97,6 +104,7 @@ export function ClientList({ clients, loading }: ClientListProps) {
 }
 
 type CreateClientDrawerProps = {
+  canRegisterMembership: boolean;
   createdClientId: string | null;
   errors: FieldErrorMap;
   form: ClientRegistrationForm;
@@ -109,6 +117,7 @@ type CreateClientDrawerProps = {
 };
 
 export function CreateClientDrawer({
+  canRegisterMembership,
   createdClientId,
   errors,
   form,
@@ -119,63 +128,88 @@ export function CreateClientDrawer({
   onFormChange,
   onSubmit,
 }: CreateClientDrawerProps) {
+  const hasSelectedPlan = canRegisterMembership && Boolean(form.planId);
+
   return (
     <AppDrawer
-      description="Captura datos personales, membresia inicial y pago de entrada desde recepcion."
+      description="Registra primero los datos del socio. Puedes agregar una membresía y su pago en el mismo flujo, pero es opcional."
       onClose={onClose}
       open={open}
       title="Registrar socio"
     >
-      <form className="grid gap-4" onSubmit={onSubmit}>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <TextField error={errors.firstName} label="Nombre" name="firstName" value={form.firstName} onChange={(value) => onFormChange("firstName", value)} />
-          <TextField error={errors.lastName} label="Apellido paterno" name="lastName" value={form.lastName} onChange={(value) => onFormChange("lastName", value)} />
-          <TextField error={errors.maternalLastName} label="Apellido materno" name="maternalLastName" required={false} value={form.maternalLastName ?? ""} onChange={(value) => onFormChange("maternalLastName", value)} />
-          <PhoneField error={errors.phone} label="Telefono" name="phone" required value={form.phone ?? ""} onChange={(value) => onFormChange("phone", value)} />
-          <EmailField error={errors.email} label="Email" name="email" value={form.email ?? ""} onChange={(value) => onFormChange("email", value)} />
-          <DateField error={errors.birthDate} label="Fecha de nacimiento" name="birthDate" value={form.birthDate ?? ""} onChange={(value) => onFormChange("birthDate", value)} />
-          <GenderField error={errors.gender} label="Genero" name="gender" value={form.gender ?? ""} onChange={(value) => onFormChange("gender", value)} />
-        </div>
-
-        <label className="form-field" htmlFor="planId">
-          <span>Plan inicial{plans.length > 0 ? <b>*</b> : null}</span>
-          <select className="app-input" id="planId" onChange={(event) => onFormChange("planId", event.target.value)} value={form.planId}>
-            {plans.length === 0 ? <option value="">No hay planes activos</option> : null}
-            {plans.map((plan) => (
-              <option key={plan.id} value={plan.id}>
-                {plan.name} - {formatMoney(plan.priceCents, plan.currency)}
-              </option>
-            ))}
-          </select>
-          {errors.planId ? <small className="form-field-error">{errors.planId}</small> : null}
-        </label>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label className="form-field" htmlFor="paymentMethod">
-            <span>Metodo de pago</span>
-            <select className="app-input" id="paymentMethod" onChange={(event) => onFormChange("paymentMethod", event.target.value)} value={form.paymentMethod}>
-              <option value="CASH">Efectivo</option>
-              <option value="TRANSFER">Transferencia</option>
-              <option value="CARD_MANUAL">Tarjeta manual</option>
-            </select>
+      <form className="grid gap-5" onSubmit={onSubmit}>
+        <section className="grid gap-4 rounded-xl border border-[#d8ddd2] bg-white p-4">
+          <div>
+            <p className="font-semibold text-[#111815]">Datos del socio</p>
+            <p className="mt-1 text-sm text-[#5d6b63]">Estos datos crean la ficha personal.</p>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <TextField error={errors.firstName} label="Nombre" name="firstName" value={form.firstName} onChange={(value) => onFormChange("firstName", value)} />
+            <TextField error={errors.lastName} label="Apellido paterno" name="lastName" value={form.lastName} onChange={(value) => onFormChange("lastName", value)} />
+            <TextField error={errors.maternalLastName} label="Apellido materno" name="maternalLastName" required={false} value={form.maternalLastName ?? ""} onChange={(value) => onFormChange("maternalLastName", value)} />
+            <PhoneField error={errors.phone} label="Teléfono" name="phone" required value={form.phone ?? ""} onChange={(value) => onFormChange("phone", value)} />
+            <EmailField error={errors.email} label="Email" name="email" value={form.email ?? ""} onChange={(value) => onFormChange("email", value)} />
+            <DateField error={errors.birthDate} label="Fecha de nacimiento" name="birthDate" value={form.birthDate ?? ""} onChange={(value) => onFormChange("birthDate", value)} />
+            <GenderField error={errors.gender} label="Género" name="gender" value={form.gender ?? ""} onChange={(value) => onFormChange("gender", value)} />
+          </div>
+          <label className="form-field" htmlFor="notes">
+            <span>Notas</span>
+            <textarea
+              className="app-input min-h-20 py-2"
+              id="notes"
+              onChange={(event) => onFormChange("notes", event.target.value)}
+              value={form.notes ?? ""}
+            />
           </label>
-          <TextField label="Referencia de pago" name="paymentReference" required={false} value={form.paymentReference} onChange={(value) => onFormChange("paymentReference", value)} />
-        </div>
+        </section>
 
-        <label className="flex items-center gap-2 text-sm font-medium text-[#42514a]">
-          <input checked={form.validateNow} onChange={(event) => onFormChange("validateNow", event.target.checked)} type="checkbox" />
-          Validar pago ahora
-        </label>
+        {canRegisterMembership ? (
+          <section className="grid gap-4 rounded-xl border border-[#d8ddd2] bg-[#fafbf9] p-4">
+            <div>
+              <p className="font-semibold text-[#111815]">Membresía inicial opcional</p>
+              <p className="mt-1 text-sm text-[#5d6b63]">
+                Si la dejas vacía, sólo se crea el socio y podrás asignar la membresía después desde su ficha.
+              </p>
+            </div>
 
-        <label className="form-field" htmlFor="notes">
-          <span>Notas</span>
-          <textarea
-            className="app-input min-h-24 py-2"
-            id="notes"
-            onChange={(event) => onFormChange("notes", event.target.value)}
-            value={form.notes ?? ""}
-          />
-        </label>
+            <label className="form-field" htmlFor="planId">
+              <span>Plan inicial</span>
+              <select className="app-input" id="planId" onChange={(event) => onFormChange("planId", event.target.value)} value={form.planId}>
+                <option value="">Sin membresía inicial</option>
+                {plans.map((plan) => (
+                  <option key={plan.id} value={plan.id}>
+                    {plan.name} - {formatMoney(plan.priceCents, plan.currency)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {hasSelectedPlan ? (
+              <>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="form-field" htmlFor="paymentMethod">
+                    <span>Método de pago</span>
+                    <select className="app-input" id="paymentMethod" onChange={(event) => onFormChange("paymentMethod", event.target.value)} value={form.paymentMethod}>
+                      <option value="CASH">Efectivo</option>
+                      <option value="TRANSFER">Transferencia</option>
+                      <option value="CARD_MANUAL">Tarjeta manual</option>
+                    </select>
+                  </label>
+                  <TextField label="Referencia de pago" name="paymentReference" required={false} value={form.paymentReference} onChange={(value) => onFormChange("paymentReference", value)} />
+                </div>
+
+                <label className="flex items-center gap-2 text-sm font-medium text-[#42514a]">
+                  <input checked={form.validateNow} onChange={(event) => onFormChange("validateNow", event.target.checked)} type="checkbox" />
+                  Marcar el pago como validado ahora
+                </label>
+              </>
+            ) : null}
+          </section>
+        ) : (
+          <p className="rounded-xl border border-[#e4d5af] bg-[#fffaf0] px-4 py-3 text-sm text-[#76551f]">
+            Tu perfil puede registrar al socio, pero la venta de una membresía debe realizarla un usuario con permiso de caja.
+          </p>
+        )}
 
         {createdClientId ? (
           <Link className="text-sm font-semibold text-[var(--brand-primary)]" href={`/clients/${createdClientId}`}>
@@ -183,7 +217,7 @@ export function CreateClientDrawer({
           </Link>
         ) : null}
         <button className="form-primary-button" disabled={saving} type="submit">
-          {saving ? "Guardando..." : "Registrar socio"}
+          {saving ? "Guardando..." : hasSelectedPlan ? "Registrar socio y membresía" : "Registrar socio"}
         </button>
       </form>
     </AppDrawer>
