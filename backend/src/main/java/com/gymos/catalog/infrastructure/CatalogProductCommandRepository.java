@@ -63,6 +63,22 @@ public class CatalogProductCommandRepository implements CatalogProductCommandPor
 	}
 
 	@Override
+	public void attachBranch(UUID organizationId, UUID branchId, UUID productId, UUID userId, OffsetDateTime now) {
+		jdbcClient.sql("""
+				INSERT INTO catalog_product_branch (
+				    organization_id, branch_id, product_id, created_at, created_by
+				) VALUES (:organizationId, :branchId, :productId, :now, :userId)
+				ON CONFLICT DO NOTHING
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("productId", productId)
+				.param("now", now)
+				.param("userId", userId)
+				.update();
+	}
+
+	@Override
 	public int update(ProductMutation product) {
 		return jdbcClient.sql("""
 				UPDATE catalog_product
