@@ -30,7 +30,7 @@ class JwtServiceTests {
 	}
 
 	@Test
-	void receptionReceivesAWorkdayAccessToken() {
+	void receptionReceivesAFullDayAccessToken() {
 		JwtService jwtService = service();
 		GymOsPrincipal principal = new GymOsPrincipal(
 				UUID.randomUUID(),
@@ -45,7 +45,7 @@ class JwtServiceTests {
 
 		var tokens = jwtService.issueTokens(principal, "refresh");
 
-		assertThat(tokens.expiresIn()).isEqualTo(57_600);
+		assertThat(tokens.expiresIn()).isEqualTo(86_400);
 		assertThat(jwtService.parseAccessToken(tokens.accessToken())).contains(principal);
 	}
 
@@ -91,7 +91,7 @@ class JwtServiceTests {
 				List.of("http://localhost:3000"),
 				"different-test-secret-with-enough-entropy",
 				900,
-				57_600,
+				86_400,
 				7
 		));
 		GymOsPrincipal principal = new GymOsPrincipal(
@@ -111,7 +111,7 @@ class JwtServiceTests {
 				List.of("http://localhost:3000"),
 				TEST_SECRET,
 				900,
-				57_600,
+				86_400,
 				7
 		));
 	}
