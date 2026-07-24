@@ -18,58 +18,78 @@ export default function CatalogProductDetailPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const stored = getStoredSession();
-    setSession(stored);
-    if (!stored) { setLoading(false); return; }
-    getProductDetail(stored.accessToken, params.productId)
-      .then(setDetail)
-      .catch((exception) => setError(exception instanceof Error ? exception.message : "No fue posible cargar el producto."))
-      .finally(() => setLoading(false));
+    let active = true;
+
+    async function loadDetail() {
+      await Promise.resolve();
+      if (!active) return;
+      const stored = getStoredSession();
+      setSession(stored);
+      if (!stored) {
+        setLoading(false);
+        return;
+      }
+      try {
+        const loaded = await getProductDetail(stored.accessToken, params.productId);
+        if (active) setDetail(loaded);
+      } catch (exception) {
+        if (active) {
+          setError(exception instanceof Error ? exception.message : "No fue posible cargar el producto.");
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    void loadDetail();
+    return () => {
+      active = false;
+    };
   }, [params.productId]);
 
   if (loading) return <LoadingScreen text="Cargando detalle del producto..." />;
-  if (!session) return <AuthRequired message="Necesitas iniciar sesion para consultar el producto." title="Inicia sesion" />;
-  if (!detail) return <AppShell eyebrow="Catalogo" session={session} title="Producto">{error ? <InlineError message={error} /> : null}</AppShell>;
+  if (!session) return <AuthRequired message="Necesitas iniciar sesión para consultar el producto." title="Inicia sesión" />;
+  if (!detail) return <AppShell eyebrow="Catálogo" session={session} title="Producto">{error ? <InlineError message={error} /> : null}</AppShell>;
 
   const { product, dependencies, history } = detail;
   const canReadCosts = hasPermission(session, "catalog.cost.read");
   return (
-    <AppShell eyebrow="Catalogo" session={session} title={product.name}
-      subtitle={`${product.sku} · ${product.categoryName ?? "Sin categoria"}`}>
+    <AppShell eyebrow="Catálogo" session={session} title={product.name}
+      subtitle={`${product.sku} · ${product.categoryName ?? "Sin categoría"}`}>
       {error ? <InlineError message={error} /> : null}
       <div className="flex flex-wrap gap-3">
-        <Link className="app-button-secondary" href="/catalog">Volver al catalogo</Link>
+        <Link className="app-button-secondary" href="/catalog">Volver al catálogo</Link>
         {product.inventoryTracked ? <Link className="app-button" href="/inventory">Ver inventario</Link> : null}
       </div>
       <section className="grid gap-6 lg:grid-cols-2">
         <article className="app-card p-5">
-          <p className="app-eyebrow">Informacion comercial</p>
+          <p className="app-eyebrow">Información comercial</p>
           <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
             <Detail label="Estado" value={product.archived ? "Archivado" : product.status} />
             <Detail label="Tipo" value={product.productType} />
             <Detail label="Subtipo" value={product.commercialSubtype} />
             <Detail label="Precio regular" value={formatMoney(product.priceCents, product.currency)} />
-            <Detail label="Precio promocional" value={product.promotionalPriceCents == null ? "Sin promocion" : formatMoney(product.promotionalPriceCents, product.currency)} />
+            <Detail label="Precio promocional" value={product.promotionalPriceCents == null ? "Sin promoción" : formatMoney(product.promotionalPriceCents, product.currency)} />
             {canReadCosts ? <Detail label="Costo de referencia" value={product.referenceCostCents == null ? "Sin costo" : formatMoney(product.referenceCostCents, product.currency)} /> : null}
             {canReadCosts ? <Detail label="Proveedor" value={product.supplierName ?? "Sin proveedor"} /> : null}
-            <Detail label="Codigo de barras" value={product.barcode ?? "Sin codigo"} />
+            <Detail label="Código de barras" value={product.barcode ?? "Sin código"} />
             <Detail label="Marca" value={product.brand ?? "Sin marca"} />
-            <Detail label="Presentacion" value={product.presentation ?? "Sin presentacion"} />
+            <Detail label="Presentación" value={product.presentation ?? "Sin presentación"} />
             <Detail label="Unidad" value={product.unitOfMeasure ?? "Sin unidad"} />
             <Detail label="Inventario" value={product.inventoryTracked ? "Controlado" : "No controlado"} />
-            <Detail label="Inicio promocion" value={formatDate(product.promotionStartsAt)} />
-            <Detail label="Fin promocion" value={formatDate(product.promotionEndsAt)} />
+            <Detail label="Inicio promoción" value={formatDate(product.promotionStartsAt)} />
+            <Detail label="Fin promoción" value={formatDate(product.promotionEndsAt)} />
             <Detail label="Etiquetas" value={product.tags.join(", ") || "Sin etiquetas"} />
           </dl>
         </article>
         <article className="app-card p-5">
           <p className="app-eyebrow">Dependencias</p>
           <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
-            <Detail label="Lineas vendidas" value={String(dependencies.saleItems)} />
+            <Detail label="Líneas vendidas" value={String(dependencies.saleItems)} />
             <Detail label="Movimientos" value={String(dependencies.inventoryMovements)} />
             <Detail label="Sucursales con stock" value={String(dependencies.branchesWithStock)} />
             <Detail label="Planes activos" value={String(dependencies.activeMembershipPlans)} />
-            <Detail label="Productos de categoria" value={String(dependencies.activeProductsInCategory)} />
+            <Detail label="Productos de categoría" value={String(dependencies.activeProductsInCategory)} />
           </dl>
         </article>
       </section>
