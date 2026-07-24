@@ -41,8 +41,8 @@ public class SalesRepository {
 		this.membershipLookup = membershipLookup;
 	}
 
-	public Optional<ProductForSale> productForSale(UUID organizationId, UUID productId) {
-		return catalogLookup.productForSale(organizationId, productId);
+	public Optional<ProductForSale> productForSale(UUID organizationId, UUID branchId, UUID productId) {
+		return catalogLookup.productForSale(organizationId, branchId, productId);
 	}
 
 	public boolean clientExists(UUID organizationId, UUID clientId) {
