@@ -1,16 +1,8 @@
+import Link from "next/link";
 import type { FormEvent } from "react";
 import { AppDrawer } from "@/components/AppDrawer";
 import { NumberField, SelectField, TextAreaField, TextField } from "@/components/FormFields";
 import type { CatalogCategory, ProductPayload } from "@/lib/api";
-
-const serviceSubtypeOptions = [
-  { label: "Servicio general", value: "GENERAL_SERVICE" },
-  { label: "Pase o visita", value: "VISIT_PASS" },
-  { label: "Actividad o servicio con reserva", value: "BOOKING" },
-  { label: "Rutina o programa de entrenamiento", value: "ROUTINE" },
-  { label: "Consulta profesional", value: "CONSULTATION" },
-  { label: "Bienestar y recuperacion", value: "WELLNESS_SERVICE" },
-];
 
 type CatalogProductDrawerProps = {
   categories: CatalogCategory[];
@@ -48,19 +40,17 @@ export function CatalogProductDrawer({
     const productType = value as ProductPayload["productType"];
     change({
       productType,
-      commercialSubtype: productType === "PHYSICAL"
-        ? "GENERAL_PRODUCT"
-        : form.commercialSubtype === "GENERAL_PRODUCT" ? "GENERAL_SERVICE" : form.commercialSubtype,
+      commercialSubtype: productType === "PHYSICAL" ? "GENERAL_PRODUCT" : "GENERAL_SERVICE",
       inventoryTracked: productType === "PHYSICAL" ? form.inventoryTracked : false,
     });
   }
 
   return (
     <AppDrawer
-      description="Empieza con lo indispensable. Los detalles internos, costos y promociones quedan separados para no complicar el alta."
+      description="Empieza con lo indispensable. El catálogo administra artículos y cobros simples de caja; los servicios con agenda o profesionales viven en sus módulos operativos."
       onClose={onClose}
       open={open}
-      title={editing ? "Editar producto o servicio" : "Nuevo producto o servicio"}
+      title={editing ? "Editar artículo o cargo" : "Nuevo artículo o cargo"}
     >
       <form className="grid gap-5" onSubmit={onSubmit}>
         <section className="overflow-hidden rounded-2xl border border-[#d8ddd2] bg-white shadow-sm">
@@ -73,31 +63,21 @@ export function CatalogProductDrawer({
           <div className="grid gap-4 p-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <TextField label="Nombre" name="productName" value={form.name}
-                placeholder={form.productType === "SERVICE" ? "Ej. Consulta de nutricion" : "Ej. Agua 600 ml"}
+                placeholder={form.productType === "SERVICE" ? "Ej. Inscripción o renta de locker" : "Ej. Agua 600 ml"}
                 onChange={(name) => change({ name })} />
               <TextField label="SKU" name="productSku" value={form.sku}
-                help="Código interno único. Ej. AGUA-600 o NUTRICION-01" onChange={(sku) => change({ sku })} />
+                help="Código interno único. Ej. AGUA-600 o INSCRIPCION" onChange={(sku) => change({ sku })} />
               <NumberField label="Precio" name="productPrice" value={price}
                 help="Precio al público en MXN." onChange={onPriceChange} />
               <SelectField label="¿Qué estás vendiendo?" name="productType"
                 options={[
                   { label: "Producto físico", value: "PHYSICAL" },
-                  { label: "Servicio", value: "SERVICE" },
+                  { label: "Cargo simple en caja", value: "SERVICE" },
                 ]}
                 value={form.productType} onChange={changeProductType} />
             </div>
 
             <TypeExplanation type={form.productType} />
-
-            {form.productType === "SERVICE" ? (
-              <div className="grid gap-2 rounded-xl border border-[#d8ddd2] bg-[#fbfcfa] p-4">
-                <SelectField label="Tipo de servicio" name="productCommercialSubtype"
-                  options={serviceSubtypeOptions}
-                  value={form.commercialSubtype}
-                  onChange={(commercialSubtype) => change({ commercialSubtype: commercialSubtype as ProductPayload["commercialSubtype"] })} />
-                <p className="text-xs text-[#5d6b63]">{serviceSubtypeDescription(form.commercialSubtype)}</p>
-              </div>
-            ) : null}
 
             <SelectField label="Categoría" name="productCategory" required={false}
               options={[{ label: "Sin categoría", value: "" }, ...categoryOptions]}
@@ -112,7 +92,7 @@ export function CatalogProductDrawer({
                 <strong className="block text-[#111815]">Controlar existencias</strong>
                 {form.productType === "PHYSICAL"
                   ? "Actívalo cuando el POS deba descontar unidades del inventario al vender."
-                  : "Los servicios no manejan inventario físico."}
+                  : "Los cargos simples no manejan inventario físico."}
               </span>
             </label>
           </div>
@@ -121,13 +101,13 @@ export function CatalogProductDrawer({
         <details className="rounded-2xl border border-[#d8ddd2] bg-white p-5 shadow-sm">
           <summary className="cursor-pointer text-base font-semibold text-[#111815]">Descripción y detalles de venta</summary>
           <p className="mt-2 text-sm text-[#5d6b63]">
-            Información útil para identificar el artículo o explicar el servicio. Todo este bloque es opcional.
+            Información útil para identificar el artículo o explicar el cargo. Todo este bloque es opcional.
           </p>
 
           <div className="mt-4 grid gap-4">
             <TextAreaField label="Descripción" name="productDescription" required={false}
               placeholder={form.productType === "SERVICE"
-                ? "Explica qué incluye, duración aproximada y condiciones."
+                ? "Explica qué se está cobrando y las condiciones aplicables."
                 : "Describe el producto, contenido o características importantes."}
               value={form.description ?? ""} onChange={(description) => change({ description })} />
 
@@ -147,7 +127,7 @@ export function CatalogProductDrawer({
             ) : null}
 
             <TextField label="Etiquetas" name="productTags" required={false}
-              help="Palabras para búsqueda, separadas por coma. Ej. energia, cafeina, entrenamiento."
+              help="Palabras para búsqueda, separadas por coma."
               value={form.tags.join(", ")}
               onChange={(value) => change({ tags: value.split(",").map((tag) => tag.trim()).filter(Boolean) })} />
           </div>
@@ -207,7 +187,7 @@ export function CatalogProductDrawer({
         ) : null}
 
         <button className="app-button h-12 text-base" disabled={saving} type="submit">
-          {saving ? "Guardando..." : editing ? "Guardar cambios" : form.productType === "SERVICE" ? "Crear servicio" : "Crear producto"}
+          {saving ? "Guardando..." : editing ? "Guardar cambios" : form.productType === "SERVICE" ? "Crear cargo" : "Crear producto"}
         </button>
       </form>
     </AppDrawer>
@@ -217,9 +197,17 @@ export function CatalogProductDrawer({
 function TypeExplanation({ type }: { type: ProductPayload["productType"] }) {
   if (type === "SERVICE") {
     return (
-      <aside className="rounded-xl border border-[#c9dbe1] bg-[#f3f9fb] px-4 py-3 text-sm text-[#34515b]">
-        <strong className="block text-[#203b44]">¿Qué entra como servicio?</strong>
-        Algo que cobras pero no entregas como inventario: consulta de nutrición, sesión de entrenamiento personal, masaje, evaluación física, pase de día o una actividad reservable.
+      <aside className="grid gap-3 rounded-xl border border-[#c9dbe1] bg-[#f3f9fb] px-4 py-4 text-sm text-[#34515b]">
+        <div>
+          <strong className="block text-[#203b44]">Cargo simple en caja</strong>
+          Úsalo únicamente para conceptos que se cobran en el POS y no requieren agenda, profesional, control de visitas ni otra operación especial: inscripción, reposición de credencial, renta de locker o cargo administrativo.
+        </div>
+        <div className="grid gap-1 border-t border-[#d6e5e9] pt-3 text-xs">
+          <span><strong>Pases diarios o paquetes de visitas:</strong> se crean en <Link className="font-semibold underline" href="/access">Accesos y pases</Link>.</span>
+          <span><strong>Consultas, masajes, fisioterapia o nutrición:</strong> se crean en <Link className="font-semibold underline" href="/wellness">Servicios de bienestar</Link>.</span>
+          <span><strong>Clases, canchas o sesiones con horario:</strong> se administran en <Link className="font-semibold underline" href="/bookings">Reservas</Link>.</span>
+          <span><strong>Rutinas y programas:</strong> se administran en <Link className="font-semibold underline" href="/coaches">Coaches y rutinas</Link>.</span>
+        </div>
       </aside>
     );
   }
@@ -257,18 +245,6 @@ function buildCategoryOptions(categories: CatalogCategory[]) {
     options.push({ label: `↳ ${category.name}`, value: category.id });
   }
   return options;
-}
-
-function serviceSubtypeDescription(subtype: ProductPayload["commercialSubtype"]) {
-  const descriptions: Partial<Record<ProductPayload["commercialSubtype"], string>> = {
-    GENERAL_SERVICE: "Cobro por un servicio que no necesita agenda ni un flujo especial, por ejemplo inscripción, medición corporal o renta de toalla.",
-    VISIT_PASS: "Entrada de un día, pase de invitado o paquete de visitas.",
-    BOOKING: "Servicio que normalmente requiere elegir fecha, hora o recurso, como una clase o sesión reservada.",
-    ROUTINE: "Diseño o seguimiento de una rutina y programa de entrenamiento.",
-    CONSULTATION: "Consulta con nutrición, fisioterapia, medicina, coaching u otro profesional.",
-    WELLNESS_SERVICE: "Masaje, recuperación, terapia, spa u otro servicio de bienestar.",
-  };
-  return descriptions[subtype] ?? "Selecciona la opción que mejor describa el servicio.";
 }
 
 function cents(value: string) {
