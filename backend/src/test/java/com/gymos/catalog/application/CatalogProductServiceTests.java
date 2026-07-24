@@ -49,13 +49,15 @@ class CatalogProductServiceTests {
 	@Test
 	void exactBarcodeLookupNormalizesAndReturnsOnlyActiveProduct() {
 		ProductSummaryView expected = product(false, "ACTIVE", "750123");
-		when(products.findActiveByBarcode(principal.organizationId(), "750123")).thenReturn(Optional.of(expected));
+		when(products.findActiveByBarcode(principal.organizationId(), principal.branchId(), "750123"))
+				.thenReturn(Optional.of(expected));
 		assertThat(service.productByBarcode(principal, " 750123 ")).isEqualTo(expected);
 	}
 
 	@Test
 	void exactBarcodeLookupRejectsMissingProduct() {
-		when(products.findActiveByBarcode(principal.organizationId(), "ABC")).thenReturn(Optional.empty());
+		when(products.findActiveByBarcode(principal.organizationId(), principal.branchId(), "ABC"))
+				.thenReturn(Optional.empty());
 		assertThatThrownBy(() -> service.productByBarcode(principal, "abc"))
 				.isInstanceOf(BusinessException.class)
 				.hasMessageContaining("codigo de barras");
@@ -66,11 +68,12 @@ class CatalogProductServiceTests {
 		UUID productId = UUID.randomUUID();
 		ProductSummaryView archived = product(true, "INACTIVE", "750123", productId);
 		ProductSummaryView restored = product(false, "INACTIVE", "750123", productId);
-		when(products.findProductIncludingArchived(principal.organizationId(), productId)).thenReturn(Optional.of(archived));
+		when(products.findProductIncludingArchived(principal.organizationId(), principal.branchId(), productId))
+				.thenReturn(Optional.of(archived));
 		when(products.skuExists(principal.organizationId(), archived.sku(), productId)).thenReturn(false);
 		when(products.barcodeExists(principal.organizationId(), archived.barcode(), productId)).thenReturn(false);
 		when(commands.restore(eq(principal.organizationId()), eq(productId), eq("INACTIVE"), eq(principal.userId()), any())).thenReturn(1);
-		when(products.findProduct(principal.organizationId(), productId)).thenReturn(Optional.of(restored));
+		when(products.findProduct(principal.organizationId(), principal.branchId(), productId)).thenReturn(Optional.of(restored));
 		assertThat(service.restoreProduct(principal, productId, "test").status()).isEqualTo("INACTIVE");
 		verify(commands).restore(eq(principal.organizationId()), eq(productId), eq("INACTIVE"), eq(principal.userId()), any());
 	}
@@ -80,7 +83,7 @@ class CatalogProductServiceTests {
 		GymOsPrincipal reader = new GymOsPrincipal(UUID.randomUUID(), principal.organizationId(), principal.branchId(),
 				"reader", "Reader", Set.of("catalog.read"));
 		UUID productId = UUID.randomUUID();
-		when(products.findProduct(reader.organizationId(), productId)).thenReturn(Optional.of(costedProduct(productId)));
+		when(products.findProduct(reader.organizationId(), reader.branchId(), productId)).thenReturn(Optional.of(costedProduct(productId)));
 
 		ProductSummaryView result = service.product(reader, productId);
 
@@ -108,7 +111,8 @@ class CatalogProductServiceTests {
 		UUID productId = UUID.randomUUID();
 		ProductSummaryView existing = costedProduct(productId);
 		ProductSummaryView updated = costedProduct(productId);
-		when(products.findProduct(updater.organizationId(), productId)).thenReturn(Optional.of(existing), Optional.of(updated));
+		when(products.findProduct(updater.organizationId(), updater.branchId(), productId))
+				.thenReturn(Optional.of(existing), Optional.of(updated));
 		when(commands.update(any())).thenReturn(1);
 		ProductCommand request = command(existing.version());
 
@@ -125,7 +129,7 @@ class CatalogProductServiceTests {
 	void staleVersionIsRejectedBeforeMutation() {
 		UUID productId = UUID.randomUUID();
 		ProductSummaryView existing = costedProduct(productId);
-		when(products.findProduct(principal.organizationId(), productId)).thenReturn(Optional.of(existing));
+		when(products.findProduct(principal.organizationId(), principal.branchId(), productId)).thenReturn(Optional.of(existing));
 
 		assertThatThrownBy(() -> service.updateProduct(principal, productId, command(existing.version() + 1), "test"))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
