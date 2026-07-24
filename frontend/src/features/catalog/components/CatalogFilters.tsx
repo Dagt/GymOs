@@ -13,11 +13,11 @@ type Props = {
 export function CatalogFilters({ categories, filters, searchInput, total, onClear, onSearchChange, onUpdate }: Props) {
   const activeCategories = categories.filter((category) => category.status === "ACTIVE");
   return (
-    <section aria-label="Filtros del catálogo" className="app-card p-2.5">
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(220px,1fr)_150px_190px_auto]">
+    <section aria-label="Filtros del catálogo" className="app-card h-full p-2.5">
+      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(210px,320px)_140px_180px_auto] lg:justify-start">
         <label>
           <span className="sr-only">Buscar</span>
-          <input className="app-input h-9 min-h-9 text-sm" onChange={(event) => onSearchChange(event.target.value)} placeholder="Buscar por nombre, SKU o código" value={searchInput} />
+          <input className="app-input h-9 min-h-9 text-sm" onChange={(event) => onSearchChange(event.target.value)} placeholder="Nombre, SKU o código" value={searchInput} />
         </label>
         <CompactSelect label="Tipo" value={filters.type ?? ""} onChange={(value) => onUpdate("type", value || null)} options={[["", "Todos los tipos"], ["PHYSICAL", "Productos"], ["SERVICE", "Cargos"]]} />
         <CompactSelect label="Categoría" value={filters.categoryId ?? ""} onChange={(value) => onUpdate("categoryId", value || null)} options={[["", "Todas las categorías"], ...activeCategories.map((category) => [category.id, category.name])]} />
