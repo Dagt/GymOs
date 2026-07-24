@@ -1,19 +1,38 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api/v1";
 
+let refreshPromise: Promise<RefreshResult> | null = null;
+
+type RefreshResult =
+  | { status: "refreshed"; accessToken: string }
+  | { status: "rejected" }
+  | { status: "unavailable" };
+
 export async function apiFetch<T>(
   path: string,
   accessToken: string,
   init: RequestInit = {},
 ): Promise<T> {
-  const isFormData = init.body instanceof FormData;
-  return request<T>(path, {
-    ...init,
-    headers: {
-      ...(isFormData ? {} : { "Content-Type": "application/json" }),
-      Authorization: `Bearer ${accessToken}`,
-      ...init.headers,
-    },
-  });
+  const activeToken = currentAccessToken() ?? accessToken;
+  const response = await authenticatedRequest(path, activeToken, init);
+  if (response.status !== 401) {
+    return readResponse<T>(response, path);
+  }
+
+  const refresh = await refreshAccessToken();
+  if (refresh.status !== "refreshed") {
+    if (refresh.status === "rejected") {
+      clearStoredSession();
+      notifySessionExpired();
+    }
+    return readResponse<T>(response, path);
+  }
+
+  const retry = await authenticatedRequest(path, refresh.accessToken, init);
+  if (retry.status === 401) {
+    clearStoredSession();
+    notifySessionExpired();
+  }
+  return readResponse<T>(retry, path);
 }
 
 export async function publicApiFetch<T>(
@@ -21,13 +40,13 @@ export async function publicApiFetch<T>(
   init: RequestInit = {},
 ): Promise<T> {
   const isFormData = init.body instanceof FormData;
-  return request<T>(path, {
+  return readResponse<T>(await performRequest(path, {
     ...init,
     headers: {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...init.headers,
     },
-  });
+  }), path);
 }
 
 export function normalizePayload<T extends Record<string, unknown>>(payload: T): T {
@@ -52,17 +71,29 @@ export function withIdempotency<T extends { idempotencyKey?: string | null }>(
   };
 }
 
-async function request<T>(path: string, init: RequestInit): Promise<T> {
-  let response: Response;
+async function authenticatedRequest(path: string, accessToken: string, init: RequestInit) {
+  const isFormData = init.body instanceof FormData;
+  return performRequest(path, {
+    ...init,
+    headers: {
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
+      Authorization: `Bearer ${accessToken}`,
+      ...init.headers,
+    },
+  });
+}
 
+async function performRequest(path: string, init: RequestInit): Promise<Response> {
   try {
-    response = await fetch(`${API_BASE_URL}${path}`, init);
+    return await fetch(`${API_BASE_URL}${path}`, init);
   } catch {
     throw new Error(
       `No se pudo conectar con el servidor (${API_BASE_URL}). Revisa que el backend esté encendido y que la URL de API sea correcta.`,
     );
   }
+}
 
+async function readResponse<T>(response: Response, path: string): Promise<T> {
   if (!response.ok) {
     const error = await response.json().catch(() => null);
     throw new Error(formatApiError(response, path, error));
@@ -74,6 +105,71 @@ async function request<T>(path: string, init: RequestInit): Promise<T> {
 
   const text = await response.text();
   return (text ? JSON.parse(text) : undefined) as T;
+}
+
+async function refreshAccessToken(): Promise<RefreshResult> {
+  if (typeof window === "undefined") return { status: "unavailable" };
+  if (refreshPromise) return refreshPromise;
+
+  refreshPromise = performRefresh().finally(() => {
+    refreshPromise = null;
+  });
+  return refreshPromise;
+}
+
+async function performRefresh(): Promise<RefreshResult> {
+  const refreshToken = window.localStorage.getItem("gymos.refreshToken");
+  if (!refreshToken) return { status: "rejected" };
+
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken }),
+    });
+  } catch {
+    return { status: "unavailable" };
+  }
+
+  if (!response.ok) {
+    if ([400, 401, 403].includes(response.status)) return { status: "rejected" };
+    return { status: "unavailable" };
+  }
+
+  const session = await response.json().catch(() => null) as {
+    accessToken?: string;
+    refreshToken?: string;
+    user?: unknown;
+  } | null;
+  if (!session?.accessToken) return { status: "unavailable" };
+
+  window.localStorage.setItem("gymos.accessToken", session.accessToken);
+  if (session.refreshToken) {
+    window.localStorage.setItem("gymos.refreshToken", session.refreshToken);
+  }
+  if (session.user) {
+    window.localStorage.setItem("gymos.currentUser", JSON.stringify(session.user));
+  }
+  window.dispatchEvent(new Event("gymos.session-refreshed"));
+  return { status: "refreshed", accessToken: session.accessToken };
+}
+
+function currentAccessToken() {
+  if (typeof window === "undefined") return null;
+  return window.localStorage.getItem("gymos.accessToken");
+}
+
+function clearStoredSession() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem("gymos.accessToken");
+  window.localStorage.removeItem("gymos.refreshToken");
+  window.localStorage.removeItem("gymos.currentUser");
+}
+
+function notifySessionExpired() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event("gymos.session-expired"));
 }
 
 function operationKey(...parts: string[]) {
