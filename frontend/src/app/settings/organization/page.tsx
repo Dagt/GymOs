@@ -119,9 +119,10 @@ export default function OrganizationSettingsPage() {
       resizeObserver.disconnect();
       desktopQuery.removeEventListener("change", updateHeight);
     };
-  }, [organizationForm]);
+  }, [organization]);
 
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
+  const persistedOrganizationForm = organization ? toOrganizationForm(organization) : organizationForm;
 
   async function submitOrganization(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -201,13 +202,27 @@ export default function OrganizationSettingsPage() {
   }
 
   function openOrganizationDrawer() {
+    if (organization) setOrganizationForm(toOrganizationForm(organization));
     setFieldErrors({});
     setShowOrganizationDrawer(true);
   }
 
+  function closeOrganizationDrawer() {
+    if (organization) setOrganizationForm(toOrganizationForm(organization));
+    setFieldErrors({});
+    setShowOrganizationDrawer(false);
+  }
+
   function openNewBranchDrawer() {
+    setNewBranchForm(emptyBranchForm);
     setFieldErrors({});
     setShowNewBranchDrawer(true);
+  }
+
+  function closeNewBranchDrawer() {
+    setNewBranchForm(emptyBranchForm);
+    setFieldErrors({});
+    setShowNewBranchDrawer(false);
   }
 
   function openEditBranch(branchId: string) {
@@ -216,10 +231,17 @@ export default function OrganizationSettingsPage() {
     setShowEditBranchDrawer(true);
   }
 
+  function closeEditBranchDrawer() {
+    const branch = branches.find((item) => item.id === selectedBranchId);
+    setBranchForm(branch ? toBranchForm(branch) : null);
+    setFieldErrors({});
+    setShowEditBranchDrawer(false);
+  }
+
   if (!session) return <AuthRequired />;
   if (loading) return <LoadingScreen text="Cargando datos y sucursales..." />;
 
-  if (!organizationForm) {
+  if (!organizationForm || !persistedOrganizationForm) {
     return (
       <AppShell
         branchName={activeBranch?.name}
@@ -257,7 +279,7 @@ export default function OrganizationSettingsPage() {
 
       <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
         <div className="grid min-w-0 gap-5" ref={settingsColumnRef}>
-          <OrganizationOverviewCard form={organizationForm} onEdit={openOrganizationDrawer} />
+          <OrganizationOverviewCard form={persistedOrganizationForm} onEdit={openOrganizationDrawer} />
           <TeamAccessCard />
         </div>
         <div
@@ -268,9 +290,9 @@ export default function OrganizationSettingsPage() {
         </div>
       </section>
 
-      <OrganizationDrawer errors={fieldErrors} form={organizationForm} open={showOrganizationDrawer} saving={saving} onChange={setOrganizationForm} onClose={() => setShowOrganizationDrawer(false)} onSubmit={submitOrganization} />
-      <NewBranchDrawer errors={fieldErrors} form={newBranchForm} open={showNewBranchDrawer} saving={saving} onChange={setNewBranchForm} onClose={() => setShowNewBranchDrawer(false)} onSubmit={submitNewBranch} />
-      <EditBranchDrawer branchId={selectedBranchId} branches={branches} errors={fieldErrors} form={branchForm} open={showEditBranchDrawer} saving={saving} onBranchSelect={selectEditableBranch} onChange={setBranchForm} onClose={() => setShowEditBranchDrawer(false)} onSubmit={submitBranch} />
+      <OrganizationDrawer errors={fieldErrors} form={organizationForm} open={showOrganizationDrawer} saving={saving} onChange={setOrganizationForm} onClose={closeOrganizationDrawer} onSubmit={submitOrganization} />
+      <NewBranchDrawer errors={fieldErrors} form={newBranchForm} open={showNewBranchDrawer} saving={saving} onChange={setNewBranchForm} onClose={closeNewBranchDrawer} onSubmit={submitNewBranch} />
+      <EditBranchDrawer branchId={selectedBranchId} branches={branches} errors={fieldErrors} form={branchForm} open={showEditBranchDrawer} saving={saving} onBranchSelect={selectEditableBranch} onChange={setBranchForm} onClose={closeEditBranchDrawer} onSubmit={submitBranch} />
     </AppShell>
   );
 }
