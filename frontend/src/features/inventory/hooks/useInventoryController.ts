@@ -87,12 +87,12 @@ export function useInventoryController() {
     if (!accessToken) return;
     let active = true;
 
-    async function loadStock() {
+    async function loadStock(token: string) {
       await Promise.resolve();
       if (!active) return;
       setStockLoading(true);
       try {
-        const page = await searchInventoryStock(accessToken, {
+        const page = await searchInventoryStock(token, {
           q: debouncedStockQuery,
           page: stockPage,
           size: 25,
@@ -115,7 +115,7 @@ export function useInventoryController() {
       }
     }
 
-    void loadStock();
+    void loadStock(accessToken);
     return () => { active = false; };
   }, [debouncedStockQuery, session, stockPage, stockSort]);
 
@@ -124,12 +124,12 @@ export function useInventoryController() {
     if (!accessToken) return;
     let active = true;
 
-    async function loadMovements() {
+    async function loadMovements(token: string) {
       await Promise.resolve();
       if (!active) return;
       setMovementLoading(true);
       try {
-        const page = await searchInventoryMovements(accessToken, {
+        const page = await searchInventoryMovements(token, {
           productId: selectedProductId || undefined,
           page: movementPage,
           size: 25,
@@ -144,7 +144,7 @@ export function useInventoryController() {
       }
     }
 
-    void loadMovements();
+    void loadMovements(accessToken);
     return () => { active = false; };
   }, [movementPage, selectedProductId, session]);
 
