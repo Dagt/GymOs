@@ -40,14 +40,14 @@ class CatalogMembershipPlanService {
 	}
 
 	List<PlanView> plans(GymOsPrincipal principal) {
-		CatalogAccessGuard.requirePrincipal(principal);
-		return plans.listPlans(principal.organizationId());
+		CatalogAccessGuard.requireBranch(principal);
+		return plans.listPlans(principal.organizationId(), principal.branchId());
 	}
 
 	PlanView createPlan(GymOsPrincipal principal, CreatePlanCommand request, String correlationId) {
-		CatalogAccessGuard.requirePrincipal(principal);
-		ProductSummaryView product = products.findProduct(principal.organizationId(), request.productId())
-				.orElseThrow(() -> new BusinessException("PRODUCT_NOT_FOUND", "El producto no esta disponible."));
+		CatalogAccessGuard.requireBranch(principal);
+		ProductSummaryView product = products.findProduct(principal.organizationId(), principal.branchId(), request.productId())
+				.orElseThrow(() -> new BusinessException("PRODUCT_NOT_FOUND", "El producto no esta disponible en esta sucursal."));
 		if (!"MEMBERSHIP_PLAN".equals(product.productType())) {
 			throw new BusinessException("PRODUCT_NOT_MEMBERSHIP_PLAN", "El producto debe ser de tipo MEMBERSHIP_PLAN.");
 		}
@@ -59,12 +59,12 @@ class CatalogMembershipPlanService {
 				request.status().trim().toUpperCase(), now, principal.userId()
 		));
 		auditService.record(principal, "PLAN_CREATED", "MEMBERSHIP_PLAN", planId, "BACKOFFICE", null, correlationId);
-		return plans.findPlan(principal.organizationId(), planId)
-				.orElseThrow(() -> new BusinessException("PLAN_NOT_FOUND", "El plan no esta disponible."));
+		return plans.findPlan(principal.organizationId(), principal.branchId(), planId)
+				.orElseThrow(() -> new BusinessException("PLAN_NOT_FOUND", "El plan no esta disponible en esta sucursal."));
 	}
 
 	PlanView createMembershipPlan(GymOsPrincipal principal, CreateMembershipPlanCommand request, String correlationId) {
-		CatalogAccessGuard.requirePrincipal(principal);
+		CatalogAccessGuard.requireBranch(principal);
 		String sku = request.sku().trim().toUpperCase();
 		if (products.skuExists(principal.organizationId(), sku, null)) {
 			throw new BusinessException("PRODUCT_SKU_ALREADY_EXISTS", "Ya existe un producto o plan con ese codigo.");
@@ -79,6 +79,7 @@ class CatalogMembershipPlanService {
 				request.status().trim().toUpperCase(), null, null, null, null,
 				false, 0, null, null, null, null, null, null, now, principal.userId()
 		));
+		productCommands.attachBranch(principal.organizationId(), principal.branchId(), productId, principal.userId(), now);
 		auditService.record(principal, "PRODUCT_CREATED", "PRODUCT", productId, "BACKOFFICE", null, correlationId);
 
 		return createPlan(
@@ -91,10 +92,10 @@ class CatalogMembershipPlanService {
 
 	PlanView updateMembershipPlan(GymOsPrincipal principal, UUID planId,
 			UpdateMembershipPlanCommand request, String correlationId) {
-		CatalogAccessGuard.requirePrincipal(principal);
-		PlanView existing = plans.findPlan(principal.organizationId(), planId)
-				.orElseThrow(() -> new BusinessException("PLAN_NOT_FOUND", "El plan no esta disponible."));
-		ProductSummaryView product = products.findProduct(principal.organizationId(), existing.productId())
+		CatalogAccessGuard.requireBranch(principal);
+		PlanView existing = plans.findPlan(principal.organizationId(), principal.branchId(), planId)
+				.orElseThrow(() -> new BusinessException("PLAN_NOT_FOUND", "El plan no esta disponible en esta sucursal."));
+		ProductSummaryView product = products.findProduct(principal.organizationId(), principal.branchId(), existing.productId())
 				.orElseThrow(() -> new BusinessException("PRODUCT_NOT_FOUND", "El producto del plan no esta disponible."));
 		OffsetDateTime now = OffsetDateTime.now();
 		int updatedProducts = productCommands.update(new ProductMutation(
@@ -118,7 +119,7 @@ class CatalogMembershipPlanService {
 				request.status().trim().toUpperCase(), now, principal.userId()
 		));
 		auditService.record(principal, "PLAN_UPDATED", "MEMBERSHIP_PLAN", planId, "BACKOFFICE", null, correlationId);
-		return plans.findPlan(principal.organizationId(), planId)
-				.orElseThrow(() -> new BusinessException("PLAN_NOT_FOUND", "El plan no esta disponible."));
+		return plans.findPlan(principal.organizationId(), principal.branchId(), planId)
+				.orElseThrow(() -> new BusinessException("PLAN_NOT_FOUND", "El plan no esta disponible en esta sucursal."));
 	}
 }
