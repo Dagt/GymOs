@@ -14,6 +14,13 @@ export async function getInventoryStock(accessToken: string): Promise<InventoryS
   return apiFetch<InventoryStock[]>("/inventory", accessToken);
 }
 
+export async function getInventoryStockDetail(
+  accessToken: string,
+  productId: string,
+): Promise<InventoryStock> {
+  return apiFetch<InventoryStock>(`/inventory/${productId}`, accessToken);
+}
+
 export async function searchInventoryStock(
   accessToken: string,
   params: InventoryStockSearchParams = {},
