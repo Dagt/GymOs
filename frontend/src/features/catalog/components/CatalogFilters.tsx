@@ -13,17 +13,21 @@ type Props = {
 export function CatalogFilters({ categories, filters, searchInput, total, onClear, onSearchChange, onUpdate }: Props) {
   const activeCategories = categories.filter((category) => category.status === "ACTIVE");
   return (
-    <section aria-label="Filtros del catálogo" className="app-card h-full p-2.5">
-      <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(210px,320px)_140px_180px_auto] lg:justify-start">
-        <label>
+    <section aria-label="Filtros del catálogo" className="app-card h-fit p-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="w-full sm:w-72">
           <span className="sr-only">Buscar</span>
           <input className="app-input h-9 min-h-9 text-sm" onChange={(event) => onSearchChange(event.target.value)} placeholder="Nombre, SKU o código" value={searchInput} />
         </label>
-        <CompactSelect label="Tipo" value={filters.type ?? ""} onChange={(value) => onUpdate("type", value || null)} options={[["", "Todos los tipos"], ["PHYSICAL", "Productos"], ["SERVICE", "Cargos"]]} />
-        <CompactSelect label="Categoría" value={filters.categoryId ?? ""} onChange={(value) => onUpdate("categoryId", value || null)} options={[["", "Todas las categorías"], ...activeCategories.map((category) => [category.id, category.name])]} />
+        <div className="w-full sm:w-36">
+          <CompactSelect label="Tipo" value={filters.type ?? ""} onChange={(value) => onUpdate("type", value || null)} options={[["", "Todos los tipos"], ["PHYSICAL", "Productos"], ["SERVICE", "Cargos"]]} />
+        </div>
+        <div className="w-full sm:w-48">
+          <CompactSelect label="Categoría" value={filters.categoryId ?? ""} onChange={(value) => onUpdate("categoryId", value || null)} options={[["", "Todas las categorías"], ...activeCategories.map((category) => [category.id, category.name])]} />
+        </div>
         <button className="app-button-secondary h-9 min-h-9 px-3 text-xs" onClick={onClear} type="button">Limpiar</button>
       </div>
-      <details className="mt-2 rounded-md border border-[#e1e5de] bg-[#fafbf9] px-2.5 py-1.5">
+      <details className="mt-2 max-w-3xl rounded-md border border-[#e1e5de] bg-[#fafbf9] px-2.5 py-1.5">
         <summary className="cursor-pointer text-[11px] font-semibold text-[#42514a]">Más filtros · {total} resultados</summary>
         <div className="mt-2 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <Select label="Estado" value={filters.status ?? ""} onChange={(value) => onUpdate("status", value || null)} options={[["", "Todos"], ["ACTIVE", "Activo"], ["INACTIVE", "Inactivo"]]} />
