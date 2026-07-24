@@ -13,7 +13,7 @@ public record SecurityProperties(
 		long refreshTokenDays
 ) {
 	public SecurityProperties(List<String> corsAllowedOrigins, String jwtSecret, long accessTokenSeconds, long refreshTokenDays) {
-		this(corsAllowedOrigins, jwtSecret, accessTokenSeconds, 57_600, refreshTokenDays);
+		this(corsAllowedOrigins, jwtSecret, accessTokenSeconds, 86_400, refreshTokenDays);
 	}
 
 	@ConstructorBinding
@@ -28,7 +28,7 @@ public record SecurityProperties(
 			accessTokenSeconds = 900;
 		}
 		if (receptionAccessTokenSeconds <= 0) {
-			receptionAccessTokenSeconds = 57_600;
+			receptionAccessTokenSeconds = 86_400;
 		}
 		if (refreshTokenDays <= 0) {
 			refreshTokenDays = 7;
