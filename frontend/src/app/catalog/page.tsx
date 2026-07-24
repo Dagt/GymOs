@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import { CatalogToolbar, PlanDrawer, PlanList } from "./CatalogSections";
@@ -10,6 +10,8 @@ import { CatalogProductDrawer } from "@/features/catalog/components/CatalogProdu
 import { CatalogProductTable } from "@/features/catalog/components/CatalogProductTable";
 import { CatalogSummaryCards } from "@/features/catalog/components/CatalogSummaryCards";
 import { CatalogCategoryManager } from "@/features/catalog/components/CatalogCategoryManager";
+
+type CatalogView = "products" | "plans" | "categories";
 
 export default function CatalogPage() {
   return (
@@ -21,31 +23,52 @@ export default function CatalogPage() {
 
 function CatalogContent() {
   const controller = useCatalogController();
+  const [view, setView] = useState<CatalogView>("products");
   if (controller.loading && !controller.session) return <LoadingScreen text="Cargando catalogo..." />;
   if (!controller.session) return <AuthRequired />;
 
+  function openProductCreation() {
+    setView("products");
+    controller.openProductCreation();
+  }
+
+  function openPlanCreation() {
+    setView("plans");
+    controller.openPlanCreation();
+  }
+
   return (
     <AppShell eyebrow="Administracion" session={controller.session}
-      subtitle="Productos, servicios y planes disponibles para vender desde recepcion." title="Catalogo">
+      subtitle="Administra por separado productos, servicios, planes y categorias." title="Catalogo">
       {controller.error ? <InlineError message={controller.error} /> : null}
       {controller.message ? <p className="rounded-md border border-[#bad9c4] bg-[#eff8f1] px-3 py-2 text-sm text-[#31563c]">{controller.message}</p> : null}
-      <section className="grid gap-6">
-        <CatalogToolbar canCreate={controller.canCreate} onNewPlan={controller.openPlanCreation} onNewProduct={controller.openProductCreation} />
-        <CatalogSummaryCards summary={controller.summary} />
-        <CatalogFilters categories={controller.categories} filters={controller.catalogFilters.filters}
-          searchInput={controller.catalogFilters.searchInput} total={controller.totalProducts}
-          onClear={controller.catalogFilters.clear} onSearchChange={controller.catalogFilters.setSearchInput}
-          onUpdate={controller.catalogFilters.update} />
-        <CatalogProductTable canArchive={controller.canArchive} canManageStatus={controller.canManageStatus}
-          canUpdate={controller.canUpdate} loading={controller.loading} products={controller.products}
-          saving={controller.saving} onArchive={controller.archiveCatalogProduct} onEdit={controller.openProductEdition}
-          onRestore={controller.restoreCatalogProduct} onToggleStatus={controller.toggleProductStatus} />
-        <CatalogPagination page={controller.catalogFilters.filters.page ?? 0} totalPages={controller.totalPages}
-          onPageChange={(page) => controller.catalogFilters.update("page", String(page))} />
-        {controller.canManageCategories ? <CatalogCategoryManager accessToken={controller.session.accessToken} categories={controller.categories} onChanged={controller.reloadCatalog} /> : null}
-        <section className="grid gap-6">
+      <section className="grid gap-5">
+        <CatalogToolbar canCreate={controller.canCreate} onNewPlan={openPlanCreation} onNewProduct={openProductCreation} />
+        <CatalogNavigation canManageCategories={controller.canManageCategories} view={view} onChange={setView} />
+
+        {view === "products" ? (
+          <section className="grid gap-5">
+            <CatalogSummaryCards summary={controller.summary} />
+            <CatalogFilters categories={controller.categories} filters={controller.catalogFilters.filters}
+              searchInput={controller.catalogFilters.searchInput} total={controller.totalProducts}
+              onClear={controller.catalogFilters.clear} onSearchChange={controller.catalogFilters.setSearchInput}
+              onUpdate={controller.catalogFilters.update} />
+            <CatalogProductTable canArchive={controller.canArchive} canManageStatus={controller.canManageStatus}
+              canUpdate={controller.canUpdate} loading={controller.loading} products={controller.products}
+              saving={controller.saving} onArchive={controller.archiveCatalogProduct} onEdit={controller.openProductEdition}
+              onRestore={controller.restoreCatalogProduct} onToggleStatus={controller.toggleProductStatus} />
+            <CatalogPagination page={controller.catalogFilters.filters.page ?? 0} totalPages={controller.totalPages}
+              onPageChange={(page) => controller.catalogFilters.update("page", String(page))} />
+          </section>
+        ) : null}
+
+        {view === "plans" ? (
           <PlanList canUpdate={controller.canUpdate} plans={controller.plans} onEditPlan={controller.openPlanEdition} />
-        </section>
+        ) : null}
+
+        {view === "categories" && controller.canManageCategories ? (
+          <CatalogCategoryManager accessToken={controller.session.accessToken} categories={controller.categories} onChanged={controller.reloadCatalog} />
+        ) : null}
       </section>
       <CatalogProductDrawer categories={controller.categories} canManageImages={controller.canManageImages}
         canReadCosts={controller.canReadCosts} editing={Boolean(controller.editingProductId)}
@@ -58,6 +81,28 @@ function CatalogContent() {
         saving={controller.saving} onClose={controller.resetPlanDrawer} onFormChange={controller.setPlanForm}
         onSubmit={controller.submitPlan} />
     </AppShell>
+  );
+}
+
+function CatalogNavigation({ canManageCategories, onChange, view }: {
+  canManageCategories: boolean;
+  onChange: (view: CatalogView) => void;
+  view: CatalogView;
+}) {
+  const options: { label: string; value: CatalogView }[] = [
+    { label: "Productos y servicios", value: "products" },
+    { label: "Planes de membresia", value: "plans" },
+    ...(canManageCategories ? [{ label: "Categorias", value: "categories" as CatalogView }] : []),
+  ];
+  return (
+    <nav aria-label="Secciones del catalogo" className="flex flex-wrap gap-2 rounded-xl border border-[#d8ddd2] bg-white p-2 shadow-sm">
+      {options.map((option) => (
+        <button key={option.value} type="button" onClick={() => onChange(option.value)}
+          className={view === option.value ? "app-button h-10" : "app-button-secondary h-10"}>
+          {option.label}
+        </button>
+      ))}
+    </nav>
   );
 }
 
