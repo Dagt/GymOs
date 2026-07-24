@@ -46,7 +46,8 @@ class SaleCreationService {
 		if (request.clientId() != null && !salesRepository.clientExists(principal.organizationId(), request.clientId())) {
 			throw new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible.");
 		}
-		var resolved = saleLineResolver.resolve(principal.organizationId(), request.clientId(), request.items(), request.discountCents());
+		var resolved = saleLineResolver.resolve(
+				principal.organizationId(), principal.branchId(), request.clientId(), request.items(), request.discountCents());
 		OffsetDateTime now = OffsetDateTime.now();
 		UUID saleId = UUID.randomUUID();
 		String saleNumber = "S-" + now.format(SALE_NUMBER_FORMAT) + "-" + saleId.toString().substring(0, 6).toUpperCase();
