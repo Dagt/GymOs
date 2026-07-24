@@ -21,8 +21,10 @@ import {
   SaleMembershipsSection,
   SalePaymentsSection,
   SaleRefundsSection,
+  estimatedItemizedRefundCents,
   estimatedRefundableCents,
   formatMoney,
+  selectedRefundItems,
   type PaymentFormState,
   type RefundFormState,
 } from "./SaleDetailSections";
@@ -38,6 +40,8 @@ const INITIAL_REFUND_FORM: RefundFormState = {
   paymentId: "",
   amount: "",
   reason: "",
+  itemized: false,
+  items: {},
 };
 
 export default function SaleDetailPage() {
@@ -136,14 +140,23 @@ export default function SaleDetailPage() {
   async function submitRefund(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session || !data) return;
+    const items = refundForm.itemized ? selectedRefundItems(data, refundForm) : [];
+    if (refundForm.itemized && items.length === 0) {
+      setError("Selecciona al menos un producto y una cantidad para devolver.");
+      return;
+    }
+    const suggestedAmount = refundForm.itemized
+      ? estimatedItemizedRefundCents(data, refundForm)
+      : estimatedRefundableCents(data);
     const amountCents = refundForm.amount.trim()
       ? Math.round(Number(refundForm.amount) * 100)
-      : estimatedRefundableCents(data);
+      : suggestedAmount;
     const succeeded = await runAction(
       () => requestSaleRefund(session.accessToken, data.sale.id, {
         paymentId: refundForm.paymentId || null,
         amountCents,
         reason: refundForm.reason,
+        items: refundForm.itemized ? items : undefined,
       }),
       "No fue posible registrar reembolso.",
     );
