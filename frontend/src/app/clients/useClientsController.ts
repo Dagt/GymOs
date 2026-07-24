@@ -36,7 +36,7 @@ export function useClientsController() {
 
   const permissions = useMemo(() => new Set(session?.user.permissions ?? []), [session]);
   const canCreateClient = permissions.has("client.create");
-  const canCreateMembershipSale = permissions.has("sale.create");
+  const canCreateMembershipSale = permissions.has("sale.create") && permissions.has("catalog.read");
 
   useEffect(() => {
     let active = true;
@@ -52,7 +52,9 @@ export function useClientsController() {
       setError(null);
       try {
         const results = await searchClients(storedSession.accessToken, "");
-        const activePlans = storedSession.user.permissions.includes("sale.create")
+        const canLoadPlans = storedSession.user.permissions.includes("sale.create")
+          && storedSession.user.permissions.includes("catalog.read");
+        const activePlans = canLoadPlans
           ? await getPlans(storedSession.accessToken).then((loaded) => loaded.filter((plan) => plan.status === "ACTIVE"))
           : [];
         if (!active) return;
@@ -74,10 +76,14 @@ export function useClientsController() {
     };
   }, []);
 
-  async function loadClients(activeSession = getStoredSession() ?? session, activeQuery = query) {
+  async function loadClients(
+    activeSession = getStoredSession() ?? session,
+    activeQuery = query,
+    clearPreviousError = true,
+  ) {
     if (!activeSession) return;
     setLoading(true);
-    setError(null);
+    if (clearPreviousError) setError(null);
     try {
       setClients(await searchClients(activeSession.accessToken, activeQuery));
       setSession(getStoredSession() ?? activeSession);
@@ -139,6 +145,7 @@ export function useClientsController() {
       return;
     }
 
+    let operationError: string | null = null;
     const selectedPlan = plans.find((plan) => plan.id === form.planId);
     if (selectedPlan) {
       if (!activeSession.user.permissions.includes("sale.create")) {
@@ -149,7 +156,7 @@ export function useClientsController() {
           setMessage("Socio registrado con membresía inicial.");
         } catch (exception) {
           setMessage("El socio sí quedó registrado. Puedes abrir su ficha y agregar la membresía después.");
-          setError(prependStep("No fue posible registrar la membresía o el pago inicial", exception));
+          operationError = prependStep("No fue posible registrar la membresía o el pago inicial", exception);
         }
       }
     } else {
@@ -157,7 +164,8 @@ export function useClientsController() {
     }
 
     setForm({ ...emptyClientForm });
-    await loadClients(getStoredSession() ?? activeSession, query);
+    await loadClients(getStoredSession() ?? activeSession, query, false);
+    if (operationError) setError(operationError);
     setShowCreateClient(false);
     setSaving(false);
   }
