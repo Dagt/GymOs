@@ -85,38 +85,64 @@ export function useInventoryController() {
   useEffect(() => {
     if (!session) return;
     let active = true;
-    setStockLoading(true);
-    searchInventoryStock(session.accessToken, {
-      q: debouncedStockQuery, page: stockPage, size: 25, sort: stockSort,
-    })
-      .then((page) => {
+
+    async function loadStock() {
+      await Promise.resolve();
+      if (!active) return;
+      setStockLoading(true);
+      try {
+        const page = await searchInventoryStock(session.accessToken, {
+          q: debouncedStockQuery,
+          page: stockPage,
+          size: 25,
+          sort: stockSort,
+        });
         if (!active) return;
-        setStock(page.items); setStockTotal(page.totalElements); setStockTotalPages(page.totalPages);
+        setStock(page.items);
+        setStockTotal(page.totalElements);
+        setStockTotalPages(page.totalPages);
         setSelectedProductId((current) => {
           if (current && page.items.some((item) => item.productId === current)) return current;
           const next = page.items[0]?.productId ?? "";
           setReorderPoint(String(page.items[0]?.reorderPoint ?? 0));
           return next;
         });
-      })
-      .catch((exception) => { if (active) setError(exception instanceof Error ? exception.message : "No fue posible cargar existencias."); })
-      .finally(() => { if (active) setStockLoading(false); });
+      } catch (exception) {
+        if (active) setError(exception instanceof Error ? exception.message : "No fue posible cargar existencias.");
+      } finally {
+        if (active) setStockLoading(false);
+      }
+    }
+
+    void loadStock();
     return () => { active = false; };
   }, [debouncedStockQuery, session, stockPage, stockSort]);
 
   useEffect(() => {
     if (!session) return;
     let active = true;
-    setMovementLoading(true);
-    searchInventoryMovements(session.accessToken, {
-      productId: selectedProductId || undefined, page: movementPage, size: 25,
-    })
-      .then((page) => {
+
+    async function loadMovements() {
+      await Promise.resolve();
+      if (!active) return;
+      setMovementLoading(true);
+      try {
+        const page = await searchInventoryMovements(session.accessToken, {
+          productId: selectedProductId || undefined,
+          page: movementPage,
+          size: 25,
+        });
         if (!active) return;
-        setMovements(page.items); setMovementTotalPages(page.totalPages);
-      })
-      .catch((exception) => { if (active) setError(exception instanceof Error ? exception.message : "No fue posible cargar movimientos."); })
-      .finally(() => { if (active) setMovementLoading(false); });
+        setMovements(page.items);
+        setMovementTotalPages(page.totalPages);
+      } catch (exception) {
+        if (active) setError(exception instanceof Error ? exception.message : "No fue posible cargar movimientos.");
+      } finally {
+        if (active) setMovementLoading(false);
+      }
+    }
+
+    void loadMovements();
     return () => { active = false; };
   }, [movementPage, selectedProductId, session]);
 
