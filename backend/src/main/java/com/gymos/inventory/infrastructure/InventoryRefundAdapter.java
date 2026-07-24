@@ -1,6 +1,7 @@
 package com.gymos.inventory.infrastructure;
 
 import com.gymos.inventory.api.InventoryRefundOperations;
+import com.gymos.inventory.api.InventoryRefundOperations.RefundedInventoryItem;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -32,11 +33,24 @@ class InventoryRefundAdapter implements InventoryRefundOperations {
 				.param("saleId", saleId)
 				.query((rs, row) -> new RefundItem(rs.getObject("product_id", UUID.class), rs.getInt("quantity")))
 				.list();
-		for (RefundItem item : items) restoreItem(organizationId, branchId, refundId, actorUserId, occurredAt, correlationId, item);
+		for (RefundItem item : items) {
+			restoreItem(organizationId, branchId, refundId, actorUserId, occurredAt, correlationId, item,
+					"Reposicion automatica por reembolso total.");
+		}
+	}
+
+	@Override
+	public void restoreItems(UUID organizationId, UUID branchId, UUID saleId, UUID refundId,
+			UUID actorUserId, List<RefundedInventoryItem> items, OffsetDateTime occurredAt, UUID correlationId) {
+		for (RefundedInventoryItem item : items) {
+			restoreItem(organizationId, branchId, refundId, actorUserId, occurredAt, correlationId,
+					new RefundItem(item.productId(), item.quantity()),
+					"Reposicion automatica por devolucion de producto.");
+		}
 	}
 
 	private void restoreItem(UUID organizationId, UUID branchId, UUID refundId, UUID actorUserId,
-			OffsetDateTime occurredAt, UUID correlationId, RefundItem item) {
+			OffsetDateTime occurredAt, UUID correlationId, RefundItem item, String reason) {
 		UUID stockId = stockCommands.ensureStock(organizationId, branchId, item.productId(), actorUserId, occurredAt);
 		InventoryStockCommandRepository.StockLedger stock = stockCommands.lock(organizationId, branchId, stockId).orElseThrow();
 		if (movementExists(organizationId, branchId, item.productId(), refundId)) return;
@@ -50,14 +64,15 @@ class InventoryRefundAdapter implements InventoryRefundOperations {
 				) VALUES (
 				 :id, :organizationId, :branchId, :stockId, :productId, 'RETURN',
 				 :quantity, :before, :after, 'SALE_REFUND', :refundId,
-				 'Reposicion automatica por reembolso total.', :occurredAt, :occurredAt, :actorUserId, :correlationId
+				 :reason, :occurredAt, :occurredAt, :actorUserId, :correlationId
 				)
 				ON CONFLICT DO NOTHING
 				""")
 				.param("id", UUID.randomUUID()).param("organizationId", organizationId).param("branchId", branchId)
 				.param("stockId", stockId).param("productId", item.productId()).param("quantity", item.quantity())
 				.param("before", stock.quantityOnHand()).param("after", quantityAfter).param("refundId", refundId)
-				.param("occurredAt", occurredAt).param("actorUserId", actorUserId).param("correlationId", correlationId)
+				.param("reason", reason).param("occurredAt", occurredAt).param("actorUserId", actorUserId)
+				.param("correlationId", correlationId)
 				.update();
 	}
 
