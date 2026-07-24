@@ -96,7 +96,7 @@ export function PasswordField(props: BaseProps) {
   );
 }
 
-export function NumberField(props: BaseProps & { min?: string }) {
+export function NumberField(props: BaseProps & { min?: string; step?: string }) {
   return (
     <FieldFrame error={props.error} help={props.help} label={props.label} name={props.name} required={props.required ?? true}>
       <input
@@ -107,6 +107,7 @@ export function NumberField(props: BaseProps & { min?: string }) {
         name={props.name}
         onChange={(event) => props.onChange(event.target.value)}
         required={props.required ?? true}
+        step={props.step ?? "1"}
         type="number"
         value={props.value}
       />

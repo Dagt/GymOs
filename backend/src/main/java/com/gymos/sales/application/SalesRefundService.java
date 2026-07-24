@@ -22,12 +22,15 @@ class SalesRefundService {
 	}
 
 	UUID process(GymOsPrincipal principal, UUID saleId, RequestRefundCommand request, String correlationId) {
+		lookupService.saleForBranch(principal, saleId);
+		validationService.lockSale(principal, saleId);
 		SaleHeader sale = lookupService.saleForBranch(principal, saleId);
 		var idempotentRefund = idempotencyService.resolve(principal.organizationId(), saleId, request);
 		if (idempotentRefund.existingSaleId().isPresent()) {
 			return idempotentRefund.existingSaleId().get();
 		}
-		validationService.validate(principal, saleId, sale, request);
-		return processor.process(principal, saleId, sale, request, idempotentRefund.idempotencyKey(), correlationId);
+		RefundValidationResult validation = validationService.validate(principal, saleId, sale, request);
+		return processor.process(principal, saleId, sale, request, validation,
+				idempotentRefund.idempotencyKey(), correlationId);
 	}
 }

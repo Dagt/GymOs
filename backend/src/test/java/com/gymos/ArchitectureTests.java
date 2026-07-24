@@ -16,100 +16,62 @@ class ArchitectureTests {
 			.withImportOption(new ImportOption.DoNotIncludeTests())
 			.importPackages("com.gymos");
 
-	@Test
-	void verifiesModulithBoundaries() {
-		ApplicationModules.of(GymOsApplication.class).verify();
+	@Test void verifiesModulithBoundaries() { ApplicationModules.of(GymOsApplication.class).verify(); }
+
+	@Test void applicationLayerDoesNotDependOnWebControllers() {
+		noClasses().that().resideInAPackage("..application..").should().dependOnClassesThat().haveSimpleNameEndingWith("Controller").check(classes);
 	}
 
-	@Test
-	void applicationLayerDoesNotDependOnWebControllers() {
-		noClasses()
-				.that().resideInAPackage("..application..")
-				.should().dependOnClassesThat().haveSimpleNameEndingWith("Controller")
-				.check(classes);
-	}
-
-	@Test
-	void modulesDoNotDependOnOtherModulesInfrastructure() {
-		var violations = classes.stream()
-				.flatMap(javaClass -> javaClass.getDirectDependenciesFromSelf().stream())
+	@Test void modulesDoNotDependOnOtherModulesInfrastructure() {
+		var violations = classes.stream().flatMap(javaClass -> javaClass.getDirectDependenciesFromSelf().stream())
 				.filter(dependency -> moduleOf(dependency.getOriginClass().getPackageName()) != null)
 				.filter(dependency -> dependency.getTargetClass().getPackageName().contains(".infrastructure"))
-				.filter(dependency -> {
-					String originModule = moduleOf(dependency.getOriginClass().getPackageName());
-					String targetModule = moduleOf(dependency.getTargetClass().getPackageName());
-					return targetModule != null && !targetModule.equals(originModule);
-				})
-				.map(dependency -> dependency.getOriginClass().getName() + " -> " + dependency.getTargetClass().getName())
-				.sorted()
-				.toList();
-
+				.filter(dependency -> { String origin = moduleOf(dependency.getOriginClass().getPackageName()); String target = moduleOf(dependency.getTargetClass().getPackageName()); return target != null && !target.equals(origin); })
+				.map(dependency -> dependency.getOriginClass().getName() + " -> " + dependency.getTargetClass().getName()).sorted().toList();
 		assertThat(violations).isEmpty();
 	}
 
-	@Test
-	void controllersDoNotDependOnInfrastructureOfOtherModules() {
-		var violations = classes.stream()
-				.filter(javaClass -> javaClass.getPackageName().contains(".api"))
+	@Test void controllersDoNotDependOnInfrastructureOfOtherModules() {
+		var violations = classes.stream().filter(javaClass -> javaClass.getPackageName().contains(".api"))
 				.flatMap(javaClass -> javaClass.getDirectDependenciesFromSelf().stream())
 				.filter(dependency -> dependency.getTargetClass().getPackageName().contains(".infrastructure"))
-				.filter(dependency -> {
-					String originModule = moduleOf(dependency.getOriginClass().getPackageName());
-					String targetModule = moduleOf(dependency.getTargetClass().getPackageName());
-					return targetModule != null && !targetModule.equals(originModule);
-				})
-				.map(dependency -> dependency.getOriginClass().getName() + " -> " + dependency.getTargetClass().getName())
-				.sorted()
-				.toList();
-
+				.filter(dependency -> { String origin = moduleOf(dependency.getOriginClass().getPackageName()); String target = moduleOf(dependency.getTargetClass().getPackageName()); return target != null && !target.equals(origin); })
+				.map(dependency -> dependency.getOriginClass().getName() + " -> " + dependency.getTargetClass().getName()).sorted().toList();
 		assertThat(violations).isEmpty();
 	}
 
-	@Test
-	void applicationLayerDoesNotUseJdbcClient() {
-		Set<String> actual = classes.stream()
-				.filter(javaClass -> javaClass.getPackageName().contains(".application"))
-				.filter(javaClass -> javaClass.getDirectDependenciesFromSelf().stream()
-						.anyMatch(dependency -> dependency.getTargetClass().isEquivalentTo(JdbcClient.class)))
-				.map(javaClass -> javaClass.getName())
-				.collect(java.util.stream.Collectors.toSet());
-
+	@Test void applicationLayerDoesNotUseJdbcClient() {
+		Set<String> actual = classes.stream().filter(javaClass -> javaClass.getPackageName().contains(".application"))
+				.filter(javaClass -> javaClass.getDirectDependenciesFromSelf().stream().anyMatch(dependency -> dependency.getTargetClass().isEquivalentTo(JdbcClient.class)))
+				.map(javaClass -> javaClass.getName()).collect(java.util.stream.Collectors.toSet());
 		assertThat(actual).isEmpty();
 	}
 
-	@Test
-	void selfServiceUsesOnlyPublicApisFromOtherModules() {
-		var violations = classes.stream()
-				.filter(javaClass -> javaClass.getPackageName().startsWith("com.gymos.selfservice."))
-				.flatMap(javaClass -> javaClass.getDirectDependenciesFromSelf().stream())
-				.filter(dependency -> {
-					String targetPackage = dependency.getTargetClass().getPackageName();
-					return targetPackage.startsWith("com.gymos.memberships.application")
-							|| targetPackage.startsWith("com.gymos.clients.application")
-							|| targetPackage.startsWith("com.gymos.clients.infrastructure");
-				})
-				.map(dependency -> dependency.getOriginClass().getName() + " -> " + dependency.getTargetClass().getName())
-				.sorted()
-				.toList();
+	@Test void catalogApiAndApplicationDoNotDependOnCatalogInfrastructure() {
+		noClasses().that().resideInAnyPackage("com.gymos.catalog.api..", "com.gymos.catalog.application..")
+				.should().dependOnClassesThat().resideInAPackage("com.gymos.catalog.infrastructure..").check(classes);
+	}
 
+	@Test void inventoryApiAndApplicationDoNotDependOnInventoryInfrastructure() {
+		noClasses().that().resideInAnyPackage("com.gymos.inventory.api..", "com.gymos.inventory.application..")
+				.should().dependOnClassesThat().resideInAPackage("com.gymos.inventory.infrastructure..").check(classes);
+	}
+
+	@Test void selfServiceUsesOnlyPublicApisFromOtherModules() {
+		var violations = classes.stream().filter(javaClass -> javaClass.getPackageName().startsWith("com.gymos.selfservice."))
+				.flatMap(javaClass -> javaClass.getDirectDependenciesFromSelf().stream())
+				.filter(dependency -> { String target = dependency.getTargetClass().getPackageName(); return target.startsWith("com.gymos.memberships.application") || target.startsWith("com.gymos.clients.application") || target.startsWith("com.gymos.clients.infrastructure"); })
+				.map(dependency -> dependency.getOriginClass().getName() + " -> " + dependency.getTargetClass().getName()).sorted().toList();
 		assertThat(violations).isEmpty();
 	}
 
-	@Test
-	void commonDoesNotOwnBusinessEvents() {
-		var commonEvents = classes.stream()
-				.map(javaClass -> javaClass.getPackageName())
-				.filter(packageName -> packageName.startsWith("com.gymos.common.events"))
-				.distinct()
-				.toList();
-
+	@Test void commonDoesNotOwnBusinessEvents() {
+		var commonEvents = classes.stream().map(javaClass -> javaClass.getPackageName()).filter(packageName -> packageName.startsWith("com.gymos.common.events")).distinct().toList();
 		assertThat(commonEvents).isEmpty();
 	}
 
 	private String moduleOf(String packageName) {
-		if (!packageName.startsWith("com.gymos.")) {
-			return null;
-		}
+		if (!packageName.startsWith("com.gymos.")) return null;
 		String remainder = packageName.substring("com.gymos.".length());
 		int dot = remainder.indexOf('.');
 		return dot < 0 ? remainder : remainder.substring(0, dot);

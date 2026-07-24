@@ -21,7 +21,24 @@ jobs:
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v5
       - name: Test backend
-        run: ./gradlew test --no-daemon
+        id: backend-test
+        shell: bash
+        run: |
+          chmod +x gradlew
+          if ! ./gradlew test --no-daemon --console=plain > /tmp/backend.log 2>&1; then
+            tail -n 160 /tmp/backend.log
+            exit 1
+          fi
+      - name: Upload backend diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-diagnostics
+          path: |
+            /tmp/backend.log
+            backend/build/test-results/test
+            backend/build/reports/tests/test
+          if-no-files-found: ignore
 
   frontend:
     runs-on: ubuntu-latest
@@ -40,11 +57,36 @@ jobs:
       - name: Test
         run: npm test
       - name: Lint
-        run: npm run lint
+        shell: bash
+        run: |
+          if ! npm run lint > /tmp/frontend-lint.log 2>&1; then
+            tail -n 120 /tmp/frontend-lint.log
+            exit 1
+          fi
       - name: Typecheck
-        run: npm run typecheck
+        shell: bash
+        run: |
+          if ! npm run typecheck > /tmp/frontend-typecheck.log 2>&1; then
+            tail -n 120 /tmp/frontend-typecheck.log
+            exit 1
+          fi
       - name: Build
-        run: npm run build
+        shell: bash
+        run: |
+          if ! npm run build > /tmp/frontend-build.log 2>&1; then
+            tail -n 120 /tmp/frontend-build.log
+            exit 1
+          fi
+      - name: Upload frontend diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-diagnostics
+          path: |
+            /tmp/frontend-lint.log
+            /tmp/frontend-typecheck.log
+            /tmp/frontend-build.log
+          if-no-files-found: ignore
 
   docker:
     runs-on: ubuntu-latest

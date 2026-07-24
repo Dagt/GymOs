@@ -34,6 +34,21 @@ class SalesRecordLookupRepository {
 				.optional();
 	}
 
+	void lockSaleForRefund(UUID organizationId, UUID saleId) {
+		jdbcClient.sql("""
+				SELECT id
+				FROM sale
+				WHERE organization_id = :organizationId
+				  AND id = :saleId
+				  AND deleted_at IS NULL
+				FOR UPDATE
+				""")
+				.param("organizationId", organizationId)
+				.param("saleId", saleId)
+				.query(UUID.class)
+				.single();
+	}
+
 	Optional<SaleHeader> saleHeaderByIdempotencyKey(UUID organizationId, String idempotencyKey) {
 		return jdbcClient.sql("""
 				SELECT s.id, s.sale_number, s.branch_id, s.client_id,

@@ -27,26 +27,13 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 	@Bean
 	SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
-		return http
-				.csrf(AbstractHttpConfigurer::disable)
-				.cors(Customizer.withDefaults())
+		return http.csrf(AbstractHttpConfigurer::disable).cors(Customizer.withDefaults())
 				.authorizeHttpRequests(authorize -> authorize
-						.requestMatchers(
-								"/actuator/health/**",
-								"/api/v1/system/**",
-								"/api/v1/auth/login",
-								"/api/v1/auth/refresh",
-								"/api/v1/self-service/**",
-								"/api/v1/openapi/**",
-								"/api/v1/docs/**",
-								"/swagger-ui/**"
-						).permitAll()
+						.requestMatchers("/actuator/health/**", "/api/v1/system/**", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/self-service/**", "/api/v1/openapi/**", "/api/v1/docs/**", "/swagger-ui/**").permitAll()
 						.requestMatchers("/api/v1/auth/select-branch").hasAuthority("branch.read")
-						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/roles").hasAuthority("user.read")
-						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/internal").hasAuthority("user.read")
+						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/roles", "/api/v1/users/internal").hasAuthority("user.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/users/internal").hasAuthority("user.manage")
-						.requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/users/internal/*/status").hasAuthority("user.manage")
-						.requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/users/internal/*/role").hasAuthority("user.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/users/internal/*/status", "/api/v1/users/internal/*/role").hasAuthority("user.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/auth/select-organization").hasAuthority("organization.read")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/organizations").hasAuthority("organization.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/organizations").hasAuthority("platform.admin")
@@ -62,12 +49,25 @@ public class SecurityConfig {
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/clients/*/workouts").hasAuthority("workout.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/clients/imports").hasAuthority("client.import")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/clients/*/benefits").hasAuthority("client.benefit.assign")
-						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/clients/**").hasAuthority("client.read")
-						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/clients").hasAuthority("client.create")
+						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/clients/**")
+								.hasAnyAuthority("client.read", "client.create", "client.update", "membership.read", "membership.create", "membership.update")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/clients")
+								.hasAnyAuthority("client.create", "platform.admin")
 						.requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/v1/clients/**").hasAuthority("client.update")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/catalog/**").hasAuthority("catalog.read")
-						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/catalog/**").hasAuthority("catalog.manage")
-						.requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/catalog/**").hasAuthority("catalog.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/catalog/products/*/image").hasAuthority("catalog.image.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/catalog/products/*/activate", "/api/v1/catalog/products/*/deactivate").hasAuthority("catalog.status.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/catalog/products/*/restore").hasAuthority("catalog.archive")
+						.requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/v1/catalog/products/*/image").hasAuthority("catalog.image.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/catalog/categories").hasAuthority("catalog.category.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/catalog/categories/*").hasAuthority("catalog.category.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/v1/catalog/categories/*").hasAuthority("catalog.category.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/catalog/products/*/status").hasAuthority("catalog.status.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.DELETE, "/api/v1/catalog/products/*").hasAuthority("catalog.archive")
+						.requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/v1/catalog/products/*").hasAuthority("catalog.update")
+						.requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/catalog/products/*").hasAuthority("catalog.update")
+						.requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/catalog/plans/*").hasAuthority("catalog.update")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/catalog/**").hasAuthority("catalog.create")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/benefits/**").hasAuthority("benefit.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/benefits/**").hasAuthority("benefit.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/client-benefits/*/verify").hasAuthority("client.benefit.verify")
@@ -89,6 +89,7 @@ public class SecurityConfig {
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/access/**").hasAuthority("access.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/inventory/**").hasAuthority("inventory.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/inventory/**").hasAuthority("inventory.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/v1/inventory/**").hasAuthority("inventory.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/resources/**").hasAuthority("resource.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/resources/**").hasAuthority("resource.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/v1/resources/**").hasAuthority("resource.manage")
@@ -109,48 +110,14 @@ public class SecurityConfig {
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/automations/**").hasAuthority("automation.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/reports/owner-dashboard").hasAuthority("report.owner.read")
 						.anyRequest().authenticated())
-				.exceptionHandling(exceptions -> exceptions
-						.authenticationEntryPoint(new StandardAuthenticationEntryPoint()))
+				.exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(new StandardAuthenticationEntryPoint()))
 				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-				.httpBasic(AbstractHttpConfigurer::disable)
-				.formLogin(AbstractHttpConfigurer::disable)
-				.build();
+				.httpBasic(AbstractHttpConfigurer::disable).formLogin(AbstractHttpConfigurer::disable).build();
 	}
 
-	@Bean
-	FilterRegistrationBean<JwtAuthenticationFilter> jwtAuthenticationFilterRegistration(JwtAuthenticationFilter filter) {
-		FilterRegistrationBean<JwtAuthenticationFilter> registration = new FilterRegistrationBean<>(filter);
-		registration.setEnabled(false);
-		return registration;
-	}
-
-	@Bean
-	PasswordEncoder passwordEncoder() {
-		return new BCryptPasswordEncoder();
-	}
-
-	@Bean
-	AuthenticationManager authenticationManager(UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) {
-		DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService);
-		provider.setPasswordEncoder(passwordEncoder);
-		return new ProviderManager(provider);
-	}
-
-	@Bean
-	CorsConfigurationSource corsConfigurationSource(SecurityProperties properties) {
-		return corsConfigurationSource(properties.corsAllowedOrigins());
-	}
-
-	private CorsConfigurationSource corsConfigurationSource(List<String> allowedOrigins) {
-		CorsConfiguration configuration = new CorsConfiguration();
-		configuration.setAllowedOrigins(allowedOrigins);
-		configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"));
-		configuration.setAllowedHeaders(List.of("*"));
-		configuration.setExposedHeaders(List.of("X-Correlation-Id"));
-		configuration.setAllowCredentials(true);
-
-		UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-		source.registerCorsConfiguration("/**", configuration);
-		return source;
-	}
+	@Bean FilterRegistrationBean<JwtAuthenticationFilter> jwtAuthenticationFilterRegistration(JwtAuthenticationFilter filter) { FilterRegistrationBean<JwtAuthenticationFilter> registration = new FilterRegistrationBean<>(filter); registration.setEnabled(false); return registration; }
+	@Bean PasswordEncoder passwordEncoder() { return new BCryptPasswordEncoder(); }
+	@Bean AuthenticationManager authenticationManager(UserDetailsService userDetailsService, PasswordEncoder passwordEncoder) { DaoAuthenticationProvider provider = new DaoAuthenticationProvider(userDetailsService); provider.setPasswordEncoder(passwordEncoder); return new ProviderManager(provider); }
+	@Bean CorsConfigurationSource corsConfigurationSource(SecurityProperties properties) { return corsConfigurationSource(properties.corsAllowedOrigins()); }
+	private CorsConfigurationSource corsConfigurationSource(List<String> allowedOrigins) { CorsConfiguration configuration = new CorsConfiguration(); configuration.setAllowedOrigins(allowedOrigins); configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS")); configuration.setAllowedHeaders(List.of("*")); configuration.setExposedHeaders(List.of("X-Correlation-Id")); configuration.setAllowCredentials(true); UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource(); source.registerCorsConfiguration("/**", configuration); return source; }
 }

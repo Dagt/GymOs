@@ -4,6 +4,8 @@ import com.gymos.sales.model.MembershipPlanForSale;
 import com.gymos.sales.model.PaymentDetail;
 import com.gymos.sales.model.ProductForSale;
 import com.gymos.sales.model.RefundDetail;
+import com.gymos.sales.model.RefundItemSnapshot;
+import com.gymos.sales.model.RefundableSaleItem;
 import com.gymos.sales.model.SaleHeader;
 import java.time.LocalDate;
 import java.util.List;
@@ -39,8 +41,8 @@ public class SalesRepository {
 		this.membershipLookup = membershipLookup;
 	}
 
-	public Optional<ProductForSale> productForSale(UUID organizationId, UUID productId) {
-		return catalogLookup.productForSale(organizationId, productId);
+	public Optional<ProductForSale> productForSale(UUID organizationId, UUID branchId, UUID productId) {
+		return catalogLookup.productForSale(organizationId, branchId, productId);
 	}
 
 	public boolean clientExists(UUID organizationId, UUID clientId) {
@@ -49,6 +51,10 @@ public class SalesRepository {
 
 	public Optional<SaleHeader> saleHeader(UUID organizationId, UUID saleId) {
 		return recordLookup.saleHeader(organizationId, saleId);
+	}
+
+	public void lockSaleForRefund(UUID organizationId, UUID saleId) {
+		recordLookup.lockSaleForRefund(organizationId, saleId);
 	}
 
 	public Optional<SaleHeader> saleHeaderByIdempotencyKey(UUID organizationId, String idempotencyKey) {
@@ -69,6 +75,22 @@ public class SalesRepository {
 
 	public long processedRefundTotal(UUID organizationId, UUID saleId) {
 		return refundLookup.processedTotal(organizationId, saleId);
+	}
+
+	public List<RefundableSaleItem> refundableSaleItems(UUID organizationId, UUID saleId) {
+		return refundLookup.refundableItems(organizationId, saleId);
+	}
+
+	public List<RefundItemSnapshot> refundItems(UUID organizationId, UUID refundId) {
+		return refundLookup.itemsByRefundId(organizationId, refundId);
+	}
+
+	public boolean hasItemizedRefunds(UUID organizationId, UUID saleId) {
+		return refundLookup.hasItemizedRefunds(organizationId, saleId);
+	}
+
+	public boolean hasAmountOnlyRefunds(UUID organizationId, UUID saleId) {
+		return refundLookup.hasAmountOnlyRefunds(organizationId, saleId);
 	}
 
 	public Optional<PaymentDetail> payment(UUID organizationId, UUID paymentId) {

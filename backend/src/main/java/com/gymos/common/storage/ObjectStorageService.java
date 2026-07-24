@@ -5,6 +5,7 @@ import io.minio.BucketExistsArgs;
 import io.minio.MakeBucketArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
+import io.minio.RemoveObjectArgs;
 import java.io.InputStream;
 import org.springframework.stereotype.Service;
 
@@ -19,6 +20,10 @@ public class ObjectStorageService {
 	}
 
 	public String putReceipt(String objectKey, String contentType, long size, InputStream inputStream) {
+		return putObject(objectKey, contentType, size, inputStream);
+	}
+
+	public String putObject(String objectKey, String contentType, long size, InputStream inputStream) {
 		try {
 			ensureBucket();
 			minioClient.putObject(PutObjectArgs.builder()
@@ -29,7 +34,18 @@ public class ObjectStorageService {
 					.build());
 			return objectKey;
 		} catch (Exception exception) {
-			throw new BusinessException("OBJECT_STORAGE_UPLOAD_FAILED", "No fue posible guardar el comprobante.");
+			throw new BusinessException("OBJECT_STORAGE_UPLOAD_FAILED", "No fue posible guardar el archivo.");
+		}
+	}
+
+	public void removeObject(String objectKey) {
+		try {
+			minioClient.removeObject(RemoveObjectArgs.builder()
+					.bucket(properties.bucket())
+					.object(objectKey)
+					.build());
+		} catch (Exception exception) {
+			throw new BusinessException("OBJECT_STORAGE_DELETE_FAILED", "No fue posible eliminar el archivo.");
 		}
 	}
 

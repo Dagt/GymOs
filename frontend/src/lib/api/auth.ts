@@ -2,6 +2,9 @@ import { apiFetch } from "./client";
 import type { AuthResponse, CurrentUser, StoredSession, UserConsole } from "./auth-types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api/v1";
+const ACCESS_TOKEN_KEY = "gymos.accessToken";
+const REFRESH_TOKEN_KEY = "gymos.refreshToken";
+const CURRENT_USER_KEY = "gymos.currentUser";
 
 export async function login(username: string, password: string): Promise<AuthResponse> {
   let response: Response;
@@ -55,19 +58,26 @@ export async function logout(accessToken: string, refreshToken: string): Promise
 
 export function storeSession(session: AuthResponse) {
   const normalized = normalizeAuthResponse(session);
-  window.localStorage.setItem("gymos.accessToken", normalized.accessToken);
-  window.localStorage.setItem("gymos.refreshToken", normalized.refreshToken);
-  window.localStorage.setItem("gymos.currentUser", JSON.stringify(normalized.user));
+  const storage = browserSessionStorage();
+  if (!storage) return;
+  storage.setItem(ACCESS_TOKEN_KEY, normalized.accessToken);
+  storage.setItem(REFRESH_TOKEN_KEY, normalized.refreshToken);
+  storage.setItem(CURRENT_USER_KEY, JSON.stringify(normalized.user));
+  clearLegacySharedSession();
 }
 
 export function storeCurrentUser(user: CurrentUser) {
-  window.localStorage.setItem("gymos.currentUser", JSON.stringify(normalizeCurrentUser(user)));
+  browserSessionStorage()?.setItem(CURRENT_USER_KEY, JSON.stringify(normalizeCurrentUser(user)));
 }
 
 export function getStoredSession(): StoredSession | null {
-  const accessToken = window.localStorage.getItem("gymos.accessToken");
-  const refreshToken = window.localStorage.getItem("gymos.refreshToken");
-  const currentUser = window.localStorage.getItem("gymos.currentUser");
+  const storage = browserSessionStorage();
+  if (!storage) return null;
+  migrateLegacySession(storage);
+
+  const accessToken = storage.getItem(ACCESS_TOKEN_KEY);
+  const refreshToken = storage.getItem(REFRESH_TOKEN_KEY);
+  const currentUser = storage.getItem(CURRENT_USER_KEY);
 
   if (!accessToken || !refreshToken || !currentUser) {
     return null;
@@ -87,9 +97,35 @@ export function getStoredSession(): StoredSession | null {
 }
 
 export function clearSession() {
-  window.localStorage.removeItem("gymos.accessToken");
-  window.localStorage.removeItem("gymos.refreshToken");
-  window.localStorage.removeItem("gymos.currentUser");
+  const storage = browserSessionStorage();
+  storage?.removeItem(ACCESS_TOKEN_KEY);
+  storage?.removeItem(REFRESH_TOKEN_KEY);
+  storage?.removeItem(CURRENT_USER_KEY);
+  clearLegacySharedSession();
+}
+
+function browserSessionStorage() {
+  return typeof window === "undefined" ? null : window.sessionStorage;
+}
+
+function migrateLegacySession(storage: Storage) {
+  if (storage.getItem(ACCESS_TOKEN_KEY) || typeof window === "undefined") return;
+  const legacyAccessToken = window.localStorage.getItem(ACCESS_TOKEN_KEY);
+  const legacyRefreshToken = window.localStorage.getItem(REFRESH_TOKEN_KEY);
+  const legacyCurrentUser = window.localStorage.getItem(CURRENT_USER_KEY);
+  if (legacyAccessToken && legacyRefreshToken && legacyCurrentUser) {
+    storage.setItem(ACCESS_TOKEN_KEY, legacyAccessToken);
+    storage.setItem(REFRESH_TOKEN_KEY, legacyRefreshToken);
+    storage.setItem(CURRENT_USER_KEY, legacyCurrentUser);
+  }
+  clearLegacySharedSession();
+}
+
+function clearLegacySharedSession() {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(ACCESS_TOKEN_KEY);
+  window.localStorage.removeItem(REFRESH_TOKEN_KEY);
+  window.localStorage.removeItem(CURRENT_USER_KEY);
 }
 
 function normalizeCurrentUser(user: CurrentUser): CurrentUser {

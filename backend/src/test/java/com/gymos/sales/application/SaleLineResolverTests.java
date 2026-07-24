@@ -23,13 +23,15 @@ class SaleLineResolverTests {
 		SalesRepository repository = mock(SalesRepository.class);
 		SaleLineResolver resolver = new SaleLineResolver(repository);
 		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
 		UUID productId = UUID.randomUUID();
-		when(repository.productForSale(organizationId, productId)).thenReturn(Optional.of(
+		when(repository.productForSale(organizationId, branchId, productId)).thenReturn(Optional.of(
 				new ProductForSale(productId, "Mensualidad", "MEMBERSHIP_PLAN", 50000, "MXN")
 		));
 
 		ResolvedSale result = resolver.resolve(
 				organizationId,
+				branchId,
 				UUID.randomUUID(),
 				List.of(
 						new SaleItemCommand(productId, 1, 0),
@@ -43,7 +45,7 @@ class SaleLineResolverTests {
 		assertEquals(15000, result.discountCents());
 		assertEquals(135000, result.totalCents());
 		assertEquals("MXN", result.currency());
-		verify(repository, times(1)).productForSale(organizationId, productId);
+		verify(repository, times(1)).productForSale(organizationId, branchId, productId);
 	}
 
 	@Test
@@ -51,17 +53,19 @@ class SaleLineResolverTests {
 		SalesRepository repository = mock(SalesRepository.class);
 		SaleLineResolver resolver = new SaleLineResolver(repository);
 		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
 		UUID firstProductId = UUID.randomUUID();
 		UUID secondProductId = UUID.randomUUID();
-		when(repository.productForSale(organizationId, firstProductId)).thenReturn(Optional.of(
+		when(repository.productForSale(organizationId, branchId, firstProductId)).thenReturn(Optional.of(
 				new ProductForSale(firstProductId, "Producto MXN", "RETAIL", 1000, "MXN")
 		));
-		when(repository.productForSale(organizationId, secondProductId)).thenReturn(Optional.of(
+		when(repository.productForSale(organizationId, branchId, secondProductId)).thenReturn(Optional.of(
 				new ProductForSale(secondProductId, "Producto USD", "RETAIL", 1000, "USD")
 		));
 
 		BusinessException exception = assertThrows(BusinessException.class, () -> resolver.resolve(
 				organizationId,
+				branchId,
 				null,
 				List.of(
 						new SaleItemCommand(firstProductId, 1, 0),
@@ -78,13 +82,15 @@ class SaleLineResolverTests {
 		SalesRepository repository = mock(SalesRepository.class);
 		SaleLineResolver resolver = new SaleLineResolver(repository);
 		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
 		UUID productId = UUID.randomUUID();
-		when(repository.productForSale(organizationId, productId)).thenReturn(Optional.of(
+		when(repository.productForSale(organizationId, branchId, productId)).thenReturn(Optional.of(
 				new ProductForSale(productId, "Mensualidad", "MEMBERSHIP_PLAN", 50000, "MXN")
 		));
 
 		BusinessException exception = assertThrows(BusinessException.class, () -> resolver.resolve(
 				organizationId,
+				branchId,
 				null,
 				List.of(new SaleItemCommand(productId, 1, 0)),
 				0

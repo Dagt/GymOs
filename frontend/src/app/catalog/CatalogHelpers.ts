@@ -9,11 +9,54 @@ export const emptyProduct: ProductPayload = {
   name: "",
   description: "",
   productType: "PHYSICAL",
+  commercialSubtype: "GENERAL_PRODUCT",
   priceCents: 0,
   currency: "MXN",
   taxable: true,
   status: "ACTIVE",
+  barcode: null,
+  brand: null,
+  presentation: null,
+  unitOfMeasure: null,
+  inventoryTracked: true,
+  displayOrder: 0,
+  supplierName: null,
+  referenceCostCents: null,
+  promotionalPriceCents: null,
+  promotionStartsAt: null,
+  promotionEndsAt: null,
+  categoryId: null,
+  tags: [],
+  version: null,
 };
+
+export function productToDraft(product: import("@/lib/api").ProductSummary): ProductPayload {
+  return {
+    sku: product.sku,
+    name: product.name,
+    description: product.description,
+    productType: product.productType,
+    commercialSubtype: product.commercialSubtype,
+    priceCents: product.priceCents,
+    currency: product.currency,
+    taxable: product.taxable,
+    status: product.status,
+    barcode: product.barcode,
+    brand: product.brand,
+    presentation: product.presentation,
+    unitOfMeasure: product.unitOfMeasure,
+    inventoryTracked: product.inventoryTracked,
+    displayOrder: product.displayOrder,
+    supplierName: product.supplierName,
+    referenceCostCents: product.referenceCostCents,
+    promotionalPriceCents: product.promotionalPriceCents,
+    promotionStartsAt: product.promotionStartsAt,
+    promotionEndsAt: product.promotionEndsAt,
+    categoryId: product.categoryId,
+    tags: product.tags,
+    version: product.version,
+  };
+}
 
 export type PlanDraft = {
   sku: string;
@@ -44,12 +87,22 @@ export const emptyPlan: PlanDraft = {
 export function productDraftToPayload(form: ProductPayload, price: string): ProductPayload {
   return {
     ...form,
+    commercialSubtype: form.productType === "PHYSICAL" ? "GENERAL_PRODUCT" : "GENERAL_SERVICE",
     currency: form.currency.trim().toUpperCase() || "MXN",
     priceCents: Math.round(Number(price || "0") * 100),
     sku: form.sku.trim(),
     name: form.name.trim(),
     description: form.description?.trim() || null,
+    supplierName: form.supplierName?.trim() || null,
+    promotionStartsAt: normalizeDateTime(form.promotionStartsAt),
+    promotionEndsAt: normalizeDateTime(form.promotionEndsAt),
   };
+}
+
+function normalizeDateTime(value?: string | null) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 export function planDraftToPayload(plan: PlanDraft): MembershipPlanPayload {
@@ -83,16 +136,11 @@ export function planToDraft(plan: PlanSummary): PlanDraft {
 }
 
 export function formatMoney(cents: number, currency: string) {
-  return new Intl.NumberFormat("es-MX", {
-    style: "currency",
-    currency,
-  }).format(cents / 100);
+  return new Intl.NumberFormat("es-MX", { style: "currency", currency }).format(cents / 100);
 }
 
 export function benefitsToText(value: string | null) {
-  if (!value) {
-    return "";
-  }
+  if (!value) return "";
   try {
     const parsed = JSON.parse(value) as { included?: unknown };
     if (Array.isArray(parsed.included)) {

@@ -19,7 +19,8 @@ class SaleLineResolver {
 		this.salesRepository = salesRepository;
 	}
 
-	ResolvedSale resolve(UUID organizationId, UUID clientId, List<SaleItemCommand> items, long requestedHeaderDiscountCents) {
+	ResolvedSale resolve(UUID organizationId, UUID branchId, UUID clientId,
+			List<SaleItemCommand> items, long requestedHeaderDiscountCents) {
 		if (items == null || items.isEmpty()) {
 			throw new BusinessException("SALE_EMPTY", "La venta necesita al menos un item.");
 		}
@@ -34,8 +35,9 @@ class SaleLineResolver {
 		for (SaleItemCommand item : items) {
 			ProductForSale product = products.computeIfAbsent(
 					item.productId(),
-					productId -> salesRepository.productForSale(organizationId, productId)
-							.orElseThrow(() -> new BusinessException("PRODUCT_NOT_FOUND", "Un producto no existe o no esta activo."))
+					productId -> salesRepository.productForSale(organizationId, branchId, productId)
+							.orElseThrow(() -> new BusinessException(
+									"PRODUCT_NOT_FOUND", "Un producto no existe, no esta activo o no pertenece a esta sucursal."))
 			);
 			if (currency == null) {
 				currency = product.currency();

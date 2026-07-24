@@ -54,12 +54,23 @@ public class SalesReadRepository {
 
 	public List<SaleItemDetail> saleItems(UUID organizationId, UUID saleId) {
 		return jdbcClient.sql("""
-				SELECT id, product_id, item_type, name, quantity, unit_price_cents,
-				       discount_cents, total_cents, created_at
-				FROM sale_item
-				WHERE organization_id = :organizationId
-				  AND sale_id = :saleId
-				ORDER BY created_at, name
+				SELECT si.id, si.product_id, si.item_type, si.name, si.quantity, si.unit_price_cents,
+				       si.discount_cents, si.total_cents, si.created_at,
+				       COALESCE(refunded.refunded_quantity, 0) AS refunded_quantity
+				FROM sale_item si
+				LEFT JOIN (
+				    SELECT sri.sale_item_id, SUM(sri.quantity)::int AS refunded_quantity
+				    FROM sale_refund_item sri
+				    JOIN sale_refund sr ON sr.id = sri.refund_id
+				      AND sr.organization_id = sri.organization_id
+				    WHERE sri.organization_id = :organizationId
+				      AND sri.sale_id = :saleId
+				      AND sr.status = 'PROCESSED'
+				    GROUP BY sri.sale_item_id
+				) refunded ON refunded.sale_item_id = si.id
+				WHERE si.organization_id = :organizationId
+				  AND si.sale_id = :saleId
+				ORDER BY si.created_at, si.name
 				""")
 				.param("organizationId", organizationId)
 				.param("saleId", saleId)
@@ -72,6 +83,7 @@ public class SalesReadRepository {
 						resultSet.getLong("unit_price_cents"),
 						resultSet.getLong("discount_cents"),
 						resultSet.getLong("total_cents"),
+						resultSet.getInt("refunded_quantity"),
 						resultSet.getObject("created_at", OffsetDateTime.class)
 				))
 				.list();

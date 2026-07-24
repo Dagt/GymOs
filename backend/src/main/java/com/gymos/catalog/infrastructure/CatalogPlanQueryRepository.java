@@ -1,6 +1,6 @@
 package com.gymos.catalog.infrastructure;
 
-import com.gymos.catalog.infrastructure.CatalogRepository.PlanSummary;
+import com.gymos.catalog.application.query.PlanView;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,8 +15,13 @@ class CatalogPlanQueryRepository {
 		this.jdbcClient = jdbcClient;
 	}
 
-	List<PlanSummary> list(UUID organizationId) {
-		return jdbcClient.sql("""
+	List<PlanView> list(UUID organizationId) {
+		return list(organizationId, null);
+	}
+
+	List<PlanView> list(UUID organizationId, UUID branchId) {
+		String availability = availability(branchId);
+		JdbcClient.StatementSpec spec = jdbcClient.sql("""
 				SELECT mp.id, mp.product_id, cp.sku, cp.name, cp.price_cents, cp.currency,
 				       mp.duration_days, mp.grace_days, mp.benefits_json::text AS benefits_json,
 				       mp.multi_branch_access, mp.status, mp.created_at, mp.updated_at
@@ -25,15 +30,19 @@ class CatalogPlanQueryRepository {
 				WHERE mp.organization_id = :organizationId
 				  AND mp.deleted_at IS NULL
 				  AND cp.deleted_at IS NULL
-				ORDER BY cp.name
-				""")
-				.param("organizationId", organizationId)
-				.query(CatalogRowMappers.planSummary())
-				.list();
+				""" + availability + " ORDER BY cp.name")
+				.param("organizationId", organizationId);
+		if (branchId != null) spec = spec.param("branchId", branchId);
+		return spec.query(CatalogRowMappers.planSummary()).list();
 	}
 
-	Optional<PlanSummary> find(UUID organizationId, UUID planId) {
-		return jdbcClient.sql("""
+	Optional<PlanView> find(UUID organizationId, UUID planId) {
+		return find(organizationId, null, planId);
+	}
+
+	Optional<PlanView> find(UUID organizationId, UUID branchId, UUID planId) {
+		String availability = availability(branchId);
+		JdbcClient.StatementSpec spec = jdbcClient.sql("""
 				SELECT mp.id, mp.product_id, cp.sku, cp.name, cp.price_cents, cp.currency,
 				       mp.duration_days, mp.grace_days, mp.benefits_json::text AS benefits_json,
 				       mp.multi_branch_access, mp.status, mp.created_at, mp.updated_at
@@ -43,10 +52,17 @@ class CatalogPlanQueryRepository {
 				  AND mp.id = :planId
 				  AND mp.deleted_at IS NULL
 				  AND cp.deleted_at IS NULL
-				""")
+				""" + availability)
 				.param("organizationId", organizationId)
-				.param("planId", planId)
-				.query(CatalogRowMappers.planSummary())
-				.optional();
+				.param("planId", planId);
+		if (branchId != null) spec = spec.param("branchId", branchId);
+		return spec.query(CatalogRowMappers.planSummary()).optional();
+	}
+
+	private String availability(UUID branchId) {
+		if (branchId == null) return "";
+		return " AND EXISTS (SELECT 1 FROM catalog_product_branch cpb"
+				+ " WHERE cpb.organization_id=mp.organization_id AND cpb.product_id=mp.product_id"
+				+ " AND cpb.branch_id=:branchId)";
 	}
 }

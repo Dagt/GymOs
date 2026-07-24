@@ -39,7 +39,7 @@ final class SalesServiceTestFactory {
 				lookupService,
 				new SalesRefundIdempotencyService(salesRepository),
 				new SalesRefundValidationService(salesRepository, lookupService),
-				new SalesRefundProcessor(refundCommandRepository, auditService)
+				new SalesRefundProcessor(refundCommandRepository, eventPublisher, auditService)
 		);
 		SalesPointOfSaleService pointOfSaleService = new SalesPointOfSaleService(
 				saleDetailQuery, saleCreationService, paymentService, refundService, completionService);

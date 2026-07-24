@@ -22,7 +22,7 @@ class MembershipActivationWindowCalculator {
 		if ("MEMBERSHIP_PLAN_CHANGED".equals(action)) {
 			startsOn = businessDate;
 		}
-		LocalDate endsOn = startsOn.plusDays(plan.durationDays() - 1L);
+		LocalDate endsOn = startsOn.plusDays(plan.durationDays());
 		return new MembershipActivationWindow(startsOn, endsOn, endsOn.plusDays(plan.graceDays()));
 	}
 }

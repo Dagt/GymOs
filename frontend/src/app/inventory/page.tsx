@@ -1,24 +1,7 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
-import {
-  createInventoryMovement,
-  getBranches,
-  getCurrentOrganization,
-  getInventoryMovements,
-  getInventoryStock,
-  getLowInventoryStock,
-  getStoredSession,
-  type BranchSummary,
-  type InventoryMovement,
-  type InventoryMovementPayload,
-  type InventoryMovementType,
-  type InventoryStock,
-  type OrganizationSummary,
-  type StoredSession,
-} from "@/lib/api";
 import {
   InventoryAlertsPanel,
   InventoryMovementDrawer,
@@ -27,202 +10,47 @@ import {
   InventoryStatusMessages,
   InventoryStockPanel,
 } from "./InventorySections";
+import { useInventoryController } from "@/features/inventory/hooks/useInventoryController";
 
 export default function InventoryPage() {
-  const [session, setSession] = useState<StoredSession | null>(null);
-  const [organization, setOrganization] = useState<OrganizationSummary | null>(null);
-  const [branches, setBranches] = useState<BranchSummary[]>([]);
-  const [stock, setStock] = useState<InventoryStock[]>([]);
-  const [lowStock, setLowStock] = useState<InventoryStock[]>([]);
-  const [movements, setMovements] = useState<InventoryMovement[]>([]);
-  const [selectedProductId, setSelectedProductId] = useState("");
-  const [movementType, setMovementType] = useState<InventoryMovementType>("PURCHASE");
-  const [quantity, setQuantity] = useState(1);
-  const [unitCostCents, setUnitCostCents] = useState("");
-  const [reorderPoint, setReorderPoint] = useState("");
-  const [reason, setReason] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [showMovementDrawer, setShowMovementDrawer] = useState(false);
+  const controller = useInventoryController();
 
-  useEffect(() => {
-    let active = true;
-
-    async function load() {
-      const stored = getStoredSession();
-      if (!active) {
-        return;
-      }
-      if (!stored) {
-        setLoading(false);
-        return;
-      }
-      setSession(stored);
-      try {
-        const [loadedOrganization, loadedBranches, loadedStock, loadedLowStock, loadedMovements] =
-          await Promise.all([
-            getCurrentOrganization(stored.accessToken).catch(() => null),
-            getBranches(stored.accessToken),
-            getInventoryStock(stored.accessToken),
-            getLowInventoryStock(stored.accessToken),
-            getInventoryMovements(stored.accessToken),
-          ]);
-        if (!active) {
-          return;
-        }
-        setOrganization(loadedOrganization);
-        setBranches(loadedBranches);
-        setStock(loadedStock);
-        setLowStock(loadedLowStock);
-        setMovements(loadedMovements);
-        setSelectedProductId(loadedStock[0]?.productId ?? "");
-        setReorderPoint(String(loadedStock[0]?.reorderPoint ?? 0));
-      } catch (exception) {
-        if (active) {
-          setError(exception instanceof Error ? exception.message : "No fue posible cargar inventario.");
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void load();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const selectedStock = useMemo(
-    () => stock.find((item) => item.productId === selectedProductId) ?? null,
-    [selectedProductId, stock],
-  );
-  const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
-
-  async function refresh(activeSession = session, productId = selectedProductId) {
-    if (!activeSession) {
-      return;
-    }
-    const [nextStock, nextLowStock, nextMovements] = await Promise.all([
-      getInventoryStock(activeSession.accessToken),
-      getLowInventoryStock(activeSession.accessToken),
-      getInventoryMovements(activeSession.accessToken, productId || undefined),
-    ]);
-    setStock(nextStock);
-    setLowStock(nextLowStock);
-    setMovements(nextMovements);
-  }
-
-  function selectProduct(product: InventoryStock) {
-    setSelectedProductId(product.productId);
-    setReorderPoint(String(product.reorderPoint));
-    void refresh(session, product.productId);
-  }
-
-  function selectDrawerProduct(productId: string) {
-    setSelectedProductId(productId);
-    const nextStock = stock.find((item) => item.productId === productId);
-    setReorderPoint(String(nextStock?.reorderPoint ?? 0));
-  }
-
-  async function submitMovement(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!session || !selectedProductId) {
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const payload: InventoryMovementPayload = {
-        productId: selectedProductId,
-        movementType,
-        quantity,
-        unitCostCents: unitCostCents.trim() ? Math.round(Number(unitCostCents) * 100) : null,
-        reorderPoint: reorderPoint.trim() ? Number(reorderPoint) : null,
-        reason,
-      };
-      const updated = await createInventoryMovement(session.accessToken, payload);
-      setReason("");
-      setUnitCostCents("");
-      setReorderPoint(String(updated.reorderPoint));
-      setMessage(`${updated.productName}: existencia actual ${updated.quantityOnHand}.`);
-      await refresh(session, selectedProductId);
-      setShowMovementDrawer(false);
-    } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible registrar movimiento.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  if (loading) {
-    return <LoadingScreen text="Cargando inventario..." />;
-  }
-
-  if (!session) {
-    return (
-      <AuthRequiredCard
-        message="Necesitas iniciar sesion para administrar inventario."
-        title="Inicia sesion"
-      />
-    );
-  }
+  if (controller.loading) return <LoadingScreen text="Cargando inventario..." />;
+  if (!controller.session) return <AuthRequiredCard message="Necesitas iniciar sesion para administrar inventario." title="Inicia sesion" />;
 
   return (
-    <AppShell
-      branchName={activeBranch?.name}
-      eyebrow="Operacion"
-      mode={activeBranch ? "operation" : undefined}
-      organizationName={organization?.brandName || organization?.tradeName}
-      session={session}
-      subtitle="Existencias, movimientos, ajustes y alertas."
-      title="Inventario"
-    >
+    <AppShell branchName={controller.activeBranch?.name} eyebrow="Operacion"
+      mode={controller.activeBranch ? "operation" : undefined}
+      organizationName={controller.organization?.brandName || controller.organization?.tradeName}
+      session={controller.session} subtitle="Existencias, movimientos, ajustes y alertas." title="Inventario">
       <section className="grid gap-6 lg:grid-cols-[1fr_1.25fr]">
         <aside className="grid gap-6">
-          <InventoryStockPanel
-            onRefresh={() => refresh()}
-            onSelectProduct={selectProduct}
-            selectedProductId={selectedProductId}
-            stock={stock}
-          />
-          <InventoryAlertsPanel lowStock={lowStock} />
+          <InventoryStockPanel loading={controller.stockLoading} onPageChange={controller.setStockPage}
+            onQueryChange={controller.setStockQuery} onRefresh={() => controller.refresh()}
+            onSelectProduct={controller.selectProduct} onSortChange={controller.setStockSort}
+            page={controller.stockPage} query={controller.stockQuery}
+            selectedProductId={controller.selectedProductId} sort={controller.stockSort}
+            stock={controller.stock} total={controller.stockTotal} totalPages={controller.stockTotalPages} />
+          <InventoryAlertsPanel lowStock={controller.lowStock} />
         </aside>
-
         <section className="grid gap-6">
-          <InventoryStatusMessages error={error} message={message} />
-          <InventoryMovementSummary
-            onOpenDrawer={() => setShowMovementDrawer(true)}
-            selectedStock={selectedStock}
-          />
-          <InventoryMovementsTable movements={movements} />
+          <InventoryStatusMessages error={controller.error} message={controller.message} />
+          <InventoryMovementSummary onOpenDrawer={() => controller.setShowMovementDrawer(true)}
+            selectedStock={controller.selectedStock} />
+          <InventoryMovementsTable loading={controller.movementLoading} movements={controller.movements}
+            onPageChange={controller.setMovementPage} page={controller.movementPage}
+            totalPages={controller.movementTotalPages} />
         </section>
       </section>
-
-      <InventoryMovementDrawer
-        movementType={movementType}
-        onClose={() => setShowMovementDrawer(false)}
-        onMovementTypeChange={setMovementType}
-        onProductChange={selectDrawerProduct}
-        onQuantityChange={setQuantity}
-        onReasonChange={setReason}
-        onReorderPointChange={setReorderPoint}
-        onSubmit={submitMovement}
-        onUnitCostChange={setUnitCostCents}
-        open={showMovementDrawer}
-        quantity={quantity}
-        reason={reason}
-        reorderPoint={reorderPoint}
-        saving={saving}
-        selectedProductId={selectedProductId}
-        stock={stock}
-        unitCostCents={unitCostCents}
-      />
+      <InventoryMovementDrawer movementType={controller.movementType}
+        onClose={() => controller.setShowMovementDrawer(false)}
+        onMovementTypeChange={controller.setMovementType} onProductChange={controller.selectDrawerProduct}
+        onQuantityChange={controller.setQuantity} onReasonChange={controller.setReason}
+        onReorderPointChange={controller.setReorderPoint} onSubmit={controller.submitMovement}
+        onUnitCostChange={controller.setUnitCostCents} open={controller.showMovementDrawer}
+        quantity={controller.quantity} reason={controller.reason} reorderPoint={controller.reorderPoint}
+        saving={controller.saving} selectedProductId={controller.selectedProductId}
+        stock={controller.stock} unitCostCents={controller.unitCostCents} />
     </AppShell>
   );
 }

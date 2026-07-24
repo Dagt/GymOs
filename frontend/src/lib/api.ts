@@ -39,18 +39,33 @@ export type {
 } from "./api/client-types";
 export {
   createMembershipPlan,
+  archiveProduct,
+  restoreProduct,
+  archiveCatalogCategory,
+  changeProductStatus,
+  createCatalogCategory,
   createPlan,
   createProduct,
   getPlans,
   getProducts,
+  getCatalogCategories,
+  searchProducts,
+  uploadProductImage,
+  removeProductImage,
+  updateCatalogCategory,
+  updateProduct,
   updateMembershipPlan,
 } from "./api/catalog";
 export type {
   MembershipPlanPayload,
+  CatalogCategory,
+  CatalogCategoryPayload,
   PlanPayload,
   PlanSummary,
   ProductPayload,
   ProductSummary,
+  ProductPage,
+  ProductSearchParams,
   UpdateMembershipPlanPayload,
 } from "./api/catalog-types";
 export * from "./api/benefits";
@@ -77,6 +92,7 @@ export type {
   SaleHeader,
   SaleItemDetail,
   SaleItemPayload,
+  SaleRefundItemPayload,
   SaleRefundPayload,
   SalesReportResponse,
   SalesReportTotals,
@@ -137,13 +153,22 @@ export {
   createInventoryMovement,
   getInventoryMovements,
   getInventoryStock,
+  getInventoryStockDetail,
   getLowInventoryStock,
+  searchInventoryMovements,
+  searchInventoryStock,
+  updateInventorySettings,
 } from "./api/inventory";
 export type {
   InventoryMovement,
+  InventoryMovementPage,
   InventoryMovementPayload,
+  InventoryMovementSearchParams,
   InventoryMovementType,
+  InventorySettingsPayload,
   InventoryStock,
+  InventoryStockPage,
+  InventoryStockSearchParams,
 } from "./api/inventory-types";
 export {
   createBooking,

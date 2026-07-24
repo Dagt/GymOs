@@ -3,6 +3,17 @@
 Estado: en progreso  
 Fecha: 19 de julio de 2026
 
+## Mejora integral de catálogo e inventario - 23 de julio de 2026
+
+Implementado en `feature/catalog-inventory-enhancement-plan`:
+
+- metadatos comerciales, archivado lógico, categorías, etiquetas, código de barras e inventario opcional;
+- puertos de aplicación y vistas que eliminan dependencias de API/aplicación hacia infraestructura;
+- detalle, edición, estados explícitos, archivado, imágenes MinIO y búsqueda paginada;
+- inventario, POS y onboarding respetan `inventory_tracked` y productos archivados;
+- `/catalog` incorpora filtros URL, debounce, tabla, métricas, edición, categorías, imagen y permisos;
+- decisiones y contratos técnicos documentados en `18-implementacion-catalogo-inventario.md`.
+
 ## Cierre de auditoria puntos 2-5 del refactor general - 23 de julio de 2026
 
 Implementado en rama `feature/code-simplification-rebasion-and-refactor`:

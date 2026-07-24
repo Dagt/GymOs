@@ -13,9 +13,12 @@ import com.gymos.bookings.infrastructure.BookingResourceRepository.ResourceRecor
 import com.gymos.bookings.infrastructure.BookingRepository;
 import com.gymos.bookings.infrastructure.BookingRepository.BookingRecord;
 import com.gymos.bookings.infrastructure.ClientBookingConflictRepository;
-import com.gymos.catalog.infrastructure.CatalogCommandRepository;
-import com.gymos.catalog.infrastructure.CatalogCommandRepository.PlanRecord;
-import com.gymos.catalog.infrastructure.CatalogCommandRepository.ProductRecord;
+import com.gymos.catalog.application.port.CatalogPlanCommandPort;
+import com.gymos.catalog.application.port.CatalogPlanCommandPort.PlanMutation;
+import com.gymos.catalog.application.port.CatalogProductCommandPort;
+import com.gymos.catalog.application.port.CatalogProductCommandPort.ProductMutation;
+import com.gymos.catalog.infrastructure.CatalogPlanCommandRepository;
+import com.gymos.catalog.infrastructure.CatalogProductCommandRepository;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.time.BusinessTime;
@@ -39,7 +42,8 @@ class BookingMembershipPlanIntegrationTests {
 	static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18-alpine");
 
 	private JdbcClient jdbcClient;
-	private CatalogCommandRepository catalogCommandRepository;
+	private CatalogProductCommandPort catalogProducts;
+	private CatalogPlanCommandPort catalogPlans;
 	private BookingService bookingService;
 
 	private UUID organizationId;
@@ -65,7 +69,8 @@ class BookingMembershipPlanIntegrationTests {
 				.load()
 				.migrate();
 		jdbcClient = JdbcClient.create(dataSource);
-		catalogCommandRepository = new CatalogCommandRepository(jdbcClient);
+		catalogProducts = new CatalogProductCommandRepository(jdbcClient);
+		catalogPlans = new CatalogPlanCommandRepository(jdbcClient);
 		bookingService = new BookingService(
 				new BookingRepository(jdbcClient),
 				new BookingResourceRepository(jdbcClient),
@@ -168,9 +173,9 @@ class BookingMembershipPlanIntegrationTests {
 		insertOrganizationAndBranch();
 		UUID productId = UUID.randomUUID();
 		OffsetDateTime now = OffsetDateTime.now();
-		catalogCommandRepository.createProduct(new ProductRecord(
-				productId,
+		catalogProducts.create(new ProductMutation(
 				organizationId,
+				productId,
 				"PLAN-BOOKING",
 				"Plan Reservas",
 				"Plan usado para validar reservas",
@@ -179,12 +184,19 @@ class BookingMembershipPlanIntegrationTests {
 				"MXN",
 				true,
 				"ACTIVE",
+				null,
+				null,
+				null,
+				null,
+				false,
+				0,
+				null,
 				now,
 				userId
 		));
-		catalogCommandRepository.createPlan(new PlanRecord(
-				allowedPlanId,
+		catalogPlans.create(new PlanMutation(
 				organizationId,
+				allowedPlanId,
 				productId,
 				30,
 				3,

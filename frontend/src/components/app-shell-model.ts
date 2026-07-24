@@ -20,6 +20,15 @@ export type NavigationSection = {
   links: NavigationLink[];
 };
 
+const memberWorkflowPermissions = [
+  "client.read",
+  "client.create",
+  "client.update",
+  "membership.read",
+  "membership.create",
+  "membership.update",
+];
+
 const platformSections: NavigationSection[] = [
   {
     title: "Negocio GymOS",
@@ -42,7 +51,7 @@ const ownerSections: NavigationSection[] = [
     title: "Administracion del gimnasio",
     links: [
       { label: "Operacion", href: "/operations", hint: "Pendientes y herramientas", permissions: ["operations.read", "inventory.read", "booking.read"] },
-      { label: "Socios", href: "/clients", hint: "Altas, fichas y membresias", permissions: ["client.read"] },
+      { label: "Socios", href: "/clients", hint: "Altas, fichas y membresias", permissions: memberWorkflowPermissions },
       { label: "Equipo y accesos", href: "/users", hint: "Duenos, gerentes y staff", permissions: ["user.read"] },
       { label: "Datos y sucursales", href: "/settings/organization", hint: "Marca, sedes y contacto", permissions: ["organization.update", "branch.update"] },
       { label: "Catalogo", href: "/catalog", hint: "Planes y productos", permissions: ["catalog.read"] },
@@ -74,7 +83,7 @@ const managerSections: NavigationSection[] = [
   {
     title: "Administracion diaria",
     links: [
-      { label: "Socios", href: "/clients", hint: "Altas y fichas", permissions: ["client.read"] },
+      { label: "Socios", href: "/clients", hint: "Altas y fichas", permissions: memberWorkflowPermissions },
       { label: "Equipo", href: "/users", hint: "Usuarios autorizados", permissions: ["user.read"] },
       { label: "Catalogo", href: "/catalog", hint: "Planes y productos", permissions: ["catalog.read"] },
       { label: "Inventario", href: "/inventory", hint: "Stock", permissions: ["inventory.read"] },
@@ -96,7 +105,7 @@ const receptionSections: NavigationSection[] = [
     links: [
       { label: "Inicio recepcion", href: "/reception", hint: "Acciones del dia", permissions: ["client.read", "sale.create"] },
       { label: "Caja / POS", href: "/pos", hint: "Ventas y pagos", permissions: ["sale.create"] },
-      { label: "Socios", href: "/clients", hint: "Altas y fichas", permissions: ["client.read"] },
+      { label: "Socios", href: "/clients", hint: "Altas y fichas", permissions: memberWorkflowPermissions },
       { label: "Reservas", href: "/bookings", hint: "Agenda", permissions: ["booking.read"] },
       { label: "Ventas", href: "/reports/sales", hint: "Pagos pendientes", permissions: ["report.sales.read"] },
       { label: "Beneficios", href: "/benefits", hint: "Aplicacion", permissions: ["benefit.read"] },
@@ -109,7 +118,7 @@ const coachSections: NavigationSection[] = [
     title: "Entrenamiento",
     links: [
       { label: "Rutinas", href: "/coaches", hint: "Planes y asignaciones", permissions: ["coach.read", "workout.read"] },
-      { label: "Socios", href: "/clients", hint: "Consulta autorizada", permissions: ["client.read"] },
+      { label: "Socios", href: "/clients", hint: "Consulta autorizada", permissions: memberWorkflowPermissions },
     ],
   },
 ];

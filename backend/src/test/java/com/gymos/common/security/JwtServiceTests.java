@@ -12,12 +12,7 @@ class JwtServiceTests {
 
 	@Test
 	void accessTokenPreservesAuthenticatedTenantAndAuthorities() {
-		JwtService jwtService = new JwtService(new SecurityProperties(
-				List.of("http://localhost:3000"),
-				TEST_SECRET,
-				900,
-				7
-		));
+		JwtService jwtService = service();
 		GymOsPrincipal principal = new GymOsPrincipal(
 				UUID.randomUUID(),
 				UUID.randomUUID(),
@@ -25,7 +20,7 @@ class JwtServiceTests {
 				"owner@gymos.local",
 				"Owner GymOS",
 				Set.of("organization.read", "branch.read"),
-				Set.of("OWNER"),
+				Set.of("Dueño"),
 				false
 		);
 
@@ -35,13 +30,45 @@ class JwtServiceTests {
 	}
 
 	@Test
+	void receptionReceivesAFullDayAccessToken() {
+		JwtService jwtService = service();
+		GymOsPrincipal principal = new GymOsPrincipal(
+				UUID.randomUUID(),
+				UUID.randomUUID(),
+				UUID.randomUUID(),
+				"reception@gymos.local",
+				"Reception GymOS",
+				Set.of("client.read", "sale.create"),
+				Set.of("Recepción"),
+				false
+		);
+
+		var tokens = jwtService.issueTokens(principal, "refresh");
+
+		assertThat(tokens.expiresIn()).isEqualTo(86_400);
+		assertThat(jwtService.parseAccessToken(tokens.accessToken())).contains(principal);
+	}
+
+	@Test
+	void privilegedProfilesKeepTheShortAccessToken() {
+		JwtService jwtService = service();
+		GymOsPrincipal principal = new GymOsPrincipal(
+				UUID.randomUUID(),
+				UUID.randomUUID(),
+				UUID.randomUUID(),
+				"manager@gymos.local",
+				"Manager GymOS",
+				Set.of("client.read", "sale.create"),
+				Set.of("Gerente"),
+				false
+		);
+
+		assertThat(jwtService.issueTokens(principal, "refresh").expiresIn()).isEqualTo(900);
+	}
+
+	@Test
 	void alteredAccessTokenIsRejected() {
-		JwtService jwtService = new JwtService(new SecurityProperties(
-				List.of("http://localhost:3000"),
-				TEST_SECRET,
-				900,
-				7
-		));
+		JwtService jwtService = service();
 		GymOsPrincipal principal = new GymOsPrincipal(
 				UUID.randomUUID(),
 				UUID.randomUUID(),
@@ -59,16 +86,12 @@ class JwtServiceTests {
 
 	@Test
 	void tokenSignedWithAnotherSecretIsRejected() {
-		JwtService issuer = new JwtService(new SecurityProperties(
-				List.of("http://localhost:3000"),
-				TEST_SECRET,
-				900,
-				7
-		));
+		JwtService issuer = service();
 		JwtService verifier = new JwtService(new SecurityProperties(
 				List.of("http://localhost:3000"),
 				"different-test-secret-with-enough-entropy",
 				900,
+				86_400,
 				7
 		));
 		GymOsPrincipal principal = new GymOsPrincipal(
@@ -81,5 +104,15 @@ class JwtServiceTests {
 		);
 
 		assertThat(verifier.parseAccessToken(issuer.accessToken(principal))).isEmpty();
+	}
+
+	private JwtService service() {
+		return new JwtService(new SecurityProperties(
+				List.of("http://localhost:3000"),
+				TEST_SECRET,
+				900,
+				86_400,
+				7
+		));
 	}
 }

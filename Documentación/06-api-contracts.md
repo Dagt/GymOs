@@ -226,10 +226,20 @@ Autenticacion y sucursal activa:
 ## 6.4 Productos
 
 - `GET /catalog/products`
+- `GET /catalog/products/search`
 - `POST /catalog/products`
-- `GET /products/{id}` (pendiente)
-- `PATCH /products/{id}` (pendiente)
-- `PATCH /products/{id}/status` (pendiente)
+- `GET /catalog/products/{id}`
+- `PUT|PATCH /catalog/products/{id}`
+- `PATCH /catalog/products/{id}/status`
+- `POST /catalog/products/{id}/activate`
+- `POST /catalog/products/{id}/deactivate`
+- `DELETE /catalog/products/{id}`
+- `POST /catalog/products/{id}/image`
+- `DELETE /catalog/products/{id}/image`
+- `GET|POST /catalog/categories`
+- `PATCH|DELETE /catalog/categories/{id}`
+
+`GET /catalog/products/search` devuelve `items`, `page`, `size`, `totalElements` y `totalPages`. Acepta búsqueda por nombre, SKU, código de barras y etiqueta, además de filtros por tipo, categoría, estado y seguimiento de inventario.
 
 ## 6.5 Planes
 
