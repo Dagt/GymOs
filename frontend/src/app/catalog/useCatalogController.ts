@@ -64,13 +64,13 @@ export function useCatalogController() {
     if (!accessToken) return;
     let active = true;
 
-    async function refreshCatalog() {
+    async function refreshCatalog(token: string) {
       await Promise.resolve();
       if (!active) return;
       setLoading(true);
       try {
         const [page, loadedPlans, loadedCategories, loadedSummary] = await loadCatalog(
-          accessToken,
+          token,
           catalogFilters.filters,
         );
         if (!active) return;
@@ -89,7 +89,7 @@ export function useCatalogController() {
       }
     }
 
-    void refreshCatalog();
+    void refreshCatalog(accessToken);
     return () => {
       active = false;
     };
