@@ -3,6 +3,8 @@ package com.gymos.sales.application;
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.sales.api.events.RefundProcessedV1;
+import com.gymos.sales.api.events.SaleItemsRefundedLineV1;
+import com.gymos.sales.api.events.SaleItemsRefundedV1;
 import com.gymos.sales.application.command.RequestRefundCommand;
 import com.gymos.sales.infrastructure.SalesRefundCommandRepository;
 import com.gymos.sales.model.SaleHeader;
@@ -26,15 +28,28 @@ class SalesRefundProcessor {
 	}
 
 	UUID process(GymOsPrincipal principal, UUID saleId, SaleHeader sale, RequestRefundCommand request,
-			long alreadyRefunded, String idempotencyKey, String correlationId) {
+			RefundValidationResult validation, String idempotencyKey, String correlationId) {
 		UUID refundId = commandRepository.createProcessed(
 				principal.organizationId(), principal.branchId(), saleId, request.paymentId(), request.amountCents(),
 				sale.currency(), request.reason(), idempotencyKey, principal.userId()
 		);
-		if (alreadyRefunded + request.amountCents() == sale.paidCents()) {
+		OffsetDateTime occurredAt = OffsetDateTime.now();
+		UUID safeCorrelationId = safeCorrelationId(correlationId);
+		if (request.itemized()) {
+			commandRepository.createItems(
+					principal.organizationId(), principal.branchId(), saleId, refundId, request.items(), principal.userId()
+			);
+			eventPublisher.publishEvent(new SaleItemsRefundedV1(
+					principal.organizationId(), principal.branchId(), saleId, refundId, principal.userId(),
+					validation.items().stream().map(item -> new SaleItemsRefundedLineV1(
+							item.saleItemId(), item.productId(), item.itemType(), item.quantity(), item.restock()
+					)).toList(),
+					occurredAt, safeCorrelationId
+			));
+		} else if (validation.alreadyRefunded() + request.amountCents() == sale.paidCents()) {
 			eventPublisher.publishEvent(new RefundProcessedV1(
 					principal.organizationId(), principal.branchId(), saleId, refundId, principal.userId(),
-					OffsetDateTime.now(), safeCorrelationId(correlationId)
+					occurredAt, safeCorrelationId
 			));
 		}
 		auditService.record(principal, "SALE_REFUND_PROCESSED", "SALE_REFUND", refundId, "POS", request.reason(), correlationId);
