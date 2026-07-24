@@ -49,6 +49,7 @@ gymos:
     cors-allowed-origins: ${GYMOS_CORS_ALLOWED_ORIGINS:http://localhost:3000}
     jwt-secret: ${GYMOS_JWT_SECRET:dev-only-change-this-secret-before-production-please}
     access-token-seconds: ${GYMOS_ACCESS_TOKEN_SECONDS:900}
+    reception-access-token-seconds: ${GYMOS_RECEPTION_ACCESS_TOKEN_SECONDS:57600}
     refresh-token-days: ${GYMOS_REFRESH_TOKEN_DAYS:7}
   storage:
     endpoint: ${GYMOS_MINIO_ENDPOINT:http://localhost:9000}
