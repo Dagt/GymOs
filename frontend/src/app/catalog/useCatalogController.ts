@@ -60,8 +60,8 @@ export function useCatalogController() {
   }, []);
 
   useEffect(() => {
-    const activeSession = session;
-    if (!activeSession) return;
+    const accessToken = session?.accessToken;
+    if (!accessToken) return;
     let active = true;
 
     async function refreshCatalog() {
@@ -70,7 +70,7 @@ export function useCatalogController() {
       setLoading(true);
       try {
         const [page, loadedPlans, loadedCategories, loadedSummary] = await loadCatalog(
-          activeSession.accessToken,
+          accessToken,
           catalogFilters.filters,
         );
         if (!active) return;
