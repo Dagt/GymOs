@@ -38,8 +38,8 @@ class CatalogProductImageService {
 	}
 
 	ProductSummaryView upload(GymOsPrincipal principal, UUID productId, UploadProductImageCommand command, String correlationId) {
-		CatalogAccessGuard.requirePrincipal(principal);
-		ProductSummaryView product = require(principal.organizationId(), productId);
+		CatalogAccessGuard.requireBranch(principal);
+		ProductSummaryView product = require(principal.organizationId(), principal.branchId(), productId);
 		validate(command);
 		String newKey = objectKey(principal.organizationId(), productId, command.filename());
 		storage.store(newKey, command.contentType(), command.size(), command.content());
@@ -50,12 +50,12 @@ class CatalogProductImageService {
 		}
 		cleanups.enqueue(product.imageObjectKey(), now);
 		auditService.record(principal, "PRODUCT_IMAGE_UPDATED", "CATALOG_PRODUCT", productId, "BACKOFFICE", null, correlationId);
-		return require(principal.organizationId(), productId).visibleTo(principal.permissions());
+		return require(principal.organizationId(), principal.branchId(), productId).visibleTo(principal.permissions());
 	}
 
 	ProductSummaryView remove(GymOsPrincipal principal, UUID productId, String correlationId) {
-		CatalogAccessGuard.requirePrincipal(principal);
-		ProductSummaryView product = require(principal.organizationId(), productId);
+		CatalogAccessGuard.requireBranch(principal);
+		ProductSummaryView product = require(principal.organizationId(), principal.branchId(), productId);
 		if (product.imageObjectKey() == null) return product.visibleTo(principal.permissions());
 		OffsetDateTime now = OffsetDateTime.now();
 		if (commands.updateImageKey(principal.organizationId(), productId, null, principal.userId(), now) != 1) {
@@ -63,7 +63,7 @@ class CatalogProductImageService {
 		}
 		cleanups.enqueue(product.imageObjectKey(), now);
 		auditService.record(principal, "PRODUCT_IMAGE_REMOVED", "CATALOG_PRODUCT", productId, "BACKOFFICE", null, correlationId);
-		return require(principal.organizationId(), productId).visibleTo(principal.permissions());
+		return require(principal.organizationId(), principal.branchId(), productId).visibleTo(principal.permissions());
 	}
 
 	private void registerUploadRollback(String newKey) {
@@ -100,11 +100,11 @@ class CatalogProductImageService {
 		return "catalog/" + organizationId + "/" + productId + "/" + UUID.randomUUID() + "-" + safeName;
 	}
 
-	private ProductSummaryView require(UUID organizationId, UUID productId) {
-		return products.findProduct(organizationId, productId).orElseThrow(this::notFound);
+	private ProductSummaryView require(UUID organizationId, UUID branchId, UUID productId) {
+		return products.findProduct(organizationId, branchId, productId).orElseThrow(this::notFound);
 	}
 
 	private BusinessException notFound() {
-		return new BusinessException("PRODUCT_NOT_FOUND", "El producto no existe o fue archivado.");
+		return new BusinessException("PRODUCT_NOT_FOUND", "El producto no existe en la sucursal activa o fue archivado.");
 	}
 }
