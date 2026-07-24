@@ -38,5 +38,5 @@ public interface InventoryQueryPort {
 		return InventoryMovementPageView.of(values.subList(from, to), criteria.page(), criteria.size(), values.size());
 	}
 
-	Optional<InventoryProductView> product(UUID organizationId, UUID productId);
+	Optional<InventoryProductView> product(UUID organizationId, UUID branchId, UUID productId);
 }
