@@ -7,6 +7,7 @@ import java.util.UUID;
 public interface CatalogProductCommandPort {
 	void create(ProductMutation mutation);
 	int update(ProductMutation mutation);
+	void attachBranch(UUID organizationId, UUID branchId, UUID productId, UUID userId, OffsetDateTime now);
 	int changeStatus(UUID organizationId, UUID productId, String status, UUID userId, OffsetDateTime now);
 	int archive(UUID organizationId, UUID productId, UUID userId, OffsetDateTime now);
 	int restore(UUID organizationId, UUID productId, String status, UUID userId, OffsetDateTime now);
