@@ -54,12 +54,14 @@ export function useClientsController() {
       setError(null);
       try {
         const results = await searchClients(storedSession.accessToken, "");
-        const canLoadPlans = hasPermission(storedSession, "sale.create")
-          && hasPermission(storedSession, "catalog.read");
+        const refreshedSession = getStoredSession() ?? storedSession;
+        const canLoadPlans = hasPermission(refreshedSession, "sale.create")
+          && hasPermission(refreshedSession, "catalog.read");
         const activePlans = canLoadPlans
-          ? await getPlans(storedSession.accessToken).then((loaded) => loaded.filter((plan) => plan.status === "ACTIVE"))
+          ? await getPlans(refreshedSession.accessToken).then((loaded) => loaded.filter((plan) => plan.status === "ACTIVE"))
           : [];
         if (!active) return;
+        setSession(getStoredSession() ?? refreshedSession);
         setClients(results);
         setPlans(activePlans);
       } catch (exception) {
@@ -135,7 +137,7 @@ export function useClientsController() {
     }
 
     if (!canRegisterClients(activeSession)) {
-      setError("La sesión actual no permite registrar socios. Actualiza la sesión e inténtalo nuevamente.");
+      setError("La sesión actual no permite registrar socios. Cierra sesión e ingresa nuevamente para actualizar los permisos.");
       setSaving(false);
       return;
     }
@@ -249,12 +251,7 @@ function hasPermission(session: StoredSession | null, permission: string) {
 }
 
 function canRegisterClients(session: StoredSession | null) {
-  if (!session) return false;
-  const permissions = new Set(session.user.permissions);
-  if (["client.create", "client.manage", "sale.create", "platform.admin"].some((permission) => permissions.has(permission))) {
-    return true;
-  }
-  return ["PLATFORM_OWNER", "TENANT_OWNER", "TENANT_MANAGER", "RECEPTION"].includes(session.user.console);
+  return hasPermission(session, "client.create");
 }
 
 function prependStep(step: string, exception: unknown) {
