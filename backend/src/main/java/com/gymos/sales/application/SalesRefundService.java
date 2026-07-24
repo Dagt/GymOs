@@ -23,6 +23,7 @@ class SalesRefundService {
 
 	UUID process(GymOsPrincipal principal, UUID saleId, RequestRefundCommand request, String correlationId) {
 		SaleHeader sale = lookupService.saleForBranch(principal, saleId);
+		validationService.lockSale(principal, saleId);
 		var idempotentRefund = idempotencyService.resolve(principal.organizationId(), saleId, request);
 		if (idempotentRefund.existingSaleId().isPresent()) {
 			return idempotentRefund.existingSaleId().get();
