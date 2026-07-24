@@ -3,7 +3,6 @@ package com.gymos.catalog.application;
 import com.gymos.audit.api.AuditService;
 import com.gymos.catalog.application.command.CreateMembershipPlanCommand;
 import com.gymos.catalog.application.command.CreatePlanCommand;
-import com.gymos.catalog.application.command.ProductCommand;
 import com.gymos.catalog.application.command.UpdateMembershipPlanCommand;
 import com.gymos.catalog.application.port.CatalogPlanCommandPort;
 import com.gymos.catalog.application.port.CatalogPlanCommandPort.PlanMutation;
@@ -26,18 +25,16 @@ class CatalogMembershipPlanService {
 	private final CatalogPlanQueryPort plans;
 	private final CatalogProductCommandPort productCommands;
 	private final CatalogPlanCommandPort planCommands;
-	private final CatalogProductService productService;
 	private final CatalogBenefitsSerializer benefitsSerializer;
 	private final AuditService auditService;
 
 	CatalogMembershipPlanService(CatalogProductQueryPort products, CatalogPlanQueryPort plans,
 			CatalogProductCommandPort productCommands, CatalogPlanCommandPort planCommands,
-			CatalogProductService productService, CatalogBenefitsSerializer benefitsSerializer, AuditService auditService) {
+			CatalogBenefitsSerializer benefitsSerializer, AuditService auditService) {
 		this.products = products;
 		this.plans = plans;
 		this.productCommands = productCommands;
 		this.planCommands = planCommands;
-		this.productService = productService;
 		this.benefitsSerializer = benefitsSerializer;
 		this.auditService = auditService;
 	}
@@ -72,18 +69,21 @@ class CatalogMembershipPlanService {
 		if (products.skuExists(principal.organizationId(), sku, null)) {
 			throw new BusinessException("PRODUCT_SKU_ALREADY_EXISTS", "Ya existe un producto o plan con ese codigo.");
 		}
-		ProductSummaryView product = productService.createProduct(
-				principal,
-				new ProductCommand(
-						sku, request.name(), request.description(), "MEMBERSHIP_PLAN", "MEMBERSHIP",
-						request.priceCents(), request.currency(), true, request.status(), null, null, null, null,
-						false, 0, null, null, null, null, null, null, List.of()
-				),
-				correlationId
-		);
+
+		UUID productId = UUID.randomUUID();
+		OffsetDateTime now = OffsetDateTime.now();
+		productCommands.create(new ProductMutation(
+				principal.organizationId(), productId, sku, request.name().trim(),
+				CatalogBenefitsSerializer.blankToNull(request.description()), "MEMBERSHIP_PLAN", "MEMBERSHIP",
+				request.priceCents(), request.currency().trim().toUpperCase(), true,
+				request.status().trim().toUpperCase(), null, null, null, null,
+				false, 0, null, null, null, null, null, null, now, principal.userId()
+		));
+		auditService.record(principal, "PRODUCT_CREATED", "PRODUCT", productId, "BACKOFFICE", null, correlationId);
+
 		return createPlan(
 				principal,
-				new CreatePlanCommand(product.id(), request.durationDays(), request.graceDays(),
+				new CreatePlanCommand(productId, request.durationDays(), request.graceDays(),
 						benefitsSerializer.textToJson(request.benefits()), request.multiBranchAccess(), request.status()),
 				correlationId
 		);
