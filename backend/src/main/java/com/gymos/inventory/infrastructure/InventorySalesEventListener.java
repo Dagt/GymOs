@@ -78,17 +78,20 @@ public class InventorySalesEventListener {
 	@EventListener
 	@Transactional
 	public void onSaleItemsRefunded(SaleItemsRefundedV1 event) {
-		Map<UUID, Integer> quantities = event.items().stream()
+		Map<UUID, Integer> requestedQuantities = event.items().stream()
 				.filter(SaleItemsRefundedLineV1::restock)
 				.filter(item -> "PHYSICAL".equals(item.itemType()) && item.productId() != null)
 				.collect(Collectors.groupingBy(
 						SaleItemsRefundedLineV1::productId,
 						Collectors.summingInt(SaleItemsRefundedLineV1::quantity)
 				));
-		if (quantities.isEmpty()) return;
-		List<RefundedInventoryItem> items = quantities.entrySet().stream()
+		List<RefundedInventoryItem> items = requestedQuantities.entrySet().stream()
+				.filter(entry -> catalog.product(event.organizationId(), entry.getKey())
+						.filter(CatalogProductOperations.CatalogProductSnapshot::physicalInventoryTracked)
+						.isPresent())
 				.map(entry -> new RefundedInventoryItem(entry.getKey(), entry.getValue()))
 				.toList();
+		if (items.isEmpty()) return;
 		inventoryRefundOperations.restoreItems(
 				event.organizationId(), event.branchId(), event.saleId(), event.refundId(),
 				event.actorUserId(), items, event.occurredAt(), event.correlationId()
