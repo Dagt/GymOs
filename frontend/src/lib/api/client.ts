@@ -3,6 +3,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8
 let refreshPromise: Promise<RefreshResult> | null = null;
 
 const REFRESH_MARGIN_MILLISECONDS = 30_000;
+const CROSS_TAB_REFRESH_WAIT_MILLISECONDS = 2_000;
 
 type RefreshResult =
   | { status: "refreshed"; accessToken: string }
@@ -16,9 +17,6 @@ export async function apiFetch<T>(
 ): Promise<T> {
   let tokenUsed = currentAccessToken() ?? accessToken;
 
-  // Refresh before a protected request when the JWT is already expired or close
-  // to expiring. This is especially important for POST/PUT operations filled out
-  // in long forms, such as registering a new member.
   if (tokenNeedsRefresh(tokenUsed)) {
     const proactiveRefresh = await refreshAccessToken(tokenUsed);
     if (proactiveRefresh.status === "refreshed") {
@@ -31,8 +29,6 @@ export async function apiFetch<T>(
     return readResponse<T>(response, path);
   }
 
-  // Another request or browser tab may already have refreshed the session.
-  // Retry with the newest stored token before consuming the rotating refresh token.
   const newerToken = currentAccessToken();
   if (newerToken && newerToken !== tokenUsed) {
     tokenUsed = newerToken;
@@ -44,8 +40,6 @@ export async function apiFetch<T>(
 
   const refresh = await refreshAccessToken(tokenUsed);
   if (refresh.status !== "refreshed") {
-    // A failed endpoint must not erase the complete browser session. The caller
-    // receives the original API error and other modules remain usable.
     return readResponse<T>(response, path);
   }
 
@@ -95,8 +89,8 @@ async function authenticatedRequest(path: string, accessToken: string, init: Req
     ...init,
     headers: {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
-      Authorization: `Bearer ${accessToken}`,
       ...init.headers,
+      Authorization: `Bearer ${accessToken}`,
     },
   });
 }
@@ -162,12 +156,9 @@ async function performRefresh(expectedAccessToken: string): Promise<RefreshResul
   }
 
   if (!response.ok) {
-    // A different tab can win the refresh-token rotation while this request is
-    // in flight. Prefer its newly stored access token over treating the session
-    // as invalid.
-    const tokenAfterFailure = currentAccessToken();
-    if (tokenAfterFailure && tokenAfterFailure !== expectedAccessToken) {
-      return { status: "refreshed", accessToken: tokenAfterFailure };
+    const synchronizedToken = await waitForNewAccessToken(expectedAccessToken);
+    if (synchronizedToken) {
+      return { status: "refreshed", accessToken: synchronizedToken };
     }
     if ([400, 401, 403].includes(response.status)) return { status: "rejected" };
     return { status: "unavailable" };
@@ -189,6 +180,43 @@ async function performRefresh(expectedAccessToken: string): Promise<RefreshResul
   }
   window.dispatchEvent(new Event("gymos.session-refreshed"));
   return { status: "refreshed", accessToken: session.accessToken };
+}
+
+function waitForNewAccessToken(expectedAccessToken: string): Promise<string | null> {
+  const immediate = currentAccessToken();
+  if (immediate && immediate !== expectedAccessToken) return Promise.resolve(immediate);
+
+  return new Promise((resolve) => {
+    const startedAt = Date.now();
+    let settled = false;
+    let intervalId: number | null = null;
+
+    const finish = (token: string | null) => {
+      if (settled) return;
+      settled = true;
+      window.removeEventListener("storage", onStorage);
+      if (intervalId !== null) window.clearInterval(intervalId);
+      window.clearTimeout(timeoutId);
+      resolve(token);
+    };
+
+    const inspect = () => {
+      const token = currentAccessToken();
+      if (token && token !== expectedAccessToken) {
+        finish(token);
+      } else if (Date.now() - startedAt >= CROSS_TAB_REFRESH_WAIT_MILLISECONDS) {
+        finish(null);
+      }
+    };
+
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === "gymos.accessToken") inspect();
+    };
+
+    const timeoutId = window.setTimeout(() => finish(null), CROSS_TAB_REFRESH_WAIT_MILLISECONDS);
+    intervalId = window.setInterval(inspect, 100);
+    window.addEventListener("storage", onStorage);
+  });
 }
 
 function currentAccessToken() {
@@ -235,7 +263,7 @@ function formatApiError(response: Response, path: string, error: unknown) {
 
 function fallbackMessage(status: number) {
   if (status === 400) return "La solicitud tiene datos inválidos.";
-  if (status === 401) return "El servidor no pudo autenticar esta operación después de intentar renovar la sesión.";
+  if (status === 401) return "La sesión no pudo renovarse o el token no es válido.";
   if (status === 403) return "Tu usuario no tiene permiso para realizar esta acción.";
   if (status === 404) return "No se encontró la información solicitada.";
   if (status >= 500) return "El servidor tuvo un problema al procesar la operación.";
