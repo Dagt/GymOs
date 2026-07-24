@@ -3,7 +3,6 @@ package com.gymos.security.application;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -41,13 +40,13 @@ class AuthServiceTests {
 				"Admin GymOS",
 				Set.of("branch.read")
 		);
-		when(authQueryRepository.userHasBranchAccess(userId, foreignBranchId)).thenReturn(false);
+		when(authQueryRepository.branchBelongsToOrganization(foreignBranchId, organizationId)).thenReturn(false);
 
 		assertThatThrownBy(() -> authService.selectBranch(principal, foreignBranchId, "test-correlation"))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						org.assertj.core.api.Assertions.assertThat(exception.code()).isEqualTo("BRANCH_ACCESS_DENIED"));
 
-		verify(authQueryRepository).userHasBranchAccess(userId, foreignBranchId);
+		verify(authQueryRepository).branchBelongsToOrganization(foreignBranchId, organizationId);
 		verifyNoInteractions(auditService);
 	}
 
@@ -130,6 +129,7 @@ class AuthServiceTests {
 				true
 		);
 		when(authQueryRepository.branchBelongsToOrganization(branchId, organizationId)).thenReturn(true);
+		when(authQueryRepository.userHasBranchAccess(userId, branchId)).thenReturn(false);
 		when(authQueryRepository.findActiveUserById(userId)).thenReturn(java.util.Optional.of(new AuthQueryRepository.AuthenticatedUser(
 				userId,
 				organizationId,
@@ -147,7 +147,6 @@ class AuthServiceTests {
 
 		assertThat(result.user().supportMode()).isTrue();
 		assertThat(result.user().branchId()).isEqualTo(branchId);
-		verify(authQueryRepository, never()).userHasBranchAccess(userId, branchId);
 		verify(auditService).recordSystem(
 				organizationId,
 				branchId,
