@@ -153,9 +153,11 @@ export {
   createInventoryMovement,
   getInventoryMovements,
   getInventoryStock,
+  getInventoryStockDetail,
   getLowInventoryStock,
   searchInventoryMovements,
   searchInventoryStock,
+  updateInventorySettings,
 } from "./api/inventory";
 export type {
   InventoryMovement,
@@ -163,6 +165,7 @@ export type {
   InventoryMovementPayload,
   InventoryMovementSearchParams,
   InventoryMovementType,
+  InventorySettingsPayload,
   InventoryStock,
   InventoryStockPage,
   InventoryStockSearchParams,
