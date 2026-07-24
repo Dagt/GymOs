@@ -26,8 +26,11 @@ class SalesRefundValidationService {
 		this.lookupService = lookupService;
 	}
 
-	RefundValidationResult validate(GymOsPrincipal principal, UUID saleId, SaleHeader sale, RequestRefundCommand request) {
+	void lockSale(GymOsPrincipal principal, UUID saleId) {
 		salesRepository.lockSaleForRefund(principal.organizationId(), saleId);
+	}
+
+	RefundValidationResult validate(GymOsPrincipal principal, UUID saleId, SaleHeader sale, RequestRefundCommand request) {
 		if (request.amountCents() <= 0) {
 			throw new BusinessException("REFUND_AMOUNT_INVALID", "El reembolso debe ser mayor a cero.");
 		}
