@@ -92,6 +92,7 @@ export type {
   SaleHeader,
   SaleItemDetail,
   SaleItemPayload,
+  SaleRefundItemPayload,
   SaleRefundPayload,
   SalesReportResponse,
   SalesReportTotals,
