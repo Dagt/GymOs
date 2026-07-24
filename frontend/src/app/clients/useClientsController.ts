@@ -34,9 +34,11 @@ export function useClientsController() {
   const [saving, setSaving] = useState(false);
   const [showCreateClient, setShowCreateClient] = useState(false);
 
-  const permissions = useMemo(() => new Set(session?.user.permissions ?? []), [session]);
-  const canCreateClient = permissions.has("client.create");
-  const canCreateMembershipSale = permissions.has("sale.create") && permissions.has("catalog.read");
+  const canCreateClient = useMemo(() => canRegisterClients(session), [session]);
+  const canCreateMembershipSale = useMemo(
+    () => hasPermission(session, "sale.create") && hasPermission(session, "catalog.read"),
+    [session],
+  );
 
   useEffect(() => {
     let active = true;
@@ -52,8 +54,8 @@ export function useClientsController() {
       setError(null);
       try {
         const results = await searchClients(storedSession.accessToken, "");
-        const canLoadPlans = storedSession.user.permissions.includes("sale.create")
-          && storedSession.user.permissions.includes("catalog.read");
+        const canLoadPlans = hasPermission(storedSession, "sale.create")
+          && hasPermission(storedSession, "catalog.read");
         const activePlans = canLoadPlans
           ? await getPlans(storedSession.accessToken).then((loaded) => loaded.filter((plan) => plan.status === "ACTIVE"))
           : [];
@@ -107,7 +109,7 @@ export function useClientsController() {
       setError("No se encontró una sesión activa. Inicia sesión nuevamente antes de registrar al socio.");
       return;
     }
-    if (!storedSession.user.permissions.includes("client.create")) {
+    if (!canRegisterClients(storedSession)) {
       setError("Tu perfil puede consultar socios, pero no tiene permiso para registrar uno nuevo.");
       return;
     }
@@ -123,13 +125,17 @@ export function useClientsController() {
 
     let activeSession = storedSession;
     try {
-      // Validate the access token immediately before the write. apiFetch refreshes
-      // an expired token and getStoredSession then exposes the rotated credentials.
       await getCurrentUser(storedSession.accessToken);
       activeSession = getStoredSession() ?? storedSession;
       setSession(activeSession);
     } catch (exception) {
       setError(prependStep("No fue posible validar la sesión antes del alta", exception));
+      setSaving(false);
+      return;
+    }
+
+    if (!canRegisterClients(activeSession)) {
+      setError("La sesión actual no permite registrar socios. Actualiza la sesión e inténtalo nuevamente.");
       setSaving(false);
       return;
     }
@@ -148,7 +154,7 @@ export function useClientsController() {
     let operationError: string | null = null;
     const selectedPlan = plans.find((plan) => plan.id === form.planId);
     if (selectedPlan) {
-      if (!activeSession.user.permissions.includes("sale.create")) {
+      if (!hasPermission(activeSession, "sale.create")) {
         setMessage("Socio registrado. La membresía inicial no se creó porque tu perfil no puede registrar ventas.");
       } else {
         try {
@@ -232,6 +238,23 @@ function createInitialMembershipSale(
     },
     idempotencyKey: `client-initial-membership:${clientId}:${plan.id}`,
   });
+}
+
+function hasPermission(session: StoredSession | null, permission: string) {
+  return Boolean(
+    session?.user.permissions.includes(permission)
+      || session?.user.permissions.includes("platform.admin")
+      || session?.user.platformAdmin,
+  );
+}
+
+function canRegisterClients(session: StoredSession | null) {
+  if (!session) return false;
+  const permissions = new Set(session.user.permissions);
+  if (["client.create", "client.manage", "sale.create", "platform.admin"].some((permission) => permissions.has(permission))) {
+    return true;
+  }
+  return ["PLATFORM_OWNER", "TENANT_OWNER", "TENANT_MANAGER", "RECEPTION"].includes(session.user.console);
 }
 
 function prependStep(step: string, exception: unknown) {
