@@ -24,6 +24,7 @@ jobs:
         id: backend-test
         shell: bash
         run: |
+          chmod +x gradlew
           if ! ./gradlew test --no-daemon --console=plain > /tmp/backend.log 2>&1; then
             tail -n 160 /tmp/backend.log
             exit 1
