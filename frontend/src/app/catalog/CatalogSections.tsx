@@ -100,7 +100,7 @@ export function PlanDrawer({ editingPlanId, form, open, saving, onClose, onFormC
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField label="Código" name="planSku" placeholder="REGULAR-30" value={form.sku} onChange={(value) => onFormChange({ ...form, sku: value })} />
           <TextField label="Nombre" name="planName" placeholder="Plan regular" value={form.name} onChange={(value) => onFormChange({ ...form, name: value })} />
-          <NumberField label="Precio" name="planPrice" value={form.price} onChange={(value) => onFormChange({ ...form, price: value })} />
+          <NumberField label="Precio" name="planPrice" step="0.01" value={form.price} onChange={(value) => onFormChange({ ...form, price: value })} />
           <NumberField label="Duración en días" name="planDurationDays" value={form.durationDays} onChange={(value) => onFormChange({ ...form, durationDays: value })} />
           <NumberField label="Días de gracia" name="planGraceDays" value={form.graceDays} onChange={(value) => onFormChange({ ...form, graceDays: value })} />
           <SelectField label="Estado" name="planStatus" options={[{ label: "Activo", value: "ACTIVE" }, { label: "Inactivo", value: "INACTIVE" }]} value={form.status} onChange={(value) => onFormChange({ ...form, status: value as MembershipPlanPayload["status"] })} />
