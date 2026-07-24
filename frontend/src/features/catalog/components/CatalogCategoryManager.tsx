@@ -1,6 +1,6 @@
 "use client";
 
-import { type FormEvent, useMemo, useState } from "react";
+import { type FormEvent, type ReactNode, useMemo, useState } from "react";
 import {
   archiveCatalogCategory,
   createCatalogCategory,
@@ -30,21 +30,55 @@ export function CatalogCategoryManager({
   const [draft, setDraft] = useState<CatalogCategoryPayload>(emptyDraft);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const categoriesById = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
+
+  const sortedCategories = useMemo(
+    () => [...categories].sort(compareCategories),
+    [categories],
+  );
+  const categoriesById = useMemo(
+    () => new Map(sortedCategories.map((category) => [category.id, category])),
+    [sortedCategories],
+  );
+  const rootCategories = useMemo(
+    () => sortedCategories.filter((category) => !category.parentId),
+    [sortedCategories],
+  );
+  const childrenByParent = useMemo(() => {
+    const grouped = new Map<string, CatalogCategory[]>();
+    for (const category of sortedCategories) {
+      if (!category.parentId) continue;
+      const children = grouped.get(category.parentId) ?? [];
+      children.push(category);
+      grouped.set(category.parentId, children);
+    }
+    return grouped;
+  }, [sortedCategories]);
+  const orphanedCategories = useMemo(
+    () => sortedCategories.filter((category) => category.parentId && !categoriesById.has(category.parentId)),
+    [categoriesById, sortedCategories],
+  );
+  const editingHasChildren = Boolean(editingId && childrenByParent.get(editingId)?.length);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     if (!draft.name.trim()) return;
     await run(async () => {
-      const payload = {
+      const payload: CatalogCategoryPayload = {
         ...draft,
         name: draft.name.trim(),
         description: draft.description?.trim() || null,
+        status: editingId ? draft.status : "ACTIVE",
+        displayOrder: editingId ? draft.displayOrder : nextDisplayOrder(draft.parentId),
       };
       if (editingId) await updateCatalogCategory(accessToken, editingId, payload);
       else await createCatalogCategory(accessToken, payload);
       reset();
     });
+  }
+
+  function nextDisplayOrder(parentId?: string | null) {
+    const siblings = categories.filter((category) => category.parentId === (parentId ?? null));
+    return siblings.length === 0 ? 0 : Math.max(...siblings.map((category) => category.displayOrder)) + 1;
   }
 
   function edit(category: CatalogCategory) {
@@ -92,91 +126,182 @@ export function CatalogCategoryManager({
 
   function reset() {
     setEditingId(null);
-    setDraft({ ...emptyDraft, displayOrder: categories.length });
+    setDraft({ ...emptyDraft });
   }
 
   return (
-    <section className="app-card grid gap-5 p-5">
-      <div>
-        <p className="app-eyebrow">Clasificacion</p>
-        <h2 className="app-card-title">Categorias y subcategorias</h2>
-        <p className="app-card-copy">Organiza el catalogo con jerarquia, descripcion y orden operativo.</p>
-      </div>
-      {error ? <p className="text-sm text-[#9b2c2c]" role="alert">{error}</p> : null}
-      <form className="grid gap-3 rounded-md border border-[#d8ddd2] p-4" onSubmit={submit}>
-        <div className="grid gap-3 md:grid-cols-2">
-          <Field label="Nombre">
-            <input className="h-10 rounded-md border border-[#cdd5ca] px-3" maxLength={120}
-              onChange={(event) => setDraft({ ...draft, name: event.target.value })} value={draft.name} />
-          </Field>
-          <Field label="Categoria padre">
-            <select className="h-10 rounded-md border border-[#cdd5ca] bg-white px-3"
-              onChange={(event) => setDraft({ ...draft, parentId: event.target.value || null })}
-              value={draft.parentId ?? ""}>
-              <option value="">Categoria raiz</option>
-              {categories.filter((category) => category.id !== editingId && category.status === "ACTIVE").map((category) => (
-                <option key={category.id} value={category.id}>{category.name}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Orden">
-            <input className="h-10 rounded-md border border-[#cdd5ca] px-3" min={0} type="number"
-              onChange={(event) => setDraft({ ...draft, displayOrder: Number(event.target.value || 0) })}
-              value={draft.displayOrder} />
-          </Field>
-          <Field label="Estado">
-            <select className="h-10 rounded-md border border-[#cdd5ca] bg-white px-3"
-              onChange={(event) => setDraft({ ...draft, status: event.target.value as CatalogCategory["status"] })}
-              value={draft.status}>
-              <option value="ACTIVE">Activa</option>
-              <option value="INACTIVE">Inactiva</option>
-            </select>
-          </Field>
+    <section className="grid gap-5">
+      <section className="overflow-hidden rounded-2xl border border-[#d8ddd2] bg-white shadow-sm">
+        <div className="border-b border-[#e3e7df] bg-[#f7f9f5] px-5 py-4">
+          <p className="app-eyebrow">Clasificacion</p>
+          <h2 className="app-card-title">{editingId ? "Editar categoria" : "Nueva categoria"}</h2>
+          <p className="app-card-copy">
+            Una categoria principal agrupa productos. Una subcategoria aparece dentro de otra, por ejemplo Suplementos → Preentrenos.
+          </p>
         </div>
-        <Field label="Descripcion">
-          <textarea className="min-h-20 rounded-md border border-[#cdd5ca] px-3 py-2" maxLength={500}
-            onChange={(event) => setDraft({ ...draft, description: event.target.value })}
-            value={draft.description ?? ""} />
-        </Field>
-        <div className="flex flex-wrap gap-2">
-          <button className="app-button" disabled={saving || !draft.name.trim()} type="submit">
-            {saving ? "Guardando..." : editingId ? "Guardar categoria" : "Agregar categoria"}
-          </button>
-          {editingId ? <button className="app-button-secondary" disabled={saving} onClick={reset} type="button">Cancelar</button> : null}
+
+        <form className="grid gap-4 p-5" onSubmit={submit}>
+          {error ? <p className="rounded-lg border border-[#e2b6b6] bg-[#fff7f7] px-3 py-2 text-sm text-[#9b2c2c]" role="alert">{error}</p> : null}
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <Field label="Nombre">
+              <input
+                className="app-input"
+                maxLength={120}
+                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+                placeholder="Ej. Suplementos"
+                required
+                value={draft.name}
+              />
+            </Field>
+
+            <Field label="Ubicacion">
+              <select
+                className="app-input bg-white"
+                disabled={editingHasChildren}
+                onChange={(event) => setDraft({ ...draft, parentId: event.target.value || null })}
+                value={draft.parentId ?? ""}
+              >
+                <option value="">Categoria principal</option>
+                {rootCategories
+                  .filter((category) => category.id !== editingId && category.status === "ACTIVE")
+                  .map((category) => (
+                    <option key={category.id} value={category.id}>Dentro de {category.name}</option>
+                  ))}
+              </select>
+              <small className="text-[#6f7a73]">
+                {editingHasChildren
+                  ? "Esta categoria contiene subcategorias y debe permanecer como principal."
+                  : "Selecciona una categoria principal sólo cuando estés creando una subcategoria."}
+              </small>
+            </Field>
+          </div>
+
+          <Field label="Descripcion opcional">
+            <textarea
+              className="app-input min-h-24"
+              maxLength={500}
+              onChange={(event) => setDraft({ ...draft, description: event.target.value })}
+              placeholder="Ej. Proteinas, creatinas, preentrenos y otros suplementos."
+              value={draft.description ?? ""}
+            />
+          </Field>
+
+          <div className="flex flex-wrap gap-2">
+            <button className="app-button" disabled={saving || !draft.name.trim()} type="submit">
+              {saving ? "Guardando..." : editingId ? "Guardar cambios" : draft.parentId ? "Crear subcategoria" : "Crear categoria"}
+            </button>
+            {editingId ? (
+              <button className="app-button-secondary" disabled={saving} onClick={reset} type="button">Cancelar</button>
+            ) : null}
+          </div>
+        </form>
+      </section>
+
+      <section className="rounded-2xl border border-[#d8ddd2] bg-white p-5 shadow-sm">
+        <div className="mb-4">
+          <p className="app-eyebrow">Estructura actual</p>
+          <h2 className="app-card-title">Categorias del catalogo</h2>
+          <p className="app-card-copy">Las subcategorias se muestran indentadas debajo de su categoria principal.</p>
         </div>
-      </form>
-      <div className="grid gap-2">
-        {categories.length === 0 ? <p className="text-sm text-[#5d6b63]">Todavia no hay categorias.</p> : null}
-        {categories.map((category) => (
-          <article className="flex flex-col gap-3 rounded-md border border-[#d8ddd2] px-4 py-3 sm:flex-row sm:items-center sm:justify-between" key={category.id}>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <strong>{category.name}</strong>
-                <span className={category.status === "ACTIVE" ? "text-xs font-semibold text-[#28733e]" : "text-xs font-semibold text-[#8a5a22]"}>
-                  {category.status === "ACTIVE" ? "Activa" : "Inactiva"}
-                </span>
+
+        <div className="grid gap-4">
+          {rootCategories.length === 0 && orphanedCategories.length === 0 ? (
+            <p className="rounded-xl border border-dashed border-[#cdd5ca] bg-[#fafbf9] px-4 py-6 text-center text-sm text-[#5d6b63]">
+              Todavia no hay categorias.
+            </p>
+          ) : null}
+
+          {rootCategories.map((category) => {
+            const children = childrenByParent.get(category.id) ?? [];
+            return (
+              <article className="rounded-xl border border-[#d8ddd2] bg-[#fbfcfa] p-4" key={category.id}>
+                <CategoryHeader category={category} kind="Categoria principal" saving={saving}
+                  onArchive={archive} onEdit={edit} onToggle={toggle} />
+
+                {children.length > 0 ? (
+                  <div className="mt-4 grid gap-2 border-l-2 border-[var(--brand-accent)] pl-4">
+                    {children.map((child) => (
+                      <div className="rounded-lg border border-[#e1e5de] bg-white px-4 py-3" key={child.id}>
+                        <CategoryHeader category={child} kind={`Subcategoria de ${category.name}`} saving={saving}
+                          onArchive={archive} onEdit={edit} onToggle={toggle} compact />
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="mt-3 text-xs text-[#7a847e]">Sin subcategorias.</p>
+                )}
+              </article>
+            );
+          })}
+
+          {orphanedCategories.length > 0 ? (
+            <section className="rounded-xl border border-[#e5cfaa] bg-[#fffaf1] p-4">
+              <strong className="text-sm text-[#79531e]">Categorias con padre archivado</strong>
+              <div className="mt-3 grid gap-2">
+                {orphanedCategories.map((category) => (
+                  <div className="rounded-lg border border-[#ead9bd] bg-white px-4 py-3" key={category.id}>
+                    <CategoryHeader category={category} kind="Subcategoria sin categoria principal visible" saving={saving}
+                      onArchive={archive} onEdit={edit} onToggle={toggle} compact />
+                  </div>
+                ))}
               </div>
-              <p className="mt-1 text-xs text-[#6f7a73]">
-                {category.parentId ? `Subcategoria de ${categoriesById.get(category.parentId)?.name ?? "categoria archivada"}` : "Categoria raiz"}
-                {` · Orden ${category.displayOrder}`}
-              </p>
-              {category.description ? <p className="mt-1 text-sm text-[#5d6b63]">{category.description}</p> : null}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <button className="app-button-secondary" disabled={saving} onClick={() => edit(category)} type="button">Editar</button>
-              <button className="app-button-secondary" disabled={saving} onClick={() => toggle(category)} type="button">
-                {category.status === "ACTIVE" ? "Desactivar" : "Activar"}
-              </button>
-              <button className="rounded-md border border-[#e2b6b6] px-3 py-2 text-sm font-semibold text-[#9b2c2c]" disabled={saving}
-                onClick={() => archive(category)} type="button">Archivar</button>
-            </div>
-          </article>
-        ))}
-      </div>
+            </section>
+          ) : null}
+        </div>
+      </section>
     </section>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="grid gap-1 text-sm"><span className="font-medium">{label}</span>{children}</label>;
+function CategoryHeader({
+  category,
+  compact = false,
+  kind,
+  onArchive,
+  onEdit,
+  onToggle,
+  saving,
+}: {
+  category: CatalogCategory;
+  compact?: boolean;
+  kind: string;
+  onArchive: (category: CatalogCategory) => Promise<void>;
+  onEdit: (category: CatalogCategory) => void;
+  onToggle: (category: CatalogCategory) => Promise<void>;
+  saving: boolean;
+}) {
+  return (
+    <div className={`flex flex-col gap-3 ${compact ? "sm:flex-row sm:items-center sm:justify-between" : "md:flex-row md:items-start md:justify-between"}`}>
+      <div>
+        <div className="flex flex-wrap items-center gap-2">
+          <strong className={compact ? "text-sm" : "text-base"}>{category.name}</strong>
+          <span className="rounded-full bg-[#eef2ec] px-2 py-1 text-[11px] font-semibold text-[#536158]">{kind}</span>
+          <span className={category.status === "ACTIVE"
+            ? "rounded-full bg-[#eaf6ed] px-2 py-1 text-[11px] font-semibold text-[#28733e]"
+            : "rounded-full bg-[#fff3df] px-2 py-1 text-[11px] font-semibold text-[#8a5a22]"}>
+            {category.status === "ACTIVE" ? "Activa" : "Inactiva"}
+          </span>
+        </div>
+        {category.description ? <p className="mt-2 text-sm text-[#5d6b63]">{category.description}</p> : null}
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button className="app-button-secondary" disabled={saving} onClick={() => onEdit(category)} type="button">Editar</button>
+        <button className="app-button-secondary" disabled={saving} onClick={() => void onToggle(category)} type="button">
+          {category.status === "ACTIVE" ? "Desactivar" : "Activar"}
+        </button>
+        <button className="rounded-md border border-[#e2b6b6] px-3 py-2 text-sm font-semibold text-[#9b2c2c]"
+          disabled={saving} onClick={() => void onArchive(category)} type="button">Archivar</button>
+      </div>
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: ReactNode }) {
+  return <label className="grid gap-1.5 text-sm"><span className="font-semibold text-[#28332d]">{label}</span>{children}</label>;
+}
+
+function compareCategories(left: CatalogCategory, right: CatalogCategory) {
+  return left.displayOrder - right.displayOrder || left.name.localeCompare(right.name, "es");
 }
