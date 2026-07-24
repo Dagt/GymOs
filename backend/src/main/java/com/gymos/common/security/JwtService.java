@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -31,10 +32,15 @@ public class JwtService {
 	}
 
 	public TokenPair issueTokens(GymOsPrincipal principal, String refreshToken) {
-		return new TokenPair(accessToken(principal), refreshToken, properties.accessTokenSeconds());
+		long lifetimeSeconds = accessTokenLifetime(principal);
+		return new TokenPair(accessToken(principal, lifetimeSeconds), refreshToken, lifetimeSeconds);
 	}
 
 	public String accessToken(GymOsPrincipal principal) {
+		return accessToken(principal, accessTokenLifetime(principal));
+	}
+
+	private String accessToken(GymOsPrincipal principal, long lifetimeSeconds) {
 		Instant now = Instant.now();
 		Map<String, Object> payload = new LinkedHashMap<>();
 		payload.put("type", "access");
@@ -47,7 +53,7 @@ public class JwtService {
 		payload.put("roles", principal.roles().stream().sorted().toList());
 		payload.put("supportMode", principal.supportMode());
 		payload.put("iat", now.getEpochSecond());
-		payload.put("exp", now.plusSeconds(properties.accessTokenSeconds()).getEpochSecond());
+		payload.put("exp", now.plusSeconds(lifetimeSeconds).getEpochSecond());
 		return sign(payload);
 	}
 
@@ -79,6 +85,34 @@ public class JwtService {
 		} catch (Exception exception) {
 			return Optional.empty();
 		}
+	}
+
+	private long accessTokenLifetime(GymOsPrincipal principal) {
+		return isReception(principal)
+				? properties.receptionAccessTokenSeconds()
+				: properties.accessTokenSeconds();
+	}
+
+	private boolean isReception(GymOsPrincipal principal) {
+		boolean explicitReceptionRole = principal.roles().stream()
+				.map(role -> role.toLowerCase(Locale.ROOT))
+				.anyMatch(role -> role.contains("recepcion") || role.contains("recepción") || role.contains("reception"));
+		if (explicitReceptionRole) {
+			return true;
+		}
+		boolean elevatedRole = principal.roles().stream()
+				.map(role -> role.toLowerCase(Locale.ROOT))
+				.anyMatch(role -> role.contains("dueno")
+						|| role.contains("dueño")
+						|| role.contains("owner")
+						|| role.contains("administrador")
+						|| role.contains("admin")
+						|| role.contains("gerente")
+						|| role.contains("manager")
+						|| role.contains("coach"));
+		return !elevatedRole
+				&& principal.permissions().contains("sale.create")
+				&& principal.permissions().contains("client.read");
 	}
 
 	private String sign(Map<String, Object> payload) {
