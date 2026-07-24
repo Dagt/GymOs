@@ -39,7 +39,7 @@ class InventoryServiceTests {
 		productId = UUID.randomUUID();
 		principal = new GymOsPrincipal(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
 				"inventory", "Inventory", Set.of("inventory.manage"));
-		when(queries.product(principal.organizationId(), productId))
+		when(queries.product(principal.organizationId(), principal.branchId(), productId))
 				.thenReturn(Optional.of(new InventoryProductView(productId, "SKU", "Producto", "PHYSICAL", true, "ACTIVE")));
 	}
 
