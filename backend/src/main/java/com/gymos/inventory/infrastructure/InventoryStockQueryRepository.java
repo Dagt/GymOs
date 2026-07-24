@@ -15,6 +15,8 @@ class InventoryStockQueryRepository {
 			       s.id AS stock_id, COALESCE(s.quantity_on_hand, 0) AS quantity_on_hand,
 			       COALESCE(s.reorder_point, 0) AS reorder_point, s.average_cost_cents, s.updated_at
 			FROM catalog_product cp
+			JOIN catalog_product_branch cpb ON cpb.organization_id=cp.organization_id
+			    AND cpb.product_id=cp.id AND cpb.branch_id=:branchId
 			LEFT JOIN inventory_stock s ON s.product_id=cp.id AND s.organization_id=cp.organization_id
 			    AND s.branch_id=:branchId AND s.deleted_at IS NULL
 			WHERE cp.organization_id=:organizationId AND cp.product_type='PHYSICAL'
@@ -41,9 +43,11 @@ class InventoryStockQueryRepository {
 				.param("size", criteria.size()).param("offset", criteria.page() * criteria.size());
 		var countSpec = jdbcClient.sql("""
 				SELECT COUNT(*) FROM catalog_product cp
+				JOIN catalog_product_branch cpb ON cpb.organization_id=cp.organization_id
+				  AND cpb.product_id=cp.id AND cpb.branch_id=:branchId
 				WHERE cp.organization_id=:organizationId AND cp.product_type='PHYSICAL'
 				  AND cp.inventory_tracked=TRUE AND cp.deleted_at IS NULL AND cp.archived_at IS NULL
-				""" + queryFilter).param("organizationId", organizationId);
+				""" + queryFilter).param("organizationId", organizationId).param("branchId", branchId);
 		if (hasText(criteria.query())) {
 			String value = "%" + criteria.query().trim().toLowerCase() + "%";
 			itemSpec = itemSpec.param("query", value);
@@ -64,6 +68,8 @@ class InventoryStockQueryRepository {
 				       s.id AS stock_id, s.quantity_on_hand, s.reorder_point, s.average_cost_cents, s.updated_at
 				FROM inventory_stock s
 				JOIN catalog_product cp ON cp.id=s.product_id AND cp.organization_id=s.organization_id
+				JOIN catalog_product_branch cpb ON cpb.organization_id=cp.organization_id
+				  AND cpb.product_id=cp.id AND cpb.branch_id=s.branch_id
 				WHERE s.organization_id=:organizationId AND s.branch_id=:branchId AND s.id=:stockId
 				  AND s.deleted_at IS NULL
 				""")
