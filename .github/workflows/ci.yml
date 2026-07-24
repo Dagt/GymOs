@@ -21,12 +21,20 @@ jobs:
       - name: Validate Gradle wrapper
         uses: gradle/actions/wrapper-validation@v5
       - name: Test backend
+        id: backend-test
         shell: bash
         run: |
           if ! ./gradlew test --no-daemon --console=plain > /tmp/backend.log 2>&1; then
             tail -n 160 /tmp/backend.log
             exit 1
           fi
+      - name: Upload backend diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-diagnostics
+          path: /tmp/backend.log
+          if-no-files-found: ignore
 
   frontend:
     runs-on: ubuntu-latest
@@ -65,6 +73,16 @@ jobs:
             tail -n 120 /tmp/frontend-build.log
             exit 1
           fi
+      - name: Upload frontend diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-diagnostics
+          path: |
+            /tmp/frontend-lint.log
+            /tmp/frontend-typecheck.log
+            /tmp/frontend-build.log
+          if-no-files-found: ignore
 
   docker:
     runs-on: ubuntu-latest
