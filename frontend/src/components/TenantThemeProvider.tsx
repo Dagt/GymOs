@@ -2,7 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import { useEffect } from "react";
-import { getCurrentOrganization, getCurrentUser, getStoredSession, storeCurrentUser, type CurrentUser, type OrganizationSummary } from "@/lib/api";
+import { getCurrentUser, getStoredSession, storeCurrentUser, type CurrentUser } from "@/lib/api";
 import { isPlatformAdmin, isSupportMode } from "@/lib/role-model";
 
 type ThemeConfig = {
@@ -36,33 +36,18 @@ export function TenantThemeProvider() {
 
     applyTheme(themeFromUser(session.user));
 
-    async function loadTenantTheme() {
-      if (!session) {
-        return;
-      }
-      let themedUser = session.user;
+    async function refreshMissingTheme() {
+      if (!session || hasCompleteTheme(session.user)) return;
       try {
-        if (!session.user.primaryColor && !session.user.logoUrl && !session.user.brandName) {
-          const currentUser = await getCurrentUser(session.accessToken);
-          themedUser = currentUser;
-          storeCurrentUser(currentUser);
-          if (!cancelled) {
-            applyTheme(themeFromUser(currentUser));
-          }
-        }
-        const organization = await getCurrentOrganization(session.accessToken);
-        if (!cancelled) {
-          applyTheme(themeFromOrganization(organization));
-        }
+        const currentUser = await getCurrentUser(session.accessToken);
+        storeCurrentUser(currentUser);
+        if (!cancelled) applyTheme(themeFromUser(currentUser));
       } catch {
-        if (!cancelled) {
-          applyTheme(themeFromUser(themedUser));
-        }
+        // The embedded session theme remains active when profile refresh is unavailable.
       }
     }
 
-    void loadTenantTheme();
-
+    void refreshMissingTheme();
     return () => {
       cancelled = true;
     };
@@ -71,14 +56,8 @@ export function TenantThemeProvider() {
   return null;
 }
 
-export function themeFromOrganization(organization: OrganizationSummary): ThemeConfig {
-  return {
-    name: organization.brandName || organization.tradeName || defaultTheme.name,
-    logoUrl: organization.logoUrl || "",
-    primary: organization.primaryColor || defaultTheme.primary,
-    accent: organization.accentColor || defaultTheme.accent,
-    surface: organization.surfaceColor || defaultTheme.surface,
-  };
+function hasCompleteTheme(user: CurrentUser) {
+  return Boolean(user.primaryColor && user.accentColor && user.surfaceColor);
 }
 
 function themeFromUser(user: CurrentUser): ThemeConfig {
