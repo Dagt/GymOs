@@ -64,7 +64,7 @@ public class InventoryRepository {
 
 	public StockDeductionResult deductPaidSaleItem(UUID organizationId, UUID branchId, UUID productId,
 			UUID saleId, int quantity, OffsetDateTime occurredAt, UUID correlationId) {
-		CatalogProductOperations.CatalogProductSnapshot product = catalog.product(organizationId, productId).orElse(null);
+		CatalogProductOperations.CatalogProductSnapshot product = catalog.product(organizationId, branchId, productId).orElse(null);
 		if (product == null || !product.physicalInventoryTracked()) return StockDeductionResult.IGNORED_NON_PHYSICAL;
 		InventorySaleDeductionRepository.StockDeductionResult result = saleDeductions.deductPaidSaleItem(
 				organizationId, branchId, productId, product.name(), saleId, quantity, occurredAt, correlationId
@@ -89,8 +89,8 @@ public class InventoryRepository {
 		);
 	}
 
-	public Optional<ProductForInventory> product(UUID organizationId, UUID productId) {
-		return catalog.product(organizationId, productId).map(value -> new ProductForInventory(
+	public Optional<ProductForInventory> product(UUID organizationId, UUID branchId, UUID productId) {
+		return catalog.product(organizationId, branchId, productId).map(value -> new ProductForInventory(
 				value.id(), value.sku(), value.name(), value.productType(), value.inventoryTracked(), value.status()
 		));
 	}
