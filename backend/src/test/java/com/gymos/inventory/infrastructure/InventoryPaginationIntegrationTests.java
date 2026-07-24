@@ -57,6 +57,9 @@ class InventoryPaginationIntegrationTests {
 		insertBranch(secondBranchId, "NORTE");
 		createProduct(waterId, "AGUA-1", "Agua mineral");
 		createProduct(towelId, "TOALLA-1", "Toalla");
+		attachProduct(branchId, waterId);
+		attachProduct(secondBranchId, waterId);
+		attachProduct(branchId, towelId);
 		setStock(branchId, waterId, 8);
 		setStock(branchId, towelId, 3);
 		setStock(secondBranchId, waterId, 2);
@@ -83,11 +86,12 @@ class InventoryPaginationIntegrationTests {
 	}
 
 	@Test
-	void stockQuantityIsIsolatedByBranch() {
+	void stockQuantityAndAvailabilityAreIsolatedByBranch() {
 		var center = stockQueries.stockDetail(organizationId, branchId, waterId).orElseThrow();
 		var north = stockQueries.stockDetail(organizationId, secondBranchId, waterId).orElseThrow();
 		assertThat(center.quantityOnHand()).isEqualTo(8);
 		assertThat(north.quantityOnHand()).isEqualTo(2);
+		assertThat(stockQueries.stockDetail(organizationId, secondBranchId, towelId)).isEmpty();
 	}
 
 	@Test
@@ -112,6 +116,10 @@ class InventoryPaginationIntegrationTests {
 				organizationId, productId, sku, name, null, "PHYSICAL", 1_000,
 				"MXN", true, "ACTIVE", null, null, null, null, true, 0, null,
 				OffsetDateTime.now(), userId));
+	}
+
+	private void attachProduct(UUID branch, UUID productId) {
+		products.attachBranch(organizationId, branch, productId, userId, OffsetDateTime.now());
 	}
 
 	private void setStock(UUID branch, UUID productId, int quantity) {
