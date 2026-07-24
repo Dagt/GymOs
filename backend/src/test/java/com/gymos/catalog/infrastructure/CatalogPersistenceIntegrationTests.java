@@ -23,8 +23,11 @@ class CatalogPersistenceIntegrationTests {
 
 	private JdbcClient jdbcClient;
 	private CatalogProductCommandRepository products;
+	private CatalogProductQueryRepository productQueries;
 	private UUID organizationId;
 	private UUID secondOrganizationId;
+	private UUID firstBranchId;
+	private UUID secondBranchId;
 	private UUID userId;
 
 	@BeforeEach
@@ -35,11 +38,32 @@ class CatalogPersistenceIntegrationTests {
 		Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load().migrate();
 		jdbcClient = JdbcClient.create(dataSource);
 		products = new CatalogProductCommandRepository(jdbcClient);
+		productQueries = new CatalogProductQueryRepository(jdbcClient);
 		organizationId = UUID.randomUUID();
 		secondOrganizationId = UUID.randomUUID();
+		firstBranchId = UUID.randomUUID();
+		secondBranchId = UUID.randomUUID();
 		userId = UUID.randomUUID();
 		insertOrganization(organizationId, "Catalog One");
 		insertOrganization(secondOrganizationId, "Catalog Two");
+		insertBranch(organizationId, firstBranchId, "CENTRO");
+		insertBranch(organizationId, secondBranchId, "NORTE");
+	}
+
+	@Test
+	void productIsVisibleOnlyInAttachedBranch() {
+		UUID productId = UUID.randomUUID();
+		OffsetDateTime now = OffsetDateTime.now();
+		products.create(new ProductMutation(
+				organizationId, productId, "SKU-BRANCH", "Producto Centro", null, "PHYSICAL", 1_000,
+				"MXN", true, "ACTIVE", null, null, null, null, true, 0, null, now, userId
+		));
+		products.attachBranch(organizationId, firstBranchId, productId, userId, now);
+
+		assertThat(productQueries.list(organizationId, firstBranchId))
+				.extracting(com.gymos.catalog.application.query.ProductSummaryView::id)
+				.containsExactly(productId);
+		assertThat(productQueries.list(organizationId, secondBranchId)).isEmpty();
 	}
 
 	@Test
@@ -110,6 +134,16 @@ class CatalogPersistenceIntegrationTests {
 				VALUES (:id, :name, :name, 'ACTIVE', 'America/Mexico_City', 'MXN', now(), now(), 0)
 				""")
 				.param("id", id).param("name", name).update();
+	}
+
+	private void insertBranch(UUID organization, UUID id, String code) {
+		jdbcClient.sql("""
+				INSERT INTO branch (
+				 id, organization_id, name, code, status, timezone, created_at, updated_at, version)
+				VALUES (:id, :organizationId, :name, :code, 'ACTIVE', 'America/Mexico_City', now(), now(), 0)
+				""")
+				.param("id", id).param("organizationId", organization)
+				.param("name", code).param("code", code).update();
 	}
 
 	private void insertCategory(UUID organization, UUID categoryId, String name, String slug) {
