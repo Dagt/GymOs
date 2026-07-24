@@ -63,7 +63,7 @@ class SaleCreationServiceTests {
 		);
 		when(salesRepository.saleHeaderByIdempotencyKey(organizationId, "sale-key")).thenReturn(Optional.empty());
 		when(salesRepository.clientExists(organizationId, clientId)).thenReturn(true);
-		when(lineResolver.resolve(organizationId, clientId, command.items(), 200)).thenReturn(
+		when(lineResolver.resolve(organizationId, branchId, clientId, command.items(), 200)).thenReturn(
 				new SaleLineResolver.ResolvedSale(
 						List.of(new SaleLineResolver.ResolvedSaleLine(productId, "PRODUCT", "Producto", 2, 1_000, 100, 1_900)),
 						2_000,
@@ -139,6 +139,6 @@ class SaleCreationServiceTests {
 		assertThat(result.created()).isFalse();
 		verify(commandRepository, never()).createSale(any());
 		verify(commandRepository, never()).createItems(any(), any(), any(), any());
-		verify(lineResolver, never()).resolve(any(), any(), any(), org.mockito.ArgumentMatchers.anyLong());
+		verify(lineResolver, never()).resolve(any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyLong());
 	}
 }
