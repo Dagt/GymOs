@@ -1,5 +1,6 @@
 package com.gymos.inventory.infrastructure;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
@@ -131,21 +132,25 @@ class InventorySalesEventListenerTests {
 	}
 
 	@Test
-	void itemizedRefundRestocksOnlySelectedPhysicalItemsAggregatedByProduct() {
+	void itemizedRefundRestocksOnlySelectedTrackedPhysicalItemsAggregatedByProduct() {
 		UUID organizationId = UUID.randomUUID();
 		UUID branchId = UUID.randomUUID();
 		UUID saleId = UUID.randomUUID();
 		UUID refundId = UUID.randomUUID();
 		UUID actorUserId = UUID.randomUUID();
 		UUID productId = UUID.randomUUID();
+		UUID untrackedProductId = UUID.randomUUID();
 		OffsetDateTime occurredAt = OffsetDateTime.now();
 		UUID correlationId = UUID.randomUUID();
+		when(catalog.product(organizationId, productId)).thenReturn(Optional.of(product(productId, "Agua", true)));
+		when(catalog.product(organizationId, untrackedProductId)).thenReturn(Optional.of(product(untrackedProductId, "Playera", false)));
 
 		listener.onSaleItemsRefunded(new SaleItemsRefundedV1(
 				organizationId, branchId, saleId, refundId, actorUserId,
 				List.of(
 						new SaleItemsRefundedLineV1(UUID.randomUUID(), productId, "PHYSICAL", 1, true),
 						new SaleItemsRefundedLineV1(UUID.randomUUID(), productId, "PHYSICAL", 2, true),
+						new SaleItemsRefundedLineV1(UUID.randomUUID(), untrackedProductId, "PHYSICAL", 1, true),
 						new SaleItemsRefundedLineV1(UUID.randomUUID(), UUID.randomUUID(), "PHYSICAL", 1, false),
 						new SaleItemsRefundedLineV1(UUID.randomUUID(), UUID.randomUUID(), "SERVICE", 1, true)
 				), occurredAt, correlationId
