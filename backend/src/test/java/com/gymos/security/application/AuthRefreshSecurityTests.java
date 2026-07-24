@@ -46,7 +46,7 @@ class AuthRefreshSecurityTests {
 		when(values.get("gymos:refresh:" + previousToken)).thenReturn(storedSession);
 		when(repository.findActiveUserById(userId)).thenReturn(Optional.of(user));
 		when(repository.organizationIsActive(organizationId)).thenReturn(true);
-		when(repository.userHasOrganizationAccess(userId, organizationId)).thenReturn(true);
+		when(repository.branchBelongsToOrganization(branchId, organizationId)).thenReturn(true);
 		when(repository.userHasBranchAccess(userId, branchId)).thenReturn(true);
 		when(jwtService.issueTokens(any(GymOsPrincipal.class), anyString()))
 				.thenAnswer(invocation -> new JwtService.TokenPair("access", invocation.getArgument(1), 900));
@@ -62,6 +62,36 @@ class AuthRefreshSecurityTests {
 				"rotated:" + result.refreshToken(),
 				Duration.ofSeconds(15)
 		);
+	}
+
+	@Test
+	void ownerCanRefreshHomeOrganizationWithoutBranchAssignment() {
+		AuthQueryRepository repository = mock(AuthQueryRepository.class);
+		JwtService jwtService = mock(JwtService.class);
+		StringRedisTemplate redis = mock(StringRedisTemplate.class);
+		@SuppressWarnings("unchecked")
+		ValueOperations<String, String> values = mock(ValueOperations.class);
+		AuthService service = new AuthService(
+				mock(AuthenticationManager.class), repository, jwtService, redis, mock(AuditService.class));
+
+		UUID userId = UUID.randomUUID();
+		UUID organizationId = UUID.randomUUID();
+		String refreshToken = "owner-refresh";
+		String storedSession = userId + "|" + organizationId + "||false";
+
+		when(redis.opsForValue()).thenReturn(values);
+		when(values.get("gymos:refresh:" + refreshToken)).thenReturn(storedSession);
+		when(repository.findActiveUserById(userId)).thenReturn(Optional.of(new AuthQueryRepository.AuthenticatedUser(
+				userId, organizationId, "owner@gymos.local", "hash", "Owner", Set.of("organization.read"), Set.of("Dueño"))));
+		when(repository.organizationIsActive(organizationId)).thenReturn(true);
+		when(jwtService.issueTokens(any(GymOsPrincipal.class), anyString()))
+				.thenAnswer(invocation -> new JwtService.TokenPair("access", invocation.getArgument(1), 900));
+
+		var result = service.refresh(refreshToken);
+
+		assertThat(result.user().organizationId()).isEqualTo(organizationId);
+		assertThat(result.user().branchId()).isNull();
+		verify(repository, never()).userHasOrganizationAccess(userId, organizationId);
 	}
 
 	@Test
@@ -86,7 +116,7 @@ class AuthRefreshSecurityTests {
 		when(values.get("gymos:refresh:" + replacementToken)).thenReturn(storedSession);
 		when(repository.findActiveUserById(userId)).thenReturn(Optional.of(user(userId, organizationId, Set.of("branch.read"))));
 		when(repository.organizationIsActive(organizationId)).thenReturn(true);
-		when(repository.userHasOrganizationAccess(userId, organizationId)).thenReturn(true);
+		when(repository.branchBelongsToOrganization(branchId, organizationId)).thenReturn(true);
 		when(repository.userHasBranchAccess(userId, branchId)).thenReturn(true);
 		when(jwtService.issueTokens(any(GymOsPrincipal.class), eq(replacementToken)))
 				.thenReturn(new JwtService.TokenPair("access", replacementToken, 900));
@@ -159,7 +189,7 @@ class AuthRefreshSecurityTests {
 				.thenReturn(userId + "|" + organizationId + "|" + revokedBranchId + "|false");
 		when(repository.findActiveUserById(userId)).thenReturn(Optional.of(user(userId, organizationId, Set.of())));
 		when(repository.organizationIsActive(organizationId)).thenReturn(true);
-		when(repository.userHasOrganizationAccess(userId, organizationId)).thenReturn(true);
+		when(repository.branchBelongsToOrganization(revokedBranchId, organizationId)).thenReturn(true);
 		when(repository.userHasBranchAccess(userId, revokedBranchId)).thenReturn(false);
 
 		assertThatThrownBy(() -> service.refresh(token))
