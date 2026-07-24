@@ -72,7 +72,7 @@ class AuthOrganizationSecurityTests {
 		String refreshToken = "support-refresh";
 		String storedSession = userId + "|" + organizationId + "|" + branchId + "|true";
 		when(redisTemplate.opsForValue()).thenReturn(values);
-		when(values.getAndDelete("gymos:refresh:" + refreshToken)).thenReturn(storedSession);
+		when(values.get("gymos:refresh:" + refreshToken)).thenReturn(storedSession);
 		when(repository.findActiveUserById(userId)).thenReturn(Optional.of(new AuthQueryRepository.AuthenticatedUser(
 				userId,
 				UUID.randomUUID(),
