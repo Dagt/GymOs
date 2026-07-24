@@ -47,7 +47,7 @@ class InventoryPersistenceAdapter implements InventoryQueryPort, InventoryComman
 		var page = movementQueries.search(organizationId, branchId, criteria);
 		return InventoryMovementPageView.of(page.items().stream().map(this::movement).toList(), criteria.page(), criteria.size(), page.total());
 	}
-	@Override public Optional<InventoryProductView> product(UUID organizationId, UUID productId) { return catalog.product(organizationId, productId).map(value -> new InventoryProductView(value.id(), value.sku(), value.name(), value.productType(), value.inventoryTracked(), value.status())); }
+	@Override public Optional<InventoryProductView> product(UUID organizationId, UUID branchId, UUID productId) { return catalog.product(organizationId, branchId, productId).map(value -> new InventoryProductView(value.id(), value.sku(), value.name(), value.productType(), value.inventoryTracked(), value.status())); }
 	@Override public UUID ensureStock(UUID organizationId, UUID branchId, UUID productId, UUID actorUserId, OffsetDateTime now) { return stockCommands.ensureStock(organizationId, branchId, productId, actorUserId, now); }
 	@Override public Optional<InventoryStockLedgerView> lock(UUID organizationId, UUID branchId, UUID stockId) { return stockCommands.lock(organizationId, branchId, stockId).map(value -> new InventoryStockLedgerView(value.stockId(), value.quantityOnHand(), value.reorderPoint(), value.averageCostCents())); }
 	@Override public void update(UUID stockId, int quantityOnHand, int reorderPoint, Long averageCostCents, UUID actorUserId, OffsetDateTime now) { stockCommands.update(stockId, quantityOnHand, reorderPoint, averageCostCents, actorUserId, now); }
