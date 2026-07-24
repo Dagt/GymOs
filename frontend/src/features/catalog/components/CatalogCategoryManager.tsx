@@ -126,9 +126,9 @@ export function CatalogCategoryManager({ accessToken, categories, onChanged }: {
         </div>
         <div className="max-h-[58vh] overflow-y-auto p-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {roots.length === 0 ? <p className="py-6 text-center text-xs text-[#5d6b63]">No hay categorías.</p> : null}
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+          <div className="columns-1 gap-2 md:columns-2 xl:columns-3">
             {roots.map((root) => (
-              <article className="rounded-lg border border-[#d8ddd2] bg-[#fbfcfa] p-2.5" key={root.id}>
+              <article className="mb-2 break-inside-avoid rounded-lg border border-[#d8ddd2] bg-[#fbfcfa] p-2.5" key={root.id}>
                 <CategoryRow category={root} label="Principal" saving={saving} onArchive={archive} onEdit={edit} onToggle={toggle} />
                 {(children.get(root.id) ?? []).length ? (
                   <div className="mt-2 grid gap-1.5 border-l-2 border-[var(--brand-accent)] pl-2">
