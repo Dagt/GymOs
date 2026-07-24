@@ -11,11 +11,11 @@ export function CatalogSummaryCards({ summary }: { summary: CatalogSummary | nul
     <section aria-label="Resumen del catálogo" className="app-card grid grid-cols-2 overflow-hidden p-0 md:grid-cols-4">
       {metrics.map(([label, value], index) => (
         <article
-          className={`px-4 py-3 ${index > 0 ? "border-l border-[#e3e7df]" : ""}`}
+          className={`flex items-center justify-between gap-2 px-3 py-2 ${index > 0 ? "border-l border-[#e3e7df]" : ""}`}
           key={label}
         >
-          <p className="text-xs font-medium text-[#6f7a73]">{label}</p>
-          <p className="mt-1 text-xl font-semibold">{value}</p>
+          <p className="text-[11px] font-medium text-[#6f7a73]">{label}</p>
+          <p className="text-base font-semibold leading-none">{value}</p>
         </article>
       ))}
     </section>
