@@ -1,15 +1,7 @@
 import type { FormEvent } from "react";
 import { AppDrawer } from "@/components/AppDrawer";
-import {
-  NumberField,
-  SelectField,
-  TextAreaField,
-  TextField,
-} from "@/components/FormFields";
-import type {
-  MembershipPlanPayload,
-  PlanSummary,
-} from "@/lib/api";
+import { NumberField, SelectField, TextAreaField, TextField } from "@/components/FormFields";
+import type { MembershipPlanPayload, PlanSummary } from "@/lib/api";
 import { formatMoney, type PlanDraft } from "./CatalogHelpers";
 
 type CatalogToolbarProps = {
@@ -20,26 +12,21 @@ type CatalogToolbarProps = {
 
 export function CatalogToolbar({ canCreate, onNewPlan, onNewProduct }: CatalogToolbarProps) {
   return (
-    <section className="catalog-toolbar app-card p-5">
+    <section className="app-card flex flex-col gap-4 p-5 lg:flex-row lg:items-center lg:justify-between">
       <div>
         <p className="app-eyebrow">Gestión del catálogo</p>
-        <h2 className="app-card-title">Artículos de venta y planes de membresía</h2>
-        <p className="app-card-copy">
-          Aquí se crean productos físicos y cargos simples que aparecen en caja. Los pases, consultas, rutinas y servicios con agenda se administran en Accesos, Servicios, Coaches o Reservas.
-        </p>
+        <h2 className="app-card-title">Artículos y membresías</h2>
       </div>
-      <div>
-        {canCreate ? (
-          <>
-            <button className="app-button-secondary" onClick={onNewProduct} type="button">
-              Nuevo artículo o cargo
-            </button>
-            <button className="app-button" onClick={onNewPlan} type="button">
-              Nuevo plan
-            </button>
-          </>
-        ) : null}
-      </div>
+      {canCreate ? (
+        <div className="grid w-full gap-2 sm:grid-cols-2 lg:w-auto">
+          <button className="app-button-secondary h-11 min-w-44" onClick={onNewProduct} type="button">
+            Nuevo artículo o cargo
+          </button>
+          <button className="app-button h-11 min-w-44" onClick={onNewPlan} type="button">
+            Nuevo plan
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -52,26 +39,32 @@ type PlanListProps = {
 
 export function PlanList({ canUpdate, plans, onEditPlan }: PlanListProps) {
   return (
-    <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
-      <h2 className="text-xl font-semibold">Planes</h2>
-      <div className="mt-4 grid gap-3">
-        {plans.length === 0 ? <p className="text-sm text-[#5d6b63]">No hay planes de membresía activos.</p> : null}
+    <section className="app-card p-5">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="app-card-title">Planes</h2>
+        <span className="text-sm text-[#6f7a73]">{plans.length}</span>
+      </div>
+      {plans.length === 0 ? <p className="text-sm text-[#5d6b63]">No hay planes activos.</p> : null}
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {plans.map((plan) => (
-          <article className="rounded-md border border-[#d8ddd2] px-4 py-3" key={plan.id}>
-            <p className="font-semibold">{plan.name}</p>
-            <p className="mt-1 text-sm text-[#5d6b63]">
-              {plan.durationDays} días - gracia {plan.graceDays} - {formatMoney(plan.priceCents, plan.currency)}
-            </p>
-            <p className="mt-2 text-xs font-semibold text-[var(--brand-primary)]">
-              {plan.multiBranchAccess ? "Acceso multi-sucursal" : "Acceso por sucursal de venta"}
-            </p>
+          <article className="flex min-h-40 flex-col justify-between rounded-xl border border-[#d8ddd2] bg-white p-4" key={plan.id}>
+            <div>
+              <div className="flex items-start justify-between gap-3">
+                <p className="font-semibold text-[#111815]">{plan.name}</p>
+                <strong className="whitespace-nowrap text-sm text-[var(--brand-primary)]">
+                  {formatMoney(plan.priceCents, plan.currency)}
+                </strong>
+              </div>
+              <p className="mt-2 text-sm text-[#5d6b63]">
+                {plan.durationDays} días{plan.graceDays > 0 ? ` · ${plan.graceDays} de gracia` : ""}
+              </p>
+              <span className="mt-3 inline-flex rounded-full bg-[#eef2ec] px-2 py-1 text-xs font-semibold text-[#536158]">
+                {plan.multiBranchAccess ? "Multi-sucursal" : "Sucursal actual"}
+              </span>
+            </div>
             {canUpdate ? (
-              <button
-                className="mt-3 h-9 rounded-md border border-[#cdd5ca] px-3 text-xs font-semibold text-[var(--brand-primary)]"
-                onClick={() => onEditPlan(plan)}
-                type="button"
-              >
-                Editar plan
+              <button className="app-button-secondary mt-4 h-9 w-full" onClick={() => onEditPlan(plan)} type="button">
+                Editar
               </button>
             ) : null}
           </article>
@@ -91,65 +84,25 @@ type PlanDrawerProps = {
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
-export function PlanDrawer({
-  editingPlanId,
-  form,
-  open,
-  saving,
-  onClose,
-  onFormChange,
-  onSubmit,
-}: PlanDrawerProps) {
+export function PlanDrawer({ editingPlanId, form, open, saving, onClose, onFormChange, onSubmit }: PlanDrawerProps) {
   return (
-    <AppDrawer
-      description="Crea o edita membresías con duración. Estos planes aparecen como opción en el alta y la ficha de socios."
-      onClose={onClose}
-      open={open}
-      title={editingPlanId ? "Editar plan de membresía" : "Nuevo plan de membresía"}
-    >
+    <AppDrawer onClose={onClose} open={open} title={editingPlanId ? "Editar plan" : "Nuevo plan"}>
       <form className="grid gap-4" onSubmit={onSubmit}>
         <div className="grid gap-4 sm:grid-cols-2">
-          <TextField label="Código del plan" name="planSku" value={form.sku} onChange={(value) => onFormChange({ ...form, sku: value })} />
-          <TextField label="Nombre del plan" name="planName" value={form.name} onChange={(value) => onFormChange({ ...form, name: value })} />
+          <TextField label="Código" name="planSku" placeholder="Ej. REGULAR-30" value={form.sku} onChange={(value) => onFormChange({ ...form, sku: value })} />
+          <TextField label="Nombre" name="planName" placeholder="Ej. Regular" value={form.name} onChange={(value) => onFormChange({ ...form, name: value })} />
           <NumberField label="Precio" name="planPrice" value={form.price} onChange={(value) => onFormChange({ ...form, price: value })} />
-          <TextField label="Moneda" name="planCurrency" value={form.currency} onChange={(value) => onFormChange({ ...form, currency: value })} />
           <NumberField label="Duración en días" name="planDurationDays" value={form.durationDays} onChange={(value) => onFormChange({ ...form, durationDays: value })} />
           <NumberField label="Días de gracia" name="planGraceDays" value={form.graceDays} onChange={(value) => onFormChange({ ...form, graceDays: value })} />
         </div>
-        <TextAreaField
-          label="Beneficios incluidos"
-          name="planBenefits"
-          placeholder="Ej. Acceso general, clases grupales, estacionamiento."
-          value={form.benefitsJson}
-          onChange={(value) => onFormChange({ ...form, benefitsJson: value })}
-        />
-        <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-          Alcance
-          <span className="flex items-start gap-3 rounded-md border border-[#cdd5ca] bg-white px-3 py-3 text-sm text-[#42514a]">
-            <input
-              className="mt-1 h-4 w-4 accent-[var(--brand-primary)]"
-              checked={form.multiBranchAccess}
-              onChange={(event) => onFormChange({ ...form, multiBranchAccess: event.target.checked })}
-              type="checkbox"
-            />
-            <span>
-              <strong className="block text-[#111815]">Acceso multi-sucursal</strong>
-              Disponible para entrar con esta membresía en todas las sucursales activas del gimnasio.
-            </span>
-          </span>
+        <TextAreaField label="Beneficios" name="planBenefits" placeholder="Ej. Acceso general, clases grupales." value={form.benefitsJson} onChange={(value) => onFormChange({ ...form, benefitsJson: value })} />
+        <label className="flex items-center gap-3 rounded-xl border border-[#cdd5ca] bg-[#f8faf7] p-4 text-sm">
+          <input checked={form.multiBranchAccess} className="h-4 w-4 accent-[var(--brand-primary)]" onChange={(event) => onFormChange({ ...form, multiBranchAccess: event.target.checked })} type="checkbox" />
+          <strong>Permitir acceso en todas las sucursales</strong>
         </label>
-        <SelectField
-          label="Estado"
-          name="planStatus"
-          options={[
-            { label: "Activo", value: "ACTIVE" },
-            { label: "Inactivo", value: "INACTIVE" },
-          ]}
-          value={form.status}
-          onChange={(value) => onFormChange({ ...form, status: value as MembershipPlanPayload["status"] })}
-        />
+        <SelectField label="Estado" name="planStatus" options={[{ label: "Activo", value: "ACTIVE" }, { label: "Inactivo", value: "INACTIVE" }]} value={form.status} onChange={(value) => onFormChange({ ...form, status: value as MembershipPlanPayload["status"] })} />
         <button className="app-button h-11" disabled={saving} type="submit">
-          {saving ? "Guardando..." : editingPlanId ? "Guardar cambios del plan" : "Crear plan de membresía"}
+          {saving ? "Guardando..." : editingPlanId ? "Guardar cambios" : "Crear plan"}
         </button>
       </form>
     </AppDrawer>
