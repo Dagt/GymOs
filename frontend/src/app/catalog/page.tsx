@@ -23,11 +23,18 @@ function CatalogContent() {
   if (controller.loading && !controller.session) return <LoadingScreen text="Cargando catálogo..." />;
   if (!controller.session) return <AuthRequired />;
 
-  function openProductCreation() { setView("products"); controller.openProductCreation(); }
-  function openPlanCreation() { setView("plans"); controller.openPlanCreation(); }
+  function openProductCreation() {
+    setView("products");
+    controller.openProductCreation();
+  }
+
+  function openPlanCreation() {
+    setView("plans");
+    controller.openPlanCreation();
+  }
 
   return (
-    <AppShell eyebrow="Administración" session={controller.session} title="Catálogo">
+    <AppShell eyebrow="Administración" session={controller.session} subtitle="Catálogo de la sucursal activa." title="Catálogo">
       {controller.error ? <InlineError message={controller.error} /> : null}
       {controller.message ? <p className="rounded-md border border-[#bad9c4] bg-[#eff8f1] px-3 py-2 text-sm text-[#31563c]">{controller.message}</p> : null}
       <section className="grid gap-4">
@@ -51,14 +58,27 @@ function CatalogContent() {
         {view === "plans" ? <PlanList canUpdate={controller.canUpdate} plans={controller.plans} onEditPlan={controller.openPlanEdition} /> : null}
         {view === "categories" && controller.canManageCategories ? <CatalogCategoryManager accessToken={controller.session.accessToken} categories={controller.categories} onChanged={controller.reloadCatalog} /> : null}
       </section>
-      <CatalogProductDrawer categories={controller.categories} canManageImages={controller.canManageImages}
-        canReadCosts={controller.canReadCosts} editing={Boolean(controller.editingProductId)}
-        existingImage={Boolean(controller.existingImageObjectKey)} form={controller.form}
-        open={controller.showProductDrawer} price={controller.price} minimumStock={controller.minimumStock}
-        image={controller.productImage} saving={controller.saving} onClose={controller.resetProductDrawer}
-        onFormChange={controller.setForm} onPriceChange={controller.setPrice}
-        onMinimumStockChange={controller.setMinimumStock} onImageChange={controller.setProductImage}
-        onRemoveImage={controller.removeCurrentProductImage} onSubmit={controller.submitProduct} />
+      <CatalogProductDrawer
+        categories={controller.categories}
+        canManageImages={controller.canManageImages}
+        canManageInventory={controller.canManageInventory}
+        canReadCosts={controller.canReadCosts}
+        editing={Boolean(controller.editingProductId)}
+        existingImage={Boolean(controller.existingImageObjectKey)}
+        form={controller.form}
+        open={controller.showProductDrawer}
+        price={controller.price}
+        reorderPoint={controller.reorderPoint}
+        image={controller.productImage}
+        saving={controller.saving}
+        onClose={controller.resetProductDrawer}
+        onFormChange={controller.setForm}
+        onPriceChange={controller.setPrice}
+        onReorderPointChange={controller.setReorderPoint}
+        onImageChange={controller.setProductImage}
+        onRemoveImage={controller.removeCurrentProductImage}
+        onSubmit={controller.submitProduct}
+      />
       <PlanDrawer editingPlanId={controller.editingPlanId} form={controller.planForm} open={controller.showPlanDrawer}
         saving={controller.saving} onClose={controller.resetPlanDrawer} onFormChange={controller.setPlanForm}
         onSubmit={controller.submitPlan} />
@@ -79,4 +99,7 @@ function CatalogPagination({ onPageChange, page, totalPages }: { onPageChange: (
   if (totalPages <= 1) return null;
   return <nav aria-label="Paginación del catálogo" className="flex items-center justify-end gap-3"><button className="app-button-secondary" disabled={page <= 0} onClick={() => onPageChange(page - 1)} type="button">Anterior</button><span className="text-sm text-[#5d6b63]">{page + 1} / {totalPages}</span><button className="app-button-secondary" disabled={page + 1 >= totalPages} onClick={() => onPageChange(page + 1)} type="button">Siguiente</button></nav>;
 }
-function AuthRequired() { return <AuthRequiredCard message="Se requiere una cuenta autorizada." title="Inicia sesión para ver el catálogo" />; }
+
+function AuthRequired() {
+  return <AuthRequiredCard message="Se requiere una cuenta autorizada." title="Inicia sesión para ver el catálogo" />;
+}
