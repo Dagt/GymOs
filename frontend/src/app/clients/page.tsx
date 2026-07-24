@@ -26,7 +26,7 @@ export default function ClientsPage() {
     <AppShell
       eyebrow="Socios"
       session={controller.session}
-      subtitle="Registro completo de socios, membresia inicial y busqueda para recepcion."
+      subtitle="Registro de socios, membresía inicial opcional y búsqueda para recepción."
       title="Socios"
     >
       <ClientSearchBar query={controller.query} onQueryChange={controller.setQuery} onSubmit={controller.submitSearch} />
@@ -35,11 +35,15 @@ export default function ClientsPage() {
       {controller.message ? <p className="form-message success">{controller.message}</p> : null}
 
       <section className="grid gap-6">
-        <ClientToolbar onCreateClient={() => controller.setShowCreateClient(true)} />
+        <ClientToolbar
+          canCreate={controller.canCreateClient}
+          onCreateClient={() => controller.setShowCreateClient(true)}
+        />
         <ClientList clients={controller.clients} loading={controller.loading} />
       </section>
 
       <CreateClientDrawer
+        canRegisterMembership={controller.canCreateMembershipSale}
         createdClientId={controller.createdClientId}
         errors={controller.fieldErrors}
         form={controller.form}
@@ -57,8 +61,8 @@ export default function ClientsPage() {
 function AuthRequired() {
   return (
     <AuthRequiredCard
-      message="La lista de socios contiene informacion sensible y requiere una cuenta autorizada."
-      title="Inicia sesion para consultar socios"
+      message="La lista de socios contiene información sensible y requiere una cuenta autorizada."
+      title="Inicia sesión para consultar socios"
     />
   );
 }
