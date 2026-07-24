@@ -42,7 +42,7 @@ function CatalogContent() {
         <CatalogNavigation canManageCategories={controller.canManageCategories} view={view} onChange={setView} />
         {view === "products" ? (
           <section className="grid gap-3">
-            <div className="grid gap-3 xl:grid-cols-[260px_minmax(0,1fr)] xl:items-start">
+            <div className="grid gap-3 xl:grid-cols-[260px_minmax(0,1fr)] xl:items-stretch">
               <CatalogSummaryCards summary={controller.summary} />
               <CatalogFilters categories={controller.categories} filters={controller.catalogFilters.filters}
                 searchInput={controller.catalogFilters.searchInput} total={controller.totalProducts}
