@@ -2,6 +2,8 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8
 
 let refreshPromise: Promise<RefreshResult> | null = null;
 
+const REFRESH_MARGIN_MILLISECONDS = 30_000;
+
 type RefreshResult =
   | { status: "refreshed"; accessToken: string }
   | { status: "rejected" }
@@ -13,6 +15,17 @@ export async function apiFetch<T>(
   init: RequestInit = {},
 ): Promise<T> {
   let tokenUsed = currentAccessToken() ?? accessToken;
+
+  // Refresh before a protected request when the JWT is already expired or close
+  // to expiring. This is especially important for POST/PUT operations filled out
+  // in long forms, such as registering a new member.
+  if (tokenNeedsRefresh(tokenUsed)) {
+    const proactiveRefresh = await refreshAccessToken(tokenUsed);
+    if (proactiveRefresh.status === "refreshed") {
+      tokenUsed = proactiveRefresh.accessToken;
+    }
+  }
+
   let response = await authenticatedRequest(path, tokenUsed, init);
   if (response.status !== 401) {
     return readResponse<T>(response, path);
@@ -183,6 +196,28 @@ function currentAccessToken() {
   return window.localStorage.getItem("gymos.accessToken");
 }
 
+function tokenNeedsRefresh(accessToken: string) {
+  const expiresAt = accessTokenExpiration(accessToken);
+  return expiresAt !== null && expiresAt <= Date.now() + REFRESH_MARGIN_MILLISECONDS;
+}
+
+function accessTokenExpiration(accessToken: string): number | null {
+  if (typeof window === "undefined" || typeof TextDecoder === "undefined") return null;
+  const parts = accessToken.split(".");
+  if (parts.length !== 3) return null;
+
+  try {
+    const normalized = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+    const binary = window.atob(padded);
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    const payload = JSON.parse(new TextDecoder().decode(bytes)) as { exp?: unknown };
+    return typeof payload.exp === "number" ? payload.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
 function operationKey(...parts: string[]) {
   const random = typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
@@ -200,7 +235,7 @@ function formatApiError(response: Response, path: string, error: unknown) {
 
 function fallbackMessage(status: number) {
   if (status === 400) return "La solicitud tiene datos inválidos.";
-  if (status === 401) return "Tu sesión expiró o no es válida. Vuelve a iniciar sesión.";
+  if (status === 401) return "El servidor no pudo autenticar esta operación después de intentar renovar la sesión.";
   if (status === 403) return "Tu usuario no tiene permiso para realizar esta acción.";
   if (status === 404) return "No se encontró la información solicitada.";
   if (status >= 500) return "El servidor tuvo un problema al procesar la operación.";
