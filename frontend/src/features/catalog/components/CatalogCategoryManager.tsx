@@ -101,37 +101,37 @@ export function CatalogCategoryManager({ accessToken, categories, onChanged }: {
   function reset() { setEditingId(null); setDraft({ ...emptyDraft }); }
 
   return (
-    <section className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)] xl:items-start">
-      <form className="app-card grid gap-4 p-5 xl:sticky xl:top-4" onSubmit={submit}>
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="app-card-title">{editingId ? "Editar categoría" : "Nueva categoría"}</h2>
-          {editingId ? <button className="text-sm font-semibold text-[var(--brand-primary)]" disabled={saving} onClick={reset} type="button">Cancelar</button> : null}
+    <section className="grid gap-3 xl:grid-cols-[310px_minmax(0,1fr)] xl:items-start">
+      <form className="app-card grid gap-3 p-4 xl:sticky xl:top-4" onSubmit={submit}>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="text-base font-semibold">{editingId ? "Editar categoría" : "Nueva categoría"}</h2>
+          {editingId ? <button className="text-xs font-semibold text-[var(--brand-primary)]" disabled={saving} onClick={reset} type="button">Cancelar</button> : null}
         </div>
-        {error ? <p className="rounded-lg border border-[#e2b6b6] bg-[#fff7f7] px-3 py-2 text-sm text-[#9b2c2c]">{error}</p> : null}
-        <Field label="Nombre"><input className="app-input" maxLength={120} placeholder="Ej. Suplementos" required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></Field>
+        {error ? <p className="rounded-md border border-[#e2b6b6] bg-[#fff7f7] px-2 py-1.5 text-xs text-[#9b2c2c]">{error}</p> : null}
+        <Field label="Nombre"><input className="app-input h-10 min-h-10 text-sm" maxLength={120} placeholder="Suplementos" required value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></Field>
         <Field label="Ubicación">
-          <select className="app-input bg-white" disabled={editingHasChildren} value={draft.parentId ?? ""} onChange={(event) => setDraft({ ...draft, parentId: event.target.value || null })}>
+          <select className="app-input h-10 min-h-10 bg-white text-sm" disabled={editingHasChildren} value={draft.parentId ?? ""} onChange={(event) => setDraft({ ...draft, parentId: event.target.value || null })}>
             <option value="">Categoría principal</option>
             {roots.filter((item) => item.id !== editingId && item.status === "ACTIVE").map((item) => <option key={item.id} value={item.id}>Dentro de {item.name}</option>)}
           </select>
         </Field>
-        <Field label="Descripción"><textarea className="app-input min-h-24" maxLength={500} placeholder="Opcional" value={draft.description ?? ""} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /></Field>
-        <button className="app-button h-11" disabled={saving || !draft.name.trim()} type="submit">{saving ? "Guardando..." : editingId ? "Guardar" : draft.parentId ? "Crear subcategoría" : "Crear categoría"}</button>
+        <Field label="Descripción"><textarea className="app-input min-h-16 py-2 text-sm" maxLength={500} placeholder="Opcional" value={draft.description ?? ""} onChange={(event) => setDraft({ ...draft, description: event.target.value })} /></Field>
+        <button className="app-button h-10 min-h-10 text-sm" disabled={saving || !draft.name.trim()} type="submit">{saving ? "Guardando..." : editingId ? "Guardar" : draft.parentId ? "Crear subcategoría" : "Crear categoría"}</button>
       </form>
 
       <section className="app-card overflow-hidden">
-        <div className="flex items-center justify-between border-b border-[#e3e7df] p-5">
-          <h2 className="app-card-title">Estructura</h2>
-          <span className="text-sm text-[#6f7a73]">{categories.length}</span>
+        <div className="flex items-center justify-between border-b border-[#e3e7df] px-3 py-2.5">
+          <h2 className="text-base font-semibold">Estructura</h2>
+          <span className="text-xs text-[#6f7a73]">{categories.length}</span>
         </div>
-        <div className="max-h-[65vh] overflow-y-auto p-4">
-          {roots.length === 0 ? <p className="py-8 text-center text-sm text-[#5d6b63]">No hay categorías.</p> : null}
-          <div className="grid gap-3 lg:grid-cols-2">
+        <div className="max-h-[58vh] overflow-y-auto p-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {roots.length === 0 ? <p className="py-6 text-center text-xs text-[#5d6b63]">No hay categorías.</p> : null}
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {roots.map((root) => (
-              <article className="rounded-xl border border-[#d8ddd2] bg-[#fbfcfa] p-4" key={root.id}>
+              <article className="rounded-lg border border-[#d8ddd2] bg-[#fbfcfa] p-2.5" key={root.id}>
                 <CategoryRow category={root} label="Principal" saving={saving} onArchive={archive} onEdit={edit} onToggle={toggle} />
                 {(children.get(root.id) ?? []).length ? (
-                  <div className="mt-3 grid gap-2 border-l-2 border-[var(--brand-accent)] pl-3">
+                  <div className="mt-2 grid gap-1.5 border-l-2 border-[var(--brand-accent)] pl-2">
                     {(children.get(root.id) ?? []).map((child) => <CategoryRow key={child.id} category={child} label="Subcategoría" compact saving={saving} onArchive={archive} onEdit={edit} onToggle={toggle} />)}
                   </div>
                 ) : null}
@@ -154,18 +154,16 @@ function CategoryRow({ category, label, compact = false, saving, onArchive, onEd
   onToggle: (category: CatalogCategory) => Promise<void>;
 }) {
   return (
-    <div className={compact ? "rounded-lg border border-[#e1e5de] bg-white p-3" : ""}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <strong className="truncate">{category.name}</strong>
-            <span className="rounded-full bg-[#eef2ec] px-2 py-1 text-[10px] font-semibold text-[#536158]">{label}</span>
-            {category.status !== "ACTIVE" ? <span className="text-xs font-semibold text-[#8a5a22]">Inactiva</span> : null}
-          </div>
-          {category.description ? <p className="mt-1 line-clamp-2 text-xs text-[#6f7a73]">{category.description}</p> : null}
+    <div className={compact ? "rounded-md border border-[#e1e5de] bg-white p-2" : ""}>
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <strong className="truncate text-[12px] leading-tight">{category.name}</strong>
+          <span className="rounded-full bg-[#eef2ec] px-1.5 py-0.5 text-[9px] font-semibold text-[#536158]">{label}</span>
+          {category.status !== "ACTIVE" ? <span className="text-[9px] font-semibold text-[#8a5a22]">Inactiva</span> : null}
         </div>
+        {category.description ? <p className="mt-1 line-clamp-1 text-[10px] leading-tight text-[#6f7a73]">{category.description}</p> : null}
       </div>
-      <div className="mt-3 flex flex-wrap gap-2">
+      <div className="mt-2 flex flex-wrap gap-1">
         <Action label="Editar" disabled={saving} onClick={() => onEdit(category)} />
         <Action label={category.status === "ACTIVE" ? "Desactivar" : "Activar"} disabled={saving} onClick={() => void onToggle(category)} />
         <Action label="Archivar" danger disabled={saving} onClick={() => void onArchive(category)} />
@@ -175,7 +173,7 @@ function CategoryRow({ category, label, compact = false, saving, onArchive, onEd
 }
 
 function Action({ label, disabled, danger = false, onClick }: { label: string; disabled: boolean; danger?: boolean; onClick: () => void }) {
-  return <button className={danger ? "rounded-md border border-[#e2b6b6] px-2 py-1 text-xs font-semibold text-[#9b2c2c]" : "app-button-secondary h-8 px-2 text-xs"} disabled={disabled} onClick={onClick} type="button">{label}</button>;
+  return <button className={danger ? "rounded border border-[#e2b6b6] px-1.5 py-1 text-[9px] font-semibold leading-none text-[#9b2c2c]" : "rounded border border-[#cdd5ca] bg-white px-1.5 py-1 text-[9px] font-semibold leading-none text-[var(--brand-primary)]"} disabled={disabled} onClick={onClick} type="button">{label}</button>;
 }
-function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="grid gap-1.5 text-sm"><span className="font-semibold text-[#28332d]">{label}</span>{children}</label>; }
+function Field({ label, children }: { label: string; children: ReactNode }) { return <label className="grid gap-1 text-xs"><span className="font-semibold text-[#28332d]">{label}</span>{children}</label>; }
 function compare(a: CatalogCategory, b: CatalogCategory) { return a.displayOrder - b.displayOrder || a.name.localeCompare(b.name, "es"); }
