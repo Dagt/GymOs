@@ -12,16 +12,20 @@ import com.gymos.audit.api.AuditService;
 import com.gymos.catalog.api.CatalogProductOperations;
 import com.gymos.catalog.api.CatalogProductOperations.CatalogProductSnapshot;
 import com.gymos.inventory.api.InventoryRefundOperations;
+import com.gymos.inventory.api.InventoryRefundOperations.RefundedInventoryItem;
 import com.gymos.inventory.infrastructure.InventorySaleDeductionRepository.StockDeductionResult;
 import com.gymos.sales.api.events.PaymentCompletedLineItemV1;
 import com.gymos.sales.api.events.PaymentCompletedV1;
 import com.gymos.sales.api.events.RefundProcessedV1;
+import com.gymos.sales.api.events.SaleItemsRefundedLineV1;
+import com.gymos.sales.api.events.SaleItemsRefundedV1;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -124,6 +128,37 @@ class InventorySalesEventListenerTests {
 		verify(inventoryRefundOperations).restoreFullSale(
 				eq(organizationId), eq(branchId), eq(saleId), eq(refundId), eq(actorUserId), eq(occurredAt), eq(correlationId)
 		);
+	}
+
+	@Test
+	void itemizedRefundRestocksOnlySelectedPhysicalItemsAggregatedByProduct() {
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		UUID saleId = UUID.randomUUID();
+		UUID refundId = UUID.randomUUID();
+		UUID actorUserId = UUID.randomUUID();
+		UUID productId = UUID.randomUUID();
+		OffsetDateTime occurredAt = OffsetDateTime.now();
+		UUID correlationId = UUID.randomUUID();
+
+		listener.onSaleItemsRefunded(new SaleItemsRefundedV1(
+				organizationId, branchId, saleId, refundId, actorUserId,
+				List.of(
+						new SaleItemsRefundedLineV1(UUID.randomUUID(), productId, "PHYSICAL", 1, true),
+						new SaleItemsRefundedLineV1(UUID.randomUUID(), productId, "PHYSICAL", 2, true),
+						new SaleItemsRefundedLineV1(UUID.randomUUID(), UUID.randomUUID(), "PHYSICAL", 1, false),
+						new SaleItemsRefundedLineV1(UUID.randomUUID(), UUID.randomUUID(), "SERVICE", 1, true)
+				), occurredAt, correlationId
+		));
+
+		ArgumentCaptor<List<RefundedInventoryItem>> itemsCaptor = ArgumentCaptor.forClass(List.class);
+		verify(inventoryRefundOperations).restoreItems(
+				eq(organizationId), eq(branchId), eq(saleId), eq(refundId), eq(actorUserId),
+				itemsCaptor.capture(), eq(occurredAt), eq(correlationId)
+		);
+		assertThat(itemsCaptor.getValue()).containsExactly(new RefundedInventoryItem(productId, 3));
+		verify(auditService).recordSystem(eq(organizationId), eq(branchId), eq(actorUserId),
+				eq("INVENTORY_REFUND_RESTOCKED"), eq("SALE_REFUND"), eq(refundId), eq("SALES_EVENT"), any(), any());
 	}
 
 	private CatalogProductSnapshot product(UUID id, String name, boolean inventoryTracked) {
