@@ -87,6 +87,7 @@ export const emptyPlan: PlanDraft = {
 export function productDraftToPayload(form: ProductPayload, price: string): ProductPayload {
   return {
     ...form,
+    commercialSubtype: form.productType === "PHYSICAL" ? "GENERAL_PRODUCT" : "GENERAL_SERVICE",
     currency: form.currency.trim().toUpperCase() || "MXN",
     priceCents: Math.round(Number(price || "0") * 100),
     sku: form.sku.trim(),
