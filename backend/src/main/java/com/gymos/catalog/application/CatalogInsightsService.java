@@ -21,14 +21,15 @@ class CatalogInsightsService {
 	}
 
 	CatalogSummaryView summary(GymOsPrincipal principal) {
-		CatalogAccessGuard.requirePrincipal(principal);
+		CatalogAccessGuard.requireBranch(principal);
 		return insights.summary(principal.organizationId(), principal.branchId());
 	}
 
 	ProductDetailView detail(GymOsPrincipal principal, UUID productId, int historyLimit) {
-		CatalogAccessGuard.requirePrincipal(principal);
-		ProductSummaryView product = products.findProductIncludingArchived(principal.organizationId(), productId)
-				.orElseThrow(() -> new BusinessException("PRODUCT_NOT_FOUND", "El producto no esta disponible."));
+		CatalogAccessGuard.requireBranch(principal);
+		ProductSummaryView product = products.findProductIncludingArchived(
+				principal.organizationId(), principal.branchId(), productId)
+				.orElseThrow(() -> new BusinessException("PRODUCT_NOT_FOUND", "El producto no esta disponible en esta sucursal."));
 		return new ProductDetailView(
 				product.visibleTo(principal.permissions()),
 				insights.dependencies(principal.organizationId(), productId),
