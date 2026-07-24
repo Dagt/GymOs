@@ -23,16 +23,16 @@ export function CatalogToolbar({ canCreate, onNewPlan, onNewProduct }: CatalogTo
     <section className="catalog-toolbar app-card p-5">
       <div>
         <p className="app-eyebrow">Gestion del catalogo</p>
-        <h2 className="app-card-title">Planes separados de productos de venta</h2>
+        <h2 className="app-card-title">Productos, servicios y planes tienen funciones distintas</h2>
         <p className="app-card-copy">
-          Usa productos para mostrador y servicios. Usa planes para membresias con duracion, acceso multi-sucursal y alta de socios.
+          Un producto físico se entrega y puede descontar inventario. Un servicio es algo que cobras sin manejar existencias, como una consulta, sesión o pase. Los planes se usan únicamente para membresías con duración y acceso.
         </p>
       </div>
       <div>
         {canCreate ? (
           <>
             <button className="app-button-secondary" onClick={onNewProduct} type="button">
-              Nuevo producto
+              Nuevo producto o servicio
             </button>
             <button className="app-button" onClick={onNewPlan} type="button">
               Nuevo plan
