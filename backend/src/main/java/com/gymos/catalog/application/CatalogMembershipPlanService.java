@@ -97,15 +97,21 @@ class CatalogMembershipPlanService {
 		ProductSummaryView product = products.findProduct(principal.organizationId(), existing.productId())
 				.orElseThrow(() -> new BusinessException("PRODUCT_NOT_FOUND", "El producto del plan no esta disponible."));
 		OffsetDateTime now = OffsetDateTime.now();
-		productCommands.update(new ProductMutation(
+		int updatedProducts = productCommands.update(new ProductMutation(
 				principal.organizationId(), existing.productId(), product.sku(), request.name().trim(),
 				CatalogBenefitsSerializer.blankToNull(request.description()), "MEMBERSHIP_PLAN", "MEMBERSHIP",
 				request.priceCents(), request.currency().trim().toUpperCase(), true,
 				request.status().trim().toUpperCase(), product.barcode(), product.brand(), product.presentation(),
 				product.unitOfMeasure(), false, product.displayOrder(), product.imageObjectKey(),
 				product.supplierName(), product.referenceCostCents(), product.promotionalPriceCents(),
-				product.promotionStartsAt(), product.promotionEndsAt(), now, principal.userId()
+				product.promotionStartsAt(), product.promotionEndsAt(), product.version(), now, principal.userId()
 		));
+		if (updatedProducts != 1) {
+			throw new BusinessException(
+					"PRODUCT_VERSION_CONFLICT",
+					"El plan fue modificado por otra operacion. Recarga la pagina e intenta nuevamente."
+			);
+		}
 		planCommands.update(new PlanMutation(
 				principal.organizationId(), planId, existing.productId(), request.durationDays(), request.graceDays(),
 				benefitsSerializer.textToJson(request.benefits()), request.multiBranchAccess(),
