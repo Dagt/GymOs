@@ -40,6 +40,7 @@ export function useCatalogController() {
   const [existingImageObjectKey, setExistingImageObjectKey] = useState<string | null>(null);
   const [price, setPrice] = useState("");
   const [reorderPoint, setReorderPoint] = useState("0");
+  const [tagsText, setTagsText] = useState("");
   const [productImage, setProductImage] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -121,7 +122,10 @@ export function useCatalogController() {
     setError(null);
     setMessage(null);
     try {
-      const payload = productDraftToPayload(form, price);
+      const payload = {
+        ...productDraftToPayload(form, price),
+        tags: parseTags(tagsText),
+      };
       const saved = editingProductId
         ? await updateProduct(activeSession.accessToken, editingProductId, payload)
         : await createProduct(activeSession.accessToken, payload);
@@ -187,6 +191,7 @@ export function useCatalogController() {
     setForm(emptyProduct);
     setPrice("");
     setReorderPoint("0");
+    setTagsText("");
     setProductImage(null);
     setShowProductDrawer(true);
   }
@@ -198,6 +203,7 @@ export function useCatalogController() {
     setForm(productToDraft(product));
     setPrice(String(product.priceCents / 100));
     setReorderPoint("0");
+    setTagsText(product.tags.join(", "));
     setProductImage(null);
     setShowProductDrawer(true);
 
@@ -217,6 +223,7 @@ export function useCatalogController() {
     setForm(emptyProduct);
     setPrice("");
     setReorderPoint("0");
+    setTagsText("");
     setProductImage(null);
     setShowProductDrawer(false);
   }
@@ -297,6 +304,7 @@ export function useCatalogController() {
     setPrice,
     setProductImage,
     setReorderPoint,
+    setTagsText,
     showPlanDrawer: planEditor.open,
     showProductDrawer,
     submitPlan: planEditor.submit,
@@ -304,6 +312,7 @@ export function useCatalogController() {
     resetPlanDrawer: planEditor.close,
     resetProductDrawer,
     reloadCatalog,
+    tagsText,
     toggleProductStatus,
     totalPages,
     totalProducts,
@@ -325,6 +334,10 @@ function loadCatalog(accessToken: string, filters: import("@/lib/api").ProductSe
     getCatalogCategories(accessToken, true),
     getCatalogSummary(accessToken),
   ]);
+}
+
+function parseTags(value: string) {
+  return [...new Set(value.split(",").map((tag) => tag.trim()).filter(Boolean))];
 }
 
 function hasPermission(session: StoredSession | null, permission: string) {
