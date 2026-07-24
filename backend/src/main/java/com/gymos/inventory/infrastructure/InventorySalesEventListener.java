@@ -3,12 +3,16 @@ package com.gymos.inventory.infrastructure;
 import com.gymos.audit.api.AuditService;
 import com.gymos.catalog.api.CatalogProductOperations;
 import com.gymos.inventory.api.InventoryRefundOperations;
+import com.gymos.inventory.api.InventoryRefundOperations.RefundedInventoryItem;
 import com.gymos.inventory.infrastructure.InventorySaleDeductionRepository.StockDeductionResult;
 import com.gymos.sales.api.events.PaymentCompletedLineItemV1;
 import com.gymos.sales.api.events.PaymentCompletedV1;
 import com.gymos.sales.api.events.RefundProcessedV1;
+import com.gymos.sales.api.events.SaleItemsRefundedLineV1;
+import com.gymos.sales.api.events.SaleItemsRefundedV1;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -68,6 +72,31 @@ public class InventorySalesEventListener {
 		inventoryRefundOperations.restoreFullSale(
 				event.organizationId(), event.branchId(), event.saleId(), event.refundId(),
 				event.actorUserId(), event.occurredAt(), event.correlationId()
+		);
+	}
+
+	@EventListener
+	@Transactional
+	public void onSaleItemsRefunded(SaleItemsRefundedV1 event) {
+		Map<UUID, Integer> quantities = event.items().stream()
+				.filter(SaleItemsRefundedLineV1::restock)
+				.filter(item -> "PHYSICAL".equals(item.itemType()) && item.productId() != null)
+				.collect(Collectors.groupingBy(
+						SaleItemsRefundedLineV1::productId,
+						Collectors.summingInt(SaleItemsRefundedLineV1::quantity)
+				));
+		if (quantities.isEmpty()) return;
+		List<RefundedInventoryItem> items = quantities.entrySet().stream()
+				.map(entry -> new RefundedInventoryItem(entry.getKey(), entry.getValue()))
+				.toList();
+		inventoryRefundOperations.restoreItems(
+				event.organizationId(), event.branchId(), event.saleId(), event.refundId(),
+				event.actorUserId(), items, event.occurredAt(), event.correlationId()
+		);
+		auditService.recordSystem(
+				event.organizationId(), event.branchId(), event.actorUserId(),
+				"INVENTORY_REFUND_RESTOCKED", "SALE_REFUND", event.refundId(), "SALES_EVENT",
+				"Reposicion selectiva por devolucion de productos.", event.correlationId().toString()
 		);
 	}
 }
