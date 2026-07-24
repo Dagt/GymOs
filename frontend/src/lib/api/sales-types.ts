@@ -33,6 +33,7 @@ export type SaleItemDetail = {
   unitPriceCents: number;
   discountCents: number;
   totalCents: number;
+  refundedQuantity: number;
   createdAt: string;
 };
 
@@ -152,11 +153,18 @@ export type ManualPaymentPayload = {
   idempotencyKey?: string | null;
 };
 
+export type SaleRefundItemPayload = {
+  saleItemId: string;
+  quantity: number;
+  restock: boolean;
+};
+
 export type SaleRefundPayload = {
   paymentId?: string | null;
   amountCents: number;
   reason: string;
   idempotencyKey?: string | null;
+  items?: SaleRefundItemPayload[];
 };
 
 export type CreateSalePayload = {
