@@ -111,16 +111,6 @@ export function CatalogProductDrawer({
           </details>
         ) : null}
 
-        <details className="rounded-xl border border-[#d8ddd2] bg-white p-4">
-          <summary className="cursor-pointer font-semibold">Promoción</summary>
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <NumberField label="Precio promocional" name="productPromotionalPrice" required={false} value={money(form.promotionalPriceCents)} onChange={(value) => change({ promotionalPriceCents: cents(value) })} />
-            <div className="hidden sm:block" aria-hidden="true" />
-            <DateTimeField label="Inicio" value={form.promotionStartsAt} onChange={(promotionStartsAt) => change({ promotionStartsAt })} />
-            <DateTimeField label="Fin" value={form.promotionEndsAt} onChange={(promotionEndsAt) => change({ promotionEndsAt })} />
-          </div>
-        </details>
-
         {canManageImages ? (
           <details className="rounded-xl border border-[#d8ddd2] bg-white p-4">
             <summary className="cursor-pointer font-semibold">Imagen</summary>
@@ -155,15 +145,4 @@ function cents(value: string) {
 
 function money(value?: number | null) {
   return value == null ? "" : String(value / 100);
-}
-
-function DateTimeField({ label, value, onChange }: { label: string; value?: string | null; onChange: (value: string | null) => void }) {
-  return <label className="grid gap-1 text-sm"><span className="font-medium">{label}</span><input className="app-input" type="datetime-local" value={localDateTime(value)} onChange={(event) => onChange(event.target.value || null)} /></label>;
-}
-
-function localDateTime(value?: string | null) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value.slice(0, 16);
-  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 }
