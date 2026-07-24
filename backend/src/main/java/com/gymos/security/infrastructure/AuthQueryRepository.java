@@ -43,9 +43,12 @@ public class AuthQueryRepository {
 	public boolean userHasBranchAccess(UUID userId, UUID branchId) {
 		Integer count = jdbcClient.sql("""
 				SELECT COUNT(*)
-				FROM user_branch_access
-				WHERE user_id = :userId
-				  AND branch_id = :branchId
+				FROM user_branch_access uba
+				JOIN branch b ON b.id = uba.branch_id
+				WHERE uba.user_id = :userId
+				  AND uba.branch_id = :branchId
+				  AND b.status = 'ACTIVE'
+				  AND b.deleted_at IS NULL
 				""")
 				.param("userId", userId)
 				.param("branchId", branchId)
@@ -61,6 +64,7 @@ public class AuthQueryRepository {
 				JOIN branch b ON b.id = uba.branch_id
 				WHERE uba.user_id = :userId
 				  AND b.organization_id = :organizationId
+				  AND b.status = 'ACTIVE'
 				  AND b.deleted_at IS NULL
 				""")
 				.param("userId", userId)
@@ -76,6 +80,7 @@ public class AuthQueryRepository {
 				FROM branch
 				WHERE id = :branchId
 				  AND organization_id = :organizationId
+				  AND status = 'ACTIVE'
 				  AND deleted_at IS NULL
 				""")
 				.param("branchId", branchId)
