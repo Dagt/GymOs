@@ -83,7 +83,8 @@ export function useInventoryController() {
   }, [stockQuery]);
 
   useEffect(() => {
-    if (!session) return;
+    const activeSession = session;
+    if (!activeSession) return;
     let active = true;
 
     async function loadStock() {
@@ -91,7 +92,7 @@ export function useInventoryController() {
       if (!active) return;
       setStockLoading(true);
       try {
-        const page = await searchInventoryStock(session.accessToken, {
+        const page = await searchInventoryStock(activeSession.accessToken, {
           q: debouncedStockQuery,
           page: stockPage,
           size: 25,
@@ -119,7 +120,8 @@ export function useInventoryController() {
   }, [debouncedStockQuery, session, stockPage, stockSort]);
 
   useEffect(() => {
-    if (!session) return;
+    const activeSession = session;
+    if (!activeSession) return;
     let active = true;
 
     async function loadMovements() {
@@ -127,7 +129,7 @@ export function useInventoryController() {
       if (!active) return;
       setMovementLoading(true);
       try {
-        const page = await searchInventoryMovements(session.accessToken, {
+        const page = await searchInventoryMovements(activeSession.accessToken, {
           productId: selectedProductId || undefined,
           page: movementPage,
           size: 25,
