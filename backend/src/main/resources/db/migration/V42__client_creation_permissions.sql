@@ -1,7 +1,6 @@
--- Expand the legacy client-management permission and the operational front-desk
--- roles that can both consult clients and create sales. Coaches normally have
--- client visibility for assigned work, but do not have sale.create and therefore
--- are intentionally excluded.
+-- Grant client creation to owner, management, reception and platform support
+-- roles. Coaches can retain client visibility for assigned work but are excluded
+-- because they do not have client.manage, sale.create or platform.admin.
 INSERT INTO role_permission (role_id, permission_id)
 SELECT DISTINCT eligible.role_id, client_create.id
 FROM permission client_create
@@ -21,7 +20,14 @@ JOIN (
     JOIN role_permission operational ON operational.role_id = client_read.role_id
     JOIN permission operational_permission
       ON operational_permission.id = operational.permission_id
-     AND operational_permission.code IN ('sale.create', 'platform.admin')
+     AND operational_permission.code = 'sale.create'
+
+    UNION
+
+    SELECT rp.role_id
+    FROM role_permission rp
+    JOIN permission p ON p.id = rp.permission_id
+    WHERE p.code = 'platform.admin'
 ) eligible ON TRUE
 WHERE client_create.code = 'client.create'
 ON CONFLICT DO NOTHING;
