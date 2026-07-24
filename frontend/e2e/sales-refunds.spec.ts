@@ -1,4 +1,17 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
+
+const user = {
+  userId: "77777777-7777-4777-8777-777777777777",
+  organizationId: "88888888-8888-4888-8888-888888888888",
+  branchId: "22222222-2222-4222-8222-222222222222",
+  username: "owner@gymos.test",
+  fullName: "Owner",
+  permissions: ["sale.read", "sale.refund"],
+  roles: ["Dueno del gimnasio"],
+  platformAdmin: false,
+  supportMode: false,
+  console: "TENANT_OWNER",
+};
 
 const sale = {
   sale: {
@@ -106,27 +119,20 @@ test("registra devolucion por cantidad y solicita reposicion de inventario", asy
 
 async function boot(
   page: Page,
-  handler: (route: Parameters<Page["route"]>[1] extends (route: infer R) => unknown ? R : never, path: string) => Promise<void>,
+  handler: (route: Route, path: string) => Promise<void>,
 ) {
   await page.route("**/api/v1/**", async (route) => {
     const url = new URL(route.request().url());
-    await handler(route, url.pathname.replace(/^\/api\/v1/, ""));
+    const path = url.pathname.replace(/^\/api\/v1/, "");
+    if (path === "/auth/me") {
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify(user) });
+      return;
+    }
+    await handler(route, path);
   });
-  await page.addInitScript(() => {
-    const user = {
-      userId: "77777777-7777-4777-8777-777777777777",
-      organizationId: "88888888-8888-4888-8888-888888888888",
-      branchId: "22222222-2222-4222-8222-222222222222",
-      username: "owner@gymos.test",
-      fullName: "Owner",
-      permissions: ["sale.read", "sale.refund"],
-      roles: ["Dueno del gimnasio"],
-      platformAdmin: false,
-      supportMode: false,
-      console: "TENANT_OWNER",
-    };
+  await page.addInitScript(({ currentUser }) => {
     window.localStorage.setItem("gymos.accessToken", "e2e-access-token");
     window.localStorage.setItem("gymos.refreshToken", "e2e-refresh-token");
-    window.localStorage.setItem("gymos.currentUser", JSON.stringify(user));
-  });
+    window.localStorage.setItem("gymos.currentUser", JSON.stringify(currentUser));
+  }, { currentUser: user });
 }
