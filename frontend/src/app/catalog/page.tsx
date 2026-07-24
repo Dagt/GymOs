@@ -42,11 +42,13 @@ function CatalogContent() {
         <CatalogNavigation canManageCategories={controller.canManageCategories} view={view} onChange={setView} />
         {view === "products" ? (
           <section className="grid gap-3">
-            <CatalogSummaryCards summary={controller.summary} />
-            <CatalogFilters categories={controller.categories} filters={controller.catalogFilters.filters}
-              searchInput={controller.catalogFilters.searchInput} total={controller.totalProducts}
-              onClear={controller.catalogFilters.clear} onSearchChange={controller.catalogFilters.setSearchInput}
-              onUpdate={controller.catalogFilters.update} />
+            <div className="grid gap-3 xl:grid-cols-[310px_minmax(0,1fr)] xl:items-stretch">
+              <CatalogSummaryCards summary={controller.summary} />
+              <CatalogFilters categories={controller.categories} filters={controller.catalogFilters.filters}
+                searchInput={controller.catalogFilters.searchInput} total={controller.totalProducts}
+                onClear={controller.catalogFilters.clear} onSearchChange={controller.catalogFilters.setSearchInput}
+                onUpdate={controller.catalogFilters.update} />
+            </div>
             <CatalogProductTable canArchive={controller.canArchive} canManageStatus={controller.canManageStatus}
               canUpdate={controller.canUpdate} loading={controller.loading} products={controller.products}
               saving={controller.saving} onArchive={controller.archiveCatalogProduct} onEdit={controller.openProductEdition}
