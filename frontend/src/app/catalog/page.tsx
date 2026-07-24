@@ -41,7 +41,7 @@ function CatalogContent() {
         <CatalogToolbar canCreate={controller.canCreate} onNewPlan={openPlanCreation} onNewProduct={openProductCreation} />
         <CatalogNavigation canManageCategories={controller.canManageCategories} view={view} onChange={setView} />
         {view === "products" ? (
-          <section className="grid gap-4">
+          <section className="grid gap-3">
             <CatalogSummaryCards summary={controller.summary} />
             <CatalogFilters categories={controller.categories} filters={controller.catalogFilters.filters}
               searchInput={controller.catalogFilters.searchInput} total={controller.totalProducts}
@@ -69,12 +69,14 @@ function CatalogContent() {
         open={controller.showProductDrawer}
         price={controller.price}
         reorderPoint={controller.reorderPoint}
+        tagsText={controller.tagsText}
         image={controller.productImage}
         saving={controller.saving}
         onClose={controller.resetProductDrawer}
         onFormChange={controller.setForm}
         onPriceChange={controller.setPrice}
         onReorderPointChange={controller.setReorderPoint}
+        onTagsTextChange={controller.setTagsText}
         onImageChange={controller.setProductImage}
         onRemoveImage={controller.removeCurrentProductImage}
         onSubmit={controller.submitProduct}
