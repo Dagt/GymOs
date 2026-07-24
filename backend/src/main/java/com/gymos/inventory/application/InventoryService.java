@@ -48,7 +48,7 @@ public class InventoryService {
 	@Transactional(readOnly = true)
 	public InventoryStockView stockDetail(GymOsPrincipal principal, UUID productId) {
 		requireBranch(principal);
-		ensureInventoryProduct(principal.organizationId(), productId);
+		ensureInventoryProduct(principal.organizationId(), principal.branchId(), productId);
 		return queries.stockDetail(principal.organizationId(), principal.branchId(), productId)
 				.orElseThrow(() -> new BusinessException("INVENTORY_PRODUCT_NOT_FOUND", "El producto no esta disponible para inventario."));
 	}
@@ -74,7 +74,7 @@ public class InventoryService {
 	@Transactional
 	public InventoryStockView createMovement(GymOsPrincipal principal, InventoryMovementCommand request, String correlationId) {
 		requireBranch(principal);
-		InventoryProductView product = ensureInventoryProduct(principal.organizationId(), request.productId());
+		InventoryProductView product = ensureInventoryProduct(principal.organizationId(), principal.branchId(), request.productId());
 		String movementType = normalizeManualMovementType(request.movementType());
 		int quantityDelta = quantityDelta(movementType, request.quantity());
 		OffsetDateTime now = OffsetDateTime.now();
@@ -96,7 +96,7 @@ public class InventoryService {
 	@Transactional
 	public InventoryStockView updateReorderPoint(GymOsPrincipal principal, UUID productId, int reorderPoint, String correlationId) {
 		requireBranch(principal);
-		ensureInventoryProduct(principal.organizationId(), productId);
+		ensureInventoryProduct(principal.organizationId(), principal.branchId(), productId);
 		if (reorderPoint < 0) throw new BusinessException("INVENTORY_REORDER_POINT_INVALID", "El punto de reorden no puede ser negativo.");
 		commands.updateReorderPoint(principal.organizationId(), principal.branchId(), productId, reorderPoint, principal.userId(), OffsetDateTime.now());
 		auditService.record(principal, "INVENTORY_REORDER_POINT_UPDATED", "CATALOG_PRODUCT", productId, "BACKOFFICE", String.valueOf(reorderPoint), correlationId);
@@ -104,9 +104,9 @@ public class InventoryService {
 				.orElseThrow(() -> new BusinessException("INVENTORY_STOCK_NOT_FOUND", "No fue posible recuperar existencias."));
 	}
 
-	private InventoryProductView ensureInventoryProduct(UUID organizationId, UUID productId) {
-		InventoryProductView product = queries.product(organizationId, productId)
-				.orElseThrow(() -> new BusinessException("PRODUCT_NOT_FOUND", "El producto no existe o no esta disponible."));
+	private InventoryProductView ensureInventoryProduct(UUID organizationId, UUID branchId, UUID productId) {
+		InventoryProductView product = queries.product(organizationId, branchId, productId)
+				.orElseThrow(() -> new BusinessException("PRODUCT_NOT_FOUND", "El producto no existe en la sucursal activa."));
 		if (!"PHYSICAL".equals(product.productType()) || !product.inventoryTracked() || !"ACTIVE".equals(product.status())) {
 			throw new BusinessException("PRODUCT_NOT_INVENTORY_TRACKED", "Solo los productos fisicos activos con control de inventario pueden manejar existencias.");
 		}
