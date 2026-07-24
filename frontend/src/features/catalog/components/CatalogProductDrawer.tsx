@@ -14,12 +14,14 @@ type Props = {
   open: boolean;
   price: string;
   reorderPoint: string;
+  tagsText: string;
   image: File | null;
   saving: boolean;
   onClose: () => void;
   onFormChange: (form: ProductPayload) => void;
   onPriceChange: (value: string) => void;
   onReorderPointChange: (value: string) => void;
+  onTagsTextChange: (value: string) => void;
   onImageChange: (file: File | null) => void;
   onRemoveImage: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -36,12 +38,14 @@ export function CatalogProductDrawer({
   open,
   price,
   reorderPoint,
+  tagsText,
   image,
   saving,
   onClose,
   onFormChange,
   onPriceChange,
   onReorderPointChange,
+  onTagsTextChange,
   onImageChange,
   onRemoveImage,
   onSubmit,
@@ -57,6 +61,8 @@ export function CatalogProductDrawer({
       productType,
       commercialSubtype: productType === "PHYSICAL" ? "GENERAL_PRODUCT" : "GENERAL_SERVICE",
       inventoryTracked: productType === "PHYSICAL" ? form.inventoryTracked : false,
+      referenceCostCents: productType === "PHYSICAL" ? form.referenceCostCents : null,
+      supplierName: productType === "PHYSICAL" ? form.supplierName : null,
     });
   }
 
@@ -65,9 +71,9 @@ export function CatalogProductDrawer({
       <form className="grid gap-4" onSubmit={onSubmit}>
         <section className="grid gap-4 rounded-xl border border-[#d8ddd2] bg-white p-4">
           <div className="grid gap-4 sm:grid-cols-2">
-            <TextField label="Nombre" name="productName" placeholder={form.productType === "SERVICE" ? "Inscripción" : "Agua 600 ml"} value={form.name} onChange={(name) => change({ name })} />
-            <TextField label="SKU" name="productSku" placeholder={form.productType === "SERVICE" ? "INSCRIPCION" : "AGUA-600"} value={form.sku} onChange={(sku) => change({ sku })} />
-            <NumberField label="Precio" name="productPrice" value={price} onChange={onPriceChange} />
+            <TextField label="Nombre" name="productName" placeholder={form.productType === "SERVICE" ? "Scoop de preentreno" : "Agua 600 ml"} value={form.name} onChange={(name) => change({ name })} />
+            <TextField label="SKU" name="productSku" placeholder={form.productType === "SERVICE" ? "SCOOP-PRE" : "AGUA-600"} value={form.sku} onChange={(sku) => change({ sku })} />
+            <NumberField label="Precio" name="productPrice" step="0.01" value={price} onChange={onPriceChange} />
             <SelectField label="Tipo" name="productType" options={[{ label: "Producto físico", value: "PHYSICAL" }, { label: "Cargo de caja", value: "SERVICE" }]} value={form.productType} onChange={changeType} />
             <SelectField label="Categoría" name="productCategory" required={false} options={[{ label: "Sin categoría", value: "" }, ...options]} value={form.categoryId ?? ""} onChange={(categoryId) => change({ categoryId: categoryId || null })} />
             {form.productType === "PHYSICAL" && form.inventoryTracked && canManageInventory ? (
@@ -94,18 +100,18 @@ export function CatalogProductDrawer({
                 <TextField label="Unidad" name="productUnit" placeholder="Pieza" required={false} value={form.unitOfMeasure ?? ""} onChange={(unitOfMeasure) => change({ unitOfMeasure: unitOfMeasure || null })} />
               </>
             ) : null}
-            <TextField label="Etiquetas" name="productTags" placeholder="energía, cafeína" required={false} value={form.tags.join(", ")} onChange={(value) => change({ tags: value.split(",").map((tag) => tag.trim()).filter(Boolean) })} />
+            <TextField label="Etiquetas" name="productTags" placeholder="energía, cafeína, preentreno" required={false} value={tagsText} onChange={onTagsTextChange} />
             <div className="sm:col-span-2">
               <TextAreaField label="Descripción" name="productDescription" required={false} placeholder="Descripción opcional" value={form.description ?? ""} onChange={(description) => change({ description })} />
             </div>
           </div>
         </details>
 
-        {canReadCosts ? (
+        {canReadCosts && form.productType === "PHYSICAL" ? (
           <details className="rounded-xl border border-[#d8ddd2] bg-white p-4">
             <summary className="cursor-pointer font-semibold">Costo y proveedor</summary>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <NumberField label="Costo" name="productReferenceCost" required={false} value={money(form.referenceCostCents)} onChange={(value) => change({ referenceCostCents: cents(value) })} />
+              <NumberField label="Costo" name="productReferenceCost" required={false} step="0.01" value={money(form.referenceCostCents)} onChange={(value) => change({ referenceCostCents: cents(value) })} />
               <TextField label="Proveedor" name="productSupplier" placeholder="Proveedor" required={false} value={form.supplierName ?? ""} onChange={(supplierName) => change({ supplierName: supplierName || null })} />
             </div>
           </details>
