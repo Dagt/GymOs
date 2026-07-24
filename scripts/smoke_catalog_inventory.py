@@ -9,8 +9,9 @@ Variables opcionales:
   GYMOS_BASE_URL=http://localhost:8080/api/v1
 
 El script crea datos temporales, valida carga/sustitución/eliminación de imagen,
-registra inventario inicial, vende, verifica descuento, reembolsa y verifica
-reposición. Finalmente archiva el producto temporal.
+registra inventario inicial, vende, verifica descuento y procesa dos devoluciones
+por línea: una reposicionable y otra no reposicionable. Finalmente archiva el
+producto temporal.
 """
 
 from __future__ import annotations
@@ -120,6 +121,16 @@ def find_sale_id(value: Any) -> str | None:
             if result:
                 return result
     return None
+
+
+def find_sale_item_id(value: Any) -> str | None:
+    if not isinstance(value, dict):
+        return None
+    items = value.get("items")
+    if not isinstance(items, list) or not items:
+        return None
+    first = items[0]
+    return first.get("id") if isinstance(first, dict) and isinstance(first.get("id"), str) else None
 
 
 def wait_for_stock(client: Client, product_id: str, expected: int) -> None:
@@ -233,21 +244,44 @@ def main() -> None:
             headers={"Idempotency-Key": f"sale-smoke-{uuid.uuid4().hex}"},
         )
         sale_id = find_sale_id(sale)
-        if not sale_id:
-            raise RuntimeError("No fue posible resolver saleId en la respuesta de venta.")
+        sale_item_id = find_sale_item_id(sale)
+        if not sale_id or not sale_item_id:
+            raise RuntimeError("No fue posible resolver la venta o su línea en la respuesta.")
         wait_for_stock(client, product_id, 3)
 
-        client.request(
+        first_refund = client.request(
             "POST",
             f"sales/{sale_id}/refunds",
             {
                 "paymentId": None,
-                "amountCents": 2000,
-                "reason": "Reembolso del smoke test",
+                "amountCents": 1000,
+                "reason": "Devolución reposicionable del smoke test",
                 "idempotencyKey": f"refund-smoke-{uuid.uuid4().hex}",
+                "items": [
+                    {"saleItemId": sale_item_id, "quantity": 1, "restock": True}
+                ],
             },
         )
-        wait_for_stock(client, product_id, 5)
+        wait_for_stock(client, product_id, 4)
+        if first_refund["items"][0].get("refundedQuantity") != 1:
+            raise RuntimeError("La primera devolución no actualizó refundedQuantity.")
+
+        second_refund = client.request(
+            "POST",
+            f"sales/{sale_id}/refunds",
+            {
+                "paymentId": None,
+                "amountCents": 1000,
+                "reason": "Devolución dañada no reposicionable del smoke test",
+                "idempotencyKey": f"refund-smoke-{uuid.uuid4().hex}",
+                "items": [
+                    {"saleItemId": sale_item_id, "quantity": 1, "restock": False}
+                ],
+            },
+        )
+        wait_for_stock(client, product_id, 4)
+        if second_refund["items"][0].get("refundedQuantity") != 2:
+            raise RuntimeError("La segunda devolución no acumuló refundedQuantity.")
 
         print(
             json.dumps(
@@ -255,7 +289,8 @@ def main() -> None:
                     "status": "OK",
                     "productId": product_id,
                     "saleId": sale_id,
-                    "finalStock": 5,
+                    "refundedQuantity": 2,
+                    "finalStock": 4,
                 },
                 ensure_ascii=False,
             )
