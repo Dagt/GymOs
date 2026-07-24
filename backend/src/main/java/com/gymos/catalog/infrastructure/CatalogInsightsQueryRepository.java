@@ -40,6 +40,12 @@ class CatalogInsightsQueryRepository implements CatalogInsightsQueryPort {
 				      AND p.inventory_tracked=TRUE AND s.reorder_point>0 AND s.quantity_on_hand<=s.reorder_point) AS low_stock
 				FROM catalog_product cp
 				WHERE cp.organization_id=:organizationId AND cp.deleted_at IS NULL
+				  AND (:branchId IS NULL OR EXISTS (
+				      SELECT 1 FROM catalog_product_branch cpb
+				      WHERE cpb.organization_id=cp.organization_id
+				        AND cpb.product_id=cp.id
+				        AND cpb.branch_id=:branchId
+				  ))
 				""")
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
