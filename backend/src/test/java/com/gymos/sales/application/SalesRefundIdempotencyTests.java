@@ -3,6 +3,7 @@ package com.gymos.sales.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -102,7 +103,8 @@ class SalesRefundIdempotencyTests {
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.code()).isEqualTo("IDEMPOTENCY_KEY_REUSED"));
 
-		verify(salesRepository).saleHeader(organizationId, saleId);
+		verify(salesRepository, times(2)).saleHeader(organizationId, saleId);
+		verify(salesRepository).lockSaleForRefund(organizationId, saleId);
 		verify(salesRepository).refundByIdempotencyKey(organizationId, idempotencyKey);
 		verifyNoInteractions(jdbcClient, auditService, objectStorageService, eventPublisher);
 	}
