@@ -6,11 +6,13 @@ import {
   changeProductStatus,
   createProduct,
   getCatalogCategories,
+  getInventoryStockDetail,
   getPlans,
   getStoredSession,
   removeProductImage,
   restoreProduct,
   searchProducts,
+  updateInventorySettings,
   uploadProductImage,
   updateProduct,
   type CatalogCategory,
@@ -37,6 +39,7 @@ export function useCatalogController() {
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [existingImageObjectKey, setExistingImageObjectKey] = useState<string | null>(null);
   const [price, setPrice] = useState("");
+  const [reorderPoint, setReorderPoint] = useState("0");
   const [productImage, setProductImage] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -46,6 +49,7 @@ export function useCatalogController() {
   const catalogFilters = useCatalogFilters();
   const filtersKey = JSON.stringify(catalogFilters.filters);
   const planEditor = useCatalogPlanEditor(session, reloadCatalog);
+  const canManageInventory = hasDirectPermission(session, "inventory.manage");
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -62,127 +66,263 @@ export function useCatalogController() {
     loadCatalog(session.accessToken, catalogFilters.filters)
       .then(([page, loadedPlans, loadedCategories, loadedSummary]) => {
         if (!active) return;
-        setProducts(page.items); setTotalProducts(page.totalElements); setTotalPages(page.totalPages);
-        setPlans(loadedPlans); setCategories(loadedCategories); setSummary(loadedSummary);
+        setProducts(page.items);
+        setTotalProducts(page.totalElements);
+        setTotalPages(page.totalPages);
+        setPlans(loadedPlans);
+        setCategories(loadedCategories);
+        setSummary(loadedSummary);
       })
-      .catch((exception) => { if (active) setError(exception instanceof Error ? exception.message : "No fue posible cargar catalogo."); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+      .catch((exception) => {
+        if (active) setError(exception instanceof Error ? exception.message : "No fue posible cargar catálogo.");
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [session, filtersKey]);
 
   async function reloadCatalog() {
-    if (!session) return;
-    const [page, loadedPlans, loadedCategories, loadedSummary] = await loadCatalog(session.accessToken, catalogFilters.filters);
-    setProducts(page.items); setTotalProducts(page.totalElements); setTotalPages(page.totalPages);
-    setPlans(loadedPlans); setCategories(loadedCategories); setSummary(loadedSummary);
+    const activeSession = getStoredSession() ?? session;
+    if (!activeSession) return;
+    const [page, loadedPlans, loadedCategories, loadedSummary] = await loadCatalog(
+      activeSession.accessToken,
+      catalogFilters.filters,
+    );
+    setSession(activeSession);
+    setProducts(page.items);
+    setTotalProducts(page.totalElements);
+    setTotalPages(page.totalPages);
+    setPlans(loadedPlans);
+    setCategories(loadedCategories);
+    setSummary(loadedSummary);
   }
 
   async function submitProduct(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!session) return;
+    const activeSession = getStoredSession() ?? session;
+    if (!activeSession) return;
     const wasEditing = Boolean(editingProductId);
-    setSaving(true); setError(null); setMessage(null);
+    setSaving(true);
+    setError(null);
+    setMessage(null);
     try {
       const payload = productDraftToPayload(form, price);
       const saved = editingProductId
-        ? await updateProduct(session.accessToken, editingProductId, payload)
-        : await createProduct(session.accessToken, payload);
-      let imageWarning: string | null = null;
-      if (productImage) {
+        ? await updateProduct(activeSession.accessToken, editingProductId, payload)
+        : await createProduct(activeSession.accessToken, payload);
+      const warnings: string[] = [];
+
+      if (canManageInventory && payload.productType === "PHYSICAL" && payload.inventoryTracked) {
         try {
-          const withImage = await uploadProductImage(session.accessToken, saved.id, productImage);
-          setExistingImageObjectKey(withImage.imageObjectKey);
+          await updateInventorySettings(activeSession.accessToken, saved.id, {
+            reorderPoint: Math.max(0, Number(reorderPoint || "0")),
+          });
         } catch {
-          imageWarning = "Producto guardado, pero no fue posible cargar la imagen. Puedes editarlo e intentarlo nuevamente.";
+          warnings.push("No se guardó el stock mínimo");
         }
       }
+
+      if (productImage) {
+        try {
+          const withImage = await uploadProductImage(activeSession.accessToken, saved.id, productImage);
+          setExistingImageObjectKey(withImage.imageObjectKey);
+        } catch {
+          warnings.push("No se cargó la imagen");
+        }
+      }
+
       await reloadCatalog();
       resetProductDrawer();
-      setMessage(imageWarning ?? (wasEditing ? "Producto actualizado." : "Producto creado."));
+      const baseMessage = wasEditing ? "Artículo actualizado." : "Artículo creado.";
+      setMessage(warnings.length ? `${baseMessage} ${warnings.join(" y ")}.` : baseMessage);
     } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible guardar el producto.");
-    } finally { setSaving(false); }
+      setError(exception instanceof Error ? exception.message : "No fue posible guardar el artículo.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function removeCurrentProductImage() {
-    if (!session || !editingProductId || !existingImageObjectKey) return;
-    if (!window.confirm("Eliminar la imagen actual del producto?")) return;
-    setSaving(true); setError(null); setMessage(null);
+    const activeSession = getStoredSession() ?? session;
+    if (!activeSession || !editingProductId || !existingImageObjectKey) return;
+    if (!window.confirm("¿Eliminar la imagen actual?")) return;
+    setSaving(true);
+    setError(null);
+    setMessage(null);
     try {
-      await removeProductImage(session.accessToken, editingProductId);
+      await removeProductImage(activeSession.accessToken, editingProductId);
       setExistingImageObjectKey(null);
       setProductImage(null);
       await reloadCatalog();
-      setMessage("Imagen eliminada. La limpieza del archivo se procesara de forma segura.");
+      setMessage("Imagen eliminada.");
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible eliminar la imagen.");
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   }
 
   function openProductCreation() {
-    setEditingProductId(null); setExistingImageObjectKey(null); setForm(emptyProduct);
-    setPrice(""); setProductImage(null); setShowProductDrawer(true);
+    setEditingProductId(null);
+    setExistingImageObjectKey(null);
+    setForm(emptyProduct);
+    setPrice("");
+    setReorderPoint("0");
+    setProductImage(null);
+    setShowProductDrawer(true);
   }
-  function openProductEdition(product: ProductSummary) {
+
+  async function openProductEdition(product: ProductSummary) {
     if (product.archived) return;
-    setEditingProductId(product.id); setExistingImageObjectKey(product.imageObjectKey);
-    setForm(productToDraft(product)); setPrice(String(product.priceCents / 100));
-    setProductImage(null); setShowProductDrawer(true);
+    setEditingProductId(product.id);
+    setExistingImageObjectKey(product.imageObjectKey);
+    setForm(productToDraft(product));
+    setPrice(String(product.priceCents / 100));
+    setReorderPoint("0");
+    setProductImage(null);
+    setShowProductDrawer(true);
+
+    const activeSession = getStoredSession() ?? session;
+    if (!activeSession || !canManageInventory || !product.inventoryTracked || product.productType !== "PHYSICAL") return;
+    try {
+      const stock = await getInventoryStockDetail(activeSession.accessToken, product.id);
+      setReorderPoint(String(stock.reorderPoint));
+    } catch {
+      setReorderPoint("0");
+    }
   }
+
   function resetProductDrawer() {
-    setEditingProductId(null); setExistingImageObjectKey(null); setForm(emptyProduct);
-    setPrice(""); setProductImage(null); setShowProductDrawer(false);
+    setEditingProductId(null);
+    setExistingImageObjectKey(null);
+    setForm(emptyProduct);
+    setPrice("");
+    setReorderPoint("0");
+    setProductImage(null);
+    setShowProductDrawer(false);
   }
 
   async function toggleProductStatus(product: ProductSummary) {
-    if (!session || product.archived) return;
-    await runMutation(() => changeProductStatus(session.accessToken, product.id, product.status === "ACTIVE" ? "INACTIVE" : "ACTIVE"), product.status === "ACTIVE" ? "Producto desactivado." : "Producto activado.", "No fue posible cambiar el estado.");
+    const activeSession = getStoredSession() ?? session;
+    if (!activeSession || product.archived) return;
+    await runMutation(
+      () => changeProductStatus(activeSession.accessToken, product.id, product.status === "ACTIVE" ? "INACTIVE" : "ACTIVE"),
+      product.status === "ACTIVE" ? "Artículo desactivado." : "Artículo activado.",
+      "No fue posible cambiar el estado.",
+    );
   }
 
   async function archiveCatalogProduct(product: ProductSummary) {
-    if (!session || product.archived || !window.confirm(`Archivar ${product.name}? Se conservara en el historial.`)) return;
-    await runMutation(() => archiveProduct(session.accessToken, product.id), "Producto archivado.", "No fue posible archivar el producto.");
+    const activeSession = getStoredSession() ?? session;
+    if (!activeSession || product.archived || !window.confirm(`¿Archivar ${product.name}?`)) return;
+    await runMutation(
+      () => archiveProduct(activeSession.accessToken, product.id),
+      "Artículo archivado.",
+      "No fue posible archivar el artículo.",
+    );
   }
 
   async function restoreCatalogProduct(product: ProductSummary) {
-    if (!session || !product.archived || !window.confirm(`Restaurar ${product.name}? Quedara inactivo hasta que lo habilites.`)) return;
-    await runMutation(() => restoreProduct(session.accessToken, product.id), "Producto restaurado como inactivo.", "No fue posible restaurar el producto.");
+    const activeSession = getStoredSession() ?? session;
+    if (!activeSession || !product.archived || !window.confirm(`¿Restaurar ${product.name}?`)) return;
+    await runMutation(
+      () => restoreProduct(activeSession.accessToken, product.id),
+      "Artículo restaurado como inactivo.",
+      "No fue posible restaurar el artículo.",
+    );
   }
 
   async function runMutation(action: () => Promise<unknown>, successMessage: string, failureMessage: string) {
-    setSaving(true); setError(null); setMessage(null);
-    try { await action(); await reloadCatalog(); setMessage(successMessage); }
-    catch (exception) { setError(exception instanceof Error ? exception.message : failureMessage); }
-    finally { setSaving(false); }
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await action();
+      await reloadCatalog();
+      setMessage(successMessage);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : failureMessage);
+    } finally {
+      setSaving(false);
+    }
   }
 
   return {
-    archiveCatalogProduct, restoreCatalogProduct, catalogFilters, categories, editingProductId,
-    editingPlanId: planEditor.editingId, error: error ?? planEditor.error, existingImageObjectKey,
-    form, loading, message: message ?? planEditor.message, openPlanCreation: planEditor.create,
-    openPlanEdition: planEditor.edit, openProductCreation, openProductEdition,
-    planForm: planEditor.form, plans, price, productImage, removeCurrentProductImage,
-    saving: saving || planEditor.saving, products, summary, session, setForm,
-    setPlanForm: planEditor.setForm, setPrice, setProductImage, showPlanDrawer: planEditor.open,
-    showProductDrawer, submitPlan: planEditor.submit, submitProduct,
-    resetPlanDrawer: planEditor.close, resetProductDrawer, reloadCatalog, toggleProductStatus,
-    totalPages, totalProducts, canArchive: hasPermission(session, "catalog.archive"),
-    canCreate: hasPermission(session, "catalog.create"), canManageStatus: hasPermission(session, "catalog.status.manage"),
+    archiveCatalogProduct,
+    restoreCatalogProduct,
+    catalogFilters,
+    categories,
+    editingProductId,
+    editingPlanId: planEditor.editingId,
+    error: error ?? planEditor.error,
+    existingImageObjectKey,
+    form,
+    loading,
+    message: message ?? planEditor.message,
+    openPlanCreation: planEditor.create,
+    openPlanEdition: planEditor.edit,
+    openProductCreation,
+    openProductEdition,
+    planForm: planEditor.form,
+    plans,
+    price,
+    productImage,
+    reorderPoint,
+    removeCurrentProductImage,
+    saving: saving || planEditor.saving,
+    products,
+    summary,
+    session,
+    setForm,
+    setPlanForm: planEditor.setForm,
+    setPrice,
+    setProductImage,
+    setReorderPoint,
+    showPlanDrawer: planEditor.open,
+    showProductDrawer,
+    submitPlan: planEditor.submit,
+    submitProduct,
+    resetPlanDrawer: planEditor.close,
+    resetProductDrawer,
+    reloadCatalog,
+    toggleProductStatus,
+    totalPages,
+    totalProducts,
+    canArchive: hasPermission(session, "catalog.archive"),
+    canCreate: hasPermission(session, "catalog.create"),
+    canManageStatus: hasPermission(session, "catalog.status.manage"),
     canManageCategories: hasPermission(session, "catalog.category.manage"),
     canManageImages: hasPermission(session, "catalog.image.manage"),
-    canUpdate: hasPermission(session, "catalog.update"), canReadCosts: hasPermission(session, "catalog.cost.read"),
+    canManageInventory,
+    canUpdate: hasPermission(session, "catalog.update"),
+    canReadCosts: hasPermission(session, "catalog.cost.read"),
   };
 }
 
 function loadCatalog(accessToken: string, filters: import("@/lib/api").ProductSearchParams) {
   return Promise.all([
-    searchProducts(accessToken, filters), getPlans(accessToken), getCatalogCategories(accessToken, true), getCatalogSummary(accessToken),
+    searchProducts(accessToken, filters),
+    getPlans(accessToken),
+    getCatalogCategories(accessToken, true),
+    getCatalogSummary(accessToken),
   ]);
 }
 
 function hasPermission(session: StoredSession | null, permission: string) {
-  return Boolean(session?.user.permissions.includes(permission)
-    || session?.user.permissions.includes("catalog.manage")
-    || session?.user.permissions.includes("platform.admin"));
+  return Boolean(
+    session?.user.permissions.includes(permission)
+      || session?.user.permissions.includes("catalog.manage")
+      || session?.user.permissions.includes("platform.admin"),
+  );
+}
+
+function hasDirectPermission(session: StoredSession | null, permission: string) {
+  return Boolean(
+    session?.user.permissions.includes(permission)
+      || session?.user.permissions.includes("platform.admin"),
+  );
 }
