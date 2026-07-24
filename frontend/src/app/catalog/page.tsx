@@ -15,7 +15,7 @@ type CatalogView = "products" | "plans" | "categories";
 
 export default function CatalogPage() {
   return (
-    <Suspense fallback={<LoadingScreen text="Cargando catalogo..." />}>
+    <Suspense fallback={<LoadingScreen text="Cargando catálogo..." />}>
       <CatalogContent />
     </Suspense>
   );
@@ -24,7 +24,7 @@ export default function CatalogPage() {
 function CatalogContent() {
   const controller = useCatalogController();
   const [view, setView] = useState<CatalogView>("products");
-  if (controller.loading && !controller.session) return <LoadingScreen text="Cargando catalogo..." />;
+  if (controller.loading && !controller.session) return <LoadingScreen text="Cargando catálogo..." />;
   if (!controller.session) return <AuthRequired />;
 
   function openProductCreation() {
@@ -38,8 +38,8 @@ function CatalogContent() {
   }
 
   return (
-    <AppShell eyebrow="Administracion" session={controller.session}
-      subtitle="Administra por separado productos, servicios, planes y categorias." title="Catalogo">
+    <AppShell eyebrow="Administración" session={controller.session}
+      subtitle="Administra artículos de venta, cargos simples de caja, planes y categorías." title="Catálogo">
       {controller.error ? <InlineError message={controller.error} /> : null}
       {controller.message ? <p className="rounded-md border border-[#bad9c4] bg-[#eff8f1] px-3 py-2 text-sm text-[#31563c]">{controller.message}</p> : null}
       <section className="grid gap-5">
@@ -90,12 +90,12 @@ function CatalogNavigation({ canManageCategories, onChange, view }: {
   view: CatalogView;
 }) {
   const options: { label: string; value: CatalogView }[] = [
-    { label: "Productos y servicios", value: "products" },
-    { label: "Planes de membresia", value: "plans" },
-    ...(canManageCategories ? [{ label: "Categorias", value: "categories" as CatalogView }] : []),
+    { label: "Productos y cargos", value: "products" },
+    { label: "Planes de membresía", value: "plans" },
+    ...(canManageCategories ? [{ label: "Categorías", value: "categories" as CatalogView }] : []),
   ];
   return (
-    <nav aria-label="Secciones del catalogo" className="flex flex-wrap gap-2 rounded-xl border border-[#d8ddd2] bg-white p-2 shadow-sm">
+    <nav aria-label="Secciones del catálogo" className="flex flex-wrap gap-2 rounded-xl border border-[#d8ddd2] bg-white p-2 shadow-sm">
       {options.map((option) => (
         <button key={option.value} type="button" onClick={() => onChange(option.value)}
           className={view === option.value ? "app-button h-10" : "app-button-secondary h-10"}>
@@ -109,14 +109,14 @@ function CatalogNavigation({ canManageCategories, onChange, view }: {
 function CatalogPagination({ onPageChange, page, totalPages }: { onPageChange: (page: number) => void; page: number; totalPages: number; }) {
   if (totalPages <= 1) return null;
   return (
-    <nav aria-label="Paginacion del catalogo" className="flex items-center justify-end gap-3">
+    <nav aria-label="Paginación del catálogo" className="flex items-center justify-end gap-3">
       <button className="app-button-secondary" disabled={page <= 0} onClick={() => onPageChange(page - 1)} type="button">Anterior</button>
-      <span className="text-sm text-[#5d6b63]">Pagina {page + 1} de {totalPages}</span>
+      <span className="text-sm text-[#5d6b63]">Página {page + 1} de {totalPages}</span>
       <button className="app-button-secondary" disabled={page + 1 >= totalPages} onClick={() => onPageChange(page + 1)} type="button">Siguiente</button>
     </nav>
   );
 }
 
 function AuthRequired() {
-  return <AuthRequiredCard message="El catalogo requiere una cuenta con permisos para consultar o administrar productos y planes." title="Inicia sesion para ver el catalogo" />;
+  return <AuthRequiredCard message="El catálogo requiere una cuenta con permisos para consultar o administrar productos y planes." title="Inicia sesión para ver el catálogo" />;
 }
