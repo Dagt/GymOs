@@ -27,8 +27,8 @@ class SalesRefundService {
 		if (idempotentRefund.existingSaleId().isPresent()) {
 			return idempotentRefund.existingSaleId().get();
 		}
-		long alreadyRefunded = validationService.validate(principal, saleId, sale, request);
-		return processor.process(principal, saleId, sale, request, alreadyRefunded,
+		RefundValidationResult validation = validationService.validate(principal, saleId, sale, request);
+		return processor.process(principal, saleId, sale, request, validation,
 				idempotentRefund.idempotencyKey(), correlationId);
 	}
 }
