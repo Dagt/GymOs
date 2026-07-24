@@ -8,8 +8,13 @@ public record SecurityProperties(
 		List<String> corsAllowedOrigins,
 		String jwtSecret,
 		long accessTokenSeconds,
+		long receptionAccessTokenSeconds,
 		long refreshTokenDays
 ) {
+	public SecurityProperties(List<String> corsAllowedOrigins, String jwtSecret, long accessTokenSeconds, long refreshTokenDays) {
+		this(corsAllowedOrigins, jwtSecret, accessTokenSeconds, 57_600, refreshTokenDays);
+	}
+
 	public SecurityProperties {
 		if (corsAllowedOrigins == null || corsAllowedOrigins.isEmpty()) {
 			corsAllowedOrigins = List.of("http://localhost:3000");
@@ -19,6 +24,9 @@ public record SecurityProperties(
 		}
 		if (accessTokenSeconds <= 0) {
 			accessTokenSeconds = 900;
+		}
+		if (receptionAccessTokenSeconds <= 0) {
+			receptionAccessTokenSeconds = 57_600;
 		}
 		if (refreshTokenDays <= 0) {
 			refreshTokenDays = 7;
