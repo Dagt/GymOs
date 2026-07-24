@@ -62,9 +62,16 @@ export function useCatalogController() {
   useEffect(() => {
     if (!session) return;
     let active = true;
-    setLoading(true);
-    loadCatalog(session.accessToken, catalogFilters.filters)
-      .then(([page, loadedPlans, loadedCategories, loadedSummary]) => {
+
+    async function refreshCatalog() {
+      await Promise.resolve();
+      if (!active) return;
+      setLoading(true);
+      try {
+        const [page, loadedPlans, loadedCategories, loadedSummary] = await loadCatalog(
+          session.accessToken,
+          catalogFilters.filters,
+        );
         if (!active) return;
         setProducts(page.items);
         setTotalProducts(page.totalElements);
@@ -72,13 +79,16 @@ export function useCatalogController() {
         setPlans(loadedPlans);
         setCategories(loadedCategories);
         setSummary(loadedSummary);
-      })
-      .catch((exception) => {
-        if (active) setError(exception instanceof Error ? exception.message : "No fue posible cargar catálogo.");
-      })
-      .finally(() => {
+      } catch (exception) {
+        if (active) {
+          setError(exception instanceof Error ? exception.message : "No fue posible cargar catálogo.");
+        }
+      } finally {
         if (active) setLoading(false);
-      });
+      }
+    }
+
+    void refreshCatalog();
     return () => {
       active = false;
     };
