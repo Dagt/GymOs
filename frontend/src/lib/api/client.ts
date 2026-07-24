@@ -3,7 +3,9 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8
 let refreshPromise: Promise<RefreshResult> | null = null;
 
 const REFRESH_MARGIN_MILLISECONDS = 30_000;
-const CROSS_TAB_REFRESH_WAIT_MILLISECONDS = 2_000;
+const ACCESS_TOKEN_KEY = "gymos.accessToken";
+const REFRESH_TOKEN_KEY = "gymos.refreshToken";
+const CURRENT_USER_KEY = "gymos.currentUser";
 
 type RefreshResult =
   | { status: "refreshed"; accessToken: string }
@@ -136,8 +138,9 @@ async function refreshAccessToken(expectedAccessToken: string): Promise<RefreshR
 }
 
 async function performRefresh(expectedAccessToken: string): Promise<RefreshResult> {
-  const refreshToken = window.localStorage.getItem("gymos.refreshToken");
-  if (!refreshToken) return { status: "rejected" };
+  const storage = browserSessionStorage();
+  const refreshToken = storage?.getItem(REFRESH_TOKEN_KEY);
+  if (!storage || !refreshToken) return { status: "rejected" };
 
   const tokenBeforeRequest = currentAccessToken();
   if (tokenBeforeRequest && tokenBeforeRequest !== expectedAccessToken) {
@@ -156,10 +159,6 @@ async function performRefresh(expectedAccessToken: string): Promise<RefreshResul
   }
 
   if (!response.ok) {
-    const synchronizedToken = await waitForNewAccessToken(expectedAccessToken);
-    if (synchronizedToken) {
-      return { status: "refreshed", accessToken: synchronizedToken };
-    }
     if ([400, 401, 403].includes(response.status)) return { status: "rejected" };
     return { status: "unavailable" };
   }
@@ -173,55 +172,21 @@ async function performRefresh(expectedAccessToken: string): Promise<RefreshResul
     return { status: "unavailable" };
   }
 
-  window.localStorage.setItem("gymos.accessToken", session.accessToken);
-  window.localStorage.setItem("gymos.refreshToken", session.refreshToken);
+  storage.setItem(ACCESS_TOKEN_KEY, session.accessToken);
+  storage.setItem(REFRESH_TOKEN_KEY, session.refreshToken);
   if (session.user) {
-    window.localStorage.setItem("gymos.currentUser", JSON.stringify(session.user));
+    storage.setItem(CURRENT_USER_KEY, JSON.stringify(session.user));
   }
   window.dispatchEvent(new Event("gymos.session-refreshed"));
   return { status: "refreshed", accessToken: session.accessToken };
 }
 
-function waitForNewAccessToken(expectedAccessToken: string): Promise<string | null> {
-  const immediate = currentAccessToken();
-  if (immediate && immediate !== expectedAccessToken) return Promise.resolve(immediate);
-
-  return new Promise((resolve) => {
-    const startedAt = Date.now();
-    let settled = false;
-    let intervalId: number | null = null;
-
-    const finish = (token: string | null) => {
-      if (settled) return;
-      settled = true;
-      window.removeEventListener("storage", onStorage);
-      if (intervalId !== null) window.clearInterval(intervalId);
-      window.clearTimeout(timeoutId);
-      resolve(token);
-    };
-
-    const inspect = () => {
-      const token = currentAccessToken();
-      if (token && token !== expectedAccessToken) {
-        finish(token);
-      } else if (Date.now() - startedAt >= CROSS_TAB_REFRESH_WAIT_MILLISECONDS) {
-        finish(null);
-      }
-    };
-
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === "gymos.accessToken") inspect();
-    };
-
-    const timeoutId = window.setTimeout(() => finish(null), CROSS_TAB_REFRESH_WAIT_MILLISECONDS);
-    intervalId = window.setInterval(inspect, 100);
-    window.addEventListener("storage", onStorage);
-  });
+function browserSessionStorage() {
+  return typeof window === "undefined" ? null : window.sessionStorage;
 }
 
 function currentAccessToken() {
-  if (typeof window === "undefined") return null;
-  return window.localStorage.getItem("gymos.accessToken");
+  return browserSessionStorage()?.getItem(ACCESS_TOKEN_KEY) ?? null;
 }
 
 function tokenNeedsRefresh(accessToken: string) {
@@ -263,7 +228,7 @@ function formatApiError(response: Response, path: string, error: unknown) {
 
 function fallbackMessage(status: number) {
   if (status === 400) return "La solicitud tiene datos inválidos.";
-  if (status === 401) return "La sesión no pudo renovarse o el token no es válido.";
+  if (status === 401) return "La sesión de esta pestaña no es válida. Inicia sesión nuevamente en esta pestaña.";
   if (status === 403) return "Tu usuario no tiene permiso para realizar esta acción.";
   if (status === 404) return "No se encontró la información solicitada.";
   if (status >= 500) return "El servidor tuvo un problema al procesar la operación.";
