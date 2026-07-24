@@ -43,34 +43,34 @@ class CatalogProductService {
 	}
 
 	List<ProductSummaryView> products(GymOsPrincipal principal) {
-		CatalogAccessGuard.requirePrincipal(principal);
-		return products.listProducts(principal.organizationId()).stream()
+		CatalogAccessGuard.requireBranch(principal);
+		return products.listProducts(principal.organizationId(), principal.branchId()).stream()
 				.filter(product -> !"MEMBERSHIP_PLAN".equals(product.productType()))
 				.map(product -> visible(principal, product))
 				.toList();
 	}
 
 	ProductSummaryView product(GymOsPrincipal principal, UUID productId) {
-		CatalogAccessGuard.requirePrincipal(principal);
-		return visible(principal, requireProduct(principal.organizationId(), productId));
+		CatalogAccessGuard.requireBranch(principal);
+		return visible(principal, requireProduct(principal.organizationId(), principal.branchId(), productId));
 	}
 
 	ProductSummaryView productByBarcode(GymOsPrincipal principal, String barcode) {
-		CatalogAccessGuard.requirePrincipal(principal);
+		CatalogAccessGuard.requireBranch(principal);
 		String normalized = normalizeNullable(barcode);
 		if (normalized == null) {
 			throw new BusinessException("PRODUCT_BARCODE_REQUIRED", "Proporciona un codigo de barras.");
 		}
-		ProductSummaryView product = products.findActiveByBarcode(principal.organizationId(), normalized)
+		ProductSummaryView product = products.findActiveByBarcode(principal.organizationId(), principal.branchId(), normalized)
 				.filter(candidate -> !"MEMBERSHIP_PLAN".equals(candidate.productType()))
 				.orElseThrow(() -> new BusinessException(
-						"PRODUCT_BARCODE_NOT_FOUND", "No existe un producto activo con ese codigo de barras."));
+						"PRODUCT_BARCODE_NOT_FOUND", "No existe un producto activo con ese codigo de barras en esta sucursal."));
 		return visible(principal, product);
 	}
 
 	ProductPageView search(GymOsPrincipal principal, ProductSearchCriteria criteria) {
-		CatalogAccessGuard.requirePrincipal(principal);
-		ProductPageView page = products.search(principal.organizationId(), criteria);
+		CatalogAccessGuard.requireBranch(principal);
+		ProductPageView page = products.search(principal.organizationId(), principal.branchId(), criteria);
 		return new ProductPageView(
 				page.items().stream().map(product -> visible(principal, product)).toList(),
 				page.page(), page.size(), page.totalElements(), page.totalPages()
@@ -78,7 +78,7 @@ class CatalogProductService {
 	}
 
 	ProductSummaryView createProduct(GymOsPrincipal principal, ProductCommand request, String correlationId) {
-		CatalogAccessGuard.requirePrincipal(principal);
+		CatalogAccessGuard.requireBranch(principal);
 		validate(request);
 		String sku = normalizeRequired(request.sku());
 		if (products.skuExists(principal.organizationId(), sku, null)) throw duplicateSku();
@@ -89,16 +89,17 @@ class CatalogProductService {
 		UUID productId = UUID.randomUUID();
 		OffsetDateTime now = OffsetDateTime.now();
 		commands.create(mutation(principal, productId, request, sku, barcode, null, null, now));
+		commands.attachBranch(principal.organizationId(), principal.branchId(), productId, principal.userId(), now);
 		commands.replaceCategory(principal.organizationId(), productId, request.categoryId(), principal.userId(), now);
 		commands.replaceTags(principal.organizationId(), productId, tags, principal.userId(), now);
 		auditService.record(principal, "PRODUCT_CREATED", "CATALOG_PRODUCT", productId, "BACKOFFICE", null, correlationId);
-		return visible(principal, requireProduct(principal.organizationId(), productId));
+		return visible(principal, requireProduct(principal.organizationId(), principal.branchId(), productId));
 	}
 
 	ProductSummaryView updateProduct(GymOsPrincipal principal, UUID productId, ProductCommand request, String correlationId) {
-		CatalogAccessGuard.requirePrincipal(principal);
+		CatalogAccessGuard.requireBranch(principal);
 		validate(request);
-		ProductSummaryView existing = requireProduct(principal.organizationId(), productId);
+		ProductSummaryView existing = requireProduct(principal.organizationId(), principal.branchId(), productId);
 		if ("MEMBERSHIP_PLAN".equals(existing.productType())) {
 			throw new BusinessException("PRODUCT_UPDATE_REQUIRES_PLAN_WORKFLOW",
 					"Los productos de membresia se administran desde planes.");
@@ -121,13 +122,13 @@ class CatalogProductService {
 		commands.replaceTags(principal.organizationId(), productId, tags, principal.userId(), now);
 		auditService.record(principal, "PRODUCT_UPDATED", "CATALOG_PRODUCT", productId, "BACKOFFICE",
 				describeChanges(principal, existing, request, sku, barcode, tags), correlationId);
-		return visible(principal, requireProduct(principal.organizationId(), productId));
+		return visible(principal, requireProduct(principal.organizationId(), principal.branchId(), productId));
 	}
 
 	ProductSummaryView changeStatus(GymOsPrincipal principal, UUID productId, String status, String correlationId) {
-		CatalogAccessGuard.requirePrincipal(principal);
+		CatalogAccessGuard.requireBranch(principal);
 		String normalizedStatus = normalizeStatus(status);
-		ProductSummaryView product = requireProduct(principal.organizationId(), productId);
+		ProductSummaryView product = requireProduct(principal.organizationId(), principal.branchId(), productId);
 		if ("MEMBERSHIP_PLAN".equals(product.productType())) {
 			throw new BusinessException("PRODUCT_STATUS_REQUIRES_PLAN_WORKFLOW",
 					"Los productos de membresia se administran desde planes.");
@@ -136,12 +137,12 @@ class CatalogProductService {
 				principal.userId(), OffsetDateTime.now()) != 1) throw notFound();
 		String eventType = "ACTIVE".equals(normalizedStatus) ? "PRODUCT_ACTIVATED" : "PRODUCT_DEACTIVATED";
 		auditService.record(principal, eventType, "CATALOG_PRODUCT", productId, "BACKOFFICE", normalizedStatus, correlationId);
-		return visible(principal, requireProduct(principal.organizationId(), productId));
+		return visible(principal, requireProduct(principal.organizationId(), principal.branchId(), productId));
 	}
 
 	void archiveProduct(GymOsPrincipal principal, UUID productId, String correlationId) {
-		CatalogAccessGuard.requirePrincipal(principal);
-		ProductSummaryView product = requireProduct(principal.organizationId(), productId);
+		CatalogAccessGuard.requireBranch(principal);
+		ProductSummaryView product = requireProduct(principal.organizationId(), principal.branchId(), productId);
 		if ("MEMBERSHIP_PLAN".equals(product.productType())) {
 			throw new BusinessException("PRODUCT_ARCHIVE_REQUIRES_PLAN_WORKFLOW",
 					"Los productos de membresia se administran desde planes.");
@@ -156,8 +157,8 @@ class CatalogProductService {
 	}
 
 	ProductSummaryView restoreProduct(GymOsPrincipal principal, UUID productId, String correlationId) {
-		CatalogAccessGuard.requirePrincipal(principal);
-		ProductSummaryView archived = products.findProductIncludingArchived(principal.organizationId(), productId)
+		CatalogAccessGuard.requireBranch(principal);
+		ProductSummaryView archived = products.findProductIncludingArchived(principal.organizationId(), principal.branchId(), productId)
 				.orElseThrow(this::notFound);
 		if ("MEMBERSHIP_PLAN".equals(archived.productType())) {
 			throw new BusinessException("PRODUCT_RESTORE_REQUIRES_PLAN_WORKFLOW",
@@ -171,7 +172,7 @@ class CatalogProductService {
 		}
 		auditService.record(principal, "PRODUCT_RESTORED", "CATALOG_PRODUCT", productId,
 				"BACKOFFICE", "INACTIVE", correlationId);
-		return visible(principal, requireProduct(principal.organizationId(), productId));
+		return visible(principal, requireProduct(principal.organizationId(), principal.branchId(), productId));
 	}
 
 	private ProductMutation mutation(GymOsPrincipal principal, UUID productId, ProductCommand request,
@@ -325,8 +326,8 @@ class CatalogProductService {
 		return canReadCosts(principal) ? request.referenceCostCents() : existing == null ? null : existing.referenceCostCents();
 	}
 	private String safe(Object value) { return String.valueOf(value).replace("\\", "\\\\").replace("\"", "\\\""); }
-	private ProductSummaryView requireProduct(UUID organizationId, UUID productId) {
-		return products.findProduct(organizationId, productId).orElseThrow(this::notFound);
+	private ProductSummaryView requireProduct(UUID organizationId, UUID branchId, UUID productId) {
+		return products.findProduct(organizationId, branchId, productId).orElseThrow(this::notFound);
 	}
 	private String normalizeRequired(String value) { return value == null ? "" : value.trim().toUpperCase(); }
 	private String normalizeNullable(String value) { String normalized = normalizeRequired(value); return normalized.isBlank() ? null : normalized; }
@@ -340,5 +341,5 @@ class CatalogProductService {
 	private String trimToNull(String value) { return value == null || value.isBlank() ? null : value.trim(); }
 	private BusinessException duplicateSku() { return new BusinessException("PRODUCT_SKU_ALREADY_EXISTS", "Ya existe otro producto con ese SKU."); }
 	private BusinessException concurrentModification() { return new BusinessException("PRODUCT_CONCURRENT_MODIFICATION", "El producto cambio mientras lo editabas. Recargalo antes de guardar."); }
-	private BusinessException notFound() { return new BusinessException("PRODUCT_NOT_FOUND", "El producto no existe o fue archivado."); }
+	private BusinessException notFound() { return new BusinessException("PRODUCT_NOT_FOUND", "El producto no existe en la sucursal activa o fue archivado."); }
 }
