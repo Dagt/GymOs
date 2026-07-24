@@ -59,7 +59,7 @@ class CatalogProductImageServiceTests {
 		UUID productId = UUID.randomUUID();
 		ProductSummaryView existing = product(productId, "catalog/old.webp");
 		ProductSummaryView updated = product(productId, null);
-		when(products.findProduct(principal.organizationId(), productId))
+		when(products.findProduct(principal.organizationId(), principal.branchId(), productId))
 				.thenReturn(Optional.of(existing), Optional.of(updated));
 		when(commands.updateImageKey(eq(principal.organizationId()), eq(productId), eq(null),
 				eq(principal.userId()), any())).thenReturn(1);
@@ -76,7 +76,7 @@ class CatalogProductImageServiceTests {
 		UUID productId = UUID.randomUUID();
 		ProductSummaryView existing = product(productId, "catalog/old.webp");
 		ProductSummaryView updated = product(productId, "catalog/new.webp");
-		when(products.findProduct(principal.organizationId(), productId))
+		when(products.findProduct(principal.organizationId(), principal.branchId(), productId))
 				.thenReturn(Optional.of(existing), Optional.of(updated));
 		when(commands.updateImageKey(eq(principal.organizationId()), eq(productId), any(),
 				eq(principal.userId()), any())).thenReturn(1);
