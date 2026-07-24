@@ -20,16 +20,16 @@ export function CatalogProductTable({ loading, products, saving, canArchive, can
   return (
     <section className="app-card overflow-hidden">
       <div className="flex items-center justify-between border-b border-[#e3e7df] p-4">
-        <div><p className="app-eyebrow">Administracion</p><h2 className="app-card-title">Productos y servicios</h2></div>
-        <span className="text-sm text-[#5d6b63]">{products.length} en esta pagina</span>
+        <div><p className="app-eyebrow">Administración</p><h2 className="app-card-title">Productos y cargos de caja</h2></div>
+        <span className="text-sm text-[#5d6b63]">{products.length} en esta página</span>
       </div>
       {loading ? <TableSkeleton /> : null}
-      {!loading && products.length === 0 ? <div className="p-8 text-center text-sm text-[#5d6b63]">No hay resultados para estos filtros. Limpialos o crea un producto nuevo.</div> : null}
+      {!loading && products.length === 0 ? <div className="p-8 text-center text-sm text-[#5d6b63]">No hay resultados para estos filtros. Límpialos o crea un registro nuevo.</div> : null}
       {!loading && products.length ? (
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead className="bg-[#f6f8f4] text-xs uppercase tracking-wide text-[#5d6b63]"><tr>
-              <th className="px-4 py-3">Producto</th><th className="px-4 py-3">Categoria</th><th className="px-4 py-3">Tipo</th>
+              <th className="px-4 py-3">Registro</th><th className="px-4 py-3">Categoría</th><th className="px-4 py-3">Tipo</th>
               <th className="px-4 py-3">Precio</th><th className="px-4 py-3">Inventario</th><th className="px-4 py-3">Estado</th>
               <th className="px-4 py-3 text-right">Acciones</th>
             </tr></thead>
@@ -37,10 +37,10 @@ export function CatalogProductTable({ loading, products, saving, canArchive, can
               {products.map((product) => (
                 <tr className={product.archived ? "bg-[#faf7f2] opacity-80" : undefined} key={product.id}>
                   <td className="px-4 py-3"><p className="font-semibold">{product.name}</p><p className="text-xs text-[#6f7a73]">{product.sku}{product.barcode ? ` · ${product.barcode}` : ""}</p></td>
-                  <td className="px-4 py-3">{product.categoryName ?? "Sin categoria"}</td>
-                  <td className="px-4 py-3">{product.productType === "PHYSICAL" ? "Fisico" : "Servicio"}</td>
+                  <td className="px-4 py-3">{product.categoryName ?? "Sin categoría"}</td>
+                  <td className="px-4 py-3">{product.productType === "PHYSICAL" ? "Producto físico" : "Cargo de caja"}</td>
                   <td className="px-4 py-3 font-medium">{formatMoney(product.priceCents, product.currency)}</td>
-                  <td className="px-4 py-3">{product.inventoryTracked ? "Controlado" : "No controlado"}</td>
+                  <td className="px-4 py-3">{product.inventoryTracked ? "Controlado" : "No aplica"}</td>
                   <td className="px-4 py-3"><ProductStatus product={product} /></td>
                   <td className="px-4 py-3"><div className="flex justify-end gap-2">
                     <Link className="rounded-md border border-[#cdd5ca] px-2 py-1 text-xs font-semibold text-[var(--brand-primary)]" href={`/catalog/${product.id}`}>Detalle</Link>
