@@ -21,14 +21,14 @@ export function CatalogFilters({
 }: CatalogFiltersProps) {
   const activeCategories = categories.filter((category) => category.status === "ACTIVE");
   return (
-    <section aria-label="Filtros del catalogo" className="app-card grid gap-4 p-4">
+    <section aria-label="Filtros del catálogo" className="app-card grid gap-4 p-4">
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-7">
         <label className="grid gap-1 text-sm xl:col-span-2">
           <span className="font-medium">Buscar</span>
           <input
             className="h-10 rounded-md border border-[#cdd5ca] px-3"
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder="Nombre, SKU, etiqueta o codigo"
+            placeholder="Nombre, SKU, etiqueta o código"
             value={searchInput}
           />
         </label>
@@ -38,12 +38,12 @@ export function CatalogFilters({
           onChange={(value) => onUpdate("type", value || null)}
           options={[
             ["", "Todos"],
-            ["PHYSICAL", "Fisico"],
-            ["SERVICE", "Servicio"],
+            ["PHYSICAL", "Producto físico"],
+            ["SERVICE", "Cargo de caja"],
           ]}
         />
         <FilterSelect
-          label="Categoria"
+          label="Categoría"
           value={filters.categoryId ?? ""}
           onChange={(value) => onUpdate("categoryId", value || null)}
           options={[["", "Todas"], ...activeCategories.map((category) => [category.id, category.name])]}
@@ -73,11 +73,11 @@ export function CatalogFilters({
           value={filters.sort ?? "displayOrder,asc"}
           onChange={(value) => onUpdate("sort", value)}
           options={[
-            ["displayOrder,asc", "Orden manual"],
+            ["displayOrder,asc", "Orden del catálogo"],
             ["name,asc", "Nombre A-Z"],
             ["name,desc", "Nombre Z-A"],
-            ["createdAt,desc", "Mas recientes"],
-            ["createdAt,asc", "Mas antiguos"],
+            ["createdAt,desc", "Más recientes"],
+            ["createdAt,asc", "Más antiguos"],
             ["price,asc", "Menor precio"],
             ["price,desc", "Mayor precio"],
           ]}
@@ -97,7 +97,7 @@ export function CatalogFilters({
           </label>
           <FilterSelect
             compact
-            label="Por pagina"
+            label="Por página"
             value={String(filters.size ?? 25)}
             onChange={(value) => onUpdate("size", value)}
             options={[
