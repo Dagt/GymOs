@@ -14,8 +14,8 @@ class SalesCatalogLookupRepository {
 		this.catalog = catalog;
 	}
 
-	Optional<ProductForSale> productForSale(UUID organizationId, UUID productId) {
-		return catalog.product(organizationId, productId)
+	Optional<ProductForSale> productForSale(UUID organizationId, UUID branchId, UUID productId) {
+		return catalog.product(organizationId, branchId, productId)
 				.filter(CatalogProductOperations.CatalogProductSnapshot::active)
 				.map(product -> new ProductForSale(
 						product.id(), product.name(), product.productType(), product.priceCents(), product.currency()
