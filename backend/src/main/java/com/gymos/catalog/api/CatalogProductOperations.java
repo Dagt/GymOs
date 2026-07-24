@@ -6,6 +6,8 @@ import java.util.UUID;
 public interface CatalogProductOperations {
 	Optional<CatalogProductSnapshot> product(UUID organizationId, UUID productId);
 
+	Optional<CatalogProductSnapshot> product(UUID organizationId, UUID branchId, UUID productId);
+
 	record CatalogProductSnapshot(
 			UUID id,
 			String sku,
