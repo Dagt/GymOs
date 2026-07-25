@@ -64,6 +64,11 @@ public class OrganizationController {
 		return organizationService.branches(principal);
 	}
 
+	@GetMapping("/current/branches/all")
+	List<BranchSummary> allBranches(@AuthenticationPrincipal GymOsPrincipal principal) {
+		return organizationService.allOrganizationBranches(principal);
+	}
+
 	@GetMapping("/{organizationId}/branches")
 	List<BranchSummary> organizationBranches(
 			@AuthenticationPrincipal GymOsPrincipal principal,

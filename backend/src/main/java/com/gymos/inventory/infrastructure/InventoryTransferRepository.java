@@ -18,7 +18,7 @@ class InventoryTransferRepository {
 	}
 
 	List<InventoryTransferView> list(UUID organizationId, UUID branchId) {
-		return jdbcClient.sql("""
+		var headers = jdbcClient.sql("""
 				SELECT t.id, t.organization_id, t.origin_branch_id, ob.name AS origin_branch_name,
 				       t.destination_branch_id, db.name AS destination_branch_name,
 				       t.status, t.notes, t.created_at, t.updated_at, t.created_by,
@@ -41,6 +41,32 @@ class InventoryTransferRepository {
 						rs.getObject("shipped_by", UUID.class), rs.getObject("received_at", OffsetDateTime.class),
 						rs.getObject("received_by", UUID.class), List.of()))
 				.list();
+
+		if (headers.isEmpty()) return List.of();
+
+		return headers.stream().map(h -> {
+			var items = jdbcClient.sql("""
+					SELECT i.id, i.product_id, cp.name AS product_name, cp.sku,
+					       i.requested_quantity, i.shipped_quantity, i.received_quantity, i.unit_cost_cents
+					FROM inventory_transfer_item i
+					JOIN catalog_product cp ON cp.id = i.product_id
+					WHERE i.transfer_id = :transferId
+					ORDER BY cp.name
+					""")
+					.param("transferId", h.id())
+					.query((rs, rowNum) -> new InventoryTransferItemView(
+							rs.getObject("id", UUID.class), rs.getObject("product_id", UUID.class),
+							rs.getString("product_name"), rs.getString("sku"),
+							rs.getInt("requested_quantity"), rs.getObject("shipped_quantity", Integer.class),
+							rs.getObject("received_quantity", Integer.class), rs.getObject("unit_cost_cents", Long.class)))
+					.list();
+
+			return new InventoryTransferView(
+					h.id(), h.organizationId(), h.originBranchId(), h.originBranchName(),
+					h.destinationBranchId(), h.destinationBranchName(), h.status(), h.notes(),
+					h.createdAt(), h.updatedAt(), h.createdBy(), h.shippedAt(), h.shippedBy(),
+					h.receivedAt(), h.receivedBy(), items);
+		}).toList();
 	}
 
 	Optional<InventoryTransferView> findById(UUID organizationId, UUID branchId, UUID transferId) {

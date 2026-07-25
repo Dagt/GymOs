@@ -43,6 +43,7 @@ public interface InventoryQueryPort {
 	}
 
 	Optional<InventoryProductView> product(UUID organizationId, UUID branchId, UUID productId);
+	Optional<InventoryProductView> product(UUID organizationId, UUID productId);
 
 	boolean isNegativeStockAllowed(UUID organizationId, UUID branchId);
 	InventorySummaryView summary(UUID organizationId, UUID branchId);

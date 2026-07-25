@@ -7,6 +7,7 @@ import java.util.UUID;
 
 public interface InventoryCommandPort {
 	UUID ensureStock(UUID organizationId, UUID branchId, UUID productId, UUID actorUserId, OffsetDateTime now);
+	void attachBranch(UUID organizationId, UUID branchId, UUID productId, UUID actorUserId, OffsetDateTime now);
 	Optional<InventoryStockLedgerView> lock(UUID organizationId, UUID branchId, UUID stockId);
 	void update(UUID stockId, int quantityOnHand, int reorderPoint, Long averageCostCents, UUID actorUserId, OffsetDateTime now);
 	UUID createMovement(UUID organizationId, UUID branchId, UUID stockId, UUID productId, String movementType,

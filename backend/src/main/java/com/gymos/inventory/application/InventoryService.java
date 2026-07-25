@@ -21,6 +21,7 @@ import com.gymos.inventory.application.query.InventoryTransferView;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -231,11 +232,17 @@ public class InventoryService {
 		if (items == null || items.isEmpty()) {
 			throw new BusinessException("INVENTORY_TRANSFER_NO_ITEMS", "Debe incluir al menos un producto en la transferencia.");
 		}
+		boolean allowNegative = queries.isNegativeStockAllowed(principal.organizationId(), principal.branchId());
 		OffsetDateTime now = OffsetDateTime.now();
 		UUID transferId = commands.createTransfer(principal.organizationId(), principal.branchId(), destinationBranchId, notes, principal.userId(), now);
 		for (TransferItemRequest itemReq : items) {
 			InventoryStockView stockItem = queries.stockDetail(principal.organizationId(), principal.branchId(), itemReq.productId())
 					.orElseThrow(() -> new BusinessException("PRODUCT_NOT_FOUND", "Producto no encontrado en la sucursal de origen."));
+			if (itemReq.requestedQuantity() > stockItem.quantityOnHand() && !allowNegative) {
+				throw new BusinessException("INVENTORY_TRANSFER_EXCEEDS_STOCK",
+						String.format("No hay suficiente existencia en la sucursal de origen para transferir %d unidades de '%s'. Existencia disponible: %d unidades.",
+								itemReq.requestedQuantity(), stockItem.productName(), stockItem.quantityOnHand()));
+			}
 			commands.addTransferItem(transferId, itemReq.productId(), itemReq.requestedQuantity(), stockItem.averageCostCents());
 		}
 		auditService.record(principal, "INVENTORY_TRANSFER_CREATED", "INVENTORY_TRANSFER", transferId, "BACKOFFICE", notes, correlationId);
@@ -322,7 +329,14 @@ public class InventoryService {
 	}
 
 	private InventoryProductView ensureTrackedProduct(UUID organizationId, UUID branchId, UUID productId) {
-		InventoryProductView product = queries.product(organizationId, branchId, productId)
+		Optional<InventoryProductView> productOpt = queries.product(organizationId, branchId, productId);
+		if (productOpt.isEmpty()) {
+			queries.product(organizationId, productId)
+					.orElseThrow(() -> new BusinessException("PRODUCT_NOT_FOUND", "El producto no existe en la organizacion."));
+			commands.attachBranch(organizationId, branchId, productId, null, OffsetDateTime.now());
+			productOpt = queries.product(organizationId, branchId, productId);
+		}
+		InventoryProductView product = productOpt
 				.orElseThrow(() -> new BusinessException("PRODUCT_NOT_FOUND", "El producto no existe en la sucursal activa."));
 		if (!"PHYSICAL".equals(product.productType()) || !product.inventoryTracked()) {
 			throw new BusinessException("PRODUCT_NOT_INVENTORY_TRACKED", "Solo los productos fisicos con control de inventario pueden manejar existencias.");

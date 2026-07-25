@@ -162,6 +162,29 @@ class InventoryServiceTests {
 				.hasMessageContaining("sucursal destino debe ser distinta");
 	}
 
+	@Test
+	void automaticallyAttachesProductToDestinationBranchWhenNotInBranchCatalog() {
+		UUID newProductId = UUID.randomUUID();
+		when(queries.product(principal.organizationId(), principal.branchId(), newProductId))
+				.thenReturn(Optional.empty())
+				.thenReturn(Optional.of(new InventoryProductView(newProductId, "SKU2", "Nuevo Producto", "PHYSICAL", true, "ACTIVE")));
+		when(queries.product(principal.organizationId(), newProductId))
+				.thenReturn(Optional.of(new InventoryProductView(newProductId, "SKU2", "Nuevo Producto", "PHYSICAL", true, "ACTIVE")));
+
+		UUID stockId = UUID.randomUUID();
+		when(commands.ensureStock(eq(principal.organizationId()), eq(principal.branchId()), eq(newProductId), eq(principal.userId()), any()))
+				.thenReturn(stockId);
+		when(commands.lock(principal.organizationId(), principal.branchId(), stockId))
+				.thenReturn(Optional.of(new InventoryStockLedgerView(stockId, 0, 0, 100L)));
+		when(queries.stockDetail(principal.organizationId(), principal.branchId(), newProductId))
+				.thenReturn(Optional.of(new InventoryStockView(stockId, newProductId, "SKU2", "Nuevo Producto", 1000, "MXN", 5, 0, 100L, OffsetDateTime.now())));
+
+		InventoryMovementCommand request = new InventoryMovementCommand(newProductId, "TRANSFER_IN", 5, 100L, "TRANSFER", UUID.randomUUID(), "Entrada por transferencia");
+		service.createMovement(principal, request, "test");
+
+		verify(commands).attachBranch(eq(principal.organizationId()), eq(principal.branchId()), eq(newProductId), any(), any());
+	}
+
 	private InventoryStockView stock(UUID stockId, int quantity, int reorderPoint) {
 		return new InventoryStockView(stockId, productId, "SKU", "Producto", 1000, "MXN", quantity,
 				reorderPoint, 100L, OffsetDateTime.now());

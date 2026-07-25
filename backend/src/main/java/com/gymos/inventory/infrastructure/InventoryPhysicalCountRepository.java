@@ -18,7 +18,7 @@ class InventoryPhysicalCountRepository {
 	}
 
 	List<InventoryPhysicalCountView> list(UUID organizationId, UUID branchId) {
-		return jdbcClient.sql("""
+		var headers = jdbcClient.sql("""
 				SELECT id, organization_id, branch_id, status, notes, created_at, updated_at, created_by, approved_at, approved_by
 				FROM inventory_physical_count
 				WHERE organization_id = :organizationId AND branch_id = :branchId
@@ -32,6 +32,30 @@ class InventoryPhysicalCountRepository {
 						rs.getObject("approved_at", OffsetDateTime.class), rs.getObject("approved_by", UUID.class),
 						List.of()))
 				.list();
+
+		if (headers.isEmpty()) return List.of();
+
+		return headers.stream().map(h -> {
+			var items = jdbcClient.sql("""
+					SELECT i.id, i.product_id, cp.name AS product_name, cp.sku, i.system_quantity, i.counted_quantity, i.variance_quantity, i.unit_cost_cents, i.notes
+					FROM inventory_physical_count_item i
+					JOIN catalog_product cp ON cp.id = i.product_id
+					WHERE i.physical_count_id = :countId
+					ORDER BY cp.name
+					""")
+					.param("countId", h.id())
+					.query((rs, rowNum) -> new InventoryPhysicalCountItemView(
+							rs.getObject("id", UUID.class), rs.getObject("product_id", UUID.class),
+							rs.getString("product_name"), rs.getString("sku"),
+							rs.getInt("system_quantity"), rs.getObject("counted_quantity", Integer.class),
+							rs.getObject("variance_quantity", Integer.class), rs.getObject("unit_cost_cents", Long.class),
+							rs.getString("notes")))
+					.list();
+
+			return new InventoryPhysicalCountView(
+					h.id(), h.organizationId(), h.branchId(), h.status(), h.notes(),
+					h.createdAt(), h.updatedAt(), h.createdBy(), h.approvedAt(), h.approvedBy(), items);
+		}).toList();
 	}
 
 	Optional<InventoryPhysicalCountView> findById(UUID organizationId, UUID branchId, UUID countId) {

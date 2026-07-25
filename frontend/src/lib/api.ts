@@ -3,6 +3,7 @@ export * from "./api/auth";
 export {
   createBranch,
   createOrganization,
+  getAllOrganizationBranches,
   getBranches,
   getCurrentOrganization,
   getOrganizationBranches,

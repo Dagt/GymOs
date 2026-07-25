@@ -1,7 +1,30 @@
 ﻿# 13. Estado de Desarrollo
 
 Estado: en progreso  
-Fecha: 19 de julio de 2026
+Fecha: 25 de julio de 2026
+
+## Cierre de endurecimiento operativo y UX de Inventario - 25 de julio de 2026
+
+Implementado en rama `feature/inventory-operations-hardening`:
+
+- **Transferencias entre Sucursales & Seguridad de Gerentes:**
+  - Corrección de la regla de Spring Security en `SecurityConfig` (se acotó `branch.update` a HTTP `PUT`) para habilitar la consulta `GET /api/v1/organizations/current/branches/all` en cuentas de Gerente.
+  - Publicación automática de fichas de catálogo (`catalog.attachBranch`) al recibir transferencias de productos pertenecientes a la organización que aún no estuvieran publicados en la sucursal destino.
+  - Validación preventiva en tiempo real de disponibilidad de stock en la sucursal de origen al crear o solicitar una transferencia.
+- **Auditorías de Conteo Físico & Mapeo de Partidas:**
+  - Mapeo completo de partidas (`items`) en la consulta `list()` de `InventoryTransferRepository` e `InventoryPhysicalCountRepository`.
+  - Captura directa de conteo físico real con cálculo de varianzas en tiempo real y ajuste automático de stock al aprobar.
+- **Rediseño UI/UX y Sistema de Diseño GymOS:**
+  - Estandarización de la pantalla `/inventory` utilizando las primitivas de GymOS (`app-card`, `app-input`, `app-button`).
+  - Navegación organizada en **4 pestañas independientes**: `Existencias y Alertas`, `Historial de Movimientos`, `Gestión de Transferencias` y `Auditorías`.
+  - Alineación de altura entre Existencias y Alertas mediante CSS Flexbox, fijación de tamaño constante (`shrink-0 h-fit`) en las tarjetas de alerta de stock e invisibilización de las barras de desplazamiento con `[scrollbar-width:none] [&::-webkit-scrollbar]:hidden`.
+  - Ampliación de columnas de menú desplegable en el buscador de `/catalog` para prevenir cortes de texto en etiquetas y placeholders.
+
+Verificado:
+
+- Frontend: `npm.cmd run typecheck`, `npm.cmd run test`, `npm.cmd run build`.
+- Backend: `./gradlew.bat test`.
+- Docker: `docker compose -f infra/docker-compose.yml up -d --build`.
 
 ## Mejora integral de catálogo e inventario - 23 de julio de 2026
 

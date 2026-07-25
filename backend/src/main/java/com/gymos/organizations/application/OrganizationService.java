@@ -68,6 +68,12 @@ public class OrganizationService {
 	}
 
 	@Transactional(readOnly = true)
+	public List<BranchSummary> allOrganizationBranches(GymOsPrincipal principal) {
+		requirePrincipal(principal);
+		return organizationQueryRepository.findBranchesForOrganization(principal.organizationId());
+	}
+
+	@Transactional(readOnly = true)
 	public List<BranchSummary> branchesForOrganization(GymOsPrincipal principal, UUID organizationId) {
 		requirePrincipal(principal);
 		if (!principal.platformAdmin()) {

@@ -8,6 +8,7 @@ import {
   createInventoryMovement,
   createInventoryPhysicalCount,
   createInventoryTransfer,
+  getAllOrganizationBranches,
   getBranches,
   getCurrentOrganization,
   getInventoryBranchSettings,
@@ -17,12 +18,10 @@ import {
   getLowInventoryStock,
   getStoredSession,
   receiveInventoryTransfer,
+  updateInventoryPhysicalCountItem,
   searchInventoryMovements,
   searchInventoryStock,
   shipInventoryTransfer,
-  updateInventoryBranchSettings,
-  updateInventoryPhysicalCountItem,
-  updateInventorySettings,
   type BranchSummary,
   type InventoryBranchSettings,
   type InventoryMovement,
@@ -35,8 +34,10 @@ import {
   type InventoryTransfer,
   type OrganizationSummary,
   type StoredSession,
+  updateInventoryBranchSettings,
+  updateInventorySettings,
 } from "@/lib/api";
-import { downloadCsvFile, generateMovementsCsv, generateStockCsv } from "@/features/inventory/inventory-utils";
+import { downloadCsvFile, generateMovementsCsv, generateStockCsv } from "../inventory-utils";
 
 type ManualMovementType = Exclude<InventoryMovementType, "SALE">;
 
@@ -44,19 +45,24 @@ export function useInventoryController() {
   const [session, setSession] = useState<StoredSession | null>(null);
   const [organization, setOrganization] = useState<OrganizationSummary | null>(null);
   const [branches, setBranches] = useState<BranchSummary[]>([]);
-  const [summary, setSummary] = useState<InventorySummary | null>(null);
-  const [branchSettings, setBranchSettings] = useState<InventoryBranchSettings | null>(null);
   const [stock, setStock] = useState<InventoryStock[]>([]);
+  const [stockTotal, setStockTotal] = useState(0);
+  const [stockTotalPages, setStockTotalPages] = useState(1);
+  const [stockPage, setStockPage] = useState(0);
   const [stockQuery, setStockQuery] = useState("");
   const [debouncedStockQuery, setDebouncedStockQuery] = useState("");
-  const [stockPage, setStockPage] = useState(0);
-  const [stockTotal, setStockTotal] = useState(0);
-  const [stockTotalPages, setStockTotalPages] = useState(0);
   const [stockSort, setStockSort] = useState<NonNullable<InventoryStockSearchParams["sort"]>>("name,asc");
+
   const [lowStock, setLowStock] = useState<InventoryStock[]>([]);
   const [movements, setMovements] = useState<InventoryMovement[]>([]);
   const [movementPage, setMovementPage] = useState(0);
-  const [movementTotalPages, setMovementTotalPages] = useState(0);
+  const [movementTotalPages, setMovementTotalPages] = useState(1);
+  const [movementProductIdFilter, setMovementProductIdFilter] = useState<string>("");
+  const [movementTypeFilter, setMovementTypeFilter] = useState<string>("");
+  const [movementQuery, setMovementQuery] = useState<string>("");
+
+  const [summary, setSummary] = useState<InventorySummary | null>(null);
+  const [branchSettings, setBranchSettings] = useState<InventoryBranchSettings | null>(null);
   const [physicalCounts, setPhysicalCounts] = useState<InventoryPhysicalCount[]>([]);
   const [transfers, setTransfers] = useState<InventoryTransfer[]>([]);
 
@@ -87,7 +93,7 @@ export function useInventoryController() {
       try {
         const [loadedOrganization, loadedBranches, loadedLowStock, loadedSummary, loadedSettings, loadedCounts, loadedTransfers] = await Promise.all([
           getCurrentOrganization(stored.accessToken).catch(() => null),
-          getBranches(stored.accessToken),
+          getAllOrganizationBranches(stored.accessToken).catch(() => getBranches(stored.accessToken)),
           getLowInventoryStock(stored.accessToken),
           getInventorySummary(stored.accessToken).catch(() => null),
           getInventoryBranchSettings(stored.accessToken).catch(() => null),
@@ -166,9 +172,9 @@ export function useInventoryController() {
       setMovementLoading(true);
       try {
         const page = await searchInventoryMovements(token, {
-          productId: selectedProductId || undefined,
+          productId: movementProductIdFilter || undefined,
           page: movementPage,
-          size: 25,
+          size: 50,
         });
         if (!active) return;
         setMovements(page.items);
@@ -182,10 +188,24 @@ export function useInventoryController() {
 
     void loadMovements(accessToken);
     return () => { active = false; };
-  }, [movementPage, selectedProductId, session]);
+  }, [movementPage, movementProductIdFilter, session]);
 
   const selectedStock = useMemo(() => stock.find((item) => item.productId === selectedProductId) ?? null, [selectedProductId, stock]);
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
+
+  const filteredMovements = useMemo(() => {
+    return movements.filter((m) => {
+      if (movementTypeFilter && m.movementType !== movementTypeFilter) return false;
+      if (movementQuery.trim()) {
+        const q = movementQuery.toLowerCase().trim();
+        const matchName = m.productName.toLowerCase().includes(q);
+        const matchSku = m.sku.toLowerCase().includes(q);
+        const matchReason = (m.reason || "").toLowerCase().includes(q);
+        if (!matchName && !matchSku && !matchReason) return false;
+      }
+      return true;
+    });
+  }, [movements, movementTypeFilter, movementQuery]);
 
   async function refresh(activeSession = session) {
     if (!activeSession) return;
@@ -195,7 +215,7 @@ export function useInventoryController() {
       }),
       getLowInventoryStock(activeSession.accessToken),
       searchInventoryMovements(activeSession.accessToken, {
-        productId: selectedProductId || undefined, page: movementPage, size: 25,
+        productId: movementProductIdFilter || undefined, page: movementPage, size: 50,
       }),
       getInventorySummary(activeSession.accessToken).catch(() => null),
       getInventoryPhysicalCounts(activeSession.accessToken).catch(() => []),
@@ -207,13 +227,21 @@ export function useInventoryController() {
   }
 
   function selectProduct(product: InventoryStock) {
-    setSelectedProductId(product.productId); setReorderPoint(String(product.reorderPoint)); setMovementPage(0);
+    setSelectedProductId(product.productId);
+    setReorderPoint(String(product.reorderPoint));
   }
 
   function selectDrawerProduct(productId: string) {
-    setSelectedProductId(productId); setMovementPage(0);
+    setSelectedProductId(productId);
     const nextStock = stock.find((item) => item.productId === productId);
     setReorderPoint(String(nextStock?.reorderPoint ?? 0));
+  }
+
+  function clearMovementFilters() {
+    setMovementProductIdFilter("");
+    setMovementTypeFilter("");
+    setMovementQuery("");
+    setMovementPage(0);
   }
 
   async function toggleAllowNegativeStock(allow: boolean) {
@@ -248,20 +276,22 @@ export function useInventoryController() {
       const updated = await createInventoryMovement(session.accessToken, payload);
       setReason(""); setUnitCostCents(""); setReorderPoint(String(updated.reorderPoint)); setMovementPage(0);
       setMessage(`${updated.productName}: existencia actual ${updated.quantityOnHand}.`);
-      await refresh(session); setShowMovementDrawer(false);
+      await refresh(session);
+      setShowMovementDrawer(false);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible registrar movimiento.");
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function startPhysicalCount(notes?: string) {
     if (!session) return;
     setSaving(true); setError(null); setMessage(null);
     try {
-      const created = await createInventoryPhysicalCount(session.accessToken, notes);
-      setMessage(`Conteo físico iniciado con estado ${created.status}.`);
+      await createInventoryPhysicalCount(session.accessToken, notes);
+      setMessage("Sesión de conteo físico iniciada.");
       await refresh(session);
-      return created;
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible iniciar el conteo físico.");
     } finally { setSaving(false); }
@@ -269,17 +299,12 @@ export function useInventoryController() {
 
   async function savePhysicalCountItem(countId: string, productId: string, countedQty: number | null, notes?: string) {
     if (!session) return;
-    setSaving(true); setError(null); setMessage(null);
     try {
-      const updated = await updateInventoryPhysicalCountItem(session.accessToken, countId, productId, {
-        countedQuantity: countedQty, notes,
-      });
-      setMessage("Ítem de conteo actualizado.");
+      await updateInventoryPhysicalCountItem(session.accessToken, countId, productId, { countedQuantity: countedQty, notes });
       await refresh(session);
-      return updated;
     } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible actualizar ítem de conteo.");
-    } finally { setSaving(false); }
+      setError(exception instanceof Error ? exception.message : "No fue posible actualizar la partida.");
+    }
   }
 
   async function approveCount(countId: string) {
@@ -287,8 +312,9 @@ export function useInventoryController() {
     setSaving(true); setError(null); setMessage(null);
     try {
       await approveInventoryPhysicalCount(session.accessToken, countId);
-      setMessage("Conteo físico aprobado y ajustes de inventario aplicados.");
+      setMessage("Conteo físico aprobado y diferencias ajustadas en inventario.");
       await refresh(session);
+      setShowPhysicalCountDrawer(false);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible aprobar el conteo físico.");
     } finally { setSaving(false); }
@@ -364,20 +390,20 @@ export function useInventoryController() {
   }
 
   function exportMovementsCsv() {
-    if (movements.length === 0) return;
-    const content = generateMovementsCsv(movements);
+    if (filteredMovements.length === 0) return;
+    const content = generateMovementsCsv(filteredMovements);
     const dateStr = new Date().toISOString().split("T")[0];
     downloadCsvFile(content, `inventario_movimientos_${dateStr}.csv`);
   }
 
   return {
-    activeBranch, approveCount, branchSettings, branches, cancelCount, error,
-    exportMovementsCsv, exportStockCsv,
+    activeBranch, approveCount, branchSettings, branches, cancelCount, clearMovementFilters, error,
+    exportMovementsCsv, exportStockCsv, filteredMovements,
     handleCancelTransfer, handleCreateTransfer, handleReceiveTransfer, handleShipTransfer,
-    loading, lowStock, message, movementLoading, movementPage, movementTotalPages,
-    movementType, movements, organization, physicalCounts, quantity, reason, refresh, reorderPoint, saving,
+    loading, lowStock, message, movementLoading, movementPage, movementProductIdFilter, movementQuery, movementTotalPages,
+    movementType, movementTypeFilter, movements, organization, physicalCounts, quantity, reason, refresh, reorderPoint, saving,
     savePhysicalCountItem, selectDrawerProduct, selectProduct, selectedProductId, selectedStock, session,
-    setMovementPage, setMovementType, setQuantity, setReason, setReorderPoint,
+    setMovementPage, setMovementProductIdFilter, setMovementQuery, setMovementType, setMovementTypeFilter, setQuantity, setReason, setReorderPoint,
     setShowMovementDrawer, setShowPhysicalCountDrawer, setShowTransferDrawer, setStockPage, setStockQuery,
     setStockSort, setUnitCostCents, showMovementDrawer, showPhysicalCountDrawer, showTransferDrawer,
     startPhysicalCount, stock, stockLoading, stockPage, stockQuery, stockSort, stockTotal, stockTotalPages,
