@@ -18,4 +18,11 @@ public record InventoryStockView(
 	public boolean lowStock() {
 		return reorderPoint > 0 && quantityOnHand <= reorderPoint;
 	}
+
+	public int suggestedReorderQuantity() {
+		if (reorderPoint <= 0 || quantityOnHand > reorderPoint) {
+			return 0;
+		}
+		return Math.max(0, (reorderPoint * 2) - quantityOnHand);
+	}
 }

@@ -8,6 +8,8 @@ public interface CatalogProductOperations {
 
 	Optional<CatalogProductSnapshot> product(UUID organizationId, UUID branchId, UUID productId);
 
+	void attachBranch(UUID organizationId, UUID branchId, UUID productId, UUID userId, java.time.OffsetDateTime now);
+
 	record CatalogProductSnapshot(
 			UUID id,
 			String sku,
