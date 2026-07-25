@@ -27,8 +27,9 @@ class InventorySaleDeductionRepository {
 		if (movementExists(organizationId, branchId, productId, saleId)) {
 			return StockDeductionResult.ALREADY_PROCESSED;
 		}
+		boolean allowNegative = isNegativeStockAllowed(organizationId, branchId);
 		int quantityAfter = stock.quantityOnHand() - quantity;
-		if (quantityAfter < 0) {
+		if (quantityAfter < 0 && !allowNegative) {
 			throw new BusinessException("INVENTORY_STOCK_INSUFFICIENT", "La venta supera las existencias disponibles de " + productName + ".");
 		}
 		stockCommands.update(stockId, quantityAfter, stock.reorderPoint(), stock.averageCostCents(), null, occurredAt);
@@ -48,6 +49,15 @@ class InventorySaleDeductionRepository {
 				.param("saleId", saleId).param("occurredAt", occurredAt).param("correlationId", correlationId)
 				.update();
 		return StockDeductionResult.DEDUCTED;
+	}
+
+	private boolean isNegativeStockAllowed(UUID organizationId, UUID branchId) {
+		return jdbcClient.sql("""
+				SELECT allow_negative_stock FROM branch
+				WHERE id = :branchId AND organization_id = :organizationId AND deleted_at IS NULL
+				""")
+				.param("branchId", branchId).param("organizationId", organizationId)
+				.query(Boolean.class).optional().orElse(false);
 	}
 
 	private boolean movementExists(UUID organizationId, UUID branchId, UUID productId, UUID saleId) {

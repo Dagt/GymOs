@@ -4,17 +4,22 @@ import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.inventory.application.InventoryService;
 import com.gymos.inventory.application.command.InventoryMovementCommand;
+import com.gymos.inventory.application.query.InventoryBranchSettingsView;
 import com.gymos.inventory.application.query.InventoryMovementPageView;
 import com.gymos.inventory.application.query.InventoryMovementSearchCriteria;
 import com.gymos.inventory.application.query.InventoryMovementView;
+import com.gymos.inventory.application.query.InventoryPhysicalCountView;
 import com.gymos.inventory.application.query.InventoryStockPageView;
 import com.gymos.inventory.application.query.InventoryStockSearchCriteria;
 import com.gymos.inventory.application.query.InventoryStockView;
+import com.gymos.inventory.application.query.InventorySummaryView;
+import com.gymos.inventory.application.query.InventoryTransferView;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -41,6 +46,18 @@ public class InventoryController {
 
 	@GetMapping
 	List<InventoryStockView> stock(@AuthenticationPrincipal GymOsPrincipal principal) { return inventoryService.stock(principal); }
+
+	@GetMapping("/summary")
+	InventorySummaryView summary(@AuthenticationPrincipal GymOsPrincipal principal) { return inventoryService.summary(principal); }
+
+	@GetMapping("/branch-settings")
+	InventoryBranchSettingsView branchSettings(@AuthenticationPrincipal GymOsPrincipal principal) { return inventoryService.branchSettings(principal); }
+
+	@PutMapping("/branch-settings")
+	InventoryBranchSettingsView updateBranchSettings(@AuthenticationPrincipal GymOsPrincipal principal,
+			@Valid @RequestBody UpdateBranchSettingsRequest request, HttpServletRequest servletRequest) {
+		return inventoryService.updateBranchSettings(principal, request.allowNegativeStock(), correlationId(servletRequest));
+	}
 
 	@GetMapping("/search")
 	InventoryStockPageView searchStock(@AuthenticationPrincipal GymOsPrincipal principal,
@@ -85,6 +102,80 @@ public class InventoryController {
 		return inventoryService.updateReorderPoint(principal, productId, request.reorderPoint(), correlationId(servletRequest));
 	}
 
+	// Conteos Físicos
+	@GetMapping("/physical-counts")
+	List<InventoryPhysicalCountView> physicalCounts(@AuthenticationPrincipal GymOsPrincipal principal) {
+		return inventoryService.physicalCounts(principal);
+	}
+
+	@GetMapping("/physical-counts/{countId}")
+	InventoryPhysicalCountView physicalCountDetail(@AuthenticationPrincipal GymOsPrincipal principal, @PathVariable UUID countId) {
+		return inventoryService.physicalCountDetail(principal, countId);
+	}
+
+	@PostMapping("/physical-counts")
+	InventoryPhysicalCountView createPhysicalCount(@AuthenticationPrincipal GymOsPrincipal principal,
+			@Valid @RequestBody CreatePhysicalCountRequest request, HttpServletRequest servletRequest) {
+		return inventoryService.createPhysicalCount(principal, request.notes(), correlationId(servletRequest));
+	}
+
+	@PutMapping("/physical-counts/{countId}/items/{productId}")
+	InventoryPhysicalCountView updatePhysicalCountItem(@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID countId, @PathVariable UUID productId,
+			@Valid @RequestBody UpdatePhysicalCountItemRequest request, HttpServletRequest servletRequest) {
+		return inventoryService.updatePhysicalCountItem(principal, countId, productId, request.countedQuantity(), request.notes(), correlationId(servletRequest));
+	}
+
+	@PostMapping("/physical-counts/{countId}/approve")
+	InventoryPhysicalCountView approvePhysicalCount(@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID countId, HttpServletRequest servletRequest) {
+		return inventoryService.approvePhysicalCount(principal, countId, correlationId(servletRequest));
+	}
+
+	@PostMapping("/physical-counts/{countId}/cancel")
+	InventoryPhysicalCountView cancelPhysicalCount(@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID countId, HttpServletRequest servletRequest) {
+		return inventoryService.cancelPhysicalCount(principal, countId, correlationId(servletRequest));
+	}
+
+	// Transferencias entre sucursales
+	@GetMapping("/transfers")
+	List<InventoryTransferView> transfers(@AuthenticationPrincipal GymOsPrincipal principal) {
+		return inventoryService.transfers(principal);
+	}
+
+	@GetMapping("/transfers/{transferId}")
+	InventoryTransferView transferDetail(@AuthenticationPrincipal GymOsPrincipal principal, @PathVariable UUID transferId) {
+		return inventoryService.transferDetail(principal, transferId);
+	}
+
+	@PostMapping("/transfers")
+	InventoryTransferView createTransfer(@AuthenticationPrincipal GymOsPrincipal principal,
+			@Valid @RequestBody CreateTransferRequest request, HttpServletRequest servletRequest) {
+		List<InventoryService.TransferItemRequest> items = request.items().stream()
+				.map(item -> new InventoryService.TransferItemRequest(item.productId(), item.requestedQuantity()))
+				.toList();
+		return inventoryService.createTransfer(principal, request.destinationBranchId(), request.notes(), items, correlationId(servletRequest));
+	}
+
+	@PostMapping("/transfers/{transferId}/ship")
+	InventoryTransferView shipTransfer(@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID transferId, HttpServletRequest servletRequest) {
+		return inventoryService.shipTransfer(principal, transferId, correlationId(servletRequest));
+	}
+
+	@PostMapping("/transfers/{transferId}/receive")
+	InventoryTransferView receiveTransfer(@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID transferId, HttpServletRequest servletRequest) {
+		return inventoryService.receiveTransfer(principal, transferId, correlationId(servletRequest));
+	}
+
+	@PostMapping("/transfers/{transferId}/cancel")
+	InventoryTransferView cancelTransfer(@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID transferId, HttpServletRequest servletRequest) {
+		return inventoryService.cancelTransfer(principal, transferId, correlationId(servletRequest));
+	}
+
 	private String correlationId(HttpServletRequest request) {
 		Object value = request.getAttribute(Correlation.ATTRIBUTE);
 		return value == null ? "unknown" : value.toString();
@@ -92,7 +183,7 @@ public class InventoryController {
 
 	public record InventoryMovementRequest(
 			@NotNull UUID productId,
-			@NotBlank @Pattern(regexp = "INITIAL|PURCHASE|ADJUSTMENT_IN|ADJUSTMENT_OUT|WASTE|RETURN") String movementType,
+			@NotBlank @Pattern(regexp = "INITIAL|PURCHASE|ADJUSTMENT_IN|ADJUSTMENT_OUT|WASTE|INTERNAL_CONSUMPTION|RETURN|TRANSFER_OUT|TRANSFER_IN") String movementType,
 			@Min(1) int quantity,
 			@Min(0) Long unitCostCents,
 			@Size(max = 80) String referenceType,
@@ -105,5 +196,30 @@ public class InventoryController {
 	}
 
 	public record InventorySettingsRequest(@Min(0) int reorderPoint) {
+	}
+
+	public record UpdateBranchSettingsRequest(boolean allowNegativeStock) {
+	}
+
+	public record CreatePhysicalCountRequest(@Size(max = 500) String notes) {
+	}
+
+	public record UpdatePhysicalCountItemRequest(
+			@Min(0) Integer countedQuantity,
+			@Size(max = 500) String notes
+	) {
+	}
+
+	public record CreateTransferRequest(
+			@NotNull UUID destinationBranchId,
+			@Size(max = 500) String notes,
+			@NotEmpty List<@Valid TransferItemApiRequest> items
+	) {
+	}
+
+	public record TransferItemApiRequest(
+			@NotNull UUID productId,
+			@Min(1) int requestedQuantity
+	) {
 	}
 }

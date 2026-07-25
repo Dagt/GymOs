@@ -3,14 +3,18 @@ package com.gymos.inventory.infrastructure;
 import com.gymos.catalog.api.CatalogProductOperations;
 import com.gymos.inventory.application.port.InventoryCommandPort;
 import com.gymos.inventory.application.port.InventoryQueryPort;
+import com.gymos.inventory.application.query.InventoryBranchSettingsView;
 import com.gymos.inventory.application.query.InventoryMovementPageView;
 import com.gymos.inventory.application.query.InventoryMovementSearchCriteria;
 import com.gymos.inventory.application.query.InventoryMovementView;
+import com.gymos.inventory.application.query.InventoryPhysicalCountView;
 import com.gymos.inventory.application.query.InventoryProductView;
 import com.gymos.inventory.application.query.InventoryStockLedgerView;
 import com.gymos.inventory.application.query.InventoryStockPageView;
 import com.gymos.inventory.application.query.InventoryStockSearchCriteria;
 import com.gymos.inventory.application.query.InventoryStockView;
+import com.gymos.inventory.application.query.InventorySummaryView;
+import com.gymos.inventory.application.query.InventoryTransferView;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -23,15 +27,20 @@ class InventoryPersistenceAdapter implements InventoryQueryPort, InventoryComman
 	private final InventoryStockQueryRepository stockQueries;
 	private final InventoryMovementQueryRepository movementQueries;
 	private final InventoryStockCommandRepository stockCommands;
+	private final InventoryPhysicalCountRepository physicalCountRepository;
+	private final InventoryTransferRepository transferRepository;
 	private final CatalogProductOperations catalog;
 
 	InventoryPersistenceAdapter(InventoryRepository repository, InventoryStockQueryRepository stockQueries,
 			InventoryMovementQueryRepository movementQueries, InventoryStockCommandRepository stockCommands,
+			InventoryPhysicalCountRepository physicalCountRepository, InventoryTransferRepository transferRepository,
 			CatalogProductOperations catalog) {
 		this.repository = repository;
 		this.stockQueries = stockQueries;
 		this.movementQueries = movementQueries;
 		this.stockCommands = stockCommands;
+		this.physicalCountRepository = physicalCountRepository;
+		this.transferRepository = transferRepository;
 		this.catalog = catalog;
 	}
 
@@ -57,6 +66,24 @@ class InventoryPersistenceAdapter implements InventoryQueryPort, InventoryComman
 		InventoryStockCommandRepository.StockLedger ledger = stockCommands.lock(organizationId, branchId, stockId).orElseThrow();
 		stockCommands.update(stockId, ledger.quantityOnHand(), reorderPoint, ledger.averageCostCents(), actorUserId, now);
 	}
+
+	@Override public boolean isNegativeStockAllowed(UUID organizationId, UUID branchId) { return stockQueries.isNegativeStockAllowed(organizationId, branchId); }
+	@Override public InventorySummaryView summary(UUID organizationId, UUID branchId) { return stockQueries.summary(organizationId, branchId); }
+	@Override public InventoryBranchSettingsView branchSettings(UUID organizationId, UUID branchId) { return stockQueries.branchSettings(organizationId, branchId); }
+	@Override public void updateBranchSettings(UUID organizationId, UUID branchId, boolean allowNegativeStock, UUID actorUserId, OffsetDateTime now) { stockCommands.updateBranchSettings(organizationId, branchId, allowNegativeStock, actorUserId, now); }
+
+	@Override public List<InventoryPhysicalCountView> physicalCounts(UUID organizationId, UUID branchId) { return physicalCountRepository.list(organizationId, branchId); }
+	@Override public Optional<InventoryPhysicalCountView> physicalCountDetail(UUID organizationId, UUID branchId, UUID countId) { return physicalCountRepository.findById(organizationId, branchId, countId); }
+	@Override public UUID createPhysicalCount(UUID organizationId, UUID branchId, String notes, UUID actorUserId, OffsetDateTime now) { return physicalCountRepository.create(organizationId, branchId, notes, actorUserId, now); }
+	@Override public void updatePhysicalCountItem(UUID physicalCountId, UUID productId, int systemQuantity, Integer countedQuantity, Long unitCostCents, String notes, OffsetDateTime now) { physicalCountRepository.updateItem(physicalCountId, productId, systemQuantity, countedQuantity, unitCostCents, notes, now); }
+	@Override public void updatePhysicalCountStatus(UUID organizationId, UUID branchId, UUID physicalCountId, String status, UUID actorUserId, OffsetDateTime now) { physicalCountRepository.updateStatus(organizationId, branchId, physicalCountId, status, actorUserId, now); }
+
+	@Override public List<InventoryTransferView> transfers(UUID organizationId, UUID branchId) { return transferRepository.list(organizationId, branchId); }
+	@Override public Optional<InventoryTransferView> transferDetail(UUID organizationId, UUID branchId, UUID transferId) { return transferRepository.findById(organizationId, branchId, transferId); }
+	@Override public UUID createTransfer(UUID organizationId, UUID originBranchId, UUID destinationBranchId, String notes, UUID actorUserId, OffsetDateTime now) { return transferRepository.create(organizationId, originBranchId, destinationBranchId, notes, actorUserId, now); }
+	@Override public void addTransferItem(UUID transferId, UUID productId, int requestedQuantity, Long unitCostCents) { transferRepository.addItem(transferId, productId, requestedQuantity, unitCostCents); }
+	@Override public void updateTransferStatus(UUID organizationId, UUID transferId, String status, UUID actorUserId, OffsetDateTime now) { transferRepository.updateStatus(organizationId, transferId, status, actorUserId, now); }
+	@Override public void updateTransferItemQuantities(UUID transferId, UUID productId, Integer shippedQuantity, Integer receivedQuantity) { transferRepository.updateTransferItemQuantities(transferId, productId, shippedQuantity, receivedQuantity); }
 
 	private InventoryStockView stock(InventoryRepository.InventoryStockRecord value) { return new InventoryStockView(value.stockId(), value.productId(), value.sku(), value.productName(), value.priceCents(), value.currency(), value.quantityOnHand(), value.reorderPoint(), value.averageCostCents(), value.updatedAt()); }
 	private InventoryMovementView movement(InventoryRepository.InventoryMovementRecord value) { return new InventoryMovementView(value.id(), value.productId(), value.sku(), value.productName(), value.movementType(), value.quantityDelta(), value.quantityBefore(), value.quantityAfter(), value.unitCostCents(), value.referenceType(), value.referenceId(), value.reason(), value.occurredAt()); }

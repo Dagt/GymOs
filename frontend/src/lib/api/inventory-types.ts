@@ -10,6 +10,7 @@ export type InventoryStock = {
   averageCostCents: number | null;
   updatedAt: string | null;
   lowStock: boolean;
+  suggestedReorderQuantity: number;
 };
 
 export type InventoryStockPage = {
@@ -33,7 +34,10 @@ export type InventoryMovementType =
   | "ADJUSTMENT_IN"
   | "ADJUSTMENT_OUT"
   | "WASTE"
+  | "INTERNAL_CONSUMPTION"
   | "RETURN"
+  | "TRANSFER_OUT"
+  | "TRANSFER_IN"
   | "SALE";
 
 export type InventoryMovement = {
@@ -78,4 +82,73 @@ export type InventoryMovementPayload = {
 
 export type InventorySettingsPayload = {
   reorderPoint: number;
+};
+
+export type InventorySummary = {
+  totalValuationCents: number;
+  totalTrackedProducts: number;
+  lowStockCount: number;
+  outOfStockCount: number;
+  allowNegativeStock: boolean;
+};
+
+export type InventoryBranchSettings = {
+  branchId: string;
+  allowNegativeStock: boolean;
+};
+
+export type InventoryPhysicalCountItem = {
+  id: string;
+  productId: string;
+  productName: string;
+  sku: string;
+  systemQuantity: number;
+  countedQuantity: number | null;
+  varianceQuantity: number | null;
+  unitCostCents: number | null;
+  notes: string | null;
+};
+
+export type InventoryPhysicalCount = {
+  id: string;
+  organizationId: string;
+  branchId: string;
+  status: "IN_PROGRESS" | "PENDING_APPROVAL" | "APPROVED" | "CANCELLED";
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+  approvedAt: string | null;
+  approvedBy: string | null;
+  items: InventoryPhysicalCountItem[];
+};
+
+export type InventoryTransferItem = {
+  id: string;
+  productId: string;
+  productName: string;
+  sku: string;
+  requestedQuantity: number;
+  shippedQuantity: number | null;
+  receivedQuantity: number | null;
+  unitCostCents: number | null;
+};
+
+export type InventoryTransfer = {
+  id: string;
+  organizationId: string;
+  originBranchId: string;
+  originBranchName: string;
+  destinationBranchId: string;
+  destinationBranchName: string;
+  status: "REQUESTED" | "SHIPPED" | "RECEIVED" | "CANCELLED";
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+  shippedAt: string | null;
+  shippedBy: string | null;
+  receivedAt: string | null;
+  receivedBy: string | null;
+  items: InventoryTransferItem[];
 };

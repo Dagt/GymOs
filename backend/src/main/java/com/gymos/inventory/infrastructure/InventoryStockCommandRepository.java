@@ -105,6 +105,23 @@ public class InventoryStockCommandRepository {
 		}
 	}
 
+	public void updateBranchSettings(UUID organizationId, UUID branchId, boolean allowNegativeStock, UUID actorUserId, OffsetDateTime now) {
+		jdbcClient.sql("""
+				UPDATE branch
+				SET allow_negative_stock = :allowNegativeStock,
+				    updated_at = :now,
+				    updated_by = COALESCE(:actorUserId, updated_by),
+				    version = version + 1
+				WHERE id = :branchId AND organization_id = :organizationId AND deleted_at IS NULL
+				""")
+				.param("allowNegativeStock", allowNegativeStock)
+				.param("now", now)
+				.param("actorUserId", actorUserId)
+				.param("branchId", branchId)
+				.param("organizationId", organizationId)
+				.update();
+	}
+
 	public record StockLedger(UUID stockId, int quantityOnHand, int reorderPoint, Long averageCostCents) {
 	}
 }

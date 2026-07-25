@@ -1,6 +1,8 @@
 package com.gymos.inventory.infrastructure;
 
+import com.gymos.inventory.application.query.InventoryBranchSettingsView;
 import com.gymos.inventory.application.query.InventoryStockSearchCriteria;
+import com.gymos.inventory.application.query.InventorySummaryView;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -81,6 +83,48 @@ class InventoryStockQueryRepository {
 		return jdbcClient.sql(SELECT_STOCK + " AND s.reorder_point>0 AND s.quantity_on_hand<=s.reorder_point ORDER BY s.quantity_on_hand, cp.name LIMIT 100")
 				.param("organizationId", organizationId).param("branchId", branchId)
 				.query(this::mapStock).list();
+	}
+
+	boolean isNegativeStockAllowed(UUID organizationId, UUID branchId) {
+		return jdbcClient.sql("""
+				SELECT allow_negative_stock FROM branch
+				WHERE id = :branchId AND organization_id = :organizationId AND deleted_at IS NULL
+				""")
+				.param("branchId", branchId).param("organizationId", organizationId)
+				.query(Boolean.class).optional().orElse(false);
+	}
+
+	InventoryBranchSettingsView branchSettings(UUID organizationId, UUID branchId) {
+		boolean allow = isNegativeStockAllowed(organizationId, branchId);
+		return new InventoryBranchSettingsView(branchId, allow);
+	}
+
+	InventorySummaryView summary(UUID organizationId, UUID branchId) {
+		boolean allowNegative = isNegativeStockAllowed(organizationId, branchId);
+		return jdbcClient.sql("""
+				SELECT
+				  COALESCE(SUM(CASE WHEN COALESCE(s.quantity_on_hand, 0) > 0
+				                    THEN (COALESCE(s.quantity_on_hand, 0) * COALESCE(s.average_cost_cents, cp.reference_cost_cents, 0))
+				                    ELSE 0 END), 0) AS total_valuation,
+				  COUNT(cp.id) AS total_tracked,
+				  COUNT(CASE WHEN s.reorder_point > 0 AND COALESCE(s.quantity_on_hand, 0) <= s.reorder_point THEN 1 END) AS low_stock,
+				  COUNT(CASE WHEN COALESCE(s.quantity_on_hand, 0) <= 0 THEN 1 END) AS out_of_stock
+				FROM catalog_product cp
+				JOIN catalog_product_branch cpb ON cpb.organization_id = cp.organization_id
+				  AND cpb.product_id = cp.id AND cpb.branch_id = :branchId
+				LEFT JOIN inventory_stock s ON s.product_id = cp.id AND s.organization_id = cp.organization_id
+				  AND s.branch_id = :branchId AND s.deleted_at IS NULL
+				WHERE cp.organization_id = :organizationId AND cp.product_type = 'PHYSICAL'
+				  AND cp.inventory_tracked = TRUE AND cp.deleted_at IS NULL AND cp.archived_at IS NULL
+				""")
+				.param("organizationId", organizationId).param("branchId", branchId)
+				.query((rs, rowNum) -> new InventorySummaryView(
+						rs.getLong("total_valuation"),
+						rs.getLong("total_tracked"),
+						rs.getLong("low_stock"),
+						rs.getLong("out_of_stock"),
+						allowNegative))
+				.single();
 	}
 
 	private String orderBy(String sort) {
