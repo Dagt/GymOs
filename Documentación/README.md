@@ -2,7 +2,7 @@
 
 Versión: 0.2  
 Estado: Borrador consolidado  
-Fecha base: 25 de julio de 2026
+Fecha base: 26 de julio de 2026
 
 GymOS es una plataforma web modular para la administración integral de gimnasios y centros de bienestar. Esta carpeta reúne la especificación funcional y técnica definida durante el levantamiento inicial del producto y los planes de cierre por módulo.
 
@@ -22,8 +22,9 @@ GymOS es una plataforma web modular para la administración integral de gimnasio
 12. `12-decisiones-fundacionales.md` — Decisiones confirmadas sobre producto vendible, multi-organización, sucursales, primer hito, seguridad, pagos e infraestructura local.
 13. `13-estado-desarrollo.md` — Estado de implementación por hito, verificaciones y bloqueos locales.
 14. `14-plan-accion-catalogo-inventario.md` y documentos posteriores — planes y cierres técnicos por módulo.
-25. `25-plan-accion-coaches-rutinas.md` — alcance definitivo, dominio, métricas, PDF, API, frontend y fases para concluir Coaches y rutinas.
+25. `25-plan-accion-coaches-rutinas.md` — alcance definitivo, dominio, catálogo de ejercicios, métricas, PDF, API, frontend y fases para concluir Coaches y rutinas.
 26. `26-prompt-maestro-implementacion-coaches-rutinas.md` — instrucciones de implementación y validación de la rama `feature/coaches-workouts`.
+26A. `26-ajustes-transversales-coaches-rutinas.md` — correcciones de alcance y precedencia sobre PRD, dominio, datos, API, casos de uso, frontend y roadmap.
 
 ## Alcance de la versión 1
 
@@ -49,7 +50,7 @@ La aplicación móvil o portal remoto de clientes queda fuera de la versión 1, 
 
 ### Precisión de alcance para Coaches y rutinas
 
-En V1, GymOS permite que el coach cree, versione y asigne rutinas, que el gimnasio conserve el registro, que se genere un PDF imprimible y que dueño/gerencia consulten métricas semanales de asignaciones por coach y socio.
+En V1, GymOS permite que el coach consulte y amplíe un catálogo de ejercicios, cree y versione rutinas estructuradas, asigne una versión específica a un socio, conserve el historial, genere un PDF imprimible y permita que dueño/gerencia consulten métricas semanales de asignaciones por coach y socio.
 
 Las rutinas **no se cobran por medio de GymOS**. Los cobros en efectivo acordados entre coach y socio son externos a la plataforma y no generan venta, pago, comisión, ingreso ni movimiento de caja. La consulta remota de la rutina por el socio se reserva para una aplicación futura.
 
