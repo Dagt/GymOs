@@ -2,7 +2,7 @@
 
 Estado: `ESTABILIZADO`
 Rama de cierre: `feature/coaches-workouts`
-Código verificado: `0066c0b`
+Código verificado: `3933aa5`
 Corte: 26 de julio de 2026
 
 ## Propósito y alcance V1
@@ -93,6 +93,8 @@ La consulta remota por el socio pertenece a una aplicación futura.
 - el perfil de coach se vincula a `user_account_id`; un coach no puede crear,
   leer, modificar, asignar, reemplazar ni imprimir rutinas de otro coach;
 - organización y sucursal se filtran en servicio y repositorio;
+- los filtros UUID opcionales se tipan explícitamente en PostgreSQL para evitar
+  `500` cuando coach, socio o propietario no están seleccionados;
 - los ejercicios SYSTEM son de sólo lectura y un coach sólo modifica los que
   creó;
 - editar una rutina nunca cambia el contenido de una asignación histórica;
@@ -112,8 +114,8 @@ La consulta remota por el socio pertenece a una aplicación futura.
 - `git diff --check`, exitoso.
 
 Los antiguos `COA-001` a `COA-007` y `COA-009` quedaron resueltos en
-`84a5fd3`; `COA-010` y `COA-011` se cerraron en `8162814` y `COA-012` en
-`0066c0b`. Todos se conservan
+`84a5fd3`; `COA-010` y `COA-011` se cerraron en `8162814`, `COA-012` en
+`0066c0b` y `COA-013` en `3933aa5`. Todos se conservan
 en la sección de cerradas del documento 28. Los riesgos
 transversales de despliegue, migración PostgreSQL real, observabilidad y
 almacenamiento se siguen administrando como `DB-001` y `OPS-001`; no son

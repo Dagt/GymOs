@@ -2,7 +2,7 @@
 
 Estado: FUENTE CANÓNICA / EN PROGRESO
 Corte: 26 de julio de 2026
-Código auditado: `feature/coaches-workouts` en `0066c0b`, posterior a la
+Código auditado: `feature/coaches-workouts` en `3933aa5`, posterior a la
 separación de los cambios de Wellness.
 
 ## 1. Cómo interpretar este documento
@@ -66,9 +66,10 @@ El módulo permite:
   asignación, PDF o mutaciones del historial.
 
 El alcance funcional V1 está cerrado y estabilizado. El cierre base está en
-`84a5fd3`, la ampliación de perfiles e histórico en `8162814` y la corrección de
-alcance/UX en `0066c0b`. Los hallazgos específicos `COA-001` a `COA-007` y
-`COA-009` a `COA-012` pasaron al historial
+`84a5fd3`, la ampliación de perfiles e histórico en `8162814`, la corrección de
+alcance/UX en `0066c0b` y la compatibilidad PostgreSQL real en `3933aa5`. Los
+hallazgos específicos `COA-001` a `COA-007` y `COA-009` a `COA-013` pasaron al
+historial
 resuelto del documento 28.
 
 ## 4. Verificación del corte
@@ -80,6 +81,8 @@ Validación ejecutada sobre el árbol saneado:
 - E2E específico de Coaches: 5 recorridos Playwright exitosos;
 - cobertura dedicada: propiedad `own/all`, permiso de perfiles, métricas,
   histórico semanal, perfil multi-sucursal, PDF y medios;
+- prueba PostgreSQL de filtros UUID nulos para biblioteca, resumen, detalle,
+  desempeño y tendencia;
 - comprobación de whitespace Git: exitosa.
 
 Al finalizar cada iteración se debe registrar aquí el commit auditado, suites
