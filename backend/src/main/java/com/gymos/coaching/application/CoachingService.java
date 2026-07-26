@@ -73,8 +73,8 @@ public class CoachingService {
 			);
 			if ("ACTIVE".equals(row.status())) {
 				profile.active = true;
-				profile.branches.add(new CoachBranchRecord(row.branchId(), row.branchName()));
 			}
+			profile.branches.add(new CoachBranchRecord(row.branchId(), row.branchName()));
 		}
 		return profiles.values().stream()
 				.map(CoachProfileAccumulator::toRecord)
@@ -132,7 +132,7 @@ public class CoachingService {
 				principal.userId(), now
 		);
 		List<UUID> activeBranchIds = "ACTIVE".equals(status) ? selectedBranchIds : List.of();
-		for (UUID branchId : activeBranchIds) {
+		for (UUID branchId : selectedBranchIds) {
 			coachingRepository.upsertCoachBranchProfile(
 					principal.organizationId(), branchId, identity, specialtiesJson, bio,
 					principal.userId(), now
@@ -143,7 +143,7 @@ public class CoachingService {
 				principal.userId(), now
 		);
 		coachingRepository.replaceCoachBranchAccess(
-				coachUserId, managedBranchIds, activeBranchIds
+				coachUserId, managedBranchIds, selectedBranchIds
 		);
 		auditService.record(
 				principal, "COACH_PROFILE_UPDATED", "COACH_PROFILE", coachUserId,

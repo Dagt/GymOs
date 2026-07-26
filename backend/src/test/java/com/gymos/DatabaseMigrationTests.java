@@ -57,6 +57,13 @@ class DatabaseMigrationTests {
 			assertThat(indexExists(connection, "ux_workout_assignment_idempotency")).isTrue();
 			assertThat(roleHasPermission(connection, "Coach", "exercise.read")).isTrue();
 			assertThat(roleHasPermission(connection, "Coach", "workout.assign")).isTrue();
+			assertThat(roleHasPermission(connection, "Coach", "workout.manage.own")).isTrue();
+			assertThat(roleHasPermission(connection, "Dueno del gimnasio", "coach.metrics.read")).isTrue();
+			assertThat(roleHasPermission(connection, "Dueno del gimnasio", "coach.profile.manage")).isTrue();
+			assertThat(roleHasPermission(connection, "Dueno del gimnasio", "workout.read.all")).isFalse();
+			assertThat(roleHasPermission(connection, "Dueno del gimnasio", "workout.manage.all")).isFalse();
+			assertThat(roleHasPermission(connection, "Dueno del gimnasio", "workout.assign")).isFalse();
+			assertThat(roleHasPermission(connection, "Dueno del gimnasio", "exercise.read")).isFalse();
 			assertThat(tableExists(connection, "professional")).isTrue();
 			assertThat(tableExists(connection, "professional_service")).isTrue();
 			assertThat(tableExists(connection, "professional_availability")).isTrue();

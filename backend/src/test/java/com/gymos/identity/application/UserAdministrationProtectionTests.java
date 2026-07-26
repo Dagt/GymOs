@@ -92,7 +92,8 @@ class UserAdministrationProtectionTests {
 				"+521234567890",
 				"ACTIVE",
 				List.of("Recepcion"),
-				List.of("Centro")
+				List.of("Centro"),
+				List.of(branchId)
 		);
 		when(repository.userBelongsToOrganization(principal.organizationId(), targetUserId)).thenReturn(true);
 		when(repository.findUsers(principal.organizationId())).thenReturn(List.of(target));
@@ -159,7 +160,8 @@ class UserAdministrationProtectionTests {
 				null,
 				"ACTIVE",
 				List.of("Dueno del gimnasio"),
-				List.of("Centro")
+				List.of("Centro"),
+				List.of()
 		);
 	}
 }

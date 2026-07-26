@@ -8,6 +8,7 @@ const clientId = "55555555-5555-4555-8555-555555555555";
 const assignmentId = "66666666-6666-4666-8666-666666666666";
 const exerciseId = "77777777-7777-4777-8777-777777777777";
 const userId = "88888888-8888-4888-8888-888888888888";
+const ownerUserId = "12121212-1212-4212-8212-121212121212";
 const branchId = "99999999-9999-4999-8999-999999999999";
 const secondBranchId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
 
@@ -175,7 +176,28 @@ test.describe("coaches y rutinas", () => {
     await expect(page.getByLabel("Rutinas asignadas por semana")).toBeVisible();
   });
 
-  test("administra perfil, estado y múltiples sucursales del coach", async ({ page }) => {
+  test("el dueño sólo consulta métricas y no carga superficies operativas", async ({ page }) => {
+    const operationalRequests: string[] = [];
+    await bootCoaching(page, async (route, path) => {
+      if (path === "/workouts" || path === "/exercises" || path === "/coaches/profiles") {
+        operationalRequests.push(path);
+      }
+      return false;
+    }, ownerUser());
+
+    await page.goto("/coaches");
+
+    await expect(page.getByRole("button", { name: "Métricas" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Constructor" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Ejercicios" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Asignaciones" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Actividad semanal" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "PDF" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Cancelar", exact: true })).toHaveCount(0);
+    expect(operationalRequests).toEqual([]);
+  });
+
+  test("administra el perfil del coach desde Equipo y accesos", async ({ page }) => {
     let profilePayload: Record<string, unknown> | null = null;
     await bootCoaching(page, async (route, path) => {
       if (route.request().method() === "PUT" && path === `/coaches/profiles/${userId}`) {
@@ -195,12 +217,11 @@ test.describe("coaches y rutinas", () => {
         return true;
       }
       return false;
-    });
+    }, ownerUser());
 
-    await page.goto("/coaches");
-    await page.getByRole("button", { name: "Coaches", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Perfiles de coaches" })).toBeVisible();
-    await page.getByRole("button", { name: "Administrar perfil" }).click();
+    await page.goto("/users");
+    await expect(page.getByRole("heading", { name: "Equipo del gimnasio" })).toBeVisible();
+    await page.getByRole("button", { name: "Editar perfil" }).click();
     await page.getByLabel("Especialidades").fill("Fuerza, Movilidad");
     await page.getByLabel("Biografía").fill("Entrenamiento funcional y fuerza.");
     await page.getByRole("checkbox", { name: "Norte", exact: true }).check();
@@ -212,13 +233,14 @@ test.describe("coaches y rutinas", () => {
       status: "ACTIVE",
       branchIds: [branchId, secondBranchId],
     });
-    await expect(page.getByText("Perfil de Coach Uno actualizado.")).toBeVisible();
+    await expect(page.getByText("Perfil y sucursales del coach actualizados.")).toBeVisible();
   });
 });
 
 async function bootCoaching(
   page: Page,
   override?: (route: Route, path: string, url: URL) => Promise<boolean>,
+  user = coachUser(),
 ) {
   await page.route("**/api/v1/**", async (route) => {
     const url = new URL(route.request().url());
@@ -230,7 +252,7 @@ async function bootCoaching(
     window.localStorage.setItem("gymos.accessToken", "coaching-e2e-access");
     window.localStorage.setItem("gymos.refreshToken", "coaching-e2e-refresh");
     window.localStorage.setItem("gymos.currentUser", JSON.stringify(user));
-  }, { user: currentUser() });
+  }, { user });
 }
 
 function responseFor(path: string) {
@@ -255,6 +277,19 @@ function responseFor(path: string) {
     }];
   }
   if (path === "/coaches/profiles") return [coachProfile()];
+  if (path === "/organizations/current") {
+    return { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", tradeName: "GymOS Test" };
+  }
+  if (path === "/users/roles") {
+    return [{
+      id: "13131313-1313-4313-8313-131313131313",
+      name: "Coach",
+      description: "Entrenamiento",
+      systemRole: true,
+      permissionCount: 8,
+    }];
+  }
+  if (path === "/users/internal") return [internalCoach()];
   if (path === "/workouts") return workouts();
   if (path === "/exercises") {
     return { items: [exercise()], page: 0, size: 100, totalElements: 1, totalPages: 1 };
@@ -274,6 +309,20 @@ function coachProfile() {
     bio: "Entrenamiento de fuerza.",
     status: "ACTIVE",
     branches: [{ id: branchId, name: "Centro" }],
+  };
+}
+
+function internalCoach() {
+  return {
+    id: userId,
+    fullName: "Coach Uno",
+    username: "coach@gymos.test",
+    email: "coach@gymos.test",
+    phone: "555-0100",
+    status: "ACTIVE",
+    roles: ["Coach"],
+    branches: ["Centro"],
+    branchIds: [branchId],
   };
 }
 
@@ -401,28 +450,47 @@ function report() {
   };
 }
 
-function currentUser() {
+function coachUser() {
   return {
     userId,
     organizationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     branchId,
-    username: "owner@gymos.test",
-    fullName: "Owner GymOS",
+    username: "coach@gymos.test",
+    fullName: "Coach Uno",
     permissions: [
-      "coach.read", "exercise.read", "exercise.create", "exercise.manage",
-      "workout.read.all", "workout.manage.all", "workout.assign",
+      "coach.read", "exercise.read", "exercise.create",
+      "workout.read.own", "workout.manage.own", "workout.assign",
       "workout.pdf.download", "coach.metrics.read",
-      "coach.profile.manage",
     ],
-    roles: ["Dueno del gimnasio"],
+    roles: ["Coach"],
     platformAdmin: false,
     supportMode: false,
-    console: "TENANT_OWNER",
+    console: "COACH",
     organizationName: "GymOS Test",
     brandName: "GymOS Test",
     logoUrl: "",
     primaryColor: "#173c2a",
     accentColor: "#EAB308",
     surfaceColor: "#F4F7FB",
+  };
+}
+
+function ownerUser() {
+  return {
+    ...coachUser(),
+    userId: ownerUserId,
+    username: "owner@gymos.test",
+    fullName: "Owner GymOS",
+    permissions: [
+      "branch.read",
+      "client.read",
+      "coach.read",
+      "coach.metrics.read",
+      "coach.profile.manage",
+      "user.read",
+      "user.manage",
+    ],
+    roles: ["Dueno del gimnasio"],
+    console: "TENANT_OWNER",
   };
 }

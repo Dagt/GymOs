@@ -11,6 +11,7 @@ public record InternalUserSummary(
 		String phone,
 		String status,
 		List<String> roles,
-		List<String> branches
+		List<String> branches,
+		List<UUID> branchIds
 ) {
 }

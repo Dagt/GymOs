@@ -202,6 +202,41 @@ class CoachingServiceSecurityTests {
 		);
 	}
 
+	@Test
+	void inactiveCoachProfileKeepsItsAssignedBranchesForTeamManagement() {
+		GymOsPrincipal principal = principal(Set.of("coach.profile.manage"));
+		UUID coachUserId = UUID.randomUUID();
+		List<UUID> managedBranches = List.of(branchId);
+		when(repository.accessibleBranchIds(organizationId, userId)).thenReturn(managedBranches);
+		when(repository.coachProfileRows(organizationId, managedBranches))
+				.thenReturn(
+						List.of(profileRow(coachUserId, branchId, "Centro", "ACTIVE")),
+						List.of(profileRow(coachUserId, branchId, "Centro", "INACTIVE"))
+				);
+		when(repository.userHasCoachRole(organizationId, coachUserId)).thenReturn(true);
+		when(repository.coachIdentity(organizationId, coachUserId))
+				.thenReturn(Optional.of(new CoachIdentity(
+						coachUserId, "Coach Uno", "coach@example.com", "555-0100"
+				)));
+
+		var updated = service.updateCoachProfile(
+				principal, coachUserId,
+				new CoachingService.UpdateCoachProfileCommand(
+						List.of("Fuerza"), "Trabajo funcional",
+						"INACTIVE", List.of(branchId)
+				),
+				"test"
+		);
+
+		assertThat(updated.status()).isEqualTo("INACTIVE");
+		assertThat(updated.branches()).extracting(branch -> branch.id()).containsExactly(branchId);
+		verify(repository).replaceCoachBranchAccess(coachUserId, managedBranches, List.of(branchId));
+		verify(repository).deactivateCoachBranches(
+				eq(organizationId), eq(coachUserId), eq(managedBranches),
+				eq(List.of()), eq(userId), any()
+		);
+	}
+
 	private GymOsPrincipal principal(Set<String> permissions) {
 		return new GymOsPrincipal(
 				userId, organizationId, branchId, "coach", "Coach", permissions

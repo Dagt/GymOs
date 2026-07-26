@@ -300,7 +300,11 @@ public class UserAdministrationRepository {
 				    p.phone,
 				    u.status,
 				    COALESCE(array_remove(array_agg(DISTINCT r.name ORDER BY r.name), NULL), ARRAY[]::text[]) AS roles,
-				    COALESCE(array_remove(array_agg(DISTINCT b.name ORDER BY b.name), NULL), ARRAY[]::text[]) AS branches
+				    COALESCE(array_remove(array_agg(DISTINCT b.name ORDER BY b.name), NULL), ARRAY[]::text[]) AS branches,
+				    COALESCE(
+				        array_remove(array_agg(DISTINCT b.id ORDER BY b.id), NULL),
+				        ARRAY[]::uuid[]
+				    ) AS branch_ids
 				FROM user_account u
 				JOIN person p ON p.id = u.person_id
 				LEFT JOIN user_role ur ON ur.user_id = u.id
@@ -321,7 +325,8 @@ public class UserAdministrationRepository {
 						resultSet.getString("phone"),
 						resultSet.getString("status"),
 						List.of((String[]) resultSet.getArray("roles").getArray()),
-						List.of((String[]) resultSet.getArray("branches").getArray())
+						List.of((String[]) resultSet.getArray("branches").getArray()),
+						List.of((UUID[]) resultSet.getArray("branch_ids").getArray())
 				))
 				.list();
 	}

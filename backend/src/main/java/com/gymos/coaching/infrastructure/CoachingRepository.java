@@ -52,17 +52,46 @@ public class CoachingRepository {
 	public List<CoachProfileRow> coachProfileRows(UUID organizationId, List<UUID> branchIds) {
 		if (branchIds == null || branchIds.isEmpty()) return List.of();
 		return jdbcClient.sql("""
-				SELECT c.user_account_id, c.display_name, c.email, c.phone,
-				       c.specialties_json::text AS specialties_json, c.bio, c.status,
-				       c.branch_id, b.name AS branch_name
-				FROM coach c
-				JOIN branch b ON b.id = c.branch_id
-				WHERE c.organization_id = :organizationId
-				  AND c.user_account_id IS NOT NULL
-				  AND c.branch_id IN (:branchIds)
-				  AND c.deleted_at IS NULL
+				SELECT u.id AS user_account_id,
+				       trim(concat(p.first_name, ' ', p.last_name, ' ', coalesce(p.maternal_last_name, ''))) AS display_name,
+				       p.email,
+				       p.phone,
+				       COALESCE(c.specialties_json, details.specialties_json, '[]'::jsonb)::text AS specialties_json,
+				       COALESCE(c.bio, details.bio) AS bio,
+				       CASE
+				           WHEN u.status = 'ACTIVE' AND COALESCE(c.status, 'ACTIVE') = 'ACTIVE'
+				           THEN 'ACTIVE'
+				           ELSE 'INACTIVE'
+				       END AS status,
+				       b.id AS branch_id,
+				       b.name AS branch_name
+				FROM user_account u
+				JOIN person p ON p.id = u.person_id
+				JOIN user_role ur ON ur.user_id = u.id
+				JOIN role r ON r.id = ur.role_id
+				JOIN user_branch_access uba ON uba.user_id = u.id
+				JOIN branch b ON b.id = uba.branch_id
+				LEFT JOIN coach c
+				  ON c.organization_id = u.organization_id
+				 AND c.branch_id = b.id
+				 AND c.user_account_id = u.id
+				 AND c.deleted_at IS NULL
+				LEFT JOIN LATERAL (
+				    SELECT profile.specialties_json, profile.bio
+				    FROM coach profile
+				    WHERE profile.organization_id = u.organization_id
+				      AND profile.user_account_id = u.id
+				      AND profile.deleted_at IS NULL
+				    ORDER BY profile.updated_at DESC
+				    LIMIT 1
+				) details ON true
+				WHERE u.organization_id = :organizationId
+				  AND u.deleted_at IS NULL
+				  AND r.deleted_at IS NULL
+				  AND lower(r.name) = 'coach'
+				  AND b.id IN (:branchIds)
 				  AND b.deleted_at IS NULL
-				ORDER BY c.display_name, b.name
+				ORDER BY display_name, b.name
 				""")
 				.param("organizationId", organizationId)
 				.param("branchIds", branchIds)
@@ -90,7 +119,7 @@ public class CoachingRepository {
 				  AND u.id = :userId
 				  AND u.deleted_at IS NULL
 				  AND r.deleted_at IS NULL
-				  AND lower(r.name) LIKE '%coach%'
+				  AND lower(r.name) = 'coach'
 				""")
 				.param("organizationId", organizationId)
 				.param("userId", userId)

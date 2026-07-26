@@ -48,7 +48,23 @@ export function TeamContextCard({ branches, organization, session, roles, users 
   );
 }
 
-export function UsersTable({ roles, saving, session, users, onChangeRole, onToggleStatus }: { roles: RoleOption[]; saving: boolean; session: StoredSession; users: InternalUserSummary[]; onChangeRole: (user: InternalUserSummary, roleId: string) => void; onToggleStatus: (user: InternalUserSummary) => void }) {
+export function UsersTable({
+  roles,
+  saving,
+  session,
+  users,
+  onChangeRole,
+  onEditCoach,
+  onToggleStatus,
+}: {
+  roles: RoleOption[];
+  saving: boolean;
+  session: StoredSession;
+  users: InternalUserSummary[];
+  onChangeRole: (user: InternalUserSummary, roleId: string) => void;
+  onEditCoach: (user: InternalUserSummary) => void;
+  onToggleStatus: (user: InternalUserSummary) => void;
+}) {
   return (
     <section className="app-card p-5">
       <div className="admin-panel-header"><div><p>Usuarios actuales</p><h2>Equipo del gimnasio</h2></div></div>
@@ -57,6 +73,7 @@ export function UsersTable({ roles, saving, session, users, onChangeRole, onTogg
         {users.map((user) => {
           const isCurrentUser = user.id === session.user.userId;
           const isOwner = user.roles.some((role) => displayRoleName(role) === "Dueno del gimnasio");
+          const isCoach = user.roles.some((role) => displayRoleName(role) === "Coach");
           const canManage = !isCurrentUser && canManageUserForSession(session.user.roles, user.roles, Boolean(session.user.platformAdmin));
           return (
             <article key={user.id}>
@@ -69,6 +86,11 @@ export function UsersTable({ roles, saving, session, users, onChangeRole, onTogg
                   <div className="team-role-control"><span>Rol protegido</span><strong>{user.roles.map(displayRoleName).join(", ") || "Sin rol"}</strong></div>
                 )}
                 <p className={user.status === "ACTIVE" ? "status-pill active" : "status-pill"}>{user.status}</p>
+                {canManage && isCoach && session.user.permissions.includes("coach.profile.manage") ? (
+                  <button className="safe-action" disabled={saving} onClick={() => onEditCoach(user)} type="button">
+                    Editar perfil
+                  </button>
+                ) : null}
                 {canManage ? <button className={user.status === "ACTIVE" ? "danger-action" : "safe-action"} disabled={saving} onClick={() => onToggleStatus(user)} type="button">{user.status === "ACTIVE" ? "Suspender" : "Reactivar"}</button> : <small>{isCurrentUser ? "Tu cuenta" : isOwner ? "Dueno protegido" : "Solo lectura"}</small>}
               </div>
             </article>
@@ -76,6 +98,88 @@ export function UsersTable({ roles, saving, session, users, onChangeRole, onTogg
         })}
       </div>
     </section>
+  );
+}
+
+export function CoachProfileDrawer({
+  bio,
+  branches,
+  branchIds,
+  open,
+  saving,
+  specialties,
+  user,
+  onBioChange,
+  onBranchChange,
+  onClose,
+  onSpecialtiesChange,
+  onSubmit,
+}: {
+  bio: string;
+  branches: BranchSummary[];
+  branchIds: string[];
+  open: boolean;
+  saving: boolean;
+  specialties: string;
+  user: InternalUserSummary | null;
+  onBioChange: (value: string) => void;
+  onBranchChange: (branchId: string, checked: boolean) => void;
+  onClose: () => void;
+  onSpecialtiesChange: (value: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <AppDrawer
+      description="Complementa la ficha del coach y define en qué sucursales puede trabajar. El estado de acceso se controla desde la tabla del equipo."
+      onClose={onClose}
+      open={open}
+      title={user ? `Perfil de ${user.fullName}` : "Perfil del coach"}
+    >
+      <form className="grid gap-4" onSubmit={onSubmit}>
+        <label className="grid gap-1 text-sm font-medium text-[#435249]">
+          <span>Especialidades</span>
+          <input
+            className="app-input"
+            onChange={(event) => onSpecialtiesChange(event.target.value)}
+            placeholder="Fuerza, movilidad, rehabilitación"
+            value={specialties}
+          />
+        </label>
+        <p className="-mt-3 text-xs text-[#637268]">Separa cada especialidad con una coma.</p>
+        <label className="grid gap-1 text-sm font-medium text-[#435249]">
+          <span>Biografía</span>
+          <textarea
+            className="app-input min-h-28"
+            maxLength={1500}
+            onChange={(event) => onBioChange(event.target.value)}
+            value={bio}
+          />
+        </label>
+        <section className="team-branch-selector">
+          <div>
+            <strong>Sucursales permitidas</strong>
+            <span>Selecciona todas las sedes donde este coach puede trabajar.</span>
+          </div>
+          {branches.map((branch) => (
+            <label key={branch.id}>
+              <input
+                checked={branchIds.includes(branch.id)}
+                onChange={(event) => onBranchChange(branch.id, event.target.checked)}
+                type="checkbox"
+              />
+              <span>{branch.name}</span>
+              <small>{branch.code}</small>
+            </label>
+          ))}
+        </section>
+        {!branchIds.length ? (
+          <p className="text-xs font-semibold text-red-700">Selecciona al menos una sucursal.</p>
+        ) : null}
+        <button className="form-primary-button" disabled={saving || !branchIds.length} type="submit">
+          Guardar perfil
+        </button>
+      </form>
+    </AppDrawer>
   );
 }
 
