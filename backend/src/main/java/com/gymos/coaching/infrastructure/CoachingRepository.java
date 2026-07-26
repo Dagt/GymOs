@@ -32,6 +32,228 @@ public class CoachingRepository {
 				.list();
 	}
 
+	public List<UUID> accessibleBranchIds(UUID organizationId, UUID actorUserId) {
+		return jdbcClient.sql("""
+				SELECT b.id
+				FROM branch b
+				JOIN user_branch_access uba ON uba.branch_id = b.id
+				WHERE b.organization_id = :organizationId
+				  AND uba.user_id = :actorUserId
+				  AND b.status = 'ACTIVE'
+				  AND b.deleted_at IS NULL
+				ORDER BY b.name
+				""")
+				.param("organizationId", organizationId)
+				.param("actorUserId", actorUserId)
+				.query(UUID.class)
+				.list();
+	}
+
+	public List<CoachProfileRow> coachProfileRows(UUID organizationId, List<UUID> branchIds) {
+		if (branchIds == null || branchIds.isEmpty()) return List.of();
+		return jdbcClient.sql("""
+				SELECT c.user_account_id, c.display_name, c.email, c.phone,
+				       c.specialties_json::text AS specialties_json, c.bio, c.status,
+				       c.branch_id, b.name AS branch_name
+				FROM coach c
+				JOIN branch b ON b.id = c.branch_id
+				WHERE c.organization_id = :organizationId
+				  AND c.user_account_id IS NOT NULL
+				  AND c.branch_id IN (:branchIds)
+				  AND c.deleted_at IS NULL
+				  AND b.deleted_at IS NULL
+				ORDER BY c.display_name, b.name
+				""")
+				.param("organizationId", organizationId)
+				.param("branchIds", branchIds)
+				.query((resultSet, rowNumber) -> new CoachProfileRow(
+						resultSet.getObject("user_account_id", UUID.class),
+						resultSet.getString("display_name"),
+						resultSet.getString("email"),
+						resultSet.getString("phone"),
+						resultSet.getString("specialties_json"),
+						resultSet.getString("bio"),
+						resultSet.getString("status"),
+						resultSet.getObject("branch_id", UUID.class),
+						resultSet.getString("branch_name")
+				))
+				.list();
+	}
+
+	public boolean userHasCoachRole(UUID organizationId, UUID userId) {
+		Integer count = jdbcClient.sql("""
+				SELECT COUNT(*)
+				FROM user_account u
+				JOIN user_role ur ON ur.user_id = u.id
+				JOIN role r ON r.id = ur.role_id
+				WHERE u.organization_id = :organizationId
+				  AND u.id = :userId
+				  AND u.deleted_at IS NULL
+				  AND r.deleted_at IS NULL
+				  AND lower(r.name) LIKE '%coach%'
+				""")
+				.param("organizationId", organizationId)
+				.param("userId", userId)
+				.query(Integer.class)
+				.single();
+		return count > 0;
+	}
+
+	public Optional<CoachIdentity> coachIdentity(UUID organizationId, UUID userId) {
+		return jdbcClient.sql("""
+				SELECT u.id,
+				       trim(concat(p.first_name, ' ', p.last_name, ' ', coalesce(p.maternal_last_name, ''))) AS display_name,
+				       p.email, p.phone
+				FROM user_account u
+				JOIN person p ON p.id = u.person_id
+				WHERE u.organization_id = :organizationId
+				  AND u.id = :userId
+				  AND u.deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("userId", userId)
+				.query((resultSet, rowNumber) -> new CoachIdentity(
+						resultSet.getObject("id", UUID.class),
+						resultSet.getString("display_name"),
+						resultSet.getString("email"),
+						resultSet.getString("phone")
+				))
+				.optional();
+	}
+
+	public void updateCoachProfileDetails(
+			UUID organizationId, UUID userId, String specialtiesJson, String bio,
+			UUID actorUserId, OffsetDateTime now
+	) {
+		jdbcClient.sql("""
+				UPDATE coach
+				SET specialties_json = CAST(:specialtiesJson AS jsonb),
+				    bio = :bio,
+				    updated_at = :updatedAt,
+				    updated_by = :actorUserId,
+				    version = version + 1
+				WHERE organization_id = :organizationId
+				  AND user_account_id = :userId
+				  AND deleted_at IS NULL
+				""")
+				.param("specialtiesJson", specialtiesJson)
+				.param("bio", bio)
+				.param("updatedAt", now)
+				.param("actorUserId", actorUserId)
+				.param("organizationId", organizationId)
+				.param("userId", userId)
+				.update();
+	}
+
+	public void upsertCoachBranchProfile(
+			UUID organizationId, UUID branchId, CoachIdentity identity,
+			String specialtiesJson, String bio, UUID actorUserId, OffsetDateTime now
+	) {
+		jdbcClient.sql("""
+				INSERT INTO coach (
+				    id, organization_id, branch_id, user_account_id, display_name,
+				    email, phone, specialties_json, bio, status,
+				    created_at, updated_at, created_by, updated_by, version
+				)
+				VALUES (
+				    :id, :organizationId, :branchId, :userId, :displayName,
+				    :email, :phone, CAST(:specialtiesJson AS jsonb), :bio, 'ACTIVE',
+				    :createdAt, :updatedAt, :actorUserId, :actorUserId, 0
+				)
+				ON CONFLICT (organization_id, branch_id, user_account_id)
+				    WHERE user_account_id IS NOT NULL
+				DO UPDATE SET
+				    display_name = EXCLUDED.display_name,
+				    email = EXCLUDED.email,
+				    phone = EXCLUDED.phone,
+				    specialties_json = EXCLUDED.specialties_json,
+				    bio = EXCLUDED.bio,
+				    status = 'ACTIVE',
+				    updated_at = EXCLUDED.updated_at,
+				    updated_by = EXCLUDED.updated_by,
+				    version = coach.version + 1
+				""")
+				.param("id", UUID.randomUUID())
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("userId", identity.userId())
+				.param("displayName", identity.displayName())
+				.param("email", identity.email())
+				.param("phone", identity.phone())
+				.param("specialtiesJson", specialtiesJson)
+				.param("bio", bio)
+				.param("createdAt", now)
+				.param("updatedAt", now)
+				.param("actorUserId", actorUserId)
+				.update();
+	}
+
+	public void deactivateCoachBranches(
+			UUID organizationId, UUID userId, List<UUID> managedBranchIds,
+			List<UUID> activeBranchIds, UUID actorUserId, OffsetDateTime now
+	) {
+		if (managedBranchIds == null || managedBranchIds.isEmpty()) return;
+		if (activeBranchIds == null || activeBranchIds.isEmpty()) {
+			jdbcClient.sql("""
+					UPDATE coach
+					SET status = 'INACTIVE', updated_at = :updatedAt,
+					    updated_by = :actorUserId, version = version + 1
+					WHERE organization_id = :organizationId
+					  AND user_account_id = :userId
+					  AND branch_id IN (:managedBranchIds)
+					  AND deleted_at IS NULL
+					""")
+					.param("updatedAt", now)
+					.param("actorUserId", actorUserId)
+					.param("organizationId", organizationId)
+					.param("userId", userId)
+					.param("managedBranchIds", managedBranchIds)
+					.update();
+			return;
+		}
+		jdbcClient.sql("""
+				UPDATE coach
+				SET status = 'INACTIVE', updated_at = :updatedAt,
+				    updated_by = :actorUserId, version = version + 1
+				WHERE organization_id = :organizationId
+				  AND user_account_id = :userId
+				  AND branch_id IN (:managedBranchIds)
+				  AND branch_id NOT IN (:activeBranchIds)
+				  AND deleted_at IS NULL
+				""")
+				.param("updatedAt", now)
+				.param("actorUserId", actorUserId)
+				.param("organizationId", organizationId)
+				.param("userId", userId)
+				.param("managedBranchIds", managedBranchIds)
+				.param("activeBranchIds", activeBranchIds)
+				.update();
+	}
+
+	public void replaceCoachBranchAccess(
+			UUID userId, List<UUID> managedBranchIds, List<UUID> selectedBranchIds
+	) {
+		if (managedBranchIds == null || managedBranchIds.isEmpty()) return;
+		jdbcClient.sql("""
+				DELETE FROM user_branch_access
+				WHERE user_id = :userId AND branch_id IN (:managedBranchIds)
+				""")
+				.param("userId", userId)
+				.param("managedBranchIds", managedBranchIds)
+				.update();
+		for (UUID branchId : selectedBranchIds == null ? List.<UUID>of() : selectedBranchIds) {
+			jdbcClient.sql("""
+					INSERT INTO user_branch_access (user_id, branch_id, access_scope)
+					VALUES (:userId, :branchId, 'BRANCH')
+					ON CONFLICT (user_id, branch_id)
+					DO UPDATE SET access_scope = EXCLUDED.access_scope
+					""")
+					.param("userId", userId)
+					.param("branchId", branchId)
+					.update();
+		}
+	}
+
 	public Optional<CoachRecord> coach(UUID organizationId, UUID branchId, UUID coachId) {
 		return jdbcClient.sql("""
 				SELECT id, user_account_id, display_name, email, phone, specialties_json::text AS specialties_json,
@@ -760,6 +982,16 @@ public class CoachingRepository {
 			String specialtiesJson, String bio, String status,
 			OffsetDateTime createdAt, OffsetDateTime updatedAt
 	) {
+	}
+
+	public record CoachProfileRow(
+			UUID userId, String displayName, String email, String phone,
+			String specialtiesJson, String bio, String status,
+			UUID branchId, String branchName
+	) {
+	}
+
+	public record CoachIdentity(UUID userId, String displayName, String email, String phone) {
 	}
 
 	public record WorkoutSummaryRecord(UUID id, UUID coachId, String coachName, String title, String goal, String level, String status, UUID latestVersionId, Integer latestVersionNumber, OffsetDateTime createdAt, OffsetDateTime updatedAt) {

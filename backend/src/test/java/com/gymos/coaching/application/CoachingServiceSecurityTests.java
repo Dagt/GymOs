@@ -1,6 +1,8 @@
 package com.gymos.coaching.application;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -10,6 +12,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.audit.api.AuditService;
 import com.gymos.coaching.application.command.CreateWorkoutCommand;
 import com.gymos.coaching.infrastructure.CoachingRepository;
+import com.gymos.coaching.infrastructure.CoachingRepository.CoachIdentity;
+import com.gymos.coaching.infrastructure.CoachingRepository.CoachProfileRow;
 import com.gymos.coaching.infrastructure.CoachingRepository.CoachRecord;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
@@ -109,6 +113,95 @@ class CoachingServiceSecurityTests {
 				.hasMessageContaining("no existe");
 	}
 
+	@Test
+	void coachProfilesAggregateActiveBranchesForTheSameUser() {
+		GymOsPrincipal principal = principal(Set.of("coach.profile.manage"));
+		UUID secondBranchId = UUID.randomUUID();
+		UUID coachUserId = UUID.randomUUID();
+		when(repository.accessibleBranchIds(organizationId, userId))
+				.thenReturn(List.of(branchId, secondBranchId));
+		when(repository.coachProfileRows(organizationId, List.of(branchId, secondBranchId)))
+				.thenReturn(List.of(
+						profileRow(coachUserId, branchId, "Centro", "ACTIVE"),
+						profileRow(coachUserId, secondBranchId, "Norte", "ACTIVE")
+				));
+
+		var profiles = service.coachProfiles(principal);
+
+		assertThat(profiles).hasSize(1);
+		assertThat(profiles.getFirst().status()).isEqualTo("ACTIVE");
+		assertThat(profiles.getFirst().specialties()).containsExactly("Fuerza", "Movilidad");
+		assertThat(profiles.getFirst().branches()).extracting(branch -> branch.name())
+				.containsExactly("Centro", "Norte");
+	}
+
+	@Test
+	void activeCoachProfileRequiresAnAccessibleBranch() {
+		GymOsPrincipal principal = principal(Set.of("coach.profile.manage"));
+		UUID coachUserId = UUID.randomUUID();
+		UUID inaccessibleBranch = UUID.randomUUID();
+		when(repository.accessibleBranchIds(organizationId, userId)).thenReturn(List.of(branchId));
+		when(repository.coachProfileRows(organizationId, List.of(branchId)))
+				.thenReturn(List.of(profileRow(coachUserId, branchId, "Centro", "ACTIVE")));
+		when(repository.userHasCoachRole(organizationId, coachUserId)).thenReturn(true);
+
+		assertThatThrownBy(() -> service.updateCoachProfile(
+				principal, coachUserId,
+				new CoachingService.UpdateCoachProfileCommand(
+						List.of("Fuerza"), "Biografía", "ACTIVE", List.of(inaccessibleBranch)
+				),
+				"test"
+		))
+				.isInstanceOf(BusinessException.class)
+				.hasMessageContaining("fuera de tu alcance");
+	}
+
+	@Test
+	void updateCoachProfileSynchronizesProfileAndBranchAccess() {
+		GymOsPrincipal principal = principal(Set.of("coach.profile.manage"));
+		UUID secondBranchId = UUID.randomUUID();
+		UUID coachUserId = UUID.randomUUID();
+		List<UUID> managedBranches = List.of(branchId, secondBranchId);
+		when(repository.accessibleBranchIds(organizationId, userId)).thenReturn(managedBranches);
+		when(repository.coachProfileRows(organizationId, managedBranches))
+				.thenReturn(
+						List.of(profileRow(coachUserId, branchId, "Centro", "ACTIVE")),
+						List.of(profileRow(coachUserId, secondBranchId, "Norte", "ACTIVE"))
+				);
+		when(repository.userHasCoachRole(organizationId, coachUserId)).thenReturn(true);
+		when(repository.coachIdentity(organizationId, coachUserId))
+				.thenReturn(Optional.of(new CoachIdentity(
+						coachUserId, "Coach Uno", "coach@example.com", "555-0100"
+				)));
+
+		var updated = service.updateCoachProfile(
+				principal, coachUserId,
+				new CoachingService.UpdateCoachProfileCommand(
+						List.of(" Fuerza ", "Movilidad"), "Trabajo funcional",
+						"ACTIVE", List.of(secondBranchId)
+				),
+				"test"
+		);
+
+		assertThat(updated.branches()).extracting(branch -> branch.id())
+				.containsExactly(secondBranchId);
+		verify(repository).updateCoachProfileDetails(
+				eq(organizationId), eq(coachUserId), eq("[\"Fuerza\",\"Movilidad\"]"),
+				eq("Trabajo funcional"), eq(userId), any()
+		);
+		verify(repository).upsertCoachBranchProfile(
+				eq(organizationId), eq(secondBranchId), any(), eq("[\"Fuerza\",\"Movilidad\"]"),
+				eq("Trabajo funcional"), eq(userId), any()
+		);
+		verify(repository).deactivateCoachBranches(
+				eq(organizationId), eq(coachUserId), eq(managedBranches),
+				eq(List.of(secondBranchId)), eq(userId), any()
+		);
+		verify(repository).replaceCoachBranchAccess(
+				coachUserId, managedBranches, List.of(secondBranchId)
+		);
+	}
+
 	private GymOsPrincipal principal(Set<String> permissions) {
 		return new GymOsPrincipal(
 				userId, organizationId, branchId, "coach", "Coach", permissions
@@ -119,6 +212,16 @@ class CoachingServiceSecurityTests {
 		return new CoachRecord(
 				id, userId, "Coach Uno", null, null, "[]", null, "ACTIVE",
 				OffsetDateTime.now(), OffsetDateTime.now()
+		);
+	}
+
+	private CoachProfileRow profileRow(
+			UUID coachUserId, UUID profileBranchId, String branchName, String status
+	) {
+		return new CoachProfileRow(
+				coachUserId, "Coach Uno", "coach@example.com", "555-0100",
+				"[\"Fuerza\",\"Movilidad\"]", "Trabajo funcional", status,
+				profileBranchId, branchName
 		);
 	}
 }

@@ -1,6 +1,8 @@
 package com.gymos.coaching.api;
 
 import com.gymos.coaching.application.CoachingService;
+import com.gymos.coaching.application.CoachingService.CoachProfileRecord;
+import com.gymos.coaching.application.CoachingService.UpdateCoachProfileCommand;
 import com.gymos.coaching.application.command.AssignWorkoutCommand;
 import com.gymos.coaching.application.command.CreateCoachCommand;
 import com.gymos.coaching.application.command.CreateWorkoutCommand;
@@ -53,6 +55,23 @@ public class CoachingController {
 			HttpServletRequest servletRequest
 	) {
 		return coachingService.createCoach(principal, request.toCommand(), correlationId(servletRequest));
+	}
+
+	@GetMapping("/coaches/profiles")
+	List<CoachProfileRecord> coachProfiles(@AuthenticationPrincipal GymOsPrincipal principal) {
+		return coachingService.coachProfiles(principal);
+	}
+
+	@PutMapping("/coaches/profiles/{coachUserId}")
+	CoachProfileRecord updateCoachProfile(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID coachUserId,
+			@Valid @RequestBody UpdateCoachProfileRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return coachingService.updateCoachProfile(
+				principal, coachUserId, request.toCommand(), correlationId(servletRequest)
+		);
 	}
 
 	@GetMapping("/workouts")
@@ -229,6 +248,17 @@ public class CoachingController {
 	) {
 		private CreateWorkoutCommand toCommand() {
 			return new CreateWorkoutCommand(coachId, title, goal, level, summary, contentJson);
+		}
+	}
+
+	public record UpdateCoachProfileRequest(
+			List<@NotBlank @Size(max = 80) String> specialties,
+			@Size(max = 4000) String bio,
+			@NotBlank String status,
+			@NotNull List<@NotNull UUID> branchIds
+	) {
+		private UpdateCoachProfileCommand toCommand() {
+			return new UpdateCoachProfileCommand(specialties, bio, status, branchIds);
 		}
 	}
 

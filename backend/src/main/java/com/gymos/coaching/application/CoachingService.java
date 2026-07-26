@@ -10,6 +10,8 @@ import com.gymos.coaching.application.command.CreateWorkoutVersionCommand;
 import com.gymos.coaching.infrastructure.CoachingRepository;
 import com.gymos.coaching.infrastructure.CoachingRepository.AssignWorkoutData;
 import com.gymos.coaching.infrastructure.CoachingRepository.CoachRecord;
+import com.gymos.coaching.infrastructure.CoachingRepository.CoachProfileRow;
+import com.gymos.coaching.infrastructure.CoachingRepository.CoachIdentity;
 import com.gymos.coaching.infrastructure.CoachingRepository.CoachReportRecord;
 import com.gymos.coaching.infrastructure.CoachingRepository.CreateCoachData;
 import com.gymos.coaching.infrastructure.CoachingRepository.CreateWorkoutData;
@@ -22,10 +24,14 @@ import com.gymos.coaching.infrastructure.CoachingRepository.WorkoutVersionRecord
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,6 +52,109 @@ public class CoachingService {
 	public List<CoachRecord> coaches(GymOsPrincipal principal) {
 		requireBranch(principal);
 		return coachingRepository.coaches(principal.organizationId(), principal.branchId());
+	}
+
+	@Transactional(readOnly = true)
+	public List<CoachProfileRecord> coachProfiles(GymOsPrincipal principal) {
+		requireBranch(principal);
+		List<UUID> managedBranchIds = coachingRepository.accessibleBranchIds(
+				principal.organizationId(), principal.userId()
+		);
+		Map<UUID, CoachProfileAccumulator> profiles = new LinkedHashMap<>();
+		for (CoachProfileRow row : coachingRepository.coachProfileRows(
+				principal.organizationId(), managedBranchIds
+		)) {
+			CoachProfileAccumulator profile = profiles.computeIfAbsent(
+					row.userId(),
+					ignored -> new CoachProfileAccumulator(
+							row.userId(), row.displayName(), row.email(), row.phone(),
+							parseSpecialties(row.specialtiesJson()), row.bio()
+					)
+			);
+			if ("ACTIVE".equals(row.status())) {
+				profile.active = true;
+				profile.branches.add(new CoachBranchRecord(row.branchId(), row.branchName()));
+			}
+		}
+		return profiles.values().stream()
+				.map(CoachProfileAccumulator::toRecord)
+				.sorted(java.util.Comparator.comparing(CoachProfileRecord::displayName))
+				.toList();
+	}
+
+	@Transactional
+	public CoachProfileRecord updateCoachProfile(
+			GymOsPrincipal principal, UUID coachUserId,
+			UpdateCoachProfileCommand command, String correlationId
+	) {
+		requireBranch(principal);
+		List<UUID> managedBranchIds = coachingRepository.accessibleBranchIds(
+				principal.organizationId(), principal.userId()
+		);
+		boolean visible = coachingRepository.coachProfileRows(
+				principal.organizationId(), managedBranchIds
+		).stream().anyMatch(row -> row.userId().equals(coachUserId));
+		if (!visible || !coachingRepository.userHasCoachRole(principal.organizationId(), coachUserId)) {
+			throw new BusinessException("COACH_PROFILE_NOT_FOUND", "El perfil de coach no está disponible.");
+		}
+		String status = required(
+				command.status(), "COACH_STATUS_REQUIRED", "El estado del coach es obligatorio."
+		).toUpperCase();
+		if (!List.of("ACTIVE", "INACTIVE").contains(status)) {
+			throw new BusinessException("COACH_STATUS_INVALID", "Usa ACTIVE o INACTIVE.");
+		}
+		List<UUID> selectedBranchIds = command.branchIds() == null
+				? List.of()
+				: command.branchIds().stream().distinct().toList();
+		if ("ACTIVE".equals(status) && selectedBranchIds.isEmpty()) {
+			throw new BusinessException(
+					"COACH_BRANCH_REQUIRED",
+					"Un coach activo necesita al menos una sucursal."
+			);
+		}
+		if (!managedBranchIds.containsAll(selectedBranchIds)) {
+			throw new BusinessException(
+					"COACH_BRANCH_OUTSIDE_SCOPE",
+					"Una sucursal seleccionada está fuera de tu alcance."
+			);
+		}
+		List<String> specialties = normalizeSpecialties(command.specialties());
+		String specialtiesJson = specialtiesJson(specialties);
+		String bio = blankToNull(command.bio());
+		CoachIdentity identity = coachingRepository.coachIdentity(
+				principal.organizationId(), coachUserId
+		).orElseThrow(() -> new BusinessException(
+				"COACH_PROFILE_NOT_FOUND", "El perfil de coach no está disponible."
+		));
+		OffsetDateTime now = OffsetDateTime.now();
+		coachingRepository.updateCoachProfileDetails(
+				principal.organizationId(), coachUserId, specialtiesJson, bio,
+				principal.userId(), now
+		);
+		List<UUID> activeBranchIds = "ACTIVE".equals(status) ? selectedBranchIds : List.of();
+		for (UUID branchId : activeBranchIds) {
+			coachingRepository.upsertCoachBranchProfile(
+					principal.organizationId(), branchId, identity, specialtiesJson, bio,
+					principal.userId(), now
+			);
+		}
+		coachingRepository.deactivateCoachBranches(
+				principal.organizationId(), coachUserId, managedBranchIds, activeBranchIds,
+				principal.userId(), now
+		);
+		coachingRepository.replaceCoachBranchAccess(
+				coachUserId, managedBranchIds, activeBranchIds
+		);
+		auditService.record(
+				principal, "COACH_PROFILE_UPDATED", "COACH_PROFILE", coachUserId,
+				"BACKOFFICE", status + ":" + activeBranchIds, correlationId
+		);
+		return coachProfiles(principal).stream()
+				.filter(profile -> profile.userId().equals(coachUserId))
+				.findFirst()
+				.orElseThrow(() -> new BusinessException(
+						"COACH_PROFILE_NOT_FOUND", "El perfil actualizado no está disponible."
+				));
 	}
 
 	@Transactional
@@ -523,6 +632,31 @@ public class CoachingService {
 		}
 	}
 
+	private List<String> normalizeSpecialties(List<String> specialties) {
+		if (specialties == null) return List.of();
+		return specialties.stream()
+				.filter(value -> value != null && !value.isBlank())
+				.map(String::trim)
+				.distinct()
+				.limit(20)
+				.toList();
+	}
+
+	private List<String> parseSpecialties(String specialtiesJson) {
+		if (specialtiesJson == null || specialtiesJson.isBlank()) return List.of();
+		try {
+			var node = objectMapper.readTree(specialtiesJson);
+			if (!node.isArray()) return List.of();
+			List<String> values = new ArrayList<>();
+			node.forEach(value -> {
+				if (value.isTextual() && !value.asText().isBlank()) values.add(value.asText());
+			});
+			return List.copyOf(values);
+		} catch (JsonProcessingException exception) {
+			return List.of();
+		}
+	}
+
 	private String normalizeLevel(String level) {
 		String normalized = level == null || level.isBlank() ? "GENERAL" : level.trim().toUpperCase();
 		return switch (normalized) {
@@ -563,5 +697,50 @@ public class CoachingService {
 		if (principal.permissions().contains("workout.manage.all")) return null;
 		if (principal.permissions().contains("workout.manage.own")) return principal.userId();
 		throw new BusinessException("WORKOUT_MANAGE_FORBIDDEN", "No tienes permiso para administrar rutinas.");
+	}
+
+	public record UpdateCoachProfileCommand(
+			List<String> specialties, String bio, String status, List<UUID> branchIds
+	) {
+	}
+
+	public record CoachBranchRecord(UUID id, String name) {
+	}
+
+	public record CoachProfileRecord(
+			UUID userId, String displayName, String email, String phone,
+			List<String> specialties, String bio, String status,
+			List<CoachBranchRecord> branches
+	) {
+	}
+
+	private static final class CoachProfileAccumulator {
+		private final UUID userId;
+		private final String displayName;
+		private final String email;
+		private final String phone;
+		private final List<String> specialties;
+		private final String bio;
+		private final List<CoachBranchRecord> branches = new ArrayList<>();
+		private boolean active;
+
+		private CoachProfileAccumulator(
+				UUID userId, String displayName, String email, String phone,
+				List<String> specialties, String bio
+		) {
+			this.userId = userId;
+			this.displayName = displayName;
+			this.email = email;
+			this.phone = phone;
+			this.specialties = specialties;
+			this.bio = bio;
+		}
+
+		private CoachProfileRecord toRecord() {
+			return new CoachProfileRecord(
+					userId, displayName, email, phone, specialties, bio,
+					active ? "ACTIVE" : "INACTIVE", List.copyOf(branches)
+			);
+		}
 	}
 }

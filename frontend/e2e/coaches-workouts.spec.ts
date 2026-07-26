@@ -8,6 +8,8 @@ const clientId = "55555555-5555-4555-8555-555555555555";
 const assignmentId = "66666666-6666-4666-8666-666666666666";
 const exerciseId = "77777777-7777-4777-8777-777777777777";
 const userId = "88888888-8888-4888-8888-888888888888";
+const branchId = "99999999-9999-4999-8999-999999999999";
+const secondBranchId = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee";
 
 test.describe("coaches y rutinas", () => {
   test("construye bloques estructurados y publica la rutina", async ({ page }) => {
@@ -104,10 +106,12 @@ test.describe("coaches y rutinas", () => {
     await expect.poll(() => mediaUploaded).toBe(true);
   });
 
-  test("cancela con motivo, reemplaza y filtra métricas por coach", async ({ page }) => {
+  test("cancela con motivo y filtra métricas históricas por coach y socio", async ({ page }) => {
     let cancelledWith: Record<string, unknown> | null = null;
     let replacementPayload: Record<string, unknown> | null = null;
     let reportCoachFilter = "";
+    let reportClientFilter = "";
+    let trendWeeksFilter = "";
     await bootCoaching(page, async (route, path, url) => {
       if (route.request().method() === "PATCH" && path === `/workout-assignments/${assignmentId}/status`) {
         cancelledWith = route.request().postDataJSON() as Record<string, unknown>;
@@ -121,7 +125,18 @@ test.describe("coaches y rutinas", () => {
       }
       if (path === "/reports/coaches/workout-assignments/summary") {
         reportCoachFilter = url.searchParams.get("coachId") ?? reportCoachFilter;
+        reportClientFilter = url.searchParams.get("clientId") ?? reportClientFilter;
         await route.fulfill({ contentType: "application/json", body: JSON.stringify(report()) });
+        return true;
+      }
+      if (path === "/reports/coaches/workout-assignments/trend") {
+        trendWeeksFilter = url.searchParams.get("weeks") ?? trendWeeksFilter;
+        reportClientFilter = url.searchParams.get("clientId") ?? reportClientFilter;
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify(trend()) });
+        return true;
+      }
+      if (path === "/clients") {
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify([client()]) });
         return true;
       }
       return false;
@@ -147,9 +162,57 @@ test.describe("coaches y rutinas", () => {
 
     await page.getByRole("button", { name: "Métricas" }).click();
     await expect(page.getByText("+2 vs. anterior")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Actividad semanal" })).toBeVisible();
+    await page.getByPlaceholder("Nombre, correo o teléfono").last().fill("Diego");
+    await page.getByRole("button", { name: "Buscar socio" }).click();
+    await page.getByRole("button", { name: "Diego García" }).click();
     await page.getByLabel("Coach").last().selectOption(coachId);
+    await page.getByLabel("Histórico").selectOption("26");
     await page.getByRole("button", { name: "Actualizar" }).click();
     await expect.poll(() => reportCoachFilter).toBe(coachId);
+    await expect.poll(() => reportClientFilter).toBe(clientId);
+    await expect.poll(() => trendWeeksFilter).toBe("26");
+    await expect(page.getByLabel("Rutinas asignadas por semana")).toBeVisible();
+  });
+
+  test("administra perfil, estado y múltiples sucursales del coach", async ({ page }) => {
+    let profilePayload: Record<string, unknown> | null = null;
+    await bootCoaching(page, async (route, path) => {
+      if (route.request().method() === "PUT" && path === `/coaches/profiles/${userId}`) {
+        profilePayload = route.request().postDataJSON() as Record<string, unknown>;
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({
+            ...coachProfile(),
+            specialties: ["Fuerza", "Movilidad"],
+            bio: "Entrenamiento funcional y fuerza.",
+            branches: [
+              { id: branchId, name: "Centro" },
+              { id: secondBranchId, name: "Norte" },
+            ],
+          }),
+        });
+        return true;
+      }
+      return false;
+    });
+
+    await page.goto("/coaches");
+    await page.getByRole("button", { name: "Coaches", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Perfiles de coaches" })).toBeVisible();
+    await page.getByRole("button", { name: "Administrar perfil" }).click();
+    await page.getByLabel("Especialidades").fill("Fuerza, Movilidad");
+    await page.getByLabel("Biografía").fill("Entrenamiento funcional y fuerza.");
+    await page.getByRole("checkbox", { name: "Norte", exact: true }).check();
+    await page.getByRole("button", { name: "Guardar perfil" }).click();
+
+    await expect.poll(() => profilePayload).toMatchObject({
+      specialties: ["Fuerza", "Movilidad"],
+      bio: "Entrenamiento funcional y fuerza.",
+      status: "ACTIVE",
+      branchIds: [branchId, secondBranchId],
+    });
+    await expect(page.getByText("Perfil de Coach Uno actualizado.")).toBeVisible();
   });
 });
 
@@ -172,7 +235,10 @@ async function bootCoaching(
 
 function responseFor(path: string) {
   if (path === "/branches" || path === "/organizations/current/branches") {
-    return [{ id: "99999999-9999-4999-8999-999999999999", name: "Centro" }];
+    return [
+      { id: branchId, name: "Centro" },
+      { id: secondBranchId, name: "Norte" },
+    ];
   }
   if (path === "/coaches") {
     return [{
@@ -188,12 +254,53 @@ function responseFor(path: string) {
       updatedAt: "2026-07-01T00:00:00Z",
     }];
   }
+  if (path === "/coaches/profiles") return [coachProfile()];
   if (path === "/workouts") return workouts();
   if (path === "/exercises") {
     return { items: [exercise()], page: 0, size: 100, totalElements: 1, totalPages: 1 };
   }
   if (path === "/reports/coaches/workout-assignments/summary") return report();
+  if (path === "/reports/coaches/workout-assignments/trend") return trend();
   return [];
+}
+
+function coachProfile() {
+  return {
+    userId,
+    displayName: "Coach Uno",
+    email: "coach@gymos.test",
+    phone: "555-0100",
+    specialties: ["Fuerza"],
+    bio: "Entrenamiento de fuerza.",
+    status: "ACTIVE",
+    branches: [{ id: branchId, name: "Centro" }],
+  };
+}
+
+function client() {
+  return {
+    id: clientId,
+    firstName: "Diego",
+    lastName: "García",
+    email: "diego@example.com",
+    phone: "555-0200",
+    status: "ACTIVE",
+  };
+}
+
+function trend() {
+  return {
+    from: "2026-05-04",
+    to: "2026-07-26",
+    weeks: 12,
+    points: Array.from({ length: 12 }, (_, index) => ({
+      weekFrom: `2026-${String(5 + Math.floor(index / 4)).padStart(2, "0")}-${String(4 + ((index % 4) * 7)).padStart(2, "0")}`,
+      weekTo: "2026-07-26",
+      assignments: index % 4,
+      uniqueClients: index % 3,
+      firstWorkouts: index % 2,
+    })),
+  };
 }
 
 function workouts() {
@@ -298,13 +405,14 @@ function currentUser() {
   return {
     userId,
     organizationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
-    branchId: "99999999-9999-4999-8999-999999999999",
+    branchId,
     username: "owner@gymos.test",
     fullName: "Owner GymOS",
     permissions: [
       "coach.read", "exercise.read", "exercise.create", "exercise.manage",
       "workout.read.all", "workout.manage.all", "workout.assign",
       "workout.pdf.download", "coach.metrics.read",
+      "coach.profile.manage",
     ],
     roles: ["Dueno del gimnasio"],
     platformAdmin: false,

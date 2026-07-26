@@ -17,6 +17,7 @@ import com.gymos.coaching.infrastructure.CoachingCatalogRepository.AssignmentDet
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.AssignmentPdfData;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.AssignmentStats;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.ExerciseRecord;
+import com.gymos.coaching.infrastructure.CoachingCatalogRepository.WeeklyTrendMetric;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import java.time.LocalDate;
@@ -201,6 +202,36 @@ class CoachingCatalogServiceTests {
 				eq(coach.organizationId()), eq(coach.branchId()), any(), any(),
 				any(), any(), eq(coach.userId())
 		);
+	}
+
+	@Test
+	void weeklyTrendFillsWeeksWithoutAssignmentsAndKeepsClientFilter() {
+		UUID clientId = UUID.randomUUID();
+		UUID coachId = UUID.randomUUID();
+		LocalDate to = LocalDate.of(2026, 7, 26);
+		LocalDate firstWeek = LocalDate.of(2026, 6, 29);
+		when(repository.weeklyTrend(
+				principal.organizationId(), principal.branchId(), firstWeek, to,
+				coachId, clientId, null
+		)).thenReturn(List.of(
+				new WeeklyTrendMetric(firstWeek.plusWeeks(1), 3, 1, 1),
+				new WeeklyTrendMetric(firstWeek.plusWeeks(3), 2, 1, 0)
+		));
+
+		var trend = service.weeklyTrend(principal, 4, to, coachId, clientId);
+
+		assertThat(trend.from()).isEqualTo(firstWeek);
+		assertThat(trend.to()).isEqualTo(to);
+		assertThat(trend.points()).extracting(point -> point.assignments())
+				.containsExactly(0L, 3L, 0L, 2L);
+		assertThat(trend.points().getLast().weekTo()).isEqualTo(to);
+	}
+
+	@Test
+	void weeklyTrendRejectsUnsupportedRange() {
+		assertThatThrownBy(() -> service.weeklyTrend(principal, 53, LocalDate.now(), null, null))
+				.isInstanceOf(BusinessException.class)
+				.hasMessageContaining("entre 4 y 52");
 	}
 
 	@Test

@@ -216,6 +216,7 @@ export type {
 export {
   assignWorkout,
   createCoach,
+  getCoachProfiles,
   createWorkout,
   getWorkout,
   updateWorkout,
@@ -234,15 +235,19 @@ export {
   removeExerciseMedia,
   replaceWorkoutAssignment,
   getAssignmentReport,
+  getAssignmentTrend,
   downloadWorkoutPdf,
   downloadAssignmentCsv,
   duplicateWorkout,
   updateWorkoutAssignmentStatus,
+  updateCoachProfile,
   publishWorkout,
 } from "./api/coaching";
 export type {
   AssignWorkoutPayload,
   CoachReport,
+  CoachProfile,
+  CoachProfileBranch,
   CoachSummary,
   CreateCoachPayload,
   CreateWorkoutPayload,
@@ -259,6 +264,9 @@ export type {
   AssignmentDetail,
   AssignmentReport,
   CoachMetric,
+  UpdateCoachProfilePayload,
+  WeeklyTrendPoint,
+  WeeklyTrendReport,
 } from "./api/coaching-types";
 export {
   createProfessional,

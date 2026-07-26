@@ -86,6 +86,17 @@ class SecurityAuthorizationTests {
 	}
 
 	@Test
+	@WithMockUser(authorities = "coach.read")
+	void advancedCoachProfilesRequireDedicatedPermission() throws Exception {
+		mockMvc.perform(get("/api/v1/coaches/profiles"))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(put("/api/v1/coaches/profiles/99999999-9999-9999-9999-999999999952")
+						.contentType("application/json")
+						.content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
 	@WithMockUser(authorities = "workout.read")
 	void workoutAssignmentRequiresManagePermission() throws Exception {
 		mockMvc.perform(post("/api/v1/workouts/99999999-9999-9999-9999-999999999952/assign")

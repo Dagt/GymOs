@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired } from "@/components/AuthRequired";
@@ -13,7 +14,9 @@ import {
   downloadWorkoutPdf,
   duplicateWorkout,
   getAssignmentReport,
+  getAssignmentTrend,
   getBranches,
+  getCoachProfiles,
   getCoaches,
   getExerciseAliases,
   getExercises,
@@ -26,16 +29,19 @@ import {
   searchClients,
   updateExerciseCatalog,
   updateExerciseStatus,
+  updateCoachProfile,
   updateWorkout,
   updateWorkoutAssignmentStatus,
   uploadExerciseMedia,
   type AssignmentReport,
   type BranchSummary,
   type ClientSummary,
+  type CoachProfile,
   type CoachSummary,
   type CreateExercisePayload,
   type Exercise,
   type StoredSession,
+  type WeeklyTrendReport,
   type WorkoutBlockDraft,
   type WorkoutExerciseDraft,
   type WorkoutSessionDraft,
@@ -51,7 +57,7 @@ import {
   validateWorkout,
 } from "./workout-builder";
 
-type Tab = "builder" | "catalog" | "assignments" | "metrics";
+type Tab = "team" | "builder" | "catalog" | "assignments" | "metrics";
 
 const EMPTY_EXERCISE_FORM: CreateExercisePayload = {
   name: "",
@@ -74,6 +80,8 @@ export default function CoachesPage() {
   const [workouts, setWorkouts] = useState<WorkoutSummary[]>([]);
   const [exercisePage, setExercisePage] = useState<Exercise[]>([]);
   const [report, setReport] = useState<AssignmentReport | null>(null);
+  const [trend, setTrend] = useState<WeeklyTrendReport | null>(null);
+  const [coachProfiles, setCoachProfiles] = useState<CoachProfile[]>([]);
   const [tab, setTab] = useState<Tab>("builder");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -106,6 +114,15 @@ export default function CoachesPage() {
   const [reportTo, setReportTo] = useState(today());
   const [reportCoachId, setReportCoachId] = useState("");
   const [reportPage, setReportPage] = useState(0);
+  const [trendWeeks, setTrendWeeks] = useState(12);
+  const [metricClientQuery, setMetricClientQuery] = useState("");
+  const [metricClients, setMetricClients] = useState<ClientSummary[]>([]);
+  const [reportClient, setReportClient] = useState<ClientSummary | null>(null);
+  const [editingCoachProfile, setEditingCoachProfile] = useState<CoachProfile | null>(null);
+  const [profileSpecialties, setProfileSpecialties] = useState("");
+  const [profileBio, setProfileBio] = useState("");
+  const [profileStatus, setProfileStatus] = useState<"ACTIVE" | "INACTIVE">("ACTIVE");
+  const [profileBranchIds, setProfileBranchIds] = useState<string[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -117,13 +134,16 @@ export default function CoachesPage() {
       }
       setSession(stored);
       try {
-        const [loadedBranches, loadedCoaches, loadedWorkouts, loadedExercises, loadedReport] =
+        const canManageProfiles = stored.user.permissions.includes("coach.profile.manage");
+        const [loadedBranches, loadedCoaches, loadedWorkouts, loadedExercises, loadedReport, loadedTrend, loadedProfiles] =
           await Promise.all([
             getBranches(stored.accessToken),
             getCoaches(stored.accessToken),
             getWorkouts(stored.accessToken),
             getExercises(stored.accessToken, { size: 100 }),
             getAssignmentReport(stored.accessToken, { from: startOfWeek(), to: today() }),
+            getAssignmentTrend(stored.accessToken, { weeks: 12, to: today() }),
+            canManageProfiles ? getCoachProfiles(stored.accessToken) : Promise.resolve([]),
           ]);
         if (!active) return;
         setBranches(loadedBranches);
@@ -131,6 +151,8 @@ export default function CoachesPage() {
         setWorkouts(loadedWorkouts);
         setExercisePage(loadedExercises.items);
         setReport(loadedReport);
+        setTrend(loadedTrend);
+        setCoachProfiles(loadedProfiles);
         const canManageAll = stored.user.permissions.includes("workout.manage.all");
         setCoachId(
           (canManageAll
@@ -171,6 +193,7 @@ export default function CoachesPage() {
     ? coaches
     : coaches.filter((coach) => coach.userAccountId === session?.user.userId);
   const canManageExerciseCatalog = session?.user.permissions.includes("exercise.manage") ?? false;
+  const canManageCoachProfiles = session?.user.permissions.includes("coach.profile.manage") ?? false;
 
   async function refresh() {
     if (!session) return;
@@ -178,17 +201,27 @@ export default function CoachesPage() {
       from: reportFrom,
       to: reportTo,
       coachId: reportCoachId || undefined,
+      clientId: reportClient?.id,
       page: reportPage,
       size: 25,
     };
-    const [nextWorkouts, nextExercises, nextReport] = await Promise.all([
+    const [nextWorkouts, nextExercises, nextReport, nextTrend, nextProfiles] = await Promise.all([
       getWorkouts(session.accessToken),
       getExercises(session.accessToken, { query: exerciseQuery, size: 100 }),
       getAssignmentReport(session.accessToken, reportParams),
+      getAssignmentTrend(session.accessToken, {
+        weeks: trendWeeks,
+        to: reportTo,
+        coachId: reportCoachId || undefined,
+        clientId: reportClient?.id,
+      }),
+      canManageCoachProfiles ? getCoachProfiles(session.accessToken) : Promise.resolve([]),
     ]);
     setWorkouts(nextWorkouts);
     setExercisePage(nextExercises.items);
     setReport(nextReport);
+    setTrend(nextTrend);
+    if (canManageCoachProfiles) setCoachProfiles(nextProfiles);
     setSelectedWorkoutId((current) =>
       current || nextWorkouts.find(isPublished)?.id || "");
   }
@@ -356,6 +389,55 @@ export default function CoachesPage() {
     }
   }
 
+  async function findMetricClients() {
+    if (!session) return;
+    clearFeedback();
+    try {
+      setMetricClients(await searchClients(session.accessToken, metricClientQuery, "ACTIVE"));
+    } catch (exception) {
+      setError(errorMessage(exception));
+    }
+  }
+
+  function editCoachProfile(profile: CoachProfile) {
+    setEditingCoachProfile(profile);
+    setProfileSpecialties(profile.specialties.join(", "));
+    setProfileBio(profile.bio ?? "");
+    setProfileStatus(profile.status);
+    setProfileBranchIds(profile.branches.map((branch) => branch.id));
+    clearFeedback();
+  }
+
+  async function saveCoachProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session || !editingCoachProfile) return;
+    setSaving(true);
+    clearFeedback();
+    try {
+      const updated = await updateCoachProfile(
+        session.accessToken,
+        editingCoachProfile.userId,
+        {
+          specialties: profileSpecialties
+            .split(",")
+            .map((specialty) => specialty.trim())
+            .filter(Boolean),
+          bio: profileBio.trim() || null,
+          status: profileStatus,
+          branchIds: profileStatus === "ACTIVE" ? profileBranchIds : [],
+        },
+      );
+      setCoachProfiles((current) =>
+        current.map((profile) => profile.userId === updated.userId ? updated : profile));
+      setEditingCoachProfile(null);
+      setMessage(`Perfil de ${updated.displayName} actualizado.`);
+    } catch (exception) {
+      setError(errorMessage(exception));
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function saveAssignment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session || !selectedClient || !selectedWorkoutId) return;
@@ -390,13 +472,26 @@ export default function CoachesPage() {
     clearFeedback();
     try {
       setReportPage(0);
-      setReport(await getAssignmentReport(session.accessToken, {
-        from: reportFrom,
-        to: reportTo,
+      const filters = {
         coachId: reportCoachId || undefined,
-        page: 0,
-        size: 25,
-      }));
+        clientId: reportClient?.id,
+      };
+      const [nextReport, nextTrend] = await Promise.all([
+        getAssignmentReport(session.accessToken, {
+          from: reportFrom,
+          to: reportTo,
+          ...filters,
+          page: 0,
+          size: 25,
+        }),
+        getAssignmentTrend(session.accessToken, {
+          weeks: trendWeeks,
+          to: reportTo,
+          ...filters,
+        }),
+      ]);
+      setReport(nextReport);
+      setTrend(nextTrend);
     } catch (exception) {
       setError(errorMessage(exception));
     } finally {
@@ -413,6 +508,7 @@ export default function CoachesPage() {
         from: reportFrom,
         to: reportTo,
         coachId: reportCoachId || undefined,
+        clientId: reportClient?.id,
         page,
         size: 25,
       }));
@@ -542,6 +638,14 @@ export default function CoachesPage() {
     }
   }
 
+  const navigationTabs: [Tab, string][] = [
+    ...(canManageCoachProfiles ? [["team", "Coaches"] as [Tab, string]] : []),
+    ["builder", "Constructor"],
+    ["catalog", "Ejercicios"],
+    ["assignments", "Asignaciones"],
+    ["metrics", "Métricas"],
+  ];
+
   if (loading) return <LoadingScreen text="Cargando Coaches y rutinas..." />;
   if (!session) {
     return (
@@ -564,12 +668,7 @@ export default function CoachesPage() {
     >
       <div className="grid gap-5">
         <nav aria-label="Secciones de Coaches" className="flex flex-wrap gap-2">
-          {([
-            ["builder", "Constructor"],
-            ["catalog", "Ejercicios"],
-            ["assignments", "Asignaciones"],
-            ["metrics", "Métricas"],
-          ] as [Tab, string][]).map(([value, label]) => (
+          {navigationTabs.map(([value, label]) => (
             <button
               className={`rounded-full px-4 py-2 text-sm font-semibold ${
                 tab === value
@@ -594,6 +693,145 @@ export default function CoachesPage() {
           <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
             {message}
           </p>
+        ) : null}
+
+        {tab === "team" && canManageCoachProfiles ? (
+          <section className="grid gap-5 xl:grid-cols-[1.15fr_0.85fr]">
+            <div className="rounded-xl border border-[#d9e2dc] bg-white p-5 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-[#6b7d72]">Equipo</p>
+                  <h2 className="text-xl font-semibold">Perfiles de coaches</h2>
+                  <p className="mt-1 text-sm text-[#637268]">
+                    Administra su presentación, disponibilidad y acceso a sucursales.
+                  </p>
+                </div>
+                <Link className="rounded-md border border-[#9eb2a5] px-3 py-2 text-sm font-semibold" href="/users">
+                  Alta y acceso de usuarios
+                </Link>
+              </div>
+              <div className="mt-5 grid gap-3 md:grid-cols-2">
+                {coachProfiles.map((profile) => (
+                  <article className="rounded-lg border border-[#e0e7e2] p-4" key={profile.userId}>
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <h3 className="font-semibold">{profile.displayName}</h3>
+                        <p className="text-xs text-[#637268]">{profile.email || "Sin correo"}</p>
+                        {profile.phone ? <p className="text-xs text-[#637268]">{profile.phone}</p> : null}
+                      </div>
+                      <span className={`rounded-full px-2 py-1 text-xs font-semibold ${
+                        profile.status === "ACTIVE"
+                          ? "bg-emerald-50 text-emerald-800"
+                          : "bg-slate-100 text-slate-700"
+                      }`}>
+                        {profile.status === "ACTIVE" ? "Activo" : "Inactivo"}
+                      </span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-1">
+                      {profile.specialties.length
+                        ? profile.specialties.map((specialty) => (
+                          <span className="rounded-full bg-[#eef4ef] px-2 py-1 text-xs" key={specialty}>
+                            {specialty}
+                          </span>
+                        ))
+                        : <span className="text-xs text-[#637268]">Sin especialidades registradas</span>}
+                    </div>
+                    {profile.bio ? <p className="mt-3 text-sm text-[#435249]">{profile.bio}</p> : null}
+                    <p className="mt-3 text-xs text-[#637268]">
+                      {profile.branches.length
+                        ? profile.branches.map((branch) => branch.name).join(" · ")
+                        : "Sin sucursales activas"}
+                    </p>
+                    <button
+                      className="mt-4 rounded-md border px-3 py-2 text-sm font-semibold"
+                      onClick={() => editCoachProfile(profile)}
+                      type="button"
+                    >
+                      Administrar perfil
+                    </button>
+                  </article>
+                ))}
+                {!coachProfiles.length ? (
+                  <p className="rounded-lg border border-dashed p-5 text-sm text-[#637268]">
+                    No hay usuarios con rol de Coach en las sucursales administradas.
+                  </p>
+                ) : null}
+              </div>
+            </div>
+
+            <form className="h-fit rounded-xl border border-[#d9e2dc] bg-white p-5 shadow-sm" onSubmit={saveCoachProfile}>
+              <h2 className="text-xl font-semibold">Administrar perfil</h2>
+              {editingCoachProfile ? (
+                <div className="mt-4 grid gap-4">
+                  <p className="rounded-md bg-[#f1f6f2] p-3 text-sm font-semibold">
+                    {editingCoachProfile.displayName}
+                  </p>
+                  <Field label="Especialidades">
+                    <input
+                      className="app-input"
+                      onChange={(event) => setProfileSpecialties(event.target.value)}
+                      placeholder="Fuerza, movilidad, rehabilitación"
+                      value={profileSpecialties}
+                    />
+                  </Field>
+                  <p className="-mt-3 text-xs text-[#637268]">Separa cada especialidad con una coma.</p>
+                  <Field label="Biografía">
+                    <textarea
+                      className="app-input min-h-28"
+                      maxLength={1500}
+                      onChange={(event) => setProfileBio(event.target.value)}
+                      value={profileBio}
+                    />
+                  </Field>
+                  <Field label="Estado">
+                    <select
+                      className="app-input"
+                      onChange={(event) => setProfileStatus(event.target.value as "ACTIVE" | "INACTIVE")}
+                      value={profileStatus}
+                    >
+                      <option value="ACTIVE">Activo</option>
+                      <option value="INACTIVE">Inactivo</option>
+                    </select>
+                  </Field>
+                  <fieldset className="grid gap-2" disabled={profileStatus === "INACTIVE"}>
+                    <legend className="mb-1 text-sm font-medium text-[#435249]">Sucursales activas</legend>
+                    {branches.map((branch) => (
+                      <label className="flex items-center gap-2 rounded-md border p-3 text-sm" key={branch.id}>
+                        <input
+                          checked={profileBranchIds.includes(branch.id)}
+                          onChange={(event) => setProfileBranchIds((current) =>
+                            event.target.checked
+                              ? [...new Set([...current, branch.id])]
+                              : current.filter((id) => id !== branch.id))}
+                          type="checkbox"
+                        />
+                        {branch.name}
+                      </label>
+                    ))}
+                  </fieldset>
+                  {profileStatus === "ACTIVE" && !profileBranchIds.length ? (
+                    <p className="text-xs font-semibold text-red-700">Selecciona al menos una sucursal.</p>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      className="rounded-md bg-[#173c2a] px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                      disabled={saving || (profileStatus === "ACTIVE" && !profileBranchIds.length)}
+                      type="submit"
+                    >
+                      Guardar perfil
+                    </button>
+                    <button className="rounded-md border px-4 py-2 text-sm font-semibold" onClick={() => setEditingCoachProfile(null)} type="button">
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-4 rounded-lg border border-dashed p-5 text-sm text-[#637268]">
+                  Selecciona un coach para editar sus datos.
+                </p>
+              )}
+            </form>
+          </section>
         ) : null}
 
         {tab === "builder" ? (
@@ -1077,27 +1315,95 @@ export default function CoachesPage() {
 
         {tab === "metrics" ? (
           <section className="grid gap-5">
-            <div className="flex flex-wrap items-end gap-3 rounded-xl border border-[#d9e2dc] bg-white p-4">
-              <Field label="Desde"><input className="app-input" onChange={(event) => setReportFrom(event.target.value)} type="date" value={reportFrom} /></Field>
-              <Field label="Hasta"><input className="app-input" onChange={(event) => setReportTo(event.target.value)} type="date" value={reportTo} /></Field>
-              <Field label="Coach">
-                <select className="app-input min-w-48" onChange={(event) => setReportCoachId(event.target.value)} value={reportCoachId}>
-                  <option value="">Todos</option>
-                  {coaches.map((coach) => <option key={coach.id} value={coach.id}>{coach.displayName}</option>)}
-                </select>
-              </Field>
-              <button className="rounded-md bg-[#173c2a] px-4 py-2 text-sm font-semibold text-white" onClick={loadReport} type="button">Actualizar</button>
-              <button
-                className="rounded-md border px-4 py-2 text-sm font-semibold"
-                onClick={() => downloadAssignmentCsv(session.accessToken, {
-                  from: reportFrom,
-                  to: reportTo,
-                  coachId: reportCoachId || undefined,
-                })}
-                type="button"
-              >
-                Exportar CSV
-              </button>
+            <div className="grid gap-4 rounded-xl border border-[#d9e2dc] bg-white p-4">
+              <div className="flex flex-wrap items-end gap-3">
+                <Field label="Desde"><input className="app-input" onChange={(event) => setReportFrom(event.target.value)} type="date" value={reportFrom} /></Field>
+                <Field label="Hasta"><input className="app-input" onChange={(event) => setReportTo(event.target.value)} type="date" value={reportTo} /></Field>
+                <Field label="Coach">
+                  <select className="app-input min-w-48" onChange={(event) => setReportCoachId(event.target.value)} value={reportCoachId}>
+                    <option value="">Todos</option>
+                    {coaches.map((coach) => <option key={coach.id} value={coach.id}>{coach.displayName}</option>)}
+                  </select>
+                </Field>
+                <Field label="Histórico">
+                  <select className="app-input min-w-36" onChange={(event) => setTrendWeeks(Number(event.target.value))} value={trendWeeks}>
+                    <option value={8}>8 semanas</option>
+                    <option value={12}>12 semanas</option>
+                    <option value={26}>26 semanas</option>
+                    <option value={52}>52 semanas</option>
+                  </select>
+                </Field>
+                <button className="rounded-md bg-[#173c2a] px-4 py-2 text-sm font-semibold text-white" disabled={saving} onClick={loadReport} type="button">
+                  Actualizar
+                </button>
+                <button
+                  className="rounded-md border px-4 py-2 text-sm font-semibold"
+                  onClick={() => downloadAssignmentCsv(session.accessToken, {
+                    from: reportFrom,
+                    to: reportTo,
+                    coachId: reportCoachId || undefined,
+                    clientId: reportClient?.id,
+                  })}
+                  type="button"
+                >
+                  Exportar CSV
+                </button>
+              </div>
+              <div>
+                <p className="mb-1 text-sm font-medium text-[#435249]">Socio</p>
+                <div className="flex max-w-2xl flex-wrap gap-2">
+                  <input
+                    className="app-input min-w-64 flex-1"
+                    onChange={(event) => setMetricClientQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void findMetricClients();
+                      }
+                    }}
+                    placeholder="Nombre, correo o teléfono"
+                    value={metricClientQuery}
+                  />
+                  <button className="rounded-md border px-3 py-2 text-sm font-semibold" onClick={findMetricClients} type="button">
+                    Buscar socio
+                  </button>
+                </div>
+                {metricClients.length ? (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {metricClients.slice(0, 8).map((client) => (
+                      <button
+                        className="rounded-full border border-[#b8c9bd] px-3 py-1 text-xs font-semibold"
+                        key={client.id}
+                        onClick={() => {
+                          setReportClient(client);
+                          setMetricClientQuery(`${client.firstName} ${client.lastName}`);
+                          setMetricClients([]);
+                        }}
+                        type="button"
+                      >
+                        {client.firstName} {client.lastName}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                {reportClient ? (
+                  <div className="mt-2 flex items-center gap-2 text-sm">
+                    <span className="rounded-full bg-emerald-50 px-3 py-1 font-semibold text-emerald-800">
+                      Filtrando: {reportClient.firstName} {reportClient.lastName}
+                    </span>
+                    <button
+                      className="font-semibold text-red-700"
+                      onClick={() => {
+                        setReportClient(null);
+                        setMetricClientQuery("");
+                      }}
+                      type="button"
+                    >
+                      Quitar filtro
+                    </button>
+                  </div>
+                ) : null}
+              </div>
             </div>
             {report ? (
               <p className="text-sm text-[#637268]">
@@ -1110,6 +1416,38 @@ export default function CoachesPage() {
               <Metric label="Coaches activos" value={report?.activeCoaches ?? 0} />
               <Metric label="Sin asignaciones" value={report?.coachesWithoutAssignments ?? 0} />
             </div>
+            <section className="rounded-xl border border-[#d9e2dc] bg-white p-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-[#6b7d72]">Tendencia histórica</p>
+                <h2 className="text-xl font-semibold">Actividad semanal</h2>
+                {trend ? (
+                  <p className="mt-1 text-sm text-[#637268]">
+                    {trend.weeks} semanas, del {trend.from} al {trend.to}
+                    {reportClient ? ` · ${reportClient.firstName} ${reportClient.lastName}` : ""}
+                  </p>
+                ) : null}
+              </div>
+              <div className="mt-5 grid gap-4 xl:grid-cols-3">
+                <WeeklyTrendChart
+                  color="#1b6b45"
+                  label="Rutinas asignadas"
+                  points={trend?.points ?? []}
+                  value={(point) => point.assignments}
+                />
+                <WeeklyTrendChart
+                  color="#276f91"
+                  label="Socios únicos"
+                  points={trend?.points ?? []}
+                  value={(point) => point.uniqueClients}
+                />
+                <WeeklyTrendChart
+                  color="#b26a1b"
+                  label="Primeras rutinas"
+                  points={trend?.points ?? []}
+                  value={(point) => point.firstWorkouts}
+                />
+              </div>
+            </section>
             <section className="rounded-xl border border-[#d9e2dc] bg-white p-5">
               <h2 className="text-xl font-semibold">Desempeño por coach</h2>
               <div className="mt-4 grid gap-2">
@@ -1464,6 +1802,90 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+function WeeklyTrendChart({
+  color,
+  label,
+  points,
+  value,
+}: {
+  color: string;
+  label: string;
+  points: WeeklyTrendReport["points"];
+  value: (point: WeeklyTrendReport["points"][number]) => number;
+}) {
+  const width = 640;
+  const height = 220;
+  const paddingX = 28;
+  const paddingTop = 20;
+  const paddingBottom = 34;
+  const values = points.map(value);
+  const maximum = Math.max(1, ...values);
+  const chartHeight = height - paddingTop - paddingBottom;
+  const chartWidth = width - (paddingX * 2);
+  const coordinates = points.map((point, index) => {
+    const x = paddingX + (points.length === 1 ? chartWidth / 2 : (index / (points.length - 1)) * chartWidth);
+    const y = paddingTop + chartHeight - ((value(point) / maximum) * chartHeight);
+    return { point, x, y };
+  });
+  const total = values.reduce((sum, current) => sum + current, 0);
+
+  return (
+    <article className="rounded-lg border border-[#e0e7e2] p-4">
+      <div className="flex items-end justify-between gap-3">
+        <h3 className="text-sm font-semibold">{label}</h3>
+        <p className="text-2xl font-semibold">{total}</p>
+      </div>
+      {points.length ? (
+        <>
+          <svg
+            aria-label={`${label} por semana`}
+            className="mt-3 h-auto w-full"
+            role="img"
+            viewBox={`0 0 ${width} ${height}`}
+          >
+            {[0, 0.5, 1].map((ratio) => {
+              const y = paddingTop + (chartHeight * ratio);
+              return (
+                <line
+                  key={ratio}
+                  stroke="#dce5df"
+                  strokeDasharray={ratio === 1 ? undefined : "4 5"}
+                  strokeWidth="1"
+                  x1={paddingX}
+                  x2={width - paddingX}
+                  y1={y}
+                  y2={y}
+                />
+              );
+            })}
+            <polyline
+              fill="none"
+              points={coordinates.map(({ x, y }) => `${x},${y}`).join(" ")}
+              stroke={color}
+              strokeLinejoin="round"
+              strokeWidth="4"
+            />
+            {coordinates.map(({ point, x, y }) => (
+              <circle cx={x} cy={y} fill="white" key={point.weekFrom} r="5" stroke={color} strokeWidth="3">
+                <title>{formatShortDate(point.weekFrom)}: {value(point)}</title>
+              </circle>
+            ))}
+            <text fill="#637268" fontSize="18" x={paddingX} y={height - 7}>
+              {formatShortDate(points[0].weekFrom)}
+            </text>
+            <text fill="#637268" fontSize="18" textAnchor="end" x={width - paddingX} y={height - 7}>
+              {formatShortDate(points[points.length - 1].weekFrom)}
+            </text>
+          </svg>
+          <p className="mt-1 text-xs text-[#637268]">Máximo semanal: {maximum}</p>
+        </>
+      ) : (
+        <p className="mt-3 rounded-md border border-dashed p-4 text-sm text-[#637268]">Sin datos para graficar.</p>
+      )}
+    </article>
+  );
+}
+
 function Metric({ change, label, value }: { change?: number; label: string; value: number }) {
   const direction = change === undefined ? null : change > 0 ? "increase" : change < 0 ? "decrease" : "same";
   return (
@@ -1508,4 +1930,9 @@ function startOfWeek() {
   const day = date.getDay() || 7;
   date.setDate(date.getDate() - day + 1);
   return date.toISOString().slice(0, 10);
+}
+
+function formatShortDate(value: string) {
+  return new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "short", timeZone: "UTC" })
+    .format(new Date(`${value}T00:00:00Z`));
 }

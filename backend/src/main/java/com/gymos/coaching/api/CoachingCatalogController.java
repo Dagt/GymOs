@@ -5,6 +5,7 @@ import com.gymos.coaching.application.CoachingExerciseMediaService;
 import com.gymos.coaching.application.CoachingExerciseMediaService.UploadExerciseMedia;
 import com.gymos.coaching.application.CoachingCatalogService.AssignmentReport;
 import com.gymos.coaching.application.CoachingCatalogService.CreateExerciseCommand;
+import com.gymos.coaching.application.CoachingCatalogService.WeeklyTrendReport;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.ExercisePage;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.ExerciseRecord;
 import com.gymos.common.api.Correlation;
@@ -203,6 +204,17 @@ public class CoachingCatalogController {
 				.header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename("asignaciones-rutinas.csv").build().toString())
 				.contentType(MediaType.parseMediaType("text/csv;charset=UTF-8"))
 				.body(csv);
+	}
+
+	@GetMapping("/reports/coaches/workout-assignments/trend")
+	WeeklyTrendReport trend(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@RequestParam(defaultValue = "12") int weeks,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+			@RequestParam(required = false) UUID coachId,
+			@RequestParam(required = false) UUID clientId
+	) {
+		return service.weeklyTrend(principal, weeks, to, coachId, clientId);
 	}
 
 	@GetMapping("/workout-assignments/{assignmentId}/pdf")

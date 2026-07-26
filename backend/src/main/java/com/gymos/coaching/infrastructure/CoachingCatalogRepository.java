@@ -370,6 +370,51 @@ public class CoachingCatalogRepository {
 				)).list();
 	}
 
+	public List<WeeklyTrendMetric> weeklyTrend(
+			UUID organizationId, UUID branchId, LocalDate from, LocalDate to,
+			UUID coachId, UUID clientId, UUID ownerUserId
+	) {
+		return jdbc.sql("""
+				SELECT CAST(date_trunc('week', a.assigned_on) AS DATE) AS week_start,
+				       COUNT(a.id) FILTER (WHERE a.status <> 'CANCELLED') AS assignments,
+				       COUNT(DISTINCT a.client_id) FILTER (WHERE a.status <> 'CANCELLED') AS unique_clients,
+				       COUNT(a.id) FILTER (WHERE a.status <> 'CANCELLED' AND NOT EXISTS (
+				           SELECT 1
+				           FROM workout_assignment previous
+				           WHERE previous.organization_id = a.organization_id
+				             AND previous.client_id = a.client_id
+				             AND previous.assigned_on < a.assigned_on
+				             AND previous.status <> 'CANCELLED'
+				             AND previous.deleted_at IS NULL
+				       )) AS first_workouts
+				FROM workout_assignment a
+				LEFT JOIN coach c ON c.id = a.coach_id
+				WHERE a.organization_id = :organizationId
+				  AND a.branch_id = :branchId
+				  AND a.deleted_at IS NULL
+				  AND a.assigned_on BETWEEN :fromDate AND :toDate
+				  AND (:coachId IS NULL OR a.coach_id = :coachId)
+				  AND (:clientId IS NULL OR a.client_id = :clientId)
+				  AND (:ownerUserId IS NULL OR c.user_account_id = :ownerUserId)
+				GROUP BY CAST(date_trunc('week', a.assigned_on) AS DATE)
+				ORDER BY week_start
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("fromDate", from)
+				.param("toDate", to)
+				.param("coachId", coachId)
+				.param("clientId", clientId)
+				.param("ownerUserId", ownerUserId)
+				.query((resultSet, rowNumber) -> new WeeklyTrendMetric(
+						resultSet.getObject("week_start", LocalDate.class),
+						resultSet.getLong("assignments"),
+						resultSet.getLong("unique_clients"),
+						resultSet.getLong("first_workouts")
+				))
+				.list();
+	}
+
 	public Optional<AssignmentPdfData> assignmentPdf(
 			UUID organizationId, UUID branchId, UUID assignmentId, UUID ownerUserId
 	) {
@@ -447,6 +492,9 @@ public class CoachingCatalogRepository {
 	) {}
 	public record CoachMetric(UUID coachId, String coachName, long assignments, long uniqueClients, long firstWorkouts) {}
 	public record AssignmentStats(long totalRows, long assignments, long uniqueClients) {}
+	public record WeeklyTrendMetric(
+			LocalDate weekStart, long assignments, long uniqueClients, long firstWorkouts
+	) {}
 	public record AssignmentPdfData(
 			UUID id, LocalDate assignedOn, LocalDate startsOn, LocalDate endsOn, String printableNotes,
 			String title, String goal, String level, int versionNumber, String contentJson,

@@ -2,6 +2,7 @@ import { apiFetch, normalizePayload } from "./client";
 import type {
   AssignWorkoutPayload,
   CoachReport,
+  CoachProfile,
   CoachSummary,
   CreateCoachPayload,
   CreateWorkoutPayload,
@@ -12,6 +13,8 @@ import type {
   WorkoutAssignment,
   WorkoutDetail,
   WorkoutSummary,
+  UpdateCoachProfilePayload,
+  WeeklyTrendReport,
 } from "./coaching-types";
 
 export async function getCoaches(accessToken: string): Promise<CoachSummary[]> {
@@ -24,6 +27,21 @@ export async function createCoach(
 ): Promise<CoachSummary> {
   return apiFetch<CoachSummary>("/coaches", accessToken, {
     method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function getCoachProfiles(accessToken: string): Promise<CoachProfile[]> {
+  return apiFetch<CoachProfile[]>("/coaches/profiles", accessToken);
+}
+
+export async function updateCoachProfile(
+  accessToken: string,
+  coachUserId: string,
+  payload: UpdateCoachProfilePayload,
+): Promise<CoachProfile> {
+  return apiFetch<CoachProfile>(`/coaches/profiles/${coachUserId}`, accessToken, {
+    method: "PUT",
     body: JSON.stringify(normalizePayload(payload)),
   });
 }
@@ -226,13 +244,32 @@ export async function getAssignmentReport(
   );
 }
 
+export async function getAssignmentTrend(
+  accessToken: string,
+  params: {
+    weeks?: number;
+    to?: string;
+    coachId?: string;
+    clientId?: string;
+  } = {},
+): Promise<WeeklyTrendReport> {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") search.set(key, String(value));
+  });
+  return apiFetch<WeeklyTrendReport>(
+    `/reports/coaches/workout-assignments/trend?${search.toString()}`,
+    accessToken,
+  );
+}
+
 export async function downloadWorkoutPdf(accessToken: string, assignmentId: string) {
   return downloadFile(accessToken, `/workout-assignments/${assignmentId}/pdf`, `rutina-${assignmentId}.pdf`);
 }
 
 export async function downloadAssignmentCsv(
   accessToken: string,
-  params: { from?: string; to?: string; coachId?: string } = {},
+  params: { from?: string; to?: string; coachId?: string; clientId?: string } = {},
 ) {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => { if (value) search.set(key, value); });

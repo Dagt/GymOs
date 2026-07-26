@@ -11,6 +11,29 @@ export type CoachSummary = {
   updatedAt: string;
 };
 
+export type CoachProfileBranch = {
+  id: string;
+  name: string;
+};
+
+export type CoachProfile = {
+  userId: string;
+  displayName: string;
+  email: string | null;
+  phone: string | null;
+  specialties: string[];
+  bio: string | null;
+  status: "ACTIVE" | "INACTIVE";
+  branches: CoachProfileBranch[];
+};
+
+export type UpdateCoachProfilePayload = {
+  specialties: string[];
+  bio?: string | null;
+  status: "ACTIVE" | "INACTIVE";
+  branchIds: string[];
+};
+
 export type WorkoutSummary = {
   id: string;
   coachId: string | null;
@@ -211,4 +234,19 @@ export type AssignmentReport = {
   totalPages: number;
   coaches: CoachMetric[];
   details: AssignmentDetail[];
+};
+
+export type WeeklyTrendPoint = {
+  weekFrom: string;
+  weekTo: string;
+  assignments: number;
+  uniqueClients: number;
+  firstWorkouts: number;
+};
+
+export type WeeklyTrendReport = {
+  from: string;
+  to: string;
+  weeks: number;
+  points: WeeklyTrendPoint[];
 };

@@ -11,6 +11,7 @@ import com.gymos.coaching.infrastructure.CoachingCatalogRepository.CoachMetric;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.ExerciseData;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.ExercisePage;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.ExerciseRecord;
+import com.gymos.coaching.infrastructure.CoachingCatalogRepository.WeeklyTrendMetric;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.time.BusinessTime;
@@ -31,7 +32,10 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -259,6 +263,41 @@ public class CoachingCatalogService {
 	}
 
 	@Transactional(readOnly = true)
+	public WeeklyTrendReport weeklyTrend(
+			GymOsPrincipal principal, int weeks, LocalDate to, UUID coachId, UUID clientId
+	) {
+		requireBranch(principal);
+		if (weeks < 4 || weeks > 52) {
+			throw new BusinessException(
+					"REPORT_WEEKS_INVALID",
+					"El historial semanal debe cubrir entre 4 y 52 semanas."
+			);
+		}
+		LocalDate safeTo = to == null ? BusinessTime.today() : to;
+		LocalDate currentWeek = safeTo.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+		LocalDate safeFrom = currentWeek.minusWeeks(weeks - 1L);
+		UUID ownerUserId = workoutReadScope(principal);
+		Map<LocalDate, WeeklyTrendMetric> values = repository.weeklyTrend(
+				principal.organizationId(), principal.branchId(), safeFrom, safeTo,
+				coachId, clientId, ownerUserId
+		).stream().collect(Collectors.toMap(WeeklyTrendMetric::weekStart, Function.identity()));
+		List<WeeklyTrendPoint> points = new ArrayList<>();
+		for (int index = 0; index < weeks; index++) {
+			LocalDate weekFrom = safeFrom.plusWeeks(index);
+			LocalDate weekTo = weekFrom.plusDays(6).isAfter(safeTo)
+					? safeTo : weekFrom.plusDays(6);
+			WeeklyTrendMetric metric = values.get(weekFrom);
+			points.add(new WeeklyTrendPoint(
+					weekFrom, weekTo,
+					metric == null ? 0 : metric.assignments(),
+					metric == null ? 0 : metric.uniqueClients(),
+					metric == null ? 0 : metric.firstWorkouts()
+			));
+		}
+		return new WeeklyTrendReport(safeFrom, safeTo, weeks, points);
+	}
+
+	@Transactional(readOnly = true)
 	public byte[] assignmentCsv(
 			GymOsPrincipal principal, LocalDate from, LocalDate to, UUID coachId, UUID clientId
 	) {
@@ -409,6 +448,15 @@ public class CoachingCatalogService {
 			long assignmentChange, long uniqueClientChange,
 			int page, int size, long totalDetails, int totalPages,
 			List<CoachMetric> coaches, List<AssignmentDetail> details
+	) {}
+
+	public record WeeklyTrendReport(
+			LocalDate from, LocalDate to, int weeks, List<WeeklyTrendPoint> points
+	) {}
+
+	public record WeeklyTrendPoint(
+			LocalDate weekFrom, LocalDate weekTo,
+			long assignments, long uniqueClients, long firstWorkouts
 	) {}
 
 	private final class PdfWriter {
