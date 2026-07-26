@@ -3012,7 +3012,7 @@ button.admin-secondary-link:disabled {
   border-radius: 0.75rem;
   display: grid;
   gap: 1rem;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(18rem, auto);
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(25rem, auto);
   padding: 1rem;
   position: relative;
 }
@@ -3042,8 +3042,20 @@ button.admin-secondary-link:disabled {
   border-radius: 0.65rem;
   display: grid;
   gap: 0.6rem;
-  grid-template-columns: minmax(11rem, 1fr) auto auto;
+  grid-template-columns: minmax(11rem, 1fr) auto;
   padding: 0.65rem;
+}
+
+.team-user-action-buttons {
+  align-items: center;
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  min-width: max-content;
+}
+
+.team-user-action-buttons > small {
+  white-space: nowrap;
 }
 
 .team-role-control {
@@ -3233,6 +3245,16 @@ button.admin-secondary-link:disabled {
 }
 
 @media (max-width: 640px) {
+  .team-user-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .team-user-action-buttons {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    min-width: 0;
+  }
+
   .home-header,
   .home-header nav,
   .admin-command-actions,

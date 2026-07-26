@@ -56,6 +56,8 @@ export default function UsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [showCreateUser, setShowCreateUser] = useState(false);
+  const [newCoachSpecialties, setNewCoachSpecialties] = useState("");
+  const [newCoachBio, setNewCoachBio] = useState("");
   const [editingCoach, setEditingCoach] = useState<InternalUserSummary | null>(null);
   const [coachSpecialties, setCoachSpecialties] = useState("");
   const [coachBio, setCoachBio] = useState("");
@@ -126,6 +128,7 @@ export default function UsersPage() {
   const visibleUsers = users.filter((user) => canSeeUserForSession(session?.user.roles ?? [], user.roles, Boolean(session?.user.platformAdmin)));
   const selectedRoleLabel = displayRoleName(selectableRoles.find((role) => role.id === form.roleId)?.name ?? "");
   const ownerRoleSelected = selectedRoleLabel === "Dueno del gimnasio";
+  const coachRoleSelected = selectedRoleLabel === "Coach";
   const managerSingleBranchLocked = selectedRoleLabel !== "Dueno del gimnasio"
     && branches.length === 1
     && (session?.user.roles ?? []).some((role) => displayRoleName(role) === "Gerente")
@@ -145,25 +148,50 @@ export default function UsersPage() {
     setError(null);
     setMessage(null);
     try {
+      const effectiveBranchIds = ownerRoleSelected
+        ? branches.map((branch) => branch.id)
+        : managerSingleBranchLocked
+          ? [branches[0].id]
+          : form.branchIds;
+      const specialties = newCoachSpecialties
+        .split(",")
+        .map((specialty) => specialty.trim())
+        .filter(Boolean);
       const created = await createInternalUser(session.accessToken, {
         ...form,
         email: form.email?.trim() || null,
         phone: normalizePhone(form.phone ?? ""),
         username: form.username.trim(),
-        branchIds: ownerRoleSelected
-          ? branches.map((branch) => branch.id)
-          : managerSingleBranchLocked
-            ? [branches[0].id]
-            : form.branchIds,
+        branchIds: effectiveBranchIds,
+        coachSpecialties: coachRoleSelected ? specialties : undefined,
+        coachBio: coachRoleSelected ? newCoachBio.trim() || null : undefined,
       });
       setUsers((current) => [...current, created].sort((left, right) => left.fullName.localeCompare(right.fullName)));
+      if (coachRoleSelected) {
+        setCoachProfiles((current) => [...current, {
+          userId: created.id,
+          displayName: created.fullName,
+          email: created.email,
+          phone: created.phone,
+          specialties,
+          bio: newCoachBio.trim() || null,
+          status: "ACTIVE",
+          branches: branches
+            .filter((branch) => effectiveBranchIds.includes(branch.id))
+            .map((branch) => ({ id: branch.id, name: branch.name })),
+        }]);
+      }
       setForm({
         ...emptyUserForm,
         roleId: form.roleId,
         branchIds: ownerRoleSelected ? branches.map((branch) => branch.id) : branches.length === 1 ? [branches[0].id] : [],
       });
+      setNewCoachSpecialties("");
+      setNewCoachBio("");
       setShowCreateUser(false);
-      setMessage("Usuario creado. Ya puede iniciar sesion con su usuario y contrasena temporal.");
+      setMessage(coachRoleSelected
+        ? "Usuario y perfil de Coach creados. Ya puede iniciar sesion con su contrasena temporal."
+        : "Usuario creado. Ya puede iniciar sesion con su usuario y contrasena temporal.");
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible crear el usuario.");
     } finally {
@@ -185,6 +213,8 @@ export default function UsersPage() {
 
   function openCreateUser() {
     setFieldErrors({});
+    setNewCoachSpecialties("");
+    setNewCoachBio("");
     setForm((current) => ({
       ...current,
       branchIds: ownerRoleSelected
@@ -363,6 +393,9 @@ export default function UsersPage() {
 
       <CreateUserDrawer
         branches={branches}
+        coachBio={newCoachBio}
+        coachRoleSelected={coachRoleSelected}
+        coachSpecialties={newCoachSpecialties}
         errors={fieldErrors}
         form={form}
         open={showCreateUser}
@@ -371,6 +404,8 @@ export default function UsersPage() {
         roles={selectableRoles}
         saving={saving}
         onBranchAccessChange={updateBranchAccess}
+        onCoachBioChange={setNewCoachBio}
+        onCoachSpecialtiesChange={setNewCoachSpecialties}
         onClose={() => setShowCreateUser(false)}
         onFormChange={setForm}
         onSubmit={submitUser}

@@ -28,4 +28,6 @@ export type CreateInternalUserPayload = {
   temporaryPassword: string;
   roleId: string;
   branchIds: string[];
+  coachSpecialties?: string[];
+  coachBio?: string | null;
 };

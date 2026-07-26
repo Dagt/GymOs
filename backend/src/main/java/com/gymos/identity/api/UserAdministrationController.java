@@ -86,10 +86,16 @@ public class UserAdministrationController {
 			@NotBlank @Size(max = 120) String username,
 			@NotBlank @Size(min = 8, max = 120) String temporaryPassword,
 			@NotNull UUID roleId,
-			List<UUID> branchIds
+			List<UUID> branchIds,
+			@Size(max = 30) List<@NotBlank @Size(max = 80) String> coachSpecialties,
+			@Size(max = 4000) String coachBio
 	) {
 		private CreateInternalUserCommand toCommand() {
-			return new CreateInternalUserCommand(firstName, lastName, maternalLastName, email, phone, username, temporaryPassword, roleId, branchIds);
+			return new CreateInternalUserCommand(
+					firstName, lastName, maternalLastName, email, phone,
+					username, temporaryPassword, roleId, branchIds,
+					coachSpecialties, coachBio
+			);
 		}
 	}
 

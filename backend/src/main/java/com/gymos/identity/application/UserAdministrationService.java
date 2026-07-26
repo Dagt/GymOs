@@ -114,6 +114,8 @@ public class UserAdministrationService {
 					blankToNull(command.email()),
 					blankToNull(command.phone()),
 					branchIds,
+					command.coachSpecialties(),
+					blankToNull(command.coachBio()),
 					true,
 					principal.userId()
 			);
@@ -194,6 +196,8 @@ public class UserAdministrationService {
 				data.email(),
 				data.phone(),
 				data.branchIds(),
+				null,
+				null,
 				active,
 				principal.userId()
 		);

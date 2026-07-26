@@ -85,13 +85,15 @@ export function UsersTable({
                 ) : (
                   <div className="team-role-control"><span>Rol protegido</span><strong>{user.roles.map(displayRoleName).join(", ") || "Sin rol"}</strong></div>
                 )}
-                <p className={user.status === "ACTIVE" ? "status-pill active" : "status-pill"}>{user.status}</p>
-                {canManage && isCoach && session.user.permissions.includes("coach.profile.manage") ? (
-                  <button className="safe-action" disabled={saving} onClick={() => onEditCoach(user)} type="button">
-                    Editar perfil
-                  </button>
-                ) : null}
-                {canManage ? <button className={user.status === "ACTIVE" ? "danger-action" : "safe-action"} disabled={saving} onClick={() => onToggleStatus(user)} type="button">{user.status === "ACTIVE" ? "Suspender" : "Reactivar"}</button> : <small>{isCurrentUser ? "Tu cuenta" : isOwner ? "Dueno protegido" : "Solo lectura"}</small>}
+                <div className="team-user-action-buttons">
+                  <p className={user.status === "ACTIVE" ? "status-pill active" : "status-pill"}>{user.status}</p>
+                  {canManage && isCoach && session.user.permissions.includes("coach.profile.manage") ? (
+                    <button className="safe-action" disabled={saving} onClick={() => onEditCoach(user)} type="button">
+                      Datos de Coach
+                    </button>
+                  ) : null}
+                  {canManage ? <button className={user.status === "ACTIVE" ? "danger-action" : "safe-action"} disabled={saving} onClick={() => onToggleStatus(user)} type="button">{user.status === "ACTIVE" ? "Suspender" : "Reactivar"}</button> : <small>{isCurrentUser ? "Tu cuenta" : isOwner ? "Dueno protegido" : "Solo lectura"}</small>}
+                </div>
               </div>
             </article>
           );
@@ -183,7 +185,7 @@ export function CoachProfileDrawer({
   );
 }
 
-export function CreateUserDrawer({ branches, branchSelectionLocked, errors, form, open, ownerRoleSelected, roles, saving, onBranchAccessChange, onClose, onFormChange, onSubmit }: { branches: BranchSummary[]; branchSelectionLocked: boolean; errors: FieldErrorMap; form: CreateInternalUserPayload; open: boolean; ownerRoleSelected: boolean; roles: RoleOption[]; saving: boolean; onBranchAccessChange: (branchId: string, checked: boolean) => void; onClose: () => void; onFormChange: (form: CreateInternalUserPayload) => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
+export function CreateUserDrawer({ branches, branchSelectionLocked, coachBio, coachRoleSelected, coachSpecialties, errors, form, open, ownerRoleSelected, roles, saving, onBranchAccessChange, onCoachBioChange, onCoachSpecialtiesChange, onClose, onFormChange, onSubmit }: { branches: BranchSummary[]; branchSelectionLocked: boolean; coachBio: string; coachRoleSelected: boolean; coachSpecialties: string; errors: FieldErrorMap; form: CreateInternalUserPayload; open: boolean; ownerRoleSelected: boolean; roles: RoleOption[]; saving: boolean; onBranchAccessChange: (branchId: string, checked: boolean) => void; onCoachBioChange: (value: string) => void; onCoachSpecialtiesChange: (value: string) => void; onClose: () => void; onFormChange: (form: CreateInternalUserPayload) => void; onSubmit: (event: FormEvent<HTMLFormElement>) => void }) {
   return (
     <AppDrawer description="Crea la cuenta y define desde que sucursales podra operar. Cada usuario entrara a su consola segun su rol." onClose={onClose} open={open} title="Crear usuario del gimnasio">
       <form className="grid gap-4" onSubmit={onSubmit}>
@@ -192,6 +194,23 @@ export function CreateUserDrawer({ branches, branchSelectionLocked, errors, form
         <TextField error={errors.username} label="Usuario de inicio de sesion" name="username" value={form.username} onChange={(value) => onFormChange({ ...form, username: value })} />
         <PasswordField error={errors.temporaryPassword} label="Contrasena temporal" name="temporaryPassword" value={form.temporaryPassword} onChange={(value) => onFormChange({ ...form, temporaryPassword: value })} />
         <SelectField error={errors.roleId} label="Rol" name="roleId" options={roles.map((role) => ({ label: displayRoleName(role.name), value: role.id }))} value={form.roleId} onChange={(nextRoleId) => { const nextLabel = displayRoleName(roles.find((role) => role.id === nextRoleId)?.name ?? ""); onFormChange({ ...form, roleId: nextRoleId, branchIds: nextLabel === "Dueno del gimnasio" ? branches.map((branch) => branch.id) : branches.length === 1 ? [branches[0].id] : form.branchIds }); }} />
+        {coachRoleSelected ? (
+          <section className="grid gap-4 rounded-xl border border-[#d9e2dc] bg-[#f8faf9] p-4">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-[#637268]">Información del Coach</p>
+              <p className="mt-1 text-sm text-[#526159]">Estos datos complementan su cuenta; después se pueden actualizar sin tratarlo como un usuario distinto.</p>
+            </div>
+            <label className="grid gap-1 text-sm font-medium text-[#435249]">
+              <span>Especialidades</span>
+              <input className="app-input" onChange={(event) => onCoachSpecialtiesChange(event.target.value)} placeholder="Fuerza, movilidad, rehabilitación" value={coachSpecialties} />
+            </label>
+            <p className="-mt-3 text-xs text-[#637268]">Separa cada especialidad con una coma.</p>
+            <label className="grid gap-1 text-sm font-medium text-[#435249]">
+              <span>Biografía</span>
+              <textarea className="app-input min-h-24" maxLength={4000} onChange={(event) => onCoachBioChange(event.target.value)} value={coachBio} />
+            </label>
+          </section>
+        ) : null}
         <section className="team-branch-selector"><div><strong>Sucursales permitidas</strong><span>{ownerRoleSelected ? "El dueno del gimnasio recibe acceso a todas las sucursales actuales." : branchSelectionLocked ? `Asignado automaticamente a ${branches[0]?.name ?? "tu sucursal"}.` : "Selecciona todas las sedes donde este usuario puede trabajar."}</span></div>{branches.map((branch) => <label key={branch.id}><input checked={ownerRoleSelected || branchSelectionLocked ? true : form.branchIds.includes(branch.id)} disabled={ownerRoleSelected || branchSelectionLocked} onChange={(event) => onBranchAccessChange(branch.id, event.target.checked)} type="checkbox" /><span>{branch.name}</span><small>{branchSelectionLocked ? "Sucursal fija para tu alcance" : branch.code}</small></label>)}</section>
         <button className="form-primary-button" disabled={saving} type="submit">Crear usuario</button>
       </form>

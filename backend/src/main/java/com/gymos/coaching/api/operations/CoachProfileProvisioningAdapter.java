@@ -1,5 +1,8 @@
 package com.gymos.coaching.api.operations;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gymos.common.api.BusinessException;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -9,9 +12,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class CoachProfileProvisioningAdapter implements CoachProfileProvisioning {
 	private final JdbcClient jdbcClient;
+	private final ObjectMapper objectMapper;
 
-	public CoachProfileProvisioningAdapter(JdbcClient jdbcClient) {
+	public CoachProfileProvisioningAdapter(JdbcClient jdbcClient, ObjectMapper objectMapper) {
 		this.jdbcClient = jdbcClient;
+		this.objectMapper = objectMapper;
 	}
 
 	@Override
@@ -22,6 +27,8 @@ public class CoachProfileProvisioningAdapter implements CoachProfileProvisioning
 			String email,
 			String phone,
 			List<UUID> branchIds,
+			List<String> specialties,
+			String bio,
 			boolean active,
 			UUID actorUserId
 	) {
@@ -46,9 +53,18 @@ public class CoachProfileProvisioningAdapter implements CoachProfileProvisioning
 		}
 
 		List<UUID> resolvedBranches = branchIds == null ? List.of() : branchIds.stream().distinct().toList();
+		boolean updateDetails = specialties != null || bio != null;
+		String specialtiesJson = specialtiesJson(specialties);
+		String normalizedBio = bio == null || bio.isBlank() ? null : bio.trim();
 		for (UUID branchId : resolvedBranches) {
-			linkExistingProfile(organizationId, branchId, userId, displayName, email, phone, actorUserId, now);
-			upsertProfile(organizationId, branchId, userId, displayName, email, phone, actorUserId, now);
+			linkExistingProfile(
+					organizationId, branchId, userId, displayName, email, phone,
+					specialtiesJson, normalizedBio, updateDetails, actorUserId, now
+			);
+			upsertProfile(
+					organizationId, branchId, userId, displayName, email, phone,
+					specialtiesJson, normalizedBio, updateDetails, actorUserId, now
+			);
 		}
 
 		if (resolvedBranches.isEmpty()) {
@@ -65,6 +81,9 @@ public class CoachProfileProvisioningAdapter implements CoachProfileProvisioning
 			String displayName,
 			String email,
 			String phone,
+			String specialtiesJson,
+			String bio,
+			boolean updateDetails,
 			UUID actorUserId,
 			OffsetDateTime now
 	) {
@@ -76,6 +95,11 @@ public class CoachProfileProvisioningAdapter implements CoachProfileProvisioning
 				SET user_account_id = :userId,
 				    display_name = :displayName,
 				    phone = :phone,
+				    specialties_json = CASE
+				        WHEN :updateDetails THEN CAST(:specialtiesJson AS jsonb)
+				        ELSE specialties_json
+				    END,
+				    bio = CASE WHEN :updateDetails THEN :bio ELSE bio END,
 				    status = 'ACTIVE',
 				    updated_at = :updatedAt,
 				    updated_by = :updatedBy,
@@ -89,6 +113,9 @@ public class CoachProfileProvisioningAdapter implements CoachProfileProvisioning
 				.param("userId", userId)
 				.param("displayName", displayName)
 				.param("phone", phone)
+				.param("specialtiesJson", specialtiesJson)
+				.param("bio", bio)
+				.param("updateDetails", updateDetails)
 				.param("updatedAt", now)
 				.param("updatedBy", actorUserId)
 				.param("organizationId", organizationId)
@@ -104,6 +131,9 @@ public class CoachProfileProvisioningAdapter implements CoachProfileProvisioning
 			String displayName,
 			String email,
 			String phone,
+			String specialtiesJson,
+			String bio,
+			boolean updateDetails,
 			UUID actorUserId,
 			OffsetDateTime now
 	) {
@@ -114,13 +144,19 @@ public class CoachProfileProvisioningAdapter implements CoachProfileProvisioning
 				)
 				VALUES (
 				    :id, :organizationId, :branchId, :userId, :displayName, :email, :phone,
-				    '[]'::jsonb, NULL, 'ACTIVE', :createdAt, :updatedAt, :createdBy, :updatedBy, 0
+				    CAST(:specialtiesJson AS jsonb), :bio, 'ACTIVE',
+				    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
 				)
 				ON CONFLICT (organization_id, branch_id, user_account_id) WHERE user_account_id IS NOT NULL
 				DO UPDATE SET
 				    display_name = EXCLUDED.display_name,
 				    email = EXCLUDED.email,
 				    phone = EXCLUDED.phone,
+				    specialties_json = CASE
+				        WHEN :updateDetails THEN EXCLUDED.specialties_json
+				        ELSE coach.specialties_json
+				    END,
+				    bio = CASE WHEN :updateDetails THEN EXCLUDED.bio ELSE coach.bio END,
 				    status = 'ACTIVE',
 				    updated_at = EXCLUDED.updated_at,
 				    updated_by = EXCLUDED.updated_by,
@@ -133,11 +169,32 @@ public class CoachProfileProvisioningAdapter implements CoachProfileProvisioning
 				.param("displayName", displayName)
 				.param("email", email)
 				.param("phone", phone)
+				.param("specialtiesJson", specialtiesJson)
+				.param("bio", bio)
+				.param("updateDetails", updateDetails)
 				.param("createdAt", now)
 				.param("updatedAt", now)
 				.param("createdBy", actorUserId)
 				.param("updatedBy", actorUserId)
 				.update();
+	}
+
+	private String specialtiesJson(List<String> specialties) {
+		List<String> normalized = specialties == null
+				? List.of()
+				: specialties.stream()
+						.map(String::trim)
+						.filter(value -> !value.isBlank())
+						.distinct()
+						.toList();
+		try {
+			return objectMapper.writeValueAsString(normalized);
+		} catch (JsonProcessingException exception) {
+			throw new BusinessException(
+					"COACH_SPECIALTIES_INVALID",
+					"No fue posible guardar las especialidades del coach."
+			);
+		}
 	}
 
 	private void deactivateProfilesOutsideBranches(

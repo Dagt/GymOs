@@ -4,11 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gymos.coaching.api.operations.CoachProfileProvisioningAdapter;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository;
 import com.gymos.coaching.infrastructure.CoachingRepository;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
@@ -18,6 +21,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 
 @Testcontainers
 class DatabaseMigrationTests {
@@ -146,6 +150,46 @@ class DatabaseMigrationTests {
 		}).doesNotThrowAnyException();
 	}
 
+	@Test
+	void coachProvisioningPersistsCreationDetailsOnPostgresql() throws Exception {
+		try (var connection = DriverManager.getConnection(
+				postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword()
+		)) {
+			UUID organizationId = UUID.randomUUID();
+			UUID branchId = UUID.randomUUID();
+			UUID userId = UUID.randomUUID();
+			insertOrganization(connection, organizationId);
+			insertBranch(connection, organizationId, branchId);
+			insertUser(connection, organizationId, userId);
+			var dataSource = new SingleConnectionDataSource(connection, true);
+			var adapter = new CoachProfileProvisioningAdapter(
+					JdbcClient.create(dataSource), new ObjectMapper()
+			);
+
+			adapter.synchronize(
+					organizationId, userId, "Ana Coach", "ana@example.com", "+521234567890",
+					List.of(branchId), List.of("Fuerza", "Movilidad"),
+					"Entrenadora funcional.", true, userId
+			);
+
+			try (var statement = connection.prepareStatement("""
+					SELECT specialties_json::text, bio
+					FROM coach
+					WHERE organization_id = ? AND branch_id = ? AND user_account_id = ?
+					""")) {
+				statement.setObject(1, organizationId);
+				statement.setObject(2, branchId);
+				statement.setObject(3, userId);
+				try (var resultSet = statement.executeQuery()) {
+					assertThat(resultSet.next()).isTrue();
+					assertThat(resultSet.getString("specialties_json"))
+							.contains("Fuerza", "Movilidad");
+					assertThat(resultSet.getString("bio")).isEqualTo("Entrenadora funcional.");
+				}
+			}
+		}
+	}
+
 	private boolean columnExists(java.sql.Connection connection, String table, String column) throws Exception {
 		try (var statement = connection.prepareStatement("""
 				SELECT 1
@@ -229,6 +273,38 @@ class DatabaseMigrationTests {
 			statement.setObject(1, branchId);
 			statement.setObject(2, organizationId);
 			statement.executeUpdate();
+		}
+	}
+
+	private void insertUser(
+			java.sql.Connection connection, UUID organizationId, UUID userId
+	) throws Exception {
+		UUID personId = UUID.randomUUID();
+		try (var person = connection.prepareStatement("""
+				INSERT INTO person (
+				    id, organization_id, first_name, last_name, email, phone, status,
+				    created_at, updated_at, version
+				)
+				VALUES (?, ?, 'Ana', 'Coach', ?, ?, 'ACTIVE', now(), now(), 0)
+				""")) {
+			person.setObject(1, personId);
+			person.setObject(2, organizationId);
+			person.setString(3, "ana-" + userId + "@example.com");
+			person.setString(4, "+52" + String.format("%010d", Math.abs(userId.hashCode())));
+			person.executeUpdate();
+		}
+		try (var user = connection.prepareStatement("""
+				INSERT INTO user_account (
+				    id, organization_id, person_id, username, password_hash, status,
+				    failed_attempts, created_at, updated_at, version
+				)
+				VALUES (?, ?, ?, ?, 'encoded', 'ACTIVE', 0, now(), now(), 0)
+				""")) {
+			user.setObject(1, userId);
+			user.setObject(2, organizationId);
+			user.setObject(3, personId);
+			user.setString(4, "ana-" + userId);
+			user.executeUpdate();
 		}
 	}
 

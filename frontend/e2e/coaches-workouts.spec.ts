@@ -244,7 +244,7 @@ test.describe("coaches y rutinas", () => {
 
     await page.goto("/users");
     await expect(page.getByRole("heading", { name: "Equipo del gimnasio" })).toBeVisible();
-    await page.getByRole("button", { name: "Editar perfil" }).click();
+    await page.getByRole("button", { name: "Datos de Coach" }).click();
     await page.getByLabel("Especialidades").fill("Fuerza, Movilidad");
     await page.getByLabel("Biografía").fill("Entrenamiento funcional y fuerza.");
     await page.getByRole("checkbox", { name: "Norte", exact: true }).check();
@@ -257,6 +257,97 @@ test.describe("coaches y rutinas", () => {
       branchIds: [branchId, secondBranchId],
     });
     await expect(page.getByText("Perfil y sucursales del coach actualizados.")).toBeVisible();
+  });
+
+  test("mantiene alineadas las acciones de Coach con el resto del equipo", async ({ page }) => {
+    await bootCoaching(page, async (route, path) => {
+      if (route.request().method() === "GET" && path === "/users/internal") {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify([
+            internalCoach(),
+            {
+              ...internalCoach(),
+              id: "cdcdcdcd-cdcd-4dcd-8dcd-cdcdcdcdcdcd",
+              fullName: "Usuario Recepción",
+              username: "recepcion@gymos.test",
+              roles: ["Recepcion"],
+            },
+          ]),
+        });
+        return true;
+      }
+      return false;
+    }, ownerUser());
+
+    await page.goto("/users");
+    const coachRow = page.locator(".team-user-table article").filter({ hasText: "Coach Uno" });
+    const receptionRow = page.locator(".team-user-table article").filter({ hasText: "Usuario Recepción" });
+    const profileButton = coachRow.getByRole("button", { name: "Datos de Coach" });
+    const suspendButton = coachRow.getByRole("button", { name: "Suspender" });
+    await expect(profileButton).toBeVisible();
+    await expect(suspendButton).toBeVisible();
+
+    const [profileBox, suspendBox, coachBox, receptionBox] = await Promise.all([
+      profileButton.boundingBox(),
+      suspendButton.boundingBox(),
+      coachRow.boundingBox(),
+      receptionRow.boundingBox(),
+    ]);
+    expect(profileBox).not.toBeNull();
+    expect(suspendBox).not.toBeNull();
+    expect(coachBox).not.toBeNull();
+    expect(receptionBox).not.toBeNull();
+    expect(Math.abs((profileBox?.y ?? 0) - (suspendBox?.y ?? 0))).toBeLessThanOrEqual(2);
+    expect(Math.abs((coachBox?.height ?? 0) - (receptionBox?.height ?? 0))).toBeLessThanOrEqual(2);
+  });
+
+  test("crea la cuenta y los datos adicionales del Coach desde una sola alta", async ({ page }) => {
+    let createPayload: Record<string, unknown> | null = null;
+    await bootCoaching(page, async (route, path) => {
+      if (route.request().method() === "POST" && path === "/users/internal") {
+        createPayload = route.request().postDataJSON() as Record<string, unknown>;
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({
+            ...internalCoach(),
+            id: "abababab-abab-4bab-8bab-abababababab",
+            fullName: "Ana Coach",
+            username: "ana.coach",
+            email: "ana@example.com",
+            branches: ["Norte"],
+            branchIds: [secondBranchId],
+          }),
+        });
+        return true;
+      }
+      return false;
+    }, ownerUser());
+
+    await page.goto("/users");
+    await page.getByRole("button", { name: "Crear usuario" }).first().click();
+    await page.getByLabel("Nombre").fill("Ana");
+    await page.getByLabel("Apellido paterno").fill("Coach");
+    await page.getByLabel("Email").fill("ana@example.com");
+    await page.getByLabel("Telefono").fill("5512345678");
+    await page.getByLabel("Usuario de inicio de sesion").fill("ana.coach");
+    await page.getByLabel("Contrasena temporal").fill("Temporal123!");
+    await expect(page.getByText("Información del Coach")).toBeVisible();
+    await page.getByLabel("Especialidades").fill("Fuerza, Movilidad");
+    await page.getByLabel("Biografía").fill("Entrenadora funcional.");
+    await page.getByRole("checkbox", { name: "Norte", exact: true }).check();
+    await page.getByRole("button", { name: "Crear usuario" }).last().click();
+
+    await expect.poll(() => createPayload).toMatchObject({
+      firstName: "Ana",
+      lastName: "Coach",
+      username: "ana.coach",
+      roleId: "13131313-1313-4313-8313-131313131313",
+      branchIds: [secondBranchId],
+      coachSpecialties: ["Fuerza", "Movilidad"],
+      coachBio: "Entrenadora funcional.",
+    });
+    await expect(page.getByText("Usuario y perfil de Coach creados.")).toBeVisible();
   });
 });
 
