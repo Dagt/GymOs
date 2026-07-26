@@ -5,7 +5,6 @@ public record CreateProfessionalCommand(
 		String professionalType,
 		String email,
 		String phone,
-		String bio,
-		String officeLocation
+		String bio
 ) {
 }

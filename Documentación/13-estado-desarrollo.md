@@ -25,36 +25,6 @@ Implementado e integrado en rama `feature/coaches-workouts`:
   - Exportación de reporte operativo en CSV (`/reports/coaches/workout-assignments/export`).
   - Confirmación explícita de que **las rutinas no generan ventas, pagos, comisiones ni ingresos en POS/caja**.
 
-## Cierre e Integración Unificada del Módulo de Servicios de Bienestar (Wellness) - 25 de julio de 2026
-
-Implementado y verificado en rama `feature/wellness-services`:
-
-- **Rediseño Operativo Unificado (2 Pestañas):**
-  - **Agenda & Solicitudes:** Vista de calendario interactivo con 3 modos de despliegue (`Mes`, `Semana`, `Día`), por defecto en **`Vista Mes`**. Muestra badges con conteo de citas y chips con hora y nombre del socio en cada celda del mes/semana.
-  - **Equipo Profesional:** Directorio en cuadrícula de tarjetas compactas y formulario modal de 2 columnas para alta y edición integral del especialista (datos, especialidad, honorarios $, duración de consulta, modalidad `De Planta` vs `Externo`, consultorio y matriz de horarios semanales).
-  - Se eliminaron las pestañas independientes de Catálogo de Servicios y Horarios de Atención para unificar la configuración en la ficha del profesional.
-
-- **Diferenciación de Modalidades y Confirmación Automática:**
-  - **Especialistas De Planta (`STAFF`):** Tienen un consultorio asignado y horarios fijos. Al agendarse una cita en sus bloques libres, la cita se registra en estado **`CONFIRMED` (Confirmada de origen)**.
-  - **Especialistas Externos (`EXTERNAL`):** Tienen ubicación externa. Al agendarse una cita, se registra en estado **`REQUESTED` (Solicitada)** y habilita el **Modal de Coordinación Externa** para acordar la fecha y hora definitivas antes de confirmar.
-
-- **Seguridad, Permisos y Eliminación en Cascada:**
-  - Migración **`V46__wellness_role_permissions.sql`**: Asigna `professional.manage` a Gerente y `professional.read` a Recepción.
-  - Recepción opera en modo solo lectura para el directorio (sin botones de agregar/editar/eliminar) y con permisos para agendar/coordinar/confirmar/completar citas.
-  - Endpoint **`DELETE /api/v1/professionals/{id}`**: Elimina en cascada suave (`deleted_at = NOW()`) el perfil del especialista, su servicio de consulta, su disponibilidad semanal y **todas sus citas asociadas**, limpiando inmediatamente la agenda.
-
-- **Resolución de Hallazgos y Deudas Técnicas:**
-  - [x] Corregido error SQL 500 en `/wellness/appointments` ajustando el `JOIN` a la relación `person cp` para obtener nombre completo y datos de contacto del socio.
-  - [x] Resuelta colisión de tipos TypeScript `AvailabilitySlot` mediante la creación de `WellnessAvailabilitySlot`.
-  - [x] Eliminados slots duplicados de disponibilidad mediante la purga previa por día al guardar y la deduplicación en servidor por `startsAt`.
-  - [x] Corregido desfase de zona horaria `toISOString()` por `toDateInput(new Date())` para preservar la fecha local real (Sábado 25 de Julio).
-  - [x] Herencia de la fecha seleccionada en el calendario al abrir el modal de agendamiento.
-
-- **Pendientes para Producción / Futuras Iteraciones:**
-  - [ ] **Despachador de Notificaciones para Externos:** Integración de avisos por correo/SMS/push automatizados cuando se recibe una solicitud de cita para un especialista externo.
-  - [ ] **App Móvil de Socios:** Endpoint público/cliente para que el socio consulte la disponibilidad y envíe solicitudes desde la aplicación móvil.
-  - [ ] **Liquidación de Honorarios en POS:** Permitir cobrar la consulta directamente en la caja registradora (`/pos`) al marcar la cita como completada.
-
 ## Cierre de endurecimiento operativo y UX de Inventario - 25 de julio de 2026
 
 Implementado en rama `feature/inventory-operations-hardening`:

@@ -258,9 +258,9 @@ Ejemplos:
 - sauna
 - tina fría
 - sala
-- consultorio de fisioterapia/masajes
-- cancha
-- clase de grupo
+- consultorio
+- clase
+- profesional
 
 Atributos:
 - capacity
@@ -349,31 +349,25 @@ Invariantes:
 
 El diseño completo está en `25-plan-accion-coaches-rutinas.md`.
 
-## 4.15 Professional, ProfessionalService & WellnessAppointment
+## 4.15 ProfessionalService
 
 Atributos:
 - professionalId
-- officeLocation
 - serviceType
 - duration
 - price
 - schedule
+- reservableResourceId
 
-Implementación:
-- `Professional` pertenece a organización y sucursal, tiene tipo profesional (Nutriólogo, Fisioterapeuta, Quiropráctico, Bienestar), datos de contacto, biografía, lugar o consultorio de atención (`officeLocation`) y estado.
-- `ProfessionalService` define nombre, tipo, duración en minutos, precio, moneda y estado.
-- `ProfessionalAvailability` define disponibilidad semanal por día de la semana y rango horario (`opensAt`, `closesAt`).
-- `WellnessAppointment` representa la cita de salud/bienestar entre un socio (`clientId`) y un profesional (`professionalId`) para un servicio (`serviceId`).
-  - Estados: `Requested` (Solicitada), `Confirmed` (Confirmada), `Completed` (Completada/Atendida), `Cancelled` (Cancelada), `Rejected` (Rechazada).
-  - Campos: `startsAt`, `endsAt`, `notes`, `cancellationReason`, `confirmedByUserId`, `confirmedAt`.
+Implementado en Hito 5:
+- `Professional` pertenece a organizacion y sucursal, tiene tipo profesional, contacto, biografia y estado.
+- `ProfessionalService` define nombre, tipo, duracion, precio, moneda y estado.
+- `ProfessionalAvailability` define disponibilidad semanal por dia y rango horario.
 
 Invariantes:
-- Las citas de bienestar son independientes de los recursos físicos del gimnasio (`Resource`).
-- Solo profesionales activos pueden ofrecer servicios, recibir disponibilidades o agendar citas.
-- La confirmación de una cita en estado `Requested` puede ser ejecutada por el propio profesional o por el usuario de Recepción cuando exista acuerdo telefónico u offline.
-- No pueden existir traslapes de citas activas (`Requested` o `Confirmed`) para el mismo profesional en el mismo rango de tiempo.
-- La duración del servicio debe estar entre 15 y 480 minutos.
-- La disponibilidad debe cerrar después de abrir (`closesAt > opensAt`).
+- Solo profesionales activos pueden recibir servicios o disponibilidad.
+- La duracion del servicio debe estar dentro de un rango operativo valido.
+- La disponibilidad debe cerrar despues de abrir.
 
 ## 4.16 Automation
 

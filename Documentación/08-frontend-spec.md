@@ -193,7 +193,7 @@ Widgets:
 Pantallas implementadas hasta Hito 5:
 - `/reception`: hub operativo con accesos a clientes, POS, catalogo, ventas, reportes, kiosco, inventario, reservas, accesos, coaches, bienestar, automatizaciones y dashboard.
 - `/coaches`: alta de coaches, rutinas, versiones, asignacion a clientes y metricas base.
-- `/wellness`: centro de mando de bienestar unificado en 2 pestañas: (1) Agenda & Solicitudes de Cita (calendario interactivo en vistas Mes, Semana y Día, con confirmación rápida, métricas globales de sucursal y agendamiento con búsqueda de socios); (2) Equipo Profesional (directorio de especialistas, eliminación con borrado en cascada y modal de alta/edición de 2 columnas para gestionar especialidad, honorarios, duración de consulta, modalidad De Planta vs Externo, consultorio y horarios semanales).
+- `/wellness`: alta de profesionales, servicios, disponibilidad y consulta por profesional.
 - `/automations`: reglas internas, ejecucion manual y notificaciones operativas.
 - `/dashboard`: vista del dueno por rango de fechas.
 - `/onboarding`: checklist vendible y setup piloto de organizacion, sucursal, catalogo base y kiosco.

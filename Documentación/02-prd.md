@@ -27,7 +27,7 @@ Usuario operativo principal. Debe poder registrar clientes, cobrar, renovar, ven
 Puede administrar su perfil, consultar o ampliar el catálogo de ejercicios, crear y versionar rutinas, asignarlas a socios dentro de su alcance y descargar el PDF imprimible. No registra cobros de rutinas en GymOS.
 
 ### Profesional de bienestar
-Especialista externo o interno (nutriólogo, fisioterapeuta, quiropráctico, etc.). Puede administrar sus servicios, ventanas de atención, registrar su ubicación o consultorio de atención (`office_location`) y gestionar sus citas solicitadas o agendadas.
+Puede administrar servicios, disponibilidad y citas.
 
 ### Cliente
 Actor externo contemplado desde el diseño. Puede interactuar con GymOS desde un kiosco o pantalla de autoservicio dentro del gimnasio. La app móvil o portal remoto completo no se construye en V1.
@@ -189,15 +189,14 @@ Reglas de alcance:
 - El dominio y los contratos deben quedar preparados para que una futura app consuma la versión asignada.
 - El documento rector de este módulo es `25-plan-accion-coaches-rutinas.md`.
 
-### Profesionales de bienestar y Citas
-- Profesionales independientes y de planta (Quiropráctico, Nutriólogo, Fisioterapeuta, Bienestar).
-- Configuración en un solo paso: especialidad, honorarios $, duración de consulta, modalidad (`De Planta` vs `Externo`), consultorio (`office_location`) y matriz de horarios semanales.
-- Citas de bienestar independientes de la reserva de recursos físicos del gimnasio (saunas, canchas).
-- Auto-confirmación inmediata (`CONFIRMED`) para especialistas De Planta.
-- Flujo de solicitud (`REQUESTED`) y coordinación con modal de fecha/hora acordada para especialistas Externos.
-- Confirmación de cita habilitada tanto para el profesional como para la recepción.
-- Eliminación en cascada suave de especialistas, servicios, horarios y citas activas asociadas.
-- Cobro opcional de servicios/citas vinculado a caja y POS (`sales`).
+### Profesionales de bienestar
+- Quiropráctico.
+- Nutriólogo.
+- Fisioterapeuta.
+- Servicios.
+- Agenda.
+- Reservas.
+- Cobros.
 
 ### Notificaciones
 - Correo.

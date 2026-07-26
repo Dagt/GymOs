@@ -187,9 +187,7 @@ Decisiones implementadas:
 - `coaching` gestiona coaches por organizacion y sucursal.
 - Las rutinas se modelan como `workout` con versiones publicadas en `workout_version`.
 - Las asignaciones a clientes quedan en `workout_assignment`, apuntando a una version concreta para preservar historial.
-- `wellness` gestiona profesionales independientes, lugar/consultorio de atención (`office_location`), catálogo de servicios profesionales, disponibilidad semanal y citas de bienestar (`wellness_appointment`).
-- Las citas de bienestar son independientes de los recursos físicos reservables de la sucursal (`bookings`). Operan con flujo de solicitud/confirmación (`REQUESTED` -> `CONFIRMED` -> `COMPLETED` / `CANCELLED` / `REJECTED`).
-- La confirmación de citas puede realizarse tanto por el profesional como por el usuario de Recepción cuando el acuerdo ocurra de forma telefónica u offline.
+- `wellness` gestiona profesionales, servicios, precios, duracion y disponibilidad base.
 - `notifications` funciona como cola/log interno auditable; el envio externo por correo, WhatsApp o push queda aislado para una integracion posterior.
 - `automations` gestiona reglas configurables, enable/disable y ejecucion manual; la accion inicial soportada crea notificaciones internas.
 - `reporting` expone el dashboard del dueno con metricas agregadas de ventas, clientes, membresias, reservas, inventario, coaches, profesionales, notificaciones y automatizaciones.

@@ -211,16 +211,14 @@ Alternativas: una versión en borrador no se asigna; un coach/socio fuera de alc
 se rechaza; un reemplazo conserva el histórico; un reintento devuelve el resultado
 original sin duplicar la métrica.
 
-## UC-014 Agendar o Solicitar Citas de Bienestar
+## UC-014 Reservar consulta profesional
 
-1. Seleccionar o buscar socio (`clientId`) mediante búsqueda dinámica.
-2. Seleccionar profesional especialista (se identifica si es De Planta `STAFF` con consultorio e historia semanal, o Externo `EXTERNAL`).
-3. El servicio de consulta asociado se selecciona automáticamente según la especialidad (Nutrición, Fisioterapia, Quiropráctica, Bienestar).
-4. Para profesionales De Planta: Consultar slots de disponibilidad dinámicos calculados a partir de su horario semanal y citas activas sin traslapes. La cita se registra en estado **`CONFIRMED`** de origen.
-5. Para profesionales Externos: La solicitud se registra en estado **`REQUESTED`** y habilita el Modal de Coordinación Externa para que Recepción o el profesional definan la fecha y hora finales acordadas para pasar a **`CONFIRMED`**.
-6. Al concluir la sesión, la Recepción o el especialista marcan la cita como **`COMPLETED`**.
-7. En caso de inasistencia o cancelación, se registra la cita como **`CANCELLED`** o **`REJECTED`**.
-8. Si un profesional es eliminado por el Gerente/Admin (`DELETE /professionals/{id}`), el sistema ejecuta un borrado en cascada suave de sus perfiles, horarios, servicios y todas sus citas activas.
+1. Seleccionar profesional.
+2. Seleccionar servicio.
+3. Consultar disponibilidad.
+4. Cobrar si aplica.
+5. Crear Booking.
+6. Notificar.
 
 ## UC-015 Automatización de vencimiento
 

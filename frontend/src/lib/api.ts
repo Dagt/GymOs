@@ -251,34 +251,20 @@ export type {
   CoachMetric,
 } from "./api/coaching-types";
 export {
-  cancelWellnessAppointment,
-  completeWellnessAppointment,
-  confirmWellnessAppointment,
   createProfessional,
   createProfessionalAvailability,
   createProfessionalService,
-  createWellnessAppointment,
   getProfessionalAvailability,
-  getProfessionalAvailabilitySlots,
   getProfessionalServices,
   getProfessionals,
-  getWellnessAppointments,
-  deleteProfessional,
-  updateProfessional,
-  updateProfessionalService,
 } from "./api/wellness";
 export type {
   CreateProfessionalAvailabilityPayload,
   CreateProfessionalPayload,
   CreateProfessionalServicePayload,
-  CreateWellnessAppointmentPayload,
   ProfessionalAvailability,
   ProfessionalServiceSummary,
   ProfessionalSummary,
-  UpdateProfessionalPayload,
-  UpdateProfessionalServicePayload,
-  WellnessAppointment,
-  WellnessAvailabilitySlot,
 } from "./api/wellness-types";
 export {
   createAutomation,
