@@ -1,8 +1,8 @@
 # GymOS Permissions Matrix
 
-Estado: baseline inicial Hito 7  
+Estado: VIGENTE / COBERTURA PARCIAL
 Fuente primaria: `backend/src/main/java/com/gymos/common/security/SecurityConfig.java`  
-Última revisión local: 2026-07-16
+Última revisión documental: 2026-07-26
 
 Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe mantenerse alineada con pruebas de autorización. Los endpoints públicos no sustituyen validaciones de negocio ni rate limiting.
 
@@ -104,11 +104,14 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 | GET | `/api/v1/workouts/**` | coaching | `workout.read` | Sí | Sí | No | Pendiente |
 | POST | `/api/v1/workouts/**` | coaching | `workout.manage` | Sí | Sí | Sí | `workoutAssignmentRequiresManagePermission` negativo |
 | GET | `/api/v1/reports/coaches` | coaching/reporting | `report.coaches.read` | Sí | Sí | No | Pendiente |
-| GET | `/api/v1/exercises/**` | coaching | `exercise.read` | Sí | Según origen | No | Objetivo de cierre |
-| POST/PUT/PATCH | `/api/v1/exercises/**` | coaching | `exercise.create` / `exercise.manage` | Sí | Según origen | Sí | Objetivo de cierre |
-| POST | `/api/v1/workout-assignments` | coaching | `workout.assign` | Sí | Sí | Sí | Objetivo de cierre: tenant, sucursal e idempotencia |
-| GET | `/api/v1/workout-assignments/*/pdf` | coaching | `workout.pdf.download` | Sí | Sí | Opcional | Objetivo de cierre |
-| GET | `/api/v1/reports/coaches/workout-assignments/**` | coaching/reporting | `coach.metrics.read` | Sí | Sí | No | Objetivo de cierre |
+| GET | `/api/v1/exercises/**` | coaching | `exercise.read` | Sí | Según origen | No | Implementado; negativos completos pendientes |
+| POST/PUT/PATCH | `/api/v1/exercises/**` | coaching | `exercise.create` / `exercise.manage` | Sí | Según origen | Sí | SYSTEM inmutable; matriz completa pendiente |
+| GET/PUT/POST | `/api/v1/workouts/**` | coaching | `workout.read` / `workout.manage` | Sí | Sí | Según acción | Implementado; alcance own/all pendiente |
+| GET | `/api/v1/workout-versions/**` | coaching | `workout.read` | Sí | Sí | No | Implementado con filtro de sucursal |
+| POST | `/api/v1/workout-assignments` | coaching | `workout.assign` | Sí | Sí | Sí | Implementado con idempotencia |
+| POST | `/api/v1/workout-assignments/*/replace` | coaching | `workout.assign` | Sí | Sí | Sí | Backend implementado; prueba integral pendiente |
+| GET | `/api/v1/workout-assignments/*/pdf` | coaching | `workout.pdf.download` | Sí | Sí | Opcional | PDF base implementado |
+| GET | `/api/v1/reports/coaches/workout-assignments/**` | coaching/reporting | `coach.metrics.read` | Sí | Sí | No | Implementado; comparativas pendientes |
 | GET | `/api/v1/professionals/**` | wellness | `professional.read` | Sí | Sí | No | Pendiente |
 | POST | `/api/v1/professionals/**` | wellness | `professional.manage` | Sí | Sí | Sí | `professionalCreationRequiresManagePermission` negativo |
 | GET | `/api/v1/notifications/**` | notifications | `notification.read` | Sí | No | No | Pendiente |

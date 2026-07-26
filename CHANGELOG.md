@@ -4,6 +4,9 @@ All notable changes to GymOS will be documented in this file.
 
 ## 0.7.0-pilot-readiness - Unreleased
 
+- Consolidate documentation into one canonical status file per module.
+- Add the live technical-debt register and audited branch chronology.
+- Advance Coaches and workouts editing, exercise aliases and assignment lifecycle.
 - Harden production readiness configuration.
 - Add operational runbooks for deployment, backup, restore, rollback, incidents and maintenance.
 - Restrict demo seed to the local Spring profile.

@@ -20,6 +20,7 @@ La pertenencia a `main` se determinó por ancestros de Git, no por nombres. Una 
 | 24 jul | Cierre integral de catálogo y operación por sucursal |
 | 25 jul | Integración de endurecimiento de inventarios por PR #6 |
 | 26 jul | Coaches/rutinas en rama; todavía no integrado en main |
+| 26 jul | Sanitización documental global: fichas por módulo y retiro de documentos transitorios |
 
 ## 3. Inventario de ramas remotas
 
@@ -43,3 +44,15 @@ Coaches incorporó `4a7a7d1` de Wellness mediante `f3cdf74` y después `907c530`
 3. Trabajo ajeno se integra por cherry-pick o PR propio, no por merge lateral.
 4. Todo cierre actualiza documentos 13, 28 y 29.
 5. Las ramas históricas sólo se eliminan por decisión explícita.
+
+## 6. Sanitización documental global
+
+Se consolidaron los planes, prompts, cierres y auditorías transitorias en:
+
+- `13-estado-desarrollo.md`;
+- `modulos/`, con una ficha por módulo;
+- `28-registro-vivo-deuda-tecnica.md`;
+- este documento para la historia de ramas.
+
+Los archivos residuales fueron eliminados del árbol vigente. Su contenido sigue
+disponible en el historial Git anterior a esta sanitización.

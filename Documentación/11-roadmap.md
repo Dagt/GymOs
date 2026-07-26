@@ -114,7 +114,7 @@
 
 Para Coaches y rutinas, quedan fuera de esta fase el cobro por plataforma, registro
 del efectivo del coach, comisiones y app remota del socio. El plan ejecutable es
-`25-plan-accion-coaches-rutinas.md`.
+`modulos/14-coaching.md`.
 
 ## Fase 8 — Automatizaciones y reportes
 

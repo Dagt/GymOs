@@ -20,7 +20,17 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 | GEN-002 | P1 | General/arquitectura | ABIERTA | Algunos módulos carecen de puertos de aplicación consistentes. | Fronteras documentadas y verificadas por pruebas de arquitectura. |
 | GEN-003 | P1 | General/documentación | EN_CURSO | La documentación mezclaba estado, plan y bitácora. | Documentos 13, 28, 29 y 30 adoptados y mantenidos en cada cierre. |
 | GEN-004 | P1 | General/calidad | ABIERTA | No existe suite E2E homogénea de recorridos críticos. | E2E en CI para autenticación, venta, membresía, reserva, inventario y rutina. |
+| ORG-001 | P1 | Organizaciones | ABIERTA | Cobertura incompleta de UUID ajeno, sucursales y CRUD de equipo. | Pruebas positivas/negativas por rol, tenant y sucursal. |
+| CFG-001 | P2 | Configuración | ABIERTA | Marca/logotipo no tiene ciclo completo de archivo y limpieza. | Carga, reemplazo, fallback, eliminación y pruebas. |
+| ONB-001 | P1 | Onboarding | ABIERTA | Falta demostrar idempotencia y recuperación de altas parciales. | Pruebas transaccionales y reintento seguro. |
+| CLI-001 | P1 | Socios/CRM | ABIERTA | Falta auditoría completa de PII, duplicados e importaciones fallidas. | Política de exposición y pruebas CRUD/importación/multi-sucursal. |
+| CAT-001 | P2 | Catálogo | ABIERTA | Quedan compatibilidad legacy, alto volumen y ciclo de imágenes por validar. | Retirar contratos obsoletos y aprobar pruebas de volumen/archivos. |
+| SAL-001 | P0 | Ventas/pagos | ABIERTA | Concurrencia y conciliación financiera no tienen E2E integral. | Pruebas simultáneas e invariantes venta–pago–inventario–refund. |
 | MEM-001 | P1 | Membresías | ABIERTA | Semántica de inicio, fin y duración requiere auditoría integral. | Casos de borde y pruebas con zona horaria y renovación. |
+| BEN-001 | P1 | Beneficios | ABIERTA | Elegibilidad no tiene una fuente de verdad transversal demostrada. | Política única usada por membresía, reserva y acceso con pruebas. |
+| ACC-001 | P0 | Accesos | ABIERTA | Doble consumo, reintentos y privacidad requieren pruebas. | Consumo atómico, respuestas mínimas y matriz dispositivo/tenant. |
+| SELF-001 | P0 | Autoservicio | ABIERTA | Token de terminal, rate limiting y privacidad necesitan hardening. | Threat model, límites, expiración y E2E de kiosco. |
+| BKG-001 | P1 | Reservas | ABIERTA | Falta E2E de colisiones, pagos, cancelación y otra sucursal. | Suite crítica de calendario y autorización en CI. |
 | INV-001 | P1 | Inventarios | ABIERTA | Transferencias y conteos no tienen paginación parametrizada completa. | Contratos paginados, UI y pruebas de volumen. |
 | INV-002 | P2 | Inventarios | ABIERTA | Falta indicador inequívoco de guardado por renglón en conteos. | Estado guardando/guardado/error accesible por partida. |
 | COA-001 | P1 | Coaches/rutinas | ABIERTA | Autorización amplia `workout.manage`; falta alcance propio/global. | Permisos `own/all`, filtros y pruebas negativas. |
@@ -32,6 +42,11 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 | COA-007 | P2 | Coaches/rutinas/métricas | ABIERTA | Falta comparación semanal, filtros, paginación e indicadores de acompañamiento. | KPIs definidos, periodos comparables y exportación consistente. |
 | COA-009 | P2 | Coaches/rutinas/catálogo | ABIERTA | Medios limitados a URL, sin carga ni ciclo de archivo. | Servicio, límites, fallback y limpieza documentados. |
 | WEL-001 | P1 | Wellness | ABIERTA | Avance de citas aislado en rama divergente, no validado con Coaches. | Revisar y fusionar mediante PR independiente. |
+| AUT-001 | P1 | Automatizaciones | ABIERTA | Faltan locks, reintentos e idempotencia de ejecución. | Ejecución única demostrada y telemetría por tenant. |
+| NOT-001 | P1 | Notificaciones | ABIERTA | Proveedores, preferencias, reintentos y deduplicación no están cerrados. | Entrega trazable e idempotente con privacidad. |
+| REP-001 | P1 | Reportes | ABIERTA | Filtros tenant/sucursal y definiciones KPI no están auditados uniformemente. | Contratos KPI y pruebas negativas/volumen para cada reporte. |
+| AUD-001 | P1 | Auditoría | ABIERTA | No existe matriz completa de mutaciones sensibles contra `audit_log`. | Cobertura automatizada, retención e inmutabilidad definidas. |
+| DB-001 | P0 | Datos/Flyway | ABIERTA | Falta demostrar migración desde cero y upgrade de una base real. | Pipeline de migración limpia y actualización con rollback documentado. |
 | OPS-001 | P1 | Producción | ABIERTA | Faltan observabilidad, backups restaurables y runbooks verificados. | Simulacro, alertas y procedimientos de recuperación. |
 
 ## 3. Hallazgos cerrados en este corte
@@ -46,6 +61,8 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 | COA-C06 | Coaches/API | Asignación acepta `Idempotency-Key` con compatibilidad temporal del campo en cuerpo. | Controlador y cliente web alineados. |
 | BR-C01 | Gestión de ramas | Wellness retirado del árbol final de Coaches. | Revert explícito de `4a7a7d1`. |
 
-## 4. Registros anteriores
+## 4. Historia
 
-`24-registro-hallazgos-deuda-tecnica-cierre-catalogo.md` queda como evidencia histórica. Sus pendientes vigentes fueron consolidados aquí. Desde este corte, el documento 28 es la única lista operativa.
+Los registros anteriores fueron consolidados y retirados del árbol para evitar
+fuentes paralelas. Git conserva su historia. Este documento es la única lista
+operativa.

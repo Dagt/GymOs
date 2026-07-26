@@ -1,10 +1,12 @@
 # GymOS — Documentación Maestra
 
 Versión: 0.2  
-Estado: Borrador consolidado  
+Estado: ESTRUCTURA CANÓNICA
 Fecha base: 26 de julio de 2026
 
-GymOS es una plataforma web modular para la administración integral de gimnasios y centros de bienestar. Esta carpeta reúne la especificación funcional y técnica definida durante el levantamiento inicial del producto y los planes de cierre por módulo.
+GymOS es una plataforma web modular para la administración integral de gimnasios
+y centros de bienestar. Esta carpeta separa especificación, estado, deuda y
+documentación por módulo.
 
 ## Documentos
 
@@ -20,22 +22,23 @@ GymOS es una plataforma web modular para la administración integral de gimnasio
 10. `10-ai-development.md` — Estrategia de desarrollo asistido por IA y prompts maestros.
 11. `11-roadmap.md` — Orden de implementación, épicas y entregables.
 12. `12-decisiones-fundacionales.md` — Decisiones confirmadas sobre producto vendible, multi-organización, sucursales, primer hito, seguridad, pagos e infraestructura local.
-13. `13-estado-desarrollo.md` — fotografía canónica y vigente del estado por módulo.
-14. `14-plan-accion-catalogo-inventario.md` y documentos posteriores — planes y cierres técnicos por módulo.
-25. `25-plan-accion-coaches-rutinas.md` — alcance definitivo, dominio, catálogo de ejercicios, métricas, PDF, API, frontend y fases para concluir Coaches y rutinas.
-26. `26-prompt-maestro-implementacion-coaches-rutinas.md` — instrucciones de implementación y validación de la rama `feature/coaches-workouts`.
-26A. `26-ajustes-transversales-coaches-rutinas.md` — correcciones de alcance y precedencia sobre PRD, dominio, datos, API, casos de uso, frontend y roadmap.
-27. `27-implementacion-coaches-rutinas.md` — avance real, matriz de estado y backlog priorizado para completar catálogo, constructor, asignaciones, seguridad, métricas y PDF.
-28. `28-registro-vivo-deuda-tecnica.md` — lista única y obligatoria de hallazgos y deuda activa/cerrada.
-29. `29-cronologia-ramas.md` — cronología Git, ramas integradas, activas y divergentes.
-30. `30-bitacora-historica-desarrollo.md` — archivo histórico detallado; no representa el estado vigente.
+13. `13-estado-desarrollo.md` — resumen canónico vigente de la plataforma.
+14. `modulos/` — un documento de estado por cada módulo backend.
+15. `28-registro-vivo-deuda-tecnica.md` — lista única de hallazgos y deuda.
+16. `29-cronologia-ramas.md` — cronología Git y ramas activas/divergentes.
+
+Documentación operativa y de seguridad vigente:
+
+- `../docs/operations/` — despliegue, rollback, backup, restore, incidentes y soporte.
+- `../docs/security/` — permisos y verificación multi-tenant.
 
 ### Regla de mantenimiento documental
 
-Todo cambio material debe reconciliar en el mismo commit el estado del documento
-13, la deuda del documento 28 y, cuando cambie la integración, la cronología del
-documento 29. Los planes describen el objetivo; el documento 13 describe el código
-verificado. El documento 30 sólo conserva historia.
+Todo cambio material debe actualizar en el mismo commit la ficha correspondiente
+en `modulos/`, el resumen 13 y la deuda 28. Si cambia la integración de ramas,
+también debe actualizar el documento 29. No deben crearse prompts, planes de
+acción, cierres ni bitácoras nuevas como fuentes paralelas: Git conserva el
+historial.
 
 ## Alcance de la versión 1
 

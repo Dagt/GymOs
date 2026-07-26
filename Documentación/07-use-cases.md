@@ -616,4 +616,6 @@ Reglas:
 
 ## Anexo Hito 3.5 final
 
-Ver `Documentación/07-use-cases-hito-3-5-final.md` para la definicion vigente de verificacion segura de kiosco, idempotencia por hash de solicitud y eventos por modulo propietario.
+La verificación segura de kiosco, la idempotencia por hash y los eventos por
+módulo propietario forman parte de este contrato y del estado en
+`modulos/11-selfservice.md`.

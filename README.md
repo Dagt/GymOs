@@ -8,6 +8,9 @@ GymOS es una plataforma modular para la operacion integral de gimnasios y centro
 - `frontend/`: aplicacion web Next.js, React, TypeScript y Tailwind CSS.
 - `infra/`: Docker Compose local, reverse proxy example y observabilidad base.
 - `Documentación/`: documentacion maestra del producto y arquitectura.
+- `Documentación/modulos/`: estado funcional, evidencia y pendientes de cada módulo.
+- `Documentación/28-registro-vivo-deuda-tecnica.md`: registro único de deuda técnica.
+- `Documentación/29-cronologia-ramas.md`: estado y cronología de ramas.
 - `docs/operations/`: runbooks de despliegue, backup, restore, incidentes y mantenimiento.
 - `scripts/`: utilidades operativas locales.
 
@@ -82,4 +85,5 @@ docker compose -f infra/docker-compose.yml build
 - Desarrollo: ramas `feature/*`.
 - Commits: convencionales, por ejemplo `feat: add client registration`.
 - No hacer push directo a `main` en operacion real; usar PR con CI verde.
-- Cada hito debe incluir pruebas, migraciones, OpenAPI y documentacion actualizada.
+- Cada cambio debe actualizar la ficha de su módulo y, cuando corresponda, el
+  estado general, la deuda técnica y la cronología de ramas.

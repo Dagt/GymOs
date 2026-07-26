@@ -187,7 +187,7 @@ Reglas de alcance:
 - Las métricas miden involucramiento operativo, no ingresos ni comisiones.
 - La aplicación móvil o portal remoto para que el socio consulte su rutina queda fuera de V1.
 - El dominio y los contratos deben quedar preparados para que una futura app consuma la versión asignada.
-- El documento rector de este módulo es `25-plan-accion-coaches-rutinas.md`.
+- El alcance y estado rector del módulo está en `modulos/14-coaching.md`.
 
 ### Profesionales de bienestar
 - Quiropráctico.

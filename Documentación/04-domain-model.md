@@ -347,7 +347,7 @@ Invariantes:
 - Reintentar la misma asignación no duplica registros ni métricas.
 - Crear, publicar, asignar o imprimir una rutina no crea ventas, pagos, comisiones, ingresos ni movimientos de caja.
 
-El diseño completo está en `25-plan-accion-coaches-rutinas.md`.
+El diseño y estado completo está en `modulos/14-coaching.md`.
 
 ## 4.15 ProfessionalService
 
