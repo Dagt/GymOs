@@ -46,7 +46,7 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 | POST | `/api/v1/clients/imports` | clients | `client.import` | Sí | Opcional | Sí | `clientImportRequiresImportPermission` negativo |
 | POST | `/api/v1/clients/*/benefits` | benefits | `client.benefit.assign` | Sí | Según cliente | Sí | `clientBenefitAssignmentRequiresAssignPermission` negativo |
 | POST | `/api/v1/client-benefits/*/verify` | benefits | `client.benefit.verify` | Sí | Según beneficio | Sí | `clientBenefitVerificationRequiresVerifyPermission` negativo |
-| GET | `/api/v1/clients/*/workouts` | coaching | `workout.read` | Sí | Según cliente | No | Pendiente |
+| GET | `/api/v1/clients/*/workouts` | coaching | `workout.read.own/all` | Sí | Sí; coach propio | No | `CoachingServiceSecurityTests` |
 
 ## Catálogo, beneficios y membresías
 
@@ -101,17 +101,18 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/coaches/**` | coaching | `coach.read` | Sí | Sí | No | Pendiente |
 | POST | `/api/v1/coaches/**` | coaching | `coach.manage` | Sí | Sí | Sí | `coachCreationRequiresManagePermission` negativo |
-| GET | `/api/v1/workouts/**` | coaching | `workout.read` | Sí | Sí | No | Pendiente |
-| POST | `/api/v1/workouts/**` | coaching | `workout.manage` | Sí | Sí | Sí | `workoutAssignmentRequiresManagePermission` negativo |
+| GET | `/api/v1/workouts/**` | coaching | `workout.read.own/all` | Sí | Sí; coach propio/global | No | `CoachingServiceSecurityTests`; permiso legacy negativo |
+| POST/PUT | `/api/v1/workouts/**` | coaching | `workout.manage.own/all` | Sí | Sí; coach propio/global | Sí | `CoachingServiceSecurityTests`; `workoutAssignmentRequiresManagePermission` |
 | GET | `/api/v1/reports/coaches` | coaching/reporting | `report.coaches.read` | Sí | Sí | No | Pendiente |
 | GET | `/api/v1/exercises/**` | coaching | `exercise.read` | Sí | Según origen | No | Implementado; negativos completos pendientes |
-| POST/PUT/PATCH | `/api/v1/exercises/**` | coaching | `exercise.create` / `exercise.manage` | Sí | Según origen | Sí | SYSTEM inmutable; matriz completa pendiente |
-| GET/PUT/POST | `/api/v1/workouts/**` | coaching | `workout.read` / `workout.manage` | Sí | Sí | Según acción | Implementado; alcance own/all pendiente |
-| GET | `/api/v1/workout-versions/**` | coaching | `workout.read` | Sí | Sí | No | Implementado con filtro de sucursal |
+| POST/PUT/DELETE | `/api/v1/exercises/**` | coaching | `exercise.create` / `exercise.manage` | Sí | Propio/organización | Sí | SYSTEM inmutable, propiedad y medios probados |
+| PATCH | `/api/v1/exercises/**` | coaching | `exercise.manage` | Sí | Organización | Sí | `exerciseMutationRequiresCreateOrManagePermission` |
+| GET | `/api/v1/workout-versions/**` | coaching | `workout.read.own/all` | Sí | Sí; coach propio/global | No | Filtro de sucursal y propiedad |
 | POST | `/api/v1/workout-assignments` | coaching | `workout.assign` | Sí | Sí | Sí | Implementado con idempotencia |
-| POST | `/api/v1/workout-assignments/*/replace` | coaching | `workout.assign` | Sí | Sí | Sí | Backend implementado; prueba integral pendiente |
-| GET | `/api/v1/workout-assignments/*/pdf` | coaching | `workout.pdf.download` | Sí | Sí | Opcional | PDF base implementado |
-| GET | `/api/v1/reports/coaches/workout-assignments/**` | coaching/reporting | `coach.metrics.read` | Sí | Sí | No | Implementado; comparativas pendientes |
+| PATCH | `/api/v1/workout-assignments/**` | coaching | `workout.assign` | Sí | Sí; coach propio/global | Sí | Motivo obligatorio y negativo de permiso |
+| POST | `/api/v1/workout-assignments/*/replace` | coaching | `workout.assign` | Sí | Sí; coach propio/global | Sí | E2E de reemplazo e idempotencia |
+| GET | `/api/v1/workout-assignments/*/pdf` | coaching | `workout.pdf.download` | Sí | Sí; coach propio/global | No | PDFBox y filtro de propiedad |
+| GET | `/api/v1/reports/coaches/workout-assignments/**` | coaching/reporting | `coach.metrics.read` | Sí | Sí; coach propio/global | No | Comparación, filtro, paginación y E2E |
 | GET | `/api/v1/professionals/**` | wellness | `professional.read` | Sí | Sí | No | Pendiente |
 | POST | `/api/v1/professionals/**` | wellness | `professional.manage` | Sí | Sí | Sí | `professionalCreationRequiresManagePermission` negativo |
 | GET | `/api/v1/notifications/**` | notifications | `notification.read` | Sí | No | No | Pendiente |

@@ -2,7 +2,8 @@
 
 Estado: FUENTE CANÓNICA / EN PROGRESO
 Corte: 26 de julio de 2026
-Código auditado: `feature/coaches-workouts`, posterior a `907c530` y a la separación de los cambios de Wellness.
+Código auditado: `feature/coaches-workouts` en `84a5fd3`, posterior a la
+separación de los cambios de Wellness.
 
 ## 1. Cómo interpretar este documento
 
@@ -32,7 +33,7 @@ Ningún módulo se declara “completo” sólo por el nombre de una rama o comm
 | [Membresías](modulos/08-memberships.md) y [kiosco](modulos/11-selfservice.md) | FUNCIONAL | Alta, renovación, cambio de plan y autoservicio | Revisar semántica de fechas y seguridad de sesión |
 | [Reservas y recursos](modulos/12-bookings.md) | FUNCIONAL | Calendario, disponibilidad, restricciones por plan y recepción | Suite E2E y deuda UX residual |
 | [Inventarios](modulos/13-inventory.md) | ESTABILIZADO | Existencias, transferencias, conteos, valuación y movimientos | Paginación parametrizada y feedback por renglón |
-| [Coaches y rutinas](modulos/14-coaching.md) | PARCIAL | Catálogo amplio, constructor, versiones, publicación, asignación, métricas, CSV y PDF base | Autorización fina, UX avanzada, PDF final y E2E |
+| [Coaches y rutinas](modulos/14-coaching.md) | ESTABILIZADO | Catálogo/medios, constructor estructurado, versiones, asignaciones trazables, métricas comparables, CSV, PDF A4 y E2E | Riesgos transversales `DB-001` y `OPS-001` |
 | [Wellness/profesionales](modulos/15-wellness.md) | PARCIAL en `main` | Base histórica de profesionales, servicios y disponibilidad | Agenda aislada en rama propia |
 | [Reportes generales](modulos/18-reporting.md) | PARCIAL | Reportes operativos por dominio | Definiciones KPI y cobertura homogénea |
 | [Producción/piloto](modulos/20-common-operations.md) | PLANIFICADO | Configuración y runbooks base | Observabilidad, backups, seguridad y piloto |
@@ -49,21 +50,25 @@ El módulo permite:
 - duplicar rutinas;
 - asignar una versión publicada a un socio con idempotencia;
 - completar, cancelar o reemplazar asignaciones conservando trazabilidad;
-- consultar métricas y detalle por periodo;
-- exportar CSV y descargar un PDF básico por asignación.
+- exigir motivo de cancelación y mostrar el vínculo de reemplazo;
+- consultar métricas paginadas por periodo, coach y socio, comparadas contra el
+  periodo anterior;
+- exportar CSV y descargar un PDF A4 con identidad del gimnasio;
+- cargar y administrar medios de ejercicios;
+- separar alcance propio de coach y alcance global de dueño/gerencia.
 
-No se considera cerrado porque faltan autorización `own/all`, administración
-completa del catálogo desde frontend, constructor avanzado, comparación semanal,
-PDF final, OpenAPI y pruebas E2E. El desglose está en `modulos/14-coaching.md`.
+El alcance funcional V1 está cerrado y estabilizado en `84a5fd3`. Los hallazgos
+específicos `COA-001` a `COA-007` y `COA-009` pasaron al historial resuelto del
+documento 28.
 
 ## 4. Verificación del corte
 
 Validación ejecutada sobre el árbol saneado:
 
-- backend: `gradlew test`, exitoso;
-- backend después del soporte `Idempotency-Key`: `gradlew compileJava`, exitoso;
-- frontend: 28 pruebas, typecheck, lint y build de producción, exitosos;
-- E2E específico de Coaches: pendiente (`COA-005`);
+- backend: `gradlew clean test --no-daemon`, exitoso;
+- frontend: 31 pruebas, typecheck, lint y build de producción, exitosos;
+- E2E específico de Coaches: 3 recorridos Playwright exitosos;
+- cobertura dedicada: propiedad `own/all`, permisos HTTP, métricas, PDF y medios;
 - comprobación de whitespace Git: exitosa.
 
 Al finalizar cada iteración se debe registrar aquí el commit auditado, suites

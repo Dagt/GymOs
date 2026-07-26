@@ -1,52 +1,90 @@
 # Coaches, ejercicios y rutinas
 
-Estado: `PARCIAL`
-Rama activa: `feature/coaches-workouts`
+Estado: `ESTABILIZADO`
+Rama de cierre: `feature/coaches-workouts`
+Código verificado: `84a5fd3`
+Corte: 26 de julio de 2026
 
-## Propósito
+## Propósito y alcance V1
 
-Permitir que coaches creen y asignen rutinas; el gimnasio mide acompañamiento y
-desempeño. No se cobran rutinas dentro de GymOS. La futura app del socio queda
-fuera del alcance actual.
+GymOS permite que cada coach cree, publique, asigne e imprima rutinas, mientras
+dueño y gerencia miden el acompañamiento a socios. La plataforma no cobra estas
+rutinas, no registra comisiones y no genera ventas, pagos ni movimientos de caja.
+La consulta remota por el socio pertenece a una aplicación futura.
 
-## Implementado
+## Implementación vigente
 
-- coaches por sucursal;
-- catálogo SYSTEM y propio con más de 60 ejercicios;
-- búsqueda por nombre, alias, músculo, equipo y tipo;
-- alta, edición y alias de ejercicios propios; SYSTEM es inmutable;
-- rutinas con sesiones, bloques, ejercicios y prescripción estructurada;
-- borrador editable, publicación, duplicado e historial de versiones;
-- asignación idempotente de versiones publicadas;
-- completar, cancelar y reemplazar asignaciones en backend;
-- métricas por periodo/coach/socio y exportación CSV;
-- PDF básico reproducible desde la versión asignada;
-- constructor, edición, catálogo, asignación y métricas en `/coaches`.
+### Catálogo de ejercicios
 
-## Invariantes
+- catálogo SYSTEM inmutable con más de 60 ejercicios;
+- búsqueda paginada por nombre, alias, músculo, equipo y tipo;
+- ejercicios propios de organización o coach con descripción, instrucciones,
+  músculos, patrón, equipo, nivel, lateralidad y advertencias;
+- alta y edición por propietario, archivo administrativo y prevención de
+  duplicados por nombre o alias normalizado;
+- consulta, alta y eliminación de aliases;
+- carga, lectura, reemplazo y eliminación de JPG, PNG, WebP, GIF o MP4 de hasta
+  8 MB mediante almacenamiento de objetos;
+- limpieza del archivo sustituido y compensación si falla la persistencia.
 
-- una asignación apunta a una versión publicada e inmutable;
-- editar una rutina no modifica asignaciones históricas;
-- los ejercicios SYSTEM son de sólo lectura;
-- no existe integración con POS, caja, ventas o comisiones;
-- toda lectura/escritura respeta organización y sucursal.
+### Constructor y versiones
 
-## Pendiente prioritario
+- biblioteca de rutinas propias o globales según permiso;
+- sesiones y bloques múltiples reordenables con controles accesibles;
+- ejercicios libres o seleccionados del catálogo;
+- series, repeticiones, carga, descanso, tempo, duración, distancia,
+  agrupación, opcionalidad, notas y prescripción libre;
+- guardado del borrador vigente sin producir versiones artificiales;
+- publicación inmutable, duplicado e historial de versiones;
+- persistencia estructurada en sesiones, bloques y ejercicios, conservando
+  `content_json` como instantánea compatible.
 
-- permisos propios/globales (`COA-001`);
-- edición/archivo y consulta/eliminación de alias en UI (`COA-002`);
-- CRUD y reordenamiento accesible de bloques (`COA-003`);
-- UX de reemplazo y motivos (`COA-004`);
-- pruebas dedicadas y E2E (`COA-005`);
-- PDF final con identidad y QA (`COA-006`);
-- comparación semanal y filtros avanzados (`COA-007`);
-- carga de medios (`COA-009`).
+### Asignaciones e impresión
 
-## Criterio de cierre
+- sólo se asignan versiones publicadas a socios activos;
+- `Idempotency-Key` evita duplicados y detecta reutilización con otro payload;
+- estados activa, completada, cancelada y reemplazada;
+- cancelación con motivo obligatorio y auditoría;
+- reemplazo idempotente que conserva y muestra el vínculo histórico;
+- notas privadas separadas de indicaciones imprimibles;
+- PDF A4 reproducible desde la versión asignada, con color, logotipo seguro o
+  inicial, gimnasio, sucursal, teléfono, socio, coach, vigencia, sesiones,
+  bloques, prescripción y saltos de página.
 
-Coach crea/edita/publica/asigna/imprime; dueño compara semanas y socios; gerente
-queda limitado a sucursales; las asignaciones históricas son inmutables; E2E y
-PDF quedan validados.
+### Métricas
 
-Última validación: backend completo; frontend 28 pruebas, typecheck, lint y build,
-26-jul-2026.
+- asignaciones y socios únicos por periodo, coach y socio;
+- coaches activos, coaches sin actividad y primeras rutinas;
+- comparación automática contra un periodo anterior de igual duración;
+- detalle paginado y filtros visibles por fechas y coach;
+- CSV completo y acotado a 10,000 filas para evitar exportaciones accidentales
+  sin filtro;
+- alcance propio para coach y global de sucursal para dueño/gerencia.
+
+## Seguridad e invariantes
+
+- `workout.read.own|all` y `workout.manage.own|all` separan propiedad de alcance
+  global;
+- el perfil de coach se vincula a `user_account_id`; un coach no puede crear,
+  leer, modificar, asignar, reemplazar ni imprimir rutinas de otro coach;
+- organización y sucursal se filtran en servicio y repositorio;
+- los ejercicios SYSTEM son de sólo lectura y un coach sólo modifica los que
+  creó;
+- editar una rutina nunca cambia el contenido de una asignación histórica;
+- `REPLACED` sólo surge del flujo de reemplazo, no de un cambio manual de estado.
+
+## Evidencia de cierre
+
+- backend: `gradlew clean test --no-daemon`, exitoso;
+- frontend: 31 pruebas, typecheck, lint y build de producción, exitosos;
+- E2E Playwright: 3 recorridos exitosos para constructor/publicación,
+  catálogo/aliases/medios y cancelación/reemplazo/métricas;
+- pruebas dedicadas de propiedad, permisos HTTP, comparación de periodos,
+  PDF y ciclo de medios;
+- `git diff --check`, exitoso.
+
+Los antiguos `COA-001` a `COA-007` y `COA-009` quedaron resueltos en
+`84a5fd3` y se conservan en la sección de cerradas del documento 28. Los riesgos
+transversales de despliegue, migración PostgreSQL real, observabilidad y
+almacenamiento se siguen administrando como `DB-001` y `OPS-001`; no son
+funcionalidad pendiente específica de Coaches.

@@ -347,26 +347,24 @@ Formularios:
 
 ## Coaches y rutinas
 
-La pantalla actual `/coaches` con textarea JSON es un prototipo operativo, no la
-experiencia final.
+La pantalla implementada `/coaches` concentra cuatro pestañas operativas para
+evitar perder contexto: Constructor, Ejercicios, Asignaciones y Métricas.
 
-La solución objetivo separa:
-
-- `/coaches`: equipo, perfiles, sucursales, estado y desempeño;
-- `/exercises`: catálogo paginado, filtros, aliases, creación rápida y archivado;
-- `/workouts`: biblioteca de borradores/publicadas, duplicado y versionado;
-- `/workouts/new` y `/workouts/{id}/edit`: constructor visual por sesiones,
-  bloques y ejercicios reordenables;
-- `/workout-assignments`: asignación, historial, reemplazo, estado y PDF;
-- dashboard de dueño/gerencia: semana actual/anterior, tendencia, socios únicos,
-  primeras rutinas, reasignaciones y coaches sin actividad.
+- Constructor: biblioteca, alta/edición/duplicado/publicación, sesiones, bloques
+  y ejercicios reordenables con controles de subir/bajar/eliminar.
+- Ejercicios: búsqueda, alta, edición propia, archivo administrativo, aliases y
+  carga/eliminación de imagen o video.
+- Asignaciones: búsqueda de socio, versión publicada, vigencia, notas privadas e
+  imprimibles, historial, PDF, completar, cancelar con motivo y reemplazar.
+- Métricas: fechas, coach, periodo anterior comparable, KPIs, tabla por coach,
+  historial paginado y CSV.
 
 El constructor combina campos estructurados con prescripción libre y representa
 `3x20`, `3x12, 10, 8 subiendo`, `3x24 pasos`, `3 series`, alternativas `VS`,
 opcionales y notas narrativas. Crear un ejercicio inline no pierde el borrador. El
-reordenamiento tiene alternativa accesible al arrastrar y soltar.
+reordenamiento usa botones accesibles además de puntero.
 
-La vista previa de PDF muestra marca, socio, coach, sesiones, prescripción,
-indicaciones e imágenes opcionales de movilidad/estiramiento. El archivo final se
+El PDF descargable muestra marca o inicial de respaldo, socio, coach, sucursal,
+vigencia, sesiones, bloques, prescripción e indicaciones. El archivo final se
 descarga desde la asignación. La UI nunca muestra precio, cobro, comisión ni POS
 para rutinas; el socio no tiene vista remota en V1.

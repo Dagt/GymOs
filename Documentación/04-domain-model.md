@@ -345,6 +345,10 @@ Invariantes:
 - Solo socios activos de la misma organización y dentro del alcance de sucursal pueden recibir rutinas.
 - Un coach inactivo no crea nuevas asignaciones; su histórico permanece.
 - Reintentar la misma asignación no duplica registros ni métricas.
+- Cancelar exige motivo; reemplazar crea una asignación nueva y enlaza la
+  anterior sin destruir su versión ni contenido.
+- Un coach sólo administra su perfil; dueño y gerencia pueden operar el alcance
+  global de la sucursal.
 - Crear, publicar, asignar o imprimir una rutina no crea ventas, pagos, comisiones, ingresos ni movimientos de caja.
 
 El diseño y estado completo está en `modulos/14-coaching.md`.

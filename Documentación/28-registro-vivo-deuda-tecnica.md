@@ -18,7 +18,6 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 | GEN-001 | P0 | General/seguridad | ABIERTA | La autorización no aplica uniformemente propiedad, sucursal y organización. | Matriz automatizada positiva/negativa para módulos sensibles. |
 | AUTH-001 | P0 | Identidad | ABIERTA | El refresh token requiere revisar almacenamiento y exposición en cliente. | Mecanismo seguro, rotación y pruebas de reutilización. |
 | GEN-002 | P1 | General/arquitectura | ABIERTA | Algunos módulos carecen de puertos de aplicación consistentes. | Fronteras documentadas y verificadas por pruebas de arquitectura. |
-| GEN-003 | P1 | General/documentación | EN_CURSO | La documentación mezclaba estado, plan y bitácora. | Documentos 13, 28, 29 y 30 adoptados y mantenidos en cada cierre. |
 | GEN-004 | P1 | General/calidad | ABIERTA | No existe suite E2E homogénea de recorridos críticos. | E2E en CI para autenticación, venta, membresía, reserva, inventario y rutina. |
 | ORG-001 | P1 | Organizaciones | ABIERTA | Cobertura incompleta de UUID ajeno, sucursales y CRUD de equipo. | Pruebas positivas/negativas por rol, tenant y sucursal. |
 | CFG-001 | P2 | Configuración | ABIERTA | Marca/logotipo no tiene ciclo completo de archivo y limpieza. | Carga, reemplazo, fallback, eliminación y pruebas. |
@@ -33,14 +32,6 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 | BKG-001 | P1 | Reservas | ABIERTA | Falta E2E de colisiones, pagos, cancelación y otra sucursal. | Suite crítica de calendario y autorización en CI. |
 | INV-001 | P1 | Inventarios | ABIERTA | Transferencias y conteos no tienen paginación parametrizada completa. | Contratos paginados, UI y pruebas de volumen. |
 | INV-002 | P2 | Inventarios | ABIERTA | Falta indicador inequívoco de guardado por renglón en conteos. | Estado guardando/guardado/error accesible por partida. |
-| COA-001 | P1 | Coaches/rutinas | ABIERTA | Autorización amplia `workout.manage`; falta alcance propio/global. | Permisos `own/all`, filtros y pruebas negativas. |
-| COA-002 | P1 | Coaches/rutinas | ABIERTA | Administración de ejercicios y alias incompleta en frontend. | Editar, archivar y gestionar alias con duplicidad visible. |
-| COA-003 | P1 | Coaches/rutinas | ABIERTA | Constructor sin reordenamiento accesible ni CRUD completo de bloques. | CRUD/reordenamiento con teclado y puntero. |
-| COA-004 | P1 | Coaches/rutinas | ABIERTA | Reemplazo existe en backend, pero falta UX y cobertura integral. | Acción UI, confirmación, vínculo visible y pruebas transaccionales. |
-| COA-005 | P1 | Coaches/rutinas | ABIERTA | Contratos nuevos carecen de cobertura dedicada suficiente. | Pruebas de servicio/controlador/repositorio y aislamiento tenant/sucursal. |
-| COA-006 | P1 | Coaches/rutinas/PDF | ABIERTA | PDF base sin identidad visual, tablas, imágenes ni QA de impresión. | Plantilla A4 aprobada, datos del gimnasio, saltos y pruebas de render. |
-| COA-007 | P2 | Coaches/rutinas/métricas | ABIERTA | Falta comparación semanal, filtros, paginación e indicadores de acompañamiento. | KPIs definidos, periodos comparables y exportación consistente. |
-| COA-009 | P2 | Coaches/rutinas/catálogo | ABIERTA | Medios limitados a URL, sin carga ni ciclo de archivo. | Servicio, límites, fallback y limpieza documentados. |
 | WEL-001 | P1 | Wellness | ABIERTA | Avance de citas aislado en rama divergente, no validado con Coaches. | Revisar y fusionar mediante PR independiente. |
 | AUT-001 | P1 | Automatizaciones | ABIERTA | Faltan locks, reintentos e idempotencia de ejecución. | Ejecución única demostrada y telemetría por tenant. |
 | NOT-001 | P1 | Notificaciones | ABIERTA | Proveedores, preferencias, reintentos y deduplicación no están cerrados. | Entrega trazable e idempotente con privacidad. |
@@ -59,6 +50,15 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 | COA-C04 | Coaches/versiones | La edición reutiliza el borrador vigente. | Actualización transaccional y reconstrucción de estructura. |
 | COA-C05 | Coaches/seguridad | Detalle de versión limitado por sucursal. | Consulta enlazada con `workout.branch_id`. |
 | COA-C06 | Coaches/API | Asignación acepta `Idempotency-Key` con compatibilidad temporal del campo en cuerpo. | Controlador y cliente web alineados. |
+| COA-001 | Coaches/seguridad | Incorporados permisos y filtros `workout.*.own/all` por usuario, organización y sucursal. | `84a5fd3`; pruebas `CoachingServiceSecurityTests` y `SecurityAuthorizationTests`. |
+| COA-002 | Coaches/catálogo | UI permite editar/archivar ejercicios administrables y consultar/agregar/eliminar aliases. | `84a5fd3`; E2E de catálogo y aliases. |
+| COA-003 | Coaches/constructor | Sesiones, bloques y ejercicios tienen CRUD, ordenamiento accesible y prescripción completa. | `84a5fd3`; pruebas del constructor y E2E de publicación. |
+| COA-004 | Coaches/asignaciones | Cancelación exige motivo; reemplazo conserva vínculo, historial e idempotencia y tiene UX completa. | `84a5fd3`; E2E de cancelación y reemplazo. |
+| COA-005 | Coaches/calidad | Añadida cobertura dedicada de servicio, seguridad HTTP, PDF, medios, helpers y tres E2E. | `84a5fd3`; suites backend y frontend exitosas. |
+| COA-006 | Coaches/PDF | PDF A4 usa identidad del gimnasio, logotipo seguro/fallback, ficha estructurada y saltos de página. | `84a5fd3`; extracción y aserciones PDFBox. |
+| COA-007 | Coaches/métricas | Periodos comparables, filtros coach/socio, detalle paginado, KPIs y CSV acotado. | `84a5fd3`; pruebas de comparación y E2E de filtro. |
+| COA-009 | Coaches/catálogo | Ciclo de medios implementado con tipos/tamaño permitidos, reemplazo, eliminación y compensación. | `84a5fd3`; `CoachingExerciseMediaServiceTests`. |
+| GEN-003 | General/documentación | Estado, deuda, ramas y fichas modulares consolidados; se retiraron fuentes transitorias paralelas. | Documentos 13, 28, 29 y `modulos/` vigentes al corte. |
 | BR-C01 | Gestión de ramas | Wellness retirado del árbol final de Coaches. | Revert explícito de `4a7a7d1`. |
 
 ## 4. Historia

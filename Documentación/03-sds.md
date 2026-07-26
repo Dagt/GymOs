@@ -191,11 +191,13 @@ Decisiones implementadas:
 - `notifications` funciona como cola/log interno auditable; el envio externo por correo, WhatsApp o push queda aislado para una integracion posterior.
 - `automations` gestiona reglas configurables, enable/disable y ejecucion manual; la accion inicial soportada crea notificaciones internas.
 - `reporting` expone el dashboard del dueno con metricas agregadas de ventas, clientes, membresias, reservas, inventario, coaches, profesionales, notificaciones y automatizaciones.
-- Los endpoints internos usan permisos `coach.read`, `coach.manage`, `workout.read`, `workout.manage` y `report.coaches.read`.
+- Los endpoints internos de rutinas usan `workout.read.own|all` y
+  `workout.manage.own|all`; asignación, PDF y métricas usan respectivamente
+  `workout.assign`, `workout.pdf.download` y `coach.metrics.read`.
 - Permisos adicionales: `professional.read`, `professional.manage`, `notification.read`, `notification.manage`, `automation.read`, `automation.manage` y `report.owner.read`.
 - Las pantallas `/coaches`, `/wellness`, `/automations` y `/dashboard` completan el primer paquete vendible de servicios avanzados.
 
-Objetivo de cierre de `coaching`:
+Diseño implementado para el cierre de `coaching` (`84a5fd3`):
 
 - vincular el perfil de coach con la identidad interna y modelar alcance multi-sucursal;
 - incorporar catálogo normalizado, paginado y extensible de ejercicios;
@@ -203,7 +205,8 @@ Objetivo de cierre de `coaching`:
 - publicar versiones inmutables y asignarlas con transacción e idempotencia;
 - generar PDF desde la versión asignada;
 - proyectar métricas semanales por coach, socio y sucursal en la zona horaria de negocio;
-- preparar contratos de lectura para una futura app del socio, fuera de V1.
+- mantener la futura app del socio fuera de V1, sin exponer todavía sus
+  contratos remotos.
 
 `coaching` no depende de `sales`, `payments` ni POS. Los cobros privados entre coach
 y socio son externos y no se persisten en GymOS.

@@ -401,19 +401,22 @@ Contratos base de Hito 5:
 
 Nota implementada Hito 5:
 - `GET /coaches` y `POST /coaches` operan por organizacion y sucursal activa.
-- `POST /workouts` crea la rutina y su primera version publicada.
-- `POST /workouts/{id}/versions` agrega una nueva version publicada sin modificar asignaciones historicas.
+- `POST /workouts` crea la rutina y su primer borrador.
+- `POST /workouts/{id}/versions` agrega un borrador; publicar lo vuelve
+  inmutable sin modificar asignaciones históricas.
 - `POST /workouts/{id}/assign` asigna una version concreta o la ultima version publicada a un cliente activo.
 - `GET /reports/coaches` devuelve conteos base: coaches, rutinas, asignaciones activas y asignaciones de ultimos 30 dias.
 
-Contratos objetivo de cierre:
+Contratos implementados en el cierre `84a5fd3`:
 
 - `GET|POST /exercises`
 - `GET|PUT /exercises/{exerciseId}`
 - `PATCH /exercises/{exerciseId}/status`
-- `POST /exercises/{exerciseId}/aliases`
+- `GET|POST|DELETE /exercises/{exerciseId}/aliases`
+- `GET|POST|DELETE /exercises/{exerciseId}/media`
 - `GET|POST /workouts`
 - `GET|PUT /workouts/{workoutId}`
+- `POST /workouts/{workoutId}/assign`
 - `POST /workouts/{workoutId}/duplicate`
 - `POST /workouts/{workoutId}/publish`
 - `GET /workouts/{workoutId}/versions`
@@ -424,18 +427,25 @@ Contratos objetivo de cierre:
 - `PATCH /workout-assignments/{assignmentId}/status`
 - `GET /workout-assignments/{assignmentId}/pdf`
 - `GET /reports/coaches/workout-assignments/summary`
-- `GET /reports/coaches/workout-assignments/detail`
 - `GET /reports/coaches/workout-assignments/export`
 
-Las colecciones grandes son paginadas. Crear una asignación acepta
+El catálogo usa `page` y `size`. El resumen de asignaciones acepta `from`, `to`,
+`coachId`, `clientId`, `page` y `size`; devuelve KPIs del conjunto filtrado,
+periodo anterior comparable y detalle paginado. El CSV exporta el conjunto
+filtrado y rechaza más de 10,000 filas.
+
+Crear una asignación acepta
 `Idempotency-Key`; reutilizarla con otro payload responde
 `IDEMPOTENCY_KEY_REUSED`. Solo se asignan versiones publicadas y el PDF se descarga
 por `assignmentId`, nunca desde el borrador actual.
 
-Errores mínimos: `COACH_INACTIVE`, `COACH_OUTSIDE_BRANCH_SCOPE`,
-`EXERCISE_DUPLICATE`, `EXERCISE_ARCHIVED`,
-`WORKOUT_VERSION_NOT_PUBLISHED`, `CLIENT_NOT_ELIGIBLE`,
-`WORKOUT_ASSIGNMENT_NOT_FOUND` e `IDEMPOTENCY_KEY_REUSED`.
+Errores principales: `COACH_NOT_ACTIVE`, `COACH_PROFILE_REQUIRED`,
+`EXERCISE_DUPLICATE`, `SYSTEM_EXERCISE_IMMUTABLE`,
+`EXERCISE_OUTSIDE_OWNER_SCOPE`, `EXERCISE_MEDIA_INVALID`,
+`WORKOUT_OUTSIDE_OWNER_SCOPE`, `WORKOUT_VERSION_NOT_PUBLISHED`,
+`WORKOUT_ASSIGNMENT_CANCEL_REASON_REQUIRED`, `WORKOUT_ASSIGNMENT_NOT_FOUND`,
+`REPORT_RANGE_INVALID`, `REPORT_EXPORT_TOO_LARGE` e
+`IDEMPOTENCY_KEY_REUSED`.
 
 Estos contratos no crean ni consultan ventas o pagos. La lectura remota del socio se
 reserva para una aplicación futura.
@@ -567,7 +577,9 @@ Permisos por endpoint interno:
 - `resource.read`, `resource.manage`
 - `booking.read`, `booking.manage`
 - `coach.read`, `coach.manage`
-- `workout.read`, `workout.manage`
+- `workout.read.own`, `workout.read.all`
+- `workout.manage.own`, `workout.manage.all`
+- `workout.assign`, `workout.pdf.download`, `coach.metrics.read`
 - `report.coaches.read`
 - `professional.read`, `professional.manage`
 - `notification.read`, `notification.manage`

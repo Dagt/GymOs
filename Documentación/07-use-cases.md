@@ -204,12 +204,13 @@ Actor principal: Coach activo con sucursal habilitada.
 Postcondiciones:
 
 - dueño y gerencia consultan coach, fecha, socio, rutina y versión;
+- dueño y gerencia comparan el periodo contra otro anterior de igual duración;
 - la asignación conserva su contenido aunque se publique otra versión;
 - no se registra venta, pago, comisión, ingreso ni movimiento de caja.
 
 Alternativas: una versión en borrador no se asigna; un coach/socio fuera de alcance
-se rechaza; un reemplazo conserva el histórico; un reintento devuelve el resultado
-original sin duplicar la métrica.
+se rechaza; cancelar exige motivo; un reemplazo conserva y muestra el histórico;
+un reintento devuelve el resultado original sin duplicar la métrica.
 
 ## UC-014 Reservar consulta profesional
 
