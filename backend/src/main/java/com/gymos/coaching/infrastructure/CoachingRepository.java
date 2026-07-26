@@ -381,7 +381,7 @@ public class CoachingRepository {
 				) v ON true
 				WHERE w.organization_id = :organizationId
 				  AND w.branch_id = :branchId
-				  AND (:ownerUserId IS NULL OR c.user_account_id = :ownerUserId)
+				  AND (CAST(:ownerUserId AS UUID) IS NULL OR c.user_account_id = CAST(:ownerUserId AS UUID))
 				  AND w.deleted_at IS NULL
 				ORDER BY w.updated_at DESC, w.title
 				""")
@@ -401,7 +401,7 @@ public class CoachingRepository {
 				WHERE w.organization_id = :organizationId
 				  AND w.branch_id = :branchId
 				  AND w.id = :workoutId
-				  AND (:ownerUserId IS NULL OR c.user_account_id = :ownerUserId)
+				  AND (CAST(:ownerUserId AS UUID) IS NULL OR c.user_account_id = CAST(:ownerUserId AS UUID))
 				  AND w.deleted_at IS NULL
 				""")
 				.param("organizationId", organizationId)
@@ -703,7 +703,7 @@ public class CoachingRepository {
 				LEFT JOIN coach c ON c.id = w.coach_id
 				WHERE v.organization_id = :organizationId
 				  AND w.branch_id = :branchId
-				  AND (:ownerUserId IS NULL OR c.user_account_id = :ownerUserId)
+				  AND (CAST(:ownerUserId AS UUID) IS NULL OR c.user_account_id = CAST(:ownerUserId AS UUID))
 				  AND v.id = :versionId
 				  AND v.deleted_at IS NULL
 				  AND w.deleted_at IS NULL
@@ -734,7 +734,7 @@ public class CoachingRepository {
 				WHERE a.organization_id = :organizationId
 				  AND a.branch_id = :branchId
 				  AND a.id = :assignmentId
-				  AND (:ownerUserId IS NULL OR c.user_account_id = :ownerUserId)
+				  AND (CAST(:ownerUserId AS UUID) IS NULL OR c.user_account_id = CAST(:ownerUserId AS UUID))
 				  AND a.deleted_at IS NULL
 				""")
 				.param("organizationId", organizationId)
@@ -845,7 +845,7 @@ public class CoachingRepository {
 				WHERE a.organization_id = :organizationId
 				  AND a.branch_id = :branchId
 				  AND a.client_id = :clientId
-				  AND (:ownerUserId IS NULL OR c.user_account_id = :ownerUserId)
+				  AND (CAST(:ownerUserId AS UUID) IS NULL OR c.user_account_id = CAST(:ownerUserId AS UUID))
 				  AND a.deleted_at IS NULL
 				ORDER BY a.assigned_on DESC, a.created_at DESC
 				""")
@@ -875,7 +875,7 @@ public class CoachingRepository {
 				WHERE a.organization_id = :organizationId
 				  AND a.branch_id = :branchId
 				  AND a.id = :assignmentId
-				  AND (:ownerUserId IS NULL OR c.user_account_id = :ownerUserId)
+				  AND (CAST(:ownerUserId AS UUID) IS NULL OR c.user_account_id = CAST(:ownerUserId AS UUID))
 				  AND a.deleted_at IS NULL
 				""")
 				.param("organizationId", organizationId)

@@ -1,10 +1,14 @@
 package com.gymos;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.gymos.coaching.infrastructure.CoachingCatalogRepository;
+import com.gymos.coaching.infrastructure.CoachingRepository;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
@@ -12,6 +16,8 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
 
 @Testcontainers
 class DatabaseMigrationTests {
@@ -110,6 +116,28 @@ class DatabaseMigrationTests {
 			assertThatThrownBy(() -> insertSale(connection, UUID.randomUUID(), organizationId, branchId, "S-2", "repeat-key"))
 					.isInstanceOf(SQLException.class);
 		}
+	}
+
+	@Test
+	void coachingQueriesAcceptNullUuidFiltersOnPostgresql() {
+		var dataSource = new DriverManagerDataSource(
+				postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword()
+		);
+		var jdbcClient = JdbcClient.create(dataSource);
+		var coaching = new CoachingRepository(jdbcClient);
+		var catalog = new CoachingCatalogRepository(jdbcClient);
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		LocalDate from = LocalDate.of(2026, 7, 1);
+		LocalDate to = LocalDate.of(2026, 7, 31);
+
+		assertThatCode(() -> {
+			coaching.workouts(organizationId, branchId, null);
+			catalog.assignmentStats(organizationId, branchId, from, to, null, null, null);
+			catalog.assignments(organizationId, branchId, from, to, null, null, null, 25, 0);
+			catalog.metrics(organizationId, branchId, from, to, null, null, null);
+			catalog.weeklyTrend(organizationId, branchId, from, to, null, null, null);
+		}).doesNotThrowAnyException();
 	}
 
 	private boolean columnExists(java.sql.Connection connection, String table, String column) throws Exception {

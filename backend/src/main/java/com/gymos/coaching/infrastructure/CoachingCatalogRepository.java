@@ -269,9 +269,9 @@ public class CoachingCatalogRepository {
 				  AND a.branch_id = :branchId
 				  AND a.deleted_at IS NULL
 				  AND a.assigned_on BETWEEN :fromDate AND :toDate
-				  AND (:coachId IS NULL OR a.coach_id = :coachId)
-				  AND (:clientId IS NULL OR a.client_id = :clientId)
-				  AND (:ownerUserId IS NULL OR c.user_account_id = :ownerUserId)
+				  AND (CAST(:coachId AS UUID) IS NULL OR a.coach_id = CAST(:coachId AS UUID))
+				  AND (CAST(:clientId AS UUID) IS NULL OR a.client_id = CAST(:clientId AS UUID))
+				  AND (CAST(:ownerUserId AS UUID) IS NULL OR c.user_account_id = CAST(:ownerUserId AS UUID))
 				ORDER BY a.assigned_on DESC, a.created_at DESC
 				LIMIT :size OFFSET :offset
 				""")
@@ -311,9 +311,9 @@ public class CoachingCatalogRepository {
 				  AND a.branch_id = :branchId
 				  AND a.deleted_at IS NULL
 				  AND a.assigned_on BETWEEN :fromDate AND :toDate
-				  AND (:coachId IS NULL OR a.coach_id = :coachId)
-				  AND (:clientId IS NULL OR a.client_id = :clientId)
-				  AND (:ownerUserId IS NULL OR c.user_account_id = :ownerUserId)
+				  AND (CAST(:coachId AS UUID) IS NULL OR a.coach_id = CAST(:coachId AS UUID))
+				  AND (CAST(:clientId AS UUID) IS NULL OR a.client_id = CAST(:clientId AS UUID))
+				  AND (CAST(:ownerUserId AS UUID) IS NULL OR c.user_account_id = CAST(:ownerUserId AS UUID))
 				""")
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
@@ -348,11 +348,11 @@ public class CoachingCatalogRepository {
 				FROM coach c
 				LEFT JOIN workout_assignment a ON a.coach_id = c.id
 				  AND a.assigned_on BETWEEN :fromDate AND :toDate AND a.deleted_at IS NULL
-				  AND (:clientId IS NULL OR a.client_id = :clientId)
+				  AND (CAST(:clientId AS UUID) IS NULL OR a.client_id = CAST(:clientId AS UUID))
 				WHERE c.organization_id = :organizationId AND c.branch_id = :branchId
 				  AND c.deleted_at IS NULL AND c.status = 'ACTIVE'
-				  AND (:coachId IS NULL OR c.id = :coachId)
-				  AND (:ownerUserId IS NULL OR c.user_account_id = :ownerUserId)
+				  AND (CAST(:coachId AS UUID) IS NULL OR c.id = CAST(:coachId AS UUID))
+				  AND (CAST(:ownerUserId AS UUID) IS NULL OR c.user_account_id = CAST(:ownerUserId AS UUID))
 				GROUP BY c.id, c.display_name
 				ORDER BY assignments DESC, c.display_name
 				""")
@@ -393,9 +393,9 @@ public class CoachingCatalogRepository {
 				  AND a.branch_id = :branchId
 				  AND a.deleted_at IS NULL
 				  AND a.assigned_on BETWEEN :fromDate AND :toDate
-				  AND (:coachId IS NULL OR a.coach_id = :coachId)
-				  AND (:clientId IS NULL OR a.client_id = :clientId)
-				  AND (:ownerUserId IS NULL OR c.user_account_id = :ownerUserId)
+				  AND (CAST(:coachId AS UUID) IS NULL OR a.coach_id = CAST(:coachId AS UUID))
+				  AND (CAST(:clientId AS UUID) IS NULL OR a.client_id = CAST(:clientId AS UUID))
+				  AND (CAST(:ownerUserId AS UUID) IS NULL OR c.user_account_id = CAST(:ownerUserId AS UUID))
 				GROUP BY CAST(date_trunc('week', a.assigned_on) AS DATE)
 				ORDER BY week_start
 				""")
@@ -436,7 +436,7 @@ public class CoachingCatalogRepository {
 				LEFT JOIN coach c ON c.id = a.coach_id
 				WHERE a.id = :id AND a.organization_id = :organizationId
 				  AND a.branch_id = :branchId AND a.deleted_at IS NULL
-				  AND (:ownerUserId IS NULL OR c.user_account_id = :ownerUserId)
+				  AND (CAST(:ownerUserId AS UUID) IS NULL OR c.user_account_id = CAST(:ownerUserId AS UUID))
 				""")
 				.param("id", assignmentId)
 				.param("organizationId", organizationId)
