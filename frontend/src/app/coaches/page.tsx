@@ -2,87 +2,109 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
-import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
+import { AuthRequired } from "@/components/AuthRequired";
 import {
   assignWorkout,
+  createExercise,
   createWorkout,
+  downloadAssignmentCsv,
+  downloadWorkoutPdf,
+  duplicateWorkout,
+  getAssignmentReport,
   getBranches,
-  getCoachReport,
   getCoaches,
-  getCurrentOrganization,
-  getInternalUsers,
+  getExercises,
   getStoredSession,
   getWorkouts,
+  publishWorkout,
   searchClients,
+  updateWorkoutAssignmentStatus,
+  type AssignmentReport,
   type BranchSummary,
-  type CoachReport,
-  type CoachSummary,
   type ClientSummary,
-  type InternalUserSummary,
-  type OrganizationSummary,
+  type CoachSummary,
+  type Exercise,
   type StoredSession,
+  type WorkoutExerciseDraft,
+  type WorkoutSessionDraft,
   type WorkoutSummary,
 } from "@/lib/api";
 
-const defaultWorkoutJson = JSON.stringify({
-  days: [{ name: "Dia A", blocks: [{ exercise: "Sentadilla goblet", sets: 3, reps: "10" }, { exercise: "Press con mancuernas", sets: 3, reps: "8" }] }],
-}, null, 2);
+type Tab = "builder" | "catalog" | "assignments" | "metrics";
+
+const emptyExercise = (): WorkoutExerciseDraft => ({
+  exerciseName: "",
+  prescription: "",
+  optional: false,
+});
+
+const emptySession = (index: number): WorkoutSessionDraft => ({
+  name: `Día ${index + 1}`,
+  focus: "",
+  notes: "",
+  blocks: [{ name: "Trabajo principal", type: "MAIN", notes: "", exercises: [emptyExercise()] }],
+});
 
 export default function CoachesPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
-  const [organization, setOrganization] = useState<OrganizationSummary | null>(null);
   const [branches, setBranches] = useState<BranchSummary[]>([]);
   const [coaches, setCoaches] = useState<CoachSummary[]>([]);
-  const [coachUsers, setCoachUsers] = useState<InternalUserSummary[]>([]);
   const [workouts, setWorkouts] = useState<WorkoutSummary[]>([]);
-  const [clients, setClients] = useState<ClientSummary[]>([]);
-  const [report, setReport] = useState<CoachReport | null>(null);
-  const [workoutTitle, setWorkoutTitle] = useState("");
-  const [workoutGoal, setWorkoutGoal] = useState("");
-  const [workoutLevel, setWorkoutLevel] = useState<"BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "GENERAL">("GENERAL");
-  const [workoutCoachId, setWorkoutCoachId] = useState("");
-  const [workoutSummary, setWorkoutSummary] = useState("");
-  const [workoutJson, setWorkoutJson] = useState(defaultWorkoutJson);
-  const [clientQuery, setClientQuery] = useState("");
-  const [selectedClient, setSelectedClient] = useState<ClientSummary | null>(null);
-  const [assignmentWorkoutId, setAssignmentWorkoutId] = useState("");
-  const [assignmentStartsOn, setAssignmentStartsOn] = useState("");
-  const [assignmentEndsOn, setAssignmentEndsOn] = useState("");
-  const [assignmentNotes, setAssignmentNotes] = useState("");
+  const [exercisePage, setExercisePage] = useState<Exercise[]>([]);
+  const [report, setReport] = useState<AssignmentReport | null>(null);
+  const [tab, setTab] = useState<Tab>("builder");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
+  const [title, setTitle] = useState("");
+  const [goal, setGoal] = useState("");
+  const [level, setLevel] = useState("GENERAL");
+  const [coachId, setCoachId] = useState("");
+  const [summary, setSummary] = useState("");
+  const [sessions, setSessions] = useState<WorkoutSessionDraft[]>([emptySession(0)]);
+
+  const [exerciseQuery, setExerciseQuery] = useState("");
+  const [newExercise, setNewExercise] = useState({
+    name: "", primaryMuscleGroup: "", equipment: "", type: "STRENGTH", instructions: "",
+  });
+
+  const [clientQuery, setClientQuery] = useState("");
+  const [clients, setClients] = useState<ClientSummary[]>([]);
+  const [selectedClient, setSelectedClient] = useState<ClientSummary | null>(null);
+  const [selectedWorkoutId, setSelectedWorkoutId] = useState("");
+  const [startsOn, setStartsOn] = useState("");
+  const [endsOn, setEndsOn] = useState("");
+  const [printableNotes, setPrintableNotes] = useState("");
+  const [privateNotes, setPrivateNotes] = useState("");
+  const [reportFrom, setReportFrom] = useState(startOfWeek());
+  const [reportTo, setReportTo] = useState(today());
+
   useEffect(() => {
     let active = true;
     async function load() {
       const stored = getStoredSession();
-      if (!stored) {
-        setLoading(false);
-        return;
-      }
+      if (!stored) { setLoading(false); return; }
       setSession(stored);
       try {
-        const [loadedOrganization, loadedBranches, loadedCoaches, loadedUsers, loadedWorkouts, loadedReport] = await Promise.all([
-          getCurrentOrganization(stored.accessToken).catch(() => null),
+        const [loadedBranches, loadedCoaches, loadedWorkouts, loadedExercises, loadedReport] = await Promise.all([
           getBranches(stored.accessToken),
           getCoaches(stored.accessToken),
-          getInternalUsers(stored.accessToken),
           getWorkouts(stored.accessToken),
-          getCoachReport(stored.accessToken),
+          getExercises(stored.accessToken, { size: 60 }),
+          getAssignmentReport(stored.accessToken, { from: startOfWeek(), to: today() }),
         ]);
         if (!active) return;
-        setOrganization(loadedOrganization);
         setBranches(loadedBranches);
         setCoaches(loadedCoaches);
-        setCoachUsers(loadedUsers.filter((user) => user.status === "ACTIVE" && user.roles.some(isCoachRole)));
         setWorkouts(loadedWorkouts);
+        setExercisePage(loadedExercises.items);
         setReport(loadedReport);
-        setWorkoutCoachId(loadedCoaches[0]?.id ?? "");
-        setAssignmentWorkoutId(loadedWorkouts[0]?.id ?? "");
+        setCoachId(loadedCoaches[0]?.id ?? "");
+        setSelectedWorkoutId(loadedWorkouts[0]?.id ?? "");
       } catch (exception) {
-        if (active) setError(exception instanceof Error ? exception.message : "No fue posible cargar coaches.");
+        if (active) setError(errorMessage(exception));
       } finally {
         if (active) setLoading(false);
       }
@@ -91,118 +113,425 @@ export default function CoachesPage() {
     return () => { active = false; };
   }, []);
 
-  const selectedWorkout = useMemo(() => workouts.find((workout) => workout.id === assignmentWorkoutId) ?? null, [assignmentWorkoutId, workouts]);
-  const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
+  const activeBranch = branches.find((branch) => branch.id === session?.user.branchId);
+  const filteredExercises = useMemo(() => {
+    const query = exerciseQuery.trim().toLowerCase();
+    if (!query) return exercisePage;
+    return exercisePage.filter((exercise) =>
+      [exercise.name, exercise.primaryMuscleGroup, exercise.equipment]
+        .some((value) => value?.toLowerCase().includes(query)),
+    );
+  }, [exercisePage, exerciseQuery]);
+  const publishedWorkouts = useMemo(
+    () => workouts.filter((workout) => workout.status === "PUBLISHED" || workout.status === "ACTIVE"),
+    [workouts],
+  );
 
-  async function refresh(activeSession = session) {
-    if (!activeSession) return;
-    const [nextCoaches, nextUsers, nextWorkouts, nextReport] = await Promise.all([
-      getCoaches(activeSession.accessToken),
-      getInternalUsers(activeSession.accessToken),
-      getWorkouts(activeSession.accessToken),
-      getCoachReport(activeSession.accessToken),
+  async function refresh() {
+    if (!session) return;
+    const [nextWorkouts, nextExercises, nextReport] = await Promise.all([
+      getWorkouts(session.accessToken),
+      getExercises(session.accessToken, { query: exerciseQuery, size: 100 }),
+      getAssignmentReport(session.accessToken, { from: reportFrom, to: reportTo }),
     ]);
-    setCoaches(nextCoaches);
-    setCoachUsers(nextUsers.filter((user) => user.status === "ACTIVE" && user.roles.some(isCoachRole)));
     setWorkouts(nextWorkouts);
+    setExercisePage(nextExercises.items);
     setReport(nextReport);
-    setWorkoutCoachId((current) => current || nextCoaches[0]?.id || "");
-    setAssignmentWorkoutId((current) => current || nextWorkouts[0]?.id || "");
+    setSelectedWorkoutId((current) => current || nextWorkouts[0]?.id || "");
   }
 
-  async function submitWorkout(event: FormEvent<HTMLFormElement>) {
+  async function saveWorkout(event: FormEvent) {
     event.preventDefault();
     if (!session) return;
-    setSaving(true); setError(null); setMessage(null);
+    const validation = validateWorkout(title, sessions);
+    if (validation) { setError(validation); return; }
+    setSaving(true); clearFeedback();
     try {
-      const created = await createWorkout(session.accessToken, { coachId: workoutCoachId || null, title: workoutTitle, goal: workoutGoal, level: workoutLevel, summary: workoutSummary, contentJson: workoutJson });
-      setWorkoutTitle(""); setWorkoutGoal(""); setWorkoutSummary(""); setWorkoutJson(defaultWorkoutJson);
-      setMessage(`Rutina ${created.workout.title} creada.`);
-      await refresh(session);
-    } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible crear rutina.");
-    } finally { setSaving(false); }
+      const created = await createWorkout(session.accessToken, {
+        coachId: coachId || null,
+        title, goal, level: level as "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "GENERAL",
+        summary,
+        contentJson: JSON.stringify({ sessions }),
+      });
+      const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
+      const shouldPublish = submitter?.value !== "draft";
+      if (shouldPublish) await publishWorkout(session.accessToken, created.workout.id);
+      setMessage(shouldPublish
+        ? `Rutina “${created.workout.title}” publicada correctamente.`
+        : `Borrador “${created.workout.title}” guardado.`);
+      setTitle(""); setGoal(""); setSummary(""); setSessions([emptySession(0)]);
+      await refresh();
+    } catch (exception) { setError(errorMessage(exception)); }
+    finally { setSaving(false); }
   }
 
-  async function runClientSearch() {
+  async function saveExercise(event: FormEvent) {
+    event.preventDefault();
     if (!session) return;
-    setError(null);
+    setSaving(true); clearFeedback();
+    try {
+      const created = await createExercise(session.accessToken, newExercise);
+      setExercisePage((current) => [...current, created].sort((a, b) => a.name.localeCompare(b.name)));
+      setNewExercise({ name: "", primaryMuscleGroup: "", equipment: "", type: "STRENGTH", instructions: "" });
+      setMessage(`Ejercicio “${created.name}” agregado al catálogo.`);
+    } catch (exception) { setError(errorMessage(exception)); }
+    finally { setSaving(false); }
+  }
+
+  async function findClients() {
+    if (!session) return;
+    clearFeedback();
     try { setClients(await searchClients(session.accessToken, clientQuery, "ACTIVE")); }
-    catch (exception) { setError(exception instanceof Error ? exception.message : "No fue posible buscar clientes."); }
+    catch (exception) { setError(errorMessage(exception)); }
   }
 
-  async function submitAssignment(event: FormEvent<HTMLFormElement>) {
+  async function saveAssignment(event: FormEvent) {
     event.preventDefault();
-    if (!session || !selectedClient || !selectedWorkout) return;
-    setSaving(true); setError(null); setMessage(null);
+    if (!session || !selectedClient || !selectedWorkoutId) return;
+    setSaving(true); clearFeedback();
     try {
-      const assignment = await assignWorkout(session.accessToken, selectedWorkout.id, { clientId: selectedClient.id, workoutVersionId: selectedWorkout.latestVersionId, startsOn: assignmentStartsOn, endsOn: assignmentEndsOn, notes: assignmentNotes });
-      setAssignmentNotes("");
-      setMessage(`${assignment.workoutTitle} asignada a ${assignment.clientName}.`);
-      await refresh(session);
-    } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible asignar rutina.");
-    } finally { setSaving(false); }
+      const workout = workouts.find((item) => item.id === selectedWorkoutId);
+      const assignment = await assignWorkout(session.accessToken, selectedWorkoutId, {
+        clientId: selectedClient.id,
+        workoutVersionId: workout?.latestVersionId ?? null,
+        startsOn: startsOn || null,
+        endsOn: endsOn || null,
+        notes: privateNotes || null,
+        printableNotes: printableNotes || null,
+        idempotencyKey: `workout:${selectedWorkoutId}:${selectedClient.id}:${crypto.randomUUID()}`,
+      });
+      setMessage(`Rutina asignada a ${assignment.clientName}. El PDF ya está disponible.`);
+      setPrintableNotes(""); setPrivateNotes("");
+      await refresh();
+      setTab("assignments");
+    } catch (exception) { setError(errorMessage(exception)); }
+    finally { setSaving(false); }
   }
 
-  if (loading) return <LoadingScreen text="Cargando coaches..." />;
-  if (!session) return <AuthRequiredCard message="Necesitas iniciar sesion para administrar coaches y rutinas." title="Inicia sesion" />;
+  async function loadReport() {
+    if (!session) return;
+    setSaving(true); clearFeedback();
+    try { setReport(await getAssignmentReport(session.accessToken, { from: reportFrom, to: reportTo })); }
+    catch (exception) { setError(errorMessage(exception)); }
+    finally { setSaving(false); }
+  }
+
+  function updateSession(index: number, patch: Partial<WorkoutSessionDraft>) {
+    setSessions((current) => current.map((item, position) => position === index ? { ...item, ...patch } : item));
+  }
+
+  function updateExercise(sessionIndex: number, exerciseIndex: number, patch: Partial<WorkoutExerciseDraft>) {
+    setSessions((current) => current.map((day, dayIndex) => {
+      if (dayIndex !== sessionIndex) return day;
+      const block = day.blocks[0];
+      return {
+        ...day,
+        blocks: [{
+          ...block,
+          exercises: block.exercises.map((exercise, position) =>
+            position === exerciseIndex ? { ...exercise, ...patch } : exercise),
+        }],
+      };
+    }));
+  }
+
+  function addCatalogExercise(sessionIndex: number, exercise: Exercise) {
+    setSessions((current) => current.map((day, dayIndex) => {
+      if (dayIndex !== sessionIndex) return day;
+      const block = day.blocks[0];
+      return {
+        ...day,
+        blocks: [{
+          ...block,
+          exercises: [...block.exercises, {
+            exerciseId: exercise.id, exerciseName: exercise.name, prescription: "", optional: false,
+          }],
+        }],
+      };
+    }));
+  }
+
+  async function copyWorkout(workoutId: string) {
+    if (!session) return;
+    setSaving(true); clearFeedback();
+    try {
+      const copy = await duplicateWorkout(session.accessToken, workoutId);
+      setMessage(`Se creó “${copy.workout.title}”.`);
+      await refresh();
+    } catch (exception) { setError(errorMessage(exception)); }
+    finally { setSaving(false); }
+  }
+
+  async function publishExistingWorkout(workoutId: string) {
+    if (!session) return;
+    setSaving(true); clearFeedback();
+    try {
+      const published = await publishWorkout(session.accessToken, workoutId);
+      setMessage(`“${published.workout.title}” quedó publicada.`);
+      await refresh();
+    } catch (exception) { setError(errorMessage(exception)); }
+    finally { setSaving(false); }
+  }
+
+  if (loading) return <LoadingScreen text="Cargando Coaches y rutinas..." />;
+  if (!session) return <AuthRequired message="Necesitas iniciar sesión para gestionar rutinas." title="Inicia sesión" />;
 
   return (
-    <AppShell branchName={activeBranch?.name} eyebrow="Gerencia" mode={activeBranch ? "operation" : undefined} organizationName={organization?.brandName || organization?.tradeName || session.user.brandName || session.user.organizationName} session={session} subtitle="Entrenadores, planes versionados y asignaciones a clientes." title="Coaches y rutinas">
-      <section className="grid gap-6">
-        <section className="grid gap-4 md:grid-cols-4">
-          <Metric label="Coaches" value={coachUsers.length} />
-          <Metric label="Rutinas" value={report?.workoutCount ?? 0} />
-          <Metric label="Asignaciones activas" value={report?.activeAssignments ?? 0} />
-          <Metric label="Ultimos 30 dias" value={report?.assignmentsLast30Days ?? 0} />
-        </section>
-        {error ? <p className="rounded-md border border-[#e5b7b7] bg-[#fff4f4] px-3 py-2 text-sm text-[#8c2f2f]">{error}</p> : null}
-        {message ? <p className="rounded-md border border-[#bad9c4] bg-[#eff8f1] px-3 py-2 text-sm text-[#31563c]">{message}</p> : null}
+    <AppShell
+      branchName={activeBranch?.name}
+      eyebrow="Entrenamiento"
+      mode={activeBranch ? "operation" : undefined}
+      organizationName={session.user.brandName || session.user.organizationName}
+      session={session}
+      subtitle="Crea planes completos, asígnalos a socios y mide el acompañamiento del equipo."
+      title="Coaches y rutinas"
+    >
+      <div className="grid gap-5">
+        <nav aria-label="Secciones de Coaches" className="flex flex-wrap gap-2">
+          {([
+            ["builder", "Constructor"],
+            ["catalog", "Ejercicios"],
+            ["assignments", "Asignaciones"],
+            ["metrics", "Métricas"],
+          ] as [Tab, string][]).map(([value, label]) => (
+            <button
+              className={`rounded-full px-4 py-2 text-sm font-semibold ${tab === value ? "bg-[#173c2a] text-white" : "border border-[#cfd9d2] bg-white text-[#365143]"}`}
+              key={value}
+              onClick={() => setTab(value)}
+              type="button"
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
 
-        <section className="grid items-start gap-6 lg:grid-cols-[0.8fr_1.2fr]">
-          <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
-            <h2 className="text-xl font-semibold">Coaches del equipo</h2>
-            <p className="mt-2 text-sm leading-6 text-[#5d6b63]">Usuarios activos con rol Coach en el gimnasio. La asignacion de rutinas usa los perfiles operativos disponibles en la sucursal.</p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-              {coachUsers.length === 0 ? <article className="rounded-md border border-dashed border-[#cdd5ca] p-4 text-sm leading-6 text-[#5d6b63]">No hay usuarios activos con rol Coach.</article> : null}
-              {coachUsers.map((coach) => {
-                const profile = coaches.find((item) => sameIdentity(item, coach));
-                return <article className="min-w-0 rounded-md border border-[#d8ddd2] p-4" key={coach.id}><div className="flex min-w-0 items-start justify-between gap-3"><div className="min-w-0"><p className="break-words font-semibold">{coach.fullName}</p><p className="mt-1 break-all text-sm text-[#5d6b63]">{coach.email ?? coach.phone ?? coach.username}</p></div><span className="shrink-0 rounded-md bg-[#eef7f0] px-2 py-1 text-xs font-semibold text-[#31543d]">ACTIVE</span></div><p className="mt-3 text-xs text-[#6f7a73]">{profile ? "Perfil operativo disponible" : "Cuenta Coach sin perfil operativo vinculado"}</p></article>;
-              })}
-            </div>
-          </section>
+        {error ? <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">{error}</p> : null}
+        {message ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p> : null}
 
-          <section className="grid gap-6">
-            <form className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm" onSubmit={submitWorkout}>
-              <h2 className="text-xl font-semibold">Nueva rutina</h2>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <input className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => setWorkoutTitle(event.target.value)} placeholder="Titulo" value={workoutTitle} />
-                <select className="h-10 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm" onChange={(event) => setWorkoutCoachId(event.target.value)} value={workoutCoachId}><option value="">Sin coach</option>{coaches.map((coach) => <option key={coach.id} value={coach.id}>{coach.displayName}</option>)}</select>
-                <input className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => setWorkoutGoal(event.target.value)} placeholder="Objetivo" value={workoutGoal} />
-                <select className="h-10 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm" onChange={(event) => setWorkoutLevel(event.target.value as typeof workoutLevel)} value={workoutLevel}><option value="GENERAL">General</option><option value="BEGINNER">Principiante</option><option value="INTERMEDIATE">Intermedio</option><option value="ADVANCED">Avanzado</option></select>
+        {tab === "builder" ? (
+          <form className="grid gap-5" onSubmit={saveWorkout}>
+            <section className="rounded-xl border border-[#d9e2dc] bg-white p-5 shadow-sm">
+              <div className="mb-4">
+                <p className="text-xs font-semibold uppercase tracking-wider text-[#6b7d72]">Plantilla</p>
+                <h2 className="text-xl font-semibold">Información de la rutina</h2>
               </div>
-              <textarea className="mt-3 min-h-20 w-full rounded-md border border-[#cdd5ca] px-3 py-2 text-sm" onChange={(event) => setWorkoutSummary(event.target.value)} placeholder="Resumen" value={workoutSummary} />
-              <textarea className="mt-3 min-h-44 w-full rounded-md border border-[#cdd5ca] px-3 py-2 font-mono text-xs" onChange={(event) => setWorkoutJson(event.target.value)} value={workoutJson} />
-              <button className="mt-4 h-10 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white disabled:opacity-60" disabled={saving || !workoutTitle.trim()} type="submit">Crear rutina</button>
-            </form>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                <Field label="Título"><input className="app-input" onChange={(e) => setTitle(e.target.value)} value={title} /></Field>
+                <Field label="Objetivo"><input className="app-input" onChange={(e) => setGoal(e.target.value)} value={goal} /></Field>
+                <Field label="Nivel">
+                  <select className="app-input" onChange={(e) => setLevel(e.target.value)} value={level}>
+                    <option value="GENERAL">General</option><option value="BEGINNER">Principiante</option>
+                    <option value="INTERMEDIATE">Intermedio</option><option value="ADVANCED">Avanzado</option>
+                  </select>
+                </Field>
+                <Field label="Coach">
+                  <select className="app-input" onChange={(e) => setCoachId(e.target.value)} value={coachId}>
+                    <option value="">Sin coach</option>
+                    {coaches.map((coach) => <option key={coach.id} value={coach.id}>{coach.displayName}</option>)}
+                  </select>
+                </Field>
+              </div>
+              <Field label="Indicaciones generales">
+                <textarea className="app-input mt-3 min-h-20" onChange={(e) => setSummary(e.target.value)} value={summary} />
+              </Field>
+            </section>
 
-            <form className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm" onSubmit={submitAssignment}>
-              <h2 className="text-xl font-semibold">Asignar rutina</h2>
-              <div className="mt-4 flex gap-2"><input className="h-10 min-w-0 flex-1 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => setClientQuery(event.target.value)} placeholder="Buscar cliente" value={clientQuery} /><button className="h-10 rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a]" onClick={runClientSearch} type="button">Buscar</button></div>
-              <div className="mt-3 grid gap-2">{clients.slice(0, 4).map((client) => <button className={`rounded-md border px-3 py-2 text-left text-sm ${selectedClient?.id === client.id ? "border-[#51735f] bg-[#eef7f0]" : "border-[#d8ddd2]"}`} key={client.id} onClick={() => setSelectedClient(client)} type="button">{client.firstName} {client.lastName}</button>)}</div>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2"><select className="h-10 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm" onChange={(event) => setAssignmentWorkoutId(event.target.value)} value={assignmentWorkoutId}>{workouts.map((workout) => <option key={workout.id} value={workout.id}>{workout.title}</option>)}</select><input className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => setAssignmentStartsOn(event.target.value)} type="date" value={assignmentStartsOn} /><input className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => setAssignmentEndsOn(event.target.value)} type="date" value={assignmentEndsOn} /><input className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => setAssignmentNotes(event.target.value)} placeholder="Notas" value={assignmentNotes} /></div>
-              <button className="mt-4 h-10 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white disabled:opacity-60" disabled={saving || !selectedClient || !selectedWorkout} type="submit">Asignar</button>
+            {sessions.map((day, sessionIndex) => (
+              <section className="rounded-xl border border-[#d9e2dc] bg-white p-5 shadow-sm" key={sessionIndex}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="grid flex-1 gap-3 md:grid-cols-2">
+                    <Field label={`Sesión ${sessionIndex + 1}`}>
+                      <input className="app-input" onChange={(e) => updateSession(sessionIndex, { name: e.target.value })} value={day.name} />
+                    </Field>
+                    <Field label="Enfoque">
+                      <input className="app-input" onChange={(e) => updateSession(sessionIndex, { focus: e.target.value })} placeholder="Pecho y hombro" value={day.focus ?? ""} />
+                    </Field>
+                  </div>
+                  {sessions.length > 1 ? <button className="text-sm font-semibold text-red-700" onClick={() => setSessions((items) => items.filter((_, i) => i !== sessionIndex))} type="button">Eliminar día</button> : null}
+                </div>
+                <textarea className="app-input mt-3 min-h-16" onChange={(e) => updateSession(sessionIndex, { notes: e.target.value })} placeholder="Movilidad, calentamiento o notas del día" value={day.notes ?? ""} />
+
+                <div className="mt-4 grid gap-3">
+                  {day.blocks[0].exercises.map((exercise, exerciseIndex) => (
+                    <article className="grid gap-2 rounded-lg border border-[#e0e7e2] bg-[#f8faf8] p-3 lg:grid-cols-[1.2fr_1fr_1fr_auto]" key={exerciseIndex}>
+                      <input className="app-input" list={`exercise-options-${sessionIndex}`} onChange={(e) => updateExercise(sessionIndex, exerciseIndex, { exerciseName: e.target.value, exerciseId: null })} placeholder="Ejercicio" value={exercise.exerciseName} />
+                      <input className="app-input" onChange={(e) => updateExercise(sessionIndex, exerciseIndex, { prescription: e.target.value })} placeholder="3x12, 10, 8 subiendo" value={exercise.prescription} />
+                      <input className="app-input" onChange={(e) => updateExercise(sessionIndex, exerciseIndex, { notes: e.target.value })} placeholder="Carga, técnica o alternativa VS" value={exercise.notes ?? ""} />
+                      <button className="px-2 text-sm font-semibold text-red-700" disabled={day.blocks[0].exercises.length === 1} onClick={() => updateSession(sessionIndex, { blocks: [{ ...day.blocks[0], exercises: day.blocks[0].exercises.filter((_, i) => i !== exerciseIndex) }] })} type="button">Quitar</button>
+                    </article>
+                  ))}
+                  <datalist id={`exercise-options-${sessionIndex}`}>{exercisePage.map((exercise) => <option key={exercise.id} value={exercise.name} />)}</datalist>
+                  <div className="flex flex-wrap gap-2">
+                    <button className="rounded-md border border-[#b9c9bf] bg-white px-3 py-2 text-sm font-semibold" onClick={() => updateSession(sessionIndex, { blocks: [{ ...day.blocks[0], exercises: [...day.blocks[0].exercises, emptyExercise()] }] })} type="button">+ Ejercicio libre</button>
+                    <select className="rounded-md border border-[#b9c9bf] bg-white px-3 py-2 text-sm" defaultValue="" onChange={(e) => { const found = exercisePage.find((item) => item.id === e.target.value); if (found) addCatalogExercise(sessionIndex, found); e.target.value = ""; }}>
+                      <option value="">Agregar desde catálogo…</option>
+                      {exercisePage.map((exercise) => <option key={exercise.id} value={exercise.id}>{exercise.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </section>
+            ))}
+
+            <div className="flex flex-wrap justify-between gap-3">
+              <button className="rounded-lg border border-[#9eb2a5] bg-white px-4 py-2 font-semibold" onClick={() => setSessions((items) => [...items, emptySession(items.length)])} type="button">+ Agregar día</button>
+              <div className="flex gap-2">
+                <button className="rounded-lg border border-[#9eb2a5] bg-white px-5 py-2 font-semibold disabled:opacity-60" disabled={saving} type="submit" value="draft">Guardar borrador</button>
+                <button className="rounded-lg bg-[#173c2a] px-5 py-2 font-semibold text-white disabled:opacity-60" disabled={saving} type="submit" value="publish">{saving ? "Guardando…" : "Publicar rutina"}</button>
+              </div>
+            </div>
+            {workouts.length ? (
+              <section className="rounded-xl border border-[#d9e2dc] bg-white p-5">
+                <h2 className="text-xl font-semibold">Rutinas publicadas</h2>
+                <div className="mt-3 grid gap-2 md:grid-cols-2">
+                  {workouts.map((workout) => (
+                    <article className="flex items-center justify-between gap-3 rounded-lg border border-[#e0e7e2] p-3" key={workout.id}>
+                      <div><strong>{workout.title}</strong><p className="text-xs text-[#637268]">{workout.coachName || "Sin coach"} · versión {workout.latestVersionNumber} · {workout.status}</p></div>
+                      <div className="flex gap-2">
+                        {workout.status === "DRAFT" ? <button className="rounded-md bg-[#173c2a] px-3 py-2 text-sm font-semibold text-white" onClick={() => publishExistingWorkout(workout.id)} type="button">Publicar</button> : null}
+                        <button className="rounded-md border px-3 py-2 text-sm font-semibold" onClick={() => copyWorkout(workout.id)} type="button">Duplicar</button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+          </form>
+        ) : null}
+
+        {tab === "catalog" ? (
+          <section className="grid gap-5 lg:grid-cols-[1.4fr_0.8fr]">
+            <article className="rounded-xl border border-[#d9e2dc] bg-white p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div><h2 className="text-xl font-semibold">Catálogo de ejercicios</h2><p className="text-sm text-[#637268]">{exercisePage.length} opciones disponibles en esta vista.</p></div>
+                <input className="app-input max-w-xs" onChange={(e) => setExerciseQuery(e.target.value)} placeholder="Buscar nombre, músculo o equipo" value={exerciseQuery} />
+              </div>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {filteredExercises.map((exercise) => (
+                  <article className="rounded-lg border border-[#dde5df] p-3" key={exercise.id}>
+                    <div className="flex justify-between gap-2"><strong>{exercise.name}</strong><span className="text-[10px] font-semibold text-[#66786d]">{exercise.origin}</span></div>
+                    <p className="mt-1 text-xs text-[#637268]">{exercise.primaryMuscleGroup || "General"} · {exercise.equipment || "Sin equipo"}</p>
+                    {exercise.instructions ? <p className="mt-2 line-clamp-2 text-xs">{exercise.instructions}</p> : null}
+                  </article>
+                ))}
+              </div>
+            </article>
+            <form className="rounded-xl border border-[#d9e2dc] bg-white p-5" onSubmit={saveExercise}>
+              <h2 className="text-xl font-semibold">Agregar ejercicio</h2>
+              <div className="mt-4 grid gap-3">
+                <Field label="Nombre"><input className="app-input" onChange={(e) => setNewExercise({ ...newExercise, name: e.target.value })} value={newExercise.name} /></Field>
+                <Field label="Grupo muscular"><input className="app-input" onChange={(e) => setNewExercise({ ...newExercise, primaryMuscleGroup: e.target.value })} value={newExercise.primaryMuscleGroup} /></Field>
+                <Field label="Equipo"><input className="app-input" onChange={(e) => setNewExercise({ ...newExercise, equipment: e.target.value })} value={newExercise.equipment} /></Field>
+                <Field label="Tipo"><select className="app-input" onChange={(e) => setNewExercise({ ...newExercise, type: e.target.value })} value={newExercise.type}><option value="STRENGTH">Fuerza</option><option value="MOBILITY">Movilidad</option><option value="CARDIO">Cardio</option><option value="CORE">Core</option><option value="WARMUP">Calentamiento</option><option value="STRETCHING">Estiramiento</option></select></Field>
+                <Field label="Instrucciones"><textarea className="app-input min-h-20" onChange={(e) => setNewExercise({ ...newExercise, instructions: e.target.value })} value={newExercise.instructions} /></Field>
+                <button className="rounded-lg bg-[#173c2a] px-4 py-2 font-semibold text-white disabled:opacity-60" disabled={saving || !newExercise.name.trim()} type="submit">Guardar ejercicio</button>
+              </div>
             </form>
           </section>
-        </section>
+        ) : null}
 
-        <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm"><h2 className="text-xl font-semibold">Rutinas disponibles</h2><div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">{workouts.map((workout) => <article className="rounded-md border border-[#d8ddd2] p-4" key={workout.id}><p className="font-semibold">{workout.title}</p><p className="mt-1 text-sm text-[#5d6b63]">{workout.goal ?? "Sin objetivo"} - {workout.level}</p><p className="mt-3 text-xs text-[#6f7a73]">{workout.coachName ?? "Sin coach"} - version {workout.latestVersionNumber ?? "N/A"}</p></article>)}</div></section>
-      </section>
+        {tab === "assignments" ? (
+          <section className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
+            <form className="rounded-xl border border-[#d9e2dc] bg-white p-5" onSubmit={saveAssignment}>
+              <h2 className="text-xl font-semibold">Asignar a un socio</h2>
+              <div className="mt-4 flex gap-2"><input className="app-input" onChange={(e) => setClientQuery(e.target.value)} placeholder="Nombre, correo o teléfono" value={clientQuery} /><button className="rounded-md border px-3 text-sm font-semibold" onClick={findClients} type="button">Buscar</button></div>
+              <div className="mt-2 grid gap-2">{clients.slice(0, 6).map((client) => <button className={`rounded-md border p-2 text-left text-sm ${selectedClient?.id === client.id ? "border-emerald-700 bg-emerald-50" : ""}`} key={client.id} onClick={() => setSelectedClient(client)} type="button">{client.firstName} {client.lastName}</button>)}</div>
+              <div className="mt-4 grid gap-3">
+                <Field label="Rutina"><select className="app-input" onChange={(e) => setSelectedWorkoutId(e.target.value)} value={selectedWorkoutId}><option value="">Selecciona una rutina publicada</option>{publishedWorkouts.map((workout) => <option key={workout.id} value={workout.id}>{workout.title} · v{workout.latestVersionNumber}</option>)}</select></Field>
+                <div className="grid grid-cols-2 gap-3"><Field label="Inicio"><input className="app-input" onChange={(e) => setStartsOn(e.target.value)} type="date" value={startsOn} /></Field><Field label="Fin"><input className="app-input" onChange={(e) => setEndsOn(e.target.value)} type="date" value={endsOn} /></Field></div>
+                <Field label="Indicaciones imprimibles"><textarea className="app-input min-h-20" onChange={(e) => setPrintableNotes(e.target.value)} value={printableNotes} /></Field>
+                <Field label="Notas privadas"><textarea className="app-input min-h-16" onChange={(e) => setPrivateNotes(e.target.value)} value={privateNotes} /></Field>
+                <button className="rounded-lg bg-[#173c2a] px-4 py-2 font-semibold text-white disabled:opacity-60" disabled={saving || !selectedClient || !selectedWorkoutId} type="submit">Asignar rutina</button>
+              </div>
+            </form>
+            <AssignmentTable report={report} session={session} />
+          </section>
+        ) : null}
+
+        {tab === "metrics" ? (
+          <section className="grid gap-5">
+            <div className="flex flex-wrap items-end gap-3 rounded-xl border border-[#d9e2dc] bg-white p-4">
+              <Field label="Desde"><input className="app-input" onChange={(e) => setReportFrom(e.target.value)} type="date" value={reportFrom} /></Field>
+              <Field label="Hasta"><input className="app-input" onChange={(e) => setReportTo(e.target.value)} type="date" value={reportTo} /></Field>
+              <button className="rounded-md bg-[#173c2a] px-4 py-2 text-sm font-semibold text-white" onClick={loadReport} type="button">Actualizar</button>
+              <button className="rounded-md border px-4 py-2 text-sm font-semibold" onClick={() => downloadAssignmentCsv(session.accessToken, { from: reportFrom, to: reportTo })} type="button">Exportar CSV</button>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <Metric label="Rutinas asignadas" value={report?.assignments ?? 0} />
+              <Metric label="Socios atendidos" value={report?.uniqueClients ?? 0} />
+              <Metric label="Coaches activos" value={report?.activeCoaches ?? 0} />
+              <Metric label="Sin asignaciones" value={report?.coachesWithoutAssignments ?? 0} />
+            </div>
+            <section className="rounded-xl border border-[#d9e2dc] bg-white p-5">
+              <h2 className="text-xl font-semibold">Desempeño por coach</h2>
+              <div className="mt-4 grid gap-2">
+                {report?.coaches.map((coach) => (
+                  <article className="grid items-center gap-2 rounded-lg border border-[#e0e7e2] p-3 sm:grid-cols-[1fr_repeat(3,120px)]" key={coach.coachId}>
+                    <strong>{coach.coachName}</strong><span>{coach.assignments} asignadas</span><span>{coach.uniqueClients} socios</span><span>{coach.firstWorkouts} primeras</span>
+                  </article>
+                ))}
+              </div>
+            </section>
+            <AssignmentTable report={report} session={session} />
+          </section>
+        ) : null}
+      </div>
     </AppShell>
+  );
+
+  function clearFeedback() { setError(null); setMessage(null); }
+}
+
+function AssignmentTable({ report, session }: { report: AssignmentReport | null; session: StoredSession }) {
+  const [changing, setChanging] = useState<string | null>(null);
+  async function changeStatus(id: string, status: "COMPLETED" | "CANCELLED") {
+    setChanging(id);
+    try {
+      await updateWorkoutAssignmentStatus(session.accessToken, id, status);
+      window.location.reload();
+    } finally {
+      setChanging(null);
+    }
+  }
+  return (
+    <section className="rounded-xl border border-[#d9e2dc] bg-white p-5">
+      <h2 className="text-xl font-semibold">Historial de asignaciones</h2>
+      <div className="mt-4 grid gap-2">
+        {report?.details.length ? report.details.map((assignment) => (
+          <article className="grid gap-2 rounded-lg border border-[#e0e7e2] p-3 md:grid-cols-[1fr_1fr_auto]" key={assignment.id}>
+            <div><strong>{assignment.clientName}</strong><p className="text-xs text-[#637268]">{assignment.assignedOn} · {assignment.coachName || "Sin coach"}</p></div>
+            <div><p>{assignment.workoutTitle}</p><p className="text-xs text-[#637268]">Versión {assignment.versionNumber} · {assignment.status}</p></div>
+            <div className="flex flex-wrap gap-2">
+              <button className="rounded-md border border-[#9eb2a5] px-3 py-2 text-sm font-semibold" onClick={() => downloadWorkoutPdf(session.accessToken, assignment.id)} type="button">PDF</button>
+              {assignment.status === "ACTIVE" ? <button className="rounded-md border px-3 py-2 text-sm font-semibold" disabled={changing === assignment.id} onClick={() => changeStatus(assignment.id, "COMPLETED")} type="button">Completar</button> : null}
+            </div>
+          </article>
+        )) : <p className="rounded-lg border border-dashed p-5 text-sm text-[#637268]">No hay asignaciones en el periodo.</p>}
+      </div>
+    </section>
   );
 }
 
-function Metric({ label, value }: { label: string; value: number }) { return <article className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm"><p className="text-sm font-medium text-[#5d6b63]">{label}</p><p className="mt-2 text-3xl font-semibold">{value}</p></article>; }
-function isCoachRole(role: string) { return role.toLowerCase().includes("coach"); }
-function sameIdentity(profile: CoachSummary, user: InternalUserSummary) { return Boolean(profile.email && user.email && profile.email.toLowerCase() === user.email.toLowerCase()) || profile.displayName.trim().toLowerCase() === user.fullName.trim().toLowerCase(); }
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return <label className="grid min-w-0 gap-1 text-sm font-medium text-[#435249]"><span>{label}</span>{children}</label>;
+}
+
+function Metric({ label, value }: { label: string; value: number }) {
+  return <article className="rounded-xl border border-[#d9e2dc] bg-white p-5"><p className="text-sm text-[#637268]">{label}</p><p className="mt-1 text-3xl font-semibold">{value}</p></article>;
+}
+
+function validateWorkout(title: string, sessions: WorkoutSessionDraft[]) {
+  if (!title.trim()) return "Escribe un título para la rutina.";
+  if (!sessions.length) return "Agrega al menos una sesión.";
+  if (sessions.some((session) => !session.name.trim())) return "Cada sesión necesita nombre.";
+  if (sessions.some((session) => session.blocks.some((block) => block.exercises.some((exercise) => !exercise.exerciseName.trim())))) return "Todos los ejercicios necesitan nombre.";
+  return null;
+}
+
+function errorMessage(error: unknown) { return error instanceof Error ? error.message : "No fue posible completar la operación."; }
+function today() { return new Date().toISOString().slice(0, 10); }
+function startOfWeek() {
+  const date = new Date();
+  const day = date.getDay() || 7;
+  date.setDate(date.getDate() - day + 1);
+  return date.toISOString().slice(0, 10);
+}

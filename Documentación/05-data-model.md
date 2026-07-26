@@ -338,6 +338,25 @@ Regla:
 - ends_on
 - notes
 
+### Modelo objetivo para cierre de Coaches y rutinas
+
+El esquema de Hito 5 es una base, no el diseño final. Debe evolucionar conservando
+datos hacia:
+
+- `coach_profile` vinculado a `user/person` y `coach_branch`;
+- `exercise`, `exercise_alias`, `exercise_muscle_group` y `exercise_equipment`;
+- `workout`, `workout_version`, `workout_session`, `workout_session_block` y
+  `workout_exercise`;
+- `workout_assignment` con versión obligatoria, llave idempotente, actor, notas
+  privadas y observaciones imprimibles;
+- eventos o auditoría de reemplazo, cancelación y finalización.
+
+Todas las tablas incluyen `organization_id`; las dependientes de sede incluyen
+`branch_id`. Los históricos conservan nombre, prescripción e indicaciones aunque un
+ejercicio se archive. `content_json` puede mantenerse como instantánea compatible,
+pero deja de ser la única representación editable. Coaching no referencia ventas,
+pagos, comisiones ni caja.
+
 ### professional
 - organization_id
 - branch_id

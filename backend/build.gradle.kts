@@ -35,6 +35,7 @@ dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-webmvc")
 	implementation("io.minio:minio:${property("minioVersion")}")
 	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:${property("springdocVersion")}")
+	implementation("org.apache.pdfbox:pdfbox:3.0.3")
 	implementation("org.springframework.modulith:spring-modulith-starter-core")
 	implementation("org.springframework.modulith:spring-modulith-starter-jpa")
 	runtimeOnly("org.springframework.modulith:spring-modulith-starter-insight")

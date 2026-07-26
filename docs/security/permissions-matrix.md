@@ -104,6 +104,11 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 | GET | `/api/v1/workouts/**` | coaching | `workout.read` | Sí | Sí | No | Pendiente |
 | POST | `/api/v1/workouts/**` | coaching | `workout.manage` | Sí | Sí | Sí | `workoutAssignmentRequiresManagePermission` negativo |
 | GET | `/api/v1/reports/coaches` | coaching/reporting | `report.coaches.read` | Sí | Sí | No | Pendiente |
+| GET | `/api/v1/exercises/**` | coaching | `exercise.read` | Sí | Según origen | No | Objetivo de cierre |
+| POST/PUT/PATCH | `/api/v1/exercises/**` | coaching | `exercise.create` / `exercise.manage` | Sí | Según origen | Sí | Objetivo de cierre |
+| POST | `/api/v1/workout-assignments` | coaching | `workout.assign` | Sí | Sí | Sí | Objetivo de cierre: tenant, sucursal e idempotencia |
+| GET | `/api/v1/workout-assignments/*/pdf` | coaching | `workout.pdf.download` | Sí | Sí | Opcional | Objetivo de cierre |
+| GET | `/api/v1/reports/coaches/workout-assignments/**` | coaching/reporting | `coach.metrics.read` | Sí | Sí | No | Objetivo de cierre |
 | GET | `/api/v1/professionals/**` | wellness | `professional.read` | Sí | Sí | No | Pendiente |
 | POST | `/api/v1/professionals/**` | wellness | `professional.manage` | Sí | Sí | Sí | `professionalCreationRequiresManagePermission` negativo |
 | GET | `/api/v1/notifications/**` | notifications | `notification.read` | Sí | No | No | Pendiente |
@@ -116,6 +121,9 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 
 1. Convertir cada fila `Pendiente` en prueba MVC o integración.
 2. Dividir endpoints públicos por perfil: OpenAPI/Swagger no deben quedar públicos en producción sin decisión explícita.
-3. Agregar prueba negativa de selección de sucursal ajena.
-4. Agregar prueba negativa de UUID ajeno por módulo crítico.
-5. Verificar que toda operación marcada con auditoría escriba realmente `audit_log`.
+3. Sustituir los permisos amplios de coaching por lectura, gestión propia/global,
+   asignación, PDF y métricas; coach solo ve sus rutinas/asignaciones y dueño/gerente
+   quedan limitados por organización y sucursales autorizadas.
+4. Agregar prueba negativa de selección de sucursal ajena.
+5. Agregar prueba negativa de UUID ajeno por módulo crítico.
+6. Verificar que toda operación marcada con auditoría escriba realmente `audit_log`.

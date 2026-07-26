@@ -24,6 +24,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -90,6 +91,50 @@ public class CoachingController {
 		return coachingService.assignWorkout(principal, workoutId, request.toCommand(), correlationId(servletRequest));
 	}
 
+	@PostMapping("/workout-assignments")
+	WorkoutAssignmentRecord createAssignment(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@Valid @RequestBody CreateAssignmentRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return coachingService.assignWorkout(
+				principal, request.workoutId(),
+				new AssignWorkoutCommand(
+						request.clientId(), request.workoutVersionId(), request.startsOn(), request.endsOn(),
+						request.privateNotes(), request.printableNotes(), request.idempotencyKey()
+				),
+				correlationId(servletRequest)
+		);
+	}
+
+	@PostMapping("/workouts/{workoutId}/duplicate")
+	WorkoutDetailRecord duplicateWorkout(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID workoutId,
+			HttpServletRequest servletRequest
+	) {
+		return coachingService.duplicateWorkout(principal, workoutId, correlationId(servletRequest));
+	}
+
+	@PostMapping("/workouts/{workoutId}/publish")
+	WorkoutDetailRecord publishWorkout(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID workoutId,
+			HttpServletRequest servletRequest
+	) {
+		return coachingService.publishWorkout(principal, workoutId, correlationId(servletRequest));
+	}
+
+	@PatchMapping("/workout-assignments/{assignmentId}/status")
+	WorkoutAssignmentRecord updateAssignmentStatus(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID assignmentId,
+			@Valid @RequestBody AssignmentStatusRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return coachingService.updateAssignmentStatus(principal, assignmentId, request.status(), correlationId(servletRequest));
+	}
+
 	@GetMapping("/clients/{clientId}/workouts")
 	List<WorkoutAssignmentRecord> clientWorkouts(@AuthenticationPrincipal GymOsPrincipal principal, @PathVariable UUID clientId) {
 		return coachingService.clientWorkouts(principal, clientId);
@@ -144,10 +189,24 @@ public class CoachingController {
 			UUID workoutVersionId,
 			LocalDate startsOn,
 			LocalDate endsOn,
-			@Size(max = 2000) String notes
+			@Size(max = 2000) String notes,
+			@Size(max = 4000) String printableNotes,
+			@Size(max = 160) String idempotencyKey
 	) {
 		private AssignWorkoutCommand toCommand() {
-			return new AssignWorkoutCommand(clientId, workoutVersionId, startsOn, endsOn, notes);
+			return new AssignWorkoutCommand(clientId, workoutVersionId, startsOn, endsOn, notes, printableNotes, idempotencyKey);
 		}
 	}
+
+	public record CreateAssignmentRequest(
+			@NotNull UUID workoutId,
+			@NotNull UUID clientId,
+			UUID workoutVersionId,
+			LocalDate startsOn,
+			LocalDate endsOn,
+			@Size(max = 2000) String privateNotes,
+			@Size(max = 4000) String printableNotes,
+			@NotBlank @Size(max = 160) String idempotencyKey
+	) {}
+	public record AssignmentStatusRequest(@NotBlank String status) {}
 }

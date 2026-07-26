@@ -344,3 +344,29 @@ Formularios:
 - El dashboard de recepcion prioriza una banda visual con el color principal y acciones asimetricas; evita verse como una lista plana de tarjetas independientes.
 - El kiosco muestra logo, nombre y colores del gimnasio propietario del terminal.
 - `/settings/organization` permite configurar marca solo en la seccion del gimnasio; la seccion de sucursales solo administra datos operativos de cada sede.
+
+## Coaches y rutinas
+
+La pantalla actual `/coaches` con textarea JSON es un prototipo operativo, no la
+experiencia final.
+
+La solución objetivo separa:
+
+- `/coaches`: equipo, perfiles, sucursales, estado y desempeño;
+- `/exercises`: catálogo paginado, filtros, aliases, creación rápida y archivado;
+- `/workouts`: biblioteca de borradores/publicadas, duplicado y versionado;
+- `/workouts/new` y `/workouts/{id}/edit`: constructor visual por sesiones,
+  bloques y ejercicios reordenables;
+- `/workout-assignments`: asignación, historial, reemplazo, estado y PDF;
+- dashboard de dueño/gerencia: semana actual/anterior, tendencia, socios únicos,
+  primeras rutinas, reasignaciones y coaches sin actividad.
+
+El constructor combina campos estructurados con prescripción libre y representa
+`3x20`, `3x12, 10, 8 subiendo`, `3x24 pasos`, `3 series`, alternativas `VS`,
+opcionales y notas narrativas. Crear un ejercicio inline no pierde el borrador. El
+reordenamiento tiene alternativa accesible al arrastrar y soltar.
+
+La vista previa de PDF muestra marca, socio, coach, sesiones, prescripción,
+indicaciones e imágenes opcionales de movilidad/estiramiento. El archivo final se
+descarga desde la asignación. La UI nunca muestra precio, cobro, comisión ni POS
+para rutinas; el socio no tiene vista remota en V1.

@@ -188,12 +188,28 @@ Criterios:
 
 ## UC-013 Crear rutina
 
-1. Coach selecciona cliente.
-2. Crea rutina estructurada.
-3. Guarda versión.
-4. Asigna.
-5. Registra venta si aplica.
-6. Actualiza métrica del coach.
+Actor principal: Coach activo con sucursal habilitada.
+
+1. Crea o duplica una plantilla y define título, objetivo, nivel y sesiones.
+2. Busca ejercicios por nombre, alias, músculo, patrón o equipo.
+3. Si falta una opción, la crea inline sin perder el borrador; el sistema advierte duplicados.
+4. Ordena bloques y ejercicios y captura prescripción estructurada o libre.
+5. Puede agrupar superseries/circuitos, alternativas, opcionales, calentamiento,
+   movilidad, cardio, core y estiramiento.
+6. Guarda el borrador y publica una versión inmutable.
+7. Selecciona un socio activo dentro de su alcance y asigna esa versión.
+8. El sistema registra una sola asignación idempotente y actualiza la proyección semanal.
+9. El coach descarga el PDF para entrega física.
+
+Postcondiciones:
+
+- dueño y gerencia consultan coach, fecha, socio, rutina y versión;
+- la asignación conserva su contenido aunque se publique otra versión;
+- no se registra venta, pago, comisión, ingreso ni movimiento de caja.
+
+Alternativas: una versión en borrador no se asigna; un coach/socio fuera de alcance
+se rechaza; un reemplazo conserva el histórico; un reintento devuelve el resultado
+original sin duplicar la métrica.
 
 ## UC-014 Agendar o Solicitar Citas de Bienestar
 

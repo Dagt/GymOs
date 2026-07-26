@@ -150,7 +150,7 @@ public class CoachingRepository {
 				)
 				VALUES (
 				    :id, :organizationId, :branchId, :coachId, :title, :goal, :level,
-				    'ACTIVE', :createdAt, :updatedAt, :createdBy, :updatedBy, 0
+				    'DRAFT', :createdAt, :updatedAt, :createdBy, :updatedBy, 0
 				)
 				""")
 				.param("id", workoutId)
@@ -189,7 +189,7 @@ public class CoachingRepository {
 				)
 				VALUES (
 				    :id, :organizationId, :workoutId, :versionNumber, :summary,
-				    CAST(:contentJson AS jsonb), 'PUBLISHED', :createdAt, :createdBy
+				    CAST(:contentJson AS jsonb), 'DRAFT', :createdAt, :createdBy
 				)
 				""")
 				.param("id", versionId)
@@ -215,6 +215,84 @@ public class CoachingRepository {
 				.param("workoutId", workoutId)
 				.update();
 		return versionId;
+	}
+
+	public void publishWorkoutVersion(UUID organizationId, UUID workoutId, UUID versionId, UUID actorUserId) {
+		int published = jdbcClient.sql("""
+				UPDATE workout_version SET status = 'PUBLISHED'
+				WHERE id = :versionId AND workout_id = :workoutId
+				  AND organization_id = :organizationId AND status = 'DRAFT'
+				  AND deleted_at IS NULL
+				""")
+				.param("versionId", versionId)
+				.param("workoutId", workoutId)
+				.param("organizationId", organizationId)
+				.update();
+		if (published == 0) throw new IllegalStateException("Draft version not found");
+		jdbcClient.sql("""
+				UPDATE workout SET status = 'PUBLISHED', updated_at = now(),
+				    updated_by = :actorUserId, version = version + 1
+				WHERE id = :workoutId AND organization_id = :organizationId AND deleted_at IS NULL
+				""")
+				.param("actorUserId", actorUserId)
+				.param("workoutId", workoutId)
+				.param("organizationId", organizationId)
+				.update();
+	}
+
+	public UUID createWorkoutSession(
+			UUID organizationId, UUID versionId, String name, String focus, String notes, int position
+	) {
+		UUID id = UUID.randomUUID();
+		jdbcClient.sql("""
+				INSERT INTO workout_session (id, organization_id, workout_version_id, name, focus, notes, position)
+				VALUES (:id, :organizationId, :versionId, :name, :focus, :notes, :position)
+				""")
+				.param("id", id).param("organizationId", organizationId).param("versionId", versionId)
+				.param("name", name).param("focus", focus).param("notes", notes).param("position", position)
+				.update();
+		return id;
+	}
+
+	public UUID createWorkoutBlock(
+			UUID organizationId, UUID sessionId, String name, String type, String notes, int position
+	) {
+		UUID id = UUID.randomUUID();
+		jdbcClient.sql("""
+				INSERT INTO workout_session_block (
+				    id, organization_id, workout_session_id, name, block_type, notes, position
+				) VALUES (:id, :organizationId, :sessionId, :name, :type, :notes, :position)
+				""")
+				.param("id", id).param("organizationId", organizationId).param("sessionId", sessionId)
+				.param("name", name).param("type", type).param("notes", notes).param("position", position)
+				.update();
+		return id;
+	}
+
+	public void createWorkoutExercise(
+			UUID organizationId, UUID blockId, UUID exerciseId, String name, String prescription,
+			Integer sets, String reps, String load, Integer restSeconds, String tempo,
+			String duration, String distance, String notes, String groupKey, boolean optional, int position
+	) {
+		jdbcClient.sql("""
+				INSERT INTO workout_exercise (
+				    id, organization_id, workout_session_block_id, exercise_id,
+				    exercise_name_snapshot, prescription_text, sets, reps, load_text,
+				    rest_seconds, tempo, duration_text, distance_text, notes, group_key,
+				    optional, position
+				) VALUES (
+				    :id, :organizationId, :blockId, :exerciseId, :name, :prescription,
+				    :sets, :reps, :load, :restSeconds, :tempo, :duration, :distance,
+				    :notes, :groupKey, :optional, :position
+				)
+				""")
+				.param("id", UUID.randomUUID()).param("organizationId", organizationId)
+				.param("blockId", blockId).param("exerciseId", exerciseId).param("name", name)
+				.param("prescription", prescription).param("sets", sets).param("reps", reps)
+				.param("load", load).param("restSeconds", restSeconds).param("tempo", tempo)
+				.param("duration", duration).param("distance", distance).param("notes", notes)
+				.param("groupKey", groupKey).param("optional", optional).param("position", position)
+				.update();
 	}
 
 	public Optional<WorkoutVersionRecord> workoutVersion(UUID organizationId, UUID workoutId, UUID versionId) {
@@ -249,6 +327,27 @@ public class CoachingRepository {
 				.param("workoutId", workoutId)
 				.query(this::mapVersion)
 				.optional();
+	}
+
+	public void updateAssignmentStatus(
+			UUID organizationId, UUID branchId, UUID assignmentId, String status, UUID actorUserId
+	) {
+		int updated = jdbcClient.sql("""
+				UPDATE workout_assignment
+				SET status = :status, updated_at = now(), updated_by = :actorUserId,
+				    completed_at = CASE WHEN :status = 'COMPLETED' THEN now() ELSE completed_at END,
+				    cancelled_at = CASE WHEN :status = 'CANCELLED' THEN now() ELSE cancelled_at END,
+				    version = version + 1
+				WHERE id = :assignmentId AND organization_id = :organizationId
+				  AND branch_id = :branchId AND deleted_at IS NULL
+				""")
+				.param("status", status)
+				.param("actorUserId", actorUserId)
+				.param("assignmentId", assignmentId)
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.update();
+		if (updated == 0) throw new IllegalStateException("Assignment not found");
 	}
 
 	public List<WorkoutVersionRecord> workoutVersions(UUID organizationId, UUID workoutId) {
@@ -290,12 +389,14 @@ public class CoachingRepository {
 				INSERT INTO workout_assignment (
 				    id, organization_id, branch_id, workout_id, workout_version_id,
 				    client_id, coach_id, status, assigned_on, starts_on, ends_on,
-				    notes, created_at, updated_at, created_by, updated_by, version
+				    notes, printable_notes, idempotency_key, request_hash,
+				    created_at, updated_at, created_by, updated_by, version
 				)
 				VALUES (
 				    :id, :organizationId, :branchId, :workoutId, :workoutVersionId,
 				    :clientId, :coachId, 'ACTIVE', :assignedOn, :startsOn, :endsOn,
-				    :notes, :createdAt, :updatedAt, :createdBy, :updatedBy, 0
+				    :notes, :printableNotes, :idempotencyKey, :requestHash,
+				    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
 				)
 				""")
 				.param("id", assignmentId)
@@ -309,12 +410,28 @@ public class CoachingRepository {
 				.param("startsOn", data.startsOn())
 				.param("endsOn", data.endsOn())
 				.param("notes", data.notes())
+				.param("printableNotes", data.printableNotes())
+				.param("idempotencyKey", data.idempotencyKey())
+				.param("requestHash", data.requestHash())
 				.param("createdAt", now)
 				.param("updatedAt", now)
 				.param("createdBy", actorUserId)
 				.param("updatedBy", actorUserId)
 				.update();
 		return assignmentId;
+	}
+
+	public Optional<IdempotentAssignment> assignmentByIdempotencyKey(UUID organizationId, String key) {
+		return jdbcClient.sql("""
+				SELECT id, request_hash FROM workout_assignment
+				WHERE organization_id = :organizationId AND idempotency_key = :key
+				  AND deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("key", key)
+				.query((resultSet, rowNumber) -> new IdempotentAssignment(
+						resultSet.getObject("id", UUID.class), resultSet.getString("request_hash")
+				)).optional();
 	}
 
 	public List<WorkoutAssignmentRecord> clientAssignments(UUID organizationId, UUID branchId, UUID clientId) {
@@ -478,8 +595,14 @@ public class CoachingRepository {
 	public record CreateWorkoutVersionData(String summary, String contentJson) {
 	}
 
-	public record AssignWorkoutData(UUID workoutId, UUID workoutVersionId, UUID clientId, UUID coachId, LocalDate assignedOn, LocalDate startsOn, LocalDate endsOn, String notes) {
+	public record AssignWorkoutData(
+			UUID workoutId, UUID workoutVersionId, UUID clientId, UUID coachId,
+			LocalDate assignedOn, LocalDate startsOn, LocalDate endsOn, String notes,
+			String printableNotes, String idempotencyKey, String requestHash
+	) {
 	}
+
+	public record IdempotentAssignment(UUID assignmentId, String requestHash) {}
 
 	public record CoachRecord(UUID id, String displayName, String email, String phone, String specialtiesJson, String bio, String status, OffsetDateTime createdAt, OffsetDateTime updatedAt) {
 	}

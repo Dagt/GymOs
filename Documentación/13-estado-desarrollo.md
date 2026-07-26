@@ -637,7 +637,9 @@ Pendiente fuera del alcance central del Hito 4:
 
 ## Hito 5 - Servicios avanzados
 
-Estado: completo
+Estado histórico: completo como base técnica. El módulo de Coaches y rutinas
+permanece `IN_PROGRESS` para producto final según
+`25-plan-accion-coaches-rutinas.md`.
 
 Implementado:
 
@@ -668,6 +670,43 @@ Verificado localmente:
 - Frontend typecheck.
 - Frontend build de produccion.
 - Docker Compose config.
+
+Brechas de Coaches y rutinas abiertas en `feature/coaches-workouts`:
+
+- catálogo amplio/extensible de ejercicios y seed;
+- constructor visual en lugar de captura JSON manual;
+- borrador, publicación, duplicado y modelo normalizado de sesiones/bloques;
+- asignación idempotente, reemplazo e historial completo;
+- PDF imprimible por asignación;
+- métricas semanales por coach y detalle de socios;
+- permisos granulares, aislamiento y pruebas propias del módulo.
+
+Decisión de alcance: una rutina no es producto ni servicio de POS. Los cobros en
+efectivo entre coach y socio no se registran y no generan ventas, pagos, comisiones,
+ingresos ni movimientos de caja en GymOS.
+
+## Avance de Coaches y rutinas - 26 de julio de 2026
+
+Estado: núcleo funcional implementado; cierre integral pendiente en
+`feature/coaches-workouts`.
+
+- Migración `V45__complete_coaches_workouts.sql`.
+- Catálogo global/extensible con más de 60 ejercicios base.
+- Sesiones, bloques y prescripciones normalizadas con instantánea JSON compatible.
+- Borradores, publicación, duplicado y versiones inmutables.
+- Asignación idempotente y estados operativos.
+- PDF imprimible desde la versión asignada.
+- Métricas por periodo, coach y socio, incluyendo coaches sin actividad.
+- Exportación CSV y permisos granulares.
+- Nueva consola `/coaches` con constructor, catálogo, asignaciones e indicadores.
+- Documento de avance y backlog: `27-implementacion-coaches-rutinas.md`.
+- Pendientes P1: edición de rutinas, aliases/edición de ejercicios, constructor con
+  múltiples bloques y reordenamiento, prescripción completa, reemplazos, contratos
+  de detalle, autorización por propiedad, OpenAPI y E2E.
+- Pendientes P2: comparación semanal, filtros, indicadores, perfil multi-sucursal,
+  ciclo de vida del catálogo, paginación y medios.
+- PDF pendiente de identidad visual, contenido avanzado, reproducibilidad y pruebas
+  de impresión/renderizado.
 
 Pendiente fuera del alcance central del Hito 5:
 
