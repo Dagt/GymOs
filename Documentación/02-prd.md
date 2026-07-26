@@ -24,7 +24,7 @@ Acceso operativo y reportes de una sucursal específica, según permisos asignad
 Usuario operativo principal. Debe poder registrar clientes, cobrar, renovar, vender, reservar y resolver excepciones con velocidad.
 
 ### Coach
-Puede gestionar rutinas, asignaciones y seguimiento de clientes según permisos.
+Puede administrar su perfil, consultar o ampliar el catálogo de ejercicios, crear y versionar rutinas, asignarlas a socios dentro de su alcance y descargar el PDF imprimible. No registra cobros de rutinas en GymOS.
 
 ### Profesional de bienestar
 Puede administrar servicios, disponibilidad y citas.
@@ -100,6 +100,8 @@ Cliente usando una pantalla compartida dentro del gimnasio. Puede consultar info
 - Integración futura con pasarela.
 - Recibos y notificaciones.
 
+Los pagos cubiertos por este apartado corresponden a productos y servicios comercializados por el gimnasio. Los acuerdos o cobros en efectivo entre coach y socio por una rutina se realizan fuera de GymOS y no generan ventas, pagos, comisiones, ingresos ni movimientos de caja en la plataforma.
+
 ### Kiosco de autoservicio
 - Pantalla interna para uso de clientes dentro del gimnasio.
 - Identificación segura del cliente mediante mecanismo configurable.
@@ -119,10 +121,11 @@ Cliente usando una pantalla compartida dentro del gimnasio. Puede consultar info
 - Productos físicos.
 - Dosis o consumos simples sin control fino de gramos.
 - Reservas.
-- Servicios.
-- Rutinas.
+- Servicios comercializados por el gimnasio.
 - Consultas.
 - Operaciones rápidas.
+
+Las rutinas creadas o asignadas por coaches no son artículos del POS en V1.
 
 ### Inventario
 - Control opcional por producto.
@@ -161,12 +164,30 @@ Cliente usando una pantalla compartida dentro del gimnasio. Puede consultar info
 - Independencia de proveedor.
 
 ### Entrenadores y rutinas
-- Perfil de coach.
-- Rutinas estructuradas.
-- Versionado.
-- Asignación a clientes.
-- Venta de rutinas.
-- Métricas por coach.
+- Perfil de coach vinculado con la identidad interna existente.
+- Alcance de coach por organización y sucursal.
+- Catálogo inicial amplio de ejercicios.
+- Búsqueda por nombre, alias, grupo muscular, patrón de movimiento, tipo y equipamiento.
+- Alta de ejercicios faltantes por organización o coach, con detección de duplicados y archivado lógico.
+- Rutinas estructuradas por días o sesiones, bloques y ejercicios ordenados.
+- Prescripción flexible para series, repeticiones, carga, intensidad, descanso, tempo, duración, distancia, pasos y notas libres.
+- Soporte para calentamiento, movilidad, fuerza, cardio, core, superseries, circuitos, ejercicios opcionales y estiramiento.
+- Borradores, publicación y versionado inmutable.
+- Asignación de una versión específica a un socio elegible.
+- Historial de asignaciones y reemplazos sin alterar versiones anteriores.
+- Generación y descarga de PDF imprimible para entrega física al socio.
+- Métricas semanales de asignaciones por coach, sucursal y socio.
+- Socios únicos atendidos, primera rutina, reasignaciones y coaches sin actividad.
+- Exportación del detalle para supervisión.
+
+Reglas de alcance:
+
+- La creación o asignación de una rutina no genera una venta ni un pago.
+- El efectivo cobrado directamente por el coach no se registra en GymOS.
+- Las métricas miden involucramiento operativo, no ingresos ni comisiones.
+- La aplicación móvil o portal remoto para que el socio consulte su rutina queda fuera de V1.
+- El dominio y los contratos deben quedar preparados para que una futura app consuma la versión asignada.
+- El documento rector de este módulo es `25-plan-accion-coaches-rutinas.md`.
 
 ### Profesionales de bienestar
 - Quiropráctico.
@@ -204,13 +225,17 @@ Cliente usando una pantalla compartida dentro del gimnasio. Puede consultar info
 - Accesos por horario.
 - Uso de recursos.
 - Inventario bajo.
-- Desempeño de coaches.
-- Ingresos por categoría.
+- Desempeño de coaches medido por asignaciones de rutinas y socios atendidos.
+- Ingresos por categoría, excluyendo rutinas externas de coaches.
 
 ## 2.4 Exclusiones V1
 
 - App móvil o portal remoto completo para clientes.
+- Visualización remota de rutinas por el socio.
 - Pasarela de pagos obligatoria en producción.
+- Cobro de rutinas de coaches por POS o pasarela.
+- Registro del efectivo recibido por el coach.
+- Comisiones, nómina o liquidaciones de coaches.
 - Microservicios.
 - Control de gramos exactos por scoop.
 - Contabilidad completa.
@@ -231,3 +256,5 @@ Cliente usando una pantalla compartida dentro del gimnasio. Puede consultar info
 - Migraciones controladas.
 - Backups.
 - Escalabilidad horizontal futura.
+- Generación de PDF estable, legible y reproducible desde la versión asignada.
+- Búsqueda paginada y extensible del catálogo de ejercicios.
