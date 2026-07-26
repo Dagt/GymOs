@@ -220,6 +220,25 @@ public class CoachingCatalogService {
 			GymOsPrincipal principal, LocalDate from, LocalDate to, UUID coachId, UUID clientId,
 			int page, int size
 	) {
+		return buildAssignmentReport(
+				principal, from, to, coachId, clientId, page, size, workoutReadScope(principal)
+		);
+	}
+
+	@Transactional(readOnly = true)
+	public AssignmentReport metricsReport(
+			GymOsPrincipal principal, LocalDate from, LocalDate to, UUID coachId, UUID clientId,
+			int page, int size
+	) {
+		return buildAssignmentReport(
+				principal, from, to, coachId, clientId, page, size, metricsReadScope(principal)
+		);
+	}
+
+	private AssignmentReport buildAssignmentReport(
+			GymOsPrincipal principal, LocalDate from, LocalDate to, UUID coachId, UUID clientId,
+			int page, int size, UUID ownerUserId
+	) {
 		requireBranch(principal);
 		LocalDate safeTo = to == null ? BusinessTime.today() : to;
 		LocalDate safeFrom = from == null ? safeTo.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)) : from;
@@ -228,7 +247,6 @@ public class CoachingCatalogService {
 		}
 		int safePage = Math.max(0, page);
 		int safeSize = Math.max(1, Math.min(MAX_PAGE_SIZE, size));
-		UUID ownerUserId = workoutReadScope(principal);
 		List<CoachMetric> metrics = repository.metrics(
 				principal.organizationId(), principal.branchId(), safeFrom, safeTo,
 				coachId, clientId, ownerUserId
@@ -276,7 +294,7 @@ public class CoachingCatalogService {
 		LocalDate safeTo = to == null ? BusinessTime.today() : to;
 		LocalDate currentWeek = safeTo.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
 		LocalDate safeFrom = currentWeek.minusWeeks(weeks - 1L);
-		UUID ownerUserId = workoutReadScope(principal);
+		UUID ownerUserId = metricsReadScope(principal);
 		Map<LocalDate, WeeklyTrendMetric> values = repository.weeklyTrend(
 				principal.organizationId(), principal.branchId(), safeFrom, safeTo,
 				coachId, clientId, ownerUserId
@@ -301,7 +319,10 @@ public class CoachingCatalogService {
 	public byte[] assignmentCsv(
 			GymOsPrincipal principal, LocalDate from, LocalDate to, UUID coachId, UUID clientId
 	) {
-		AssignmentReport report = assignmentReport(principal, from, to, coachId, clientId);
+		UUID ownerUserId = metricsReadScope(principal);
+		AssignmentReport report = buildAssignmentReport(
+				principal, from, to, coachId, clientId, 0, 50, ownerUserId
+		);
 		if (report.totalDetails() > 10_000) {
 			throw new BusinessException(
 					"REPORT_EXPORT_TOO_LARGE",
@@ -310,7 +331,7 @@ public class CoachingCatalogService {
 		}
 		List<AssignmentDetail> exportRows = repository.assignments(
 				principal.organizationId(), principal.branchId(), report.from(), report.to(),
-				coachId, clientId, workoutReadScope(principal),
+				coachId, clientId, ownerUserId,
 				Math.max(1, (int) report.totalDetails()), 0
 		);
 		StringBuilder csv = new StringBuilder(
@@ -433,6 +454,20 @@ public class CoachingCatalogService {
 		if (principal.permissions().contains("workout.read.own")
 				|| principal.permissions().contains("workout.manage.own")) return principal.userId();
 		throw new BusinessException("WORKOUT_READ_FORBIDDEN", "No tienes permiso para consultar esta rutina.");
+	}
+
+	private UUID metricsReadScope(GymOsPrincipal principal) {
+		if (!principal.permissions().contains("coach.metrics.read")) {
+			throw new BusinessException(
+					"COACH_METRICS_READ_FORBIDDEN",
+					"No tienes permiso para consultar las métricas de coaches."
+			);
+		}
+		if (principal.permissions().contains("workout.read.all")
+				|| principal.permissions().contains("workout.manage.all")) return null;
+		if (principal.permissions().contains("workout.read.own")
+				|| principal.permissions().contains("workout.manage.own")) return principal.userId();
+		return null;
 	}
 
 	public record CreateExerciseCommand(

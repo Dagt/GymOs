@@ -42,7 +42,8 @@ class CoachingCatalogServiceTests {
 		service = new CoachingCatalogService(repository, mock(AuditService.class), new ObjectMapper());
 		principal = new GymOsPrincipal(
 				UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
-				"coach", "Coach", Set.of("exercise.read", "exercise.create", "workout.read.all")
+				"coach", "Coach",
+				Set.of("exercise.read", "exercise.create", "workout.read.all", "coach.metrics.read")
 		);
 	}
 
@@ -197,6 +198,66 @@ class CoachingCatalogServiceTests {
 		)).thenReturn(new AssignmentStats(0, 0, 0));
 
 		service.assignmentReport(coach, LocalDate.of(2026, 7, 20), LocalDate.of(2026, 7, 26), null, null);
+
+		verify(repository).metrics(
+				eq(coach.organizationId()), eq(coach.branchId()), any(), any(),
+				any(), any(), eq(coach.userId())
+		);
+	}
+
+	@Test
+	void metricsOnlySupervisorReadsBranchMetricsWithoutWorkoutPermission() {
+		GymOsPrincipal owner = new GymOsPrincipal(
+				principal.userId(), principal.organizationId(), principal.branchId(),
+				"owner", "Owner", Set.of("coach.metrics.read")
+		);
+		when(repository.metrics(
+				eq(owner.organizationId()), eq(owner.branchId()), any(), any(),
+				any(), any(), eq((UUID) null)
+		)).thenReturn(List.of());
+		when(repository.assignments(
+				eq(owner.organizationId()), eq(owner.branchId()), any(), any(),
+				any(), any(), eq((UUID) null), anyInt(), anyInt()
+		)).thenReturn(List.of());
+		when(repository.assignmentStats(
+				eq(owner.organizationId()), eq(owner.branchId()), any(), any(),
+				any(), any(), eq((UUID) null)
+		)).thenReturn(new AssignmentStats(0, 0, 0));
+
+		service.metricsReport(
+				owner, LocalDate.of(2026, 7, 20), LocalDate.of(2026, 7, 26),
+				null, null, 0, 25
+		);
+
+		verify(repository).metrics(
+				eq(owner.organizationId()), eq(owner.branchId()), any(), any(),
+				any(), any(), eq((UUID) null)
+		);
+	}
+
+	@Test
+	void coachMetricsRemainRestrictedToTheAuthenticatedCoach() {
+		GymOsPrincipal coach = new GymOsPrincipal(
+				principal.userId(), principal.organizationId(), principal.branchId(),
+				"coach", "Coach", Set.of("coach.metrics.read", "workout.read.own")
+		);
+		when(repository.metrics(
+				eq(coach.organizationId()), eq(coach.branchId()), any(), any(),
+				any(), any(), eq(coach.userId())
+		)).thenReturn(List.of());
+		when(repository.assignments(
+				eq(coach.organizationId()), eq(coach.branchId()), any(), any(),
+				any(), any(), eq(coach.userId()), anyInt(), anyInt()
+		)).thenReturn(List.of());
+		when(repository.assignmentStats(
+				eq(coach.organizationId()), eq(coach.branchId()), any(), any(),
+				any(), any(), eq(coach.userId())
+		)).thenReturn(new AssignmentStats(0, 0, 0));
+
+		service.metricsReport(
+				coach, LocalDate.of(2026, 7, 20), LocalDate.of(2026, 7, 26),
+				null, null, 0, 25
+		);
 
 		verify(repository).metrics(
 				eq(coach.organizationId()), eq(coach.branchId()), any(), any(),

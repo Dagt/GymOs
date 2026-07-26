@@ -176,7 +176,7 @@ test.describe("coaches y rutinas", () => {
     await expect(page.getByLabel("Rutinas asignadas por semana")).toBeVisible();
   });
 
-  test("el dueño sólo consulta métricas y no carga superficies operativas", async ({ page }) => {
+  test("el dueño entra directamente a métricas sin pestañas ni superficies operativas", async ({ page }) => {
     const operationalRequests: string[] = [];
     await bootCoaching(page, async (route, path) => {
       if (path === "/workouts" || path === "/exercises" || path === "/coaches/profiles") {
@@ -187,10 +187,33 @@ test.describe("coaches y rutinas", () => {
 
     await page.goto("/coaches");
 
-    await expect(page.getByRole("button", { name: "Métricas" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Métricas" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Constructor" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Ejercicios" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Asignaciones" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Información de la rutina" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Actividad semanal" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "PDF" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Cancelar", exact: true })).toHaveCount(0);
+    expect(operationalRequests).toEqual([]);
+  });
+
+  test("el gerente entra directamente a métricas aunque conserve un token operativo anterior", async ({ page }) => {
+    const operationalRequests: string[] = [];
+    await bootCoaching(page, async (route, path) => {
+      if (path === "/workouts" || path === "/exercises" || path === "/coaches/profiles") {
+        operationalRequests.push(path);
+      }
+      return false;
+    }, managerWithStalePermissions());
+
+    await page.goto("/coaches");
+
+    await expect(page.getByRole("button", { name: "Métricas" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Constructor" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Ejercicios" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Asignaciones" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Información de la rutina" })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Actividad semanal" })).toBeVisible();
     await expect(page.getByRole("button", { name: "PDF" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Cancelar", exact: true })).toHaveCount(0);
@@ -492,5 +515,28 @@ function ownerUser() {
     ],
     roles: ["Dueno del gimnasio"],
     console: "TENANT_OWNER",
+  };
+}
+
+function managerWithStalePermissions() {
+  return {
+    ...coachUser(),
+    userId: ownerUserId,
+    username: "manager@gymos.test",
+    fullName: "Manager GymOS",
+    permissions: [
+      "branch.read",
+      "client.read",
+      "coach.read",
+      "coach.metrics.read",
+      "exercise.read",
+      "exercise.manage",
+      "workout.read.all",
+      "workout.manage.all",
+      "workout.assign",
+      "workout.pdf.download",
+    ],
+    roles: ["Gerente"],
+    console: "TENANT_MANAGER",
   };
 }

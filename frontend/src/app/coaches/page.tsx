@@ -77,7 +77,7 @@ export default function CoachesPage() {
   const [exercisePage, setExercisePage] = useState<Exercise[]>([]);
   const [report, setReport] = useState<AssignmentReport | null>(null);
   const [trend, setTrend] = useState<WeeklyTrendReport | null>(null);
-  const [tab, setTab] = useState<Tab>("builder");
+  const [tab, setTab] = useState<Tab>("metrics");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -123,12 +123,13 @@ export default function CoachesPage() {
         return;
       }
       setSession(stored);
+      setTab(availableTabs(stored)[0] ?? "metrics");
       try {
-        const ownerMetricsOnly = isTenantOwner(stored);
-        const canReadWorkouts = !ownerMetricsOnly && hasAnyPermission(
+        const supervisorMetricsOnly = isMetricsOnlySupervisor(stored);
+        const canReadWorkouts = !supervisorMetricsOnly && hasAnyPermission(
           stored, "workout.read.own", "workout.read.all", "workout.manage.own", "workout.manage.all",
         );
-        const canReadExercises = !ownerMetricsOnly
+        const canReadExercises = !supervisorMetricsOnly
           && stored.user.permissions.includes("exercise.read");
         const canReadMetrics = stored.user.permissions.includes("coach.metrics.read");
         const [loadedBranches, loadedCoaches, loadedWorkouts, loadedExercises, loadedReport, loadedTrend] =
@@ -153,7 +154,6 @@ export default function CoachesPage() {
         setExercisePage(loadedExercises.items);
         setReport(loadedReport);
         setTrend(loadedTrend);
-        setTab(availableTabs(stored)[0] ?? "metrics");
         const canManageAll = stored.user.permissions.includes("workout.manage.all");
         setCoachId(
           (canManageAll
@@ -189,16 +189,18 @@ export default function CoachesPage() {
     () => workouts.filter(isPublished),
     [workouts],
   );
-  const canManageAllWorkouts = session?.user.permissions.includes("workout.manage.all") ?? false;
+  const canManageAllWorkouts = session
+    ? !isMetricsOnlySupervisor(session) && session.user.permissions.includes("workout.manage.all")
+    : false;
   const selectableCoaches = canManageAllWorkouts
     ? coaches
     : coaches.filter((coach) => coach.userAccountId === session?.user.userId);
   const canManageExerciseCatalog = session?.user.permissions.includes("exercise.manage") ?? false;
   const canManageAssignments = session
-    ? !isTenantOwner(session) && session.user.permissions.includes("workout.assign")
+    ? !isMetricsOnlySupervisor(session) && session.user.permissions.includes("workout.assign")
     : false;
   const canDownloadAssignmentPdf = session
-    ? !isTenantOwner(session) && session.user.permissions.includes("workout.pdf.download")
+    ? !isMetricsOnlySupervisor(session) && session.user.permissions.includes("workout.pdf.download")
     : false;
 
   async function refresh() {
@@ -211,11 +213,11 @@ export default function CoachesPage() {
       page: reportPage,
       size: 25,
     };
-    const ownerMetricsOnly = isTenantOwner(session);
-    const canReadWorkouts = !ownerMetricsOnly && hasAnyPermission(
+    const supervisorMetricsOnly = isMetricsOnlySupervisor(session);
+    const canReadWorkouts = !supervisorMetricsOnly && hasAnyPermission(
       session, "workout.read.own", "workout.read.all", "workout.manage.own", "workout.manage.all",
     );
-    const canReadExercises = !ownerMetricsOnly
+    const canReadExercises = !supervisorMetricsOnly
       && session.user.permissions.includes("exercise.read");
     const canReadMetrics = session.user.permissions.includes("coach.metrics.read");
     const [nextWorkouts, nextExercises, nextReport, nextTrend] = await Promise.all([
@@ -639,28 +641,30 @@ export default function CoachesPage() {
       mode={activeBranch ? "operation" : undefined}
       organizationName={session.user.brandName || session.user.organizationName}
       session={session}
-      subtitle={isTenantOwner(session)
+      subtitle={isMetricsOnlySupervisor(session)
         ? "Consulta el desempeño y acompañamiento del equipo de coaches."
         : "Crea planes completos, asígnalos a socios y mide el acompañamiento del equipo."}
       title="Coaches y rutinas"
     >
       <div className="grid gap-5">
-        <nav aria-label="Secciones de Coaches" className="flex flex-wrap gap-2">
-          {navigationTabs.map(([value, label]) => (
-            <button
-              className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                tab === value
-                  ? "bg-[#173c2a] text-white"
-                  : "border border-[#cfd9d2] bg-white text-[#365143]"
-              }`}
-              key={value}
-              onClick={() => setTab(value)}
-              type="button"
-            >
-              {label}
-            </button>
-          ))}
-        </nav>
+        {navigationTabs.length > 1 ? (
+          <nav aria-label="Secciones de Coaches" className="flex flex-wrap gap-2">
+            {navigationTabs.map(([value, label]) => (
+              <button
+                className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                  tab === value
+                    ? "bg-[#173c2a] text-white"
+                    : "border border-[#cfd9d2] bg-white text-[#365143]"
+                }`}
+                key={value}
+                onClick={() => setTab(value)}
+                type="button"
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+        ) : null}
 
         {error ? (
           <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
@@ -1788,7 +1792,7 @@ function formatShortDate(value: string) {
 
 function availableTabs(session: StoredSession | null): Tab[] {
   if (!session) return [];
-  if (isTenantOwner(session)) {
+  if (isMetricsOnlySupervisor(session)) {
     return session.user.permissions.includes("coach.metrics.read") ? ["metrics"] : [];
   }
   const tabs: Tab[] = [];
@@ -1803,12 +1807,15 @@ function hasAnyPermission(session: StoredSession, ...permissions: string[]) {
   return permissions.some((permission) => session.user.permissions.includes(permission));
 }
 
-function isTenantOwner(session: StoredSession) {
+function isMetricsOnlySupervisor(session: StoredSession) {
+  if (session.user.platformAdmin) return false;
   return session.user.roles.some((role) => {
     const normalized = role
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .toLowerCase();
-    return normalized === "dueno del gimnasio" || normalized === "administrador";
+    return normalized === "dueno del gimnasio"
+      || normalized === "administrador"
+      || normalized === "gerente";
   });
 }

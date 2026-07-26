@@ -188,7 +188,7 @@ public class CoachingCatalogController {
 			@RequestParam(defaultValue = "0") int page,
 			@RequestParam(defaultValue = "50") int size
 	) {
-		return service.assignmentReport(principal, from, to, coachId, clientId, page, size);
+		return service.metricsReport(principal, from, to, coachId, clientId, page, size);
 	}
 
 	@GetMapping("/reports/coaches/workout-assignments/export")

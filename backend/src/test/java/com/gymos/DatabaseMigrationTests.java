@@ -70,6 +70,12 @@ class DatabaseMigrationTests {
 			assertThat(roleHasPermission(connection, "Dueno del gimnasio", "workout.manage.all")).isFalse();
 			assertThat(roleHasPermission(connection, "Dueno del gimnasio", "workout.assign")).isFalse();
 			assertThat(roleHasPermission(connection, "Dueno del gimnasio", "exercise.read")).isFalse();
+			assertThat(roleHasPermission(connection, "Gerente", "coach.metrics.read")).isTrue();
+			assertThat(roleHasPermission(connection, "Gerente", "coach.profile.manage")).isTrue();
+			assertThat(roleHasPermission(connection, "Gerente", "workout.read.all")).isFalse();
+			assertThat(roleHasPermission(connection, "Gerente", "workout.manage.all")).isFalse();
+			assertThat(roleHasPermission(connection, "Gerente", "workout.assign")).isFalse();
+			assertThat(roleHasPermission(connection, "Gerente", "exercise.read")).isFalse();
 			assertThat(tableExists(connection, "professional")).isTrue();
 			assertThat(tableExists(connection, "professional_service")).isTrue();
 			assertThat(tableExists(connection, "professional_availability")).isTrue();
