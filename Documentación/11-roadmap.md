@@ -102,12 +102,19 @@
 
 ## Fase 7 — Coaches y bienestar
 
-- Coaches.
-- Rutinas.
-- Versionado.
+- Coaches vinculados con usuarios y alcance por sucursal.
+- Catálogo amplio, buscable y extensible de ejercicios.
+- Constructor de rutinas por sesiones, bloques y prescripciones flexibles.
+- Borradores, publicación y versionado inmutable.
+- Asignación idempotente a socios y PDF imprimible.
+- Métricas semanales por coach, socio y sucursal.
 - Profesionales.
 - Servicios.
 - Agenda.
+
+Para Coaches y rutinas, quedan fuera de esta fase el cobro por plataforma, registro
+del efectivo del coach, comisiones y app remota del socio. El plan ejecutable es
+`25-plan-accion-coaches-rutinas.md`.
 
 ## Fase 8 — Automatizaciones y reportes
 

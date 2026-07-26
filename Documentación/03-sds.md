@@ -195,6 +195,19 @@ Decisiones implementadas:
 - Permisos adicionales: `professional.read`, `professional.manage`, `notification.read`, `notification.manage`, `automation.read`, `automation.manage` y `report.owner.read`.
 - Las pantallas `/coaches`, `/wellness`, `/automations` y `/dashboard` completan el primer paquete vendible de servicios avanzados.
 
+Objetivo de cierre de `coaching`:
+
+- vincular el perfil de coach con la identidad interna y modelar alcance multi-sucursal;
+- incorporar catálogo normalizado, paginado y extensible de ejercicios;
+- modelar sesiones, bloques y prescripciones sin depender solo de JSON opaco;
+- publicar versiones inmutables y asignarlas con transacción e idempotencia;
+- generar PDF desde la versión asignada;
+- proyectar métricas semanales por coach, socio y sucursal en la zona horaria de negocio;
+- preparar contratos de lectura para una futura app del socio, fuera de V1.
+
+`coaching` no depende de `sales`, `payments` ni POS. Los cobros privados entre coach
+y socio son externos y no se persisten en GymOS.
+
 ## 3.17 Productizacion Hito 6
 
 Decisiones implementadas:

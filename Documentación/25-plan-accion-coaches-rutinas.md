@@ -22,7 +22,7 @@ La finalidad de estas métricas es evaluar participación, seguimiento e involuc
 
 ## 3. Referencia funcional entregada
 
-El PDF de ejemplo contiene una rutina de cinco días organizada por grupo muscular, ejercicios y prescripción de series/repeticiones. También incluye indicaciones libres como movilidad, calentamiento, estiramiento, preentreno, ejercicios opcionales, progresiones de carga y notas para sábado y domingo.
+El PDF de ejemplo contiene dos páginas verticales con una rutina de cinco días organizada por grupo muscular, ejercicios y prescripción de series/repeticiones. También incluye indicaciones libres como movilidad, calentamiento, estiramiento, preentreno, ejercicios opcionales, progresiones de carga y notas para sábado y domingo. Usa alternativas marcadas como `VS`, imágenes demostrativas de movilidad/estiramiento, nombre del socio, firma/nombre del coach y marca del gimnasio.
 
 La plataforma debe poder representar como mínimo:
 
@@ -35,9 +35,11 @@ La plataforma debe poder representar como mínimo:
 - carga, intensidad o progresión opcional;
 - descanso, tempo, duración o distancia opcionales;
 - superseries, circuitos o agrupaciones;
+- alternativas excluyentes o equivalentes, por ejemplo `VS`;
 - instrucciones generales y notas por día o ejercicio;
 - calentamiento, movilidad, core, cardio, estiramiento y actividades opcionales;
 - marca del gimnasio y fecha de generación en el PDF.
+- nombre visible o firma del coach y recursos visuales opcionales por ejercicio/bloque.
 
 El modelo no debe limitar la captura a una única notación. Expresiones como `3x12`, `3x12, 10, 8 subiendo`, `3x24 pasos`, `3x8 a 10 pesadas`, `3 series` o indicaciones narrativas deben conservarse fielmente.
 
@@ -435,3 +437,32 @@ Registrar como mínimo:
 - Un ejercicio archivado sigue visible en históricos.
 - Ninguna operación genera ventas, pagos, comisiones o movimientos de caja.
 - La suite valida aislamiento por organización, permisos y auditoría.
+
+## 15. Línea base auditada y brechas
+
+Estado encontrado antes de implementar:
+
+- migración `V13` con `coach`, `workout`, `workout_version` en JSON y
+  `workout_assignment`;
+- API base para crear/listar coaches y rutinas, publicar otra versión, asignar y
+  consultar asignaciones por socio;
+- `/coaches` permite capturar JSON manual, buscar socio y asignar;
+- `GET /reports/coaches` solo entrega totales generales y últimos 30 días;
+- los perfiles de coach se sincronizan por coincidencia de identidad, pero el modelo
+  conserva datos personales duplicados;
+- permisos actuales son amplios: `coach.read/manage`, `workout.read/manage` y
+  `report.coaches.read`.
+
+Brechas que esta rama debe cerrar:
+
+- no existe catálogo de ejercicios ni seed amplio;
+- no existen sesiones, bloques y prescripciones normalizadas;
+- crear una rutina publica inmediatamente y no hay flujo real de borrador/publicación;
+- no hay constructor visual, alta inline, duplicado ni filtros paginados;
+- la asignación no tiene llave de idempotencia ni estados/reemplazo completos;
+- no hay PDF por asignación;
+- no hay métrica semanal por coach y socio, comparación, coaches sin actividad ni CSV;
+- faltan pruebas específicas del módulo, aislamiento y autorización granular;
+- el `content_json` y el textarea manual no son experiencia ni persistencia finales;
+- cualquier referencia previa a `WorkoutService` comercial queda anulada: rutinas no
+  pertenecen al catálogo/POS.

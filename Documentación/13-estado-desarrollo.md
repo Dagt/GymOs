@@ -607,7 +607,9 @@ Pendiente fuera del alcance central del Hito 4:
 
 ## Hito 5 - Servicios avanzados
 
-Estado: completo
+Estado histórico: completo como base técnica. El módulo de Coaches y rutinas
+permanece `IN_PROGRESS` para producto final según
+`25-plan-accion-coaches-rutinas.md`.
 
 Implementado:
 
@@ -638,6 +640,20 @@ Verificado localmente:
 - Frontend typecheck.
 - Frontend build de produccion.
 - Docker Compose config.
+
+Brechas de Coaches y rutinas abiertas en `feature/coaches-workouts`:
+
+- catálogo amplio/extensible de ejercicios y seed;
+- constructor visual en lugar de captura JSON manual;
+- borrador, publicación, duplicado y modelo normalizado de sesiones/bloques;
+- asignación idempotente, reemplazo e historial completo;
+- PDF imprimible por asignación;
+- métricas semanales por coach y detalle de socios;
+- permisos granulares, aislamiento y pruebas propias del módulo.
+
+Decisión de alcance: una rutina no es producto ni servicio de POS. Los cobros en
+efectivo entre coach y socio no se registran y no generan ventas, pagos, comisiones,
+ingresos ni movimientos de caja en GymOS.
 
 Pendiente fuera del alcance central del Hito 5:
 

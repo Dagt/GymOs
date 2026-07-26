@@ -388,6 +388,8 @@ Nota implementada Hito 4:
 
 ## 6.13 Coaches y rutinas
 
+Contratos base de Hito 5:
+
 - `POST /coaches`
 - `GET /coaches`
 - `POST /workouts`
@@ -403,6 +405,39 @@ Nota implementada Hito 5:
 - `POST /workouts/{id}/versions` agrega una nueva version publicada sin modificar asignaciones historicas.
 - `POST /workouts/{id}/assign` asigna una version concreta o la ultima version publicada a un cliente activo.
 - `GET /reports/coaches` devuelve conteos base: coaches, rutinas, asignaciones activas y asignaciones de ultimos 30 dias.
+
+Contratos objetivo de cierre:
+
+- `GET|POST /exercises`
+- `GET|PUT /exercises/{exerciseId}`
+- `PATCH /exercises/{exerciseId}/status`
+- `POST /exercises/{exerciseId}/aliases`
+- `GET|POST /workouts`
+- `GET|PUT /workouts/{workoutId}`
+- `POST /workouts/{workoutId}/duplicate`
+- `POST /workouts/{workoutId}/publish`
+- `GET /workouts/{workoutId}/versions`
+- `GET /workout-versions/{versionId}`
+- `GET|POST /workout-assignments`
+- `GET /workout-assignments/{assignmentId}`
+- `PATCH /workout-assignments/{assignmentId}/status`
+- `GET /workout-assignments/{assignmentId}/pdf`
+- `GET /reports/coaches/workout-assignments/summary`
+- `GET /reports/coaches/workout-assignments/detail`
+- `GET /reports/coaches/workout-assignments/export`
+
+Las colecciones grandes son paginadas. Crear una asignación acepta
+`Idempotency-Key`; reutilizarla con otro payload responde
+`IDEMPOTENCY_KEY_REUSED`. Solo se asignan versiones publicadas y el PDF se descarga
+por `assignmentId`, nunca desde el borrador actual.
+
+Errores mínimos: `COACH_INACTIVE`, `COACH_OUTSIDE_BRANCH_SCOPE`,
+`EXERCISE_DUPLICATE`, `EXERCISE_ARCHIVED`,
+`WORKOUT_VERSION_NOT_PUBLISHED`, `CLIENT_NOT_ELIGIBLE`,
+`WORKOUT_ASSIGNMENT_NOT_FOUND` e `IDEMPOTENCY_KEY_REUSED`.
+
+Estos contratos no crean ni consultan ventas o pagos. La lectura remota del socio se
+reserva para una aplicación futura.
 
 ## 6.14 Profesionales
 
