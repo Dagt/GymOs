@@ -176,7 +176,11 @@ function inferConsole(
   if (permissions.includes("sale.create") || permissions.includes("payment.manual.create") || permissions.includes("client.create")) {
     return "RECEPTION";
   }
-  if (permissions.includes("coach.read") || permissions.includes("workout.manage")) {
+  if (
+    permissions.includes("coach.read")
+    || permissions.includes("workout.manage.own")
+    || permissions.includes("workout.manage.all")
+  ) {
     return "COACH";
   }
   return "TENANT_MANAGER";

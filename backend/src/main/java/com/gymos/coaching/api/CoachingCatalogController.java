@@ -1,6 +1,8 @@
 package com.gymos.coaching.api;
 
 import com.gymos.coaching.application.CoachingCatalogService;
+import com.gymos.coaching.application.CoachingExerciseMediaService;
+import com.gymos.coaching.application.CoachingExerciseMediaService.UploadExerciseMedia;
 import com.gymos.coaching.application.CoachingCatalogService.AssignmentReport;
 import com.gymos.coaching.application.CoachingCatalogService.CreateExerciseCommand;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.ExercisePage;
@@ -21,6 +23,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,14 +32,18 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/v1")
 public class CoachingCatalogController {
 	private final CoachingCatalogService service;
+	private final CoachingExerciseMediaService mediaService;
 
-	public CoachingCatalogController(CoachingCatalogService service) {
+	public CoachingCatalogController(CoachingCatalogService service, CoachingExerciseMediaService mediaService) {
 		this.service = service;
+		this.mediaService = mediaService;
 	}
 
 	@GetMapping("/exercises")
@@ -89,6 +96,64 @@ public class CoachingCatalogController {
 		return service.addAlias(principal, exerciseId, request.alias(), correlationId(servletRequest));
 	}
 
+	@GetMapping("/exercises/{exerciseId}/aliases")
+	List<String> aliases(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID exerciseId
+	) {
+		return service.aliases(principal, exerciseId);
+	}
+
+	@DeleteMapping("/exercises/{exerciseId}/aliases")
+	List<String> deleteAlias(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID exerciseId,
+			@RequestParam String alias,
+			HttpServletRequest servletRequest
+	) {
+		return service.deleteAlias(principal, exerciseId, alias, correlationId(servletRequest));
+	}
+
+	@PostMapping(value = "/exercises/{exerciseId}/media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	ExerciseRecord uploadMedia(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID exerciseId,
+			@RequestPart("file") MultipartFile file,
+			HttpServletRequest servletRequest
+	) {
+		try {
+			return mediaService.upload(
+					principal, exerciseId,
+					new UploadExerciseMedia(
+							file.getOriginalFilename(), file.getContentType(), file.getSize(), file.getInputStream()
+					),
+					correlationId(servletRequest)
+			);
+		} catch (java.io.IOException exception) {
+			throw new com.gymos.common.api.BusinessException("EXERCISE_MEDIA_INVALID", "No fue posible leer el archivo.");
+		}
+	}
+
+	@GetMapping("/exercises/{exerciseId}/media")
+	ResponseEntity<byte[]> media(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID exerciseId
+	) {
+		var media = mediaService.read(principal, exerciseId);
+		return ResponseEntity.ok()
+				.contentType(MediaType.parseMediaType(media.contentType()))
+				.body(media.content());
+	}
+
+	@DeleteMapping("/exercises/{exerciseId}/media")
+	ExerciseRecord removeMedia(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID exerciseId,
+			HttpServletRequest servletRequest
+	) {
+		return mediaService.remove(principal, exerciseId, correlationId(servletRequest));
+	}
+
 	@PatchMapping("/exercises/{exerciseId}/status")
 	ExerciseRecord changeExerciseStatus(
 			@AuthenticationPrincipal GymOsPrincipal principal,
@@ -105,9 +170,11 @@ public class CoachingCatalogController {
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
 			@RequestParam(required = false) UUID coachId,
-			@RequestParam(required = false) UUID clientId
+			@RequestParam(required = false) UUID clientId,
+			@RequestParam(defaultValue = "0") int page,
+			@RequestParam(defaultValue = "50") int size
 	) {
-		return service.assignmentReport(principal, from, to, coachId, clientId);
+		return service.assignmentReport(principal, from, to, coachId, clientId, page, size);
 	}
 
 	@GetMapping("/reports/coaches/workout-assignments/summary")
@@ -116,9 +183,11 @@ public class CoachingCatalogController {
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
 			@RequestParam(required = false) UUID coachId,
-			@RequestParam(required = false) UUID clientId
+			@RequestParam(required = false) UUID clientId,
+			@RequestParam(defaultValue = "0") int page,
+			@RequestParam(defaultValue = "50") int size
 	) {
-		return service.assignmentReport(principal, from, to, coachId, clientId);
+		return service.assignmentReport(principal, from, to, coachId, clientId, page, size);
 	}
 
 	@GetMapping("/reports/coaches/workout-assignments/export")

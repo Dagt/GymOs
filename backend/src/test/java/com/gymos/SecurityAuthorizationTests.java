@@ -4,6 +4,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -88,6 +89,31 @@ class SecurityAuthorizationTests {
 	@WithMockUser(authorities = "workout.read")
 	void workoutAssignmentRequiresManagePermission() throws Exception {
 		mockMvc.perform(post("/api/v1/workouts/99999999-9999-9999-9999-999999999952/assign")
+						.contentType("application/json")
+						.content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(authorities = "workout.manage")
+	void legacyWorkoutPermissionNoLongerGrantsAccess() throws Exception {
+		mockMvc.perform(get("/api/v1/workouts"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(authorities = "workout.read.own")
+	void assignmentStatusRequiresAssignPermission() throws Exception {
+		mockMvc.perform(patch("/api/v1/workout-assignments/99999999-9999-9999-9999-999999999952/status")
+						.contentType("application/json")
+						.content("{\"status\":\"COMPLETED\"}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(authorities = "exercise.read")
+	void exerciseMutationRequiresCreateOrManagePermission() throws Exception {
+		mockMvc.perform(put("/api/v1/exercises/99999999-9999-9999-9999-999999999952")
 						.contentType("application/json")
 						.content("{}"))
 				.andExpect(status().isForbidden());

@@ -79,6 +79,56 @@ export async function addExerciseAlias(
   });
 }
 
+export async function getExerciseAliases(
+  accessToken: string,
+  exerciseId: string,
+): Promise<string[]> {
+  return apiFetch<string[]>(`/exercises/${exerciseId}/aliases`, accessToken);
+}
+
+export async function deleteExerciseAlias(
+  accessToken: string,
+  exerciseId: string,
+  alias: string,
+): Promise<string[]> {
+  return apiFetch<string[]>(
+    `/exercises/${exerciseId}/aliases?alias=${encodeURIComponent(alias)}`,
+    accessToken,
+    { method: "DELETE" },
+  );
+}
+
+export async function updateExerciseStatus(
+  accessToken: string,
+  exerciseId: string,
+  status: "ACTIVE" | "ARCHIVED",
+): Promise<Exercise> {
+  return apiFetch<Exercise>(`/exercises/${exerciseId}/status`, accessToken, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
+
+export async function uploadExerciseMedia(
+  accessToken: string,
+  exerciseId: string,
+  file: File,
+): Promise<Exercise> {
+  const body = new FormData();
+  body.set("file", file);
+  return apiFetch<Exercise>(`/exercises/${exerciseId}/media`, accessToken, {
+    method: "POST",
+    body,
+  });
+}
+
+export async function removeExerciseMedia(
+  accessToken: string,
+  exerciseId: string,
+): Promise<Exercise> {
+  return apiFetch<Exercise>(`/exercises/${exerciseId}/media`, accessToken, { method: "DELETE" });
+}
+
 export async function duplicateWorkout(accessToken: string, workoutId: string): Promise<WorkoutDetail> {
   return apiFetch<WorkoutDetail>(`/workouts/${workoutId}/duplicate`, accessToken, { method: "POST" });
 }
@@ -91,10 +141,11 @@ export async function updateWorkoutAssignmentStatus(
   accessToken: string,
   assignmentId: string,
   status: "ACTIVE" | "COMPLETED" | "CANCELLED" | "REPLACED",
+  reason?: string | null,
 ): Promise<WorkoutAssignment> {
   return apiFetch<WorkoutAssignment>(`/workout-assignments/${assignmentId}/status`, accessToken, {
     method: "PATCH",
-    body: JSON.stringify({ status }),
+    body: JSON.stringify(normalizePayload({ status, reason })),
   });
 }
 
@@ -104,6 +155,18 @@ export async function assignWorkout(
   payload: AssignWorkoutPayload,
 ): Promise<WorkoutAssignment> {
   return apiFetch<WorkoutAssignment>(`/workouts/${workoutId}/assign`, accessToken, {
+    method: "POST",
+    headers: payload.idempotencyKey ? { "Idempotency-Key": payload.idempotencyKey } : undefined,
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function replaceWorkoutAssignment(
+  accessToken: string,
+  assignmentId: string,
+  payload: AssignWorkoutPayload & { workoutId: string },
+): Promise<WorkoutAssignment> {
+  return apiFetch<WorkoutAssignment>(`/workout-assignments/${assignmentId}/replace`, accessToken, {
     method: "POST",
     headers: payload.idempotencyKey ? { "Idempotency-Key": payload.idempotencyKey } : undefined,
     body: JSON.stringify(normalizePayload(payload)),
@@ -144,10 +207,19 @@ export async function createExercise(
 
 export async function getAssignmentReport(
   accessToken: string,
-  params: { from?: string; to?: string; coachId?: string; clientId?: string } = {},
+  params: {
+    from?: string;
+    to?: string;
+    coachId?: string;
+    clientId?: string;
+    page?: number;
+    size?: number;
+  } = {},
 ): Promise<AssignmentReport> {
   const search = new URLSearchParams();
-  Object.entries(params).forEach(([key, value]) => { if (value) search.set(key, value); });
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== "") search.set(key, String(value));
+  });
   return apiFetch<AssignmentReport>(
     `/reports/coaches/workout-assignments/summary?${search.toString()}`,
     accessToken,

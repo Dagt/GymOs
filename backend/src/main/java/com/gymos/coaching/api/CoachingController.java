@@ -187,7 +187,9 @@ public class CoachingController {
 			@Valid @RequestBody AssignmentStatusRequest request,
 			HttpServletRequest servletRequest
 	) {
-		return coachingService.updateAssignmentStatus(principal, assignmentId, request.status(), correlationId(servletRequest));
+		return coachingService.updateAssignmentStatus(
+				principal, assignmentId, request.status(), request.reason(), correlationId(servletRequest)
+		);
 	}
 
 	@GetMapping("/clients/{clientId}/workouts")
@@ -265,5 +267,8 @@ public class CoachingController {
 			@Size(max = 4000) String printableNotes,
 			@NotBlank @Size(max = 160) String idempotencyKey
 	) {}
-	public record AssignmentStatusRequest(@NotBlank String status) {}
+	public record AssignmentStatusRequest(
+			@NotBlank String status,
+			@Size(max = 2000) String reason
+	) {}
 }

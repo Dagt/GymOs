@@ -8,45 +8,64 @@ import {
   assignWorkout,
   createExercise,
   createWorkout,
+  deleteExerciseAlias,
   downloadAssignmentCsv,
   downloadWorkoutPdf,
   duplicateWorkout,
   getAssignmentReport,
   getBranches,
   getCoaches,
+  getExerciseAliases,
   getExercises,
   getStoredSession,
   getWorkout,
   getWorkouts,
   publishWorkout,
+  removeExerciseMedia,
+  replaceWorkoutAssignment,
   searchClients,
+  updateExerciseCatalog,
+  updateExerciseStatus,
   updateWorkout,
   updateWorkoutAssignmentStatus,
+  uploadExerciseMedia,
   type AssignmentReport,
   type BranchSummary,
   type ClientSummary,
   type CoachSummary,
+  type CreateExercisePayload,
   type Exercise,
   type StoredSession,
+  type WorkoutBlockDraft,
   type WorkoutExerciseDraft,
   type WorkoutSessionDraft,
   type WorkoutSummary,
 } from "@/lib/api";
+import {
+  emptyBlock,
+  emptyExercise,
+  emptySession,
+  moveItem,
+  updateBlock as updateBlockList,
+  updateExercise as updateExerciseList,
+  validateWorkout,
+} from "./workout-builder";
 
 type Tab = "builder" | "catalog" | "assignments" | "metrics";
 
-const emptyExercise = (): WorkoutExerciseDraft => ({
-  exerciseName: "",
-  prescription: "",
-  optional: false,
-});
-
-const emptySession = (index: number): WorkoutSessionDraft => ({
-  name: `Día ${index + 1}`,
-  focus: "",
-  notes: "",
-  blocks: [{ name: "Trabajo principal", type: "MAIN", notes: "", exercises: [emptyExercise()] }],
-});
+const EMPTY_EXERCISE_FORM: CreateExercisePayload = {
+  name: "",
+  description: "",
+  instructions: "",
+  primaryMuscleGroup: "",
+  secondaryMuscleGroups: "",
+  movementPattern: "",
+  type: "STRENGTH",
+  equipment: "",
+  suggestedLevel: "",
+  laterality: "",
+  warnings: "",
+};
 
 export default function CoachesPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
@@ -71,9 +90,9 @@ export default function CoachesPage() {
 
   const [exerciseQuery, setExerciseQuery] = useState("");
   const [aliasDrafts, setAliasDrafts] = useState<Record<string, string>>({});
-  const [newExercise, setNewExercise] = useState({
-    name: "", primaryMuscleGroup: "", equipment: "", type: "STRENGTH", instructions: "",
-  });
+  const [exerciseAliases, setExerciseAliases] = useState<Record<string, string[]>>({});
+  const [exerciseForm, setExerciseForm] = useState<CreateExercisePayload>({ ...EMPTY_EXERCISE_FORM });
+  const [editingExerciseId, setEditingExerciseId] = useState<string | null>(null);
 
   const [clientQuery, setClientQuery] = useState("");
   const [clients, setClients] = useState<ClientSummary[]>([]);
@@ -85,29 +104,43 @@ export default function CoachesPage() {
   const [privateNotes, setPrivateNotes] = useState("");
   const [reportFrom, setReportFrom] = useState(startOfWeek());
   const [reportTo, setReportTo] = useState(today());
+  const [reportCoachId, setReportCoachId] = useState("");
+  const [reportPage, setReportPage] = useState(0);
 
   useEffect(() => {
     let active = true;
     async function load() {
       const stored = getStoredSession();
-      if (!stored) { setLoading(false); return; }
+      if (!stored) {
+        setLoading(false);
+        return;
+      }
       setSession(stored);
       try {
-        const [loadedBranches, loadedCoaches, loadedWorkouts, loadedExercises, loadedReport] = await Promise.all([
-          getBranches(stored.accessToken),
-          getCoaches(stored.accessToken),
-          getWorkouts(stored.accessToken),
-          getExercises(stored.accessToken, { size: 60 }),
-          getAssignmentReport(stored.accessToken, { from: startOfWeek(), to: today() }),
-        ]);
+        const [loadedBranches, loadedCoaches, loadedWorkouts, loadedExercises, loadedReport] =
+          await Promise.all([
+            getBranches(stored.accessToken),
+            getCoaches(stored.accessToken),
+            getWorkouts(stored.accessToken),
+            getExercises(stored.accessToken, { size: 100 }),
+            getAssignmentReport(stored.accessToken, { from: startOfWeek(), to: today() }),
+          ]);
         if (!active) return;
         setBranches(loadedBranches);
         setCoaches(loadedCoaches);
         setWorkouts(loadedWorkouts);
         setExercisePage(loadedExercises.items);
         setReport(loadedReport);
-        setCoachId(loadedCoaches[0]?.id ?? "");
-        setSelectedWorkoutId(loadedWorkouts[0]?.id ?? "");
+        const canManageAll = stored.user.permissions.includes("workout.manage.all");
+        setCoachId(
+          (canManageAll
+            ? loadedCoaches[0]
+            : loadedCoaches.find((coach) => coach.userAccountId === stored.user.userId)
+          )?.id ?? "",
+        );
+        setSelectedWorkoutId(
+          loadedWorkouts.find((workout) => isPublished(workout))?.id ?? "",
+        );
       } catch (exception) {
         if (active) setError(errorMessage(exception));
       } finally {
@@ -115,7 +148,9 @@ export default function CoachesPage() {
       }
     }
     void load();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, []);
 
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId);
@@ -128,88 +163,204 @@ export default function CoachesPage() {
     );
   }, [exercisePage, exerciseQuery]);
   const publishedWorkouts = useMemo(
-    () => workouts.filter((workout) => workout.status === "PUBLISHED" || workout.status === "ACTIVE"),
+    () => workouts.filter(isPublished),
     [workouts],
   );
+  const canManageAllWorkouts = session?.user.permissions.includes("workout.manage.all") ?? false;
+  const selectableCoaches = canManageAllWorkouts
+    ? coaches
+    : coaches.filter((coach) => coach.userAccountId === session?.user.userId);
+  const canManageExerciseCatalog = session?.user.permissions.includes("exercise.manage") ?? false;
 
   async function refresh() {
     if (!session) return;
+    const reportParams = {
+      from: reportFrom,
+      to: reportTo,
+      coachId: reportCoachId || undefined,
+      page: reportPage,
+      size: 25,
+    };
     const [nextWorkouts, nextExercises, nextReport] = await Promise.all([
       getWorkouts(session.accessToken),
       getExercises(session.accessToken, { query: exerciseQuery, size: 100 }),
-      getAssignmentReport(session.accessToken, { from: reportFrom, to: reportTo }),
+      getAssignmentReport(session.accessToken, reportParams),
     ]);
     setWorkouts(nextWorkouts);
     setExercisePage(nextExercises.items);
     setReport(nextReport);
-    setSelectedWorkoutId((current) => current || nextWorkouts[0]?.id || "");
+    setSelectedWorkoutId((current) =>
+      current || nextWorkouts.find(isPublished)?.id || "");
   }
 
-  async function saveWorkout(event: FormEvent) {
+  async function saveWorkout(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session) return;
     const validation = validateWorkout(title, sessions);
-    if (validation) { setError(validation); return; }
-    setSaving(true); clearFeedback();
+    if (validation) {
+      setError(validation);
+      return;
+    }
+    setSaving(true);
+    clearFeedback();
     try {
       const payload = {
         coachId: coachId || null,
-        title, goal, level: level as "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "GENERAL",
+        title,
+        goal,
+        level: level as "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "GENERAL",
         summary,
         contentJson: JSON.stringify({ sessions }),
       };
-      const created = editingWorkoutId
+      const saved = editingWorkoutId
         ? await updateWorkout(session.accessToken, editingWorkoutId, payload)
         : await createWorkout(session.accessToken, payload);
       const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
       const shouldPublish = submitter?.value !== "draft";
-      if (shouldPublish) await publishWorkout(session.accessToken, created.workout.id);
+      if (shouldPublish) await publishWorkout(session.accessToken, saved.workout.id);
       setMessage(shouldPublish
-        ? `Rutina “${created.workout.title}” publicada correctamente.`
-        : `Borrador “${created.workout.title}” guardado.`);
+        ? `Rutina “${saved.workout.title}” publicada correctamente.`
+        : `Borrador “${saved.workout.title}” guardado.`);
       resetWorkoutForm();
       await refresh();
-    } catch (exception) { setError(errorMessage(exception)); }
-    finally { setSaving(false); }
+    } catch (exception) {
+      setError(errorMessage(exception));
+    } finally {
+      setSaving(false);
+    }
   }
 
-  async function saveExercise(event: FormEvent) {
+  async function saveExercise(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session) return;
-    setSaving(true); clearFeedback();
+    setSaving(true);
+    clearFeedback();
     try {
-      const created = await createExercise(session.accessToken, newExercise);
-      setExercisePage((current) => [...current, created].sort((a, b) => a.name.localeCompare(b.name)));
-      setNewExercise({ name: "", primaryMuscleGroup: "", equipment: "", type: "STRENGTH", instructions: "" });
-      setMessage(`Ejercicio “${created.name}” agregado al catálogo.`);
-    } catch (exception) { setError(errorMessage(exception)); }
-    finally { setSaving(false); }
+      const saved = editingExerciseId
+        ? await updateExerciseCatalog(session.accessToken, editingExerciseId, exerciseForm)
+        : await createExercise(session.accessToken, exerciseForm);
+      setExercisePage((current) =>
+        [...current.filter((item) => item.id !== saved.id), saved]
+          .sort((a, b) => a.name.localeCompare(b.name)));
+      resetExerciseForm();
+      setMessage(`Ejercicio “${saved.name}” guardado correctamente.`);
+    } catch (exception) {
+      setError(errorMessage(exception));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function editExercise(exercise: Exercise) {
+    if (!session) return;
+    clearFeedback();
+    try {
+      const aliases = await getExerciseAliases(session.accessToken, exercise.id);
+      setExerciseAliases((current) => ({ ...current, [exercise.id]: aliases }));
+      setEditingExerciseId(exercise.id);
+      setExerciseForm({
+        name: exercise.name,
+        description: exercise.description ?? "",
+        instructions: exercise.instructions ?? "",
+        primaryMuscleGroup: exercise.primaryMuscleGroup ?? "",
+        secondaryMuscleGroups: exercise.secondaryMuscleGroups ?? "",
+        movementPattern: exercise.movementPattern ?? "",
+        type: exercise.type,
+        equipment: exercise.equipment ?? "",
+        suggestedLevel: exercise.suggestedLevel ?? "",
+        laterality: exercise.laterality ?? "",
+        mediaUrl: exercise.mediaUrl,
+        warnings: exercise.warnings ?? "",
+      });
+      setMessage(`Editando “${exercise.name}”.`);
+    } catch (exception) {
+      setError(errorMessage(exception));
+    }
   }
 
   async function saveAlias(exercise: Exercise) {
     if (!session) return;
     const alias = aliasDrafts[exercise.id]?.trim();
     if (!alias) return;
-    setSaving(true); clearFeedback();
+    setSaving(true);
+    clearFeedback();
     try {
-      await addExerciseAlias(session.accessToken, exercise.id, alias);
+      const aliases = await addExerciseAlias(session.accessToken, exercise.id, alias);
+      setExerciseAliases((current) => ({ ...current, [exercise.id]: aliases }));
       setAliasDrafts((current) => ({ ...current, [exercise.id]: "" }));
-      setMessage(`Alias "${alias}" agregado a ${exercise.name}.`);
-    } catch (exception) { setError(errorMessage(exception)); }
-    finally { setSaving(false); }
+      setMessage(`Alias “${alias}” agregado a ${exercise.name}.`);
+    } catch (exception) {
+      setError(errorMessage(exception));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function removeAlias(exercise: Exercise, alias: string) {
+    if (!session) return;
+    setSaving(true);
+    clearFeedback();
+    try {
+      const aliases = await deleteExerciseAlias(session.accessToken, exercise.id, alias);
+      setExerciseAliases((current) => ({ ...current, [exercise.id]: aliases }));
+      setMessage(`Alias “${alias}” eliminado.`);
+    } catch (exception) {
+      setError(errorMessage(exception));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function changeExerciseStatus(exercise: Exercise, status: "ACTIVE" | "ARCHIVED") {
+    if (!session) return;
+    setSaving(true);
+    clearFeedback();
+    try {
+      await updateExerciseStatus(session.accessToken, exercise.id, status);
+      setMessage(`Ejercicio “${exercise.name}” ${status === "ARCHIVED" ? "archivado" : "restaurado"}.`);
+      resetExerciseForm();
+      await refresh();
+    } catch (exception) {
+      setError(errorMessage(exception));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function changeExerciseMedia(file?: File) {
+    if (!session || !editingExerciseId) return;
+    setSaving(true);
+    clearFeedback();
+    try {
+      const updated = file
+        ? await uploadExerciseMedia(session.accessToken, editingExerciseId, file)
+        : await removeExerciseMedia(session.accessToken, editingExerciseId);
+      setExercisePage((current) =>
+        current.map((exercise) => exercise.id === updated.id ? updated : exercise));
+      setExerciseForm((current) => ({ ...current, mediaUrl: updated.mediaUrl }));
+      setMessage(file ? "Medio del ejercicio actualizado." : "Medio del ejercicio eliminado.");
+    } catch (exception) {
+      setError(errorMessage(exception));
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function findClients() {
     if (!session) return;
     clearFeedback();
-    try { setClients(await searchClients(session.accessToken, clientQuery, "ACTIVE")); }
-    catch (exception) { setError(errorMessage(exception)); }
+    try {
+      setClients(await searchClients(session.accessToken, clientQuery, "ACTIVE"));
+    } catch (exception) {
+      setError(errorMessage(exception));
+    }
   }
 
-  async function saveAssignment(event: FormEvent) {
+  async function saveAssignment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session || !selectedClient || !selectedWorkoutId) return;
-    setSaving(true); clearFeedback();
+    setSaving(true);
+    clearFeedback();
     try {
       const workout = workouts.find((item) => item.id === selectedWorkoutId);
       const assignment = await assignWorkout(session.accessToken, selectedWorkoutId, {
@@ -222,75 +373,129 @@ export default function CoachesPage() {
         idempotencyKey: `workout:${selectedWorkoutId}:${selectedClient.id}:${crypto.randomUUID()}`,
       });
       setMessage(`Rutina asignada a ${assignment.clientName}. El PDF ya está disponible.`);
-      setPrintableNotes(""); setPrivateNotes("");
+      setPrintableNotes("");
+      setPrivateNotes("");
       await refresh();
       setTab("assignments");
-    } catch (exception) { setError(errorMessage(exception)); }
-    finally { setSaving(false); }
+    } catch (exception) {
+      setError(errorMessage(exception));
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function loadReport() {
     if (!session) return;
-    setSaving(true); clearFeedback();
-    try { setReport(await getAssignmentReport(session.accessToken, { from: reportFrom, to: reportTo })); }
-    catch (exception) { setError(errorMessage(exception)); }
-    finally { setSaving(false); }
+    setSaving(true);
+    clearFeedback();
+    try {
+      setReportPage(0);
+      setReport(await getAssignmentReport(session.accessToken, {
+        from: reportFrom,
+        to: reportTo,
+        coachId: reportCoachId || undefined,
+        page: 0,
+        size: 25,
+      }));
+    } catch (exception) {
+      setError(errorMessage(exception));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function loadReportPage(page: number) {
+    if (!session) return;
+    setSaving(true);
+    clearFeedback();
+    try {
+      setReport(await getAssignmentReport(session.accessToken, {
+        from: reportFrom,
+        to: reportTo,
+        coachId: reportCoachId || undefined,
+        page,
+        size: 25,
+      }));
+      setReportPage(page);
+    } catch (exception) {
+      setError(errorMessage(exception));
+    } finally {
+      setSaving(false);
+    }
   }
 
   function updateSession(index: number, patch: Partial<WorkoutSessionDraft>) {
-    setSessions((current) => current.map((item, position) => position === index ? { ...item, ...patch } : item));
+    setSessions((current) =>
+      current.map((item, position) => position === index ? { ...item, ...patch } : item));
   }
 
-  function updateExercise(sessionIndex: number, exerciseIndex: number, patch: Partial<WorkoutExerciseDraft>) {
-    setSessions((current) => current.map((day, dayIndex) => {
-      if (dayIndex !== sessionIndex) return day;
-      const block = day.blocks[0];
-      return {
-        ...day,
-        blocks: [{
-          ...block,
-          exercises: block.exercises.map((exercise, position) =>
-            position === exerciseIndex ? { ...exercise, ...patch } : exercise),
-        }],
-      };
-    }));
+  function updateBlock(
+    sessionIndex: number,
+    blockIndex: number,
+    patch: Partial<WorkoutBlockDraft>,
+  ) {
+    setSessions((current) =>
+      updateBlockList(current, sessionIndex, blockIndex, (block) => ({ ...block, ...patch })));
   }
 
-  function addCatalogExercise(sessionIndex: number, exercise: Exercise) {
-    setSessions((current) => current.map((day, dayIndex) => {
-      if (dayIndex !== sessionIndex) return day;
-      const block = day.blocks[0];
-      return {
-        ...day,
-        blocks: [{
-          ...block,
-          exercises: [...block.exercises, {
-            exerciseId: exercise.id, exerciseName: exercise.name, prescription: "", optional: false,
-          }],
-        }],
-      };
+  function updateExercise(
+    sessionIndex: number,
+    blockIndex: number,
+    exerciseIndex: number,
+    patch: Partial<WorkoutExerciseDraft>,
+  ) {
+    setSessions((current) =>
+      updateExerciseList(current, sessionIndex, blockIndex, exerciseIndex, patch));
+  }
+
+  function mutateBlock(
+    sessionIndex: number,
+    blockIndex: number,
+    updater: (block: WorkoutBlockDraft) => WorkoutBlockDraft,
+  ) {
+    setSessions((current) =>
+      updateBlockList(current, sessionIndex, blockIndex, updater));
+  }
+
+  function addCatalogExercise(sessionIndex: number, blockIndex: number, exercise: Exercise) {
+    mutateBlock(sessionIndex, blockIndex, (block) => ({
+      ...block,
+      exercises: [...block.exercises, {
+        exerciseId: exercise.id,
+        exerciseName: exercise.name,
+        prescription: "",
+        optional: false,
+      }],
     }));
   }
 
   async function copyWorkout(workoutId: string) {
     if (!session) return;
-    setSaving(true); clearFeedback();
+    setSaving(true);
+    clearFeedback();
     try {
       const copy = await duplicateWorkout(session.accessToken, workoutId);
       setMessage(`Se creó “${copy.workout.title}”.`);
       await refresh();
-    } catch (exception) { setError(errorMessage(exception)); }
-    finally { setSaving(false); }
+    } catch (exception) {
+      setError(errorMessage(exception));
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function editWorkout(workoutId: string) {
     if (!session) return;
-    setSaving(true); clearFeedback();
+    setSaving(true);
+    clearFeedback();
     try {
       const detail = await getWorkout(session.accessToken, workoutId);
       const version = detail.versions[0];
       const content = version
-        ? JSON.parse(version.contentJson) as { sessions?: WorkoutSessionDraft[]; days?: WorkoutSessionDraft[] }
+        ? JSON.parse(version.contentJson) as {
+            sessions?: WorkoutSessionDraft[];
+            days?: WorkoutSessionDraft[];
+          }
         : {};
       setEditingWorkoutId(workoutId);
       setTitle(detail.workout.title);
@@ -299,30 +504,53 @@ export default function CoachesPage() {
       setCoachId(detail.workout.coachId ?? "");
       setSummary(version?.summary ?? "");
       setSessions(content.sessions ?? content.days ?? [emptySession(0)]);
-      setMessage(`Editando "${detail.workout.title}".`);
+      setTab("builder");
+      setMessage(`Editando “${detail.workout.title}”.`);
       window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch (exception) { setError(errorMessage(exception)); }
-    finally { setSaving(false); }
+    } catch (exception) {
+      setError(errorMessage(exception));
+    } finally {
+      setSaving(false);
+    }
   }
 
   function resetWorkoutForm() {
     setEditingWorkoutId(null);
-    setTitle(""); setGoal(""); setSummary(""); setSessions([emptySession(0)]);
+    setTitle("");
+    setGoal("");
+    setSummary("");
+    setSessions([emptySession(0)]);
+  }
+
+  function resetExerciseForm() {
+    setEditingExerciseId(null);
+    setExerciseForm({ ...EMPTY_EXERCISE_FORM });
   }
 
   async function publishExistingWorkout(workoutId: string) {
     if (!session) return;
-    setSaving(true); clearFeedback();
+    setSaving(true);
+    clearFeedback();
     try {
       const published = await publishWorkout(session.accessToken, workoutId);
       setMessage(`“${published.workout.title}” quedó publicada.`);
       await refresh();
-    } catch (exception) { setError(errorMessage(exception)); }
-    finally { setSaving(false); }
+    } catch (exception) {
+      setError(errorMessage(exception));
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (loading) return <LoadingScreen text="Cargando Coaches y rutinas..." />;
-  if (!session) return <AuthRequired message="Necesitas iniciar sesión para gestionar rutinas." title="Inicia sesión" />;
+  if (!session) {
+    return (
+      <AuthRequired
+        message="Necesitas iniciar sesión para gestionar rutinas."
+        title="Inicia sesión"
+      />
+    );
+  }
 
   return (
     <AppShell
@@ -343,7 +571,11 @@ export default function CoachesPage() {
             ["metrics", "Métricas"],
           ] as [Tab, string][]).map(([value, label]) => (
             <button
-              className={`rounded-full px-4 py-2 text-sm font-semibold ${tab === value ? "bg-[#173c2a] text-white" : "border border-[#cfd9d2] bg-white text-[#365143]"}`}
+              className={`rounded-full px-4 py-2 text-sm font-semibold ${
+                tab === value
+                  ? "bg-[#173c2a] text-white"
+                  : "border border-[#cfd9d2] bg-white text-[#365143]"
+              }`}
               key={value}
               onClick={() => setTab(value)}
               type="button"
@@ -353,34 +585,61 @@ export default function CoachesPage() {
           ))}
         </nav>
 
-        {error ? <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">{error}</p> : null}
-        {message ? <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p> : null}
+        {error ? (
+          <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800" role="alert">
+            {error}
+          </p>
+        ) : null}
+        {message ? (
+          <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">
+            {message}
+          </p>
+        ) : null}
 
         {tab === "builder" ? (
           <form className="grid gap-5" onSubmit={saveWorkout}>
             <section className="rounded-xl border border-[#d9e2dc] bg-white p-5 shadow-sm">
               <div className="mb-4">
                 <p className="text-xs font-semibold uppercase tracking-wider text-[#6b7d72]">Plantilla</p>
-                <h2 className="text-xl font-semibold">{editingWorkoutId ? "Editar rutina" : "Información de la rutina"}</h2>
+                <h2 className="text-xl font-semibold">
+                  {editingWorkoutId ? "Editar rutina" : "Información de la rutina"}
+                </h2>
               </div>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                <Field label="Título"><input className="app-input" onChange={(e) => setTitle(e.target.value)} value={title} /></Field>
-                <Field label="Objetivo"><input className="app-input" onChange={(e) => setGoal(e.target.value)} value={goal} /></Field>
+                <Field label="Título">
+                  <input className="app-input" onChange={(event) => setTitle(event.target.value)} value={title} />
+                </Field>
+                <Field label="Objetivo">
+                  <input className="app-input" onChange={(event) => setGoal(event.target.value)} value={goal} />
+                </Field>
                 <Field label="Nivel">
-                  <select className="app-input" onChange={(e) => setLevel(e.target.value)} value={level}>
-                    <option value="GENERAL">General</option><option value="BEGINNER">Principiante</option>
-                    <option value="INTERMEDIATE">Intermedio</option><option value="ADVANCED">Avanzado</option>
+                  <select className="app-input" onChange={(event) => setLevel(event.target.value)} value={level}>
+                    <option value="GENERAL">General</option>
+                    <option value="BEGINNER">Principiante</option>
+                    <option value="INTERMEDIATE">Intermedio</option>
+                    <option value="ADVANCED">Avanzado</option>
                   </select>
                 </Field>
                 <Field label="Coach">
-                  <select className="app-input" onChange={(e) => setCoachId(e.target.value)} value={coachId}>
-                    <option value="">Sin coach</option>
-                    {coaches.map((coach) => <option key={coach.id} value={coach.id}>{coach.displayName}</option>)}
+                  <select
+                    className="app-input"
+                    disabled={!canManageAllWorkouts}
+                    onChange={(event) => setCoachId(event.target.value)}
+                    value={coachId}
+                  >
+                    {canManageAllWorkouts ? <option value="">Sin coach</option> : null}
+                    {selectableCoaches.map((coach) => (
+                      <option key={coach.id} value={coach.id}>{coach.displayName}</option>
+                    ))}
                   </select>
                 </Field>
               </div>
               <Field label="Indicaciones generales">
-                <textarea className="app-input mt-3 min-h-20" onChange={(e) => setSummary(e.target.value)} value={summary} />
+                <textarea
+                  className="app-input mt-3 min-h-20"
+                  onChange={(event) => setSummary(event.target.value)}
+                  value={summary}
+                />
               </Field>
             </section>
 
@@ -389,56 +648,215 @@ export default function CoachesPage() {
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="grid flex-1 gap-3 md:grid-cols-2">
                     <Field label={`Sesión ${sessionIndex + 1}`}>
-                      <input className="app-input" onChange={(e) => updateSession(sessionIndex, { name: e.target.value })} value={day.name} />
+                      <input
+                        className="app-input"
+                        onChange={(event) => updateSession(sessionIndex, { name: event.target.value })}
+                        value={day.name}
+                      />
                     </Field>
                     <Field label="Enfoque">
-                      <input className="app-input" onChange={(e) => updateSession(sessionIndex, { focus: e.target.value })} placeholder="Pecho y hombro" value={day.focus ?? ""} />
+                      <input
+                        className="app-input"
+                        onChange={(event) => updateSession(sessionIndex, { focus: event.target.value })}
+                        placeholder="Pecho y hombro"
+                        value={day.focus ?? ""}
+                      />
                     </Field>
                   </div>
-                  {sessions.length > 1 ? <button className="text-sm font-semibold text-red-700" onClick={() => setSessions((items) => items.filter((_, i) => i !== sessionIndex))} type="button">Eliminar día</button> : null}
+                  <OrderButtons
+                    canDelete={sessions.length > 1}
+                    index={sessionIndex}
+                    length={sessions.length}
+                    onDelete={() => setSessions((items) => items.filter((_, index) => index !== sessionIndex))}
+                    onMove={(direction) => setSessions((items) => moveItem(items, sessionIndex, direction))}
+                  />
                 </div>
-                <textarea className="app-input mt-3 min-h-16" onChange={(e) => updateSession(sessionIndex, { notes: e.target.value })} placeholder="Movilidad, calentamiento o notas del día" value={day.notes ?? ""} />
+                <textarea
+                  className="app-input mt-3 min-h-16"
+                  onChange={(event) => updateSession(sessionIndex, { notes: event.target.value })}
+                  placeholder="Movilidad, calentamiento o notas del día"
+                  value={day.notes ?? ""}
+                />
 
-                <div className="mt-4 grid gap-3">
-                  {day.blocks[0].exercises.map((exercise, exerciseIndex) => (
-                    <article className="grid gap-2 rounded-lg border border-[#e0e7e2] bg-[#f8faf8] p-3 lg:grid-cols-[1.2fr_1fr_1fr_auto]" key={exerciseIndex}>
-                      <input className="app-input" list={`exercise-options-${sessionIndex}`} onChange={(e) => updateExercise(sessionIndex, exerciseIndex, { exerciseName: e.target.value, exerciseId: null })} placeholder="Ejercicio" value={exercise.exerciseName} />
-                      <input className="app-input" onChange={(e) => updateExercise(sessionIndex, exerciseIndex, { prescription: e.target.value })} placeholder="3x12, 10, 8 subiendo" value={exercise.prescription} />
-                      <input className="app-input" onChange={(e) => updateExercise(sessionIndex, exerciseIndex, { notes: e.target.value })} placeholder="Carga, técnica o alternativa VS" value={exercise.notes ?? ""} />
-                      <button className="px-2 text-sm font-semibold text-red-700" disabled={day.blocks[0].exercises.length === 1} onClick={() => updateSession(sessionIndex, { blocks: [{ ...day.blocks[0], exercises: day.blocks[0].exercises.filter((_, i) => i !== exerciseIndex) }] })} type="button">Quitar</button>
+                <div className="mt-4 grid gap-4">
+                  {day.blocks.map((block, blockIndex) => (
+                    <article className="rounded-xl border border-[#cfdad2] bg-[#f8faf8] p-4" key={blockIndex}>
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="grid flex-1 gap-3 md:grid-cols-2">
+                          <Field label={`Bloque ${blockIndex + 1}`}>
+                            <input
+                              className="app-input"
+                              onChange={(event) => updateBlock(sessionIndex, blockIndex, { name: event.target.value })}
+                              value={block.name}
+                            />
+                          </Field>
+                          <Field label="Tipo">
+                            <select
+                              className="app-input"
+                              onChange={(event) => updateBlock(sessionIndex, blockIndex, { type: event.target.value })}
+                              value={block.type}
+                            >
+                              <option value="WARMUP">Calentamiento</option>
+                              <option value="MAIN">Trabajo principal</option>
+                              <option value="SUPERSET">Superserie</option>
+                              <option value="CIRCUIT">Circuito</option>
+                              <option value="FINISHER">Finalizador</option>
+                              <option value="COOLDOWN">Vuelta a la calma</option>
+                            </select>
+                          </Field>
+                        </div>
+                        <OrderButtons
+                          canDelete={day.blocks.length > 1}
+                          index={blockIndex}
+                          length={day.blocks.length}
+                          onDelete={() => updateSession(sessionIndex, {
+                            blocks: day.blocks.filter((_, index) => index !== blockIndex),
+                          })}
+                          onMove={(direction) => updateSession(sessionIndex, {
+                            blocks: moveItem(day.blocks, blockIndex, direction),
+                          })}
+                        />
+                      </div>
+                      <textarea
+                        className="app-input mt-3 min-h-14"
+                        onChange={(event) => updateBlock(sessionIndex, blockIndex, { notes: event.target.value })}
+                        placeholder="Notas del bloque"
+                        value={block.notes ?? ""}
+                      />
+
+                      <div className="mt-3 grid gap-3">
+                        {block.exercises.map((exercise, exerciseIndex) => (
+                          <ExerciseEditor
+                            blockIndex={blockIndex}
+                            exercise={exercise}
+                            exerciseIndex={exerciseIndex}
+                            key={exerciseIndex}
+                            listId={`exercise-options-${sessionIndex}-${blockIndex}`}
+                            onChange={(patch) =>
+                              updateExercise(sessionIndex, blockIndex, exerciseIndex, patch)}
+                            onDelete={() => mutateBlock(sessionIndex, blockIndex, (current) => ({
+                              ...current,
+                              exercises: current.exercises.filter((_, index) => index !== exerciseIndex),
+                            }))}
+                            onMove={(direction) => mutateBlock(sessionIndex, blockIndex, (current) => ({
+                              ...current,
+                              exercises: moveItem(current.exercises, exerciseIndex, direction),
+                            }))}
+                            total={block.exercises.length}
+                          />
+                        ))}
+                        <datalist id={`exercise-options-${sessionIndex}-${blockIndex}`}>
+                          {exercisePage.map((exercise) => (
+                            <option key={exercise.id} value={exercise.name} />
+                          ))}
+                        </datalist>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            className="rounded-md border border-[#b9c9bf] bg-white px-3 py-2 text-sm font-semibold"
+                            onClick={() => mutateBlock(sessionIndex, blockIndex, (current) => ({
+                              ...current,
+                              exercises: [...current.exercises, emptyExercise()],
+                            }))}
+                            type="button"
+                          >
+                            + Ejercicio libre
+                          </button>
+                          <select
+                            aria-label={`Agregar ejercicio de catálogo al bloque ${blockIndex + 1}`}
+                            className="rounded-md border border-[#b9c9bf] bg-white px-3 py-2 text-sm"
+                            defaultValue=""
+                            onChange={(event) => {
+                              const found = exercisePage.find((item) => item.id === event.target.value);
+                              if (found) addCatalogExercise(sessionIndex, blockIndex, found);
+                              event.target.value = "";
+                            }}
+                          >
+                            <option value="">Agregar desde catálogo…</option>
+                            {exercisePage.map((exercise) => (
+                              <option key={exercise.id} value={exercise.id}>{exercise.name}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
                     </article>
                   ))}
-                  <datalist id={`exercise-options-${sessionIndex}`}>{exercisePage.map((exercise) => <option key={exercise.id} value={exercise.name} />)}</datalist>
-                  <div className="flex flex-wrap gap-2">
-                    <button className="rounded-md border border-[#b9c9bf] bg-white px-3 py-2 text-sm font-semibold" onClick={() => updateSession(sessionIndex, { blocks: [{ ...day.blocks[0], exercises: [...day.blocks[0].exercises, emptyExercise()] }] })} type="button">+ Ejercicio libre</button>
-                    <select className="rounded-md border border-[#b9c9bf] bg-white px-3 py-2 text-sm" defaultValue="" onChange={(e) => { const found = exercisePage.find((item) => item.id === e.target.value); if (found) addCatalogExercise(sessionIndex, found); e.target.value = ""; }}>
-                      <option value="">Agregar desde catálogo…</option>
-                      {exercisePage.map((exercise) => <option key={exercise.id} value={exercise.id}>{exercise.name}</option>)}
-                    </select>
-                  </div>
+                  <button
+                    className="w-fit rounded-md border border-[#9eb2a5] bg-white px-3 py-2 text-sm font-semibold"
+                    onClick={() => updateSession(sessionIndex, {
+                      blocks: [...day.blocks, emptyBlock(`Bloque ${day.blocks.length + 1}`)],
+                    })}
+                    type="button"
+                  >
+                    + Agregar bloque
+                  </button>
                 </div>
               </section>
             ))}
 
             <div className="flex flex-wrap justify-between gap-3">
-              <button className="rounded-lg border border-[#9eb2a5] bg-white px-4 py-2 font-semibold" onClick={() => setSessions((items) => [...items, emptySession(items.length)])} type="button">+ Agregar día</button>
-              <div className="flex gap-2">
-                {editingWorkoutId ? <button className="rounded-lg border border-[#9eb2a5] bg-white px-5 py-2 font-semibold" onClick={resetWorkoutForm} type="button">Cancelar edición</button> : null}
-                <button className="rounded-lg border border-[#9eb2a5] bg-white px-5 py-2 font-semibold disabled:opacity-60" disabled={saving} type="submit" value="draft">Guardar borrador</button>
-                <button className="rounded-lg bg-[#173c2a] px-5 py-2 font-semibold text-white disabled:opacity-60" disabled={saving} type="submit" value="publish">{saving ? "Guardando…" : "Publicar rutina"}</button>
+              <button
+                className="rounded-lg border border-[#9eb2a5] bg-white px-4 py-2 font-semibold"
+                onClick={() => setSessions((items) => [...items, emptySession(items.length)])}
+                type="button"
+              >
+                + Agregar día
+              </button>
+              <div className="flex flex-wrap gap-2">
+                {editingWorkoutId ? (
+                  <button
+                    className="rounded-lg border border-[#9eb2a5] bg-white px-5 py-2 font-semibold"
+                    onClick={resetWorkoutForm}
+                    type="button"
+                  >
+                    Cancelar edición
+                  </button>
+                ) : null}
+                <button
+                  className="rounded-lg border border-[#9eb2a5] bg-white px-5 py-2 font-semibold disabled:opacity-60"
+                  disabled={saving}
+                  type="submit"
+                  value="draft"
+                >
+                  Guardar borrador
+                </button>
+                <button
+                  className="rounded-lg bg-[#173c2a] px-5 py-2 font-semibold text-white disabled:opacity-60"
+                  disabled={saving}
+                  type="submit"
+                  value="publish"
+                >
+                  {saving ? "Guardando…" : "Publicar rutina"}
+                </button>
               </div>
             </div>
+
             {workouts.length ? (
               <section className="rounded-xl border border-[#d9e2dc] bg-white p-5">
-                <h2 className="text-xl font-semibold">Rutinas publicadas</h2>
+                <h2 className="text-xl font-semibold">Rutinas disponibles</h2>
                 <div className="mt-3 grid gap-2 md:grid-cols-2">
                   {workouts.map((workout) => (
-                    <article className="flex items-center justify-between gap-3 rounded-lg border border-[#e0e7e2] p-3" key={workout.id}>
-                      <div><strong>{workout.title}</strong><p className="text-xs text-[#637268]">{workout.coachName || "Sin coach"} · versión {workout.latestVersionNumber} · {workout.status}</p></div>
-                      <div className="flex gap-2">
-                        <button className="rounded-md border px-3 py-2 text-sm font-semibold" onClick={() => editWorkout(workout.id)} type="button">Editar</button>
-                        {workout.status === "DRAFT" ? <button className="rounded-md bg-[#173c2a] px-3 py-2 text-sm font-semibold text-white" onClick={() => publishExistingWorkout(workout.id)} type="button">Publicar</button> : null}
-                        <button className="rounded-md border px-3 py-2 text-sm font-semibold" onClick={() => copyWorkout(workout.id)} type="button">Duplicar</button>
+                    <article
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#e0e7e2] p-3"
+                      key={workout.id}
+                    >
+                      <div>
+                        <strong>{workout.title}</strong>
+                        <p className="text-xs text-[#637268]">
+                          {workout.coachName || "Sin coach"} · versión {workout.latestVersionNumber} · {workout.status}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <button className="rounded-md border px-3 py-2 text-sm font-semibold" onClick={() => editWorkout(workout.id)} type="button">
+                          Editar
+                        </button>
+                        {workout.status === "DRAFT" ? (
+                          <button className="rounded-md bg-[#173c2a] px-3 py-2 text-sm font-semibold text-white" onClick={() => publishExistingWorkout(workout.id)} type="button">
+                            Publicar
+                          </button>
+                        ) : null}
+                        <button className="rounded-md border px-3 py-2 text-sm font-semibold" onClick={() => copyWorkout(workout.id)} type="button">
+                          Duplicar
+                        </button>
                       </div>
                     </article>
                   ))}
@@ -452,40 +870,152 @@ export default function CoachesPage() {
           <section className="grid gap-5 lg:grid-cols-[1.4fr_0.8fr]">
             <article className="rounded-xl border border-[#d9e2dc] bg-white p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div><h2 className="text-xl font-semibold">Catálogo de ejercicios</h2><p className="text-sm text-[#637268]">{exercisePage.length} opciones disponibles en esta vista.</p></div>
-                <input className="app-input max-w-xs" onChange={(e) => setExerciseQuery(e.target.value)} placeholder="Buscar nombre, músculo o equipo" value={exerciseQuery} />
+                <div>
+                  <h2 className="text-xl font-semibold">Catálogo de ejercicios</h2>
+                  <p className="text-sm text-[#637268]">{exercisePage.length} opciones disponibles en esta vista.</p>
+                </div>
+                <input
+                  className="app-input max-w-xs"
+                  onChange={(event) => setExerciseQuery(event.target.value)}
+                  placeholder="Buscar nombre, músculo o equipo"
+                  value={exerciseQuery}
+                />
               </div>
               <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-                {filteredExercises.map((exercise) => (
-                  <article className="rounded-lg border border-[#dde5df] p-3" key={exercise.id}>
-                    <div className="flex justify-between gap-2"><strong>{exercise.name}</strong><span className="text-[10px] font-semibold text-[#66786d]">{exercise.origin}</span></div>
-                    <p className="mt-1 text-xs text-[#637268]">{exercise.primaryMuscleGroup || "General"} · {exercise.equipment || "Sin equipo"}</p>
-                    {exercise.instructions ? <p className="mt-2 line-clamp-2 text-xs">{exercise.instructions}</p> : null}
-                    {exercise.origin !== "SYSTEM" ? (
-                      <div className="mt-3 flex gap-2">
-                        <input
-                          aria-label={`Nuevo alias para ${exercise.name}`}
-                          className="app-input min-w-0 text-xs"
-                          onChange={(event) => setAliasDrafts((current) => ({ ...current, [exercise.id]: event.target.value }))}
-                          placeholder="Agregar alias"
-                          value={aliasDrafts[exercise.id] ?? ""}
-                        />
-                        <button className="rounded-md border px-2 text-xs font-semibold" disabled={saving || !aliasDrafts[exercise.id]?.trim()} onClick={() => saveAlias(exercise)} type="button">Guardar</button>
+                {filteredExercises.map((exercise) => {
+                  const manageable = canManageExerciseCatalog
+                    || exercise.createdBy === session.user.userId;
+                  const aliases = exerciseAliases[exercise.id];
+                  return (
+                    <article className="rounded-lg border border-[#dde5df] p-3" key={exercise.id}>
+                      <div className="flex justify-between gap-2">
+                        <strong>{exercise.name}</strong>
+                        <span className="text-[10px] font-semibold text-[#66786d]">{exercise.origin}</span>
                       </div>
-                    ) : null}
-                  </article>
-                ))}
+                      <p className="mt-1 text-xs text-[#637268]">
+                        {exercise.primaryMuscleGroup || "General"} · {exercise.equipment || "Sin equipo"}
+                      </p>
+                      {exercise.instructions ? <p className="mt-2 line-clamp-2 text-xs">{exercise.instructions}</p> : null}
+                      {exercise.mediaUrl ? <p className="mt-2 text-xs font-semibold text-emerald-800">Medio adjunto</p> : null}
+                      {manageable && exercise.origin !== "SYSTEM" ? (
+                        <>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <button className="rounded-md border px-2 py-1 text-xs font-semibold" onClick={() => editExercise(exercise)} type="button">
+                              Editar y ver aliases
+                            </button>
+                            {canManageExerciseCatalog ? (
+                              <button className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700" onClick={() => changeExerciseStatus(exercise, "ARCHIVED")} type="button">
+                                Archivar
+                              </button>
+                            ) : null}
+                          </div>
+                          <div className="mt-3 flex gap-2">
+                            <input
+                              aria-label={`Nuevo alias para ${exercise.name}`}
+                              className="app-input min-w-0 text-xs"
+                              onChange={(event) => setAliasDrafts((current) => ({
+                                ...current,
+                                [exercise.id]: event.target.value,
+                              }))}
+                              placeholder="Agregar alias"
+                              value={aliasDrafts[exercise.id] ?? ""}
+                            />
+                            <button
+                              className="rounded-md border px-2 text-xs font-semibold"
+                              disabled={saving || !aliasDrafts[exercise.id]?.trim()}
+                              onClick={() => saveAlias(exercise)}
+                              type="button"
+                            >
+                              Guardar
+                            </button>
+                          </div>
+                          {aliases?.length ? (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {aliases.map((alias) => (
+                                <button
+                                  className="rounded-full bg-[#edf3ef] px-2 py-1 text-[11px]"
+                                  key={alias}
+                                  onClick={() => removeAlias(exercise, alias)}
+                                  title="Eliminar alias"
+                                  type="button"
+                                >
+                                  {alias} ×
+                                </button>
+                              ))}
+                            </div>
+                          ) : null}
+                        </>
+                      ) : null}
+                    </article>
+                  );
+                })}
               </div>
             </article>
+
             <form className="rounded-xl border border-[#d9e2dc] bg-white p-5" onSubmit={saveExercise}>
-              <h2 className="text-xl font-semibold">Agregar ejercicio</h2>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-xl font-semibold">{editingExerciseId ? "Editar ejercicio" : "Agregar ejercicio"}</h2>
+                {editingExerciseId ? (
+                  <button className="text-sm font-semibold text-[#365143]" onClick={resetExerciseForm} type="button">
+                    Cancelar
+                  </button>
+                ) : null}
+              </div>
               <div className="mt-4 grid gap-3">
-                <Field label="Nombre"><input className="app-input" onChange={(e) => setNewExercise({ ...newExercise, name: e.target.value })} value={newExercise.name} /></Field>
-                <Field label="Grupo muscular"><input className="app-input" onChange={(e) => setNewExercise({ ...newExercise, primaryMuscleGroup: e.target.value })} value={newExercise.primaryMuscleGroup} /></Field>
-                <Field label="Equipo"><input className="app-input" onChange={(e) => setNewExercise({ ...newExercise, equipment: e.target.value })} value={newExercise.equipment} /></Field>
-                <Field label="Tipo"><select className="app-input" onChange={(e) => setNewExercise({ ...newExercise, type: e.target.value })} value={newExercise.type}><option value="STRENGTH">Fuerza</option><option value="MOBILITY">Movilidad</option><option value="CARDIO">Cardio</option><option value="CORE">Core</option><option value="WARMUP">Calentamiento</option><option value="STRETCHING">Estiramiento</option></select></Field>
-                <Field label="Instrucciones"><textarea className="app-input min-h-20" onChange={(e) => setNewExercise({ ...newExercise, instructions: e.target.value })} value={newExercise.instructions} /></Field>
-                <button className="rounded-lg bg-[#173c2a] px-4 py-2 font-semibold text-white disabled:opacity-60" disabled={saving || !newExercise.name.trim()} type="submit">Guardar ejercicio</button>
+                <Field label="Nombre"><ExerciseInput field="name" form={exerciseForm} setForm={setExerciseForm} /></Field>
+                <Field label="Descripción"><ExerciseInput field="description" form={exerciseForm} setForm={setExerciseForm} /></Field>
+                <Field label="Grupo muscular principal"><ExerciseInput field="primaryMuscleGroup" form={exerciseForm} setForm={setExerciseForm} /></Field>
+                <Field label="Grupos secundarios"><ExerciseInput field="secondaryMuscleGroups" form={exerciseForm} setForm={setExerciseForm} /></Field>
+                <Field label="Patrón de movimiento"><ExerciseInput field="movementPattern" form={exerciseForm} setForm={setExerciseForm} /></Field>
+                <Field label="Equipo"><ExerciseInput field="equipment" form={exerciseForm} setForm={setExerciseForm} /></Field>
+                <Field label="Tipo">
+                  <select className="app-input" onChange={(event) => setExerciseForm({ ...exerciseForm, type: event.target.value })} value={exerciseForm.type}>
+                    <option value="STRENGTH">Fuerza</option>
+                    <option value="MOBILITY">Movilidad</option>
+                    <option value="CARDIO">Cardio</option>
+                    <option value="CORE">Core</option>
+                    <option value="WARMUP">Calentamiento</option>
+                    <option value="STRETCHING">Estiramiento</option>
+                  </select>
+                </Field>
+                <Field label="Nivel sugerido"><ExerciseInput field="suggestedLevel" form={exerciseForm} setForm={setExerciseForm} /></Field>
+                <Field label="Lateralidad"><ExerciseInput field="laterality" form={exerciseForm} setForm={setExerciseForm} /></Field>
+                <Field label="Instrucciones">
+                  <textarea className="app-input min-h-24" onChange={(event) => setExerciseForm({ ...exerciseForm, instructions: event.target.value })} value={exerciseForm.instructions ?? ""} />
+                </Field>
+                <Field label="Advertencias">
+                  <textarea className="app-input min-h-20" onChange={(event) => setExerciseForm({ ...exerciseForm, warnings: event.target.value })} value={exerciseForm.warnings ?? ""} />
+                </Field>
+                {editingExerciseId ? (
+                  <div className="rounded-lg border border-dashed p-3">
+                    <p className="text-sm font-semibold">Imagen o video demostrativo</p>
+                    <p className="mb-2 text-xs text-[#637268]">JPG, PNG, WebP, GIF o MP4; máximo 8 MB.</p>
+                    <input
+                      accept="image/jpeg,image/png,image/webp,image/gif,video/mp4"
+                      disabled={saving}
+                      onChange={(event) => {
+                        const file = event.target.files?.[0];
+                        if (file) void changeExerciseMedia(file);
+                        event.target.value = "";
+                      }}
+                      type="file"
+                    />
+                    {exerciseForm.mediaUrl ? (
+                      <button className="mt-2 block text-xs font-semibold text-red-700" onClick={() => changeExerciseMedia()} type="button">
+                        Eliminar medio actual
+                      </button>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p className="text-xs text-[#637268]">Guarda el ejercicio para poder adjuntar una imagen o video.</p>
+                )}
+                <button
+                  className="rounded-lg bg-[#173c2a] px-4 py-2 font-semibold text-white disabled:opacity-60"
+                  disabled={saving || !exerciseForm.name.trim()}
+                  type="submit"
+                >
+                  {editingExerciseId ? "Actualizar ejercicio" : "Guardar ejercicio"}
+                </button>
               </div>
             </form>
           </section>
@@ -495,31 +1025,88 @@ export default function CoachesPage() {
           <section className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
             <form className="rounded-xl border border-[#d9e2dc] bg-white p-5" onSubmit={saveAssignment}>
               <h2 className="text-xl font-semibold">Asignar a un socio</h2>
-              <div className="mt-4 flex gap-2"><input className="app-input" onChange={(e) => setClientQuery(e.target.value)} placeholder="Nombre, correo o teléfono" value={clientQuery} /><button className="rounded-md border px-3 text-sm font-semibold" onClick={findClients} type="button">Buscar</button></div>
-              <div className="mt-2 grid gap-2">{clients.slice(0, 6).map((client) => <button className={`rounded-md border p-2 text-left text-sm ${selectedClient?.id === client.id ? "border-emerald-700 bg-emerald-50" : ""}`} key={client.id} onClick={() => setSelectedClient(client)} type="button">{client.firstName} {client.lastName}</button>)}</div>
+              <div className="mt-4 flex gap-2">
+                <input className="app-input" onChange={(event) => setClientQuery(event.target.value)} placeholder="Nombre, correo o teléfono" value={clientQuery} />
+                <button className="rounded-md border px-3 text-sm font-semibold" onClick={findClients} type="button">Buscar</button>
+              </div>
+              <div className="mt-2 grid gap-2">
+                {clients.slice(0, 6).map((client) => (
+                  <button
+                    className={`rounded-md border p-2 text-left text-sm ${
+                      selectedClient?.id === client.id ? "border-emerald-700 bg-emerald-50" : ""
+                    }`}
+                    key={client.id}
+                    onClick={() => setSelectedClient(client)}
+                    type="button"
+                  >
+                    {client.firstName} {client.lastName}
+                  </button>
+                ))}
+              </div>
               <div className="mt-4 grid gap-3">
-                <Field label="Rutina"><select className="app-input" onChange={(e) => setSelectedWorkoutId(e.target.value)} value={selectedWorkoutId}><option value="">Selecciona una rutina publicada</option>{publishedWorkouts.map((workout) => <option key={workout.id} value={workout.id}>{workout.title} · v{workout.latestVersionNumber}</option>)}</select></Field>
-                <div className="grid grid-cols-2 gap-3"><Field label="Inicio"><input className="app-input" onChange={(e) => setStartsOn(e.target.value)} type="date" value={startsOn} /></Field><Field label="Fin"><input className="app-input" onChange={(e) => setEndsOn(e.target.value)} type="date" value={endsOn} /></Field></div>
-                <Field label="Indicaciones imprimibles"><textarea className="app-input min-h-20" onChange={(e) => setPrintableNotes(e.target.value)} value={printableNotes} /></Field>
-                <Field label="Notas privadas"><textarea className="app-input min-h-16" onChange={(e) => setPrivateNotes(e.target.value)} value={privateNotes} /></Field>
-                <button className="rounded-lg bg-[#173c2a] px-4 py-2 font-semibold text-white disabled:opacity-60" disabled={saving || !selectedClient || !selectedWorkoutId} type="submit">Asignar rutina</button>
+                <Field label="Rutina">
+                  <select className="app-input" onChange={(event) => setSelectedWorkoutId(event.target.value)} value={selectedWorkoutId}>
+                    <option value="">Selecciona una rutina publicada</option>
+                    {publishedWorkouts.map((workout) => (
+                      <option key={workout.id} value={workout.id}>{workout.title} · v{workout.latestVersionNumber}</option>
+                    ))}
+                  </select>
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="Inicio"><input className="app-input" onChange={(event) => setStartsOn(event.target.value)} type="date" value={startsOn} /></Field>
+                  <Field label="Fin"><input className="app-input" onChange={(event) => setEndsOn(event.target.value)} type="date" value={endsOn} /></Field>
+                </div>
+                <Field label="Indicaciones imprimibles"><textarea className="app-input min-h-20" onChange={(event) => setPrintableNotes(event.target.value)} value={printableNotes} /></Field>
+                <Field label="Notas privadas"><textarea className="app-input min-h-16" onChange={(event) => setPrivateNotes(event.target.value)} value={privateNotes} /></Field>
+                <button className="rounded-lg bg-[#173c2a] px-4 py-2 font-semibold text-white disabled:opacity-60" disabled={saving || !selectedClient || !selectedWorkoutId} type="submit">
+                  Asignar rutina
+                </button>
               </div>
             </form>
-            <AssignmentTable report={report} session={session} />
+            <AssignmentTable
+              onChanged={refresh}
+              onError={(value) => setError(value)}
+              onMessage={(value) => setMessage(value)}
+              onPageChange={loadReportPage}
+              report={report}
+              session={session}
+              workouts={publishedWorkouts}
+            />
           </section>
         ) : null}
 
         {tab === "metrics" ? (
           <section className="grid gap-5">
             <div className="flex flex-wrap items-end gap-3 rounded-xl border border-[#d9e2dc] bg-white p-4">
-              <Field label="Desde"><input className="app-input" onChange={(e) => setReportFrom(e.target.value)} type="date" value={reportFrom} /></Field>
-              <Field label="Hasta"><input className="app-input" onChange={(e) => setReportTo(e.target.value)} type="date" value={reportTo} /></Field>
+              <Field label="Desde"><input className="app-input" onChange={(event) => setReportFrom(event.target.value)} type="date" value={reportFrom} /></Field>
+              <Field label="Hasta"><input className="app-input" onChange={(event) => setReportTo(event.target.value)} type="date" value={reportTo} /></Field>
+              <Field label="Coach">
+                <select className="app-input min-w-48" onChange={(event) => setReportCoachId(event.target.value)} value={reportCoachId}>
+                  <option value="">Todos</option>
+                  {coaches.map((coach) => <option key={coach.id} value={coach.id}>{coach.displayName}</option>)}
+                </select>
+              </Field>
               <button className="rounded-md bg-[#173c2a] px-4 py-2 text-sm font-semibold text-white" onClick={loadReport} type="button">Actualizar</button>
-              <button className="rounded-md border px-4 py-2 text-sm font-semibold" onClick={() => downloadAssignmentCsv(session.accessToken, { from: reportFrom, to: reportTo })} type="button">Exportar CSV</button>
+              <button
+                className="rounded-md border px-4 py-2 text-sm font-semibold"
+                onClick={() => downloadAssignmentCsv(session.accessToken, {
+                  from: reportFrom,
+                  to: reportTo,
+                  coachId: reportCoachId || undefined,
+                })}
+                type="button"
+              >
+                Exportar CSV
+              </button>
             </div>
+            {report ? (
+              <p className="text-sm text-[#637268]">
+                Comparación contra el periodo anterior: {report.previousFrom} a {report.previousTo}.
+              </p>
+            ) : null}
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <Metric label="Rutinas asignadas" value={report?.assignments ?? 0} />
-              <Metric label="Socios atendidos" value={report?.uniqueClients ?? 0} />
+              <Metric change={report?.assignmentChange} label="Rutinas asignadas" value={report?.assignments ?? 0} />
+              <Metric change={report?.uniqueClientChange} label="Socios atendidos" value={report?.uniqueClients ?? 0} />
               <Metric label="Coaches activos" value={report?.activeCoaches ?? 0} />
               <Metric label="Sin asignaciones" value={report?.coachesWithoutAssignments ?? 0} />
             </div>
@@ -528,69 +1115,394 @@ export default function CoachesPage() {
               <div className="mt-4 grid gap-2">
                 {report?.coaches.map((coach) => (
                   <article className="grid items-center gap-2 rounded-lg border border-[#e0e7e2] p-3 sm:grid-cols-[1fr_repeat(3,120px)]" key={coach.coachId}>
-                    <strong>{coach.coachName}</strong><span>{coach.assignments} asignadas</span><span>{coach.uniqueClients} socios</span><span>{coach.firstWorkouts} primeras</span>
+                    <strong>{coach.coachName}</strong>
+                    <span>{coach.assignments} asignadas</span>
+                    <span>{coach.uniqueClients} socios</span>
+                    <span>{coach.firstWorkouts} primeras</span>
                   </article>
                 ))}
               </div>
             </section>
-            <AssignmentTable report={report} session={session} />
+            <AssignmentTable
+              onChanged={refresh}
+              onError={(value) => setError(value)}
+              onMessage={(value) => setMessage(value)}
+              onPageChange={loadReportPage}
+              report={report}
+              session={session}
+              workouts={publishedWorkouts}
+            />
           </section>
         ) : null}
       </div>
     </AppShell>
   );
 
-  function clearFeedback() { setError(null); setMessage(null); }
+  function clearFeedback() {
+    setError(null);
+    setMessage(null);
+  }
 }
 
-function AssignmentTable({ report, session }: { report: AssignmentReport | null; session: StoredSession }) {
+function ExerciseEditor({
+  blockIndex,
+  exercise,
+  exerciseIndex,
+  listId,
+  onChange,
+  onDelete,
+  onMove,
+  total,
+}: {
+  blockIndex: number;
+  exercise: WorkoutExerciseDraft;
+  exerciseIndex: number;
+  listId: string;
+  onChange: (patch: Partial<WorkoutExerciseDraft>) => void;
+  onDelete: () => void;
+  onMove: (direction: -1 | 1) => void;
+  total: number;
+}) {
+  return (
+    <article className="rounded-lg border border-[#e0e7e2] bg-white p-3">
+      <div className="flex items-start justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-wide text-[#637268]">
+          Ejercicio {exerciseIndex + 1} · bloque {blockIndex + 1}
+        </p>
+        <OrderButtons
+          canDelete={total > 1}
+          compact
+          index={exerciseIndex}
+          length={total}
+          onDelete={onDelete}
+          onMove={onMove}
+        />
+      </div>
+      <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+        <Field label="Ejercicio">
+          <input
+            className="app-input"
+            list={listId}
+            onChange={(event) => onChange({ exerciseName: event.target.value, exerciseId: null })}
+            value={exercise.exerciseName}
+          />
+        </Field>
+        <Field label="Prescripción libre">
+          <input className="app-input" onChange={(event) => onChange({ prescription: event.target.value })} placeholder="3x12, 10/8/6" value={exercise.prescription} />
+        </Field>
+        <Field label="Series">
+          <input className="app-input" min="1" onChange={(event) => onChange({ sets: numberOrNull(event.target.value) })} type="number" value={exercise.sets ?? ""} />
+        </Field>
+        <Field label="Repeticiones">
+          <input className="app-input" onChange={(event) => onChange({ reps: event.target.value })} placeholder="8-12" value={exercise.reps ?? ""} />
+        </Field>
+        <Field label="Carga">
+          <input className="app-input" onChange={(event) => onChange({ load: event.target.value })} placeholder="20 kg / RPE 8" value={exercise.load ?? ""} />
+        </Field>
+        <Field label="Descanso (segundos)">
+          <input className="app-input" min="0" onChange={(event) => onChange({ restSeconds: numberOrNull(event.target.value) })} type="number" value={exercise.restSeconds ?? ""} />
+        </Field>
+        <Field label="Tempo">
+          <input className="app-input" onChange={(event) => onChange({ tempo: event.target.value })} placeholder="3-1-1" value={exercise.tempo ?? ""} />
+        </Field>
+        <Field label="Duración">
+          <input className="app-input" onChange={(event) => onChange({ duration: event.target.value })} placeholder="45 segundos" value={exercise.duration ?? ""} />
+        </Field>
+        <Field label="Distancia">
+          <input className="app-input" onChange={(event) => onChange({ distance: event.target.value })} placeholder="500 m" value={exercise.distance ?? ""} />
+        </Field>
+        <Field label="Agrupación">
+          <input className="app-input" onChange={(event) => onChange({ groupKey: event.target.value })} placeholder="A1 / circuito 1" value={exercise.groupKey ?? ""} />
+        </Field>
+        <Field label="Notas técnicas">
+          <input className="app-input" onChange={(event) => onChange({ notes: event.target.value })} value={exercise.notes ?? ""} />
+        </Field>
+        <label className="flex items-center gap-2 self-end pb-2 text-sm font-medium">
+          <input checked={exercise.optional ?? false} onChange={(event) => onChange({ optional: event.target.checked })} type="checkbox" />
+          Ejercicio opcional
+        </label>
+      </div>
+    </article>
+  );
+}
+
+function AssignmentTable({
+  onChanged,
+  onError,
+  onMessage,
+  onPageChange,
+  report,
+  session,
+  workouts,
+}: {
+  onChanged: () => Promise<void>;
+  onError: (message: string) => void;
+  onMessage: (message: string) => void;
+  onPageChange: (page: number) => Promise<void>;
+  report: AssignmentReport | null;
+  session: StoredSession;
+  workouts: WorkoutSummary[];
+}) {
   const [changing, setChanging] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState<string | null>(null);
+  const [cancelReason, setCancelReason] = useState("");
+  const [replacing, setReplacing] = useState<string | null>(null);
+  const [replacementWorkoutId, setReplacementWorkoutId] = useState("");
+
   async function changeStatus(id: string, status: "COMPLETED" | "CANCELLED") {
+    if (status === "CANCELLED" && !cancelReason.trim()) {
+      onError("Indica el motivo de cancelación.");
+      return;
+    }
     setChanging(id);
+    onError("");
     try {
-      await updateWorkoutAssignmentStatus(session.accessToken, id, status);
-      window.location.reload();
+      await updateWorkoutAssignmentStatus(
+        session.accessToken,
+        id,
+        status,
+        status === "CANCELLED" ? cancelReason : null,
+      );
+      setCancelling(null);
+      setCancelReason("");
+      onMessage(status === "COMPLETED" ? "Asignación completada." : "Asignación cancelada.");
+      await onChanged();
+    } catch (exception) {
+      onError(errorMessage(exception));
     } finally {
       setChanging(null);
     }
   }
+
+  async function replaceAssignment(assignment: AssignmentReport["details"][number]) {
+    const workout = workouts.find((item) => item.id === replacementWorkoutId);
+    if (!workout) {
+      onError("Selecciona la rutina de reemplazo.");
+      return;
+    }
+    setChanging(assignment.id);
+    onError("");
+    try {
+      await replaceWorkoutAssignment(session.accessToken, assignment.id, {
+        clientId: assignment.clientId,
+        workoutId: workout.id,
+        workoutVersionId: workout.latestVersionId,
+        startsOn: assignment.startsOn,
+        endsOn: assignment.endsOn,
+        printableNotes: assignment.printableNotes,
+        notes: assignment.privateNotes,
+        idempotencyKey: `replace:${assignment.id}:${workout.id}:${crypto.randomUUID()}`,
+      });
+      setReplacing(null);
+      setReplacementWorkoutId("");
+      onMessage("La asignación anterior fue reemplazada y se conservó el historial.");
+      await onChanged();
+    } catch (exception) {
+      onError(errorMessage(exception));
+    } finally {
+      setChanging(null);
+    }
+  }
+
   return (
     <section className="rounded-xl border border-[#d9e2dc] bg-white p-5">
       <h2 className="text-xl font-semibold">Historial de asignaciones</h2>
       <div className="mt-4 grid gap-2">
         {report?.details.length ? report.details.map((assignment) => (
-          <article className="grid gap-2 rounded-lg border border-[#e0e7e2] p-3 md:grid-cols-[1fr_1fr_auto]" key={assignment.id}>
-            <div><strong>{assignment.clientName}</strong><p className="text-xs text-[#637268]">{assignment.assignedOn} · {assignment.coachName || "Sin coach"}</p></div>
-            <div><p>{assignment.workoutTitle}</p><p className="text-xs text-[#637268]">Versión {assignment.versionNumber} · {assignment.status}</p></div>
-            <div className="flex flex-wrap gap-2">
-              <button className="rounded-md border border-[#9eb2a5] px-3 py-2 text-sm font-semibold" onClick={() => downloadWorkoutPdf(session.accessToken, assignment.id)} type="button">PDF</button>
-              {assignment.status === "ACTIVE" ? <button className="rounded-md border px-3 py-2 text-sm font-semibold" disabled={changing === assignment.id} onClick={() => changeStatus(assignment.id, "COMPLETED")} type="button">Completar</button> : null}
+          <article className="grid gap-2 rounded-lg border border-[#e0e7e2] p-3" key={assignment.id}>
+            <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
+              <div>
+                <strong>{assignment.clientName}</strong>
+                <p className="text-xs text-[#637268]">{assignment.assignedOn} · {assignment.coachName || "Sin coach"}</p>
+              </div>
+              <div>
+                <p>{assignment.workoutTitle}</p>
+                <p className="text-xs text-[#637268]">Versión {assignment.versionNumber} · {assignment.status}</p>
+                {assignment.statusReason ? (
+                  <p className="text-xs text-[#637268]">Motivo: {assignment.statusReason}</p>
+                ) : null}
+                {assignment.replacedAssignmentId ? (
+                  <p className="text-xs text-[#637268]">
+                    Reemplazada por la asignación {assignment.replacedAssignmentId}
+                  </p>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button className="rounded-md border border-[#9eb2a5] px-3 py-2 text-sm font-semibold" onClick={() => downloadWorkoutPdf(session.accessToken, assignment.id)} type="button">
+                  PDF
+                </button>
+                {assignment.status === "ACTIVE" ? (
+                  <>
+                    <button className="rounded-md border px-3 py-2 text-sm font-semibold" disabled={changing === assignment.id} onClick={() => changeStatus(assignment.id, "COMPLETED")} type="button">
+                      Completar
+                    </button>
+                    <button className="rounded-md border px-3 py-2 text-sm font-semibold" disabled={changing === assignment.id} onClick={() => {
+                      setCancelling(assignment.id);
+                      setReplacing(null);
+                    }} type="button">
+                      Cancelar
+                    </button>
+                    <button className="rounded-md border px-3 py-2 text-sm font-semibold" disabled={changing === assignment.id} onClick={() => {
+                      setReplacing(assignment.id);
+                      setCancelling(null);
+                    }} type="button">
+                      Reemplazar
+                    </button>
+                  </>
+                ) : null}
+              </div>
             </div>
+            {cancelling === assignment.id ? (
+              <div className="flex flex-wrap gap-2 rounded-md bg-red-50 p-2">
+                <input className="app-input min-w-64 flex-1" onChange={(event) => setCancelReason(event.target.value)} placeholder="Motivo obligatorio de cancelación" value={cancelReason} />
+                <button className="rounded-md bg-red-700 px-3 py-2 text-sm font-semibold text-white" disabled={changing === assignment.id || !cancelReason.trim()} onClick={() => changeStatus(assignment.id, "CANCELLED")} type="button">
+                  Confirmar cancelación
+                </button>
+              </div>
+            ) : null}
+            {replacing === assignment.id ? (
+              <div className="flex flex-wrap gap-2 rounded-md bg-[#f1f6f2] p-2">
+                <select
+                  aria-label="Selecciona la nueva rutina"
+                  className="app-input min-w-64 flex-1"
+                  onChange={(event) => setReplacementWorkoutId(event.target.value)}
+                  value={replacementWorkoutId}
+                >
+                  <option value="">Selecciona la nueva rutina</option>
+                  {workouts.filter((workout) => workout.id !== assignment.workoutId).map((workout) => (
+                    <option key={workout.id} value={workout.id}>{workout.title} · v{workout.latestVersionNumber}</option>
+                  ))}
+                </select>
+                <button className="rounded-md bg-[#173c2a] px-3 py-2 text-sm font-semibold text-white" disabled={changing === assignment.id || !replacementWorkoutId} onClick={() => replaceAssignment(assignment)} type="button">
+                  Confirmar reemplazo
+                </button>
+              </div>
+            ) : null}
           </article>
-        )) : <p className="rounded-lg border border-dashed p-5 text-sm text-[#637268]">No hay asignaciones en el periodo.</p>}
+        )) : (
+          <p className="rounded-lg border border-dashed p-5 text-sm text-[#637268]">
+            No hay asignaciones en el periodo.
+          </p>
+        )}
       </div>
+      {report && report.totalPages > 1 ? (
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <button
+            className="rounded-md border px-3 py-2 text-sm font-semibold disabled:opacity-50"
+            disabled={report.page === 0}
+            onClick={() => onPageChange(report.page - 1)}
+            type="button"
+          >
+            Anterior
+          </button>
+          <span className="text-sm text-[#637268]">
+            Página {report.page + 1} de {report.totalPages} · {report.totalDetails} asignaciones
+          </span>
+          <button
+            className="rounded-md border px-3 py-2 text-sm font-semibold disabled:opacity-50"
+            disabled={report.page + 1 >= report.totalPages}
+            onClick={() => onPageChange(report.page + 1)}
+            type="button"
+          >
+            Siguiente
+          </button>
+        </div>
+      ) : null}
     </section>
   );
 }
 
+function ExerciseInput({
+  field,
+  form,
+  setForm,
+}: {
+  field: keyof CreateExercisePayload;
+  form: CreateExercisePayload;
+  setForm: React.Dispatch<React.SetStateAction<CreateExercisePayload>>;
+}) {
+  return (
+    <input
+      className="app-input"
+      onChange={(event) => setForm((current) => ({ ...current, [field]: event.target.value }))}
+      value={String(form[field] ?? "")}
+    />
+  );
+}
+
+function OrderButtons({
+  canDelete,
+  compact = false,
+  index,
+  length,
+  onDelete,
+  onMove,
+}: {
+  canDelete: boolean;
+  compact?: boolean;
+  index: number;
+  length: number;
+  onDelete: () => void;
+  onMove: (direction: -1 | 1) => void;
+}) {
+  const style = compact ? "px-2 py-1 text-xs" : "px-2 py-2 text-sm";
+  return (
+    <div className="flex gap-1">
+      <button aria-label="Mover arriba" className={`rounded-md border ${style}`} disabled={index === 0} onClick={() => onMove(-1)} type="button">↑</button>
+      <button aria-label="Mover abajo" className={`rounded-md border ${style}`} disabled={index === length - 1} onClick={() => onMove(1)} type="button">↓</button>
+      {canDelete ? <button className={`rounded-md border border-red-200 font-semibold text-red-700 ${style}`} onClick={onDelete} type="button">Eliminar</button> : null}
+    </div>
+  );
+}
+
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <label className="grid min-w-0 gap-1 text-sm font-medium text-[#435249]"><span>{label}</span>{children}</label>;
+  return (
+    <label className="grid min-w-0 gap-1 text-sm font-medium text-[#435249]">
+      <span>{label}</span>
+      {children}
+    </label>
+  );
 }
 
-function Metric({ label, value }: { label: string; value: number }) {
-  return <article className="rounded-xl border border-[#d9e2dc] bg-white p-5"><p className="text-sm text-[#637268]">{label}</p><p className="mt-1 text-3xl font-semibold">{value}</p></article>;
+function Metric({ change, label, value }: { change?: number; label: string; value: number }) {
+  const direction = change === undefined ? null : change > 0 ? "increase" : change < 0 ? "decrease" : "same";
+  return (
+    <article className="rounded-xl border border-[#d9e2dc] bg-white p-5">
+      <p className="text-sm text-[#637268]">{label}</p>
+      <div className="mt-1 flex items-end justify-between gap-2">
+        <p className="text-3xl font-semibold">{value}</p>
+        {direction ? (
+          <span className={`rounded-full px-2 py-1 text-xs font-semibold ${
+            direction === "increase"
+              ? "bg-emerald-50 text-emerald-800"
+              : direction === "decrease"
+                ? "bg-red-50 text-red-700"
+                : "bg-slate-100 text-slate-700"
+          }`}>
+            {change && change > 0 ? "+" : ""}{change} vs. anterior
+          </span>
+        ) : null}
+      </div>
+    </article>
+  );
 }
 
-function validateWorkout(title: string, sessions: WorkoutSessionDraft[]) {
-  if (!title.trim()) return "Escribe un título para la rutina.";
-  if (!sessions.length) return "Agrega al menos una sesión.";
-  if (sessions.some((session) => !session.name.trim())) return "Cada sesión necesita nombre.";
-  if (sessions.some((session) => session.blocks.some((block) => block.exercises.some((exercise) => !exercise.exerciseName.trim())))) return "Todos los ejercicios necesitan nombre.";
-  return null;
+function isPublished(workout: WorkoutSummary) {
+  return workout.status === "PUBLISHED" || workout.status === "ACTIVE";
 }
 
-function errorMessage(error: unknown) { return error instanceof Error ? error.message : "No fue posible completar la operación."; }
-function today() { return new Date().toISOString().slice(0, 10); }
+function numberOrNull(value: string) {
+  return value === "" ? null : Number(value);
+}
+
+function errorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "No fue posible completar la operación.";
+}
+
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 function startOfWeek() {
   const date = new Date();
   const day = date.getDay() || 7;

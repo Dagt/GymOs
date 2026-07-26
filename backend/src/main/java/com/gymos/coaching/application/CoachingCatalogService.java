@@ -6,6 +6,7 @@ import com.gymos.audit.api.AuditService;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.AssignmentDetail;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.AssignmentPdfData;
+import com.gymos.coaching.infrastructure.CoachingCatalogRepository.AssignmentStats;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.CoachMetric;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.ExerciseData;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.ExercisePage;
@@ -15,10 +16,18 @@ import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.time.BusinessTime;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.awt.Color;
+import java.net.InetAddress;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.text.Normalizer;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.Duration;
 import java.time.temporal.TemporalAdjusters;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -29,6 +38,7 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -98,7 +108,7 @@ public class CoachingCatalogService {
 		requireTenant(principal);
 		ExerciseRecord existing = repository.exercise(principal.organizationId(), exerciseId)
 				.orElseThrow(() -> new BusinessException("EXERCISE_NOT_FOUND", "El ejercicio no existe."));
-		requireMutableExercise(existing);
+		requireManageableExercise(principal, existing);
 
 		String name = required(command.name(), "EXERCISE_NAME_REQUIRED", "El nombre del ejercicio es obligatorio.");
 		String normalizedName = normalize(name);
@@ -134,7 +144,7 @@ public class CoachingCatalogService {
 		requireTenant(principal);
 		ExerciseRecord exercise = repository.exercise(principal.organizationId(), exerciseId)
 				.orElseThrow(() -> new BusinessException("EXERCISE_NOT_FOUND", "El ejercicio no existe."));
-		requireMutableExercise(exercise);
+		requireManageableExercise(principal, exercise);
 		String cleanAlias = required(alias, "EXERCISE_ALIAS_REQUIRED", "El alias es obligatorio.");
 		String normalizedAlias = normalize(cleanAlias);
 		if (normalizedAlias.equals(normalize(exercise.name()))) {
@@ -150,6 +160,28 @@ public class CoachingCatalogService {
 				});
 		repository.addAlias(exerciseId, cleanAlias, normalizedAlias);
 		auditService.record(principal, "EXERCISE_ALIAS_ADDED", "EXERCISE", exerciseId, "BACKOFFICE", cleanAlias, correlationId);
+		return repository.aliases(exerciseId);
+	}
+
+	@Transactional(readOnly = true)
+	public List<String> aliases(GymOsPrincipal principal, UUID exerciseId) {
+		requireTenant(principal);
+		repository.exercise(principal.organizationId(), exerciseId)
+				.orElseThrow(() -> new BusinessException("EXERCISE_NOT_FOUND", "El ejercicio no existe."));
+		return repository.aliases(exerciseId);
+	}
+
+	@Transactional
+	public List<String> deleteAlias(
+			GymOsPrincipal principal, UUID exerciseId, String alias, String correlationId
+	) {
+		requireTenant(principal);
+		ExerciseRecord exercise = repository.exercise(principal.organizationId(), exerciseId)
+				.orElseThrow(() -> new BusinessException("EXERCISE_NOT_FOUND", "El ejercicio no existe."));
+		requireManageableExercise(principal, exercise);
+		String cleanAlias = required(alias, "EXERCISE_ALIAS_REQUIRED", "El alias es obligatorio.");
+		repository.deleteAlias(exerciseId, normalize(cleanAlias));
+		auditService.record(principal, "EXERCISE_ALIAS_DELETED", "EXERCISE", exerciseId, "BACKOFFICE", cleanAlias, correlationId);
 		return repository.aliases(exerciseId);
 	}
 
@@ -176,22 +208,52 @@ public class CoachingCatalogService {
 	public AssignmentReport assignmentReport(
 			GymOsPrincipal principal, LocalDate from, LocalDate to, UUID coachId, UUID clientId
 	) {
+		return assignmentReport(principal, from, to, coachId, clientId, 0, 50);
+	}
+
+	@Transactional(readOnly = true)
+	public AssignmentReport assignmentReport(
+			GymOsPrincipal principal, LocalDate from, LocalDate to, UUID coachId, UUID clientId,
+			int page, int size
+	) {
 		requireBranch(principal);
 		LocalDate safeTo = to == null ? BusinessTime.today() : to;
 		LocalDate safeFrom = from == null ? safeTo.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY)) : from;
 		if (safeTo.isBefore(safeFrom) || safeFrom.plusYears(1).isBefore(safeTo)) {
 			throw new BusinessException("REPORT_RANGE_INVALID", "El rango del reporte es inválido o excede un año.");
 		}
-		List<CoachMetric> metrics = repository.metrics(principal.organizationId(), principal.branchId(), safeFrom, safeTo);
-		List<AssignmentDetail> details = repository.assignments(
-				principal.organizationId(), principal.branchId(), safeFrom, safeTo, coachId, clientId
+		int safePage = Math.max(0, page);
+		int safeSize = Math.max(1, Math.min(MAX_PAGE_SIZE, size));
+		UUID ownerUserId = workoutReadScope(principal);
+		List<CoachMetric> metrics = repository.metrics(
+				principal.organizationId(), principal.branchId(), safeFrom, safeTo,
+				coachId, clientId, ownerUserId
 		);
-		long assignments = metrics.stream().mapToLong(CoachMetric::assignments).sum();
-		long uniqueClients = details.stream().map(AssignmentDetail::clientId).distinct().count();
+		AssignmentStats currentStats = repository.assignmentStats(
+				principal.organizationId(), principal.branchId(), safeFrom, safeTo,
+				coachId, clientId, ownerUserId
+		);
+		List<AssignmentDetail> details = repository.assignments(
+				principal.organizationId(), principal.branchId(), safeFrom, safeTo,
+				coachId, clientId, ownerUserId, safeSize, safePage * safeSize
+		);
 		long activeCoaches = metrics.size();
 		long coachesWithoutAssignments = metrics.stream().filter(metric -> metric.assignments() == 0).count();
+		long periodDays = ChronoUnit.DAYS.between(safeFrom, safeTo) + 1;
+		LocalDate previousTo = safeFrom.minusDays(1);
+		LocalDate previousFrom = previousTo.minusDays(periodDays - 1);
+		AssignmentStats previousStats = repository.assignmentStats(
+				principal.organizationId(), principal.branchId(), previousFrom, previousTo,
+				coachId, clientId, ownerUserId
+		);
+		int totalPages = (int) Math.ceil(currentStats.totalRows() / (double) safeSize);
 		return new AssignmentReport(
-				safeFrom, safeTo, assignments, uniqueClients, activeCoaches, coachesWithoutAssignments,
+				safeFrom, safeTo, currentStats.assignments(), currentStats.uniqueClients(),
+				activeCoaches, coachesWithoutAssignments,
+				previousFrom, previousTo, previousStats.assignments(), previousStats.uniqueClients(),
+				currentStats.assignments() - previousStats.assignments(),
+				currentStats.uniqueClients() - previousStats.uniqueClients(),
+				safePage, safeSize, currentStats.totalRows(), totalPages,
 				metrics, details
 		);
 	}
@@ -201,14 +263,30 @@ public class CoachingCatalogService {
 			GymOsPrincipal principal, LocalDate from, LocalDate to, UUID coachId, UUID clientId
 	) {
 		AssignmentReport report = assignmentReport(principal, from, to, coachId, clientId);
-		StringBuilder csv = new StringBuilder("\uFEFFfecha,coach,socio,rutina,version,estado\n");
-		for (AssignmentDetail row : report.details()) {
+		if (report.totalDetails() > 10_000) {
+			throw new BusinessException(
+					"REPORT_EXPORT_TOO_LARGE",
+					"El reporte excede 10,000 asignaciones. Reduce el rango o filtra por coach."
+			);
+		}
+		List<AssignmentDetail> exportRows = repository.assignments(
+				principal.organizationId(), principal.branchId(), report.from(), report.to(),
+				coachId, clientId, workoutReadScope(principal),
+				Math.max(1, (int) report.totalDetails()), 0
+		);
+		StringBuilder csv = new StringBuilder(
+				"\uFEFFfecha,coach,socio,rutina,version,estado,motivo,reemplazada_por\n"
+		);
+		for (AssignmentDetail row : exportRows) {
 			csv.append(row.assignedOn()).append(',')
 					.append(csv(row.coachName())).append(',')
 					.append(csv(row.clientName())).append(',')
 					.append(csv(row.workoutTitle())).append(',')
 					.append(row.versionNumber()).append(',')
-					.append(csv(row.status())).append('\n');
+					.append(csv(row.status())).append(',')
+					.append(csv(row.statusReason())).append(',')
+					.append(csv(row.replacedAssignmentId() == null ? null : row.replacedAssignmentId().toString()))
+					.append('\n');
 		}
 		return csv.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8);
 	}
@@ -217,7 +295,7 @@ public class CoachingCatalogService {
 	public byte[] assignmentPdf(GymOsPrincipal principal, UUID assignmentId) {
 		requireBranch(principal);
 		AssignmentPdfData data = repository.assignmentPdf(
-				principal.organizationId(), principal.branchId(), assignmentId
+				principal.organizationId(), principal.branchId(), assignmentId, workoutReadScope(principal)
 		).orElseThrow(() -> new BusinessException("WORKOUT_ASSIGNMENT_NOT_FOUND", "La asignación no existe."));
 		try {
 			return renderPdf(data);
@@ -228,15 +306,13 @@ public class CoachingCatalogService {
 
 	private byte[] renderPdf(AssignmentPdfData data) throws IOException {
 		try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-			PdfWriter writer = new PdfWriter(document);
-			writer.title(data.gymName());
+			PdfWriter writer = new PdfWriter(document, data);
 			writer.heading(data.title());
-			writer.line("Socio: " + data.clientName());
-			writer.line("Coach: " + data.coachName());
-			writer.line("Objetivo: " + value(data.goal()) + "   Nivel: " + value(data.level()));
-			writer.line("Asignada: " + data.assignedOn() + "   Versión: " + data.versionNumber());
+			writer.summary("Socio", data.clientName(), "Coach", data.coachName());
+			writer.summary("Objetivo", value(data.goal()), "Nivel", value(data.level()));
+			writer.summary("Asignada", data.assignedOn().toString(), "Versión", String.valueOf(data.versionNumber()));
 			if (data.startsOn() != null || data.endsOn() != null) {
-				writer.line("Vigencia: " + value(data.startsOn()) + " a " + value(data.endsOn()));
+				writer.summary("Vigencia", value(data.startsOn()) + " a " + value(data.endsOn()), "", "");
 			}
 			writer.separator();
 			JsonNode root = objectMapper.readTree(data.contentJson());
@@ -292,9 +368,13 @@ public class CoachingCatalogService {
 	}
 	private String csv(String value) { return "\"" + (value == null ? "" : value.replace("\"", "\"\"")) + "\""; }
 	private String value(Object value) { return value == null ? "-" : value.toString(); }
-	private void requireMutableExercise(ExerciseRecord exercise) {
+	private void requireManageableExercise(GymOsPrincipal principal, ExerciseRecord exercise) {
 		if (exercise.organizationId() == null || "SYSTEM".equals(exercise.origin())) {
 			throw new BusinessException("SYSTEM_EXERCISE_IMMUTABLE", "Los ejercicios del sistema son de solo lectura.");
+		}
+		if (!principal.permissions().contains("exercise.manage")
+				&& !repository.exerciseCreatedBy(principal.organizationId(), exercise.id(), principal.userId())) {
+			throw new BusinessException("EXERCISE_OUTSIDE_OWNER_SCOPE", "Solo puedes modificar ejercicios creados por ti.");
 		}
 	}
 	private void requireTenant(GymOsPrincipal principal) {
@@ -308,6 +388,13 @@ public class CoachingCatalogService {
 			throw new BusinessException("BRANCH_REQUIRED", "Selecciona una sucursal para operar.");
 		}
 	}
+	private UUID workoutReadScope(GymOsPrincipal principal) {
+		if (principal.permissions().contains("workout.read.all")
+				|| principal.permissions().contains("workout.manage.all")) return null;
+		if (principal.permissions().contains("workout.read.own")
+				|| principal.permissions().contains("workout.manage.own")) return principal.userId();
+		throw new BusinessException("WORKOUT_READ_FORBIDDEN", "No tienes permiso para consultar esta rutina.");
+	}
 
 	public record CreateExerciseCommand(
 			String name, String description, String instructions, String primaryMuscleGroup,
@@ -317,24 +404,38 @@ public class CoachingCatalogService {
 	public record AssignmentReport(
 			LocalDate from, LocalDate to, long assignments, long uniqueClients,
 			long activeCoaches, long coachesWithoutAssignments,
+			LocalDate previousFrom, LocalDate previousTo,
+			long previousAssignments, long previousUniqueClients,
+			long assignmentChange, long uniqueClientChange,
+			int page, int size, long totalDetails, int totalPages,
 			List<CoachMetric> coaches, List<AssignmentDetail> details
 	) {}
 
 	private final class PdfWriter {
 		private final PDDocument document;
+		private final AssignmentPdfData data;
+		private final Color primary;
+		private final PDImageXObject logo;
 		private final PDType1Font regular = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
 		private final PDType1Font bold = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
 		private PDPage page;
 		private PDPageContentStream stream;
 		private float y;
 
-		private PdfWriter(PDDocument document) throws IOException {
+		private PdfWriter(PDDocument document, AssignmentPdfData data) throws IOException {
 			this.document = document;
+			this.data = data;
+			this.primary = color(data.primaryColor());
+			this.logo = loadLogo(document, data.logoUrl());
 			newPage();
 		}
-		void title(String value) throws IOException { write(value, 18, bold, 22); }
 		void heading(String value) throws IOException { ensure(40); write(value, 15, bold, 20); }
 		void subheading(String value) throws IOException { ensure(32); write(value, 12, bold, 17); }
+		void summary(String labelA, String valueA, String labelB, String valueB) throws IOException {
+			String left = labelA.isBlank() ? valueA : labelA + ": " + valueA;
+			String right = labelB.isBlank() ? "" : labelB + ": " + valueB;
+			write(left + (right.isBlank() ? "" : "    |    " + right), 10, regular, 15);
+		}
 		void line(String value) throws IOException {
 			for (String part : wrap(value == null ? "" : value, 96)) write(part, 10, regular, 14);
 		}
@@ -346,8 +447,25 @@ public class CoachingCatalogService {
 				String reps = text(node, "reps", "");
 				prescription = (sets.isBlank() ? "" : sets + " x ") + reps;
 			}
+			List<String> details = new ArrayList<>();
+			addDetail(details, "Carga", text(node, "load", ""));
+			addDetail(details, "Descanso", suffix(text(node, "restSeconds", ""), " s"));
+			addDetail(details, "Tempo", text(node, "tempo", ""));
+			addDetail(details, "Duración", text(node, "duration", ""));
+			addDetail(details, "Distancia", text(node, "distance", ""));
+			addDetail(details, "Grupo", text(node, "groupKey", ""));
 			String notes = text(node, "notes", "");
-			line("• " + name + (prescription.isBlank() ? "" : " — " + prescription) + (notes.isBlank() ? "" : " — " + notes));
+			int rows = 1 + (details.isEmpty() ? 0 : 1) + (notes.isBlank() ? 0 : 1);
+			ensure(12 + rows * 13);
+			float boxHeight = 8 + rows * 13;
+			stream.setNonStrokingColor(new Color(245, 248, 246));
+			stream.addRect(40, y - boxHeight + 9, page.getMediaBox().getWidth() - 80, boxHeight);
+			stream.fill();
+			stream.setNonStrokingColor(Color.BLACK);
+			write(name + (prescription.isBlank() ? "" : "  |  " + prescription), 10, bold, 14);
+			if (!details.isEmpty()) write(String.join("  |  ", details), 8, regular, 12);
+			if (!notes.isBlank()) write(notes, 8, regular, 12);
+			y -= 3;
 		}
 		void separator() throws IOException { ensure(20); y -= 8; }
 		void finish() throws IOException { if (stream != null) stream.close(); }
@@ -363,10 +481,33 @@ public class CoachingCatalogService {
 		private void ensure(float needed) throws IOException { if (y - needed < 45) newPage(); }
 		private void newPage() throws IOException {
 			if (stream != null) stream.close();
-			page = new PDPage(PDRectangle.LETTER);
+			page = new PDPage(PDRectangle.A4);
 			document.addPage(page);
 			stream = new PDPageContentStream(document, page);
-			y = page.getMediaBox().getHeight() - 45;
+			float top = page.getMediaBox().getHeight();
+			stream.setNonStrokingColor(primary);
+			stream.addRect(0, top - 88, page.getMediaBox().getWidth(), 88);
+			stream.fill();
+			stream.setNonStrokingColor(Color.WHITE);
+			if (logo == null) {
+				String initials = data.gymName() == null || data.gymName().isBlank()
+						? "G" : data.gymName().substring(0, 1).toUpperCase(Locale.ROOT);
+				writeAt(initials, 48, top - 51, 24, bold);
+			} else {
+				stream.drawImage(logo, 40, top - 72, 48, 48);
+			}
+			writeAt(data.gymName(), 86, top - 41, 17, bold);
+			writeAt(data.branchName() + (data.contactPhone() == null ? "" : "  |  " + data.contactPhone()),
+					86, top - 61, 9, regular);
+			stream.setNonStrokingColor(Color.BLACK);
+			y = top - 112;
+		}
+		private void writeAt(String value, float x, float positionY, float size, PDType1Font font) throws IOException {
+			stream.beginText();
+			stream.setFont(font, size);
+			stream.newLineAtOffset(x, positionY);
+			stream.showText(safePdfText(value == null ? "" : value));
+			stream.endText();
 		}
 		private List<String> wrap(String value, int max) {
 			List<String> lines = new ArrayList<>();
@@ -384,7 +525,58 @@ public class CoachingCatalogService {
 			return lines.isEmpty() ? List.of("") : lines;
 		}
 		private String safePdfText(String value) {
-			return value.replace('—', '-').replace('•', '-').replace('\t', ' ');
+			String normalized = value
+					.replace('—', '-')
+					.replace('–', '-')
+					.replace('•', '-')
+					.replace('“', '"')
+					.replace('”', '"')
+					.replace('‘', '\'')
+					.replace('’', '\'')
+					.replace('\t', ' ');
+			StringBuilder safe = new StringBuilder(normalized.length());
+			for (int index = 0; index < normalized.length(); index++) {
+				char character = normalized.charAt(index);
+				safe.append(character >= 32 && character <= 255 ? character : '?');
+			}
+			return safe.toString();
+		}
+		private void addDetail(List<String> details, String label, String value) {
+			if (value != null && !value.isBlank()) details.add(label + ": " + value);
+		}
+		private String suffix(String value, String suffix) {
+			return value == null || value.isBlank() ? "" : value + suffix;
+		}
+	}
+
+	private Color color(String value) {
+		try {
+			return Color.decode(value == null || value.isBlank() ? "#173C2A" : value);
+		} catch (NumberFormatException ignored) {
+			return Color.decode("#173C2A");
+		}
+	}
+
+	private PDImageXObject loadLogo(PDDocument document, String logoUrl) {
+		if (logoUrl == null || logoUrl.isBlank()) return null;
+		try {
+			URI uri = URI.create(logoUrl);
+			if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null) return null;
+			for (InetAddress address : InetAddress.getAllByName(uri.getHost())) {
+				if (address.isAnyLocalAddress() || address.isLoopbackAddress()
+						|| address.isLinkLocalAddress() || address.isSiteLocalAddress()) return null;
+			}
+			HttpRequest request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(3)).GET().build();
+			HttpResponse<byte[]> response = HttpClient.newBuilder()
+					.connectTimeout(Duration.ofSeconds(2))
+					.followRedirects(HttpClient.Redirect.NEVER)
+					.build()
+					.send(request, HttpResponse.BodyHandlers.ofByteArray());
+			byte[] body = response.body();
+			if (response.statusCode() / 100 != 2 || body.length == 0 || body.length > 2_000_000) return null;
+			return PDImageXObject.createFromByteArray(document, body, "gym-logo");
+		} catch (Exception ignored) {
+			return null;
 		}
 	}
 }

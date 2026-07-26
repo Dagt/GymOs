@@ -117,7 +117,7 @@ const coachSections: NavigationSection[] = [
   {
     title: "Entrenamiento",
     links: [
-      { label: "Rutinas", href: "/coaches", hint: "Planes y asignaciones", permissions: ["coach.read", "workout.read"] },
+      { label: "Rutinas", href: "/coaches", hint: "Planes y asignaciones", permissions: ["coach.read", "workout.read.own", "workout.read.all"] },
       { label: "Socios", href: "/clients", hint: "Consulta autorizada", permissions: memberWorkflowPermissions },
     ],
   },

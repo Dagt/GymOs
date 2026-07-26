@@ -18,7 +18,7 @@ public class CoachingRepository {
 
 	public List<CoachRecord> coaches(UUID organizationId, UUID branchId) {
 		return jdbcClient.sql("""
-				SELECT id, display_name, email, phone, specialties_json::text AS specialties_json,
+				SELECT id, user_account_id, display_name, email, phone, specialties_json::text AS specialties_json,
 				       bio, status, created_at, updated_at
 				FROM coach
 				WHERE organization_id = :organizationId
@@ -34,7 +34,7 @@ public class CoachingRepository {
 
 	public Optional<CoachRecord> coach(UUID organizationId, UUID branchId, UUID coachId) {
 		return jdbcClient.sql("""
-				SELECT id, display_name, email, phone, specialties_json::text AS specialties_json,
+				SELECT id, user_account_id, display_name, email, phone, specialties_json::text AS specialties_json,
 				       bio, status, created_at, updated_at
 				FROM coach
 				WHERE organization_id = :organizationId
@@ -45,6 +45,23 @@ public class CoachingRepository {
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
 				.param("coachId", coachId)
+				.query(this::mapCoach)
+				.optional();
+	}
+
+	public Optional<CoachRecord> coachByUser(UUID organizationId, UUID branchId, UUID userId) {
+		return jdbcClient.sql("""
+				SELECT id, user_account_id, display_name, email, phone, specialties_json::text AS specialties_json,
+				       bio, status, created_at, updated_at
+				FROM coach
+				WHERE organization_id = :organizationId
+				  AND branch_id = :branchId
+				  AND user_account_id = :userId
+				  AND deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("userId", userId)
 				.query(this::mapCoach)
 				.optional();
 	}
@@ -96,7 +113,7 @@ public class CoachingRepository {
 		return coachId;
 	}
 
-	public List<WorkoutSummaryRecord> workouts(UUID organizationId, UUID branchId) {
+	public List<WorkoutSummaryRecord> workouts(UUID organizationId, UUID branchId, UUID ownerUserId) {
 		return jdbcClient.sql("""
 				SELECT w.id, w.coach_id, c.display_name AS coach_name, w.title, w.goal, w.level,
 				       w.status, v.id AS latest_version_id, v.version_number AS latest_version_number,
@@ -113,16 +130,18 @@ public class CoachingRepository {
 				) v ON true
 				WHERE w.organization_id = :organizationId
 				  AND w.branch_id = :branchId
+				  AND (:ownerUserId IS NULL OR c.user_account_id = :ownerUserId)
 				  AND w.deleted_at IS NULL
 				ORDER BY w.updated_at DESC, w.title
 				""")
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
+				.param("ownerUserId", ownerUserId)
 				.query(this::mapWorkoutSummary)
 				.list();
 	}
 
-	public Optional<WorkoutRecord> workout(UUID organizationId, UUID branchId, UUID workoutId) {
+	public Optional<WorkoutRecord> workout(UUID organizationId, UUID branchId, UUID workoutId, UUID ownerUserId) {
 		return jdbcClient.sql("""
 				SELECT w.id, w.coach_id, c.display_name AS coach_name, w.title, w.goal, w.level,
 				       w.status, w.created_at, w.updated_at
@@ -131,11 +150,13 @@ public class CoachingRepository {
 				WHERE w.organization_id = :organizationId
 				  AND w.branch_id = :branchId
 				  AND w.id = :workoutId
+				  AND (:ownerUserId IS NULL OR c.user_account_id = :ownerUserId)
 				  AND w.deleted_at IS NULL
 				""")
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
 				.param("workoutId", workoutId)
+				.param("ownerUserId", ownerUserId)
 				.query(this::mapWorkout)
 				.optional();
 	}
@@ -382,11 +403,12 @@ public class CoachingRepository {
 	}
 
 	public void updateAssignmentStatus(
-			UUID organizationId, UUID branchId, UUID assignmentId, String status, UUID actorUserId
+			UUID organizationId, UUID branchId, UUID assignmentId, String status, String reason, UUID actorUserId
 	) {
 		int updated = jdbcClient.sql("""
 				UPDATE workout_assignment
 				SET status = :status, updated_at = now(), updated_by = :actorUserId,
+				    status_reason = :reason,
 				    completed_at = CASE WHEN :status = 'COMPLETED' THEN now() ELSE completed_at END,
 				    cancelled_at = CASE WHEN :status = 'CANCELLED' THEN now() ELSE cancelled_at END,
 				    version = version + 1
@@ -394,6 +416,7 @@ public class CoachingRepository {
 				  AND branch_id = :branchId AND deleted_at IS NULL
 				""")
 				.param("status", status)
+				.param("reason", reason)
 				.param("actorUserId", actorUserId)
 				.param("assignmentId", assignmentId)
 				.param("organizationId", organizationId)
@@ -418,26 +441,33 @@ public class CoachingRepository {
 				.list();
 	}
 
-	public Optional<WorkoutVersionRecord> workoutVersionById(UUID organizationId, UUID branchId, UUID versionId) {
+	public Optional<WorkoutVersionRecord> workoutVersionById(
+			UUID organizationId, UUID branchId, UUID versionId, UUID ownerUserId
+	) {
 		return jdbcClient.sql("""
 				SELECT v.id, v.workout_id, v.version_number, v.summary,
 				       v.content_json::text AS content_json, v.status, v.created_at
 				FROM workout_version v
 				JOIN workout w ON w.id = v.workout_id
+				LEFT JOIN coach c ON c.id = w.coach_id
 				WHERE v.organization_id = :organizationId
 				  AND w.branch_id = :branchId
+				  AND (:ownerUserId IS NULL OR c.user_account_id = :ownerUserId)
 				  AND v.id = :versionId
 				  AND v.deleted_at IS NULL
 				  AND w.deleted_at IS NULL
 				""")
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
+				.param("ownerUserId", ownerUserId)
 				.param("versionId", versionId)
 				.query(this::mapVersion)
 				.optional();
 	}
 
-	public Optional<WorkoutAssignmentRecord> workoutAssignmentById(UUID organizationId, UUID branchId, UUID assignmentId) {
+	public Optional<WorkoutAssignmentRecord> workoutAssignmentById(
+			UUID organizationId, UUID branchId, UUID assignmentId, UUID ownerUserId
+	) {
 		return jdbcClient.sql("""
 				SELECT a.id, a.workout_id, a.workout_version_id, a.client_id,
 				       p.first_name || ' ' || p.last_name AS client_name,
@@ -453,11 +483,13 @@ public class CoachingRepository {
 				WHERE a.organization_id = :organizationId
 				  AND a.branch_id = :branchId
 				  AND a.id = :assignmentId
+				  AND (:ownerUserId IS NULL OR c.user_account_id = :ownerUserId)
 				  AND a.deleted_at IS NULL
 				""")
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
 				.param("assignmentId", assignmentId)
+				.param("ownerUserId", ownerUserId)
 				.query(this::mapAssignment)
 				.optional();
 	}
@@ -544,7 +576,9 @@ public class CoachingRepository {
 				)).optional();
 	}
 
-	public List<WorkoutAssignmentRecord> clientAssignments(UUID organizationId, UUID branchId, UUID clientId) {
+	public List<WorkoutAssignmentRecord> clientAssignments(
+			UUID organizationId, UUID branchId, UUID clientId, UUID ownerUserId
+	) {
 		return jdbcClient.sql("""
 				SELECT a.id, a.workout_id, a.workout_version_id, a.client_id,
 				       p.first_name || ' ' || p.last_name AS client_name,
@@ -560,17 +594,21 @@ public class CoachingRepository {
 				WHERE a.organization_id = :organizationId
 				  AND a.branch_id = :branchId
 				  AND a.client_id = :clientId
+				  AND (:ownerUserId IS NULL OR c.user_account_id = :ownerUserId)
 				  AND a.deleted_at IS NULL
 				ORDER BY a.assigned_on DESC, a.created_at DESC
 				""")
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
 				.param("clientId", clientId)
+				.param("ownerUserId", ownerUserId)
 				.query(this::mapAssignment)
 				.list();
 	}
 
-	public Optional<WorkoutAssignmentRecord> assignment(UUID organizationId, UUID branchId, UUID assignmentId) {
+	public Optional<WorkoutAssignmentRecord> assignment(
+			UUID organizationId, UUID branchId, UUID assignmentId, UUID ownerUserId
+	) {
 		return jdbcClient.sql("""
 				SELECT a.id, a.workout_id, a.workout_version_id, a.client_id,
 				       p.first_name || ' ' || p.last_name AS client_name,
@@ -586,11 +624,13 @@ public class CoachingRepository {
 				WHERE a.organization_id = :organizationId
 				  AND a.branch_id = :branchId
 				  AND a.id = :assignmentId
+				  AND (:ownerUserId IS NULL OR c.user_account_id = :ownerUserId)
 				  AND a.deleted_at IS NULL
 				""")
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
 				.param("assignmentId", assignmentId)
+				.param("ownerUserId", ownerUserId)
 				.query(this::mapAssignment)
 				.optional();
 	}
@@ -623,6 +663,7 @@ public class CoachingRepository {
 	private CoachRecord mapCoach(java.sql.ResultSet resultSet, int rowNumber) throws java.sql.SQLException {
 		return new CoachRecord(
 				resultSet.getObject("id", UUID.class),
+				resultSet.getObject("user_account_id", UUID.class),
 				resultSet.getString("display_name"),
 				resultSet.getString("email"),
 				resultSet.getString("phone"),
@@ -714,7 +755,11 @@ public class CoachingRepository {
 
 	public record IdempotentAssignment(UUID assignmentId, String requestHash) {}
 
-	public record CoachRecord(UUID id, String displayName, String email, String phone, String specialtiesJson, String bio, String status, OffsetDateTime createdAt, OffsetDateTime updatedAt) {
+	public record CoachRecord(
+			UUID id, UUID userAccountId, String displayName, String email, String phone,
+			String specialtiesJson, String bio, String status,
+			OffsetDateTime createdAt, OffsetDateTime updatedAt
+	) {
 	}
 
 	public record WorkoutSummaryRecord(UUID id, UUID coachId, String coachName, String title, String goal, String level, String status, UUID latestVersionId, Integer latestVersionNumber, OffsetDateTime createdAt, OffsetDateTime updatedAt) {

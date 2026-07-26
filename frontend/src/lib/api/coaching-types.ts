@@ -1,5 +1,6 @@
 export type CoachSummary = {
   id: string;
+  userAccountId: string | null;
   displayName: string;
   email: string | null;
   phone: string | null;
@@ -108,6 +109,7 @@ export type Exercise = {
   warnings: string | null;
   origin: "SYSTEM" | "ORGANIZATION" | "COACH";
   status: "ACTIVE" | "ARCHIVED";
+  createdBy: string | null;
 };
 
 export type ExercisePage = {
@@ -167,6 +169,8 @@ export type AssignmentDetail = {
   id: string;
   assignedOn: string;
   status: string;
+  statusReason: string | null;
+  replacedAssignmentId: string | null;
   startsOn: string | null;
   endsOn: string | null;
   workoutId: string;
@@ -195,6 +199,16 @@ export type AssignmentReport = {
   uniqueClients: number;
   activeCoaches: number;
   coachesWithoutAssignments: number;
+  previousFrom: string;
+  previousTo: string;
+  previousAssignments: number;
+  previousUniqueClients: number;
+  assignmentChange: number;
+  uniqueClientChange: number;
+  page: number;
+  size: number;
+  totalDetails: number;
+  totalPages: number;
   coaches: CoachMetric[];
   details: AssignmentDetail[];
 };
