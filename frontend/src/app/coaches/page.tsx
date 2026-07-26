@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired } from "@/components/AuthRequired";
 import {
+  addExerciseAlias,
   assignWorkout,
   createExercise,
   createWorkout,
@@ -15,9 +16,11 @@ import {
   getCoaches,
   getExercises,
   getStoredSession,
+  getWorkout,
   getWorkouts,
   publishWorkout,
   searchClients,
+  updateWorkout,
   updateWorkoutAssignmentStatus,
   type AssignmentReport,
   type BranchSummary,
@@ -63,9 +66,11 @@ export default function CoachesPage() {
   const [level, setLevel] = useState("GENERAL");
   const [coachId, setCoachId] = useState("");
   const [summary, setSummary] = useState("");
+  const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<WorkoutSessionDraft[]>([emptySession(0)]);
 
   const [exerciseQuery, setExerciseQuery] = useState("");
+  const [aliasDrafts, setAliasDrafts] = useState<Record<string, string>>({});
   const [newExercise, setNewExercise] = useState({
     name: "", primaryMuscleGroup: "", equipment: "", type: "STRENGTH", instructions: "",
   });
@@ -147,19 +152,22 @@ export default function CoachesPage() {
     if (validation) { setError(validation); return; }
     setSaving(true); clearFeedback();
     try {
-      const created = await createWorkout(session.accessToken, {
+      const payload = {
         coachId: coachId || null,
         title, goal, level: level as "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "GENERAL",
         summary,
         contentJson: JSON.stringify({ sessions }),
-      });
+      };
+      const created = editingWorkoutId
+        ? await updateWorkout(session.accessToken, editingWorkoutId, payload)
+        : await createWorkout(session.accessToken, payload);
       const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
       const shouldPublish = submitter?.value !== "draft";
       if (shouldPublish) await publishWorkout(session.accessToken, created.workout.id);
       setMessage(shouldPublish
         ? `Rutina “${created.workout.title}” publicada correctamente.`
         : `Borrador “${created.workout.title}” guardado.`);
-      setTitle(""); setGoal(""); setSummary(""); setSessions([emptySession(0)]);
+      resetWorkoutForm();
       await refresh();
     } catch (exception) { setError(errorMessage(exception)); }
     finally { setSaving(false); }
@@ -174,6 +182,19 @@ export default function CoachesPage() {
       setExercisePage((current) => [...current, created].sort((a, b) => a.name.localeCompare(b.name)));
       setNewExercise({ name: "", primaryMuscleGroup: "", equipment: "", type: "STRENGTH", instructions: "" });
       setMessage(`Ejercicio “${created.name}” agregado al catálogo.`);
+    } catch (exception) { setError(errorMessage(exception)); }
+    finally { setSaving(false); }
+  }
+
+  async function saveAlias(exercise: Exercise) {
+    if (!session) return;
+    const alias = aliasDrafts[exercise.id]?.trim();
+    if (!alias) return;
+    setSaving(true); clearFeedback();
+    try {
+      await addExerciseAlias(session.accessToken, exercise.id, alias);
+      setAliasDrafts((current) => ({ ...current, [exercise.id]: "" }));
+      setMessage(`Alias "${alias}" agregado a ${exercise.name}.`);
     } catch (exception) { setError(errorMessage(exception)); }
     finally { setSaving(false); }
   }
@@ -262,6 +283,33 @@ export default function CoachesPage() {
     finally { setSaving(false); }
   }
 
+  async function editWorkout(workoutId: string) {
+    if (!session) return;
+    setSaving(true); clearFeedback();
+    try {
+      const detail = await getWorkout(session.accessToken, workoutId);
+      const version = detail.versions[0];
+      const content = version
+        ? JSON.parse(version.contentJson) as { sessions?: WorkoutSessionDraft[]; days?: WorkoutSessionDraft[] }
+        : {};
+      setEditingWorkoutId(workoutId);
+      setTitle(detail.workout.title);
+      setGoal(detail.workout.goal ?? "");
+      setLevel(detail.workout.level);
+      setCoachId(detail.workout.coachId ?? "");
+      setSummary(version?.summary ?? "");
+      setSessions(content.sessions ?? content.days ?? [emptySession(0)]);
+      setMessage(`Editando "${detail.workout.title}".`);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (exception) { setError(errorMessage(exception)); }
+    finally { setSaving(false); }
+  }
+
+  function resetWorkoutForm() {
+    setEditingWorkoutId(null);
+    setTitle(""); setGoal(""); setSummary(""); setSessions([emptySession(0)]);
+  }
+
   async function publishExistingWorkout(workoutId: string) {
     if (!session) return;
     setSaving(true); clearFeedback();
@@ -313,7 +361,7 @@ export default function CoachesPage() {
             <section className="rounded-xl border border-[#d9e2dc] bg-white p-5 shadow-sm">
               <div className="mb-4">
                 <p className="text-xs font-semibold uppercase tracking-wider text-[#6b7d72]">Plantilla</p>
-                <h2 className="text-xl font-semibold">Información de la rutina</h2>
+                <h2 className="text-xl font-semibold">{editingWorkoutId ? "Editar rutina" : "Información de la rutina"}</h2>
               </div>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <Field label="Título"><input className="app-input" onChange={(e) => setTitle(e.target.value)} value={title} /></Field>
@@ -375,6 +423,7 @@ export default function CoachesPage() {
             <div className="flex flex-wrap justify-between gap-3">
               <button className="rounded-lg border border-[#9eb2a5] bg-white px-4 py-2 font-semibold" onClick={() => setSessions((items) => [...items, emptySession(items.length)])} type="button">+ Agregar día</button>
               <div className="flex gap-2">
+                {editingWorkoutId ? <button className="rounded-lg border border-[#9eb2a5] bg-white px-5 py-2 font-semibold" onClick={resetWorkoutForm} type="button">Cancelar edición</button> : null}
                 <button className="rounded-lg border border-[#9eb2a5] bg-white px-5 py-2 font-semibold disabled:opacity-60" disabled={saving} type="submit" value="draft">Guardar borrador</button>
                 <button className="rounded-lg bg-[#173c2a] px-5 py-2 font-semibold text-white disabled:opacity-60" disabled={saving} type="submit" value="publish">{saving ? "Guardando…" : "Publicar rutina"}</button>
               </div>
@@ -387,6 +436,7 @@ export default function CoachesPage() {
                     <article className="flex items-center justify-between gap-3 rounded-lg border border-[#e0e7e2] p-3" key={workout.id}>
                       <div><strong>{workout.title}</strong><p className="text-xs text-[#637268]">{workout.coachName || "Sin coach"} · versión {workout.latestVersionNumber} · {workout.status}</p></div>
                       <div className="flex gap-2">
+                        <button className="rounded-md border px-3 py-2 text-sm font-semibold" onClick={() => editWorkout(workout.id)} type="button">Editar</button>
                         {workout.status === "DRAFT" ? <button className="rounded-md bg-[#173c2a] px-3 py-2 text-sm font-semibold text-white" onClick={() => publishExistingWorkout(workout.id)} type="button">Publicar</button> : null}
                         <button className="rounded-md border px-3 py-2 text-sm font-semibold" onClick={() => copyWorkout(workout.id)} type="button">Duplicar</button>
                       </div>
@@ -411,6 +461,18 @@ export default function CoachesPage() {
                     <div className="flex justify-between gap-2"><strong>{exercise.name}</strong><span className="text-[10px] font-semibold text-[#66786d]">{exercise.origin}</span></div>
                     <p className="mt-1 text-xs text-[#637268]">{exercise.primaryMuscleGroup || "General"} · {exercise.equipment || "Sin equipo"}</p>
                     {exercise.instructions ? <p className="mt-2 line-clamp-2 text-xs">{exercise.instructions}</p> : null}
+                    {exercise.origin !== "SYSTEM" ? (
+                      <div className="mt-3 flex gap-2">
+                        <input
+                          aria-label={`Nuevo alias para ${exercise.name}`}
+                          className="app-input min-w-0 text-xs"
+                          onChange={(event) => setAliasDrafts((current) => ({ ...current, [exercise.id]: event.target.value }))}
+                          placeholder="Agregar alias"
+                          value={aliasDrafts[exercise.id] ?? ""}
+                        />
+                        <button className="rounded-md border px-2 text-xs font-semibold" disabled={saving || !aliasDrafts[exercise.id]?.trim()} onClick={() => saveAlias(exercise)} type="button">Guardar</button>
+                      </div>
+                    ) : null}
                   </article>
                 ))}
               </div>

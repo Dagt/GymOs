@@ -4,6 +4,10 @@ Estado: VIGENTE / ACTUALIZADO Y AUDITADO AL CIERRE DE INVENTARIOS
 Fecha de revisión: 25 de julio de 2026  
 Ramas revisadas: `feature/catalog-inventory-enhancement-plan` / `feature/inventory-operations-hardening`  
 
+> Registro histórico del cierre de catálogo e inventarios. Desde el 26 de julio
+> de 2026, todo pendiente vigente se administra exclusivamente en
+> `28-registro-vivo-deuda-tecnica.md`.
+
 ## 1. Objetivo
 
 Este documento registra el estado técnico real después de la mejora integral de catálogo e inventarios por sucursal, sesiones, transferencias entre sucursales, conteos físicos, valuación de inventario, corrección de permisos de seguridad y resolución de deuda técnica.

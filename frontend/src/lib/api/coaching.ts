@@ -42,6 +42,43 @@ export async function createWorkout(
   });
 }
 
+export async function getWorkout(accessToken: string, workoutId: string): Promise<WorkoutDetail> {
+  return apiFetch<WorkoutDetail>(`/workouts/${workoutId}`, accessToken);
+}
+
+export async function updateWorkout(
+  accessToken: string,
+  workoutId: string,
+  payload: CreateWorkoutPayload,
+): Promise<WorkoutDetail> {
+  return apiFetch<WorkoutDetail>(`/workouts/${workoutId}`, accessToken, {
+    method: "PUT",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function updateExerciseCatalog(
+  accessToken: string,
+  exerciseId: string,
+  payload: CreateExercisePayload,
+): Promise<Exercise> {
+  return apiFetch<Exercise>(`/exercises/${exerciseId}`, accessToken, {
+    method: "PUT",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function addExerciseAlias(
+  accessToken: string,
+  exerciseId: string,
+  alias: string,
+): Promise<string[]> {
+  return apiFetch<string[]>(`/exercises/${exerciseId}/aliases`, accessToken, {
+    method: "POST",
+    body: JSON.stringify({ alias }),
+  });
+}
+
 export async function duplicateWorkout(accessToken: string, workoutId: string): Promise<WorkoutDetail> {
   return apiFetch<WorkoutDetail>(`/workouts/${workoutId}/duplicate`, accessToken, { method: "POST" });
 }
@@ -68,6 +105,7 @@ export async function assignWorkout(
 ): Promise<WorkoutAssignment> {
   return apiFetch<WorkoutAssignment>(`/workouts/${workoutId}/assign`, accessToken, {
     method: "POST",
+    headers: payload.idempotencyKey ? { "Idempotency-Key": payload.idempotencyKey } : undefined,
     body: JSON.stringify(normalizePayload(payload)),
   });
 }

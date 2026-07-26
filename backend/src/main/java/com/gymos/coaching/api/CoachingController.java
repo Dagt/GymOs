@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -121,10 +122,11 @@ public class CoachingController {
 	WorkoutAssignmentRecord assignWorkout(
 			@AuthenticationPrincipal GymOsPrincipal principal,
 			@PathVariable UUID workoutId,
+			@RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
 			@Valid @RequestBody AssignWorkoutRequest request,
 			HttpServletRequest servletRequest
 	) {
-		return coachingService.assignWorkout(principal, workoutId, request.toCommand(), correlationId(servletRequest));
+		return coachingService.assignWorkout(principal, workoutId, request.toCommand(idempotencyKey), correlationId(servletRequest));
 	}
 
 	@PostMapping("/workout-assignments")
@@ -135,6 +137,23 @@ public class CoachingController {
 	) {
 		return coachingService.assignWorkout(
 				principal, request.workoutId(),
+				new AssignWorkoutCommand(
+						request.clientId(), request.workoutVersionId(), request.startsOn(), request.endsOn(),
+						request.privateNotes(), request.printableNotes(), request.idempotencyKey()
+				),
+				correlationId(servletRequest)
+		);
+	}
+
+	@PostMapping("/workout-assignments/{assignmentId}/replace")
+	WorkoutAssignmentRecord replaceAssignment(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID assignmentId,
+			@Valid @RequestBody CreateAssignmentRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return coachingService.replaceAssignment(
+				principal, assignmentId, request.workoutId(),
 				new AssignWorkoutCommand(
 						request.clientId(), request.workoutVersionId(), request.startsOn(), request.endsOn(),
 						request.privateNotes(), request.printableNotes(), request.idempotencyKey()
@@ -229,8 +248,10 @@ public class CoachingController {
 			@Size(max = 4000) String printableNotes,
 			@Size(max = 160) String idempotencyKey
 	) {
-		private AssignWorkoutCommand toCommand() {
-			return new AssignWorkoutCommand(clientId, workoutVersionId, startsOn, endsOn, notes, printableNotes, idempotencyKey);
+		private AssignWorkoutCommand toCommand(String headerIdempotencyKey) {
+			String effectiveKey = headerIdempotencyKey == null || headerIdempotencyKey.isBlank()
+					? idempotencyKey : headerIdempotencyKey;
+			return new AssignWorkoutCommand(clientId, workoutVersionId, startsOn, endsOn, notes, printableNotes, effectiveKey);
 		}
 	}
 

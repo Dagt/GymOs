@@ -77,6 +77,38 @@ class CoachingCatalogServiceTests {
 	}
 
 	@Test
+	void systemExerciseCannotBeEditedOrReceiveAliases() {
+		UUID exerciseId = UUID.randomUUID();
+		when(repository.exercise(principal.organizationId(), exerciseId))
+				.thenReturn(Optional.of(exercise(exerciseId, "Press inclinado", "SYSTEM")));
+
+		assertThatThrownBy(() -> service.updateExercise(
+				principal, exerciseId,
+				new CreateExerciseCommand(
+						"Press inclinado", null, null, null, null,
+						null, "STRENGTH", null, null, null, null, null
+				), "test"
+		)).isInstanceOf(BusinessException.class).hasMessageContaining("solo lectura");
+
+		assertThatThrownBy(() -> service.addAlias(principal, exerciseId, "Press superior", "test"))
+				.isInstanceOf(BusinessException.class)
+				.hasMessageContaining("solo lectura");
+	}
+
+	@Test
+	void aliasIsNormalizedBeforePersistence() {
+		UUID exerciseId = UUID.randomUUID();
+		when(repository.exercise(principal.organizationId(), exerciseId))
+				.thenReturn(Optional.of(exercise(exerciseId, "Press inclinado", "COACH")));
+		when(repository.aliases(exerciseId)).thenReturn(List.of("Press superior"));
+
+		List<String> aliases = service.addAlias(principal, exerciseId, "  Préss   Superior ", "test");
+
+		assertThat(aliases).containsExactly("Press superior");
+		verify(repository).addAlias(exerciseId, "Préss   Superior", "press superior");
+	}
+
+	@Test
 	void reportIncludesActiveCoachesWithoutAssignments() {
 		var coachId = UUID.randomUUID();
 		when(repository.metrics(eq(principal.organizationId()), eq(principal.branchId()), any(), any()))

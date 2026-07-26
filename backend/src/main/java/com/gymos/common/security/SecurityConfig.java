@@ -111,6 +111,7 @@ public class SecurityConfig {
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/workout-assignments/*/pdf").hasAuthority("workout.pdf.download")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/workout-assignments/**").hasAuthority("workout.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/workout-assignments").hasAuthority("workout.assign")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/workout-assignments/*/replace").hasAuthority("workout.assign")
 						.requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/workout-assignments/**").hasAuthority("workout.assign")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/reports/coaches/workout-assignments/**").hasAuthority("coach.metrics.read")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/reports/coaches").hasAuthority("report.coaches.read")

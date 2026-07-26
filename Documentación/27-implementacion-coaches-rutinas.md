@@ -47,9 +47,14 @@ se proyectan al modelo normalizado.
 Implementado:
 
 - listado y alta de ejercicios;
+- consulta y edición individual de ejercicios propios;
+- alta de aliases normalizados con protección de duplicados;
 - búsqueda paginada básica por nombre, músculo, equipo y tipo;
 - advertencia de nombre duplicado;
 - borrador, publicación y duplicado de rutina;
+- edición que reutiliza el borrador vigente y crea una versión nueva después de publicar;
+- consulta de detalle de rutina, versiones y asignaciones;
+- reemplazo transaccional de asignaciones en backend;
 - asignación exclusiva de versiones publicadas;
 - llave y hash de idempotencia;
 - estados de asignación;
@@ -69,6 +74,7 @@ Implementado:
 4. métricas por periodo y coach;
 5. descarga de PDF y CSV;
 6. guardado de borrador, publicación y duplicado.
+7. carga de una rutina existente en el constructor y edición de su borrador.
 
 ### 2.4 Verificación ejecutada
 
@@ -91,16 +97,19 @@ Estas brechas impiden declarar el módulo terminado.
 
 ### P1-01 Edición real de rutinas
 
-Estado: `PENDIENTE`.
+Estado: `PARCIAL`.
+
+Implementado:
+
+- `PUT /workouts/{workoutId}`;
+- carga de una rutina existente en el constructor;
+- actualización del borrador vigente;
+- creación de borrador nuevo cuando la última versión ya fue publicada.
 
 Falta:
 
-- `PUT /workouts/{workoutId}`;
-- cargar una rutina existente en el constructor;
-- editar un borrador;
-- crear un nuevo borrador desde la última versión publicada;
 - control de concurrencia o versión optimista;
-- pantalla o ruta `/workouts/{id}/edit`.
+- ruta dedicada `/workouts/{id}/edit` si se decide separar la experiencia.
 
 Criterio de terminado: un coach abre una rutina existente, modifica el borrador,
 publica una versión nueva y las asignaciones previas permanecen inmutables.
@@ -109,14 +118,11 @@ publica una versión nueva y las asignaciones previas permanecen inmutables.
 
 Estado: `PARCIAL`.
 
-Existe alta, consulta y estructura de aliases, pero faltan:
+Existen alta, consulta, edición individual, creación de aliases desde la interfaz,
+normalización, búsqueda por alias y protección de ejercicios SYSTEM. Falta:
 
-- `GET /exercises/{exerciseId}`;
-- `PUT /exercises/{exerciseId}`;
-- `POST /exercises/{exerciseId}/aliases`;
-- edición de instrucciones, músculo, equipo, nivel, medios y advertencias;
-- interfaz para crear, editar y eliminar aliases;
-- detección de duplicados considerando aliases;
+- interfaz para consultar y eliminar aliases;
+- interfaz para editar instrucciones, músculo, equipo, nivel, medios y advertencias;
 - fusión administrativa de duplicados.
 
 Criterio de terminado: dueño/gerencia administran la ficha completa y un coach
@@ -162,13 +168,11 @@ perder expresiones como `3x12, 10, 8 subiendo`.
 
 Estado: `PARCIAL`.
 
-Existen estados persistentes, pero faltan:
+Existe reemplazo transaccional en backend, vínculo
+`replaced_assignment_id`, estado `REPLACED` y auditoría. Falta:
 
-- operación transaccional de reemplazo;
-- enlazar `replaced_assignment_id`;
-- marcar la anterior como `REPLACED` al crear la nueva;
-- conservar motivo y auditoría;
 - acción de cancelación desde frontend;
+- acción de reemplazo desde frontend;
 - confirmaciones y motivos obligatorios;
 - actualización local de la pantalla sin recarga completa.
 
@@ -177,12 +181,15 @@ histórico ni duplicar la métrica incorrectamente.
 
 ### P1-06 Contratos de detalle
 
-Estado: `PENDIENTE`.
+Estado: `PARCIAL`.
 
-Faltan:
+Implementado:
 
 - `GET /workout-assignments/{assignmentId}`;
 - `GET /workout-versions/{versionId}`;
+
+Falta:
+
 - contrato detallado normalizado de sesión, bloque y prescripción;
 - uso de esos contratos en edición, detalle y futura app del socio.
 

@@ -98,9 +98,20 @@ public class CoachingCatalogService {
 		requireTenant(principal);
 		ExerciseRecord existing = repository.exercise(principal.organizationId(), exerciseId)
 				.orElseThrow(() -> new BusinessException("EXERCISE_NOT_FOUND", "El ejercicio no existe."));
+		requireMutableExercise(existing);
 
 		String name = required(command.name(), "EXERCISE_NAME_REQUIRED", "El nombre del ejercicio es obligatorio.");
 		String normalizedName = normalize(name);
+		repository.activeByNormalizedName(principal.organizationId(), normalizedName)
+				.filter(match -> !match.id().equals(exerciseId))
+				.ifPresent(match -> {
+					throw new BusinessException("EXERCISE_DUPLICATE", "Ya existe un ejercicio con ese nombre.");
+				});
+		repository.activeByNormalizedAlias(principal.organizationId(), normalizedName)
+				.filter(match -> !match.id().equals(exerciseId))
+				.ifPresent(match -> {
+					throw new BusinessException("EXERCISE_DUPLICATE", "El nombre coincide con el alias de otro ejercicio.");
+				});
 		String type = normalizeEnum(command.type(), "STRENGTH");
 
 		repository.updateExercise(
@@ -121,10 +132,24 @@ public class CoachingCatalogService {
 	@Transactional
 	public List<String> addAlias(GymOsPrincipal principal, UUID exerciseId, String alias, String correlationId) {
 		requireTenant(principal);
-		repository.exercise(principal.organizationId(), exerciseId)
+		ExerciseRecord exercise = repository.exercise(principal.organizationId(), exerciseId)
 				.orElseThrow(() -> new BusinessException("EXERCISE_NOT_FOUND", "El ejercicio no existe."));
-		repository.addAlias(exerciseId, alias);
-		auditService.record(principal, "EXERCISE_ALIAS_ADDED", "EXERCISE", exerciseId, "BACKOFFICE", alias, correlationId);
+		requireMutableExercise(exercise);
+		String cleanAlias = required(alias, "EXERCISE_ALIAS_REQUIRED", "El alias es obligatorio.");
+		String normalizedAlias = normalize(cleanAlias);
+		if (normalizedAlias.equals(normalize(exercise.name()))) {
+			throw new BusinessException("EXERCISE_ALIAS_DUPLICATE", "El alias coincide con el nombre del ejercicio.");
+		}
+		repository.activeByNormalizedName(principal.organizationId(), normalizedAlias).ifPresent(match -> {
+			throw new BusinessException("EXERCISE_ALIAS_DUPLICATE", "El alias coincide con un ejercicio existente.");
+		});
+		repository.activeByNormalizedAlias(principal.organizationId(), normalizedAlias)
+				.filter(match -> !match.id().equals(exerciseId))
+				.ifPresent(match -> {
+					throw new BusinessException("EXERCISE_ALIAS_DUPLICATE", "El alias pertenece a otro ejercicio.");
+				});
+		repository.addAlias(exerciseId, cleanAlias, normalizedAlias);
+		auditService.record(principal, "EXERCISE_ALIAS_ADDED", "EXERCISE", exerciseId, "BACKOFFICE", cleanAlias, correlationId);
 		return repository.aliases(exerciseId);
 	}
 
@@ -267,6 +292,11 @@ public class CoachingCatalogService {
 	}
 	private String csv(String value) { return "\"" + (value == null ? "" : value.replace("\"", "\"\"")) + "\""; }
 	private String value(Object value) { return value == null ? "-" : value.toString(); }
+	private void requireMutableExercise(ExerciseRecord exercise) {
+		if (exercise.organizationId() == null || "SYSTEM".equals(exercise.origin())) {
+			throw new BusinessException("SYSTEM_EXERCISE_IMMUTABLE", "Los ejercicios del sistema son de solo lectura.");
+		}
+	}
 	private void requireTenant(GymOsPrincipal principal) {
 		if (principal == null || principal.organizationId() == null) {
 			throw new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesión para continuar.");

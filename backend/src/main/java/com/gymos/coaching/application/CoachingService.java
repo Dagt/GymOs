@@ -284,6 +284,32 @@ public class CoachingService {
 	}
 
 	@Transactional
+	public WorkoutAssignmentRecord replaceAssignment(
+			GymOsPrincipal principal, UUID replacedAssignmentId, UUID workoutId,
+			AssignWorkoutCommand command, String correlationId
+	) {
+		requireBranch(principal);
+		WorkoutAssignmentRecord replaced = coachingRepository.assignment(
+				principal.organizationId(), principal.branchId(), replacedAssignmentId
+		).orElseThrow(() -> new BusinessException("WORKOUT_ASSIGNMENT_NOT_FOUND", "La asignacion a reemplazar no existe."));
+		if (!"ACTIVE".equals(replaced.status())) {
+			throw new BusinessException("WORKOUT_ASSIGNMENT_NOT_ACTIVE", "Solo se puede reemplazar una asignacion activa.");
+		}
+		if (!replaced.clientId().equals(command.clientId())) {
+			throw new BusinessException("WORKOUT_ASSIGNMENT_CLIENT_MISMATCH", "El reemplazo debe conservar al mismo socio.");
+		}
+		WorkoutAssignmentRecord replacement = assignWorkout(principal, workoutId, command, correlationId);
+		coachingRepository.replaceAssignment(
+				principal.organizationId(), principal.branchId(), replacedAssignmentId, replacement.id()
+		);
+		auditService.record(
+				principal, "WORKOUT_ASSIGNMENT_REPLACED", "WORKOUT_ASSIGNMENT",
+				replacedAssignmentId, "BACKOFFICE", replacement.id().toString(), correlationId
+		);
+		return replacement;
+	}
+
+	@Transactional
 	public WorkoutDetailRecord duplicateWorkout(
 			GymOsPrincipal principal, UUID workoutId, String correlationId
 	) {
@@ -319,7 +345,7 @@ public class CoachingService {
 		} catch (IllegalStateException exception) {
 			throw new BusinessException("WORKOUT_VERSION_NOT_DRAFT", "La última versión no está disponible para publicar.");
 		}
-		auditService.record(principal, "WORKOUT_CREATED", "WORKOUT", workoutId, "BACKOFFICE", null, correlationId);
+		auditService.record(principal, "WORKOUT_PUBLISHED", "WORKOUT", workoutId, "BACKOFFICE", null, correlationId);
 		return workout(principal, workoutId);
 		}
 
@@ -331,8 +357,11 @@ public class CoachingService {
 
 		UUID coachId = command.coachId();
 		if (coachId != null) {
-			coachingRepository.coach(principal.organizationId(), principal.branchId(), coachId)
+			CoachRecord coach = coachingRepository.coach(principal.organizationId(), principal.branchId(), coachId)
 					.orElseThrow(() -> new BusinessException("COACH_NOT_FOUND", "El coach no existe o no esta disponible."));
+			if (!"ACTIVE".equals(coach.status())) {
+				throw new BusinessException("COACH_NOT_ACTIVE", "El coach no esta activo.");
+			}
 		} else {
 			coachId = existing.coachId();
 		}
@@ -349,12 +378,22 @@ public class CoachingService {
 				)
 		);
 
-		UUID versionId = coachingRepository.createWorkoutVersion(
-				principal.organizationId(),
-				workoutId,
-				principal.userId(),
-				new CreateWorkoutVersionData(blankToNull(command.summary()), command.contentJson().trim())
-		);
+		WorkoutVersionRecord latest = coachingRepository.latestWorkoutVersion(principal.organizationId(), workoutId)
+				.orElseThrow(() -> new BusinessException("WORKOUT_VERSION_NOT_FOUND", "La rutina no tiene version."));
+		UUID versionId;
+		if ("DRAFT".equals(latest.status())) {
+			versionId = latest.id();
+			coachingRepository.updateDraftVersion(
+					principal.organizationId(), workoutId, versionId,
+					new CreateWorkoutVersionData(blankToNull(command.summary()), command.contentJson().trim())
+			);
+			coachingRepository.deleteWorkoutStructure(principal.organizationId(), versionId);
+		} else {
+			versionId = coachingRepository.createWorkoutVersion(
+					principal.organizationId(), workoutId, principal.userId(),
+					new CreateWorkoutVersionData(blankToNull(command.summary()), command.contentJson().trim())
+			);
+		}
 		persistStructure(principal.organizationId(), versionId, command.contentJson());
 
 		auditService.record(principal, "WORKOUT_UPDATED", "WORKOUT", workoutId, "BACKOFFICE", null, correlationId);
@@ -372,7 +411,7 @@ public class CoachingService {
 		@Transactional(readOnly = true)
 		public WorkoutVersionRecord workoutVersion(GymOsPrincipal principal, UUID versionId) {
 		requireBranch(principal);
-		return coachingRepository.workoutVersionById(principal.organizationId(), versionId)
+		return coachingRepository.workoutVersionById(principal.organizationId(), principal.branchId(), versionId)
 				.orElseThrow(() -> new BusinessException("WORKOUT_VERSION_NOT_FOUND", "La version de rutina no existe."));
 		}
 

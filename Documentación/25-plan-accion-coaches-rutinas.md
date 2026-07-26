@@ -4,6 +4,9 @@ Estado: APROBADO PARA IMPLEMENTACIÓN
 Fecha: 25 de julio de 2026  
 Rama: `feature/coaches-workouts`
 
+Este documento define el objetivo. El avance verificable se registra en el
+documento 27 y toda deuda activa en el documento 28.
+
 ## 1. Objetivo
 
 Completar el módulo de Coaches y rutinas para que cada coach pueda crear rutinas estructuradas, mantener un catálogo amplio y extensible de ejercicios, asignar una versión concreta de la rutina a un socio y generar un PDF imprimible. El dueño y los gerentes deben poder medir semanalmente cuántas rutinas asigna cada coach y a qué socios.

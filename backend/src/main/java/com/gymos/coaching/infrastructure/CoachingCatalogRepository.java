@@ -96,6 +96,25 @@ public class CoachingCatalogRepository {
 				.optional();
 	}
 
+	public Optional<ExerciseRecord> activeByNormalizedAlias(UUID organizationId, String normalizedAlias) {
+		return jdbc.sql("""
+				SELECT e.id, e.organization_id, e.name, e.description, e.instructions,
+				       e.primary_muscle_group, e.secondary_muscle_groups, e.movement_pattern,
+				       e.exercise_type, e.equipment, e.suggested_level, e.laterality,
+				       e.media_url, e.warnings, e.origin, e.status, e.created_at, e.updated_at
+				FROM exercise_alias a
+				JOIN exercise e ON e.id = a.exercise_id
+				WHERE a.normalized_alias = :alias
+				  AND e.status = 'ACTIVE'
+				  AND (e.organization_id IS NULL OR e.organization_id = :organizationId)
+				ORDER BY e.organization_id NULLS LAST LIMIT 1
+				""")
+				.param("alias", normalizedAlias)
+				.param("organizationId", organizationId)
+				.query(this::mapExercise)
+				.optional();
+	}
+
 	public UUID createExercise(UUID organizationId, UUID userId, ExerciseData data) {
 		UUID id = UUID.randomUUID();
 		jdbc.sql("""
@@ -141,7 +160,7 @@ public class CoachingCatalogRepository {
 				    exercise_type = :type, equipment = :equipment, suggested_level = :level,
 				    laterality = :laterality, media_url = :mediaUrl, warnings = :warnings,
 				    updated_at = now()
-				WHERE id = :id AND (organization_id IS NULL OR organization_id = :organizationId)
+				WHERE id = :id AND organization_id = :organizationId
 				""")
 				.param("name", data.name())
 				.param("normalizedName", data.normalizedName())
@@ -161,23 +180,21 @@ public class CoachingCatalogRepository {
 				.update();
 	}
 
-	public void addAlias(UUID exerciseId, String alias) {
-		if (alias == null || alias.isBlank()) return;
-		String normalized = alias.trim().toLowerCase();
+	public void addAlias(UUID exerciseId, String alias, String normalizedAlias) {
 		jdbc.sql("""
-				INSERT INTO exercise_alias (id, exercise_id, alias_name, normalized_alias, created_at)
-				VALUES (:id, :exerciseId, :aliasName, :normalizedAlias, now())
+				INSERT INTO exercise_alias (id, exercise_id, alias, normalized_alias, created_at)
+				VALUES (:id, :exerciseId, :alias, :normalizedAlias, now())
 				ON CONFLICT (exercise_id, normalized_alias) DO NOTHING
 				""")
 				.param("id", UUID.randomUUID())
 				.param("exerciseId", exerciseId)
-				.param("aliasName", alias.trim())
-				.param("normalizedAlias", normalized)
+				.param("alias", alias)
+				.param("normalizedAlias", normalizedAlias)
 				.update();
 	}
 
 	public List<String> aliases(UUID exerciseId) {
-		return jdbc.sql("SELECT alias_name FROM exercise_alias WHERE exercise_id = :exerciseId ORDER BY alias_name")
+		return jdbc.sql("SELECT alias FROM exercise_alias WHERE exercise_id = :exerciseId ORDER BY alias")
 				.param("exerciseId", exerciseId)
 				.query(String.class)
 				.list();

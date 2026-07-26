@@ -420,6 +420,7 @@ Contratos objetivo de cierre:
 - `GET /workout-versions/{versionId}`
 - `GET|POST /workout-assignments`
 - `GET /workout-assignments/{assignmentId}`
+- `POST /workout-assignments/{assignmentId}/replace`
 - `PATCH /workout-assignments/{assignmentId}/status`
 - `GET /workout-assignments/{assignmentId}/pdf`
 - `GET /reports/coaches/workout-assignments/summary`

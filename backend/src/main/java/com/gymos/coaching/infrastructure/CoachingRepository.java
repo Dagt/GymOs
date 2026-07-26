@@ -240,6 +240,35 @@ public class CoachingRepository {
 		return versionId;
 	}
 
+	public void updateDraftVersion(
+			UUID organizationId, UUID workoutId, UUID versionId, CreateWorkoutVersionData data
+	) {
+		int updated = jdbcClient.sql("""
+				UPDATE workout_version
+				SET summary = :summary, content_json = CAST(:contentJson AS jsonb)
+				WHERE id = :versionId AND workout_id = :workoutId
+				  AND organization_id = :organizationId AND status = 'DRAFT'
+				  AND deleted_at IS NULL
+				""")
+				.param("summary", data.summary())
+				.param("contentJson", data.contentJson())
+				.param("versionId", versionId)
+				.param("workoutId", workoutId)
+				.param("organizationId", organizationId)
+				.update();
+		if (updated == 0) throw new IllegalStateException("Draft version not found");
+	}
+
+	public void deleteWorkoutStructure(UUID organizationId, UUID versionId) {
+		jdbcClient.sql("""
+				DELETE FROM workout_session
+				WHERE organization_id = :organizationId AND workout_version_id = :versionId
+				""")
+				.param("organizationId", organizationId)
+				.param("versionId", versionId)
+				.update();
+	}
+
 	public void publishWorkoutVersion(UUID organizationId, UUID workoutId, UUID versionId, UUID actorUserId) {
 		int published = jdbcClient.sql("""
 				UPDATE workout_version SET status = 'PUBLISHED'
@@ -389,16 +418,20 @@ public class CoachingRepository {
 				.list();
 	}
 
-	public Optional<WorkoutVersionRecord> workoutVersionById(UUID organizationId, UUID versionId) {
+	public Optional<WorkoutVersionRecord> workoutVersionById(UUID organizationId, UUID branchId, UUID versionId) {
 		return jdbcClient.sql("""
-				SELECT id, workout_id, version_number, summary, content_json::text AS content_json,
-				       status, created_at
-				FROM workout_version
-				WHERE organization_id = :organizationId
-				  AND id = :versionId
-				  AND deleted_at IS NULL
+				SELECT v.id, v.workout_id, v.version_number, v.summary,
+				       v.content_json::text AS content_json, v.status, v.created_at
+				FROM workout_version v
+				JOIN workout w ON w.id = v.workout_id
+				WHERE v.organization_id = :organizationId
+				  AND w.branch_id = :branchId
+				  AND v.id = :versionId
+				  AND v.deleted_at IS NULL
+				  AND w.deleted_at IS NULL
 				""")
 				.param("organizationId", organizationId)
+				.param("branchId", branchId)
 				.param("versionId", versionId)
 				.query(this::mapVersion)
 				.optional();
