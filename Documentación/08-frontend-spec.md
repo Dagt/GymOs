@@ -347,13 +347,15 @@ Formularios:
 
 ## Coaches y rutinas
 
-La pantalla implementada `/coaches` concentra cinco pestañas operativas para
-evitar perder contexto: Coaches, Constructor, Ejercicios, Asignaciones y
-Métricas. La primera sólo aparece a quien posee `coach.profile.manage`.
+La pantalla `/coaches` se adapta al rol. Un Coach autorizado ve Constructor,
+Ejercicios, Asignaciones y Métricas. El dueño del gimnasio sólo ve Métricas y
+el frontend no solicita `/workouts`, `/exercises` ni `/coaches/profiles` para
+ese rol, incluso si su sesión conserva permisos antiguos.
 
-- Coaches: tarjetas agregadas por usuario, especialidades, biografía, estado y
-  selección de múltiples sucursales. El alta y las credenciales enlazan a
-  `/users`.
+- Equipo y accesos (`/users`): el renglón del Coach abre un único panel con
+  especialidades, biografía y selección de múltiples sucursales. El estado usa
+  el control existente de suspender/reactivar, evitando dos administradores de
+  la misma persona.
 - Constructor: biblioteca, alta/edición/duplicado/publicación, sesiones, bloques
   y ejercicios reordenables con controles de subir/bajar/eliminar.
 - Ejercicios: búsqueda, alta, edición propia, archivo administrativo, aliases y
@@ -365,6 +367,10 @@ Métricas. La primera sólo aparece a quien posee `coach.profile.manage`.
   8, 12, 26 o 52 semanas alimenta tres gráficas: asignaciones, socios únicos y
   primeras rutinas. El socio seleccionado se aplica a resumen, gráficas,
   detalle y exportación.
+
+En la vista del dueño, el historial es de sólo lectura: no aparecen PDF,
+completar, cancelar ni reemplazar. Estas acciones permanecen disponibles para
+el Coach con sus permisos operativos.
 
 El constructor combina campos estructurados con prescripción libre y representa
 `3x20`, `3x12, 10, 8 subiendo`, `3x24 pasos`, `3 series`, alternativas `VS`,

@@ -2,7 +2,7 @@
 
 Estado: FUENTE CANÓNICA / EN PROGRESO
 Corte: 26 de julio de 2026
-Código auditado: `feature/coaches-workouts` en `8162814`, posterior a la
+Código auditado: `feature/coaches-workouts` en `0066c0b`, posterior a la
 separación de los cambios de Wellness.
 
 ## 1. Cómo interpretar este documento
@@ -33,7 +33,7 @@ Ningún módulo se declara “completo” sólo por el nombre de una rama o comm
 | [Membresías](modulos/08-memberships.md) y [kiosco](modulos/11-selfservice.md) | FUNCIONAL | Alta, renovación, cambio de plan y autoservicio | Revisar semántica de fechas y seguridad de sesión |
 | [Reservas y recursos](modulos/12-bookings.md) | FUNCIONAL | Calendario, disponibilidad, restricciones por plan y recepción | Suite E2E y deuda UX residual |
 | [Inventarios](modulos/13-inventory.md) | ESTABILIZADO | Existencias, transferencias, conteos, valuación y movimientos | Paginación parametrizada y feedback por renglón |
-| [Coaches y rutinas](modulos/14-coaching.md) | ESTABILIZADO | Perfiles multi-sucursal, catálogo/medios, constructor, versiones, asignaciones trazables, histórico de 4–52 semanas, filtro por socio, CSV, PDF A4 y E2E | Riesgos transversales `DB-001` y `OPS-001` |
+| [Coaches y rutinas](modulos/14-coaching.md) | ESTABILIZADO | Dueño limitado a métricas; Coach con catálogo/constructor/asignaciones; perfil multi-sucursal en Equipo; histórico 4–52 semanas, CSV, PDF y E2E | Riesgos transversales `DB-001` y `OPS-001` |
 | [Wellness/profesionales](modulos/15-wellness.md) | PARCIAL en `main` | Base histórica de profesionales, servicios y disponibilidad | Agenda aislada en rama propia |
 | [Reportes generales](modulos/18-reporting.md) | PARCIAL | Reportes operativos por dominio | Definiciones KPI y cobertura homogénea |
 | [Producción/piloto](modulos/20-common-operations.md) | PLANIFICADO | Configuración y runbooks base | Observabilidad, backups, seguridad y piloto |
@@ -43,7 +43,7 @@ Ningún módulo se declara “completo” sólo por el nombre de una rama o comm
 El módulo permite:
 
 - crear coaches y administrar especialidades, biografía, estado y múltiples
-  sucursales;
+  sucursales desde Gestión del equipo;
 - consultar y ampliar un catálogo de ejercicios SYSTEM y propios;
 - crear rutinas estructuradas en sesiones, bloques y ejercicios;
 - guardar y editar el borrador vigente sin crear una versión en cada guardado;
@@ -60,11 +60,15 @@ El módulo permite:
   incluyendo reporte, histórico y CSV;
 - exportar CSV y descargar un PDF A4 con identidad del gimnasio;
 - cargar y administrar medios de ejercicios;
-- separar alcance propio de coach y alcance global de dueño/gerencia.
+- separar alcance propio del coach y alcance global de reportes para
+  dueño/gerencia;
+- limitar al dueño a métricas, sin cargar ni exponer constructor, ejercicios,
+  asignación, PDF o mutaciones del historial.
 
 El alcance funcional V1 está cerrado y estabilizado. El cierre base está en
-`84a5fd3` y la ampliación de perfiles e histórico en `8162814`. Los hallazgos
-específicos `COA-001` a `COA-007` y `COA-009` a `COA-011` pasaron al historial
+`84a5fd3`, la ampliación de perfiles e histórico en `8162814` y la corrección de
+alcance/UX en `0066c0b`. Los hallazgos específicos `COA-001` a `COA-007` y
+`COA-009` a `COA-012` pasaron al historial
 resuelto del documento 28.
 
 ## 4. Verificación del corte
@@ -73,7 +77,7 @@ Validación ejecutada sobre el árbol saneado:
 
 - backend: `gradlew clean test --no-daemon`, exitoso;
 - frontend: 31 pruebas, typecheck, lint y build de producción, exitosos;
-- E2E específico de Coaches: 4 recorridos Playwright exitosos;
+- E2E específico de Coaches: 5 recorridos Playwright exitosos;
 - cobertura dedicada: propiedad `own/all`, permiso de perfiles, métricas,
   histórico semanal, perfil multi-sucursal, PDF y medios;
 - comprobación de whitespace Git: exitosa.

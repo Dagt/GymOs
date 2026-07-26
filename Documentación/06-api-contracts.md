@@ -444,7 +444,14 @@ incluyendo ceros en semanas sin actividad.
 `PUT /coaches/profiles/{coachUserId}` recibe `specialties[]`, `bio`, estado
 `ACTIVE|INACTIVE` y `branchIds[]`. Un perfil activo requiere al menos una
 sucursal administrable; el cambio sincroniza las filas operativas `coach` y el
-acceso del usuario sólo dentro del alcance del actor.
+acceso del usuario sólo dentro del alcance del actor. Estos contratos se
+consumen desde `/users`, no como una administración duplicada en `/coaches`.
+
+El rol `Dueno del gimnasio` puede usar `GET /coaches`, los contratos de métricas
+y los contratos de perfil desde Gestión del equipo. No recibe `exercise.*`,
+`workout.read.*`, `workout.manage.*`, `workout.assign`,
+`workout.pdf.download` ni `coach.manage`. El Coach conserva sus permisos
+operativos de alcance propio.
 
 Crear una asignación acepta
 `Idempotency-Key`; reutilizarla con otro payload responde

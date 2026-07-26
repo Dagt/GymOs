@@ -60,6 +60,7 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 | COA-009 | Coaches/catálogo | Ciclo de medios implementado con tipos/tamaño permitidos, reemplazo, eliminación y compensación. | `84a5fd3`; `CoachingExerciseMediaServiceTests`. |
 | COA-010 | Coaches/métricas | Añadidas series continuas de 4–52 semanas, tres gráficas históricas y filtro directo por socio aplicado a resumen, detalle, tendencia y CSV. | `8162814`; `CoachingCatalogServiceTests` y E2E de métricas. |
 | COA-011 | Coaches/perfiles | Especialidades, biografía, estado y múltiples sucursales se administran como perfil agregado con permiso dedicado y auditoría. | `8162814`; `CoachingServiceSecurityTests`, `SecurityAuthorizationTests` y E2E multi-sucursal. |
+| COA-012 | Coaches/roles y UX | Dueño limitado a métricas; carga operativa condicionada por rol; perfil movido a Equipo y perfiles faltantes reparados desde usuarios Coach. | `0066c0b`; V48, `DatabaseMigrationTests` y 5 E2E de Coaches/Equipo. |
 | GEN-003 | General/documentación | Estado, deuda, ramas y fichas modulares consolidados; se retiraron fuentes transitorias paralelas. | Documentos 13, 28, 29 y `modulos/` vigentes al corte. |
 | BR-C01 | Gestión de ramas | Wellness retirado del árbol final de Coaches. | Revert explícito de `4a7a7d1`. |
 

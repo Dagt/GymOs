@@ -195,7 +195,9 @@ Decisiones implementadas:
   `workout.manage.own|all`; asignación, PDF y métricas usan respectivamente
   `workout.assign`, `workout.pdf.download` y `coach.metrics.read`.
 - La administración agregada de especialidades, biografía, estado y sucursales
-  del coach usa `coach.profile.manage`.
+  del coach usa `coach.profile.manage` desde Gestión del equipo.
+- El dueño conserva lectura de coaches y métricas, pero no recibe permisos
+  operativos de rutinas, ejercicios, asignaciones o PDF.
 - Permisos adicionales: `professional.read`, `professional.manage`, `notification.read`, `notification.manage`, `automation.read`, `automation.manage` y `report.owner.read`.
 - Las pantallas `/coaches`, `/wellness`, `/automations` y `/dashboard` completan el primer paquete vendible de servicios avanzados.
 

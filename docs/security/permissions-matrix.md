@@ -114,6 +114,11 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 | POST | `/api/v1/workout-assignments/*/replace` | coaching | `workout.assign` | Sí | Sí; coach propio/global | Sí | E2E de reemplazo e idempotencia |
 | GET | `/api/v1/workout-assignments/*/pdf` | coaching | `workout.pdf.download` | Sí | Sí; coach propio/global | No | PDFBox y filtro de propiedad |
 | GET | `/api/v1/reports/coaches/workout-assignments/**` | coaching/reporting | `coach.metrics.read` | Sí | Sí; coach propio/global | No | Comparación, filtro socio/coach, tendencia 4–52 semanas, paginación y E2E |
+
+Regla de rol vigente: `Dueno del gimnasio` sólo conserva `coach.read`,
+`coach.metrics.read` y `coach.profile.manage`. No recibe permisos de ejercicios,
+rutinas, asignación o PDF. La edición del perfil se presenta exclusivamente en
+`/users`; `/coaches` es una vista de métricas para el dueño.
 | GET | `/api/v1/professionals/**` | wellness | `professional.read` | Sí | Sí | No | Pendiente |
 | POST | `/api/v1/professionals/**` | wellness | `professional.manage` | Sí | Sí | Sí | `professionalCreationRequiresManagePermission` negativo |
 | GET | `/api/v1/notifications/**` | notifications | `notification.read` | Sí | No | No | Pendiente |
@@ -126,9 +131,9 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 
 1. Convertir cada fila `Pendiente` en prueba MVC o integración.
 2. Dividir endpoints públicos por perfil: OpenAPI/Swagger no deben quedar públicos en producción sin decisión explícita.
-3. Sustituir los permisos amplios de coaching por lectura, gestión propia/global,
-   asignación, PDF y métricas; coach solo ve sus rutinas/asignaciones y dueño/gerente
-   quedan limitados por organización y sucursales autorizadas.
+3. Mantener pruebas de regresión de la separación: Coach opera sólo sus
+   rutinas/asignaciones; dueño consulta únicamente métricas; gerente queda
+   limitado por organización y sucursales autorizadas.
 4. Agregar prueba negativa de selección de sucursal ajena.
 5. Agregar prueba negativa de UUID ajeno por módulo crítico.
 6. Verificar que toda operación marcada con auditoría escriba realmente `audit_log`.

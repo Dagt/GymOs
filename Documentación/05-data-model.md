@@ -535,6 +535,9 @@ Migraciones nuevas:
 - `V47__advanced_coach_profiles.sql`: registra `coach.profile.manage` y lo
   asigna a los roles administrativos que pueden editar el perfil y las
   sucursales de un coach.
+- `V48__owner_coaching_metrics_scope.sql`: retira al dueño los permisos
+  operativos de rutinas, ejercicios, asignaciones y PDF, conserva métricas y
+  repara perfiles faltantes para usuarios existentes con rol `Coach`.
  
 ## Hito 7 - Tablas V16
 
