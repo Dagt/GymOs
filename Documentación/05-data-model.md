@@ -501,6 +501,7 @@ Migraciones nuevas:
 - `V25__manager_permissions_and_client_branch_visibility.sql`: agrega `client.home_branch_id`, filtra socios por sucursal/plan multi-sucursal y revoca permisos de administracion de datos/sucursales al rol `Gerente`.
 - `V26__branch_branding_and_owner_branch_selection.sql`: historicamente agrego marca opcional por sucursal (`brand_name`, `logo_url`, colores) y soportaba que el dueño entrara sin sucursal operativa por defecto.
 - `V27__reception_booking_scope_and_gym_branding.sql`: elimina marca visual de `branch`, deja logo/colores exclusivamente en `organization` y revoca `resource.manage` a recepcion.
+- `V45__wellness_appointments_and_office_location.sql`: agrega `office_location` a `professional` y crea tabla `wellness_appointment` para gestionar citas con profesionales independientes.
  
 ## Hito 7 - Tablas V16
 

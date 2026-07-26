@@ -404,19 +404,29 @@ Nota implementada Hito 5:
 - `POST /workouts/{id}/assign` asigna una version concreta o la ultima version publicada a un cliente activo.
 - `GET /reports/coaches` devuelve conteos base: coaches, rutinas, asignaciones activas y asignaciones de ultimos 30 dias.
 
-## 6.14 Profesionales
+## 6.14 Profesionales y Citas de Bienestar
 
 - `GET /professionals`
-- `POST /professionals`
+- `POST /professionals` (incluye `officeLocation`)
+- `PUT /professionals/{professionalId}` (actualiza datos, `officeLocation` y estatus)
+- `DELETE /professionals/{professionalId}` (elimina al profesional y realiza un borrado en cascada de sus servicios, horarios y citas asociadas)
 - `GET /professionals/{professionalId}/services`
 - `POST /professionals/{professionalId}/services`
+- `PUT /professionals/{professionalId}/services/{serviceId}` (actualiza servicio o estatus)
 - `GET /professionals/{professionalId}/availability`
 - `POST /professionals/{professionalId}/availability`
+- `GET /professionals/{professionalId}/availability-slots?date=YYYY-MM-DD&serviceId=UUID` (genera slots libres en base a horarios y citas activas)
+- `POST /wellness/appointments` (agendar/solicitar cita; auto-confirma en `CONFIRMED` para especialistas De Planta, o crea en `REQUESTED` para Externos)
+- `GET /wellness/appointments?date=YYYY-MM-DD&professionalId=UUID` (listar citas por rango o sucursal)
+- `POST /wellness/appointments/{appointmentId}/confirm` (coordinar y confirmar cita en estado `REQUESTED`; acepta payload opcional `{ startsAt, notes }` para fijar la hora y fecha definitivas)
+- `POST /wellness/appointments/{appointmentId}/complete` (marcar cita como atendida)
+- `POST /wellness/appointments/{appointmentId}/cancel` (cancelar cita con motivo)
 
-Nota implementada Hito 5:
-- Los profesionales pertenecen siempre a la organizacion y sucursal activa.
-- Los servicios profesionales mantienen precio, moneda, duracion, tipo y estado propio.
-- La disponibilidad se expresa por dia de semana y rango horario; el backend valida `day_of_week` entre 1 y 7 y que la hora de cierre sea posterior a la apertura.
+Nota implementada:
+- Los profesionales pertenecen siempre a la organización y sucursal activa, e incluyen su consultorio o lugar de atención (`officeLocation`).
+- Las citas de bienestar son independientes de los recursos reservables físicos (`bookings`).
+- Para profesionales De Planta (`STAFF`), las citas nacen auto-confirmadas (`CONFIRMED`). Para profesionales Externos (`EXTERNAL`), nacen en `REQUESTED` y siguen el flujo de coordinación.
+- Recepción posee permisos para coordinar, confirmar y administrar citas en nombre del profesional cuando exista acuerdo telefónico u offline.
 
 ## 6.15 Automatizaciones
 
