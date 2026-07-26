@@ -22,6 +22,9 @@ import com.gymos.coaching.infrastructure.CoachingRepository.WorkoutVersionRecord
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import java.time.LocalDate;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -109,6 +112,7 @@ public class CoachingService {
 				principal.userId(),
 				new CreateWorkoutVersionData(blankToNull(command.summary()), command.contentJson().trim())
 		);
+		persistStructure(principal.organizationId(), versionId, command.contentJson());
 		auditService.record(principal, "WORKOUT_CREATED", "WORKOUT", workoutId, "BACKOFFICE", null, correlationId);
 		auditService.record(principal, "WORKOUT_VERSION_CREATED", "WORKOUT_VERSION", versionId, "BACKOFFICE", null, correlationId);
 		return workout(principal, workoutId);
@@ -126,8 +130,65 @@ public class CoachingService {
 				principal.userId(),
 				new CreateWorkoutVersionData(blankToNull(command.summary()), command.contentJson().trim())
 		);
+		persistStructure(principal.organizationId(), versionId, command.contentJson());
 		auditService.record(principal, "WORKOUT_VERSION_CREATED", "WORKOUT_VERSION", versionId, "BACKOFFICE", null, correlationId);
 		return workout(principal, workoutId);
+	}
+
+	private void persistStructure(UUID organizationId, UUID versionId, String contentJson) {
+		try {
+			var root = objectMapper.readTree(contentJson);
+			var sessions = root.has("sessions") ? root.get("sessions") : root.get("days");
+			if (sessions == null || !sessions.isArray()) return;
+			int sessionPosition = 0;
+			for (var session : sessions) {
+				UUID sessionId = coachingRepository.createWorkoutSession(
+						organizationId, versionId,
+						session.path("name").asText("Sesión " + (sessionPosition + 1)),
+						session.path("focus").asText(null), session.path("notes").asText(null),
+						sessionPosition++
+				);
+				var blocks = session.get("blocks");
+				if (blocks == null || !blocks.isArray()) continue;
+				int blockPosition = 0;
+				for (var block : blocks) {
+					boolean structured = block.isObject() && block.has("exercises");
+					UUID blockId = coachingRepository.createWorkoutBlock(
+							organizationId, sessionId,
+							structured ? block.path("name").asText("Bloque") : "Trabajo principal",
+							structured ? block.path("type").asText("MAIN") : "MAIN",
+							structured ? block.path("notes").asText(null) : null,
+							blockPosition++
+					);
+					var exercises = structured ? block.get("exercises") : objectMapper.createArrayNode().add(block);
+					int exercisePosition = 0;
+					for (var exercise : exercises) {
+						UUID exerciseId = null;
+						if (exercise.hasNonNull("exerciseId")) {
+							try { exerciseId = UUID.fromString(exercise.get("exerciseId").asText()); }
+							catch (IllegalArgumentException ignored) { exerciseId = null; }
+						}
+						String name = exercise.path("exerciseName").asText(
+								exercise.path("exercise").asText(exercise.path("name").asText("Ejercicio"))
+						);
+						coachingRepository.createWorkoutExercise(
+								organizationId, blockId, exerciseId, name,
+								exercise.path("prescription").asText(null),
+								exercise.has("sets") && exercise.get("sets").canConvertToInt() ? exercise.get("sets").asInt() : null,
+								exercise.path("reps").asText(null), exercise.path("load").asText(null),
+								exercise.has("restSeconds") && exercise.get("restSeconds").canConvertToInt()
+										? exercise.get("restSeconds").asInt() : null,
+								exercise.path("tempo").asText(null), exercise.path("duration").asText(null),
+								exercise.path("distance").asText(null), exercise.path("notes").asText(null),
+								exercise.path("groupKey").asText(null), exercise.path("optional").asBoolean(false),
+								exercisePosition++
+						);
+					}
+				}
+			}
+		} catch (JsonProcessingException exception) {
+			throw new BusinessException("WORKOUT_CONTENT_INVALID", "El contenido de la rutina debe ser JSON válido.");
+		}
 	}
 
 	@Transactional
@@ -148,6 +209,18 @@ public class CoachingService {
 		if (command.startsOn() != null && command.endsOn() != null && command.endsOn().isBefore(command.startsOn())) {
 			throw new BusinessException("WORKOUT_ASSIGNMENT_RANGE_INVALID", "La fecha final no puede ser anterior al inicio.");
 		}
+		String idempotencyKey = blankToNull(command.idempotencyKey());
+		String requestHash = assignmentHash(workoutId, version.id(), command);
+		if (idempotencyKey != null) {
+			var existing = coachingRepository.assignmentByIdempotencyKey(principal.organizationId(), idempotencyKey);
+			if (existing.isPresent()) {
+				if (!requestHash.equals(existing.get().requestHash())) {
+					throw new BusinessException("IDEMPOTENCY_KEY_REUSED", "La llave de idempotencia ya fue usada con otra solicitud.");
+				}
+				return coachingRepository.assignment(principal.organizationId(), principal.branchId(), existing.get().assignmentId())
+						.orElseThrow();
+			}
+		}
 		UUID assignmentId = coachingRepository.assignWorkout(
 				principal.organizationId(),
 				principal.branchId(),
@@ -160,11 +233,27 @@ public class CoachingService {
 						LocalDate.now(),
 						command.startsOn(),
 						command.endsOn(),
-						blankToNull(command.notes())
+						blankToNull(command.notes()),
+						blankToNull(command.printableNotes()),
+						idempotencyKey,
+						requestHash
 				)
 		);
 		auditService.record(principal, "WORKOUT_ASSIGNED", "WORKOUT_ASSIGNMENT", assignmentId, "BACKOFFICE", null, correlationId);
 		return coachingRepository.assignment(principal.organizationId(), principal.branchId(), assignmentId).orElseThrow();
+	}
+
+	private String assignmentHash(UUID workoutId, UUID versionId, AssignWorkoutCommand command) {
+		try {
+			String value = String.join("|",
+					workoutId.toString(), versionId.toString(), command.clientId().toString(),
+					String.valueOf(command.startsOn()), String.valueOf(command.endsOn()),
+					String.valueOf(command.notes()), String.valueOf(command.printableNotes()));
+			byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+			return java.util.HexFormat.of().formatHex(digest);
+		} catch (NoSuchAlgorithmException exception) {
+			throw new IllegalStateException(exception);
+		}
 	}
 
 	@Transactional(readOnly = true)
@@ -174,6 +263,64 @@ public class CoachingService {
 			throw new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta activo.");
 		}
 		return coachingRepository.clientAssignments(principal.organizationId(), principal.branchId(), clientId);
+	}
+
+	@Transactional
+	public WorkoutAssignmentRecord updateAssignmentStatus(
+			GymOsPrincipal principal, UUID assignmentId, String status, String correlationId
+	) {
+		requireBranch(principal);
+		String normalized = required(status, "WORKOUT_ASSIGNMENT_STATUS_REQUIRED", "El estado es obligatorio.").toUpperCase();
+		if (!List.of("ACTIVE", "COMPLETED", "CANCELLED", "REPLACED").contains(normalized)) {
+			throw new BusinessException("WORKOUT_ASSIGNMENT_STATUS_INVALID", "Estado de asignación inválido.");
+		}
+		coachingRepository.assignment(principal.organizationId(), principal.branchId(), assignmentId)
+				.orElseThrow(() -> new BusinessException("WORKOUT_ASSIGNMENT_NOT_FOUND", "La asignación no existe."));
+		coachingRepository.updateAssignmentStatus(
+				principal.organizationId(), principal.branchId(), assignmentId, normalized, principal.userId()
+		);
+		auditService.record(principal, "WORKOUT_ASSIGNMENT_STATUS_CHANGED", "WORKOUT_ASSIGNMENT", assignmentId, "BACKOFFICE", normalized, correlationId);
+		return coachingRepository.assignment(principal.organizationId(), principal.branchId(), assignmentId).orElseThrow();
+	}
+
+	@Transactional
+	public WorkoutDetailRecord duplicateWorkout(
+			GymOsPrincipal principal, UUID workoutId, String correlationId
+	) {
+		requireBranch(principal);
+		WorkoutRecord source = coachingRepository.workout(principal.organizationId(), principal.branchId(), workoutId)
+				.orElseThrow(() -> new BusinessException("WORKOUT_NOT_FOUND", "La rutina no existe."));
+		WorkoutVersionRecord version = coachingRepository.latestWorkoutVersion(principal.organizationId(), workoutId)
+				.orElseThrow(() -> new BusinessException("WORKOUT_VERSION_NOT_FOUND", "La rutina no tiene versión."));
+		return createWorkout(
+				principal,
+				new CreateWorkoutCommand(
+						source.coachId(), source.title() + " (copia)", source.goal(), source.level(),
+						version.summary(), version.contentJson()
+				),
+				correlationId
+		);
+	}
+
+	@Transactional
+	public WorkoutDetailRecord publishWorkout(
+			GymOsPrincipal principal, UUID workoutId, String correlationId
+	) {
+		requireBranch(principal);
+		coachingRepository.workout(principal.organizationId(), principal.branchId(), workoutId)
+				.orElseThrow(() -> new BusinessException("WORKOUT_NOT_FOUND", "La rutina no existe."));
+		WorkoutVersionRecord version = coachingRepository.latestWorkoutVersion(principal.organizationId(), workoutId)
+				.orElseThrow(() -> new BusinessException("WORKOUT_VERSION_NOT_FOUND", "La rutina no tiene versión."));
+		if ("PUBLISHED".equals(version.status())) return workout(principal, workoutId);
+		try {
+			coachingRepository.publishWorkoutVersion(
+					principal.organizationId(), workoutId, version.id(), principal.userId()
+			);
+		} catch (IllegalStateException exception) {
+			throw new BusinessException("WORKOUT_VERSION_NOT_DRAFT", "La última versión no está disponible para publicar.");
+		}
+		auditService.record(principal, "WORKOUT_PUBLISHED", "WORKOUT", workoutId, "BACKOFFICE", null, correlationId);
+		return workout(principal, workoutId);
 	}
 
 	@Transactional(readOnly = true)

@@ -221,6 +221,14 @@ export {
   getCoachReport,
   getCoaches,
   getWorkouts,
+  getExercises,
+  createExercise,
+  getAssignmentReport,
+  downloadWorkoutPdf,
+  downloadAssignmentCsv,
+  duplicateWorkout,
+  updateWorkoutAssignmentStatus,
+  publishWorkout,
 } from "./api/coaching";
 export type {
   AssignWorkoutPayload,
@@ -232,6 +240,15 @@ export type {
   WorkoutDetail,
   WorkoutSummary,
   WorkoutVersion,
+  Exercise,
+  ExercisePage,
+  CreateExercisePayload,
+  WorkoutExerciseDraft,
+  WorkoutBlockDraft,
+  WorkoutSessionDraft,
+  AssignmentDetail,
+  AssignmentReport,
+  CoachMetric,
 } from "./api/coaching-types";
 export {
   createProfessional,

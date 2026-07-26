@@ -25,6 +25,7 @@ GymOS es una plataforma web modular para la administración integral de gimnasio
 25. `25-plan-accion-coaches-rutinas.md` — alcance definitivo, dominio, catálogo de ejercicios, métricas, PDF, API, frontend y fases para concluir Coaches y rutinas.
 26. `26-prompt-maestro-implementacion-coaches-rutinas.md` — instrucciones de implementación y validación de la rama `feature/coaches-workouts`.
 26A. `26-ajustes-transversales-coaches-rutinas.md` — correcciones de alcance y precedencia sobre PRD, dominio, datos, API, casos de uso, frontend y roadmap.
+27. `27-implementacion-coaches-rutinas.md` — cierre técnico y funcional del catálogo, constructor, versionado, asignaciones, PDF, métricas y frontend.
 
 ## Alcance de la versión 1
 

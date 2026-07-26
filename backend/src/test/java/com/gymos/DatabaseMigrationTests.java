@@ -48,6 +48,15 @@ class DatabaseMigrationTests {
 			assertThat(tableExists(connection, "workout")).isTrue();
 			assertThat(tableExists(connection, "workout_version")).isTrue();
 			assertThat(tableExists(connection, "workout_assignment")).isTrue();
+			assertThat(tableExists(connection, "exercise")).isTrue();
+			assertThat(tableExists(connection, "exercise_alias")).isTrue();
+			assertThat(tableExists(connection, "workout_session")).isTrue();
+			assertThat(tableExists(connection, "workout_session_block")).isTrue();
+			assertThat(tableExists(connection, "workout_exercise")).isTrue();
+			assertThat(columnExists(connection, "workout_assignment", "idempotency_key")).isTrue();
+			assertThat(indexExists(connection, "ux_workout_assignment_idempotency")).isTrue();
+			assertThat(roleHasPermission(connection, "Coach", "exercise.read")).isTrue();
+			assertThat(roleHasPermission(connection, "Coach", "workout.assign")).isTrue();
 			assertThat(tableExists(connection, "professional")).isTrue();
 			assertThat(tableExists(connection, "professional_service")).isTrue();
 			assertThat(tableExists(connection, "professional_availability")).isTrue();
