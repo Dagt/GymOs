@@ -84,6 +84,50 @@ public class CoachingCatalogService {
 		return repository.exercise(principal.organizationId(), id).orElseThrow();
 	}
 
+	@Transactional(readOnly = true)
+	public ExerciseRecord getExercise(GymOsPrincipal principal, UUID exerciseId) {
+		requireTenant(principal);
+		return repository.exercise(principal.organizationId(), exerciseId)
+				.orElseThrow(() -> new BusinessException("EXERCISE_NOT_FOUND", "El ejercicio no existe."));
+	}
+
+	@Transactional
+	public ExerciseRecord updateExercise(
+			GymOsPrincipal principal, UUID exerciseId, CreateExerciseCommand command, String correlationId
+	) {
+		requireTenant(principal);
+		ExerciseRecord existing = repository.exercise(principal.organizationId(), exerciseId)
+				.orElseThrow(() -> new BusinessException("EXERCISE_NOT_FOUND", "El ejercicio no existe."));
+
+		String name = required(command.name(), "EXERCISE_NAME_REQUIRED", "El nombre del ejercicio es obligatorio.");
+		String normalizedName = normalize(name);
+		String type = normalizeEnum(command.type(), "STRENGTH");
+
+		repository.updateExercise(
+				principal.organizationId(), exerciseId,
+				new ExerciseData(
+						name, normalizedName, blank(command.description()), blank(command.instructions()),
+						blank(command.primaryMuscleGroup()), blank(command.secondaryMuscleGroups()),
+						blank(command.movementPattern()), type, blank(command.equipment()),
+						blank(command.suggestedLevel()), blank(command.laterality()),
+						blank(command.mediaUrl()), blank(command.warnings()),
+						existing.origin()
+				)
+		);
+		auditService.record(principal, "EXERCISE_UPDATED", "EXERCISE", exerciseId, "BACKOFFICE", null, correlationId);
+		return repository.exercise(principal.organizationId(), exerciseId).orElseThrow();
+	}
+
+	@Transactional
+	public List<String> addAlias(GymOsPrincipal principal, UUID exerciseId, String alias, String correlationId) {
+		requireTenant(principal);
+		repository.exercise(principal.organizationId(), exerciseId)
+				.orElseThrow(() -> new BusinessException("EXERCISE_NOT_FOUND", "El ejercicio no existe."));
+		repository.addAlias(exerciseId, alias);
+		auditService.record(principal, "EXERCISE_ALIAS_ADDED", "EXERCISE", exerciseId, "BACKOFFICE", alias, correlationId);
+		return repository.aliases(exerciseId);
+	}
+
 	@Transactional
 	public ExerciseRecord changeExerciseStatus(
 			GymOsPrincipal principal, UUID exerciseId, String status, String correlationId

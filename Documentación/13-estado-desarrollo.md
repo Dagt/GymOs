@@ -1,7 +1,29 @@
 ﻿# 13. Estado de Desarrollo
 
 Estado: en progreso  
-Fecha: 25 de julio de 2026
+Fecha: 26 de julio de 2026
+
+## Cierre Completo del Módulo de Coaches y Rutinas - 26 de julio de 2026
+
+Implementado e integrado en rama `feature/coaches-workouts`:
+
+- **Constructor y Edición Integral de Rutinas (`PUT /workouts/{id}`):**
+  - Soporte para creación de borradores, edición de rutinas existentes (`PUT /workouts/{workoutId}`), duplicación y publicación inmutable de versiones.
+  - Estructuración flexible por sesiones (días de entrenamiento), múltiples bloques (calentamiento, trabajo principal, accesorios, cardio, enfriamiento) y prescripciones con notaciones libres y estructuradas (`3x12`, `3x12, 10, 8 subiendo`, RPE, descansos, etc.).
+
+- **Catálogo Institucional de Ejercicios y Aliases (`GET/PUT /exercises/{id}`):**
+  - Búsqueda paginada y filtrada por músculo, equipamiento y categoría (`STRENGTH`, `CARDIO`, `CORE`, etc.).
+  - Edición de ejercicios (`PUT /exercises/{id}`), gestión de nombres alternativos (`POST /exercises/{id}/aliases`), y alta rápida de ejercicios directamente desde el constructor sin perder el avance de la rutina.
+
+- **Asignaciones Idempotentes, Reemplazo y Descarga PDF:**
+  - Asignación de versiones publicadas a socios con control de idempotencia (`Idempotency-Key`).
+  - Mapeo y trazabilidad de reemplazo de asignaciones (`REPLACED`) y cancelación de rutinas asignadas (`CANCELLED`).
+  - Generación de PDF imprimible multi-página formateado desde la versión asignada inmutable.
+
+- **Reporte de Acompañamiento y Métricas Operativas:**
+  - Dashboard de métricas semanales por coach, sucursal y socio (`/reports/coaches/workout-assignments/summary`).
+  - Exportación de reporte operativo en CSV (`/reports/coaches/workout-assignments/export`).
+  - Confirmación explícita de que **las rutinas no generan ventas, pagos, comisiones ni ingresos en POS/caja**.
 
 ## Cierre e Integración Unificada del Módulo de Servicios de Bienestar (Wellness) - 25 de julio de 2026
 

@@ -10,6 +10,7 @@ import com.gymos.coaching.infrastructure.CoachingRepository.CoachReportRecord;
 import com.gymos.coaching.infrastructure.CoachingRepository.WorkoutAssignmentRecord;
 import com.gymos.coaching.infrastructure.CoachingRepository.WorkoutDetailRecord;
 import com.gymos.coaching.infrastructure.CoachingRepository.WorkoutSummaryRecord;
+import com.gymos.coaching.infrastructure.CoachingRepository.WorkoutVersionRecord;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,6 +25,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -69,6 +71,40 @@ public class CoachingController {
 	@GetMapping("/workouts/{workoutId}")
 	WorkoutDetailRecord workout(@AuthenticationPrincipal GymOsPrincipal principal, @PathVariable UUID workoutId) {
 		return coachingService.workout(principal, workoutId);
+	}
+
+	@PutMapping("/workouts/{workoutId}")
+	WorkoutDetailRecord updateWorkout(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID workoutId,
+			@Valid @RequestBody CreateWorkoutRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return coachingService.updateWorkout(principal, workoutId, request.toCommand(), correlationId(servletRequest));
+	}
+
+	@GetMapping("/workouts/{workoutId}/versions")
+	List<WorkoutVersionRecord> workoutVersions(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID workoutId
+	) {
+		return coachingService.workoutVersions(principal, workoutId);
+	}
+
+	@GetMapping("/workout-versions/{versionId}")
+	WorkoutVersionRecord workoutVersion(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID versionId
+	) {
+		return coachingService.workoutVersion(principal, versionId);
+	}
+
+	@GetMapping("/workout-assignments/{assignmentId}")
+	WorkoutAssignmentRecord workoutAssignment(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID assignmentId
+	) {
+		return coachingService.workoutAssignment(principal, assignmentId);
 	}
 
 	@PostMapping("/workouts/{workoutId}/versions")

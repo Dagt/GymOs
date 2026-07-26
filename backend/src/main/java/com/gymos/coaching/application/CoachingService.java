@@ -319,9 +319,69 @@ public class CoachingService {
 		} catch (IllegalStateException exception) {
 			throw new BusinessException("WORKOUT_VERSION_NOT_DRAFT", "La última versión no está disponible para publicar.");
 		}
-		auditService.record(principal, "WORKOUT_PUBLISHED", "WORKOUT", workoutId, "BACKOFFICE", null, correlationId);
+		auditService.record(principal, "WORKOUT_CREATED", "WORKOUT", workoutId, "BACKOFFICE", null, correlationId);
 		return workout(principal, workoutId);
-	}
+		}
+
+		@Transactional
+		public WorkoutDetailRecord updateWorkout(GymOsPrincipal principal, UUID workoutId, CreateWorkoutCommand command, String correlationId) {
+		requireBranch(principal);
+		WorkoutRecord existing = coachingRepository.workout(principal.organizationId(), principal.branchId(), workoutId)
+				.orElseThrow(() -> new BusinessException("WORKOUT_NOT_FOUND", "La rutina no existe o no esta disponible."));
+
+		UUID coachId = command.coachId();
+		if (coachId != null) {
+			coachingRepository.coach(principal.organizationId(), principal.branchId(), coachId)
+					.orElseThrow(() -> new BusinessException("COACH_NOT_FOUND", "El coach no existe o no esta disponible."));
+		} else {
+			coachId = existing.coachId();
+		}
+
+		validateWorkoutJson(command.contentJson());
+
+		coachingRepository.updateWorkout(
+				principal.organizationId(), principal.branchId(), workoutId, principal.userId(),
+				new CreateWorkoutData(
+						coachId,
+						required(command.title(), "WORKOUT_TITLE_REQUIRED", "El titulo de la rutina es obligatorio."),
+						blankToNull(command.goal()),
+						normalizeLevel(command.level())
+				)
+		);
+
+		UUID versionId = coachingRepository.createWorkoutVersion(
+				principal.organizationId(),
+				workoutId,
+				principal.userId(),
+				new CreateWorkoutVersionData(blankToNull(command.summary()), command.contentJson().trim())
+		);
+		persistStructure(principal.organizationId(), versionId, command.contentJson());
+
+		auditService.record(principal, "WORKOUT_UPDATED", "WORKOUT", workoutId, "BACKOFFICE", null, correlationId);
+		return workout(principal, workoutId);
+		}
+
+		@Transactional(readOnly = true)
+		public List<WorkoutVersionRecord> workoutVersions(GymOsPrincipal principal, UUID workoutId) {
+		requireBranch(principal);
+		coachingRepository.workout(principal.organizationId(), principal.branchId(), workoutId)
+				.orElseThrow(() -> new BusinessException("WORKOUT_NOT_FOUND", "La rutina no existe o no esta disponible."));
+		return coachingRepository.workoutVersions(principal.organizationId(), workoutId);
+		}
+
+		@Transactional(readOnly = true)
+		public WorkoutVersionRecord workoutVersion(GymOsPrincipal principal, UUID versionId) {
+		requireBranch(principal);
+		return coachingRepository.workoutVersionById(principal.organizationId(), versionId)
+				.orElseThrow(() -> new BusinessException("WORKOUT_VERSION_NOT_FOUND", "La version de rutina no existe."));
+		}
+
+		@Transactional(readOnly = true)
+		public WorkoutAssignmentRecord workoutAssignment(GymOsPrincipal principal, UUID assignmentId) {
+		requireBranch(principal);
+		return coachingRepository.workoutAssignmentById(principal.organizationId(), principal.branchId(), assignmentId)
+				.orElseThrow(() -> new BusinessException("WORKOUT_ASSIGNMENT_NOT_FOUND", "La asignacion no existe."));
+		}
 
 	@Transactional(readOnly = true)
 	public CoachReportRecord coachReport(GymOsPrincipal principal) {

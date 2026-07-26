@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ContentDisposition;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -57,6 +59,34 @@ public class CoachingCatalogController {
 			HttpServletRequest servletRequest
 	) {
 		return service.createExercise(principal, request.toCommand(), correlationId(servletRequest));
+	}
+
+	@GetMapping("/exercises/{exerciseId}")
+	ExerciseRecord getExercise(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID exerciseId
+	) {
+		return service.getExercise(principal, exerciseId);
+	}
+
+	@PutMapping("/exercises/{exerciseId}")
+	ExerciseRecord updateExercise(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID exerciseId,
+			@Valid @RequestBody CreateExerciseRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return service.updateExercise(principal, exerciseId, request.toCommand(), correlationId(servletRequest));
+	}
+
+	@PostMapping("/exercises/{exerciseId}/aliases")
+	List<String> addAlias(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID exerciseId,
+			@Valid @RequestBody AddAliasRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return service.addAlias(principal, exerciseId, request.alias(), correlationId(servletRequest));
 	}
 
 	@PatchMapping("/exercises/{exerciseId}/status")
@@ -145,4 +175,5 @@ public class CoachingCatalogController {
 		}
 	}
 	public record ExerciseStatusRequest(@NotBlank String status) {}
+	public record AddAliasRequest(@NotBlank String alias) {}
 }

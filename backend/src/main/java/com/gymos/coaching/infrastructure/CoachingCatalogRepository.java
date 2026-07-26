@@ -132,6 +132,57 @@ public class CoachingCatalogRepository {
 		return id;
 	}
 
+	public void updateExercise(UUID organizationId, UUID id, ExerciseData data) {
+		jdbc.sql("""
+				UPDATE exercise SET
+				    name = :name, normalized_name = :normalizedName, description = :description,
+				    instructions = :instructions, primary_muscle_group = :primaryMuscle,
+				    secondary_muscle_groups = :secondaryMuscles, movement_pattern = :movementPattern,
+				    exercise_type = :type, equipment = :equipment, suggested_level = :level,
+				    laterality = :laterality, media_url = :mediaUrl, warnings = :warnings,
+				    updated_at = now()
+				WHERE id = :id AND (organization_id IS NULL OR organization_id = :organizationId)
+				""")
+				.param("name", data.name())
+				.param("normalizedName", data.normalizedName())
+				.param("description", data.description())
+				.param("instructions", data.instructions())
+				.param("primaryMuscle", data.primaryMuscleGroup())
+				.param("secondaryMuscles", data.secondaryMuscleGroups())
+				.param("movementPattern", data.movementPattern())
+				.param("type", data.type())
+				.param("equipment", data.equipment())
+				.param("level", data.suggestedLevel())
+				.param("laterality", data.laterality())
+				.param("mediaUrl", data.mediaUrl())
+				.param("warnings", data.warnings())
+				.param("id", id)
+				.param("organizationId", organizationId)
+				.update();
+	}
+
+	public void addAlias(UUID exerciseId, String alias) {
+		if (alias == null || alias.isBlank()) return;
+		String normalized = alias.trim().toLowerCase();
+		jdbc.sql("""
+				INSERT INTO exercise_alias (id, exercise_id, alias_name, normalized_alias, created_at)
+				VALUES (:id, :exerciseId, :aliasName, :normalizedAlias, now())
+				ON CONFLICT (exercise_id, normalized_alias) DO NOTHING
+				""")
+				.param("id", UUID.randomUUID())
+				.param("exerciseId", exerciseId)
+				.param("aliasName", alias.trim())
+				.param("normalizedAlias", normalized)
+				.update();
+	}
+
+	public List<String> aliases(UUID exerciseId) {
+		return jdbc.sql("SELECT alias_name FROM exercise_alias WHERE exercise_id = :exerciseId ORDER BY alias_name")
+				.param("exerciseId", exerciseId)
+				.query(String.class)
+				.list();
+	}
+
 	public void updateExerciseStatus(UUID organizationId, UUID id, String status) {
 		jdbc.sql("""
 				UPDATE exercise SET status = :status, archived_at =

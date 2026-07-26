@@ -168,6 +168,29 @@ public class CoachingRepository {
 		return workoutId;
 	}
 
+	public void updateWorkout(UUID organizationId, UUID branchId, UUID workoutId, UUID actorUserId, CreateWorkoutData data) {
+		OffsetDateTime now = OffsetDateTime.now();
+		jdbcClient.sql("""
+				UPDATE workout
+				SET title = :title, goal = :goal, level = :level, coach_id = :coachId,
+				    updated_at = :now, updated_by = :actorUserId, version = version + 1
+				WHERE organization_id = :organizationId
+				  AND branch_id = :branchId
+				  AND id = :workoutId
+				  AND deleted_at IS NULL
+				""")
+				.param("title", data.title())
+				.param("goal", data.goal())
+				.param("level", data.level())
+				.param("coachId", data.coachId())
+				.param("now", now)
+				.param("actorUserId", actorUserId)
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("workoutId", workoutId)
+				.update();
+	}
+
 	public UUID createWorkoutVersion(UUID organizationId, UUID workoutId, UUID actorUserId, CreateWorkoutVersionData data) {
 		OffsetDateTime now = OffsetDateTime.now();
 		UUID versionId = UUID.randomUUID();
@@ -364,6 +387,60 @@ public class CoachingRepository {
 				.param("workoutId", workoutId)
 				.query(this::mapVersion)
 				.list();
+	}
+
+	public Optional<WorkoutVersionRecord> workoutVersionById(UUID organizationId, UUID versionId) {
+		return jdbcClient.sql("""
+				SELECT id, workout_id, version_number, summary, content_json::text AS content_json,
+				       status, created_at
+				FROM workout_version
+				WHERE organization_id = :organizationId
+				  AND id = :versionId
+				  AND deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("versionId", versionId)
+				.query(this::mapVersion)
+				.optional();
+	}
+
+	public Optional<WorkoutAssignmentRecord> workoutAssignmentById(UUID organizationId, UUID branchId, UUID assignmentId) {
+		return jdbcClient.sql("""
+				SELECT a.id, a.workout_id, a.workout_version_id, a.client_id,
+				       p.first_name || ' ' || p.last_name AS client_name,
+				       a.coach_id, c.display_name AS coach_name,
+				       w.title AS workout_title, w.level,
+				       v.version_number, a.status, a.assigned_on, a.starts_on, a.ends_on, a.notes
+				FROM workout_assignment a
+				JOIN workout w ON w.id = a.workout_id
+				JOIN workout_version v ON v.id = a.workout_version_id
+				JOIN client cl ON cl.id = a.client_id
+				JOIN person p ON p.id = cl.person_id
+				LEFT JOIN coach c ON c.id = a.coach_id
+				WHERE a.organization_id = :organizationId
+				  AND a.branch_id = :branchId
+				  AND a.id = :assignmentId
+				  AND a.deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("assignmentId", assignmentId)
+				.query(this::mapAssignment)
+				.optional();
+	}
+
+	public void replaceAssignment(UUID organizationId, UUID branchId, UUID oldAssignmentId, UUID newAssignmentId) {
+		jdbcClient.sql("""
+				UPDATE workout_assignment
+				SET status = 'REPLACED', replaced_assignment_id = :newAssignmentId, updated_at = now()
+				WHERE id = :oldAssignmentId AND organization_id = :organizationId
+				  AND branch_id = :branchId AND deleted_at IS NULL
+				""")
+				.param("newAssignmentId", newAssignmentId)
+				.param("oldAssignmentId", oldAssignmentId)
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.update();
 	}
 
 	public boolean clientExists(UUID organizationId, UUID clientId) {
