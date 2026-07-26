@@ -194,17 +194,22 @@ Decisiones implementadas:
 - Los endpoints internos de rutinas usan `workout.read.own|all` y
   `workout.manage.own|all`; asignación, PDF y métricas usan respectivamente
   `workout.assign`, `workout.pdf.download` y `coach.metrics.read`.
+- La administración agregada de especialidades, biografía, estado y sucursales
+  del coach usa `coach.profile.manage`.
 - Permisos adicionales: `professional.read`, `professional.manage`, `notification.read`, `notification.manage`, `automation.read`, `automation.manage` y `report.owner.read`.
 - Las pantallas `/coaches`, `/wellness`, `/automations` y `/dashboard` completan el primer paquete vendible de servicios avanzados.
 
-Diseño implementado para el cierre de `coaching` (`84a5fd3`):
+Diseño implementado para los cierres de `coaching` (`84a5fd3` y `8162814`):
 
 - vincular el perfil de coach con la identidad interna y modelar alcance multi-sucursal;
+- agregar el perfil por usuario y sincronizar detalles comunes, estado operativo
+  y accesos de sucursal dentro del alcance del administrador;
 - incorporar catálogo normalizado, paginado y extensible de ejercicios;
 - modelar sesiones, bloques y prescripciones sin depender solo de JSON opaco;
 - publicar versiones inmutables y asignarlas con transacción e idempotencia;
 - generar PDF desde la versión asignada;
-- proyectar métricas semanales por coach, socio y sucursal en la zona horaria de negocio;
+- proyectar métricas semanales por coach, socio y sucursal en la zona horaria de
+  negocio, con series continuas de 4 a 52 semanas;
 - mantener la futura app del socio fuera de V1, sin exponer todavía sus
   contratos remotos.
 

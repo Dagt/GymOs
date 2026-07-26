@@ -101,6 +101,7 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/coaches/**` | coaching | `coach.read` | Sí | Sí | No | Pendiente |
 | POST | `/api/v1/coaches/**` | coaching | `coach.manage` | Sí | Sí | Sí | `coachCreationRequiresManagePermission` negativo |
+| GET/PUT | `/api/v1/coaches/profiles/**` | coaching | `coach.profile.manage` | Sí | Sólo sucursales administrables | PUT | `advancedCoachProfilesRequireDedicatedPermission`; `CoachingServiceSecurityTests`; E2E |
 | GET | `/api/v1/workouts/**` | coaching | `workout.read.own/all` | Sí | Sí; coach propio/global | No | `CoachingServiceSecurityTests`; permiso legacy negativo |
 | POST/PUT | `/api/v1/workouts/**` | coaching | `workout.manage.own/all` | Sí | Sí; coach propio/global | Sí | `CoachingServiceSecurityTests`; `workoutAssignmentRequiresManagePermission` |
 | GET | `/api/v1/reports/coaches` | coaching/reporting | `report.coaches.read` | Sí | Sí | No | Pendiente |
@@ -112,7 +113,7 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 | PATCH | `/api/v1/workout-assignments/**` | coaching | `workout.assign` | Sí | Sí; coach propio/global | Sí | Motivo obligatorio y negativo de permiso |
 | POST | `/api/v1/workout-assignments/*/replace` | coaching | `workout.assign` | Sí | Sí; coach propio/global | Sí | E2E de reemplazo e idempotencia |
 | GET | `/api/v1/workout-assignments/*/pdf` | coaching | `workout.pdf.download` | Sí | Sí; coach propio/global | No | PDFBox y filtro de propiedad |
-| GET | `/api/v1/reports/coaches/workout-assignments/**` | coaching/reporting | `coach.metrics.read` | Sí | Sí; coach propio/global | No | Comparación, filtro, paginación y E2E |
+| GET | `/api/v1/reports/coaches/workout-assignments/**` | coaching/reporting | `coach.metrics.read` | Sí | Sí; coach propio/global | No | Comparación, filtro socio/coach, tendencia 4–52 semanas, paginación y E2E |
 | GET | `/api/v1/professionals/**` | wellness | `professional.read` | Sí | Sí | No | Pendiente |
 | POST | `/api/v1/professionals/**` | wellness | `professional.manage` | Sí | Sí | Sí | `professionalCreationRequiresManagePermission` negativo |
 | GET | `/api/v1/notifications/**` | notifications | `notification.read` | Sí | No | No | Pendiente |

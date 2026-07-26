@@ -407,8 +407,10 @@ Nota implementada Hito 5:
 - `POST /workouts/{id}/assign` asigna una version concreta o la ultima version publicada a un cliente activo.
 - `GET /reports/coaches` devuelve conteos base: coaches, rutinas, asignaciones activas y asignaciones de ultimos 30 dias.
 
-Contratos implementados en el cierre `84a5fd3`:
+Contratos implementados en los cierres `84a5fd3` y `8162814`:
 
+- `GET /coaches/profiles`
+- `PUT /coaches/profiles/{coachUserId}`
 - `GET|POST /exercises`
 - `GET|PUT /exercises/{exerciseId}`
 - `PATCH /exercises/{exerciseId}/status`
@@ -427,12 +429,22 @@ Contratos implementados en el cierre `84a5fd3`:
 - `PATCH /workout-assignments/{assignmentId}/status`
 - `GET /workout-assignments/{assignmentId}/pdf`
 - `GET /reports/coaches/workout-assignments/summary`
+- `GET /reports/coaches/workout-assignments/trend`
 - `GET /reports/coaches/workout-assignments/export`
 
 El catálogo usa `page` y `size`. El resumen de asignaciones acepta `from`, `to`,
 `coachId`, `clientId`, `page` y `size`; devuelve KPIs del conjunto filtrado,
 periodo anterior comparable y detalle paginado. El CSV exporta el conjunto
-filtrado y rechaza más de 10,000 filas.
+filtrado y rechaza más de 10,000 filas. La tendencia acepta `weeks` entre 4 y
+52, `to`, `coachId` y `clientId`; devuelve una serie ordenada con
+`weekFrom`, `weekTo`, `assignments`, `uniqueClients` y `firstWorkouts`,
+incluyendo ceros en semanas sin actividad.
+
+`GET /coaches/profiles` agrega por `userId` las sucursales visibles del actor.
+`PUT /coaches/profiles/{coachUserId}` recibe `specialties[]`, `bio`, estado
+`ACTIVE|INACTIVE` y `branchIds[]`. Un perfil activo requiere al menos una
+sucursal administrable; el cambio sincroniza las filas operativas `coach` y el
+acceso del usuario sólo dentro del alcance del actor.
 
 Crear una asignación acepta
 `Idempotency-Key`; reutilizarla con otro payload responde
@@ -440,6 +452,8 @@ Crear una asignación acepta
 por `assignmentId`, nunca desde el borrador actual.
 
 Errores principales: `COACH_NOT_ACTIVE`, `COACH_PROFILE_REQUIRED`,
+`COACH_PROFILE_NOT_FOUND`, `COACH_BRANCH_REQUIRED`,
+`COACH_BRANCH_OUTSIDE_SCOPE`, `REPORT_WEEKS_INVALID`,
 `EXERCISE_DUPLICATE`, `SYSTEM_EXERCISE_IMMUTABLE`,
 `EXERCISE_OUTSIDE_OWNER_SCOPE`, `EXERCISE_MEDIA_INVALID`,
 `WORKOUT_OUTSIDE_OWNER_SCOPE`, `WORKOUT_VERSION_NOT_PUBLISHED`,
@@ -576,7 +590,7 @@ Permisos por endpoint interno:
 - `inventory.read`, `inventory.manage`
 - `resource.read`, `resource.manage`
 - `booking.read`, `booking.manage`
-- `coach.read`, `coach.manage`
+- `coach.read`, `coach.manage`, `coach.profile.manage`
 - `workout.read.own`, `workout.read.all`
 - `workout.manage.own`, `workout.manage.all`
 - `workout.assign`, `workout.pdf.download`, `coach.metrics.read`

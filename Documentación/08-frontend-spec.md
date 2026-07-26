@@ -347,17 +347,24 @@ Formularios:
 
 ## Coaches y rutinas
 
-La pantalla implementada `/coaches` concentra cuatro pestañas operativas para
-evitar perder contexto: Constructor, Ejercicios, Asignaciones y Métricas.
+La pantalla implementada `/coaches` concentra cinco pestañas operativas para
+evitar perder contexto: Coaches, Constructor, Ejercicios, Asignaciones y
+Métricas. La primera sólo aparece a quien posee `coach.profile.manage`.
 
+- Coaches: tarjetas agregadas por usuario, especialidades, biografía, estado y
+  selección de múltiples sucursales. El alta y las credenciales enlazan a
+  `/users`.
 - Constructor: biblioteca, alta/edición/duplicado/publicación, sesiones, bloques
   y ejercicios reordenables con controles de subir/bajar/eliminar.
 - Ejercicios: búsqueda, alta, edición propia, archivo administrativo, aliases y
   carga/eliminación de imagen o video.
 - Asignaciones: búsqueda de socio, versión publicada, vigencia, notas privadas e
   imprimibles, historial, PDF, completar, cancelar con motivo y reemplazar.
-- Métricas: fechas, coach, periodo anterior comparable, KPIs, tabla por coach,
-  historial paginado y CSV.
+- Métricas: fechas, coach, búsqueda/selección directa de socio, periodo anterior
+  comparable, KPIs, tabla por coach, historial paginado y CSV. El selector de
+  8, 12, 26 o 52 semanas alimenta tres gráficas: asignaciones, socios únicos y
+  primeras rutinas. El socio seleccionado se aplica a resumen, gráficas,
+  detalle y exportación.
 
 El constructor combina campos estructurados con prescripción libre y representa
 `3x20`, `3x12, 10, 8 subiendo`, `3x24 pasos`, `3 series`, alternativas `VS`,

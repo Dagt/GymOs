@@ -22,6 +22,7 @@ La pertenencia a `main` se determinó por ancestros de Git, no por nombres. Una 
 | 26 jul | Coaches/rutinas en rama; todavía no integrado en main |
 | 26 jul | Sanitización documental global: fichas por módulo y retiro de documentos transitorios |
 | 26 jul | Cierre funcional de Coaches/rutinas en `84a5fd3`: seguridad `own/all`, constructor, medios, trazabilidad, métricas paginadas, PDF A4 y E2E |
+| 26 jul | Ampliación en `8162814`: perfiles avanzados multi-sucursal, filtro directo por socio y métricas históricas de 4–52 semanas |
 
 ## 3. Inventario de ramas remotas
 
@@ -29,7 +30,7 @@ Ya contenidas en `main`, sin commits exclusivos: `backup/system-updated-2026-07-
 
 | Rama activa/divergente | Situación | Acción |
 |---|---|---|
-| `feature/coaches-workouts` | Alcance funcional V1 cerrado y validado en `84a5fd3`; Wellness permanece excluido. | Publicar la documentación de cierre y abrir PR hacia `main`. |
+| `feature/coaches-workouts` | Alcance funcional V1 cerrado en `84a5fd3` y ampliado/validado en `8162814`; Wellness permanece excluido. | Publicar la documentación actualizada y abrir PR hacia `main`. |
 | `feature/wellness-services` | Un commit exclusivo y uno de main ausente. | Rebase y revisión independiente. |
 | `feature/code-simplification-rebasion-and-refactor` | Un commit exclusivo y seis de main ausentes. | Auditar commit y rebase. |
 | `feature/catalog-inventory-enhancement-plan` | Historia fuertemente divergente. | No fusionar directamente; extraer cambios útiles. |

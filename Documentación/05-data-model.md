@@ -306,6 +306,7 @@ Regla:
 ### coach
 - organization_id
 - branch_id
+- user_account_id
 - display_name
 - email
 - phone
@@ -345,9 +346,13 @@ Regla:
 
 ### Modelo implementado para Coaches y rutinas
 
-El cierre funcional de `84a5fd3` conserva las tablas base y agrega:
+Los cierres funcionales `84a5fd3` y `8162814` conservan las tablas base y
+agregan:
 
 - `coach.user_account_id` para resolver propiedad del perfil;
+- una fila `coach` por usuario y sucursal, con índice único parcial. Las
+  especialidades y biografía se sincronizan entre las filas del mismo usuario;
+  el estado y la pertenencia se administran por sucursal;
 - `exercise` y `exercise_alias`, con origen SYSTEM/ORGANIZATION/COACH y referencia
   de medio en almacenamiento de objetos;
 - `workout`, `workout_version`, `workout_session`, `workout_session_block` y
@@ -356,7 +361,7 @@ El cierre funcional de `84a5fd3` conserva las tablas base y agrega:
   privadas, observaciones imprimibles, `status_reason` y
   `replaced_assignment_id`;
 - auditoría de asignación, reemplazo, cancelación, finalización, catálogo,
-  aliases y medios.
+  aliases, medios y actualización del perfil del coach.
 
 Todas las tablas incluyen `organization_id`; las dependientes de sede incluyen
 `branch_id`. Los históricos conservan nombre, prescripción e indicaciones aunque un
@@ -527,6 +532,9 @@ Migraciones nuevas:
 - `V25__manager_permissions_and_client_branch_visibility.sql`: agrega `client.home_branch_id`, filtra socios por sucursal/plan multi-sucursal y revoca permisos de administracion de datos/sucursales al rol `Gerente`.
 - `V26__branch_branding_and_owner_branch_selection.sql`: historicamente agrego marca opcional por sucursal (`brand_name`, `logo_url`, colores) y soportaba que el dueño entrara sin sucursal operativa por defecto.
 - `V27__reception_booking_scope_and_gym_branding.sql`: elimina marca visual de `branch`, deja logo/colores exclusivamente en `organization` y revoca `resource.manage` a recepcion.
+- `V47__advanced_coach_profiles.sql`: registra `coach.profile.manage` y lo
+  asigna a los roles administrativos que pueden editar el perfil y las
+  sucursales de un coach.
  
 ## Hito 7 - Tablas V16
 
