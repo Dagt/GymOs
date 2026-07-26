@@ -2,7 +2,7 @@
 
 Estado: FUENTE CANÓNICA / EN PROGRESO
 Corte: 26 de julio de 2026
-Código auditado: `feature/coaches-workouts` en `3933aa5`, posterior a la
+Código auditado: `feature/coaches-workouts` en `5dd0e47`, posterior a la
 separación de los cambios de Wellness.
 
 ## 1. Cómo interpretar este documento
@@ -33,7 +33,7 @@ Ningún módulo se declara “completo” sólo por el nombre de una rama o comm
 | [Membresías](modulos/08-memberships.md) y [kiosco](modulos/11-selfservice.md) | FUNCIONAL | Alta, renovación, cambio de plan y autoservicio | Revisar semántica de fechas y seguridad de sesión |
 | [Reservas y recursos](modulos/12-bookings.md) | FUNCIONAL | Calendario, disponibilidad, restricciones por plan y recepción | Suite E2E y deuda UX residual |
 | [Inventarios](modulos/13-inventory.md) | ESTABILIZADO | Existencias, transferencias, conteos, valuación y movimientos | Paginación parametrizada y feedback por renglón |
-| [Coaches y rutinas](modulos/14-coaching.md) | ESTABILIZADO | Dueño limitado a métricas; Coach con catálogo/constructor/asignaciones; perfil multi-sucursal en Equipo; histórico 4–52 semanas, CSV, PDF y E2E | Riesgos transversales `DB-001` y `OPS-001` |
+| [Coaches y rutinas](modulos/14-coaching.md) | ESTABILIZADO | Dueño y gerente limitados al tablero de métricas; Coach con catálogo/constructor/asignaciones; perfil multi-sucursal en Equipo; histórico 4–52 semanas, CSV, PDF y E2E | Riesgos transversales `DB-001` y `OPS-001` |
 | [Wellness/profesionales](modulos/15-wellness.md) | PARCIAL en `main` | Base histórica de profesionales, servicios y disponibilidad | Agenda aislada en rama propia |
 | [Reportes generales](modulos/18-reporting.md) | PARCIAL | Reportes operativos por dominio | Definiciones KPI y cobertura homogénea |
 | [Producción/piloto](modulos/20-common-operations.md) | PLANIFICADO | Configuración y runbooks base | Observabilidad, backups, seguridad y piloto |
@@ -62,13 +62,17 @@ El módulo permite:
 - cargar y administrar medios de ejercicios;
 - separar alcance propio del coach y alcance global de reportes para
   dueño/gerencia;
-- limitar al dueño a métricas, sin cargar ni exponer constructor, ejercicios,
-  asignación, PDF o mutaciones del historial.
+- limitar a dueño y gerente al tablero de métricas como vista predeterminada,
+  sin pestaña redundante ni carga/exposición de constructor, ejercicios,
+  asignación, PDF o mutaciones del historial;
+- autorizar los reportes con `coach.metrics.read` sin exigir lectura operativa
+  de rutinas.
 
 El alcance funcional V1 está cerrado y estabilizado. El cierre base está en
 `84a5fd3`, la ampliación de perfiles e histórico en `8162814`, la corrección de
-alcance/UX en `0066c0b` y la compatibilidad PostgreSQL real en `3933aa5`. Los
-hallazgos específicos `COA-001` a `COA-007` y `COA-009` a `COA-013` pasaron al
+alcance/UX en `0066c0b`, la compatibilidad PostgreSQL real en `3933aa5` y el
+alcance analítico de supervisores en `5dd0e47`. Los hallazgos específicos
+`COA-001` a `COA-007` y `COA-009` a `COA-014` pasaron al
 historial
 resuelto del documento 28.
 
@@ -78,7 +82,7 @@ Validación ejecutada sobre el árbol saneado:
 
 - backend: `gradlew clean test --no-daemon`, exitoso;
 - frontend: 31 pruebas, typecheck, lint y build de producción, exitosos;
-- E2E específico de Coaches: 5 recorridos Playwright exitosos;
+- E2E específico de Coaches: 6 recorridos Playwright exitosos;
 - cobertura dedicada: propiedad `own/all`, permiso de perfiles, métricas,
   histórico semanal, perfil multi-sucursal, PDF y medios;
 - prueba PostgreSQL de filtros UUID nulos para biblioteca, resumen, detalle,

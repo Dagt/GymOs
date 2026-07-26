@@ -2,7 +2,7 @@
 
 Estado: `ESTABILIZADO`
 Rama de cierre: `feature/coaches-workouts`
-Código verificado: `3933aa5`
+Código verificado: `5dd0e47`
 Corte: 26 de julio de 2026
 
 ## Propósito y alcance V1
@@ -78,8 +78,10 @@ La consulta remota por el socio pertenece a una aplicación futura.
 - CSV completo y acotado a 10,000 filas para evitar exportaciones accidentales
   sin filtro, respetando también el socio seleccionado;
 - alcance propio para coach y global de sucursal para dueño/gerencia;
-- el dueño sólo recibe la pestaña Métricas: no carga rutinas, catálogo de
-  ejercicios ni acciones sobre asignaciones.
+- dueño y gerente entran directamente al tablero de métricas, sin pestaña
+  redundante y sin cargar rutinas, catálogo de ejercicios ni acciones sobre
+  asignaciones; la detección por rol también protege la interfaz mientras se
+  renueva un token anterior.
 
 ## Seguridad e invariantes
 
@@ -87,9 +89,11 @@ La consulta remota por el socio pertenece a una aplicación futura.
   global;
 - `coach.profile.manage` protege tanto la consulta como la mutación de perfiles
   avanzados desde Gestión del equipo;
-- el rol `Dueno del gimnasio` conserva `coach.read`, `coach.metrics.read` y
-  `coach.profile.manage`, pero no recibe permisos de lectura/gestión de rutinas,
-  catálogo, asignación ni PDF;
+- los roles `Dueno del gimnasio` y `Gerente` conservan `coach.read`,
+  `coach.metrics.read` y `coach.profile.manage`, pero no reciben permisos de
+  lectura/gestión de rutinas, catálogo, asignación ni PDF;
+- los reportes usan `coach.metrics.read` y un alcance analítico propio; no
+  dependen de `workout.read.*`, reservado para consultar rutinas operativas;
 - el perfil de coach se vincula a `user_account_id`; un coach no puede crear,
   leer, modificar, asignar, reemplazar ni imprimir rutinas de otro coach;
 - organización y sucursal se filtran en servicio y repositorio;
@@ -104,10 +108,10 @@ La consulta remota por el socio pertenece a una aplicación futura.
 
 - backend: `gradlew clean test --no-daemon`, exitoso;
 - frontend: 31 pruebas, typecheck, lint y build de producción, exitosos;
-- E2E Playwright: 5 recorridos exitosos para constructor/publicación,
+- E2E Playwright: 6 recorridos exitosos para constructor/publicación,
   catálogo/aliases/medios, cancelación/reemplazo/métricas históricas y
-  administración multi-sucursal del coach, incluyendo el alcance exclusivo de
-  métricas para el dueño;
+  administración multi-sucursal del coach, incluyendo acceso directo a
+  métricas para dueño y gerente sin superficies operativas;
 - pruebas dedicadas de propiedad, permisos HTTP, comparación de periodos,
   series semanales, perfiles agregados, sincronización de sucursales, PDF y
   ciclo de medios;
@@ -115,7 +119,7 @@ La consulta remota por el socio pertenece a una aplicación futura.
 
 Los antiguos `COA-001` a `COA-007` y `COA-009` quedaron resueltos en
 `84a5fd3`; `COA-010` y `COA-011` se cerraron en `8162814`, `COA-012` en
-`0066c0b` y `COA-013` en `3933aa5`. Todos se conservan
+`0066c0b`, `COA-013` en `3933aa5` y `COA-014` en `5dd0e47`. Todos se conservan
 en la sección de cerradas del documento 28. Los riesgos
 transversales de despliegue, migración PostgreSQL real, observabilidad y
 almacenamiento se siguen administrando como `DB-001` y `OPS-001`; no son
