@@ -655,9 +655,10 @@ Decisión de alcance: una rutina no es producto ni servicio de POS. Los cobros e
 efectivo entre coach y socio no se registran y no generan ventas, pagos, comisiones,
 ingresos ni movimientos de caja en GymOS.
 
-## Cierre de Coaches y rutinas - 26 de julio de 2026
+## Avance de Coaches y rutinas - 26 de julio de 2026
 
-Estado: implementado en `feature/coaches-workouts`.
+Estado: núcleo funcional implementado; cierre integral pendiente en
+`feature/coaches-workouts`.
 
 - Migración `V45__complete_coaches_workouts.sql`.
 - Catálogo global/extensible con más de 60 ejercicios base.
@@ -668,7 +669,14 @@ Estado: implementado en `feature/coaches-workouts`.
 - Métricas por periodo, coach y socio, incluyendo coaches sin actividad.
 - Exportación CSV y permisos granulares.
 - Nueva consola `/coaches` con constructor, catálogo, asignaciones e indicadores.
-- Documento de cierre: `27-implementacion-coaches-rutinas.md`.
+- Documento de avance y backlog: `27-implementacion-coaches-rutinas.md`.
+- Pendientes P1: edición de rutinas, aliases/edición de ejercicios, constructor con
+  múltiples bloques y reordenamiento, prescripción completa, reemplazos, contratos
+  de detalle, autorización por propiedad, OpenAPI y E2E.
+- Pendientes P2: comparación semanal, filtros, indicadores, perfil multi-sucursal,
+  ciclo de vida del catálogo, paginación y medios.
+- PDF pendiente de identidad visual, contenido avanzado, reproducibilidad y pruebas
+  de impresión/renderizado.
 
 Pendiente fuera del alcance central del Hito 5:
 
