@@ -10,13 +10,18 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.audit.api.AuditService;
+import com.gymos.coaching.application.command.AssignWorkoutCommand;
 import com.gymos.coaching.application.command.CreateWorkoutCommand;
 import com.gymos.coaching.infrastructure.CoachingRepository;
 import com.gymos.coaching.infrastructure.CoachingRepository.CoachIdentity;
 import com.gymos.coaching.infrastructure.CoachingRepository.CoachProfileRow;
 import com.gymos.coaching.infrastructure.CoachingRepository.CoachRecord;
+import com.gymos.coaching.infrastructure.CoachingRepository.WorkoutAssignmentRecord;
+import com.gymos.coaching.infrastructure.CoachingRepository.WorkoutRecord;
+import com.gymos.coaching.infrastructure.CoachingRepository.WorkoutVersionRecord;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -111,6 +116,46 @@ class CoachingServiceSecurityTests {
 		))
 				.isInstanceOf(BusinessException.class)
 				.hasMessageContaining("no existe");
+	}
+
+	@Test
+	void publishedWorkoutCanBeAssigned() {
+		GymOsPrincipal principal = principal(Set.of("workout.manage.own"));
+		UUID workoutId = UUID.randomUUID();
+		UUID versionId = UUID.randomUUID();
+		UUID clientId = UUID.randomUUID();
+		UUID coachId = UUID.randomUUID();
+		UUID assignmentId = UUID.randomUUID();
+		OffsetDateTime now = OffsetDateTime.now();
+		WorkoutRecord workout = new WorkoutRecord(
+				workoutId, coachId, "Coach Uno", "Rutina publicada", null,
+				"GENERAL", "PUBLISHED", now, now
+		);
+		WorkoutVersionRecord version = new WorkoutVersionRecord(
+				versionId, workoutId, 2, null, "{\"sessions\":[]}", "PUBLISHED", now
+		);
+		WorkoutAssignmentRecord assignment = new WorkoutAssignmentRecord(
+				assignmentId, workoutId, versionId, clientId, "Socio Uno",
+				coachId, "Coach Uno", "Rutina publicada", "GENERAL", 2,
+				"ACTIVE", LocalDate.now(), null, null, null
+		);
+		when(repository.workout(organizationId, branchId, workoutId, userId))
+				.thenReturn(Optional.of(workout));
+		when(repository.clientExists(organizationId, clientId)).thenReturn(true);
+		when(repository.workoutVersion(organizationId, workoutId, versionId))
+				.thenReturn(Optional.of(version));
+		when(repository.assignWorkout(eq(organizationId), eq(branchId), eq(userId), any()))
+				.thenReturn(assignmentId);
+		when(repository.assignment(organizationId, branchId, assignmentId, userId))
+				.thenReturn(Optional.of(assignment));
+
+		WorkoutAssignmentRecord result = service.assignWorkout(
+				principal, workoutId,
+				new AssignWorkoutCommand(clientId, versionId, null, null, null, null, null),
+				"test"
+		);
+
+		assertThat(result.id()).isEqualTo(assignmentId);
 	}
 
 	@Test

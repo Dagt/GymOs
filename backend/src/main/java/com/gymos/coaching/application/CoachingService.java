@@ -322,8 +322,8 @@ public class CoachingService {
 				principal.organizationId(), principal.branchId(), workoutId, ownerUserId
 		)
 				.orElseThrow(() -> new BusinessException("WORKOUT_NOT_FOUND", "La rutina no existe o no esta disponible."));
-		if (!"ACTIVE".equals(workout.status())) {
-			throw new BusinessException("WORKOUT_NOT_ACTIVE", "La rutina no esta activa.");
+		if (!"PUBLISHED".equals(workout.status()) && !"ACTIVE".equals(workout.status())) {
+			throw new BusinessException("WORKOUT_NOT_ACTIVE", "La rutina debe estar publicada para poder asignarla.");
 		}
 		if (!coachingRepository.clientExists(principal.organizationId(), command.clientId())) {
 			throw new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta activo.");

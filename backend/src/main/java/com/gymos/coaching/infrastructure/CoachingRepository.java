@@ -376,6 +376,10 @@ public class CoachingRepository {
 				    FROM workout_version
 				    WHERE workout_id = w.id
 				      AND deleted_at IS NULL
+				      AND (
+				        w.status NOT IN ('PUBLISHED', 'ACTIVE')
+				        OR status = 'PUBLISHED'
+				      )
 				    ORDER BY version_number DESC
 				    LIMIT 1
 				) v ON true

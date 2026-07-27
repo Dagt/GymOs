@@ -28,7 +28,7 @@ test.describe("coaches y rutinas", () => {
       if (route.request().method() === "POST" && path === `/workouts/${workoutId}/publish`) {
         await route.fulfill({
           contentType: "application/json",
-          body: JSON.stringify(workoutDetail(workoutId, "Rutina E2E", "ACTIVE")),
+          body: JSON.stringify(workoutDetail(workoutId, "Rutina E2E", "PUBLISHED")),
         });
         return true;
       }
@@ -40,11 +40,14 @@ test.describe("coaches y rutinas", () => {
     await expect(page.getByText("Tu perfil se asigna automáticamente.")).toBeVisible();
     await expect(page.getByRole("combobox", { name: "Coach", exact: true })).toHaveCount(0);
     await page.getByLabel("Título").fill("Rutina E2E");
+    await page.getByRole("button", { name: "Continuar a días y ejercicios" }).click();
     await page.getByRole("combobox", { name: "Ejercicio", exact: true }).fill("Sentadilla libre");
     await page.getByLabel("Series").fill("4");
     await page.getByLabel("Repeticiones").fill("8-10");
     await page.getByRole("button", { name: "+ Agregar bloque" }).click();
     await page.getByRole("combobox", { name: "Ejercicio", exact: true }).nth(1).fill("Peso muerto");
+    await page.getByRole("button", { name: "Revisar rutina" }).click();
+    await expect(page.getByText("2 bloques")).toBeVisible();
     await page.getByRole("button", { name: "Publicar rutina" }).click();
 
     await expect(page.getByText("Rutina “Rutina E2E” publicada correctamente.")).toBeVisible();
@@ -93,7 +96,7 @@ test.describe("coaches y rutinas", () => {
     });
 
     await page.goto("/coaches");
-    await page.getByRole("button", { name: "Ejercicios" }).click();
+    await page.getByRole("button", { name: "Ejercicios", exact: true }).click();
     await page.getByRole("button", { name: "Editar detalles" }).click();
     await page.getByLabel("Nombre").fill("Press inclinado actualizado");
     await page.getByRole("button", { name: "Actualizar ejercicio" }).click();
@@ -131,7 +134,7 @@ test.describe("coaches y rutinas", () => {
     });
 
     await page.goto("/coaches");
-    await page.getByRole("button", { name: "Ejercicios" }).click();
+    await page.getByRole("button", { name: "Ejercicios", exact: true }).click();
     const catalog = page.locator(".exercise-catalog-list");
     await expect(catalog).toHaveCSS("overflow-y", "auto");
     await page.getByRole("button", { name: "+ Nuevo ejercicio" }).click();
@@ -157,12 +160,60 @@ test.describe("coaches y rutinas", () => {
       cards.nth(1).boundingBox(),
     ]);
     expect(Math.abs((firstCard?.height ?? 0) - (secondCard?.height ?? 0))).toBeLessThanOrEqual(1);
-    expect(firstCard?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(121);
+    expect(firstCard?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(89);
+    await catalog.locator(".exercise-catalog-card")
+      .filter({ hasText: "Press inclinado" })
+      .getByRole("button", { name: "Ver descripción" })
+      .click();
+    await expect(page.getByRole("heading", { name: "Press inclinado" })).toBeVisible();
+    await expect(page.getByText("Controlar el descenso")).toBeVisible();
+    await page.getByRole("button", { name: "Cerrar", exact: true }).click();
 
     await page.getByRole("button", { name: "+ Nuevo ejercicio" }).click();
     await expect(
       page.getByRole("combobox", { name: "Equipo", exact: true }).locator('option[value="Trineo de empuje"]'),
     ).toHaveCount(1);
+  });
+
+  test("busca socios al escribir y asigna una rutina publicada", async ({ page }) => {
+    let searchedQuery = "";
+    let assignmentPayload: Record<string, unknown> | null = null;
+    await bootCoaching(page, async (route, path, url) => {
+      if (route.request().method() === "GET" && path === "/clients") {
+        searchedQuery = url.searchParams.get("query") ?? "";
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify([client()]) });
+        return true;
+      }
+      if (route.request().method() === "POST" && path === `/workouts/${workoutId}/assign`) {
+        assignmentPayload = route.request().postDataJSON() as Record<string, unknown>;
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({
+            id: assignmentId,
+            clientName: "Diego García",
+            workoutId,
+            workoutVersionId: versionId,
+            status: "ACTIVE",
+          }),
+        });
+        return true;
+      }
+      return false;
+    });
+
+    await page.goto("/coaches");
+    await page.getByRole("button", { name: "Asignaciones" }).click();
+    await page.getByPlaceholder("Escribe al menos 2 letras del nombre, correo o teléfono").fill("Diego");
+    await expect(page.getByRole("button", { name: "Diego García" })).toBeVisible();
+    expect(searchedQuery).toBe("Diego");
+    await page.getByRole("button", { name: "Diego García" }).click();
+    await page.getByRole("button", { name: "Asignar rutina" }).click();
+
+    await expect.poll(() => assignmentPayload).toMatchObject({
+      clientId,
+      workoutVersionId: versionId,
+    });
+    await expect(page.getByText("Rutina asignada a Diego García. El PDF ya está disponible.")).toBeVisible();
   });
 
   test("cancela con motivo y filtra sus métricas históricas por socio", async ({ page }) => {
@@ -480,7 +531,7 @@ function coachProfile() {
     phone: "555-0100",
     specialties: ["Fuerza"],
     bio: "Entrenamiento de fuerza.",
-    status: "ACTIVE",
+    status: "PUBLISHED",
     branches: [{ id: branchId, name: "Centro" }],
   };
 }

@@ -143,6 +143,7 @@ export default function CoachesPage() {
   const [coachId, setCoachId] = useState("");
   const [summary, setSummary] = useState("");
   const [editingWorkoutId, setEditingWorkoutId] = useState<string | null>(null);
+  const [builderStep, setBuilderStep] = useState<1 | 2 | 3>(1);
   const [sessions, setSessions] = useState<WorkoutSessionDraft[]>([emptySession(0)]);
 
   const [exerciseQuery, setExerciseQuery] = useState("");
@@ -151,9 +152,11 @@ export default function CoachesPage() {
   const [exerciseForm, setExerciseForm] = useState<CreateExercisePayload>({ ...EMPTY_EXERCISE_FORM });
   const [editingExerciseId, setEditingExerciseId] = useState<string | null>(null);
   const [exerciseDrawerOpen, setExerciseDrawerOpen] = useState(false);
+  const [previewExercise, setPreviewExercise] = useState<Exercise | null>(null);
 
   const [clientQuery, setClientQuery] = useState("");
   const [clients, setClients] = useState<ClientSummary[]>([]);
+  const [clientSearchBusy, setClientSearchBusy] = useState(false);
   const [selectedClient, setSelectedClient] = useState<ClientSummary | null>(null);
   const [selectedWorkoutId, setSelectedWorkoutId] = useState("");
   const [startsOn, setStartsOn] = useState("");
@@ -242,6 +245,28 @@ export default function CoachesPage() {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    const query = clientQuery.trim();
+    if (!session || query.length < 2) return;
+    let active = true;
+    const timer = window.setTimeout(() => {
+      void searchClients(session.accessToken, query, "ACTIVE")
+        .then((matches) => {
+          if (active) setClients(matches);
+        })
+        .catch((exception) => {
+          if (active) setError(errorMessage(exception));
+        })
+        .finally(() => {
+          if (active) setClientSearchBusy(false);
+        });
+    }, 250);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [clientQuery, session]);
 
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId);
   const filteredExercises = useMemo(() => {
@@ -482,16 +507,6 @@ export default function CoachesPage() {
     }
   }
 
-  async function findClients() {
-    if (!session) return;
-    clearFeedback();
-    try {
-      setClients(await searchClients(session.accessToken, clientQuery, "ACTIVE"));
-    } catch (exception) {
-      setError(errorMessage(exception));
-    }
-  }
-
   async function findMetricClients() {
     if (!session) return;
     clearFeedback();
@@ -664,6 +679,7 @@ export default function CoachesPage() {
       setCoachId(detail.workout.coachId ?? "");
       setSummary(version?.summary ?? "");
       setSessions(content.sessions ?? content.days ?? [emptySession(0)]);
+      setBuilderStep(1);
       setTab("builder");
       setMessage(`Editando “${detail.workout.title}”.`);
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -679,6 +695,7 @@ export default function CoachesPage() {
     setTitle("");
     setGoal("");
     setSummary("");
+    setBuilderStep(1);
     setSessions([emptySession(0)]);
   }
 
@@ -777,7 +794,28 @@ export default function CoachesPage() {
 
         {tab === "builder" ? (
           <form className="workout-builder" onSubmit={saveWorkout}>
-            <section className="workout-builder-overview">
+            <nav aria-label="Pasos para crear la rutina" className="workout-builder-steps">
+              {([
+                [1, "Datos generales"],
+                [2, "Días y ejercicios"],
+                [3, "Revisar y guardar"],
+              ] as const).map(([step, label]) => (
+                <button
+                  aria-current={builderStep === step ? "step" : undefined}
+                  className={builderStep === step ? "active" : ""}
+                  key={step}
+                  onClick={() => setBuilderStep(step)}
+                  type="button"
+                >
+                  <span>{step}</span>
+                  {label}
+                </button>
+              ))}
+            </nav>
+
+            {builderStep === 1 ? (
+              <>
+                <section className="workout-builder-overview">
               <div className="workout-section-heading">
                 <p className="text-xs font-semibold uppercase tracking-wider text-[#6b7d72]">Plantilla</p>
                 <h2 className="text-xl font-semibold">
@@ -829,9 +867,27 @@ export default function CoachesPage() {
                   value={summary}
                 />
               </Field>
-            </section>
+                </section>
+                <div className="workout-builder-actions">
+                  <span className="text-sm text-[#637268]">Paso 1 de 3 · Define únicamente la información que aplica a toda la rutina.</span>
+                  <button
+                    className="rounded-lg bg-[#173c2a] px-5 py-2 font-semibold text-white"
+                    onClick={() => setBuilderStep(2)}
+                    type="button"
+                  >
+                    Continuar a días y ejercicios
+                  </button>
+                </div>
+              </>
+            ) : null}
 
-            {sessions.map((day, sessionIndex) => (
+            {builderStep === 2 ? (
+              <>
+                <section className="workout-builder-guidance">
+                  <strong>Organiza el entrenamiento por días</strong>
+                  <span>Cada día contiene bloques —por ejemplo calentamiento y trabajo principal— y dentro de ellos agregas los ejercicios.</span>
+                </section>
+                {sessions.map((day, sessionIndex) => (
               <section className="workout-day-card" key={sessionIndex}>
                 <div className="workout-day-header">
                   <div className="grid flex-1 gap-3 md:grid-cols-2">
@@ -985,49 +1041,127 @@ export default function CoachesPage() {
                   </button>
                 </div>
               </section>
-            ))}
+                ))}
 
-            <div className="workout-builder-actions">
-              <button
-                className="rounded-lg border border-[#9eb2a5] bg-white px-4 py-2 font-semibold"
-                onClick={() => setSessions((items) => [...items, emptySession(items.length)])}
-                type="button"
-              >
-                + Agregar día
-              </button>
-              <div className="flex flex-wrap gap-2">
-                {editingWorkoutId ? (
+                <div className="workout-builder-actions">
                   <button
-                    className="rounded-lg border border-[#9eb2a5] bg-white px-5 py-2 font-semibold"
-                    onClick={resetWorkoutForm}
+                    className="rounded-lg border border-[#9eb2a5] bg-white px-4 py-2 font-semibold"
+                    onClick={() => setSessions((items) => [...items, emptySession(items.length)])}
                     type="button"
                   >
-                    Cancelar edición
+                    + Agregar día
                   </button>
-                ) : null}
-                <button
-                  className="rounded-lg border border-[#9eb2a5] bg-white px-5 py-2 font-semibold disabled:opacity-60"
-                  disabled={saving}
-                  type="submit"
-                  value="draft"
-                >
-                  Guardar borrador
-                </button>
-                <button
-                  className="rounded-lg bg-[#173c2a] px-5 py-2 font-semibold text-white disabled:opacity-60"
-                  disabled={saving}
-                  type="submit"
-                  value="publish"
-                >
-                  {saving ? "Guardando…" : "Publicar rutina"}
-                </button>
-              </div>
-            </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      className="rounded-lg border border-[#9eb2a5] bg-white px-5 py-2 font-semibold"
+                      onClick={() => setBuilderStep(1)}
+                      type="button"
+                    >
+                      Volver a datos generales
+                    </button>
+                    <button
+                      className="rounded-lg bg-[#173c2a] px-5 py-2 font-semibold text-white"
+                      onClick={() => {
+                        const validation = validateWorkout(title, sessions);
+                        if (validation) {
+                          setError(validation);
+                          return;
+                        }
+                        clearFeedback();
+                        setBuilderStep(3);
+                      }}
+                      type="button"
+                    >
+                      Revisar rutina
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : null}
+
+            {builderStep === 3 ? (
+              <>
+                <section className="workout-review-card">
+                  <div className="workout-section-heading">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-[#6b7d72]">Resumen</p>
+                    <h2 className="text-xl font-semibold">{title || "Rutina sin título"}</h2>
+                    <span>Confirma la estructura antes de guardar o publicar.</span>
+                  </div>
+                  <div className="workout-review-metrics">
+                    <p><strong>{sessions.length}</strong><span>{sessions.length === 1 ? "día" : "días"}</span></p>
+                    <p>
+                      <strong>{sessions.reduce((total, day) => total + day.blocks.length, 0)}</strong>
+                      <span>bloques</span>
+                    </p>
+                    <p>
+                      <strong>{sessions.reduce(
+                        (total, day) => total + day.blocks.reduce(
+                          (blockTotal, block) => blockTotal + block.exercises.length,
+                          0,
+                        ),
+                        0,
+                      )}</strong>
+                      <span>ejercicios</span>
+                    </p>
+                  </div>
+                  <div className="workout-review-days">
+                    {sessions.map((day, index) => (
+                      <article key={index}>
+                        <strong>{day.name || `Día ${index + 1}`}</strong>
+                        <span>
+                          {day.focus || "Sin enfoque específico"} · {day.blocks.length} bloque{day.blocks.length === 1 ? "" : "s"} ·{" "}
+                          {day.blocks.reduce((total, block) => total + block.exercises.length, 0)} ejercicios
+                        </span>
+                      </article>
+                    ))}
+                  </div>
+                </section>
+                <div className="workout-builder-actions">
+                  <button
+                    className="rounded-lg border border-[#9eb2a5] bg-white px-5 py-2 font-semibold"
+                    onClick={() => setBuilderStep(2)}
+                    type="button"
+                  >
+                    Volver a editar días
+                  </button>
+                  <div className="flex flex-wrap gap-2">
+                    {editingWorkoutId ? (
+                      <button
+                        className="rounded-lg border border-[#9eb2a5] bg-white px-5 py-2 font-semibold"
+                        onClick={resetWorkoutForm}
+                        type="button"
+                      >
+                        Cancelar edición
+                      </button>
+                    ) : null}
+                    <button
+                      className="rounded-lg border border-[#9eb2a5] bg-white px-5 py-2 font-semibold disabled:opacity-60"
+                      disabled={saving}
+                      type="submit"
+                      value="draft"
+                    >
+                      Guardar borrador
+                    </button>
+                    <button
+                      className="rounded-lg bg-[#173c2a] px-5 py-2 font-semibold text-white disabled:opacity-60"
+                      disabled={saving}
+                      type="submit"
+                      value="publish"
+                    >
+                      {saving ? "Guardando…" : "Publicar rutina"}
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : null}
 
             {workouts.length ? (
-              <section className="rounded-xl border border-[#d9e2dc] bg-white p-5">
-                <h2 className="text-xl font-semibold">Rutinas disponibles</h2>
-                <div className="mt-3 grid gap-2 md:grid-cols-2">
+              <details className="workout-library">
+                <summary>
+                  <span>Rutinas disponibles</span>
+                  <small>{workouts.length} guardada{workouts.length === 1 ? "" : "s"} · abrir para editar o duplicar</small>
+                </summary>
+                <div className="grid gap-2 md:grid-cols-2">
                   {workouts.map((workout) => (
                     <article
                       className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#e0e7e2] p-3"
@@ -1055,7 +1189,7 @@ export default function CoachesPage() {
                     </article>
                   ))}
                 </div>
-              </section>
+              </details>
             ) : null}
           </form>
         ) : null}
@@ -1096,10 +1230,27 @@ export default function CoachesPage() {
                       <p className="mt-1 text-xs text-[#637268]">
                         {exercise.primaryMuscleGroup || "General"} · {exercise.equipment || "Sin equipo"}
                       </p>
-                      {exercise.instructions ? (
-                        <p className="exercise-catalog-description" title={exercise.instructions}>{exercise.instructions}</p>
-                      ) : null}
-                      {manageable && exercise.origin !== "SYSTEM" ? (
+                      {(exercise.description || exercise.instructions) ? (
+                        <div className="exercise-catalog-card-actions flex flex-wrap gap-1.5">
+                          {manageable && exercise.origin !== "SYSTEM" ? (
+                            <button className="rounded-md border px-2 py-1 text-xs font-semibold" onClick={() => editExercise(exercise)} type="button">
+                              Editar detalles
+                            </button>
+                          ) : null}
+                          <button
+                            className="rounded-md border px-2 py-1 text-xs font-semibold"
+                            onClick={() => setPreviewExercise(exercise)}
+                            type="button"
+                          >
+                            Ver descripción
+                          </button>
+                          {manageable && exercise.origin !== "SYSTEM" && canManageExerciseCatalog ? (
+                            <button className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700" onClick={() => changeExerciseStatus(exercise, "ARCHIVED")} type="button">
+                              Archivar
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : manageable && exercise.origin !== "SYSTEM" ? (
                         <div className="exercise-catalog-card-actions flex flex-wrap gap-2">
                           <button className="rounded-md border px-2 py-1 text-xs font-semibold" onClick={() => editExercise(exercise)} type="button">
                             Editar detalles
@@ -1123,10 +1274,32 @@ export default function CoachesPage() {
           <section className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
             <form className="rounded-xl border border-[#d9e2dc] bg-white p-5" onSubmit={saveAssignment}>
               <h2 className="text-xl font-semibold">Asignar a un socio</h2>
-              <div className="mt-4 flex gap-2">
-                <input className="app-input" onChange={(event) => setClientQuery(event.target.value)} placeholder="Nombre, correo o teléfono" value={clientQuery} />
-                <button className="rounded-md border px-3 text-sm font-semibold" onClick={findClients} type="button">Buscar</button>
-              </div>
+              <input
+                className="app-input mt-4"
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setClientQuery(value);
+                  setSelectedClient(null);
+                  clearFeedback();
+                  if (value.trim().length < 2) {
+                    setClients([]);
+                    setClientSearchBusy(false);
+                  } else {
+                    setClientSearchBusy(true);
+                  }
+                }}
+                placeholder="Escribe al menos 2 letras del nombre, correo o teléfono"
+                value={clientQuery}
+              />
+              <p className="mt-1 text-xs text-[#637268]">
+                {clientSearchBusy
+                  ? "Buscando socios activos…"
+                  : clientQuery.trim().length < 2
+                    ? "Los resultados aparecerán mientras escribes."
+                    : clients.length
+                      ? `${clients.length} resultado${clients.length === 1 ? "" : "s"}`
+                      : "No se encontraron socios activos."}
+              </p>
               <div className="mt-2 grid gap-2">
                 {clients.slice(0, 6).map((client) => (
                   <button
@@ -1381,6 +1554,32 @@ export default function CoachesPage() {
           onMediaChange={changeExerciseMedia}
           onSubmit={saveExercise}
         />
+        <AppDrawer
+          description="Consulta la guía sin abrir el formulario de edición."
+          onClose={() => setPreviewExercise(null)}
+          open={Boolean(previewExercise)}
+          title={previewExercise?.name ?? "Descripción del ejercicio"}
+        >
+          {previewExercise ? (
+            <div className="exercise-description-preview">
+              <p>
+                <strong>Clasificación</strong>
+                <span>
+                  {previewExercise.primaryMuscleGroup || "General"} · {previewExercise.equipment || "Sin equipo"}
+                </span>
+              </p>
+              {previewExercise.description ? (
+                <p><strong>Descripción</strong><span>{previewExercise.description}</span></p>
+              ) : null}
+              {previewExercise.instructions ? (
+                <p><strong>Cómo realizarlo</strong><span>{previewExercise.instructions}</span></p>
+              ) : null}
+              {previewExercise.warnings ? (
+                <p><strong>Precauciones</strong><span>{previewExercise.warnings}</span></p>
+              ) : null}
+            </div>
+          ) : null}
+        </AppDrawer>
       </div>
     </AppShell>
   );

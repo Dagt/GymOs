@@ -3191,13 +3191,138 @@ button.admin-secondary-link:disabled {
   gap: 1rem;
 }
 
+.workout-builder-steps {
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.workout-builder-steps button {
+  align-items: center;
+  background: color-mix(in srgb, var(--brand-surface) 68%, white);
+  border: 1px solid var(--brand-line);
+  border-radius: 0.75rem;
+  color: var(--brand-muted);
+  display: flex;
+  font-size: 0.78rem;
+  font-weight: 850;
+  gap: 0.5rem;
+  min-height: 2.9rem;
+  padding: 0.55rem 0.7rem;
+  text-align: left;
+}
+
+.workout-builder-steps button > span {
+  align-items: center;
+  background: white;
+  border: 1px solid var(--brand-line);
+  border-radius: 999px;
+  display: inline-flex;
+  flex: 0 0 1.65rem;
+  height: 1.65rem;
+  justify-content: center;
+}
+
+.workout-builder-steps button.active {
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+  color: white;
+}
+
+.workout-builder-steps button.active > span {
+  background: var(--brand-accent);
+  border-color: var(--brand-accent);
+  color: var(--brand-ink);
+}
+
 .workout-builder-overview,
-.workout-day-card {
+.workout-day-card,
+.workout-review-card {
   background: white;
   border: 1px solid var(--brand-line);
   border-radius: 0.85rem;
   box-shadow: 0 8px 24px rgba(32, 54, 42, 0.05);
   padding: 1rem;
+}
+
+.workout-builder-guidance {
+  background: color-mix(in srgb, var(--brand-primary-soft) 52%, white);
+  border: 1px solid var(--brand-primary-border);
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 0.15rem;
+  padding: 0.75rem 0.9rem;
+}
+
+.workout-builder-guidance span {
+  color: var(--brand-muted);
+  font-size: 0.8rem;
+}
+
+.workout-review-metrics {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.workout-review-metrics p {
+  background: var(--brand-surface);
+  border: 1px solid var(--brand-line);
+  border-radius: 0.7rem;
+  display: grid;
+  padding: 0.75rem;
+}
+
+.workout-review-metrics strong {
+  color: var(--brand-primary);
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.workout-review-metrics span,
+.workout-review-days span {
+  color: var(--brand-muted);
+  font-size: 0.75rem;
+}
+
+.workout-review-days {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.8rem;
+}
+
+.workout-review-days article {
+  align-items: center;
+  border: 1px solid var(--brand-line);
+  border-radius: 0.65rem;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  padding: 0.65rem 0.75rem;
+}
+
+.workout-library {
+  background: white;
+  border: 1px solid var(--brand-line);
+  border-radius: 0.8rem;
+  padding: 0.75rem 0.9rem;
+}
+
+.workout-library > summary {
+  cursor: pointer;
+  display: grid;
+  font-weight: 900;
+  gap: 0.1rem;
+}
+
+.workout-library > summary small {
+  color: var(--brand-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.workout-library[open] > summary {
+  margin-bottom: 0.75rem;
 }
 
 .workout-section-heading {
@@ -3461,7 +3586,7 @@ button.admin-secondary-link:disabled {
 .exercise-catalog-list {
   display: grid;
   gap: 0.65rem;
-  grid-auto-rows: 7.5rem;
+  grid-auto-rows: 5.5rem;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-top: 1rem;
   max-height: min(64vh, 43rem);
@@ -3479,21 +3604,11 @@ button.admin-secondary-link:disabled {
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
-  padding: 0.75rem;
+  padding: 0.65rem;
 }
 
 .exercise-catalog-card-actions {
   margin-top: auto;
-}
-
-.exercise-catalog-description {
-  color: var(--brand-ink);
-  font-size: 0.75rem;
-  line-height: 1.4;
-  margin-top: 0.35rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .exercise-catalog-media {
@@ -3503,6 +3618,26 @@ button.admin-secondary-link:disabled {
   font-size: 0.6rem;
   font-weight: 800;
   padding: 0.12rem 0.35rem;
+}
+
+.exercise-description-preview {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.exercise-description-preview p {
+  background: var(--brand-surface);
+  border: 1px solid var(--brand-line);
+  border-radius: 0.65rem;
+  display: grid;
+  gap: 0.25rem;
+  line-height: 1.55;
+  padding: 0.8rem;
+}
+
+.exercise-description-preview span {
+  color: var(--brand-muted);
+  white-space: pre-wrap;
 }
 
 .exercise-form {
@@ -3775,6 +3910,16 @@ button.admin-secondary-link:disabled {
 }
 
 @media (max-width: 640px) {
+  .workout-builder-steps,
+  .workout-review-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .workout-review-days article {
+    align-items: start;
+    display: grid;
+  }
+
   .team-user-actions {
     grid-template-columns: 1fr;
   }
@@ -4248,7 +4393,7 @@ button.admin-secondary-link:disabled {
   }
 
   .exercise-catalog-list {
-    grid-auto-rows: 7.5rem;
+    grid-auto-rows: 5.5rem;
     grid-template-columns: 1fr;
     max-height: 65vh;
   }
