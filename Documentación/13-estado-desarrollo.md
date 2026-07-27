@@ -2,7 +2,7 @@
 
 Estado: FUENTE CANÓNICA / EN PROGRESO
 Corte: 27 de julio de 2026
-Código auditado: `feature/coaches-workouts` en `fbdfa65`.
+Código auditado: `feature/coaches-workouts` en `e718fdf`.
 
 ## 1. Cómo interpretar este documento
 
@@ -32,7 +32,7 @@ Ningún módulo se declara “completo” sólo por el nombre de una rama o comm
 | [Membresías](modulos/08-memberships.md) y [kiosco](modulos/11-selfservice.md) | FUNCIONAL | Alta, renovación, cambio de plan y autoservicio | Revisar semántica de fechas y seguridad de sesión |
 | [Reservas y recursos](modulos/12-bookings.md) | FUNCIONAL | Calendario, disponibilidad, restricciones por plan y recepción | Suite E2E y deuda UX residual |
 | [Inventarios](modulos/13-inventory.md) | ESTABILIZADO | Existencias, transferencias, conteos, valuación y movimientos | Paginación parametrizada y feedback por renglón |
-| [Coaches y rutinas](modulos/14-coaching.md) | ESTABILIZADO | Dueño y gerente limitados a métricas; Coach con constructor guiado, series uniformes o detalladas, catálogo compacto, asignación reactiva y métricas personales; histórico 4–52 semanas, CSV, PDF rediseñado y 12 E2E | `COA-018`, `DB-001` y `OPS-001` |
+| [Coaches y rutinas](modulos/14-coaching.md) | ESTABILIZADO | Dueño y gerente limitados a métricas; Coach con constructor guiado y ejercicio esencial en una fila, detalle excepcional en panel lateral, catálogo compacto, asignación reactiva y métricas personales; histórico 4–52 semanas, CSV, PDF moderno con logo y 12 E2E | `COA-018`, `DB-001` y `OPS-001` |
 | [Wellness/profesionales](modulos/15-wellness.md) | ESTABILIZADO en esta rama | Directorio, servicios, disponibilidad, agenda, citas internas/externas, coordinación y permisos para dueño, gerente y recepción | Cobertura E2E y hardening multi-tenant transversal |
 | [Reportes generales](modulos/18-reporting.md) | PARCIAL | Reportes operativos por dominio | Definiciones KPI y cobertura homogénea |
 | [Producción/piloto](modulos/20-common-operations.md) | PLANIFICADO | Configuración y runbooks base | Observabilidad, backups, seguridad y piloto |
@@ -54,11 +54,13 @@ El módulo permite:
   selectores de grupo muscular y equipo;
 - crear rutinas estructuradas en sesiones, bloques y ejercicios;
 - usar un constructor guiado en tres pasos —datos generales, días/ejercicios y
-  revisión/guardado— con campos avanzados y notas desplegables, resumen previo,
-  biblioteca colapsada y coach propio fijo;
-- prescribir series iguales con un solo número de repeticiones/carga o series
-  detalladas fila por fila; cada serie detallada admite tramos adicionales sin
-  descanso para dropsets;
+  revisión/guardado— con cada ejercicio normal reducido a nombre, series,
+  repeticiones, carga y descanso en una sola fila;
+- prescribir series iguales directamente o abrir una hoja lateral compacta para
+  personalizar repeticiones/carga por serie y tramos sin descanso; al cerrarla,
+  una síntesis sustituye todas las tarjetas y campos detallados;
+- consultar tempo, duración, distancia, agrupación, opcionalidad y notas sólo
+  bajo `Más opciones`, sin perder los datos avanzados existentes;
 - regresar desde la revisión usando los pasos superiores, sin una segunda acción
   redundante junto a guardar y publicar;
 - guardar y editar el borrador vigente sin crear una versión en cada guardado;
@@ -74,9 +76,9 @@ El módulo permite:
   únicos y primeras rutinas, con semanas sin actividad explícitas;
 - buscar y aplicar directamente el filtro de socio en la pantalla de métricas,
   incluyendo reporte, histórico y CSV;
-- exportar CSV y descargar de forma controlada un PDF A4 con identidad del
-  gimnasio, ficha de socio/coach, jerarquía por día y bloque, tabla de series y
-  numeración de páginas;
+- exportar CSV y descargar de forma controlada un PDF A4 moderno, claro y
+  espaciado, con el logo interno del gimnasio resuelto contra un origen CORS
+  autorizado, ficha de socio/coach, jerarquía, series y numeración;
 - cargar y administrar medios de ejercicios;
 - separar alcance propio del coach y alcance global de reportes para
   dueño/gerencia;
@@ -99,8 +101,9 @@ alcance analítico de supervisores en `5dd0e47`, la integración del alta Coach
 en Equipo en `602d37b`, el rediseño UX en `d1d5124` y el catálogo reutilizable
 en `9af72e7`, con compactación y alineación corregidas en `1f69dfa`. Los
 flujos de asignación y construcción se corrigieron en `6bb92c2`; la
-prescripción estructurada y el PDF se cerraron en `fbdfa65`. Los hallazgos
-específicos `COA-001` a `COA-007`, `COA-009` a `COA-017` y `COA-019` a `COA-023`
+prescripción estructurada y el PDF se cerraron en `fbdfa65`, y su compactación,
+composición moderna y carga segura del logo interno en `e718fdf`. Los hallazgos
+específicos `COA-001` a `COA-007`, `COA-009` a `COA-017` y `COA-019` a `COA-024`
 pasaron al
 historial
 resuelto del documento 28.
@@ -113,8 +116,8 @@ Validación ejecutada sobre el árbol saneado:
 - frontend: 33 pruebas, typecheck, lint y build de producción, exitosos;
 - E2E específico de Coaches/Equipo: 12 recorridos Playwright exitosos;
 - cobertura dedicada: propiedad `own/all`, permiso de perfiles, métricas,
-  histórico semanal, perfil multi-sucursal, prescripción detallada, descarga y
-  paginación del PDF y medios;
+  histórico semanal, perfil multi-sucursal, prescripción detallada, descarga,
+  paginación e incrustación real del logo del PDF y medios;
 - prueba PostgreSQL de filtros UUID nulos para biblioteca, resumen, detalle,
   desempeño y tendencia;
 - comprobación de whitespace Git: exitosa.

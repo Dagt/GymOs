@@ -1,7 +1,7 @@
 # 28. Registro vivo de hallazgos y deuda técnica
 
 Estado: VIGENTE / OBLIGATORIO
-Corte: 26 de julio de 2026
+Corte: 27 de julio de 2026
 
 ## 1. Propósito y regla de actualización
 
@@ -71,6 +71,7 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 | COA-021 | Coaches/UX | Constructor dividido en tres pasos con revisión previa y biblioteca colapsada; tarjetas reducidas a 88 px y descripción trasladada a panel bajo demanda. | `6bb92c2`; 32 pruebas frontend, typecheck, lint, build y 10 E2E. |
 | COA-022 | Coaches/constructor | Reemplazada la notación ambigua por modos de series iguales y detalladas; el segundo conserva repeticiones/carga por serie y tramos sin descanso para dropsets. Se retiró la navegación redundante de la revisión. | `fbdfa65`; prueba de helpers y E2E de progresión 20/15/10 con tramo descendente. |
 | COA-023 | Coaches/PDF | Reparada la descarga temporal y rediseñado el PDF con ficha, jerarquía visual, tablas de series, encabezado/pie y paginación consistente. | `fbdfa65`; pruebas PDFBox de una y varias páginas, render Poppler y E2E de descarga. |
+| COA-024 | Coaches/constructor y PDF | La captura normal de un ejercicio se redujo a una sola fila; la personalización por serie y los campos técnicos se trasladaron a un panel lateral progresivo sin cambiar el JSON. El PDF adoptó una composición más ligera y ahora incrusta logos `/tenants/...` sólo desde un origen CORS autorizado, conservando validación SSRF para URL externas y fallback. | `e718fdf`; 190 pruebas backend, 33 frontend, typecheck/lint/build, 12 E2E, prueba de imagen PDFBox y render visual Poppler con logo real. |
 | WEL-001 | Wellness/ramas | Reaplicada la versión cerrada de `feature/wellness-services` sobre el árbol actual, con agenda, citas, permisos, navegación y migraciones renumeradas/idempotentes. | `922c0ce`, `4eac4d5`; suite backend PostgreSQL, `WellnessServiceTests`, pruebas de navegación y build frontend. |
 | GEN-003 | General/documentación | Estado, deuda, ramas y fichas modulares consolidados; se retiraron fuentes transitorias paralelas. | Documentos 13, 28, 29 y `modulos/` vigentes al corte. |
 | BR-C01 | Gestión de ramas | Wellness retirado del árbol final de Coaches. | Revert explícito de `4a7a7d1`. |

@@ -21,8 +21,12 @@ All notable changes to GymOS will be documented in this file.
   descriptions to an on-demand preview.
 - Add explicit uniform and detailed set prescriptions, including no-rest
   segments for pyramids, progressions and drop sets.
+- Keep the everyday exercise prescription in one compact row and move
+  per-set variations plus technical options into an on-demand side panel.
 - Repair assignment PDF downloads and replace the plain export with a branded,
   paginated layout containing workout metadata and structured set tables.
+- Relax the workout PDF visual hierarchy and safely embed tenant logos stored
+  under the frontend's internal `/tenants/` path.
 - Harden production readiness configuration.
 - Add operational runbooks for deployment, backup, restore, rollback, incidents and maintenance.
 - Restrict demo seed to the local Spring profile.

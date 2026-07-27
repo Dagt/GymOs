@@ -2,7 +2,7 @@
 
 Estado: `ESTABILIZADO`
 Rama de cierre: `feature/coaches-workouts`
-Código verificado: `fbdfa65`
+Código verificado: `e718fdf`
 Corte: 27 de julio de 2026
 
 ## Propósito y alcance V1
@@ -91,13 +91,18 @@ La consulta remota por el socio pertenece a una aplicación futura.
 - biblioteca de rutinas propias o globales según permiso;
 - sesiones y bloques múltiples reordenables con controles accesibles;
 - ejercicios libres o seleccionados del catálogo;
-- modo `Series iguales`: número de series, repeticiones por serie y una carga
-  común;
-- modo `Series detalladas`: repeticiones y carga por serie, con tramos
-  adicionales sin descanso dentro de la misma serie para dropsets;
-- descanso, tempo, duración, distancia, agrupación, opcionalidad, notas y una
-  indicación complementaria libre;
-- datos esenciales visibles por ejercicio y campos avanzados desplegables;
+- cada ejercicio normal ocupa una sola fila esencial: nombre, series,
+  repeticiones, carga y descanso;
+- `Personalizar series` abre una hoja lateral compacta con repeticiones y carga
+  por serie; conserva tramos adicionales sin descanso para pirámides,
+  progresiones y dropsets sin llenar la página de tarjetas;
+- al cerrar el panel, la tarjeta muestra una síntesis como
+  `20 @ 20 kg → 15 @ 25 kg → 10 @ 30 kg`;
+- tempo, duración, distancia, agrupación, opcionalidad, notas e indicación
+  complementaria permanecen disponibles, pero bajo `Más opciones` y un segundo
+  nivel desplegable;
+- el rediseño no cambia `content_json`: las rutinas uniformes y los `setPlan`
+  detallados anteriores siguen siendo editables e imprimibles;
 - flujo en tres pasos: datos generales, días/ejercicios y revisión/guardado;
 - notas de sesión y bloque colapsables, resumen de días/bloques/ejercicios,
   biblioteca de rutinas colapsada y barra contextual de navegación/guardado;
@@ -126,10 +131,15 @@ La consulta remota por el socio pertenece a una aplicación futura.
 - notas privadas separadas de indicaciones imprimibles;
 - descarga PDF mediante un enlace temporal insertado en el documento, con
   validación de respuesta vacía, estado visible y mensaje de éxito/error;
-- PDF A4 reproducible desde la versión asignada, con encabezado de marca,
-  logotipo seguro o inicial, ficha de socio/coach/objetivo/vigencia, indicaciones,
-  jerarquía de días y bloques, tablas de series uniformes o detalladas, pie,
-  numeración y saltos de página.
+- PDF A4 reproducible desde la versión asignada, con composición clara y
+  moderna, encabezado liviano, ficha única de socio/coach/objetivo/vigencia,
+  indicaciones, días suaves, bloques, tablas de series, pie, numeración y saltos;
+- el logotipo relativo almacenado por la configuración (`/tenants/...`) se
+  resuelve únicamente contra el origen del frontend autorizado en CORS; las URL
+  externas siguen limitadas a HTTPS público y se conserva la inicial como
+  fallback;
+- el logotipo mantiene su proporción dentro del encabezado y cuenta con prueba
+  automatizada de incrustación de una imagen real.
 
 ### Métricas
 
@@ -182,19 +192,21 @@ La consulta remota por el socio pertenece a una aplicación futura.
   métricas para dueño y gerente sin superficies operativas, alta integral de
   Coach, identidad fija en el constructor, métricas personales y alineación
   visual de la tabla de Equipo, búsqueda reactiva de socio, asignación de una
-  rutina `PUBLISHED`, prescripción progresiva/dropset y descarga real del PDF;
+  rutina `PUBLISHED`, prescripción progresiva/dropset en panel lateral y
+  descarga real del PDF;
 - pruebas dedicadas de propiedad, permisos HTTP, comparación de periodos,
   series semanales, perfiles agregados, sincronización de sucursales, PDF corto
   y multipágina y ciclo de medios;
-- verificación visual del PDF renderizado con Poppler en una y cuatro páginas,
-  sin recortes, superposiciones ni pérdida de encabezado o pie;
+- verificación visual del PDF moderno renderizado con Poppler, incluido un
+  documento con imagen real, sin recortes, superposiciones ni pérdida de
+  encabezado o pie;
 - `git diff --check`, exitoso.
 
 Los antiguos `COA-001` a `COA-007` y `COA-009` quedaron resueltos en
 `84a5fd3`; `COA-010` y `COA-011` se cerraron en `8162814`, `COA-012` en
 `0066c0b`, `COA-013` en `3933aa5`, `COA-014` en `5dd0e47`, `COA-015` en
 `602d37b`, `COA-016` en `d1d5124`, `COA-017` en `9af72e7` y `COA-019` a
-`COA-023` en los cortes posteriores. Todos se conservan en la sección de
+`COA-024` en los cortes posteriores. Todos se conservan en la sección de
 cerradas del documento 28. `COA-018` permanece como deuda específica de
 limpieza durable de medios; los riesgos transversales de despliegue, migración
 PostgreSQL real y observabilidad siguen como `DB-001` y `OPS-001`.

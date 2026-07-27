@@ -34,6 +34,7 @@ La pertenencia a `main` se determinó por ancestros de Git, no por nombres. Una 
 | 26 jul | Estabilización `4eac4d5`: confirmación interna/externa, hooks, migración idempotente y navegación probada de Wellness |
 | 26 jul | Corrección `6bb92c2`: asignación `PUBLISHED`, búsqueda reactiva, constructor en tres pasos y tarjetas de ejercicios de 88 px |
 | 27 jul | Mejora `fbdfa65`: series uniformes/detalladas con dropsets, descarga PDF reparada y documento A4 rediseñado/verificado |
+| 27 jul | Refinamiento `e718fdf`: ejercicio esencial en una fila, detalle por serie en panel lateral y PDF ligero con carga segura del logo interno |
 
 ## 3. Inventario de ramas remotas
 
@@ -41,7 +42,7 @@ Ya contenidas en `main`, sin commits exclusivos: `backup/system-updated-2026-07-
 
 | Rama activa/divergente | Situación | Acción |
 |---|---|---|
-| `feature/coaches-workouts` | Coaches V1 estabilizado hasta `fbdfa65`; la versión cerrada de Wellness fue reaplicada y validada en `922c0ce`/`4eac4d5`. | Publicar la documentación actualizada y abrir PR hacia `main`. |
+| `feature/coaches-workouts` | Coaches V1 estabilizado hasta `e718fdf`; la versión cerrada de Wellness fue reaplicada y validada en `922c0ce`/`4eac4d5`. | Publicar la documentación actualizada y abrir PR hacia `main`. |
 | `feature/wellness-services` | Su commit funcional `4a7a7d1` ya fue auditado y reaplicado sobre el árbol actual; la rama remota conserva historia divergente. | Mantener como referencia; no fusionar de nuevo. |
 | `feature/code-simplification-rebasion-and-refactor` | Un commit exclusivo y seis de main ausentes. | Auditar commit y rebase. |
 | `feature/catalog-inventory-enhancement-plan` | Historia fuertemente divergente. | No fusionar directamente; extraer cambios útiles. |
