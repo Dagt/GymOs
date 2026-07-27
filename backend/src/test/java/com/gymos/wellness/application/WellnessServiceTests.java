@@ -58,7 +58,7 @@ class WellnessServiceTests {
 	void createProfessional_createsRecordWithOfficeLocation() {
 		UUID professionalId = UUID.randomUUID();
 		when(wellnessRepository.createProfessional(eq(orgId), eq(branchId), eq(userId), any())).thenReturn(professionalId);
-		
+
 		ProfessionalRecord record = new ProfessionalRecord(professionalId, "Dra. Ana Lopez", "NUTRITIONIST", "ana@test.com", "5551234", "Bio", "Consultorio 302", "ACTIVE", OffsetDateTime.now(), OffsetDateTime.now());
 		when(wellnessRepository.professional(orgId, branchId, professionalId)).thenReturn(Optional.of(record));
 

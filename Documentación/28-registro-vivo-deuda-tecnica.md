@@ -33,7 +33,6 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 | INV-001 | P1 | Inventarios | ABIERTA | Transferencias y conteos no tienen paginación parametrizada completa. | Contratos paginados, UI y pruebas de volumen. |
 | INV-002 | P2 | Inventarios | ABIERTA | Falta indicador inequívoco de guardado por renglón en conteos. | Estado guardando/guardado/error accesible por partida. |
 | COA-018 | P2 | Coaches/multimedia | ABIERTA | El contrato heredado permite recibir `mediaUrl` aunque la UI usa carga real; si falla el borrado en MinIO al reemplazar/eliminar, el objeto anterior puede quedar huérfano sin cola de reintento. | Retirar `mediaUrl` de altas/ediciones, usar una referencia interna inequívoca y añadir cleanup durable con prueba de fallo/reintento. |
-| WEL-001 | P1 | Wellness | ABIERTA | Avance de citas aislado en rama divergente, no validado con Coaches. | Revisar y fusionar mediante PR independiente. |
 | AUT-001 | P1 | Automatizaciones | ABIERTA | Faltan locks, reintentos e idempotencia de ejecución. | Ejecución única demostrada y telemetría por tenant. |
 | NOT-001 | P1 | Notificaciones | ABIERTA | Proveedores, preferencias, reintentos y deduplicación no están cerrados. | Entrega trazable e idempotente con privacidad. |
 | REP-001 | P1 | Reportes | ABIERTA | Filtros tenant/sucursal y definiciones KPI no están auditados uniformemente. | Contratos KPI y pruebas negativas/volumen para cada reporte. |
@@ -68,8 +67,12 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 | COA-016 | Identidad/Coaches/UX | Rediseñados Equipo, constructor y catálogo con jerarquía compacta, taxonomía guiada e identidad fija; métricas del Coach reducidas a su contexto personal. | `d1d5124`; 31 pruebas frontend, typecheck, lint, build, revisión visual responsiva y 8 E2E. |
 | COA-017 | Coaches/catálogo | Añadidos equipos personalizados reutilizables por organización, endpoint no paginado de opciones, scroll interno, tarjetas uniformes y descripciones acotadas. | `9af72e7`; prueba PostgreSQL de opciones, servicio, 31 pruebas frontend, build y 9 E2E. |
 | COA-019 | Coaches/catálogo/UX | Corregida la altura excesiva de tarjetas SYSTEM y propias; la descripción queda en una línea sin expandir la fila y el alta de equipo ya no deforma el selector muscular. | `1f69dfa`; typecheck, lint, 31 pruebas frontend, build y 9 E2E con medición de altura y alineación. |
+| COA-020 | Coaches/asignaciones | Alineado el contrato de publicación y asignación: `PUBLISHED` es asignable, `ACTIVE` queda como compatibilidad heredada y los listados de rutinas publicadas exponen su última versión publicada, no un borrador posterior. La búsqueda de socio ahora es reactiva. | `6bb92c2`; `CoachingServiceSecurityTests`, suite PostgreSQL y E2E de búsqueda/asignación. |
+| COA-021 | Coaches/UX | Constructor dividido en tres pasos con revisión previa y biblioteca colapsada; tarjetas reducidas a 88 px y descripción trasladada a panel bajo demanda. | `6bb92c2`; 32 pruebas frontend, typecheck, lint, build y 10 E2E. |
+| WEL-001 | Wellness/ramas | Reaplicada la versión cerrada de `feature/wellness-services` sobre el árbol actual, con agenda, citas, permisos, navegación y migraciones renumeradas/idempotentes. | `922c0ce`, `4eac4d5`; suite backend PostgreSQL, `WellnessServiceTests`, pruebas de navegación y build frontend. |
 | GEN-003 | General/documentación | Estado, deuda, ramas y fichas modulares consolidados; se retiraron fuentes transitorias paralelas. | Documentos 13, 28, 29 y `modulos/` vigentes al corte. |
 | BR-C01 | Gestión de ramas | Wellness retirado del árbol final de Coaches. | Revert explícito de `4a7a7d1`. |
+| BR-C02 | Gestión de ramas | El retiro anterior de Wellness fue auditado y revertido funcionalmente sin fusionar documentación residual ni sobrescribir Coaches. | Reaplicación `922c0ce`, estabilización `4eac4d5` y migraciones V50/V51. |
 
 ## 4. Historia
 

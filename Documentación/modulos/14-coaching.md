@@ -56,8 +56,9 @@ La consulta remota por el socio pertenece a una aplicación futura.
   identificación para no desplazar el selector de grupo muscular;
 - identificación y ejecución visibles primero; detalles técnicos, medios y
   nombres alternativos se administran de forma progresiva;
-- catálogo con scroll interno, cuadrícula responsiva, tarjetas compactas de
-  altura fija y descripción elidida a una línea;
+- catálogo con scroll interno, cuadrícula responsiva y tarjetas de 88 px;
+- la descripción e instrucciones no se imprimen dentro de la tarjeta: `Ver
+  descripción` abre un panel de consulta que no altera la cuadrícula;
 - carga, lectura, reemplazo y eliminación de JPG, PNG, WebP, GIF o MP4 de hasta
   8 MB mediante almacenamiento de objetos;
 - intento de limpieza del archivo sustituido y compensación si falla la
@@ -93,8 +94,9 @@ La consulta remota por el socio pertenece a una aplicación futura.
 - series, repeticiones, carga, descanso, tempo, duración, distancia,
   agrupación, opcionalidad, notas y prescripción libre;
 - datos esenciales visibles por ejercicio y campos avanzados desplegables;
-- notas de sesión y bloque colapsables y barra persistente de guardado, para
-  reducir la longitud de la página sin eliminar información;
+- flujo en tres pasos: datos generales, días/ejercicios y revisión/guardado;
+- notas de sesión y bloque colapsables, resumen de días/bloques/ejercicios,
+  biblioteca de rutinas colapsada y barra contextual de navegación/guardado;
 - identidad fija del coach conectado en lugar de un selector deshabilitado;
   sólo quien tiene alcance `workout.manage.all` conserva selección de coach;
 - guardado del borrador vigente sin producir versiones artificiales;
@@ -105,6 +107,12 @@ La consulta remota por el socio pertenece a una aplicación futura.
 ### Asignaciones e impresión
 
 - sólo se asignan versiones publicadas a socios activos;
+- la búsqueda del socio se ejecuta automáticamente 250 ms después de escribir
+  dos caracteres; no requiere presionar un botón;
+- `PUBLISHED` es el estado canónico producido por publicar y aceptado al
+  asignar; `ACTIVE` se conserva sólo para plantillas heredadas;
+- para rutinas con un borrador posterior, el listado selecciona la versión
+  publicada más reciente y nunca propone el borrador para una asignación;
 - `Idempotency-Key` evita duplicados y detecta reutilización con otro payload;
 - estados activa, completada, cancelada y reemplazada;
 - cancelación con motivo obligatorio y auditoría;
@@ -158,13 +166,14 @@ La consulta remota por el socio pertenece a una aplicación futura.
 ## Evidencia de cierre
 
 - backend: `gradlew clean test --no-daemon`, exitoso;
-- frontend: 31 pruebas, typecheck, lint y build de producción, exitosos;
-- E2E Playwright: 9 recorridos exitosos para constructor/publicación,
+- frontend: 32 pruebas, typecheck, lint y build de producción, exitosos;
+- E2E Playwright: 10 recorridos exitosos para constructor/publicación,
   catálogo/aliases/medios, cancelación/reemplazo/métricas históricas y
   administración multi-sucursal del coach, incluyendo acceso directo a
   métricas para dueño y gerente sin superficies operativas, alta integral de
   Coach, identidad fija en el constructor, métricas personales y alineación
-  visual de la tabla de Equipo;
+  visual de la tabla de Equipo, búsqueda reactiva de socio y asignación de una
+  rutina `PUBLISHED`;
 - pruebas dedicadas de propiedad, permisos HTTP, comparación de periodos,
   series semanales, perfiles agregados, sincronización de sucursales, PDF y
   ciclo de medios;

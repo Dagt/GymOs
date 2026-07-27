@@ -13,6 +13,12 @@ All notable changes to GymOS will be documented in this file.
   compact fixed-height exercise cards whose descriptions do not stretch rows.
 - Keep muscle-group and equipment selectors aligned by rendering new-equipment
   details outside the identification grid.
+- Restore the completed Wellness directory, agenda, appointments and role
+  access from `feature/wellness-services` on top of the current platform.
+- Add live member lookup for workout assignments and align assignment eligibility
+  with the `PUBLISHED` status produced by the publishing workflow.
+- Rework the workout builder into three progressive steps and move exercise
+  descriptions to an on-demand preview.
 - Harden production readiness configuration.
 - Add operational runbooks for deployment, backup, restore, rollback, incidents and maintenance.
 - Restrict demo seed to the local Spring profile.

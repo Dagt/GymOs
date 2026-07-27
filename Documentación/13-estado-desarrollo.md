@@ -33,8 +33,8 @@ Ningún módulo se declara “completo” sólo por el nombre de una rama o comm
 | [Membresías](modulos/08-memberships.md) y [kiosco](modulos/11-selfservice.md) | FUNCIONAL | Alta, renovación, cambio de plan y autoservicio | Revisar semántica de fechas y seguridad de sesión |
 | [Reservas y recursos](modulos/12-bookings.md) | FUNCIONAL | Calendario, disponibilidad, restricciones por plan y recepción | Suite E2E y deuda UX residual |
 | [Inventarios](modulos/13-inventory.md) | ESTABILIZADO | Existencias, transferencias, conteos, valuación y movimientos | Paginación parametrizada y feedback por renglón |
-| [Coaches y rutinas](modulos/14-coaching.md) | ESTABILIZADO | Dueño y gerente limitados a métricas; Coach con constructor progresivo, catálogo con equipos reutilizables, scroll y tarjetas uniformes, asignaciones y métricas personales; histórico 4–52 semanas, CSV, PDF y E2E | `COA-018`, `DB-001` y `OPS-001` |
-| [Wellness/profesionales](modulos/15-wellness.md) | PARCIAL en `main` | Base histórica de profesionales, servicios y disponibilidad | Agenda aislada en rama propia |
+| [Coaches y rutinas](modulos/14-coaching.md) | ESTABILIZADO | Dueño y gerente limitados a métricas; Coach con constructor guiado en tres pasos, catálogo compacto, asignación con búsqueda reactiva y métricas personales; histórico 4–52 semanas, CSV, PDF y 10 E2E | `COA-018`, `DB-001` y `OPS-001` |
+| [Wellness/profesionales](modulos/15-wellness.md) | ESTABILIZADO en esta rama | Directorio, servicios, disponibilidad, agenda, citas internas/externas, coordinación y permisos para dueño, gerente y recepción | Cobertura E2E y hardening multi-tenant transversal |
 | [Reportes generales](modulos/18-reporting.md) | PARCIAL | Reportes operativos por dominio | Definiciones KPI y cobertura homogénea |
 | [Producción/piloto](modulos/20-common-operations.md) | PLANIFICADO | Configuración y runbooks base | Observabilidad, backups, seguridad y piloto |
 
@@ -50,16 +50,18 @@ El módulo permite:
 - crear equipos durante el alta de un ejercicio y reutilizarlos desde una lista
   reconstruida para toda la organización;
 - recorrer el catálogo dentro de una superficie con scroll y tarjetas compactas
-  de altura fija; las descripciones se eliden a una línea y no estiran la fila;
+  de 88 px; la descripción se consulta bajo demanda y no ocupa espacio en la fila;
 - crear un equipo desde un bloque independiente que no desplaza ni deforma los
   selectores de grupo muscular y equipo;
 - crear rutinas estructuradas en sesiones, bloques y ejercicios;
-- usar un constructor compacto: datos esenciales visibles, campos avanzados y
-  notas desplegables, acciones de guardado persistentes y coach propio fijo;
+- usar un constructor guiado en tres pasos —datos generales, días/ejercicios y
+  revisión/guardado— con campos avanzados y notas desplegables, resumen previo,
+  biblioteca colapsada y coach propio fijo;
 - guardar y editar el borrador vigente sin crear una versión en cada guardado;
 - publicar versiones inmutables y consultar su historial;
 - duplicar rutinas;
-- asignar una versión publicada a un socio con idempotencia;
+- buscar socios activos automáticamente a partir de dos caracteres y asignar
+  una versión publicada con idempotencia;
 - completar, cancelar o reemplazar asignaciones conservando trazabilidad;
 - exigir motivo de cancelación y mostrar el vínculo de reemplazo;
 - consultar métricas paginadas por periodo, coach y socio, comparadas contra el
@@ -90,7 +92,8 @@ alcance/UX en `0066c0b`, la compatibilidad PostgreSQL real en `3933aa5` y el
 alcance analítico de supervisores en `5dd0e47`, la integración del alta Coach
 en Equipo en `602d37b`, el rediseño UX en `d1d5124` y el catálogo reutilizable
 en `9af72e7`, con compactación y alineación corregidas en `1f69dfa`. Los
-hallazgos específicos `COA-001` a `COA-007`, `COA-009` a `COA-017` y `COA-019`
+flujos de asignación y construcción se corrigieron en `6bb92c2`. Los hallazgos
+específicos `COA-001` a `COA-007`, `COA-009` a `COA-017` y `COA-019` a `COA-021`
 pasaron al
 historial
 resuelto del documento 28.
@@ -100,8 +103,8 @@ resuelto del documento 28.
 Validación ejecutada sobre el árbol saneado:
 
 - backend: `gradlew clean test --no-daemon`, exitoso;
-- frontend: 31 pruebas, typecheck, lint y build de producción, exitosos;
-- E2E específico de Coaches/Equipo: 9 recorridos Playwright exitosos;
+- frontend: 32 pruebas, typecheck, lint y build de producción, exitosos;
+- E2E específico de Coaches/Equipo: 10 recorridos Playwright exitosos;
 - cobertura dedicada: propiedad `own/all`, permiso de perfiles, métricas,
   histórico semanal, perfil multi-sucursal, PDF y medios;
 - prueba PostgreSQL de filtros UUID nulos para biblioteca, resumen, detalle,

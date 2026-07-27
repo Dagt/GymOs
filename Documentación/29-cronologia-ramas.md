@@ -30,6 +30,9 @@ La pertenencia a `main` se determinó por ancestros de Git, no por nombres. Una 
 | 26 jul | Rediseño `d1d5124`: Equipo compacto, constructor progresivo, catálogo guiado y métricas personales del Coach |
 | 26 jul | Catálogo `9af72e7`: equipos reutilizables por organización, scroll interno y tarjetas uniformes |
 | 26 jul | Corrección `1f69dfa`: tarjetas compactas con descripción elidida y alta de equipo desacoplada de la cuadrícula |
+| 26 jul | Restauración `922c0ce`: reaplicación de la versión cerrada de Wellness sobre Coaches con migraciones V50/V51 |
+| 26 jul | Estabilización `4eac4d5`: confirmación interna/externa, hooks, migración idempotente y navegación probada de Wellness |
+| 26 jul | Corrección `6bb92c2`: asignación `PUBLISHED`, búsqueda reactiva, constructor en tres pasos y tarjetas de ejercicios de 88 px |
 
 ## 3. Inventario de ramas remotas
 
@@ -37,14 +40,23 @@ Ya contenidas en `main`, sin commits exclusivos: `backup/system-updated-2026-07-
 
 | Rama activa/divergente | Situación | Acción |
 |---|---|---|
-| `feature/coaches-workouts` | Alcance funcional V1 cerrado en `84a5fd3`, ampliado en `8162814` y corregido/validado hasta `1f69dfa`; Wellness permanece excluido. | Publicar la documentación actualizada y abrir PR hacia `main`. |
-| `feature/wellness-services` | Un commit exclusivo y uno de main ausente. | Rebase y revisión independiente. |
+| `feature/coaches-workouts` | Coaches V1 estabilizado hasta `6bb92c2`; la versión cerrada de Wellness fue reaplicada y validada en `922c0ce`/`4eac4d5`. | Publicar la documentación actualizada y abrir PR hacia `main`. |
+| `feature/wellness-services` | Su commit funcional `4a7a7d1` ya fue auditado y reaplicado sobre el árbol actual; la rama remota conserva historia divergente. | Mantener como referencia; no fusionar de nuevo. |
 | `feature/code-simplification-rebasion-and-refactor` | Un commit exclusivo y seis de main ausentes. | Auditar commit y rebase. |
 | `feature/catalog-inventory-enhancement-plan` | Historia fuertemente divergente. | No fusionar directamente; extraer cambios útiles. |
 
 ## 4. Incidente de alcance del 26 de julio
 
-Coaches incorporó `4a7a7d1` de Wellness mediante `f3cdf74` y después `907c530`. La sanitización conserva el historial, pero revierte el contenido Wellness explícitamente. Los hunks útiles de Coaches se corrigen y prueban. Así se evita reescribir destructivamente la rama.
+Coaches incorporó `4a7a7d1` de Wellness mediante `f3cdf74` y después `907c530`.
+La sanitización lo retiró explícitamente con `08ec1a8`, aunque Coaches había
+nacido después de ese cierre. La revisión posterior determinó que el retiro
+también eliminó agenda, citas, permisos y navegación ya terminados.
+
+La versión funcional se reaplicó en `922c0ce`, sin recuperar los documentos
+residuales retirados durante la sanitización. Sus migraciones se renumeraron a
+V50/V51 para coexistir con V45–V49 de Coaches y se estabilizó contra el árbol
+actual en `4eac4d5`. La rama remota de Wellness queda como referencia histórica,
+no como una fusión pendiente.
 
 ## 5. Regla futura
 
