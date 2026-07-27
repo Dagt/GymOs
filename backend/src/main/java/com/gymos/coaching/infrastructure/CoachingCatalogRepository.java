@@ -436,7 +436,8 @@ public class CoachingCatalogRepository {
 	) {
 		return jdbc.sql("""
 				SELECT a.id, a.assigned_on, a.starts_on, a.ends_on, a.printable_notes,
-				       w.title, w.goal, w.level, v.version_number, v.content_json::text AS content_json,
+				       w.title, w.goal, w.level, v.version_number, v.summary,
+				       v.content_json::text AS content_json,
 				       trim(concat(p.first_name, ' ', p.last_name, ' ', coalesce(p.maternal_last_name, ''))) AS client_name,
 				       coalesce(c.display_name, 'Coach') AS coach_name,
 				       coalesce(o.brand_name, o.trade_name) AS gym_name,
@@ -462,7 +463,8 @@ public class CoachingCatalogRepository {
 						rs.getObject("id", UUID.class), rs.getObject("assigned_on", LocalDate.class),
 						rs.getObject("starts_on", LocalDate.class), rs.getObject("ends_on", LocalDate.class),
 						rs.getString("printable_notes"), rs.getString("title"), rs.getString("goal"),
-						rs.getString("level"), rs.getInt("version_number"), rs.getString("content_json"),
+						rs.getString("level"), rs.getInt("version_number"), rs.getString("summary"),
+						rs.getString("content_json"),
 						rs.getString("client_name"), rs.getString("coach_name"), rs.getString("gym_name"),
 						rs.getString("logo_url"), rs.getString("primary_color"),
 						rs.getString("branch_name"), rs.getString("contact_phone")
@@ -513,7 +515,7 @@ public class CoachingCatalogRepository {
 	) {}
 	public record AssignmentPdfData(
 			UUID id, LocalDate assignedOn, LocalDate startsOn, LocalDate endsOn, String printableNotes,
-			String title, String goal, String level, int versionNumber, String contentJson,
+			String title, String goal, String level, int versionNumber, String summary, String contentJson,
 			String clientName, String coachName, String gymName, String logoUrl,
 			String primaryColor, String branchName, String contactPhone
 	) {}

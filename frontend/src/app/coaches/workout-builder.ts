@@ -1,6 +1,8 @@
 import type {
   WorkoutBlockDraft,
   WorkoutExerciseDraft,
+  WorkoutSetDraft,
+  WorkoutSetSegmentDraft,
   WorkoutSessionDraft,
 } from "@/lib/api";
 
@@ -10,6 +12,29 @@ export function emptyExercise(): WorkoutExerciseDraft {
     prescription: "",
     optional: false,
   };
+}
+
+export function emptySetSegment(
+  reps = "",
+  load = "",
+): WorkoutSetSegmentDraft {
+  return { reps, load };
+}
+
+export function emptySet(
+  reps = "",
+  load = "",
+): WorkoutSetDraft {
+  return { segments: [emptySetSegment(reps, load)] };
+}
+
+export function detailedSetPlan(exercise: WorkoutExerciseDraft): WorkoutSetDraft[] {
+  if (exercise.setPlan?.length) return exercise.setPlan;
+  const total = Math.max(1, exercise.sets ?? 3);
+  return Array.from(
+    { length: total },
+    () => emptySet(exercise.reps ?? "", exercise.load ?? ""),
+  );
 }
 
 export function emptyBlock(

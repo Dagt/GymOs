@@ -288,10 +288,15 @@ async function downloadFile(accessToken: string, path: string, filename: string)
   const base = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api/v1";
   const response = await fetch(`${base}${path}`, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (!response.ok) throw new Error(`No fue posible descargar el archivo (${response.status}).`);
-  const url = URL.createObjectURL(await response.blob());
+  const blob = await response.blob();
+  if (!blob.size) throw new Error("El archivo recibido está vacío.");
+  const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
   anchor.click();
-  URL.revokeObjectURL(url);
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }

@@ -3506,10 +3506,155 @@ button.admin-secondary-link:disabled {
   text-transform: uppercase;
 }
 
-.workout-exercise-essential {
+.workout-exercise-identity {
   display: grid;
   gap: 0.65rem;
-  grid-template-columns: minmax(14rem, 1.7fr) repeat(4, minmax(6.25rem, 0.65fr));
+  grid-template-columns: minmax(14rem, 1.7fr) minmax(12rem, 0.7fr);
+}
+
+.workout-prescription {
+  background: color-mix(in srgb, var(--brand-primary-soft) 38%, white);
+  border: 1px solid var(--brand-primary-border);
+  border-radius: 0.7rem;
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.75rem;
+}
+
+.workout-prescription-header {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.workout-prescription-header > span {
+  display: grid;
+  gap: 0.12rem;
+}
+
+.workout-prescription-header strong {
+  color: var(--brand-ink);
+  font-size: 0.86rem;
+}
+
+.workout-prescription-header small,
+.workout-set-card header small {
+  color: var(--brand-muted);
+  font-size: 0.72rem;
+}
+
+.workout-prescription-modes {
+  background: white;
+  border: 1px solid var(--brand-line);
+  border-radius: 0.55rem;
+  display: flex;
+  padding: 0.2rem;
+}
+
+.workout-prescription-modes button {
+  border-radius: 0.4rem;
+  color: var(--brand-muted);
+  font-size: 0.74rem;
+  font-weight: 900;
+  min-height: 2rem;
+  padding: 0.35rem 0.65rem;
+}
+
+.workout-prescription-modes button.active {
+  background: var(--brand-primary);
+  color: white;
+}
+
+.workout-uniform-prescription {
+  display: grid;
+  gap: 0.65rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.workout-set-plan {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.workout-set-card {
+  background: white;
+  border: 1px solid var(--brand-line);
+  border-radius: 0.6rem;
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.65rem;
+}
+
+.workout-set-card > header {
+  align-items: center;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+
+.workout-set-card > header span {
+  display: grid;
+  gap: 0.05rem;
+}
+
+.workout-set-card > header button,
+.workout-set-add-segment {
+  color: var(--brand-primary);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.workout-set-segments {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.workout-set-segment {
+  align-items: end;
+  display: grid;
+  gap: 0.55rem;
+  grid-template-columns: minmax(5rem, 0.36fr) repeat(2, minmax(8rem, 1fr)) 2rem;
+}
+
+.workout-set-segment-label {
+  color: var(--brand-ink);
+  display: grid;
+  font-size: 0.75rem;
+  font-weight: 900;
+  min-height: 2.7rem;
+  place-content: center start;
+}
+
+.workout-set-segment-label small {
+  color: var(--brand-muted);
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
+.workout-set-remove {
+  align-items: center;
+  border: 1px solid #fecaca;
+  border-radius: 0.45rem;
+  color: #b91c1c;
+  display: flex;
+  font-size: 1rem;
+  height: 2.7rem;
+  justify-content: center;
+}
+
+.workout-set-add-segment {
+  justify-self: start;
+}
+
+.workout-set-add {
+  border: 1px dashed var(--brand-primary-border);
+  border-radius: 0.55rem;
+  color: var(--brand-primary);
+  font-size: 0.76rem;
+  font-weight: 900;
+  min-height: 2.5rem;
 }
 
 .workout-advanced-fields {
@@ -4319,12 +4464,17 @@ button.admin-secondary-link:disabled {
     display: block;
   }
 
-  .workout-exercise-essential {
+  .workout-exercise-identity,
+  .workout-uniform-prescription {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .workout-exercise-essential .form-field:first-child {
+  .workout-exercise-identity .form-field:first-child {
     grid-column: 1 / -1;
+  }
+
+  .workout-set-segment {
+    grid-template-columns: minmax(4.5rem, 0.32fr) repeat(2, minmax(7rem, 1fr)) 2rem;
   }
 
   .exercise-catalog-list {
@@ -4371,14 +4521,35 @@ button.admin-secondary-link:disabled {
     padding-right: 3.2rem;
   }
 
-  .workout-exercise-essential,
+  .workout-exercise-identity,
+  .workout-uniform-prescription,
   .workout-advanced-fields > div,
   .exercise-form-grid {
     grid-template-columns: 1fr;
   }
 
-  .workout-exercise-essential .form-field:first-child {
+  .workout-exercise-identity .form-field:first-child {
     grid-column: auto;
+  }
+
+  .workout-prescription-header,
+  .workout-prescription-modes {
+    align-items: stretch;
+    display: grid;
+  }
+
+  .workout-set-segment {
+    align-items: stretch;
+    grid-template-columns: 1fr 2rem;
+  }
+
+  .workout-set-segment-label,
+  .workout-set-segment .form-field {
+    grid-column: 1 / -1;
+  }
+
+  .workout-set-remove {
+    grid-column: 2;
   }
 
   .exercise-catalog-toolbar > div:last-child {

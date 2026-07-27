@@ -162,6 +162,7 @@ export type WorkoutExerciseDraft = {
   exerciseId?: string | null;
   exerciseName: string;
   prescription: string;
+  setPlan?: WorkoutSetDraft[];
   sets?: number | null;
   reps?: string | null;
   load?: string | null;
@@ -172,6 +173,15 @@ export type WorkoutExerciseDraft = {
   notes?: string | null;
   groupKey?: string | null;
   optional?: boolean;
+};
+
+export type WorkoutSetSegmentDraft = {
+  reps: string;
+  load: string;
+};
+
+export type WorkoutSetDraft = {
+  segments: WorkoutSetSegmentDraft[];
 };
 
 export type WorkoutBlockDraft = {

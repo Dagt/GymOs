@@ -42,8 +42,8 @@ test.describe("coaches y rutinas", () => {
     await page.getByLabel("Título").fill("Rutina E2E");
     await page.getByRole("button", { name: "Continuar a días y ejercicios" }).click();
     await page.getByRole("combobox", { name: "Ejercicio", exact: true }).fill("Sentadilla libre");
-    await page.getByLabel("Series").fill("4");
-    await page.getByLabel("Repeticiones").fill("8-10");
+    await page.getByLabel("Número de series").fill("4");
+    await page.getByLabel("Repeticiones por serie").fill("8-10");
     await page.getByRole("button", { name: "+ Agregar bloque" }).click();
     await page.getByRole("combobox", { name: "Ejercicio", exact: true }).nth(1).fill("Peso muerto");
     await page.getByRole("button", { name: "Revisar rutina" }).click();
@@ -59,6 +59,52 @@ test.describe("coaches y rutinas", () => {
       exerciseName: "Sentadilla libre",
       sets: 4,
       reps: "8-10",
+    });
+  });
+
+  test("define series progresivas y un tramo descendente sin notación libre", async ({ page }) => {
+    let createdPayload: Record<string, unknown> | null = null;
+    await bootCoaching(page, async (route, path) => {
+      if (route.request().method() === "POST" && path === "/workouts") {
+        createdPayload = route.request().postDataJSON() as Record<string, unknown>;
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify(workoutDetail(workoutId, "Pirámide E2E", "DRAFT")),
+        });
+        return true;
+      }
+      return false;
+    });
+
+    await page.goto("/coaches");
+    await page.getByLabel("Título").fill("Pirámide E2E");
+    await page.getByRole("button", { name: "Continuar a días y ejercicios" }).click();
+    await page.getByRole("combobox", { name: "Ejercicio", exact: true }).fill("Curl con barra");
+    await page.getByRole("button", { name: "Series detalladas" }).click();
+    await page.getByLabel("Repeticiones de serie 1", { exact: true }).fill("20");
+    await page.getByLabel("Carga de serie 1", { exact: true }).fill("20 kg");
+    await page.getByLabel("Repeticiones de serie 2", { exact: true }).fill("15");
+    await page.getByLabel("Carga de serie 2", { exact: true }).fill("25 kg");
+    await page.getByLabel("Repeticiones de serie 3", { exact: true }).fill("10");
+    await page.getByLabel("Carga de serie 3", { exact: true }).fill("30 kg");
+    await page.getByRole("button", { name: "+ Agregar tramo sin descanso" }).nth(2).click();
+    await page.getByLabel("Repeticiones de serie 3, tramo 2").fill("20");
+    await page.getByLabel("Carga de serie 3, tramo 2").fill("20 kg");
+    await page.getByRole("button", { name: "Revisar rutina" }).click();
+    await expect(page.getByRole("button", { name: "Volver a editar días" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Guardar borrador" }).click();
+
+    const content = JSON.parse(String(createdPayload?.contentJson)) as {
+      sessions: Array<{ blocks: Array<{ exercises: Array<Record<string, unknown>> }> }>;
+    };
+    expect(content.sessions[0].blocks[0].exercises[0]).toMatchObject({
+      exerciseName: "Curl con barra",
+      sets: 3,
+      setPlan: [
+        { segments: [{ reps: "20", load: "20 kg" }] },
+        { segments: [{ reps: "15", load: "25 kg" }] },
+        { segments: [{ reps: "10", load: "30 kg" }, { reps: "20", load: "20 kg" }] },
+      ],
     });
   });
 
@@ -214,6 +260,28 @@ test.describe("coaches y rutinas", () => {
       workoutVersionId: versionId,
     });
     await expect(page.getByText("Rutina asignada a Diego García. El PDF ya está disponible.")).toBeVisible();
+  });
+
+  test("descarga el PDF de una rutina asignada", async ({ page }) => {
+    await bootCoaching(page, async (route, path) => {
+      if (path === `/workout-assignments/${assignmentId}/pdf`) {
+        await route.fulfill({
+          contentType: "application/pdf",
+          headers: { "Content-Disposition": `attachment; filename="rutina-${assignmentId}.pdf"` },
+          body: Buffer.from("%PDF-1.4\n%%EOF"),
+        });
+        return true;
+      }
+      return false;
+    });
+
+    await page.goto("/coaches");
+    await page.getByRole("button", { name: "Asignaciones" }).click();
+    const downloadPromise = page.waitForEvent("download");
+    await page.getByRole("button", { name: "Descargar PDF" }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toBe(`rutina-${assignmentId}.pdf`);
+    await expect(page.getByText("PDF de “Fuerza base” descargado.")).toBeVisible();
   });
 
   test("cancela con motivo y filtra sus métricas históricas por socio", async ({ page }) => {

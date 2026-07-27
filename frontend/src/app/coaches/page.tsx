@@ -42,13 +42,17 @@ import {
   type WeeklyTrendReport,
   type WorkoutBlockDraft,
   type WorkoutExerciseDraft,
+  type WorkoutSetDraft,
   type WorkoutSessionDraft,
   type WorkoutSummary,
 } from "@/lib/api";
 import {
   emptyBlock,
   emptyExercise,
+  emptySet,
+  emptySetSegment,
   emptySession,
+  detailedSetPlan,
   moveItem,
   updateBlock as updateBlockList,
   updateExercise as updateExerciseList,
@@ -1116,14 +1120,7 @@ export default function CoachesPage() {
                     ))}
                   </div>
                 </section>
-                <div className="workout-builder-actions">
-                  <button
-                    className="rounded-lg border border-[#9eb2a5] bg-white px-5 py-2 font-semibold"
-                    onClick={() => setBuilderStep(2)}
-                    type="button"
-                  >
-                    Volver a editar días
-                  </button>
+                <div className="workout-builder-actions justify-end">
                   <div className="flex flex-wrap gap-2">
                     {editingWorkoutId ? (
                       <button
@@ -1918,11 +1915,43 @@ function ExerciseEditor({
   total: number;
 }) {
   const exerciseSummary = exercise.exerciseName.trim() || `Ejercicio ${exerciseIndex + 1}`;
+  const setPlan = exercise.setPlan ?? [];
+  const usesDetailedSets = setPlan.length > 0;
   const prescriptionSummary = [
-    exercise.sets ? `${exercise.sets} series` : "",
-    exercise.reps ? `${exercise.reps} reps` : "",
-    exercise.load ?? "",
+    usesDetailedSets
+      ? `${setPlan.length} ${setPlan.length === 1 ? "serie detallada" : "series detalladas"}`
+      : exercise.sets ? `${exercise.sets} series` : "",
+    usesDetailedSets ? "" : exercise.reps ? `${exercise.reps} reps` : "",
+    usesDetailedSets ? "" : exercise.load ?? "",
   ].filter(Boolean).join(" · ");
+
+  function changeSetPlan(next: WorkoutSetDraft[]) {
+    onChange({
+      setPlan: next,
+      sets: next.length,
+      reps: null,
+      load: null,
+    });
+  }
+
+  function useDetailedSets() {
+    const next = detailedSetPlan(exercise);
+    changeSetPlan(next);
+  }
+
+  function useUniformSets() {
+    const firstSegment = setPlan[0]?.segments[0];
+    onChange({
+      setPlan: undefined,
+      sets: Math.max(1, setPlan.length || exercise.sets || 1),
+      reps: firstSegment?.reps ?? exercise.reps ?? "",
+      load: firstSegment?.load ?? exercise.load ?? "",
+    });
+  }
+
+  function updateSet(setIndex: number, updater: (set: WorkoutSetDraft) => WorkoutSetDraft) {
+    changeSetPlan(setPlan.map((set, index) => index === setIndex ? updater(set) : set));
+  }
 
   return (
     <details className="workout-exercise-card" open={exerciseIndex === 0 || undefined}>
@@ -1945,7 +1974,7 @@ function ExerciseEditor({
             onMove={onMove}
           />
         </div>
-        <div className="workout-exercise-essential">
+        <div className="workout-exercise-identity">
           <Field label="Ejercicio">
             <input
               className="app-input"
@@ -1954,24 +1983,146 @@ function ExerciseEditor({
               value={exercise.exerciseName}
             />
           </Field>
-          <Field label="Series">
-            <input className="app-input" min="1" onChange={(event) => onChange({ sets: numberOrNull(event.target.value) })} type="number" value={exercise.sets ?? ""} />
-          </Field>
-          <Field label="Repeticiones">
-            <input className="app-input" onChange={(event) => onChange({ reps: event.target.value })} placeholder="8-12" value={exercise.reps ?? ""} />
-          </Field>
-          <Field label="Carga">
-            <input className="app-input" onChange={(event) => onChange({ load: event.target.value })} placeholder="20 kg / RPE 8" value={exercise.load ?? ""} />
-          </Field>
-          <Field label="Descanso (segundos)">
+          <Field label="Descanso entre series (segundos)">
             <input className="app-input" min="0" onChange={(event) => onChange({ restSeconds: numberOrNull(event.target.value) })} type="number" value={exercise.restSeconds ?? ""} />
           </Field>
         </div>
+        <section className="workout-prescription">
+          <div className="workout-prescription-header">
+            <span>
+              <strong>Prescripción de series</strong>
+              <small>
+                Usa series iguales cuando todas repiten la misma carga. Elige detalladas para pirámides, progresiones o dropsets.
+              </small>
+            </span>
+            <div aria-label="Tipo de prescripción" className="workout-prescription-modes" role="group">
+              <button
+                aria-pressed={!usesDetailedSets}
+                className={!usesDetailedSets ? "active" : ""}
+                onClick={useUniformSets}
+                type="button"
+              >
+                Series iguales
+              </button>
+              <button
+                aria-pressed={usesDetailedSets}
+                className={usesDetailedSets ? "active" : ""}
+                onClick={useDetailedSets}
+                type="button"
+              >
+                Series detalladas
+              </button>
+            </div>
+          </div>
+          {usesDetailedSets ? (
+            <div className="workout-set-plan">
+              {setPlan.map((set, setIndex) => (
+                <article className="workout-set-card" key={setIndex}>
+                  <header>
+                    <span>
+                      <strong>Serie {setIndex + 1}</strong>
+                      <small>
+                        {set.segments.length === 1
+                          ? "Una ejecución"
+                          : `${set.segments.length} tramos seguidos sin descanso`}
+                      </small>
+                    </span>
+                    {setPlan.length > 1 ? (
+                      <button
+                        aria-label={`Eliminar serie ${setIndex + 1}`}
+                        onClick={() => changeSetPlan(setPlan.filter((_, index) => index !== setIndex))}
+                        type="button"
+                      >
+                        Eliminar
+                      </button>
+                    ) : null}
+                  </header>
+                  <div className="workout-set-segments">
+                    {set.segments.map((segment, segmentIndex) => (
+                      <div className="workout-set-segment" key={segmentIndex}>
+                        <span className="workout-set-segment-label">
+                          {segmentIndex === 0 ? "Inicio" : `Tramo ${segmentIndex + 1}`}
+                          {segmentIndex > 0 ? <small>sin descanso</small> : null}
+                        </span>
+                        <Field label={`Repeticiones de serie ${setIndex + 1}${segmentIndex ? `, tramo ${segmentIndex + 1}` : ""}`}>
+                          <input
+                            className="app-input"
+                            onChange={(event) => updateSet(setIndex, (current) => ({
+                              ...current,
+                              segments: current.segments.map((item, index) =>
+                                index === segmentIndex ? { ...item, reps: event.target.value } : item),
+                            }))}
+                            placeholder="10"
+                            value={segment.reps}
+                          />
+                        </Field>
+                        <Field label={`Carga de serie ${setIndex + 1}${segmentIndex ? `, tramo ${segmentIndex + 1}` : ""}`}>
+                          <input
+                            className="app-input"
+                            onChange={(event) => updateSet(setIndex, (current) => ({
+                              ...current,
+                              segments: current.segments.map((item, index) =>
+                                index === segmentIndex ? { ...item, load: event.target.value } : item),
+                            }))}
+                            placeholder="30 kg / RPE 8"
+                            value={segment.load}
+                          />
+                        </Field>
+                        {set.segments.length > 1 ? (
+                          <button
+                            aria-label={`Eliminar tramo ${segmentIndex + 1} de serie ${setIndex + 1}`}
+                            className="workout-set-remove"
+                            onClick={() => updateSet(setIndex, (current) => ({
+                              ...current,
+                              segments: current.segments.filter((_, index) => index !== segmentIndex),
+                            }))}
+                            type="button"
+                          >
+                            ×
+                          </button>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    className="workout-set-add-segment"
+                    onClick={() => updateSet(setIndex, (current) => ({
+                      ...current,
+                      segments: [...current.segments, emptySetSegment()],
+                    }))}
+                    type="button"
+                  >
+                    + Agregar tramo sin descanso
+                  </button>
+                </article>
+              ))}
+              <button
+                className="workout-set-add"
+                onClick={() => changeSetPlan([...setPlan, emptySet()])}
+                type="button"
+              >
+                + Agregar serie
+              </button>
+            </div>
+          ) : (
+            <div className="workout-uniform-prescription">
+              <Field label="Número de series">
+                <input className="app-input" min="1" onChange={(event) => onChange({ sets: numberOrNull(event.target.value) })} placeholder="3" type="number" value={exercise.sets ?? ""} />
+              </Field>
+              <Field label="Repeticiones por serie">
+                <input className="app-input" onChange={(event) => onChange({ reps: event.target.value })} placeholder="8-12" value={exercise.reps ?? ""} />
+              </Field>
+              <Field label="Carga para todas las series">
+                <input className="app-input" onChange={(event) => onChange({ load: event.target.value })} placeholder="20 kg / RPE 8" value={exercise.load ?? ""} />
+              </Field>
+            </div>
+          )}
+        </section>
         <details className="workout-advanced-fields">
           <summary>Campos avanzados y notas</summary>
           <div>
-            <Field label="Prescripción libre">
-              <input className="app-input" onChange={(event) => onChange({ prescription: event.target.value })} placeholder="3x12, 10/8/6" value={exercise.prescription} />
+            <Field label="Nota complementaria de prescripción">
+              <input className="app-input" onChange={(event) => onChange({ prescription: event.target.value })} placeholder="Subir carga si completa todas las repeticiones" value={exercise.prescription} />
             </Field>
             <Field label="Tempo">
               <input className="app-input" onChange={(event) => onChange({ tempo: event.target.value })} placeholder="3-1-1" value={exercise.tempo ?? ""} />
@@ -2021,10 +2172,24 @@ function AssignmentTable({
   workouts: WorkoutSummary[];
 }) {
   const [changing, setChanging] = useState<string | null>(null);
+  const [downloading, setDownloading] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<string | null>(null);
   const [cancelReason, setCancelReason] = useState("");
   const [replacing, setReplacing] = useState<string | null>(null);
   const [replacementWorkoutId, setReplacementWorkoutId] = useState("");
+
+  async function downloadPdf(assignment: AssignmentReport["details"][number]) {
+    setDownloading(assignment.id);
+    onError("");
+    try {
+      await downloadWorkoutPdf(session.accessToken, assignment.id);
+      onMessage(`PDF de “${assignment.workoutTitle}” descargado.`);
+    } catch (exception) {
+      onError(errorMessage(exception));
+    } finally {
+      setDownloading(null);
+    }
+  }
 
   async function changeStatus(id: string, status: "COMPLETED" | "CANCELLED") {
     if (status === "CANCELLED" && !cancelReason.trim()) {
@@ -2106,8 +2271,13 @@ function AssignmentTable({
               </div>
               <div className="flex flex-wrap gap-2">
                 {canDownloadPdf ? (
-                  <button className="rounded-md border border-[#9eb2a5] px-3 py-2 text-sm font-semibold" onClick={() => downloadWorkoutPdf(session.accessToken, assignment.id)} type="button">
-                    PDF
+                  <button
+                    className="rounded-md border border-[#9eb2a5] px-3 py-2 text-sm font-semibold disabled:opacity-60"
+                    disabled={downloading === assignment.id}
+                    onClick={() => downloadPdf(assignment)}
+                    type="button"
+                  >
+                    {downloading === assignment.id ? "Descargando…" : "Descargar PDF"}
                   </button>
                 ) : null}
                 {canManage && assignment.status === "ACTIVE" ? (

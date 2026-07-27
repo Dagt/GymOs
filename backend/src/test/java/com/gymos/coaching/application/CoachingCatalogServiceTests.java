@@ -311,7 +311,11 @@ class CoachingCatalogServiceTests {
 		String content = """
 				{"sessions":[{"name":"Pierna","notes":"Calentamiento articular","blocks":[{
 				"name":"Trabajo principal","exercises":[{"exerciseName":"Sentadilla libre",
-				"sets":4,"reps":"8-10","load":"RPE 8","restSeconds":90,"tempo":"3-1-1",
+				"sets":3,"setPlan":[
+				{"segments":[{"reps":"20","load":"40 kg"}]},
+				{"segments":[{"reps":"15","load":"45 kg"}]},
+				{"segments":[{"reps":"10","load":"50 kg"},{"reps":"20","load":"35 kg"}]}],
+				"restSeconds":90,"tempo":"3-1-1",
 				"prescription":"4 series progresivas","notes":"Mantener espalda neutra"}]}]}]}
 				""";
 		when(repository.assignmentPdf(
@@ -319,7 +323,8 @@ class CoachingCatalogServiceTests {
 		)).thenReturn(Optional.of(new AssignmentPdfData(
 				assignmentId, LocalDate.of(2026, 7, 26), LocalDate.of(2026, 7, 28),
 				LocalDate.of(2026, 8, 25), "Subir carga sólo con técnica correcta",
-				"Fuerza base", "Hipertrofia", "INTERMEDIATE", 3, content,
+				"Fuerza base", "Hipertrofia", "INTERMEDIATE", 3,
+				"Entrenar tres veces por semana y priorizar una técnica controlada.", content,
 				"Diego García", "Coach Uno", "GymOS Demo", null,
 				"#173c2a", "Sucursal Centro", "555-0100"
 		)));
@@ -331,7 +336,43 @@ class CoachingCatalogServiceTests {
 			String text = new PDFTextStripper().getText(document);
 			assertThat(document.getNumberOfPages()).isGreaterThanOrEqualTo(1);
 			assertThat(text).contains("GymOS Demo", "Fuerza base", "Diego García", "Sentadilla libre");
-			assertThat(text).contains("RPE 8", "90 s", "3-1-1");
+			assertThat(text).contains("20", "40 kg", "50 kg", "35 kg", "90 s", "3-1-1");
+			assertThat(text).contains("INDICACIONES GENERALES", "Página 1 de");
+		}
+	}
+
+	@Test
+	void assignmentPdfPaginatesLongWorkoutWithHeadersAndFooters() throws Exception {
+		UUID assignmentId = UUID.randomUUID();
+		StringBuilder exercises = new StringBuilder();
+		for (int index = 1; index <= 14; index++) {
+			if (index > 1) exercises.append(',');
+			exercises.append("""
+					{"exerciseName":"Ejercicio %d","sets":3,"reps":"12","load":"RPE 8",
+					"restSeconds":60,"notes":"Controlar el movimiento durante toda la ejecución"}
+					""".formatted(index));
+		}
+		String content = """
+				{"sessions":[{"name":"Cuerpo completo","focus":"Fuerza general","blocks":[{
+				"name":"Circuito principal","type":"CIRCUIT","exercises":[%s]}]}]}
+				""".formatted(exercises);
+		when(repository.assignmentPdf(
+				principal.organizationId(), principal.branchId(), assignmentId, null
+		)).thenReturn(Optional.of(new AssignmentPdfData(
+				assignmentId, LocalDate.of(2026, 7, 26), null, null,
+				null, "Plan de adaptación", "Condición general", "BEGINNER", 1,
+				"Realizar tres veces por semana.", content,
+				"Socio Uno", "Coach Uno", "GymOS Demo", null,
+				"#173c2a", "Sucursal Centro", "555-0100"
+		)));
+
+		byte[] pdf = service.assignmentPdf(principal, assignmentId);
+
+		try (var document = Loader.loadPDF(pdf)) {
+			String text = new PDFTextStripper().getText(document);
+			assertThat(document.getNumberOfPages()).isGreaterThan(1);
+			assertThat(text).contains("Ejercicio 1", "Ejercicio 14");
+			assertThat(text).contains("Página 1 de", "Página 2 de");
 		}
 	}
 

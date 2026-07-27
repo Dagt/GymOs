@@ -27,6 +27,7 @@ import java.text.Normalizer;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.Duration;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAdjusters;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -373,30 +374,38 @@ public class CoachingCatalogService {
 	private byte[] renderPdf(AssignmentPdfData data) throws IOException {
 		try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
 			PdfWriter writer = new PdfWriter(document, data);
-			writer.heading(data.title());
-			writer.summary("Socio", data.clientName(), "Coach", data.coachName());
-			writer.summary("Objetivo", value(data.goal()), "Nivel", value(data.level()));
-			writer.summary("Asignada", data.assignedOn().toString(), "Versión", String.valueOf(data.versionNumber()));
-			if (data.startsOn() != null || data.endsOn() != null) {
-				writer.summary("Vigencia", value(data.startsOn()) + " a " + value(data.endsOn()), "", "");
+			writer.workoutTitle(data.title(), data.versionNumber());
+			writer.assignmentSummary();
+			if (data.summary() != null && !data.summary().isBlank()) {
+				writer.callout("Indicaciones generales", data.summary());
 			}
-			writer.separator();
 			JsonNode root = objectMapper.readTree(data.contentJson());
 			JsonNode sessions = root.has("sessions") ? root.get("sessions") : root.get("days");
 			if (sessions != null && sessions.isArray()) {
-				int index = 1;
+				int dayIndex = 1;
 				for (JsonNode session : sessions) {
-					writer.heading("Día " + index++ + " - " + text(session, "name", "Sesión"));
+					writer.day(
+							dayIndex++,
+							text(session, "name", "Sesión"),
+							text(session, "focus", "")
+					);
 					String notes = text(session, "notes", "");
-					if (!notes.isBlank()) writer.line(notes);
+					if (!notes.isBlank()) writer.note("Preparación del día", notes);
 					JsonNode blocks = session.get("blocks");
 					if (blocks != null && blocks.isArray()) {
 						for (JsonNode block : blocks) {
 							if (block.isObject() && block.has("exercises")) {
-								writer.subheading(text(block, "name", text(block, "type", "Bloque")));
-								for (JsonNode exercise : block.get("exercises")) writer.exercise(exercise);
+								writer.block(
+										text(block, "name", "Bloque"),
+										text(block, "type", ""),
+										text(block, "notes", "")
+								);
+								int exerciseIndex = 1;
+								for (JsonNode exercise : block.get("exercises")) {
+									writer.exercise(exercise, exerciseIndex++);
+								}
 							} else {
-								writer.exercise(block);
+								writer.exercise(block, 1);
 							}
 						}
 					}
@@ -405,9 +414,7 @@ public class CoachingCatalogService {
 				writer.line(data.contentJson());
 			}
 			if (data.printableNotes() != null && !data.printableNotes().isBlank()) {
-				writer.separator();
-				writer.subheading("Indicaciones");
-				writer.line(data.printableNotes());
+				writer.callout("Indicaciones personales del coach", data.printableNotes());
 			}
 			writer.finish();
 			document.save(output);
@@ -501,110 +508,392 @@ public class CoachingCatalogService {
 	) {}
 
 	private final class PdfWriter {
+		private static final float MARGIN = 40;
+		private static final float CONTENT_WIDTH = PDRectangle.A4.getWidth() - MARGIN * 2;
+		private static final float BOTTOM_LIMIT = 52;
 		private final PDDocument document;
 		private final AssignmentPdfData data;
 		private final Color primary;
+		private final Color primaryDark;
+		private final Color primarySoft;
+		private final Color ink = new Color(30, 42, 35);
+		private final Color muted = new Color(91, 107, 98);
+		private final Color line = new Color(218, 226, 221);
+		private final Color surface = new Color(247, 249, 247);
+		private final Color accent = new Color(214, 173, 48);
 		private final PDImageXObject logo;
 		private final PDType1Font regular = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
 		private final PDType1Font bold = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
 		private PDPage page;
 		private PDPageContentStream stream;
 		private float y;
+		private int pageNumber;
 
 		private PdfWriter(PDDocument document, AssignmentPdfData data) throws IOException {
 			this.document = document;
 			this.data = data;
 			this.primary = color(data.primaryColor());
+			this.primaryDark = blend(primary, Color.BLACK, 0.18f);
+			this.primarySoft = blend(primary, Color.WHITE, 0.91f);
 			this.logo = loadLogo(document, data.logoUrl());
 			newPage();
 		}
-		void heading(String value) throws IOException { ensure(40); write(value, 15, bold, 20); }
-		void subheading(String value) throws IOException { ensure(32); write(value, 12, bold, 17); }
-		void summary(String labelA, String valueA, String labelB, String valueB) throws IOException {
-			String left = labelA.isBlank() ? valueA : labelA + ": " + valueA;
-			String right = labelB.isBlank() ? "" : labelB + ": " + valueB;
-			write(left + (right.isBlank() ? "" : "    |    " + right), 10, regular, 15);
+
+		void workoutTitle(String value, int version) throws IOException {
+			List<String> titleLines = wrap(value, bold, 22, CONTENT_WIDTH - 80);
+			ensure(35 + titleLines.size() * 25);
+			writeAt("RUTINA ASIGNADA", MARGIN, y, 8, bold, muted);
+			writePill("VERSIÓN " + version, PDRectangle.A4.getWidth() - MARGIN - 68, y - 5, 68);
+			y -= 24;
+			for (String titleLine : titleLines) {
+				writeAt(titleLine, MARGIN, y, 22, bold, ink);
+				y -= 25;
+			}
+			y -= 5;
 		}
+
+		void assignmentSummary() throws IOException {
+			String validity = data.startsOn() == null && data.endsOn() == null
+					? "Sin vigencia definida"
+					: formatDate(data.startsOn()) + " - " + formatDate(data.endsOn());
+			List<Info> values = List.of(
+					new Info("SOCIO", value(data.clientName())),
+					new Info("COACH", value(data.coachName())),
+					new Info("OBJETIVO", value(data.goal())),
+					new Info("NIVEL", levelLabel(data.level())),
+					new Info("ASIGNADA", formatDate(data.assignedOn())),
+					new Info("VIGENCIA", validity)
+			);
+			int rows = (values.size() + 1) / 2;
+			ensure(rows * 56 + 10);
+			float gap = 8;
+			float cardWidth = (CONTENT_WIDTH - gap) / 2;
+			for (int index = 0; index < values.size(); index++) {
+				int column = index % 2;
+				int row = index / 2;
+				float cardX = MARGIN + column * (cardWidth + gap);
+				float cardTop = y - row * 56;
+				infoCard(values.get(index), cardX, cardTop, cardWidth, 48);
+			}
+			y -= rows * 56 + 4;
+		}
+
+		void callout(String label, String value) throws IOException {
+			List<String> lines = wrap(value, regular, 9, CONTENT_WIDTH - 32);
+			float height = 31 + lines.size() * 12;
+			ensure(height + 10);
+			stream.setNonStrokingColor(primarySoft);
+			stream.addRect(MARGIN, y - height, CONTENT_WIDTH, height);
+			stream.fill();
+			stream.setNonStrokingColor(accent);
+			stream.addRect(MARGIN, y - height, 4, height);
+			stream.fill();
+			writeAt(label.toUpperCase(Locale.ROOT), MARGIN + 16, y - 17, 8, bold, primaryDark);
+			float cursor = y - 34;
+			for (String line : lines) {
+				writeAt(line, MARGIN + 16, cursor, 9, regular, ink);
+				cursor -= 12;
+			}
+			y -= height + 10;
+		}
+
+		void day(int index, String name, String focus) throws IOException {
+			ensure(115);
+			y -= 5;
+			stream.setNonStrokingColor(primary);
+			stream.addRect(MARGIN, y - 46, CONTENT_WIDTH, 46);
+			stream.fill();
+			stream.setNonStrokingColor(accent);
+			stream.addRect(MARGIN, y - 46, 5, 46);
+			stream.fill();
+			writeAt(String.format(Locale.ROOT, "DÍA %02d", index), MARGIN + 18, y - 17, 8, bold, Color.WHITE);
+			writeAt(truncate(name, bold, 14, 305), MARGIN + 18, y - 35, 14, bold, Color.WHITE);
+			if (focus != null && !focus.isBlank()) {
+				writeRight("ENFOQUE  " + focus.toUpperCase(Locale.ROOT), PDRectangle.A4.getWidth() - MARGIN - 16,
+						y - 29, 8, bold, Color.WHITE);
+			}
+			y -= 56;
+		}
+
+		void block(String name, String type, String notes) throws IOException {
+			List<String> noteLines = notes == null || notes.isBlank()
+					? List.of()
+					: wrap(notes, regular, 8, CONTENT_WIDTH - 20);
+			float height = 32 + noteLines.size() * 11;
+			ensure(height + 90);
+			writeAt(blockTypeLabel(type), MARGIN, y - 8, 7, bold, primary);
+			writeAt(truncate(name, bold, 12, CONTENT_WIDTH - 145), MARGIN, y - 24, 12, bold, ink);
+			stream.setStrokingColor(line);
+			stream.setLineWidth(0.8f);
+			stream.moveTo(MARGIN, y - 30);
+			stream.lineTo(PDRectangle.A4.getWidth() - MARGIN, y - 30);
+			stream.stroke();
+			float cursor = y - 43;
+			for (String noteLine : noteLines) {
+				writeAt(noteLine, MARGIN, cursor, 8, regular, muted);
+				cursor -= 11;
+			}
+			y -= height + 8;
+		}
+
+		void note(String label, String value) throws IOException {
+			List<String> lines = wrap(value, regular, 8, CONTENT_WIDTH - 24);
+			float height = 25 + lines.size() * 11;
+			ensure(height + 5);
+			stream.setNonStrokingColor(surface);
+			stream.addRect(MARGIN, y - height, CONTENT_WIDTH, height);
+			stream.fill();
+			writeAt(label.toUpperCase(Locale.ROOT), MARGIN + 12, y - 15, 7, bold, muted);
+			float cursor = y - 29;
+			for (String line : lines) {
+				writeAt(line, MARGIN + 12, cursor, 8, regular, ink);
+				cursor -= 11;
+			}
+			y -= height + 8;
+		}
+
 		void line(String value) throws IOException {
-			for (String part : wrap(value == null ? "" : value, 96)) write(part, 10, regular, 14);
+			callout("Contenido de la rutina", value == null ? "" : value);
 		}
-		void exercise(JsonNode node) throws IOException {
+
+		void exercise(JsonNode node, int exerciseIndex) throws IOException {
 			String name = text(node, "exerciseName", text(node, "exercise", text(node, "name", "Ejercicio")));
 			String prescription = text(node, "prescription", "");
-			if (prescription.isBlank()) {
-				String sets = text(node, "sets", "");
-				String reps = text(node, "reps", "");
-				prescription = (sets.isBlank() ? "" : sets + " x ") + reps;
-			}
+			List<SetRow> setRows = setRows(node);
 			List<String> details = new ArrayList<>();
-			addDetail(details, "Carga", text(node, "load", ""));
 			addDetail(details, "Descanso", suffix(text(node, "restSeconds", ""), " s"));
 			addDetail(details, "Tempo", text(node, "tempo", ""));
 			addDetail(details, "Duración", text(node, "duration", ""));
 			addDetail(details, "Distancia", text(node, "distance", ""));
-			addDetail(details, "Grupo", text(node, "groupKey", ""));
+			addDetail(details, "Agrupación", text(node, "groupKey", ""));
+			if (node.path("optional").asBoolean(false)) details.add("Opcional");
 			String notes = text(node, "notes", "");
-			int rows = 1 + (details.isEmpty() ? 0 : 1) + (notes.isBlank() ? 0 : 1);
-			ensure(12 + rows * 13);
-			float boxHeight = 8 + rows * 13;
-			stream.setNonStrokingColor(new Color(245, 248, 246));
-			stream.addRect(40, y - boxHeight + 9, page.getMediaBox().getWidth() - 80, boxHeight);
+			List<String> nameLines = wrap(name, bold, 11, CONTENT_WIDTH - 54);
+			List<String> detailLines = details.isEmpty()
+					? List.of()
+					: wrap(String.join("  |  ", details), regular, 8, CONTENT_WIDTH - 28);
+			List<String> prescriptionLines = prescription.isBlank()
+					? List.of()
+					: wrap("Indicación: " + prescription, regular, 8, CONTENT_WIDTH - 28);
+			List<String> noteLines = notes.isBlank()
+					? List.of()
+					: wrap("Técnica: " + notes, regular, 8, CONTENT_WIDTH - 28);
+			float boxHeight = 19 + nameLines.size() * 14
+					+ (setRows.isEmpty() ? 0 : 20 + setRows.size() * 19)
+					+ (detailLines.size() + prescriptionLines.size() + noteLines.size()) * 12
+					+ 12;
+			ensure(boxHeight + 10);
+			float top = y;
+			stream.setNonStrokingColor(surface);
+			stream.addRect(MARGIN, top - boxHeight, CONTENT_WIDTH, boxHeight);
 			stream.fill();
-			stream.setNonStrokingColor(Color.BLACK);
-			write(name + (prescription.isBlank() ? "" : "  |  " + prescription), 10, bold, 14);
-			if (!details.isEmpty()) write(String.join("  |  ", details), 8, regular, 12);
-			if (!notes.isBlank()) write(notes, 8, regular, 12);
-			y -= 3;
+			stream.setNonStrokingColor(primary);
+			stream.addRect(MARGIN, top - boxHeight, 4, boxHeight);
+			stream.fill();
+			stream.setNonStrokingColor(primarySoft);
+			stream.addRect(MARGIN + 13, top - 32, 24, 24);
+			stream.fill();
+			writeCentered(String.valueOf(exerciseIndex), MARGIN + 25, top - 25, 9, bold, primaryDark);
+			float cursor = top - 18;
+			for (String nameLine : nameLines) {
+				writeAt(nameLine, MARGIN + 48, cursor, 11, bold, ink);
+				cursor -= 14;
+			}
+			cursor -= 3;
+			if (!setRows.isEmpty()) {
+				stream.setNonStrokingColor(blend(primary, Color.WHITE, 0.86f));
+				stream.addRect(MARGIN + 12, cursor - 16, CONTENT_WIDTH - 24, 17);
+				stream.fill();
+				writeAt("SERIE", MARGIN + 20, cursor - 11, 7, bold, primaryDark);
+				writeAt("REPETICIONES", MARGIN + 150, cursor - 11, 7, bold, primaryDark);
+				writeAt("CARGA", MARGIN + 310, cursor - 11, 7, bold, primaryDark);
+				cursor -= 19;
+				for (SetRow row : setRows) {
+					writeAt(truncate(row.label(), regular, 8, 115), MARGIN + 20, cursor - 11, 8, regular, ink);
+					writeAt(truncate(row.reps(), regular, 8, 145), MARGIN + 150, cursor - 11, 8, regular, ink);
+					writeAt(truncate(row.load(), regular, 8, 170), MARGIN + 310, cursor - 11, 8, regular, ink);
+					stream.setStrokingColor(line);
+					stream.setLineWidth(0.35f);
+					stream.moveTo(MARGIN + 12, cursor - 16);
+					stream.lineTo(PDRectangle.A4.getWidth() - MARGIN - 12, cursor - 16);
+					stream.stroke();
+					cursor -= 19;
+				}
+			}
+			cursor = writeLines(detailLines, MARGIN + 14, cursor - 2, 8, regular, muted, 12);
+			cursor = writeLines(prescriptionLines, MARGIN + 14, cursor, 8, regular, ink, 12);
+			writeLines(noteLines, MARGIN + 14, cursor, 8, regular, ink, 12);
+			y = top - boxHeight - 9;
 		}
-		void separator() throws IOException { ensure(20); y -= 8; }
-		void finish() throws IOException { if (stream != null) stream.close(); }
-		private void write(String value, float size, PDType1Font font, float leading) throws IOException {
-			ensure(leading + 8);
-			stream.beginText();
-			stream.setFont(font, size);
-			stream.newLineAtOffset(45, y);
-			stream.showText(safePdfText(value));
-			stream.endText();
-			y -= leading;
+
+		void finish() throws IOException {
+			if (stream != null) stream.close();
+			int totalPages = document.getNumberOfPages();
+			for (int index = 0; index < totalPages; index++) {
+				PDPage footerPage = document.getPage(index);
+				try (PDPageContentStream footer = new PDPageContentStream(
+						document, footerPage, PDPageContentStream.AppendMode.APPEND, true, true
+				)) {
+					footer.setStrokingColor(line);
+					footer.setLineWidth(0.6f);
+					footer.moveTo(MARGIN, 39);
+					footer.lineTo(PDRectangle.A4.getWidth() - MARGIN, 39);
+					footer.stroke();
+					writeAt(footer, value(data.branchName()), MARGIN, 24, 7, regular, muted);
+					writeRight(footer, "Página " + (index + 1) + " de " + totalPages,
+							PDRectangle.A4.getWidth() - MARGIN, 24, 7, bold, muted);
+				}
+			}
 		}
-		private void ensure(float needed) throws IOException { if (y - needed < 45) newPage(); }
+
+		private void ensure(float needed) throws IOException {
+			if (y - needed < BOTTOM_LIMIT) {
+				newPage();
+				y = PDRectangle.A4.getHeight() - 112;
+			}
+		}
+
 		private void newPage() throws IOException {
 			if (stream != null) stream.close();
 			page = new PDPage(PDRectangle.A4);
 			document.addPage(page);
 			stream = new PDPageContentStream(document, page);
+			pageNumber++;
 			float top = page.getMediaBox().getHeight();
-			stream.setNonStrokingColor(primary);
-			stream.addRect(0, top - 88, page.getMediaBox().getWidth(), 88);
+			stream.setNonStrokingColor(primaryDark);
+			stream.addRect(0, top - 84, page.getMediaBox().getWidth(), 84);
 			stream.fill();
-			stream.setNonStrokingColor(Color.WHITE);
+			stream.setNonStrokingColor(accent);
+			stream.addRect(0, top - 88, page.getMediaBox().getWidth(), 4);
+			stream.fill();
 			if (logo == null) {
 				String initials = data.gymName() == null || data.gymName().isBlank()
 						? "G" : data.gymName().substring(0, 1).toUpperCase(Locale.ROOT);
-				writeAt(initials, 48, top - 51, 24, bold);
+				stream.setNonStrokingColor(Color.WHITE);
+				stream.addRect(MARGIN, top - 68, 44, 44);
+				stream.fill();
+				writeCentered(initials, MARGIN + 22, top - 49, 20, bold, primaryDark);
 			} else {
-				stream.drawImage(logo, 40, top - 72, 48, 48);
+				stream.drawImage(logo, MARGIN, top - 68, 44, 44);
 			}
-			writeAt(data.gymName(), 86, top - 41, 17, bold);
-			writeAt(data.branchName() + (data.contactPhone() == null ? "" : "  |  " + data.contactPhone()),
-					86, top - 61, 9, regular);
-			stream.setNonStrokingColor(Color.BLACK);
+			writeAt(value(data.gymName()), MARGIN + 58, top - 40, 16, bold, Color.WHITE);
+			writeAt(value(data.branchName()) + (data.contactPhone() == null ? "" : "  |  " + data.contactPhone()),
+					MARGIN + 58, top - 58, 8, regular, Color.WHITE);
+			writeRight("PLAN DE ENTRENAMIENTO", PDRectangle.A4.getWidth() - MARGIN, top - 45,
+					8, bold, Color.WHITE);
 			y = top - 112;
 		}
-		private void writeAt(String value, float x, float positionY, float size, PDType1Font font) throws IOException {
-			stream.beginText();
-			stream.setFont(font, size);
-			stream.newLineAtOffset(x, positionY);
-			stream.showText(safePdfText(value == null ? "" : value));
-			stream.endText();
+
+		private void infoCard(Info info, float x, float top, float width, float height) throws IOException {
+			stream.setNonStrokingColor(surface);
+			stream.addRect(x, top - height, width, height);
+			stream.fill();
+			writeAt(info.label(), x + 12, top - 16, 7, bold, muted);
+			List<String> valueLines = wrap(info.value(), bold, 9, width - 24);
+			float cursor = top - 32;
+			for (String valueLine : valueLines.stream().limit(2).toList()) {
+				writeAt(valueLine, x + 12, cursor, 9, bold, ink);
+				cursor -= 11;
+			}
 		}
-		private List<String> wrap(String value, int max) {
+
+		private List<SetRow> setRows(JsonNode node) {
+			List<SetRow> rows = new ArrayList<>();
+			JsonNode plan = node.get("setPlan");
+			if (plan != null && plan.isArray() && !plan.isEmpty()) {
+				int setIndex = 1;
+				for (JsonNode set : plan) {
+					JsonNode segments = set.get("segments");
+					if (segments != null && segments.isArray() && !segments.isEmpty()) {
+						int segmentIndex = 0;
+						for (JsonNode segment : segments) {
+							String label = segments.size() == 1
+									? "Serie " + setIndex
+									: "Serie " + setIndex + (segmentIndex == 0 ? " - inicio" : " - tramo " + (segmentIndex + 1));
+							rows.add(new SetRow(label, value(text(segment, "reps", "")), value(text(segment, "load", ""))));
+							segmentIndex++;
+						}
+					}
+					setIndex++;
+				}
+				return rows;
+			}
+			String sets = text(node, "sets", "");
+			String reps = text(node, "reps", "");
+			String load = text(node, "load", "");
+			if (!sets.isBlank() || !reps.isBlank() || !load.isBlank()) {
+				rows.add(new SetRow(sets.isBlank() ? "Todas" : sets + " iguales", value(reps), value(load)));
+			}
+			return rows;
+		}
+
+		private float writeLines(
+				List<String> lines, float x, float startY, float size, PDType1Font font, Color color, float leading
+		) throws IOException {
+			float cursor = startY;
+			for (String line : lines) {
+				writeAt(line, x, cursor, size, font, color);
+				cursor -= leading;
+			}
+			return cursor;
+		}
+
+		private void writePill(String value, float x, float centerY, float width) throws IOException {
+			stream.setNonStrokingColor(primarySoft);
+			stream.addRect(x, centerY - 11, width, 19);
+			stream.fill();
+			writeCentered(value, x + width / 2, centerY - 5, 7, bold, primaryDark);
+		}
+
+		private void writeAt(
+				String value, float x, float positionY, float size, PDType1Font font, Color color
+		) throws IOException {
+			writeAt(stream, value, x, positionY, size, font, color);
+		}
+
+		private void writeAt(
+				PDPageContentStream target, String value, float x, float positionY,
+				float size, PDType1Font font, Color color
+		) throws IOException {
+			target.setNonStrokingColor(color);
+			target.beginText();
+			target.setFont(font, size);
+			target.newLineAtOffset(x, positionY);
+			target.showText(safePdfText(value == null ? "" : value));
+			target.endText();
+		}
+
+		private void writeRight(
+				String value, float right, float positionY, float size, PDType1Font font, Color color
+		) throws IOException {
+			writeRight(stream, value, right, positionY, size, font, color);
+		}
+
+		private void writeRight(
+				PDPageContentStream target, String value, float right, float positionY,
+				float size, PDType1Font font, Color color
+		) throws IOException {
+			String safe = safePdfText(value);
+			float width = textWidth(safe, font, size);
+			writeAt(target, safe, right - width, positionY, size, font, color);
+		}
+
+		private void writeCentered(
+				String value, float centerX, float positionY, float size, PDType1Font font, Color color
+		) throws IOException {
+			String safe = safePdfText(value);
+			writeAt(safe, centerX - textWidth(safe, font, size) / 2, positionY, size, font, color);
+		}
+
+		private List<String> wrap(String value, PDType1Font font, float size, float maxWidth) throws IOException {
 			List<String> lines = new ArrayList<>();
-			for (String paragraph : value.replace('\r', ' ').split("\\n")) {
+			for (String paragraph : safePdfText(value == null ? "" : value).replace('\r', ' ').split("\\n")) {
 				StringBuilder current = new StringBuilder();
 				for (String word : paragraph.split("\\s+")) {
-					if (current.length() + word.length() + 1 > max && !current.isEmpty()) {
-						lines.add(current.toString()); current.setLength(0);
+					String candidate = current.isEmpty() ? word : current + " " + word;
+					if (textWidth(candidate, font, size) > maxWidth && !current.isEmpty()) {
+						lines.add(current.toString());
+						current.setLength(0);
 					}
 					if (!current.isEmpty()) current.append(' ');
 					current.append(word);
@@ -613,6 +902,57 @@ public class CoachingCatalogService {
 			}
 			return lines.isEmpty() ? List.of("") : lines;
 		}
+
+		private String truncate(String value, PDType1Font font, float size, float maxWidth) throws IOException {
+			String safe = safePdfText(value);
+			if (textWidth(safe, font, size) <= maxWidth) return safe;
+			String suffix = "...";
+			int end = safe.length();
+			while (end > 1 && textWidth(safe.substring(0, end) + suffix, font, size) > maxWidth) end--;
+			return safe.substring(0, end).stripTrailing() + suffix;
+		}
+
+		private float textWidth(String value, PDType1Font font, float size) throws IOException {
+			return font.getStringWidth(safePdfText(value)) / 1000f * size;
+		}
+
+		private String formatDate(LocalDate date) {
+			if (date == null) return "No definida";
+			return date.format(DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", Locale.forLanguageTag("es-MX")));
+		}
+
+		private String levelLabel(String level) {
+			if (level == null) return "General";
+			return switch (level.toUpperCase(Locale.ROOT)) {
+				case "BEGINNER" -> "Principiante";
+				case "INTERMEDIATE" -> "Intermedio";
+				case "ADVANCED" -> "Avanzado";
+				default -> "General";
+			};
+		}
+
+		private String blockTypeLabel(String type) {
+			if (type == null) return "BLOQUE";
+			return switch (type.toUpperCase(Locale.ROOT)) {
+				case "WARMUP" -> "CALENTAMIENTO";
+				case "MAIN" -> "TRABAJO PRINCIPAL";
+				case "SUPERSET" -> "SUPERSERIE";
+				case "CIRCUIT" -> "CIRCUITO";
+				case "FINISHER" -> "FINALIZADOR";
+				case "COOLDOWN" -> "VUELTA A LA CALMA";
+				default -> "BLOQUE";
+			};
+		}
+
+		private Color blend(Color from, Color to, float ratio) {
+			float safeRatio = Math.max(0, Math.min(1, ratio));
+			return new Color(
+					Math.round(from.getRed() + (to.getRed() - from.getRed()) * safeRatio),
+					Math.round(from.getGreen() + (to.getGreen() - from.getGreen()) * safeRatio),
+					Math.round(from.getBlue() + (to.getBlue() - from.getBlue()) * safeRatio)
+			);
+		}
+
 		private String safePdfText(String value) {
 			String normalized = value
 					.replace('—', '-')
@@ -636,6 +976,9 @@ public class CoachingCatalogService {
 		private String suffix(String value, String suffix) {
 			return value == null || value.isBlank() ? "" : value + suffix;
 		}
+
+		private record Info(String label, String value) {}
+		private record SetRow(String label, String reps, String load) {}
 	}
 
 	private Color color(String value) {
