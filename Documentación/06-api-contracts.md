@@ -90,7 +90,11 @@ Permisos:
 - `user.read` para listar roles y usuarios internos.
 - `user.manage` para crear usuarios internos, cambiar roles y suspender/reactivar cuentas.
 
-`POST /users/internal` crea persona, cuenta de usuario, rol y accesos a sucursales dentro de la organizacion actual. No devuelve contrasenas ni hashes.
+`POST /users/internal` crea persona, cuenta de usuario, rol y accesos a
+sucursales dentro de la organizacion actual. Cuando el rol es `Coach`, acepta
+ademas `coachSpecialties` (hasta 30 valores de 80 caracteres) y `coachBio`
+(hasta 4,000 caracteres), y crea el perfil operativo en la misma transaccion.
+No devuelve contrasenas ni hashes.
 
 `PATCH /users/internal/{userId}/status` cambia el estado de una cuenta interna. Estados validos: `ACTIVE`, `SUSPENDED`, `INACTIVE`. Una cuenta suspendida o inactiva no puede iniciar sesion. No se permite suspender la propia cuenta.
 
@@ -952,4 +956,6 @@ Valores posibles de `console`:
 
 - Rechaza cualquier rol con `platform.admin` con `ROLE_NOT_AVAILABLE`.
 - Rechaza roles no asignables por el perfil actual con `ROLE_NOT_ALLOWED`; por ejemplo, un gerente no puede crear dueños ni otros gerentes.
+- Para `Coach`, persiste cuenta, sucursales, especialidades y biografia como una
+  sola operacion; un fallo del perfil revierte el alta completa.
 - Los usuarios creados entran a su consola segun permisos/rol.

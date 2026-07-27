@@ -550,10 +550,14 @@ Flujo:
 1. Usuario abre Equipo y accesos.
 2. Frontend muestra solo roles validos para el contexto.
 3. Usuario captura nombre, apellido, email, telefono, usuario, contrasena temporal, rol y sucursal.
-4. Frontend valida email, telefono `+52` mas 10 digitos y contrasena minima antes de enviar.
-5. Si el rol es `Dueno del gimnasio`, el frontend asigna automaticamente todas las sucursales existentes.
-6. Backend valida que rol y sucursales pertenezcan al tenant y que el rol no sea de plataforma.
-7. Backend crea persona, cuenta, rol y acceso de sucursal.
+4. Si selecciona `Coach`, el mismo formulario muestra especialidades y
+   biografia como datos complementarios.
+5. Frontend valida email, telefono `+52` mas 10 digitos y contrasena minima antes de enviar.
+6. Si el rol es `Dueno del gimnasio`, el frontend asigna automaticamente todas las sucursales existentes.
+7. Backend valida que rol y sucursales pertenezcan al tenant y que el rol no sea de plataforma.
+8. Backend crea persona, cuenta, rol y acceso de sucursal; para `Coach` crea
+   tambien su perfil y replica los datos complementarios en cada sucursal,
+   dentro de la misma transaccion.
 
 Resultado esperado:
 - Un gimnasio no ofrece el rol `Administrador GymOS` como rol operativo.
@@ -561,6 +565,7 @@ Resultado esperado:
 - El gerente con permiso de equipo solo puede crear recepcionistas y coaches.
 - Si el gerente tiene una sola sucursal, esa sucursal queda seleccionada y bloqueada automaticamente al crear usuarios operativos.
 - Un recepcionista creado inicia sesion en recepcion y no ve administracion de plataforma.
+- Un Coach no requiere una segunda edicion para completar sus datos iniciales.
 - Si faltan campos o hay permisos invalidos, se muestra error claro con codigo y `correlationId`.
 
 ## UC-031 Suspender acceso comercial y usuarios internos

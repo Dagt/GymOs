@@ -64,7 +64,7 @@ La aplicación móvil o portal remoto de clientes queda fuera de la versión 1, 
 
 ### Precisión de alcance para Coaches y rutinas
 
-En V1, GymOS permite que el coach consulte y amplíe un catálogo de ejercicios, cree y versione rutinas estructuradas, asigne una versión específica a un socio, conserve el historial y genere un PDF imprimible. El dueño sólo consulta métricas por coach o socio con históricos de 4 a 52 semanas; el perfil y las sucursales del coach se administran en Gestión del equipo.
+En V1, GymOS permite que el coach consulte y amplíe un catálogo de ejercicios, cree y versione rutinas estructuradas, asigne una versión específica a un socio, conserve el historial y genere un PDF imprimible. Dueño y gerente sólo consultan métricas por coach o socio con históricos de 4 a 52 semanas; la cuenta, el perfil y las sucursales del coach se administran como un único usuario en Gestión del equipo.
 
 Las rutinas **no se cobran por medio de GymOS**. Los cobros en efectivo acordados entre coach y socio son externos a la plataforma y no generan venta, pago, comisión, ingreso ni movimiento de caja. La consulta remota de la rutina por el socio se reserva para una aplicación futura.
 

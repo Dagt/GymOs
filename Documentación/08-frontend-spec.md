@@ -329,6 +329,11 @@ Formularios:
   - Telefonos de gimnasio, sucursal y usuario interno en formato `+52` mas 10 digitos; si el usuario captura 10 digitos, el frontend antepone `+52`.
   - Confirmacion modal nativa antes de suspender/reactivar gimnasios o usuarios.
 - Al crear un usuario con rol `Dueno del gimnasio`, el frontend asigna automaticamente todas las sucursales existentes del tenant. Gerentes, recepcionistas y coaches siguen seleccionando sucursales concretas.
+- Al seleccionar el rol `Coach`, el mismo drawer de alta muestra especialidades
+  y biografia; no existe un proceso de alta separado para ese tipo de usuario.
+- La tabla de Equipo conserva una altura y banda de acciones uniforme para todos
+  los roles; `Datos de Coach` es una accion adicional en linea, no una fila o
+  panel especial.
 - Un gerente no ve ni puede seleccionar `Dueno del gimnasio` ni `Gerente` al crear o modificar usuarios; solo puede asignar roles operativos permitidos.
 - Un gerente no ve la entrada `Datos y sucursales` y `canAccessRoute` no permite abrir `/settings/organization` con esa consola.
 - `/users` permite cambiar el rol de usuarios existentes desde la tabla, excepto la propia cuenta del usuario autenticado.

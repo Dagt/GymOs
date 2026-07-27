@@ -2,7 +2,7 @@
 
 Estado: FUENTE CANÓNICA / EN PROGRESO
 Corte: 26 de julio de 2026
-Código auditado: `feature/coaches-workouts` en `5dd0e47`, posterior a la
+Código auditado: `feature/coaches-workouts` en `602d37b`, posterior a la
 separación de los cambios de Wellness.
 
 ## 1. Cómo interpretar este documento
@@ -66,13 +66,16 @@ El módulo permite:
   sin pestaña redundante ni carga/exposición de constructor, ejercicios,
   asignación, PDF o mutaciones del historial;
 - autorizar los reportes con `coach.metrics.read` sin exigir lectura operativa
-  de rutinas.
+  de rutinas;
+- crear usuarios Coach desde el mismo alta de Equipo, incluyendo especialidades,
+  biografía y sucursales en una sola transacción y sin romper el layout común.
 
 El alcance funcional V1 está cerrado y estabilizado. El cierre base está en
 `84a5fd3`, la ampliación de perfiles e histórico en `8162814`, la corrección de
 alcance/UX en `0066c0b`, la compatibilidad PostgreSQL real en `3933aa5` y el
-alcance analítico de supervisores en `5dd0e47`. Los hallazgos específicos
-`COA-001` a `COA-007` y `COA-009` a `COA-014` pasaron al
+alcance analítico de supervisores en `5dd0e47` y la integración del alta Coach
+en Equipo en `602d37b`. Los hallazgos específicos `COA-001` a `COA-007` y
+`COA-009` a `COA-015` pasaron al
 historial
 resuelto del documento 28.
 
@@ -82,7 +85,7 @@ Validación ejecutada sobre el árbol saneado:
 
 - backend: `gradlew clean test --no-daemon`, exitoso;
 - frontend: 31 pruebas, typecheck, lint y build de producción, exitosos;
-- E2E específico de Coaches: 6 recorridos Playwright exitosos;
+- E2E específico de Coaches/Equipo: 8 recorridos Playwright exitosos;
 - cobertura dedicada: propiedad `own/all`, permiso de perfiles, métricas,
   histórico semanal, perfil multi-sucursal, PDF y medios;
 - prueba PostgreSQL de filtros UUID nulos para biblioteca, resumen, detalle,
