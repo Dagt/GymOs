@@ -2,7 +2,7 @@
 
 Estado: `ESTABILIZADO`
 Rama de cierre: `feature/coaches-workouts`
-Código verificado: `d1d5124`
+Código verificado: `9af72e7`
 Corte: 26 de julio de 2026
 
 ## Propósito y alcance V1
@@ -49,11 +49,39 @@ La consulta remota por el socio pertenece a una aplicación futura.
 - alta y edición en panel lateral, separadas de la superficie de consulta;
 - taxonomía guiada para músculo principal, patrón de movimiento, equipo, nivel
   y lateralidad, conservando valores anteriores sin multiplicar variantes;
+- el selector permite crear un equipo durante el alta; se guarda en
+  `exercise.equipment` y el endpoint `/exercises/equipment-options` reconstruye
+  las opciones activas SYSTEM y de la organización sin depender de paginación;
 - identificación y ejecución visibles primero; detalles técnicos, medios y
   nombres alternativos se administran de forma progresiva;
+- catálogo con scroll interno, cuadrícula responsiva, tarjetas de altura uniforme
+  y descripción limitada a dos líneas;
 - carga, lectura, reemplazo y eliminación de JPG, PNG, WebP, GIF o MP4 de hasta
   8 MB mediante almacenamiento de objetos;
-- limpieza del archivo sustituido y compensación si falla la persistencia.
+- intento de limpieza del archivo sustituido y compensación si falla la
+  persistencia de la nueva referencia.
+
+### Persistencia de multimedia y nombres alternativos
+
+- el ejercicio se crea primero para obtener el UUID que define propiedad,
+  organización y ruta del objeto;
+- el navegador envía el archivo como `multipart/form-data` a
+  `POST /exercises/{exerciseId}/media`;
+- se aceptan JPG, PNG, WebP, GIF y MP4 de 1 byte a 8 MB;
+- el binario se almacena en MinIO, no en PostgreSQL; la clave sigue
+  `coaching/{organizationId}/{exerciseId}/{uuid}-{nombreSeguro}`;
+- PostgreSQL conserva únicamente esa clave en `exercise.media_url`; pese al
+  nombre histórico de la columna, no es una URL pública;
+- la lectura usa `GET /exercises/{exerciseId}/media`, valida el tenant y entrega
+  los bytes con su `Content-Type`;
+- al reemplazar se sube el nuevo objeto, se actualiza la referencia y se intenta
+  eliminar el anterior; si falla la actualización SQL, el objeto nuevo se
+  elimina como compensación;
+- los nombres alternativos viven en `exercise_alias` con texto visible y una
+  versión normalizada para búsqueda y unicidad; apuntan al mismo ejercicio, no
+  crean una copia;
+- `COA-018` registra el reintento pendiente de limpieza de objetos huérfanos y
+  la retirada del campo heredado `mediaUrl` del contrato de alta/edición.
 
 ### Constructor y versiones
 
@@ -129,7 +157,7 @@ La consulta remota por el socio pertenece a una aplicación futura.
 
 - backend: `gradlew clean test --no-daemon`, exitoso;
 - frontend: 31 pruebas, typecheck, lint y build de producción, exitosos;
-- E2E Playwright: 8 recorridos exitosos para constructor/publicación,
+- E2E Playwright: 9 recorridos exitosos para constructor/publicación,
   catálogo/aliases/medios, cancelación/reemplazo/métricas históricas y
   administración multi-sucursal del coach, incluyendo acceso directo a
   métricas para dueño y gerente sin superficies operativas, alta integral de
@@ -143,7 +171,7 @@ La consulta remota por el socio pertenece a una aplicación futura.
 Los antiguos `COA-001` a `COA-007` y `COA-009` quedaron resueltos en
 `84a5fd3`; `COA-010` y `COA-011` se cerraron en `8162814`, `COA-012` en
 `0066c0b`, `COA-013` en `3933aa5`, `COA-014` en `5dd0e47`, `COA-015` en
-`602d37b` y `COA-016` en `d1d5124`. Todos se conservan
+`602d37b`, `COA-016` en `d1d5124` y `COA-017` en `9af72e7`. Todos se conservan
 en la sección de cerradas del documento 28. Los riesgos
 transversales de despliegue, migración PostgreSQL real, observabilidad y
 almacenamiento se siguen administrando como `DB-001` y `OPS-001`; no son

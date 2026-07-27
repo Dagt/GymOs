@@ -28,6 +28,7 @@ La pertenencia a `main` se determinó por ancestros de Git, no por nombres. Una 
 | 26 jul | Corrección `5dd0e47`: métricas independientes de lectura de rutinas y alcance exclusivo de tablero para dueño/gerente |
 | 26 jul | Corrección `602d37b`: alta transaccional de datos Coach dentro de Equipo y restauración del layout uniforme de usuarios |
 | 26 jul | Rediseño `d1d5124`: Equipo compacto, constructor progresivo, catálogo guiado y métricas personales del Coach |
+| 26 jul | Catálogo `9af72e7`: equipos reutilizables por organización, scroll interno y tarjetas uniformes |
 
 ## 3. Inventario de ramas remotas
 
@@ -35,7 +36,7 @@ Ya contenidas en `main`, sin commits exclusivos: `backup/system-updated-2026-07-
 
 | Rama activa/divergente | Situación | Acción |
 |---|---|---|
-| `feature/coaches-workouts` | Alcance funcional V1 cerrado en `84a5fd3`, ampliado en `8162814` y corregido/validado hasta `d1d5124`; Wellness permanece excluido. | Publicar la documentación actualizada y abrir PR hacia `main`. |
+| `feature/coaches-workouts` | Alcance funcional V1 cerrado en `84a5fd3`, ampliado en `8162814` y corregido/validado hasta `9af72e7`; Wellness permanece excluido. | Publicar la documentación actualizada y abrir PR hacia `main`. |
 | `feature/wellness-services` | Un commit exclusivo y uno de main ausente. | Rebase y revisión independiente. |
 | `feature/code-simplification-rebasion-and-refactor` | Un commit exclusivo y seis de main ausentes. | Auditar commit y rebase. |
 | `feature/catalog-inventory-enhancement-plan` | Historia fuertemente divergente. | No fusionar directamente; extraer cambios útiles. |

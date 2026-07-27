@@ -33,7 +33,7 @@ Ningún módulo se declara “completo” sólo por el nombre de una rama o comm
 | [Membresías](modulos/08-memberships.md) y [kiosco](modulos/11-selfservice.md) | FUNCIONAL | Alta, renovación, cambio de plan y autoservicio | Revisar semántica de fechas y seguridad de sesión |
 | [Reservas y recursos](modulos/12-bookings.md) | FUNCIONAL | Calendario, disponibilidad, restricciones por plan y recepción | Suite E2E y deuda UX residual |
 | [Inventarios](modulos/13-inventory.md) | ESTABILIZADO | Existencias, transferencias, conteos, valuación y movimientos | Paginación parametrizada y feedback por renglón |
-| [Coaches y rutinas](modulos/14-coaching.md) | ESTABILIZADO | Dueño y gerente limitados a métricas; Coach con constructor progresivo, catálogo guiado, asignaciones y métricas personales; perfil multi-sucursal integrado en Equipo; histórico 4–52 semanas, CSV, PDF y E2E | Riesgos transversales `DB-001` y `OPS-001` |
+| [Coaches y rutinas](modulos/14-coaching.md) | ESTABILIZADO | Dueño y gerente limitados a métricas; Coach con constructor progresivo, catálogo con equipos reutilizables, scroll y tarjetas uniformes, asignaciones y métricas personales; histórico 4–52 semanas, CSV, PDF y E2E | `COA-018`, `DB-001` y `OPS-001` |
 | [Wellness/profesionales](modulos/15-wellness.md) | PARCIAL en `main` | Base histórica de profesionales, servicios y disponibilidad | Agenda aislada en rama propia |
 | [Reportes generales](modulos/18-reporting.md) | PARCIAL | Reportes operativos por dominio | Definiciones KPI y cobertura homogénea |
 | [Producción/piloto](modulos/20-common-operations.md) | PLANIFICADO | Configuración y runbooks base | Observabilidad, backups, seguridad y piloto |
@@ -47,6 +47,10 @@ El módulo permite:
 - consultar y ampliar un catálogo de ejercicios SYSTEM y propios;
 - crear y editar ejercicios en un panel guiado con taxonomía controlada,
   detalles técnicos progresivos, medios y nombres alternativos;
+- crear equipos durante el alta de un ejercicio y reutilizarlos desde una lista
+  reconstruida para toda la organización;
+- recorrer el catálogo dentro de una superficie con scroll y tarjetas uniformes
+  aunque existan descripciones;
 - crear rutinas estructuradas en sesiones, bloques y ejercicios;
 - usar un constructor compacto: datos esenciales visibles, campos avanzados y
   notas desplegables, acciones de guardado persistentes y coach propio fijo;
@@ -82,8 +86,9 @@ El alcance funcional V1 está cerrado y estabilizado. El cierre base está en
 `84a5fd3`, la ampliación de perfiles e histórico en `8162814`, la corrección de
 alcance/UX en `0066c0b`, la compatibilidad PostgreSQL real en `3933aa5` y el
 alcance analítico de supervisores en `5dd0e47`, la integración del alta Coach
-en Equipo en `602d37b` y el rediseño UX en `d1d5124`. Los hallazgos específicos
-`COA-001` a `COA-007` y `COA-009` a `COA-016` pasaron al
+en Equipo en `602d37b`, el rediseño UX en `d1d5124` y el catálogo reutilizable
+en `9af72e7`. Los hallazgos específicos `COA-001` a `COA-007` y `COA-009` a
+`COA-017` pasaron al
 historial
 resuelto del documento 28.
 
@@ -93,7 +98,7 @@ Validación ejecutada sobre el árbol saneado:
 
 - backend: `gradlew clean test --no-daemon`, exitoso;
 - frontend: 31 pruebas, typecheck, lint y build de producción, exitosos;
-- E2E específico de Coaches/Equipo: 8 recorridos Playwright exitosos;
+- E2E específico de Coaches/Equipo: 9 recorridos Playwright exitosos;
 - cobertura dedicada: propiedad `own/all`, permiso de perfiles, métricas,
   histórico semanal, perfil multi-sucursal, PDF y medios;
 - prueba PostgreSQL de filtros UUID nulos para biblioteca, resumen, detalle,
