@@ -8,12 +8,14 @@ export function AppDrawer({
   onClose,
   open,
   title,
+  wide = false,
 }: {
   children: ReactNode;
   description?: string;
   onClose: () => void;
   open: boolean;
   title: string;
+  wide?: boolean;
 }) {
   if (!open) {
     return null;
@@ -22,7 +24,7 @@ export function AppDrawer({
   return (
     <aside className="app-drawer" aria-modal="true" role="dialog">
       <button className="app-drawer-backdrop" onClick={onClose} type="button" aria-label="Cerrar panel" />
-      <section className="app-drawer-card">
+      <section className={`app-drawer-card${wide ? " wide" : ""}`}>
         <header>
           <div>
             <p>Panel de trabajo</p>

@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
+import { AppDrawer } from "@/components/AppDrawer";
 import { AuthRequired } from "@/components/AuthRequired";
 import {
   addExerciseAlias,
@@ -69,6 +70,58 @@ const EMPTY_EXERCISE_FORM: CreateExercisePayload = {
   warnings: "",
 };
 
+const MUSCLE_GROUP_OPTIONS = [
+  "Pecho",
+  "Espalda",
+  "Hombros",
+  "Bíceps",
+  "Tríceps",
+  "Cuádriceps",
+  "Isquiotibiales",
+  "Glúteos",
+  "Pantorrillas",
+  "Core",
+  "Cuerpo completo",
+  "Cardio",
+  "Movilidad",
+];
+
+const MOVEMENT_PATTERN_OPTIONS = [
+  "Empuje horizontal",
+  "Empuje vertical",
+  "Jalón horizontal",
+  "Jalón vertical",
+  "Sentadilla",
+  "Bisagra de cadera",
+  "Zancada",
+  "Acarreo",
+  "Rotación",
+  "Antirrotación",
+  "Flexión de codo",
+  "Extensión de codo",
+  "Locomoción",
+  "Movilidad",
+  "Estiramiento",
+];
+
+const EQUIPMENT_OPTIONS = [
+  "Peso corporal",
+  "Mancuernas",
+  "Barra",
+  "Discos",
+  "Kettlebell",
+  "Banda elástica",
+  "Polea",
+  "Máquina",
+  "Banco",
+  "TRX",
+  "Caminadora",
+  "Bicicleta",
+  "Remo",
+  "Elíptica",
+  "Otro equipo",
+];
+
 export default function CoachesPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
   const [branches, setBranches] = useState<BranchSummary[]>([]);
@@ -96,6 +149,7 @@ export default function CoachesPage() {
   const [exerciseAliases, setExerciseAliases] = useState<Record<string, string[]>>({});
   const [exerciseForm, setExerciseForm] = useState<CreateExercisePayload>({ ...EMPTY_EXERCISE_FORM });
   const [editingExerciseId, setEditingExerciseId] = useState<string | null>(null);
+  const [exerciseDrawerOpen, setExerciseDrawerOpen] = useState(false);
 
   const [clientQuery, setClientQuery] = useState("");
   const [clients, setClients] = useState<ClientSummary[]>([]);
@@ -195,6 +249,10 @@ export default function CoachesPage() {
   const selectableCoaches = canManageAllWorkouts
     ? coaches
     : coaches.filter((coach) => coach.userAccountId === session?.user.userId);
+  const assignedCoach = selectableCoaches.find((coach) => coach.id === coachId)
+    ?? selectableCoaches[0];
+  const coachMetricsView = session ? isCoachSession(session) : false;
+  const firstWorkouts = report?.coaches.reduce((total, coach) => total + coach.firstWorkouts, 0) ?? 0;
   const canManageExerciseCatalog = session?.user.permissions.includes("exercise.manage") ?? false;
   const canManageAssignments = session
     ? !isMetricsOnlySupervisor(session) && session.user.permissions.includes("workout.assign")
@@ -320,6 +378,7 @@ export default function CoachesPage() {
         mediaUrl: exercise.mediaUrl,
         warnings: exercise.warnings ?? "",
       });
+      setExerciseDrawerOpen(true);
       setMessage(`Editando “${exercise.name}”.`);
     } catch (exception) {
       setError(errorMessage(exception));
@@ -597,6 +656,14 @@ export default function CoachesPage() {
   function resetExerciseForm() {
     setEditingExerciseId(null);
     setExerciseForm({ ...EMPTY_EXERCISE_FORM });
+    setExerciseDrawerOpen(false);
+  }
+
+  function openNewExercise() {
+    setEditingExerciseId(null);
+    setExerciseForm({ ...EMPTY_EXERCISE_FORM });
+    setExerciseDrawerOpen(true);
+    clearFeedback();
   }
 
   async function publishExistingWorkout(workoutId: string) {
@@ -643,7 +710,9 @@ export default function CoachesPage() {
       session={session}
       subtitle={isMetricsOnlySupervisor(session)
         ? "Consulta el desempeño y acompañamiento del equipo de coaches."
-        : "Crea planes completos, asígnalos a socios y mide el acompañamiento del equipo."}
+        : coachMetricsView
+          ? "Crea planes, asígnalos a socios y consulta tu propia actividad de acompañamiento."
+          : "Crea planes completos, asígnalos a socios y mide el acompañamiento del equipo."}
       title="Coaches y rutinas"
     >
       <div className="grid gap-5">
@@ -678,13 +747,14 @@ export default function CoachesPage() {
         ) : null}
 
         {tab === "builder" ? (
-          <form className="grid gap-5" onSubmit={saveWorkout}>
-            <section className="rounded-xl border border-[#d9e2dc] bg-white p-5 shadow-sm">
-              <div className="mb-4">
+          <form className="workout-builder" onSubmit={saveWorkout}>
+            <section className="workout-builder-overview">
+              <div className="workout-section-heading">
                 <p className="text-xs font-semibold uppercase tracking-wider text-[#6b7d72]">Plantilla</p>
                 <h2 className="text-xl font-semibold">
                   {editingWorkoutId ? "Editar rutina" : "Información de la rutina"}
                 </h2>
+                <span>Define los datos generales una vez; después organiza el plan por días y bloques.</span>
               </div>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 <Field label="Título">
@@ -701,32 +771,40 @@ export default function CoachesPage() {
                     <option value="ADVANCED">Avanzado</option>
                   </select>
                 </Field>
-                <Field label="Coach">
-                  <select
-                    className="app-input"
-                    disabled={!canManageAllWorkouts}
-                    onChange={(event) => setCoachId(event.target.value)}
-                    value={coachId}
-                  >
-                    {canManageAllWorkouts ? <option value="">Sin coach</option> : null}
-                    {selectableCoaches.map((coach) => (
-                      <option key={coach.id} value={coach.id}>{coach.displayName}</option>
-                    ))}
-                  </select>
-                </Field>
+                {canManageAllWorkouts ? (
+                  <Field label="Coach">
+                    <select
+                      className="app-input"
+                      onChange={(event) => setCoachId(event.target.value)}
+                      value={coachId}
+                    >
+                      <option value="">Sin coach</option>
+                      {selectableCoaches.map((coach) => (
+                        <option key={coach.id} value={coach.id}>{coach.displayName}</option>
+                      ))}
+                    </select>
+                  </Field>
+                ) : (
+                  <div className="workout-coach-identity">
+                    <span>Coach responsable</span>
+                    <strong>{assignedCoach?.displayName ?? session.user.fullName}</strong>
+                    <small>Tu perfil se asigna automáticamente.</small>
+                  </div>
+                )}
               </div>
               <Field label="Indicaciones generales">
                 <textarea
-                  className="app-input mt-3 min-h-20"
+                  className="app-input mt-3 min-h-16"
                   onChange={(event) => setSummary(event.target.value)}
+                  placeholder="Objetivo, frecuencia o indicaciones que aplican a toda la rutina"
                   value={summary}
                 />
               </Field>
             </section>
 
             {sessions.map((day, sessionIndex) => (
-              <section className="rounded-xl border border-[#d9e2dc] bg-white p-5 shadow-sm" key={sessionIndex}>
-                <div className="flex flex-wrap items-start justify-between gap-3">
+              <section className="workout-day-card" key={sessionIndex}>
+                <div className="workout-day-header">
                   <div className="grid flex-1 gap-3 md:grid-cols-2">
                     <Field label={`Sesión ${sessionIndex + 1}`}>
                       <input
@@ -752,17 +830,20 @@ export default function CoachesPage() {
                     onMove={(direction) => setSessions((items) => moveItem(items, sessionIndex, direction))}
                   />
                 </div>
-                <textarea
-                  className="app-input mt-3 min-h-16"
-                  onChange={(event) => updateSession(sessionIndex, { notes: event.target.value })}
-                  placeholder="Movilidad, calentamiento o notas del día"
-                  value={day.notes ?? ""}
-                />
+                <details className="workout-optional-panel" open={Boolean(day.notes) || undefined}>
+                  <summary>Notas, movilidad o calentamiento del día</summary>
+                  <textarea
+                    className="app-input min-h-16"
+                    onChange={(event) => updateSession(sessionIndex, { notes: event.target.value })}
+                    placeholder="Agrega sólo cuando este día necesita indicaciones particulares"
+                    value={day.notes ?? ""}
+                  />
+                </details>
 
-                <div className="mt-4 grid gap-4">
+                <div className="workout-block-list">
                   {day.blocks.map((block, blockIndex) => (
-                    <article className="rounded-xl border border-[#cfdad2] bg-[#f8faf8] p-4" key={blockIndex}>
-                      <div className="flex flex-wrap items-start justify-between gap-3">
+                    <article className="workout-block-card" key={blockIndex}>
+                      <div className="workout-block-header">
                         <div className="grid flex-1 gap-3 md:grid-cols-2">
                           <Field label={`Bloque ${blockIndex + 1}`}>
                             <input
@@ -798,14 +879,17 @@ export default function CoachesPage() {
                           })}
                         />
                       </div>
-                      <textarea
-                        className="app-input mt-3 min-h-14"
-                        onChange={(event) => updateBlock(sessionIndex, blockIndex, { notes: event.target.value })}
-                        placeholder="Notas del bloque"
-                        value={block.notes ?? ""}
-                      />
+                      <details className="workout-optional-panel compact" open={Boolean(block.notes) || undefined}>
+                        <summary>Notas opcionales del bloque</summary>
+                        <textarea
+                          className="app-input min-h-14"
+                          onChange={(event) => updateBlock(sessionIndex, blockIndex, { notes: event.target.value })}
+                          placeholder="Indicaciones que aplican a todos los ejercicios de este bloque"
+                          value={block.notes ?? ""}
+                        />
+                      </details>
 
-                      <div className="mt-3 grid gap-3">
+                      <div className="workout-exercise-list">
                         {block.exercises.map((exercise, exerciseIndex) => (
                           <ExerciseEditor
                             blockIndex={blockIndex}
@@ -831,7 +915,7 @@ export default function CoachesPage() {
                             <option key={exercise.id} value={exercise.name} />
                           ))}
                         </datalist>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="workout-add-exercise">
                           <button
                             className="rounded-md border border-[#b9c9bf] bg-white px-3 py-2 text-sm font-semibold"
                             onClick={() => mutateBlock(sessionIndex, blockIndex, (current) => ({
@@ -874,7 +958,7 @@ export default function CoachesPage() {
               </section>
             ))}
 
-            <div className="flex flex-wrap justify-between gap-3">
+            <div className="workout-builder-actions">
               <button
                 className="rounded-lg border border-[#9eb2a5] bg-white px-4 py-2 font-semibold"
                 onClick={() => setSessions((items) => [...items, emptySession(items.length)])}
@@ -948,25 +1032,29 @@ export default function CoachesPage() {
         ) : null}
 
         {tab === "catalog" ? (
-          <section className="grid gap-5 lg:grid-cols-[1.4fr_0.8fr]">
+          <section className="exercise-catalog">
             <article className="rounded-xl border border-[#d9e2dc] bg-white p-5">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="exercise-catalog-toolbar">
                 <div>
                   <h2 className="text-xl font-semibold">Catálogo de ejercicios</h2>
-                  <p className="text-sm text-[#637268]">{exercisePage.length} opciones disponibles en esta vista.</p>
+                  <p className="text-sm text-[#637268]">{exercisePage.length} opciones normalizadas para reutilizar en tus rutinas.</p>
                 </div>
-                <input
-                  className="app-input max-w-xs"
-                  onChange={(event) => setExerciseQuery(event.target.value)}
-                  placeholder="Buscar nombre, músculo o equipo"
-                  value={exerciseQuery}
-                />
+                <div>
+                  <input
+                    className="app-input"
+                    onChange={(event) => setExerciseQuery(event.target.value)}
+                    placeholder="Buscar nombre, músculo o equipo"
+                    value={exerciseQuery}
+                  />
+                  <button className="app-button" onClick={openNewExercise} type="button">
+                    + Nuevo ejercicio
+                  </button>
+                </div>
               </div>
               <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                 {filteredExercises.map((exercise) => {
                   const manageable = canManageExerciseCatalog
                     || exercise.createdBy === session.user.userId;
-                  const aliases = exerciseAliases[exercise.id];
                   return (
                     <article className="rounded-lg border border-[#dde5df] p-3" key={exercise.id}>
                       <div className="flex justify-between gap-2">
@@ -982,7 +1070,7 @@ export default function CoachesPage() {
                         <>
                           <div className="mt-3 flex flex-wrap gap-2">
                             <button className="rounded-md border px-2 py-1 text-xs font-semibold" onClick={() => editExercise(exercise)} type="button">
-                              Editar y ver aliases
+                              Editar detalles
                             </button>
                             {canManageExerciseCatalog ? (
                               <button className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700" onClick={() => changeExerciseStatus(exercise, "ARCHIVED")} type="button">
@@ -990,41 +1078,6 @@ export default function CoachesPage() {
                               </button>
                             ) : null}
                           </div>
-                          <div className="mt-3 flex gap-2">
-                            <input
-                              aria-label={`Nuevo alias para ${exercise.name}`}
-                              className="app-input min-w-0 text-xs"
-                              onChange={(event) => setAliasDrafts((current) => ({
-                                ...current,
-                                [exercise.id]: event.target.value,
-                              }))}
-                              placeholder="Agregar alias"
-                              value={aliasDrafts[exercise.id] ?? ""}
-                            />
-                            <button
-                              className="rounded-md border px-2 text-xs font-semibold"
-                              disabled={saving || !aliasDrafts[exercise.id]?.trim()}
-                              onClick={() => saveAlias(exercise)}
-                              type="button"
-                            >
-                              Guardar
-                            </button>
-                          </div>
-                          {aliases?.length ? (
-                            <div className="mt-2 flex flex-wrap gap-1">
-                              {aliases.map((alias) => (
-                                <button
-                                  className="rounded-full bg-[#edf3ef] px-2 py-1 text-[11px]"
-                                  key={alias}
-                                  onClick={() => removeAlias(exercise, alias)}
-                                  title="Eliminar alias"
-                                  type="button"
-                                >
-                                  {alias} ×
-                                </button>
-                              ))}
-                            </div>
-                          ) : null}
                         </>
                       ) : null}
                     </article>
@@ -1032,73 +1085,6 @@ export default function CoachesPage() {
                 })}
               </div>
             </article>
-
-            <form className="rounded-xl border border-[#d9e2dc] bg-white p-5" onSubmit={saveExercise}>
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-xl font-semibold">{editingExerciseId ? "Editar ejercicio" : "Agregar ejercicio"}</h2>
-                {editingExerciseId ? (
-                  <button className="text-sm font-semibold text-[#365143]" onClick={resetExerciseForm} type="button">
-                    Cancelar
-                  </button>
-                ) : null}
-              </div>
-              <div className="mt-4 grid gap-3">
-                <Field label="Nombre"><ExerciseInput field="name" form={exerciseForm} setForm={setExerciseForm} /></Field>
-                <Field label="Descripción"><ExerciseInput field="description" form={exerciseForm} setForm={setExerciseForm} /></Field>
-                <Field label="Grupo muscular principal"><ExerciseInput field="primaryMuscleGroup" form={exerciseForm} setForm={setExerciseForm} /></Field>
-                <Field label="Grupos secundarios"><ExerciseInput field="secondaryMuscleGroups" form={exerciseForm} setForm={setExerciseForm} /></Field>
-                <Field label="Patrón de movimiento"><ExerciseInput field="movementPattern" form={exerciseForm} setForm={setExerciseForm} /></Field>
-                <Field label="Equipo"><ExerciseInput field="equipment" form={exerciseForm} setForm={setExerciseForm} /></Field>
-                <Field label="Tipo">
-                  <select className="app-input" onChange={(event) => setExerciseForm({ ...exerciseForm, type: event.target.value })} value={exerciseForm.type}>
-                    <option value="STRENGTH">Fuerza</option>
-                    <option value="MOBILITY">Movilidad</option>
-                    <option value="CARDIO">Cardio</option>
-                    <option value="CORE">Core</option>
-                    <option value="WARMUP">Calentamiento</option>
-                    <option value="STRETCHING">Estiramiento</option>
-                  </select>
-                </Field>
-                <Field label="Nivel sugerido"><ExerciseInput field="suggestedLevel" form={exerciseForm} setForm={setExerciseForm} /></Field>
-                <Field label="Lateralidad"><ExerciseInput field="laterality" form={exerciseForm} setForm={setExerciseForm} /></Field>
-                <Field label="Instrucciones">
-                  <textarea className="app-input min-h-24" onChange={(event) => setExerciseForm({ ...exerciseForm, instructions: event.target.value })} value={exerciseForm.instructions ?? ""} />
-                </Field>
-                <Field label="Advertencias">
-                  <textarea className="app-input min-h-20" onChange={(event) => setExerciseForm({ ...exerciseForm, warnings: event.target.value })} value={exerciseForm.warnings ?? ""} />
-                </Field>
-                {editingExerciseId ? (
-                  <div className="rounded-lg border border-dashed p-3">
-                    <p className="text-sm font-semibold">Imagen o video demostrativo</p>
-                    <p className="mb-2 text-xs text-[#637268]">JPG, PNG, WebP, GIF o MP4; máximo 8 MB.</p>
-                    <input
-                      accept="image/jpeg,image/png,image/webp,image/gif,video/mp4"
-                      disabled={saving}
-                      onChange={(event) => {
-                        const file = event.target.files?.[0];
-                        if (file) void changeExerciseMedia(file);
-                        event.target.value = "";
-                      }}
-                      type="file"
-                    />
-                    {exerciseForm.mediaUrl ? (
-                      <button className="mt-2 block text-xs font-semibold text-red-700" onClick={() => changeExerciseMedia()} type="button">
-                        Eliminar medio actual
-                      </button>
-                    ) : null}
-                  </div>
-                ) : (
-                  <p className="text-xs text-[#637268]">Guarda el ejercicio para poder adjuntar una imagen o video.</p>
-                )}
-                <button
-                  className="rounded-lg bg-[#173c2a] px-4 py-2 font-semibold text-white disabled:opacity-60"
-                  disabled={saving || !exerciseForm.name.trim()}
-                  type="submit"
-                >
-                  {editingExerciseId ? "Actualizar ejercicio" : "Guardar ejercicio"}
-                </button>
-              </div>
-            </form>
           </section>
         ) : null}
 
@@ -1160,16 +1146,27 @@ export default function CoachesPage() {
 
         {tab === "metrics" ? (
           <section className="grid gap-5">
+            {coachMetricsView ? (
+              <div className="coach-personal-metrics-heading">
+                <div>
+                  <p className="app-eyebrow">Mi seguimiento</p>
+                  <h2>Resultados de mis asignaciones</h2>
+                </div>
+                <span>Los datos de esta vista corresponden únicamente a tu perfil de Coach.</span>
+              </div>
+            ) : null}
             <div className="grid gap-4 rounded-xl border border-[#d9e2dc] bg-white p-4">
               <div className="flex flex-wrap items-end gap-3">
                 <Field label="Desde"><input className="app-input" onChange={(event) => setReportFrom(event.target.value)} type="date" value={reportFrom} /></Field>
                 <Field label="Hasta"><input className="app-input" onChange={(event) => setReportTo(event.target.value)} type="date" value={reportTo} /></Field>
-                <Field label="Coach">
-                  <select className="app-input min-w-48" onChange={(event) => setReportCoachId(event.target.value)} value={reportCoachId}>
-                    <option value="">Todos</option>
-                    {coaches.map((coach) => <option key={coach.id} value={coach.id}>{coach.displayName}</option>)}
-                  </select>
-                </Field>
+                {!coachMetricsView ? (
+                  <Field label="Coach">
+                    <select className="app-input min-w-48" onChange={(event) => setReportCoachId(event.target.value)} value={reportCoachId}>
+                      <option value="">Todos</option>
+                      {coaches.map((coach) => <option key={coach.id} value={coach.id}>{coach.displayName}</option>)}
+                    </select>
+                  </Field>
+                ) : null}
                 <Field label="Histórico">
                   <select className="app-input min-w-36" onChange={(event) => setTrendWeeks(Number(event.target.value))} value={trendWeeks}>
                     <option value={8}>8 semanas</option>
@@ -1255,11 +1252,17 @@ export default function CoachesPage() {
                 Comparación contra el periodo anterior: {report.previousFrom} a {report.previousTo}.
               </p>
             ) : null}
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className={`grid gap-3 sm:grid-cols-2 ${coachMetricsView ? "xl:grid-cols-3" : "xl:grid-cols-4"}`}>
               <Metric change={report?.assignmentChange} label="Rutinas asignadas" value={report?.assignments ?? 0} />
               <Metric change={report?.uniqueClientChange} label="Socios atendidos" value={report?.uniqueClients ?? 0} />
-              <Metric label="Coaches activos" value={report?.activeCoaches ?? 0} />
-              <Metric label="Sin asignaciones" value={report?.coachesWithoutAssignments ?? 0} />
+              {coachMetricsView ? (
+                <Metric label="Primeras rutinas" value={firstWorkouts} />
+              ) : (
+                <>
+                  <Metric label="Coaches activos" value={report?.activeCoaches ?? 0} />
+                  <Metric label="Sin asignaciones" value={report?.coachesWithoutAssignments ?? 0} />
+                </>
+              )}
             </div>
             <section className="rounded-xl border border-[#d9e2dc] bg-white p-5">
               <div>
@@ -1293,19 +1296,21 @@ export default function CoachesPage() {
                 />
               </div>
             </section>
-            <section className="rounded-xl border border-[#d9e2dc] bg-white p-5">
-              <h2 className="text-xl font-semibold">Desempeño por coach</h2>
-              <div className="mt-4 grid gap-2">
-                {report?.coaches.map((coach) => (
-                  <article className="grid items-center gap-2 rounded-lg border border-[#e0e7e2] p-3 sm:grid-cols-[1fr_repeat(3,120px)]" key={coach.coachId}>
-                    <strong>{coach.coachName}</strong>
-                    <span>{coach.assignments} asignadas</span>
-                    <span>{coach.uniqueClients} socios</span>
-                    <span>{coach.firstWorkouts} primeras</span>
-                  </article>
-                ))}
-              </div>
-            </section>
+            {!coachMetricsView ? (
+              <section className="rounded-xl border border-[#d9e2dc] bg-white p-5">
+                <h2 className="text-xl font-semibold">Desempeño por coach</h2>
+                <div className="mt-4 grid gap-2">
+                  {report?.coaches.map((coach) => (
+                    <article className="grid items-center gap-2 rounded-lg border border-[#e0e7e2] p-3 sm:grid-cols-[1fr_repeat(3,120px)]" key={coach.coachId}>
+                      <strong>{coach.coachName}</strong>
+                      <span>{coach.assignments} asignadas</span>
+                      <span>{coach.uniqueClients} socios</span>
+                      <span>{coach.firstWorkouts} primeras</span>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ) : null}
             <AssignmentTable
               canDownloadPdf={canDownloadAssignmentPdf}
               canManage={canManageAssignments}
@@ -1319,6 +1324,31 @@ export default function CoachesPage() {
             />
           </section>
         ) : null}
+
+        <ExerciseFormDrawer
+          aliasDraft={editingExerciseId ? aliasDrafts[editingExerciseId] ?? "" : ""}
+          aliases={editingExerciseId ? exerciseAliases[editingExerciseId] ?? [] : []}
+          editing={Boolean(editingExerciseId)}
+          form={exerciseForm}
+          open={exerciseDrawerOpen}
+          saving={saving}
+          onAliasDraftChange={(value) => {
+            if (!editingExerciseId) return;
+            setAliasDrafts((current) => ({ ...current, [editingExerciseId]: value }));
+          }}
+          onAliasRemove={(alias) => {
+            const exercise = exercisePage.find((item) => item.id === editingExerciseId);
+            if (exercise) void removeAlias(exercise, alias);
+          }}
+          onAliasSave={() => {
+            const exercise = exercisePage.find((item) => item.id === editingExerciseId);
+            if (exercise) void saveAlias(exercise);
+          }}
+          onChange={(patch) => setExerciseForm((current) => ({ ...current, ...patch }))}
+          onClose={resetExerciseForm}
+          onMediaChange={changeExerciseMedia}
+          onSubmit={saveExercise}
+        />
       </div>
     </AppShell>
   );
@@ -1327,6 +1357,259 @@ export default function CoachesPage() {
     setError(null);
     setMessage(null);
   }
+}
+
+function ExerciseFormDrawer({
+  aliasDraft,
+  aliases,
+  editing,
+  form,
+  open,
+  saving,
+  onAliasDraftChange,
+  onAliasRemove,
+  onAliasSave,
+  onChange,
+  onClose,
+  onMediaChange,
+  onSubmit,
+}: {
+  aliasDraft: string;
+  aliases: string[];
+  editing: boolean;
+  form: CreateExercisePayload;
+  open: boolean;
+  saving: boolean;
+  onAliasDraftChange: (value: string) => void;
+  onAliasRemove: (alias: string) => void;
+  onAliasSave: () => void;
+  onChange: (patch: Partial<CreateExercisePayload>) => void;
+  onClose: () => void;
+  onMediaChange: (file?: File) => Promise<void>;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+}) {
+  return (
+    <AppDrawer
+      description="Usa categorías estandarizadas para que los ejercicios nuevos se integren al catálogo sin generar variantes inconsistentes."
+      onClose={onClose}
+      open={open}
+      title={editing ? "Editar ejercicio" : "Nuevo ejercicio"}
+      wide
+    >
+      <form className="exercise-form" onSubmit={onSubmit}>
+        <section>
+          <div className="exercise-form-heading">
+            <span>1</span>
+            <div>
+              <strong>Identificación</strong>
+              <small>Nombre único y clasificación principal.</small>
+            </div>
+          </div>
+          <div className="exercise-form-grid">
+            <Field label="Nombre">
+              <input
+                className="app-input"
+                onChange={(event) => onChange({ name: event.target.value })}
+                placeholder="Ej. Press inclinado con mancuernas"
+                value={form.name}
+              />
+            </Field>
+            <Field label="Tipo">
+              <select className="app-input" onChange={(event) => onChange({ type: event.target.value })} value={form.type}>
+                <option value="STRENGTH">Fuerza</option>
+                <option value="MOBILITY">Movilidad</option>
+                <option value="CARDIO">Cardio</option>
+                <option value="CORE">Core</option>
+                <option value="WARMUP">Calentamiento</option>
+                <option value="STRETCHING">Estiramiento</option>
+              </select>
+            </Field>
+            <Field label="Grupo muscular principal">
+              <GuidedSelect
+                options={MUSCLE_GROUP_OPTIONS}
+                placeholder="Seleccionar grupo"
+                value={form.primaryMuscleGroup ?? ""}
+                onChange={(value) => onChange({ primaryMuscleGroup: value })}
+              />
+            </Field>
+            <Field label="Equipo">
+              <GuidedSelect
+                options={EQUIPMENT_OPTIONS}
+                placeholder="Seleccionar equipo"
+                value={form.equipment ?? ""}
+                onChange={(value) => onChange({ equipment: value })}
+              />
+            </Field>
+          </div>
+        </section>
+
+        <section>
+          <div className="exercise-form-heading">
+            <span>2</span>
+            <div>
+              <strong>Ejecución</strong>
+              <small>La guía que verá el coach al reutilizarlo.</small>
+            </div>
+          </div>
+          <Field label="Instrucciones">
+            <textarea
+              className="app-input min-h-24"
+              onChange={(event) => onChange({ instructions: event.target.value })}
+              placeholder="Describe posición inicial, recorrido y puntos de control."
+              value={form.instructions ?? ""}
+            />
+          </Field>
+        </section>
+
+        <details className="exercise-form-advanced">
+          <summary>Detalles técnicos opcionales</summary>
+          <div className="exercise-form-grid">
+            <Field label="Descripción">
+              <input className="app-input" onChange={(event) => onChange({ description: event.target.value })} value={form.description ?? ""} />
+            </Field>
+            <Field label="Grupos secundarios">
+              <input
+                className="app-input"
+                onChange={(event) => onChange({ secondaryMuscleGroups: event.target.value })}
+                placeholder="Ej. Tríceps, hombros"
+                value={form.secondaryMuscleGroups ?? ""}
+              />
+            </Field>
+            <Field label="Patrón de movimiento">
+              <GuidedSelect
+                options={MOVEMENT_PATTERN_OPTIONS}
+                placeholder="Seleccionar patrón"
+                value={form.movementPattern ?? ""}
+                onChange={(value) => onChange({ movementPattern: value })}
+              />
+            </Field>
+            <Field label="Nivel sugerido">
+              <select className="app-input" onChange={(event) => onChange({ suggestedLevel: event.target.value })} value={form.suggestedLevel ?? ""}>
+                <option value="">Sin nivel sugerido</option>
+                <option value="BEGINNER">Principiante</option>
+                <option value="INTERMEDIATE">Intermedio</option>
+                <option value="ADVANCED">Avanzado</option>
+              </select>
+            </Field>
+            <Field label="Lateralidad">
+              <select className="app-input" onChange={(event) => onChange({ laterality: event.target.value })} value={form.laterality ?? ""}>
+                <option value="">No aplica</option>
+                <option value="BILATERAL">Bilateral</option>
+                <option value="UNILATERAL">Unilateral</option>
+                <option value="ALTERNATING">Alternado</option>
+              </select>
+            </Field>
+            <Field label="Advertencias">
+              <textarea className="app-input min-h-20" onChange={(event) => onChange({ warnings: event.target.value })} value={form.warnings ?? ""} />
+            </Field>
+          </div>
+        </details>
+
+        <section className="exercise-media-panel">
+          <strong>Imagen o video demostrativo</strong>
+          {editing ? (
+            <>
+              <small>JPG, PNG, WebP, GIF o MP4; máximo 8 MB.</small>
+              <input
+                accept="image/jpeg,image/png,image/webp,image/gif,video/mp4"
+                disabled={saving}
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  if (file) void onMediaChange(file);
+                  event.target.value = "";
+                }}
+                type="file"
+              />
+              {form.mediaUrl ? (
+                <button className="text-xs font-semibold text-red-700" onClick={() => void onMediaChange()} type="button">
+                  Eliminar medio actual
+                </button>
+              ) : null}
+            </>
+          ) : (
+            <small>Guarda primero el ejercicio; después podrás adjuntar el medio al editarlo.</small>
+          )}
+        </section>
+
+        {editing ? (
+          <section className="exercise-alias-panel">
+            <div>
+              <strong>Nombres alternativos</strong>
+              <small>Ayudan a encontrar el mismo ejercicio sin duplicarlo en el catálogo.</small>
+            </div>
+            <div className="exercise-alias-entry">
+              <input
+                aria-label={`Nuevo alias para ${form.name}`}
+                className="app-input"
+                onChange={(event) => onAliasDraftChange(event.target.value)}
+                placeholder="Ej. Press superior"
+                value={aliasDraft}
+              />
+              <button
+                className="rounded-md border px-3 text-sm font-semibold"
+                disabled={saving || !aliasDraft.trim()}
+                onClick={onAliasSave}
+                type="button"
+              >
+                Agregar
+              </button>
+            </div>
+            {aliases.length ? (
+              <div className="exercise-alias-list">
+                {aliases.map((alias) => (
+                  <button
+                    className="rounded-full bg-[#edf3ef] px-3 py-1 text-xs"
+                    key={alias}
+                    onClick={() => onAliasRemove(alias)}
+                    title="Eliminar alias"
+                    type="button"
+                  >
+                    {alias} ×
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <small className="text-[#637268]">Este ejercicio aún no tiene nombres alternativos.</small>
+            )}
+          </section>
+        ) : null}
+
+        <div className="exercise-form-actions">
+          <button className="rounded-lg border border-[#9eb2a5] bg-white px-4 py-2 font-semibold" onClick={onClose} type="button">
+            Cancelar
+          </button>
+          <button
+            className="rounded-lg bg-[#173c2a] px-4 py-2 font-semibold text-white disabled:opacity-60"
+            disabled={saving || !form.name.trim() || !form.primaryMuscleGroup || !form.equipment}
+            type="submit"
+          >
+            {editing ? "Actualizar ejercicio" : "Guardar ejercicio"}
+          </button>
+        </div>
+      </form>
+    </AppDrawer>
+  );
+}
+
+function GuidedSelect({
+  onChange,
+  options,
+  placeholder,
+  value,
+}: {
+  onChange: (value: string) => void;
+  options: string[];
+  placeholder: string;
+  value: string;
+}) {
+  const hasLegacyValue = Boolean(value) && !options.includes(value);
+  return (
+    <select className="app-input" onChange={(event) => onChange(event.target.value)} value={value}>
+      <option value="">{placeholder}</option>
+      {hasLegacyValue ? <option value={value}>{value} (valor existente)</option> : null}
+      {options.map((option) => <option key={option} value={option}>{option}</option>)}
+    </select>
+  );
 }
 
 function ExerciseEditor({
@@ -1348,66 +1631,85 @@ function ExerciseEditor({
   onMove: (direction: -1 | 1) => void;
   total: number;
 }) {
+  const exerciseSummary = exercise.exerciseName.trim() || `Ejercicio ${exerciseIndex + 1}`;
+  const prescriptionSummary = [
+    exercise.sets ? `${exercise.sets} series` : "",
+    exercise.reps ? `${exercise.reps} reps` : "",
+    exercise.load ?? "",
+  ].filter(Boolean).join(" · ");
+
   return (
-    <article className="rounded-lg border border-[#e0e7e2] bg-white p-3">
-      <div className="flex items-start justify-between gap-3">
-        <p className="text-xs font-semibold uppercase tracking-wide text-[#637268]">
-          Ejercicio {exerciseIndex + 1} · bloque {blockIndex + 1}
-        </p>
-        <OrderButtons
-          canDelete={total > 1}
-          compact
-          index={exerciseIndex}
-          length={total}
-          onDelete={onDelete}
-          onMove={onMove}
-        />
-      </div>
-      <div className="mt-2 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-        <Field label="Ejercicio">
-          <input
-            className="app-input"
-            list={listId}
-            onChange={(event) => onChange({ exerciseName: event.target.value, exerciseId: null })}
-            value={exercise.exerciseName}
+    <details className="workout-exercise-card" open={exerciseIndex === 0 || undefined}>
+      <summary>
+        <span>
+          <small>Ejercicio {exerciseIndex + 1} · bloque {blockIndex + 1}</small>
+          <strong>{exerciseSummary}</strong>
+        </span>
+        <em>{prescriptionSummary || "Completar prescripción"}</em>
+      </summary>
+      <div className="workout-exercise-body">
+        <div className="workout-exercise-toolbar">
+          <span>Datos esenciales</span>
+          <OrderButtons
+            canDelete={total > 1}
+            compact
+            index={exerciseIndex}
+            length={total}
+            onDelete={onDelete}
+            onMove={onMove}
           />
-        </Field>
-        <Field label="Prescripción libre">
-          <input className="app-input" onChange={(event) => onChange({ prescription: event.target.value })} placeholder="3x12, 10/8/6" value={exercise.prescription} />
-        </Field>
-        <Field label="Series">
-          <input className="app-input" min="1" onChange={(event) => onChange({ sets: numberOrNull(event.target.value) })} type="number" value={exercise.sets ?? ""} />
-        </Field>
-        <Field label="Repeticiones">
-          <input className="app-input" onChange={(event) => onChange({ reps: event.target.value })} placeholder="8-12" value={exercise.reps ?? ""} />
-        </Field>
-        <Field label="Carga">
-          <input className="app-input" onChange={(event) => onChange({ load: event.target.value })} placeholder="20 kg / RPE 8" value={exercise.load ?? ""} />
-        </Field>
-        <Field label="Descanso (segundos)">
-          <input className="app-input" min="0" onChange={(event) => onChange({ restSeconds: numberOrNull(event.target.value) })} type="number" value={exercise.restSeconds ?? ""} />
-        </Field>
-        <Field label="Tempo">
-          <input className="app-input" onChange={(event) => onChange({ tempo: event.target.value })} placeholder="3-1-1" value={exercise.tempo ?? ""} />
-        </Field>
-        <Field label="Duración">
-          <input className="app-input" onChange={(event) => onChange({ duration: event.target.value })} placeholder="45 segundos" value={exercise.duration ?? ""} />
-        </Field>
-        <Field label="Distancia">
-          <input className="app-input" onChange={(event) => onChange({ distance: event.target.value })} placeholder="500 m" value={exercise.distance ?? ""} />
-        </Field>
-        <Field label="Agrupación">
-          <input className="app-input" onChange={(event) => onChange({ groupKey: event.target.value })} placeholder="A1 / circuito 1" value={exercise.groupKey ?? ""} />
-        </Field>
-        <Field label="Notas técnicas">
-          <input className="app-input" onChange={(event) => onChange({ notes: event.target.value })} value={exercise.notes ?? ""} />
-        </Field>
-        <label className="flex items-center gap-2 self-end pb-2 text-sm font-medium">
-          <input checked={exercise.optional ?? false} onChange={(event) => onChange({ optional: event.target.checked })} type="checkbox" />
-          Ejercicio opcional
-        </label>
+        </div>
+        <div className="workout-exercise-essential">
+          <Field label="Ejercicio">
+            <input
+              className="app-input"
+              list={listId}
+              onChange={(event) => onChange({ exerciseName: event.target.value, exerciseId: null })}
+              value={exercise.exerciseName}
+            />
+          </Field>
+          <Field label="Series">
+            <input className="app-input" min="1" onChange={(event) => onChange({ sets: numberOrNull(event.target.value) })} type="number" value={exercise.sets ?? ""} />
+          </Field>
+          <Field label="Repeticiones">
+            <input className="app-input" onChange={(event) => onChange({ reps: event.target.value })} placeholder="8-12" value={exercise.reps ?? ""} />
+          </Field>
+          <Field label="Carga">
+            <input className="app-input" onChange={(event) => onChange({ load: event.target.value })} placeholder="20 kg / RPE 8" value={exercise.load ?? ""} />
+          </Field>
+          <Field label="Descanso (segundos)">
+            <input className="app-input" min="0" onChange={(event) => onChange({ restSeconds: numberOrNull(event.target.value) })} type="number" value={exercise.restSeconds ?? ""} />
+          </Field>
+        </div>
+        <details className="workout-advanced-fields">
+          <summary>Campos avanzados y notas</summary>
+          <div>
+            <Field label="Prescripción libre">
+              <input className="app-input" onChange={(event) => onChange({ prescription: event.target.value })} placeholder="3x12, 10/8/6" value={exercise.prescription} />
+            </Field>
+            <Field label="Tempo">
+              <input className="app-input" onChange={(event) => onChange({ tempo: event.target.value })} placeholder="3-1-1" value={exercise.tempo ?? ""} />
+            </Field>
+            <Field label="Duración">
+              <input className="app-input" onChange={(event) => onChange({ duration: event.target.value })} placeholder="45 segundos" value={exercise.duration ?? ""} />
+            </Field>
+            <Field label="Distancia">
+              <input className="app-input" onChange={(event) => onChange({ distance: event.target.value })} placeholder="500 m" value={exercise.distance ?? ""} />
+            </Field>
+            <Field label="Agrupación">
+              <input className="app-input" onChange={(event) => onChange({ groupKey: event.target.value })} placeholder="A1 / circuito 1" value={exercise.groupKey ?? ""} />
+            </Field>
+            <Field label="Notas técnicas">
+              <input className="app-input" onChange={(event) => onChange({ notes: event.target.value })} value={exercise.notes ?? ""} />
+            </Field>
+            <label className="workout-optional-check">
+              <input checked={exercise.optional ?? false} onChange={(event) => onChange({ optional: event.target.checked })} type="checkbox" />
+              Ejercicio opcional
+            </label>
+          </div>
+        </details>
       </div>
-    </article>
+    </details>
   );
 }
 
@@ -1603,24 +1905,6 @@ function AssignmentTable({
   );
 }
 
-function ExerciseInput({
-  field,
-  form,
-  setForm,
-}: {
-  field: keyof CreateExercisePayload;
-  form: CreateExercisePayload;
-  setForm: React.Dispatch<React.SetStateAction<CreateExercisePayload>>;
-}) {
-  return (
-    <input
-      className="app-input"
-      onChange={(event) => setForm((current) => ({ ...current, [field]: event.target.value }))}
-      value={String(form[field] ?? "")}
-    />
-  );
-}
-
 function OrderButtons({
   canDelete,
   compact = false,
@@ -1807,15 +2091,23 @@ function hasAnyPermission(session: StoredSession, ...permissions: string[]) {
   return permissions.some((permission) => session.user.permissions.includes(permission));
 }
 
+function isCoachSession(session: StoredSession) {
+  return session.user.roles.some((role) => normalizeRole(role) === "coach");
+}
+
 function isMetricsOnlySupervisor(session: StoredSession) {
   if (session.user.platformAdmin) return false;
   return session.user.roles.some((role) => {
-    const normalized = role
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase();
+    const normalized = normalizeRole(role);
     return normalized === "dueno del gimnasio"
       || normalized === "administrador"
       || normalized === "gerente";
   });
+}
+
+function normalizeRole(role: string) {
+  return role
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
 }

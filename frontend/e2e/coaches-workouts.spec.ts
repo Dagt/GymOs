@@ -36,6 +36,8 @@ test.describe("coaches y rutinas", () => {
 
     await page.goto("/coaches");
     await expect(page.getByRole("heading", { name: "Coaches y rutinas" })).toBeVisible();
+    await expect(page.getByText("Tu perfil se asigna automáticamente.")).toBeVisible();
+    await expect(page.getByRole("combobox", { name: "Coach", exact: true })).toHaveCount(0);
     await page.getByLabel("Título").fill("Rutina E2E");
     await page.getByRole("combobox", { name: "Ejercicio", exact: true }).fill("Sentadilla libre");
     await page.getByLabel("Series").fill("4");
@@ -91,12 +93,12 @@ test.describe("coaches y rutinas", () => {
 
     await page.goto("/coaches");
     await page.getByRole("button", { name: "Ejercicios" }).click();
-    await page.getByRole("button", { name: "Editar y ver aliases" }).click();
+    await page.getByRole("button", { name: "Editar detalles" }).click();
     await page.getByLabel("Nombre").fill("Press inclinado actualizado");
     await page.getByRole("button", { name: "Actualizar ejercicio" }).click();
     await expect.poll(() => updatePayload?.name).toBe("Press inclinado actualizado");
 
-    await page.getByRole("button", { name: "Editar y ver aliases" }).click();
+    await page.getByRole("button", { name: "Editar detalles" }).click();
     await page.getByRole("button", { name: "Press superior ×" }).click();
     await expect.poll(() => aliasDeleted).toBe(true);
     await page.locator('input[type="file"]').setInputFiles({
@@ -107,10 +109,9 @@ test.describe("coaches y rutinas", () => {
     await expect.poll(() => mediaUploaded).toBe(true);
   });
 
-  test("cancela con motivo y filtra métricas históricas por coach y socio", async ({ page }) => {
+  test("cancela con motivo y filtra sus métricas históricas por socio", async ({ page }) => {
     let cancelledWith: Record<string, unknown> | null = null;
     let replacementPayload: Record<string, unknown> | null = null;
-    let reportCoachFilter = "";
     let reportClientFilter = "";
     let trendWeeksFilter = "";
     await bootCoaching(page, async (route, path, url) => {
@@ -125,7 +126,6 @@ test.describe("coaches y rutinas", () => {
         return true;
       }
       if (path === "/reports/coaches/workout-assignments/summary") {
-        reportCoachFilter = url.searchParams.get("coachId") ?? reportCoachFilter;
         reportClientFilter = url.searchParams.get("clientId") ?? reportClientFilter;
         await route.fulfill({ contentType: "application/json", body: JSON.stringify(report()) });
         return true;
@@ -167,10 +167,12 @@ test.describe("coaches y rutinas", () => {
     await page.getByPlaceholder("Nombre, correo o teléfono").last().fill("Diego");
     await page.getByRole("button", { name: "Buscar socio" }).click();
     await page.getByRole("button", { name: "Diego García" }).click();
-    await page.getByLabel("Coach").last().selectOption(coachId);
+    await expect(page.getByRole("combobox", { name: "Coach", exact: true })).toHaveCount(0);
+    await expect(page.getByText("Coaches activos")).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Desempeño por coach" })).toHaveCount(0);
+    await expect(page.getByText("Primeras rutinas", { exact: true }).first()).toBeVisible();
     await page.getByLabel("Histórico").selectOption("26");
     await page.getByRole("button", { name: "Actualizar" }).click();
-    await expect.poll(() => reportCoachFilter).toBe(coachId);
     await expect.poll(() => reportClientFilter).toBe(clientId);
     await expect.poll(() => trendWeeksFilter).toBe("26");
     await expect(page.getByLabel("Rutinas asignadas por semana")).toBeVisible();

@@ -30,9 +30,12 @@ export function TeamOverview({ branches, roles, onCreateUser }: { branches: Bran
       {branches.length === 0 ? (
         <section className="team-warning"><strong>Primero crea una sucursal</strong><span>Sin sucursales no podras asignar acceso operativo a recepcion, coaches o gerencia.</span><Link href="/settings/organization">Crear sucursal</Link></section>
       ) : null}
-      <div className="team-role-list compact">
-        {roles.map((role) => <article key={role.id}><strong>{displayRoleName(role.name)}</strong><span>{roleDescription(role.name, role.description)}</span><small>{role.permissionCount} permisos</small></article>)}
-      </div>
+      <details className="team-role-disclosure">
+        <summary>Consultar roles disponibles ({roles.length})</summary>
+        <div className="team-role-list compact">
+          {roles.map((role) => <article key={role.id}><strong>{displayRoleName(role.name)}</strong><span>{roleDescription(role.name, role.description)}</span><small>{role.permissionCount} permisos</small></article>)}
+        </div>
+      </details>
     </section>
   );
 }
@@ -70,6 +73,14 @@ export function UsersTable({
       <div className="admin-panel-header"><div><p>Usuarios actuales</p><h2>Equipo del gimnasio</h2></div></div>
       <div className="team-user-table">
         {users.length === 0 ? <section className="admin-empty-card"><strong>No hay usuarios internos creados</strong><span>Crea cuentas para duenos, gerentes, recepcion y coaches.</span></section> : null}
+        {users.length ? (
+          <div aria-hidden="true" className="team-user-table-header">
+            <span>Usuario</span>
+            <span>Sucursales</span>
+            <span>Rol</span>
+            <span>Estado y acciones</span>
+          </div>
+        ) : null}
         {users.map((user) => {
           const isCurrentUser = user.id === session.user.userId;
           const isOwner = user.roles.some((role) => displayRoleName(role) === "Dueno del gimnasio");
@@ -77,23 +88,57 @@ export function UsersTable({
           const canManage = !isCurrentUser && canManageUserForSession(session.user.roles, user.roles, Boolean(session.user.platformAdmin));
           return (
             <article key={user.id}>
-              <div><strong>{user.fullName}</strong><span className="break-all">{user.username}</span></div>
-              <div><span>{user.roles.map(displayRoleName).join(", ") || "Sin rol"}</span><small>{user.branches.join(", ") || "Sin sucursal"}</small></div>
-              <div className="team-user-actions">
-                {canManage ? (
-                  <label className="team-role-control"><span>Rol</span><select defaultValue={roleIdForUser(user, roles)} disabled={saving} onChange={(event) => onChangeRole(user, event.target.value)}><option value="">Seleccionar rol</option>{roles.map((role) => <option key={role.id} value={role.id}>{displayRoleName(role.name)}</option>)}</select></label>
-                ) : (
-                  <div className="team-role-control"><span>Rol protegido</span><strong>{user.roles.map(displayRoleName).join(", ") || "Sin rol"}</strong></div>
-                )}
-                <div className="team-user-action-buttons">
-                  <p className={user.status === "ACTIVE" ? "status-pill active" : "status-pill"}>{user.status}</p>
-                  {canManage && isCoach && session.user.permissions.includes("coach.profile.manage") ? (
-                    <button className="safe-action" disabled={saving} onClick={() => onEditCoach(user)} type="button">
-                      Datos de Coach
-                    </button>
-                  ) : null}
-                  {canManage ? <button className={user.status === "ACTIVE" ? "danger-action" : "safe-action"} disabled={saving} onClick={() => onToggleStatus(user)} type="button">{user.status === "ACTIVE" ? "Suspender" : "Reactivar"}</button> : <small>{isCurrentUser ? "Tu cuenta" : isOwner ? "Dueno protegido" : "Solo lectura"}</small>}
+              <div className="team-user-identity">
+                <span className="team-user-avatar">{userInitials(user.fullName)}</span>
+                <div>
+                  <strong>{user.fullName}</strong>
+                  <span className="break-all">{user.username}</span>
                 </div>
+              </div>
+              <div className="team-user-branches">
+                <span className="team-mobile-label">Sucursales</span>
+                <span>{user.branches.join(", ") || "Sin sucursal"}</span>
+              </div>
+              {canManage ? (
+                <label className="team-role-control">
+                  <span className="team-mobile-label">Rol</span>
+                  <select
+                    aria-label={`Rol de ${user.fullName}`}
+                    defaultValue={roleIdForUser(user, roles)}
+                    disabled={saving}
+                    onChange={(event) => onChangeRole(user, event.target.value)}
+                  >
+                    <option value="">Seleccionar rol</option>
+                    {roles.map((role) => <option key={role.id} value={role.id}>{displayRoleName(role.name)}</option>)}
+                  </select>
+                </label>
+              ) : (
+                <div className="team-role-control">
+                  <span className="team-mobile-label">Rol protegido</span>
+                  <strong>{user.roles.map(displayRoleName).join(", ") || "Sin rol"}</strong>
+                </div>
+              )}
+              <div className="team-user-action-buttons">
+                <p className={user.status === "ACTIVE" ? "status-pill active" : "status-pill"}>
+                  {user.status === "ACTIVE" ? "Activo" : "Suspendido"}
+                </p>
+                {canManage && isCoach && session.user.permissions.includes("coach.profile.manage") ? (
+                  <button className="safe-action" disabled={saving} onClick={() => onEditCoach(user)} type="button">
+                    Datos de Coach
+                  </button>
+                ) : null}
+                {canManage ? (
+                  <button
+                    className={user.status === "ACTIVE" ? "danger-action" : "safe-action"}
+                    disabled={saving}
+                    onClick={() => onToggleStatus(user)}
+                    type="button"
+                  >
+                    {user.status === "ACTIVE" ? "Suspender" : "Reactivar"}
+                  </button>
+                ) : (
+                  <small>{isCurrentUser ? "Tu cuenta" : isOwner ? "Dueno protegido" : "Solo lectura"}</small>
+                )}
               </div>
             </article>
           );
@@ -101,6 +146,15 @@ export function UsersTable({
       </div>
     </section>
   );
+}
+
+function userInitials(fullName: string) {
+  return fullName
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0).toUpperCase())
+    .join("") || "U";
 }
 
 export function CoachProfileDrawer({
