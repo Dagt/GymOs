@@ -1005,19 +1005,9 @@ export default function CoachesPage() {
                           ))}
                         </datalist>
                         <div className="workout-add-exercise">
-                          <button
-                            className="rounded-md border border-[#b9c9bf] bg-white px-3 py-2 text-sm font-semibold"
-                            onClick={() => mutateBlock(sessionIndex, blockIndex, (current) => ({
-                              ...current,
-                              exercises: [...current.exercises, emptyExercise()],
-                            }))}
-                            type="button"
-                          >
-                            + Ejercicio libre
-                          </button>
                           <select
                             aria-label={`Agregar ejercicio de catálogo al bloque ${blockIndex + 1}`}
-                            className="rounded-md border border-[#b9c9bf] bg-white px-3 py-2 text-sm"
+                            className="rounded-lg border border-[#3b604b] bg-emerald-50/50 px-3 py-2 text-sm font-bold text-[#1e382b] transition-all hover:bg-emerald-100/70"
                             defaultValue=""
                             onChange={(event) => {
                               const found = exercisePage.find((item) => item.id === event.target.value);
@@ -1025,7 +1015,7 @@ export default function CoachesPage() {
                               event.target.value = "";
                             }}
                           >
-                            <option value="">Agregar desde catálogo…</option>
+                            <option value="">➕ Agregar ejercicio del catálogo…</option>
                             {exercisePage.map((exercise) => (
                               <option key={exercise.id} value={exercise.id}>{exercise.name}</option>
                             ))}
@@ -2021,15 +2011,6 @@ function ExerciseEditor({
           </Field>
         </div>
         <div className="workout-exercise-secondary-actions">
-          <button
-            onClick={() => {
-              if (!usesDetailedSets) enableDetailedSets();
-              setDetailsOpen(true);
-            }}
-            type="button"
-          >
-            {usesDetailedSets ? "Editar series personalizadas" : "Personalizar series"}
-          </button>
           <button onClick={() => setDetailsOpen(true)} type="button">
             Más opciones{optionalDetailCount ? ` (${optionalDetailCount})` : ""}
           </button>
