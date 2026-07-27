@@ -3461,7 +3461,7 @@ button.admin-secondary-link:disabled {
 .exercise-catalog-list {
   display: grid;
   gap: 0.65rem;
-  grid-auto-rows: 10.75rem;
+  grid-auto-rows: 7.5rem;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-top: 1rem;
   max-height: min(64vh, 43rem);
@@ -3482,20 +3482,27 @@ button.admin-secondary-link:disabled {
   padding: 0.75rem;
 }
 
-.exercise-catalog-card > .mt-3 {
+.exercise-catalog-card-actions {
   margin-top: auto;
 }
 
 .exercise-catalog-description {
   color: var(--brand-ink);
-  display: -webkit-box;
   font-size: 0.75rem;
   line-height: 1.4;
-  margin-top: 0.5rem;
-  min-height: 2.1em;
+  margin-top: 0.35rem;
   overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.exercise-catalog-media {
+  background: #e7f6ed;
+  border-radius: 999px;
+  color: #1f6b43;
+  font-size: 0.6rem;
+  font-weight: 800;
+  padding: 0.12rem 0.35rem;
 }
 
 .exercise-form {
@@ -3540,17 +3547,22 @@ button.admin-secondary-link:disabled {
 }
 
 .exercise-form-grid {
+  align-items: start;
   display: grid;
   gap: 0.75rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.exercise-equipment-selector {
+.exercise-new-equipment {
+  background: #f7faf8;
+  border: 1px solid var(--brand-line);
+  border-radius: 0.65rem;
   display: grid;
-  gap: 0.45rem;
+  gap: 0.35rem;
+  padding: 0.65rem 0.75rem;
 }
 
-.exercise-equipment-selector small {
+.exercise-new-equipment small {
   color: var(--brand-muted);
   font-size: 0.72rem;
   line-height: 1.4;
@@ -4236,7 +4248,7 @@ button.admin-secondary-link:disabled {
   }
 
   .exercise-catalog-list {
-    grid-auto-rows: 10.75rem;
+    grid-auto-rows: 7.5rem;
     grid-template-columns: 1fr;
     max-height: 65vh;
   }

@@ -138,6 +138,11 @@ test.describe("coaches y rutinas", () => {
     await page.getByLabel("Nombre", { exact: true }).fill("Empuje de trineo");
     await page.getByLabel("Grupo muscular principal").selectOption("Cuerpo completo");
     await page.getByRole("combobox", { name: "Equipo", exact: true }).selectOption("__CREATE_EQUIPMENT__");
+    const [muscleField, equipmentField] = await Promise.all([
+      page.getByLabel("Grupo muscular principal").boundingBox(),
+      page.getByRole("combobox", { name: "Equipo", exact: true }).boundingBox(),
+    ]);
+    expect(Math.abs((muscleField?.y ?? 0) - (equipmentField?.y ?? 0))).toBeLessThanOrEqual(1);
     await page.getByLabel("Nombre del equipo nuevo").fill("Trineo de empuje");
     await page.getByRole("button", { name: "Guardar ejercicio" }).click();
 
@@ -152,6 +157,7 @@ test.describe("coaches y rutinas", () => {
       cards.nth(1).boundingBox(),
     ]);
     expect(Math.abs((firstCard?.height ?? 0) - (secondCard?.height ?? 0))).toBeLessThanOrEqual(1);
+    expect(firstCard?.height ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(121);
 
     await page.getByRole("button", { name: "+ Nuevo ejercicio" }).click();
     await expect(

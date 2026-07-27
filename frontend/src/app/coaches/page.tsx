@@ -1086,28 +1086,30 @@ export default function CoachesPage() {
                     || exercise.createdBy === session.user.userId;
                   return (
                     <article className="exercise-catalog-card" key={exercise.id}>
-                      <div className="flex justify-between gap-2">
-                        <strong>{exercise.name}</strong>
-                        <span className="text-[10px] font-semibold text-[#66786d]">{exercise.origin}</span>
+                      <div className="flex min-w-0 items-start justify-between gap-2">
+                        <strong className="min-w-0 truncate" title={exercise.name}>{exercise.name}</strong>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          {exercise.mediaUrl ? <span className="exercise-catalog-media">Medio</span> : null}
+                          <span className="text-[10px] font-semibold text-[#66786d]">{exercise.origin}</span>
+                        </div>
                       </div>
                       <p className="mt-1 text-xs text-[#637268]">
                         {exercise.primaryMuscleGroup || "General"} · {exercise.equipment || "Sin equipo"}
                       </p>
-                      {exercise.instructions ? <p className="exercise-catalog-description">{exercise.instructions}</p> : null}
-                      {exercise.mediaUrl ? <p className="mt-2 text-xs font-semibold text-emerald-800">Medio adjunto</p> : null}
+                      {exercise.instructions ? (
+                        <p className="exercise-catalog-description" title={exercise.instructions}>{exercise.instructions}</p>
+                      ) : null}
                       {manageable && exercise.origin !== "SYSTEM" ? (
-                        <>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            <button className="rounded-md border px-2 py-1 text-xs font-semibold" onClick={() => editExercise(exercise)} type="button">
-                              Editar detalles
+                        <div className="exercise-catalog-card-actions flex flex-wrap gap-2">
+                          <button className="rounded-md border px-2 py-1 text-xs font-semibold" onClick={() => editExercise(exercise)} type="button">
+                            Editar detalles
+                          </button>
+                          {canManageExerciseCatalog ? (
+                            <button className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700" onClick={() => changeExerciseStatus(exercise, "ARCHIVED")} type="button">
+                              Archivar
                             </button>
-                            {canManageExerciseCatalog ? (
-                              <button className="rounded-md border border-red-200 px-2 py-1 text-xs font-semibold text-red-700" onClick={() => changeExerciseStatus(exercise, "ARCHIVED")} type="button">
-                                Archivar
-                              </button>
-                            ) : null}
-                          </div>
-                        </>
+                          ) : null}
+                        </div>
                       ) : null}
                     </article>
                   );
@@ -1437,41 +1439,11 @@ function ExerciseFormDrawer({
               <small>Nombre único y clasificación principal.</small>
             </div>
           </div>
-          <div className="exercise-form-grid">
-            <Field label="Nombre">
-              <input
-                className="app-input"
-                onChange={(event) => onChange({ name: event.target.value })}
-                placeholder="Ej. Press inclinado con mancuernas"
-                value={form.name}
-              />
-            </Field>
-            <Field label="Tipo">
-              <select className="app-input" onChange={(event) => onChange({ type: event.target.value })} value={form.type}>
-                <option value="STRENGTH">Fuerza</option>
-                <option value="MOBILITY">Movilidad</option>
-                <option value="CARDIO">Cardio</option>
-                <option value="CORE">Core</option>
-                <option value="WARMUP">Calentamiento</option>
-                <option value="STRETCHING">Estiramiento</option>
-              </select>
-            </Field>
-            <Field label="Grupo muscular principal">
-              <GuidedSelect
-                options={MUSCLE_GROUP_OPTIONS}
-                placeholder="Seleccionar grupo"
-                value={form.primaryMuscleGroup ?? ""}
-                onChange={(value) => onChange({ primaryMuscleGroup: value })}
-              />
-            </Field>
-            <Field label="Equipo">
-              <EquipmentSelector
-                options={equipmentOptions}
-                value={form.equipment ?? ""}
-                onChange={(value) => onChange({ equipment: value })}
-              />
-            </Field>
-          </div>
+          <ExerciseIdentificationFields
+            equipmentOptions={equipmentOptions}
+            form={form}
+            onChange={onChange}
+          />
         </section>
 
         <section>
@@ -1622,54 +1594,87 @@ function ExerciseFormDrawer({
   );
 }
 
-function EquipmentSelector({
+function ExerciseIdentificationFields({
+  equipmentOptions,
+  form,
   onChange,
-  options,
-  value,
 }: {
-  onChange: (value: string) => void;
-  options: string[];
-  value: string;
+  equipmentOptions: string[];
+  form: CreateExercisePayload;
+  onChange: (patch: Partial<CreateExercisePayload>) => void;
 }) {
   const [creatingEquipment, setCreatingEquipment] = useState(false);
-  const hasLegacyValue = Boolean(value) && !options.includes(value);
+  const equipment = form.equipment ?? "";
+  const hasLegacyValue = Boolean(equipment) && !equipmentOptions.includes(equipment);
 
   return (
-    <div className="exercise-equipment-selector">
-      <select
-        aria-label="Equipo"
-        className="app-input"
-        onChange={(event) => {
-          if (event.target.value === "__CREATE_EQUIPMENT__") {
-            setCreatingEquipment(true);
-            onChange("");
-            return;
-          }
-          setCreatingEquipment(false);
-          onChange(event.target.value);
-        }}
-        value={creatingEquipment ? "__CREATE_EQUIPMENT__" : value}
-      >
-        <option value="">Seleccionar equipo</option>
-        {hasLegacyValue ? <option value={value}>{value} (valor existente)</option> : null}
-        {options.map((option) => <option key={option} value={option}>{option}</option>)}
-        <option value="__CREATE_EQUIPMENT__">+ Crear nuevo equipo</option>
-      </select>
-      {creatingEquipment ? (
-        <>
+    <>
+      <div className="exercise-form-grid">
+        <Field label="Nombre">
           <input
-            aria-label="Nombre del equipo nuevo"
-            autoFocus
             className="app-input"
-            maxLength={120}
-            onChange={(event) => onChange(event.target.value)}
-            placeholder="Ej. Trineo de empuje"
-            value={value}
+            onChange={(event) => onChange({ name: event.target.value })}
+            placeholder="Ej. Press inclinado con mancuernas"
+            value={form.name}
           />
+        </Field>
+        <Field label="Tipo">
+          <select className="app-input" onChange={(event) => onChange({ type: event.target.value })} value={form.type}>
+            <option value="STRENGTH">Fuerza</option>
+            <option value="MOBILITY">Movilidad</option>
+            <option value="CARDIO">Cardio</option>
+            <option value="CORE">Core</option>
+            <option value="WARMUP">Calentamiento</option>
+            <option value="STRETCHING">Estiramiento</option>
+          </select>
+        </Field>
+        <Field label="Grupo muscular principal">
+          <GuidedSelect
+            options={MUSCLE_GROUP_OPTIONS}
+            placeholder="Seleccionar grupo"
+            value={form.primaryMuscleGroup ?? ""}
+            onChange={(value) => onChange({ primaryMuscleGroup: value })}
+          />
+        </Field>
+        <Field label="Equipo">
+          <select
+            aria-label="Equipo"
+            className="app-input"
+            onChange={(event) => {
+              if (event.target.value === "__CREATE_EQUIPMENT__") {
+                setCreatingEquipment(true);
+                onChange({ equipment: "" });
+                return;
+              }
+              setCreatingEquipment(false);
+              onChange({ equipment: event.target.value });
+            }}
+            value={creatingEquipment ? "__CREATE_EQUIPMENT__" : equipment}
+          >
+            <option value="">Seleccionar equipo</option>
+            {hasLegacyValue ? <option value={equipment}>{equipment} (valor existente)</option> : null}
+            {equipmentOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+            <option value="__CREATE_EQUIPMENT__">+ Crear nuevo equipo</option>
+          </select>
+        </Field>
+      </div>
+      {creatingEquipment ? (
+        <div className="exercise-new-equipment">
+          <Field label="Nombre del equipo nuevo">
+            <input
+              aria-label="Nombre del equipo nuevo"
+              autoFocus
+              className="app-input"
+              maxLength={120}
+              onChange={(event) => onChange({ equipment: event.target.value })}
+              placeholder="Ej. Trineo de empuje"
+              value={equipment}
+            />
+          </Field>
           <small>Se agregará a la lista del gimnasio cuando guardes este ejercicio.</small>
-        </>
+        </div>
       ) : null}
-    </div>
+    </>
   );
 }
 
