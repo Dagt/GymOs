@@ -19,6 +19,10 @@ All notable changes to GymOS will be documented in this file.
   with the `PUBLISHED` status produced by the publishing workflow.
 - Rework the workout builder into three progressive steps and move exercise
   descriptions to an on-demand preview.
+- Add explicit uniform and detailed set prescriptions, including no-rest
+  segments for pyramids, progressions and drop sets.
+- Repair assignment PDF downloads and replace the plain export with a branded,
+  paginated layout containing workout metadata and structured set tables.
 - Harden production readiness configuration.
 - Add operational runbooks for deployment, backup, restore, rollback, incidents and maintenance.
 - Restrict demo seed to the local Spring profile.

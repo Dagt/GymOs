@@ -2,8 +2,8 @@
 
 Estado: `ESTABILIZADO`
 Rama de cierre: `feature/coaches-workouts`
-Código verificado: `9af72e7`
-Corte: 26 de julio de 2026
+Código verificado: `fbdfa65`
+Corte: 27 de julio de 2026
 
 ## Propósito y alcance V1
 
@@ -91,12 +91,18 @@ La consulta remota por el socio pertenece a una aplicación futura.
 - biblioteca de rutinas propias o globales según permiso;
 - sesiones y bloques múltiples reordenables con controles accesibles;
 - ejercicios libres o seleccionados del catálogo;
-- series, repeticiones, carga, descanso, tempo, duración, distancia,
-  agrupación, opcionalidad, notas y prescripción libre;
+- modo `Series iguales`: número de series, repeticiones por serie y una carga
+  común;
+- modo `Series detalladas`: repeticiones y carga por serie, con tramos
+  adicionales sin descanso dentro de la misma serie para dropsets;
+- descanso, tempo, duración, distancia, agrupación, opcionalidad, notas y una
+  indicación complementaria libre;
 - datos esenciales visibles por ejercicio y campos avanzados desplegables;
 - flujo en tres pasos: datos generales, días/ejercicios y revisión/guardado;
 - notas de sesión y bloque colapsables, resumen de días/bloques/ejercicios,
   biblioteca de rutinas colapsada y barra contextual de navegación/guardado;
+- la revisión no repite un botón para volver a editar días: los tres pasos
+  superiores son la navegación única;
 - identidad fija del coach conectado en lugar de un selector deshabilitado;
   sólo quien tiene alcance `workout.manage.all` conserva selección de coach;
 - guardado del borrador vigente sin producir versiones artificiales;
@@ -118,9 +124,12 @@ La consulta remota por el socio pertenece a una aplicación futura.
 - cancelación con motivo obligatorio y auditoría;
 - reemplazo idempotente que conserva y muestra el vínculo histórico;
 - notas privadas separadas de indicaciones imprimibles;
-- PDF A4 reproducible desde la versión asignada, con color, logotipo seguro o
-  inicial, gimnasio, sucursal, teléfono, socio, coach, vigencia, sesiones,
-  bloques, prescripción y saltos de página.
+- descarga PDF mediante un enlace temporal insertado en el documento, con
+  validación de respuesta vacía, estado visible y mensaje de éxito/error;
+- PDF A4 reproducible desde la versión asignada, con encabezado de marca,
+  logotipo seguro o inicial, ficha de socio/coach/objetivo/vigencia, indicaciones,
+  jerarquía de días y bloques, tablas de series uniformes o detalladas, pie,
+  numeración y saltos de página.
 
 ### Métricas
 
@@ -166,24 +175,26 @@ La consulta remota por el socio pertenece a una aplicación futura.
 ## Evidencia de cierre
 
 - backend: `gradlew clean test --no-daemon`, exitoso;
-- frontend: 32 pruebas, typecheck, lint y build de producción, exitosos;
-- E2E Playwright: 10 recorridos exitosos para constructor/publicación,
+- frontend: 33 pruebas, typecheck, lint y build de producción, exitosos;
+- E2E Playwright: 12 recorridos exitosos para constructor/publicación,
   catálogo/aliases/medios, cancelación/reemplazo/métricas históricas y
   administración multi-sucursal del coach, incluyendo acceso directo a
   métricas para dueño y gerente sin superficies operativas, alta integral de
   Coach, identidad fija en el constructor, métricas personales y alineación
-  visual de la tabla de Equipo, búsqueda reactiva de socio y asignación de una
-  rutina `PUBLISHED`;
+  visual de la tabla de Equipo, búsqueda reactiva de socio, asignación de una
+  rutina `PUBLISHED`, prescripción progresiva/dropset y descarga real del PDF;
 - pruebas dedicadas de propiedad, permisos HTTP, comparación de periodos,
-  series semanales, perfiles agregados, sincronización de sucursales, PDF y
-  ciclo de medios;
+  series semanales, perfiles agregados, sincronización de sucursales, PDF corto
+  y multipágina y ciclo de medios;
+- verificación visual del PDF renderizado con Poppler en una y cuatro páginas,
+  sin recortes, superposiciones ni pérdida de encabezado o pie;
 - `git diff --check`, exitoso.
 
 Los antiguos `COA-001` a `COA-007` y `COA-009` quedaron resueltos en
 `84a5fd3`; `COA-010` y `COA-011` se cerraron en `8162814`, `COA-012` en
 `0066c0b`, `COA-013` en `3933aa5`, `COA-014` en `5dd0e47`, `COA-015` en
-`602d37b`, `COA-016` en `d1d5124` y `COA-017` en `9af72e7`. Todos se conservan
-en la sección de cerradas del documento 28. Los riesgos
-transversales de despliegue, migración PostgreSQL real, observabilidad y
-almacenamiento se siguen administrando como `DB-001` y `OPS-001`; no son
-funcionalidad pendiente específica de Coaches.
+`602d37b`, `COA-016` en `d1d5124`, `COA-017` en `9af72e7` y `COA-019` a
+`COA-023` en los cortes posteriores. Todos se conservan en la sección de
+cerradas del documento 28. `COA-018` permanece como deuda específica de
+limpieza durable de medios; los riesgos transversales de despliegue, migración
+PostgreSQL real y observabilidad siguen como `DB-001` y `OPS-001`.
