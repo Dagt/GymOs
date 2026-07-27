@@ -656,7 +656,7 @@ function AppointmentCard({
           )}
           {appointment.clientPhone ? <span>📞 Tel: {appointment.clientPhone}</span> : null}
           {appointment.notes ? (
-            <p className="italic text-stone-600 mt-1">"{appointment.notes}"</p>
+            <p className="italic text-stone-600 mt-1">“{appointment.notes}”</p>
           ) : null}
         </div>
       </div>
@@ -673,7 +673,10 @@ function AppointmentCard({
             </button>
             <button
               className="form-primary-button py-1 px-3 text-xs bg-amber-600 hover:bg-amber-700 font-bold"
-              onClick={() => onCoordinate(appointment)}
+              onClick={() => {
+                if (isExternal) onCoordinate(appointment);
+                else onConfirm(appointment.id);
+              }}
               type="button"
             >
               {isExternal ? "Coordinar y Confirmar" : "Confirmar Cita"}
@@ -717,6 +720,28 @@ export function CoordinateExternalAppointmentModal({
 }) {
   if (!open || !appointment) return null;
 
+  return (
+    <CoordinateExternalAppointmentForm
+      appointment={appointment}
+      key={appointment.id}
+      onClose={onClose}
+      onSubmit={onSubmit}
+      saving={saving}
+    />
+  );
+}
+
+function CoordinateExternalAppointmentForm({
+  appointment,
+  saving,
+  onClose,
+  onSubmit,
+}: {
+  appointment: WellnessAppointment;
+  saving: boolean;
+  onClose: () => void;
+  onSubmit: (data: { date: string; time: string; notes: string }) => void;
+}) {
   const defaultDate = appointment.startsAt ? appointment.startsAt.split("T")[0] : toDateInput(new Date());
   const defaultTime = appointment.startsAt ? formatTime(appointment.startsAt) : "10:00";
 

@@ -1,6 +1,6 @@
-ALTER TABLE professional ADD COLUMN office_location VARCHAR(255);
+ALTER TABLE professional ADD COLUMN IF NOT EXISTS office_location VARCHAR(255);
 
-CREATE TABLE wellness_appointment (
+CREATE TABLE IF NOT EXISTS wellness_appointment (
     id UUID PRIMARY KEY,
     organization_id UUID NOT NULL REFERENCES organization(id),
     branch_id UUID NOT NULL REFERENCES branch(id),
@@ -22,11 +22,11 @@ CREATE TABLE wellness_appointment (
     deleted_at TIMESTAMPTZ
 );
 
-CREATE INDEX ix_wellness_appointment_prof_time
+CREATE INDEX IF NOT EXISTS ix_wellness_appointment_prof_time
     ON wellness_appointment (organization_id, branch_id, professional_id, starts_at, ends_at);
 
-CREATE INDEX ix_wellness_appointment_client
+CREATE INDEX IF NOT EXISTS ix_wellness_appointment_client
     ON wellness_appointment (organization_id, client_id, starts_at);
 
-CREATE INDEX ix_wellness_appointment_status_time
+CREATE INDEX IF NOT EXISTS ix_wellness_appointment_status_time
     ON wellness_appointment (organization_id, branch_id, status, starts_at);

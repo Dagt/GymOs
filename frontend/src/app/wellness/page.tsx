@@ -63,7 +63,7 @@ export default function WellnessPage() {
   const [appointments, setAppointments] = useState<WellnessAppointment[]>([]);
 
   // Agenda tab state
-  const todayIso = toDateInput(new Date());
+  const [todayIso] = useState(() => toDateInput(new Date()));
   const [agendaDate, setAgendaDate] = useState(todayIso);
   const [agendaProfId, setAgendaProfId] = useState("");
   const [agendaStatusFilter, setAgendaStatusFilter] = useState("");
@@ -159,7 +159,7 @@ export default function WellnessPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [todayIso]);
 
   async function reloadDirectory(token: string) {
     const loadedProfs = await getProfessionals(token);
