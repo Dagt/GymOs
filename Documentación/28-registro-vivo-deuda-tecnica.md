@@ -64,6 +64,7 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 | COA-013 | Coaches/PostgreSQL | Corregido `500` por parámetros UUID nulos sin tipo en consultas de rutinas, resumen, detalle y tendencias. | `3933aa5`; `DatabaseMigrationTests.coachingQueriesAcceptNullUuidFiltersOnPostgresql` y smoke real sobre V48. |
 | COA-014 | Coaches/roles y métricas | Separado el alcance analítico de la lectura operativa; dueño y gerente abren métricas por defecto, sin pestañas ni herramientas de Coach. | `5dd0e47`; V49, pruebas de servicio/migración y 6 E2E, incluido gerente con token operativo anterior. |
 | COA-015 | Identidad/Coaches/UX | Integrados especialidades y biografía en el alta transaccional del usuario Coach; restaurada la alineación uniforme de filas y acciones en Equipo. | `602d37b`; prueba PostgreSQL de provisioning, servicio de identidad y 8 E2E con medición de layout. |
+| COA-016 | Identidad/Coaches/UX | Rediseñados Equipo, constructor y catálogo con jerarquía compacta, taxonomía guiada e identidad fija; métricas del Coach reducidas a su contexto personal. | `d1d5124`; 31 pruebas frontend, typecheck, lint, build, revisión visual responsiva y 8 E2E. |
 | GEN-003 | General/documentación | Estado, deuda, ramas y fichas modulares consolidados; se retiraron fuentes transitorias paralelas. | Documentos 13, 28, 29 y `modulos/` vigentes al corte. |
 | BR-C01 | Gestión de ramas | Wellness retirado del árbol final de Coaches. | Revert explícito de `4a7a7d1`. |
 

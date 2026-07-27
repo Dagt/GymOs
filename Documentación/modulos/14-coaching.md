@@ -2,7 +2,7 @@
 
 Estado: `ESTABILIZADO`
 Rama de cierre: `feature/coaches-workouts`
-Código verificado: `602d37b`
+Código verificado: `d1d5124`
 Corte: 26 de julio de 2026
 
 ## Propósito y alcance V1
@@ -30,8 +30,12 @@ La consulta remota por el socio pertenece a una aplicación futura.
   administrativos;
 - alta, credenciales, cambio de rol, estado, perfil y sucursales se concentran
   en `/users`; `/coaches` ya no duplica la gestión de identidad.
-- las filas de Equipo mantienen el mismo layout para todos los roles; la acción
-  `Datos de Coach` no desplaza ni apila el control de estado.
+- Equipo presenta a todos los usuarios en una misma tabla visual compacta y
+  responsiva, con identidad, sucursales, rol, estado y acciones alineadas;
+- los roles disponibles quedan en un resumen desplegable y los indicadores de
+  contexto usan una cuadrícula compacta para priorizar la lista operativa;
+- `Datos de Coach` sigue siendo una acción complementaria del mismo usuario:
+  no crea una entidad visual separada ni desplaza el control de estado.
 
 ### Catálogo de ejercicios
 
@@ -42,6 +46,11 @@ La consulta remota por el socio pertenece a una aplicación futura.
 - alta y edición por propietario, archivo administrativo y prevención de
   duplicados por nombre o alias normalizado;
 - consulta, alta y eliminación de aliases;
+- alta y edición en panel lateral, separadas de la superficie de consulta;
+- taxonomía guiada para músculo principal, patrón de movimiento, equipo, nivel
+  y lateralidad, conservando valores anteriores sin multiplicar variantes;
+- identificación y ejecución visibles primero; detalles técnicos, medios y
+  nombres alternativos se administran de forma progresiva;
 - carga, lectura, reemplazo y eliminación de JPG, PNG, WebP, GIF o MP4 de hasta
   8 MB mediante almacenamiento de objetos;
 - limpieza del archivo sustituido y compensación si falla la persistencia.
@@ -53,6 +62,11 @@ La consulta remota por el socio pertenece a una aplicación futura.
 - ejercicios libres o seleccionados del catálogo;
 - series, repeticiones, carga, descanso, tempo, duración, distancia,
   agrupación, opcionalidad, notas y prescripción libre;
+- datos esenciales visibles por ejercicio y campos avanzados desplegables;
+- notas de sesión y bloque colapsables y barra persistente de guardado, para
+  reducir la longitud de la página sin eliminar información;
+- identidad fija del coach conectado en lugar de un selector deshabilitado;
+  sólo quien tiene alcance `workout.manage.all` conserva selección de coach;
 - guardado del borrador vigente sin producir versiones artificiales;
 - publicación inmutable, duplicado e historial de versiones;
 - persistencia estructurada en sesiones, bloques y ejercicios, conservando
@@ -82,6 +96,9 @@ La consulta remota por el socio pertenece a una aplicación futura.
 - CSV completo y acotado a 10,000 filas para evitar exportaciones accidentales
   sin filtro, respetando también el socio seleccionado;
 - alcance propio para coach y global de sucursal para dueño/gerencia;
+- la vista personal del coach oculta el selector global, `Coaches activos`,
+  `Sin asignaciones` y `Desempeño por coach`; muestra asignaciones, socios
+  atendidos y primeras rutinas de su propio alcance;
 - dueño y gerente entran directamente al tablero de métricas, sin pestaña
   redundante y sin cargar rutinas, catálogo de ejercicios ni acciones sobre
   asignaciones; la detección por rol también protege la interfaz mientras se
@@ -116,7 +133,8 @@ La consulta remota por el socio pertenece a una aplicación futura.
   catálogo/aliases/medios, cancelación/reemplazo/métricas históricas y
   administración multi-sucursal del coach, incluyendo acceso directo a
   métricas para dueño y gerente sin superficies operativas, alta integral de
-  Coach y alineación visual de la tabla de Equipo;
+  Coach, identidad fija en el constructor, métricas personales y alineación
+  visual de la tabla de Equipo;
 - pruebas dedicadas de propiedad, permisos HTTP, comparación de periodos,
   series semanales, perfiles agregados, sincronización de sucursales, PDF y
   ciclo de medios;
@@ -124,8 +142,8 @@ La consulta remota por el socio pertenece a una aplicación futura.
 
 Los antiguos `COA-001` a `COA-007` y `COA-009` quedaron resueltos en
 `84a5fd3`; `COA-010` y `COA-011` se cerraron en `8162814`, `COA-012` en
-`0066c0b`, `COA-013` en `3933aa5`, `COA-014` en `5dd0e47` y `COA-015` en
-`602d37b`. Todos se conservan
+`0066c0b`, `COA-013` en `3933aa5`, `COA-014` en `5dd0e47`, `COA-015` en
+`602d37b` y `COA-016` en `d1d5124`. Todos se conservan
 en la sección de cerradas del documento 28. Los riesgos
 transversales de despliegue, migración PostgreSQL real, observabilidad y
 almacenamiento se siguen administrando como `DB-001` y `OPS-001`; no son
