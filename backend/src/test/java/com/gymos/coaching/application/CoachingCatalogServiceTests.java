@@ -20,13 +20,20 @@ import com.gymos.coaching.infrastructure.CoachingCatalogRepository.ExerciseRecor
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.WeeklyTrendMetric;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.common.security.SecurityProperties;
+import com.sun.net.httpserver.HttpServer;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayOutputStream;
+import java.net.InetSocketAddress;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import javax.imageio.ImageIO;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,7 +46,10 @@ class CoachingCatalogServiceTests {
 	@BeforeEach
 	void setUp() {
 		repository = mock(CoachingCatalogRepository.class);
-		service = new CoachingCatalogService(repository, mock(AuditService.class), new ObjectMapper());
+		service = new CoachingCatalogService(
+				repository, mock(AuditService.class), new ObjectMapper(),
+				new SecurityProperties(List.of("http://localhost:3000"), "test-secret", 900, 7)
+		);
 		principal = new GymOsPrincipal(
 				UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
 				"coach", "Coach",
@@ -329,7 +339,7 @@ class CoachingCatalogServiceTests {
 				"#173c2a", "Sucursal Centro", "555-0100"
 		)));
 
-		byte[] pdf = service.assignmentPdf(principal, assignmentId);
+		byte[] pdf = service.assignmentPdf(principal, assignmentId, null);
 
 		assertThat(pdf).startsWith("%PDF".getBytes(java.nio.charset.StandardCharsets.US_ASCII));
 		try (var document = Loader.loadPDF(pdf)) {
@@ -366,13 +376,64 @@ class CoachingCatalogServiceTests {
 				"#173c2a", "Sucursal Centro", "555-0100"
 		)));
 
-		byte[] pdf = service.assignmentPdf(principal, assignmentId);
+		byte[] pdf = service.assignmentPdf(principal, assignmentId, null);
 
 		try (var document = Loader.loadPDF(pdf)) {
 			String text = new PDFTextStripper().getText(document);
 			assertThat(document.getNumberOfPages()).isGreaterThan(1);
 			assertThat(text).contains("Ejercicio 1", "Ejercicio 14");
 			assertThat(text).contains("Página 1 de", "Página 2 de");
+		}
+	}
+
+	@Test
+	void assignmentPdfLoadsTenantLogoFromAllowedFrontendOrigin() throws Exception {
+		BufferedImage logo = new BufferedImage(8, 4, BufferedImage.TYPE_INT_RGB);
+		for (int x = 0; x < logo.getWidth(); x++) {
+			for (int y = 0; y < logo.getHeight(); y++) logo.setRGB(x, y, 0x176B45);
+		}
+		ByteArrayOutputStream logoBytes = new ByteArrayOutputStream();
+		ImageIO.write(logo, "png", logoBytes);
+		HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+		server.createContext("/tenants/demo/logo.png", exchange -> {
+			byte[] body = logoBytes.toByteArray();
+			exchange.getResponseHeaders().set("Content-Type", "image/png");
+			exchange.sendResponseHeaders(200, body.length);
+			exchange.getResponseBody().write(body);
+			exchange.close();
+		});
+		server.start();
+		try {
+			String origin = "http://127.0.0.1:" + server.getAddress().getPort();
+			CoachingCatalogService localService = new CoachingCatalogService(
+					repository, mock(AuditService.class), new ObjectMapper(),
+					new SecurityProperties(List.of(origin), "test-secret", 900, 7)
+			);
+			UUID assignmentId = UUID.randomUUID();
+			when(repository.assignmentPdf(
+					principal.organizationId(), principal.branchId(), assignmentId, null
+			)).thenReturn(Optional.of(new AssignmentPdfData(
+					assignmentId, LocalDate.of(2026, 7, 27), null, null,
+					null, "Rutina con logo", "Movilidad", "BEGINNER", 1,
+					null, "{\"sessions\":[]}",
+					"Socio Uno", "Coach Uno", "GymOS Demo", "/tenants/demo/logo.png",
+					"#173c2a", "Sucursal Centro", "555-0100"
+			)));
+
+			byte[] pdf = localService.assignmentPdf(principal, assignmentId, origin);
+
+			try (var document = Loader.loadPDF(pdf)) {
+				boolean containsImage = false;
+				for (var name : document.getPage(0).getResources().getXObjectNames()) {
+					if (document.getPage(0).getResources().getXObject(name) instanceof PDImageXObject) {
+						containsImage = true;
+						break;
+					}
+				}
+				assertThat(containsImage).isTrue();
+			}
+		} finally {
+			server.stop(0);
 		}
 	}
 

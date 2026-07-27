@@ -14,6 +14,7 @@ import com.gymos.coaching.infrastructure.CoachingCatalogRepository.ExerciseRecor
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.WeeklyTrendMetric;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.common.security.SecurityProperties;
 import com.gymos.common.time.BusinessTime;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -53,13 +54,16 @@ public class CoachingCatalogService {
 	private final CoachingCatalogRepository repository;
 	private final AuditService auditService;
 	private final ObjectMapper objectMapper;
+	private final SecurityProperties securityProperties;
 
 	public CoachingCatalogService(
-			CoachingCatalogRepository repository, AuditService auditService, ObjectMapper objectMapper
+			CoachingCatalogRepository repository, AuditService auditService, ObjectMapper objectMapper,
+			SecurityProperties securityProperties
 	) {
 		this.repository = repository;
 		this.auditService = auditService;
 		this.objectMapper = objectMapper;
+		this.securityProperties = securityProperties;
 	}
 
 	@Transactional(readOnly = true)
@@ -359,21 +363,21 @@ public class CoachingCatalogService {
 	}
 
 	@Transactional(readOnly = true)
-	public byte[] assignmentPdf(GymOsPrincipal principal, UUID assignmentId) {
+	public byte[] assignmentPdf(GymOsPrincipal principal, UUID assignmentId, String assetOrigin) {
 		requireBranch(principal);
 		AssignmentPdfData data = repository.assignmentPdf(
 				principal.organizationId(), principal.branchId(), assignmentId, workoutReadScope(principal)
 		).orElseThrow(() -> new BusinessException("WORKOUT_ASSIGNMENT_NOT_FOUND", "La asignación no existe."));
 		try {
-			return renderPdf(data);
+			return renderPdf(data, assetOrigin);
 		} catch (IOException exception) {
 			throw new BusinessException("WORKOUT_PDF_FAILED", "No fue posible generar el PDF de la rutina.");
 		}
 	}
 
-	private byte[] renderPdf(AssignmentPdfData data) throws IOException {
+	private byte[] renderPdf(AssignmentPdfData data, String assetOrigin) throws IOException {
 		try (PDDocument document = new PDDocument(); ByteArrayOutputStream output = new ByteArrayOutputStream()) {
-			PdfWriter writer = new PdfWriter(document, data);
+			PdfWriter writer = new PdfWriter(document, data, assetOrigin);
 			writer.workoutTitle(data.title(), data.versionNumber());
 			writer.assignmentSummary();
 			if (data.summary() != null && !data.summary().isBlank()) {
@@ -519,8 +523,7 @@ public class CoachingCatalogService {
 		private final Color ink = new Color(30, 42, 35);
 		private final Color muted = new Color(91, 107, 98);
 		private final Color line = new Color(218, 226, 221);
-		private final Color surface = new Color(247, 249, 247);
-		private final Color accent = new Color(214, 173, 48);
+		private final Color surface = new Color(248, 250, 248);
 		private final PDImageXObject logo;
 		private final PDType1Font regular = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
 		private final PDType1Font bold = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
@@ -529,27 +532,27 @@ public class CoachingCatalogService {
 		private float y;
 		private int pageNumber;
 
-		private PdfWriter(PDDocument document, AssignmentPdfData data) throws IOException {
+		private PdfWriter(PDDocument document, AssignmentPdfData data, String assetOrigin) throws IOException {
 			this.document = document;
 			this.data = data;
 			this.primary = color(data.primaryColor());
 			this.primaryDark = blend(primary, Color.BLACK, 0.18f);
 			this.primarySoft = blend(primary, Color.WHITE, 0.91f);
-			this.logo = loadLogo(document, data.logoUrl());
+			this.logo = loadLogo(document, data.logoUrl(), assetOrigin);
 			newPage();
 		}
 
 		void workoutTitle(String value, int version) throws IOException {
-			List<String> titleLines = wrap(value, bold, 22, CONTENT_WIDTH - 80);
-			ensure(35 + titleLines.size() * 25);
-			writeAt("RUTINA ASIGNADA", MARGIN, y, 8, bold, muted);
-			writePill("VERSIÓN " + version, PDRectangle.A4.getWidth() - MARGIN - 68, y - 5, 68);
-			y -= 24;
+			List<String> titleLines = wrap(value, bold, 25, CONTENT_WIDTH - 90);
+			ensure(42 + titleLines.size() * 29);
+			writeAt("RUTINA PERSONAL", MARGIN, y, 8, bold, primary);
+			writePill("VERSIÓN " + version, PDRectangle.A4.getWidth() - MARGIN - 72, y - 5, 72);
+			y -= 27;
 			for (String titleLine : titleLines) {
-				writeAt(titleLine, MARGIN, y, 22, bold, ink);
-				y -= 25;
+				writeAt(titleLine, MARGIN, y, 25, bold, ink);
+				y -= 29;
 			}
-			y -= 5;
+			y -= 9;
 		}
 
 		void assignmentSummary() throws IOException {
@@ -565,17 +568,32 @@ public class CoachingCatalogService {
 					new Info("VIGENCIA", validity)
 			);
 			int rows = (values.size() + 1) / 2;
-			ensure(rows * 56 + 10);
-			float gap = 8;
-			float cardWidth = (CONTENT_WIDTH - gap) / 2;
+			float rowHeight = 43;
+			float panelHeight = rows * rowHeight + 10;
+			ensure(panelHeight + 14);
+			stream.setNonStrokingColor(surface);
+			stream.addRect(MARGIN, y - panelHeight, CONTENT_WIDTH, panelHeight);
+			stream.fill();
+			stream.setStrokingColor(line);
+			stream.setLineWidth(0.45f);
+			stream.moveTo(MARGIN + CONTENT_WIDTH / 2, y - 10);
+			stream.lineTo(MARGIN + CONTENT_WIDTH / 2, y - panelHeight + 10);
+			stream.stroke();
+			for (int row = 1; row < rows; row++) {
+				float dividerY = y - 5 - row * rowHeight;
+				stream.moveTo(MARGIN + 12, dividerY);
+				stream.lineTo(MARGIN + CONTENT_WIDTH - 12, dividerY);
+				stream.stroke();
+			}
+			float cardWidth = CONTENT_WIDTH / 2;
 			for (int index = 0; index < values.size(); index++) {
 				int column = index % 2;
 				int row = index / 2;
-				float cardX = MARGIN + column * (cardWidth + gap);
-				float cardTop = y - row * 56;
-				infoCard(values.get(index), cardX, cardTop, cardWidth, 48);
+				float cardX = MARGIN + column * cardWidth;
+				float cardTop = y - 5 - row * rowHeight;
+				infoCard(values.get(index), cardX, cardTop, cardWidth, rowHeight);
 			}
-			y -= rows * 56 + 4;
+			y -= panelHeight + 14;
 		}
 
 		void callout(String label, String value) throws IOException {
@@ -585,32 +603,29 @@ public class CoachingCatalogService {
 			stream.setNonStrokingColor(primarySoft);
 			stream.addRect(MARGIN, y - height, CONTENT_WIDTH, height);
 			stream.fill();
-			stream.setNonStrokingColor(accent);
-			stream.addRect(MARGIN, y - height, 4, height);
+			stream.setNonStrokingColor(primary);
+			stream.addRect(MARGIN, y - height, 2, height);
 			stream.fill();
-			writeAt(label.toUpperCase(Locale.ROOT), MARGIN + 16, y - 17, 8, bold, primaryDark);
+			writeAt(label.toUpperCase(Locale.ROOT), MARGIN + 18, y - 17, 8, bold, primaryDark);
 			float cursor = y - 34;
 			for (String line : lines) {
-				writeAt(line, MARGIN + 16, cursor, 9, regular, ink);
+				writeAt(line, MARGIN + 18, cursor, 9, regular, ink);
 				cursor -= 12;
 			}
 			y -= height + 10;
 		}
 
 		void day(int index, String name, String focus) throws IOException {
-			ensure(115);
-			y -= 5;
-			stream.setNonStrokingColor(primary);
-			stream.addRect(MARGIN, y - 46, CONTENT_WIDTH, 46);
+			ensure(108);
+			y -= 9;
+			stream.setNonStrokingColor(primarySoft);
+			stream.addRect(MARGIN, y - 43, CONTENT_WIDTH, 43);
 			stream.fill();
-			stream.setNonStrokingColor(accent);
-			stream.addRect(MARGIN, y - 46, 5, 46);
-			stream.fill();
-			writeAt(String.format(Locale.ROOT, "DÍA %02d", index), MARGIN + 18, y - 17, 8, bold, Color.WHITE);
-			writeAt(truncate(name, bold, 14, 305), MARGIN + 18, y - 35, 14, bold, Color.WHITE);
+			writeAt(String.format(Locale.ROOT, "DÍA %02d", index), MARGIN + 16, y - 15, 7, bold, primary);
+			writeAt(truncate(name, bold, 14, 305), MARGIN + 16, y - 33, 14, bold, primaryDark);
 			if (focus != null && !focus.isBlank()) {
-				writeRight("ENFOQUE  " + focus.toUpperCase(Locale.ROOT), PDRectangle.A4.getWidth() - MARGIN - 16,
-						y - 29, 8, bold, Color.WHITE);
+				writeRight(focus.toUpperCase(Locale.ROOT), PDRectangle.A4.getWidth() - MARGIN - 16,
+						y - 27, 8, bold, muted);
 			}
 			y -= 56;
 		}
@@ -684,16 +699,17 @@ public class CoachingCatalogService {
 					+ 12;
 			ensure(boxHeight + 10);
 			float top = y;
-			stream.setNonStrokingColor(surface);
+			stream.setStrokingColor(line);
+			stream.setLineWidth(0.6f);
 			stream.addRect(MARGIN, top - boxHeight, CONTENT_WIDTH, boxHeight);
-			stream.fill();
+			stream.stroke();
 			stream.setNonStrokingColor(primary);
-			stream.addRect(MARGIN, top - boxHeight, 4, boxHeight);
+			stream.addRect(MARGIN, top - boxHeight, 2, boxHeight);
 			stream.fill();
 			stream.setNonStrokingColor(primarySoft);
-			stream.addRect(MARGIN + 13, top - 32, 24, 24);
+			stream.addRect(MARGIN + 13, top - 30, 22, 22);
 			stream.fill();
-			writeCentered(String.valueOf(exerciseIndex), MARGIN + 25, top - 25, 9, bold, primaryDark);
+			writeCentered(String.valueOf(exerciseIndex), MARGIN + 24, top - 23, 8, bold, primaryDark);
 			float cursor = top - 18;
 			for (String nameLine : nameLines) {
 				writeAt(nameLine, MARGIN + 48, cursor, 11, bold, ink);
@@ -701,12 +717,9 @@ public class CoachingCatalogService {
 			}
 			cursor -= 3;
 			if (!setRows.isEmpty()) {
-				stream.setNonStrokingColor(blend(primary, Color.WHITE, 0.86f));
-				stream.addRect(MARGIN + 12, cursor - 16, CONTENT_WIDTH - 24, 17);
-				stream.fill();
-				writeAt("SERIE", MARGIN + 20, cursor - 11, 7, bold, primaryDark);
-				writeAt("REPETICIONES", MARGIN + 150, cursor - 11, 7, bold, primaryDark);
-				writeAt("CARGA", MARGIN + 310, cursor - 11, 7, bold, primaryDark);
+				writeAt("SERIE", MARGIN + 20, cursor - 11, 7, bold, muted);
+				writeAt("REPETICIONES", MARGIN + 150, cursor - 11, 7, bold, muted);
+				writeAt("CARGA", MARGIN + 310, cursor - 11, 7, bold, muted);
 				cursor -= 19;
 				for (SetRow row : setRows) {
 					writeAt(truncate(row.label(), regular, 8, 115), MARGIN + 20, cursor - 11, 8, regular, ink);
@@ -749,7 +762,6 @@ public class CoachingCatalogService {
 		private void ensure(float needed) throws IOException {
 			if (y - needed < BOTTOM_LIMIT) {
 				newPage();
-				y = PDRectangle.A4.getHeight() - 112;
 			}
 		}
 
@@ -760,41 +772,49 @@ public class CoachingCatalogService {
 			stream = new PDPageContentStream(document, page);
 			pageNumber++;
 			float top = page.getMediaBox().getHeight();
-			stream.setNonStrokingColor(primaryDark);
-			stream.addRect(0, top - 84, page.getMediaBox().getWidth(), 84);
-			stream.fill();
-			stream.setNonStrokingColor(accent);
-			stream.addRect(0, top - 88, page.getMediaBox().getWidth(), 4);
-			stream.fill();
 			if (logo == null) {
 				String initials = data.gymName() == null || data.gymName().isBlank()
 						? "G" : data.gymName().substring(0, 1).toUpperCase(Locale.ROOT);
-				stream.setNonStrokingColor(Color.WHITE);
-				stream.addRect(MARGIN, top - 68, 44, 44);
+				stream.setNonStrokingColor(primarySoft);
+				stream.addRect(MARGIN, top - 66, 42, 42);
 				stream.fill();
-				writeCentered(initials, MARGIN + 22, top - 49, 20, bold, primaryDark);
+				writeCentered(initials, MARGIN + 21, top - 49, 18, bold, primaryDark);
 			} else {
-				stream.drawImage(logo, MARGIN, top - 68, 44, 44);
+				stream.setNonStrokingColor(surface);
+				stream.addRect(MARGIN, top - 66, 42, 42);
+				stream.fill();
+				drawLogo(logo, MARGIN + 3, top - 63, 36, 36);
 			}
-			writeAt(value(data.gymName()), MARGIN + 58, top - 40, 16, bold, Color.WHITE);
+			writeAt(value(data.gymName()), MARGIN + 56, top - 39, 14, bold, ink);
 			writeAt(value(data.branchName()) + (data.contactPhone() == null ? "" : "  |  " + data.contactPhone()),
-					MARGIN + 58, top - 58, 8, regular, Color.WHITE);
-			writeRight("PLAN DE ENTRENAMIENTO", PDRectangle.A4.getWidth() - MARGIN, top - 45,
-					8, bold, Color.WHITE);
-			y = top - 112;
+					MARGIN + 56, top - 56, 8, regular, muted);
+			writePill("PLAN DE ENTRENAMIENTO", PDRectangle.A4.getWidth() - MARGIN - 118, top - 45, 118);
+			stream.setStrokingColor(line);
+			stream.setLineWidth(0.6f);
+			stream.moveTo(MARGIN, top - 78);
+			stream.lineTo(PDRectangle.A4.getWidth() - MARGIN, top - 78);
+			stream.stroke();
+			y = top - 104;
 		}
 
 		private void infoCard(Info info, float x, float top, float width, float height) throws IOException {
-			stream.setNonStrokingColor(surface);
-			stream.addRect(x, top - height, width, height);
-			stream.fill();
-			writeAt(info.label(), x + 12, top - 16, 7, bold, muted);
+			writeAt(info.label(), x + 14, top - 14, 7, bold, muted);
 			List<String> valueLines = wrap(info.value(), bold, 9, width - 24);
-			float cursor = top - 32;
+			float cursor = top - 29;
 			for (String valueLine : valueLines.stream().limit(2).toList()) {
-				writeAt(valueLine, x + 12, cursor, 9, bold, ink);
+				writeAt(valueLine, x + 14, cursor, 9, bold, ink);
 				cursor -= 11;
 			}
+		}
+
+		private void drawLogo(PDImageXObject image, float x, float y, float maxWidth, float maxHeight)
+				throws IOException {
+			float scale = Math.min(maxWidth / image.getWidth(), maxHeight / image.getHeight());
+			float width = image.getWidth() * scale;
+			float height = image.getHeight() * scale;
+			float drawX = x + (maxWidth - width) / 2;
+			float drawY = y + (maxHeight - height) / 2;
+			stream.drawImage(image, drawX, drawY, width, height);
 		}
 
 		private List<SetRow> setRows(JsonNode node) {
@@ -989,14 +1009,22 @@ public class CoachingCatalogService {
 		}
 	}
 
-	private PDImageXObject loadLogo(PDDocument document, String logoUrl) {
+	private PDImageXObject loadLogo(PDDocument document, String logoUrl, String assetOrigin) {
 		if (logoUrl == null || logoUrl.isBlank()) return null;
 		try {
-			URI uri = URI.create(logoUrl);
-			if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null) return null;
-			for (InetAddress address : InetAddress.getAllByName(uri.getHost())) {
-				if (address.isAnyLocalAddress() || address.isLoopbackAddress()
-						|| address.isLinkLocalAddress() || address.isSiteLocalAddress()) return null;
+			URI uri;
+			boolean trustedInternalAsset = logoUrl.startsWith("/tenants/");
+			if (trustedInternalAsset) {
+				URI allowedOrigin = allowedAssetOrigin(assetOrigin);
+				if (allowedOrigin == null) return null;
+				uri = allowedOrigin.resolve(logoUrl);
+			} else {
+				uri = URI.create(logoUrl);
+				if (!"https".equalsIgnoreCase(uri.getScheme()) || uri.getHost() == null) return null;
+				for (InetAddress address : InetAddress.getAllByName(uri.getHost())) {
+					if (address.isAnyLocalAddress() || address.isLoopbackAddress()
+							|| address.isLinkLocalAddress() || address.isSiteLocalAddress()) return null;
+				}
 			}
 			HttpRequest request = HttpRequest.newBuilder(uri).timeout(Duration.ofSeconds(3)).GET().build();
 			HttpResponse<byte[]> response = HttpClient.newBuilder()
@@ -1008,6 +1036,24 @@ public class CoachingCatalogService {
 			if (response.statusCode() / 100 != 2 || body.length == 0 || body.length > 2_000_000) return null;
 			return PDImageXObject.createFromByteArray(document, body, "gym-logo");
 		} catch (Exception ignored) {
+			return null;
+		}
+	}
+
+	private URI allowedAssetOrigin(String requestOrigin) {
+		List<String> allowedOrigins = securityProperties.corsAllowedOrigins();
+		String candidate = requestOrigin == null || requestOrigin.isBlank()
+				? allowedOrigins.stream().findFirst().orElse(null)
+				: requestOrigin.trim();
+		if (candidate == null || allowedOrigins.stream().noneMatch(candidate::equalsIgnoreCase)) return null;
+		try {
+			URI origin = URI.create(candidate);
+			if (origin.getHost() == null || origin.getRawUserInfo() != null
+					|| origin.getRawQuery() != null || origin.getRawFragment() != null) return null;
+			String scheme = origin.getScheme();
+			if (!"http".equalsIgnoreCase(scheme) && !"https".equalsIgnoreCase(scheme)) return null;
+			return URI.create(origin.getScheme() + "://" + origin.getRawAuthority() + "/");
+		} catch (IllegalArgumentException ignored) {
 			return null;
 		}
 	}

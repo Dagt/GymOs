@@ -225,13 +225,14 @@ public class CoachingCatalogController {
 	@GetMapping("/workout-assignments/{assignmentId}/pdf")
 	ResponseEntity<byte[]> pdf(
 			@AuthenticationPrincipal GymOsPrincipal principal,
-			@PathVariable UUID assignmentId
+			@PathVariable UUID assignmentId,
+			HttpServletRequest request
 	) {
 		return ResponseEntity.ok()
 				.header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
 						.filename("rutina-" + assignmentId + ".pdf").build().toString())
 				.contentType(MediaType.APPLICATION_PDF)
-				.body(service.assignmentPdf(principal, assignmentId));
+				.body(service.assignmentPdf(principal, assignmentId, request.getHeader(HttpHeaders.ORIGIN)));
 	}
 
 	private String correlationId(HttpServletRequest request) {

@@ -1914,12 +1914,27 @@ function ExerciseEditor({
   onMove: (direction: -1 | 1) => void;
   total: number;
 }) {
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const exerciseSummary = exercise.exerciseName.trim() || `Ejercicio ${exerciseIndex + 1}`;
   const setPlan = exercise.setPlan ?? [];
   const usesDetailedSets = setPlan.length > 0;
+  const detailedSummary = setPlan.map((set) =>
+    set.segments.map((segment) =>
+      `${segment.reps.trim() || "—"}${segment.load.trim() ? ` @ ${segment.load.trim()}` : ""}`,
+    ).join(" + "),
+  ).join(" → ");
+  const optionalDetailCount = [
+    exercise.prescription,
+    exercise.tempo,
+    exercise.duration,
+    exercise.distance,
+    exercise.groupKey,
+    exercise.notes,
+    exercise.optional ? "optional" : "",
+  ].filter((value) => Boolean(value?.toString().trim())).length;
   const prescriptionSummary = [
     usesDetailedSets
-      ? `${setPlan.length} ${setPlan.length === 1 ? "serie detallada" : "series detalladas"}`
+      ? `${setPlan.length} ${setPlan.length === 1 ? "serie personalizada" : "series personalizadas"}`
       : exercise.sets ? `${exercise.sets} series` : "",
     usesDetailedSets ? "" : exercise.reps ? `${exercise.reps} reps` : "",
     usesDetailedSets ? "" : exercise.load ?? "",
@@ -1934,12 +1949,12 @@ function ExerciseEditor({
     });
   }
 
-  function useDetailedSets() {
+  function enableDetailedSets() {
     const next = detailedSetPlan(exercise);
     changeSetPlan(next);
   }
 
-  function useUniformSets() {
+  function enableUniformSets() {
     const firstSegment = setPlan[0]?.segments[0];
     onChange({
       setPlan: undefined,
@@ -1974,7 +1989,7 @@ function ExerciseEditor({
             onMove={onMove}
           />
         </div>
-        <div className="workout-exercise-identity">
+        <div className={`workout-exercise-quick-grid${usesDetailedSets ? " detailed" : ""}`}>
           <Field label="Ejercicio">
             <input
               className="app-input"
@@ -1983,69 +1998,80 @@ function ExerciseEditor({
               value={exercise.exerciseName}
             />
           </Field>
+          {usesDetailedSets ? (
+            <div className="workout-detailed-summary">
+              <span>Series personalizadas</span>
+              <strong>{detailedSummary || `${setPlan.length} series por completar`}</strong>
+            </div>
+          ) : (
+            <>
+              <Field label="Series">
+                <input className="app-input" min="1" onChange={(event) => onChange({ sets: numberOrNull(event.target.value) })} placeholder="3" type="number" value={exercise.sets ?? ""} />
+              </Field>
+              <Field label="Repeticiones">
+                <input className="app-input" onChange={(event) => onChange({ reps: event.target.value })} placeholder="8-12" value={exercise.reps ?? ""} />
+              </Field>
+              <Field label="Carga">
+                <input className="app-input" onChange={(event) => onChange({ load: event.target.value })} placeholder="20 kg / RPE 8" value={exercise.load ?? ""} />
+              </Field>
+            </>
+          )}
           <Field label="Descanso entre series (segundos)">
             <input className="app-input" min="0" onChange={(event) => onChange({ restSeconds: numberOrNull(event.target.value) })} type="number" value={exercise.restSeconds ?? ""} />
           </Field>
         </div>
-        <section className="workout-prescription">
-          <div className="workout-prescription-header">
-            <span>
-              <strong>Prescripción de series</strong>
-              <small>
-                Usa series iguales cuando todas repiten la misma carga. Elige detalladas para pirámides, progresiones o dropsets.
-              </small>
-            </span>
-            <div aria-label="Tipo de prescripción" className="workout-prescription-modes" role="group">
-              <button
-                aria-pressed={!usesDetailedSets}
-                className={!usesDetailedSets ? "active" : ""}
-                onClick={useUniformSets}
-                type="button"
-              >
-                Series iguales
-              </button>
-              <button
-                aria-pressed={usesDetailedSets}
-                className={usesDetailedSets ? "active" : ""}
-                onClick={useDetailedSets}
-                type="button"
-              >
-                Series detalladas
-              </button>
-            </div>
-          </div>
-          {usesDetailedSets ? (
-            <div className="workout-set-plan">
-              {setPlan.map((set, setIndex) => (
-                <article className="workout-set-card" key={setIndex}>
-                  <header>
-                    <span>
-                      <strong>Serie {setIndex + 1}</strong>
-                      <small>
-                        {set.segments.length === 1
-                          ? "Una ejecución"
-                          : `${set.segments.length} tramos seguidos sin descanso`}
-                      </small>
-                    </span>
-                    {setPlan.length > 1 ? (
-                      <button
-                        aria-label={`Eliminar serie ${setIndex + 1}`}
-                        onClick={() => changeSetPlan(setPlan.filter((_, index) => index !== setIndex))}
-                        type="button"
-                      >
-                        Eliminar
-                      </button>
-                    ) : null}
-                  </header>
-                  <div className="workout-set-segments">
-                    {set.segments.map((segment, segmentIndex) => (
-                      <div className="workout-set-segment" key={segmentIndex}>
-                        <span className="workout-set-segment-label">
-                          {segmentIndex === 0 ? "Inicio" : `Tramo ${segmentIndex + 1}`}
-                          {segmentIndex > 0 ? <small>sin descanso</small> : null}
-                        </span>
-                        <Field label={`Repeticiones de serie ${setIndex + 1}${segmentIndex ? `, tramo ${segmentIndex + 1}` : ""}`}>
+        <div className="workout-exercise-secondary-actions">
+          <button
+            onClick={() => {
+              if (!usesDetailedSets) enableDetailedSets();
+              setDetailsOpen(true);
+            }}
+            type="button"
+          >
+            {usesDetailedSets ? "Editar series personalizadas" : "Personalizar series"}
+          </button>
+          <button onClick={() => setDetailsOpen(true)} type="button">
+            Más opciones{optionalDetailCount ? ` (${optionalDetailCount})` : ""}
+          </button>
+        </div>
+        <AppDrawer
+          description="La vista principal conserva sólo lo esencial. Usa este panel cuando la prescripción necesite variaciones o indicaciones especiales."
+          onClose={() => setDetailsOpen(false)}
+          open={detailsOpen}
+          title={exerciseSummary}
+          wide
+        >
+          <div className="workout-exercise-detail-drawer">
+            <section>
+              <div className="workout-detail-heading">
+                <span>
+                  <small>Prescripción</small>
+                  <strong>{usesDetailedSets ? "Series personalizadas" : "Series iguales"}</strong>
+                </span>
+                {usesDetailedSets ? (
+                  <button onClick={enableUniformSets} type="button">Usar series iguales</button>
+                ) : (
+                  <button onClick={enableDetailedSets} type="button">Personalizar cada serie</button>
+                )}
+              </div>
+              {usesDetailedSets ? (
+                <div className="workout-set-sheet">
+                  <div aria-hidden="true" className="workout-set-sheet-header">
+                    <span>Serie</span>
+                    <span>Repeticiones</span>
+                    <span>Carga</span>
+                    <span />
+                  </div>
+                  {setPlan.map((set, setIndex) => (
+                    <div className="workout-set-sheet-group" key={setIndex}>
+                      {set.segments.map((segment, segmentIndex) => (
+                        <div className="workout-set-sheet-row" key={segmentIndex}>
+                          <span>
+                            <strong>{setIndex + 1}{segmentIndex ? `.${segmentIndex + 1}` : ""}</strong>
+                            {segmentIndex ? <small>sin descanso</small> : null}
+                          </span>
                           <input
+                            aria-label={`Repeticiones de serie ${setIndex + 1}${segmentIndex ? `, tramo ${segmentIndex + 1}` : ""}`}
                             className="app-input"
                             onChange={(event) => updateSet(setIndex, (current) => ({
                               ...current,
@@ -2055,9 +2081,8 @@ function ExerciseEditor({
                             placeholder="10"
                             value={segment.reps}
                           />
-                        </Field>
-                        <Field label={`Carga de serie ${setIndex + 1}${segmentIndex ? `, tramo ${segmentIndex + 1}` : ""}`}>
                           <input
+                            aria-label={`Carga de serie ${setIndex + 1}${segmentIndex ? `, tramo ${segmentIndex + 1}` : ""}`}
                             className="app-input"
                             onChange={(event) => updateSet(setIndex, (current) => ({
                               ...current,
@@ -2067,84 +2092,99 @@ function ExerciseEditor({
                             placeholder="30 kg / RPE 8"
                             value={segment.load}
                           />
-                        </Field>
-                        {set.segments.length > 1 ? (
                           <button
-                            aria-label={`Eliminar tramo ${segmentIndex + 1} de serie ${setIndex + 1}`}
-                            className="workout-set-remove"
-                            onClick={() => updateSet(setIndex, (current) => ({
-                              ...current,
-                              segments: current.segments.filter((_, index) => index !== segmentIndex),
-                            }))}
+                            aria-label={segmentIndex
+                              ? `Eliminar tramo ${segmentIndex + 1} de serie ${setIndex + 1}`
+                              : `Eliminar serie ${setIndex + 1}`}
+                            className="workout-set-sheet-remove"
+                            disabled={setPlan.length === 1 && set.segments.length === 1}
+                            onClick={() => {
+                              if (segmentIndex > 0) {
+                                updateSet(setIndex, (current) => ({
+                                  ...current,
+                                  segments: current.segments.filter((_, index) => index !== segmentIndex),
+                                }));
+                              } else if (set.segments.length > 1) {
+                                updateSet(setIndex, (current) => ({
+                                  ...current,
+                                  segments: current.segments.slice(1),
+                                }));
+                              } else {
+                                changeSetPlan(setPlan.filter((_, index) => index !== setIndex));
+                              }
+                            }}
                             type="button"
                           >
                             ×
                           </button>
-                        ) : null}
-                      </div>
-                    ))}
-                  </div>
+                        </div>
+                      ))}
+                      <button
+                        className="workout-set-sheet-link"
+                        onClick={() => updateSet(setIndex, (current) => ({
+                          ...current,
+                          segments: [...current.segments, emptySetSegment()],
+                        }))}
+                        type="button"
+                      >
+                        + Añadir tramo sin descanso a la serie {setIndex + 1}
+                      </button>
+                    </div>
+                  ))}
                   <button
-                    className="workout-set-add-segment"
-                    onClick={() => updateSet(setIndex, (current) => ({
-                      ...current,
-                      segments: [...current.segments, emptySetSegment()],
-                    }))}
+                    className="workout-set-sheet-add"
+                    onClick={() => changeSetPlan([...setPlan, emptySet()])}
                     type="button"
                   >
-                    + Agregar tramo sin descanso
+                    + Agregar serie
                   </button>
-                </article>
-              ))}
-              <button
-                className="workout-set-add"
-                onClick={() => changeSetPlan([...setPlan, emptySet()])}
-                type="button"
-              >
-                + Agregar serie
+                </div>
+              ) : (
+                <p className="workout-detail-help">
+                  Esta prescripción reutiliza las series, repeticiones y carga de la tarjeta principal.
+                </p>
+              )}
+            </section>
+            <details className="workout-drawer-advanced">
+              <summary>
+                <span>
+                  <strong>Indicaciones opcionales</strong>
+                  <small>Tempo, duración, distancia, agrupación y notas técnicas</small>
+                </span>
+                {optionalDetailCount ? <em>{optionalDetailCount} con información</em> : null}
+              </summary>
+              <div>
+                <Field label="Indicación complementaria">
+                  <input className="app-input" onChange={(event) => onChange({ prescription: event.target.value })} placeholder="Subir carga si completa todas las repeticiones" value={exercise.prescription} />
+                </Field>
+                <Field label="Tempo">
+                  <input className="app-input" onChange={(event) => onChange({ tempo: event.target.value })} placeholder="3-1-1" value={exercise.tempo ?? ""} />
+                </Field>
+                <Field label="Duración">
+                  <input className="app-input" onChange={(event) => onChange({ duration: event.target.value })} placeholder="45 segundos" value={exercise.duration ?? ""} />
+                </Field>
+                <Field label="Distancia">
+                  <input className="app-input" onChange={(event) => onChange({ distance: event.target.value })} placeholder="500 m" value={exercise.distance ?? ""} />
+                </Field>
+                <Field label="Agrupación">
+                  <input className="app-input" onChange={(event) => onChange({ groupKey: event.target.value })} placeholder="A1 / circuito 1" value={exercise.groupKey ?? ""} />
+                </Field>
+                <Field label="Notas técnicas">
+                  <input className="app-input" onChange={(event) => onChange({ notes: event.target.value })} value={exercise.notes ?? ""} />
+                </Field>
+                <label className="workout-optional-check">
+                  <input checked={exercise.optional ?? false} onChange={(event) => onChange({ optional: event.target.checked })} type="checkbox" />
+                  Ejercicio opcional
+                </label>
+              </div>
+            </details>
+            <div className="workout-drawer-actions">
+              <button className="app-button primary" onClick={() => setDetailsOpen(false)} type="button">
+                Listo
               </button>
             </div>
-          ) : (
-            <div className="workout-uniform-prescription">
-              <Field label="Número de series">
-                <input className="app-input" min="1" onChange={(event) => onChange({ sets: numberOrNull(event.target.value) })} placeholder="3" type="number" value={exercise.sets ?? ""} />
-              </Field>
-              <Field label="Repeticiones por serie">
-                <input className="app-input" onChange={(event) => onChange({ reps: event.target.value })} placeholder="8-12" value={exercise.reps ?? ""} />
-              </Field>
-              <Field label="Carga para todas las series">
-                <input className="app-input" onChange={(event) => onChange({ load: event.target.value })} placeholder="20 kg / RPE 8" value={exercise.load ?? ""} />
-              </Field>
-            </div>
-          )}
-        </section>
-        <details className="workout-advanced-fields">
-          <summary>Campos avanzados y notas</summary>
-          <div>
-            <Field label="Nota complementaria de prescripción">
-              <input className="app-input" onChange={(event) => onChange({ prescription: event.target.value })} placeholder="Subir carga si completa todas las repeticiones" value={exercise.prescription} />
-            </Field>
-            <Field label="Tempo">
-              <input className="app-input" onChange={(event) => onChange({ tempo: event.target.value })} placeholder="3-1-1" value={exercise.tempo ?? ""} />
-            </Field>
-            <Field label="Duración">
-              <input className="app-input" onChange={(event) => onChange({ duration: event.target.value })} placeholder="45 segundos" value={exercise.duration ?? ""} />
-            </Field>
-            <Field label="Distancia">
-              <input className="app-input" onChange={(event) => onChange({ distance: event.target.value })} placeholder="500 m" value={exercise.distance ?? ""} />
-            </Field>
-            <Field label="Agrupación">
-              <input className="app-input" onChange={(event) => onChange({ groupKey: event.target.value })} placeholder="A1 / circuito 1" value={exercise.groupKey ?? ""} />
-            </Field>
-            <Field label="Notas técnicas">
-              <input className="app-input" onChange={(event) => onChange({ notes: event.target.value })} value={exercise.notes ?? ""} />
-            </Field>
-            <label className="workout-optional-check">
-              <input checked={exercise.optional ?? false} onChange={(event) => onChange({ optional: event.target.checked })} type="checkbox" />
-              Ejercicio opcional
-            </label>
           </div>
-        </details>
+        </AppDrawer>
       </div>
     </details>
   );
