@@ -71,6 +71,12 @@ public class CoachingCatalogService {
 		return repository.exercises(principal.organizationId(), query, muscle, equipment, type, safePage, safeSize);
 	}
 
+	@Transactional(readOnly = true)
+	public List<String> exerciseEquipmentOptions(GymOsPrincipal principal) {
+		requireTenant(principal);
+		return repository.exerciseEquipmentOptions(principal.organizationId());
+	}
+
 	@Transactional
 	public ExerciseRecord createExercise(
 			GymOsPrincipal principal, CreateExerciseCommand command, String correlationId

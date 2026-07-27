@@ -51,6 +51,22 @@ public class CoachingCatalogRepository {
 		return new ExercisePage(items, page, size, total, (int) Math.ceil(total / (double) size));
 	}
 
+	public List<String> exerciseEquipmentOptions(UUID organizationId) {
+		return jdbc.sql("""
+				SELECT MIN(trim(equipment)) AS equipment
+				FROM exercise
+				WHERE (organization_id IS NULL OR organization_id = :organizationId)
+				  AND status = 'ACTIVE'
+				  AND equipment IS NOT NULL
+				  AND trim(equipment) <> ''
+				GROUP BY lower(trim(equipment))
+				ORDER BY MIN(trim(equipment))
+				""")
+				.param("organizationId", organizationId)
+				.query(String.class)
+				.list();
+	}
+
 	private void bindFilters(
 			JdbcClient.StatementSpec spec, UUID organizationId, String term, String pattern,
 			String muscle, String equipment, String type

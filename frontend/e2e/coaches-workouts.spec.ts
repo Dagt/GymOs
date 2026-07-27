@@ -7,6 +7,7 @@ const versionId = "44444444-4444-4444-8444-444444444444";
 const clientId = "55555555-5555-4555-8555-555555555555";
 const assignmentId = "66666666-6666-4666-8666-666666666666";
 const exerciseId = "77777777-7777-4777-8777-777777777777";
+const customExerciseId = "78787878-7878-4878-8878-787878787878";
 const userId = "88888888-8888-4888-8888-888888888888";
 const ownerUserId = "12121212-1212-4212-8212-121212121212";
 const branchId = "99999999-9999-4999-8999-999999999999";
@@ -107,6 +108,55 @@ test.describe("coaches y rutinas", () => {
       buffer: Buffer.from([1, 2, 3, 4]),
     });
     await expect.poll(() => mediaUploaded).toBe(true);
+  });
+
+  test("crea un equipo reutilizable y mantiene el catálogo contenido", async ({ page }) => {
+    let createPayload: Record<string, unknown> | null = null;
+    await bootCoaching(page, async (route, path) => {
+      if (route.request().method() === "POST" && path === "/exercises") {
+        createPayload = route.request().postDataJSON() as Record<string, unknown>;
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({
+            ...exercise(),
+            ...createPayload,
+            id: customExerciseId,
+            origin: "COACH",
+            createdBy: userId,
+          }),
+        });
+        return true;
+      }
+      return false;
+    });
+
+    await page.goto("/coaches");
+    await page.getByRole("button", { name: "Ejercicios" }).click();
+    const catalog = page.locator(".exercise-catalog-list");
+    await expect(catalog).toHaveCSS("overflow-y", "auto");
+    await page.getByRole("button", { name: "+ Nuevo ejercicio" }).click();
+    await page.getByLabel("Nombre", { exact: true }).fill("Empuje de trineo");
+    await page.getByLabel("Grupo muscular principal").selectOption("Cuerpo completo");
+    await page.getByRole("combobox", { name: "Equipo", exact: true }).selectOption("__CREATE_EQUIPMENT__");
+    await page.getByLabel("Nombre del equipo nuevo").fill("Trineo de empuje");
+    await page.getByRole("button", { name: "Guardar ejercicio" }).click();
+
+    await expect.poll(() => createPayload).toMatchObject({
+      name: "Empuje de trineo",
+      equipment: "Trineo de empuje",
+    });
+    const cards = catalog.locator(".exercise-catalog-card");
+    await expect(cards).toHaveCount(2);
+    const [firstCard, secondCard] = await Promise.all([
+      cards.nth(0).boundingBox(),
+      cards.nth(1).boundingBox(),
+    ]);
+    expect(Math.abs((firstCard?.height ?? 0) - (secondCard?.height ?? 0))).toBeLessThanOrEqual(1);
+
+    await page.getByRole("button", { name: "+ Nuevo ejercicio" }).click();
+    await expect(
+      page.getByRole("combobox", { name: "Equipo", exact: true }).locator('option[value="Trineo de empuje"]'),
+    ).toHaveCount(1);
   });
 
   test("cancela con motivo y filtra sus métricas históricas por socio", async ({ page }) => {
@@ -407,6 +457,7 @@ function responseFor(path: string) {
   }
   if (path === "/users/internal") return [internalCoach()];
   if (path === "/workouts") return workouts();
+  if (path === "/exercises/equipment-options") return ["Barra", "Mancuerna"];
   if (path === "/exercises") {
     return { items: [exercise()], page: 0, size: 100, totalElements: 1, totalPages: 1 };
   }

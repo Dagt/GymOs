@@ -69,6 +69,16 @@ class CoachingCatalogServiceTests {
 	}
 
 	@Test
+	void equipmentOptionsIncludeSystemAndOrganizationCatalogValues() {
+		when(repository.exerciseEquipmentOptions(principal.organizationId()))
+				.thenReturn(List.of("Barra", "Trineo de empuje"));
+
+		assertThat(service.exerciseEquipmentOptions(principal))
+				.containsExactly("Barra", "Trineo de empuje");
+		verify(repository).exerciseEquipmentOptions(principal.organizationId());
+	}
+
+	@Test
 	void duplicateExerciseIsRejectedAcrossSystemAndTenantCatalog() {
 		when(repository.activeByNormalizedName(principal.organizationId(), "press inclinado"))
 				.thenReturn(Optional.of(exercise(UUID.randomUUID(), "Press inclinado", "SYSTEM")));

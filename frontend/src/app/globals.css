@@ -3458,6 +3458,46 @@ button.admin-secondary-link:disabled {
   max-width: 25rem;
 }
 
+.exercise-catalog-list {
+  display: grid;
+  gap: 0.65rem;
+  grid-auto-rows: 10.75rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 1rem;
+  max-height: min(64vh, 43rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0.1rem 0.45rem 0.1rem 0.1rem;
+  scrollbar-gutter: stable;
+}
+
+.exercise-catalog-card {
+  background: white;
+  border: 1px solid #dde5df;
+  border-radius: 0.65rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0.75rem;
+}
+
+.exercise-catalog-card > .mt-3 {
+  margin-top: auto;
+}
+
+.exercise-catalog-description {
+  color: var(--brand-ink);
+  display: -webkit-box;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  margin-top: 0.5rem;
+  min-height: 2.1em;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
 .exercise-form {
   display: grid;
   gap: 1rem;
@@ -3503,6 +3543,17 @@ button.admin-secondary-link:disabled {
   display: grid;
   gap: 0.75rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.exercise-equipment-selector {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.exercise-equipment-selector small {
+  color: var(--brand-muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
 }
 
 .exercise-form-advanced {
@@ -4118,6 +4169,10 @@ button.admin-secondary-link:disabled {
   .workout-exercise-essential .form-field:first-child {
     grid-column: 1 / -1;
   }
+
+  .exercise-catalog-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
@@ -4178,6 +4233,12 @@ button.admin-secondary-link:disabled {
 
   .exercise-catalog-toolbar .app-input {
     max-width: none;
+  }
+
+  .exercise-catalog-list {
+    grid-auto-rows: 10.75rem;
+    grid-template-columns: 1fr;
+    max-height: 65vh;
   }
 
   .workout-builder-actions,

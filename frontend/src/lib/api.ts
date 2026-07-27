@@ -229,6 +229,7 @@ export {
   updateExerciseCatalog,
   addExerciseAlias,
   getExerciseAliases,
+  getExerciseEquipmentOptions,
   deleteExerciseAlias,
   updateExerciseStatus,
   uploadExerciseMedia,

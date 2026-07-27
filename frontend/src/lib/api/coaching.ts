@@ -104,6 +104,10 @@ export async function getExerciseAliases(
   return apiFetch<string[]>(`/exercises/${exerciseId}/aliases`, accessToken);
 }
 
+export async function getExerciseEquipmentOptions(accessToken: string): Promise<string[]> {
+  return apiFetch<string[]>("/exercises/equipment-options", accessToken);
+}
+
 export async function deleteExerciseAlias(
   accessToken: string,
   exerciseId: string,

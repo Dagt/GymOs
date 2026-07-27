@@ -60,6 +60,11 @@ public class CoachingCatalogController {
 		return service.exercises(principal, query, muscleGroup, equipment, type, page, size);
 	}
 
+	@GetMapping("/exercises/equipment-options")
+	List<String> exerciseEquipmentOptions(@AuthenticationPrincipal GymOsPrincipal principal) {
+		return service.exerciseEquipmentOptions(principal);
+	}
+
 	@PostMapping("/exercises")
 	ExerciseRecord createExercise(
 			@AuthenticationPrincipal GymOsPrincipal principal,

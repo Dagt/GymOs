@@ -18,6 +18,7 @@ import {
   getBranches,
   getCoaches,
   getExerciseAliases,
+  getExerciseEquipmentOptions,
   getExercises,
   getStoredSession,
   getWorkout,
@@ -119,7 +120,6 @@ const EQUIPMENT_OPTIONS = [
   "Bicicleta",
   "Remo",
   "Elíptica",
-  "Otro equipo",
 ];
 
 export default function CoachesPage() {
@@ -128,6 +128,7 @@ export default function CoachesPage() {
   const [coaches, setCoaches] = useState<CoachSummary[]>([]);
   const [workouts, setWorkouts] = useState<WorkoutSummary[]>([]);
   const [exercisePage, setExercisePage] = useState<Exercise[]>([]);
+  const [equipmentCatalogOptions, setEquipmentCatalogOptions] = useState<string[]>([]);
   const [report, setReport] = useState<AssignmentReport | null>(null);
   const [trend, setTrend] = useState<WeeklyTrendReport | null>(null);
   const [tab, setTab] = useState<Tab>("metrics");
@@ -186,7 +187,15 @@ export default function CoachesPage() {
         const canReadExercises = !supervisorMetricsOnly
           && stored.user.permissions.includes("exercise.read");
         const canReadMetrics = stored.user.permissions.includes("coach.metrics.read");
-        const [loadedBranches, loadedCoaches, loadedWorkouts, loadedExercises, loadedReport, loadedTrend] =
+        const [
+          loadedBranches,
+          loadedCoaches,
+          loadedWorkouts,
+          loadedExercises,
+          loadedEquipmentOptions,
+          loadedReport,
+          loadedTrend,
+        ] =
           await Promise.all([
             getBranches(stored.accessToken),
             getCoaches(stored.accessToken),
@@ -194,6 +203,9 @@ export default function CoachesPage() {
             canReadExercises
               ? getExercises(stored.accessToken, { size: 100 })
               : Promise.resolve({ items: [] }),
+            canReadExercises
+              ? getExerciseEquipmentOptions(stored.accessToken)
+              : Promise.resolve([]),
             canReadMetrics
               ? getAssignmentReport(stored.accessToken, { from: startOfWeek(), to: today() })
               : Promise.resolve(null),
@@ -206,6 +218,7 @@ export default function CoachesPage() {
         setCoaches(loadedCoaches);
         setWorkouts(loadedWorkouts);
         setExercisePage(loadedExercises.items);
+        setEquipmentCatalogOptions(loadedEquipmentOptions);
         setReport(loadedReport);
         setTrend(loadedTrend);
         const canManageAll = stored.user.permissions.includes("workout.manage.all");
@@ -239,6 +252,18 @@ export default function CoachesPage() {
         .some((value) => value?.toLowerCase().includes(query)),
     );
   }, [exercisePage, exerciseQuery]);
+  const equipmentOptions = useMemo(() => {
+    const organizationEquipment = exercisePage
+      .filter((exercise) => exercise.origin !== "SYSTEM")
+      .map((exercise) => exercise.equipment?.trim())
+      .filter((equipment): equipment is string => Boolean(equipment));
+    return Array.from(new Set([
+      ...EQUIPMENT_OPTIONS,
+      ...equipmentCatalogOptions,
+      ...organizationEquipment,
+    ]))
+      .sort((left, right) => left.localeCompare(right, "es"));
+  }, [equipmentCatalogOptions, exercisePage]);
   const publishedWorkouts = useMemo(
     () => workouts.filter(isPublished),
     [workouts],
@@ -278,11 +303,14 @@ export default function CoachesPage() {
     const canReadExercises = !supervisorMetricsOnly
       && session.user.permissions.includes("exercise.read");
     const canReadMetrics = session.user.permissions.includes("coach.metrics.read");
-    const [nextWorkouts, nextExercises, nextReport, nextTrend] = await Promise.all([
+    const [nextWorkouts, nextExercises, nextEquipmentOptions, nextReport, nextTrend] = await Promise.all([
       canReadWorkouts ? getWorkouts(session.accessToken) : Promise.resolve(workouts),
       canReadExercises
         ? getExercises(session.accessToken, { query: exerciseQuery, size: 100 })
         : Promise.resolve({ items: exercisePage }),
+      canReadExercises
+        ? getExerciseEquipmentOptions(session.accessToken)
+        : Promise.resolve(equipmentCatalogOptions),
       canReadMetrics ? getAssignmentReport(session.accessToken, reportParams) : Promise.resolve(report),
       canReadMetrics ? getAssignmentTrend(session.accessToken, {
           weeks: trendWeeks,
@@ -293,6 +321,7 @@ export default function CoachesPage() {
     ]);
     setWorkouts(nextWorkouts);
     setExercisePage(nextExercises.items);
+    setEquipmentCatalogOptions(nextEquipmentOptions);
     setReport(nextReport);
     setTrend(nextTrend);
     setSelectedWorkoutId((current) =>
@@ -1051,12 +1080,12 @@ export default function CoachesPage() {
                   </button>
                 </div>
               </div>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="exercise-catalog-list">
                 {filteredExercises.map((exercise) => {
                   const manageable = canManageExerciseCatalog
                     || exercise.createdBy === session.user.userId;
                   return (
-                    <article className="rounded-lg border border-[#dde5df] p-3" key={exercise.id}>
+                    <article className="exercise-catalog-card" key={exercise.id}>
                       <div className="flex justify-between gap-2">
                         <strong>{exercise.name}</strong>
                         <span className="text-[10px] font-semibold text-[#66786d]">{exercise.origin}</span>
@@ -1064,7 +1093,7 @@ export default function CoachesPage() {
                       <p className="mt-1 text-xs text-[#637268]">
                         {exercise.primaryMuscleGroup || "General"} · {exercise.equipment || "Sin equipo"}
                       </p>
-                      {exercise.instructions ? <p className="mt-2 line-clamp-2 text-xs">{exercise.instructions}</p> : null}
+                      {exercise.instructions ? <p className="exercise-catalog-description">{exercise.instructions}</p> : null}
                       {exercise.mediaUrl ? <p className="mt-2 text-xs font-semibold text-emerald-800">Medio adjunto</p> : null}
                       {manageable && exercise.origin !== "SYSTEM" ? (
                         <>
@@ -1329,6 +1358,7 @@ export default function CoachesPage() {
           aliasDraft={editingExerciseId ? aliasDrafts[editingExerciseId] ?? "" : ""}
           aliases={editingExerciseId ? exerciseAliases[editingExerciseId] ?? [] : []}
           editing={Boolean(editingExerciseId)}
+          equipmentOptions={equipmentOptions}
           form={exerciseForm}
           open={exerciseDrawerOpen}
           saving={saving}
@@ -1363,6 +1393,7 @@ function ExerciseFormDrawer({
   aliasDraft,
   aliases,
   editing,
+  equipmentOptions,
   form,
   open,
   saving,
@@ -1377,6 +1408,7 @@ function ExerciseFormDrawer({
   aliasDraft: string;
   aliases: string[];
   editing: boolean;
+  equipmentOptions: string[];
   form: CreateExercisePayload;
   open: boolean;
   saving: boolean;
@@ -1433,9 +1465,8 @@ function ExerciseFormDrawer({
               />
             </Field>
             <Field label="Equipo">
-              <GuidedSelect
-                options={EQUIPMENT_OPTIONS}
-                placeholder="Seleccionar equipo"
+              <EquipmentSelector
+                options={equipmentOptions}
                 value={form.equipment ?? ""}
                 onChange={(value) => onChange({ equipment: value })}
               />
@@ -1588,6 +1619,57 @@ function ExerciseFormDrawer({
         </div>
       </form>
     </AppDrawer>
+  );
+}
+
+function EquipmentSelector({
+  onChange,
+  options,
+  value,
+}: {
+  onChange: (value: string) => void;
+  options: string[];
+  value: string;
+}) {
+  const [creatingEquipment, setCreatingEquipment] = useState(false);
+  const hasLegacyValue = Boolean(value) && !options.includes(value);
+
+  return (
+    <div className="exercise-equipment-selector">
+      <select
+        aria-label="Equipo"
+        className="app-input"
+        onChange={(event) => {
+          if (event.target.value === "__CREATE_EQUIPMENT__") {
+            setCreatingEquipment(true);
+            onChange("");
+            return;
+          }
+          setCreatingEquipment(false);
+          onChange(event.target.value);
+        }}
+        value={creatingEquipment ? "__CREATE_EQUIPMENT__" : value}
+      >
+        <option value="">Seleccionar equipo</option>
+        {hasLegacyValue ? <option value={value}>{value} (valor existente)</option> : null}
+        {options.map((option) => <option key={option} value={option}>{option}</option>)}
+        <option value="__CREATE_EQUIPMENT__">+ Crear nuevo equipo</option>
+      </select>
+      {creatingEquipment ? (
+        <>
+          <input
+            aria-label="Nombre del equipo nuevo"
+            autoFocus
+            className="app-input"
+            maxLength={120}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder="Ej. Trineo de empuje"
+            value={value}
+          />
+          <small>Se agregará a la lista del gimnasio cuando guardes este ejercicio.</small>
+        </>
+      ) : null}
+    </div>
   );
 }
 

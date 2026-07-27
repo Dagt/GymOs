@@ -147,7 +147,9 @@ class DatabaseMigrationTests {
 			catalog.assignments(organizationId, branchId, from, to, null, null, null, 25, 0);
 			catalog.metrics(organizationId, branchId, from, to, null, null, null);
 			catalog.weeklyTrend(organizationId, branchId, from, to, null, null, null);
+			catalog.exerciseEquipmentOptions(organizationId);
 		}).doesNotThrowAnyException();
+		assertThat(catalog.exerciseEquipmentOptions(organizationId)).contains("Barra");
 	}
 
 	@Test
