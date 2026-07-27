@@ -52,10 +52,12 @@ La consulta remota por el socio pertenece a una aplicación futura.
 - el selector permite crear un equipo durante el alta; se guarda en
   `exercise.equipment` y el endpoint `/exercises/equipment-options` reconstruye
   las opciones activas SYSTEM y de la organización sin depender de paginación;
+- el nombre de un equipo nuevo se captura debajo de la cuadrícula de
+  identificación para no desplazar el selector de grupo muscular;
 - identificación y ejecución visibles primero; detalles técnicos, medios y
   nombres alternativos se administran de forma progresiva;
-- catálogo con scroll interno, cuadrícula responsiva, tarjetas de altura uniforme
-  y descripción limitada a dos líneas;
+- catálogo con scroll interno, cuadrícula responsiva, tarjetas compactas de
+  altura fija y descripción elidida a una línea;
 - carga, lectura, reemplazo y eliminación de JPG, PNG, WebP, GIF o MP4 de hasta
   8 MB mediante almacenamiento de objetos;
 - intento de limpieza del archivo sustituido y compensación si falla la

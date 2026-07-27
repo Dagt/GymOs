@@ -49,8 +49,10 @@ El módulo permite:
   detalles técnicos progresivos, medios y nombres alternativos;
 - crear equipos durante el alta de un ejercicio y reutilizarlos desde una lista
   reconstruida para toda la organización;
-- recorrer el catálogo dentro de una superficie con scroll y tarjetas uniformes
-  aunque existan descripciones;
+- recorrer el catálogo dentro de una superficie con scroll y tarjetas compactas
+  de altura fija; las descripciones se eliden a una línea y no estiran la fila;
+- crear un equipo desde un bloque independiente que no desplaza ni deforma los
+  selectores de grupo muscular y equipo;
 - crear rutinas estructuradas en sesiones, bloques y ejercicios;
 - usar un constructor compacto: datos esenciales visibles, campos avanzados y
   notas desplegables, acciones de guardado persistentes y coach propio fijo;
@@ -87,8 +89,9 @@ El alcance funcional V1 está cerrado y estabilizado. El cierre base está en
 alcance/UX en `0066c0b`, la compatibilidad PostgreSQL real en `3933aa5` y el
 alcance analítico de supervisores en `5dd0e47`, la integración del alta Coach
 en Equipo en `602d37b`, el rediseño UX en `d1d5124` y el catálogo reutilizable
-en `9af72e7`. Los hallazgos específicos `COA-001` a `COA-007` y `COA-009` a
-`COA-017` pasaron al
+en `9af72e7`, con compactación y alineación corregidas en `1f69dfa`. Los
+hallazgos específicos `COA-001` a `COA-007`, `COA-009` a `COA-017` y `COA-019`
+pasaron al
 historial
 resuelto del documento 28.
 

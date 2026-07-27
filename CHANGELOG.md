@@ -10,7 +10,9 @@ All notable changes to GymOS will be documented in this file.
 - Redesign Team, workout builder, exercise catalog and personal Coach metrics
   with compact, progressive and role-aware interfaces.
 - Add organization-wide reusable exercise equipment, a scrollable catalog and
-  uniform exercise cards.
+  compact fixed-height exercise cards whose descriptions do not stretch rows.
+- Keep muscle-group and equipment selectors aligned by rendering new-equipment
+  details outside the identification grid.
 - Harden production readiness configuration.
 - Add operational runbooks for deployment, backup, restore, rollback, incidents and maintenance.
 - Restrict demo seed to the local Spring profile.

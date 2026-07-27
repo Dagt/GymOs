@@ -67,6 +67,7 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 | COA-015 | Identidad/Coaches/UX | Integrados especialidades y biografía en el alta transaccional del usuario Coach; restaurada la alineación uniforme de filas y acciones en Equipo. | `602d37b`; prueba PostgreSQL de provisioning, servicio de identidad y 8 E2E con medición de layout. |
 | COA-016 | Identidad/Coaches/UX | Rediseñados Equipo, constructor y catálogo con jerarquía compacta, taxonomía guiada e identidad fija; métricas del Coach reducidas a su contexto personal. | `d1d5124`; 31 pruebas frontend, typecheck, lint, build, revisión visual responsiva y 8 E2E. |
 | COA-017 | Coaches/catálogo | Añadidos equipos personalizados reutilizables por organización, endpoint no paginado de opciones, scroll interno, tarjetas uniformes y descripciones acotadas. | `9af72e7`; prueba PostgreSQL de opciones, servicio, 31 pruebas frontend, build y 9 E2E. |
+| COA-019 | Coaches/catálogo/UX | Corregida la altura excesiva de tarjetas SYSTEM y propias; la descripción queda en una línea sin expandir la fila y el alta de equipo ya no deforma el selector muscular. | `1f69dfa`; typecheck, lint, 31 pruebas frontend, build y 9 E2E con medición de altura y alineación. |
 | GEN-003 | General/documentación | Estado, deuda, ramas y fichas modulares consolidados; se retiraron fuentes transitorias paralelas. | Documentos 13, 28, 29 y `modulos/` vigentes al corte. |
 | BR-C01 | Gestión de ramas | Wellness retirado del árbol final de Coaches. | Revert explícito de `4a7a7d1`. |
 
