@@ -1,20 +1,16 @@
 package com.gymos.coaching.application.pdf;
 
-import java.util.Locale;
-
+/**
+ * The member-facing workout document now has a single supported presentation:
+ * the branded compact dark PDF. Legacy query values are intentionally ignored
+ * so existing clients continue to work without exposing multiple templates.
+ */
 public enum WorkoutPdfTemplate {
 	COMPACT_LIGHT,
 	COMPACT_DARK,
 	DETAILED;
 
 	public static WorkoutPdfTemplate fromString(String value) {
-		if (value == null || value.isBlank()) {
-			return COMPACT_LIGHT;
-		}
-		try {
-			return WorkoutPdfTemplate.valueOf(value.trim().toUpperCase(Locale.ROOT));
-		} catch (IllegalArgumentException e) {
-			return COMPACT_LIGHT;
-		}
+		return COMPACT_DARK;
 	}
 }
