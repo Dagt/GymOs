@@ -7,9 +7,11 @@ import {
 import { Metric } from "./ClientDetailMetric";
 
 export function ClientProfileCard({
+  canEdit = true,
   client,
   onEdit,
 }: {
+  canEdit?: boolean;
   client: ClientDetail;
   onEdit: () => void;
 }) {
@@ -20,9 +22,15 @@ export function ClientProfileCard({
           <p>Datos personales</p>
           <h2>Ficha del socio</h2>
         </div>
-        <button className="app-button" onClick={onEdit} type="button">
-          Editar datos
-        </button>
+        {canEdit ? (
+          <button className="app-button" onClick={onEdit} type="button">
+            Editar datos
+          </button>
+        ) : (
+          <span className="rounded-lg border border-[#d8ddd2] bg-[#f7f9f6] px-3 py-2 text-xs font-semibold text-[#5d6b63]">
+            Consulta de solo lectura
+          </span>
+        )}
       </div>
       <dl className="mt-5 grid gap-4 sm:grid-cols-2">
         <Metric label="Nombre" value={client.firstName} />
