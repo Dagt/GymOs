@@ -36,7 +36,7 @@ public final class WorkoutPdfExerciseCatalogLookup {
 					.query(String.class)
 					.optional()
 					.filter(value -> value != null && !value.isBlank());
-		} catch (IllegalArgumentException | RuntimeException ignored) {
+		} catch (RuntimeException ignored) {
 			return Optional.empty();
 		}
 	}
