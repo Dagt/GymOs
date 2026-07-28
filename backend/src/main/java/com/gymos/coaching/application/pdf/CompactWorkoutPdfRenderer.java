@@ -77,24 +77,28 @@ public class CompactWorkoutPdfRenderer implements WorkoutPdfRenderer {
 			);
 		}
 
-		static Theme dark(Color accent) {
+		static Theme dark(Color primary, Color accent) {
 			Color readableAccent = ensureReadableAccent(accent);
+			Color page = blend(primary, Color.BLACK, .84f);
+			Color surface = blend(primary, new Color(34, 34, 34), .76f);
+			Color alternate = blend(primary, new Color(50, 50, 50), .70f);
+			Color divider = blend(primary, new Color(112, 112, 112), .62f);
 			return new Theme(
-					new Color(11, 18, 15),
-					new Color(22, 33, 28),
-					new Color(28, 43, 36),
+					page,
+					surface,
+					alternate,
 					new Color(245, 247, 246),
 					new Color(202, 211, 206),
 					new Color(150, 165, 157),
-					new Color(48, 66, 57),
+					divider,
 					readableAccent,
 					blend(readableAccent, Color.BLACK, .22f),
-					blend(readableAccent, new Color(11, 18, 15), .78f),
+					blend(readableAccent, page, .82f),
+					luminance(readableAccent) > 165 ? Color.BLACK : Color.WHITE,
 					Color.WHITE,
-					Color.WHITE,
-					new Color(5, 9, 8),
-					blend(readableAccent, Color.BLACK, .52f),
-					blend(readableAccent, new Color(11, 18, 15), .70f)
+					blend(primary, Color.BLACK, .92f),
+					blend(primary, Color.BLACK, .78f),
+					blend(page, readableAccent, .10f)
 			);
 		}
 	}
@@ -114,8 +118,9 @@ public class CompactWorkoutPdfRenderer implements WorkoutPdfRenderer {
 			this.pdf = pdf;
 			this.doc = doc;
 			this.dark = dark;
-			Color configured = parseColor(doc.branding().primaryColorHex(), new Color(16, 185, 129));
-			this.theme = dark ? Theme.dark(configured) : Theme.light(configured);
+			Color accent = parseColor(doc.branding().primaryColorHex(), new Color(107, 114, 128));
+			Color primary = parseColor(doc.branding().secondaryColorHex(), new Color(17, 17, 17));
+			this.theme = dark ? Theme.dark(primary, accent) : Theme.light(accent);
 			this.logo = loadLogo(pdf, doc.branding().logoUrl(), assetOrigin);
 			newPage(false);
 		}
@@ -133,8 +138,17 @@ public class CompactWorkoutPdfRenderer implements WorkoutPdfRenderer {
 		private void paintPageBackground() throws IOException {
 			fillRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, theme.pageBackground());
 			if (dark) {
-				fillRect(PAGE_WIDTH * .58f, 0, PAGE_WIDTH * .42f, PAGE_HEIGHT, blend(theme.pageBackground(), theme.accent(), .07f));
-				Color diagonal = blend(theme.pageBackground(), theme.accent(), .16f);
+				float gradientStart = PAGE_WIDTH * .58f;
+				float gradientWidth = PAGE_WIDTH - gradientStart;
+				int bands = 12;
+				for (int index = 0; index < bands; index++) {
+					float ratio = (index + 1f) / bands;
+					float x = gradientStart + gradientWidth * index / bands;
+					float width = gradientWidth / bands + .5f;
+					Color band = blend(theme.pageBackground(), theme.accent(), .032f * ratio);
+					fillRect(x, 0, width, PAGE_HEIGHT, band);
+				}
+				Color diagonal = blend(theme.pageBackground(), theme.accent(), .11f);
 				for (float start = -PAGE_HEIGHT; start < PAGE_WIDTH + PAGE_HEIGHT; start += 18f) {
 					line(start, 0, start + PAGE_HEIGHT, PAGE_HEIGHT, diagonal, .32f);
 				}
@@ -471,8 +485,10 @@ public class CompactWorkoutPdfRenderer implements WorkoutPdfRenderer {
 		} catch (RuntimeException ignored) { return fallback; }
 	}
 	private static Color ensureReadableAccent(Color accent) {
-		double luminance = .2126 * accent.getRed() + .7152 * accent.getGreen() + .0722 * accent.getBlue();
-		return luminance < 115 ? blend(accent, Color.WHITE, .35f) : accent;
+		return luminance(accent) < 115 ? blend(accent, Color.WHITE, .35f) : accent;
+	}
+	private static double luminance(Color color) {
+		return .2126 * color.getRed() + .7152 * color.getGreen() + .0722 * color.getBlue();
 	}
 	private static Color blend(Color from, Color to, float ratio) {
 		float safe = Math.max(0, Math.min(1, ratio));
