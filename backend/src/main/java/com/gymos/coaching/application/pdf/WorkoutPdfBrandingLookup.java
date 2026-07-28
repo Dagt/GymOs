@@ -7,8 +7,8 @@ import java.util.Optional;
 
 /**
  * Resolves the same organization/branch palette used by the tenant web shell.
- * Organization branding is loaded first through a minimal, stable query. Branch
- * branding is then applied field-by-field when the active branch defines overrides.
+ * The logo reference is used as the strongest tenant identity because the
+ * display name embedded in an assignment may differ from brand_name/trade_name.
  */
 @Component
 public final class WorkoutPdfBrandingLookup {
@@ -28,20 +28,24 @@ public final class WorkoutPdfBrandingLookup {
 			String legacyPrimaryColor
 	) {
 		WorkoutPdfBrandingLookup current = instance;
-		if (current == null || gymName == null || gymName.isBlank()) {
+		if (current == null) {
 			return Palette.fallback(legacyPrimaryColor, logoUrl, gymName);
 		}
 		try {
-			Palette organization = current.findOrganization(gymName)
+			Palette organization = current.findOrganization(gymName, logoUrl)
 					.orElseGet(() -> Palette.fallback(legacyPrimaryColor, logoUrl, gymName));
-			return current.applyBranchOverrides(organization, gymName, branchName);
+			return current.applyBranchOverrides(organization, gymName, logoUrl, branchName);
 		} catch (RuntimeException ignored) {
 			// Branding must never prevent the workout document from being generated.
 			return Palette.fallback(legacyPrimaryColor, logoUrl, gymName);
 		}
 	}
 
-	private Optional<Palette> findOrganization(String gymName) {
+	private Optional<Palette> findOrganization(String gymName, String logoUrl) {
+		String normalizedName = clean(gymName, "");
+		String normalizedLogo = clean(logoUrl, "");
+		if (normalizedName.isBlank() && normalizedLogo.isBlank()) return Optional.empty();
+
 		return jdbc.sql("""
 				SELECT
 				    COALESCE(NULLIF(trim(primary_color), ''), '#111111') AS primary_color,
@@ -50,36 +54,46 @@ public final class WorkoutPdfBrandingLookup {
 				    NULLIF(trim(logo_url), '') AS logo_url,
 				    COALESCE(NULLIF(trim(brand_name), ''), trade_name) AS display_name
 				FROM organization
-				WHERE lower(trim(COALESCE(NULLIF(brand_name, ''), trade_name))) = lower(trim(:gymName))
+				WHERE (:logoUrl <> '' AND trim(COALESCE(logo_url, '')) = :logoUrl)
+				   OR (:gymName <> '' AND lower(trim(COALESCE(NULLIF(brand_name, ''), trade_name))) = lower(:gymName))
+				ORDER BY CASE WHEN :logoUrl <> '' AND trim(COALESCE(logo_url, '')) = :logoUrl THEN 0 ELSE 1 END
 				LIMIT 1
 				""")
-				.param("gymName", gymName)
+				.param("gymName", normalizedName)
+				.param("logoUrl", normalizedLogo)
 				.query((rs, row) -> new Palette(
 						clean(rs.getString("primary_color"), "#111111"),
 						clean(rs.getString("accent_color"), "#6B7280"),
 						clean(rs.getString("surface_color"), "#FFFFFF"),
-						clean(rs.getString("logo_url"), null),
+						clean(rs.getString("logo_url"), logoUrl),
 						clean(rs.getString("display_name"), gymName)
 				))
 				.optional();
 	}
 
-	private Palette applyBranchOverrides(Palette organization, String gymName, String branchName) {
+	private Palette applyBranchOverrides(
+			Palette organization,
+			String gymName,
+			String logoUrl,
+			String branchName
+	) {
 		if (branchName == null || branchName.isBlank()) return organization;
 		try {
 			return jdbc.sql("""
-					SELECT primary_color, accent_color, surface_color, logo_url, brand_name
-					FROM branch
-					WHERE lower(trim(name)) = lower(trim(:branchName))
-					  AND organization_id = (
-					      SELECT id FROM organization
-					      WHERE lower(trim(COALESCE(NULLIF(brand_name, ''), trade_name))) = lower(trim(:gymName))
-					      LIMIT 1
+					SELECT b.primary_color, b.accent_color, b.surface_color, b.logo_url, b.brand_name
+					FROM branch b
+					JOIN organization o ON o.id = b.organization_id
+					WHERE lower(trim(b.name)) = lower(trim(:branchName))
+					  AND (
+					      (:logoUrl <> '' AND trim(COALESCE(o.logo_url, '')) = :logoUrl)
+					      OR (:gymName <> '' AND lower(trim(COALESCE(NULLIF(o.brand_name, ''), o.trade_name))) = lower(:gymName))
 					  )
+					ORDER BY CASE WHEN :logoUrl <> '' AND trim(COALESCE(o.logo_url, '')) = :logoUrl THEN 0 ELSE 1 END
 					LIMIT 1
 					""")
-					.param("branchName", branchName)
-					.param("gymName", gymName)
+					.param("branchName", branchName.trim())
+					.param("gymName", clean(gymName, ""))
+					.param("logoUrl", clean(logoUrl, ""))
 					.query((rs, row) -> new Palette(
 							clean(rs.getString("primary_color"), organization.primaryColor()),
 							clean(rs.getString("accent_color"), organization.accentColor()),
