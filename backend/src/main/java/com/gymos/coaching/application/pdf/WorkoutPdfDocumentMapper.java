@@ -5,7 +5,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.AssignmentPdfData;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 public final class WorkoutPdfDocumentMapper {
 
@@ -47,6 +50,8 @@ public final class WorkoutPdfDocumentMapper {
 				}
 			}
 		} catch (Exception ignored) {}
+
+		appendEquipmentGlossary(sessions);
 
 		return new WorkoutPdfDocument(
 				data.id() != null ? data.id().toString() : "N/A",
@@ -128,6 +133,49 @@ public final class WorkoutPdfDocumentMapper {
 		);
 	}
 
+	private static void appendEquipmentGlossary(List<WorkoutPdfSession> sessions) {
+		if (sessions.isEmpty()) return;
+
+		Map<String, EquipmentEntry> unique = new LinkedHashMap<>();
+		for (WorkoutPdfSession session : sessions) {
+			if (session.blocks() == null) continue;
+			for (WorkoutPdfBlock block : session.blocks()) {
+				if (block.exercises() == null) continue;
+				for (WorkoutPdfExercise exercise : block.exercises()) {
+					if (exercise.name() == null || exercise.name().isBlank()
+							|| exercise.equipment() == null || exercise.equipment().isBlank()) continue;
+					String key = exercise.name().trim().toLowerCase(Locale.forLanguageTag("es-MX"));
+					unique.putIfAbsent(key, new EquipmentEntry(exercise.name().trim(), exercise.equipment().trim()));
+				}
+			}
+		}
+		if (unique.isEmpty()) return;
+
+		List<WorkoutPdfExercise> entries = new ArrayList<>();
+		int index = 1;
+		for (EquipmentEntry entry : unique.values()) {
+			entries.add(new WorkoutPdfExercise(
+					index++, entry.exerciseName(), entry.equipment(), "", "", false,
+					null, null, entry.equipment()
+			));
+		}
+
+		WorkoutPdfSession last = sessions.get(sessions.size() - 1);
+		List<WorkoutPdfBlock> blocks = new ArrayList<>(last.blocks() == null ? List.of() : last.blocks());
+		blocks.add(new WorkoutPdfBlock(
+				"Equipo necesario",
+				"EQUIPMENT",
+				"EQUIPO NECESARIO",
+				"Cada ejercicio aparece una sola vez.",
+				entries
+		));
+		sessions.set(sessions.size() - 1, new WorkoutPdfSession(
+				last.dayIndex(), last.name(), last.focus(), last.notes(), blocks
+		));
+	}
+
+	private record EquipmentEntry(String exerciseName, String equipment) {}
+
 	private static String blockTypeLabel(String type) {
 		if (type == null) return "BLOQUE";
 		return switch (type.toUpperCase()) {
@@ -137,6 +185,7 @@ public final class WorkoutPdfDocumentMapper {
 			case "CIRCUIT" -> "CIRCUITO";
 			case "FINISHER" -> "FINALIZADOR";
 			case "COOLDOWN" -> "VUELTA A LA CALMA";
+			case "EQUIPMENT" -> "EQUIPO NECESARIO";
 			default -> "BLOQUE";
 		};
 	}
