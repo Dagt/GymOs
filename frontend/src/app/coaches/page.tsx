@@ -2199,12 +2199,15 @@ function AssignmentTable({
   const [replacing, setReplacing] = useState<string | null>(null);
   const [replacementWorkoutId, setReplacementWorkoutId] = useState("");
 
-  async function downloadPdf(assignment: AssignmentReport["details"][number]) {
+  async function downloadPdf(
+    assignment: AssignmentReport["details"][number],
+    template: "COMPACT_LIGHT" | "COMPACT_DARK" | "DETAILED" = "COMPACT_LIGHT"
+  ) {
     setDownloading(assignment.id);
     onError("");
     try {
-      await downloadWorkoutPdf(session.accessToken, assignment.id);
-      onMessage(`PDF de “${assignment.workoutTitle}” descargado.`);
+      await downloadWorkoutPdf(session.accessToken, assignment.id, template);
+      onMessage(`PDF (${template === "COMPACT_LIGHT" ? "Claro" : template === "COMPACT_DARK" ? "Oscuro" : "Detallado"}) descargado.`);
     } catch (exception) {
       onError(errorMessage(exception));
     } finally {
@@ -2290,16 +2293,29 @@ function AssignmentTable({
                   </p>
                 ) : null}
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {canDownloadPdf ? (
-                  <button
-                    className="rounded-md border border-[#9eb2a5] px-3 py-2 text-sm font-semibold disabled:opacity-60"
-                    disabled={downloading === assignment.id}
-                    onClick={() => downloadPdf(assignment)}
-                    type="button"
-                  >
-                    {downloading === assignment.id ? "Descargando…" : "Descargar PDF"}
-                  </button>
+                  <div className="inline-flex items-center rounded-lg border border-[#9eb2a5] bg-white p-0.5 shadow-sm">
+                    <button
+                      className="px-2.5 py-1.5 text-xs font-bold text-[#1e382b] hover:bg-emerald-50 rounded transition-all disabled:opacity-60"
+                      disabled={downloading === assignment.id}
+                      onClick={() => downloadPdf(assignment, "COMPACT_LIGHT")}
+                      title="PDF para impresión en papel (fondo claro)"
+                      type="button"
+                    >
+                      {downloading === assignment.id ? "Descargando…" : "📄 PDF Claro"}
+                    </button>
+                    <span className="text-stone-300 px-0.5">|</span>
+                    <button
+                      className="px-2.5 py-1.5 text-xs font-bold text-slate-800 hover:bg-stone-100 rounded transition-all disabled:opacity-60"
+                      disabled={downloading === assignment.id}
+                      onClick={() => downloadPdf(assignment, "COMPACT_DARK")}
+                      title="PDF visual oscuro para celular"
+                      type="button"
+                    >
+                      🌙 PDF Oscuro
+                    </button>
+                  </div>
                 ) : null}
                 {canManage && assignment.status === "ACTIVE" ? (
                   <>

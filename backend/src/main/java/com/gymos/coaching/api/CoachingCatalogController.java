@@ -6,6 +6,7 @@ import com.gymos.coaching.application.CoachingExerciseMediaService.UploadExercis
 import com.gymos.coaching.application.CoachingCatalogService.AssignmentReport;
 import com.gymos.coaching.application.CoachingCatalogService.CreateExerciseCommand;
 import com.gymos.coaching.application.CoachingCatalogService.WeeklyTrendReport;
+import com.gymos.coaching.application.pdf.WorkoutPdfTemplate;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.ExercisePage;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.ExerciseRecord;
 import com.gymos.common.api.Correlation;
@@ -226,13 +227,15 @@ public class CoachingCatalogController {
 	ResponseEntity<byte[]> pdf(
 			@AuthenticationPrincipal GymOsPrincipal principal,
 			@PathVariable UUID assignmentId,
+			@RequestParam(required = false, defaultValue = "COMPACT_LIGHT") String template,
 			HttpServletRequest request
 	) {
+		WorkoutPdfTemplate pdfTemplate = WorkoutPdfTemplate.fromString(template);
 		return ResponseEntity.ok()
 				.header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
 						.filename("rutina-" + assignmentId + ".pdf").build().toString())
 				.contentType(MediaType.APPLICATION_PDF)
-				.body(service.assignmentPdf(principal, assignmentId, request.getHeader(HttpHeaders.ORIGIN)));
+				.body(service.assignmentPdf(principal, assignmentId, pdfTemplate, request.getHeader(HttpHeaders.ORIGIN)));
 	}
 
 	private String correlationId(HttpServletRequest request) {

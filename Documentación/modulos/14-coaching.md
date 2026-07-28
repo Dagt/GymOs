@@ -131,9 +131,10 @@ La consulta remota por el socio pertenece a una aplicación futura.
 - notas privadas separadas de indicaciones imprimibles;
 - descarga PDF mediante un enlace temporal insertado en el documento, con
   validación de respuesta vacía, estado visible y mensaje de éxito/error;
-- PDF A4 reproducible desde la versión asignada, con composición clara y
-  moderna, encabezado liviano, ficha única de socio/coach/objetivo/vigencia,
-  indicaciones, días suaves, bloques, tablas de series, pie, numeración y saltos;
+- soporta selección de variante visual mediante parámetro `?template=COMPACT_LIGHT` (Impresión clara) o `COMPACT_DARK` (Visual oscuro), conservando `DETAILED` para retrocompatibilidad;
+- modelo documental desacoplado (`WorkoutPdfDocument`, `WorkoutPdfSession`, `WorkoutPdfBlock`, `WorkoutPdfExercise`, `WorkoutPdfBranding`) mapeado desde la versión publicada de la asignación;
+- formateador de prescripción deportiva (`PrescriptionFormatter`) que condensa series/reps/carga en notación limpia de una sola línea (`3 × 12 / 10 / 8 · subir carga`, `3 × (8 + 15)`, `3 × 12 · RPE 8`);
+- PDF A4 reproducible con composición compacta y deportiva, encabezado liviano (menos del 15% de la primera página), ficha única de socio/coach/objetivo/vigencia, días continuos sin desperdiciar hojas, pie de página con folio, versión y numeración `Página X de Y`;
 - el logotipo relativo almacenado por la configuración (`/tenants/...`) se
   resuelve únicamente contra el origen del frontend autorizado en CORS; las URL
   externas siguen limitadas a HTTPS público y se conserva la inicial como

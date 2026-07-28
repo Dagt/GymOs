@@ -267,8 +267,16 @@ export async function getAssignmentTrend(
   );
 }
 
-export async function downloadWorkoutPdf(accessToken: string, assignmentId: string) {
-  return downloadFile(accessToken, `/workout-assignments/${assignmentId}/pdf`, `rutina-${assignmentId}.pdf`);
+export async function downloadWorkoutPdf(
+  accessToken: string,
+  assignmentId: string,
+  template: "COMPACT_LIGHT" | "COMPACT_DARK" | "DETAILED" = "COMPACT_LIGHT"
+) {
+  return downloadFile(
+    accessToken,
+    `/workout-assignments/${assignmentId}/pdf?template=${template}`,
+    `rutina-${assignmentId}-${template.toLowerCase()}.pdf`
+  );
 }
 
 export async function downloadAssignmentCsv(

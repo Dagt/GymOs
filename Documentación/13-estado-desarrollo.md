@@ -76,9 +76,7 @@ El módulo permite:
   únicos y primeras rutinas, con semanas sin actividad explícitas;
 - buscar y aplicar directamente el filtro de socio en la pantalla de métricas,
   incluyendo reporte, histórico y CSV;
-- exportar CSV y descargar de forma controlada un PDF A4 moderno, claro y
-  espaciado, con el logo interno del gimnasio resuelto contra un origen CORS
-  autorizado, ficha de socio/coach, jerarquía, series y numeración;
+- exportar CSV y descargar de forma controlada un PDF A4 compacto y deportivo con elección de variante visual (`COMPACT_LIGHT` para impresión en papel o `COMPACT_DARK` para consulta visual en celular), respaldado por un motor documental desacoplado (`WorkoutPdfDocumentMapper`, `PrescriptionFormatter`, `CompactWorkoutPdfRenderer`) que condensa rutinas de 4-5 días en 2-3 páginas con logo del gimnasio, cabecera ligera, notaciones sintéticas (`3 × 12 / 10 / 8 · subir carga`, `3 × (8 + 15)`), folio y numeración `Página X de Y`;
 - cargar y administrar medios de ejercicios;
 - separar alcance propio del coach y alcance global de reportes para
   dueño/gerencia;

@@ -355,7 +355,7 @@ class CoachingCatalogServiceTests {
 	void assignmentPdfPaginatesLongWorkoutWithHeadersAndFooters() throws Exception {
 		UUID assignmentId = UUID.randomUUID();
 		StringBuilder exercises = new StringBuilder();
-		for (int index = 1; index <= 14; index++) {
+		for (int index = 1; index <= 30; index++) {
 			if (index > 1) exercises.append(',');
 			exercises.append("""
 					{"exerciseName":"Ejercicio %d","sets":3,"reps":"12","load":"RPE 8",
@@ -363,7 +363,7 @@ class CoachingCatalogServiceTests {
 					""".formatted(index));
 		}
 		String content = """
-				{"sessions":[{"name":"Cuerpo completo","focus":"Fuerza general","blocks":[{
+				{"sessions":[{"name":"Cuerpo completo A","focus":"Fuerza general","blocks":[{
 				"name":"Circuito principal","type":"CIRCUIT","exercises":[%s]}]}]}
 				""".formatted(exercises);
 		when(repository.assignmentPdf(
@@ -381,7 +381,7 @@ class CoachingCatalogServiceTests {
 		try (var document = Loader.loadPDF(pdf)) {
 			String text = new PDFTextStripper().getText(document);
 			assertThat(document.getNumberOfPages()).isGreaterThan(1);
-			assertThat(text).contains("Ejercicio 1", "Ejercicio 14");
+			assertThat(text).contains("Ejercicio 1", "Ejercicio 30");
 			assertThat(text).contains("Página 1 de", "Página 2 de");
 		}
 	}
