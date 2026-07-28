@@ -270,3 +270,16 @@ export function AppShell({
     </main>
   );
 }
+
+export function LoadingScreen({ text = "Cargando..." }: { text?: string }) {
+  return (
+    <main className="min-h-screen bg-[#eef1ed] p-6">
+      <section className="mx-auto flex min-h-[60vh] max-w-3xl items-center justify-center">
+        <div className="app-card w-full max-w-md p-8 text-center" role="status" aria-live="polite">
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-[#d8ddd2] border-t-[#174f37]" aria-hidden="true" />
+          <p className="text-sm font-semibold text-[#435249]">{text}</p>
+        </div>
+      </section>
+    </main>
+  );
+}
