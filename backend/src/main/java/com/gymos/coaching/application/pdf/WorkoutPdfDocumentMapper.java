@@ -111,6 +111,9 @@ public final class WorkoutPdfDocumentMapper {
 		String mediaUrl = text(exNode, "mediaUrl", null);
 		String primaryMuscleGroup = text(exNode, "primaryMuscleGroup", null);
 		String equipment = text(exNode, "equipment", null);
+		if (equipment == null || equipment.isBlank()) {
+			equipment = WorkoutPdfExerciseCatalogLookup.equipment(text(exNode, "exerciseId", null)).orElse(null);
+		}
 
 		return new WorkoutPdfExercise(
 				index,
