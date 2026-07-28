@@ -2,13 +2,12 @@
 
 import { useEffect } from "react";
 
-const nativeInputValueSetter = Object.getOwnPropertyDescriptor(
-  window.HTMLInputElement.prototype,
-  "value",
-)?.set;
-
 function setReactInputValue(input: HTMLInputElement, value: string) {
-  nativeInputValueSetter?.call(input, value);
+  const setter = Object.getOwnPropertyDescriptor(
+    window.HTMLInputElement.prototype,
+    "value",
+  )?.set;
+  setter?.call(input, value);
   input.dispatchEvent(new Event("input", { bubbles: true }));
   input.dispatchEvent(new Event("change", { bubbles: true }));
 }
@@ -97,10 +96,14 @@ function simplifyPdfActions(root: ParentNode) {
   root.querySelectorAll<HTMLButtonElement>("button").forEach((button) => {
     const text = button.textContent?.trim() ?? "";
     if (text.includes("PDF Claro")) {
-      button.closest("div")?.remove();
+      button.hidden = true;
+      const separator = button.nextElementSibling;
+      if (separator instanceof HTMLElement && separator.textContent?.trim() === "|") {
+        separator.hidden = true;
+      }
       return;
     }
-    if (text.includes("PDF Oscuro")) {
+    if (text.includes("PDF Oscuro") || text === "Descargar PDF") {
       button.textContent = button.disabled ? "Descargando…" : "Descargar PDF";
       button.title = "Descargar rutina en PDF";
     }
