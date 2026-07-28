@@ -10,4 +10,11 @@ public record WorkoutPdfExercise(
 		String mediaUrl,
 		String primaryMuscleGroup,
 		String equipment
-) {}
+) {
+	/**
+	 * Compatibility accessor for renderers that use JavaBean-style boolean naming.
+	 */
+	public boolean isOptional() {
+		return optional;
+	}
+}
