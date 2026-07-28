@@ -1,0 +1,5 @@
+/* Coaches/workouts exposes one member-facing PDF action: the branded dark document. */
+button[title="PDF para impresión en papel (fondo claro)"],
+button[title="PDF para impresión en papel (fondo claro)"] + span {
+  display: none !important;
+}
