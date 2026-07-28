@@ -58,7 +58,7 @@ public final class WorkoutPdfExerciseCatalogLookup {
 					FROM exercise
 					WHERE lower(trim(name)) = lower(trim(:exerciseName))
 					  AND status = 'ACTIVE'
-					ORDER BY CASE WHEN organization_id IS NULL THEN 1 ELSE 0 END, updated_at DESC
+					ORDER BY CASE WHEN organization_id IS NULL THEN 1 ELSE 0 END
 					LIMIT 1
 					""")
 					.param("exerciseName", exerciseName.trim())
