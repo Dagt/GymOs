@@ -14,13 +14,16 @@ public final class WorkoutPdfDocumentMapper {
 	private WorkoutPdfDocumentMapper() {}
 
 	public static WorkoutPdfDocument fromAssignmentData(AssignmentPdfData data) {
+		WorkoutPdfBrandingLookup.Palette palette = WorkoutPdfBrandingLookup.resolve(
+				data.gymName(), data.logoUrl(), data.primaryColor()
+		);
 		WorkoutPdfBranding branding = new WorkoutPdfBranding(
 				data.gymName(),
 				data.branchName(),
 				data.contactPhone(),
 				data.logoUrl(),
-				data.primaryColor() != null ? data.primaryColor() : "#10B981",
-				"#064E3B"
+				palette.accentColor(),
+				palette.primaryColor()
 		);
 
 		List<WorkoutPdfSession> sessions = new ArrayList<>();
@@ -71,7 +74,6 @@ public final class WorkoutPdfDocumentMapper {
 				if (blockNode.isObject() && blockNode.has("exercises")) {
 					blocks.add(mapBlock(blockNode));
 				} else {
-					// Fallback for flat exercise structure
 					WorkoutPdfExercise ex = mapExercise(blockNode, 1);
 					blocks.add(new WorkoutPdfBlock("Bloque Principal", "MAIN", "TRABAJO PRINCIPAL", "", List.of(ex)));
 				}
