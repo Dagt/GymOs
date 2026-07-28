@@ -6,9 +6,11 @@ import org.springframework.stereotype.Component;
 import java.util.Optional;
 
 /**
- * Resolves the same organization/branch palette used by the tenant web shell.
- * The logo reference is used as the strongest tenant identity because the
- * display name embedded in an assignment may differ from brand_name/trade_name.
+ * Resolves the organization palette used by the tenant shell. The organization
+ * is loaded first and remains the source of truth for PDF colors; branch data is
+ * only allowed to override presentation metadata such as logo and display name.
+ * This prevents default branch colors from replacing an explicitly configured
+ * organization accent.
  */
 @Component
 public final class WorkoutPdfBrandingLookup {
@@ -34,7 +36,7 @@ public final class WorkoutPdfBrandingLookup {
 		try {
 			Palette organization = current.findOrganization(gymName, logoUrl)
 					.orElseGet(() -> Palette.fallback(legacyPrimaryColor, logoUrl, gymName));
-			return current.applyBranchOverrides(organization, gymName, logoUrl, branchName);
+			return current.applyBranchPresentationOverrides(organization, gymName, logoUrl, branchName);
 		} catch (RuntimeException ignored) {
 			// Branding must never prevent the workout document from being generated.
 			return Palette.fallback(legacyPrimaryColor, logoUrl, gymName);
@@ -71,7 +73,7 @@ public final class WorkoutPdfBrandingLookup {
 				.optional();
 	}
 
-	private Palette applyBranchOverrides(
+	private Palette applyBranchPresentationOverrides(
 			Palette organization,
 			String gymName,
 			String logoUrl,
@@ -80,7 +82,7 @@ public final class WorkoutPdfBrandingLookup {
 		if (branchName == null || branchName.isBlank()) return organization;
 		try {
 			return jdbc.sql("""
-					SELECT b.primary_color, b.accent_color, b.surface_color, b.logo_url, b.brand_name
+					SELECT b.logo_url, b.brand_name
 					FROM branch b
 					JOIN organization o ON o.id = b.organization_id
 					WHERE lower(trim(b.name)) = lower(trim(:branchName))
@@ -95,9 +97,9 @@ public final class WorkoutPdfBrandingLookup {
 					.param("gymName", clean(gymName, ""))
 					.param("logoUrl", clean(logoUrl, ""))
 					.query((rs, row) -> new Palette(
-							clean(rs.getString("primary_color"), organization.primaryColor()),
-							clean(rs.getString("accent_color"), organization.accentColor()),
-							clean(rs.getString("surface_color"), organization.surfaceColor()),
+							organization.primaryColor(),
+							organization.accentColor(),
+							organization.surfaceColor(),
 							clean(rs.getString("logo_url"), organization.logoUrl()),
 							clean(rs.getString("brand_name"), organization.displayName())
 					))
