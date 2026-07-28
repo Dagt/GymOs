@@ -23,7 +23,7 @@ public final class PrescriptionFormatter {
 		}
 
 		boolean optional = exerciseNode.path("optional").asBoolean(false);
-		String freePrescription = text(exerciseNode, "prescription", "");
+		String complementaryPrescription = text(exerciseNode, "prescription", "");
 		String sets = text(exerciseNode, "sets", "");
 		String reps = text(exerciseNode, "reps", "");
 		String load = text(exerciseNode, "load", "");
@@ -42,18 +42,14 @@ public final class PrescriptionFormatter {
 				? exerciseNode.get("restSeconds").asInt() : null;
 
 		JsonNode setPlan = exerciseNode.get("setPlan");
-		String mainPrescription;
+		String structuredPrescription;
 		if (setPlan != null && setPlan.isArray() && !setPlan.isEmpty()) {
-			mainPrescription = formatSetPlan(setPlan, unit);
-		} else if (!freePrescription.isBlank()) {
-			mainPrescription = freePrescription.trim();
-			if (!load.isBlank() && !containsIgnoreCase(mainPrescription, load)) {
-				mainPrescription += " · " + load.trim();
-			}
+			structuredPrescription = formatSetPlan(setPlan, unit);
 		} else {
-			mainPrescription = formatStructured(sets, reps, load, unit);
+			structuredPrescription = formatStructured(sets, reps, load, unit);
 		}
 
+		String mainPrescription = mergePrescription(structuredPrescription, complementaryPrescription);
 		if (mainPrescription.isBlank() && optional) {
 			mainPrescription = "Opcional";
 		}
@@ -73,6 +69,15 @@ public final class PrescriptionFormatter {
 				notes.trim(),
 				optional
 		);
+	}
+
+	private static String mergePrescription(String structured, String complementary) {
+		String base = clean(structured);
+		String extra = clean(complementary);
+		if (base.isBlank()) return extra;
+		if (extra.isBlank() || containsIgnoreCase(base, extra)) return base;
+		if (containsIgnoreCase(extra, base)) return extra;
+		return base + " · " + extra;
 	}
 
 	public static String formatStructured(String sets, String reps, String load) {
