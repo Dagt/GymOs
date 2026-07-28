@@ -120,7 +120,7 @@ replaceOnce(
 
 replaceOnce(
 `    <details className="workout-exercise-card" open={exerciseIndex === 0 || undefined}>`,
-`    <details className="workout-exercise-card" open={exerciseIndex === 0 || !exercise.exerciseName.trim() || undefined}>`,
+`    <details className="workout-exercise-card" defaultOpen={exerciseIndex === 0 || !exercise.exerciseName.trim()}>`,
   "apertura del ejercicio nuevo",
 );
 
@@ -138,9 +138,9 @@ replaceOnce(
               list={listId}
               onChange={(event) => {
                 const value = event.target.value;
-                const normalized = value.trim().localeCompare.bind(value.trim());
+                const normalizedValue = value.trim().toLocaleLowerCase("es-MX");
                 const match = catalogExercises.find((item) =>
-                  normalized(item.name.trim(), "es-MX", { sensitivity: "base" }) === 0,
+                  item.name.trim().toLocaleLowerCase("es-MX") === normalizedValue,
                 );
                 onChange({
                   exerciseName: value,
