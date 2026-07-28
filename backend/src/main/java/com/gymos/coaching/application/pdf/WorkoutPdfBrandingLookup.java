@@ -30,8 +30,13 @@ public final class WorkoutPdfBrandingLookup {
 		if (current == null || gymName == null || gymName.isBlank()) {
 			return Palette.fallback(legacyPrimaryColor);
 		}
-		return current.find(gymName, branchName)
-				.orElseGet(() -> Palette.fallback(legacyPrimaryColor));
+		try {
+			return current.find(gymName, branchName)
+					.orElseGet(() -> Palette.fallback(legacyPrimaryColor));
+		} catch (RuntimeException ignored) {
+			// Branding must never prevent the workout document from being generated.
+			return Palette.fallback(legacyPrimaryColor);
+		}
 	}
 
 	private Optional<Palette> find(String gymName, String branchName) {
@@ -46,7 +51,6 @@ public final class WorkoutPdfBrandingLookup {
 				FROM organization o
 				LEFT JOIN branch b
 				  ON b.organization_id = o.id
-				 AND b.deleted_at IS NULL
 				 AND (:branchName = '' OR lower(trim(b.name)) = lower(trim(:branchName)))
 				WHERE lower(trim(COALESCE(NULLIF(o.brand_name, ''), o.trade_name))) = lower(trim(:gymName))
 				ORDER BY CASE WHEN b.id IS NULL THEN 1 ELSE 0 END, b.updated_at DESC NULLS LAST, o.updated_at DESC
