@@ -15,13 +15,17 @@ public final class WorkoutPdfDocumentMapper {
 
 	public static WorkoutPdfDocument fromAssignmentData(AssignmentPdfData data) {
 		WorkoutPdfBrandingLookup.Palette palette = WorkoutPdfBrandingLookup.resolve(
-				data.gymName(), data.logoUrl(), data.primaryColor()
+				data.gymName(), data.branchName(), data.logoUrl(), data.primaryColor()
 		);
+		String resolvedLogo = palette.logoUrl() != null && !palette.logoUrl().isBlank()
+				? palette.logoUrl() : data.logoUrl();
+		String resolvedName = palette.displayName() != null && !palette.displayName().isBlank()
+				? palette.displayName() : data.gymName();
 		WorkoutPdfBranding branding = new WorkoutPdfBranding(
-				data.gymName(),
+				resolvedName,
 				data.branchName(),
 				data.contactPhone(),
-				data.logoUrl(),
+				resolvedLogo,
 				palette.accentColor(),
 				palette.primaryColor()
 		);
@@ -103,9 +107,7 @@ public final class WorkoutPdfDocumentMapper {
 
 	private static WorkoutPdfExercise mapExercise(JsonNode exNode, int index) {
 		String name = text(exNode, "exerciseName", text(exNode, "exercise", text(exNode, "name", "Ejercicio")));
-
 		var formatted = PrescriptionFormatter.format(exNode);
-
 		String mediaUrl = text(exNode, "mediaUrl", null);
 		String primaryMuscleGroup = text(exNode, "primaryMuscleGroup", null);
 		String equipment = text(exNode, "equipment", null);
