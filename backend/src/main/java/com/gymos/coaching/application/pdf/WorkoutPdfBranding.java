@@ -14,8 +14,8 @@ public record WorkoutPdfBranding(
 				"Sucursal",
 				null,
 				null,
-				"#10B981",
-				"#064E3B"
+				"#6B7280",
+				"#111111"
 		);
 	}
 }
