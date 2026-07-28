@@ -162,6 +162,9 @@ export type WorkoutExerciseDraft = {
   exerciseId?: string | null;
   exerciseName: string;
   prescription: string;
+  equipment?: string | null;
+  primaryMuscleGroup?: string | null;
+  movementPattern?: string | null;
   setPlan?: WorkoutSetDraft[];
   sets?: number | null;
   reps?: string | null;
