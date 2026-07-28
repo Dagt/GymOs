@@ -13,578 +13,486 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
-import java.net.URL;
+import java.net.URLConnection;
 import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Pattern;
 
 public class CompactWorkoutPdfRenderer implements WorkoutPdfRenderer {
 
-	private static final float MARGIN = 36f;
+	private static final float MARGIN = 34f;
 	private static final float PAGE_WIDTH = PDRectangle.A4.getWidth();
 	private static final float PAGE_HEIGHT = PDRectangle.A4.getHeight();
 	private static final float CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 	private static final float BOTTOM_LIMIT = 48f;
+	private static final Pattern DAY_PREFIX = Pattern.compile("(?i)^\\s*d[ií]a\\s+\\d+\\s*[-:·.]?\\s*");
 
 	@Override
 	public byte[] render(WorkoutPdfDocument doc, WorkoutPdfTemplate template, String assetOrigin) throws IOException {
-		boolean isDark = template == WorkoutPdfTemplate.COMPACT_DARK;
-
-		try (PDDocument pdDoc = new PDDocument(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
-			Writer writer = new PdfWriterImpl(pdDoc, doc, isDark, assetOrigin);
-			writer.drawHeader();
-			writer.drawSummary();
-
-			if (doc.summary() != null && !doc.summary().isBlank()) {
-				writer.drawCallout("Indicaciones Generales", doc.summary());
-			}
-
-			if (doc.sessions() != null) {
-				for (WorkoutPdfSession session : doc.sessions()) {
-					writer.drawSession(session);
-				}
-			}
-
-			if (doc.printableNotes() != null && !doc.printableNotes().isBlank()) {
-				writer.drawCallout("Indicaciones del Coach", doc.printableNotes());
-			}
-
+		boolean dark = template == WorkoutPdfTemplate.COMPACT_DARK;
+		try (PDDocument pdf = new PDDocument(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+			Writer writer = new Writer(pdf, doc, dark, assetOrigin);
+			writer.header();
+			writer.summary();
+			if (notBlank(doc.summary())) writer.callout("Indicaciones generales", doc.summary());
+			if (doc.sessions() != null) for (WorkoutPdfSession session : doc.sessions()) writer.session(session);
+			if (notBlank(doc.printableNotes())) writer.callout("Indicaciones del coach", doc.printableNotes());
 			writer.finish();
-			pdDoc.save(out);
+			pdf.save(out);
 			return out.toByteArray();
 		}
 	}
 
-	private interface Writer {
-		void drawHeader() throws IOException;
-		void drawSummary() throws IOException;
-		void drawCallout(String label, String content) throws IOException;
-		void drawSession(WorkoutPdfSession session) throws IOException;
-		void finish() throws IOException;
+	private record Theme(
+			Color pageBackground,
+			Color surface,
+			Color alternateSurface,
+			Color primaryText,
+			Color secondaryText,
+			Color mutedText,
+			Color divider,
+			Color accent,
+			Color accentDark,
+			Color accentSoft,
+			Color bannerText,
+			Color logoPlate
+	) {
+		static Theme light(Color accent) {
+			return new Theme(
+					Color.WHITE,
+					new Color(248, 250, 248),
+					new Color(244, 247, 245),
+					new Color(17, 24, 39),
+					new Color(55, 65, 81),
+					new Color(107, 114, 128),
+					new Color(226, 232, 228),
+					accent,
+					blend(accent, Color.BLACK, .28f),
+					blend(accent, Color.WHITE, .90f),
+					Color.WHITE,
+					Color.WHITE
+			);
+		}
+
+		static Theme dark(Color accent) {
+			Color readableAccent = ensureReadableAccent(accent);
+			return new Theme(
+					new Color(13, 21, 18),
+					new Color(23, 34, 29),
+					new Color(28, 43, 36),
+					new Color(245, 247, 246),
+					new Color(202, 211, 206),
+					new Color(150, 165, 157),
+					new Color(48, 66, 57),
+					readableAccent,
+					blend(readableAccent, Color.BLACK, .20f),
+					blend(readableAccent, new Color(13, 21, 18), .76f),
+					Color.WHITE,
+					Color.WHITE
+			);
+		}
 	}
 
-	private static class PdfWriterImpl implements Writer {
-		private final PDDocument pdDoc;
+	private static final class Writer {
+		private final PDDocument pdf;
 		private final WorkoutPdfDocument doc;
-		private final boolean isDark;
-		private final Color bg;
-		private final Color surface;
-		private final Color primary;
-		private final Color primarySoft;
-		private final Color primaryDark;
-		private final Color ink;
-		private final Color muted;
-		private final Color line;
+		private final Theme theme;
+		private final boolean dark;
 		private final PDImageXObject logo;
-
 		private final PDType1Font regular = new PDType1Font(Standard14Fonts.FontName.HELVETICA);
 		private final PDType1Font bold = new PDType1Font(Standard14Fonts.FontName.HELVETICA_BOLD);
-
-		private PDPage currentPage;
+		private PDPage page;
 		private PDPageContentStream stream;
 		private float y;
-		private int pageCount = 0;
 
-		private PdfWriterImpl(PDDocument pdDoc, WorkoutPdfDocument doc, boolean isDark, String assetOrigin) throws IOException {
-			this.pdDoc = pdDoc;
+		private Writer(PDDocument pdf, WorkoutPdfDocument doc, boolean dark, String assetOrigin) throws IOException {
+			this.pdf = pdf;
 			this.doc = doc;
-			this.isDark = isDark;
-
-			this.primary = parseColor(doc.branding().primaryColorHex(), new Color(16, 185, 129)); // Default Emerald #10B981
-			this.primaryDark = blend(primary, Color.BLACK, 0.25f);
-
-			if (isDark) {
-				this.bg = new Color(18, 24, 22);           // #121816
-				this.surface = new Color(28, 38, 34);      // #1C2622
-				this.primarySoft = new Color(24, 52, 42);  // dark emerald tint
-				this.ink = new Color(243, 244, 246);      // #F3F4F6
-				this.muted = new Color(156, 163, 175);    // #9CA3AF
-				this.line = new Color(45, 58, 52);        // subtle border
-			} else {
-				this.bg = Color.WHITE;                     // #FFFFFF
-				this.surface = new Color(248, 250, 248);  // #F8FAF8
-				this.primarySoft = blend(primary, Color.WHITE, 0.90f);
-				this.ink = new Color(17, 24, 39);         // #111827
-				this.muted = new Color(107, 114, 128);    // #6B7280
-				this.line = new Color(229, 231, 235);     // #E5E7EB
-			}
-
-			this.logo = loadLogo(pdDoc, doc.branding().logoUrl(), assetOrigin);
-			newPage();
+			this.dark = dark;
+			Color configured = parseColor(doc.branding().primaryColorHex(), new Color(16, 185, 129));
+			this.theme = dark ? Theme.dark(configured) : Theme.light(configured);
+			this.logo = loadLogo(pdf, doc.branding().logoUrl(), assetOrigin);
+			newPage(false);
 		}
 
-		private void newPage() throws IOException {
-			if (stream != null) {
-				stream.close();
-			}
-			currentPage = new PDPage(PDRectangle.A4);
-			pdDoc.addPage(currentPage);
-			pageCount++;
-			stream = new PDPageContentStream(pdDoc, currentPage);
-
-			if (isDark) {
-				stream.setNonStrokingColor(bg);
-				stream.addRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT);
-				stream.fill();
-			}
-
+		private void newPage(boolean runningHeader) throws IOException {
+			if (stream != null) stream.close();
+			page = new PDPage(PDRectangle.A4);
+			pdf.addPage(page);
+			stream = new PDPageContentStream(pdf, page);
+			stream.setNonStrokingColor(theme.pageBackground());
+			stream.addRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT);
+			stream.fill();
 			y = PAGE_HEIGHT - MARGIN;
+			if (runningHeader) runningHeader();
 		}
 
-		private void ensureSpace(float needed) throws IOException {
-			if (y - needed < BOTTOM_LIMIT) {
-				newPage();
-				drawRunningHeader();
-			}
+		private void ensure(float needed) throws IOException {
+			if (y - needed < BOTTOM_LIMIT) newPage(true);
 		}
 
-		private void drawRunningHeader() throws IOException {
-			writeAt(doc.title() + "  |  v" + doc.versionNumber(), MARGIN, y, 8, bold, muted);
-			writeRight(doc.branding().gymName(), PAGE_WIDTH - MARGIN, y, 8, bold, primary);
-			y -= 6;
-			stream.setStrokingColor(line);
-			stream.setLineWidth(0.5f);
-			stream.moveTo(MARGIN, y);
-			stream.lineTo(PAGE_WIDTH - MARGIN, y);
+		private void runningHeader() throws IOException {
+			write(value(doc.title()), MARGIN, y, 8, bold, theme.secondaryText());
+			writeRight(value(doc.branding().gymName()), PAGE_WIDTH - MARGIN, y, 8, bold, theme.accent());
+			y -= 7;
+			line(MARGIN, y, PAGE_WIDTH - MARGIN, y, theme.divider(), .5f);
+			y -= 13;
+		}
+
+		private void header() throws IOException {
+			float logoSize = 50f;
+			float headerHeight = 62f;
+			ensure(headerHeight);
+
+			// White logo plate guarantees visibility for transparent and dark logos.
+			stream.setNonStrokingColor(theme.logoPlate());
+			stream.addRect(MARGIN, y - logoSize, logoSize, logoSize);
+			stream.fill();
+			stream.setStrokingColor(theme.divider());
+			stream.addRect(MARGIN, y - logoSize, logoSize, logoSize);
 			stream.stroke();
-			y -= 12;
-		}
 
-		@Override
-		public void drawHeader() throws IOException {
-			float headerHeight = 52f;
-			ensureSpace(headerHeight);
-
-			// Logo / Initials box on left
-			float logoBoxSize = 42f;
 			if (logo != null) {
-				stream.setNonStrokingColor(surface);
-				stream.addRect(MARGIN, y - logoBoxSize, logoBoxSize, logoBoxSize);
-				stream.fill();
-				drawScaledLogo(logo, MARGIN + 2, y - logoBoxSize + 2, logoBoxSize - 4, logoBoxSize - 4);
+				drawLogo(logo, MARGIN + 4, y - logoSize + 4, logoSize - 8, logoSize - 8);
 			} else {
-				String initials = (doc.branding().gymName() == null || doc.branding().gymName().isBlank())
-						? "G" : doc.branding().gymName().substring(0, 1).toUpperCase(Locale.ROOT);
-				stream.setNonStrokingColor(primarySoft);
-				stream.addRect(MARGIN, y - logoBoxSize, logoBoxSize, logoBoxSize);
-				stream.fill();
-				writeCentered(initials, MARGIN + logoBoxSize / 2, y - logoBoxSize / 2 - 5, 18, bold, primaryDark);
+				String initials = initial(value(doc.branding().gymName()));
+				writeCentered(initials, MARGIN + logoSize / 2, y - logoSize / 2 - 6, 20, bold, theme.accentDark());
 			}
 
-			// Gym & Branch info next to logo
-			float leftTextX = MARGIN + logoBoxSize + 12;
-			writeAt(value(doc.branding().gymName()), leftTextX, y - 12, 13, bold, ink);
-			String sub = value(doc.branding().branchName());
-			if (doc.branding().contactPhone() != null && !doc.branding().contactPhone().isBlank()) {
-				sub += "  ·  Tel: " + doc.branding().contactPhone();
-			}
-			writeAt(sub, leftTextX, y - 26, 8, regular, muted);
+			float infoX = MARGIN + logoSize + 12;
+			write(value(doc.branding().gymName()), infoX, y - 14, 13, bold, theme.primaryText());
+			String branch = value(doc.branding().branchName());
+			if (notBlank(doc.branding().contactPhone())) branch += " · Tel: " + doc.branding().contactPhone().trim();
+			write(branch, infoX, y - 29, 8, regular, theme.mutedText());
 
-			// Document title & pill on right
-			writeRight(doc.title(), PAGE_WIDTH - MARGIN, y - 12, 12, bold, ink);
-			writeRight("PLAN DE ENTRENAMIENTO  ·  V" + doc.versionNumber(), PAGE_WIDTH - MARGIN, y - 26, 8, bold, primary);
-
+			float titleMax = 220f;
+			writeRight(truncate(value(doc.title()), bold, 12, titleMax), PAGE_WIDTH - MARGIN, y - 14, 12, bold, theme.primaryText());
+			writeRight("PLAN DE ENTRENAMIENTO · V" + doc.versionNumber(), PAGE_WIDTH - MARGIN, y - 30, 8, bold, theme.accent());
 			y -= headerHeight;
-
-			// Header separator line
-			stream.setStrokingColor(line);
-			stream.setLineWidth(0.6f);
-			stream.moveTo(MARGIN, y);
-			stream.lineTo(PAGE_WIDTH - MARGIN, y);
-			stream.stroke();
-
-			y -= 12;
+			line(MARGIN, y, PAGE_WIDTH - MARGIN, y, theme.divider(), .6f);
+			y -= 11;
 		}
 
-		@Override
-		public void drawSummary() throws IOException {
-			String validity = (doc.startsOn() == null && doc.endsOn() == null)
-					? "Sin vigencia"
-					: formatDate(doc.startsOn()) + " al " + formatDate(doc.endsOn());
-
-			String[][] items = {
-					{ "SOCIO", value(doc.clientName()), "OBJETIVO", value(doc.goal()) },
-					{ "COACH", value(doc.coachName()), "NIVEL", levelLabel(doc.level()) },
-					{ "ASIGNADO", formatDate(doc.assignedOn()), "VIGENCIA", validity }
+		private void summary() throws IOException {
+			String validity = doc.startsOn() == null && doc.endsOn() == null
+					? "Sin vigencia" : formatDate(doc.startsOn()) + " al " + formatDate(doc.endsOn());
+			String[][] values = {
+					{"SOCIO", value(doc.clientName()), "OBJETIVO", value(doc.goal())},
+					{"COACH", value(doc.coachName()), "NIVEL", level(doc.level())},
+					{"ASIGNADO", formatDate(doc.assignedOn()), "VIGENCIA", validity}
 			};
-
-			float rowHeight = 18f;
-			float summaryHeight = items.length * rowHeight + 8f;
-			ensureSpace(summaryHeight);
-
-			stream.setNonStrokingColor(surface);
-			stream.addRect(MARGIN, y - summaryHeight, CONTENT_WIDTH, summaryHeight);
-			stream.fill();
-
-			stream.setStrokingColor(line);
-			stream.setLineWidth(0.5f);
-			stream.addRect(MARGIN, y - summaryHeight, CONTENT_WIDTH, summaryHeight);
-			stream.stroke();
-
-			float cursorY = y - 14f;
-			float col1 = MARGIN + 10f;
-			float col2 = MARGIN + 65f;
-			float col3 = MARGIN + CONTENT_WIDTH / 2 + 10f;
-			float col4 = MARGIN + CONTENT_WIDTH / 2 + 65f;
-
-			for (String[] row : items) {
-				writeAt(row[0], col1, cursorY, 7, bold, muted);
-				writeAt(truncate(row[1], bold, 8f, (CONTENT_WIDTH / 2) - 75f), col2, cursorY, 8, bold, ink);
-
-				writeAt(row[2], col3, cursorY, 7, bold, muted);
-				writeAt(truncate(row[3], bold, 8f, (CONTENT_WIDTH / 2) - 75f), col4, cursorY, 8, bold, ink);
-
-				cursorY -= rowHeight;
+			float height = 60f;
+			ensure(height);
+			fillRect(MARGIN, y - height, CONTENT_WIDTH, height, theme.surface());
+			strokeRect(MARGIN, y - height, CONTENT_WIDTH, height, theme.divider(), .5f);
+			float rowY = y - 15;
+			float half = CONTENT_WIDTH / 2;
+			for (String[] row : values) {
+				labelValue(row[0], row[1], MARGIN + 10, MARGIN + 66, rowY, half - 76);
+				labelValue(row[2], row[3], MARGIN + half + 10, MARGIN + half + 70, rowY, half - 80);
+				rowY -= 18;
 			}
-
-			y -= summaryHeight + 10f;
+			y -= height + 9;
 		}
 
-		@Override
-		public void drawCallout(String label, String content) throws IOException {
-			List<String> lines = wrap(content, regular, 8f, CONTENT_WIDTH - 20f);
-			float height = 18f + lines.size() * 11f;
-			ensureSpace(height + 6f);
-
-			stream.setNonStrokingColor(primarySoft);
-			stream.addRect(MARGIN, y - height, CONTENT_WIDTH, height);
-			stream.fill();
-
-			stream.setNonStrokingColor(primary);
-			stream.addRect(MARGIN, y - height, 3, height);
-			stream.fill();
-
-			writeAt(label.toUpperCase(Locale.ROOT), MARGIN + 10f, y - 12f, 7, bold, primaryDark);
-			float curY = y - 23f;
-			for (String lineText : lines) {
-				writeAt(lineText, MARGIN + 10f, curY, 8, regular, ink);
-				curY -= 11f;
-			}
-
-			y -= height + 8f;
+		private void labelValue(String label, String value, float labelX, float valueX, float rowY, float maxWidth) throws IOException {
+			write(label, labelX, rowY, 7, bold, theme.mutedText());
+			write(truncate(value, bold, 8, maxWidth), valueX, rowY, 8, bold, theme.primaryText());
 		}
 
-		@Override
-		public void drawSession(WorkoutPdfSession session) throws IOException {
-			float sessionBannerHeight = 22f;
-			ensureSpace(sessionBannerHeight + 40f); // Ensure banner + at least one block header fits together
-
-			// Session Header Bar
-			stream.setNonStrokingColor(primary);
-			stream.addRect(MARGIN, y - sessionBannerHeight, CONTENT_WIDTH, sessionBannerHeight);
-			stream.fill();
-
-			String dayTag = String.format(Locale.ROOT, "DÍA %02d", session.dayIndex());
-			writeAt(dayTag, MARGIN + 8f, y - 15f, 9, bold, Color.WHITE);
-			writeAt("·  " + session.name(), MARGIN + 48f, y - 15f, 10, bold, Color.WHITE);
-
-			if (session.focus() != null && !session.focus().isBlank()) {
-				writeRight(session.focus().toUpperCase(Locale.ROOT), PAGE_WIDTH - MARGIN - 8f, y - 14f, 8, bold, Color.WHITE);
+		private void callout(String label, String content) throws IOException {
+			List<String> lines = wrap(content, regular, 8, CONTENT_WIDTH - 24);
+			float height = 18 + Math.max(1, lines.size()) * 11;
+			ensure(height + 6);
+			fillRect(MARGIN, y - height, CONTENT_WIDTH, height, theme.accentSoft());
+			fillRect(MARGIN, y - height, 4, height, theme.accent());
+			write(label.toUpperCase(Locale.forLanguageTag("es-MX")), MARGIN + 11, y - 12, 7, bold, dark ? theme.accent() : theme.accentDark());
+			float current = y - 24;
+			for (String line : lines) {
+				write(line, MARGIN + 11, current, 8, regular, theme.primaryText());
+				current -= 11;
 			}
-
-			y -= sessionBannerHeight + 4f;
-
-			if (session.notes() != null && !session.notes().isBlank()) {
-				drawCallout("Preparación / Movilidad", session.notes());
-			}
-
-			if (session.blocks() != null) {
-				for (WorkoutPdfBlock block : session.blocks()) {
-					drawBlock(block);
-				}
-			}
-
-			y -= 8f; // Extra space between days
+			y -= height + 7;
 		}
 
-		private void drawBlock(WorkoutPdfBlock block) throws IOException {
-			ensureSpace(30f);
-
-			// Block Subheader
-			String blockTitle = (block.typeLabel() != null ? block.typeLabel().toUpperCase(Locale.ROOT) : "BLOQUE")
-					+ (block.name() != null && !block.name().isBlank() ? " — " + block.name() : "");
-
-			stream.setNonStrokingColor(surface);
-			stream.addRect(MARGIN, y - 16f, CONTENT_WIDTH, 16f);
-			stream.fill();
-
-			writeAt(blockTitle, MARGIN + 6f, y - 12f, 8, bold, primary);
-
-			if (block.notes() != null && !block.notes().isBlank()) {
-				writeRight(truncate(block.notes(), regular, 7f, 200f), PAGE_WIDTH - MARGIN - 6f, y - 12f, 7, regular, muted);
-			}
-
-			y -= 18f;
-
-			// Compact Exercises Table Header
-			drawTableHeader();
-
-			if (block.exercises() != null) {
-				for (WorkoutPdfExercise ex : block.exercises()) {
-					drawExerciseRow(ex);
-				}
-			}
-
-			y -= 4f;
+		private void session(WorkoutPdfSession session) throws IOException {
+			ensure(58);
+			float bannerHeight = 24;
+			fillRect(MARGIN, y - bannerHeight, CONTENT_WIDTH, bannerHeight, theme.accentDark());
+			fillRect(MARGIN, y - bannerHeight, 52, bannerHeight, theme.accent());
+			write(String.format(Locale.ROOT, "DÍA %02d", session.dayIndex()), MARGIN + 8, y - 16, 9, bold, theme.bannerText());
+			String cleanName = cleanSessionName(session.name(), session.dayIndex());
+			String focus = notBlank(session.focus()) ? session.focus().trim().toUpperCase(Locale.forLanguageTag("es-MX")) : cleanName.toUpperCase(Locale.forLanguageTag("es-MX"));
+			write(truncate(focus, bold, 10, CONTENT_WIDTH - 70), MARGIN + 62, y - 16, 10, bold, theme.bannerText());
+			y -= bannerHeight + 4;
+			if (notBlank(session.notes())) callout("Preparación / movilidad", session.notes());
+			if (session.blocks() != null) for (WorkoutPdfBlock block : session.blocks()) block(block);
+			y -= 7;
 		}
 
-		private void drawTableHeader() throws IOException {
-			ensureSpace(14f);
-
-			float colExX = MARGIN + 22f;
-			float colPrescX = MARGIN + 180f;
-			float colDetX = MARGIN + 360f;
-
-			writeAt("#", MARGIN + 4f, y - 10f, 7, bold, muted);
-			writeAt("EJERCICIO", colExX, y - 10f, 7, bold, muted);
-			writeAt("PRESCRIPCIÓN", colPrescX, y - 10f, 7, bold, muted);
-			writeAt("DETALLES / NOTAS", colDetX, y - 10f, 7, bold, muted);
-
-			y -= 12f;
-
-			stream.setStrokingColor(line);
-			stream.setLineWidth(0.4f);
-			stream.moveTo(MARGIN, y);
-			stream.lineTo(PAGE_WIDTH - MARGIN, y);
-			stream.stroke();
-
-			y -= 3f;
+		private void block(WorkoutPdfBlock block) throws IOException {
+			boolean hasNotes = block.exercises() != null && block.exercises().stream()
+					.anyMatch(ex -> notBlank(ex.detailsText()) || notBlank(ex.notesText()));
+			ensure(32);
+			String name = notBlank(block.name()) ? block.name().trim() : block.typeLabel();
+			fillRect(MARGIN, y - 17, CONTENT_WIDTH, 17, theme.surface());
+			fillRect(MARGIN, y - 17, 4, 17, theme.accent());
+			write(name.toUpperCase(Locale.forLanguageTag("es-MX")), MARGIN + 9, y - 12, 8, bold, theme.accent());
+			if (notBlank(block.notes())) writeRight(truncate(block.notes(), regular, 7, 210), PAGE_WIDTH - MARGIN - 6, y - 12, 7, regular, theme.mutedText());
+			y -= 19;
+			tableHeader(hasNotes);
+			if (block.exercises() != null) for (WorkoutPdfExercise exercise : block.exercises()) exercise(exercise, hasNotes);
+			y -= 4;
 		}
 
-		private void drawExerciseRow(WorkoutPdfExercise ex) throws IOException {
-			List<String> nameLines = wrap(ex.name(), bold, 9f, 150f);
-			List<String> prescLines = wrap(ex.prescriptionText(), bold, 8.5f, 175f);
+		private void tableHeader(boolean hasNotes) throws IOException {
+			float prescriptionX = hasNotes ? MARGIN + 208 : MARGIN + 250;
+			write("#", MARGIN + 4, y - 9, 7, bold, theme.mutedText());
+			write("EJERCICIO", MARGIN + 23, y - 9, 7, bold, theme.mutedText());
+			write("PRESCRIPCIÓN", prescriptionX, y - 9, 7, bold, theme.mutedText());
+			if (hasNotes) write("DETALLES / NOTAS", MARGIN + 385, y - 9, 7, bold, theme.mutedText());
+			y -= 12;
+			line(MARGIN, y, PAGE_WIDTH - MARGIN, y, theme.divider(), .4f);
+			y -= 3;
+		}
 
-			StringBuilder detailsBuilder = new StringBuilder();
-			if (ex.detailsText() != null && !ex.detailsText().isBlank()) {
-				detailsBuilder.append(ex.detailsText());
-			}
-			if (ex.notesText() != null && !ex.notesText().isBlank()) {
-				if (!detailsBuilder.isEmpty()) detailsBuilder.append("\n");
-				detailsBuilder.append("Nota: ").append(ex.notesText());
-			}
-			List<String> detailLines = wrap(detailsBuilder.toString(), regular, 7.5f, 155f);
-
-			int maxLines = Math.max(nameLines.size(), Math.max(prescLines.size(), detailLines.size()));
-			float rowHeight = Math.max(18f, maxLines * 11f + 6f);
-
-			ensureSpace(rowHeight);
-
-			// Zebra alternating row background
-			if (ex.index() % 2 == 0) {
-				stream.setNonStrokingColor(surface);
-				stream.addRect(MARGIN, y - rowHeight, CONTENT_WIDTH, rowHeight);
-				stream.fill();
-			}
-
-			float textY = y - 12f;
-
-			// Badge #
-			writeAt(String.valueOf(ex.index()), MARGIN + 5f, textY, 8, bold, primary);
-
-			// Exercise Name
-			float curY = textY;
-			for (String lineText : nameLines) {
-				writeAt(lineText, MARGIN + 22f, curY, 9, bold, ink);
-				curY -= 11f;
-			}
-
-			// Muscle group / Equipment subtitle
-			if (ex.primaryMuscleGroup() != null || ex.equipment() != null) {
-				String sub = (ex.primaryMuscleGroup() != null ? ex.primaryMuscleGroup() : "")
-						+ (ex.equipment() != null ? " (" + ex.equipment() + ")" : "");
-				if (!sub.isBlank()) {
-					writeAt(truncate(sub, regular, 7f, 150f), MARGIN + 22f, curY, 7, regular, muted);
-				}
-			}
-
-			// Prescription
-			curY = textY;
-			for (String lineText : prescLines) {
-				writeAt(lineText, MARGIN + 180f, curY, 8.5f, bold, isDark ? primary : primaryDark);
-				curY -= 11f;
-			}
-
-			// Details / Notes
-			curY = textY;
-			for (String lineText : detailLines) {
-				writeAt(lineText, MARGIN + 360f, curY, 7.5f, regular, muted);
-				curY -= 10f;
-			}
-
+		private void exercise(WorkoutPdfExercise exercise, boolean hasNotes) throws IOException {
+			float nameWidth = hasNotes ? 175 : 215;
+			float prescriptionX = hasNotes ? MARGIN + 208 : MARGIN + 250;
+			float prescriptionWidth = hasNotes ? 170 : CONTENT_WIDTH - 246;
+			List<String> nameLines = wrap(value(exercise.name()), bold, 9, nameWidth);
+			List<String> prescriptionLines = wrap(value(exercise.prescriptionText()), bold, 8.5f, prescriptionWidth);
+			String details = details(exercise);
+			List<String> detailLines = hasNotes ? wrap(details, regular, 7.5f, 140) : List.of();
+			int maxLines = Math.max(nameLines.size(), Math.max(prescriptionLines.size(), detailLines.size()));
+			float rowHeight = Math.max(18, maxLines * 11 + 6);
+			ensure(rowHeight);
+			if (exercise.index() % 2 == 0) fillRect(MARGIN, y - rowHeight, CONTENT_WIDTH, rowHeight, theme.alternateSurface());
+			float textY = y - 12;
+			write(String.valueOf(exercise.index()), MARGIN + 5, textY, 8, bold, theme.accent());
+			writeLines(nameLines, MARGIN + 23, textY, 9, bold, theme.primaryText(), 11);
+			Color prescriptionColor = exercise.isOptional() ? theme.accent() : theme.primaryText();
+			writeLines(prescriptionLines, prescriptionX, textY, 8.5f, bold, prescriptionColor, 11);
+			if (hasNotes) writeLines(detailLines, MARGIN + 385, textY, 7.5f, regular, theme.secondaryText(), 10);
 			y -= rowHeight;
-
-			// Row bottom line
-			stream.setStrokingColor(line);
-			stream.setLineWidth(0.3f);
-			stream.moveTo(MARGIN + 4f, y);
-			stream.lineTo(PAGE_WIDTH - MARGIN - 4f, y);
-			stream.stroke();
+			line(MARGIN + 4, y, PAGE_WIDTH - MARGIN - 4, y, theme.divider(), .3f);
 		}
 
-		@Override
-		public void finish() throws IOException {
-			if (stream != null) {
-				stream.close();
-			}
+		private String details(WorkoutPdfExercise exercise) {
+			List<String> parts = new ArrayList<>();
+			if (notBlank(exercise.detailsText())) parts.add(exercise.detailsText().trim());
+			if (notBlank(exercise.notesText())) parts.add(exercise.notesText().trim());
+			return String.join(" · ", parts);
+		}
 
-			int totalPages = pdDoc.getNumberOfPages();
-			for (int i = 0; i < totalPages; i++) {
-				PDPage p = pdDoc.getPage(i);
-				try (PDPageContentStream footer = new PDPageContentStream(pdDoc, p, PDPageContentStream.AppendMode.APPEND, true, true)) {
-					footer.setStrokingColor(line);
-					footer.setLineWidth(0.5f);
-					footer.moveTo(MARGIN, 32f);
-					footer.lineTo(PAGE_WIDTH - MARGIN, 32f);
-					footer.stroke();
-
-					String folio = "FOLIO: " + (doc.id() != null ? doc.id() : "N/A") + "  ·  v" + doc.versionNumber();
-					writeAt(footer, folio, MARGIN, 20f, 7, regular, muted);
-					writeRight(footer, "Página " + (i + 1) + " de " + totalPages, PAGE_WIDTH - MARGIN, 20f, 7, bold, muted);
+		private void finish() throws IOException {
+			if (stream != null) stream.close();
+			int total = pdf.getNumberOfPages();
+			for (int index = 0; index < total; index++) {
+				PDPage targetPage = pdf.getPage(index);
+				try (PDPageContentStream footer = new PDPageContentStream(pdf, targetPage, PDPageContentStream.AppendMode.APPEND, true, true)) {
+					line(footer, MARGIN, 32, PAGE_WIDTH - MARGIN, 32, theme.divider(), .5f);
+					write(footer, "FOLIO: " + value(doc.id()) + " · v" + doc.versionNumber(), MARGIN, 20, 7, regular, theme.mutedText());
+					writeRight(footer, "Página " + (index + 1) + " de " + total, PAGE_WIDTH - MARGIN, 20, 7, bold, theme.mutedText());
 				}
 			}
 		}
 
-		// Helper drawing utilities
-		private void writeAt(String text, float x, float positionY, float size, PDType1Font font, Color color) throws IOException {
-			writeAt(stream, text, x, positionY, size, font, color);
+		private PDImageXObject loadLogo(PDDocument target, String logoUrl, String assetOrigin) {
+			if (!notBlank(logoUrl)) return null;
+			List<String> candidates = new ArrayList<>();
+			String trimmed = logoUrl.trim();
+			if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) candidates.add(trimmed);
+			if (trimmed.startsWith("/") && notBlank(assetOrigin)) candidates.add(assetOrigin.replaceAll("/+$", "") + trimmed);
+			for (String candidate : candidates) {
+				try {
+					URLConnection connection = URI.create(candidate).toURL().openConnection();
+					connection.setConnectTimeout(3500);
+					connection.setReadTimeout(5000);
+					connection.setRequestProperty("Accept", "image/png,image/jpeg,image/webp,*/*;q=0.5");
+					try (InputStream input = connection.getInputStream()) {
+						byte[] bytes = input.readAllBytes();
+						if (bytes.length > 0) return PDImageXObject.createFromByteArray(target, bytes, "gym-logo");
+					}
+				} catch (Exception ignored) {
+					// The visible initials fallback is intentional when an asset is unavailable.
+				}
+			}
+			return null;
 		}
 
-		private void writeAt(PDPageContentStream target, String text, float x, float positionY, float size, PDType1Font font, Color color) throws IOException {
-			target.setNonStrokingColor(color);
-			target.beginText();
-			target.setFont(font, size);
-			target.newLineAtOffset(x, positionY);
-			target.showText(safePdfText(text));
-			target.endText();
+		private void drawLogo(PDImageXObject image, float x, float imageY, float maxWidth, float maxHeight) throws IOException {
+			float scale = Math.min(maxWidth / image.getWidth(), maxHeight / image.getHeight());
+			float width = image.getWidth() * scale;
+			float height = image.getHeight() * scale;
+			stream.drawImage(image, x + (maxWidth - width) / 2, imageY + (maxHeight - height) / 2, width, height);
 		}
 
-		private void writeRight(String text, float rightX, float positionY, float size, PDType1Font font, Color color) throws IOException {
-			writeRight(stream, text, rightX, positionY, size, font, color);
-		}
-
-		private void writeRight(PDPageContentStream target, String text, float rightX, float positionY, float size, PDType1Font font, Color color) throws IOException {
-			String safe = safePdfText(text);
-			float width = textWidth(safe, font, size);
-			writeAt(target, safe, rightX - width, positionY, size, font, color);
-		}
-
-		private void writeCentered(String text, float centerX, float positionY, float size, PDType1Font font, Color color) throws IOException {
-			String safe = safePdfText(text);
-			float width = textWidth(safe, font, size);
-			writeAt(stream, safe, centerX - width / 2, positionY, size, font, color);
+		private void writeLines(List<String> lines, float x, float startY, float size, PDType1Font font, Color color, float leading) throws IOException {
+			float current = startY;
+			for (String line : lines) {
+				write(line, x, current, size, font, color);
+				current -= leading;
+			}
 		}
 
 		private List<String> wrap(String value, PDType1Font font, float size, float maxWidth) throws IOException {
-			if (value == null || value.isBlank()) return List.of();
-			List<String> lines = new ArrayList<>();
-			for (String paragraph : safePdfText(value).replace('\r', ' ').split("\\n")) {
+			if (!notBlank(value)) return List.of();
+			List<String> result = new ArrayList<>();
+			for (String paragraph : safe(value).replace('\r', ' ').split("\\n")) {
 				StringBuilder current = new StringBuilder();
 				for (String word : paragraph.split("\\s+")) {
 					String candidate = current.isEmpty() ? word : current + " " + word;
-					if (textWidth(candidate, font, size) > maxWidth && !current.isEmpty()) {
-						lines.add(current.toString());
+					if (!current.isEmpty() && width(candidate, font, size) > maxWidth) {
+						result.add(current.toString());
 						current.setLength(0);
 					}
 					if (!current.isEmpty()) current.append(' ');
 					current.append(word);
 				}
-				if (!current.isEmpty()) lines.add(current.toString());
+				if (!current.isEmpty()) result.add(current.toString());
 			}
-			return lines.isEmpty() ? List.of("") : lines;
+			return result;
 		}
 
 		private String truncate(String value, PDType1Font font, float size, float maxWidth) throws IOException {
-			String safe = safePdfText(value);
-			if (textWidth(safe, font, size) <= maxWidth) return safe;
-			String suffix = "...";
-			int end = safe.length();
-			while (end > 1 && textWidth(safe.substring(0, end) + suffix, font, size) > maxWidth) {
-				end--;
-			}
-			return safe.substring(0, end).stripTrailing() + suffix;
+			String clean = safe(value);
+			if (width(clean, font, size) <= maxWidth) return clean;
+			int end = clean.length();
+			while (end > 1 && width(clean.substring(0, end) + "...", font, size) > maxWidth) end--;
+			return clean.substring(0, end).stripTrailing() + "...";
 		}
 
-		private float textWidth(String text, PDType1Font font, float size) throws IOException {
-			return font.getStringWidth(safePdfText(text)) / 1000f * size;
+		private float width(String value, PDType1Font font, float size) throws IOException {
+			return font.getStringWidth(safe(value)) / 1000f * size;
 		}
 
-		private void drawScaledLogo(PDImageXObject img, float x, float y, float maxW, float maxH) throws IOException {
-			float scale = Math.min(maxW / img.getWidth(), maxH / img.getHeight());
-			float w = img.getWidth() * scale;
-			float h = img.getHeight() * scale;
-			stream.drawImage(img, x + (maxW - w) / 2, y + (maxH - h) / 2, w, h);
+		private void write(String value, float x, float textY, float size, PDType1Font font, Color color) throws IOException {
+			write(stream, value, x, textY, size, font, color);
 		}
 
-		private PDImageXObject loadLogo(PDDocument doc, String logoUrl, String assetOrigin) {
-			if (logoUrl == null || logoUrl.isBlank()) return null;
-			try {
-				String targetUrl = logoUrl;
-				if (logoUrl.startsWith("/") && assetOrigin != null && !assetOrigin.isBlank()) {
-					targetUrl = assetOrigin.replaceAll("/+$", "") + logoUrl;
-				}
-				URL url = URI.create(targetUrl).toURL();
-				try (InputStream in = url.openStream()) {
-					return PDImageXObject.createFromByteArray(doc, in.readAllBytes(), "logo");
-				}
-			} catch (Exception e) {
-				return null;
-			}
+		private void write(PDPageContentStream target, String value, float x, float textY, float size, PDType1Font font, Color color) throws IOException {
+			target.setNonStrokingColor(color);
+			target.beginText();
+			target.setFont(font, size);
+			target.newLineAtOffset(x, textY);
+			target.showText(safe(value));
+			target.endText();
 		}
 
-		private static Color parseColor(String hex, Color fallback) {
-			if (hex == null || hex.isBlank()) return fallback;
-			try {
-				String clean = hex.trim().replace("#", "");
-				if (clean.length() == 6) {
-					return new Color(
-							Integer.parseInt(clean.substring(0, 2), 16),
-							Integer.parseInt(clean.substring(2, 4), 16),
-							Integer.parseInt(clean.substring(4, 6), 16)
-					);
-				}
-			} catch (Exception ignored) {}
-			return fallback;
+		private void writeRight(String value, float rightX, float textY, float size, PDType1Font font, Color color) throws IOException {
+			writeRight(stream, value, rightX, textY, size, font, color);
 		}
 
-		private static Color blend(Color from, Color to, float ratio) {
-			float safe = Math.max(0, Math.min(1, ratio));
-			return new Color(
-					Math.round(from.getRed() + (to.getRed() - from.getRed()) * safe),
-					Math.round(from.getGreen() + (to.getGreen() - from.getGreen()) * safe),
-					Math.round(from.getBlue() + (to.getBlue() - from.getBlue()) * safe)
-			);
+		private void writeRight(PDPageContentStream target, String value, float rightX, float textY, float size, PDType1Font font, Color color) throws IOException {
+			String clean = safe(value);
+			write(target, clean, rightX - width(clean, font, size), textY, size, font, color);
 		}
 
-		private String formatDate(LocalDate date) {
-			if (date == null) return "No definida";
-			return date.format(DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", Locale.forLanguageTag("es-MX")));
+		private void writeCentered(String value, float centerX, float textY, float size, PDType1Font font, Color color) throws IOException {
+			String clean = safe(value);
+			write(clean, centerX - width(clean, font, size) / 2, textY, size, font, color);
 		}
 
-		private String levelLabel(String level) {
-			if (level == null) return "General";
-			return switch (level.toUpperCase(Locale.ROOT)) {
-				case "BEGINNER" -> "Principiante";
-				case "INTERMEDIATE" -> "Intermedio";
-				case "ADVANCED" -> "Avanzado";
-				default -> "General";
-			};
+		private void fillRect(float x, float rectY, float width, float height, Color color) throws IOException {
+			stream.setNonStrokingColor(color);
+			stream.addRect(x, rectY, width, height);
+			stream.fill();
 		}
 
-		private String value(String val) {
-			return (val == null || val.isBlank()) ? "-" : val.trim();
+		private void strokeRect(float x, float rectY, float width, float height, Color color, float lineWidth) throws IOException {
+			stream.setStrokingColor(color);
+			stream.setLineWidth(lineWidth);
+			stream.addRect(x, rectY, width, height);
+			stream.stroke();
 		}
 
-		private String safePdfText(String text) {
-			if (text == null) return "";
-			return Normalizer.normalize(text, Normalizer.Form.NFC)
+		private void line(float x1, float y1, float x2, float y2, Color color, float lineWidth) throws IOException {
+			line(stream, x1, y1, x2, y2, color, lineWidth);
+		}
+
+		private void line(PDPageContentStream target, float x1, float y1, float x2, float y2, Color color, float lineWidth) throws IOException {
+			target.setStrokingColor(color);
+			target.setLineWidth(lineWidth);
+			target.moveTo(x1, y1);
+			target.lineTo(x2, y2);
+			target.stroke();
+		}
+
+		private String safe(String value) {
+			if (value == null) return "";
+			return Normalizer.normalize(value, Normalizer.Form.NFC)
 					.replace('—', '-')
 					.replace('–', '-')
 					.replace('•', '-')
 					.replaceAll("[^\\x00-\\u00FF]", "?");
 		}
+	}
+
+	private static String cleanSessionName(String value, int dayIndex) {
+		if (!notBlank(value)) return "Sesión " + dayIndex;
+		String clean = DAY_PREFIX.matcher(value.trim()).replaceFirst("").trim();
+		return clean.isBlank() ? "Sesión " + dayIndex : clean;
+	}
+
+	private static String value(String value) {
+		return notBlank(value) ? value.trim() : "-";
+	}
+
+	private static String initial(String value) {
+		String clean = value(value);
+		return clean.equals("-") ? "G" : clean.substring(0, 1).toUpperCase(Locale.ROOT);
+	}
+
+	private static String formatDate(LocalDate date) {
+		if (date == null) return "No definida";
+		return date.format(DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy", Locale.forLanguageTag("es-MX")));
+	}
+
+	private static String level(String value) {
+		if (!notBlank(value)) return "General";
+		return switch (value.toUpperCase(Locale.ROOT)) {
+			case "BEGINNER" -> "Principiante";
+			case "INTERMEDIATE" -> "Intermedio";
+			case "ADVANCED" -> "Avanzado";
+			default -> value.trim();
+		};
+	}
+
+	private static boolean notBlank(String value) {
+		return value != null && !value.isBlank();
+	}
+
+	private static Color parseColor(String hex, Color fallback) {
+		if (!notBlank(hex)) return fallback;
+		try {
+			String clean = hex.trim().replace("#", "");
+			if (clean.length() != 6) return fallback;
+			return new Color(
+					Integer.parseInt(clean.substring(0, 2), 16),
+					Integer.parseInt(clean.substring(2, 4), 16),
+					Integer.parseInt(clean.substring(4, 6), 16)
+			);
+		} catch (RuntimeException ignored) {
+			return fallback;
+		}
+	}
+
+	private static Color ensureReadableAccent(Color accent) {
+		double luminance = .2126 * accent.getRed() + .7152 * accent.getGreen() + .0722 * accent.getBlue();
+		return luminance < 115 ? blend(accent, Color.WHITE, .35f) : accent;
+	}
+
+	private static Color blend(Color from, Color to, float ratio) {
+		float safe = Math.max(0, Math.min(1, ratio));
+		return new Color(
+				Math.round(from.getRed() + (to.getRed() - from.getRed()) * safe),
+				Math.round(from.getGreen() + (to.getGreen() - from.getGreen()) * safe),
+				Math.round(from.getBlue() + (to.getBlue() - from.getBlue()) * safe)
+		);
 	}
 }
