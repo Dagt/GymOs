@@ -53,8 +53,7 @@ public class CompactWorkoutPdfRenderer implements WorkoutPdfRenderer {
 			Color pageBackground, Color surface, Color alternateSurface,
 			Color primaryText, Color secondaryText, Color mutedText,
 			Color divider, Color accent, Color accentDark, Color accentSoft,
-			Color bannerText, Color logoPlate, Color headerLeft, Color headerRight,
-			Color texture
+			Color bannerText, Color logoPlate, Color headerLeft, Color headerRight
 	) {
 		static Theme light(Color accent) {
 			Color darkAccent = blend(accent, Color.BLACK, .34f);
@@ -72,8 +71,7 @@ public class CompactWorkoutPdfRenderer implements WorkoutPdfRenderer {
 					Color.WHITE,
 					Color.WHITE,
 					new Color(8, 13, 12),
-					blend(accent, Color.BLACK, .48f),
-					blend(accent, Color.WHITE, .58f)
+					blend(accent, Color.BLACK, .48f)
 			);
 		}
 
@@ -97,8 +95,7 @@ public class CompactWorkoutPdfRenderer implements WorkoutPdfRenderer {
 					luminance(readableAccent) > 165 ? Color.BLACK : Color.WHITE,
 					Color.WHITE,
 					blend(primary, Color.BLACK, .92f),
-					blend(primary, Color.BLACK, .78f),
-					blend(page, readableAccent, .10f)
+					blend(primary, Color.BLACK, .78f)
 			);
 		}
 	}
@@ -138,16 +135,6 @@ public class CompactWorkoutPdfRenderer implements WorkoutPdfRenderer {
 		private void paintPageBackground() throws IOException {
 			fillRect(0, 0, PAGE_WIDTH, PAGE_HEIGHT, theme.pageBackground());
 			if (dark) {
-				float gradientStart = PAGE_WIDTH * .58f;
-				float gradientWidth = PAGE_WIDTH - gradientStart;
-				int bands = 12;
-				for (int index = 0; index < bands; index++) {
-					float ratio = (index + 1f) / bands;
-					float x = gradientStart + gradientWidth * index / bands;
-					float width = gradientWidth / bands + .5f;
-					Color band = blend(theme.pageBackground(), theme.accent(), .032f * ratio);
-					fillRect(x, 0, width, PAGE_HEIGHT, band);
-				}
 				Color diagonal = blend(theme.pageBackground(), theme.accent(), .11f);
 				for (float start = -PAGE_HEIGHT; start < PAGE_WIDTH + PAGE_HEIGHT; start += 18f) {
 					line(start, 0, start + PAGE_HEIGHT, PAGE_HEIGHT, diagonal, .32f);
@@ -253,8 +240,20 @@ public class CompactWorkoutPdfRenderer implements WorkoutPdfRenderer {
 			write(truncate(focus, bold, 10, CONTENT_WIDTH - 70), MARGIN + 62, y - 16, 10, bold, theme.bannerText());
 			y -= bannerHeight + 4;
 			if (notBlank(session.notes())) callout("Preparación / movilidad", session.notes());
-			if (session.blocks() != null) for (WorkoutPdfBlock block : session.blocks()) block(block);
+
+			WorkoutPdfBlock equipment = null;
+			if (session.blocks() != null) {
+				for (WorkoutPdfBlock block : session.blocks()) {
+					if (isEquipmentBlock(block)) equipment = block;
+					else block(block);
+				}
+			}
 			y -= 7;
+			if (equipment != null) equipmentAppendix(equipment);
+		}
+
+		private boolean isEquipmentBlock(WorkoutPdfBlock block) {
+			return block != null && "EQUIPMENT".equalsIgnoreCase(block.type());
 		}
 
 		private void block(WorkoutPdfBlock block) throws IOException {
@@ -272,36 +271,73 @@ public class CompactWorkoutPdfRenderer implements WorkoutPdfRenderer {
 		}
 
 		private void tableHeader(boolean hasNotes) throws IOException {
-			float prescriptionX = hasNotes ? MARGIN + 208 : MARGIN + 250;
-			write("#", MARGIN + 4, y - 9, 7, bold, theme.mutedText());
-			write("EJERCICIO", MARGIN + 23, y - 9, 7, bold, theme.mutedText());
+			float prescriptionX = hasNotes ? MARGIN + 190 : MARGIN + 238;
+			write("EJERCICIO", MARGIN + 8, y - 9, 7, bold, theme.mutedText());
 			write("PRESCRIPCIÓN", prescriptionX, y - 9, 7, bold, theme.mutedText());
-			if (hasNotes) write("DETALLES / NOTAS", MARGIN + 385, y - 9, 7, bold, theme.mutedText());
+			if (hasNotes) write("DETALLES / NOTAS", MARGIN + 375, y - 9, 7, bold, theme.mutedText());
 			y -= 12;
 			line(MARGIN, y, PAGE_WIDTH - MARGIN, y, theme.divider(), .4f);
 			y -= 3;
 		}
 
 		private void exercise(WorkoutPdfExercise exercise, boolean hasNotes) throws IOException {
-			float nameWidth = hasNotes ? 175 : 215;
-			float prescriptionX = hasNotes ? MARGIN + 208 : MARGIN + 250;
-			float prescriptionWidth = hasNotes ? 170 : CONTENT_WIDTH - 246;
+			float nameWidth = hasNotes ? 165 : 205;
+			float prescriptionX = hasNotes ? MARGIN + 190 : MARGIN + 238;
+			float prescriptionWidth = hasNotes ? 175 : CONTENT_WIDTH - 232;
 			List<String> nameLines = wrap(value(exercise.name()), bold, 9, nameWidth);
 			List<String> prescriptionLines = wrap(value(exercise.prescriptionText()), bold, 8.5f, prescriptionWidth);
 			String details = details(exercise);
-			List<String> detailLines = hasNotes ? wrap(details, regular, 7.5f, 140) : List.of();
+			List<String> detailLines = hasNotes ? wrap(details, regular, 7.5f, 145) : List.of();
 			int maxLines = Math.max(nameLines.size(), Math.max(prescriptionLines.size(), detailLines.size()));
 			float rowHeight = Math.max(18, maxLines * 11 + 6);
 			ensure(rowHeight);
 			if (exercise.index() % 2 == 0) fillRect(MARGIN, y - rowHeight, CONTENT_WIDTH, rowHeight, theme.alternateSurface());
 			float textY = y - 12;
-			write(String.valueOf(exercise.index()), MARGIN + 5, textY, 8, bold, theme.accent());
-			writeLines(nameLines, MARGIN + 23, textY, 9, bold, theme.primaryText(), 11);
+			writeLines(nameLines, MARGIN + 8, textY, 9, bold, theme.primaryText(), 11);
 			Color prescriptionColor = exercise.isOptional() ? theme.accent() : theme.primaryText();
 			writeLines(prescriptionLines, prescriptionX, textY, 8.5f, bold, prescriptionColor, 11);
-			if (hasNotes) writeLines(detailLines, MARGIN + 385, textY, 7.5f, regular, theme.secondaryText(), 10);
+			if (hasNotes) writeLines(detailLines, MARGIN + 375, textY, 7.5f, regular, theme.secondaryText(), 10);
 			y -= rowHeight;
 			line(MARGIN + 4, y, PAGE_WIDTH - MARGIN - 4, y, theme.divider(), .3f);
+		}
+
+		private void equipmentAppendix(WorkoutPdfBlock block) throws IOException {
+			newPage(true);
+			y -= 10;
+			float bannerHeight = 30f;
+			fillRect(MARGIN, y - bannerHeight, CONTENT_WIDTH, bannerHeight, theme.accentDark());
+			fillRect(MARGIN, y - bannerHeight, 76f, bannerHeight, theme.accent());
+			write("ANEXO", MARGIN + 14, y - 20, 10, bold, theme.bannerText());
+			write("EQUIPO Y APARATOS NECESARIOS", MARGIN + 90, y - 20, 11, bold, theme.bannerText());
+			y -= bannerHeight + 12;
+
+			write("Relación de ejercicios con el aparato o equipo requerido. Cada ejercicio aparece una sola vez.",
+					MARGIN + 4, y - 10, 8, regular, theme.secondaryText());
+			y -= 24;
+
+			float apparatusX = MARGIN + 255;
+			write("EJERCICIO", MARGIN + 8, y - 9, 7, bold, theme.mutedText());
+			write("APARATO / EQUIPO", apparatusX, y - 9, 7, bold, theme.mutedText());
+			y -= 12;
+			line(MARGIN, y, PAGE_WIDTH - MARGIN, y, theme.divider(), .4f);
+			y -= 3;
+
+			if (block.exercises() != null) {
+				for (WorkoutPdfExercise exercise : block.exercises()) {
+					List<String> nameLines = wrap(value(exercise.name()), bold, 9, 225);
+					List<String> apparatusLines = wrap(value(exercise.prescriptionText()), bold, 8.5f, CONTENT_WIDTH - 265);
+					int maxLines = Math.max(nameLines.size(), apparatusLines.size());
+					float rowHeight = Math.max(18, maxLines * 11 + 6);
+					ensure(rowHeight);
+					if (exercise.index() % 2 == 0) fillRect(MARGIN, y - rowHeight, CONTENT_WIDTH, rowHeight, theme.alternateSurface());
+					float textY = y - 12;
+					writeLines(nameLines, MARGIN + 8, textY, 9, bold, theme.primaryText(), 11);
+					writeLines(apparatusLines, apparatusX, textY, 8.5f, bold, theme.primaryText(), 11);
+					y -= rowHeight;
+					line(MARGIN + 4, y, PAGE_WIDTH - MARGIN - 4, y, theme.divider(), .3f);
+				}
+			}
+			y -= 4;
 		}
 
 		private String details(WorkoutPdfExercise exercise) {
