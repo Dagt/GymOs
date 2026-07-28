@@ -3,7 +3,7 @@ package com.gymos.coaching.application.pdf;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
+import java.util.Locale;
 import java.util.stream.Collectors;
 
 public final class PrescriptionFormatter {
@@ -24,142 +24,171 @@ public final class PrescriptionFormatter {
 
 		boolean optional = exerciseNode.path("optional").asBoolean(false);
 		String freePrescription = text(exerciseNode, "prescription", "");
-		String setsStr = text(exerciseNode, "sets", "");
-		String repsStr = text(exerciseNode, "reps", "");
-		String loadStr = text(exerciseNode, "load", "");
-		String notesStr = text(exerciseNode, "notes", "");
-		String tempoStr = text(exerciseNode, "tempo", "");
-		String durationStr = text(exerciseNode, "duration", "");
-		String distanceStr = text(exerciseNode, "distance", "");
-		String groupKeyStr = text(exerciseNode, "groupKey", "");
+		String sets = text(exerciseNode, "sets", "");
+		String reps = text(exerciseNode, "reps", "");
+		String load = text(exerciseNode, "load", "");
+		String unit = firstNonBlank(
+				text(exerciseNode, "unit", ""),
+				text(exerciseNode, "repetitionUnit", ""),
+				text(exerciseNode, "repsUnit", "")
+		);
+		String sides = text(exerciseNode, "sides", "");
+		String notes = text(exerciseNode, "notes", "");
+		String tempo = text(exerciseNode, "tempo", "");
+		String duration = text(exerciseNode, "duration", "");
+		String distance = text(exerciseNode, "distance", "");
+		String groupKey = text(exerciseNode, "groupKey", "");
 		Integer restSeconds = exerciseNode.has("restSeconds") && exerciseNode.get("restSeconds").isNumber()
 				? exerciseNode.get("restSeconds").asInt() : null;
 
 		JsonNode setPlan = exerciseNode.get("setPlan");
-
 		String mainPrescription;
-
-		// 1. If setPlan is present with detailed sets/segments
 		if (setPlan != null && setPlan.isArray() && !setPlan.isEmpty()) {
-			mainPrescription = formatSetPlan(setPlan);
-		}
-		// 2. If free-text prescription is provided by coach
-		else if (!freePrescription.isBlank()) {
+			mainPrescription = formatSetPlan(setPlan, unit);
+		} else if (!freePrescription.isBlank()) {
 			mainPrescription = freePrescription.trim();
-			if (!loadStr.isBlank() && !mainPrescription.toLowerCase().contains(loadStr.toLowerCase())) {
-				mainPrescription += " · " + loadStr.trim();
+			if (!load.isBlank() && !containsIgnoreCase(mainPrescription, load)) {
+				mainPrescription += " · " + load.trim();
 			}
-		}
-		// 3. Structured sets, reps, load
-		else {
-			mainPrescription = formatStructured(setsStr, repsStr, loadStr);
+		} else {
+			mainPrescription = formatStructured(sets, reps, load, unit);
 		}
 
-		// Details string (Tempo, Rest, Duration, Distance, Group, Optional)
+		if (mainPrescription.isBlank() && optional) {
+			mainPrescription = "Opcional";
+		}
+
 		List<String> details = new ArrayList<>();
-		if (restSeconds != null && restSeconds > 0) {
-			details.add("Descanso: " + restSeconds + " s");
-		}
-		if (!tempoStr.isBlank()) {
-			details.add("Tempo: " + tempoStr.trim());
-		}
-		if (!durationStr.isBlank()) {
-			details.add("Duración: " + durationStr.trim());
-		}
-		if (!distanceStr.isBlank()) {
-			details.add("Distancia: " + distanceStr.trim());
-		}
-		if (!groupKeyStr.isBlank()) {
-			details.add("Agrupación: " + groupKeyStr.trim());
-		}
-		if (optional) {
-			details.add("Opcional");
-		}
+		if (!sides.isBlank()) details.add("Lados: " + sides.trim());
+		if (restSeconds != null && restSeconds > 0) details.add("Descanso: " + restSeconds + " s");
+		if (!tempo.isBlank()) details.add("Tempo: " + tempo.trim());
+		if (!duration.isBlank()) details.add("Duración: " + duration.trim());
+		if (!distance.isBlank()) details.add("Distancia: " + distance.trim());
+		if (!groupKey.isBlank()) details.add("Agrupación: " + groupKey.trim());
+		if (optional && !"Opcional".equalsIgnoreCase(mainPrescription)) details.add("Opcional");
 
-		String detailsText = String.join("  |  ", details);
-
-		return new FormattedPrescription(mainPrescription, detailsText, notesStr.trim(), optional);
+		return new FormattedPrescription(
+				mainPrescription,
+				String.join("  |  ", details),
+				notes.trim(),
+				optional
+		);
 	}
 
-	public static String formatStructured(String setsStr, String repsStr, String loadStr) {
-		StringBuilder sb = new StringBuilder();
+	public static String formatStructured(String sets, String reps, String load) {
+		return formatStructured(sets, reps, load, "");
+	}
 
-		String cleanSets = setsStr == null ? "" : setsStr.trim();
-		String cleanReps = repsStr == null ? "" : normalizeReps(repsStr);
-		String cleanLoad = loadStr == null ? "" : loadStr.trim();
+	public static String formatStructured(String sets, String reps, String load, String unit) {
+		String cleanSets = clean(sets);
+		String cleanReps = normalizeReps(reps);
+		String cleanLoad = clean(load);
+		String cleanUnit = normalizeUnit(unit);
 
-		if (!cleanSets.isBlank()) {
-			sb.append(cleanSets);
-		}
-
+		StringBuilder result = new StringBuilder();
+		if (!cleanSets.isBlank()) result.append(cleanSets);
 		if (!cleanReps.isBlank()) {
-			if (!sb.isEmpty()) {
-				sb.append(" \u00d7 "); // Unicode multiplication sign '×'
+			if (!result.isEmpty()) result.append(" × ");
+			result.append(cleanReps);
+			if (!cleanUnit.isBlank() && !containsIgnoreCase(cleanReps, cleanUnit)) {
+				result.append(' ').append(cleanUnit);
 			}
-			sb.append(cleanReps);
 		}
-
 		if (!cleanLoad.isBlank()) {
-			if (!sb.isEmpty()) {
-				sb.append(" \u00b7 "); // Unicode middle dot '·'
+			if (!result.isEmpty()) result.append(" · ");
+			result.append(cleanLoad);
+		}
+		return result.toString().trim();
+	}
+
+	private static String formatSetPlan(JsonNode setPlan, String unit) {
+		List<String> summaries = new ArrayList<>();
+		for (JsonNode set : setPlan) {
+			JsonNode segments = set.get("segments");
+			if (segments == null || !segments.isArray() || segments.isEmpty()) continue;
+			List<String> segmentParts = new ArrayList<>();
+			for (JsonNode segment : segments) {
+				String reps = text(segment, "reps", "").trim();
+				String load = text(segment, "load", "").trim();
+				String segmentUnit = normalizeUnit(firstNonBlank(text(segment, "unit", ""), unit));
+				String value = reps;
+				if (!value.isBlank() && !segmentUnit.isBlank() && !containsIgnoreCase(value, segmentUnit)) {
+					value += " " + segmentUnit;
+				}
+				if (!load.isBlank()) value = value.isBlank() ? load : value + " @ " + load;
+				if (!value.isBlank()) segmentParts.add(value);
 			}
-			sb.append(cleanLoad);
+			if (!segmentParts.isEmpty()) summaries.add(String.join(" + ", segmentParts));
 		}
 
-		return sb.toString().trim();
+		if (summaries.isEmpty()) return setPlan.size() + " series personalizadas";
+		boolean allEqual = summaries.stream().allMatch(summaries.get(0)::equals);
+		if (allEqual) {
+			String body = summaries.get(0);
+			return summaries.size() + " × " + (body.contains(" + ") ? "(" + body + ")" : body);
+		}
+
+		boolean singleSegment = summaries.stream().noneMatch(value -> value.contains(" + "));
+		if (singleSegment) {
+			List<String> reps = new ArrayList<>();
+			List<String> loads = new ArrayList<>();
+			boolean compatible = true;
+			for (String summary : summaries) {
+				String[] parts = summary.split(" @ ", 2);
+				reps.add(parts[0]);
+				loads.add(parts.length == 2 ? parts[1] : "");
+				if (parts.length != 2) compatible = false;
+			}
+			String repText = String.join(" / ", reps);
+			if (compatible) return repText + " · " + String.join(" / ", loads);
+			return repText;
+		}
+
+		List<String> numbered = new ArrayList<>();
+		for (int i = 0; i < summaries.size(); i++) numbered.add("S" + (i + 1) + ": " + summaries.get(i));
+		return String.join(" | ", numbered);
 	}
 
 	private static String normalizeReps(String reps) {
-		if (reps == null) return "";
-		String clean = reps.trim();
-		// If reps are comma separated like "12, 10, 8", format as "12 / 10 / 8"
+		String clean = clean(reps);
 		if (clean.contains(",")) {
-			String[] parts = clean.split(",");
-			return java.util.Arrays.stream(parts)
+			return java.util.Arrays.stream(clean.split(","))
 					.map(String::trim)
-					.filter(s -> !s.isEmpty())
+					.filter(value -> !value.isEmpty())
 					.collect(Collectors.joining(" / "));
 		}
 		return clean;
 	}
 
-	private static String formatSetPlan(JsonNode setPlan) {
-		int setIndex = 1;
-		List<String> setSummaries = new ArrayList<>();
-		for (JsonNode set : setPlan) {
-			JsonNode segments = set.get("segments");
-			if (segments != null && segments.isArray() && !segments.isEmpty()) {
-				List<String> segParts = new ArrayList<>();
-				for (JsonNode seg : segments) {
-					String r = text(seg, "reps", "");
-					String l = text(seg, "load", "");
-					if (!r.isBlank() && !l.isBlank()) {
-						segParts.add(r + " @ " + l);
-					} else if (!r.isBlank()) {
-						segParts.add(r);
-					} else if (!l.isBlank()) {
-						segParts.add(l);
-					}
-				}
-				if (!segParts.isEmpty()) {
-					setSummaries.add("S" + setIndex + ": " + String.join(" + ", segParts));
-				}
-			}
-			setIndex++;
-		}
-		if (setSummaries.isEmpty()) {
-			return setPlan.size() + " series personalizadas";
-		}
-		if (setSummaries.size() <= 4) {
-			return String.join(" | ", setSummaries);
-		}
-		return setPlan.size() + " series (" + String.join(" | ", setSummaries.subList(0, 3)) + "... )";
+	private static String normalizeUnit(String unit) {
+		String value = clean(unit).toLowerCase(Locale.forLanguageTag("es-MX"));
+		return switch (value) {
+			case "step", "steps", "paso", "pasos" -> "pasos";
+			case "rep", "reps", "repeticion", "repetición", "repeticiones" -> "";
+			case "segundo", "segundos", "sec", "secs", "s" -> "s";
+			case "minuto", "minutos", "min", "mins" -> "min";
+			case "metro", "metros", "m" -> "m";
+			case "kilometro", "kilómetro", "kilometros", "kilómetros", "km" -> "km";
+			default -> clean(unit);
+		};
+	}
+
+	private static boolean containsIgnoreCase(String value, String candidate) {
+		return value != null && candidate != null
+				&& value.toLowerCase(Locale.ROOT).contains(candidate.toLowerCase(Locale.ROOT));
+	}
+
+	private static String firstNonBlank(String... values) {
+		for (String value : values) if (value != null && !value.isBlank()) return value;
+		return "";
+	}
+
+	private static String clean(String value) {
+		return value == null ? "" : value.trim();
 	}
 
 	private static String text(JsonNode node, String field, String fallback) {
-		if (node == null || !node.has(field) || node.get(field).isNull()) {
-			return fallback;
-		}
+		if (node == null || !node.has(field) || node.get(field).isNull()) return fallback;
 		return node.get(field).asText(fallback);
 	}
 }
