@@ -223,6 +223,7 @@ export function PosCartForm({
   saving,
   subtotal,
   validateNow,
+  onClearCart,
   onPaymentAmountChange,
   onPaymentMethodChange,
   onPaymentReferenceChange,
@@ -238,6 +239,7 @@ export function PosCartForm({
   saving: boolean;
   subtotal: number;
   validateNow: boolean;
+  onClearCart?: () => void;
   onPaymentAmountChange: (value: string) => void;
   onPaymentMethodChange: (value: PaymentMethod) => void;
   onPaymentReferenceChange: (value: string) => void;
@@ -249,10 +251,21 @@ export function PosCartForm({
     <form className="rounded-2xl border border-gray-100 bg-white p-5 shadow-2xl overflow-hidden relative" onSubmit={onSubmit}>
       <div className="absolute -top-12 -right-12 w-32 h-32 bg-[color:var(--brand-primary)] opacity-[0.02] rounded-full blur-2xl pointer-events-none"></div>
       
-      <h2 className="text-lg font-black text-[color:var(--brand-primary)] flex items-center gap-2 mb-4">
-        <span className="w-2 h-5 bg-[color:var(--brand-primary)] rounded-full opacity-30"></span>
-        Carrito
-      </h2>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-black text-[color:var(--brand-primary)] flex items-center gap-2">
+          <span className="w-2 h-5 bg-[color:var(--brand-primary)] rounded-full opacity-30"></span>
+          Carrito {cart.length > 0 ? `(${cart.length})` : ""}
+        </h2>
+        {cart.length > 0 && onClearCart ? (
+          <button
+            className="text-[0.65rem] font-black uppercase tracking-wider text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-lg border border-red-200 transition-all flex items-center gap-1 shadow-xs"
+            onClick={onClearCart}
+            type="button"
+          >
+            🗑 Limpiar
+          </button>
+        ) : null}
+      </div>
 
       <div className="grid gap-2 max-h-[240px] overflow-y-auto pr-1 custom-scrollbar">
         {cart.length === 0 && (

@@ -207,6 +207,7 @@ export default function PosPage() {
               <PosCartForm
                 cart={cart}
                 currency={products[0]?.currency ?? cart[0]?.product.currency ?? "MXN"}
+                onClearCart={() => setCart([])}
                 onPaymentAmountChange={setPaymentAmount}
                 onPaymentMethodChange={setPaymentMethod}
                 onPaymentReferenceChange={setPaymentReference}
