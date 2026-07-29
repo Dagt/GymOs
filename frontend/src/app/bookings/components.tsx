@@ -92,29 +92,27 @@ export function BookingSummaryPanel({
         
         <div className="bookings-resource-summary-scroll custom-scrollbar pr-1 max-h-[400px] overflow-y-auto">
           {resources.length === 0 ? (
-            <p className="py-8 text-center text-xs font-black text-gray-400 uppercase tracking-widest bg-gray-50 rounded-2xl border-2 border-dashed border-gray-100">Sin recursos operativos</p>
+            <p className="py-8 text-center text-xs font-black text-gray-400 uppercase tracking-widest bg-gray-50 rounded-2xl border-2 border-dashed border-gray-100 col-span-2">Sin recursos operativos</p>
           ) : null}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {resources.map((resource) => (
-              <article className="group flex items-center justify-between p-4 rounded-xl border-2 border-gray-50 bg-gray-50/50 hover:bg-white hover:border-[color:var(--brand-primary)]/30 hover:shadow-md transition-all duration-300" key={resource.id}>
-                <div className="flex items-center gap-3 overflow-hidden">
-                  <span className="h-3 w-3 shrink-0 rounded-full shadow-sm" style={{ backgroundColor: resource.color }} />
-                  <strong className="truncate text-sm font-black text-gray-700 group-hover:text-[color:var(--brand-primary)] transition-colors">{resource.name}</strong>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="shrink-0 rounded-lg bg-white border border-gray-100 px-2 py-1 text-[10px] font-black text-[var(--brand-primary)] shadow-sm">
-                    {resource.bookingCount} Reservas
-                  </span>
-                  {canManageResources && (
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => onEditResource?.(resource.id)} className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 hover:text-[color:var(--brand-primary)]" title="Editar">✎</button>
-                      <button onClick={() => onDeleteResource?.(resource.id)} className="p-1.5 rounded-md hover:bg-red-50 text-gray-400 hover:text-red-500" title="Eliminar">🗑</button>
-                    </div>
-                  )}
-                </div>
-              </article>
-            ))}
-          </div>
+          {resources.map((resource) => (
+            <article className="group flex items-center justify-between p-3.5 rounded-xl border-2 border-gray-100 bg-white hover:border-[color:var(--brand-primary)]/40 hover:shadow-md transition-all duration-200 min-w-0" key={resource.id}>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="h-3.5 w-3.5 shrink-0 rounded-full shadow-sm" style={{ backgroundColor: resource.color }} />
+                <strong className="truncate text-sm font-black text-gray-800 group-hover:text-[color:var(--brand-primary)] transition-colors">{resource.name}</strong>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 ml-2">
+                <span className="shrink-0 rounded-lg bg-[color:var(--brand-surface)] border border-[color:var(--brand-line)] px-2.5 py-1 text-[11px] font-black text-[var(--brand-primary)] shadow-xs">
+                  {resource.bookingCount} Reservas
+                </span>
+                {canManageResources && (
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button onClick={() => onEditResource?.(resource.id)} className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 hover:text-[color:var(--brand-primary)]" title="Editar">✎</button>
+                    <button onClick={() => onDeleteResource?.(resource.id)} className="p-1.5 rounded-md hover:bg-red-50 text-gray-400 hover:text-red-500" title="Eliminar">🗑</button>
+                  </div>
+                )}
+              </div>
+            </article>
+          ))}
         </div>
       </div>
     </section>

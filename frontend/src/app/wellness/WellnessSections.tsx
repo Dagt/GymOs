@@ -314,9 +314,9 @@ export function AppointmentsTabSection({
           </div>
 
           {/* Filter Options */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <select
-              className="app-input w-auto text-xs py-1.5"
+              className="h-9 rounded-lg border border-[var(--brand-line)] bg-white px-3 text-xs font-bold text-[color:var(--brand-ink)] focus:border-[color:var(--brand-primary)] outline-none shadow-sm max-w-[200px]"
               onChange={(e) => onProfessionalChange(e.target.value)}
               value={selectedProfessionalId}
             >
@@ -329,15 +329,15 @@ export function AppointmentsTabSection({
             </select>
 
             <select
-              className="app-input w-auto text-xs py-1.5"
+              className="h-9 rounded-lg border border-[var(--brand-line)] bg-white px-3 text-xs font-bold text-[color:var(--brand-ink)] focus:border-[color:var(--brand-primary)] outline-none shadow-sm max-w-[170px]"
               onChange={(e) => onStatusFilterChange(e.target.value)}
               value={statusFilter}
             >
               <option value="">Todos los estatus</option>
-              <option value="REQUESTED">REQUESTED (Solicitada)</option>
-              <option value="CONFIRMED">CONFIRMED (Confirmada)</option>
-              <option value="COMPLETED">COMPLETED (Completada)</option>
-              <option value="CANCELLED">CANCELLED (Cancelada)</option>
+              <option value="REQUESTED">Solicitada</option>
+              <option value="CONFIRMED">Confirmada</option>
+              <option value="COMPLETED">Completada</option>
+              <option value="CANCELLED">Cancelada</option>
             </select>
           </div>
         </div>
