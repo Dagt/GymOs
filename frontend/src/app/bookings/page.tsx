@@ -40,7 +40,7 @@ export default function BookingsPage() {
       <section className={`grid gap-6 xl:grid-cols-[410px_minmax(0,1fr)] ${controller.canManageResources ? "" : "bookings-operational-layout"}`}>
         <aside className="grid content-start gap-5">
           {controller.selectedDateIsPast ? (
-            <p className="rounded-md border border-[#d8ddd2] bg-[#f8faf8] px-3 py-2 text-sm text-[#5d6b63]">
+            <p className="rounded-md border border-[var(--brand-line)] bg-[var(--brand-surface)] px-3 py-2 text-sm text-[var(--brand-muted)]">
               Este dia ya paso. Puedes consultar el detalle historico, pero no crear nuevas reservas.
             </p>
           ) : null}
@@ -207,3 +207,4 @@ function ResourceDrawer({
     </AppDrawer>
   );
 }
+

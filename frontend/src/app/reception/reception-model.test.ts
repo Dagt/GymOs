@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getFocusActions, getQuickActions } from "./reception-model.ts";
+import { getFocusActions, getQuickActions, getReceptionDensityConfig } from "./reception-model.ts";
 
 test("reception model provides exactly 7 focus actions by default", () => {
   const actions = getFocusActions();
@@ -14,3 +14,11 @@ test("reception model quick actions separates primary action from secondary", ()
   assert.equal(quickActions.primary.href, "/pos");
   assert.equal(quickActions.secondary.length, 6);
 });
+
+test("reception model provides data-dense layout configuration for hybrid contextual density", () => {
+  const config = getReceptionDensityConfig();
+  assert.equal(config.density, "compact");
+  assert.equal(config.dataDenseAdmin, true);
+  assert.equal(config.signalsCount, 3);
+});
+

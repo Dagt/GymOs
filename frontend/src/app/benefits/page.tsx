@@ -139,15 +139,15 @@ export default function BenefitsPage() {
               </section>
             ) : null}
             {benefits.map((benefit) => (
-              <article className="rounded-md border border-[#d8ddd2] bg-white p-4" key={benefit.id}>
+              <article className="rounded-md border border-[var(--brand-line)] bg-white p-4" key={benefit.id}>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <p className="font-black">{benefit.name}</p>
-                    <p className="mt-1 text-sm text-[#5d6b63]">{benefit.code} - {benefit.benefitType}</p>
+                    <p className="mt-1 text-sm text-[var(--brand-muted)]">{benefit.code} - {benefit.benefitType}</p>
                   </div>
                   <span className="app-pill">{benefit.status}</span>
                 </div>
-                <p className="mt-3 text-sm text-[#5d6b63]">
+                <p className="mt-3 text-sm text-[var(--brand-muted)]">
                   {benefit.discountType === "PERCENT" ? `${benefit.discountPercent ?? 0}% de descuento` : benefit.discountType}
                 </p>
               </article>
@@ -167,7 +167,7 @@ export default function BenefitsPage() {
           <Field label="Nombre" value={form.name} onChange={(value) => setForm({ ...form, name: value })} />
           <label className="grid gap-2 text-sm font-bold text-[#42514a]">
             Tipo
-            <select className="h-11 rounded-md border border-[#cdd5ca] px-3" value={form.benefitType} onChange={(event) => setForm({ ...form, benefitType: event.target.value as BenefitPayload["benefitType"] })}>
+            <select className="h-11 rounded-md border border-[var(--brand-line)] px-3" value={form.benefitType} onChange={(event) => setForm({ ...form, benefitType: event.target.value as BenefitPayload["benefitType"] })}>
               <option value="STUDENT">Estudiante</option>
               <option value="SENIOR">Adulto mayor</option>
               <option value="AGREEMENT">Convenio</option>
@@ -179,11 +179,11 @@ export default function BenefitsPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="grid gap-2 text-sm font-bold text-[#42514a]">
               Descuento %
-              <input className="h-11 rounded-md border border-[#cdd5ca] px-3" type="number" min="0" max="100" value={form.discountPercent ?? 0} onChange={(event) => setForm({ ...form, discountPercent: Number(event.target.value), discountType: "PERCENT" })} />
+              <input className="h-11 rounded-md border border-[var(--brand-line)] px-3" type="number" min="0" max="100" value={form.discountPercent ?? 0} onChange={(event) => setForm({ ...form, discountPercent: Number(event.target.value), discountType: "PERCENT" })} />
             </label>
             <label className="grid gap-2 text-sm font-bold text-[#42514a]">
               Prioridad
-              <input className="h-11 rounded-md border border-[#cdd5ca] px-3" type="number" min="0" value={form.priority} onChange={(event) => setForm({ ...form, priority: Number(event.target.value) })} />
+              <input className="h-11 rounded-md border border-[var(--brand-line)] px-3" type="number" min="0" value={form.priority} onChange={(event) => setForm({ ...form, priority: Number(event.target.value) })} />
             </label>
           </div>
           <label className="flex items-center gap-2 text-sm font-bold text-[#42514a]">
@@ -201,7 +201,8 @@ function Field({ label, value, onChange }: { label: string; value: string; onCha
   return (
     <label className="grid gap-2 text-sm font-bold text-[#42514a]">
       {label}
-      <input className="h-11 rounded-md border border-[#cdd5ca] px-3" value={value} onChange={(event) => onChange(event.target.value)} />
+      <input className="h-11 rounded-md border border-[var(--brand-line)] px-3" value={value} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
 }
+

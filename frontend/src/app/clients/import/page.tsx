@@ -90,14 +90,14 @@ export default function ClientImportPage() {
       title="Importar socios"
     >
       <section className="grid gap-6 lg:grid-cols-[0.9fr_1.4fr]">
-        <form className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm" onSubmit={submit}>
+        <form className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm" onSubmit={submit}>
           <h2 className="text-xl font-semibold">Archivo CSV</h2>
           <div className="mt-5 grid gap-4">
             <label className="grid gap-2 text-sm font-medium text-[#42514a]">
               Seleccionar archivo
               <input
                 accept=".csv,text/csv"
-                className="rounded-md border border-[#cdd5ca] bg-white px-3 py-2 text-sm"
+                className="rounded-md border border-[var(--brand-line)] bg-white px-3 py-2 text-sm"
                 onChange={loadFile}
                 type="file"
               />
@@ -105,7 +105,7 @@ export default function ClientImportPage() {
             <label className="grid gap-2 text-sm font-medium text-[#42514a]">
               Nombre de archivo
               <input
-                className="h-11 rounded-md border border-[#cdd5ca] px-3 text-sm outline-none transition focus:border-[#51735f]"
+                className="h-11 rounded-md border border-[var(--brand-line)] px-3 text-sm outline-none transition focus:border-[#51735f]"
                 onChange={(event) => setFileName(event.target.value)}
                 value={fileName}
               />
@@ -113,7 +113,7 @@ export default function ClientImportPage() {
             <label className="grid gap-2 text-sm font-medium text-[#42514a]">
               Contenido
               <textarea
-                className="min-h-64 rounded-md border border-[#cdd5ca] px-3 py-2 font-mono text-xs outline-none transition focus:border-[#51735f]"
+                className="min-h-64 rounded-md border border-[var(--brand-line)] px-3 py-2 font-mono text-xs outline-none transition focus:border-[#51735f]"
                 onChange={(event) => setCsvText(event.target.value)}
                 value={csvText}
               />
@@ -132,11 +132,11 @@ export default function ClientImportPage() {
           </div>
         </form>
 
-        <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+        <section className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
           <h2 className="text-xl font-semibold">Resultado</h2>
           {error ? <Message tone="error" text={error} /> : null}
           {!result && !error ? (
-            <p className="mt-5 rounded-md border border-[#d8ddd2] bg-[#fafbf8] px-3 py-2 text-sm text-[#5d6b63]">
+            <p className="mt-5 rounded-md border border-[var(--brand-line)] bg-[#fafbf8] px-3 py-2 text-sm text-[var(--brand-muted)]">
               Ejecuta una validacion para revisar errores antes de importar.
             </p>
           ) : null}
@@ -151,12 +151,12 @@ export default function ClientImportPage() {
               <div className="overflow-x-auto">
                 <table className="min-w-full border-separate border-spacing-0 text-sm">
                   <thead>
-                    <tr className="text-left text-[#5d6b63]">
-                      <th className="border-b border-[#d8ddd2] py-2 pr-4">Fila</th>
-                      <th className="border-b border-[#d8ddd2] py-2 pr-4">Estado</th>
-                      <th className="border-b border-[#d8ddd2] py-2 pr-4">Socio</th>
-                      <th className="border-b border-[#d8ddd2] py-2 pr-4">Contacto</th>
-                      <th className="border-b border-[#d8ddd2] py-2 pr-4">Detalle</th>
+                    <tr className="text-left text-[var(--brand-muted)]">
+                      <th className="border-b border-[var(--brand-line)] py-2 pr-4">Fila</th>
+                      <th className="border-b border-[var(--brand-line)] py-2 pr-4">Estado</th>
+                      <th className="border-b border-[var(--brand-line)] py-2 pr-4">Socio</th>
+                      <th className="border-b border-[var(--brand-line)] py-2 pr-4">Contacto</th>
+                      <th className="border-b border-[var(--brand-line)] py-2 pr-4">Detalle</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -169,10 +169,10 @@ export default function ClientImportPage() {
                         <td className="border-b border-[#edf0ea] py-2 pr-4">
                           {row.firstName} {row.lastName}
                         </td>
-                        <td className="border-b border-[#edf0ea] py-2 pr-4 text-[#5d6b63]">
+                        <td className="border-b border-[#edf0ea] py-2 pr-4 text-[var(--brand-muted)]">
                           {row.email ?? row.phone ?? "Sin contacto"}
                         </td>
-                        <td className="border-b border-[#edf0ea] py-2 pr-4 text-[#5d6b63]">{row.reason}</td>
+                        <td className="border-b border-[#edf0ea] py-2 pr-4 text-[var(--brand-muted)]">{row.reason}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -188,8 +188,8 @@ export default function ClientImportPage() {
 
 function Metric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-md border border-[#d8ddd2] px-3 py-2">
-      <p className="text-xs font-semibold uppercase text-[#5d6b63]">{label}</p>
+    <div className="rounded-md border border-[var(--brand-line)] px-3 py-2">
+      <p className="text-xs font-semibold uppercase text-[var(--brand-muted)]">{label}</p>
       <p className="mt-1 text-2xl font-semibold">{value}</p>
     </div>
   );
@@ -207,7 +207,8 @@ function StatusBadge({ status }: { status: string }) {
 
 function Message({ tone, text }: { tone: "success" | "error"; text: string }) {
   const className = tone === "success"
-    ? "border-[#bad9c4] bg-[#eff8f1] text-[#31563c]"
+    ? "border-[var(--brand-line)] bg-[var(--brand-surface)] text-[#31563c]"
     : "border-[#e5b7b7] bg-[#fff4f4] text-[#8c2f2f]";
   return <p className={`mt-5 rounded-md border px-3 py-2 text-sm ${className}`}>{text}</p>;
 }
+

@@ -166,7 +166,7 @@ export function PosClientSearch({
           value={clientQuery}
         />
         <button 
-          className="px-4 rounded-xl bg-[color:var(--brand-primary)] text-white font-black text-xs hover:brightness-110 active:scale-95 transition-all shadow-md" 
+          className="app-button-secondary px-4 text-xs font-black shadow-sm" 
           type="submit"
         >
           Buscar
@@ -352,16 +352,16 @@ export function PosCartForm({
       </div>
 
       <button 
-        className={`mt-6 h-14 w-full rounded-2xl font-black text-base shadow-lg transition-all duration-300 flex items-center justify-center gap-3 relative overflow-hidden group ${
+        className={`mt-6 h-14 w-full rounded-2xl font-black text-base shadow-md transition-all duration-300 flex items-center justify-center gap-3 ${
           saving || cart.length === 0 
             ? "bg-gray-100 text-gray-400 cursor-not-allowed shadow-none" 
-            : "bg-[color:var(--brand-accent)] text-white hover:brightness-110 active:scale-95 shadow-[color:var(--brand-accent)]/20"
+            : "bg-[color:var(--brand-primary)] text-white hover:opacity-95 active:scale-95 shadow-[color:var(--brand-primary)]/20"
         }`}
         disabled={saving || cart.length === 0} 
         type="submit"
       >
         {saving ? (
-          <span className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin"></span>
+          <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
         ) : (
           <>
             <span>REGISTRAR VENTA</span>
@@ -372,4 +372,5 @@ export function PosCartForm({
     </form>
   );
 }
+
 

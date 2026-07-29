@@ -36,7 +36,7 @@ function CatalogContent() {
   return (
     <AppShell eyebrow="Administración" session={controller.session} subtitle="Catálogo de la sucursal activa." title="Catálogo">
       {controller.error ? <InlineError message={controller.error} /> : null}
-      {controller.message ? <p className="rounded-md border border-[#bad9c4] bg-[#eff8f1] px-3 py-2 text-sm text-[#31563c]">{controller.message}</p> : null}
+      {controller.message ? <p className="rounded-md border border-[var(--brand-line)] bg-[var(--brand-surface)] px-3 py-2 text-sm text-[#31563c]">{controller.message}</p> : null}
       <section className="grid gap-4">
         <CatalogToolbar canCreate={controller.canCreate} onNewPlan={openPlanCreation} onNewProduct={openProductCreation} />
         <CatalogNavigation canManageCategories={controller.canManageCategories} view={view} onChange={setView} />
@@ -96,14 +96,15 @@ function CatalogNavigation({ canManageCategories, onChange, view }: { canManageC
     { label: "Planes", value: "plans" },
     ...(canManageCategories ? [{ label: "Categorías", value: "categories" as CatalogView }] : []),
   ];
-  return <nav aria-label="Secciones del catálogo" className="grid gap-2 rounded-xl border border-[#d8ddd2] bg-white p-2 shadow-sm sm:grid-cols-3">{options.map((option) => <button key={option.value} type="button" onClick={() => onChange(option.value)} className={view === option.value ? "app-button h-10 w-full" : "app-button-secondary h-10 w-full"}>{option.label}</button>)}</nav>;
+  return <nav aria-label="Secciones del catálogo" className="grid gap-2 rounded-xl border border-[var(--brand-line)] bg-white p-2 shadow-sm sm:grid-cols-3">{options.map((option) => <button key={option.value} type="button" onClick={() => onChange(option.value)} className={view === option.value ? "app-button h-10 w-full" : "app-button-secondary h-10 w-full"}>{option.label}</button>)}</nav>;
 }
 
 function CatalogPagination({ onPageChange, page, totalPages }: { onPageChange: (page: number) => void; page: number; totalPages: number }) {
   if (totalPages <= 1) return null;
-  return <nav aria-label="Paginación del catálogo" className="flex items-center justify-end gap-3"><button className="app-button-secondary" disabled={page <= 0} onClick={() => onPageChange(page - 1)} type="button">Anterior</button><span className="text-sm text-[#5d6b63]">{page + 1} / {totalPages}</span><button className="app-button-secondary" disabled={page + 1 >= totalPages} onClick={() => onPageChange(page + 1)} type="button">Siguiente</button></nav>;
+  return <nav aria-label="Paginación del catálogo" className="flex items-center justify-end gap-3"><button className="app-button-secondary" disabled={page <= 0} onClick={() => onPageChange(page - 1)} type="button">Anterior</button><span className="text-sm text-[var(--brand-muted)]">{page + 1} / {totalPages}</span><button className="app-button-secondary" disabled={page + 1 >= totalPages} onClick={() => onPageChange(page + 1)} type="button">Siguiente</button></nav>;
 }
 
 function AuthRequired() {
   return <AuthRequiredCard message="Se requiere una cuenta autorizada." title="Inicia sesión para ver el catálogo" />;
 }
+

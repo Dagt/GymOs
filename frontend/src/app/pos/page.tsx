@@ -166,50 +166,15 @@ export default function PosPage() {
 
   return (
     <AppShell
-      eyebrow="Recepción / Punto de Venta"
+      eyebrow="Terminal de Venta"
       session={session}
-      subtitle="Registra ventas de productos y servicios con cobro inmediato."
+      subtitle={`Abierta por ${session.user.fullName}. Registra ventas con cobro inmediato.`}
       title="Caja Registradora"
       mode="operation"
     >
       {error ? <InlineError message={error} /> : null}
       
       <div className="flex flex-col gap-8 w-full max-w-[1600px] mx-auto">
-        {/* Colorful Identity & Quick Stats Panel */}
-        <section 
-          className="relative flex flex-col md:flex-row justify-between items-start md:items-center gap-6 p-8 rounded-3xl shadow-xl overflow-hidden text-white"
-          style={{ 
-            background: `linear-gradient(135deg, var(--brand-primary), color-mix(in srgb, var(--brand-primary) 70%, var(--brand-accent)))`,
-          }}
-        >
-          {/* Texture Overlay */}
-          <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.2) 10px, rgba(255,255,255,0.2) 20px)`}}></div>
-          
-          <div className="relative z-10 flex items-center gap-5">
-            <div className="h-16 w-16 bg-white/20 border-2 border-white/40 text-white rounded-2xl flex items-center justify-center text-3xl font-black shadow-md" aria-hidden="true">
-              🛒
-            </div>
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-widest opacity-80">Terminal de Venta</p>
-              <h2 className="text-3xl font-black leading-tight drop-shadow-sm">Caja Abierta</h2>
-              <span className="text-sm font-medium mt-1 block opacity-90">
-                Atendido por: <strong className="text-white">{session.user.fullName}</strong>
-              </span>
-            </div>
-          </div>
-          
-          <div className="relative z-10 flex flex-wrap gap-4 self-stretch md:self-auto">
-            <div className="flex flex-col justify-center bg-white/10 backdrop-blur-md rounded-2xl px-6 py-3 border border-white/20 min-w-[140px] shadow-sm">
-              <span className="text-[0.65rem] font-bold uppercase tracking-wider opacity-70 mb-1">Estado de Caja</span>
-              <strong className="text-xl font-black leading-none drop-shadow-sm text-green-300">Lista</strong>
-            </div>
-            <div className="flex flex-col justify-center bg-white/10 backdrop-blur-md rounded-2xl px-6 py-3 border border-white/20 min-w-[140px] shadow-sm">
-              <span className="text-[0.65rem] font-bold uppercase tracking-wider opacity-70 mb-1">Ventas Hoy</span>
-              <strong className="text-xl font-black leading-none drop-shadow-sm">{sales.length}</strong>
-            </div>
-          </div>
-        </section>
-
         {message ? (
           <div className="p-4 rounded-2xl border-2 border-green-100 bg-green-50 text-green-700 font-black flex items-center gap-3 animate-in fade-in slide-in-from-top-4 shadow-sm">
             <span className="text-xl">✅</span>
@@ -273,5 +238,6 @@ function AuthRequired() {
 }
 
 function Notice({ text }: { text: string }) {
-  return <p className="rounded-md border border-[#bad9c4] bg-[#eff8f1] px-3 py-2 text-sm text-[#31563c]">{text}</p>;
+  return <p className="rounded-md border border-[var(--brand-line)] bg-[var(--brand-surface)] px-3 py-2 text-sm text-[#31563c]">{text}</p>;
 }
+

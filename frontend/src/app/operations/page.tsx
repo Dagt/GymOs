@@ -173,3 +173,4 @@ function MiniMetric({ label, value }: { label: string; value: number }) {
     </div>
   );
 }
+

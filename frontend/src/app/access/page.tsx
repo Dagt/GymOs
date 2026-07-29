@@ -118,3 +118,4 @@ function Notice({ text }: { text: string }) {
     </p>
   );
 }
+

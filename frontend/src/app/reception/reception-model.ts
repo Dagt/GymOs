@@ -70,6 +70,20 @@ export const DAY_SIGNALS: DaySignal[] = [
   { label: "Sucursal", value: "Activa", tone: "blue" },
 ];
 
+export type ReceptionDensityConfig = {
+  density: "compact";
+  dataDenseAdmin: true;
+  signalsCount: number;
+};
+
+export function getReceptionDensityConfig(): ReceptionDensityConfig {
+  return {
+    density: "compact",
+    dataDenseAdmin: true,
+    signalsCount: DAY_SIGNALS.length,
+  };
+}
+
 export function getFocusActions(): FocusAction[] {
   return FOCUS_ACTIONS;
 }

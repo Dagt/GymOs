@@ -1374,7 +1374,7 @@ export default function CoachesPage() {
                 </button>
               </div>
               <div>
-                <p className="mb-1 text-sm font-medium text-[#435249]">Socio</p>
+                <p className="mb-1 text-sm font-medium text-[var(--brand-ink)]">Socio</p>
                 <div className="flex max-w-2xl flex-wrap gap-2">
                   <input
                     className="app-input min-w-64 flex-1"
@@ -2424,7 +2424,7 @@ function OrderButtons({
 
 function Field({ label, help, children }: { label: string; help?: string; children: React.ReactNode }) {
   return (
-    <label className="grid min-w-0 gap-1 text-sm font-medium text-[#435249]">
+    <label className="grid min-w-0 gap-1 text-sm font-medium text-[var(--brand-ink)]">
       <span>{label}</span>
       {help ? <small className="text-xs font-normal leading-relaxed text-[#6b7d72]">{help}</small> : null}
       {children}
@@ -2604,3 +2604,4 @@ function normalizeRole(role: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 }
+

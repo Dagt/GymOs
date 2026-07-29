@@ -65,7 +65,7 @@ export const SPECIALTY_CONSULTATIONS: Record<
 export function WellnessNotice({ tone, text }: { tone: "ok" | "error"; text: string }) {
   const styles =
     tone === "ok"
-      ? "border-[#bad9c4] bg-[#eff8f1] text-[#31563c]"
+      ? "border-[var(--brand-line)] bg-[var(--brand-surface)] text-[#31563c]"
       : "border-[#e5b7b7] bg-[#fff4f4] text-[#8c2f2f]";
   return <p className={`rounded-lg border px-3 py-2 text-sm font-semibold ${styles}`}>{text}</p>;
 }
@@ -1473,7 +1473,7 @@ export function ProfessionalFormModal({
                   {scheduleDays.map((day) => (
                     <div
                       className={`flex items-center justify-between gap-2 rounded-lg border p-2 text-xs transition-colors ${
-                        day.enabled ? "border-[#cdd5ca] bg-white" : "border-stone-200 bg-stone-100 opacity-60"
+                        day.enabled ? "border-[var(--brand-line)] bg-white" : "border-stone-200 bg-stone-100 opacity-60"
                       }`}
                       key={day.dayOfWeek}
                     >
@@ -1490,14 +1490,14 @@ export function ProfessionalFormModal({
                       {day.enabled ? (
                         <div className="flex items-center gap-1">
                           <input
-                            className="h-8 rounded border border-[#cdd5ca] px-1 text-xs"
+                            className="h-8 rounded border border-[var(--brand-line)] px-1 text-xs"
                             onChange={(e) => onUpdateScheduleDay(day.dayOfWeek, { opensAt: e.target.value })}
                             type="time"
                             value={day.opensAt}
                           />
                           <span className="text-[10px] text-stone-400">a</span>
                           <input
-                            className="h-8 rounded border border-[#cdd5ca] px-1 text-xs"
+                            className="h-8 rounded border border-[var(--brand-line)] px-1 text-xs"
                             onChange={(e) => onUpdateScheduleDay(day.dayOfWeek, { closesAt: e.target.value })}
                             type="time"
                             value={day.closesAt}
@@ -1582,3 +1582,4 @@ function formatTime(isoOrTimeStr: string) {
   }
   return isoOrTimeStr.slice(0, 5);
 }
+

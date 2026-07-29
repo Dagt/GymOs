@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { FormEvent, useEffect, useState } from "react";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
@@ -233,8 +233,8 @@ export default function UsersPage() {
     const nextStatus = user.status === "ACTIVE" ? "SUSPENDED" : "ACTIVE";
     const confirmed = window.confirm(
       nextStatus === "ACTIVE"
-        ? `Â¿Quieres reactivar a ${user.fullName}? Podra volver a iniciar sesion.`
-        : `Â¿Quieres suspender a ${user.fullName}? No podra iniciar sesion mientras este suspendido.`,
+        ? `¿Quieres reactivar a ${user.fullName}? Podra volver a iniciar sesion.`
+        : `¿Quieres suspender a ${user.fullName}? No podra iniciar sesion mientras este suspendido.`,
     );
     if (!confirmed) {
       return;
@@ -259,7 +259,7 @@ export default function UsersPage() {
     }
     const role = selectableRoles.find((item) => item.id === roleId);
     const roleLabel = role ? displayRoleName(role.name) : "el rol seleccionado";
-    const confirmed = window.confirm(`Â¿Quieres cambiar el rol de ${user.fullName} a ${roleLabel}?`);
+    const confirmed = window.confirm(`¿Quieres cambiar el rol de ${user.fullName} a ${roleLabel}?`);
     if (!confirmed) {
       return;
     }
@@ -413,3 +413,4 @@ export default function UsersPage() {
     </AppShell>
   );
 }
+

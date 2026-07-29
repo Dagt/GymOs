@@ -91,8 +91,8 @@ export default function OwnerDashboardPage() {
             </div>
           </div>
           <div className="admin-command-actions justify-start">
-            <input className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => setFromDate(event.target.value)} type="date" value={fromDate} />
-            <input className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => setToDate(event.target.value)} type="date" value={toDate} />
+            <input className="h-10 rounded-md border border-[var(--brand-line)] px-3 text-sm" onChange={(event) => setFromDate(event.target.value)} type="date" value={fromDate} />
+            <input className="h-10 rounded-md border border-[var(--brand-line)] px-3 text-sm" onChange={(event) => setToDate(event.target.value)} type="date" value={toDate} />
             <button className="app-button" onClick={refresh} type="button">Actualizar</button>
           </div>
         </section>
@@ -196,3 +196,4 @@ function AuthRequired() {
 function formatMoney(cents: number, currency: string) {
   return new Intl.NumberFormat("es-MX", { style: "currency", currency }).format(cents / 100);
 }
+

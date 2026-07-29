@@ -131,7 +131,7 @@ export function TeamAccessCard() {
         <div className="min-w-0">
           <p className="app-eyebrow">Equipo</p>
           <h2 className="mt-2 text-xl font-semibold">Usuarios y permisos</h2>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-[#5d6b63]">
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-[var(--brand-muted)]">
             Crea cuentas para recepcion, gerencia, coaches y operacion, y limita las sucursales que puede usar cada persona.
           </p>
         </div>
@@ -283,3 +283,4 @@ export function EditBranchDrawer({
     </AppDrawer>
   );
 }
+
