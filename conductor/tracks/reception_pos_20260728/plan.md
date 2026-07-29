@@ -13,13 +13,13 @@
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Reception Dashboard Layout and Components' (Protocol in workflow.md)
 
 ## Phase 2: Point of Sale (POS) Initialization
-- [ ] Task: Set up the POS shell in `frontend/src/app/pos/page.tsx` utilizing `PosSections.tsx`.
-    - [ ] Write Tests: Write failing tests for the POS layout and initial section rendering.
-    - [ ] Implement Feature: Implement the layout and structural components to pass the tests.
-- [ ] Task: Implement the product catalog grid/list view within the POS.
-    - [ ] Write Tests: Write tests verifying that mock products render correctly and can be selected.
-    - [ ] Implement Feature: Build the product grid component and connect it to mock/API data.
-- [ ] Task: Conductor - User Manual Verification 'Phase 2: Point of Sale (POS) Initialization' (Protocol in workflow.md)
+- [x] Task: Set up the POS shell in `frontend/src/app/pos/page.tsx` utilizing `PosSections.tsx`.
+    - [x] Write Tests: Write failing tests for the POS layout and initial section rendering.
+    - [x] Implement Feature: Implement the layout and structural components to pass the tests.
+- [x] Task: Implement the product catalog grid/list view within the POS.
+    - [x] Write Tests: Write tests verifying that mock products render correctly and can be selected.
+    - [x] Implement Feature: Build the product grid component and connect it to mock/API data.
+- [x] Task: Conductor - User Manual Verification 'Phase 2: Point of Sale (POS) Initialization' (Protocol in workflow.md)
 
 ## Phase 3: Integration and Polish
 - [ ] Task: Ensure styling is consistent with the `Hybrid Contextual Density` product guidelines (Data-dense for these admin views).
