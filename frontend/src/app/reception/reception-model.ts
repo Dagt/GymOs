@@ -42,6 +42,13 @@ export const FOCUS_ACTIONS: FocusAction[] = [
     accent: "kiosk",
   },
   {
+    title: "Renovaciones y Planes",
+    detail: "Extensión de vigencias, cobro de renovaciones y cambios de plan.",
+    href: "/reception/renewals",
+    label: "Renovar plan",
+    accent: "renewals",
+  },
+  {
     title: "Reservas",
     detail: "Agenda recursos, registra reservas y vincula pagos cuando aplique.",
     href: "/bookings",

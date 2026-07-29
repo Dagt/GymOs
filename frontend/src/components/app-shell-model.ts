@@ -90,6 +90,7 @@ const managerSections: NavigationSection[] = [
       { label: "Reservas", href: "/bookings", hint: "Agenda", permissions: ["booking.read"] },
       { label: "Wellness", href: "/wellness", hint: "Bienestar", permissions: ["professional.read", "booking.read"] },
       { label: "Coaches", href: "/coaches", hint: "Rutinas", permissions: ["coach.read"] },
+      { label: "Beneficios", href: "/benefits", hint: "Promociones y convenios", permissions: ["benefit.read"] },
     ],
   },
   {
@@ -105,6 +106,7 @@ const receptionSections: NavigationSection[] = [
     title: "Mostrador",
     links: [
       { label: "Inicio recepcion", href: "/reception", hint: "Acciones del dia", permissions: ["client.read", "sale.create"] },
+      { label: "Renovaciones", href: "/reception/renewals", hint: "Planes y extensión", permissions: ["membership.update", "sale.create"] },
       { label: "Caja / POS", href: "/pos", hint: "Ventas y pagos", permissions: ["sale.create"] },
       { label: "Socios", href: "/clients", hint: "Altas y fichas", permissions: memberWorkflowPermissions },
       { label: "Reservas", href: "/bookings", hint: "Agenda", permissions: ["booking.read"] },
