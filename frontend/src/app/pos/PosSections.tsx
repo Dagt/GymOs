@@ -150,21 +150,21 @@ export function PosClientSearch({
   onSelectClient: (client: ClientSummary) => void;
 }) {
   return (
-    <section className="rounded-3xl border border-gray-100 bg-white p-8 shadow-sm relative overflow-hidden">
-      <h2 className="text-2xl font-black text-[color:var(--brand-primary)] flex items-center gap-3">
-        <span className="w-3 h-8 bg-[color:var(--brand-accent)] rounded-full shadow-sm shadow-[color:var(--brand-accent)]"></span>
+    <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm relative overflow-hidden">
+      <h2 className="text-lg font-black text-[color:var(--brand-primary)] flex items-center gap-2">
+        <span className="w-2 h-5 bg-[color:var(--brand-accent)] rounded-full"></span>
         Socio / Cliente
       </h2>
       
-      <form className="mt-6 flex gap-2" onSubmit={onSearch}>
+      <form className="mt-4 flex gap-2" onSubmit={onSearch}>
         <input
-          className="h-14 flex-1 rounded-2xl border-2 border-gray-100 bg-gray-50 px-5 text-base font-bold focus:border-[color:var(--brand-primary)] focus:bg-white transition-all outline-none shadow-inner"
+          className="h-10 flex-1 rounded-xl border-2 border-gray-100 bg-gray-50 px-4 text-sm font-bold focus:border-[color:var(--brand-primary)] focus:bg-white transition-all outline-none shadow-inner"
           onChange={(event) => onClientQueryChange(event.target.value)}
           placeholder="Nombre, teléfono o email..."
           value={clientQuery}
         />
         <button 
-          className="px-6 rounded-2xl bg-[color:var(--brand-primary)] text-white font-black text-sm hover:brightness-110 active:scale-95 transition-all shadow-lg hover:shadow-[color:var(--brand-primary)]/20" 
+          className="px-4 rounded-xl bg-[color:var(--brand-primary)] text-white font-black text-xs hover:brightness-110 active:scale-95 transition-all shadow-md" 
           type="submit"
         >
           Buscar
@@ -172,17 +172,17 @@ export function PosClientSearch({
       </form>
 
       {selectedClient && (
-        <div className="mt-6 p-5 rounded-2xl border-2 border-[color:color-mix(in_srgb,var(--brand-primary)_20%,transparent)] bg-[color:var(--brand-primary)] text-white flex items-center justify-between shadow-xl animate-in zoom-in-95">
+        <div className="mt-4 p-4 rounded-xl border-2 border-[color:color-mix(in_srgb,var(--brand-primary)_20%,transparent)] bg-[color:var(--brand-primary)] text-white flex items-center justify-between shadow-lg animate-in zoom-in-95">
           <div className="flex flex-col">
-            <span className="text-[0.65rem] font-black uppercase tracking-widest opacity-70 mb-1">Socio Identificado</span>
-            <strong className="text-xl font-black">
+            <span className="text-[0.6rem] font-black uppercase tracking-widest opacity-70 mb-0.5">Socio Identificado</span>
+            <strong className="text-base font-black">
               {selectedClient.firstName} {selectedClient.lastName}
             </strong>
           </div>
           <button 
             type="button" 
             onClick={() => onSelectClient(null as any)}
-            className="w-10 h-10 rounded-xl bg-white/10 hover:bg-white/20 flex items-center justify-center font-black text-white transition-colors"
+            className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center font-black text-white transition-colors"
           >
             ✕
           </button>
@@ -190,20 +190,20 @@ export function PosClientSearch({
       )}
 
       {clients.length > 0 && !selectedClient && (
-        <div className="mt-5 grid gap-3">
-          <p className="text-[0.65rem] font-black text-gray-400 uppercase tracking-widest ml-1">Resultados de búsqueda</p>
+        <div className="mt-4 grid gap-2">
+          <p className="text-[0.6rem] font-black text-gray-400 uppercase tracking-widest ml-1">Resultados</p>
           {clients.slice(0, 5).map((client) => (
             <button
-              className="flex items-center justify-between p-4 rounded-2xl border-2 border-gray-50 bg-gray-50 hover:bg-white hover:border-[color:var(--brand-primary)] hover:shadow-md transition-all text-left group"
+              className="flex items-center justify-between p-3 rounded-xl border-2 border-gray-50 bg-gray-50 hover:bg-white hover:border-[color:var(--brand-primary)] transition-all text-left group"
               key={client.id}
               onClick={() => onSelectClient(client)}
               type="button"
             >
               <div className="flex flex-col">
-                 <span className="text-base font-black text-gray-900 group-hover:text-[color:var(--brand-primary)] transition-colors">{client.firstName} {client.lastName}</span>
-                 <span className="text-[0.65rem] font-bold text-gray-400">{client.email || 'Sin correo registrado'}</span>
+                 <span className="text-sm font-black text-gray-900 group-hover:text-[color:var(--brand-primary)] transition-colors">{client.firstName} {client.lastName}</span>
+                 <span className="text-[0.6rem] font-bold text-gray-400">{client.email || 'Sin correo'}</span>
               </div>
-              <span className="w-8 h-8 rounded-lg bg-white border border-gray-100 flex items-center justify-center text-[color:var(--brand-primary)] font-black group-hover:bg-[color:var(--brand-primary)] group-hover:text-white transition-all opacity-0 group-hover:opacity-100 scale-90 group-hover:scale-100">✔</span>
+              <span className="w-6 h-6 rounded-md bg-white border border-gray-100 flex items-center justify-center text-[color:var(--brand-primary)] text-xs font-black group-hover:bg-[color:var(--brand-primary)] group-hover:text-white transition-all">✔</span>
             </button>
           ))}
         </div>
@@ -244,41 +244,39 @@ export function PosCartForm({
   onValidateNowChange: (value: boolean) => void;
 }) {
   return (
-    <form className="rounded-3xl border border-gray-100 bg-white p-8 shadow-2xl overflow-hidden relative" onSubmit={onSubmit}>
-      {/* Dynamic Background Blob */}
-      <div className="absolute -top-12 -right-12 w-48 h-48 bg-[color:var(--brand-primary)] opacity-[0.03] rounded-full blur-3xl pointer-events-none"></div>
+    <form className="rounded-2xl border border-gray-100 bg-white p-5 shadow-2xl overflow-hidden relative" onSubmit={onSubmit}>
+      <div className="absolute -top-12 -right-12 w-32 h-32 bg-[color:var(--brand-primary)] opacity-[0.02] rounded-full blur-2xl pointer-events-none"></div>
       
-      <h2 className="text-2xl font-black text-[color:var(--brand-primary)] flex items-center gap-3 mb-8">
-        <span className="w-3 h-8 bg-[color:var(--brand-primary)] rounded-full shadow-sm shadow-[color:var(--brand-primary)]/20"></span>
-        Carrito de Venta
+      <h2 className="text-lg font-black text-[color:var(--brand-primary)] flex items-center gap-2 mb-4">
+        <span className="w-2 h-5 bg-[color:var(--brand-primary)] rounded-full opacity-30"></span>
+        Carrito
       </h2>
 
-      <div className="grid gap-4 max-h-[350px] overflow-y-auto pr-2 custom-scrollbar">
+      <div className="grid gap-2 max-h-[240px] overflow-y-auto pr-1 custom-scrollbar">
         {cart.length === 0 && (
-          <div className="py-16 flex flex-col items-center justify-center text-center bg-gray-50/50 rounded-2xl border-2 border-dashed border-gray-100">
-            <div className="w-20 h-20 bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center justify-center mb-5 text-4xl animate-bounce">🛒</div>
-            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Añade productos para comenzar</p>
+          <div className="py-8 flex flex-col items-center justify-center text-center bg-gray-50/30 rounded-xl border-2 border-dashed border-gray-100">
+            <p className="text-[0.65rem] font-black text-gray-400 uppercase tracking-widest">Añade productos</p>
           </div>
         )}
         {cart.map((item) => (
-          <div className="group flex flex-col p-5 rounded-2xl border-2 border-gray-50 bg-white hover:border-[color:var(--brand-primary)]/20 hover:shadow-lg transition-all duration-300" key={item.product.id}>
-            <div className="flex items-start justify-between gap-4">
+          <div className="flex flex-col p-3 rounded-xl border-2 border-gray-50 bg-white hover:border-[color:var(--brand-primary)]/10 transition-all" key={item.product.id}>
+            <div className="flex items-start justify-between gap-3">
               <div className="flex-1">
-                <p className="font-black text-gray-900 leading-tight mb-1 text-base">{item.product.name}</p>
-                <p className="text-sm font-black text-[color:var(--brand-primary)]">
+                <p className="font-black text-gray-900 leading-tight text-sm">{item.product.name}</p>
+                <p className="text-xs font-black text-[color:var(--brand-primary)] mt-0.5">
                   {formatMoney(item.product.priceCents, item.product.currency)}
                 </p>
               </div>
-              <div className="flex items-center bg-[color:var(--brand-surface)] rounded-xl p-1.5 border border-gray-100 shadow-inner">
+              <div className="flex items-center bg-gray-50 rounded-lg p-1 border border-gray-100">
                 <button 
                   type="button" 
                   onClick={() => onQuantityChange(item.product.id, item.quantity - 1)}
-                  className="w-10 h-10 flex items-center justify-center font-black text-gray-500 hover:text-[color:var(--brand-primary)] transition-colors text-xl bg-white rounded-lg shadow-sm"
+                  className="w-7 h-7 flex items-center justify-center font-black text-gray-400 hover:text-[color:var(--brand-primary)] bg-white rounded shadow-sm transition-colors"
                 >
                   -
                 </button>
                 <input
-                  className="w-12 bg-transparent text-center text-base font-black text-gray-900 border-none outline-none focus:ring-0"
+                  className="w-8 bg-transparent text-center text-xs font-black text-gray-900 border-none outline-none focus:ring-0"
                   min={0}
                   onChange={(event) => onQuantityChange(item.product.id, Number(event.target.value))}
                   type="number"
@@ -287,7 +285,7 @@ export function PosCartForm({
                 <button 
                   type="button" 
                   onClick={() => onQuantityChange(item.product.id, item.quantity + 1)}
-                  className="w-10 h-10 flex items-center justify-center font-black text-gray-500 hover:text-[color:var(--brand-primary)] transition-colors text-xl bg-white rounded-lg shadow-sm"
+                  className="w-7 h-7 flex items-center justify-center font-black text-gray-400 hover:text-[color:var(--brand-primary)] bg-white rounded shadow-sm transition-colors"
                 >
                   +
                 </button>
@@ -297,30 +295,30 @@ export function PosCartForm({
         ))}
       </div>
 
-      <div className="mt-10 pt-8 border-t-4 border-double border-gray-100">
-        <div className="flex flex-col items-center gap-2 mb-10">
-          <span className="text-xs font-black uppercase tracking-[0.2em] text-gray-400">Total Neto a Pagar</span>
-          <span className="text-5xl font-black text-[color:var(--brand-primary)] drop-shadow-sm tracking-tight">{formatMoney(subtotal, currency)}</span>
+      <div className="mt-6 pt-4 border-t-2 border-dashed border-gray-100">
+        <div className="flex flex-col items-center gap-1 mb-6">
+          <span className="text-[0.6rem] font-black uppercase tracking-wider text-gray-400">Total Neto</span>
+          <span className="text-3xl font-black text-[color:var(--brand-primary)] tracking-tighter">{formatMoney(subtotal, currency)}</span>
         </div>
 
-        <div className="grid gap-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="flex flex-col gap-2">
-              <label className="text-[0.65rem] font-black uppercase tracking-widest text-[color:var(--brand-primary)] ml-1">Método de Pago</label>
+        <div className="grid gap-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[0.6rem] font-black uppercase tracking-widest text-[color:var(--brand-primary)] opacity-60 ml-1">Método</label>
               <select
-                className="h-14 rounded-2xl border-2 border-gray-100 bg-gray-50 px-5 text-base font-black text-gray-900 focus:border-[color:var(--brand-primary)] focus:bg-white transition-all outline-none appearance-none cursor-pointer shadow-sm"
+                className="h-10 rounded-xl border-2 border-gray-100 bg-gray-50 px-3 text-xs font-black text-gray-900 focus:border-[color:var(--brand-primary)] focus:bg-white transition-all outline-none"
                 onChange={(event) => onPaymentMethodChange(event.target.value as PaymentMethod)}
                 value={paymentMethod}
               >
                 <option value="CASH">Efectivo</option>
-                <option value="TRANSFER">Transferencia</option>
-                <option value="CARD_MANUAL">Tarjeta Manual</option>
+                <option value="TRANSFER">Transf.</option>
+                <option value="CARD_MANUAL">Tarjeta</option>
               </select>
             </div>
-            <div className="flex flex-col gap-2">
-              <label className="text-[0.65rem] font-black uppercase tracking-widest text-[color:var(--brand-primary)] ml-1">Monto Recibido</label>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-[0.6rem] font-black uppercase tracking-widest text-[color:var(--brand-primary)] opacity-60 ml-1">Recibido</label>
               <input
-                className="h-14 rounded-2xl border-2 border-gray-100 bg-gray-50 px-5 text-base font-black text-gray-900 focus:border-[color:var(--brand-primary)] focus:bg-white transition-all outline-none shadow-sm"
+                className="h-10 rounded-xl border-2 border-gray-100 bg-gray-50 px-3 text-xs font-black text-gray-900 focus:border-[color:var(--brand-primary)] focus:bg-white transition-all outline-none"
                 onChange={(event) => onPaymentAmountChange(event.target.value)}
                 placeholder={(subtotal / 100).toFixed(2)}
                 type="number"
@@ -329,51 +327,43 @@ export function PosCartForm({
             </div>
           </div>
           
-          <div className="flex flex-col gap-2">
-            <label className="text-[0.65rem] font-black uppercase tracking-widest text-[color:var(--brand-primary)] ml-1">Referencia / Comprobante</label>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[0.6rem] font-black uppercase tracking-widest text-[color:var(--brand-primary)] opacity-60 ml-1">Referencia</label>
             <input
-              className="h-14 rounded-2xl border-2 border-gray-100 bg-gray-50 px-5 text-base font-bold text-gray-900 focus:border-[color:var(--brand-primary)] focus:bg-white transition-all outline-none shadow-sm"
+              className="h-10 rounded-xl border-2 border-gray-100 bg-gray-50 px-3 text-xs font-bold text-gray-900 focus:border-[color:var(--brand-primary)] focus:bg-white transition-all outline-none"
               onChange={(event) => onPaymentReferenceChange(event.target.value)}
-              placeholder="Ej. Ticket Terminal #12, Últimos 4 dígitos..."
+              placeholder="Folio o Ticket"
               value={paymentReference}
             />
           </div>
 
-          <label className="flex items-center gap-4 p-5 rounded-2xl bg-[color:var(--brand-surface)] border-2 border-transparent hover:border-[color:var(--brand-primary)]/20 transition-all cursor-pointer group">
+          <label className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border-2 border-transparent hover:border-gray-100 transition-all cursor-pointer group">
             <input
               checked={validateNow}
-              className="w-6 h-6 rounded-lg border-2 border-gray-300 text-[color:var(--brand-primary)] focus:ring-[color:var(--brand-primary)]/20 cursor-pointer"
+              className="w-4 h-4 rounded border-2 border-gray-300 text-[color:var(--brand-primary)] focus:ring-[color:var(--brand-primary)]/20 cursor-pointer"
               onChange={(event) => onValidateNowChange(event.target.checked)}
               type="checkbox"
             />
-            <div className="flex flex-col">
-               <span className="text-sm font-black text-gray-700 group-hover:text-[color:var(--brand-primary)] transition-colors">Validar pago ahora</span>
-               <span className="text-[0.6rem] font-bold text-gray-400 uppercase tracking-tighter">Marca esta casilla para procesar la transacción de inmediato</span>
-            </div>
+            <span className="text-[0.7rem] font-black text-gray-600 group-hover:text-[color:var(--brand-primary)] transition-colors uppercase tracking-tighter">Validar pago ahora</span>
           </label>
         </div>
       </div>
 
       <button 
-        className={`mt-10 h-20 w-full rounded-3xl font-black text-xl shadow-2xl transition-all duration-300 flex items-center justify-center gap-4 relative overflow-hidden group ${
+        className={`mt-6 h-14 w-full rounded-2xl font-black text-base shadow-lg transition-all duration-300 flex items-center justify-center gap-3 relative overflow-hidden group ${
           saving || cart.length === 0 
             ? "bg-gray-100 text-gray-400 cursor-not-allowed shadow-none" 
-            : "bg-[color:var(--brand-accent)] text-white hover:scale-[1.02] hover:brightness-110 active:scale-95 shadow-[color:var(--brand-accent)]/20"
+            : "bg-[color:var(--brand-accent)] text-white hover:brightness-110 active:scale-95 shadow-[color:var(--brand-accent)]/20"
         }`}
         disabled={saving || cart.length === 0} 
         type="submit"
       >
         {saving ? (
-          <>
-            <span className="w-6 h-6 border-4 border-white/30 border-t-white rounded-full animate-spin"></span>
-            Registrando Operación...
-          </>
+          <span className="w-5 h-5 border-3 border-white/30 border-t-white rounded-full animate-spin"></span>
         ) : (
           <>
-            <span className="relative z-10">COMPLETAR VENTA</span>
-            <span className="text-2xl group-hover:translate-x-2 transition-transform relative z-10">➜</span>
-            {/* Animated Highlight */}
-            <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-in-out"></div>
+            <span>REGISTRAR VENTA</span>
+            <span className="text-lg group-hover:translate-x-1 transition-transform">➜</span>
           </>
         )}
       </button>
