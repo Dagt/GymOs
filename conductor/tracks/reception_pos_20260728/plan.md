@@ -1,12 +1,15 @@
 # Implementation Plan: Reception Dashboard and Point of Sale (POS) Initialization
 
 ## Phase 1: Reception Dashboard Layout and Components
-- [ ] Task: Scaffold the basic layout for the Reception Dashboard in `frontend/src/app/reception/page.tsx`.
-    - [ ] Write Tests: Create `frontend/src/app/reception/page.test.tsx` and write a failing test for rendering the dashboard shell.
-    - [ ] Implement Feature: Write the code in `page.tsx` to pass the layout test.
-- [ ] Task: Create a "Quick Actions" component for receptionists (e.g., check-in, new sale).
-    - [ ] Write Tests: Create a test for the Quick Actions component verifying buttons and interactions.
-    - [ ] Implement Feature: Build the component and integrate it into the dashboard.
+- [x] Task: Scaffold the basic layout and model for the Reception Dashboard.
+    - [x] Write Tests: Create `frontend/src/app/reception/reception-model.test.ts` and write tests for navigation and signal logic.
+    - [x] Implement Feature: Create `reception-model.ts` and update `page.tsx` to use it.
+- [x] Task: Create a "Quick Actions" component for receptionists (e.g., check-in, new sale).
+    - [x] Write Tests: Create a test for the Quick Actions logic.
+    - [x] Implement Feature: Build the component and integrate it into the dashboard.
+- [x] Task: Completely redesign the Reception Dashboard to act as a unified hub.
+    - [x] Write Tests: Update `reception-model.test.ts` to reflect the new structure.
+    - [x] Implement Feature: Refactor `page.tsx` and `ReceptionActionRail.tsx` to provide immediate access to POS, Member Management, Bookings, and Memberships.
 - [ ] Task: Conductor - User Manual Verification 'Phase 1: Reception Dashboard Layout and Components' (Protocol in workflow.md)
 
 ## Phase 2: Point of Sale (POS) Initialization

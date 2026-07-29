@@ -6,7 +6,7 @@
     "predev": "node scripts/apply-coaches-ui.mjs",
     "dev": "next dev",
     "prebuild": "node scripts/apply-coaches-ui.mjs",
-    "build": "next build",
+    "build": "next build --webpack",
     "start": "next start",
     "prelint": "node scripts/apply-coaches-ui.mjs",
     "lint": "eslint",

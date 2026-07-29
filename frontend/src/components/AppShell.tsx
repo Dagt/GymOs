@@ -152,8 +152,9 @@ export function AppShell({
       const selectedSession = await selectBranch(session.accessToken, branchId);
       storeSession(selectedSession);
       window.sessionStorage.removeItem(BRANCH_RECOVERY_KEY);
-      router.replace(pathname);
-      router.refresh();
+      // We use hard reload to ensure all contexts, themes and session hooks across the app 
+      // are fully synchronized with the new branch identity immediately.
+      window.location.reload();
     } finally {
       setSwitchingBranch(false);
     }

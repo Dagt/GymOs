@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired } from "@/components/AuthRequired";
+import { DAY_SIGNALS, FOCUS_ACTIONS } from "./reception-model";
 import {
   clearSession,
   getBranches,
@@ -17,64 +18,6 @@ import {
   type OrganizationSummary,
   type StoredSession,
 } from "@/lib/api";
-
-const focusActions = [
-  {
-    title: "Cobrar venta o membresia",
-    detail: "Productos, planes, renovaciones y pagos manuales desde caja.",
-    href: "/pos",
-    label: "Abrir caja",
-    accent: "money",
-  },
-  {
-    title: "Buscar o registrar socio",
-    detail: "Alta rapida, ficha, membresias, beneficios y notas.",
-    href: "/clients",
-    label: "Ir a socios",
-    accent: "people",
-  },
-  {
-    title: "Revisar ventas",
-    detail: "Pagos pendientes, saldos, comprobantes y operaciones recientes.",
-    href: "/reports/sales",
-    label: "Ver reporte",
-    accent: "report",
-  },
-  {
-    title: "Pantalla para socios",
-    detail: "Autoservicio para pagos, renovaciones y cambios de plan.",
-    href: "/kiosk/KIOSK-MAIN",
-    label: "Abrir kiosco",
-    accent: "kiosk",
-  },
-  {
-    title: "Reservas",
-    detail: "Agenda recursos, registra reservas y vincula pagos cuando aplique.",
-    href: "/bookings",
-    label: "Ver agenda",
-    accent: "bookings",
-  },
-  {
-    title: "Beneficios",
-    detail: "Consulta beneficios aplicables para socios y promociones activas.",
-    href: "/benefits",
-    label: "Ver beneficios",
-    accent: "benefits",
-  },
-  {
-    title: "Servicios de Bienestar",
-    detail: "Agendar citas, consultar especialistas, confirmación y estatus.",
-    href: "/wellness",
-    label: "Ver citas",
-    accent: "wellness",
-  },
-];
-
-const daySignals = [
-  { label: "Caja", value: "Lista", tone: "green" },
-  { label: "Pagos", value: "Por revisar", tone: "amber" },
-  { label: "Sucursal", value: "Activa", tone: "blue" },
-];
 
 export default function ReceptionPage() {
   const router = useRouter();
@@ -206,79 +149,111 @@ export default function ReceptionPage() {
           onSwitchBranch={switchBranch}
         />
       ) : (
-        <section className="reception-home">
-          <section className="reception-identity-panel">
-            {session.user.logoUrl ? (
-              <Image alt={session.user.brandName ?? receptionOrganizationName} className="reception-brand-mark image" height={72} src={session.user.logoUrl} unoptimized width={72} />
-            ) : (
-              <div className="reception-brand-mark" aria-hidden="true">
-                {(session.user.brandName ?? receptionOrganizationName).slice(0, 1)}
+        <div className="flex flex-col gap-6 w-full max-w-7xl mx-auto">
+          {/* Identity & Shift Panel */}
+          <section 
+            className="relative flex flex-col md:flex-row justify-between items-start md:items-center gap-6 p-8 rounded-2xl shadow-xl overflow-hidden text-white"
+            style={{ 
+              background: `linear-gradient(135deg, color-mix(in srgb, var(--brand-primary) 90%, black), color-mix(in srgb, var(--brand-primary) 60%, var(--brand-accent)))`,
+            }}
+          >
+            {/* Texture Overlay */}
+            <div className="absolute inset-0 opacity-10 pointer-events-none" style={{ backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.2) 10px, rgba(255,255,255,0.2) 20px)`}}></div>
+            
+            <div className="relative z-10 flex items-center gap-5">
+              {session.user.logoUrl ? (
+                <Image alt={session.user.brandName ?? receptionOrganizationName} className="rounded-xl border-2 border-white/30 shadow-md bg-white/10 p-1" height={80} src={session.user.logoUrl} unoptimized width={80} />
+              ) : (
+                <div className="h-20 w-20 bg-white/20 border-2 border-white/40 text-white rounded-xl flex items-center justify-center text-3xl font-black shadow-md" aria-hidden="true">
+                  {(session.user.brandName ?? receptionOrganizationName).slice(0, 1)}
+                </div>
+              )}
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-widest opacity-80">{receptionOrganizationName}</p>
+                <h2 className="text-3xl font-black leading-tight drop-shadow-sm">{visibleBranchName}</h2>
+                <span className="text-sm font-medium mt-1 block opacity-90">
+                  Operador: {session.user.fullName}
+                </span>
               </div>
-            )}
-            <div>
-              <p>{receptionOrganizationName}</p>
-              <h2>{visibleBranchName}</h2>
-              <span>
-                Entraste como Recepcion. Usuario: {session.user.fullName} ({session.user.username}).
-              </span>
             </div>
-            <div className="reception-scope-card">
-              <span>Alcance</span>
-              <strong>Mostrador</strong>
-              <small>Clientes, ventas, pagos, membresias y reservas de la sucursal activa.</small>
+            
+            <div className="relative z-10 flex flex-wrap gap-3 self-stretch md:self-auto">
+              {DAY_SIGNALS.map((signal) => (
+                <div key={signal.label} className="flex flex-col justify-center bg-white/10 backdrop-blur-md rounded-xl px-4 py-3 border border-white/20 min-w-[120px] shadow-sm">
+                  <span className="text-[0.65rem] font-bold uppercase tracking-wider opacity-70 mb-1">{signal.label}</span>
+                  <strong className="text-lg font-black leading-none drop-shadow-sm">{signal.value}</strong>
+                </div>
+              ))}
+              <button 
+                onClick={logout} 
+                type="button"
+                className="flex flex-col justify-center items-center bg-black/20 hover:bg-black/40 transition-colors backdrop-blur-md rounded-xl px-5 py-3 border border-white/10 shadow-sm"
+              >
+                <strong className="text-sm font-bold">Salir</strong>
+              </button>
             </div>
-            <button onClick={logout} type="button">
-              Salir
-            </button>
           </section>
 
-          <section className="reception-command-layout">
-            <section className="reception-action-rail" aria-label="Acciones de recepcion">
-              <Link className="reception-primary-command" href="/pos">
-                <span>Caja lista</span>
-                <strong>Cobrar venta o membresia</strong>
-                <p>Productos, planes, renovaciones y pagos manuales desde mostrador.</p>
-                <b>Abrir caja</b>
-              </Link>
-              <div className="reception-secondary-commands">
-                {focusActions.slice(1).map((action) => (
-                  <Link className={`reception-command ${action.accent}`} href={action.href} key={action.href}>
-                    <span>{action.title}</span>
-                    <strong>{action.label}</strong>
-                  </Link>
-                ))}
-              </div>
-            </section>
+          {/* Unified Hub Grid */}
+          <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {FOCUS_ACTIONS.map((action, index) => {
+              const isPrimary = index === 0;
+              return (
+                <Link
+                  key={action.href}
+                  href={action.href}
+                  className={`group relative flex flex-col p-6 rounded-2xl border-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl overflow-hidden ${
+                    isPrimary 
+                      ? "col-span-1 md:col-span-2 lg:col-span-2 shadow-lg" 
+                      : "shadow-sm bg-white"
+                  }`}
+                  style={isPrimary ? {
+                    background: `var(--brand-primary)`,
+                    borderColor: `color-mix(in srgb, var(--brand-primary) 80%, black)`,
+                    color: 'white'
+                  } : {
+                    background: `color-mix(in srgb, var(--brand-primary) 2%, white)`,
+                    borderColor: `color-mix(in srgb, var(--brand-primary) 15%, transparent)`,
+                  }}
+                >
+                  {/* Decorative Background Blob */}
+                  <div 
+                    className={`absolute -top-24 -right-24 w-64 h-64 rounded-full blur-3xl transition-opacity duration-500 ${isPrimary ? 'opacity-20 group-hover:opacity-40' : 'opacity-[0.05] group-hover:opacity-10'}`}
+                    style={{ background: isPrimary ? 'white' : 'var(--brand-primary)' }}
+                  ></div>
 
-            <aside className="reception-shift-panel">
-              <div>
-                <p>Turno actual</p>
-                <h2>Mostrador en operacion</h2>
-              </div>
-              <div className="reception-signal-list">
-                {daySignals.map((signal) => (
-                  <ReportMetric key={signal.label} label={signal.label} value={signal.value} tone={signal.tone} />
-                ))}
-              </div>
-              <div className="reception-next-panel">
-                <span>Siguiente accion</span>
-                <strong>Buscar socio o cobrar membresia</strong>
-              </div>
-            </aside>
+                  <div className="relative z-10 flex items-center justify-between mb-5">
+                    <span className={`text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full shadow-sm ${
+                      isPrimary 
+                        ? "bg-white/20 text-white backdrop-blur-md border border-white/20" 
+                        : "bg-white text-[color:var(--brand-primary)] border border-[color:color-mix(in_srgb,var(--brand-primary)_20%,transparent)]"
+                    }`}>
+                      {action.title}
+                    </span>
+                  </div>
+                  
+                  <h3 className={`text-2xl font-black mb-3 relative z-10 drop-shadow-sm ${
+                    isPrimary ? "text-white" : "text-[color:var(--brand-ink)] group-hover:text-[color:var(--brand-primary)] transition-colors"
+                  }`}>
+                    {action.label}
+                  </h3>
+                  
+                  <p className={`text-base font-medium flex-grow relative z-10 ${
+                    isPrimary ? "text-white/90" : "text-[color:var(--brand-muted)]"
+                  }`}>
+                    {action.detail}
+                  </p>
 
-            <section className="reception-wide-strip">
-              <div>
-                <p>Operacion rapida</p>
-                <h2>Reservas, beneficios y ventas sin salir del flujo de mostrador</h2>
-              </div>
-              <div>
-                <Link href="/bookings">Agenda</Link>
-                <Link href="/benefits">Beneficios</Link>
-                <Link href="/reports/sales">Ventas</Link>
-              </div>
-            </section>
+                  {isPrimary && (
+                    <div className="relative z-10 mt-6 inline-flex self-start items-center justify-center px-8 py-3 bg-[color:var(--brand-accent)] text-white text-lg font-black rounded-xl hover:scale-105 transition-transform shadow-md">
+                      Abrir módulo →
+                    </div>
+                  )}
+                </Link>
+              );
+            })}
           </section>
-        </section>
+        </div>
       )}
     </AppShell>
   );
