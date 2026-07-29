@@ -1,10 +1,10 @@
 # Implementation Plan: POS Membership Renewals & Benefits Optimization
 
-## Phase 1: Benefits Security & Form Simplification
-- [ ] Task: Restrict `/benefits` page access to managerial roles and simplify the benefit creation form.
-    - [ ] Write Tests: Update role access tests to verify receptionists cannot access `/benefits`.
-    - [ ] Implement Feature: Update `role-model.ts`, `app-shell-model.ts`, and `frontend/src/app/benefits/page.tsx` to restrict creation to Manager/Owner/Admin, remove `/benefits` from reception navigation, hide the "Priority" input field, and add descriptive helper text.
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Benefits Security & Form Simplification' (Protocol in workflow.md)
+## Phase 1: Benefits Security & Form Simplification [checkpoint: 72fe8a5]
+- [x] Task: Restrict `/benefits` page access to managerial roles and simplify the benefit creation form.
+    - [x] Write Tests: Update role access tests to verify receptionists cannot access `/benefits`.
+    - [x] Implement Feature: Update `role-model.ts`, `app-shell-model.ts`, and `frontend/src/app/benefits/page.tsx` to restrict creation to Manager/Owner/Admin, remove `/benefits` from reception navigation, hide the "Priority" input field, and add descriptive helper text.
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Benefits Security & Form Simplification' (Protocol in workflow.md)
 
 ## Phase 2: Client Detail Expired Membership Renewal Fix
 - [ ] Task: Enable renewal action for expired memberships on client detail page.
