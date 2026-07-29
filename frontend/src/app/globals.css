@@ -1308,6 +1308,7 @@ th {
   border-radius: 0.75rem;
   color: var(--brand-primary);
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  border-left: 4px solid var(--brand-accent);
 }
 
 .admin-sidebar nav a.active span {

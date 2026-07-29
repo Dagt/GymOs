@@ -48,7 +48,6 @@ export function ProductGrid({
               placeholder="Nombre del producto, SKU o código de barras..."
               value={productQuery}
             />
-            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-xl opacity-30 group-focus-within:opacity-100 transition-opacity">🔍</div>
           </div>
         </div>
 
@@ -313,9 +312,9 @@ export function PosCartForm({
                 onChange={(event) => onPaymentMethodChange(event.target.value as PaymentMethod)}
                 value={paymentMethod}
               >
-                <option value="CASH">💵 Efectivo</option>
-                <option value="TRANSFER">🏦 Transferencia</option>
-                <option value="CARD_MANUAL">💳 Tarjeta Manual</option>
+                <option value="CASH">Efectivo</option>
+                <option value="TRANSFER">Transferencia</option>
+                <option value="CARD_MANUAL">Tarjeta Manual</option>
               </select>
             </div>
             <div className="flex flex-col gap-2">
