@@ -12,7 +12,7 @@
     - [x] Implement Feature: Refactor `page.tsx` and `ReceptionActionRail.tsx` to provide immediate access to POS, Member Management, Bookings, and Memberships.
 - [x] Task: Conductor - User Manual Verification 'Phase 1: Reception Dashboard Layout and Components' (Protocol in workflow.md)
 
-## Phase 2: Point of Sale (POS) Initialization
+## Phase 2: Point of Sale (POS) Initialization [checkpoint: 464c91b]
 - [x] Task: Set up the POS shell in `frontend/src/app/pos/page.tsx` utilizing `PosSections.tsx`.
     - [x] Write Tests: Write failing tests for the POS layout and initial section rendering.
     - [x] Implement Feature: Implement the layout and structural components to pass the tests.
