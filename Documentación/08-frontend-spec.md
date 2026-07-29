@@ -329,6 +329,11 @@ Formularios:
   - Telefonos de gimnasio, sucursal y usuario interno en formato `+52` mas 10 digitos; si el usuario captura 10 digitos, el frontend antepone `+52`.
   - Confirmacion modal nativa antes de suspender/reactivar gimnasios o usuarios.
 - Al crear un usuario con rol `Dueno del gimnasio`, el frontend asigna automaticamente todas las sucursales existentes del tenant. Gerentes, recepcionistas y coaches siguen seleccionando sucursales concretas.
+- Al seleccionar el rol `Coach`, el mismo drawer de alta muestra especialidades
+  y biografia; no existe un proceso de alta separado para ese tipo de usuario.
+- La tabla de Equipo conserva una altura y banda de acciones uniforme para todos
+  los roles; `Datos de Coach` es una accion adicional en linea, no una fila o
+  panel especial.
 - Un gerente no ve ni puede seleccionar `Dueno del gimnasio` ni `Gerente` al crear o modificar usuarios; solo puede asignar roles operativos permitidos.
 - Un gerente no ve la entrada `Datos y sucursales` y `canAccessRoute` no permite abrir `/settings/organization` con esa consola.
 - `/users` permite cambiar el rol de usuarios existentes desde la tabla, excepto la propia cuenta del usuario autenticado.
@@ -344,3 +349,40 @@ Formularios:
 - El dashboard de recepcion prioriza una banda visual con el color principal y acciones asimetricas; evita verse como una lista plana de tarjetas independientes.
 - El kiosco muestra logo, nombre y colores del gimnasio propietario del terminal.
 - `/settings/organization` permite configurar marca solo en la seccion del gimnasio; la seccion de sucursales solo administra datos operativos de cada sede.
+
+## Coaches y rutinas
+
+La pantalla `/coaches` se adapta al rol. Un Coach autorizado ve Constructor,
+Ejercicios, Asignaciones y Métricas. El dueño del gimnasio sólo ve Métricas y
+el frontend no solicita `/workouts`, `/exercises` ni `/coaches/profiles` para
+ese rol, incluso si su sesión conserva permisos antiguos.
+
+- Equipo y accesos (`/users`): el renglón del Coach abre un único panel con
+  especialidades, biografía y selección de múltiples sucursales. El estado usa
+  el control existente de suspender/reactivar, evitando dos administradores de
+  la misma persona.
+- Constructor: biblioteca, alta/edición/duplicado/publicación, sesiones, bloques
+  y ejercicios reordenables con controles de subir/bajar/eliminar.
+- Ejercicios: búsqueda, alta, edición propia, archivo administrativo, aliases y
+  carga/eliminación de imagen o video.
+- Asignaciones: búsqueda de socio, versión publicada, vigencia, notas privadas e
+  imprimibles, historial, PDF, completar, cancelar con motivo y reemplazar.
+- Métricas: fechas, coach, búsqueda/selección directa de socio, periodo anterior
+  comparable, KPIs, tabla por coach, historial paginado y CSV. El selector de
+  8, 12, 26 o 52 semanas alimenta tres gráficas: asignaciones, socios únicos y
+  primeras rutinas. El socio seleccionado se aplica a resumen, gráficas,
+  detalle y exportación.
+
+En la vista del dueño, el historial es de sólo lectura: no aparecen PDF,
+completar, cancelar ni reemplazar. Estas acciones permanecen disponibles para
+el Coach con sus permisos operativos.
+
+El constructor combina campos estructurados con prescripción libre y representa
+`3x20`, `3x12, 10, 8 subiendo`, `3x24 pasos`, `3 series`, alternativas `VS`,
+opcionales y notas narrativas. Crear un ejercicio inline no pierde el borrador. El
+reordenamiento usa botones accesibles además de puntero.
+
+El PDF descargable muestra marca o inicial de respaldo, socio, coach, sucursal,
+vigencia, sesiones, bloques, prescripción e indicaciones. El archivo final se
+descarga desde la asignación. La UI nunca muestra precio, cobro, comisión ni POS
+para rutinas; el socio no tiene vista remota en V1.

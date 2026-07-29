@@ -188,12 +188,29 @@ Criterios:
 
 ## UC-013 Crear rutina
 
-1. Coach selecciona cliente.
-2. Crea rutina estructurada.
-3. Guarda versión.
-4. Asigna.
-5. Registra venta si aplica.
-6. Actualiza métrica del coach.
+Actor principal: Coach activo con sucursal habilitada.
+
+1. Crea o duplica una plantilla y define título, objetivo, nivel y sesiones.
+2. Busca ejercicios por nombre, alias, músculo, patrón o equipo.
+3. Si falta una opción, la crea inline sin perder el borrador; el sistema advierte duplicados.
+4. Ordena bloques y ejercicios y captura prescripción estructurada o libre.
+5. Puede agrupar superseries/circuitos, alternativas, opcionales, calentamiento,
+   movilidad, cardio, core y estiramiento.
+6. Guarda el borrador y publica una versión inmutable.
+7. Selecciona un socio activo dentro de su alcance y asigna esa versión.
+8. El sistema registra una sola asignación idempotente y actualiza la proyección semanal.
+9. El coach descarga el PDF para entrega física.
+
+Postcondiciones:
+
+- dueño y gerencia consultan coach, fecha, socio, rutina y versión;
+- dueño y gerencia comparan el periodo contra otro anterior de igual duración;
+- la asignación conserva su contenido aunque se publique otra versión;
+- no se registra venta, pago, comisión, ingreso ni movimiento de caja.
+
+Alternativas: una versión en borrador no se asigna; un coach/socio fuera de alcance
+se rechaza; cancelar exige motivo; un reemplazo conserva y muestra el histórico;
+un reintento devuelve el resultado original sin duplicar la métrica.
 
 ## UC-014 Reservar consulta profesional
 
@@ -533,10 +550,14 @@ Flujo:
 1. Usuario abre Equipo y accesos.
 2. Frontend muestra solo roles validos para el contexto.
 3. Usuario captura nombre, apellido, email, telefono, usuario, contrasena temporal, rol y sucursal.
-4. Frontend valida email, telefono `+52` mas 10 digitos y contrasena minima antes de enviar.
-5. Si el rol es `Dueno del gimnasio`, el frontend asigna automaticamente todas las sucursales existentes.
-6. Backend valida que rol y sucursales pertenezcan al tenant y que el rol no sea de plataforma.
-7. Backend crea persona, cuenta, rol y acceso de sucursal.
+4. Si selecciona `Coach`, el mismo formulario muestra especialidades y
+   biografia como datos complementarios.
+5. Frontend valida email, telefono `+52` mas 10 digitos y contrasena minima antes de enviar.
+6. Si el rol es `Dueno del gimnasio`, el frontend asigna automaticamente todas las sucursales existentes.
+7. Backend valida que rol y sucursales pertenezcan al tenant y que el rol no sea de plataforma.
+8. Backend crea persona, cuenta, rol y acceso de sucursal; para `Coach` crea
+   tambien su perfil y replica los datos complementarios en cada sucursal,
+   dentro de la misma transaccion.
 
 Resultado esperado:
 - Un gimnasio no ofrece el rol `Administrador GymOS` como rol operativo.
@@ -544,6 +565,7 @@ Resultado esperado:
 - El gerente con permiso de equipo solo puede crear recepcionistas y coaches.
 - Si el gerente tiene una sola sucursal, esa sucursal queda seleccionada y bloqueada automaticamente al crear usuarios operativos.
 - Un recepcionista creado inicia sesion en recepcion y no ve administracion de plataforma.
+- Un Coach no requiere una segunda edicion para completar sus datos iniciales.
 - Si faltan campos o hay permisos invalidos, se muestra error claro con codigo y `correlationId`.
 
 ## UC-031 Suspender acceso comercial y usuarios internos
@@ -600,4 +622,6 @@ Reglas:
 
 ## Anexo Hito 3.5 final
 
-Ver `Documentación/07-use-cases-hito-3-5-final.md` para la definicion vigente de verificacion segura de kiosco, idempotencia por hash de solicitud y eventos por modulo propietario.
+La verificación segura de kiosco, la idempotencia por hash y los eventos por
+módulo propietario forman parte de este contrato y del estado en
+`modulos/11-selfservice.md`.

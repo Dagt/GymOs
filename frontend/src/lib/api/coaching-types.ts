@@ -1,5 +1,6 @@
 export type CoachSummary = {
   id: string;
+  userAccountId: string | null;
   displayName: string;
   email: string | null;
   phone: string | null;
@@ -10,6 +11,29 @@ export type CoachSummary = {
   updatedAt: string;
 };
 
+export type CoachProfileBranch = {
+  id: string;
+  name: string;
+};
+
+export type CoachProfile = {
+  userId: string;
+  displayName: string;
+  email: string | null;
+  phone: string | null;
+  specialties: string[];
+  bio: string | null;
+  status: "ACTIVE" | "INACTIVE";
+  branches: CoachProfileBranch[];
+};
+
+export type UpdateCoachProfilePayload = {
+  specialties: string[];
+  bio?: string | null;
+  status: "ACTIVE" | "INACTIVE";
+  branchIds: string[];
+};
+
 export type WorkoutSummary = {
   id: string;
   coachId: string | null;
@@ -17,7 +41,7 @@ export type WorkoutSummary = {
   title: string;
   goal: string | null;
   level: "BEGINNER" | "INTERMEDIATE" | "ADVANCED" | "GENERAL" | string;
-  status: "ACTIVE" | "INACTIVE" | string;
+  status: "DRAFT" | "PUBLISHED" | "ARCHIVED" | "ACTIVE" | "INACTIVE" | string;
   latestVersionId: string | null;
   latestVersionNumber: number | null;
   createdAt: string;
@@ -87,4 +111,155 @@ export type AssignWorkoutPayload = {
   startsOn?: string | null;
   endsOn?: string | null;
   notes?: string | null;
+  printableNotes?: string | null;
+  idempotencyKey?: string | null;
+};
+
+export type Exercise = {
+  id: string;
+  organizationId: string | null;
+  name: string;
+  description: string | null;
+  instructions: string | null;
+  primaryMuscleGroup: string | null;
+  secondaryMuscleGroups: string | null;
+  movementPattern: string | null;
+  type: string;
+  equipment: string | null;
+  suggestedLevel: string | null;
+  laterality: string | null;
+  mediaUrl: string | null;
+  warnings: string | null;
+  origin: "SYSTEM" | "ORGANIZATION" | "COACH";
+  status: "ACTIVE" | "ARCHIVED";
+  createdBy: string | null;
+};
+
+export type ExercisePage = {
+  items: Exercise[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
+};
+
+export type CreateExercisePayload = {
+  name: string;
+  description?: string | null;
+  instructions?: string | null;
+  primaryMuscleGroup?: string | null;
+  secondaryMuscleGroups?: string | null;
+  movementPattern?: string | null;
+  type: string;
+  equipment?: string | null;
+  suggestedLevel?: string | null;
+  laterality?: string | null;
+  mediaUrl?: string | null;
+  warnings?: string | null;
+};
+
+export type WorkoutExerciseDraft = {
+  exerciseId?: string | null;
+  exerciseName: string;
+  prescription: string;
+  equipment?: string | null;
+  primaryMuscleGroup?: string | null;
+  movementPattern?: string | null;
+  setPlan?: WorkoutSetDraft[];
+  sets?: number | null;
+  reps?: string | null;
+  load?: string | null;
+  restSeconds?: number | null;
+  tempo?: string | null;
+  duration?: string | null;
+  distance?: string | null;
+  notes?: string | null;
+  groupKey?: string | null;
+  optional?: boolean;
+};
+
+export type WorkoutSetSegmentDraft = {
+  reps: string;
+  load: string;
+};
+
+export type WorkoutSetDraft = {
+  segments: WorkoutSetSegmentDraft[];
+};
+
+export type WorkoutBlockDraft = {
+  name: string;
+  type: string;
+  notes?: string | null;
+  exercises: WorkoutExerciseDraft[];
+};
+
+export type WorkoutSessionDraft = {
+  name: string;
+  focus?: string | null;
+  notes?: string | null;
+  blocks: WorkoutBlockDraft[];
+};
+
+export type AssignmentDetail = {
+  id: string;
+  assignedOn: string;
+  status: string;
+  statusReason: string | null;
+  replacedAssignmentId: string | null;
+  startsOn: string | null;
+  endsOn: string | null;
+  workoutId: string;
+  workoutTitle: string;
+  versionNumber: number;
+  clientId: string;
+  clientName: string;
+  coachId: string | null;
+  coachName: string | null;
+  printableNotes: string | null;
+  privateNotes: string | null;
+};
+
+export type CoachMetric = {
+  coachId: string;
+  coachName: string;
+  assignments: number;
+  uniqueClients: number;
+  firstWorkouts: number;
+};
+
+export type AssignmentReport = {
+  from: string;
+  to: string;
+  assignments: number;
+  uniqueClients: number;
+  activeCoaches: number;
+  coachesWithoutAssignments: number;
+  previousFrom: string;
+  previousTo: string;
+  previousAssignments: number;
+  previousUniqueClients: number;
+  assignmentChange: number;
+  uniqueClientChange: number;
+  page: number;
+  size: number;
+  totalDetails: number;
+  totalPages: number;
+  coaches: CoachMetric[];
+  details: AssignmentDetail[];
+};
+
+export type WeeklyTrendPoint = {
+  weekFrom: string;
+  weekTo: string;
+  assignments: number;
+  uniqueClients: number;
+  firstWorkouts: number;
+};
+
+export type WeeklyTrendReport = {
+  from: string;
+  to: string;
+  weeks: number;
+  points: WeeklyTrendPoint[];
 };

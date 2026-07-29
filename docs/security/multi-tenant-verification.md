@@ -1,7 +1,11 @@
 # GymOS Multi-Tenant Verification Plan
 
-Estado: plan de verificación inicial Hito 7  
-Última revisión local: 2026-07-16
+Estado: VIGENTE / EJECUCIÓN PARCIAL
+Última revisión documental: 2026-07-26
+
+La deuda y criterios pendientes derivados de este plan se registran en
+`../../Documentación/28-registro-vivo-deuda-tecnica.md` (`GEN-001` y deudas por
+módulo).
 
 GymOS debe aislar cada operación por `organization_id` y, cuando el flujo sea físico o localizable, por `branch_id`. Este documento define la estrategia mínima de pruebas y revisión para declarar el aislamiento apto para piloto.
 
@@ -93,4 +97,3 @@ El sistema requiere al menos:
 - Casos negativos de `auth`, `clients`, `sales/payments`, `memberships`, `selfservice`, `access`, `inventory`, `bookings`, `reporting`.
 - Evidencia de que object keys de MinIO no pueden reutilizarse entre tenants.
 - Evidencia de que Redis no colisiona entre tenants para rate limits, sesiones y locks.
-

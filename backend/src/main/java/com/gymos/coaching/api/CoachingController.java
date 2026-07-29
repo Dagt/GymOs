@@ -1,6 +1,8 @@
 package com.gymos.coaching.api;
 
 import com.gymos.coaching.application.CoachingService;
+import com.gymos.coaching.application.CoachingService.CoachProfileRecord;
+import com.gymos.coaching.application.CoachingService.UpdateCoachProfileCommand;
 import com.gymos.coaching.application.command.AssignWorkoutCommand;
 import com.gymos.coaching.application.command.CreateCoachCommand;
 import com.gymos.coaching.application.command.CreateWorkoutCommand;
@@ -10,6 +12,7 @@ import com.gymos.coaching.infrastructure.CoachingRepository.CoachReportRecord;
 import com.gymos.coaching.infrastructure.CoachingRepository.WorkoutAssignmentRecord;
 import com.gymos.coaching.infrastructure.CoachingRepository.WorkoutDetailRecord;
 import com.gymos.coaching.infrastructure.CoachingRepository.WorkoutSummaryRecord;
+import com.gymos.coaching.infrastructure.CoachingRepository.WorkoutVersionRecord;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,8 +27,11 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -51,6 +57,23 @@ public class CoachingController {
 		return coachingService.createCoach(principal, request.toCommand(), correlationId(servletRequest));
 	}
 
+	@GetMapping("/coaches/profiles")
+	List<CoachProfileRecord> coachProfiles(@AuthenticationPrincipal GymOsPrincipal principal) {
+		return coachingService.coachProfiles(principal);
+	}
+
+	@PutMapping("/coaches/profiles/{coachUserId}")
+	CoachProfileRecord updateCoachProfile(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID coachUserId,
+			@Valid @RequestBody UpdateCoachProfileRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return coachingService.updateCoachProfile(
+				principal, coachUserId, request.toCommand(), correlationId(servletRequest)
+		);
+	}
+
 	@GetMapping("/workouts")
 	List<WorkoutSummaryRecord> workouts(@AuthenticationPrincipal GymOsPrincipal principal) {
 		return coachingService.workouts(principal);
@@ -70,6 +93,40 @@ public class CoachingController {
 		return coachingService.workout(principal, workoutId);
 	}
 
+	@PutMapping("/workouts/{workoutId}")
+	WorkoutDetailRecord updateWorkout(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID workoutId,
+			@Valid @RequestBody CreateWorkoutRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return coachingService.updateWorkout(principal, workoutId, request.toCommand(), correlationId(servletRequest));
+	}
+
+	@GetMapping("/workouts/{workoutId}/versions")
+	List<WorkoutVersionRecord> workoutVersions(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID workoutId
+	) {
+		return coachingService.workoutVersions(principal, workoutId);
+	}
+
+	@GetMapping("/workout-versions/{versionId}")
+	WorkoutVersionRecord workoutVersion(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID versionId
+	) {
+		return coachingService.workoutVersion(principal, versionId);
+	}
+
+	@GetMapping("/workout-assignments/{assignmentId}")
+	WorkoutAssignmentRecord workoutAssignment(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID assignmentId
+	) {
+		return coachingService.workoutAssignment(principal, assignmentId);
+	}
+
 	@PostMapping("/workouts/{workoutId}/versions")
 	WorkoutDetailRecord createWorkoutVersion(
 			@AuthenticationPrincipal GymOsPrincipal principal,
@@ -84,10 +141,74 @@ public class CoachingController {
 	WorkoutAssignmentRecord assignWorkout(
 			@AuthenticationPrincipal GymOsPrincipal principal,
 			@PathVariable UUID workoutId,
+			@RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
 			@Valid @RequestBody AssignWorkoutRequest request,
 			HttpServletRequest servletRequest
 	) {
-		return coachingService.assignWorkout(principal, workoutId, request.toCommand(), correlationId(servletRequest));
+		return coachingService.assignWorkout(principal, workoutId, request.toCommand(idempotencyKey), correlationId(servletRequest));
+	}
+
+	@PostMapping("/workout-assignments")
+	WorkoutAssignmentRecord createAssignment(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@Valid @RequestBody CreateAssignmentRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return coachingService.assignWorkout(
+				principal, request.workoutId(),
+				new AssignWorkoutCommand(
+						request.clientId(), request.workoutVersionId(), request.startsOn(), request.endsOn(),
+						request.privateNotes(), request.printableNotes(), request.idempotencyKey()
+				),
+				correlationId(servletRequest)
+		);
+	}
+
+	@PostMapping("/workout-assignments/{assignmentId}/replace")
+	WorkoutAssignmentRecord replaceAssignment(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID assignmentId,
+			@Valid @RequestBody CreateAssignmentRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return coachingService.replaceAssignment(
+				principal, assignmentId, request.workoutId(),
+				new AssignWorkoutCommand(
+						request.clientId(), request.workoutVersionId(), request.startsOn(), request.endsOn(),
+						request.privateNotes(), request.printableNotes(), request.idempotencyKey()
+				),
+				correlationId(servletRequest)
+		);
+	}
+
+	@PostMapping("/workouts/{workoutId}/duplicate")
+	WorkoutDetailRecord duplicateWorkout(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID workoutId,
+			HttpServletRequest servletRequest
+	) {
+		return coachingService.duplicateWorkout(principal, workoutId, correlationId(servletRequest));
+	}
+
+	@PostMapping("/workouts/{workoutId}/publish")
+	WorkoutDetailRecord publishWorkout(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID workoutId,
+			HttpServletRequest servletRequest
+	) {
+		return coachingService.publishWorkout(principal, workoutId, correlationId(servletRequest));
+	}
+
+	@PatchMapping("/workout-assignments/{assignmentId}/status")
+	WorkoutAssignmentRecord updateAssignmentStatus(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID assignmentId,
+			@Valid @RequestBody AssignmentStatusRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return coachingService.updateAssignmentStatus(
+				principal, assignmentId, request.status(), request.reason(), correlationId(servletRequest)
+		);
 	}
 
 	@GetMapping("/clients/{clientId}/workouts")
@@ -130,6 +251,17 @@ public class CoachingController {
 		}
 	}
 
+	public record UpdateCoachProfileRequest(
+			List<@NotBlank @Size(max = 80) String> specialties,
+			@Size(max = 4000) String bio,
+			@NotBlank String status,
+			@NotNull List<@NotNull UUID> branchIds
+	) {
+		private UpdateCoachProfileCommand toCommand() {
+			return new UpdateCoachProfileCommand(specialties, bio, status, branchIds);
+		}
+	}
+
 	public record CreateWorkoutVersionRequest(
 			@Size(max = 2000) String summary,
 			@NotBlank String contentJson
@@ -144,10 +276,29 @@ public class CoachingController {
 			UUID workoutVersionId,
 			LocalDate startsOn,
 			LocalDate endsOn,
-			@Size(max = 2000) String notes
+			@Size(max = 2000) String notes,
+			@Size(max = 4000) String printableNotes,
+			@Size(max = 160) String idempotencyKey
 	) {
-		private AssignWorkoutCommand toCommand() {
-			return new AssignWorkoutCommand(clientId, workoutVersionId, startsOn, endsOn, notes);
+		private AssignWorkoutCommand toCommand(String headerIdempotencyKey) {
+			String effectiveKey = headerIdempotencyKey == null || headerIdempotencyKey.isBlank()
+					? idempotencyKey : headerIdempotencyKey;
+			return new AssignWorkoutCommand(clientId, workoutVersionId, startsOn, endsOn, notes, printableNotes, effectiveKey);
 		}
 	}
+
+	public record CreateAssignmentRequest(
+			@NotNull UUID workoutId,
+			@NotNull UUID clientId,
+			UUID workoutVersionId,
+			LocalDate startsOn,
+			LocalDate endsOn,
+			@Size(max = 2000) String privateNotes,
+			@Size(max = 4000) String printableNotes,
+			@NotBlank @Size(max = 160) String idempotencyKey
+	) {}
+	public record AssignmentStatusRequest(
+			@NotBlank String status,
+			@Size(max = 2000) String reason
+	) {}
 }

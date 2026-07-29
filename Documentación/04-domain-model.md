@@ -134,8 +134,10 @@ Tipos:
 - ConsumableService
 - ReservableService
 - ProfessionalService
-- WorkoutService
 - GenericService
+
+`WorkoutService` no forma parte del catálogo comercial de V1. Una rutina de coach es
+un agregado de `coaching`, no un producto, servicio vendible ni concepto de caja.
 
 Atributos:
 - id
@@ -323,27 +325,33 @@ Invariantes:
 - Un movimiento automatico de venta se identifica por organizacion, sucursal, venta y producto.
 - Reprocesar el mismo pago completado no puede descontar dos veces el mismo producto.
 
-## 4.14 Workout
+## 4.14 Coaching, ejercicios y rutinas
 
-Atributos:
-- coachId
-- clientId
-- status
-- currentVersion
-
-Cada edición crea WorkoutVersion.
-
-Implementado en Hito 5:
-- `Coach` pertenece a organizacion y sucursal, tiene estado, contacto y especialidades.
-- `Workout` define titulo, objetivo, nivel, estado y coach opcional.
-- `WorkoutVersion` guarda contenido JSON versionado; una asignacion siempre apunta a una version especifica.
-- `WorkoutAssignment` vincula cliente, rutina, version, coach, fechas y notas.
+- `CoachProfile` extiende la identidad interna y relaciona al usuario Coach con
+  organización, sucursales, especialidades y estado.
+- `Exercise` representa una opción reutilizable del catálogo global o del gimnasio,
+  con aliases, músculos, patrón, tipo, equipo, instrucciones, medios y origen.
+- `Workout` es una plantilla reutilizable; no contiene al socio.
+- `WorkoutVersion` es una instantánea publicada, numerada e inmutable con sesiones,
+  bloques y prescripciones normalizadas. Puede conservar JSON de compatibilidad,
+  pero no depender únicamente de él.
+- `WorkoutAssignment` vincula coach, socio, sucursal y versión. Registra fecha,
+  vigencia, estado, notas, actor e idempotencia y alimenta las métricas semanales.
 
 Invariantes:
-- Una rutina asignada a cliente no cambia retroactivamente si se publica una nueva version.
-- Solo clientes activos pueden recibir rutinas.
-- Solo versiones publicadas pueden asignarse.
-- Las fechas de asignacion no pueden cerrar antes de iniciar.
+
+- Una asignación siempre apunta a una versión publicada e inmutable.
+- Publicar otra versión no cambia asignaciones ni PDF anteriores.
+- Solo socios activos de la misma organización y dentro del alcance de sucursal pueden recibir rutinas.
+- Un coach inactivo no crea nuevas asignaciones; su histórico permanece.
+- Reintentar la misma asignación no duplica registros ni métricas.
+- Cancelar exige motivo; reemplazar crea una asignación nueva y enlaza la
+  anterior sin destruir su versión ni contenido.
+- Un coach sólo administra su perfil; dueño y gerencia pueden operar el alcance
+  global de la sucursal.
+- Crear, publicar, asignar o imprimir una rutina no crea ventas, pagos, comisiones, ingresos ni movimientos de caja.
+
+El diseño y estado completo está en `modulos/14-coaching.md`.
 
 ## 4.15 ProfessionalService
 

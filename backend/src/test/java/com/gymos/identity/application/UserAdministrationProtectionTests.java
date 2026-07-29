@@ -2,6 +2,7 @@ package com.gymos.identity.application;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -10,6 +11,7 @@ import com.gymos.audit.api.AuditService;
 import com.gymos.coaching.api.operations.CoachProfileProvisioning;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.identity.application.command.CreateInternalUserCommand;
 import com.gymos.identity.application.result.InternalUserSummary;
 import com.gymos.identity.application.result.RoleOption;
 import com.gymos.identity.infrastructure.UserAdministrationRepository;
@@ -23,9 +25,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 class UserAdministrationProtectionTests {
 	private final UserAdministrationRepository repository = mock(UserAdministrationRepository.class);
 	private final CoachProfileProvisioning coachProfiles = mock(CoachProfileProvisioning.class);
+	private final PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
 	private final UserAdministrationService service = new UserAdministrationService(
 			repository,
-			mock(PasswordEncoder.class),
+			passwordEncoder,
 			mock(AuditService.class),
 			coachProfiles
 	);
@@ -92,7 +95,8 @@ class UserAdministrationProtectionTests {
 				"+521234567890",
 				"ACTIVE",
 				List.of("Recepcion"),
-				List.of("Centro")
+				List.of("Centro"),
+				List.of(branchId)
 		);
 		when(repository.userBelongsToOrganization(principal.organizationId(), targetUserId)).thenReturn(true);
 		when(repository.findUsers(principal.organizationId())).thenReturn(List.of(target));
@@ -119,6 +123,63 @@ class UserAdministrationProtectionTests {
 				"coach@example.com",
 				"+521234567890",
 				List.of(branchId),
+				null,
+				null,
+				true,
+				principal.userId()
+		);
+	}
+
+	@Test
+	void creatingCoachUserPersistsProfileDetailsInTheSameFlow() {
+		GymOsPrincipal principal = ownerPrincipal();
+		UUID roleId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		UUID personId = UUID.randomUUID();
+		UUID userId = UUID.randomUUID();
+		InternalUserSummary created = new InternalUserSummary(
+				userId,
+				"Ana Coach",
+				"ana.coach",
+				"ana@example.com",
+				"+521234567890",
+				"ACTIVE",
+				List.of("Coach"),
+				List.of("Centro"),
+				List.of(branchId)
+		);
+		when(repository.roleBelongsToOrganization(principal.organizationId(), roleId)).thenReturn(true);
+		when(repository.roleHasPermission(roleId, "platform.admin")).thenReturn(false);
+		when(repository.roleName(roleId)).thenReturn("Coach");
+		when(repository.branchBelongsToOrganization(principal.organizationId(), branchId)).thenReturn(true);
+		when(repository.createPerson(
+				any(), any(), any(), any(), any(), any(), any(), any()
+		)).thenReturn(personId);
+		when(passwordEncoder.encode("Temporal123!")).thenReturn("encoded");
+		when(repository.createUser(
+				any(), any(), any(), any(), any(), any()
+		)).thenReturn(userId);
+		when(repository.findUsers(principal.organizationId())).thenReturn(List.of(created));
+
+		service.createUser(
+				principal,
+				new CreateInternalUserCommand(
+						"Ana", "Coach", null, "ana@example.com", "+521234567890",
+						"ana.coach", "Temporal123!", roleId, List.of(branchId),
+						List.of("Fuerza", "Movilidad"), "Entrenadora funcional."
+				),
+				"correlation"
+		);
+
+		verify(coachProfiles).synchronize(
+				principal.organizationId(),
+				userId,
+				"Ana Coach",
+				"ana@example.com",
+				"+521234567890",
+				List.of(branchId),
+				List.of("Fuerza", "Movilidad"),
+				"Entrenadora funcional.",
 				true,
 				principal.userId()
 		);
@@ -159,7 +220,8 @@ class UserAdministrationProtectionTests {
 				null,
 				"ACTIVE",
 				List.of("Dueno del gimnasio"),
-				List.of("Centro")
+				List.of("Centro"),
+				List.of()
 		);
 	}
 }

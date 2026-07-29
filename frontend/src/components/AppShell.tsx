@@ -13,6 +13,8 @@ type BranchOption = {
   name: string;
 };
 
+const BRANCH_RECOVERY_KEY = "gymos:branch-context-recovery";
+
 export function AppShell({
   branchName,
   children,
@@ -77,15 +79,11 @@ export function AppShell({
     async function resolveBranchName() {
       try {
         const branches = await getBranches(session.accessToken);
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
         setAvailableBranches(branches.map((item) => ({ branchId: item.id, name: item.name })));
         if (!branchName && session.user.branchId) {
           const branch = branches.find((item) => item.id === session.user.branchId);
-          if (branch) {
-            setResolvedBranch({ branchId: branch.id, name: branch.name });
-          }
+          if (branch) setResolvedBranch({ branchId: branch.id, name: branch.name });
         }
       } catch {
         // The shell keeps a neutral branch label if lookup is unavailable.
@@ -96,23 +94,41 @@ export function AppShell({
     return () => {
       cancelled = true;
     };
-  }, [branchName, session.accessToken, session.user, session.user.branchId, variant]);
+  }, [branchName, session.accessToken, session.user.branchId, variant]);
 
   useEffect(() => {
-    if (hasBranch || variant === "platform" || isPlatformAdmin(session.user) || consoleType === "TENANT_OWNER" || !session.user.organizationId) {
+    if (
+      hasBranch
+      || variant === "platform"
+      || isPlatformAdmin(session.user)
+      || consoleType === "TENANT_OWNER"
+      || !session.user.organizationId
+    ) {
       return;
     }
+
+    const recoveryId = `${session.user.organizationId}:${session.user.userId}`;
+    if (window.sessionStorage.getItem(BRANCH_RECOVERY_KEY) === recoveryId) return;
+
     let cancelled = false;
+    window.sessionStorage.setItem(BRANCH_RECOVERY_KEY, recoveryId);
 
     async function recoverBranchContext() {
       try {
-        const nextSession = await selectOrganization(session.accessToken, session.user.organizationId);
-        if (!cancelled && nextSession.user.branchId) {
+        const nextSession = await selectOrganization(session.accessToken, session.user.organizationId!);
+        if (cancelled) return;
+
+        if (nextSession.user.branchId && nextSession.user.branchId !== session.user.branchId) {
           storeSession(nextSession);
-          window.location.reload();
+          setResolvedBranch({ branchId: nextSession.user.branchId, name: "Sucursal seleccionada" });
+          router.replace(pathname);
+          router.refresh();
+          return;
         }
+
+        window.sessionStorage.removeItem(BRANCH_RECOVERY_KEY);
       } catch {
-        // The setup banner remains visible when the user truly has no branch access.
+        window.sessionStorage.removeItem(BRANCH_RECOVERY_KEY);
       }
     }
 
@@ -120,22 +136,23 @@ export function AppShell({
     return () => {
       cancelled = true;
     };
-  }, [consoleType, hasBranch, session, variant]);
+  }, [consoleType, hasBranch, pathname, router, session.accessToken, session.user.branchId, session.user.organizationId, session.user.userId, variant]);
 
   function logout() {
     clearSession();
+    window.sessionStorage.removeItem(BRANCH_RECOVERY_KEY);
     router.push("/login");
   }
 
   async function changeBranch(branchId: string) {
-    if (!branchId || branchId === session.user.branchId || switchingBranch) {
-      return;
-    }
+    if (!branchId || branchId === session.user.branchId || switchingBranch) return;
     setSwitchingBranch(true);
     try {
       const selectedSession = await selectBranch(session.accessToken, branchId);
       storeSession(selectedSession);
-      window.location.reload();
+      window.sessionStorage.removeItem(BRANCH_RECOVERY_KEY);
+      router.replace(pathname);
+      router.refresh();
     } finally {
       setSwitchingBranch(false);
     }
@@ -189,9 +206,7 @@ export function AppShell({
           <div className="admin-sidebar-footer">
             <span>{session.user.fullName}</span>
             <small>{session.user.username}</small>
-            <button onClick={logout} type="button">
-              Salir
-            </button>
+            <button onClick={logout} type="button">Salir</button>
           </div>
         </aside>
       ) : null}
@@ -227,9 +242,7 @@ export function AppShell({
                 <select disabled={switchingBranch} onChange={(event) => changeBranch(event.target.value)} value={session.user.branchId ?? ""}>
                   <option value="">Sin sucursal</option>
                   {availableBranches.map((branch) => (
-                    <option key={branch.branchId} value={branch.branchId}>
-                      {branch.name}
-                    </option>
+                    <option key={branch.branchId} value={branch.branchId}>{branch.name}</option>
                   ))}
                 </select>
               </label>
@@ -258,22 +271,15 @@ export function AppShell({
   );
 }
 
-export function LoadingScreen({ text }: { text: string }) {
+export function LoadingScreen({ text = "Cargando..." }: { text?: string }) {
   return (
-    <main className="admin-empty-state">
-      <section>
-        <p>GymOS</p>
-        <h1>{text}</h1>
+    <main className="min-h-screen bg-[#eef1ed] p-6">
+      <section className="mx-auto flex min-h-[60vh] max-w-3xl items-center justify-center">
+        <div className="app-card w-full max-w-md p-8 text-center" role="status" aria-live="polite">
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-[#d8ddd2] border-t-[#174f37]" aria-hidden="true" />
+          <p className="text-sm font-semibold text-[#435249]">{text}</p>
+        </div>
       </section>
     </main>
-  );
-}
-
-export function InlineError({ message }: { message: string }) {
-  return (
-    <section className="admin-alert" role="alert">
-      <strong>No se pudo cargar esta seccion</strong>
-      <span>{message}</span>
-    </section>
   );
 }

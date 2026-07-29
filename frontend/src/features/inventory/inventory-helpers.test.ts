@@ -16,7 +16,7 @@ describe("Inventory Helpers", () => {
 
   it("does not include auto-managed SALE movement type in manual list", () => {
     const values = MANUAL_MOVEMENT_TYPES.map((m) => m.value);
-    assert.strictEqual(values.includes("SALE" as any), false);
+    assert.strictEqual((values as readonly string[]).includes("SALE"), false);
   });
 
   it("calculates valuation only for positive stock and valid cost", () => {

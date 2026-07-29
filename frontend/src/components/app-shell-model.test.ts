@@ -31,7 +31,10 @@ test("reception navigation is limited to front desk work", () => {
   const sections = visibleSectionsForConsole({
     consoleType: "RECEPTION",
     hasBranch: true,
-    permissions: new Set(["client.read", "sale.create", "booking.read", "report.sales.read", "benefit.read"]),
+    permissions: new Set([
+      "client.read", "sale.create", "booking.read", "professional.read",
+      "report.sales.read", "benefit.read",
+    ]),
     variant: "tenant",
   });
 
@@ -39,8 +42,20 @@ test("reception navigation is limited to front desk work", () => {
   assert.ok(labels.includes("Inicio recepcion"));
   assert.ok(labels.includes("Caja / POS"));
   assert.ok(labels.includes("Socios"));
+  assert.ok(labels.includes("Wellness"));
   assert.equal(labels.includes("Equipo y accesos"), false);
   assert.equal(labels.includes("Datos y sucursales"), false);
+});
+
+test("manager navigation exposes the completed Wellness module", () => {
+  const sections = visibleSectionsForConsole({
+    consoleType: "TENANT_MANAGER",
+    hasBranch: true,
+    permissions: new Set(["booking.read", "professional.read"]),
+    variant: "tenant",
+  });
+
+  assert.ok(sectionLabels(sections).includes("Wellness"));
 });
 
 test("branchless tenant users only see setup-safe links", () => {

@@ -61,6 +61,13 @@ const focusActions = [
     label: "Ver beneficios",
     accent: "benefits",
   },
+  {
+    title: "Servicios de Bienestar",
+    detail: "Agendar citas, consultar especialistas, confirmación y estatus.",
+    href: "/wellness",
+    label: "Ver citas",
+    accent: "wellness",
+  },
 ];
 
 const daySignals = [

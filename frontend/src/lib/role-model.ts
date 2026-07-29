@@ -29,7 +29,7 @@ export function resolveUserConsole(user: CurrentUser): UserConsole {
   if (hasAny(user, ["sale.create", "payment.manual.create", "client.create"])) {
     return "RECEPTION";
   }
-  if (hasAny(user, ["coach.read", "workout.manage"])) {
+  if (hasAny(user, ["coach.read", "workout.manage.own", "workout.manage.all"])) {
     return "COACH";
   }
   return "TENANT_MANAGER";
@@ -175,5 +175,5 @@ const managerRoutes = [
   "/sales",
 ];
 
-const receptionRoutes = ["/reception", "/pos", "/clients", "/sales", "/reports/sales", "/bookings", "/benefits"];
+const receptionRoutes = ["/reception", "/pos", "/clients", "/sales", "/reports/sales", "/bookings", "/benefits", "/wellness"];
 const coachRoutes = ["/coaches", "/clients"];

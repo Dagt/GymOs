@@ -11,20 +11,23 @@ import {
 import {
   createInternalUser,
   getBranches,
+  getCoachProfiles,
   getCurrentOrganization,
   getInternalUsers,
   getStoredSession,
   getUserRoles,
   updateInternalUserRole,
   updateInternalUserStatus,
+  updateCoachProfile,
   type BranchSummary,
+  type CoachProfile,
   type CreateInternalUserPayload,
   type InternalUserSummary,
   type OrganizationSummary,
   type RoleOption,
   type StoredSession,
 } from "@/lib/api";
-import { CreateUserDrawer, TeamContextCard, TeamOverview, UsersTable } from "./UsersSections";
+import { CoachProfileDrawer, CreateUserDrawer, TeamContextCard, TeamOverview, UsersTable } from "./UsersSections";
 import { canSeeUserForSession, canShowRoleForSession, displayRoleName, validateUserForm } from "./UsersRoleHelpers";
 
 const emptyUserForm: CreateInternalUserPayload = {
@@ -45,6 +48,7 @@ export default function UsersPage() {
   const [branches, setBranches] = useState<BranchSummary[]>([]);
   const [roles, setRoles] = useState<RoleOption[]>([]);
   const [users, setUsers] = useState<InternalUserSummary[]>([]);
+  const [coachProfiles, setCoachProfiles] = useState<CoachProfile[]>([]);
   const [form, setForm] = useState<CreateInternalUserPayload>(emptyUserForm);
   const [fieldErrors, setFieldErrors] = useState<FieldErrorMap>({});
   const [loading, setLoading] = useState(true);
@@ -52,6 +56,12 @@ export default function UsersPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [showCreateUser, setShowCreateUser] = useState(false);
+  const [newCoachSpecialties, setNewCoachSpecialties] = useState("");
+  const [newCoachBio, setNewCoachBio] = useState("");
+  const [editingCoach, setEditingCoach] = useState<InternalUserSummary | null>(null);
+  const [coachSpecialties, setCoachSpecialties] = useState("");
+  const [coachBio, setCoachBio] = useState("");
+  const [coachBranchIds, setCoachBranchIds] = useState<string[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -65,11 +75,15 @@ export default function UsersPage() {
       setSession(stored);
       setError(null);
       try {
-        const [currentOrganization, availableBranches, availableRoles, existingUsers] = await Promise.all([
+        const canManageCoachProfiles = stored.user.permissions.includes("coach.profile.manage");
+        const [currentOrganization, availableBranches, availableRoles, existingUsers, existingCoachProfiles] = await Promise.all([
           getCurrentOrganization(stored.accessToken).catch(() => null),
           getBranches(stored.accessToken),
           getUserRoles(stored.accessToken),
           getInternalUsers(stored.accessToken),
+          canManageCoachProfiles
+            ? getCoachProfiles(stored.accessToken).catch(() => [])
+            : Promise.resolve([]),
         ]);
         if (!active) {
           return;
@@ -78,6 +92,7 @@ export default function UsersPage() {
         setBranches(availableBranches);
         setRoles(availableRoles);
         setUsers(existingUsers);
+        setCoachProfiles(existingCoachProfiles);
         const selectableRoles = availableRoles.filter((role) => canShowRoleForSession(stored.user.roles, role.name, stored.user.platformAdmin));
         const defaultRole = selectableRoles.find((role) => displayRoleName(role.name) === "Recepcion") ?? selectableRoles[0];
         const defaultRoleLabel = displayRoleName(defaultRole?.name ?? "");
@@ -113,6 +128,7 @@ export default function UsersPage() {
   const visibleUsers = users.filter((user) => canSeeUserForSession(session?.user.roles ?? [], user.roles, Boolean(session?.user.platformAdmin)));
   const selectedRoleLabel = displayRoleName(selectableRoles.find((role) => role.id === form.roleId)?.name ?? "");
   const ownerRoleSelected = selectedRoleLabel === "Dueno del gimnasio";
+  const coachRoleSelected = selectedRoleLabel === "Coach";
   const managerSingleBranchLocked = selectedRoleLabel !== "Dueno del gimnasio"
     && branches.length === 1
     && (session?.user.roles ?? []).some((role) => displayRoleName(role) === "Gerente")
@@ -132,25 +148,50 @@ export default function UsersPage() {
     setError(null);
     setMessage(null);
     try {
+      const effectiveBranchIds = ownerRoleSelected
+        ? branches.map((branch) => branch.id)
+        : managerSingleBranchLocked
+          ? [branches[0].id]
+          : form.branchIds;
+      const specialties = newCoachSpecialties
+        .split(",")
+        .map((specialty) => specialty.trim())
+        .filter(Boolean);
       const created = await createInternalUser(session.accessToken, {
         ...form,
         email: form.email?.trim() || null,
         phone: normalizePhone(form.phone ?? ""),
         username: form.username.trim(),
-        branchIds: ownerRoleSelected
-          ? branches.map((branch) => branch.id)
-          : managerSingleBranchLocked
-            ? [branches[0].id]
-            : form.branchIds,
+        branchIds: effectiveBranchIds,
+        coachSpecialties: coachRoleSelected ? specialties : undefined,
+        coachBio: coachRoleSelected ? newCoachBio.trim() || null : undefined,
       });
       setUsers((current) => [...current, created].sort((left, right) => left.fullName.localeCompare(right.fullName)));
+      if (coachRoleSelected) {
+        setCoachProfiles((current) => [...current, {
+          userId: created.id,
+          displayName: created.fullName,
+          email: created.email,
+          phone: created.phone,
+          specialties,
+          bio: newCoachBio.trim() || null,
+          status: "ACTIVE",
+          branches: branches
+            .filter((branch) => effectiveBranchIds.includes(branch.id))
+            .map((branch) => ({ id: branch.id, name: branch.name })),
+        }]);
+      }
       setForm({
         ...emptyUserForm,
         roleId: form.roleId,
         branchIds: ownerRoleSelected ? branches.map((branch) => branch.id) : branches.length === 1 ? [branches[0].id] : [],
       });
+      setNewCoachSpecialties("");
+      setNewCoachBio("");
       setShowCreateUser(false);
-      setMessage("Usuario creado. Ya puede iniciar sesion con su usuario y contrasena temporal.");
+      setMessage(coachRoleSelected
+        ? "Usuario y perfil de Coach creados. Ya puede iniciar sesion con su contrasena temporal."
+        : "Usuario creado. Ya puede iniciar sesion con su usuario y contrasena temporal.");
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible crear el usuario.");
     } finally {
@@ -172,6 +213,8 @@ export default function UsersPage() {
 
   function openCreateUser() {
     setFieldErrors({});
+    setNewCoachSpecialties("");
+    setNewCoachBio("");
     setForm((current) => ({
       ...current,
       branchIds: ownerRoleSelected
@@ -234,6 +277,64 @@ export default function UsersPage() {
     }
   }
 
+  function openCoachProfile(user: InternalUserSummary) {
+    const profile = coachProfiles.find((item) => item.userId === user.id);
+    const manageableBranchIds = new Set(branches.map((branch) => branch.id));
+    setEditingCoach(user);
+    setCoachSpecialties(profile?.specialties.join(", ") ?? "");
+    setCoachBio(profile?.bio ?? "");
+    setCoachBranchIds(
+      (profile?.branches.map((branch) => branch.id) ?? user.branchIds)
+        .filter((branchId) => manageableBranchIds.has(branchId)),
+    );
+    setError(null);
+    setMessage(null);
+  }
+
+  function updateCoachBranchAccess(branchId: string, checked: boolean) {
+    setCoachBranchIds((current) =>
+      checked
+        ? [...new Set([...current, branchId])]
+        : current.filter((item) => item !== branchId));
+  }
+
+  async function saveCoachProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session || !editingCoach || !coachBranchIds.length) return;
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const updated = await updateCoachProfile(session.accessToken, editingCoach.id, {
+        specialties: coachSpecialties
+          .split(",")
+          .map((specialty) => specialty.trim())
+          .filter(Boolean),
+        bio: coachBio.trim() || null,
+        status: editingCoach.status === "ACTIVE" ? "ACTIVE" : "INACTIVE",
+        branchIds: coachBranchIds,
+      });
+      setCoachProfiles((current) => {
+        const exists = current.some((profile) => profile.userId === updated.userId);
+        return exists
+          ? current.map((profile) => profile.userId === updated.userId ? updated : profile)
+          : [...current, updated];
+      });
+      const branchNames = branches
+        .filter((branch) => coachBranchIds.includes(branch.id))
+        .map((branch) => branch.name);
+      setUsers((current) => current.map((user) => user.id === editingCoach.id
+        ? { ...user, branchIds: coachBranchIds, branches: branchNames }
+        : user));
+      setEditingCoach(null);
+      setMessage("Perfil y sucursales del coach actualizados.");
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible actualizar el perfil del coach.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading) {
     return <LoadingScreen text="Cargando equipo y accesos..." />;
   }
@@ -271,11 +372,30 @@ export default function UsersPage() {
         session={session}
         users={visibleUsers}
         onChangeRole={changeUserRole}
+        onEditCoach={openCoachProfile}
         onToggleStatus={toggleUserStatus}
+      />
+
+      <CoachProfileDrawer
+        bio={coachBio}
+        branches={branches}
+        branchIds={coachBranchIds}
+        open={Boolean(editingCoach)}
+        saving={saving}
+        specialties={coachSpecialties}
+        user={editingCoach}
+        onBioChange={setCoachBio}
+        onBranchChange={updateCoachBranchAccess}
+        onClose={() => setEditingCoach(null)}
+        onSpecialtiesChange={setCoachSpecialties}
+        onSubmit={saveCoachProfile}
       />
 
       <CreateUserDrawer
         branches={branches}
+        coachBio={newCoachBio}
+        coachRoleSelected={coachRoleSelected}
+        coachSpecialties={newCoachSpecialties}
         errors={fieldErrors}
         form={form}
         open={showCreateUser}
@@ -284,6 +404,8 @@ export default function UsersPage() {
         roles={selectableRoles}
         saving={saving}
         onBranchAccessChange={updateBranchAccess}
+        onCoachBioChange={setNewCoachBio}
+        onCoachSpecialtiesChange={setNewCoachSpecialties}
         onClose={() => setShowCreateUser(false)}
         onFormChange={setForm}
         onSubmit={submitUser}
@@ -291,4 +413,3 @@ export default function UsersPage() {
     </AppShell>
   );
 }
-

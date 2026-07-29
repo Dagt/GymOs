@@ -15,6 +15,7 @@ export type InternalUserSummary = {
   status: string;
   roles: string[];
   branches: string[];
+  branchIds: string[];
 };
 
 export type CreateInternalUserPayload = {
@@ -27,4 +28,6 @@ export type CreateInternalUserPayload = {
   temporaryPassword: string;
   roleId: string;
   branchIds: string[];
+  coachSpecialties?: string[];
+  coachBio?: string | null;
 };

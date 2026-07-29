@@ -8,6 +8,8 @@ public record AssignWorkoutCommand(
 		UUID workoutVersionId,
 		LocalDate startsOn,
 		LocalDate endsOn,
-		String notes
+		String notes,
+		String printableNotes,
+		String idempotencyKey
 ) {
 }

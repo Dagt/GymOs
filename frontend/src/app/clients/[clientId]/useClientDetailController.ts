@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import type { FieldErrorMap } from "@/components/FormFields";
 import {
@@ -52,6 +52,17 @@ export function useClientDetailController() {
   const [showEditDrawer, setShowEditDrawer] = useState(false);
   const [membershipAction, setMembershipAction] = useState<MembershipAction | null>(null);
 
+  const canEditClient = useMemo(() => hasPermission(session, "client.update"), [session]);
+  const canReadMemberships = useMemo(() => hasPermission(session, "membership.read"), [session]);
+  const canManageMemberships = useMemo(
+    () => hasPermission(session, "membership.update") && hasPermission(session, "sale.create") && hasPermission(session, "catalog.read"),
+    [session],
+  );
+  const limitedCoachView = useMemo(
+    () => Boolean(session) && !canEditClient && !canReadMemberships,
+    [session, canEditClient, canReadMemberships],
+  );
+
   useEffect(() => {
     let active = true;
 
@@ -64,22 +75,45 @@ export function useClientDetailController() {
       setSession(storedSession);
       setLoading(true);
       setError(null);
+
       try {
-        const [response, loadedMemberships, loadedPlans] = await Promise.all([
-          getClient(storedSession.accessToken, params.clientId),
-          getClientMemberships(storedSession.accessToken, params.clientId),
-          getPlans(storedSession.accessToken),
-        ]);
+        const response = await getClient(storedSession.accessToken, params.clientId);
         if (!active) return;
-        const activePlans = loadedPlans.filter((plan) => plan.status === "ACTIVE");
         setData(response);
-        setMemberships(loadedMemberships);
-        setPlans(activePlans);
-        setTargetPlanId((current) => current || activePlans[0]?.id || "");
         setForm(toClientUpdateForm(response.client));
+
+        const mayReadMemberships = hasPermission(storedSession, "membership.read");
+        const mayManageMemberships = hasPermission(storedSession, "membership.update")
+          && hasPermission(storedSession, "sale.create")
+          && hasPermission(storedSession, "catalog.read");
+
+        if (mayReadMemberships) {
+          try {
+            const loadedMemberships = await getClientMemberships(storedSession.accessToken, params.clientId);
+            if (active) setMemberships(loadedMemberships);
+          } catch (membershipError) {
+            if (active && mayManageMemberships) {
+              setError(membershipError instanceof Error ? membershipError.message : "No fue posible cargar membresias.");
+            }
+          }
+        }
+
+        if (mayManageMemberships) {
+          try {
+            const loadedPlans = await getPlans(storedSession.accessToken);
+            if (!active) return;
+            const activePlans = loadedPlans.filter((plan) => plan.status === "ACTIVE");
+            setPlans(activePlans);
+            setTargetPlanId((current) => current || activePlans[0]?.id || "");
+          } catch (planError) {
+            if (active) setError(planError instanceof Error ? planError.message : "No fue posible cargar planes.");
+          }
+        }
       } catch (exception) {
         if (active) {
           setError(exception instanceof Error ? exception.message : "No fue posible cargar socio.");
+          setData(null);
+          setForm(null);
         }
       } finally {
         if (active) setLoading(false);
@@ -95,7 +129,7 @@ export function useClientDetailController() {
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!session || !form) return;
+    if (!session || !form || !canEditClient) return;
 
     const errors = validateClientUpdate(form);
     setFieldErrors(errors);
@@ -117,7 +151,7 @@ export function useClientDetailController() {
   }
 
   async function renew(activeMembership: ClientMembershipSummary) {
-    if (!session) return;
+    if (!session || !canManageMemberships) return;
     setRenewingMembershipId(activeMembership.id);
     setError(null);
     setMessage(null);
@@ -144,7 +178,7 @@ export function useClientDetailController() {
   }
 
   async function changePlan(activeMembership: ClientMembershipSummary) {
-    if (!session || !targetPlanId) return;
+    if (!session || !targetPlanId || !canManageMemberships) return;
     setChangingMembershipId(activeMembership.id);
     setError(null);
     setMessage(null);
@@ -173,10 +207,12 @@ export function useClientDetailController() {
   }
 
   function updateField(field: keyof ClientUpdatePayload, value: string) {
+    if (!canEditClient) return;
     setForm((current) => (current ? { ...current, [field]: value } : current));
   }
 
   function openMembershipAction(activeMembership: ClientMembershipSummary, type: "renew" | "change") {
+    if (!canManageMemberships) return;
     if (type === "change") {
       setTargetPlanId((current) => current && current !== activeMembership.planId ? current : plans.find((plan) => plan.id !== activeMembership.planId)?.id || "");
     }
@@ -185,7 +221,7 @@ export function useClientDetailController() {
 
   async function submitMembershipAction(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!membershipAction) return;
+    if (!membershipAction || !canManageMemberships) return;
     if (membershipAction.type === "change") {
       await changePlan(membershipAction.membership);
       return;
@@ -194,11 +230,15 @@ export function useClientDetailController() {
   }
 
   return {
+    canEditClient,
+    canManageMemberships,
+    canReadMemberships,
     changingMembershipId,
     data,
     error,
     fieldErrors,
     form,
+    limitedCoachView,
     loading,
     membershipAction,
     memberships,
@@ -223,4 +263,12 @@ export function useClientDetailController() {
     updateField,
     openMembershipAction,
   };
+}
+
+function hasPermission(session: StoredSession | null, permission: string) {
+  return Boolean(
+    session?.user.permissions.includes(permission)
+      || session?.user.permissions.includes("platform.admin")
+      || session?.user.platformAdmin,
+  );
 }

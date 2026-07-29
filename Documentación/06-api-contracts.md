@@ -90,7 +90,11 @@ Permisos:
 - `user.read` para listar roles y usuarios internos.
 - `user.manage` para crear usuarios internos, cambiar roles y suspender/reactivar cuentas.
 
-`POST /users/internal` crea persona, cuenta de usuario, rol y accesos a sucursales dentro de la organizacion actual. No devuelve contrasenas ni hashes.
+`POST /users/internal` crea persona, cuenta de usuario, rol y accesos a
+sucursales dentro de la organizacion actual. Cuando el rol es `Coach`, acepta
+ademas `coachSpecialties` (hasta 30 valores de 80 caracteres) y `coachBio`
+(hasta 4,000 caracteres), y crea el perfil operativo en la misma transaccion.
+No devuelve contrasenas ni hashes.
 
 `PATCH /users/internal/{userId}/status` cambia el estado de una cuenta interna. Estados validos: `ACTIVE`, `SUSPENDED`, `INACTIVE`. Una cuenta suspendida o inactiva no puede iniciar sesion. No se permite suspender la propia cuenta.
 
@@ -388,6 +392,8 @@ Nota implementada Hito 4:
 
 ## 6.13 Coaches y rutinas
 
+Contratos base de Hito 5:
+
 - `POST /coaches`
 - `GET /coaches`
 - `POST /workouts`
@@ -399,10 +405,75 @@ Nota implementada Hito 4:
 
 Nota implementada Hito 5:
 - `GET /coaches` y `POST /coaches` operan por organizacion y sucursal activa.
-- `POST /workouts` crea la rutina y su primera version publicada.
-- `POST /workouts/{id}/versions` agrega una nueva version publicada sin modificar asignaciones historicas.
+- `POST /workouts` crea la rutina y su primer borrador.
+- `POST /workouts/{id}/versions` agrega un borrador; publicar lo vuelve
+  inmutable sin modificar asignaciones históricas.
 - `POST /workouts/{id}/assign` asigna una version concreta o la ultima version publicada a un cliente activo.
 - `GET /reports/coaches` devuelve conteos base: coaches, rutinas, asignaciones activas y asignaciones de ultimos 30 dias.
+
+Contratos implementados en los cierres `84a5fd3` y `8162814`:
+
+- `GET /coaches/profiles`
+- `PUT /coaches/profiles/{coachUserId}`
+- `GET|POST /exercises`
+- `GET|PUT /exercises/{exerciseId}`
+- `PATCH /exercises/{exerciseId}/status`
+- `GET|POST|DELETE /exercises/{exerciseId}/aliases`
+- `GET|POST|DELETE /exercises/{exerciseId}/media`
+- `GET|POST /workouts`
+- `GET|PUT /workouts/{workoutId}`
+- `POST /workouts/{workoutId}/assign`
+- `POST /workouts/{workoutId}/duplicate`
+- `POST /workouts/{workoutId}/publish`
+- `GET /workouts/{workoutId}/versions`
+- `GET /workout-versions/{versionId}`
+- `GET|POST /workout-assignments`
+- `GET /workout-assignments/{assignmentId}`
+- `POST /workout-assignments/{assignmentId}/replace`
+- `PATCH /workout-assignments/{assignmentId}/status`
+- `GET /workout-assignments/{assignmentId}/pdf`
+- `GET /reports/coaches/workout-assignments/summary`
+- `GET /reports/coaches/workout-assignments/trend`
+- `GET /reports/coaches/workout-assignments/export`
+
+El catálogo usa `page` y `size`. El resumen de asignaciones acepta `from`, `to`,
+`coachId`, `clientId`, `page` y `size`; devuelve KPIs del conjunto filtrado,
+periodo anterior comparable y detalle paginado. El CSV exporta el conjunto
+filtrado y rechaza más de 10,000 filas. La tendencia acepta `weeks` entre 4 y
+52, `to`, `coachId` y `clientId`; devuelve una serie ordenada con
+`weekFrom`, `weekTo`, `assignments`, `uniqueClients` y `firstWorkouts`,
+incluyendo ceros en semanas sin actividad.
+
+`GET /coaches/profiles` agrega por `userId` las sucursales visibles del actor.
+`PUT /coaches/profiles/{coachUserId}` recibe `specialties[]`, `bio`, estado
+`ACTIVE|INACTIVE` y `branchIds[]`. Un perfil activo requiere al menos una
+sucursal administrable; el cambio sincroniza las filas operativas `coach` y el
+acceso del usuario sólo dentro del alcance del actor. Estos contratos se
+consumen desde `/users`, no como una administración duplicada en `/coaches`.
+
+El rol `Dueno del gimnasio` puede usar `GET /coaches`, los contratos de métricas
+y los contratos de perfil desde Gestión del equipo. No recibe `exercise.*`,
+`workout.read.*`, `workout.manage.*`, `workout.assign`,
+`workout.pdf.download` ni `coach.manage`. El Coach conserva sus permisos
+operativos de alcance propio.
+
+Crear una asignación acepta
+`Idempotency-Key`; reutilizarla con otro payload responde
+`IDEMPOTENCY_KEY_REUSED`. Solo se asignan versiones publicadas y el PDF se descarga
+por `assignmentId`, nunca desde el borrador actual.
+
+Errores principales: `COACH_NOT_ACTIVE`, `COACH_PROFILE_REQUIRED`,
+`COACH_PROFILE_NOT_FOUND`, `COACH_BRANCH_REQUIRED`,
+`COACH_BRANCH_OUTSIDE_SCOPE`, `REPORT_WEEKS_INVALID`,
+`EXERCISE_DUPLICATE`, `SYSTEM_EXERCISE_IMMUTABLE`,
+`EXERCISE_OUTSIDE_OWNER_SCOPE`, `EXERCISE_MEDIA_INVALID`,
+`WORKOUT_OUTSIDE_OWNER_SCOPE`, `WORKOUT_VERSION_NOT_PUBLISHED`,
+`WORKOUT_ASSIGNMENT_CANCEL_REASON_REQUIRED`, `WORKOUT_ASSIGNMENT_NOT_FOUND`,
+`REPORT_RANGE_INVALID`, `REPORT_EXPORT_TOO_LARGE` e
+`IDEMPOTENCY_KEY_REUSED`.
+
+Estos contratos no crean ni consultan ventas o pagos. La lectura remota del socio se
+reserva para una aplicación futura.
 
 ## 6.14 Profesionales
 
@@ -530,8 +601,10 @@ Permisos por endpoint interno:
 - `inventory.read`, `inventory.manage`
 - `resource.read`, `resource.manage`
 - `booking.read`, `booking.manage`
-- `coach.read`, `coach.manage`
-- `workout.read`, `workout.manage`
+- `coach.read`, `coach.manage`, `coach.profile.manage`
+- `workout.read.own`, `workout.read.all`
+- `workout.manage.own`, `workout.manage.all`
+- `workout.assign`, `workout.pdf.download`, `coach.metrics.read`
 - `report.coaches.read`
 - `professional.read`, `professional.manage`
 - `notification.read`, `notification.manage`
@@ -883,4 +956,6 @@ Valores posibles de `console`:
 
 - Rechaza cualquier rol con `platform.admin` con `ROLE_NOT_AVAILABLE`.
 - Rechaza roles no asignables por el perfil actual con `ROLE_NOT_ALLOWED`; por ejemplo, un gerente no puede crear dueños ni otros gerentes.
+- Para `Coach`, persiste cuenta, sucursales, especialidades y biografia como una
+  sola operacion; un fallo del perfil revierte el alta completa.
 - Los usuarios creados entran a su consola segun permisos/rol.

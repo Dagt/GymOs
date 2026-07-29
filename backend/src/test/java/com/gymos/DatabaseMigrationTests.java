@@ -1,10 +1,17 @@
 package com.gymos;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gymos.coaching.api.operations.CoachProfileProvisioningAdapter;
+import com.gymos.coaching.infrastructure.CoachingCatalogRepository;
+import com.gymos.coaching.infrastructure.CoachingRepository;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
@@ -12,6 +19,9 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.jdbc.datasource.DriverManagerDataSource;
+import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 
 @Testcontainers
 class DatabaseMigrationTests {
@@ -48,6 +58,28 @@ class DatabaseMigrationTests {
 			assertThat(tableExists(connection, "workout")).isTrue();
 			assertThat(tableExists(connection, "workout_version")).isTrue();
 			assertThat(tableExists(connection, "workout_assignment")).isTrue();
+			assertThat(tableExists(connection, "exercise")).isTrue();
+			assertThat(tableExists(connection, "exercise_alias")).isTrue();
+			assertThat(tableExists(connection, "workout_session")).isTrue();
+			assertThat(tableExists(connection, "workout_session_block")).isTrue();
+			assertThat(tableExists(connection, "workout_exercise")).isTrue();
+			assertThat(columnExists(connection, "workout_assignment", "idempotency_key")).isTrue();
+			assertThat(indexExists(connection, "ux_workout_assignment_idempotency")).isTrue();
+			assertThat(roleHasPermission(connection, "Coach", "exercise.read")).isTrue();
+			assertThat(roleHasPermission(connection, "Coach", "workout.assign")).isTrue();
+			assertThat(roleHasPermission(connection, "Coach", "workout.manage.own")).isTrue();
+			assertThat(roleHasPermission(connection, "Dueno del gimnasio", "coach.metrics.read")).isTrue();
+			assertThat(roleHasPermission(connection, "Dueno del gimnasio", "coach.profile.manage")).isTrue();
+			assertThat(roleHasPermission(connection, "Dueno del gimnasio", "workout.read.all")).isFalse();
+			assertThat(roleHasPermission(connection, "Dueno del gimnasio", "workout.manage.all")).isFalse();
+			assertThat(roleHasPermission(connection, "Dueno del gimnasio", "workout.assign")).isFalse();
+			assertThat(roleHasPermission(connection, "Dueno del gimnasio", "exercise.read")).isFalse();
+			assertThat(roleHasPermission(connection, "Gerente", "coach.metrics.read")).isTrue();
+			assertThat(roleHasPermission(connection, "Gerente", "coach.profile.manage")).isTrue();
+			assertThat(roleHasPermission(connection, "Gerente", "workout.read.all")).isFalse();
+			assertThat(roleHasPermission(connection, "Gerente", "workout.manage.all")).isFalse();
+			assertThat(roleHasPermission(connection, "Gerente", "workout.assign")).isFalse();
+			assertThat(roleHasPermission(connection, "Gerente", "exercise.read")).isFalse();
 			assertThat(tableExists(connection, "professional")).isTrue();
 			assertThat(tableExists(connection, "professional_service")).isTrue();
 			assertThat(tableExists(connection, "professional_availability")).isTrue();
@@ -93,6 +125,70 @@ class DatabaseMigrationTests {
 
 			assertThatThrownBy(() -> insertSale(connection, UUID.randomUUID(), organizationId, branchId, "S-2", "repeat-key"))
 					.isInstanceOf(SQLException.class);
+		}
+	}
+
+	@Test
+	void coachingQueriesAcceptNullUuidFiltersOnPostgresql() {
+		var dataSource = new DriverManagerDataSource(
+				postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword()
+		);
+		var jdbcClient = JdbcClient.create(dataSource);
+		var coaching = new CoachingRepository(jdbcClient);
+		var catalog = new CoachingCatalogRepository(jdbcClient);
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		LocalDate from = LocalDate.of(2026, 7, 1);
+		LocalDate to = LocalDate.of(2026, 7, 31);
+
+		assertThatCode(() -> {
+			coaching.workouts(organizationId, branchId, null);
+			catalog.assignmentStats(organizationId, branchId, from, to, null, null, null);
+			catalog.assignments(organizationId, branchId, from, to, null, null, null, 25, 0);
+			catalog.metrics(organizationId, branchId, from, to, null, null, null);
+			catalog.weeklyTrend(organizationId, branchId, from, to, null, null, null);
+			catalog.exerciseEquipmentOptions(organizationId);
+		}).doesNotThrowAnyException();
+		assertThat(catalog.exerciseEquipmentOptions(organizationId)).contains("Barra");
+	}
+
+	@Test
+	void coachProvisioningPersistsCreationDetailsOnPostgresql() throws Exception {
+		try (var connection = DriverManager.getConnection(
+				postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword()
+		)) {
+			UUID organizationId = UUID.randomUUID();
+			UUID branchId = UUID.randomUUID();
+			UUID userId = UUID.randomUUID();
+			insertOrganization(connection, organizationId);
+			insertBranch(connection, organizationId, branchId);
+			insertUser(connection, organizationId, userId);
+			var dataSource = new SingleConnectionDataSource(connection, true);
+			var adapter = new CoachProfileProvisioningAdapter(
+					JdbcClient.create(dataSource), new ObjectMapper()
+			);
+
+			adapter.synchronize(
+					organizationId, userId, "Ana Coach", "ana@example.com", "+521234567890",
+					List.of(branchId), List.of("Fuerza", "Movilidad"),
+					"Entrenadora funcional.", true, userId
+			);
+
+			try (var statement = connection.prepareStatement("""
+					SELECT specialties_json::text, bio
+					FROM coach
+					WHERE organization_id = ? AND branch_id = ? AND user_account_id = ?
+					""")) {
+				statement.setObject(1, organizationId);
+				statement.setObject(2, branchId);
+				statement.setObject(3, userId);
+				try (var resultSet = statement.executeQuery()) {
+					assertThat(resultSet.next()).isTrue();
+					assertThat(resultSet.getString("specialties_json"))
+							.contains("Fuerza", "Movilidad");
+					assertThat(resultSet.getString("bio")).isEqualTo("Entrenadora funcional.");
+				}
+			}
 		}
 	}
 
@@ -179,6 +275,38 @@ class DatabaseMigrationTests {
 			statement.setObject(1, branchId);
 			statement.setObject(2, organizationId);
 			statement.executeUpdate();
+		}
+	}
+
+	private void insertUser(
+			java.sql.Connection connection, UUID organizationId, UUID userId
+	) throws Exception {
+		UUID personId = UUID.randomUUID();
+		try (var person = connection.prepareStatement("""
+				INSERT INTO person (
+				    id, organization_id, first_name, last_name, email, phone, status,
+				    created_at, updated_at, version
+				)
+				VALUES (?, ?, 'Ana', 'Coach', ?, ?, 'ACTIVE', now(), now(), 0)
+				""")) {
+			person.setObject(1, personId);
+			person.setObject(2, organizationId);
+			person.setString(3, "ana-" + userId + "@example.com");
+			person.setString(4, "+52" + String.format("%010d", Math.abs(userId.hashCode())));
+			person.executeUpdate();
+		}
+		try (var user = connection.prepareStatement("""
+				INSERT INTO user_account (
+				    id, organization_id, person_id, username, password_hash, status,
+				    failed_attempts, created_at, updated_at, version
+				)
+				VALUES (?, ?, ?, ?, 'encoded', 'ACTIVE', 0, now(), now(), 0)
+				""")) {
+			user.setObject(1, userId);
+			user.setObject(2, organizationId);
+			user.setObject(3, personId);
+			user.setString(4, "ana-" + userId);
+			user.executeUpdate();
 		}
 	}
 

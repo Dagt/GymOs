@@ -1,8 +1,8 @@
 # GymOS Permissions Matrix
 
-Estado: baseline inicial Hito 7  
+Estado: VIGENTE / COBERTURA PARCIAL
 Fuente primaria: `backend/src/main/java/com/gymos/common/security/SecurityConfig.java`  
-Última revisión local: 2026-07-16
+Última revisión documental: 2026-07-26
 
 Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe mantenerse alineada con pruebas de autorización. Los endpoints públicos no sustituyen validaciones de negocio ni rate limiting.
 
@@ -46,7 +46,7 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 | POST | `/api/v1/clients/imports` | clients | `client.import` | Sí | Opcional | Sí | `clientImportRequiresImportPermission` negativo |
 | POST | `/api/v1/clients/*/benefits` | benefits | `client.benefit.assign` | Sí | Según cliente | Sí | `clientBenefitAssignmentRequiresAssignPermission` negativo |
 | POST | `/api/v1/client-benefits/*/verify` | benefits | `client.benefit.verify` | Sí | Según beneficio | Sí | `clientBenefitVerificationRequiresVerifyPermission` negativo |
-| GET | `/api/v1/clients/*/workouts` | coaching | `workout.read` | Sí | Según cliente | No | Pendiente |
+| GET | `/api/v1/clients/*/workouts` | coaching | `workout.read.own/all` | Sí | Sí; coach propio | No | `CoachingServiceSecurityTests` |
 
 ## Catálogo, beneficios y membresías
 
@@ -101,9 +101,24 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/coaches/**` | coaching | `coach.read` | Sí | Sí | No | Pendiente |
 | POST | `/api/v1/coaches/**` | coaching | `coach.manage` | Sí | Sí | Sí | `coachCreationRequiresManagePermission` negativo |
-| GET | `/api/v1/workouts/**` | coaching | `workout.read` | Sí | Sí | No | Pendiente |
-| POST | `/api/v1/workouts/**` | coaching | `workout.manage` | Sí | Sí | Sí | `workoutAssignmentRequiresManagePermission` negativo |
+| GET/PUT | `/api/v1/coaches/profiles/**` | coaching | `coach.profile.manage` | Sí | Sólo sucursales administrables | PUT | `advancedCoachProfilesRequireDedicatedPermission`; `CoachingServiceSecurityTests`; E2E |
+| GET | `/api/v1/workouts/**` | coaching | `workout.read.own/all` | Sí | Sí; coach propio/global | No | `CoachingServiceSecurityTests`; permiso legacy negativo |
+| POST/PUT | `/api/v1/workouts/**` | coaching | `workout.manage.own/all` | Sí | Sí; coach propio/global | Sí | `CoachingServiceSecurityTests`; `workoutAssignmentRequiresManagePermission` |
 | GET | `/api/v1/reports/coaches` | coaching/reporting | `report.coaches.read` | Sí | Sí | No | Pendiente |
+| GET | `/api/v1/exercises/**` | coaching | `exercise.read` | Sí | Según origen | No | Implementado; negativos completos pendientes |
+| POST/PUT/DELETE | `/api/v1/exercises/**` | coaching | `exercise.create` / `exercise.manage` | Sí | Propio/organización | Sí | SYSTEM inmutable, propiedad y medios probados |
+| PATCH | `/api/v1/exercises/**` | coaching | `exercise.manage` | Sí | Organización | Sí | `exerciseMutationRequiresCreateOrManagePermission` |
+| GET | `/api/v1/workout-versions/**` | coaching | `workout.read.own/all` | Sí | Sí; coach propio/global | No | Filtro de sucursal y propiedad |
+| POST | `/api/v1/workout-assignments` | coaching | `workout.assign` | Sí | Sí | Sí | Implementado con idempotencia |
+| PATCH | `/api/v1/workout-assignments/**` | coaching | `workout.assign` | Sí | Sí; coach propio/global | Sí | Motivo obligatorio y negativo de permiso |
+| POST | `/api/v1/workout-assignments/*/replace` | coaching | `workout.assign` | Sí | Sí; coach propio/global | Sí | E2E de reemplazo e idempotencia |
+| GET | `/api/v1/workout-assignments/*/pdf` | coaching | `workout.pdf.download` | Sí | Sí; coach propio/global | No | PDFBox y filtro de propiedad |
+| GET | `/api/v1/reports/coaches/workout-assignments/**` | coaching/reporting | `coach.metrics.read` | Sí | Sí; coach propio/global | No | Comparación, filtro socio/coach, tendencia 4–52 semanas, paginación y E2E |
+
+Regla de rol vigente: `Dueno del gimnasio` sólo conserva `coach.read`,
+`coach.metrics.read` y `coach.profile.manage`. No recibe permisos de ejercicios,
+rutinas, asignación o PDF. La edición del perfil se presenta exclusivamente en
+`/users`; `/coaches` es una vista de métricas para el dueño.
 | GET | `/api/v1/professionals/**` | wellness | `professional.read` | Sí | Sí | No | Pendiente |
 | POST | `/api/v1/professionals/**` | wellness | `professional.manage` | Sí | Sí | Sí | `professionalCreationRequiresManagePermission` negativo |
 | GET | `/api/v1/notifications/**` | notifications | `notification.read` | Sí | No | No | Pendiente |
@@ -116,6 +131,9 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 
 1. Convertir cada fila `Pendiente` en prueba MVC o integración.
 2. Dividir endpoints públicos por perfil: OpenAPI/Swagger no deben quedar públicos en producción sin decisión explícita.
-3. Agregar prueba negativa de selección de sucursal ajena.
-4. Agregar prueba negativa de UUID ajeno por módulo crítico.
-5. Verificar que toda operación marcada con auditoría escriba realmente `audit_log`.
+3. Mantener pruebas de regresión de la separación: Coach opera sólo sus
+   rutinas/asignaciones; dueño consulta únicamente métricas; gerente queda
+   limitado por organización y sucursales autorizadas.
+4. Agregar prueba negativa de selección de sucursal ajena.
+5. Agregar prueba negativa de UUID ajeno por módulo crítico.
+6. Verificar que toda operación marcada con auditoría escriba realmente `audit_log`.

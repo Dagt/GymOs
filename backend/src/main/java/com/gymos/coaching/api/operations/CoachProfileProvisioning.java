@@ -11,6 +11,8 @@ public interface CoachProfileProvisioning {
 			String email,
 			String phone,
 			List<UUID> branchIds,
+			List<String> specialties,
+			String bio,
 			boolean active,
 			UUID actorUserId
 	);

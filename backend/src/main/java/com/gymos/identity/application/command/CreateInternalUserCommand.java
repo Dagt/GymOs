@@ -12,6 +12,8 @@ public record CreateInternalUserCommand(
 		String username,
 		String temporaryPassword,
 		UUID roleId,
-		List<UUID> branchIds
+		List<UUID> branchIds,
+		List<String> coachSpecialties,
+		String coachBio
 ) {
 }

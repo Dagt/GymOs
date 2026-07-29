@@ -3,11 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "predev": "node scripts/apply-coaches-ui.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/apply-coaches-ui.mjs",
     "build": "next build",
     "start": "next start",
+    "prelint": "node scripts/apply-coaches-ui.mjs",
     "lint": "eslint",
+    "pretypecheck": "node scripts/apply-coaches-ui.mjs",
     "typecheck": "tsc --noEmit",
+    "pretest": "node scripts/apply-coaches-ui.mjs",
     "test": "node --experimental-strip-types --test src/**/*.test.ts",
     "test:e2e": "playwright test"
   },

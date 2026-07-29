@@ -3,9 +3,11 @@ package com.gymos.common.storage;
 import com.gymos.common.api.BusinessException;
 import io.minio.BucketExistsArgs;
 import io.minio.MakeBucketArgs;
+import io.minio.GetObjectArgs;
 import io.minio.MinioClient;
 import io.minio.PutObjectArgs;
 import io.minio.RemoveObjectArgs;
+import io.minio.StatObjectArgs;
 import java.io.InputStream;
 import org.springframework.stereotype.Service;
 
@@ -49,6 +51,23 @@ public class ObjectStorageService {
 		}
 	}
 
+	public StoredObject getObject(String objectKey) {
+		try {
+			var stat = minioClient.statObject(StatObjectArgs.builder()
+					.bucket(properties.bucket())
+					.object(objectKey)
+					.build());
+			try (var stream = minioClient.getObject(GetObjectArgs.builder()
+					.bucket(properties.bucket())
+					.object(objectKey)
+					.build())) {
+				return new StoredObject(stream.readAllBytes(), stat.contentType());
+			}
+		} catch (Exception exception) {
+			throw new BusinessException("OBJECT_STORAGE_READ_FAILED", "No fue posible leer el archivo.");
+		}
+	}
+
 	private void ensureBucket() throws Exception {
 		boolean exists = minioClient.bucketExists(BucketExistsArgs.builder()
 				.bucket(properties.bucket())
@@ -59,4 +78,6 @@ public class ObjectStorageService {
 					.build());
 		}
 	}
+
+	public record StoredObject(byte[] content, String contentType) {}
 }
