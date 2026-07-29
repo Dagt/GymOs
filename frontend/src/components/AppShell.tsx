@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { isActive, resolveShellBrand, visibleSectionsForConsole } from "@/components/app-shell-model";
+import { FormError } from "@/components/FormFields";
 import { clearSession, getBranches, selectBranch, selectOrganization, storeSession, type StoredSession } from "@/lib/api";
 import { getConsoleProfile, isPlatformAdmin, isSupportMode, resolveUserConsole } from "@/lib/role-model";
 
@@ -283,3 +284,8 @@ export function LoadingScreen({ text = "Cargando..." }: { text?: string }) {
     </main>
   );
 }
+
+export function InlineError({ message }: { message: string }) {
+  return <FormError message={message} />;
+}
+
