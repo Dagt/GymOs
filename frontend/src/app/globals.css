@@ -1132,8 +1132,7 @@ th {
 }
 
 .admin-sidebar {
-  background:
-    linear-gradient(180deg, #0f172a, color-mix(in srgb, var(--brand-primary) 42%, #0f172a));
+  background: var(--brand-primary);
   color: white;
   display: flex;
   flex-direction: column;
@@ -1143,6 +1142,7 @@ th {
   padding: 1.25rem;
   position: sticky;
   top: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .admin-sidebar-brand {
@@ -1304,9 +1304,10 @@ th {
 }
 
 .admin-sidebar nav a.active {
-  background: color-mix(in srgb, var(--brand-accent) 13%, white);
-  border-left: 0.25rem solid var(--brand-accent);
-  color: #0f172a;
+  background: white;
+  border-radius: 0.75rem;
+  color: var(--brand-primary);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
 
 .admin-sidebar nav a.active span {

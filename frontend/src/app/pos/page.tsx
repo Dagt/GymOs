@@ -170,7 +170,6 @@ export default function PosPage() {
       session={session}
       subtitle="Registra ventas de productos y servicios con cobro inmediato."
       title="Caja Registradora"
-      hideSidebar={true}
       mode="operation"
     >
       {error ? <InlineError message={error} /> : null}

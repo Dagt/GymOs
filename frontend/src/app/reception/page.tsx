@@ -128,7 +128,6 @@ export default function ReceptionPage() {
     <AppShell
       branchName={visibleBranchName}
       eyebrow="Recepcion"
-      hideSidebar={canOperate}
       mode={canOperate ? "operation" : undefined}
       organizationName={receptionOrganizationName}
       session={session}
