@@ -137,17 +137,25 @@ export function RecentSalesList({ sales }: { sales: SaleSummary[] }) {
 }
 
 export function PosClientSearch({
+  clientMembership,
   clientQuery,
   clients,
   selectedClient,
+  availablePlans,
+  onChangePlan,
   onClientQueryChange,
+  onRenewMembership,
   onSearch,
   onSelectClient,
 }: {
+  clientMembership?: { planId: string; planName: string; startsOn: string; endsOn: string; status: string } | null;
   clientQuery: string;
   clients: ClientSummary[];
   selectedClient: ClientSummary | null;
+  availablePlans?: ProductSummary[];
+  onChangePlan?: (plan: ProductSummary) => void;
   onClientQueryChange: (value: string) => void;
+  onRenewMembership?: () => void;
   onSearch: (event: FormEvent<HTMLFormElement>) => void;
   onSelectClient: (client: ClientSummary) => void;
 }) {
@@ -174,20 +182,71 @@ export function PosClientSearch({
       </form>
 
       {selectedClient && (
-        <div className="mt-4 p-4 rounded-xl border-2 border-[color:color-mix(in_srgb,var(--brand-primary)_20%,transparent)] bg-[color:var(--brand-primary)] text-white flex items-center justify-between shadow-lg animate-in zoom-in-95">
-          <div className="flex flex-col">
-            <span className="text-[0.6rem] font-black uppercase tracking-widest opacity-70 mb-0.5">Socio Identificado</span>
-            <strong className="text-base font-black">
-              {selectedClient.firstName} {selectedClient.lastName}
-            </strong>
+        <div className="mt-4 flex flex-col gap-3">
+          <div className="p-4 rounded-xl border-2 border-[color:color-mix(in_srgb,var(--brand-primary)_20%,transparent)] bg-[color:var(--brand-primary)] text-white flex items-center justify-between shadow-lg animate-in zoom-in-95">
+            <div className="flex flex-col">
+              <span className="text-[0.6rem] font-black uppercase tracking-widest opacity-70 mb-0.5">Socio Identificado</span>
+              <strong className="text-base font-black">
+                {selectedClient.firstName} {selectedClient.lastName}
+              </strong>
+            </div>
+            <button 
+              type="button" 
+              onClick={() => onSelectClient(null as any)}
+              className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center font-black text-white transition-colors"
+            >
+              ✕
+            </button>
           </div>
-          <button 
-            type="button" 
-            onClick={() => onSelectClient(null as any)}
-            className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center font-black text-white transition-colors"
-          >
-            ✕
-          </button>
+
+          {clientMembership ? (
+            <div className="p-3.5 rounded-xl border-2 border-blue-100 bg-blue-50/50 flex flex-col gap-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[0.65rem] font-black uppercase tracking-wider text-blue-900">Membresía del Socio</span>
+                <span className={`text-[0.6rem] font-black uppercase px-2 py-0.5 rounded-md ${clientMembership.status === "ACTIVE" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                  {clientMembership.status === "ACTIVE" ? "Activa" : "Vencida"}
+                </span>
+              </div>
+
+              <div>
+                <p className="text-sm font-black text-gray-900 leading-tight">{clientMembership.planName}</p>
+                <p className="text-[0.7rem] font-bold text-gray-500 mt-0.5">
+                  Vigencia: {clientMembership.startsOn} a {clientMembership.endsOn}
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2 pt-1">
+                {onRenewMembership ? (
+                  <button
+                    type="button"
+                    onClick={onRenewMembership}
+                    className="flex-1 h-9 px-3 rounded-lg bg-[color:var(--brand-primary)] text-white text-xs font-black hover:opacity-90 transition-all flex items-center justify-center gap-1.5 shadow-sm"
+                  >
+                    <span>🔄 Renovar Mismo Plan</span>
+                  </button>
+                ) : null}
+
+                {availablePlans && availablePlans.length > 0 && onChangePlan ? (
+                  <select
+                    className="h-9 px-2 rounded-lg border-2 border-blue-200 bg-white text-xs font-bold text-gray-800 outline-none focus:border-[color:var(--brand-primary)]"
+                    onChange={(e) => {
+                      const selected = availablePlans.find((p) => p.id === e.target.value);
+                      if (selected) onChangePlan(selected);
+                      e.target.value = "";
+                    }}
+                    defaultValue=""
+                  >
+                    <option value="" disabled>🔀 Cambiar Plan...</option>
+                    {availablePlans.map((plan) => (
+                      <option key={plan.id} value={plan.id}>
+                        {plan.name} ({formatMoney(plan.priceCents, plan.currency)})
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
         </div>
       )}
 

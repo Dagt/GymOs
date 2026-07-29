@@ -49,13 +49,6 @@ export const FOCUS_ACTIONS: FocusAction[] = [
     accent: "bookings",
   },
   {
-    title: "Beneficios",
-    detail: "Consulta beneficios aplicables para socios y promociones activas.",
-    href: "/benefits",
-    label: "Ver beneficios",
-    accent: "benefits",
-  },
-  {
     title: "Servicios de Bienestar",
     detail: "Agendar citas, consultar especialistas, confirmación y estatus.",
     href: "/wellness",

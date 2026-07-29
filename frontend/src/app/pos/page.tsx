@@ -5,16 +5,18 @@ import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   createSale,
+  getClientMemberships,
   getRecentSales,
   getStoredSession,
   searchClients,
   searchProducts,
+  type ClientMembershipSummary,
   type ClientSummary,
   type ProductSummary,
   type SaleSummary,
   type StoredSession,
 } from "@/lib/api";
-import { calculateSubtotal, findProductByBarcodeOrSku } from "./pos-model";
+import { buildRenewalProduct, calculateSubtotal, findProductByBarcodeOrSku } from "./pos-model";
 import { playScanBeep, useBarcodeScanner } from "./barcode-scanner";
 import {
   type CartItem,
@@ -33,6 +35,7 @@ export default function PosPage() {
   const [productQuery, setProductQuery] = useState("");
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [selectedClient, setSelectedClient] = useState<ClientSummary | null>(null);
+  const [clientMembership, setClientMembership] = useState<ClientMembershipSummary | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
   const [paymentReference, setPaymentReference] = useState("");
@@ -105,6 +108,39 @@ export default function PosPage() {
       window.clearTimeout(timer);
     };
   }, [productQuery, session]);
+
+  useEffect(() => {
+    if (!session || !selectedClient) {
+      setClientMembership(null);
+      return;
+    }
+    let active = true;
+    getClientMemberships(session.accessToken, selectedClient.id)
+      .then((memberships) => {
+        if (active && memberships.length > 0) {
+          setClientMembership(memberships[0]);
+        } else if (active) {
+          setClientMembership(null);
+        }
+      })
+      .catch(() => {
+        if (active) setClientMembership(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedClient, session]);
+
+  const membershipPlans = useMemo(
+    () => products.filter((p) => p.productType === "MEMBERSHIP_PLAN" || p.commercialSubtype === "MEMBERSHIP"),
+    [products],
+  );
+
+  function handleRenewMembership() {
+    if (!clientMembership) return;
+    const renewalProduct = buildRenewalProduct(clientMembership, products);
+    addProduct(renewalProduct);
+  }
 
   const subtotal = useMemo(
     () => calculateSubtotal(cart),
@@ -218,9 +254,13 @@ export default function PosPage() {
           <aside className="flex flex-col gap-8">
             <div className="sticky top-6 flex flex-col gap-8">
               <PosClientSearch
+                availablePlans={membershipPlans}
+                clientMembership={clientMembership}
                 clientQuery={clientQuery}
                 clients={clients}
+                onChangePlan={addProduct}
                 onClientQueryChange={setClientQuery}
+                onRenewMembership={handleRenewMembership}
                 onSearch={submitClientSearch}
                 onSelectClient={setSelectedClient}
                 selectedClient={selectedClient}

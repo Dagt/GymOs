@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { calculateSubtotal, findProductByBarcodeOrSku, formatMoney, getPosDensityConfig } from "./pos-model.ts";
+import { buildRenewalProduct, calculateSubtotal, findProductByBarcodeOrSku, formatMoney, getPosDensityConfig } from "./pos-model.ts";
 import type { CartItem } from "./PosSections.tsx";
 import type { ProductSummary } from "@/lib/api";
 
@@ -40,4 +40,25 @@ test("findProductByBarcodeOrSku locates product by exact barcode or SKU", () => 
   // Non-matching code returns null
   const notFound = findProductByBarcodeOrSku(products, "UNKNOWN-999");
   assert.equal(notFound, null);
+});
+
+test("buildRenewalProduct maps membership to catalog product or generates synthetic plan", () => {
+  const products: ProductSummary[] = [
+    { id: "plan-vip-1", name: "Plan VIP Mensual", priceCents: 85000, currency: "MXN", sku: "PLAN-VIP" } as unknown as ProductSummary,
+  ];
+
+  const catalogMatch = buildRenewalProduct(
+    { id: "m-1", planId: "plan-vip-1", planName: "Plan VIP Mensual", priceCents: 85000, currency: "MXN" },
+    products,
+  );
+  assert.equal(catalogMatch.id, "plan-vip-1");
+  assert.equal(catalogMatch.priceCents, 85000);
+
+  const syntheticPlan = buildRenewalProduct(
+    { id: "m-2", planId: "plan-custom", planName: "Plan Personalizado", priceCents: 90000, currency: "MXN" },
+    products,
+  );
+  assert.equal(syntheticPlan.id, "plan-custom");
+  assert.equal(syntheticPlan.name, "Renovación: Plan Personalizado");
+  assert.equal(syntheticPlan.priceCents, 90000);
 });
