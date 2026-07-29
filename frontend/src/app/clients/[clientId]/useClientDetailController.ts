@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import type { FieldErrorMap } from "@/components/FormFields";
 import {
   changeMembershipPlan,
+  createSale,
   getClient,
   getClientMemberships,
   getPlans,
@@ -55,7 +56,11 @@ export function useClientDetailController() {
   const canEditClient = useMemo(() => hasPermission(session, "client.update"), [session]);
   const canReadMemberships = useMemo(() => hasPermission(session, "membership.read"), [session]);
   const canManageMemberships = useMemo(
-    () => hasPermission(session, "membership.update") && hasPermission(session, "sale.create") && hasPermission(session, "catalog.read"),
+    () =>
+      hasPermission(session, "membership.update") ||
+      hasPermission(session, "membership.create") ||
+      hasPermission(session, "sale.create") ||
+      hasPermission(session, "client.create"),
     [session],
   );
   const limitedCoachView = useMemo(
@@ -179,10 +184,38 @@ export function useClientDetailController() {
 
   async function changePlan(activeMembership: ClientMembershipSummary) {
     if (!session || !targetPlanId || !canManageMemberships) return;
-    setChangingMembershipId(activeMembership.id);
+    setChangingMembershipId(activeMembership.id || "new");
     setError(null);
     setMessage(null);
     try {
+      if (!activeMembership.id) {
+        const selectedPlan = plans.find((p) => p.id === targetPlanId);
+        if (!selectedPlan) return;
+        const res = await createSale(session.accessToken, {
+          clientId: params.clientId,
+          items: [
+            {
+              productId: selectedPlan.id,
+              quantity: 1,
+              discountCents: 0,
+            },
+          ],
+          discountCents: 0,
+          payment: {
+            method: renewMethod,
+            amountCents: selectedPlan.priceCents ?? 80000,
+            reference: renewReference,
+            receiptObjectKey: null,
+            validateNow: renewValidateNow,
+            notes: "Venta de membresía inicial",
+          },
+        });
+        setMemberships(await getClientMemberships(session.accessToken, params.clientId));
+        setMembershipAction(null);
+        setMessage(`Membresía inicial asignada. Venta ${res.sale.saleNumber} creada.`);
+        return;
+      }
+
       const payload: ChangeMembershipPlanPayload = {
         targetPlanId,
         method: renewMethod,

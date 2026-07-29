@@ -4,6 +4,7 @@ import {
   formatDay,
   membershipStatusLabel,
 } from "./ClientDetailHelpers";
+import { canChangeMembershipPlan, canRenewMembership } from "./client-membership-helpers";
 
 export function MembershipHistory({
   changingMembershipId,
@@ -27,10 +28,35 @@ export function MembershipHistory({
         </div>
       </div>
       {memberships.length === 0 ? (
-        <section className="admin-empty-card">
+        <section className="admin-empty-card flex flex-col items-start gap-2">
           <strong>Sin membresia registrada</strong>
-          <span>Registra una membresia inicial desde el alta de socio o desde caja seleccionando este socio.</span>
-          <Link href="/pos">Abrir caja / POS</Link>
+          <span>Selecciona un plan para asignar o vender la membresia inicial a este socio.</span>
+          {plans.length > 0 ? (
+            <button
+              type="button"
+              className="app-button mt-2"
+              onClick={() =>
+                onMembershipAction(
+                  {
+                    id: "",
+                    planId: plans[0].id,
+                    planName: plans[0].name,
+                    status: "PENDING",
+                    startsOn: "",
+                    endsOn: "",
+                    graceEndsOn: "",
+                    saleId: "",
+                    saleNumber: "",
+                  } as any,
+                  "change",
+                )
+              }
+            >
+              + Asignar Membresía Inicial
+            </button>
+          ) : (
+            <Link href="/pos" className="app-button-secondary text-xs">Abrir caja / POS</Link>
+          )}
         </section>
       ) : (
         <section className="grid gap-4">
@@ -63,6 +89,9 @@ function MembershipCard({
   plans: PlanSummary[];
   renewingMembershipId: string | null;
 }) {
+  const allowRenew = canRenewMembership(membership.status);
+  const allowChange = canChangeMembershipPlan(membership.status, plans.length);
+
   return (
     <article className="rounded-md border border-[#d8ddd2] px-4 py-3">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
@@ -80,7 +109,7 @@ function MembershipCard({
       <div className="mt-3 flex flex-wrap gap-2">
         <button
           className="app-button"
-          disabled={renewingMembershipId !== null || changingMembershipId !== null || membership.status !== "ACTIVE"}
+          disabled={renewingMembershipId !== null || changingMembershipId !== null || !allowRenew}
           onClick={() => onMembershipAction(membership, "renew")}
           type="button"
         >
@@ -88,7 +117,7 @@ function MembershipCard({
         </button>
         <button
           className="app-button-secondary"
-          disabled={renewingMembershipId !== null || changingMembershipId !== null || membership.status !== "ACTIVE" || plans.length < 2}
+          disabled={renewingMembershipId !== null || changingMembershipId !== null || !allowChange}
           onClick={() => onMembershipAction(membership, "change")}
           type="button"
         >
