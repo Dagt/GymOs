@@ -110,7 +110,6 @@ const receptionSections: NavigationSection[] = [
       { label: "Reservas", href: "/bookings", hint: "Agenda", permissions: ["booking.read"] },
       { label: "Wellness", href: "/wellness", hint: "Bienestar", permissions: ["professional.read", "booking.read"] },
       { label: "Ventas", href: "/reports/sales", hint: "Pagos pendientes", permissions: ["report.sales.read"] },
-      { label: "Beneficios", href: "/benefits", hint: "Aplicacion", permissions: ["benefit.read"] },
     ],
   },
 ];

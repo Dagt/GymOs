@@ -12,6 +12,7 @@ import {
   type BenefitSummary,
   type StoredSession,
 } from "@/lib/api";
+import { resolveUserConsole } from "@/lib/role-model";
 
 const defaultForm: BenefitPayload = {
   code: "",
@@ -34,6 +35,11 @@ export default function BenefitsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showBenefitDrawer, setShowBenefitDrawer] = useState(false);
+
+  const canManageBenefits = session
+    ? session.user.platformAdmin ||
+      ["TENANT_OWNER", "TENANT_MANAGER", "PLATFORM_OWNER"].includes(resolveUserConsole(session.user))
+    : false;
 
   useEffect(() => {
     let active = true;
@@ -115,12 +121,14 @@ export default function BenefitsPage() {
             <p className="app-eyebrow">Beneficios</p>
             <h2 className="app-card-title">Promociones y descuentos</h2>
             <p className="app-card-copy">
-              Consulta beneficios vigentes y crea nuevos descuentos solo cuando cambie una regla comercial.
+              Consulta convenios y descuentos vigentes aplicables a ventas de socios.
             </p>
           </div>
-          <button className="app-button" onClick={() => setShowBenefitDrawer(true)} type="button">
-            Crear beneficio
-          </button>
+          {canManageBenefits ? (
+            <button className="app-button" onClick={() => setShowBenefitDrawer(true)} type="button">
+              Crear beneficio
+            </button>
+          ) : null}
         </section>
 
         <section className="app-card p-5">
@@ -176,16 +184,15 @@ export default function BenefitsPage() {
               <option value="CUSTOM">Personalizado</option>
             </select>
           </label>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4">
             <label className="grid gap-2 text-sm font-bold text-[#42514a]">
               Descuento %
               <input className="h-11 rounded-md border border-[var(--brand-line)] px-3" type="number" min="0" max="100" value={form.discountPercent ?? 0} onChange={(event) => setForm({ ...form, discountPercent: Number(event.target.value), discountType: "PERCENT" })} />
             </label>
-            <label className="grid gap-2 text-sm font-bold text-[#42514a]">
-              Prioridad
-              <input className="h-11 rounded-md border border-[var(--brand-line)] px-3" type="number" min="0" value={form.priority} onChange={(event) => setForm({ ...form, priority: Number(event.target.value) })} />
-            </label>
           </div>
+          <p className="text-xs font-medium text-gray-500 italic bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+            💡 Este convenio/descuento podrá asignarse a perfiles de socios y aplicarse en el punto de venta al realizar cobros.
+          </p>
           <label className="flex items-center gap-2 text-sm font-bold text-[#42514a]">
             <input type="checkbox" checked={form.requiresEvidence} onChange={(event) => setForm({ ...form, requiresEvidence: event.target.checked })} />
             Requiere evidencia

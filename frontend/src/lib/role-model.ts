@@ -175,5 +175,5 @@ const managerRoutes = [
   "/sales",
 ];
 
-const receptionRoutes = ["/reception", "/pos", "/clients", "/sales", "/reports/sales", "/bookings", "/benefits", "/wellness"];
+const receptionRoutes = ["/reception", "/pos", "/clients", "/sales", "/reports/sales", "/bookings", "/wellness"];
 const coachRoutes = ["/coaches", "/clients"];

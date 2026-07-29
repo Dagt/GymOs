@@ -6,6 +6,8 @@ import {
   canShowRoleForSession,
   displayRoleName,
 } from "./UsersRoleHelpers.ts";
+import { canAccessRoute } from "../../lib/role-model.ts";
+import type { CurrentUser } from "../../lib/api/session-types.ts";
 
 test("normalizes user-facing role names", () => {
   assert.equal(displayRoleName("Administrador GymOS"), "Admin GymOS");
@@ -42,4 +44,22 @@ test("platform administrator keeps full support visibility", () => {
   assert.equal(canShowRoleForSession(["Administrador GymOS"], "Administrador", true), true);
   assert.equal(canSeeUserForSession(["Administrador GymOS"], ["Administrador"], true), true);
   assert.equal(canManageUserForSession(["Administrador GymOS"], ["Administrador"], true), true);
+});
+
+test("receptionist role cannot access /benefits route", () => {
+  const receptionUser: CurrentUser = {
+    id: "user-1",
+    email: "reception@gymos.local",
+    fullName: "Recepcionista Test",
+    roles: ["Recepcion y caja"],
+    permissions: ["sale.create", "client.create"],
+    console: "RECEPTION",
+    platformAdmin: false,
+    supportMode: false,
+    activeBranchId: "branch-1",
+    tenantName: "GymOS Test",
+  };
+
+  assert.equal(canAccessRoute(receptionUser, "/benefits"), false);
+  assert.equal(canAccessRoute(receptionUser, "/pos"), true);
 });
