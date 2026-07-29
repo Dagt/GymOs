@@ -83,29 +83,32 @@ export function ClientList({ clients, loading }: ClientListProps) {
         </div>
         <span className="px-3 py-1 bg-[color:var(--brand-surface)] text-[color:var(--brand-primary)] text-xs font-black rounded-full border border-[color:var(--brand-line)]">{clients.length} socios</span>
       </div>
-      <div className="grid gap-3">
+      <div className="grid gap-1.5">
         {loading ? (
-          <div className="py-8 flex flex-col items-center gap-3">
-            <div className="w-8 h-8 border-4 border-[color:var(--brand-primary)]/10 border-t-[color:var(--brand-primary)] rounded-full animate-spin"></div>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Sincronizando socios...</p>
+          <div className="py-6 flex flex-col items-center gap-2">
+            <div className="w-6 h-6 border-3 border-[color:var(--brand-primary)]/10 border-t-[color:var(--brand-primary)] rounded-full animate-spin"></div>
+            <p className="text-[0.65rem] font-bold text-gray-400 uppercase tracking-widest">Sincronizando socios...</p>
           </div>
         ) : null}
         {!loading && clients.length === 0 ? (
-          <p className="py-8 text-center text-sm text-gray-400 font-bold italic bg-gray-50 rounded-xl border-2 border-dashed border-gray-100">No hay socios para mostrar.</p>
+          <p className="py-6 text-center text-xs text-gray-400 font-bold italic bg-gray-50 rounded-xl border-2 border-dashed border-gray-100">No hay socios para mostrar.</p>
         ) : null}
         {clients.map((client) => (
           <Link
-            className="group flex items-center justify-between p-4 rounded-xl border-2 border-gray-50 bg-gray-50/50 hover:bg-white hover:border-[color:var(--brand-primary)] hover:shadow-lg transition-all duration-300"
+            className="group flex items-center justify-between px-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:border-[color:var(--brand-primary)] hover:shadow-sm transition-all duration-200"
             href={`/clients/${client.id}`}
             key={client.id}
           >
-            <div className="flex flex-col">
-              <span className="font-black text-gray-900 group-hover:text-[color:var(--brand-primary)] transition-colors text-base">{clientFullName(client)}</span>
-              <span className="text-[0.65rem] font-black text-gray-400 uppercase tracking-widest mt-0.5">
-                {client.phone || "Sin teléfono"} • {client.email || "Sin email"} • {client.status}
-              </span>
+            <div className="flex items-center gap-3">
+              <span className="w-2 h-2 rounded-full bg-[color:var(--brand-primary)] opacity-40 group-hover:opacity-100 transition-opacity"></span>
+              <div className="flex flex-col">
+                <span className="font-bold text-gray-900 group-hover:text-[color:var(--brand-primary)] transition-colors text-sm leading-tight">{clientFullName(client)}</span>
+                <span className="text-[0.65rem] font-bold text-gray-400 uppercase tracking-wider mt-0.5">
+                  {client.phone || "Sin teléfono"} • {client.email || "Sin email"} • {client.status}
+                </span>
+              </div>
             </div>
-            <span className="w-8 h-8 rounded-lg bg-white border border-gray-100 flex items-center justify-center text-[color:var(--brand-primary)] font-black group-hover:bg-[color:var(--brand-primary)] group-hover:text-white transition-all">➔</span>
+            <span className="w-6 h-6 rounded-md bg-white border border-gray-100 flex items-center justify-center text-[color:var(--brand-primary)] text-xs font-bold group-hover:bg-[color:var(--brand-primary)] group-hover:text-white transition-all">➔</span>
           </Link>
         ))}
       </div>
