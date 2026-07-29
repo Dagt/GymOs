@@ -12,8 +12,8 @@
     - [x] Implement Feature: Update `MembershipHistory.tsx` and `useClientDetailController.ts` to enable "Activar / Contratar Plan Inicial" for unassigned clients across all roles, and update `/pos` (`PosSections.tsx`, `page.tsx`) to remove plan renewal cards and keep POS 100% retail.
 - [x] Task: Conductor - User Manual Verification 'Phase 2: Initial Plan Onboarding in Client Detail & POS Retail Cleanup' (Protocol in workflow.md)
 
-## Phase 3: Dedicated Reception Renewals Module (`/reception/renewals`)
-- [ ] Task: Create dedicated `/reception/renewals` page and Reception dashboard tile.
-    - [ ] Write Tests: Create `renewals-model.test.ts` testing client lookup, renewal execution, plan change, and sale payload generation.
-    - [ ] Implement Feature: Create `frontend/src/app/reception/renewals/page.tsx`, update `reception-model.ts`, `role-model.ts`, and `app-shell-model.ts` to add the "Renovaciones y Planes" card on `/reception` pointing to `/reception/renewals`.
-- [ ] Task: Conductor - User Manual Verification 'Phase 3: Dedicated Reception Renewals Module' (Protocol in workflow.md)
+## Phase 3: Dedicated Reception Renewals Module (`/reception/renewals`) [checkpoint: 288bb07]
+- [x] Task: Create dedicated `/reception/renewals` page and Reception dashboard tile.
+    - [x] Write Tests: Create `renewals-model.test.ts` testing client lookup, renewal execution, plan change, and sale payload generation.
+    - [x] Implement Feature: Create `frontend/src/app/reception/renewals/page.tsx`, update `reception-model.ts`, `role-model.ts`, and `app-shell-model.ts` to add the "Renovaciones y Planes" card on `/reception` pointing to `/reception/renewals`.
+- [x] Task: Conductor - User Manual Verification 'Phase 3: Dedicated Reception Renewals Module' (Protocol in workflow.md)
