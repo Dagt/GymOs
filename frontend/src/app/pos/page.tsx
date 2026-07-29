@@ -14,7 +14,8 @@ import {
   type SaleSummary,
   type StoredSession,
 } from "@/lib/api";
-import { calculateSubtotal } from "./pos-model";
+import { calculateSubtotal, findProductByBarcodeOrSku } from "./pos-model";
+import { playScanBeep, useBarcodeScanner } from "./barcode-scanner";
 import {
   type CartItem,
   type PaymentMethod,
@@ -42,6 +43,26 @@ export default function PosPage() {
   const [loading, setLoading] = useState(true);
   const [productLoading, setProductLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [highlightedProductId, setHighlightedProductId] = useState<string | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+
+  useBarcodeScanner({
+    onScan: (code) => {
+      const match = findProductByBarcodeOrSku(products, code);
+      if (match) {
+        addProduct(match);
+        playScanBeep("success");
+        setHighlightedProductId(match.id);
+        setScanError(null);
+        setTimeout(() => setHighlightedProductId(null), 1500);
+      } else {
+        playScanBeep("error");
+        setScanError(`Código no encontrado: ${code}`);
+        setTimeout(() => setScanError(null), 4000);
+      }
+    },
+    enabled: Boolean(session),
+  });
 
   useEffect(() => {
     let active = true;
@@ -207,6 +228,7 @@ export default function PosPage() {
               <PosCartForm
                 cart={cart}
                 currency={products[0]?.currency ?? cart[0]?.product.currency ?? "MXN"}
+                highlightedProductId={highlightedProductId}
                 onClearCart={() => setCart([])}
                 onPaymentAmountChange={setPaymentAmount}
                 onPaymentMethodChange={setPaymentMethod}
@@ -218,6 +240,7 @@ export default function PosPage() {
                 paymentMethod={paymentMethod}
                 paymentReference={paymentReference}
                 saving={saving}
+                scanError={scanError}
                 subtotal={subtotal}
                 validateNow={validateNow}
               />

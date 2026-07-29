@@ -1,3 +1,4 @@
+import type { ProductSummary } from "@/lib/api";
 import type { CartItem } from "./PosSections";
 
 export type PosDensityConfig = {
@@ -23,4 +24,26 @@ export function formatMoney(cents: number, currency: string) {
     style: "currency",
     currency,
   }).format(cents / 100);
+}
+
+export function findProductByBarcodeOrSku(
+  products: ProductSummary[],
+  code: string,
+): ProductSummary | null {
+  const normalizedCode = code.trim().toLowerCase();
+  if (!normalizedCode) return null;
+
+  // 1. First priority: exact barcode match
+  const byBarcode = products.find(
+    (product) => product.barcode && product.barcode.trim().toLowerCase() === normalizedCode,
+  );
+  if (byBarcode) return byBarcode;
+
+  // 2. Second priority: exact SKU match
+  const bySku = products.find(
+    (product) => product.sku && product.sku.trim().toLowerCase() === normalizedCode,
+  );
+  if (bySku) return bySku;
+
+  return null;
 }

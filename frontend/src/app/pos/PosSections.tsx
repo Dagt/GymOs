@@ -217,10 +217,12 @@ export function PosClientSearch({
 export function PosCartForm({
   cart,
   currency,
+  highlightedProductId,
   paymentAmount,
   paymentMethod,
   paymentReference,
   saving,
+  scanError,
   subtotal,
   validateNow,
   onClearCart,
@@ -233,10 +235,12 @@ export function PosCartForm({
 }: {
   cart: CartItem[];
   currency: string;
+  highlightedProductId?: string | null;
   paymentAmount: string;
   paymentMethod: PaymentMethod;
   paymentReference: string;
   saving: boolean;
+  scanError?: string | null;
   subtotal: number;
   validateNow: boolean;
   onClearCart?: () => void;
@@ -251,6 +255,12 @@ export function PosCartForm({
     <form className="rounded-2xl border border-gray-100 bg-white p-5 shadow-2xl overflow-hidden relative" onSubmit={onSubmit}>
       <div className="absolute -top-12 -right-12 w-32 h-32 bg-[color:var(--brand-primary)] opacity-[0.02] rounded-full blur-2xl pointer-events-none"></div>
       
+      {scanError ? (
+        <div className="mb-4 p-3 rounded-xl border-2 border-red-200 bg-red-50 text-red-700 text-xs font-black flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-2">
+          <span>⚠️ {scanError}</span>
+        </div>
+      ) : null}
+
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-black text-[color:var(--brand-primary)] flex items-center gap-2">
           <span className="w-2 h-5 bg-[color:var(--brand-primary)] rounded-full opacity-30"></span>
@@ -273,9 +283,18 @@ export function PosCartForm({
             <p className="text-[0.65rem] font-black text-gray-400 uppercase tracking-widest">Añade productos</p>
           </div>
         )}
-        {cart.map((item) => (
-          <div className="flex flex-col p-3 rounded-xl border-2 border-gray-50 bg-white hover:border-[color:var(--brand-primary)]/10 transition-all" key={item.product.id}>
-            <div className="flex items-start justify-between gap-3">
+        {cart.map((item) => {
+          const isHighlighted = item.product.id === highlightedProductId;
+          return (
+            <div
+              className={`flex flex-col p-3 rounded-xl border-2 transition-all duration-300 ${
+                isHighlighted
+                  ? "bg-[color:var(--brand-surface)] border-[color:var(--brand-primary)] ring-2 ring-[color:var(--brand-primary)]/30 shadow-md scale-[1.02]"
+                  : "border-gray-50 bg-white hover:border-[color:var(--brand-primary)]/10"
+              }`}
+              key={item.product.id}
+            >
+              <div className="flex items-start justify-between gap-3">
               <div className="flex-1">
                 <p className="font-black text-gray-900 leading-tight text-sm">{item.product.name}</p>
                 <p className="text-xs font-black text-[color:var(--brand-primary)] mt-0.5">
@@ -307,7 +326,8 @@ export function PosCartForm({
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
       </div>
 
       <div className="mt-6 pt-4 border-t-2 border-dashed border-gray-100">

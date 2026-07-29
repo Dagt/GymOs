@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { calculateSubtotal, formatMoney, getPosDensityConfig } from "./pos-model.ts";
+import { calculateSubtotal, findProductByBarcodeOrSku, formatMoney, getPosDensityConfig } from "./pos-model.ts";
 import type { CartItem } from "./PosSections.tsx";
+import type { ProductSummary } from "@/lib/api";
 
 test("calculateSubtotal correctly sums product prices", () => {
   const cart: CartItem[] = [
@@ -22,3 +23,21 @@ test("pos model provides data-dense configuration for power-user cashier operati
   assert.equal(config.compactCartLayout, true);
 });
 
+test("findProductByBarcodeOrSku locates product by exact barcode or SKU", () => {
+  const products: ProductSummary[] = [
+    { id: "1", name: "Agua 600ml", priceCents: 2000, currency: "MXN", sku: "AGUA-600", barcode: "7501234567890", status: "ACTIVE" } as unknown as ProductSummary,
+    { id: "2", name: "Proteina Scoop", priceCents: 3500, currency: "MXN", sku: "SCOOP-WHEY", barcode: null, status: "ACTIVE" } as unknown as ProductSummary,
+  ];
+
+  // Match by barcode
+  const foundBarcode = findProductByBarcodeOrSku(products, "7501234567890");
+  assert.equal(foundBarcode?.id, "1");
+
+  // Match by SKU (case insensitive)
+  const foundSku = findProductByBarcodeOrSku(products, "scoop-whey");
+  assert.equal(foundSku?.id, "2");
+
+  // Non-matching code returns null
+  const notFound = findProductByBarcodeOrSku(products, "UNKNOWN-999");
+  assert.equal(notFound, null);
+});
