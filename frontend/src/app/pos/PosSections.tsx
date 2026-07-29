@@ -51,43 +51,45 @@ export function ProductGrid({
           </div>
         </div>
 
-        <div className="mt-8 grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-          {loading && (
-            <div className="col-span-full py-12 flex flex-col items-center gap-4">
-               <div className="w-10 h-10 border-4 border-[color:var(--brand-primary)]/20 border-t-[color:var(--brand-primary)] rounded-full animate-spin"></div>
-               <p className="text-sm font-black text-[color:var(--brand-primary)] opacity-40 uppercase tracking-widest">Sincronizando catálogo...</p>
-            </div>
-          )}
-          {!loading && products.length === 0 && (
-            <div className="col-span-full py-16 text-center bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-               <p className="text-gray-400 font-bold italic">No se encontraron coincidencias en el inventario.</p>
-            </div>
-          )}
-          {products.map((product) => (
-            <button
-              className="group relative flex flex-col p-6 rounded-2xl border-2 border-transparent bg-gray-50 text-left transition-all duration-300 hover:bg-white hover:border-[color:var(--brand-primary)] hover:shadow-2xl hover:-translate-y-2"
-              key={product.id}
-              onClick={() => onAddProduct(product)}
-              type="button"
-            >
-              <div className="flex justify-between items-start mb-4">
-                <span className="block text-base font-black text-gray-900 leading-tight group-hover:text-[color:var(--brand-primary)] transition-colors">{product.name}</span>
-                <span className="text-[0.6rem] font-black uppercase tracking-widest px-2 py-1 bg-white text-gray-400 border border-gray-100 rounded-lg group-hover:border-[color:var(--brand-primary)]/20 transition-colors">{product.sku}</span>
+        <div className="mt-8 overflow-y-auto pr-2 max-h-[500px] custom-scrollbar">
+          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+            {loading && (
+              <div className="col-span-full py-12 flex flex-col items-center gap-4">
+                 <div className="w-10 h-10 border-4 border-[color:var(--brand-primary)]/20 border-t-[color:var(--brand-primary)] rounded-full animate-spin"></div>
+                 <p className="text-sm font-black text-[color:var(--brand-primary)] opacity-40 uppercase tracking-widest">Sincronizando catálogo...</p>
               </div>
-              
-              <div className="mt-auto flex items-center justify-between">
-                <div className="flex flex-col">
-                  <span className="text-[0.6rem] font-black uppercase tracking-widest text-gray-400">Precio</span>
-                  <span className="text-xl font-black text-[color:var(--brand-primary)]">
-                    {formatMoney(product.priceCents, product.currency)}
-                  </span>
-                </div>
-                <div className="w-12 h-12 rounded-xl bg-white border border-gray-200 shadow-sm flex items-center justify-center text-[color:var(--brand-primary)] text-2xl font-black group-hover:bg-[color:var(--brand-primary)] group-hover:text-white group-hover:border-[color:var(--brand-primary)] transition-all duration-300">
-                  +
-                </div>
+            )}
+            {!loading && products.length === 0 && (
+              <div className="col-span-full py-16 text-center bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
+                 <p className="text-gray-400 font-bold italic">No se encontraron coincidencias en el inventario.</p>
               </div>
-            </button>
-          ))}
+            )}
+            {products.map((product) => (
+              <button
+                className="group relative flex flex-col p-6 rounded-2xl border-2 border-gray-200 bg-white text-left transition-all duration-300 hover:bg-[color:var(--brand-surface)] hover:border-[color:var(--brand-primary)] hover:shadow-xl hover:-translate-y-1"
+                key={product.id}
+                onClick={() => onAddProduct(product)}
+                type="button"
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <span className="block text-base font-black text-gray-900 leading-tight group-hover:text-[color:var(--brand-primary)] transition-colors">{product.name}</span>
+                  <span className="text-[0.6rem] font-black uppercase tracking-widest px-2 py-1 bg-gray-100 text-gray-400 border border-gray-100 rounded-lg">{product.sku}</span>
+                </div>
+                
+                <div className="mt-auto flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-[0.6rem] font-black uppercase tracking-widest text-gray-400">Precio</span>
+                    <span className="text-xl font-black text-[color:var(--brand-primary)]">
+                      {formatMoney(product.priceCents, product.currency)}
+                    </span>
+                  </div>
+                  <div className="w-12 h-12 rounded-xl bg-white border border-gray-200 shadow-md flex items-center justify-center text-[color:var(--brand-primary)] text-2xl font-black group-hover:bg-[color:var(--brand-primary)] group-hover:text-white group-hover:border-[color:var(--brand-primary)] transition-all duration-300">
+                    +
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </section>
