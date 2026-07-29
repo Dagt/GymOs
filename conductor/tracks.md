@@ -17,4 +17,10 @@ This file tracks all major tracks for the project. Each track has its own detail
 - [x] **Track: POS Membership Renewals, Plan Changes, and Benefits/Agreements Optimization**
   *Link: [./tracks/pos_renewals_benefits_20260729/](./tracks/pos_renewals_benefits_20260729/)*
 
+---
+
+- [ ] **Track: Reception Renewals Module, Initial Plan Onboarding, and Benefits Governance**
+  *Link: [./tracks/reception_renewals_benefits_20260729/](./tracks/reception_renewals_benefits_20260729/)*
+
+
 
