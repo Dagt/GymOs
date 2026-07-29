@@ -1,10 +1,10 @@
 # Implementation Plan: Reception Renewals Module, Initial Plan Onboarding, and Benefits Governance
 
-## Phase 1: Benefits Architecture, Plan Linking & Expiration Governance
-- [ ] Task: Link access benefits to membership plans and enforce plan discount rules.
-    - [ ] Write Tests: Update benefit tests to verify plan-linked access inheritance and plan-only discount application with mandatory expiration.
-    - [ ] Implement Feature: Update `ClientBenefitsSection.tsx`, `benefits.ts`, and `page.tsx` under `/benefits` so Access Benefits are linked to Membership Plans (inherited automatically while plan is active), Discount Benefits apply exclusively to membership plan pricing with mandatory expiration dates (`validUntil`), and fix the dropdown API loading in Client Detail.
-- [ ] Task: Conductor - User Manual Verification 'Phase 1: Benefits Architecture, Plan Linking & Expiration Governance' (Protocol in workflow.md)
+## Phase 1: Benefits Architecture, Plan Linking & Expiration Governance [checkpoint: 483b559]
+- [x] Task: Link access benefits to membership plans and enforce plan discount rules.
+    - [x] Write Tests: Update benefit tests to verify plan-linked access inheritance and plan-only discount application with mandatory expiration.
+    - [x] Implement Feature: Update `ClientBenefitsSection.tsx`, `benefits.ts`, and `page.tsx` under `/benefits` so Access Benefits are linked to Membership Plans (inherited automatically while plan is active), Discount Benefits apply exclusively to membership plan pricing with mandatory expiration dates (`validUntil`), and fix the dropdown API loading in Client Detail.
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Benefits Architecture, Plan Linking & Expiration Governance' (Protocol in workflow.md)
 
 ## Phase 2: Initial Plan Onboarding in Client Detail & POS Retail Cleanup
 - [ ] Task: Add "Activar Plan Inicial" onboarding drawer in Client Detail and clean POS interface from plan items.
