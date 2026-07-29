@@ -9,6 +9,6 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 ---
 
-- [ ] **Track: POS Global Barcode Scanner Auto-Add**
+- [x] **Track: POS Global Barcode Scanner Auto-Add**
   *Link: [./tracks/pos_barcode_scanner_20260729/](./tracks/pos_barcode_scanner_20260729/)*
 
