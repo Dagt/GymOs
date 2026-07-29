@@ -285,6 +285,7 @@ export function BookingDayDetail({
                     key={booking.id}
                     onCancel={onCancel}
                     onShowNote={onShowNote}
+                    resourceName={resource.name}
                   />
                 ))}
               </div>
@@ -301,11 +302,13 @@ function BookingCard({
   color,
   onCancel,
   onShowNote,
+  resourceName,
 }: {
   booking: BookingSummary;
   color: string;
   onCancel: (bookingId: string) => void;
   onShowNote: (booking: BookingSummary) => void;
+  resourceName?: string;
 }) {
   const canCancel = booking.status !== "COMPLETED" && booking.status !== "CANCELLED";
   const hasNote = Boolean(booking.notes?.trim());
@@ -314,7 +317,14 @@ function BookingCard({
       <div className="absolute top-0 right-0 w-16 h-16 bg-white/10 rounded-bl-full pointer-events-none"></div>
       
       <div className="relative z-10">
-        <span className="inline-block px-2 py-0.5 bg-black/20 rounded-md text-[9px] font-black uppercase tracking-widest mb-2">{bookingStatusLabel(booking.status)}</span>
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <span className="inline-block px-2 py-0.5 bg-black/20 rounded-md text-[9px] font-black uppercase tracking-widest">{bookingStatusLabel(booking.status)}</span>
+          {resourceName && (
+            <span className="inline-block px-2 py-0.5 bg-white/20 rounded-md text-[9px] font-black uppercase tracking-wider truncate max-w-[130px]" title={resourceName}>
+              📍 {resourceName}
+            </span>
+          )}
+        </div>
         <p className="font-black text-sm leading-tight mb-1">{booking.clientName}</p>
         <p className="text-[11px] font-bold opacity-80">{formatTime(booking.startsAt)} - {formatTime(booking.endsAt)}</p>
         

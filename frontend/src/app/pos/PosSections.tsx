@@ -51,8 +51,8 @@ export function ProductGrid({
           </div>
         </div>
 
-        <div className="mt-8 overflow-y-auto pr-2 max-h-[500px] custom-scrollbar">
-          <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-6 overflow-y-auto pr-2 max-h-[520px] custom-scrollbar">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {loading && (
               <div className="col-span-full py-12 flex flex-col items-center gap-4">
                  <div className="w-10 h-10 border-4 border-[color:var(--brand-primary)]/20 border-t-[color:var(--brand-primary)] rounded-full animate-spin"></div>
@@ -66,24 +66,24 @@ export function ProductGrid({
             )}
             {products.map((product) => (
               <button
-                className="group relative flex flex-col p-6 rounded-2xl border-2 border-gray-200 bg-white text-left transition-all duration-300 hover:bg-[color:var(--brand-surface)] hover:border-[color:var(--brand-primary)] hover:shadow-xl hover:-translate-y-1"
+                className="group relative flex flex-col p-3.5 rounded-xl border border-gray-200 bg-white text-left transition-all duration-200 hover:bg-[color:var(--brand-surface)] hover:border-[color:var(--brand-primary)] hover:shadow-md hover:-translate-y-0.5"
                 key={product.id}
                 onClick={() => onAddProduct(product)}
                 type="button"
               >
-                <div className="flex justify-between items-start mb-4">
-                  <span className="block text-base font-black text-gray-900 leading-tight group-hover:text-[color:var(--brand-primary)] transition-colors">{product.name}</span>
-                  <span className="text-[0.6rem] font-black uppercase tracking-widest px-2 py-1 bg-gray-100 text-gray-400 border border-gray-100 rounded-lg">{product.sku}</span>
+                <div className="flex justify-between items-start mb-2 gap-2">
+                  <span className="block text-sm font-bold text-gray-900 leading-tight group-hover:text-[color:var(--brand-primary)] transition-colors line-clamp-2">{product.name}</span>
+                  <span className="shrink-0 text-[0.6rem] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-gray-100 text-gray-400 border border-gray-100 rounded-md">{product.sku}</span>
                 </div>
                 
-                <div className="mt-auto flex items-center justify-between">
+                <div className="mt-auto flex items-center justify-between pt-2">
                   <div className="flex flex-col">
-                    <span className="text-[0.6rem] font-black uppercase tracking-widest text-gray-400">Precio</span>
-                    <span className="text-xl font-black text-[color:var(--brand-primary)]">
+                    <span className="text-[0.6rem] font-bold uppercase tracking-wider text-gray-400">Precio</span>
+                    <span className="text-base font-black text-[color:var(--brand-primary)]">
                       {formatMoney(product.priceCents, product.currency)}
                     </span>
                   </div>
-                  <div className="w-12 h-12 rounded-xl bg-white border border-gray-200 shadow-md flex items-center justify-center text-[color:var(--brand-primary)] text-2xl font-black group-hover:bg-[color:var(--brand-primary)] group-hover:text-white group-hover:border-[color:var(--brand-primary)] transition-all duration-300">
+                  <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 shadow-xs flex items-center justify-center text-[color:var(--brand-primary)] text-lg font-bold group-hover:bg-[color:var(--brand-primary)] group-hover:text-white group-hover:border-[color:var(--brand-primary)] transition-all duration-200">
                     +
                   </div>
                 </div>
