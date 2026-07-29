@@ -58,7 +58,26 @@ class MembershipActivationService {
 				.orElseThrow(() -> new BusinessException("MEMBERSHIP_NOT_FOUND", "La membresia no existe o no esta disponible."));
 		PlanForRenewal plan = membershipRepository.planForRenewal(event.organizationId(), current.planId())
 				.orElseThrow(() -> new BusinessException("PLAN_NOT_AVAILABLE", "El plan de la membresia no esta disponible para renovacion."));
-		activateMembershipForSale(event, current.id(), plan, "MEMBERSHIP_RENEWED");
+
+		java.time.LocalDate businessDate = MembershipBusinessDate.from(event.occurredAt());
+		boolean isActive = "ACTIVE".equals(current.status());
+		java.time.LocalDate startsOn = isActive ? current.startsOn() : businessDate;
+		java.time.LocalDate baseEnd = (isActive && current.endsOn() != null && current.endsOn().isAfter(businessDate))
+				? current.endsOn()
+				: businessDate;
+		java.time.LocalDate endsOn = baseEnd.plusDays(plan.durationDays());
+		java.time.LocalDate graceEndsOn = endsOn.plusDays(plan.graceDays());
+
+		membershipRepository.updateMembershipForRenewal(
+				event.organizationId(),
+				current.id(),
+				event.saleId(),
+				startsOn,
+				endsOn,
+				graceEndsOn,
+				event.eventKey()
+		);
+		auditService.recordSystem(event.organizationId(), event.branchId(), null, "MEMBERSHIP_RENEWED", "MEMBERSHIP", current.id(), event.businessContext(), null, event.eventKey());
 	}
 
 	private void processPlanChangePayment(PaymentCompletedV1 event) {

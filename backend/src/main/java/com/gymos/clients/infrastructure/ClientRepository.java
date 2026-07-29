@@ -97,7 +97,8 @@ public class ClientRepository {
 				  AND c.deleted_at IS NULL
 				  AND p.deleted_at IS NULL
 				  AND (
-				      c.home_branch_id = :branchId
+				      c.home_branch_id IS NULL
+				      OR c.home_branch_id = :branchId
 				      OR EXISTS (
 				          SELECT 1
 				          FROM membership m
@@ -218,7 +219,8 @@ public class ClientRepository {
 				  AND c.deleted_at IS NULL
 				  AND p.deleted_at IS NULL
 				  AND (
-				      c.home_branch_id = :branchId
+				      c.home_branch_id IS NULL
+				      OR c.home_branch_id = :branchId
 				      OR EXISTS (
 				          SELECT 1
 				          FROM membership m

@@ -78,6 +78,38 @@ class MembershipCommandRepository {
 		return membershipId;
 	}
 
+	int updateMembershipForRenewal(
+			UUID organizationId,
+			UUID membershipId,
+			UUID saleId,
+			LocalDate startsOn,
+			LocalDate endsOn,
+			LocalDate graceEndsOn,
+			String eventKey
+	) {
+		return jdbcClient.sql("""
+				UPDATE membership
+				SET sale_id = :saleId,
+				    status = 'ACTIVE',
+				    starts_on = :startsOn,
+				    ends_on = :endsOn,
+				    grace_ends_on = :graceEndsOn,
+				    source_payment_event_key = :eventKey,
+				    updated_at = NOW(),
+				    version = version + 1
+				WHERE organization_id = :organizationId
+				  AND id = :membershipId
+				""")
+				.param("organizationId", organizationId)
+				.param("membershipId", membershipId)
+				.param("saleId", saleId)
+				.param("startsOn", startsOn)
+				.param("endsOn", endsOn)
+				.param("graceEndsOn", graceEndsOn)
+				.param("eventKey", eventKey)
+				.update();
+	}
+
 	int cancelActiveForPlanChange(UUID organizationId, UUID branchId, UUID membershipId) {
 		return jdbcClient.sql("""
 				UPDATE membership

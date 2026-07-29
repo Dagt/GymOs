@@ -7,9 +7,11 @@ import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   createBenefit,
   getBenefits,
+  getPlans,
   getStoredSession,
   type BenefitPayload,
   type BenefitSummary,
+  type PlanSummary,
   type StoredSession,
 } from "@/lib/api";
 import { resolveUserConsole } from "@/lib/role-model";
@@ -21,7 +23,7 @@ const defaultForm: BenefitPayload = {
   discountType: "PERCENT",
   discountPercent: 10,
   discountValueCents: null,
-  requiresEvidence: true,
+  requiresEvidence: false,
   combinable: false,
   priority: 10,
   status: "ACTIVE",
@@ -30,6 +32,8 @@ const defaultForm: BenefitPayload = {
 export default function BenefitsPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
   const [benefits, setBenefits] = useState<BenefitSummary[]>([]);
+  const [plans, setPlans] = useState<PlanSummary[]>([]);
+  const [selectedPlanIds, setSelectedPlanIds] = useState<string[]>([]);
   const [form, setForm] = useState<BenefitPayload>(defaultForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -54,9 +58,13 @@ export default function BenefitsPage() {
       }
       setSession(stored);
       try {
-        const loaded = await getBenefits(stored.accessToken);
+        const [loadedBenefits, loadedPlans] = await Promise.all([
+          getBenefits(stored.accessToken).catch(() => []),
+          getPlans(stored.accessToken).catch(() => []),
+        ]);
         if (active) {
-          setBenefits(loaded);
+          setBenefits(loadedBenefits);
+          setPlans(loadedPlans);
         }
       } catch (exception) {
         if (active) {
@@ -184,15 +192,56 @@ export default function BenefitsPage() {
               <option value="CUSTOM">Personalizado</option>
             </select>
           </label>
-          <div className="grid gap-4">
-            <label className="grid gap-2 text-sm font-bold text-[#42514a]">
-              Descuento %
-              <input className="h-11 rounded-md border border-[var(--brand-line)] px-3" type="number" min="0" max="100" value={form.discountPercent ?? 0} onChange={(event) => setForm({ ...form, discountPercent: Number(event.target.value), discountType: "PERCENT" })} />
-            </label>
-          </div>
-          <p className="text-xs font-medium text-gray-500 italic bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-            💡 Este convenio/descuento podrá asignarse a perfiles de socios y aplicarse en el punto de venta al realizar cobros.
-          </p>
+          {form.benefitType === "ACCESS" ? (
+            <div className="grid gap-2">
+              <label className="text-sm font-bold text-[#42514a]">
+                Vincular a Planes de Membresía (Selección Múltiple)
+              </label>
+              <div className="grid gap-2 max-h-40 overflow-y-auto p-3 rounded-md border border-[var(--brand-line)] bg-gray-50">
+                {plans.map((p) => {
+                  const isChecked = selectedPlanIds.includes(p.id);
+                  return (
+                    <label key={p.id} className="flex items-center gap-2 text-xs font-bold text-gray-800 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          const next = e.target.checked
+                            ? [...selectedPlanIds, p.id]
+                            : selectedPlanIds.filter((id) => id !== p.id);
+                          setSelectedPlanIds(next);
+                          if (next.length > 0) {
+                            const firstPlan = plans.find((pl) => pl.id === next[0]);
+                            setForm({
+                              ...form,
+                              name: form.name || `Pase/Acceso: ${firstPlan?.name || ""}`,
+                              code: form.code || `ACC-${p.id.slice(0, 6).toUpperCase()}`,
+                              discountPercent: null,
+                              discountType: "PERCENT",
+                            });
+                          }
+                        }}
+                      />
+                      <span>{p.name}</span>
+                    </label>
+                  );
+                })}
+              </div>
+              <p className="text-xs font-medium text-gray-500 italic bg-blue-50 p-2.5 rounded-lg border border-blue-100">
+                🔒 Los pases/accesos especiales se heredan automáticamente a los socios que tengan contratado cualquiera de los planes vinculados.
+              </p>
+            </div>
+          ) : (
+            <div className="grid gap-4">
+              <label className="grid gap-2 text-sm font-bold text-[#42514a]">
+                Descuento %
+                <input className="h-11 rounded-md border border-[var(--brand-line)] px-3" type="number" min="0" max="100" value={form.discountPercent ?? 0} onChange={(event) => setForm({ ...form, discountPercent: Number(event.target.value), discountType: "PERCENT" })} />
+              </label>
+              <p className="text-xs font-medium text-gray-500 italic bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+                💡 Este convenio/descuento podrá asignarse a perfiles de socios y aplicarse sobre la suscripción de su plan.
+              </p>
+            </div>
+          )}
           <label className="flex items-center gap-2 text-sm font-bold text-[#42514a]">
             <input type="checkbox" checked={form.requiresEvidence} onChange={(event) => setForm({ ...form, requiresEvidence: event.target.checked })} />
             Requiere evidencia

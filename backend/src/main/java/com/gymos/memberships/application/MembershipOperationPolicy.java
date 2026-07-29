@@ -25,7 +25,7 @@ class MembershipOperationPolicy {
 		MembershipAccessGuard.requireBranch(principal);
 		MembershipSummary current = membershipRepository.byId(principal.organizationId(), principal.branchId(), membershipId)
 				.orElseThrow(() -> new BusinessException("MEMBERSHIP_NOT_FOUND", "La membresia no existe o no esta disponible."));
-		if (!"ACTIVE".equals(current.status())) {
+		if (!"ACTIVE".equals(current.status()) && !"EXPIRED".equals(current.status())) {
 			throw new BusinessException(statusErrorCode, statusErrorMessage);
 		}
 		return current;

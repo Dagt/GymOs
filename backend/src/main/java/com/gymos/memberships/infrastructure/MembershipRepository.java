@@ -87,6 +87,26 @@ public class MembershipRepository {
 		);
 	}
 
+	public int updateMembershipForRenewal(
+			UUID organizationId,
+			UUID membershipId,
+			UUID saleId,
+			LocalDate startsOn,
+			LocalDate endsOn,
+			LocalDate graceEndsOn,
+			String eventKey
+	) {
+		return commands.updateMembershipForRenewal(
+				organizationId,
+				membershipId,
+				saleId,
+				startsOn,
+				endsOn,
+				graceEndsOn,
+				eventKey
+		);
+	}
+
 	public int cancelActiveForPlanChange(UUID organizationId, UUID branchId, UUID membershipId) {
 		return commands.cancelActiveForPlanChange(organizationId, branchId, membershipId);
 	}

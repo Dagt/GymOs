@@ -195,7 +195,7 @@ export function useClientDetailController() {
           clientId: params.clientId,
           items: [
             {
-              productId: selectedPlan.id,
+              productId: (selectedPlan as any).productId || selectedPlan.id,
               quantity: 1,
               discountCents: 0,
             },
