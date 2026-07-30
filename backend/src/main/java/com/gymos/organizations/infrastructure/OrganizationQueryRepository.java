@@ -44,6 +44,19 @@ public class OrganizationQueryRepository {
 				.optional();
 	}
 
+	public Optional<String> findLogoObjectKey(UUID organizationId) {
+		return jdbcClient.sql("""
+				SELECT logo_object_key
+				FROM organization
+				WHERE id = :organizationId
+				  AND deleted_at IS NULL
+				  AND logo_object_key IS NOT NULL
+				""")
+				.param("organizationId", organizationId)
+				.query(String.class)
+				.optional();
+	}
+
 	public List<ManagedOrganizationSummary> findOrganizationsForUser(UUID userId) {
 		return jdbcClient.sql("""
 				SELECT o.id, o.legal_name, o.trade_name, o.tax_id, o.status, o.timezone,

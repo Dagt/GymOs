@@ -1,5 +1,6 @@
 package com.gymos.common.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -26,10 +27,15 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableConfigurationProperties(SecurityProperties.class)
 public class SecurityConfig {
 	@Bean
-	SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
+	SecurityFilterChain securityFilterChain(
+			HttpSecurity http,
+			JwtAuthenticationFilter jwtAuthenticationFilter,
+			ObjectMapper objectMapper
+	) throws Exception {
 		return http.csrf(AbstractHttpConfigurer::disable).cors(Customizer.withDefaults())
 				.authorizeHttpRequests(authorize -> authorize
 						.requestMatchers("/actuator/health/**", "/api/v1/system/**", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/self-service/**", "/api/v1/openapi/**", "/api/v1/docs/**", "/swagger-ui/**").permitAll()
+						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/organizations/*/logo").permitAll()
 						.requestMatchers("/api/v1/auth/select-branch").hasAuthority("branch.read")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/roles", "/api/v1/users/internal").hasAuthority("user.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/users/internal").hasAuthority("user.manage")
@@ -43,8 +49,10 @@ public class SecurityConfig {
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/organizations/current/branches", "/api/v1/organizations/current/branches/*", "/api/v1/organizations/current/branches/**")
 								.hasAnyAuthority("branch.read", "organization.read", "inventory.manage", "inventory.transfer", "catalog.read")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/organizations/*/branches").hasAuthority("platform.admin")
-						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/organizations/current").hasAuthority("organization.read")
+						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/organizations/current")
+								.hasAnyAuthority("organization.read", "organization.update")
 						.requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/v1/organizations/current").hasAuthority("organization.update")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/organizations/current/logo").hasAuthority("organization.update")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/onboarding/**").hasAuthority("onboarding.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/onboarding/**").hasAuthority("onboarding.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/clients/*/workouts").hasAnyAuthority("workout.read.own", "workout.read.all")
@@ -134,7 +142,9 @@ public class SecurityConfig {
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/automations/**").hasAuthority("automation.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/reports/owner-dashboard").hasAuthority("report.owner.read")
 						.anyRequest().authenticated())
-				.exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(new StandardAuthenticationEntryPoint()))
+				.exceptionHandling(exceptions -> exceptions
+						.authenticationEntryPoint(new StandardAuthenticationEntryPoint(objectMapper))
+						.accessDeniedHandler(new StandardAccessDeniedHandler(objectMapper)))
 				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 				.httpBasic(AbstractHttpConfigurer::disable).formLogin(AbstractHttpConfigurer::disable).build();
 	}

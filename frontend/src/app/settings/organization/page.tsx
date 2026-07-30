@@ -9,6 +9,7 @@ import {
   getBranches,
   getCurrentOrganization,
   getStoredSession,
+  storeCurrentUser,
   updateBranch,
   updateOrganization,
   type BranchSummary,
@@ -213,6 +214,23 @@ export default function OrganizationSettingsPage() {
     setShowOrganizationDrawer(false);
   }
 
+  function applyUploadedLogo(logoUrl: string) {
+    setOrganization((current) => current ? { ...current, logoUrl } : current);
+    const currentSession = getStoredSession() ?? session;
+    if (currentSession) {
+      const nextSession = {
+        ...currentSession,
+        user: {
+          ...currentSession.user,
+          logoUrl,
+        },
+      };
+      storeCurrentUser(nextSession.user);
+      setSession(nextSession);
+    }
+    setMessage("Logo del gimnasio actualizado.");
+  }
+
   function openNewBranchDrawer() {
     setNewBranchForm(emptyBranchForm);
     setFieldErrors({});
@@ -290,7 +308,18 @@ export default function OrganizationSettingsPage() {
         </div>
       </section>
 
-      <OrganizationDrawer errors={fieldErrors} form={organizationForm} open={showOrganizationDrawer} saving={saving} onChange={setOrganizationForm} onClose={closeOrganizationDrawer} onSubmit={submitOrganization} />
+      <OrganizationDrawer
+        accessToken={session.accessToken}
+        errors={fieldErrors}
+        form={organizationForm}
+        open={showOrganizationDrawer}
+        organizationId={organization?.id ?? session.user.organizationId}
+        saving={saving}
+        onChange={setOrganizationForm}
+        onClose={closeOrganizationDrawer}
+        onLogoChange={applyUploadedLogo}
+        onSubmit={submitOrganization}
+      />
       <NewBranchDrawer errors={fieldErrors} form={newBranchForm} open={showNewBranchDrawer} saving={saving} onChange={setNewBranchForm} onClose={closeNewBranchDrawer} onSubmit={submitNewBranch} />
       <EditBranchDrawer branchId={selectedBranchId} branches={branches} errors={fieldErrors} form={branchForm} open={showEditBranchDrawer} saving={saving} onBranchSelect={selectEditableBranch} onChange={setBranchForm} onClose={closeEditBranchDrawer} onSubmit={submitBranch} />
     </AppShell>
@@ -309,4 +338,3 @@ function AuthRequired() {
     </main>
   );
 }
-

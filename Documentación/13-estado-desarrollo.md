@@ -1,7 +1,7 @@
 # 13. Estado actual de desarrollo
 
 Estado: FUENTE CANÓNICA / EN PROGRESO
-Corte: 29 de julio de 2026
+Corte: 30 de julio de 2026
 Código auditado: árbol de trabajo de `feature/reception-pos-init`.
 
 ## 1. Cómo interpretar este documento
@@ -24,8 +24,8 @@ Ningún módulo se declara “completo” sólo por el nombre de una rama o comm
 
 | Módulo | Estado | Evidencia actual | Pendiente principal |
 |---|---|---|---|
-| [Plataforma, tenant y sucursales](modulos/01-organizations.md) | FUNCIONAL | Consolas separadas, selección de gimnasio/sucursal y contexto tenant | Matriz negativa multi-tenant y endurecimiento global |
-| [Identidad, sesiones y permisos](modulos/02-identity-security.md) | FUNCIONAL | Inicio/renovación de sesión, roles y permisos por endpoint | Refresh token seguro y autorización uniforme |
+| [Plataforma, tenant y sucursales](modulos/01-organizations.md) | FUNCIONAL | Consolas separadas, selección de gimnasio/sucursal, reparación de permisos del dueño en instalaciones limpias y marca persistente | Matriz negativa multi-tenant y endurecimiento global |
+| [Identidad, sesiones y permisos](modulos/02-identity-security.md) | FUNCIONAL | Inicio/renovación de sesión, roles y permisos por endpoint; 401 de autenticación separado de 403 de autorización | Refresh token seguro y autorización uniforme |
 | [Socios/CRM](modulos/05-clients.md) | FUNCIONAL | Alta, búsqueda, detalle y asociación con membresías | Cobertura CRUD y escenarios multi-sucursal |
 | [Catálogo comercial](modulos/06-catalog.md) | ESTABILIZADO | Productos, membresías, categorías y operación por sucursal | Paginación/consistencia transversal |
 | [Ventas y pagos manuales](modulos/07-sales.md) | FUNCIONAL | Venta minorista y membresías con contexto, partidas, pagos, snapshots de beneficios, reportes, validación, reembolsos e idempotencia concurrente | E2E integral venta–pago–inventario–refund (`SAL-001`) |

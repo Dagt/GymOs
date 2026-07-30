@@ -5,9 +5,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.common.security.JwtService;
+import java.util.Set;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -22,6 +27,56 @@ import org.springframework.test.web.servlet.MockMvc;
 class SecurityAuthorizationTests {
 	@Autowired
 	private MockMvc mockMvc;
+
+	@Autowired
+	private JwtService jwtService;
+
+	@Test
+	void validJwtWithoutOrganizationPermissionReturnsForbiddenInsteadOfInvalidSession() throws Exception {
+		String token = jwtService.accessToken(new GymOsPrincipal(
+				UUID.randomUUID(),
+				UUID.randomUUID(),
+				UUID.randomUUID(),
+				"owner@gymos.local",
+				"Owner GymOS",
+				Set.of("branch.read"),
+				Set.of("Dueno del gimnasio"),
+				false
+		));
+
+		mockMvc.perform(get("/api/v1/organizations/current")
+						.header("Authorization", "Bearer " + token))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
+	}
+
+	@Test
+	void organizationUpdateAuthorityCanReadCurrentOrganization() throws Exception {
+		String token = jwtService.accessToken(new GymOsPrincipal(
+				UUID.randomUUID(),
+				UUID.randomUUID(),
+				UUID.randomUUID(),
+				"owner@gymos.local",
+				"Owner GymOS",
+				Set.of("organization.update"),
+				Set.of("Dueno del gimnasio"),
+				false
+		));
+
+		mockMvc.perform(get("/api/v1/organizations/current")
+						.header("Authorization", "Bearer " + token))
+				.andExpect(result ->
+						assertThat(result.getResponse().getStatus()).isNotIn(401, 403));
+	}
+
+	@Test
+	void organizationLogoReadIsPublic() throws Exception {
+		var result = mockMvc.perform(get(
+				"/api/v1/organizations/99999999-9999-9999-9999-999999999951/logo"
+		)).andReturn();
+
+		assertThat(result.getResponse().getStatus()).isNotIn(401, 403);
+	}
 
 	@Test
 	@WithMockUser(authorities = "client.read")

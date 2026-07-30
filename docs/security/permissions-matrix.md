@@ -2,7 +2,7 @@
 
 Estado: VIGENTE / COBERTURA PARCIAL
 Fuente primaria: `backend/src/main/java/com/gymos/common/security/SecurityConfig.java`  
-Última revisión documental: 2026-07-26
+Última revisión documental: 2026-07-30
 
 Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe mantenerse alineada con pruebas de autorización. Los endpoints públicos no sustituyen validaciones de negocio ni rate limiting.
 
@@ -18,14 +18,16 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 | GET | `/api/v1/openapi/**` | docs | Público local | No | No | No | Pendiente perfil prod |
 | GET | `/api/v1/docs/**` | docs | Público local | No | No | No | Pendiente perfil prod |
 | GET | `/swagger-ui/**` | docs | Público local | No | No | No | Pendiente perfil prod |
+| GET | `/api/v1/organizations/*/logo` | organizations/storage | Público, sólo marca | Sí, por UUID | No | No | `organizationLogoReadIsPublic` |
 
 ## Autenticación y organización
 
 | Método | Endpoint | Módulo | Permiso | Organización | Sucursal | Auditoría | Prueba actual |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | POST | `/api/v1/auth/select-branch` | security | `branch.read` | Sí | Sí | Recomendado | `AuthServiceTests.selectingBranchWithoutUserAccessIsDenied` |
-| GET | `/api/v1/organizations/current` | organizations | `organization.read` | Sí | No | No | Pendiente |
+| GET | `/api/v1/organizations/current` | organizations | `organization.read` o `organization.update` | Sí | No | No | JWT negativo y compatibilidad de actualización |
 | PUT | `/api/v1/organizations/current` | organizations | `organization.update` | Sí | No | Sí | Pendiente |
+| POST | `/api/v1/organizations/current/logo` | organizations/storage | `organization.update` | Sí | No | Sí | `OrganizationLogoServiceTests` |
 | GET | `/api/v1/organizations/current/branches` | organizations | `branch.read` | Sí | No | No | Pendiente |
 | ANY | `/api/v1/organizations/current/branches/*` | organizations | `branch.update` | Sí | Sí | Sí | Pendiente |
 

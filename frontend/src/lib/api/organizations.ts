@@ -83,3 +83,15 @@ export async function updateBranch(
     body: JSON.stringify(payload),
   });
 }
+
+export async function uploadOrganizationLogo(
+  accessToken: string,
+  file: File,
+): Promise<OrganizationSummary> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiFetch<OrganizationSummary>("/organizations/current/logo", accessToken, {
+    method: "POST",
+    body: formData,
+  });
+}

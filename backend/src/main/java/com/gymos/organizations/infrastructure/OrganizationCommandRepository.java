@@ -85,6 +85,31 @@ public class OrganizationCommandRepository {
 				.update();
 	}
 
+	public int updateLogo(
+			UUID organizationId,
+			UUID userId,
+			String logoUrl,
+			String logoObjectKey,
+			OffsetDateTime now
+	) {
+		return jdbcClient.sql("""
+				UPDATE organization
+				SET logo_url = :logoUrl,
+				    logo_object_key = :logoObjectKey,
+				    updated_at = :updatedAt,
+				    updated_by = :updatedBy,
+				    version = version + 1
+				WHERE id = :organizationId
+				  AND deleted_at IS NULL
+				""")
+				.param("logoUrl", logoUrl)
+				.param("logoObjectKey", logoObjectKey)
+				.param("updatedAt", now)
+				.param("updatedBy", userId)
+				.param("organizationId", organizationId)
+				.update();
+	}
+
 	public void createBranch(CreateBranchRecord record) {
 		jdbcClient.sql("""
 				INSERT INTO branch (

@@ -144,16 +144,30 @@ export function TeamAccessCard() {
 }
 
 type OrganizationDrawerProps = {
+  accessToken: string;
   errors: FieldErrorMap;
   form: OrganizationUpdatePayload;
   open: boolean;
+  organizationId: string;
   saving: boolean;
   onChange: (form: OrganizationUpdatePayload) => void;
   onClose: () => void;
+  onLogoChange: (logoUrl: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
-export function OrganizationDrawer({ errors, form, open, saving, onChange, onClose, onSubmit }: OrganizationDrawerProps) {
+export function OrganizationDrawer({
+  accessToken,
+  errors,
+  form,
+  open,
+  organizationId,
+  saving,
+  onChange,
+  onClose,
+  onLogoChange,
+  onSubmit,
+}: OrganizationDrawerProps) {
   return (
     <AppDrawer
       description="Actualiza datos comerciales, contacto y marca visual que veran duenos, gerentes, recepcion y kiosco."
@@ -175,10 +189,15 @@ export function OrganizationDrawer({ errors, form, open, saving, onChange, onClo
         <p className="app-eyebrow">Marca del gimnasio</p>
         <TextField label="Nombre visible de marca" name="brandName" required={false} value={form.brandName ?? ""} onChange={(value) => onChange({ ...form, brandName: value })} />
         <LogoUploadField
+          accessToken={accessToken}
           disabled={saving}
           logoUrl={form.logoUrl}
+          organizationId={organizationId}
           tenantName={form.tradeName || form.brandName || form.legalName}
-          onChange={(logoUrl) => onChange({ ...form, logoUrl })}
+          onChange={(logoUrl) => {
+            onChange({ ...form, logoUrl });
+            onLogoChange(logoUrl);
+          }}
         />
         <div className="grid gap-4 sm:grid-cols-3">
           <ColorField error={errors.primaryColor} label="Color principal" name="primaryColor" value={form.primaryColor ?? "#164E63"} onChange={(value) => onChange({ ...form, primaryColor: value })} />
@@ -283,4 +302,3 @@ export function EditBranchDrawer({
     </AppDrawer>
   );
 }
-

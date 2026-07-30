@@ -1040,3 +1040,27 @@ Deriva los beneficios desde la membresía vigente y el plan actual.
 ```
 
 Reemplaza de forma auditable los accesos requeridos por el dispositivo.
+
+## Organización y marca persistente
+
+`GET /api/v1/organizations/current`
+
+- requiere `organization.read` o `organization.update`;
+- devuelve los datos y la marca de la organización activa;
+- no depende de una sucursal seleccionada.
+
+`POST /api/v1/organizations/current/logo`
+
+- requiere `organization.update`;
+- recibe `multipart/form-data` con la parte `file`;
+- acepta PNG, JPG o WebP de hasta 2 MB;
+- persiste el archivo en almacenamiento de objetos, audita el reemplazo y
+  devuelve la organización actualizada con una URL versionada.
+
+`GET /api/v1/organizations/{organizationId}/logo`
+
+- lectura pública de la identidad visual no sensible;
+- sólo resuelve la referencia controlada de la organización, nunca una clave
+  de objeto proporcionada por el cliente;
+- el frontend la expone mediante
+  `/api/tenant-logo/{organizationId}?v={version}`.

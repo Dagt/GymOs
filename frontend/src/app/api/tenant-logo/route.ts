@@ -1,4 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
   await mkdir(tenantDirectory, { recursive: true });
 
   const bytes = Buffer.from(await file.arrayBuffer());
-  const fileName = `logo.${extension}`;
+  const fileName = `logo-${randomUUID()}.${extension}`;
   await writeFile(path.join(tenantDirectory, fileName), bytes);
 
   return NextResponse.json({

@@ -1,7 +1,7 @@
 # 28. Registro vivo de hallazgos y deuda técnica
 
 Estado: VIGENTE / OBLIGATORIO
-Corte: 29 de julio de 2026
+Corte: 30 de julio de 2026
 
 ## 1. Propósito y regla de actualización
 
@@ -43,6 +43,8 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 
 | ID | Módulo | Resolución | Evidencia |
 |---|---|---|---|
+| AUTH-002 | Identidad/organizaciones | Se corrigió la causa real del falso “sesión inválida” en Datos y sucursales: `organization.read` se usaba pero nunca había sido creado por Flyway, por lo que el seed local lo agregaba después de las migraciones sin asignarlo al rol global de dueño. V56 crea el permiso, repara todas las plantillas de dueño y el endpoint de lectura acepta también `organization.update`. Las denegaciones con JWT válido ahora responden 403 JSON y no 401 vacío. | `DatabaseMigrationTests.flywayAddsArchitecturalStabilizationColumns`, `SecurityAuthorizationTests.validJwtWithoutOrganizationPermissionReturnsForbiddenInsteadOfInvalidSession`, `organizationUpdateAuthorityCanReadCurrentOrganization` y smoke en Chromium con JWT de dueño sin `organization.read`. |
+| CFG-002 | Configuración/logo | La edición del gimnasio dejó de guardar el logo como archivo ignorado en `frontend/public/tenants`, que producía 404 al clonar o reconstruir otra PC. La carga autenticada persiste el objeto en MinIO, guarda una referencia aislada por organización, usa URL versionada, actualiza la marca visible y reemplaza el objeto anterior tras commit. | `OrganizationLogoServiceTests`, endpoint `POST /organizations/current/logo`, proxy `/api/tenant-logo/{organizationId}` y typecheck/build frontend. |
 | BEN-001 | Beneficios/elegibilidad | Se creó el módulo transversal `eligibility` con una única política pública para cliente activo, fecha efectiva, sucursal, membresía vigente, planes permitidos, descuentos asignados y beneficios ACCESS heredados. Membresías, reservas y acceso consumen el mismo contrato; se retiraron las consultas paralelas de elegibilidad de cada módulo. | `DefaultEligibilityPolicyTests`, `BookingMembershipPlanIntegrationTests`, `MembershipCommercePersistenceIntegrationTests`, `MembershipPricingServiceTests` y `AccessBenefitDecisionTests`. |
 | COA-025 | Coaches/PDF/arquitectura | Los lookups PDF dejaron de inyectar `JdbcClient` en `application` y de publicar instancias globales `static volatile`. `WorkoutPdfDocumentMapper` recibe puertos explícitos con IDs de tenant/sucursal y los adaptadores JDBC viven en `coaching.infrastructure`. | `ArchitectureTests.applicationLayerDoesNotUseJdbcClient`, `CoachingCatalogServiceTests`, `WorkoutPdfExerciseCatalogLookupTests`, `WorkoutPdfLookupAdapterTests` y `CompactWorkoutPdfRendererRegressionTests`. |
 | MEM-001 | Membresías/fechas | Definida duración inclusiva, continuidad al día siguiente, reinicio de vencidas, fecha operativa México y expiración después de gracia. | `MembershipActivationWindowCalculatorTests`, `MembershipRenewalWindowCalculatorTests`, `MembershipBusinessDateTests` y prueba PostgreSQL de expiración. |
