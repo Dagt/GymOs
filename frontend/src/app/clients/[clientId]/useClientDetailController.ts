@@ -30,6 +30,7 @@ import {
   toClientUpdateForm,
   validateClientUpdate,
 } from "./ClientDetailHelpers";
+import { resolveClientMembershipCapabilities } from "./client-membership-permissions";
 
 export type MembershipAction = {
   membership: ClientMembershipSummary;
@@ -61,12 +62,29 @@ export function useClientDetailController() {
 
   const canEditClient = useMemo(() => hasPermission(session, "client.update"), [session]);
   const canReadMemberships = useMemo(() => hasPermission(session, "membership.read"), [session]);
-  const canManageMemberships = useMemo(
-    () =>
-      hasPermission(session, "membership.update") ||
-      hasPermission(session, "membership.create") ||
-      hasPermission(session, "sale.create") ||
-      hasPermission(session, "client.create"),
+  const membershipCapabilities = useMemo(
+    () => resolveClientMembershipCapabilities(session?.user),
+    [session],
+  );
+  const canEnrollMembership = membershipCapabilities.canEnroll;
+  const canRenewMembership = membershipCapabilities.canRenew;
+  const canChangeMembership = membershipCapabilities.canChange;
+  const canManageMemberships = membershipCapabilities.canManage;
+  const canReadBenefits = useMemo(
+    () => hasAnyPermission(session, ["benefit.read", "client.benefit.assign"]),
+    [session],
+  );
+  const canAssignBenefits = useMemo(
+    () => hasAnyPermission(session, [
+      "client.benefit.assign",
+      "client.update",
+      "client.create",
+      "sale.create",
+    ]),
+    [session],
+  );
+  const canReadAccessBenefits = useMemo(
+    () => hasPermission(session, "access.read"),
     [session],
   );
   const limitedCoachView = useMemo(
@@ -94,9 +112,8 @@ export function useClientDetailController() {
         setForm(toClientUpdateForm(response.client));
 
         const mayReadMemberships = hasPermission(storedSession, "membership.read");
-        const mayManageMemberships = hasPermission(storedSession, "membership.update")
-          && hasPermission(storedSession, "sale.create")
-          && hasPermission(storedSession, "catalog.read");
+        const mayLoadPlans = hasPermission(storedSession, "sale.create")
+          || hasPermission(storedSession, "membership.change-plan");
 
         if (mayReadMemberships) {
           try {
@@ -106,13 +123,13 @@ export function useClientDetailController() {
               setMembershipPeriods(snapshot.periodsByMembership);
             }
           } catch (membershipError) {
-            if (active && mayManageMemberships) {
+            if (active && mayLoadPlans) {
               setError(membershipError instanceof Error ? membershipError.message : "No fue posible cargar membresias.");
             }
           }
         }
 
-        if (mayManageMemberships) {
+        if (mayLoadPlans) {
           try {
             const loadedPlans = await getPlans(storedSession.accessToken);
             if (!active) return;
@@ -184,7 +201,7 @@ export function useClientDetailController() {
   }
 
   async function renew(activeMembership: ClientMembershipSummary) {
-    if (!session || !canManageMemberships) return;
+    if (!session || !canRenewMembership) return;
     setRenewingMembershipId(activeMembership.id);
     setError(null);
     setMessage(null);
@@ -213,7 +230,8 @@ export function useClientDetailController() {
   }
 
   async function changePlan(activeMembership: ClientMembershipSummary) {
-    if (!session || !targetPlanId || !canManageMemberships) return;
+    const allowed = activeMembership.id ? canChangeMembership : canEnrollMembership;
+    if (!session || !targetPlanId || !allowed) return;
     setChangingMembershipId(activeMembership.id || "new");
     setError(null);
     setMessage(null);
@@ -268,9 +286,27 @@ export function useClientDetailController() {
   }
 
   function openMembershipAction(activeMembership: ClientMembershipSummary, type: "renew" | "change") {
-    if (!canManageMemberships) return;
+    const allowed = type === "renew"
+      ? canRenewMembership
+      : activeMembership.id
+        ? canChangeMembership
+        : canEnrollMembership;
+    if (!allowed) {
+      setError("Tu rol no permite realizar esta operación de membresía.");
+      return;
+    }
+    setError(null);
+    setMessage(null);
     if (type === "change") {
-      setTargetPlanId((current) => current && current !== activeMembership.planId ? current : plans.find((plan) => plan.id !== activeMembership.planId)?.id || "");
+      setTargetPlanId((current) => {
+        if (!activeMembership.id) {
+          return current || plans[0]?.id || "";
+        }
+        return current && current !== activeMembership.planId
+          ? current
+          : plans.find((plan) => plan.id !== activeMembership.planId)?.id || "";
+      });
+      setRenewValidateNow(true);
     }
     setMembershipQuote(null);
     setMembershipAction({ membership: activeMembership, type });
@@ -278,7 +314,7 @@ export function useClientDetailController() {
 
   async function submitMembershipAction(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!membershipAction || !canManageMemberships) return;
+    if (!membershipAction) return;
     if (membershipAction.type === "change") {
       await changePlan(membershipAction.membership);
       return;
@@ -287,9 +323,15 @@ export function useClientDetailController() {
   }
 
   return {
+    canAssignBenefits,
+    canChangeMembership,
     canEditClient,
+    canEnrollMembership,
     canManageMemberships,
+    canReadAccessBenefits,
+    canReadBenefits,
     canReadMemberships,
+    canRenewMembership,
     changingMembershipId,
     data,
     error,
@@ -365,4 +407,8 @@ function hasPermission(session: StoredSession | null, permission: string) {
       || session?.user.permissions.includes("platform.admin")
       || session?.user.platformAdmin,
   );
+}
+
+function hasAnyPermission(session: StoredSession | null, permissions: string[]) {
+  return permissions.some((permission) => hasPermission(session, permission));
 }

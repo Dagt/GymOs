@@ -6,6 +6,7 @@ import type {
   AccessRequestPayload,
   ConsumeVisitPassPayload,
   CreateVisitPassPayload,
+  EffectiveAccessBenefit,
   ManualOpenPayload,
   TemporaryPass,
   TemporaryPassPayload,
@@ -18,6 +19,16 @@ export async function getAccessDevices(accessToken: string): Promise<AccessDevic
 
 export async function getAccessLogs(accessToken: string, limit = 30): Promise<AccessLog[]> {
   return apiFetch<AccessLog[]>(`/access/logs?limit=${limit}`, accessToken);
+}
+
+export async function getEffectiveAccessBenefits(
+  accessToken: string,
+  clientId: string,
+): Promise<EffectiveAccessBenefit[]> {
+  return apiFetch<EffectiveAccessBenefit[]>(
+    `/access/clients/${clientId}/effective-benefits`,
+    accessToken,
+  );
 }
 
 export async function requestAccess(

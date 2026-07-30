@@ -38,6 +38,15 @@ export type AccessLog = {
   clientName: string | null;
 };
 
+export type EffectiveAccessBenefit = {
+  benefitId: string;
+  code: string;
+  name: string;
+  membershipId: string;
+  planId: string;
+  planName: string;
+};
+
 export type TemporaryPass = {
   id: string;
   clientId: string;

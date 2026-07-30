@@ -25,8 +25,9 @@ const memberWorkflowPermissions = [
   "client.create",
   "client.update",
   "membership.read",
-  "membership.create",
-  "membership.update",
+  "membership.renew",
+  "membership.change-plan",
+  "sale.create",
 ];
 
 const platformSections: NavigationSection[] = [
@@ -106,7 +107,6 @@ const receptionSections: NavigationSection[] = [
     title: "Mostrador",
     links: [
       { label: "Inicio recepcion", href: "/reception", hint: "Acciones del dia", permissions: ["client.read", "sale.create"] },
-      { label: "Renovaciones", href: "/reception/renewals", hint: "Planes y extensión", permissions: ["membership.update", "sale.create"] },
       { label: "Caja / POS", href: "/pos", hint: "Ventas y pagos", permissions: ["sale.create"] },
       { label: "Socios", href: "/clients", hint: "Altas y fichas", permissions: memberWorkflowPermissions },
       { label: "Reservas", href: "/bookings", hint: "Agenda", permissions: ["booking.read"] },

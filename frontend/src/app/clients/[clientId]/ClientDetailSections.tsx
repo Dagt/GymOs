@@ -1,5 +1,6 @@
 export { ClientProfileCard } from "./ClientProfileCard";
 export { ClientSummaryAside } from "./ClientSummaryAside";
+export { ClientBenefitsSection } from "./ClientBenefitsSection";
 export {
   EditClientDrawer,
   MembershipActionDrawer,

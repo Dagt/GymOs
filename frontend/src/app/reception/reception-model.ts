@@ -14,7 +14,7 @@ export type DaySignal = {
 
 export const FOCUS_ACTIONS: FocusAction[] = [
   {
-    title: "Cobrar venta o membresia",
+    title: "Cobrar venta o membresía",
     detail: "Productos, planes, renovaciones y pagos manuales desde caja.",
     href: "/pos",
     label: "Abrir caja",
@@ -22,7 +22,7 @@ export const FOCUS_ACTIONS: FocusAction[] = [
   },
   {
     title: "Buscar o registrar socio",
-    detail: "Alta rapida, ficha, membresias, beneficios y notas.",
+    detail: "Alta rápida, ficha, membresías, beneficios y notas.",
     href: "/clients",
     label: "Ir a socios",
     accent: "people",
@@ -42,13 +42,6 @@ export const FOCUS_ACTIONS: FocusAction[] = [
     accent: "kiosk",
   },
   {
-    title: "Renovaciones y Planes",
-    detail: "Extensión de vigencias, cobro de renovaciones y cambios de plan.",
-    href: "/reception/renewals",
-    label: "Renovar plan",
-    accent: "renewals",
-  },
-  {
     title: "Reservas",
     detail: "Agenda recursos, registra reservas y vincula pagos cuando aplique.",
     href: "/bookings",
@@ -56,8 +49,8 @@ export const FOCUS_ACTIONS: FocusAction[] = [
     accent: "bookings",
   },
   {
-    title: "Servicios de Bienestar",
-    detail: "Agendar citas, consultar especialistas, confirmación y estatus.",
+    title: "Servicios de bienestar",
+    detail: "Agenda citas, consulta especialistas, confirmación y estatus.",
     href: "/wellness",
     label: "Ver citas",
     accent: "wellness",

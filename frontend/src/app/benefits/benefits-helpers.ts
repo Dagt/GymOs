@@ -4,15 +4,7 @@ export function isAccessBenefit(benefit: { benefitType: string }): boolean {
 }
 
 export function isDiscountBenefit(benefit: { benefitType: string }): boolean {
-  const type = benefit.benefitType.toUpperCase();
-  return (
-    type === "STUDENT" ||
-    type === "AGREEMENT" ||
-    type === "DISCOUNT" ||
-    type === "PROMOTION" ||
-    type === "SENIOR" ||
-    type === "DISABILITY"
-  );
+  return !isAccessBenefit(benefit);
 }
 
 export function validateClientBenefitAssignment(payload: {

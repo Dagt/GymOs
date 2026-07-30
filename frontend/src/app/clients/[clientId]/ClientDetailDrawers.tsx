@@ -109,16 +109,23 @@ export function MembershipActionDrawer({
   renewValidateNow: boolean;
   targetPlanId: string;
 }) {
+  const initialEnrollment = Boolean(action && !action.membership.id);
+  const availablePlans = action?.type === "change" && action.membership.id
+    ? plans.filter((plan) => plan.id !== action.membership.planId)
+    : plans;
+
   return (
     <AppDrawer
       description={
-        action?.type === "change"
-          ? "Selecciona el nuevo plan, registra el pago y aplica el cambio de membresia."
+        initialEnrollment
+          ? "Selecciona el primer plan y registra el pago para activar la membresía."
+          : action?.type === "change"
+            ? "Selecciona el nuevo plan. Al confirmar el pago se sustituye el plan vigente y se recalculan sus accesos."
           : "Registra el pago de renovacion y define si se valida de inmediato o queda pendiente."
       }
       onClose={onClose}
       open={Boolean(action)}
-      title={action?.type === "change" ? "Cambiar plan" : "Renovar membresia"}
+      title={initialEnrollment ? "Asignar membresía inicial" : action?.type === "change" ? "Cambiar plan" : "Renovar membresia"}
     >
       {action ? (
         <form className="grid gap-4" onSubmit={onSubmit}>
@@ -132,7 +139,7 @@ export function MembershipActionDrawer({
           <MembershipControls
             membershipQuote={membershipQuote}
             mode={action.type}
-            plans={plans}
+            plans={availablePlans}
             renewMethod={renewMethod}
             renewReference={renewReference}
             renewValidateNow={renewValidateNow}
@@ -142,17 +149,29 @@ export function MembershipActionDrawer({
             onTargetPlanChange={onTargetPlanChange}
             onValidateNowChange={onValidateNowChange}
           />
+          {action.type === "change" && !initialEnrollment ? (
+            <p className="rounded-md border border-[#d8ddd2] bg-[#f7f9f6] p-3 text-xs text-[#5d6b63]">
+              El cambio cancela el periodo actual e inicia hoy una membresía con la duración completa del
+              nuevo plan. No transfiere días restantes ni calcula prorrateo. La venta y ambos movimientos
+              quedan en el historial, y los accesos heredados se reemplazan al validar el pago.
+            </p>
+          ) : null}
           <button
             className="form-primary-button"
             disabled={
               renewingMembershipId !== null
               || changingMembershipId !== null
-              || (action.type === "change" && (!targetPlanId || targetPlanId === action.membership.planId))
+              || (
+                action.type === "change"
+                && (!targetPlanId || (!initialEnrollment && targetPlanId === action.membership.planId))
+              )
             }
             type="submit"
           >
             {action.type === "change"
-              ? changingMembershipId === action.membership.id ? "Cambiando..." : "Cambiar plan"
+              ? changingMembershipId === action.membership.id
+                ? initialEnrollment ? "Asignando..." : "Cambiando..."
+                : initialEnrollment ? "Asignar membresía" : "Cambiar plan"
               : renewingMembershipId === action.membership.id ? "Renovando..." : "Renovar membresia"}
           </button>
         </form>
@@ -203,6 +222,7 @@ function MembershipControls({
         <label className="form-field mt-3" htmlFor="targetPlanId">
           <span>Plan nuevo</span>
           <select className="app-input" id="targetPlanId" onChange={(event) => onTargetPlanChange(event.target.value)} value={targetPlanId}>
+            {plans.length === 0 ? <option value="">No hay otro plan activo disponible</option> : null}
             {plans.map((plan) => (
               <option key={plan.id} value={plan.id}>
                 {plan.name} - {formatMoney(plan.priceCents, plan.currency)}
@@ -212,8 +232,13 @@ function MembershipControls({
         </label>
       ) : null}
       <label className="mt-3 flex items-center gap-2 text-sm font-medium text-[#42514a]">
-        <input checked={renewValidateNow} onChange={(event) => onValidateNowChange(event.target.checked)} type="checkbox" />
-        Validar pago ahora
+        <input
+          checked={mode === "change" ? true : renewValidateNow}
+          disabled={mode === "change"}
+          onChange={(event) => onValidateNowChange(event.target.checked)}
+          type="checkbox"
+        />
+        {mode === "change" ? "Validar pago y aplicar el cambio ahora" : "Validar pago ahora"}
       </label>
       <div className="mt-3">
         <MembershipQuoteSummary loading={false} quote={membershipQuote} />

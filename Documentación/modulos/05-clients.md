@@ -9,6 +9,10 @@ Estado: `FUNCIONAL`
 - membresía inicial y pago de entrada;
 - importación de socios;
 - detalle frontend y operación por sucursal.
+- ficha operativa con membresía, periodos, accesos heredados del plan y
+  descuentos asignados directamente al socio;
+- asignación de beneficios económicos desde la ficha, con expiración
+  obligatoria y actualización visible después de guardarlos;
 - V57 crea de forma canónica los permisos `client.*` y garantiza que dueño,
   gerencia y recepción puedan consultar, registrar y actualizar socios también
   en instalaciones iniciadas desde una base vacía.
@@ -29,4 +33,5 @@ Estado: `FUNCIONAL`
 - puertos de aplicación consistentes (`GEN-002`).
 
 Última evidencia: `DatabaseMigrationTests` sobre PostgreSQL limpio y E2E de
-botón de alta visible para gerencia y recepción, 30-jul-2026.
+botón de alta visible para gerencia y recepción; `member-workflows.spec.ts`
+valida beneficios, accesos y cambio de plan desde la ficha, 30-jul-2026.

@@ -28,3 +28,15 @@ continúa al día siguiente y la vencida reinicia en la fecha operativa. Un work
 y una reconciliación previa a lectura/mutación cambian a `EXPIRED` después de la
 gracia. La prueba PostgreSQL simultánea validó el bloqueo y descubrió/corrigió
 que el lock no debía unir la venta mutable antes de releer el agregado.
+
+La ficha usa los permisos reales `membership.renew`,
+`membership.change-plan` y `sale.create`; se retiraron comprobaciones frontend
+contra los códigos inexistentes `membership.update` y `membership.create`.
+Renovar y cambiar plan abren un drawer en la propia ficha con cotización y
+pago. El cambio sólo admite una membresía activa: cancela el periodo actual,
+crea una membresía del nuevo plan desde la fecha operativa, no prorratea ni
+transfiere días pendientes y actualiza inmediatamente los accesos heredados.
+
+La renovación rápida vive dentro de `/reception`. La entrada lateral y la
+tarjeta que enviaban a `/reception/renewals` fueron retiradas; esa URL sólo
+redirige al inicio para conservar marcadores antiguos.

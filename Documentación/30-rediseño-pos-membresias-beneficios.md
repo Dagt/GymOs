@@ -107,6 +107,10 @@ también.
     vigente, alcance de sucursal y beneficios; se eliminaron los repositorios
     paralelos `MembershipPricingRepository` y `BookingEligibilityRepository`,
     así como la reconstrucción de membresía/beneficios dentro de Access.
+11. **IMPLEMENTADA:** la ficha del socio muestra descuentos directos y accesos
+    heredados, permite asignar descuentos y ejecuta cambio de plan con
+    cotización. La renovación rápida quedó integrada en `/reception`; se
+    retiraron el acceso lateral y la tarjeta hacia la pantalla dedicada.
 
 ## Operación del POS
 
@@ -169,7 +173,10 @@ también.
   dependencias explícitas y el SQL/JdbcClient vive exclusivamente en adaptadores
   de `coaching.infrastructure`. La prueba
   `applicationLayerDoesNotUseJdbcClient` vuelve a pasar.
-- Frontend: 54 pruebas exitosas, typecheck y build de producción exitosos.
+- Frontend: 57 pruebas exitosas, typecheck y build de producción exitosos.
+- Playwright: 8 recorridos enfocados exitosos, incluidos cambio de plan,
+  actualización inmediata de `ACCESS`, asignación de descuento, renovación
+  embebida y redirección de la ruta anterior.
 - Lint sin errores; conserva dos advertencias preexistentes de dependencias de
   hooks en `AppShell.tsx`.
 - `git diff --check`: exitoso.

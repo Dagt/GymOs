@@ -67,6 +67,11 @@ Debe mostrar:
 
 La portada `/reception` es una consola rapida de mostrador. No debe duplicar la navegacion lateral en esa primera pantalla ni esconder acciones en una seccion secundaria de "mas herramientas". Las pantallas internas como POS, socios, reservas y ventas si pueden usar `AppShell` lateral para navegacion entre modulos.
 
+La renovación rápida se realiza dentro de esta portada: busca al socio, muestra
+su plan y cotización y registra el cobro sin navegar a una pantalla dedicada.
+No debe existir una opción lateral ni una tarjeta de navegación separada para
+`/reception/renewals`; la ruta histórica redirige a `/reception`.
+
 ## 8.2.1 Equipo y alcance de sucursal
 
 - Si un gerente solo tiene una sucursal asignada, los formularios de alta de recepcionistas o coaches deben mostrar esa sucursal seleccionada y bloqueada.
@@ -121,6 +126,11 @@ Resumen:
 - último acceso
 - próximas reservas
 - saldo o pagos pendientes
+
+La ficha muestra explícitamente accesos heredados del plan activo y descuentos
+asignados al socio. Cambiar plan abre un drawer funcional que explica que el
+periodo actual se cancela, el nuevo inicia en la fecha operativa, no existe
+prorrateo y los accesos heredados se recalculan después del pago.
 
 ## 8.5 Punto de venta
 

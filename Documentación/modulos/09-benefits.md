@@ -31,6 +31,13 @@ PostgreSQL demuestra que crear la relación beneficio–plan actualiza
 inmediatamente al socio y que cambiar su plan revoca esa herencia sin copiar
 asignaciones.
 
+La ficha del socio presenta dos fuentes sin mezclarlas: `ACCESS` se consulta
+como elegibilidad efectiva del plan activo y los descuentos/convenios se
+consultan como asignaciones directas. Sólo los beneficios económicos aparecen
+en el selector de asignación; todos, incluido `CUSTOM`, requieren fecha de
+expiración. Al cambiar plan, la ficha vuelve a consultar los accesos efectivos
+para reflejar la nueva relación sin recargar la página.
+
 ## Política transversal
 
 `com.gymos.eligibility` es la fuente única de verdad para decidir elegibilidad.

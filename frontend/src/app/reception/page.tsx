@@ -15,6 +15,7 @@ import {
   type OrganizationSummary,
   type StoredSession,
 } from "@/lib/api";
+import { ReceptionRenewalWidget } from "./ReceptionRenewalWidget";
 
 export default function ReceptionPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
@@ -151,6 +152,8 @@ export default function ReceptionPage() {
               />
             ))}
           </section>
+
+          <ReceptionRenewalWidget session={session} />
 
           {/* Main Hub Grid */}
           <section>

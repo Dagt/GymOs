@@ -194,7 +194,9 @@ test.describe("consolas por rol", () => {
 
     await expect(page.getByRole("heading", { name: /Recepcion|Revolucion/i })).toBeVisible();
     await expect(page.getByLabel("Perfil activo").getByText("Recepcion")).toBeVisible();
-    await expect(page.getByText(/Cobrar venta o membresia/i)).toBeVisible();
+    await expect(page.getByText(/Cobrar venta o membres/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Renovación y Asignación de Membresía/i })).toBeVisible();
+    await expect(page.locator('a[href="/reception/renewals"]')).toHaveCount(0);
     await expect(page.getByRole("link", { name: /Equipo/i })).toHaveCount(0);
     await expect(page.getByRole("link", { name: /Datos y sucursales/i })).toHaveCount(0);
     await page.goto("/clients");

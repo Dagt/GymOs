@@ -12,6 +12,7 @@ test("identifies access benefits vs discount benefits correctly", () => {
 
   assert.equal(isDiscountBenefit({ benefitType: "STUDENT" }), true);
   assert.equal(isDiscountBenefit({ benefitType: "AGREEMENT" }), true);
+  assert.equal(isDiscountBenefit({ benefitType: "CUSTOM" }), true);
   assert.equal(isDiscountBenefit({ benefitType: "ACCESS" }), false);
 });
 
