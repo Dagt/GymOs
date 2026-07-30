@@ -31,6 +31,12 @@ All notable changes to GymOS will be documented in this file.
 - Add operational runbooks for deployment, backup, restore, rollback, incidents and maintenance.
 - Restrict demo seed to the local Spring profile.
 - Expand CI with Docker Compose validation and image builds.
+- Scope newly created benefits to the active branch, surface evidence
+  verification state and let reception inspect inherited member access without
+  access-administration privileges.
+- Consolidate member renewal, initial enrollment and plan changes in reception;
+  keep only the operational current plan on the profile and move membership
+  movements to its activity timeline.
 
 ## 0.6.5
 

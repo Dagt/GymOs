@@ -97,6 +97,8 @@ public class SecurityConfig {
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/access/visit-passes/**").hasAuthority("visit.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/access/visit-passes/*/consume").hasAuthority("visit.consume")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/access/visit-passes").hasAuthority("visit.create")
+						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/access/clients/*/effective-benefits")
+								.hasAnyAuthority("access.read", "client.read", "membership.read", "benefit.read")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/access/**").hasAuthority("access.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/access/**").hasAuthority("access.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/v1/access/**").hasAuthority("access.manage")

@@ -52,19 +52,30 @@ public class BenefitRepository {
 				.toList();
 	}
 
+	public List<BenefitSummary> benefitsForBranch(UUID organizationId, UUID branchId) {
+		if (branchId == null) {
+			return benefits(organizationId);
+		}
+		return benefits(organizationId).stream()
+				.filter(benefit -> benefit.branchId() == null || branchId.equals(benefit.branchId()))
+				.toList();
+	}
+
 	public Optional<BenefitSummary> benefit(UUID organizationId, UUID benefitId) {
 		return benefits(organizationId).stream().filter(benefit -> benefit.id().equals(benefitId)).findFirst();
 	}
 
-	public boolean codeExists(UUID organizationId, String code) {
+	public boolean codeExists(UUID organizationId, UUID branchId, String code) {
 		Integer count = jdbcClient.sql("""
 				SELECT COUNT(*)
 				FROM benefit
 				WHERE organization_id = :organizationId
+				  AND branch_id = :branchId
 				  AND code = :code
 				  AND deleted_at IS NULL
 				""")
 				.param("organizationId", organizationId)
+				.param("branchId", branchId)
 				.param("code", code.trim().toUpperCase())
 				.query(Integer.class)
 				.single();
@@ -102,7 +113,11 @@ public class BenefitRepository {
 		return count > 0;
 	}
 
-	public UUID createBenefit(GymOsPrincipal principal, CreateBenefitCommand command) {
+	public UUID createBenefit(
+			GymOsPrincipal principal,
+			UUID branchId,
+			CreateBenefitCommand command
+	) {
 		UUID id = UUID.randomUUID();
 		OffsetDateTime now = OffsetDateTime.now();
 		jdbcClient.sql("""
@@ -119,7 +134,7 @@ public class BenefitRepository {
 				""")
 				.param("id", id)
 				.param("organizationId", principal.organizationId())
-				.param("branchId", command.branchId())
+				.param("branchId", branchId)
 				.param("code", command.code().trim().toUpperCase())
 				.param("name", command.name().trim())
 				.param("benefitType", command.benefitType().trim().toUpperCase())
@@ -225,7 +240,7 @@ public class BenefitRepository {
 
 	public Optional<ClientBenefitSummary> clientBenefit(UUID organizationId, UUID clientBenefitId) {
 		return jdbcClient.sql("""
-				SELECT cb.id, cb.client_id, cb.benefit_id, b.name AS benefit_name, cb.status,
+				SELECT cb.id, cb.branch_id, cb.client_id, cb.benefit_id, b.name AS benefit_name, cb.status,
 				       cb.valid_from, cb.valid_until, cb.verified_at
 				FROM client_benefit cb
 				JOIN benefit b ON b.id = cb.benefit_id
@@ -237,6 +252,7 @@ public class BenefitRepository {
 				.param("clientBenefitId", clientBenefitId)
 				.query((rs, row) -> new ClientBenefitSummary(
 						rs.getObject("id", UUID.class),
+						rs.getObject("branch_id", UUID.class),
 						rs.getObject("client_id", UUID.class),
 						rs.getObject("benefit_id", UUID.class),
 						rs.getString("benefit_name"),
@@ -248,9 +264,43 @@ public class BenefitRepository {
 				.optional();
 	}
 
-	public List<ClientBenefitSummary> clientBenefits(UUID organizationId, UUID clientId) {
+	public List<ClientBenefitSummary> clientBenefits(UUID organizationId, UUID branchId, UUID clientId) {
+		if (branchId == null) {
+			return clientBenefits(organizationId, clientId);
+		}
 		return jdbcClient.sql("""
-				SELECT cb.id, cb.client_id, cb.benefit_id, b.name AS benefit_name, cb.status,
+				SELECT cb.id, cb.branch_id, cb.client_id, cb.benefit_id, b.name AS benefit_name, cb.status,
+				       cb.valid_from, cb.valid_until, cb.verified_at
+				FROM client_benefit cb
+				JOIN benefit b
+				  ON b.id = cb.benefit_id
+				 AND b.organization_id = cb.organization_id
+				WHERE cb.organization_id = :organizationId
+				  AND cb.branch_id = :branchId
+				  AND cb.client_id = :clientId
+				  AND cb.deleted_at IS NULL
+				ORDER BY cb.assigned_at DESC, cb.id DESC
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("clientId", clientId)
+				.query((rs, row) -> new ClientBenefitSummary(
+						rs.getObject("id", UUID.class),
+						rs.getObject("branch_id", UUID.class),
+						rs.getObject("client_id", UUID.class),
+						rs.getObject("benefit_id", UUID.class),
+						rs.getString("benefit_name"),
+						rs.getString("status"),
+						rs.getObject("valid_from", LocalDate.class),
+						rs.getObject("valid_until", LocalDate.class),
+						rs.getObject("verified_at", OffsetDateTime.class)
+				))
+				.list();
+	}
+
+	private List<ClientBenefitSummary> clientBenefits(UUID organizationId, UUID clientId) {
+		return jdbcClient.sql("""
+				SELECT cb.id, cb.branch_id, cb.client_id, cb.benefit_id, b.name AS benefit_name, cb.status,
 				       cb.valid_from, cb.valid_until, cb.verified_at
 				FROM client_benefit cb
 				JOIN benefit b
@@ -265,6 +315,7 @@ public class BenefitRepository {
 				.param("clientId", clientId)
 				.query((rs, row) -> new ClientBenefitSummary(
 						rs.getObject("id", UUID.class),
+						rs.getObject("branch_id", UUID.class),
 						rs.getObject("client_id", UUID.class),
 						rs.getObject("benefit_id", UUID.class),
 						rs.getString("benefit_name"),
@@ -321,6 +372,7 @@ public class BenefitRepository {
 
 	public record ClientBenefitSummary(
 			UUID id,
+			UUID branchId,
 			UUID clientId,
 			UUID benefitId,
 			String benefitName,

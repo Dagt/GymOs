@@ -98,6 +98,8 @@ class DatabaseMigrationTests {
 			assertThat(indexExists(connection, "ux_membership_single_active_client")).isTrue();
 			assertThat(indexExists(connection, "ux_membership_period_event")).isTrue();
 			assertThat(indexExists(connection, "ix_membership_sale_benefit_sale")).isTrue();
+			assertThat(indexExists(connection, "ux_benefit_org_branch_code")).isTrue();
+			assertThat(indexExists(connection, "ux_benefit_org_global_code")).isTrue();
 			assertThat(tableExists(connection, "visit_pass")).isTrue();
 			assertThat(tableExists(connection, "sale_refund")).isTrue();
 			assertThat(tableExists(connection, "booking_payment")).isTrue();

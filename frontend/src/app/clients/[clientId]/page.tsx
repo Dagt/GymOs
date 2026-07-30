@@ -84,7 +84,6 @@ export default function ClientDetailPage() {
               canRenew={controller.canRenewMembership}
               changingMembershipId={controller.changingMembershipId}
               memberships={controller.memberships}
-              periodsByMembership={controller.membershipPeriods}
               onMembershipAction={controller.openMembershipAction}
               plans={controller.plans}
               renewingMembershipId={controller.renewingMembershipId}
@@ -94,6 +93,7 @@ export default function ClientDetailPage() {
             <ClientBenefitsSection
               canAssignBenefits={controller.canAssignBenefits}
               canReadAccessBenefits={controller.canReadAccessBenefits}
+              canVerifyBenefits={controller.canVerifyBenefits}
               clientId={controller.data.client.id}
               refreshKey={controller.memberships
                 .map((membership) => `${membership.id}:${membership.planId}:${membership.status}:${membership.endsOn}`)
@@ -103,7 +103,12 @@ export default function ClientDetailPage() {
           ) : null}
         </section>
 
-        {!controller.limitedCoachView ? <ClientSummaryAside data={controller.data} /> : null}
+        {!controller.limitedCoachView ? (
+          <ClientSummaryAside
+            data={controller.data}
+            periodsByMembership={controller.membershipPeriods}
+          />
+        ) : null}
       </section>
 
       {controller.canEditClient ? (

@@ -35,6 +35,7 @@ export type BenefitPayload = {
 
 export type ClientBenefitSummary = {
   id: string;
+  branchId: string | null;
   clientId: string;
   benefitId: string;
   benefitName: string;

@@ -130,11 +130,21 @@ export function MembershipActionDrawer({
       {action ? (
         <form className="grid gap-4" onSubmit={onSubmit}>
           <section className="rounded-md border border-[#d8ddd2] bg-white p-4">
-            <p className="app-eyebrow">Membresia actual</p>
-            <h3 className="mt-2 text-lg font-semibold">{action.membership.planName}</h3>
-            <p className="mt-1 text-sm text-[#5d6b63]">
-              {membershipStatusLabel(action.membership.status)} - {formatDay(action.membership.startsOn)} a {formatDay(action.membership.endsOn)}
+            <p className="app-eyebrow">
+              {initialEnrollment ? "Contratación inicial" : "Membresía actual"}
             </p>
+            <h3 className="mt-2 text-lg font-semibold">
+              {initialEnrollment ? "Socio sin membresía" : action.membership.planName}
+            </h3>
+            {initialEnrollment ? (
+              <p className="mt-1 text-sm text-[#5d6b63]">
+                La vigencia se calculará cuando selecciones el plan y confirmes el pago.
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-[#5d6b63]">
+                {membershipStatusLabel(action.membership.status)} - {formatDay(action.membership.startsOn)} a {formatDay(action.membership.endsOn)}
+              </p>
+            )}
           </section>
           <MembershipControls
             membershipQuote={membershipQuote}

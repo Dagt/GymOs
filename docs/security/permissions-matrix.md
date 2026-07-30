@@ -57,8 +57,8 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/catalog/**` | catalog | `catalog.read` | Sí | No | No | Pendiente |
 | POST | `/api/v1/catalog/**` | catalog | `catalog.manage` | Sí | No | Sí | Pendiente |
-| GET | `/api/v1/benefits/**` | benefits | `benefit.read` | Sí | No | No | Pendiente |
-| POST | `/api/v1/benefits/**` | benefits | `benefit.manage` | Sí | No | Sí | `benefitCreationRequiresManagePermission` negativo |
+| GET | `/api/v1/benefits/**` | benefits | `benefit.read` | Sí | Sí; actual + global explícito | No | Filtro en `BenefitService` |
+| POST | `/api/v1/benefits/**` | benefits | `benefit.manage` | Sí | Sí; sucursal activa por defecto | Sí | `benefitCreationRequiresManagePermission` negativo |
 | GET | `/api/v1/memberships/**` | memberships | `membership.read` | Sí | Sí | No | Pendiente |
 | POST | `/api/v1/memberships/*/renew` | memberships | `membership.renew` | Sí | Sí | Sí | Pendiente |
 | POST | `/api/v1/memberships/*/change-plan` | memberships | `membership.change-plan` | Sí | Sí | Sí | Pendiente |
@@ -83,6 +83,7 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 | GET | `/api/v1/access/visit-passes/**` | access | `visit.read` | Sí | Sí | No | Pendiente |
 | POST | `/api/v1/access/visit-passes` | access | `visit.create` | Sí | Sí | Sí | `visitPassCreationRequiresVisitCreatePermission` negativo |
 | POST | `/api/v1/access/visit-passes/*/consume` | access | `visit.consume` | Sí | Sí | Sí | `visitPassConsumeRequiresVisitConsumePermission` negativo |
+| GET | `/api/v1/access/clients/*/effective-benefits` | access/clientes | `access.read`, `client.read`, `membership.read` o `benefit.read` | Sí | Sí | No | `clientReadersCanInspectEffectiveAccessBenefitsWithoutAccessAdministrationPermission` |
 | GET | `/api/v1/access/**` | access | `access.read` | Sí | Sí | No | Pendiente |
 | POST | `/api/v1/access/**` | access | `access.manage` | Sí | Sí | Sí | Pendiente |
 

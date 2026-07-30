@@ -8,6 +8,7 @@ import {
   validateRequired,
 } from "@/components/FormFields";
 import type { ClientDetail, ClientUpdatePayload } from "@/lib/api";
+export { formatDate, formatDay } from "./client-date-helpers";
 
 export function toClientUpdateForm(client: ClientDetail): ClientUpdatePayload {
   return {
@@ -48,22 +49,6 @@ export function validateClientUpdate(form: ClientUpdatePayload) {
 
 export function clientFullName(client: ClientDetail) {
   return `${client.firstName} ${client.lastName} ${client.maternalLastName ?? ""}`.trim();
-}
-
-export function formatDate(value: string) {
-  return new Intl.DateTimeFormat("es-MX", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
-
-export function formatDay(value: string) {
-  return new Intl.DateTimeFormat("es-MX", {
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    timeZone: "UTC",
-  }).format(new Date(`${value}T00:00:00Z`));
 }
 
 export function formatMoney(cents: number, currency: string) {

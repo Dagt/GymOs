@@ -90,8 +90,12 @@ export default function BenefitsPage() {
     setSaving(true);
     setError(null);
     try {
+      if (!session.user.branchId) {
+        throw new Error("Selecciona una sucursal antes de crear el beneficio.");
+      }
       const created = await createBenefit(session.accessToken, {
         ...form,
+        branchId: session.user.branchId,
         discountType: form.benefitType === "ACCESS" ? "NONE" : form.discountType,
         discountPercent: form.benefitType === "ACCESS" ? null : form.discountPercent,
         discountValueCents: form.benefitType === "ACCESS" ? null : form.discountValueCents,
@@ -168,7 +172,14 @@ export default function BenefitsPage() {
                     <p className="font-black">{benefit.name}</p>
                     <p className="mt-1 text-sm text-[var(--brand-muted)]">{benefit.code} - {benefit.benefitType}</p>
                   </div>
-                  <span className="app-pill">{benefit.status}</span>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="app-pill">
+                      {benefit.branchId === session.user.branchId
+                        ? "Sucursal actual"
+                        : "Todas las sucursales"}
+                    </span>
+                    <span className="app-pill">{benefit.status}</span>
+                  </div>
                 </div>
                 <p className="mt-3 text-sm text-[var(--brand-muted)]">
                   {benefit.discountType === "PERCENT" ? `${benefit.discountPercent ?? 0}% de descuento` : benefit.discountType}
@@ -185,7 +196,7 @@ export default function BenefitsPage() {
       </section>
 
       <AppDrawer
-        description="Define descuentos aplicables a socios, convenios o promociones temporales."
+        description="Define descuentos o accesos para la sucursal seleccionada actualmente."
         onClose={() => setShowBenefitDrawer(false)}
         open={showBenefitDrawer}
         title="Crear beneficio"

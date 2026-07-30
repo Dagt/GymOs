@@ -1,7 +1,6 @@
 import Link from "next/link";
 import type {
   ClientMembershipSummary,
-  MembershipPeriodSummary,
   PlanSummary,
 } from "@/lib/api";
 import {
@@ -11,6 +10,7 @@ import {
 import {
   canChangeMembershipPlan,
   canRenewMembership,
+  currentMembership,
 } from "./client-membership-helpers";
 
 export function MembershipHistory({
@@ -20,7 +20,6 @@ export function MembershipHistory({
   changingMembershipId,
   memberships,
   onMembershipAction,
-  periodsByMembership,
   plans,
   renewingMembershipId,
 }: {
@@ -33,19 +32,20 @@ export function MembershipHistory({
     membership: ClientMembershipSummary,
     type: "renew" | "change",
   ) => void;
-  periodsByMembership: Record<string, MembershipPeriodSummary[]>;
   plans: PlanSummary[];
   renewingMembershipId: string | null;
 }) {
+  const membership = currentMembership(memberships);
+
   return (
     <section className="app-card p-5">
       <div className="admin-panel-header">
         <div>
-          <p>Membresías</p>
-          <h2>Plan actual e historial</h2>
+          <p>Membresía</p>
+          <h2>Plan actual</h2>
         </div>
       </div>
-      {memberships.length === 0 ? (
+      {!membership ? (
         <section className="admin-empty-card flex flex-col items-start gap-2">
           <strong>Sin membresía registrada</strong>
           <span>
@@ -80,20 +80,14 @@ export function MembershipHistory({
           ) : null}
         </section>
       ) : (
-        <section className="grid gap-4">
-          {memberships.map((membership) => (
-            <MembershipCard
-              canChange={canChange}
-              canRenew={canRenew}
-              changingMembershipId={changingMembershipId ?? null}
-              key={membership.id}
-              membership={membership}
-              onMembershipAction={onMembershipAction}
-              periods={periodsByMembership[membership.id] ?? []}
-              renewingMembershipId={renewingMembershipId}
-            />
-          ))}
-        </section>
+        <MembershipCard
+          canChange={canChange}
+          canRenew={canRenew}
+          changingMembershipId={changingMembershipId ?? null}
+          membership={membership}
+          onMembershipAction={onMembershipAction}
+          renewingMembershipId={renewingMembershipId}
+        />
       )}
     </section>
   );
@@ -105,7 +99,6 @@ function MembershipCard({
   changingMembershipId,
   membership,
   onMembershipAction,
-  periods,
   renewingMembershipId,
 }: {
   canChange: boolean;
@@ -116,7 +109,6 @@ function MembershipCard({
     membership: ClientMembershipSummary,
     type: "renew" | "change",
   ) => void;
-  periods: MembershipPeriodSummary[];
   renewingMembershipId: string | null;
 }) {
   const allowRenew = canRenewMembership(membership.status);
@@ -173,44 +165,6 @@ function MembershipCard({
           el plan actual.
         </p>
       ) : null}
-
-      {periods.length > 0 ? (
-        <div className="mt-3 grid gap-2 border-t border-[#d8ddd2] pt-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[#6f7a73]">
-            Movimientos de vigencia
-          </p>
-          {periods.map((period) => (
-            <div
-              className="flex flex-col gap-1 text-sm sm:flex-row sm:items-center sm:justify-between"
-              key={period.id}
-            >
-              <span className="text-[#5d6b63]">
-                {membershipPeriodLabel(period.operationType)} · {period.planName} ·{" "}
-                {formatDay(period.startsOn)} a {formatDay(period.endsOn)}
-              </span>
-              <Link
-                className="font-semibold text-[var(--brand-primary)]"
-                href={`/sales/${period.saleId}`}
-              >
-                {period.saleNumber}
-              </Link>
-            </div>
-          ))}
-        </div>
-      ) : null}
     </article>
   );
-}
-
-function membershipPeriodLabel(operationType: MembershipPeriodSummary["operationType"]) {
-  switch (operationType) {
-    case "ENROLLMENT":
-      return "Contratación";
-    case "RENEWAL":
-      return "Renovación";
-    case "PLAN_CHANGE":
-      return "Cambio de plan";
-    default:
-      return "Periodo anterior";
-  }
 }

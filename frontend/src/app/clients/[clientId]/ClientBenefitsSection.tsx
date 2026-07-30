@@ -7,6 +7,7 @@ import {
   getBenefits,
   getClientBenefits,
   getEffectiveAccessBenefits,
+  verifyClientBenefit,
   type BenefitSummary,
   type ClientBenefitSummary,
   type EffectiveAccessBenefit,
@@ -20,12 +21,14 @@ import {
 export function ClientBenefitsSection({
   canAssignBenefits,
   canReadAccessBenefits,
+  canVerifyBenefits,
   clientId,
   refreshKey,
   session,
 }: {
   canAssignBenefits: boolean;
   canReadAccessBenefits: boolean;
+  canVerifyBenefits: boolean;
   clientId: string;
   refreshKey: string;
   session: StoredSession;
@@ -38,6 +41,7 @@ export function ClientBenefitsSection({
   const [showDrawer, setShowDrawer] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [verifyingBenefitId, setVerifyingBenefitId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loadWarning, setLoadWarning] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -134,7 +138,11 @@ export function ClientBenefitsSection({
       setShowDrawer(false);
       setSelectedBenefitId("");
       setValidUntil("");
-      setMessage(`Se asignó ${selectedBenefit.name} al socio.`);
+      setMessage(
+        selectedBenefit.requiresEvidence
+          ? `Se asignó ${selectedBenefit.name}; verifica la evidencia antes de aplicar el descuento.`
+          : `Se asignó ${selectedBenefit.name}; ya se considerará en la siguiente cotización.`,
+      );
     } catch (exception) {
       setError(
         exception instanceof Error
@@ -143,6 +151,27 @@ export function ClientBenefitsSection({
       );
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleVerifyBenefit(benefit: ClientBenefitSummary) {
+    if (!canVerifyBenefits) return;
+    setVerifyingBenefitId(benefit.id);
+    setError(null);
+    setMessage(null);
+    try {
+      await verifyClientBenefit(session.accessToken, benefit.id);
+      const updatedAssigned = await getClientBenefits(session.accessToken, clientId);
+      setClientBenefits(updatedAssigned);
+      setMessage(`Se verificó ${benefit.benefitName}; ya puede aplicarse a la siguiente cotización.`);
+    } catch (exception) {
+      setError(
+        exception instanceof Error
+          ? exception.message
+          : "No fue posible verificar el beneficio.",
+      );
+    } finally {
+      setVerifyingBenefitId(null);
     }
   }
 
@@ -222,7 +251,16 @@ export function ClientBenefitsSection({
                 <EmptyBenefitState text="El socio no tiene descuentos o convenios asignados." />
               ) : (
                 clientBenefits.map((benefit) => {
-                  const presentation = assignmentPresentation(benefit);
+                  const definition = availableBenefits.find(
+                    (candidate) => candidate.id === benefit.benefitId,
+                  );
+                  const presentation = assignmentPresentation(
+                    benefit,
+                    definition?.requiresEvidence ?? false,
+                  );
+                  const canVerify = canVerifyBenefits
+                    && definition?.requiresEvidence
+                    && benefit.status.toUpperCase() === "ASSIGNED";
                   return (
                     <article
                       className="rounded-lg border border-[#d8ddd2] bg-white p-3"
@@ -241,6 +279,18 @@ export function ClientBenefitsSection({
                           {presentation.label}
                         </span>
                       </div>
+                      {canVerify ? (
+                        <button
+                          className="app-button-secondary mt-3 text-xs"
+                          disabled={verifyingBenefitId !== null}
+                          onClick={() => void handleVerifyBenefit(benefit)}
+                          type="button"
+                        >
+                          {verifyingBenefitId === benefit.id
+                            ? "Verificando..."
+                            : "Verificar beneficio"}
+                        </button>
+                      ) : null}
                     </article>
                   );
                 })
@@ -318,7 +368,10 @@ function EmptyBenefitState({ text }: { text: string }) {
   );
 }
 
-function assignmentPresentation(benefit: ClientBenefitSummary) {
+function assignmentPresentation(
+  benefit: ClientBenefitSummary,
+  requiresEvidence: boolean,
+) {
   const status = benefit.status.trim().toUpperCase();
   const today = todayIso();
   if (status === "REJECTED") {
@@ -329,6 +382,12 @@ function assignmentPresentation(benefit: ClientBenefitSummary) {
   }
   if (benefit.validFrom && benefit.validFrom > today) {
     return { label: "Programado", className: "bg-amber-100 text-amber-700" };
+  }
+  if (requiresEvidence && status === "ASSIGNED") {
+    return {
+      label: "Pendiente de verificación",
+      className: "bg-amber-100 text-amber-700",
+    };
   }
   if (status === "VERIFIED") {
     return { label: "Verificado", className: "bg-green-100 text-green-700" };

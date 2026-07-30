@@ -38,6 +38,19 @@ en el selector de asignación; todos, incluido `CUSTOM`, requieren fecha de
 expiración. Al cambiar plan, la ficha vuelve a consultar los accesos efectivos
 para reflejar la nueva relación sin recargar la página.
 
+Los beneficios nuevos se crean con alcance de la sucursal activa. V58 permite
+reutilizar el mismo código de negocio en distintas sucursales y el catálogo sólo
+expone los beneficios de la sucursal seleccionada más cualquier definición
+global deliberada, que se rotula explícitamente. La migración recupera desde
+`audit_log` la sucursal de beneficios creados por versiones que omitían
+`branch_id`. Las asignaciones directas y su verificación quedan aisladas por
+sucursal.
+
+Un descuento con `requiresEvidence=true` no se presenta como vigente mientras
+siga en `ASSIGNED`: la ficha lo marca como pendiente y ofrece verificación sólo
+a quien tenga `client.benefit.verify`. Sin evidencia requerida, la asignación es
+elegible inmediatamente para alta, renovación y cambio de plan.
+
 ## Política transversal
 
 `com.gymos.eligibility` es la fuente única de verdad para decidir elegibilidad.

@@ -84,7 +84,16 @@ export function useClientDetailController() {
     [session],
   );
   const canReadAccessBenefits = useMemo(
-    () => hasPermission(session, "access.read"),
+    () => hasAnyPermission(session, [
+      "access.read",
+      "client.read",
+      "membership.read",
+      "benefit.read",
+    ]),
+    [session],
+  );
+  const canVerifyBenefits = useMemo(
+    () => hasPermission(session, "client.benefit.verify"),
     [session],
   );
   const limitedCoachView = useMemo(
@@ -332,6 +341,7 @@ export function useClientDetailController() {
     canReadBenefits,
     canReadMemberships,
     canRenewMembership,
+    canVerifyBenefits,
     changingMembershipId,
     data,
     error,

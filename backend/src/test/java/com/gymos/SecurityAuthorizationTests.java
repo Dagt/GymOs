@@ -262,6 +262,16 @@ class SecurityAuthorizationTests {
 	}
 
 	@Test
+	@WithMockUser(authorities = "client.read")
+	void clientReadersCanInspectEffectiveAccessBenefitsWithoutAccessAdministrationPermission() throws Exception {
+		var result = mockMvc.perform(get(
+				"/api/v1/access/clients/99999999-9999-9999-9999-999999999951/effective-benefits"
+		)).andReturn();
+
+		assertThat(result.getResponse().getStatus()).isNotIn(401, 403);
+	}
+
+	@Test
 	@WithMockUser(authorities = "visit.create")
 	void visitPassConsumeRequiresVisitConsumePermission() throws Exception {
 		mockMvc.perform(post("/api/v1/access/visit-passes/99999999-9999-9999-9999-999999999953/consume")

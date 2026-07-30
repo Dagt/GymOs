@@ -26,7 +26,7 @@ public class BenefitService {
 	@Transactional(readOnly = true)
 	public List<BenefitSummary> benefits(GymOsPrincipal principal) {
 		requirePrincipal(principal);
-		return benefitRepository.benefits(principal.organizationId());
+		return benefitRepository.benefitsForBranch(principal.organizationId(), principal.branchId());
 	}
 
 	@Transactional(readOnly = true)
@@ -35,28 +35,32 @@ public class BenefitService {
 		if (!benefitRepository.clientExists(principal.organizationId(), clientId)) {
 			throw new BusinessException("CLIENT_NOT_FOUND", "El cliente no esta disponible.");
 		}
-		return benefitRepository.clientBenefits(principal.organizationId(), clientId);
+		return benefitRepository.clientBenefits(principal.organizationId(), principal.branchId(), clientId);
 	}
 
 	@Transactional
 	public BenefitSummary createBenefit(GymOsPrincipal principal, CreateBenefitCommand command, String correlationId) {
 		requirePrincipal(principal);
-		validatePlanLinks(principal, command);
-		if (benefitRepository.codeExists(principal.organizationId(), command.code())) {
+		UUID benefitBranchId = command.branchId() == null ? principal.branchId() : command.branchId();
+		if (benefitBranchId == null) {
+			throw new BusinessException("BRANCH_REQUIRED", "Selecciona una sucursal para crear el beneficio.");
+		}
+		validatePlanLinks(principal, command, benefitBranchId);
+		if (benefitRepository.codeExists(principal.organizationId(), benefitBranchId, command.code())) {
 			throw new BusinessException("BENEFIT_ALREADY_EXISTS", "Ya existe un beneficio con ese codigo.");
 		}
-		UUID benefitId = benefitRepository.createBenefit(principal, command);
+		UUID benefitId = benefitRepository.createBenefit(principal, benefitBranchId, command);
 		benefitRepository.replaceMembershipPlans(principal, benefitId, command.planIds());
 		auditService.record(principal, "BENEFIT_CREATED", "BENEFIT", benefitId, "BACKOFFICE", null, correlationId);
 		return benefitRepository.benefit(principal.organizationId(), benefitId)
 				.orElseThrow(() -> new BusinessException("BENEFIT_NOT_FOUND", "El beneficio no esta disponible."));
 	}
 
-	private void validatePlanLinks(GymOsPrincipal principal, CreateBenefitCommand command) {
-		if (command.branchId() != null
-				&& !benefitRepository.branchExists(principal.organizationId(), command.branchId())) {
-			throw new BusinessException("BRANCH_NOT_AVAILABLE", "La sucursal del beneficio no pertenece a la organizacion.");
-		}
+	private void validatePlanLinks(
+			GymOsPrincipal principal,
+			CreateBenefitCommand command,
+			UUID benefitBranchId
+	) {
 		boolean accessBenefit = "ACCESS".equalsIgnoreCase(command.benefitType());
 		if (!accessBenefit && !command.planIds().isEmpty()) {
 			throw new BusinessException("BENEFIT_PLAN_LINK_NOT_ALLOWED", "Solo los beneficios de acceso pueden vincularse con planes.");
@@ -71,6 +75,9 @@ public class BenefitService {
 		if (command.validFrom() != null && command.validUntil() != null
 				&& command.validUntil().isBefore(command.validFrom())) {
 			throw new BusinessException("BENEFIT_DATE_RANGE_INVALID", "La vigencia final no puede ser anterior a la inicial.");
+		}
+		if (!benefitRepository.branchExists(principal.organizationId(), benefitBranchId)) {
+			throw new BusinessException("BRANCH_NOT_AVAILABLE", "La sucursal del beneficio no pertenece a la organizacion.");
 		}
 	}
 
@@ -148,6 +155,12 @@ public class BenefitService {
 		requirePrincipal(principal);
 		ClientBenefitSummary current = benefitRepository.clientBenefit(principal.organizationId(), clientBenefitId)
 				.orElseThrow(() -> new BusinessException("CLIENT_BENEFIT_NOT_FOUND", "El beneficio asignado no esta disponible."));
+		if (principal.branchId() == null || !principal.branchId().equals(current.branchId())) {
+			throw new BusinessException(
+					"CLIENT_BENEFIT_BRANCH_MISMATCH",
+					"El beneficio asignado no pertenece a la sucursal seleccionada."
+			);
+		}
 		if ("EXPIRED".equals(current.status()) || "REJECTED".equals(current.status())) {
 			throw new BusinessException("BENEFIT_EXPIRED", "El beneficio no se puede verificar en su estado actual.");
 		}

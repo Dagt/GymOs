@@ -1,20 +1,23 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { MembershipQuoteSummary } from "@/components/MembershipQuoteSummary";
 import {
+  changeMembershipPlan,
   enrollMembership,
   getClientMemberships,
-  getPlans,
   getMembershipQuote,
+  getPlans,
   renewMembership,
   searchClients,
   type ClientMembershipSummary,
   type ClientSummary,
-  type PlanSummary,
   type MembershipQuote,
+  type PlanSummary,
   type StoredSession,
 } from "@/lib/api";
+
+type PaymentMethod = "CASH" | "CARD_MANUAL" | "TRANSFER";
 
 export function ReceptionRenewalWidget({ session }: { session: StoredSession }) {
   const [query, setQuery] = useState("");
@@ -22,251 +25,376 @@ export function ReceptionRenewalWidget({ session }: { session: StoredSession }) 
   const [selectedClient, setSelectedClient] = useState<ClientSummary | null>(null);
   const [membership, setMembership] = useState<ClientMembershipSummary | null>(null);
   const [quote, setQuote] = useState<MembershipQuote | null>(null);
+  const [quoteLoading, setQuoteLoading] = useState(false);
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState("");
-  const [method, setMethod] = useState<"CASH" | "CARD_MANUAL" | "TRANSFER">("CASH");
+  const [method, setMethod] = useState<PaymentMethod>("CASH");
+  const [reference, setReference] = useState("");
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    getPlans(session.accessToken).then(setPlans).catch(() => {});
-  }, [session]);
+  const activePlans = useMemo(
+    () => plans.filter((plan) => plan.status === "ACTIVE"),
+    [plans],
+  );
+  const targetPlanId = selectedPlanId || membership?.planId || "";
+  const visibleQuote = quote?.planId === targetPlanId ? quote : null;
+  const changesPlan = Boolean(
+    membership
+      && selectedPlanId
+      && selectedPlanId !== membership.planId,
+  );
 
   useEffect(() => {
-    if (!selectedClient) {
-      return;
-    }
-    let active = true;
-    getClientMemberships(session.accessToken, selectedClient.id)
-      .then((items) => {
-        if (active && items.length > 0) setMembership(items[0]);
-        else if (active) setMembership(null);
-      })
-      .catch(() => {
-        if (active) setMembership(null);
-      });
-    return () => { active = false; };
-  }, [selectedClient, session]);
+    getPlans(session.accessToken)
+      .then((items) => setPlans(items.filter((plan) => plan.status === "ACTIVE")))
+      .catch(() => setError("No fue posible cargar los planes disponibles."));
+  }, [session.accessToken]);
 
   useEffect(() => {
     if (!selectedClient) return;
-    const planId = membership?.planId ?? selectedPlanId;
-    if (!planId) return;
     let active = true;
-    getMembershipQuote(session.accessToken, selectedClient.id, planId)
-      .then((nextQuote) => {
-        if (active) setQuote(nextQuote);
+    getClientMemberships(session.accessToken, selectedClient.id)
+      .then((items) => {
+        if (active) {
+          const current = operationalMembership(items);
+          setMembership(current);
+          if (!current) setQuoteLoading(false);
+        }
       })
       .catch(() => {
-        if (active) setQuote(null);
+        if (active) {
+          setQuoteLoading(false);
+          setError("No fue posible consultar la membresía del socio.");
+        }
       });
     return () => {
       active = false;
     };
-  }, [membership, selectedClient, selectedPlanId, session.accessToken]);
+  }, [selectedClient, session.accessToken]);
 
-  async function handleSearch(e: FormEvent) {
-    e.preventDefault();
+  useEffect(() => {
+    if (!selectedClient || !targetPlanId) return;
+    let active = true;
+    getMembershipQuote(session.accessToken, selectedClient.id, targetPlanId)
+      .then((nextQuote) => {
+        if (active) setQuote(nextQuote);
+      })
+      .catch((exception) => {
+        if (active) {
+          setError(
+            exception instanceof Error
+              ? exception.message
+              : "No fue posible calcular la cotización.",
+          );
+        }
+      })
+      .finally(() => {
+        if (active) setQuoteLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [
+    membership?.endsOn,
+    selectedClient,
+    session.accessToken,
+    targetPlanId,
+  ]);
+
+  async function handleSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     if (!query.trim()) return;
     setLoading(true);
     setError(null);
+    setMessage(null);
+    setClients([]);
     setSelectedClient(null);
-    setMembership(null);
     try {
       setClients(await searchClients(session.accessToken, query.trim()));
     } catch {
-      setError("Error buscando socio.");
+      setError("No fue posible buscar al socio.");
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleRenew() {
-    if (!membership) return;
+  async function handleMembershipOperation() {
+    if (!selectedClient || !targetPlanId) return;
     setProcessing(true);
     setError(null);
     setMessage(null);
     try {
-      const res = await renewMembership(session.accessToken, membership.id, {
+      const payment = {
         method,
-        reference: null,
+        reference: reference.trim() || null,
         validateNow: true,
-        notes: "Renovación rápida desde inicio de recepción",
-      });
-      setMessage(`Membresía renovada por ${formatMoney(res.totalCents, res.currency)}. Venta ${res.saleNumber} registrada.`);
-      setMembership(res.membership || null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al renovar.");
+      };
+      if (!membership) {
+        const result = await enrollMembership(session.accessToken, {
+          ...payment,
+          clientId: selectedClient.id,
+          planId: targetPlanId,
+          notes: "Venta de membresía inicial desde recepción",
+        });
+        setMessage(
+          `Membresía inicial asignada por ${formatMoney(result.totalCents, result.currency)}. Venta ${result.saleNumber} creada.`,
+        );
+      } else if (changesPlan) {
+        if (membership.status !== "ACTIVE") {
+          throw new Error("Sólo una membresía activa puede cambiar de plan. Renueva primero el plan vencido.");
+        }
+        const result = await changeMembershipPlan(
+          session.accessToken,
+          membership.id,
+          {
+            ...payment,
+            targetPlanId,
+            notes: "Cambio de plan desde inicio de recepción",
+          },
+        );
+        setMessage(
+          `Plan cambiado por ${formatMoney(result.totalCents, result.currency)}. Venta ${result.saleNumber} registrada.`,
+        );
+      } else {
+        const result = await renewMembership(session.accessToken, membership.id, {
+          ...payment,
+          notes: "Renovación desde inicio de recepción",
+        });
+        setMessage(
+          `Membresía renovada por ${formatMoney(result.totalCents, result.currency)}. Venta ${result.saleNumber} registrada.`,
+        );
+      }
+
+      const updated = await getClientMemberships(
+        session.accessToken,
+        selectedClient.id,
+      );
+      setMembership(operationalMembership(updated));
+      setSelectedPlanId("");
+      setReference("");
+    } catch (exception) {
+      setError(
+        exception instanceof Error
+          ? exception.message
+          : "No fue posible completar la operación de membresía.",
+      );
     } finally {
       setProcessing(false);
     }
   }
 
-  async function handleAssignInitialPlan() {
-    if (!selectedClient || !selectedPlanId) return;
-    setProcessing(true);
-    setError(null);
+  function clearSelectedClient() {
+    setSelectedClient(null);
+    setMembership(null);
+    setQuote(null);
+    setSelectedPlanId("");
+    setReference("");
+    setQuoteLoading(false);
     setMessage(null);
-    try {
-      const plan = plans.find((p) => p.id === selectedPlanId);
-      if (!plan) return;
-      const res = await enrollMembership(session.accessToken, {
-        clientId: selectedClient.id,
-        planId: plan.id,
-        method,
-        reference: null,
-        validateNow: true,
-        notes: "Venta de membresía inicial desde recepción",
-      });
-      setMessage(`Membresía inicial asignada por ${formatMoney(res.totalCents, res.currency)}. Venta ${res.saleNumber} creada.`);
-      const updatedMemberships = await getClientMemberships(session.accessToken, selectedClient.id).catch(() => []);
-      if (updatedMemberships.length > 0) setMembership(updatedMemberships[0]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al asignar membresía inicial.");
-    } finally {
-      setProcessing(false);
-    }
+    setError(null);
   }
 
   return (
-    <section className="app-card p-6 border-2 border-[var(--brand-line)] bg-white rounded-2xl shadow-sm">
-      <div className="flex items-center justify-between mb-4">
+    <section className="app-card p-5">
+      <div className="admin-panel-header">
         <div>
-          <p className="app-eyebrow">Atención en Mostrador</p>
-          <h2 className="app-card-title">Renovación y Asignación de Membresía</h2>
+          <p>Atención en mostrador</p>
+          <h2>Renovar, asignar o cambiar plan</h2>
         </div>
-        <span className="text-xl">🔄</span>
       </div>
 
-      {message ? (
-        <div className="p-3 mb-4 text-xs font-bold text-green-700 bg-green-50 rounded-xl border border-green-200">
-          ✅ {message}
-        </div>
-      ) : null}
+      <p className="mt-2 text-sm text-[var(--brand-muted)]">
+        Busca al socio, revisa el precio final y registra la operación sin salir del inicio.
+      </p>
 
-      {error ? (
-        <div className="p-3 mb-4 text-xs font-bold text-red-700 bg-red-50 rounded-xl border border-red-200">
-          ⚠️ {error}
-        </div>
-      ) : null}
+      {message ? <p className="form-message success mt-4">{message}</p> : null}
+      {error ? <p className="form-message error mt-4">{error}</p> : null}
 
-      <form className="flex gap-2 mb-4" onSubmit={handleSearch}>
+      <form className="mt-4 flex flex-col gap-2 sm:flex-row" onSubmit={handleSearch}>
         <input
-          className="app-input flex-1 h-11 text-sm font-bold"
-          placeholder="Buscar socio por nombre, teléfono o email..."
+          className="app-input flex-1"
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Nombre, teléfono o email"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
         />
-        <button className="app-button px-5 text-xs" type="submit" disabled={loading}>
-          {loading ? "Buscando..." : "Buscar Socio"}
+        <button className="app-button sm:px-6" disabled={loading} type="submit">
+          {loading ? "Buscando..." : "Buscar socio"}
         </button>
       </form>
 
       {clients.length > 0 && !selectedClient ? (
-        <div className="grid gap-2 max-h-40 overflow-y-auto mb-4 p-2 bg-gray-50 rounded-xl border border-gray-100">
-          {clients.map((c) => (
+        <div className="mt-3 grid max-h-48 gap-2 overflow-y-auto rounded-md border border-[var(--brand-line)] p-2">
+          {clients.map((client) => (
             <button
-              key={c.id}
+              className="flex items-center justify-between gap-3 rounded-md border border-transparent bg-white p-3 text-left hover:border-[var(--brand-primary)]"
+              key={client.id}
+              onClick={() => {
+                setSelectedClient(client);
+                setMembership(null);
+                setSelectedPlanId("");
+                setQuote(null);
+                setQuoteLoading(true);
+                setClients([]);
+                setError(null);
+              }}
               type="button"
-              onClick={() => { setSelectedClient(c); setQuote(null); setClients([]); }}
-              className="p-2.5 rounded-lg bg-white border border-gray-100 hover:border-[var(--brand-primary)] text-left flex items-center justify-between transition-colors"
             >
-              <strong className="text-sm text-gray-900">{c.firstName} {c.lastName}</strong>
-              <span className="text-xs text-gray-500">{c.phone || c.email || "Socio"}</span>
+              <strong className="text-sm">
+                {client.firstName} {client.lastName}
+              </strong>
+              <span className="text-xs text-[var(--brand-muted)]">
+                {client.phone || client.email || "Socio"}
+              </span>
             </button>
           ))}
         </div>
       ) : null}
 
       {selectedClient ? (
-        <div className="p-4 rounded-xl border-2 border-blue-100 bg-blue-50/40 flex flex-col gap-3">
-          <div className="flex items-center justify-between">
-            <strong className="text-base font-black text-gray-900">
-              Socio: {selectedClient.firstName} {selectedClient.lastName}
-            </strong>
+        <section className="mt-4 rounded-md border border-[var(--brand-line)] bg-white p-4">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <p className="app-eyebrow">Socio seleccionado</p>
+              <h3 className="mt-1 text-lg font-semibold">
+                {selectedClient.firstName} {selectedClient.lastName}
+              </h3>
+            </div>
             <button
+              className="text-xs font-semibold text-[var(--brand-muted)]"
+              onClick={clearSelectedClient}
               type="button"
-              onClick={() => { setSelectedClient(null); setMembership(null); setQuote(null); setMessage(null); setError(null); }}
-              className="text-xs font-bold text-gray-500 hover:text-gray-900"
             >
-              ✕ Cambiar socio
+              Cambiar socio
             </button>
           </div>
 
           {membership ? (
-            <div className="p-3 bg-white rounded-lg border border-blue-100 flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-black text-gray-900">{membership.planName}</span>
-                <span className={`text-[0.65rem] font-black uppercase px-2 py-0.5 rounded ${membership.status === "ACTIVE" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                  {membership.status === "ACTIVE" ? "Activa" : "Vencida"}
-                </span>
-              </div>
-              <p className="text-xs text-gray-500 font-medium">
-                Vigencia: {membership.startsOn} a {membership.endsOn}
-              </p>
-              <MembershipQuoteSummary loading={false} quote={quote} />
+            <div className="mt-4 grid gap-4 md:grid-cols-[0.9fr_1.1fr]">
+              <section className="rounded-md bg-[var(--brand-surface)] p-4">
+                <p className="app-eyebrow">Membresía actual</p>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <strong>{membership.planName}</strong>
+                  <span className="app-pill">
+                    {membership.status === "ACTIVE" ? "Activa" : "Vencida"}
+                  </span>
+                </div>
+                <p className="mt-2 text-xs text-[var(--brand-muted)]">
+                  Vigencia: {membership.startsOn} a {membership.endsOn}
+                </p>
+              </section>
 
-              <div className="flex items-center gap-2 pt-2">
-                <label className="text-xs font-bold text-gray-600 flex items-center gap-1">
-                  Método de Pago:
-                  <select
-                    className="app-input text-xs h-8 px-2 py-0"
-                    value={method}
-                    onChange={(e) => setMethod(e.target.value as "CASH" | "CARD_MANUAL" | "TRANSFER")}
-                  >
-                    <option value="CASH">Efectivo</option>
-                    <option value="CARD_MANUAL">Tarjeta</option>
-                    <option value="TRANSFER">Transferencia</option>
-                  </select>
-                </label>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleRenew}
-                disabled={processing}
-                className="app-button text-xs h-9 mt-2"
-              >
-                {processing ? "Procesando..." : "🔄 Renovar Mismo Plan"}
-              </button>
+              <label className="form-field" htmlFor="receptionTargetPlan">
+                <span>Operación</span>
+                <select
+                  className="app-input"
+                  id="receptionTargetPlan"
+                  onChange={(event) => {
+                    setSelectedPlanId(event.target.value);
+                    setQuote(null);
+                    setQuoteLoading(true);
+                  }}
+                  value={selectedPlanId}
+                >
+                  <option value="">Renovar el mismo plan: {membership.planName}</option>
+                  {membership.status === "ACTIVE"
+                    ? activePlans
+                        .filter((plan) => plan.id !== membership.planId)
+                        .map((plan) => (
+                          <option key={plan.id} value={plan.id}>
+                            Cambiar a {plan.name}
+                          </option>
+                        ))
+                    : null}
+                </select>
+                {membership.status !== "ACTIVE" ? (
+                  <small>Renueva el plan vencido antes de realizar un cambio.</small>
+                ) : (
+                  <small>El cambio inicia hoy la vigencia completa del plan elegido.</small>
+                )}
+              </label>
             </div>
           ) : (
-            <div className="p-3 bg-white rounded-lg border border-amber-200 bg-amber-50/50 flex flex-col gap-3">
-              <p className="text-xs font-bold text-amber-900">
-                El socio no tiene membresía registrada. Asígnale su primer plan aquí:
-              </p>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <select
-                  className="app-input text-xs h-9 flex-1"
-                  value={selectedPlanId}
-                  onChange={(e) => {
-                    setSelectedPlanId(e.target.value);
-                    setQuote(null);
-                  }}
-                >
-                  <option value="">Selecciona un Plan del Catálogo...</option>
-                  {plans.map((p) => (
-                    <option key={p.id} value={p.id}>{p.name}</option>
-                  ))}
-                </select>
-                <button
-                  type="button"
-                  onClick={handleAssignInitialPlan}
-                  disabled={processing || !selectedPlanId}
-                  className="app-button text-xs h-9 px-4"
-                >
-                  + Asignar Membresía Inicial
-                </button>
-              </div>
-              <MembershipQuoteSummary loading={false} quote={quote} />
-            </div>
+            <label className="form-field mt-4" htmlFor="receptionInitialPlan">
+              <span>Plan inicial</span>
+              <select
+                className="app-input"
+                id="receptionInitialPlan"
+                onChange={(event) => {
+                  setSelectedPlanId(event.target.value);
+                  setQuote(null);
+                  setQuoteLoading(Boolean(event.target.value));
+                }}
+                value={selectedPlanId}
+              >
+                <option value="">Selecciona un plan</option>
+                {activePlans.map((plan) => (
+                  <option key={plan.id} value={plan.id}>
+                    {plan.name}
+                  </option>
+                ))}
+              </select>
+            </label>
           )}
-        </div>
+
+          <div className="mt-4">
+            <MembershipQuoteSummary loading={quoteLoading} quote={visibleQuote} />
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <label className="form-field" htmlFor="receptionPaymentMethod">
+              <span>Método de pago</span>
+              <select
+                className="app-input"
+                id="receptionPaymentMethod"
+                onChange={(event) => setMethod(event.target.value as PaymentMethod)}
+                value={method}
+              >
+                <option value="CASH">Efectivo</option>
+                <option value="CARD_MANUAL">Tarjeta</option>
+                <option value="TRANSFER">Transferencia</option>
+              </select>
+            </label>
+            <label className="form-field" htmlFor="receptionPaymentReference">
+              <span>Referencia</span>
+              <input
+                className="app-input"
+                id="receptionPaymentReference"
+                onChange={(event) => setReference(event.target.value)}
+                placeholder="Opcional"
+                value={reference}
+              />
+            </label>
+          </div>
+
+          <button
+            className="app-button mt-4 w-full"
+            disabled={processing || !targetPlanId || !visibleQuote}
+            onClick={() => void handleMembershipOperation()}
+            type="button"
+          >
+            {processing
+              ? "Procesando..."
+              : !membership
+                ? "Asignar membresía inicial"
+                : changesPlan
+                  ? "Cambiar plan"
+                  : "Renovar mismo plan"}
+          </button>
+        </section>
       ) : null}
     </section>
   );
+}
+
+function operationalMembership(
+  memberships: ClientMembershipSummary[],
+): ClientMembershipSummary | null {
+  return memberships.find((membership) => membership.status === "ACTIVE")
+    ?? memberships.find((membership) => membership.status === "EXPIRED")
+    ?? null;
 }
 
 function formatMoney(cents: number, currency: string) {

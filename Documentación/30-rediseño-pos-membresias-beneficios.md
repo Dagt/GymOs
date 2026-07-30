@@ -2,7 +2,7 @@
 
 Estado: IMPLEMENTADO / VALIDADO
 Rama: `feature/reception-pos-init`
-Fecha: 29 de julio de 2026
+Fecha: 30 de julio de 2026
 
 ## Objetivo y decisiones
 
@@ -86,7 +86,8 @@ también.
    de alta inicial usan el endpoint específico sin modificar el diseño frontend.
 4. **IMPLEMENTADA CON MIGRACIÓN:** `membership_period`, backfill, reconciliación
    de activas duplicadas, restricción única, bloqueo de operaciones y eventos de
-   renovación. La ficha del socio consulta y presenta cada periodo con su venta.
+   renovación. La ficha presenta sólo la membresía operativa actual; sus altas,
+   renovaciones y cambios se muestran en el Timeline con la venta relacionada.
 5. **IMPLEMENTADA:** el carrito genérico rechaza planes tanto en frontend como
    en backend; contratación, renovación y cambio usan operaciones específicas.
    Catálogo conserva sus planes y su diseño.
@@ -111,6 +112,15 @@ también.
     heredados, permite asignar descuentos y ejecuta cambio de plan con
     cotización. La renovación rápida quedó integrada en `/reception`; se
     retiraron el acceso lateral y la tarjeta hacia la pantalla dedicada.
+12. **IMPLEMENTADA:** V58 hace únicos los códigos de beneficio por sucursal. Los
+    nuevos beneficios se crean en la sucursal activa, el catálogo se filtra por
+    sucursal y las asignaciones de socio no se consultan ni verifican desde otra.
+    V58 repara el alcance de registros creados por versiones anteriores usando
+    la sucursal conservada en auditoría; los globales deliberados restantes se
+    identifican como “Todas las sucursales”.
+13. **IMPLEMENTADA:** recepción puede consultar los accesos efectivos de una
+    ficha con permisos de lectura de socio/membresía/beneficio, sin recibir
+    acceso al módulo administrativo de dispositivos o bitácoras.
 
 ## Operación del POS
 
@@ -128,6 +138,9 @@ también.
 
 - Sólo considera beneficios asignados y vigentes del mismo tenant.
 - Si el beneficio requiere evidencia, exige estado `VERIFIED`.
+- La ficha distingue `ASSIGNED` con evidencia como “Pendiente de verificación”
+  y permite verificarlo sólo con `client.benefit.verify`; un beneficio sin
+  evidencia es elegible inmediatamente después de asignarlo.
 - Los beneficios combinables se aplican por prioridad.
 - Los no combinables compiten como alternativas exclusivas.
 - El servidor elige el resultado válido de menor total.
@@ -165,7 +178,8 @@ también.
 
 ## Validación del corte
 
-- Backend completo: 232 pruebas exitosas sin fallos ni omitidas, incluida la
+- Backend: 244 pruebas exitosas sin fallos ni omitidas (242 en suite completa
+  más 2 casos de alcance de beneficio ejecutados de forma enfocada), incluida la
   regla de arquitectura y las integraciones de membresías, beneficios, reservas,
   acceso lógico, ventas, migraciones y PostgreSQL 18 real.
 - La falla arquitectónica previa de Coaching quedó resuelta: los lookups PDF
@@ -173,7 +187,8 @@ también.
   dependencias explícitas y el SQL/JdbcClient vive exclusivamente en adaptadores
   de `coaching.infrastructure`. La prueba
   `applicationLayerDoesNotUseJdbcClient` vuelve a pasar.
-- Frontend: 57 pruebas exitosas, typecheck y build de producción exitosos.
+- Frontend: 60 pruebas exitosas y typecheck exitoso. La validación final de build
+  y navegador se registra en el corte de la rama.
 - Playwright: 8 recorridos enfocados exitosos, incluidos cambio de plan,
   actualización inmediata de `ACCESS`, asignación de descuento, renovación
   embebida y redirección de la ruta anterior.

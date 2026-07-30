@@ -163,15 +163,88 @@ test("la ficha muestra beneficios, asigna descuentos y ejecuta el cambio de plan
 });
 
 test("la renovación vive en el inicio y la ruta anterior redirige", async ({ page }) => {
-  await bootMemberWorkflow(page);
+  let changePlanPayload: Record<string, unknown> | null = null;
+  await bootMemberWorkflow(page, async (route, path) => {
+    const method = route.request().method();
+    if (method === "GET" && path === "/clients") {
+      return fulfill(route, [{
+        id: clientId,
+        firstName: "Andrea",
+        lastName: "López",
+        phone: "+524921111111",
+        email: "andrea@example.test",
+        status: "ACTIVE",
+        joinedAt: "2026-07-01T12:00:00Z",
+        updatedAt: "2026-07-01T12:00:00Z",
+      }]);
+    }
+    if (method === "GET" && path === `/clients/${clientId}/memberships`) {
+      return fulfill(route, [membership(currentPlanId, "Plan Base", "2026-08-20")]);
+    }
+    if (method === "GET" && path === "/catalog/plans") {
+      return fulfill(route, [
+        plan(currentPlanId, "Plan Base", 50000),
+        plan(targetPlanId, "Plan Plus", 80000),
+      ]);
+    }
+    if (method === "POST" && path === "/membership-quotes") {
+      const payload = route.request().postDataJSON() as { planId: string };
+      const selected = payload.planId === targetPlanId
+        ? plan(targetPlanId, "Plan Plus", 80000)
+        : plan(currentPlanId, "Plan Base", 50000);
+      return fulfill(route, {
+        clientId,
+        planId: selected.id,
+        planName: selected.name,
+        listPriceCents: selected.priceCents,
+        discountCents: 8000,
+        totalCents: selected.priceCents - 8000,
+        currency: "MXN",
+        appliedBenefits: [{
+          benefitId: "99999999-9999-4999-8999-999999999999",
+          code: "ESTUDIANTE",
+          name: "Descuento estudiante",
+          discountCents: 8000,
+        }],
+      });
+    }
+    if (method === "POST" && path === `/memberships/${membershipId}/change-plan`) {
+      changePlanPayload = route.request().postDataJSON() as Record<string, unknown>;
+      return fulfill(route, {
+        saleId: "18181818-1818-4818-8818-181818181818",
+        saleNumber: "V-RECEPTION-001",
+        saleStatus: "PAID",
+        totalCents: 72000,
+        paidCents: 72000,
+        balanceCents: 0,
+        currency: "MXN",
+        membership: membership(targetPlanId, "Plan Plus", "2026-08-29"),
+      });
+    }
+    return false;
+  });
 
   await page.goto("/reception");
-  await expect(page.getByRole("heading", { name: /Renovación y Asignación de Membresía/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Renovar, asignar o cambiar plan/i })).toBeVisible();
   await expect(page.locator('a[href="/reception/renewals"]')).toHaveCount(0);
+  await expect(page.getByText("🔄")).toHaveCount(0);
+
+  await page.getByPlaceholder("Nombre, teléfono o email").fill("Andrea");
+  await page.getByRole("button", { name: "Buscar socio" }).click();
+  await page.getByRole("button", { name: /Andrea López/ }).click();
+  await page.getByLabel("Operación").selectOption(targetPlanId);
+  await expect(page.getByText(/Beneficios: Descuento estudiante/)).toBeVisible();
+  await page.getByRole("button", { name: "Cambiar plan" }).click();
+  await expect(page.getByText(/Plan cambiado por/)).toBeVisible();
+  expect(changePlanPayload).toMatchObject({
+    targetPlanId,
+    method: "CASH",
+    validateNow: true,
+  });
 
   await page.goto("/reception/renewals");
   await expect(page).toHaveURL(/\/reception$/);
-  await expect(page.getByRole("heading", { name: /Renovación y Asignación de Membresía/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Renovar, asignar o cambiar plan/i })).toBeVisible();
 });
 
 async function bootMemberWorkflow(
@@ -185,11 +258,11 @@ async function bootMemberWorkflow(
     username: "recepcion@example.test",
     fullName: "Recepción Prueba",
     permissions: [
-      "access.read",
       "benefit.read",
       "branch.read",
       "catalog.read",
       "client.benefit.assign",
+      "client.benefit.verify",
       "client.create",
       "client.read",
       "client.update",

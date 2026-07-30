@@ -20,8 +20,10 @@ pagos, métricas y movimientos de caja. V54 incorpora `membership_period`,
 backfill, reconciliación determinista de activas duplicadas, índice único por
 socio y bloqueo pesimista para renovación/cambio. El cotizador backend ya
 calcula beneficios y Sales conserva subtotal, descuento y total. La ficha del
-socio muestra los periodos con su venta, y el carrito minorista ya no acepta
-planes. El diseño del catálogo permanece sin cambios.
+socio muestra sólo la membresía operativa actual; los periodos y sus ventas
+viven en el Timeline de actividad para no presentar una membresía cancelada
+como si fuera otro plan actual. El carrito minorista ya no acepta planes. El
+diseño del catálogo permanece sin cambios.
 
 La duración usa extremos inclusivos (`durationDays - 1`), la renovación activa
 continúa al día siguiente y la vencida reinicia en la fecha operativa. Un worker
@@ -39,4 +41,6 @@ transfiere días pendientes y actualiza inmediatamente los accesos heredados.
 
 La renovación rápida vive dentro de `/reception`. La entrada lateral y la
 tarjeta que enviaban a `/reception/renewals` fueron retiradas; esa URL sólo
-redirige al inicio para conservar marcadores antiguos.
+redirige al inicio para conservar marcadores antiguos. El bloque embebido
+permite buscar socio, renovar el mismo plan, cambiar a otro plan activo o
+contratar el inicial, siempre con cotización y registro de pago.

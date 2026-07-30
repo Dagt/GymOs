@@ -140,6 +140,10 @@ class MembershipCommercePersistenceIntegrationTests {
 				"STUDENT", "Estudiante", "STUDENT", "PERCENT", null, 10.0,
 				false, true, null, today.minusDays(1), today.plusMonths(1));
 		assignBenefit(pricingBenefitId, "ASSIGNED", today.minusDays(1), today.plusMonths(1));
+		jdbcClient.sql("UPDATE client_benefit SET branch_id=:branchId WHERE benefit_id=:benefitId")
+				.param("branchId", branchId)
+				.param("benefitId", pricingBenefitId)
+				.update();
 		UUID evidenceBenefitId = insertBenefit(
 				"TEACHER", "Docente", "AGREEMENT", "FIXED", 1_000, null,
 				true, false, null, null, null);

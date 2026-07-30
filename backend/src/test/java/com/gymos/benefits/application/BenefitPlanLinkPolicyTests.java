@@ -12,6 +12,7 @@ import com.gymos.benefits.application.command.AssignClientBenefitCommand;
 import com.gymos.benefits.application.command.CreateBenefitCommand;
 import com.gymos.benefits.infrastructure.BenefitRepository;
 import com.gymos.benefits.infrastructure.BenefitRepository.BenefitSummary;
+import com.gymos.benefits.infrastructure.BenefitRepository.ClientBenefitSummary;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import java.time.LocalDate;
@@ -126,6 +127,51 @@ class BenefitPlanLinkPolicyTests {
 				"test"
 		)).isInstanceOfSatisfying(BusinessException.class,
 				exception -> assertThat(exception.code()).isEqualTo("BRANCH_NOT_AVAILABLE"));
+	}
+
+	@Test
+	void benefitVerificationRejectsAnAssignmentFromAnotherBranch() {
+		UUID clientBenefitId = UUID.randomUUID();
+		when(repository.clientBenefit(organizationId, clientBenefitId)).thenReturn(java.util.Optional.of(
+				new ClientBenefitSummary(
+						clientBenefitId,
+						UUID.randomUUID(),
+						UUID.randomUUID(),
+						UUID.randomUUID(),
+						"Estudiante",
+						"ASSIGNED",
+						LocalDate.now(),
+						LocalDate.now().plusMonths(1),
+						null
+				)
+		));
+
+		assertThatThrownBy(() -> service.verify(principal, clientBenefitId, "test"))
+				.isInstanceOfSatisfying(BusinessException.class,
+						exception -> assertThat(exception.code()).isEqualTo("CLIENT_BENEFIT_BRANCH_MISMATCH"));
+	}
+
+	@Test
+	void benefitWithoutExplicitScopeDefaultsToTheSelectedBranch() {
+		CreateBenefitCommand command = new CreateBenefitCommand(
+				null, "STUDENT", "Estudiante", "STUDENT", "PERCENT", null, 10.0,
+				false, false, 10, null, null, "ACTIVE", List.of());
+		UUID benefitId = UUID.randomUUID();
+		when(repository.membershipPlansExist(organizationId, List.of())).thenReturn(true);
+		when(repository.branchExists(organizationId, principal.branchId())).thenReturn(true);
+		when(repository.codeExists(organizationId, principal.branchId(), "STUDENT")).thenReturn(false);
+		when(repository.createBenefit(principal, principal.branchId(), command)).thenReturn(benefitId);
+		when(repository.benefit(organizationId, benefitId)).thenReturn(java.util.Optional.of(
+				new BenefitSummary(
+						benefitId, principal.branchId(), "STUDENT", "Estudiante", "STUDENT", "PERCENT",
+						null, 10.0, false, false, 10, null, null, "ACTIVE", List.of()
+				)
+		));
+
+		BenefitSummary created = service.createBenefit(principal, command, "test");
+
+		assertThat(created.branchId()).isEqualTo(principal.branchId());
+		verify(repository).createBenefit(principal, principal.branchId(), command);
 	}
 
 	private void assertCode(CreateBenefitCommand command, String expectedCode) {
