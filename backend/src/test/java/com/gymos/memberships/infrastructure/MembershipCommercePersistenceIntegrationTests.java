@@ -2,7 +2,10 @@ package com.gymos.memberships.infrastructure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.gymos.access.infrastructure.AccessRepository;
+import com.gymos.eligibility.api.EligibilityPolicy.EligibleBenefit;
+import com.gymos.eligibility.api.EligibilityPolicy.EligibilityRequest;
+import com.gymos.eligibility.application.DefaultEligibilityPolicy;
+import com.gymos.eligibility.infrastructure.EligibilityRepository;
 import com.gymos.sales.api.operations.MembershipBenefitSnapshot;
 import com.gymos.sales.infrastructure.MembershipSaleCommandRepository;
 import com.gymos.sales.infrastructure.MembershipSaleCommandRepository.MembershipSaleRecord;
@@ -145,24 +148,30 @@ class MembershipCommercePersistenceIntegrationTests {
 				"ACCESS-SAUNA", "Acceso sauna", "ACCESS", "NONE", null, null,
 				false, false, null, null, null);
 
-		var pricing = new MembershipPricingRepository(jdbcClient)
-				.eligibleBenefits(organizationId, branchId, clientId, today);
-		assertThat(pricing).extracting(MembershipPricingRepository.EligiblePricingBenefit::id)
+		var eligibility = new DefaultEligibilityPolicy(new EligibilityRepository(jdbcClient));
+		var pricing = eligibility.evaluate(
+				EligibilityRequest.membershipPricing(organizationId, branchId, clientId, today));
+		assertThat(pricing.benefits()).extracting(EligibleBenefit::id)
 				.containsExactly(pricingBenefitId);
 
-		AccessRepository access = new AccessRepository(jdbcClient);
-		assertThat(access.effectiveAccessBenefits(organizationId, branchId, clientId, today)).isEmpty();
+		assertThat(eligibility.evaluate(
+				EligibilityRequest.access(organizationId, branchId, clientId, today, java.util.Set.of()))
+				.benefits()).isEmpty();
 
 		linkAccessBenefit(accessBenefitId, firstPlanId);
-		assertThat(access.effectiveAccessBenefits(organizationId, branchId, clientId, today))
-				.extracting(AccessRepository.EffectiveAccessBenefitRecord::benefitId)
+		assertThat(eligibility.evaluate(
+				EligibilityRequest.access(organizationId, branchId, clientId, today, java.util.Set.of()))
+				.benefits())
+				.extracting(EligibleBenefit::id)
 				.containsExactly(accessBenefitId);
 
 		jdbcClient.sql("UPDATE membership SET grace_ends_on=:expiredOn WHERE id=:membershipId")
 				.param("expiredOn", today.minusDays(1))
 				.param("membershipId", membershipId)
 				.update();
-		assertThat(access.effectiveAccessBenefits(organizationId, branchId, clientId, today)).isEmpty();
+		assertThat(eligibility.evaluate(
+				EligibilityRequest.access(organizationId, branchId, clientId, today, java.util.Set.of()))
+				.benefits()).isEmpty();
 
 		jdbcClient.sql("""
 				UPDATE membership
@@ -173,7 +182,9 @@ class MembershipCommercePersistenceIntegrationTests {
 				.param("graceEndsOn", today.plusDays(30))
 				.param("membershipId", membershipId)
 				.update();
-		assertThat(access.effectiveAccessBenefits(organizationId, branchId, clientId, today)).isEmpty();
+		assertThat(eligibility.evaluate(
+				EligibilityRequest.access(organizationId, branchId, clientId, today, java.util.Set.of()))
+				.benefits()).isEmpty();
 	}
 
 	@Test

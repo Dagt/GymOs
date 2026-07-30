@@ -1,19 +1,18 @@
 # Beneficios y elegibilidad
 
-Estado: `PARCIAL`
+Estado: `ESTABILIZADO`
 
 ## Implementado
 
 - definición y asignación de beneficios;
 - verificación de beneficios de socios;
 - paquetes de visitas;
-- integración parcial con membresías, acceso y reservas.
+- integración con membresías, acceso y reservas mediante `EligibilityPolicy`.
 
 ## Pendiente
 
-- fuente única de verdad para elegibilidad;
-- cobertura de expiración, consumo y concurrencia;
-- pruebas de permisos y aislamiento.
+- consumo concurrente de pases de visita;
+- pruebas negativas exhaustivas de permisos y aislamiento.
 ## Evolución en `feature/reception-pos-init`
 
 Los beneficios de tipo `ACCESS` administran desde el propio beneficio los planes
@@ -31,3 +30,23 @@ la venta conserva el resultado en `membership_sale_benefit`. Una prueba
 PostgreSQL demuestra que crear la relación beneficio–plan actualiza
 inmediatamente al socio y que cambiar su plan revoca esa herencia sin copiar
 asignaciones.
+
+## Política transversal
+
+`com.gymos.eligibility` es la fuente única de verdad para decidir elegibilidad.
+Expone solamente `eligibility.api.EligibilityPolicy`; sus consultas viven en
+`eligibility.infrastructure` y reciben siempre organización, sucursal, socio y
+fecha efectiva.
+
+- Membresías solicita los beneficios económicos elegibles para cotizar en
+  backend.
+- Reservas entrega los planes admitidos por el recurso y evalúa la membresía en
+  la fecha local de la reserva.
+- Acceso entrega los beneficios exigidos por el punto y evalúa la membresía y
+  herencia dinámica `plan → ACCESS`.
+- Cliente inexistente/inactivo, sucursal, vigencia y gracia se interpretan igual
+  en los tres flujos.
+
+El recurso o dispositivo sigue siendo dueño de su configuración. La política
+transversal es dueña de interpretar los hechos y devolver una decisión
+consistente; no copia beneficios al socio ni acopla reservas con hardware.

@@ -113,85 +113,6 @@ public class AccessRepository {
 				.optional();
 	}
 
-	public Optional<ActiveMembershipRecord> activeMembership(UUID organizationId, UUID branchId, UUID clientId, LocalDate today) {
-		return jdbcClient.sql("""
-				SELECT m.id, m.plan_id, cp.name AS plan_name, m.starts_on, m.ends_on, m.grace_ends_on
-				FROM membership m
-				JOIN membership_plan mp ON mp.id = m.plan_id
-				JOIN catalog_product cp ON cp.id = mp.product_id
-				WHERE m.organization_id = :organizationId
-				  AND (m.branch_id = :branchId OR mp.multi_branch_access = true)
-				  AND m.client_id = :clientId
-				  AND m.status = 'ACTIVE'
-				  AND m.starts_on <= :today
-				  AND m.grace_ends_on >= :today
-				  AND m.deleted_at IS NULL
-				ORDER BY m.ends_on DESC
-				LIMIT 1
-				""")
-				.param("organizationId", organizationId)
-				.param("branchId", branchId)
-				.param("clientId", clientId)
-				.param("today", today)
-				.query((resultSet, rowNumber) -> new ActiveMembershipRecord(
-						resultSet.getObject("id", UUID.class),
-						resultSet.getObject("plan_id", UUID.class),
-						resultSet.getString("plan_name"),
-						resultSet.getObject("starts_on", LocalDate.class),
-						resultSet.getObject("ends_on", LocalDate.class),
-						resultSet.getObject("grace_ends_on", LocalDate.class)
-				))
-				.optional();
-	}
-
-	public List<EffectiveAccessBenefitRecord> effectiveAccessBenefits(
-			UUID organizationId,
-			UUID branchId,
-			UUID clientId,
-			LocalDate today
-	) {
-		return jdbcClient.sql("""
-				SELECT DISTINCT b.id AS benefit_id, b.code, b.name,
-				       m.id AS membership_id, m.plan_id, cp.name AS plan_name
-				FROM membership m
-				JOIN membership_plan mp ON mp.id = m.plan_id
-				JOIN catalog_product cp ON cp.id = mp.product_id
-				JOIN benefit_membership_plan bmp
-				  ON bmp.membership_plan_id = m.plan_id
-				 AND bmp.organization_id = m.organization_id
-				JOIN benefit b
-				  ON b.id = bmp.benefit_id
-				 AND b.organization_id = m.organization_id
-				WHERE m.organization_id = :organizationId
-				  AND (m.branch_id = :branchId OR mp.multi_branch_access = true)
-				  AND m.client_id = :clientId
-				  AND m.status = 'ACTIVE'
-				  AND m.starts_on <= :today
-				  AND m.grace_ends_on >= :today
-				  AND m.deleted_at IS NULL
-				  AND b.benefit_type = 'ACCESS'
-				  AND b.status = 'ACTIVE'
-				  AND b.deleted_at IS NULL
-				  AND (b.branch_id IS NULL OR b.branch_id = :branchId)
-				  AND (b.valid_from IS NULL OR b.valid_from <= :today)
-				  AND (b.valid_until IS NULL OR b.valid_until >= :today)
-				ORDER BY b.name, b.id
-				""")
-				.param("organizationId", organizationId)
-				.param("branchId", branchId)
-				.param("clientId", clientId)
-				.param("today", today)
-				.query((resultSet, rowNumber) -> new EffectiveAccessBenefitRecord(
-						resultSet.getObject("benefit_id", UUID.class),
-						resultSet.getString("code"),
-						resultSet.getString("name"),
-						resultSet.getObject("membership_id", UUID.class),
-						resultSet.getObject("plan_id", UUID.class),
-						resultSet.getString("plan_name")
-				))
-				.list();
-	}
-
 	public List<UUID> deviceRequiredBenefitIds(UUID organizationId, UUID branchId, UUID deviceId) {
 		return jdbcClient.sql("""
 				SELECT adb.benefit_id
@@ -652,16 +573,6 @@ public class AccessRepository {
 	}
 
 	public record ClientAccessRecord(UUID id, String fullName, String phone, String email, String status) {
-	}
-
-	public record ActiveMembershipRecord(
-			UUID id,
-			UUID planId,
-			String planName,
-			LocalDate startsOn,
-			LocalDate endsOn,
-			LocalDate graceEndsOn
-	) {
 	}
 
 	public record EffectiveAccessBenefitRecord(

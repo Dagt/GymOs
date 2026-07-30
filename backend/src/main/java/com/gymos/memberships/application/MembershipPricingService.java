@@ -3,10 +3,13 @@ package com.gymos.memberships.application;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.time.BusinessTime;
+import com.gymos.eligibility.api.EligibilityPolicy;
+import com.gymos.eligibility.api.EligibilityPolicy.EligibleBenefit;
+import com.gymos.eligibility.api.EligibilityPolicy.EligibilityDecision;
+import com.gymos.eligibility.api.EligibilityPolicy.EligibilityRequest;
+import com.gymos.eligibility.api.EligibilityPolicy.Reason;
 import com.gymos.memberships.application.result.MembershipQuoteResult;
 import com.gymos.memberships.application.result.MembershipQuoteResult.AppliedBenefit;
-import com.gymos.memberships.infrastructure.MembershipPricingRepository;
-import com.gymos.memberships.infrastructure.MembershipPricingRepository.EligiblePricingBenefit;
 import com.gymos.memberships.infrastructure.MembershipRepository;
 import com.gymos.memberships.infrastructure.MembershipRepository.PlanForRenewal;
 import java.util.ArrayList;
@@ -19,14 +22,14 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class MembershipPricingService {
 	private final MembershipRepository membershipRepository;
-	private final MembershipPricingRepository pricingRepository;
+	private final EligibilityPolicy eligibilityPolicy;
 
 	public MembershipPricingService(
 			MembershipRepository membershipRepository,
-			MembershipPricingRepository pricingRepository
+			EligibilityPolicy eligibilityPolicy
 	) {
 		this.membershipRepository = membershipRepository;
-		this.pricingRepository = pricingRepository;
+		this.eligibilityPolicy = eligibilityPolicy;
 	}
 
 	@Transactional(readOnly = true)
@@ -46,8 +49,12 @@ public class MembershipPricingService {
 			UUID clientId,
 			PlanForRenewal plan
 	) {
-		List<EligiblePricingBenefit> eligible = pricingRepository.eligibleBenefits(
-				organizationId, branchId, clientId, BusinessTime.today());
+		EligibilityDecision eligibility = eligibilityPolicy.evaluate(EligibilityRequest.membershipPricing(
+				organizationId, branchId, clientId, BusinessTime.today()));
+		if (!eligibility.eligible()) {
+			throw eligibilityException(eligibility.reason());
+		}
+		List<EligibleBenefit> eligible = eligibility.benefits();
 		QuoteCandidate combinable = applyCombinable(plan.priceCents(), eligible);
 		QuoteCandidate exclusive = bestExclusive(plan.priceCents(), eligible);
 		QuoteCandidate selected = exclusive.totalCents() < combinable.totalCents() ? exclusive : combinable;
@@ -63,12 +70,12 @@ public class MembershipPricingService {
 		);
 	}
 
-	private QuoteCandidate applyCombinable(long listPrice, List<EligiblePricingBenefit> eligible) {
+	private QuoteCandidate applyCombinable(long listPrice, List<EligibleBenefit> eligible) {
 		long current = listPrice;
 		List<AppliedBenefit> applied = new ArrayList<>();
-		for (EligiblePricingBenefit benefit : eligible.stream()
-				.filter(EligiblePricingBenefit::combinable)
-				.sorted(Comparator.comparingInt(EligiblePricingBenefit::priority))
+		for (EligibleBenefit benefit : eligible.stream()
+				.filter(EligibleBenefit::combinable)
+				.sorted(Comparator.comparingInt(EligibleBenefit::priority))
 				.toList()) {
 			long next = apply(current, benefit);
 			if (next < current) {
@@ -79,7 +86,7 @@ public class MembershipPricingService {
 		return new QuoteCandidate(current, List.copyOf(applied));
 	}
 
-	private QuoteCandidate bestExclusive(long listPrice, List<EligiblePricingBenefit> eligible) {
+	private QuoteCandidate bestExclusive(long listPrice, List<EligibleBenefit> eligible) {
 		return eligible.stream()
 				.filter(benefit -> !benefit.combinable())
 				.map(benefit -> {
@@ -92,7 +99,7 @@ public class MembershipPricingService {
 				.orElse(new QuoteCandidate(listPrice, List.of()));
 	}
 
-	private long apply(long current, EligiblePricingBenefit benefit) {
+	private long apply(long current, EligibleBenefit benefit) {
 		return switch (benefit.discountType()) {
 			case "PERCENT" -> {
 				double percent = benefit.discountPercent() == null ? 0 : benefit.discountPercent();
@@ -106,8 +113,19 @@ public class MembershipPricingService {
 		};
 	}
 
-	private AppliedBenefit toApplied(EligiblePricingBenefit benefit, long discount) {
+	private AppliedBenefit toApplied(EligibleBenefit benefit, long discount) {
 		return new AppliedBenefit(benefit.id(), benefit.code(), benefit.name(), discount);
+	}
+
+	private BusinessException eligibilityException(Reason reason) {
+		return switch (reason) {
+			case CLIENT_NOT_FOUND -> new BusinessException(
+					"CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible.");
+			case CLIENT_NOT_ACTIVE -> new BusinessException(
+					"CLIENT_NOT_ACTIVE", "El cliente debe estar activo para aplicar beneficios.");
+			default -> new BusinessException(
+					"MEMBERSHIP_PRICING_NOT_ELIGIBLE", "No fue posible determinar los beneficios aplicables.");
+		};
 	}
 
 	private record QuoteCandidate(long totalCents, List<AppliedBenefit> applied) {

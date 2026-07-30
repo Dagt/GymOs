@@ -1,88 +1,27 @@
 package com.gymos.coaching.application.pdf;
 
-import org.springframework.jdbc.core.simple.JdbcClient;
-import org.springframework.stereotype.Component;
-
 import java.text.Normalizer;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Resolves the catalog metadata needed by workout PDFs. The lookup is limited to
- * equipment so the final section remains useful without repeating prescription
- * or technical instructions already printed in the plan.
+ * Application port for resolving exercise catalog metadata required by PDFs.
  */
-@Component
-public final class WorkoutPdfExerciseCatalogLookup {
-
-	private static volatile WorkoutPdfExerciseCatalogLookup instance;
-	private final JdbcClient jdbc;
-
-	public WorkoutPdfExerciseCatalogLookup(JdbcClient jdbc) {
-		this.jdbc = jdbc;
-		instance = this;
-	}
-
-	public static Optional<String> equipment(String exerciseId, String exerciseName) {
-		WorkoutPdfExerciseCatalogLookup current = instance;
-		if (current != null) {
-			Optional<String> byId = current.findById(exerciseId);
-			if (byId.isPresent()) return byId;
-			Optional<String> byName = current.findByExactName(exerciseName);
-			if (byName.isPresent()) return byName;
-		}
-		return inferFromName(exerciseName);
-	}
-
-	private Optional<String> findById(String exerciseId) {
-		if (exerciseId == null || exerciseId.isBlank()) return Optional.empty();
-		try {
-			UUID id = UUID.fromString(exerciseId.trim());
-			return jdbc.sql("""
-					SELECT NULLIF(trim(equipment), '') AS equipment
-					FROM exercise
-					WHERE id = :id
-					  AND status = 'ACTIVE'
-					LIMIT 1
-					""")
-					.param("id", id)
-					.query(String.class)
-					.optional()
-					.filter(WorkoutPdfExerciseCatalogLookup::notBlank);
-		} catch (RuntimeException ignored) {
-			return Optional.empty();
-		}
-	}
-
-	private Optional<String> findByExactName(String exerciseName) {
-		if (exerciseName == null || exerciseName.isBlank()) return Optional.empty();
-		try {
-			return jdbc.sql("""
-					SELECT NULLIF(trim(equipment), '') AS equipment
-					FROM exercise
-					WHERE lower(trim(name)) = lower(trim(:exerciseName))
-					  AND status = 'ACTIVE'
-					ORDER BY CASE WHEN organization_id IS NULL THEN 1 ELSE 0 END
-					LIMIT 1
-					""")
-					.param("exerciseName", exerciseName.trim())
-					.query(String.class)
-					.optional()
-					.filter(WorkoutPdfExerciseCatalogLookup::notBlank);
-		} catch (RuntimeException ignored) {
-			return Optional.empty();
-		}
-	}
+public interface WorkoutPdfExerciseCatalogLookup {
+	Optional<String> equipment(UUID organizationId, String exerciseId, String exerciseName);
 
 	/**
-	 * Conservative fallback for legacy/system exercises whose catalog row does
-	 * not yet contain equipment. Only explicit equipment words in the exercise
-	 * name are translated; no biomechanical assumptions are made.
+	 * Conservative fallback for legacy exercises without catalog equipment.
+	 * It only translates explicit equipment words and makes no biomechanical
+	 * assumptions.
 	 */
 	static Optional<String> inferFromName(String exerciseName) {
-		if (!notBlank(exerciseName)) return Optional.empty();
-		String normalized = normalize(exerciseName);
+		if (exerciseName == null || exerciseName.isBlank()) return Optional.empty();
+		String normalized = Normalizer.normalize(exerciseName, Normalizer.Form.NFD)
+				.replaceAll("\\p{M}+", "")
+				.toLowerCase(Locale.ROOT)
+				.trim();
 
 		if (normalized.contains("polea") || normalized.contains("cross over") || normalized.contains("crossover")) {
 			return Optional.of("Polea / estación de cables");
@@ -106,16 +45,5 @@ public final class WorkoutPdfExerciseCatalogLookup {
 		if (normalized.contains("curl 21")) return Optional.of("Barra o mancuernas");
 		if (normalized.contains("pantorrilla") && normalized.contains("maquina")) return Optional.of("Máquina de pantorrilla");
 		return Optional.empty();
-	}
-
-	private static String normalize(String value) {
-		return Normalizer.normalize(value, Normalizer.Form.NFD)
-				.replaceAll("\\p{M}+", "")
-				.toLowerCase(Locale.ROOT)
-				.trim();
-	}
-
-	private static boolean notBlank(String value) {
-		return value != null && !value.isBlank();
 	}
 }

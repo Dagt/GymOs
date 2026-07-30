@@ -9,15 +9,32 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
+import org.springframework.stereotype.Component;
 
+@Component
 public final class WorkoutPdfDocumentMapper {
+	private final ObjectMapper objectMapper;
+	private final WorkoutPdfBrandingLookup brandingLookup;
+	private final WorkoutPdfExerciseCatalogLookup exerciseCatalogLookup;
 
-	private static final ObjectMapper objectMapper = new ObjectMapper();
+	public WorkoutPdfDocumentMapper(
+			ObjectMapper objectMapper,
+			WorkoutPdfBrandingLookup brandingLookup,
+			WorkoutPdfExerciseCatalogLookup exerciseCatalogLookup
+	) {
+		this.objectMapper = objectMapper;
+		this.brandingLookup = brandingLookup;
+		this.exerciseCatalogLookup = exerciseCatalogLookup;
+	}
 
-	private WorkoutPdfDocumentMapper() {}
-
-	public static WorkoutPdfDocument fromAssignmentData(AssignmentPdfData data) {
-		WorkoutPdfBrandingLookup.Palette palette = WorkoutPdfBrandingLookup.resolve(
+	public WorkoutPdfDocument fromAssignmentData(
+			UUID organizationId,
+			UUID branchId,
+			AssignmentPdfData data
+	) {
+		WorkoutPdfBrandingLookup.Palette palette = brandingLookup.resolve(
+				organizationId, branchId,
 				data.gymName(), data.branchName(), data.logoUrl(), data.primaryColor()
 		);
 		String resolvedLogo = palette.logoUrl() != null && !palette.logoUrl().isBlank()
@@ -46,7 +63,7 @@ public final class WorkoutPdfDocumentMapper {
 			if (sessionsNode != null && sessionsNode.isArray()) {
 				int dayIndex = 1;
 				for (JsonNode sessNode : sessionsNode) {
-					sessions.add(mapSession(sessNode, dayIndex++));
+					sessions.add(mapSession(organizationId, sessNode, dayIndex++));
 				}
 			}
 		} catch (Exception ignored) {}
@@ -71,7 +88,7 @@ public final class WorkoutPdfDocumentMapper {
 		);
 	}
 
-	private static WorkoutPdfSession mapSession(JsonNode sessNode, int dayIndex) {
+	private WorkoutPdfSession mapSession(UUID organizationId, JsonNode sessNode, int dayIndex) {
 		String name = text(sessNode, "name", "Sesión " + dayIndex);
 		String focus = text(sessNode, "focus", "");
 		String notes = text(sessNode, "notes", "");
@@ -81,9 +98,9 @@ public final class WorkoutPdfDocumentMapper {
 		if (blocksNode != null && blocksNode.isArray()) {
 			for (JsonNode blockNode : blocksNode) {
 				if (blockNode.isObject() && blockNode.has("exercises")) {
-					blocks.add(mapBlock(blockNode));
+					blocks.add(mapBlock(organizationId, blockNode));
 				} else {
-					WorkoutPdfExercise ex = mapExercise(blockNode, 1);
+					WorkoutPdfExercise ex = mapExercise(organizationId, blockNode, 1);
 					blocks.add(new WorkoutPdfBlock("Bloque Principal", "MAIN", "TRABAJO PRINCIPAL", "", List.of(ex)));
 				}
 			}
@@ -92,7 +109,7 @@ public final class WorkoutPdfDocumentMapper {
 		return new WorkoutPdfSession(dayIndex, name, focus, notes, blocks);
 	}
 
-	private static WorkoutPdfBlock mapBlock(JsonNode blockNode) {
+	private WorkoutPdfBlock mapBlock(UUID organizationId, JsonNode blockNode) {
 		String name = text(blockNode, "name", "");
 		String type = text(blockNode, "type", "MAIN");
 		String notes = text(blockNode, "notes", "");
@@ -103,22 +120,22 @@ public final class WorkoutPdfDocumentMapper {
 		if (exercisesNode != null && exercisesNode.isArray()) {
 			int exIndex = 1;
 			for (JsonNode exNode : exercisesNode) {
-				exercises.add(mapExercise(exNode, exIndex++));
+				exercises.add(mapExercise(organizationId, exNode, exIndex++));
 			}
 		}
 
 		return new WorkoutPdfBlock(name, type, typeLabel, notes, exercises);
 	}
 
-	private static WorkoutPdfExercise mapExercise(JsonNode exNode, int index) {
+	private WorkoutPdfExercise mapExercise(UUID organizationId, JsonNode exNode, int index) {
 		String name = text(exNode, "exerciseName", text(exNode, "exercise", text(exNode, "name", "Ejercicio")));
 		var formatted = PrescriptionFormatter.format(exNode);
 		String mediaUrl = text(exNode, "mediaUrl", null);
 		String primaryMuscleGroup = text(exNode, "primaryMuscleGroup", null);
 		String equipment = text(exNode, "equipment", null);
 		if (equipment == null || equipment.isBlank()) {
-			equipment = WorkoutPdfExerciseCatalogLookup.equipment(
-					text(exNode, "exerciseId", null), name
+			equipment = exerciseCatalogLookup.equipment(
+					organizationId, text(exNode, "exerciseId", null), name
 			).orElse(null);
 		}
 

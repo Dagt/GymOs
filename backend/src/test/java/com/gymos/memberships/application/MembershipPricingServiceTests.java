@@ -5,9 +5,12 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.gymos.eligibility.api.EligibilityPolicy;
+import com.gymos.eligibility.api.EligibilityPolicy.BenefitType;
+import com.gymos.eligibility.api.EligibilityPolicy.EligibleBenefit;
+import com.gymos.eligibility.api.EligibilityPolicy.EligibilityDecision;
+import com.gymos.eligibility.api.EligibilityPolicy.Reason;
 import com.gymos.memberships.application.result.MembershipQuoteResult;
-import com.gymos.memberships.infrastructure.MembershipPricingRepository;
-import com.gymos.memberships.infrastructure.MembershipPricingRepository.EligiblePricingBenefit;
 import com.gymos.memberships.infrastructure.MembershipRepository;
 import com.gymos.memberships.infrastructure.MembershipRepository.PlanForRenewal;
 import java.util.List;
@@ -16,8 +19,8 @@ import org.junit.jupiter.api.Test;
 
 class MembershipPricingServiceTests {
 	private final MembershipRepository membershipRepository = mock(MembershipRepository.class);
-	private final MembershipPricingRepository pricingRepository = mock(MembershipPricingRepository.class);
-	private final MembershipPricingService service = new MembershipPricingService(membershipRepository, pricingRepository);
+	private final EligibilityPolicy eligibilityPolicy = mock(EligibilityPolicy.class);
+	private final MembershipPricingService service = new MembershipPricingService(membershipRepository, eligibilityPolicy);
 	private final UUID organizationId = UUID.randomUUID();
 	private final UUID branchId = UUID.randomUUID();
 	private final UUID clientId = UUID.randomUUID();
@@ -26,10 +29,10 @@ class MembershipPricingServiceTests {
 
 	@Test
 	void stacksOnlyCombinableBenefitsInPriorityOrder() {
-		when(pricingRepository.eligibleBenefits(any(), any(), any(), any())).thenReturn(List.of(
+		when(eligibilityPolicy.evaluate(any())).thenReturn(eligible(List.of(
 				benefit("STUDENT", "PERCENT", null, 10.0, true, 10),
 				benefit("AGREEMENT", "FIXED", 1_000, null, true, 20)
-		));
+		)));
 
 		MembershipQuoteResult quote = service.quote(organizationId, branchId, clientId, plan);
 
@@ -41,10 +44,10 @@ class MembershipPricingServiceTests {
 
 	@Test
 	void selectsBestExclusiveAlternativeInsteadOfStackWhenCheaper() {
-		when(pricingRepository.eligibleBenefits(any(), any(), any(), any())).thenReturn(List.of(
+		when(eligibilityPolicy.evaluate(any())).thenReturn(eligible(List.of(
 				benefit("STUDENT", "PERCENT", null, 10.0, true, 10),
 				benefit("PROMO", "SPECIAL_PRICE", 4_000, null, false, 20)
-		));
+		)));
 
 		MembershipQuoteResult quote = service.quote(organizationId, branchId, clientId, plan);
 
@@ -54,7 +57,11 @@ class MembershipPricingServiceTests {
 				.satisfies(applied -> assertThat(applied.code()).isEqualTo("PROMO"));
 	}
 
-	private EligiblePricingBenefit benefit(
+	private EligibilityDecision eligible(List<EligibleBenefit> benefits) {
+		return new EligibilityDecision(true, Reason.ELIGIBLE, null, benefits);
+	}
+
+	private EligibleBenefit benefit(
 			String code,
 			String type,
 			Integer value,
@@ -62,7 +69,8 @@ class MembershipPricingServiceTests {
 			boolean combinable,
 			int priority
 	) {
-		return new EligiblePricingBenefit(
-				UUID.randomUUID(), code, code, type, value, percent, combinable, priority);
+		return new EligibleBenefit(
+				UUID.randomUUID(), code, code, BenefitType.PRICING, type, value, percent,
+				combinable, priority, null, null, null);
 	}
 }

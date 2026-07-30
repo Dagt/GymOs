@@ -288,6 +288,15 @@ Decisiones implementadas:
 - El SQL de escritura de catalogo pertenece a infraestructura; `catalog.application` puede coordinar casos de uso, pero no debe usar `JdbcClient`.
 - `CatalogRepository` debe permanecer como fachada estable sin SQL directo; las consultas de productos, planes y SKU viven en repositorios internos especializados y comparten mapeadores JDBC.
 - La capa `application` no debe inyectar ni usar `JdbcClient`. El SQL operativo pertenece a repositorios de infraestructura del mismo modulo; la regla `applicationLayerDoesNotUseJdbcClient` bloquea regresiones.
+- La elegibilidad de socio se resuelve únicamente mediante
+  `eligibility.api.EligibilityPolicy`. Membresías, reservas y acceso aportan sus
+  restricciones de destino, pero comparten estado del socio, fecha efectiva,
+  sucursal, membresía vigente y beneficios aplicables.
+- Los enriquecimientos PDF de Coaching se expresan como puertos
+  (`WorkoutPdfBrandingLookup` y `WorkoutPdfExerciseCatalogLookup`). El mapper es
+  una dependencia inyectada y los adaptadores que usan `JdbcClient` pertenecen a
+  `coaching.infrastructure`; no se permiten registros globales estáticos de
+  componentes Spring.
 - Los modulos `clients`, `organizations` y `onboarding` siguen el patron fachada application + repositorio command/query: application coordina el caso de uso y auditoria, infrastructure encapsula columnas, SQL y persistencia.
 - Los consumidores de eventos deben permanecer idempotentes y transaccionales, con pruebas orientadas al consumidor dedicado.
 - La configuracion de pruebas debe conservar el ciclo de vida necesario para que Spring Modulith cierre sin falsos positivos sobre `event_publication`.

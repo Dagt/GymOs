@@ -141,6 +141,12 @@ La consulta remota por el socio pertenece a una aplicación futura.
   fallback;
 - el logotipo mantiene su proporción dentro del encabezado y cuenta con prueba
   automatizada de incrustación de una imagen real.
+- los lookups de marca y equipo del PDF son puertos de aplicación inyectados en
+  `WorkoutPdfDocumentMapper`; sus consultas JDBC están confinadas a adaptadores
+  de infraestructura y ya no existe el service locator global `static volatile`
+  que hacía depender el resultado del orden de arranque. Los lookups reciben los
+  IDs de organización y sucursal, evitando resolver marca o equipo por nombres
+  ambiguos de otro tenant.
 
 ### Métricas
 

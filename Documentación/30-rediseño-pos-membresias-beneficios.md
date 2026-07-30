@@ -102,6 +102,11 @@ también.
 9. **FUERA DE ALCANCE:** la asociación lógica dispositivo–beneficio queda
    preparada para uso futuro. Adaptadores de proveedor, operación offline y
    hardware físico no forman parte de esta rama ni de sus criterios de cierre.
+10. **IMPLEMENTADA:** política transversal `EligibilityPolicy`. Cotización,
+    reservas y acceso usan la misma fecha efectiva, estado del socio, membresía
+    vigente, alcance de sucursal y beneficios; se eliminaron los repositorios
+    paralelos `MembershipPricingRepository` y `BookingEligibilityRepository`,
+    así como la reconstrucción de membresía/beneficios dentro de Access.
 
 ## Operación del POS
 
@@ -140,6 +145,10 @@ también.
   sola venta y un solo pago.
 - Las pruebas frontend cubren coincidencia local, fallback exacto al backend y
   rechazo funcional de planes en el carrito minorista.
+- Playwright valida en el build de producción un lector HID configurado como
+  teclado con sufijo Enter: el primer escaneo agrega el producto y el segundo
+  incrementa su cantidad. La suite E2E completa de Catálogo/Inventario/POS
+  conserva sus cuatro recorridos exitosos.
 
 ## Criterios globales
 
@@ -152,12 +161,14 @@ también.
 
 ## Validación del corte
 
-- Backend enfocado de membresías, beneficios, acceso lógico, ventas y migraciones:
-  exitoso, incluido PostgreSQL 18 real.
-- Suite backend completa: todas las pruebas salvo una falla arquitectónica
-  preexistente y ajena a este alcance en los lookups PDF de Coaching que
-  dependen directamente de `JdbcClient`; el hardening final se revalidó con la
-  suite enfocada exitosa.
+- Backend completo: 232 pruebas exitosas sin fallos ni omitidas, incluida la
+  regla de arquitectura y las integraciones de membresías, beneficios, reservas,
+  acceso lógico, ventas, migraciones y PostgreSQL 18 real.
+- La falla arquitectónica previa de Coaching quedó resuelta: los lookups PDF
+  ahora son puertos de aplicación, `WorkoutPdfDocumentMapper` recibe
+  dependencias explícitas y el SQL/JdbcClient vive exclusivamente en adaptadores
+  de `coaching.infrastructure`. La prueba
+  `applicationLayerDoesNotUseJdbcClient` vuelve a pasar.
 - Frontend: 54 pruebas exitosas, typecheck y build de producción exitosos.
 - Lint sin errores; conserva dos advertencias preexistentes de dependencias de
   hooks en `AppShell.tsx`.

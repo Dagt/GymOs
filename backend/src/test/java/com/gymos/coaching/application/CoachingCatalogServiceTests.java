@@ -12,6 +12,9 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.audit.api.AuditService;
 import com.gymos.coaching.application.CoachingCatalogService.CreateExerciseCommand;
+import com.gymos.coaching.application.pdf.WorkoutPdfBrandingLookup;
+import com.gymos.coaching.application.pdf.WorkoutPdfDocumentMapper;
+import com.gymos.coaching.application.pdf.WorkoutPdfExerciseCatalogLookup;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.AssignmentDetail;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.AssignmentPdfData;
@@ -46,9 +49,11 @@ class CoachingCatalogServiceTests {
 	@BeforeEach
 	void setUp() {
 		repository = mock(CoachingCatalogRepository.class);
+		ObjectMapper objectMapper = new ObjectMapper();
 		service = new CoachingCatalogService(
-				repository, mock(AuditService.class), new ObjectMapper(),
-				new SecurityProperties(List.of("http://localhost:3000"), "test-secret", 900, 7)
+				repository, mock(AuditService.class), objectMapper,
+				new SecurityProperties(List.of("http://localhost:3000"), "test-secret", 900, 7),
+				pdfMapper(objectMapper)
 		);
 		principal = new GymOsPrincipal(
 				UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
@@ -405,9 +410,11 @@ class CoachingCatalogServiceTests {
 		server.start();
 		try {
 			String origin = "http://127.0.0.1:" + server.getAddress().getPort();
+			ObjectMapper objectMapper = new ObjectMapper();
 			CoachingCatalogService localService = new CoachingCatalogService(
-					repository, mock(AuditService.class), new ObjectMapper(),
-					new SecurityProperties(List.of(origin), "test-secret", 900, 7)
+					repository, mock(AuditService.class), objectMapper,
+					new SecurityProperties(List.of(origin), "test-secret", 900, 7),
+					pdfMapper(objectMapper)
 			);
 			UUID assignmentId = UUID.randomUUID();
 			when(repository.assignmentPdf(
@@ -435,6 +442,14 @@ class CoachingCatalogServiceTests {
 		} finally {
 			server.stop(0);
 		}
+	}
+
+	private WorkoutPdfDocumentMapper pdfMapper(ObjectMapper objectMapper) {
+		WorkoutPdfBrandingLookup branding = (organizationId, branchId, gymName, branchName, logoUrl, primaryColor) ->
+				WorkoutPdfBrandingLookup.Palette.fallback(primaryColor, logoUrl, gymName);
+		WorkoutPdfExerciseCatalogLookup exercises = (organizationId, exerciseId, exerciseName) ->
+				WorkoutPdfExerciseCatalogLookup.inferFromName(exerciseName);
+		return new WorkoutPdfDocumentMapper(objectMapper, branding, exercises);
 	}
 
 	private ExerciseRecord exercise(UUID id, String name, String origin) {

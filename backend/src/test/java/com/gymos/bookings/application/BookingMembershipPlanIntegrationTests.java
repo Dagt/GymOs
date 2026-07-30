@@ -7,7 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.audit.api.AuditService;
 import com.gymos.bookings.application.command.CreateBookingCommand;
 import com.gymos.bookings.application.command.CreateResourceCommand;
-import com.gymos.bookings.infrastructure.BookingEligibilityRepository;
+import com.gymos.bookings.infrastructure.BookingPlanRepository;
 import com.gymos.bookings.infrastructure.BookingResourceRepository;
 import com.gymos.bookings.infrastructure.BookingResourceRepository.ResourceRecord;
 import com.gymos.bookings.infrastructure.BookingRepository;
@@ -22,6 +22,8 @@ import com.gymos.catalog.infrastructure.CatalogProductCommandRepository;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.time.BusinessTime;
+import com.gymos.eligibility.application.DefaultEligibilityPolicy;
+import com.gymos.eligibility.infrastructure.EligibilityRepository;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
@@ -74,7 +76,8 @@ class BookingMembershipPlanIntegrationTests {
 		bookingService = new BookingService(
 				new BookingRepository(jdbcClient),
 				new BookingResourceRepository(jdbcClient),
-				new BookingEligibilityRepository(jdbcClient),
+				new BookingPlanRepository(jdbcClient),
+				new DefaultEligibilityPolicy(new EligibilityRepository(jdbcClient)),
 				new ClientBookingConflictRepository(jdbcClient),
 				new ResourceScheduleResolver(new ObjectMapper()),
 				new AuditService(jdbcClient)
