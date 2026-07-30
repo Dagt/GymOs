@@ -12,6 +12,8 @@ No se usa la pantalla básica que quedó después del revert `08ec1a8`.
 
 - profesionales internos (`STAFF`) y externos (`EXTERNAL`) por organización y
   sucursal;
+- la modalidad se persiste en `professional.engagement_type`; no se infiere a
+  partir de la ubicación del consultorio;
 - nombre visible, especialidad, correo, teléfono, biografía, ubicación de
   consultorio y estado;
 - alta, edición y baja lógica de profesionales;
@@ -25,6 +27,9 @@ No se usa la pantalla básica que quedó después del revert `08ec1a8`.
 - filtros por fecha, profesional y estado;
 - búsqueda y selección de socio;
 - selección de profesional, servicio y horario disponible;
+- los internos se reservan únicamente sobre su disponibilidad semanal;
+- los externos aceptan una fecha y hora solicitadas sin requerir disponibilidad
+  interna, conservan su lugar externo de atención y nacen como `REQUESTED`;
 - citas `REQUESTED`, `CONFIRMED`, `COMPLETED`, `CANCELLED` o `REJECTED`;
 - confirmación directa de citas internas;
 - coordinación de fecha, hora y notas antes de confirmar una atención externa;
@@ -46,9 +51,20 @@ No se usa la pantalla básica que quedó después del revert `08ec1a8`.
   `wellness_appointment` de forma idempotente;
 - `V51__wellness_role_permissions.sql` repara permisos existentes de gerente y
   recepción;
+- `V59__professional_engagement_type.sql` agrega la modalidad explícita y
+  clasifica los registros históricos con disponibilidad activa como `STAFF` y
+  el resto como `EXTERNAL`;
 - `/professionals/**` administra directorio, servicios y disponibilidad;
 - `/wellness/**` administra disponibilidad calculada y ciclo de citas;
 - organización y sucursal se toman del principal autenticado, no del payload.
+
+Reglas de dominio:
+
+- `engagementType` sólo admite `STAFF` o `EXTERNAL`;
+- un profesional `EXTERNAL` puede tener `officeLocation`, pero no puede crear
+  disponibilidad interna;
+- la API decide el estado inicial de la cita por `engagementType`, nunca por la
+  presencia o ausencia de `officeLocation`.
 
 ## Evidencia
 

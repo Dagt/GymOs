@@ -37,6 +37,9 @@ All notable changes to GymOS will be documented in this file.
 - Consolidate member renewal, initial enrollment and plan changes in reception;
   keep only the operational current plan on the profile and move membership
   movements to its activity timeline.
+- Separate Wellness professional modality from office location so external
+  professionals can retain their consultation address and receive appointment
+  requests without internal availability schedules.
 
 ## 0.6.5
 

@@ -192,10 +192,11 @@ public class WellnessController {
 			@Size(max = 180) String email,
 			@Size(max = 32) String phone,
 			@Size(max = 4000) String bio,
-			@Size(max = 255) String officeLocation
+			@Size(max = 255) String officeLocation,
+			@Size(max = 16) String engagementType
 	) {
 		private CreateProfessionalCommand toCommand() {
-			return new CreateProfessionalCommand(displayName, professionalType, email, phone, bio, officeLocation);
+			return new CreateProfessionalCommand(displayName, professionalType, email, phone, bio, officeLocation, engagementType);
 		}
 	}
 
@@ -206,10 +207,11 @@ public class WellnessController {
 			@Size(max = 32) String phone,
 			@Size(max = 4000) String bio,
 			@Size(max = 255) String officeLocation,
+			@Size(max = 16) String engagementType,
 			String status
 	) {
 		private UpdateProfessionalCommand toCommand() {
-			return new UpdateProfessionalCommand(displayName, professionalType, email, phone, bio, officeLocation, status);
+			return new UpdateProfessionalCommand(displayName, professionalType, email, phone, bio, officeLocation, engagementType, status);
 		}
 	}
 

@@ -19,6 +19,14 @@ export function toLocalDateTimeInput(date: Date): string {
   return `${toDateInput(date)}T${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
+export function localDateTimeToIso(date: string, time: string): string {
+  if (!date || !isValidTimeInput(time)) {
+    return "";
+  }
+  const localDateTime = new Date(`${date}T${normalizeTimeInput(time)}:00`);
+  return Number.isNaN(localDateTime.getTime()) ? "" : localDateTime.toISOString();
+}
+
 export function addMinutes(localDateTime: string, minutes: number): string {
   const date = new Date(localDateTime);
   if (Number.isNaN(date.getTime())) {

@@ -62,7 +62,8 @@ public class WellnessService {
 						blankToNull(command.email()),
 						blankToNull(command.phone()),
 						blankToNull(command.bio()),
-						blankToNull(command.officeLocation())
+						blankToNull(command.officeLocation()),
+						resolveEngagementType(command.engagementType(), "STAFF")
 				)
 		);
 		auditService.record(principal, "PROFESSIONAL_CREATED", "PROFESSIONAL", professionalId, "BACKOFFICE", null, correlationId);
@@ -72,7 +73,7 @@ public class WellnessService {
 	@Transactional
 	public ProfessionalRecord updateProfessional(GymOsPrincipal principal, UUID professionalId, UpdateProfessionalCommand command, String correlationId) {
 		requireBranch(principal);
-		wellnessRepository.professional(principal.organizationId(), principal.branchId(), professionalId)
+		ProfessionalRecord existing = wellnessRepository.professional(principal.organizationId(), principal.branchId(), professionalId)
 				.orElseThrow(() -> new BusinessException("PROFESSIONAL_NOT_FOUND", "El profesional no existe o no esta disponible."));
 
 		String status = (command.status() == null || command.status().isBlank()) ? "ACTIVE" : command.status().trim().toUpperCase();
@@ -92,6 +93,7 @@ public class WellnessService {
 						blankToNull(command.phone()),
 						blankToNull(command.bio()),
 						blankToNull(command.officeLocation()),
+						resolveEngagementType(command.engagementType(), existing.engagementType()),
 						status
 				)
 		);
@@ -185,7 +187,13 @@ public class WellnessService {
 
 	@Transactional
 	public AvailabilityRecord createAvailability(GymOsPrincipal principal, UUID professionalId, CreateProfessionalAvailabilityCommand command, String correlationId) {
-		requireActiveProfessional(principal, professionalId);
+		ProfessionalRecord professional = requireActiveProfessional(principal, professionalId);
+		if ("EXTERNAL".equals(professional.engagementType())) {
+			throw new BusinessException(
+					"EXTERNAL_PROFESSIONAL_AVAILABILITY_NOT_ALLOWED",
+					"Los profesionales externos no administran horarios internos."
+			);
+		}
 		if (command.dayOfWeek() < 1 || command.dayOfWeek() > 7) {
 			throw new BusinessException("PROFESSIONAL_AVAILABILITY_DAY_INVALID", "El dia debe estar entre 1 y 7.");
 		}
@@ -211,7 +219,10 @@ public class WellnessService {
 
 	@Transactional(readOnly = true)
 	public List<AvailabilitySlotRecord> availabilitySlots(GymOsPrincipal principal, UUID professionalId, UUID serviceId, LocalDate date) {
-		requireActiveProfessional(principal, professionalId);
+		ProfessionalRecord professional = requireActiveProfessional(principal, professionalId);
+		if ("EXTERNAL".equals(professional.engagementType())) {
+			return List.of();
+		}
 		LocalDate resolvedDate = date == null ? BusinessTime.today() : date;
 		int dayOfWeek = resolvedDate.getDayOfWeek().getValue();
 
@@ -256,7 +267,7 @@ public class WellnessService {
 	@Transactional
 	public AppointmentRecord createAppointment(GymOsPrincipal principal, CreateWellnessAppointmentCommand command, String correlationId) {
 		requireBranch(principal);
-		requireActiveProfessional(principal, command.professionalId());
+		ProfessionalRecord professional = requireActiveProfessional(principal, command.professionalId());
 
 		if (command.clientId() == null) {
 			throw new BusinessException("CLIENT_REQUIRED", "Debes especificar un socio para la cita.");
@@ -282,10 +293,7 @@ public class WellnessService {
 			throw new BusinessException("APPOINTMENT_SLOT_TAKEN", "El profesional ya tiene una cita agendada en ese horario.");
 		}
 
-		var professional = wellnessRepository.professional(principal.organizationId(), principal.branchId(), command.professionalId())
-				.orElseThrow(() -> new BusinessException("PROFESSIONAL_NOT_FOUND", "El profesional no existe."));
-
-		boolean isDePlanta = professional.officeLocation() != null && !professional.officeLocation().isBlank();
+		boolean isDePlanta = "STAFF".equals(professional.engagementType());
 
 		String initialStatus = isDePlanta ? "CONFIRMED" : "REQUESTED";
 		UUID confirmedBy = isDePlanta ? principal.userId() : null;
@@ -394,6 +402,17 @@ public class WellnessService {
 
 	private String blankToNull(String value) {
 		return value == null || value.isBlank() ? null : value.trim();
+	}
+
+	private String resolveEngagementType(String value, String fallback) {
+		String resolved = value == null || value.isBlank() ? fallback : value.trim().toUpperCase();
+		if (!List.of("STAFF", "EXTERNAL").contains(resolved)) {
+			throw new BusinessException(
+					"PROFESSIONAL_ENGAGEMENT_TYPE_INVALID",
+					"La modalidad del profesional debe ser STAFF o EXTERNAL."
+			);
+		}
+		return resolved;
 	}
 
 	private void requireBranch(GymOsPrincipal principal) {

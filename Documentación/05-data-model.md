@@ -377,6 +377,8 @@ pagos, comisiones ni caja.
 - email
 - phone
 - bio
+- office_location
+- engagement_type (`STAFF`, `EXTERNAL`)
 - status
 - version
 - deleted_at

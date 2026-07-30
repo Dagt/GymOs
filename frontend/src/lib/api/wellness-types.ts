@@ -6,6 +6,7 @@ export type ProfessionalSummary = {
   phone: string | null;
   bio: string | null;
   officeLocation: string | null;
+  engagementType: "STAFF" | "EXTERNAL";
   status: "ACTIVE" | "INACTIVE" | string;
   createdAt: string;
   updatedAt: string;
@@ -47,6 +48,7 @@ export type WellnessAppointment = {
   professionalName: string;
   professionalType: string;
   officeLocation: string | null;
+  professionalEngagementType: "STAFF" | "EXTERNAL";
   serviceId: string | null;
   serviceName: string | null;
   durationMinutes: number;
@@ -73,6 +75,7 @@ export type CreateProfessionalPayload = {
   phone?: string | null;
   bio?: string | null;
   officeLocation?: string | null;
+  engagementType: "STAFF" | "EXTERNAL";
 };
 
 export type UpdateProfessionalPayload = {
@@ -82,6 +85,7 @@ export type UpdateProfessionalPayload = {
   phone?: string | null;
   bio?: string | null;
   officeLocation?: string | null;
+  engagementType?: "STAFF" | "EXTERNAL";
   status?: string;
 };
 

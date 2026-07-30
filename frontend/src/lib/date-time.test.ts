@@ -7,6 +7,7 @@ import {
   isPastDate,
   isPastDateTime,
   isValidTimeInput,
+  localDateTimeToIso,
   normalizeTimeInput,
   parseMexicanDate,
   toDateInput,
@@ -26,6 +27,16 @@ test("normalizes time values with optional seconds", () => {
 test("adds minutes preserving the local date-time representation", () => {
   assert.equal(addMinutes("2026-07-20T23:45", 30), "2026-07-21T00:15");
   assert.equal(addMinutes("invalid", 30), "");
+});
+
+test("converts a requested local appointment time to an ISO instant without changing its wall time", () => {
+  const result = localDateTimeToIso("2026-08-06", "16:30");
+  const roundTrip = new Date(result);
+
+  assert.equal(toDateInput(roundTrip), "2026-08-06");
+  assert.equal(roundTrip.getHours(), 16);
+  assert.equal(roundTrip.getMinutes(), 30);
+  assert.equal(localDateTimeToIso("2026-08-06", "25:00"), "");
 });
 
 test("distinguishes a past day from the current day", () => {

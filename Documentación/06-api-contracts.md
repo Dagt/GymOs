@@ -519,11 +519,20 @@ reserva para una aplicación futura.
 - `POST /professionals/{professionalId}/services`
 - `GET /professionals/{professionalId}/availability`
 - `POST /professionals/{professionalId}/availability`
+- `GET /professionals/{professionalId}/availability-slots`
+- `POST /wellness/appointments`
+- `GET /wellness/appointments`
+- `POST /wellness/appointments/{appointmentId}/confirm`
 
 Nota implementada Hito 5:
 - Los profesionales pertenecen siempre a la organizacion y sucursal activa.
+- `engagementType` es explícito (`STAFF` o `EXTERNAL`) e independiente de
+  `officeLocation`.
 - Los servicios profesionales mantienen precio, moneda, duracion, tipo y estado propio.
 - La disponibilidad se expresa por dia de semana y rango horario; el backend valida `day_of_week` entre 1 y 7 y que la hora de cierre sea posterior a la apertura.
+- Los profesionales externos no administran disponibilidad interna. Sus citas
+  reciben una fecha y hora solicitadas, nacen como `REQUESTED` y después pueden
+  coordinarse y confirmarse.
 
 ## 6.15 Automatizaciones
 

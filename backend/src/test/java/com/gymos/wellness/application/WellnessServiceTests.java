@@ -12,6 +12,8 @@ import com.gymos.wellness.application.command.UpdateProfessionalServiceCommand;
 import com.gymos.wellness.infrastructure.WellnessRepository;
 import com.gymos.wellness.infrastructure.WellnessRepository.AppointmentRecord;
 import com.gymos.wellness.infrastructure.WellnessRepository.AvailabilityRecord;
+import com.gymos.wellness.infrastructure.WellnessRepository.CreateAppointmentData;
+import com.gymos.wellness.infrastructure.WellnessRepository.CreateProfessionalData;
 import com.gymos.wellness.infrastructure.WellnessRepository.ProfessionalRecord;
 import com.gymos.wellness.infrastructure.WellnessRepository.ProfessionalServiceRecord;
 import java.time.LocalDate;
@@ -59,25 +61,28 @@ class WellnessServiceTests {
 		UUID professionalId = UUID.randomUUID();
 		when(wellnessRepository.createProfessional(eq(orgId), eq(branchId), eq(userId), any())).thenReturn(professionalId);
 
-		ProfessionalRecord record = new ProfessionalRecord(professionalId, "Dra. Ana Lopez", "NUTRITIONIST", "ana@test.com", "5551234", "Bio", "Consultorio 302", "ACTIVE", OffsetDateTime.now(), OffsetDateTime.now());
+		ProfessionalRecord record = new ProfessionalRecord(professionalId, "Dra. Ana Lopez", "NUTRITIONIST", "ana@test.com", "5551234", "Bio", "Consultorio 302", "EXTERNAL", "ACTIVE", OffsetDateTime.now(), OffsetDateTime.now());
 		when(wellnessRepository.professional(orgId, branchId, professionalId)).thenReturn(Optional.of(record));
 
-		CreateProfessionalCommand command = new CreateProfessionalCommand("Dra. Ana Lopez", "NUTRITIONIST", "ana@test.com", "5551234", "Bio", "Consultorio 302");
+		CreateProfessionalCommand command = new CreateProfessionalCommand("Dra. Ana Lopez", "NUTRITIONIST", "ana@test.com", "5551234", "Bio", "Consultorio 302", "EXTERNAL");
 		ProfessionalRecord result = wellnessService.createProfessional(principal, command, "corr-1");
 
 		assertThat(result.displayName()).isEqualTo("Dra. Ana Lopez");
 		assertThat(result.officeLocation()).isEqualTo("Consultorio 302");
+		ArgumentCaptor<CreateProfessionalData> dataCaptor = ArgumentCaptor.forClass(CreateProfessionalData.class);
+		verify(wellnessRepository).createProfessional(eq(orgId), eq(branchId), eq(userId), dataCaptor.capture());
+		assertThat(dataCaptor.getValue().engagementType()).isEqualTo("EXTERNAL");
 		verify(auditService).record(principal, "PROFESSIONAL_CREATED", "PROFESSIONAL", professionalId, "BACKOFFICE", null, "corr-1");
 	}
 
 	@Test
-	void createAppointment_createsRequestedAppointment() {
+	void createAppointment_externalWithOfficeLocationCreatesRequestedAppointment() {
 		UUID professionalId = UUID.randomUUID();
 		UUID serviceId = UUID.randomUUID();
 		UUID clientId = UUID.randomUUID();
 		UUID appointmentId = UUID.randomUUID();
 
-		ProfessionalRecord profRecord = new ProfessionalRecord(professionalId, "Dra. Ana", "NUTRITIONIST", null, null, null, "Consultorio 1", "ACTIVE", OffsetDateTime.now(), OffsetDateTime.now());
+		ProfessionalRecord profRecord = new ProfessionalRecord(professionalId, "Dra. Ana", "NUTRITIONIST", null, null, null, "Consultorio externo 1", "EXTERNAL", "ACTIVE", OffsetDateTime.now(), OffsetDateTime.now());
 		when(wellnessRepository.professional(orgId, branchId, professionalId)).thenReturn(Optional.of(profRecord));
 
 		ProfessionalServiceRecord serviceRecord = new ProfessionalServiceRecord(serviceId, professionalId, "Consulta Nutricional", "NUTRITION", 60, 50000, "MXN", "ACTIVE", OffsetDateTime.now(), OffsetDateTime.now());
@@ -89,7 +94,7 @@ class WellnessServiceTests {
 		when(wellnessRepository.createAppointment(eq(orgId), eq(branchId), eq(userId), any())).thenReturn(appointmentId);
 
 		AppointmentRecord appointmentRecord = new AppointmentRecord(
-				appointmentId, orgId, branchId, professionalId, "Dra. Ana", "NUTRITIONIST", "Consultorio 1",
+				appointmentId, orgId, branchId, professionalId, "Dra. Ana", "NUTRITIONIST", "Consultorio externo 1", "EXTERNAL",
 				serviceId, "Consulta Nutricional", 60, 50000, clientId, "Juan Perez", "juan@test.com", "5550000",
 				startsAt, startsAt.plusMinutes(60), "REQUESTED", "Primera cita", null, null, null,
 				OffsetDateTime.now(), OffsetDateTime.now()
@@ -101,6 +106,10 @@ class WellnessServiceTests {
 
 		assertThat(result.id()).isEqualTo(appointmentId);
 		assertThat(result.status()).isEqualTo("REQUESTED");
+		ArgumentCaptor<CreateAppointmentData> dataCaptor = ArgumentCaptor.forClass(CreateAppointmentData.class);
+		verify(wellnessRepository).createAppointment(eq(orgId), eq(branchId), eq(userId), dataCaptor.capture());
+		assertThat(dataCaptor.getValue().status()).isEqualTo("REQUESTED");
+		assertThat(dataCaptor.getValue().confirmedByUserId()).isNull();
 		verify(auditService).record(principal, "WELLNESS_APPOINTMENT_CREATED", "WELLNESS_APPOINTMENT", appointmentId, "BACKOFFICE", null, "corr-app");
 	}
 
@@ -110,7 +119,7 @@ class WellnessServiceTests {
 		UUID serviceId = UUID.randomUUID();
 		UUID clientId = UUID.randomUUID();
 
-		ProfessionalRecord profRecord = new ProfessionalRecord(professionalId, "Dra. Ana", "NUTRITIONIST", null, null, null, "Consultorio 1", "ACTIVE", OffsetDateTime.now(), OffsetDateTime.now());
+		ProfessionalRecord profRecord = new ProfessionalRecord(professionalId, "Dra. Ana", "NUTRITIONIST", null, null, null, "Consultorio 1", "STAFF", "ACTIVE", OffsetDateTime.now(), OffsetDateTime.now());
 		when(wellnessRepository.professional(orgId, branchId, professionalId)).thenReturn(Optional.of(profRecord));
 
 		ProfessionalServiceRecord serviceRecord = new ProfessionalServiceRecord(serviceId, professionalId, "Consulta Nutricional", "NUTRITION", 60, 50000, "MXN", "ACTIVE", OffsetDateTime.now(), OffsetDateTime.now());
@@ -127,6 +136,35 @@ class WellnessServiceTests {
 	}
 
 	@Test
+	void createAvailability_rejectsExternalProfessionalEvenWithOfficeLocation() {
+		UUID professionalId = UUID.randomUUID();
+		ProfessionalRecord external = new ProfessionalRecord(
+				professionalId,
+				"Dr. Externo",
+				"CHIROPRACTOR",
+				null,
+				null,
+				null,
+				"Consultorio externo 4",
+				"EXTERNAL",
+				"ACTIVE",
+				OffsetDateTime.now(),
+				OffsetDateTime.now()
+		);
+		when(wellnessRepository.professional(orgId, branchId, professionalId)).thenReturn(Optional.of(external));
+
+		CreateProfessionalAvailabilityCommand command = new CreateProfessionalAvailabilityCommand(
+				1,
+				LocalTime.of(9, 0),
+				LocalTime.of(14, 0)
+		);
+
+		assertThatThrownBy(() -> wellnessService.createAvailability(principal, professionalId, command, "corr-availability"))
+				.isInstanceOf(BusinessException.class)
+				.hasMessageContaining("no administran horarios internos");
+	}
+
+	@Test
 	void confirmAppointment_updatesStatusToConfirmed() {
 		UUID appointmentId = UUID.randomUUID();
 		UUID professionalId = UUID.randomUUID();
@@ -134,13 +172,13 @@ class WellnessServiceTests {
 		OffsetDateTime startsAt = OffsetDateTime.now().plusDays(1);
 
 		AppointmentRecord initialRecord = new AppointmentRecord(
-				appointmentId, orgId, branchId, professionalId, "Dra. Ana", "NUTRITIONIST", "Consultorio 1",
+				appointmentId, orgId, branchId, professionalId, "Dra. Ana", "NUTRITIONIST", "Consultorio 1", "EXTERNAL",
 				null, null, 60, 0, clientId, "Juan Perez", "juan@test.com", "5550000",
 				startsAt, startsAt.plusMinutes(60), "REQUESTED", null, null, null, null,
 				OffsetDateTime.now(), OffsetDateTime.now()
 		);
 		AppointmentRecord confirmedRecord = new AppointmentRecord(
-				appointmentId, orgId, branchId, professionalId, "Dra. Ana", "NUTRITIONIST", "Consultorio 1",
+				appointmentId, orgId, branchId, professionalId, "Dra. Ana", "NUTRITIONIST", "Consultorio 1", "EXTERNAL",
 				null, null, 60, 0, clientId, "Juan Perez", "juan@test.com", "5550000",
 				startsAt, startsAt.plusMinutes(60), "CONFIRMED", null, null, userId, OffsetDateTime.now(),
 				OffsetDateTime.now(), OffsetDateTime.now()

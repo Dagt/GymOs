@@ -615,7 +615,7 @@ function AppointmentCard({
     REJECTED: "bg-red-100 text-red-900 border-red-300",
   };
 
-  const isExternal = !appointment.officeLocation;
+  const isExternal = appointment.professionalEngagementType === "EXTERNAL";
 
   return (
     <div className="rounded-xl border border-[var(--brand-line)] bg-white p-4 shadow-sm space-y-3 flex flex-col justify-between">
@@ -649,11 +649,10 @@ function AppointmentCard({
         ) : null}
 
         <div className="mt-2 text-[11px] text-[var(--brand-muted)] space-y-0.5">
-          {appointment.officeLocation ? (
-            <p>📍 {appointment.officeLocation}</p>
-          ) : (
+          {appointment.officeLocation ? <p>📍 {appointment.officeLocation}</p> : null}
+          {isExternal ? (
             <p className="italic font-semibold text-sky-800">🌐 Atención externa / Por solicitud</p>
-          )}
+          ) : null}
           {appointment.clientPhone ? <span>📞 Tel: {appointment.clientPhone}</span> : null}
           {appointment.notes ? (
             <p className="italic text-stone-600 mt-1">“{appointment.notes}”</p>
@@ -825,6 +824,7 @@ export function CreateAppointmentModal({
   appointmentDate,
   clientQuery,
   clientResults,
+  externalRequestedTime,
   loadingSlots,
   notes,
   open,
@@ -839,6 +839,7 @@ export function CreateAppointmentModal({
   onAppointmentDateChange,
   onClientQueryChange,
   onClose,
+  onExternalRequestedTimeChange,
   onNotesChange,
   onSelectClient,
   onSelectProfessional,
@@ -849,6 +850,7 @@ export function CreateAppointmentModal({
   appointmentDate: string;
   clientQuery: string;
   clientResults: ClientSummary[];
+  externalRequestedTime: string;
   loadingSlots: boolean;
   notes: string;
   open: boolean;
@@ -863,6 +865,7 @@ export function CreateAppointmentModal({
   onAppointmentDateChange: (date: string) => void;
   onClientQueryChange: (query: string) => void;
   onClose: () => void;
+  onExternalRequestedTimeChange: (time: string) => void;
   onNotesChange: (notes: string) => void;
   onSelectClient: (client: ClientSummary) => void;
   onSelectProfessional: (id: string) => void;
@@ -873,7 +876,7 @@ export function CreateAppointmentModal({
   if (!open) return null;
 
   const selectedProf = professionals.find((p) => p.id === selectedProfessionalId);
-  const isExternalProf = Boolean(selectedProf && !selectedProf.officeLocation);
+  const isExternalProf = selectedProf?.engagementType === "EXTERNAL";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm overflow-y-auto">
@@ -968,24 +971,37 @@ export function CreateAppointmentModal({
             </Field>
           ) : null}
 
-          {/* Step 4: Fecha y Slots or External Notice */}
+          {/* Step 4: Fecha y horario interno o solicitado */}
           {isExternalProf ? (
             <div className="grid gap-3">
-              <Field label="4. Fecha Tentativa de Solicitud">
-                <input
-                  className="app-input"
-                  onChange={(e) => onAppointmentDateChange(e.target.value)}
-                  type="date"
-                  value={appointmentDate}
-                />
-              </Field>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="4. Fecha solicitada">
+                  <input
+                    className="app-input"
+                    onChange={(e) => onAppointmentDateChange(e.target.value)}
+                    required
+                    type="date"
+                    value={appointmentDate}
+                  />
+                </Field>
+
+                <Field label="Hora solicitada">
+                  <input
+                    className="app-input"
+                    onChange={(e) => onExternalRequestedTimeChange(e.target.value)}
+                    required
+                    type="time"
+                    value={externalRequestedTime}
+                  />
+                </Field>
+              </div>
 
               <div className="rounded-xl border border-sky-200 bg-sky-50/80 p-4 text-xs space-y-2 text-sky-950">
                 <strong className="block text-sm font-black text-sky-900">
                   🌐 Atención Externa / Por Solicitud
                 </strong>
                 <p className="leading-relaxed">
-                  Al confirmar esta solicitud, el especialista recibirá una notificación para revisar su agenda externa y proponer las fechas y horarios disponibles para coordinar la cita con el socio.
+                  Este profesional no usa los horarios internos de GymOS. La fecha y hora se registrarán como solicitud y podrán ajustarse al coordinar con el especialista.
                 </p>
                 <p className="text-[11px] font-bold text-sky-800">
                   ✓ Estatus inicial de la cita: SOLICITADA (Pending confirmation).
@@ -1073,7 +1089,13 @@ export function CreateAppointmentModal({
             </button>
             <button
               className="form-primary-button py-2.5 px-6 font-bold"
-              disabled={saving || !selectedClient || !selectedProfessionalId || (!selectedSlot && !isExternalProf)}
+              disabled={
+                saving
+                || !selectedClient
+                || !selectedProfessionalId
+                || (!selectedSlot && !isExternalProf)
+                || (isExternalProf && !externalRequestedTime)
+              }
               type="submit"
             >
               {saving ? "Agendando..." : "Confirmar Agendamiento"}
@@ -1136,7 +1158,7 @@ export function ProfessionalsDirectorySection({
           </div>
         ) : (
           professionals.map((prof) => {
-            const isDePlanta = Boolean(prof.officeLocation);
+            const isDePlanta = prof.engagementType === "STAFF";
             const profServices = professionalServicesMap[prof.id] || [];
             const mainService = profServices[0];
 
@@ -1186,9 +1208,10 @@ export function ProfessionalsDirectorySection({
 
                     {prof.officeLocation ? (
                       <p className="font-semibold text-stone-800">📍 {prof.officeLocation}</p>
-                    ) : (
+                    ) : null}
+                    {!isDePlanta ? (
                       <p className="italic">🌐 Atención externa / Por solicitud</p>
-                    )}
+                    ) : null}
                     {prof.email ? <p>✉ {prof.email}</p> : null}
                     {prof.phone ? <p>📞 {prof.phone}</p> : null}
                     {prof.bio ? <p className="mt-1 text-stone-600 line-clamp-2">{prof.bio}</p> : null}
@@ -1582,4 +1605,3 @@ function formatTime(isoOrTimeStr: string) {
   }
   return isoOrTimeStr.slice(0, 5);
 }
-
