@@ -26,8 +26,8 @@ Ningún módulo se declara “completo” sólo por el nombre de una rama o comm
 |---|---|---|---|
 | [Plataforma, tenant y sucursales](modulos/01-organizations.md) | FUNCIONAL | Consolas separadas, selección de gimnasio/sucursal, reparación de permisos del dueño en instalaciones limpias y marca persistente | Matriz negativa multi-tenant y endurecimiento global |
 | [Identidad, sesiones y permisos](modulos/02-identity-security.md) | FUNCIONAL | Inicio/renovación de sesión, roles y permisos por endpoint; 401 de autenticación separado de 403 de autorización | Refresh token seguro y autorización uniforme |
-| [Socios/CRM](modulos/05-clients.md) | FUNCIONAL | Alta, búsqueda, detalle y asociación con membresías | Cobertura CRUD y escenarios multi-sucursal |
-| [Catálogo comercial](modulos/06-catalog.md) | ESTABILIZADO | Productos, membresías, categorías y operación por sucursal | Paginación/consistencia transversal |
+| [Socios/CRM](modulos/05-clients.md) | FUNCIONAL | Alta, búsqueda, detalle, asociación con membresías y permisos de alta reparados para dueño, gerencia y recepción | Cobertura CRUD y escenarios multi-sucursal |
+| [Catálogo comercial](modulos/06-catalog.md) | ESTABILIZADO | Productos, membresías, categorías, unidad guiada y operación por sucursal | Paginación/consistencia transversal |
 | [Ventas y pagos manuales](modulos/07-sales.md) | FUNCIONAL | Venta minorista y membresías con contexto, partidas, pagos, snapshots de beneficios, reportes, validación, reembolsos e idempotencia concurrente | E2E integral venta–pago–inventario–refund (`SAL-001`) |
 | [Membresías](modulos/08-memberships.md) | ESTABILIZADO | Periodos y fechas inclusivas, expiración, activa única, cotización backend, alta/renovación/cambio separados y concurrencia PostgreSQL | E2E HTTP/navegador de pagos pendientes/rechazados |
 | [Beneficios](modulos/09-benefits.md) | ESTABILIZADO | Política transversal única para cotización de membresía, elegibilidad de reservas y acceso; descuentos con snapshot y ACCESS heredado/revocado dinámicamente por plan | Permisos negativos y concurrencia de asignaciones |

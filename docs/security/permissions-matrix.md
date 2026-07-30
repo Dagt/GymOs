@@ -28,6 +28,7 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 | GET | `/api/v1/organizations/current` | organizations | `organization.read` o `organization.update` | Sí | No | No | JWT negativo y compatibilidad de actualización |
 | PUT | `/api/v1/organizations/current` | organizations | `organization.update` | Sí | No | Sí | Pendiente |
 | POST | `/api/v1/organizations/current/logo` | organizations/storage | `organization.update` | Sí | No | Sí | `OrganizationLogoServiceTests` |
+| POST | `/api/v1/organizations/*/logo` | organizations/storage | `platform.admin` | Sí, destino explícito | No | Sí | autorización negativa y `platformAdministratorCanStoreLogoForNewlyCreatedOrganization` |
 | GET | `/api/v1/organizations/current/branches` | organizations | `branch.read` | Sí | No | No | Pendiente |
 | ANY | `/api/v1/organizations/current/branches/*` | organizations | `branch.update` | Sí | Sí | Sí | Pendiente |
 
@@ -43,7 +44,7 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 | Método | Endpoint | Módulo | Permiso | Organización | Sucursal | Auditoría | Prueba actual |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/clients/**` | clients | `client.read` | Sí | Según consulta | No | Pendiente |
-| POST | `/api/v1/clients` | clients | `client.create` | Sí | Sí | Sí | Pendiente |
+| POST | `/api/v1/clients` | clients | `client.create` | Sí | Sí | Sí | V57 en `DatabaseMigrationTests`; E2E gerencia/recepción |
 | PUT | `/api/v1/clients/**` | clients | `client.update` | Sí | Según recurso | Sí | Pendiente |
 | POST | `/api/v1/clients/imports` | clients | `client.import` | Sí | Opcional | Sí | `clientImportRequiresImportPermission` negativo |
 | POST | `/api/v1/clients/*/benefits` | benefits | `client.benefit.assign` | Sí | Según cliente | Sí | `clientBenefitAssignmentRequiresAssignPermission` negativo |

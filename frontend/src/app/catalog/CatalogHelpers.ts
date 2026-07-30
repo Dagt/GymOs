@@ -3,6 +3,7 @@ import type {
   PlanSummary,
   ProductPayload,
 } from "@/lib/api";
+import { normalizeCatalogUnit } from "@/features/catalog/catalog-units";
 
 export const emptyProduct: ProductPayload = {
   sku: "",
@@ -17,7 +18,7 @@ export const emptyProduct: ProductPayload = {
   barcode: null,
   brand: null,
   presentation: null,
-  unitOfMeasure: null,
+  unitOfMeasure: "PIECE",
   inventoryTracked: true,
   displayOrder: 0,
   supplierName: null,
@@ -44,7 +45,9 @@ export function productToDraft(product: import("@/lib/api").ProductSummary): Pro
     barcode: product.barcode,
     brand: product.brand,
     presentation: product.presentation,
-    unitOfMeasure: product.unitOfMeasure,
+    unitOfMeasure: product.productType === "PHYSICAL"
+      ? normalizeCatalogUnit(product.unitOfMeasure) ?? "PIECE"
+      : null,
     inventoryTracked: product.inventoryTracked,
     displayOrder: product.displayOrder,
     supplierName: product.supplierName,
@@ -93,6 +96,9 @@ export function productDraftToPayload(form: ProductPayload, price: string): Prod
     sku: form.sku.trim(),
     name: form.name.trim(),
     description: form.description?.trim() || null,
+    unitOfMeasure: form.productType === "PHYSICAL"
+      ? normalizeCatalogUnit(form.unitOfMeasure) ?? "PIECE"
+      : null,
     supplierName: form.supplierName?.trim() || null,
     promotionStartsAt: normalizeDateTime(form.promotionStartsAt),
     promotionEndsAt: normalizeDateTime(form.promotionEndsAt),

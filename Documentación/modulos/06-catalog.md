@@ -7,6 +7,8 @@ Estado: `ESTABILIZADO`
 - productos, planes de membresía, servicios y conceptos vendibles;
 - categorías, etiquetas, búsqueda, filtros y paginación;
 - activación, archivado, imágenes y código de barras;
+- unidad de producto físico guiada por un selector cerrado de valores comunes,
+  normalización de etiquetas heredadas y validación canónica en backend;
 - disponibilidad y configuración por sucursal;
 - integración con POS, ventas, inventario y reembolsos.
 
@@ -23,5 +25,5 @@ Estado: `ESTABILIZADO`
 - completar ciclo de archivos e imágenes;
 - mantener fronteras con ventas e inventario (`GEN-002`).
 
-Última validación integral: rama de catálogo/inventario fusionada en `main`,
-24–25 jul 2026.
+Última validación: `CatalogProductServiceTests`, pruebas frontend de unidades y
+E2E del selector cerrado, 30-jul-2026.

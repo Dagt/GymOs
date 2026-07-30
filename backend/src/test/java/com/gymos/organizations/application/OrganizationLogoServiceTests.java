@@ -129,4 +129,110 @@ class OrganizationLogoServiceTests {
 				"logo-success"
 		);
 	}
+
+	@Test
+	void platformAdministratorCanStoreLogoForNewlyCreatedOrganization() {
+		UUID platformOrganizationId = UUID.randomUUID();
+		UUID targetOrganizationId = UUID.randomUUID();
+		UUID userId = UUID.randomUUID();
+		GymOsPrincipal principal = new GymOsPrincipal(
+				userId,
+				platformOrganizationId,
+				null,
+				"admin@gymos.local",
+				"Admin GymOS",
+				Set.of("platform.admin")
+		);
+		var summary = new OrganizationQueryRepository.OrganizationSummary(
+				targetOrganizationId,
+				"Nuevo Gym Legal",
+				"Nuevo Gym",
+				null,
+				"ACTIVE",
+				"America/Mexico_City",
+				"MXN",
+				"contacto@gym.test",
+				"+525512345678",
+				"Nuevo Gym",
+				"/api/tenant-logo/" + targetOrganizationId + "?v=test",
+				"#164E63",
+				"#F59E0B",
+				"#F4F7FB"
+		);
+		when(organizations.findLogoObjectKey(targetOrganizationId)).thenReturn(java.util.Optional.empty());
+		when(commands.updateLogo(
+				org.mockito.ArgumentMatchers.eq(targetOrganizationId),
+				org.mockito.ArgumentMatchers.eq(userId),
+				org.mockito.ArgumentMatchers.startsWith("/api/tenant-logo/" + targetOrganizationId + "?v="),
+				org.mockito.ArgumentMatchers.startsWith("branding/" + targetOrganizationId + "/"),
+				org.mockito.ArgumentMatchers.any()
+		)).thenReturn(1);
+		when(organizations.findCurrentOrganization(targetOrganizationId))
+				.thenReturn(java.util.Optional.of(summary));
+
+		TransactionSynchronizationManager.initSynchronization();
+		try {
+			service.uploadManaged(
+					principal,
+					targetOrganizationId,
+					new UploadOrganizationLogo(
+							"new-gym.webp",
+							"image/webp",
+							4,
+							new ByteArrayInputStream(new byte[] {1, 2, 3, 4})
+					),
+					"platform-logo"
+			);
+			TransactionSynchronizationManager.getSynchronizations()
+					.forEach(synchronization ->
+							synchronization.afterCompletion(TransactionSynchronization.STATUS_COMMITTED));
+		} finally {
+			TransactionSynchronizationManager.clearSynchronization();
+		}
+
+		verify(storage).putObject(
+				org.mockito.ArgumentMatchers.startsWith("branding/" + targetOrganizationId + "/"),
+				org.mockito.ArgumentMatchers.eq("image/webp"),
+				org.mockito.ArgumentMatchers.eq(4L),
+				org.mockito.ArgumentMatchers.any()
+		);
+		verify(audit).record(
+				principal,
+				"ORGANIZATION_LOGO_UPDATED",
+				"ORGANIZATION",
+				targetOrganizationId,
+				"BACKOFFICE",
+				null,
+				"platform-logo"
+		);
+	}
+
+	@Test
+	void tenantUserCannotReplaceLogoOfAnotherOrganization() {
+		GymOsPrincipal principal = new GymOsPrincipal(
+				UUID.randomUUID(),
+				UUID.randomUUID(),
+				UUID.randomUUID(),
+				"owner@gymos.local",
+				"Owner GymOS",
+				Set.of("organization.update")
+		);
+
+		assertThatThrownBy(() -> service.uploadManaged(
+				principal,
+				UUID.randomUUID(),
+				new UploadOrganizationLogo(
+						"logo.png",
+						"image/png",
+						4,
+						new ByteArrayInputStream(new byte[] {1, 2, 3, 4})
+				),
+				"forbidden-logo"
+		))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						org.assertj.core.api.Assertions.assertThat(exception.code())
+								.isEqualTo("PERMISSION_DENIED"));
+
+		verifyNoInteractions(commands, organizations, storage, audit);
+	}
 }

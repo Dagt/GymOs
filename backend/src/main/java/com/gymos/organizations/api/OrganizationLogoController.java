@@ -35,16 +35,31 @@ public class OrganizationLogoController {
 			@RequestPart("file") MultipartFile file,
 			HttpServletRequest request
 	) {
+		return logoService.upload(principal, uploadCommand(file), correlationId(request));
+	}
+
+	@PostMapping(value = "/{organizationId}/logo", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	OrganizationSummary uploadManaged(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID organizationId,
+			@RequestPart("file") MultipartFile file,
+			HttpServletRequest request
+	) {
+		return logoService.uploadManaged(
+				principal,
+				organizationId,
+				uploadCommand(file),
+				correlationId(request)
+		);
+	}
+
+	private UploadOrganizationLogo uploadCommand(MultipartFile file) {
 		try {
-			return logoService.upload(
-					principal,
-					new UploadOrganizationLogo(
-							file.getOriginalFilename(),
-							file.getContentType(),
-							file.getSize(),
-							file.getInputStream()
-					),
-					correlationId(request)
+			return new UploadOrganizationLogo(
+					file.getOriginalFilename(),
+					file.getContentType(),
+					file.getSize(),
+					file.getInputStream()
 			);
 		} catch (IOException exception) {
 			throw new BusinessException("ORGANIZATION_LOGO_INVALID", "No fue posible leer la imagen.");

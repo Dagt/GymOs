@@ -116,6 +116,12 @@ class DatabaseMigrationTests {
 			assertThat(columnExists(connection, "organization", "logo_object_key")).isTrue();
 			assertThat(roleHasPermission(connection, "Dueno del gimnasio", "organization.read")).isTrue();
 			assertThat(roleHasPermission(connection, "Dueno del gimnasio", "organization.update")).isTrue();
+			assertThat(roleHasPermission(connection, "Gerente", "client.read")).isTrue();
+			assertThat(roleHasPermission(connection, "Gerente", "client.create")).isTrue();
+			assertThat(roleHasPermission(connection, "Gerente", "client.update")).isTrue();
+			assertThat(roleHasPermission(connection, "Recepcion", "client.read")).isTrue();
+			assertThat(roleHasPermission(connection, "Recepcion", "client.create")).isTrue();
+			assertThat(roleHasPermission(connection, "Recepcion", "client.update")).isTrue();
 			assertThat(columnExists(connection, "branch", "primary_color")).isFalse();
 			assertThat(columnExists(connection, "branch", "accent_color")).isFalse();
 			assertThat(columnExists(connection, "branch", "surface_color")).isFalse();

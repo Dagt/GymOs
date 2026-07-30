@@ -41,12 +41,14 @@ export function OrganizationForm({
   errors,
   form,
   saving,
+  onLogoFileChange,
   onChange,
   onSubmit,
 }: {
   errors: FieldErrorMap;
   form: CreateOrganizationPayload;
   saving: boolean;
+  onLogoFileChange: (file: File | null) => void;
   onChange: (next: CreateOrganizationPayload) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
@@ -60,10 +62,10 @@ export function OrganizationForm({
       <hr className="border-[#dbe4ee]" />
       <TextField error={errors.brandName} label="Nombre visible de marca" name="brandName" required={false} value={form.brandName ?? ""} onChange={(value) => onChange({ ...form, brandName: value })} />
       <LogoUploadField
+        deferUpload
         disabled={saving}
         logoUrl={form.logoUrl}
-        tenantName={form.tradeName || form.brandName || form.legalName}
-        onChange={(logoUrl) => onChange({ ...form, logoUrl })}
+        onFileChange={onLogoFileChange}
       />
       <div className="platform-color-grid">
         <TextField error={errors.primaryColor} label="Color principal" name="primaryColor" value={form.primaryColor ?? "#164E63"} onChange={(value) => onChange({ ...form, primaryColor: value })} />
@@ -126,4 +128,3 @@ function addError(errors: FieldErrorMap, key: string, value: string) {
     errors[key] = value;
   }
 }
-

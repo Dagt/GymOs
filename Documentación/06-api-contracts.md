@@ -217,6 +217,14 @@ El alta de socio en frontend puede contratar un plan después del `POST /clients
 mediante `POST /membership-enrollments`. La activación de membresía sigue
 dependiendo de que el pago quede completado.
 
+Autorización de alta:
+
+- `Dueno del gimnasio`, `Gerente` y `Recepcion` reciben `client.read`,
+  `client.create` y `client.update` desde Flyway;
+- `POST /clients` requiere `client.create` y sucursal activa;
+- después de aplicar V57 es necesario renovar la sesión para que el JWT refleje
+  los permisos reparados.
+
 Visibilidad por sucursal:
 
 - `POST /clients` y `POST /clients/imports` guardan la sucursal activa como `home_branch_id`.
@@ -251,6 +259,15 @@ Autenticacion y sucursal activa:
 `GET /catalog/products/by-barcode/{barcode}` hace una consulta exacta de un
 producto activo de la sucursal y excluye planes. El POS lo usa como fallback
 cuando el código escaneado no está en la página local.
+
+`unitOfMeasure` ya no es texto libre en el alta web. Para productos físicos usa
+uno de los valores canónicos:
+
+`PIECE`, `BOTTLE`, `CAN`, `PACKAGE`, `BOX`, `BAG`, `SACHET`, `SERVING`,
+`TABLET`, `CAPSULE`, `MILLILITER`, `LITER`, `GRAM`, `KILOGRAM`.
+
+El backend rechaza cualquier valor no reconocido con
+`PRODUCT_UNIT_INVALID`. Los cargos y servicios no conservan unidad física.
 
 ## 6.5 Planes
 
@@ -1056,6 +1073,14 @@ Reemplaza de forma auditable los accesos requeridos por el dispositivo.
 - acepta PNG, JPG o WebP de hasta 2 MB;
 - persiste el archivo en almacenamiento de objetos, audita el reemplazo y
   devuelve la organización actualizada con una URL versionada.
+
+`POST /api/v1/organizations/{organizationId}/logo`
+
+- requiere `platform.admin`;
+- permite que el alta de plataforma cree primero el tenant y después persista
+  su logo sin entrar en modo soporte;
+- comparte validación, almacenamiento, auditoría y compensación transaccional
+  con la carga del gimnasio actual.
 
 `GET /api/v1/organizations/{organizationId}/logo`
 

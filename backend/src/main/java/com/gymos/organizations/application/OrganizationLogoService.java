@@ -48,9 +48,37 @@ public class OrganizationLogoService {
 			String correlationId
 	) {
 		requirePrincipal(principal);
+		return uploadForOrganization(principal, principal.organizationId(), command, correlationId);
+	}
+
+	@Transactional
+	public OrganizationSummary uploadManaged(
+			GymOsPrincipal principal,
+			UUID organizationId,
+			UploadOrganizationLogo command,
+			String correlationId
+	) {
+		requirePrincipal(principal);
+		if (!principal.platformAdmin()) {
+			throw new BusinessException(
+					"PERMISSION_DENIED",
+					"Solo un administrador GymOS puede actualizar la marca de otro gimnasio."
+			);
+		}
+		if (organizationId == null) {
+			throw new BusinessException("ORGANIZATION_NOT_FOUND", "Selecciona un gimnasio valido.");
+		}
+		return uploadForOrganization(principal, organizationId, command, correlationId);
+	}
+
+	private OrganizationSummary uploadForOrganization(
+			GymOsPrincipal principal,
+			UUID organizationId,
+			UploadOrganizationLogo command,
+			String correlationId
+	) {
 		validate(command);
 
-		UUID organizationId = principal.organizationId();
 		String previousKey = organizations.findLogoObjectKey(organizationId).orElse(null);
 		String newKey = objectKey(organizationId, command.filename());
 		storage.putObject(newKey, command.contentType(), command.size(), command.content());

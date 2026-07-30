@@ -16,6 +16,7 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
@@ -25,6 +26,10 @@ class CatalogProductService {
 	private static final List<String> SUBTYPES = List.of(
 			"GENERAL_PRODUCT", "GENERAL_SERVICE", "VISIT_PASS", "BOOKING", "ROUTINE",
 			"CONSULTATION", "WELLNESS_SERVICE"
+	);
+	private static final Set<String> UNITS = Set.of(
+			"PIECE", "BOTTLE", "CAN", "PACKAGE", "BOX", "BAG", "SACHET",
+			"SERVING", "TABLET", "CAPSULE", "MILLILITER", "LITER", "GRAM", "KILOGRAM"
 	);
 
 	private final CatalogProductQueryPort products;
@@ -245,6 +250,19 @@ class CatalogProductService {
 		if (request.inventoryTracked() && !"PHYSICAL".equals(type)) {
 			throw new BusinessException("PRODUCT_INVENTORY_TRACKING_INVALID",
 					"Solo los productos fisicos pueden controlar inventario.");
+		}
+		String unit = normalizeNullable(request.unitOfMeasure());
+		if ("PHYSICAL".equals(type) && unit != null && !UNITS.contains(unit)) {
+			throw new BusinessException(
+					"PRODUCT_UNIT_INVALID",
+					"Selecciona una unidad valida para el producto fisico."
+			);
+		}
+		if (!"PHYSICAL".equals(type) && unit != null) {
+			throw new BusinessException(
+					"PRODUCT_UNIT_INVALID",
+					"Los cargos y servicios no deben definir una unidad fisica."
+			);
 		}
 		if (request.displayOrder() < 0) {
 			throw new BusinessException("PRODUCT_DISPLAY_ORDER_INVALID", "El orden de visualizacion no puede ser negativo.");

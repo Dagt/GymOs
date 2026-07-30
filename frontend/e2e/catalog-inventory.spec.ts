@@ -100,6 +100,20 @@ test.describe("catalogo e inventario", () => {
     await expect(page.getByText("El producto tiene una imagen almacenada.")).toHaveCount(0);
   });
 
+  test("alta de producto usa un selector cerrado de unidades comunes", async ({ page }) => {
+    await bootCatalog(page, owner());
+    await page.goto("/catalog");
+    await page.getByRole("button", { name: /Nuevo art.culo o cargo/i }).click();
+    await page.getByText(/M.s datos/i).click();
+
+    const unit = page.getByLabel("Unidad");
+    await expect(unit).toHaveJSProperty("tagName", "SELECT");
+    await expect(unit).toHaveValue("PIECE");
+    for (const label of ["Pieza", "Botella", "Lata", "Paquete", "Litro", "Kilogramo"]) {
+      await expect(unit).toContainText(label);
+    }
+  });
+
   test("POS consulta el catalogo paginado y no descarga el endpoint completo", async ({ page }) => {
     let paginatedSearches = 0;
     let completeCatalogRequests = 0;

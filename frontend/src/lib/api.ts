@@ -12,6 +12,7 @@ export {
   updateOrganization,
   updateOrganizationStatus,
   uploadOrganizationLogo,
+  uploadManagedOrganizationLogo,
 } from "./api/organizations";
 export type {
   BranchSummary,

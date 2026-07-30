@@ -193,7 +193,6 @@ export function OrganizationDrawer({
           disabled={saving}
           logoUrl={form.logoUrl}
           organizationId={organizationId}
-          tenantName={form.tradeName || form.brandName || form.legalName}
           onChange={(logoUrl) => {
             onChange({ ...form, logoUrl });
             onLogoChange(logoUrl);

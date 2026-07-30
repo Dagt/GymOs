@@ -2,6 +2,7 @@ package com.gymos;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
@@ -76,6 +77,16 @@ class SecurityAuthorizationTests {
 		)).andReturn();
 
 		assertThat(result.getResponse().getStatus()).isNotIn(401, 403);
+	}
+
+	@Test
+	@WithMockUser(authorities = "organization.update")
+	void managedOrganizationLogoUploadRequiresPlatformAdministrator() throws Exception {
+		mockMvc.perform(multipart(
+						"/api/v1/organizations/99999999-9999-9999-9999-999999999951/logo"
+				).file("file", new byte[] {1, 2, 3, 4}))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
 	}
 
 	@Test

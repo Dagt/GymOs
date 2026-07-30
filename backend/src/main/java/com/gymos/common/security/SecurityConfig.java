@@ -53,6 +53,7 @@ public class SecurityConfig {
 								.hasAnyAuthority("organization.read", "organization.update")
 						.requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/v1/organizations/current").hasAuthority("organization.update")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/organizations/current/logo").hasAuthority("organization.update")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/organizations/*/logo").hasAuthority("platform.admin")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/onboarding/**").hasAuthority("onboarding.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/onboarding/**").hasAuthority("onboarding.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/clients/*/workouts").hasAnyAuthority("workout.read.own", "workout.read.all")

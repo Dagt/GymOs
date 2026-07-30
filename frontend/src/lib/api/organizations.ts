@@ -95,3 +95,20 @@ export async function uploadOrganizationLogo(
     body: formData,
   });
 }
+
+export async function uploadManagedOrganizationLogo(
+  accessToken: string,
+  organizationId: string,
+  file: File,
+): Promise<OrganizationSummary> {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiFetch<OrganizationSummary>(
+    `/organizations/${organizationId}/logo`,
+    accessToken,
+    {
+      method: "POST",
+      body: formData,
+    },
+  );
+}
