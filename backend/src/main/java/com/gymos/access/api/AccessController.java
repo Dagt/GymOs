@@ -9,6 +9,7 @@ import com.gymos.access.application.command.TemporaryPassCommand;
 import com.gymos.access.infrastructure.AccessRepository.AccessDecisionResponse;
 import com.gymos.access.infrastructure.AccessRepository.AccessDeviceRecord;
 import com.gymos.access.infrastructure.AccessRepository.AccessLogRecord;
+import com.gymos.access.infrastructure.AccessRepository.EffectiveAccessBenefitRecord;
 import com.gymos.access.infrastructure.AccessRepository.TemporaryPassRecord;
 import com.gymos.access.infrastructure.AccessRepository.VisitPassRecord;
 import com.gymos.common.api.Correlation;
@@ -28,6 +29,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -61,6 +63,25 @@ public class AccessController {
 			@RequestParam(required = false) UUID clientId
 	) {
 		return accessService.visitPasses(principal, clientId);
+	}
+
+	@GetMapping("/clients/{clientId}/effective-benefits")
+	List<EffectiveAccessBenefitRecord> effectiveBenefits(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID clientId
+	) {
+		return accessService.effectiveBenefits(principal, clientId);
+	}
+
+	@PutMapping("/devices/{deviceId}/benefits")
+	List<UUID> replaceDeviceBenefits(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID deviceId,
+			@Valid @RequestBody DeviceBenefitsRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return accessService.replaceDeviceBenefits(
+				principal, deviceId, request.benefitIds(), correlationId(servletRequest));
 	}
 
 	@PostMapping("/requests")
@@ -163,5 +184,10 @@ public class AccessController {
 		private ConsumeVisitPassCommand toCommand() {
 			return new ConsumeVisitPassCommand(reason);
 		}
+	}
+
+	public record DeviceBenefitsRequest(
+			@Size(max = 100) List<@NotNull UUID> benefitIds
+	) {
 	}
 }

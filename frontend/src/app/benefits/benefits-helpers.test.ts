@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  calculatePlanPriceWithBenefits,
   isAccessBenefit,
   isDiscountBenefit,
   validateClientBenefitAssignment,
@@ -31,22 +30,4 @@ test("requires mandatory validUntil date when assigning discount benefits to cli
     validUntil: "2026-12-31",
   });
   assert.equal(validAssignment.valid, true);
-});
-
-test("applies active unexpired discount benefits to membership plan price", () => {
-  const planPriceCents = 100000; // $1,000 MXN
-
-  const benefits = [
-    { discountPercent: 15, validUntil: "2026-12-31" }, // 15% off
-    { discountPercent: 10, validUntil: "2026-01-01" }, // Expired
-  ];
-
-  const finalPrice = calculatePlanPriceWithBenefits(
-    planPriceCents,
-    benefits,
-    "2026-07-29",
-  );
-
-  // 15% discount on $1000 = $850 (85000 cents)
-  assert.equal(finalPrice, 85000);
 });

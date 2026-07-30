@@ -9,6 +9,7 @@ import com.gymos.memberships.application.command.ChangeMembershipPlanCommand;
 import com.gymos.memberships.application.command.RenewMembershipCommand;
 import com.gymos.memberships.application.result.MembershipSaleResult;
 import com.gymos.memberships.infrastructure.MembershipRepository.MembershipSummary;
+import com.gymos.memberships.infrastructure.MembershipRepository.MembershipPeriodSummary;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -30,14 +31,19 @@ public class MembershipService implements MembershipOperations {
 		this.planChangeService = planChangeService;
 	}
 
-	@Transactional(readOnly = true)
+	@Transactional
 	public List<MembershipSummary> forClient(GymOsPrincipal principal, UUID clientId) {
 		return queryService.forClient(principal, clientId);
 	}
 
-	@Transactional(readOnly = true)
+	@Transactional
 	public MembershipSummary detail(GymOsPrincipal principal, UUID membershipId) {
 		return queryService.detail(principal, membershipId);
+	}
+
+	public List<MembershipPeriodSummary> periods(GymOsPrincipal principal, UUID membershipId) {
+		queryService.detail(principal, membershipId);
+		return queryService.periods(principal, membershipId);
 	}
 
 	@Transactional

@@ -1,6 +1,7 @@
 package com.gymos.benefits.application.command;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 
 public record CreateBenefitCommand(
@@ -16,6 +17,10 @@ public record CreateBenefitCommand(
 		int priority,
 		LocalDate validFrom,
 		LocalDate validUntil,
-		String status
+		String status,
+		List<UUID> planIds
 ) {
+	public CreateBenefitCommand {
+		planIds = planIds == null ? List.of() : List.copyOf(planIds);
+	}
 }

@@ -119,6 +119,7 @@ class SaleCreationServiceTests {
 				null,
 				null,
 				"PENDING_PAYMENT",
+				"RETAIL_SALE",
 				1_000,
 				0,
 				1_000,

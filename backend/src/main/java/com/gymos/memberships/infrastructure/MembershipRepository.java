@@ -41,6 +41,14 @@ public class MembershipRepository {
 		return queries.byId(organizationId, branchId, membershipId);
 	}
 
+	public Optional<MembershipSummary> byIdForUpdate(UUID organizationId, UUID branchId, UUID membershipId) {
+		return queries.byIdForUpdate(organizationId, branchId, membershipId);
+	}
+
+	public List<MembershipPeriodSummary> periods(UUID organizationId, UUID branchId, UUID membershipId) {
+		return queries.periods(organizationId, branchId, membershipId);
+	}
+
 	public Optional<MembershipSummary> bySaleAndPlan(UUID organizationId, UUID branchId, UUID saleId, UUID planId) {
 		return queries.bySaleAndPlan(organizationId, branchId, saleId, planId);
 	}
@@ -55,10 +63,6 @@ public class MembershipRepository {
 
 	public boolean markEventProcessed(UUID organizationId, String eventKey, String eventType) {
 		return events.markProcessed(organizationId, eventKey, eventType);
-	}
-
-	public Optional<LocalDate> latestMembershipEnd(UUID organizationId, UUID clientId, UUID planId) {
-		return commands.latestMembershipEnd(organizationId, clientId, planId);
 	}
 
 	public UUID insertActiveMembership(
@@ -111,6 +115,38 @@ public class MembershipRepository {
 		return commands.cancelActiveForPlanChange(organizationId, branchId, membershipId);
 	}
 
+	public void insertPeriod(
+			UUID organizationId,
+			UUID branchId,
+			UUID membershipId,
+			UUID clientId,
+			UUID planId,
+			UUID saleId,
+			String operationType,
+			LocalDate startsOn,
+			LocalDate endsOn,
+			String sourceEventKey
+	) {
+		commands.insertPeriod(organizationId, branchId, membershipId, clientId, planId, saleId,
+				operationType, startsOn, endsOn, sourceEventKey);
+	}
+
+	public boolean hasOtherActiveMembership(UUID organizationId, UUID clientId, UUID excludedMembershipId) {
+		return commands.hasOtherActiveMembership(organizationId, clientId, excludedMembershipId);
+	}
+
+	public int expireDueMemberships(UUID organizationId, UUID clientId, LocalDate businessDate) {
+		return commands.expireDueMemberships(organizationId, clientId, businessDate);
+	}
+
+	public int expireMembershipIfDue(UUID organizationId, UUID membershipId, LocalDate businessDate) {
+		return commands.expireMembershipIfDue(organizationId, membershipId, businessDate);
+	}
+
+	public int expireAllDueMemberships(LocalDate businessDate) {
+		return commands.expireAllDueMemberships(businessDate);
+	}
+
 	public record MembershipSummary(
 			UUID id,
 			UUID clientId,
@@ -135,6 +171,20 @@ public class MembershipRepository {
 			boolean multiBranchAccess,
 			long priceCents,
 			String currency
+	) {
+	}
+
+	public record MembershipPeriodSummary(
+			UUID id,
+			UUID membershipId,
+			UUID planId,
+			String planName,
+			UUID saleId,
+			String saleNumber,
+			String operationType,
+			LocalDate startsOn,
+			LocalDate endsOn,
+			OffsetDateTime createdAt
 	) {
 	}
 }

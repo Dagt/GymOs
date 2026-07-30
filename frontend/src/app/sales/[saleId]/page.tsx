@@ -188,7 +188,7 @@ export default function SaleDetailPage() {
     <AppShell
       eyebrow="Venta"
       session={session}
-      subtitle={`${data.sale.clientName} - ${data.sale.status} - Saldo ${formatMoney(data.sale.balanceCents, data.sale.currency)}`}
+      subtitle={`${businessContextLabel(data.sale.businessContext)} - ${data.sale.clientName} - ${data.sale.status} - Saldo ${formatMoney(data.sale.balanceCents, data.sale.currency)}`}
       title={data.sale.saleNumber}
     >
       <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
@@ -217,4 +217,14 @@ export default function SaleDetailPage() {
 
 function messageFrom(exception: unknown, fallback: string) {
   return exception instanceof Error ? exception.message : fallback;
+}
+
+function businessContextLabel(context: string) {
+  const labels: Record<string, string> = {
+    RETAIL_SALE: "Venta de productos",
+    MEMBERSHIP_ENROLLMENT: "Contratación de membresía",
+    MEMBERSHIP_RENEWAL: "Renovación de membresía",
+    MEMBERSHIP_PLAN_CHANGE: "Cambio de plan",
+  };
+  return labels[context] ?? context;
 }

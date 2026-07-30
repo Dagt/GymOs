@@ -1,5 +1,6 @@
 import type { FormEvent } from "react";
 import { AppDrawer } from "@/components/AppDrawer";
+import { MembershipQuoteSummary } from "@/components/MembershipQuoteSummary";
 import {
   DateField,
   EmailField,
@@ -10,6 +11,7 @@ import {
 } from "@/components/FormFields";
 import type {
   ClientUpdatePayload,
+  MembershipQuote,
   PlanSummary,
   RenewMembershipPayload,
 } from "@/lib/api";
@@ -77,6 +79,7 @@ export function EditClientDrawer({
 export function MembershipActionDrawer({
   action,
   changingMembershipId,
+  membershipQuote,
   onClose,
   onMethodChange,
   onReferenceChange,
@@ -92,6 +95,7 @@ export function MembershipActionDrawer({
 }: {
   action: MembershipAction | null;
   changingMembershipId: string | null;
+  membershipQuote: MembershipQuote | null;
   onClose: () => void;
   onMethodChange: (value: RenewMembershipPayload["method"]) => void;
   onReferenceChange: (value: string) => void;
@@ -126,6 +130,7 @@ export function MembershipActionDrawer({
             </p>
           </section>
           <MembershipControls
+            membershipQuote={membershipQuote}
             mode={action.type}
             plans={plans}
             renewMethod={renewMethod}
@@ -157,6 +162,7 @@ export function MembershipActionDrawer({
 }
 
 function MembershipControls({
+  membershipQuote,
   mode,
   plans,
   renewMethod,
@@ -168,6 +174,7 @@ function MembershipControls({
   onTargetPlanChange,
   onValidateNowChange,
 }: {
+  membershipQuote: MembershipQuote | null;
   mode: "renew" | "change";
   plans: PlanSummary[];
   renewMethod: RenewMembershipPayload["method"];
@@ -208,6 +215,9 @@ function MembershipControls({
         <input checked={renewValidateNow} onChange={(event) => onValidateNowChange(event.target.checked)} type="checkbox" />
         Validar pago ahora
       </label>
+      <div className="mt-3">
+        <MembershipQuoteSummary loading={false} quote={membershipQuote} />
+      </div>
     </section>
   );
 }

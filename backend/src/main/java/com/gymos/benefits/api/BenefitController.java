@@ -40,6 +40,14 @@ public class BenefitController {
 		return benefitService.benefits(principal);
 	}
 
+	@GetMapping("/clients/{clientId}/benefits")
+	List<ClientBenefitSummary> clientBenefits(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID clientId
+	) {
+		return benefitService.clientBenefits(principal, clientId);
+	}
+
 	@PostMapping("/benefits")
 	BenefitSummary createBenefit(
 			@AuthenticationPrincipal GymOsPrincipal principal,
@@ -86,11 +94,12 @@ public class BenefitController {
 			@Min(0) int priority,
 			LocalDate validFrom,
 			LocalDate validUntil,
-			@NotBlank @Pattern(regexp = "ACTIVE|INACTIVE") String status
+			@NotBlank @Pattern(regexp = "ACTIVE|INACTIVE") String status,
+			@Size(max = 100) List<@NotNull UUID> planIds
 	) {
 		CreateBenefitCommand toCommand() {
 			return new CreateBenefitCommand(branchId, code, name, benefitType, discountType, discountValueCents,
-					discountPercent, requiresEvidence, combinable, priority, validFrom, validUntil, status);
+					discountPercent, requiresEvidence, combinable, priority, validFrom, validUntil, status, planIds);
 		}
 	}
 

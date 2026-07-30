@@ -23,7 +23,8 @@ class MembershipEventIdempotencyTests {
 		MembershipActivationService activationService = new MembershipActivationService(
 				membershipRepository,
 				auditService,
-				new MembershipActivationWindowCalculator(membershipRepository),
+				new MembershipActivationWindowCalculator(),
+				new MembershipRenewalWindowCalculator(),
 				new MembershipActivationEventPublisher(eventPublisher)
 		);
 

@@ -121,7 +121,7 @@ export function RecentSalesList({ sales }: { sales: SaleSummary[] }) {
                 <span className="font-black text-gray-900 group-hover:text-[color:var(--brand-primary)] transition-colors leading-none mb-1">{sale.saleNumber}</span>
                 <span className="text-[0.65rem] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                  {sale.clientName || 'Venta General'} • {sale.status}
+                  {sale.clientName || "Venta General"} • {businessContextLabel(sale.businessContext)} • {sale.status}
                 </span>
               </div>
             </div>
@@ -149,7 +149,7 @@ export function PosClientSearch({
   selectedClient: ClientSummary | null;
   onClientQueryChange: (value: string) => void;
   onSearch: (event: FormEvent<HTMLFormElement>) => void;
-  onSelectClient: (client: ClientSummary) => void;
+  onSelectClient: (client: ClientSummary | null) => void;
 }) {
   return (
     <section className="rounded-2xl border border-gray-100 bg-white p-5 shadow-sm relative overflow-hidden">
@@ -204,7 +204,7 @@ export function PosClientSearch({
           </div>
           <button 
             type="button" 
-            onClick={() => onSelectClient(null as any)}
+            onClick={() => onSelectClient(null)}
             className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center font-black text-white transition-colors"
           >
             ✕
@@ -407,4 +407,12 @@ export function PosCartForm({
   );
 }
 
-
+export function businessContextLabel(context: string) {
+  const labels: Record<string, string> = {
+    RETAIL_SALE: "Venta de productos",
+    MEMBERSHIP_ENROLLMENT: "Contratación",
+    MEMBERSHIP_RENEWAL: "Renovación",
+    MEMBERSHIP_PLAN_CHANGE: "Cambio de plan",
+  };
+  return labels[context] ?? context;
+}

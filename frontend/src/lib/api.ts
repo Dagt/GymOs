@@ -47,6 +47,7 @@ export {
   createCatalogCategory,
   createPlan,
   createProduct,
+  getProductByBarcode,
   getPlans,
   getProducts,
   getCatalogCategories,
@@ -83,6 +84,7 @@ export {
 } from "./api/sales";
 export type {
   CreateSalePayload,
+  AppliedBenefitDetail,
   ManualPaymentPayload,
   MembershipDetail,
   PaymentDetail,
@@ -90,6 +92,7 @@ export type {
   PaymentReportTotals,
   RefundDetail,
   SaleDetailResponse,
+  SaleBusinessContextBreakdown,
   SaleHeader,
   SaleItemDetail,
   SaleItemPayload,
@@ -102,12 +105,18 @@ export type {
 } from "./api/sales-types";
 export {
   changeMembershipPlan,
+  enrollMembership,
   getClientMemberships,
+  getMembershipQuote,
+  getMembershipPeriods,
   renewMembership,
 } from "./api/memberships";
 export type {
   ChangeMembershipPlanPayload,
   ClientMembershipSummary,
+  EnrollMembershipPayload,
+  MembershipPeriodSummary,
+  MembershipQuote,
   RenewMembershipPayload,
   RenewMembershipResponse,
 } from "./api/membership-types";

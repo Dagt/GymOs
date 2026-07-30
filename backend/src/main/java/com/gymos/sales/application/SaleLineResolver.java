@@ -70,8 +70,11 @@ class SaleLineResolver {
 		if (totalDiscountCents > subtotalCents) {
 			throw new BusinessException("SALE_DISCOUNT_INVALID", "El descuento total no puede superar el subtotal.");
 		}
-		if (containsMembershipPlan && clientId == null) {
-			throw new BusinessException("SALE_CLIENT_REQUIRED_FOR_PLAN", "Una venta de membresia necesita un cliente.");
+		if (containsMembershipPlan) {
+			throw new BusinessException(
+					"SALE_MEMBERSHIP_OPERATION_REQUIRED",
+					"Los planes deben contratarse, renovarse o cambiarse mediante una operacion de membresia."
+			);
 		}
 
 		return new ResolvedSale(

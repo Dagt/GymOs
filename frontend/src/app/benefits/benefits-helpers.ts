@@ -27,32 +27,3 @@ export function validateClientBenefitAssignment(payload: {
   }
   return { valid: true };
 }
-
-export function calculatePlanPriceWithBenefits(
-  planPriceCents: number,
-  activeBenefits: {
-    discountType?: string;
-    discountPercent?: number | null;
-    discountValueCents?: number | null;
-    validUntil?: string | null;
-  }[],
-  currentDateISO: string = new Date().toISOString().slice(0, 10),
-): number {
-  let finalCents = planPriceCents;
-
-  const validDiscounts = activeBenefits.filter((b) => {
-    if (!b.validUntil) return true;
-    return b.validUntil >= currentDateISO;
-  });
-
-  for (const discount of validDiscounts) {
-    if (discount.discountPercent && discount.discountPercent > 0) {
-      const discountAmount = Math.round((finalCents * discount.discountPercent) / 100);
-      finalCents = Math.max(0, finalCents - discountAmount);
-    } else if (discount.discountValueCents && discount.discountValueCents > 0) {
-      finalCents = Math.max(0, finalCents - discount.discountValueCents);
-    }
-  }
-
-  return finalCents;
-}

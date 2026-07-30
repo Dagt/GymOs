@@ -40,6 +40,7 @@ class SalePaymentCompletionServiceTests {
 				clientId,
 				"Cliente",
 				"PENDING_PAYMENT",
+				"RETAIL_SALE",
 				5_000,
 				0,
 				5_000,

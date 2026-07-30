@@ -80,6 +80,7 @@ export default function ClientDetailPage() {
             <MembershipHistory
               changingMembershipId={controller.changingMembershipId}
               memberships={controller.memberships}
+              periodsByMembership={controller.membershipPeriods}
               onMembershipAction={controller.openMembershipAction}
               plans={controller.plans}
               renewingMembershipId={controller.renewingMembershipId}
@@ -106,6 +107,7 @@ export default function ClientDetailPage() {
         <MembershipActionDrawer
           action={controller.membershipAction}
           changingMembershipId={controller.changingMembershipId}
+          membershipQuote={controller.membershipQuote}
           plans={controller.plans}
           renewMethod={controller.renewMethod}
           renewReference={controller.renewReference}

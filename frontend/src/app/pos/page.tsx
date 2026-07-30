@@ -5,18 +5,17 @@ import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   createSale,
-  getClientMemberships,
+  getProductByBarcode,
   getRecentSales,
   getStoredSession,
   searchClients,
   searchProducts,
-  type ClientMembershipSummary,
   type ClientSummary,
   type ProductSummary,
   type SaleSummary,
   type StoredSession,
 } from "@/lib/api";
-import { buildRenewalProduct, calculateSubtotal, findProductByBarcodeOrSku } from "./pos-model";
+import { calculateSubtotal, isMembershipPlanProduct, resolveScannedProduct } from "./pos-model";
 import { playScanBeep, useBarcodeScanner } from "./barcode-scanner";
 import {
   type CartItem,
@@ -35,7 +34,6 @@ export default function PosPage() {
   const [productQuery, setProductQuery] = useState("");
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [selectedClient, setSelectedClient] = useState<ClientSummary | null>(null);
-  const [clientMembership, setClientMembership] = useState<ClientMembershipSummary | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
   const [paymentReference, setPaymentReference] = useState("");
@@ -50,20 +48,7 @@ export default function PosPage() {
   const [scanError, setScanError] = useState<string | null>(null);
 
   useBarcodeScanner({
-    onScan: (code) => {
-      const match = findProductByBarcodeOrSku(products, code);
-      if (match) {
-        addProduct(match);
-        playScanBeep("success");
-        setHighlightedProductId(match.id);
-        setScanError(null);
-        setTimeout(() => setHighlightedProductId(null), 1500);
-      } else {
-        playScanBeep("error");
-        setScanError(`Código no encontrado: ${code}`);
-        setTimeout(() => setScanError(null), 4000);
-      }
-    },
+    onScan: (code) => void handleBarcodeScan(code),
     enabled: Boolean(session),
   });
 
@@ -109,45 +94,16 @@ export default function PosPage() {
     };
   }, [productQuery, session]);
 
-  useEffect(() => {
-    if (!session || !selectedClient) {
-      setClientMembership(null);
-      return;
-    }
-    let active = true;
-    getClientMemberships(session.accessToken, selectedClient.id)
-      .then((memberships) => {
-        if (active && memberships.length > 0) {
-          setClientMembership(memberships[0]);
-        } else if (active) {
-          setClientMembership(null);
-        }
-      })
-      .catch(() => {
-        if (active) setClientMembership(null);
-      });
-    return () => {
-      active = false;
-    };
-  }, [selectedClient, session]);
-
-  const membershipPlans = useMemo(
-    () => products.filter((p) => p.productType === "MEMBERSHIP_PLAN" || p.commercialSubtype === "MEMBERSHIP"),
-    [products],
-  );
-
-  function handleRenewMembership() {
-    if (!clientMembership) return;
-    const renewalProduct = buildRenewalProduct(clientMembership, products);
-    addProduct(renewalProduct);
-  }
-
   const subtotal = useMemo(
     () => calculateSubtotal(cart),
     [cart],
   );
 
-  function addProduct(product: ProductSummary) {
+  function addProduct(product: ProductSummary): boolean {
+    if (isMembershipPlanProduct(product)) {
+      setError("Los planes se gestionan desde la contratación o renovación de membresías.");
+      return false;
+    }
     setCart((current) => {
       const existing = current.find((item) => item.product.id === product.id);
       if (existing) {
@@ -157,6 +113,32 @@ export default function PosPage() {
       }
       return [...current, { product, quantity: 1 }];
     });
+    return true;
+  }
+
+  async function handleBarcodeScan(code: string) {
+    if (!session) return;
+    try {
+      const match = await resolveScannedProduct(
+        products,
+        code,
+        (barcode) => getProductByBarcode(session.accessToken, barcode),
+      );
+      if (!addProduct(match)) {
+        playScanBeep("error");
+        setScanError("Los planes se cobran desde el flujo de membresías.");
+        window.setTimeout(() => setScanError(null), 4000);
+        return;
+      }
+      playScanBeep("success");
+      setHighlightedProductId(match.id);
+      setScanError(null);
+      window.setTimeout(() => setHighlightedProductId(null), 1500);
+    } catch {
+      playScanBeep("error");
+      setScanError(`Código no encontrado: ${code}`);
+      window.setTimeout(() => setScanError(null), 4000);
+    }
   }
 
   function setQuantity(productId: string, quantity: number) {
@@ -254,13 +236,9 @@ export default function PosPage() {
           <aside className="flex flex-col gap-8">
             <div className="sticky top-6 flex flex-col gap-8">
               <PosClientSearch
-                availablePlans={membershipPlans}
-                clientMembership={clientMembership}
                 clientQuery={clientQuery}
                 clients={clients}
-                onChangePlan={addProduct}
                 onClientQueryChange={setClientQuery}
-                onRenewMembership={handleRenewMembership}
                 onSearch={submitClientSearch}
                 onSelectClient={setSelectedClient}
                 selectedClient={selectedClient}
@@ -300,8 +278,3 @@ function AuthRequired() {
     />
   );
 }
-
-function Notice({ text }: { text: string }) {
-  return <p className="rounded-md border border-[var(--brand-line)] bg-[var(--brand-surface)] px-3 py-2 text-sm text-[#31563c]">{text}</p>;
-}
-

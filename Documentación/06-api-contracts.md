@@ -213,7 +213,9 @@ Contrato implementado para alta/edicion de socio:
 - `gender`: solo `MALE` o `FEMALE`.
 - `phone`: formato `+52` seguido de 10 digitos.
 
-El alta de socio en frontend puede crear, despues del `POST /clients`, una venta de plan inicial usando `POST /sales` con un producto vinculado a `membership_plan`. La activacion de membresia sigue dependiendo de que el pago quede completado.
+El alta de socio en frontend puede contratar un plan después del `POST /clients`
+mediante `POST /membership-enrollments`. La activación de membresía sigue
+dependiendo de que el pago quede completado.
 
 Visibilidad por sucursal:
 
@@ -231,6 +233,7 @@ Autenticacion y sucursal activa:
 
 - `GET /catalog/products`
 - `GET /catalog/products/search`
+- `GET /catalog/products/by-barcode/{barcode}`
 - `POST /catalog/products`
 - `GET /catalog/products/{id}`
 - `PUT|PATCH /catalog/products/{id}`
@@ -244,6 +247,10 @@ Autenticacion y sucursal activa:
 - `PATCH|DELETE /catalog/categories/{id}`
 
 `GET /catalog/products/search` devuelve `items`, `page`, `size`, `totalElements` y `totalPages`. Acepta búsqueda por nombre, SKU, código de barras y etiqueta, además de filtros por tipo, categoría, estado y seguimiento de inventario.
+
+`GET /catalog/products/by-barcode/{barcode}` hace una consulta exacta de un
+producto activo de la sucursal y excluye planes. El POS lo usa como fallback
+cuando el código escaneado no está en la página local.
 
 ## 6.5 Planes
 
@@ -286,13 +293,20 @@ Errores relevantes:
 
 - `GET /clients/{clientId}/memberships`
 - `GET /memberships/{id}`
+- `GET /memberships/{id}/periods`
+- `POST /membership-enrollments`
 - `POST /memberships/{id}/renew`
 - `POST /memberships/{id}/cancel`
 - `PATCH /memberships/{id}/auto-renew`
 - Nota implementada: `GET /clients/{clientId}/memberships` y `GET /memberships/{id}` exponen membresias por cliente y detalle por membresia.
-- Nota implementada: `POST /memberships/{id}/renew` crea una venta de renovacion, registra pago manual y activa una nueva membresia acumulativa cuando el pago queda completado.
-- Nota implementada: `POST /memberships/{id}/change-plan` crea una venta de cambio de plan, exige pago completado, cancela la membresia anterior y activa la nueva.
-- Nota implementada: una venta pagada que incluya un producto vinculado a `membership_plan` activa una membresia.
+- Nota implementada: `POST /membership-enrollments` crea la venta y el primer
+  periodo mediante el flujo específico de contratación.
+- Nota implementada: `POST /memberships/{id}/renew` crea una venta de renovación,
+  registra pago manual y extiende la membresía operativa cuando el pago queda
+  completado.
+- Nota implementada: `POST /memberships/{id}/change-plan` crea una venta de
+  cambio, exige pago completado y actualiza plan y periodo sin crear una segunda
+  membresía activa.
 - Nota implementada: si la membresia origen o destino pertenece a un plan con `multiBranchAccess`, el acceso del socio se agrega o remueve para todas las sucursales por regla de consulta, sin duplicar registros por sucursal.
 
 La activación ocurre como consecuencia de pago completado.
@@ -317,6 +331,11 @@ La activación ocurre como consecuencia de pago completado.
 - `POST /sales/{id}/checkout` (pendiente)
 - `POST /sales/{id}/cancel` (pendiente)
 - `POST /sales/{id}/refund` (pendiente)
+
+`POST /sales` es exclusivo para productos y servicios cotidianos. Si contiene
+un `MEMBERSHIP_PLAN`, responde `SALE_MEMBERSHIP_OPERATION_REQUIRED`; las ventas
+de planes se crean mediante los endpoints específicos de membresía y siguen
+formando parte de reportes, pagos y movimientos de caja.
 
 ## 6.9 Pagos
 
@@ -959,3 +978,65 @@ Valores posibles de `console`:
 - Para `Coach`, persiste cuenta, sucursales, especialidades y biografia como una
   sola operacion; un fallo del perfil revierte el alta completa.
 - Los usuarios creados entran a su consola segun permisos/rol.
+## Extensiones de membresías y acceso — `feature/reception-pos-init`
+
+### Cotización de plan
+
+`POST /api/v1/membership-quotes`
+
+```json
+{ "clientId": "uuid", "planId": "uuid" }
+```
+
+Devuelve `listPriceCents`, `discountCents`, `totalCents`, `currency` y
+`appliedBenefits`. El servidor es la fuente de verdad.
+
+Cada elemento de `appliedBenefits` incluye `benefitId`, `code`, `name` y
+`discountCents`. El mismo conjunto se congela en la venta al ejecutar alta,
+renovación o cambio.
+
+### Alta inicial de membresía
+
+`POST /api/v1/membership-enrollments`
+
+Recibe socio, plan, método y validación de pago. Rechaza otra membresía activa,
+aplica la cotización de backend y registra venta, pago, periodo y activación.
+
+### Periodos de membresía
+
+`GET /api/v1/memberships/{membershipId}/periods`
+
+Devuelve alta/importación, renovaciones y cambios con plan, vigencia, venta y
+fecha de registro.
+
+Las fechas son inclusivas. Renovar antes del fin inicia el periodo nuevo al día
+siguiente; renovar una membresía vencida inicia en la fecha operativa actual.
+
+### Contexto financiero de membresías
+
+`GET /api/v1/sales` y el encabezado de
+`GET /api/v1/sales/{saleId}` incluyen `businessContext`.
+
+`GET /api/v1/sales/{saleId}` agrega `appliedBenefits`.
+
+`GET /api/v1/sales/reports/summary` agrega `salesByBusinessContext`, con conteo,
+subtotal, descuento, total, cobrado y saldo para:
+
+- `RETAIL_SALE`
+- `MEMBERSHIP_ENROLLMENT`
+- `MEMBERSHIP_RENEWAL`
+- `MEMBERSHIP_PLAN_CHANGE`
+
+### Accesos efectivos
+
+`GET /api/v1/access/clients/{clientId}/effective-benefits`
+
+Deriva los beneficios desde la membresía vigente y el plan actual.
+
+`PUT /api/v1/access/devices/{deviceId}/benefits`
+
+```json
+{ "benefitIds": ["uuid"] }
+```
+
+Reemplaza de forma auditable los accesos requeridos por el dispositivo.

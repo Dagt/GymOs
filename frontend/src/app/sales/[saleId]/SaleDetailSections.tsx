@@ -71,6 +71,11 @@ export function SaleItemsSection({ data }: { data: SaleDetailResponse }) {
             </div>
           </article>
         ))}
+        {data.appliedBenefits.map((benefit) => (
+          <p className="text-sm text-[#5d6b63]" key={benefit.benefitId}>
+            Beneficio aplicado: {benefit.name} ({benefit.code}) · -{formatMoney(benefit.discountCents, data.sale.currency)}
+          </p>
+        ))}
       </div>
     </section>
   );

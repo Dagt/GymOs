@@ -5,6 +5,35 @@ export type ClientMembershipSummary = MembershipDetail & {
   saleNumber: string;
 };
 
+export type MembershipPeriodSummary = {
+  id: string;
+  membershipId: string;
+  planId: string;
+  planName: string;
+  saleId: string;
+  saleNumber: string;
+  operationType: "LEGACY_IMPORT" | "ENROLLMENT" | "RENEWAL" | "PLAN_CHANGE";
+  startsOn: string;
+  endsOn: string;
+  createdAt: string;
+};
+
+export type MembershipQuote = {
+  clientId: string;
+  planId: string;
+  planName: string;
+  listPriceCents: number;
+  discountCents: number;
+  totalCents: number;
+  currency: string;
+  appliedBenefits: {
+    benefitId: string;
+    code: string;
+    name: string;
+    discountCents: number;
+  }[];
+};
+
 export type RenewMembershipPayload = {
   method: "CASH" | "TRANSFER" | "CARD_MANUAL";
   reference?: string | null;
@@ -15,6 +44,11 @@ export type RenewMembershipPayload = {
 
 export type ChangeMembershipPlanPayload = RenewMembershipPayload & {
   targetPlanId: string;
+};
+
+export type EnrollMembershipPayload = RenewMembershipPayload & {
+  clientId: string;
+  planId: string;
 };
 
 export type RenewMembershipResponse = {

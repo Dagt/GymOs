@@ -59,6 +59,7 @@ class SalesBranchIsolationTests {
 				UUID.randomUUID(),
 				"Cliente",
 				"PAID",
+				"RETAIL_SALE",
 				10_000,
 				0,
 				10_000,

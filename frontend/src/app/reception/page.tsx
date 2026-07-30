@@ -1,14 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired } from "@/components/AuthRequired";
 import { DAY_SIGNALS, FOCUS_ACTIONS } from "./reception-model";
 import {
-  clearSession,
   getBranches,
   getCurrentOrganization,
   getStoredSession,
@@ -20,7 +17,6 @@ import {
 } from "@/lib/api";
 
 export default function ReceptionPage() {
-  const router = useRouter();
   const [session, setSession] = useState<StoredSession | null>(null);
   const [organization, setOrganization] = useState<OrganizationSummary | null>(null);
   const [branches, setBranches] = useState<BranchSummary[]>([]);
@@ -83,11 +79,6 @@ export default function ReceptionPage() {
   const visibleBranchName = activeBranch?.name ?? (session?.user.branchId ? "Sucursal activa" : null);
   const receptionOrganizationName =
     organization?.tradeName ?? session?.user.brandName ?? session?.user.organizationName ?? "GymOS";
-
-  function logout() {
-    clearSession();
-    router.push("/login");
-  }
 
   async function switchBranch(branchId: string) {
     if (!session || branchId === session.user.branchId) {
@@ -298,4 +289,3 @@ function ReportMetric({ label, value, tone }: { label: string; value: string; to
     </article>
   );
 }
-

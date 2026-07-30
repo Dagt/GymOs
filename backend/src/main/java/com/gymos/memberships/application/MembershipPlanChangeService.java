@@ -3,6 +3,7 @@ package com.gymos.memberships.application;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.memberships.application.command.ChangeMembershipPlanCommand;
 import com.gymos.memberships.application.result.MembershipSaleResult;
+import com.gymos.memberships.application.result.MembershipQuoteResult;
 import com.gymos.memberships.infrastructure.MembershipRepository.MembershipSummary;
 import com.gymos.memberships.infrastructure.MembershipRepository.PlanForRenewal;
 import com.gymos.sales.api.operations.CreateMembershipPlanChangeSaleCommand;
@@ -17,17 +18,20 @@ class MembershipPlanChangeService {
 	private final MembershipOperationIdempotency idempotency;
 	private final SalesOperations salesOperations;
 	private final MembershipSaleResultResolver resultResolver;
+	private final MembershipPricingService pricingService;
 
 	MembershipPlanChangeService(
 			MembershipOperationPolicy policy,
 			MembershipOperationIdempotency idempotency,
 			SalesOperations salesOperations,
-			MembershipSaleResultResolver resultResolver
+			MembershipSaleResultResolver resultResolver,
+			MembershipPricingService pricingService
 	) {
 		this.policy = policy;
 		this.idempotency = idempotency;
 		this.salesOperations = salesOperations;
 		this.resultResolver = resultResolver;
+		this.pricingService = pricingService;
 	}
 
 	@Transactional
@@ -51,6 +55,8 @@ class MembershipPlanChangeService {
 		);
 		String method = command.method().trim().toUpperCase();
 		policy.requireCompletedPlanChangePayment(command.validateNow(), method);
+		MembershipQuoteResult quote = pricingService.quote(
+				principal.organizationId(), principal.branchId(), current.clientId(), plan);
 
 		var sale = salesOperations.createMembershipPlanChange(new CreateMembershipPlanChangeSaleCommand(
 				principal.organizationId(),
@@ -61,8 +67,11 @@ class MembershipPlanChangeService {
 				plan.planId(),
 				plan.productId(),
 				plan.planName(),
-				plan.priceCents(),
+				quote.listPriceCents(),
+				quote.discountCents(),
+				quote.totalCents(),
 				plan.currency(),
+				MembershipBenefitSnapshotMapper.from(quote),
 				command.method(),
 				command.reference(),
 				command.validateNow(),

@@ -18,7 +18,8 @@ class SalesRecordLookupRepository {
 		return jdbcClient.sql("""
 				SELECT s.id, s.sale_number, s.branch_id, s.client_id,
 				       COALESCE(p.first_name || ' ' || p.last_name, 'Venta mostrador') AS client_name,
-				       s.status, s.subtotal_cents, s.discount_cents, s.total_cents,
+				       s.status, COALESCE(s.business_context, 'RETAIL_SALE') AS business_context,
+				       s.subtotal_cents, s.discount_cents, s.total_cents,
 				       s.paid_cents, s.balance_cents, s.currency, s.notes, s.sold_at,
 				       s.created_at, s.updated_at
 				FROM sale s
@@ -53,7 +54,8 @@ class SalesRecordLookupRepository {
 		return jdbcClient.sql("""
 				SELECT s.id, s.sale_number, s.branch_id, s.client_id,
 				       COALESCE(p.first_name || ' ' || p.last_name, 'Cliente general') AS client_name,
-				       s.status, s.subtotal_cents, s.discount_cents, s.total_cents,
+				       s.status, COALESCE(s.business_context, 'RETAIL_SALE') AS business_context,
+				       s.subtotal_cents, s.discount_cents, s.total_cents,
 				       s.paid_cents, s.balance_cents, s.currency, s.notes, s.sold_at,
 				       s.created_at, s.updated_at
 				FROM sale s

@@ -1,5 +1,6 @@
 package com.gymos.sales.infrastructure;
 
+import com.gymos.sales.model.AppliedBenefitDetail;
 import com.gymos.sales.model.MembershipDetail;
 import com.gymos.sales.model.PaymentDetail;
 import com.gymos.sales.model.RefundDetail;
@@ -24,7 +25,8 @@ public class SalesReadRepository {
 		return jdbcClient.sql("""
 				SELECT s.id, s.sale_number, s.client_id,
 				       COALESCE(p.first_name || ' ' || p.last_name, 'Venta mostrador') AS client_name,
-				       s.status, s.total_cents, s.paid_cents, s.balance_cents,
+				       s.status, COALESCE(s.business_context, 'RETAIL_SALE') AS business_context,
+				       s.total_cents, s.paid_cents, s.balance_cents,
 				       s.currency, s.sold_at
 				FROM sale s
 				LEFT JOIN client c ON c.id = s.client_id
@@ -43,6 +45,7 @@ public class SalesReadRepository {
 						resultSet.getObject("client_id", UUID.class),
 						resultSet.getString("client_name"),
 						resultSet.getString("status"),
+						resultSet.getString("business_context"),
 						resultSet.getLong("total_cents"),
 						resultSet.getLong("paid_cents"),
 						resultSet.getLong("balance_cents"),
@@ -85,6 +88,27 @@ public class SalesReadRepository {
 						resultSet.getLong("total_cents"),
 						resultSet.getInt("refunded_quantity"),
 						resultSet.getObject("created_at", OffsetDateTime.class)
+				))
+				.list();
+	}
+
+	public List<AppliedBenefitDetail> appliedBenefits(UUID organizationId, UUID saleId) {
+		return jdbcClient.sql("""
+				SELECT benefit_id, benefit_code_snapshot, benefit_name_snapshot,
+				       discount_cents, application_order
+				FROM membership_sale_benefit
+				WHERE organization_id = :organizationId
+				  AND sale_id = :saleId
+				ORDER BY application_order, id
+				""")
+				.param("organizationId", organizationId)
+				.param("saleId", saleId)
+				.query((resultSet, rowNumber) -> new AppliedBenefitDetail(
+						resultSet.getObject("benefit_id", UUID.class),
+						resultSet.getString("benefit_code_snapshot"),
+						resultSet.getString("benefit_name_snapshot"),
+						resultSet.getLong("discount_cents"),
+						resultSet.getInt("application_order")
 				))
 				.list();
 	}

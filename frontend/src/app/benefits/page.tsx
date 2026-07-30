@@ -90,9 +90,16 @@ export default function BenefitsPage() {
     setSaving(true);
     setError(null);
     try {
-      const created = await createBenefit(session.accessToken, form);
+      const created = await createBenefit(session.accessToken, {
+        ...form,
+        discountType: form.benefitType === "ACCESS" ? "NONE" : form.discountType,
+        discountPercent: form.benefitType === "ACCESS" ? null : form.discountPercent,
+        discountValueCents: form.benefitType === "ACCESS" ? null : form.discountValueCents,
+        planIds: form.benefitType === "ACCESS" ? selectedPlanIds : [],
+      });
       setBenefits((current) => [created, ...current]);
       setForm(defaultForm);
+      setSelectedPlanIds([]);
       setShowBenefitDrawer(false);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible crear el beneficio.");
@@ -166,6 +173,11 @@ export default function BenefitsPage() {
                 <p className="mt-3 text-sm text-[var(--brand-muted)]">
                   {benefit.discountType === "PERCENT" ? `${benefit.discountPercent ?? 0}% de descuento` : benefit.discountType}
                 </p>
+                {benefit.benefitType === "ACCESS" ? (
+                  <p className="mt-2 text-xs font-bold text-[var(--brand-primary)]">
+                    {benefit.planIds.length} {benefit.planIds.length === 1 ? "plan vinculado" : "planes vinculados"}
+                  </p>
+                ) : null}
               </article>
             ))}
           </div>
@@ -183,7 +195,20 @@ export default function BenefitsPage() {
           <Field label="Nombre" value={form.name} onChange={(value) => setForm({ ...form, name: value })} />
           <label className="grid gap-2 text-sm font-bold text-[#42514a]">
             Tipo
-            <select className="h-11 rounded-md border border-[var(--brand-line)] px-3" value={form.benefitType} onChange={(event) => setForm({ ...form, benefitType: event.target.value as BenefitPayload["benefitType"] })}>
+            <select
+              className="h-11 rounded-md border border-[var(--brand-line)] px-3"
+              value={form.benefitType}
+              onChange={(event) => {
+                const benefitType = event.target.value as BenefitPayload["benefitType"];
+                setForm({
+                  ...form,
+                  benefitType,
+                  discountType: benefitType === "ACCESS" ? "NONE" : "PERCENT",
+                  discountPercent: benefitType === "ACCESS" ? null : (form.discountPercent ?? 10),
+                  discountValueCents: null,
+                });
+              }}
+            >
               <option value="STUDENT">Estudiante</option>
               <option value="SENIOR">Adulto mayor</option>
               <option value="AGREEMENT">Convenio</option>
@@ -217,7 +242,7 @@ export default function BenefitsPage() {
                               name: form.name || `Pase/Acceso: ${firstPlan?.name || ""}`,
                               code: form.code || `ACC-${p.id.slice(0, 6).toUpperCase()}`,
                               discountPercent: null,
-                              discountType: "PERCENT",
+                              discountType: "NONE",
                             });
                           }
                         }}
@@ -246,7 +271,13 @@ export default function BenefitsPage() {
             <input type="checkbox" checked={form.requiresEvidence} onChange={(event) => setForm({ ...form, requiresEvidence: event.target.checked })} />
             Requiere evidencia
           </label>
-          <button className="app-button h-11" disabled={saving} type="submit">{saving ? "Guardando..." : "Crear beneficio"}</button>
+          <button
+            className="app-button h-11"
+            disabled={saving || (form.benefitType === "ACCESS" && selectedPlanIds.length === 0)}
+            type="submit"
+          >
+            {saving ? "Guardando..." : "Crear beneficio"}
+          </button>
         </form>
       </AppDrawer>
     </AppShell>
@@ -261,4 +292,3 @@ function Field({ label, value, onChange }: { label: string; value: string; onCha
     </label>
   );
 }
-

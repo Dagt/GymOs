@@ -3,27 +3,32 @@
 import { FormEvent, useEffect, useState } from "react";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
+import { MembershipQuoteSummary } from "@/components/MembershipQuoteSummary";
 import {
   changeMembershipPlan,
   getClientMemberships,
   getPlans,
+  getMembershipQuote,
   getStoredSession,
   renewMembership,
   searchClients,
   type ClientMembershipSummary,
   type ClientSummary,
   type PlanSummary,
+  type MembershipQuote,
   type StoredSession,
 } from "@/lib/api";
 import { buildChangePlanPayload, buildRenewalPayload } from "./renewals-model";
 
 export default function ReceptionRenewalsPage() {
-  const [session, setSession] = useState<StoredSession | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [session] = useState<StoredSession | null>(() => getStoredSession());
+  const [loading, setLoading] = useState(() => Boolean(session));
   const [query, setQuery] = useState("");
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [selectedClient, setSelectedClient] = useState<ClientSummary | null>(null);
   const [membership, setMembership] = useState<ClientMembershipSummary | null>(null);
+  const [renewalQuote, setRenewalQuote] = useState<MembershipQuote | null>(null);
+  const [changeQuote, setChangeQuote] = useState<MembershipQuote | null>(null);
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [targetPlanId, setTargetPlanId] = useState("");
   const [method, setMethod] = useState<"CASH" | "CARD_MANUAL" | "TRANSFER">("CASH");
@@ -34,23 +39,23 @@ export default function ReceptionRenewalsPage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const activeSession = getStoredSession();
-    setSession(activeSession);
-    if (activeSession) {
-      getPlans(activeSession.accessToken)
-        .then(setPlans)
-        .catch(() => {})
-        .finally(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
-  }, []);
+    if (!session) return;
+    let active = true;
+    getPlans(session.accessToken)
+      .then((loadedPlans) => {
+        if (active) setPlans(loadedPlans);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [session]);
 
   useEffect(() => {
-    if (!session || !selectedClient) {
-      setMembership(null);
-      return;
-    }
+    if (!session || !selectedClient) return;
     let active = true;
     getClientMemberships(session.accessToken, selectedClient.id)
       .then((items) => {
@@ -64,6 +69,36 @@ export default function ReceptionRenewalsPage() {
       active = false;
     };
   }, [selectedClient, session]);
+
+  useEffect(() => {
+    if (!session || !selectedClient || !membership) return;
+    let active = true;
+    getMembershipQuote(session.accessToken, selectedClient.id, membership.planId)
+      .then((quote) => {
+        if (active) setRenewalQuote(quote);
+      })
+      .catch(() => {
+        if (active) setRenewalQuote(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [membership, selectedClient, session]);
+
+  useEffect(() => {
+    if (!session || !selectedClient || !targetPlanId) return;
+    let active = true;
+    getMembershipQuote(session.accessToken, selectedClient.id, targetPlanId)
+      .then((quote) => {
+        if (active) setChangeQuote(quote);
+      })
+      .catch(() => {
+        if (active) setChangeQuote(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [selectedClient, session, targetPlanId]);
 
   async function handleSearch(e: FormEvent) {
     e.preventDefault();
@@ -87,7 +122,7 @@ export default function ReceptionRenewalsPage() {
     try {
       const payload = buildRenewalPayload({ method, reference });
       const res = await renewMembership(session.accessToken, membership.id, payload);
-      setMessage(`Membresía renovada con éxito. Venta ${res.saleNumber} registrada.`);
+      setMessage(`Membresía renovada con éxito por ${formatMoney(res.totalCents, res.currency)}. Venta ${res.saleNumber} registrada.`);
       setMembership(res.membership || null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al procesar la renovación.");
@@ -104,7 +139,7 @@ export default function ReceptionRenewalsPage() {
     try {
       const payload = buildChangePlanPayload({ targetPlanId, method, reference });
       const res = await changeMembershipPlan(session.accessToken, membership.id, payload);
-      setMessage(`Plan cambiado con éxito. Venta ${res.saleNumber} registrada.`);
+      setMessage(`Plan cambiado con éxito por ${formatMoney(res.totalCents, res.currency)}. Venta ${res.saleNumber} registrada.`);
       setMembership(res.membership || null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al procesar cambio de plan.");
@@ -157,7 +192,13 @@ export default function ReceptionRenewalsPage() {
                 <button
                   key={c.id}
                   type="button"
-                  onClick={() => { setSelectedClient(c); setClients([]); }}
+                  onClick={() => {
+                    setSelectedClient(c);
+                    setMembership(null);
+                    setRenewalQuote(null);
+                    setChangeQuote(null);
+                    setClients([]);
+                  }}
                   className="p-3 rounded-lg bg-white border border-gray-100 hover:border-[var(--brand-primary)] text-left flex items-center justify-between transition-colors group"
                 >
                   <div>
@@ -189,7 +230,14 @@ export default function ReceptionRenewalsPage() {
 
               <button
                 type="button"
-                onClick={() => { setSelectedClient(null); setMembership(null); setMessage(null); setError(null); }}
+                onClick={() => {
+                  setSelectedClient(null);
+                  setMembership(null);
+                  setRenewalQuote(null);
+                  setChangeQuote(null);
+                  setMessage(null);
+                  setError(null);
+                }}
                 className="app-button-secondary text-xs mt-6 self-start"
               >
                 ✕ Cambiar de socio
@@ -217,6 +265,7 @@ export default function ReceptionRenewalsPage() {
                   <p className="text-xs font-bold text-gray-600">
                     Vigencia: {membership.startsOn} al {membership.endsOn}
                   </p>
+                  <MembershipQuoteSummary loading={false} quote={renewalQuote} />
 
                   <div className="grid gap-3 pt-2">
                     <label className="grid gap-1 text-xs font-bold text-gray-700">
@@ -224,7 +273,11 @@ export default function ReceptionRenewalsPage() {
                       <select
                         className="app-input h-10 text-xs font-bold"
                         value={method}
-                        onChange={(e) => setMethod(e.target.value as any)}
+                        onChange={(e) => {
+                          if (e.target.value === "CASH" || e.target.value === "CARD_MANUAL" || e.target.value === "TRANSFER") {
+                            setMethod(e.target.value);
+                          }
+                        }}
                       >
                         <option value="CASH">Efectivo</option>
                         <option value="CARD_MANUAL">Tarjeta</option>
@@ -258,7 +311,10 @@ export default function ReceptionRenewalsPage() {
                         <select
                           className="app-input flex-1 h-11 text-xs font-bold"
                           value={targetPlanId}
-                          onChange={(e) => setTargetPlanId(e.target.value)}
+                          onChange={(e) => {
+                            setTargetPlanId(e.target.value);
+                            setChangeQuote(null);
+                          }}
                         >
                           <option value="">🔀 Seleccionar Nuevo Plan...</option>
                           {plans.map((p) => (
@@ -275,6 +331,7 @@ export default function ReceptionRenewalsPage() {
                         </button>
                       </div>
                     ) : null}
+                    {targetPlanId ? <MembershipQuoteSummary loading={false} quote={changeQuote} /> : null}
                   </div>
                 </div>
               ) : (
@@ -293,4 +350,11 @@ export default function ReceptionRenewalsPage() {
       </div>
     </AppShell>
   );
+}
+
+function formatMoney(cents: number, currency: string) {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency,
+  }).format(cents / 100);
 }

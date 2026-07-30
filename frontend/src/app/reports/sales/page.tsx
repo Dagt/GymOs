@@ -8,6 +8,7 @@ import {
   getSalesReport,
   getStoredSession,
   type PaymentMethodBreakdown,
+  type SaleBusinessContextBreakdown,
   type SaleStatusBreakdown,
   type SalesReportResponse,
   type StoredSession,
@@ -196,6 +197,28 @@ export default function SalesReportPage() {
                   </table>
                 </div>
               </section>
+
+              <section className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
+                <h2 className="text-xl font-semibold">Ventas por tipo</h2>
+                <div className="mt-4 overflow-x-auto">
+                  <table className="w-full min-w-[620px] border-collapse text-sm">
+                    <thead className="text-left text-[#6f7a73]">
+                      <tr>
+                        <th className="border-b border-[#e4e8df] py-2 pr-3">Tipo</th>
+                        <th className="border-b border-[#e4e8df] py-2 pr-3">Ventas</th>
+                        <th className="border-b border-[#e4e8df] py-2 pr-3">Subtotal</th>
+                        <th className="border-b border-[#e4e8df] py-2 pr-3">Descuentos</th>
+                        <th className="border-b border-[#e4e8df] py-2">Cobrado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {report.salesByBusinessContext.map((row) => (
+                        <BusinessContextRow currency={currency} key={row.businessContext} row={row} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
             </section>
 
             <section className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
@@ -217,7 +240,7 @@ export default function SalesReportPage() {
                   >
                     <span className="block font-semibold">{sale.saleNumber}</span>
                     <span className="mt-1 block text-sm text-[var(--brand-muted)]">
-                      {sale.clientName} - {saleStatusLabel(sale.status)} - {formatMoney(sale.totalCents, sale.currency)}
+                      {sale.clientName} - {businessContextLabel(sale.businessContext)} - {saleStatusLabel(sale.status)} - {formatMoney(sale.totalCents, sale.currency)}
                     </span>
                   </Link>
                 ))}
@@ -264,6 +287,18 @@ function PaymentMethodRow({ row, currency }: { row: PaymentMethodBreakdown; curr
   );
 }
 
+function BusinessContextRow({ row, currency }: { row: SaleBusinessContextBreakdown; currency: string }) {
+  return (
+    <tr>
+      <td className="border-b border-[#eef1ea] py-3 pr-3 font-semibold">{businessContextLabel(row.businessContext)}</td>
+      <td className="border-b border-[#eef1ea] py-3 pr-3">{row.saleCount}</td>
+      <td className="border-b border-[#eef1ea] py-3 pr-3">{formatMoney(row.subtotalCents, currency)}</td>
+      <td className="border-b border-[#eef1ea] py-3 pr-3">{formatMoney(row.discountCents, currency)}</td>
+      <td className="border-b border-[#eef1ea] py-3">{formatMoney(row.paidCents, currency)}</td>
+    </tr>
+  );
+}
+
 function AuthRequired() {
   return (
     <AuthRequiredCard
@@ -299,6 +334,16 @@ function paymentMethodLabel(method: string) {
   return labels[method] ?? method;
 }
 
+function businessContextLabel(context: string) {
+  const labels: Record<string, string> = {
+    RETAIL_SALE: "Productos y servicios",
+    MEMBERSHIP_ENROLLMENT: "Contrataciones",
+    MEMBERSHIP_RENEWAL: "Renovaciones",
+    MEMBERSHIP_PLAN_CHANGE: "Cambios de plan",
+  };
+  return labels[context] ?? context;
+}
+
 function periodLabel(report: SalesReportResponse) {
   return `${report.fromDate} a ${report.toDate}`;
 }
@@ -312,4 +357,3 @@ function addDays(dateIso: string, days: number) {
   date.setDate(date.getDate() + days);
   return date.toISOString().slice(0, 10);
 }
-

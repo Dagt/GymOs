@@ -1,13 +1,20 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildRenewalProduct, calculateSubtotal, findProductByBarcodeOrSku, formatMoney, getPosDensityConfig } from "./pos-model.ts";
+import {
+  calculateSubtotal,
+  findProductByBarcodeOrSku,
+  formatMoney,
+  getPosDensityConfig,
+  isMembershipPlanProduct,
+  resolveScannedProduct,
+} from "./pos-model.ts";
 import type { CartItem } from "./PosSections.tsx";
 import type { ProductSummary } from "@/lib/api";
 
 test("calculateSubtotal correctly sums product prices", () => {
   const cart: CartItem[] = [
-    { product: { id: "1", name: "P1", priceCents: 10000, currency: "MXN", sku: "S1", status: "ACTIVE" } as any, quantity: 2 },
-    { product: { id: "2", name: "P2", priceCents: 5000, currency: "MXN", sku: "S2", status: "ACTIVE" } as any, quantity: 1 },
+    { product: product({ id: "1", name: "P1", priceCents: 10000, sku: "S1" }), quantity: 2 },
+    { product: product({ id: "2", name: "P2", priceCents: 5000, sku: "S2" }), quantity: 1 },
   ];
   assert.equal(calculateSubtotal(cart), 25000);
 });
@@ -25,8 +32,8 @@ test("pos model provides data-dense configuration for power-user cashier operati
 
 test("findProductByBarcodeOrSku locates product by exact barcode or SKU", () => {
   const products: ProductSummary[] = [
-    { id: "1", name: "Agua 600ml", priceCents: 2000, currency: "MXN", sku: "AGUA-600", barcode: "7501234567890", status: "ACTIVE" } as unknown as ProductSummary,
-    { id: "2", name: "Proteina Scoop", priceCents: 3500, currency: "MXN", sku: "SCOOP-WHEY", barcode: null, status: "ACTIVE" } as unknown as ProductSummary,
+    product({ id: "1", name: "Agua 600ml", priceCents: 2000, sku: "AGUA-600", barcode: "7501234567890" }),
+    product({ id: "2", name: "Proteina Scoop", priceCents: 3500, sku: "SCOOP-WHEY" }),
   ];
 
   // Match by barcode
@@ -42,23 +49,90 @@ test("findProductByBarcodeOrSku locates product by exact barcode or SKU", () => 
   assert.equal(notFound, null);
 });
 
-test("buildRenewalProduct maps membership to catalog product or generates synthetic plan", () => {
-  const products: ProductSummary[] = [
-    { id: "plan-vip-1", name: "Plan VIP Mensual", priceCents: 85000, currency: "MXN", sku: "PLAN-VIP" } as unknown as ProductSummary,
-  ];
+test("resolveScannedProduct falls back to the exact backend barcode lookup", async () => {
+  const remote = product({
+    id: "remote",
+    name: "Producto fuera de la pagina visible",
+    priceCents: 4200,
+    sku: "REMOTE-1",
+    barcode: "7500000000001",
+  });
+  let requestedCode = "";
 
-  const catalogMatch = buildRenewalProduct(
-    { id: "m-1", planId: "plan-vip-1", planName: "Plan VIP Mensual", priceCents: 85000, currency: "MXN" },
-    products,
-  );
-  assert.equal(catalogMatch.id, "plan-vip-1");
-  assert.equal(catalogMatch.priceCents, 85000);
+  const resolved = await resolveScannedProduct([], " 7500000000001 ", async (code) => {
+    requestedCode = code;
+    return remote;
+  });
 
-  const syntheticPlan = buildRenewalProduct(
-    { id: "m-2", planId: "plan-custom", planName: "Plan Personalizado", priceCents: 90000, currency: "MXN" },
-    products,
-  );
-  assert.equal(syntheticPlan.id, "plan-custom");
-  assert.equal(syntheticPlan.name, "Renovación: Plan Personalizado");
-  assert.equal(syntheticPlan.priceCents, 90000);
+  assert.equal(resolved.id, "remote");
+  assert.equal(requestedCode, "7500000000001");
 });
+
+test("resolveScannedProduct does not call the backend when the visible catalog matches", async () => {
+  const local = product({
+    id: "local",
+    name: "Agua",
+    priceCents: 2000,
+    sku: "AGUA",
+    barcode: "7500000000002",
+  });
+  let remoteCalls = 0;
+
+  const resolved = await resolveScannedProduct([local], "7500000000002", async () => {
+    remoteCalls += 1;
+    throw new Error("No debe consultar");
+  });
+
+  assert.equal(resolved.id, "local");
+  assert.equal(remoteCalls, 0);
+});
+
+test("membership plans remain visible in catalog but cannot enter the retail cart", () => {
+  const plan = product({
+    id: "plan",
+    name: "Plan mensual",
+    priceCents: 10000,
+    sku: "PLAN-30",
+    productType: "MEMBERSHIP_PLAN",
+    commercialSubtype: "MEMBERSHIP",
+  });
+
+  assert.equal(isMembershipPlanProduct(plan), true);
+});
+
+function product(overrides: Partial<ProductSummary> & Pick<ProductSummary, "id" | "name" | "sku" | "priceCents">): ProductSummary {
+  const { id, name, sku, priceCents, ...optionalOverrides } = overrides;
+  return {
+    id,
+    sku,
+    name,
+    description: null,
+    productType: "PHYSICAL",
+    commercialSubtype: "GENERAL_PRODUCT",
+    priceCents,
+    currency: "MXN",
+    taxable: true,
+    status: "ACTIVE",
+    barcode: null,
+    brand: null,
+    presentation: null,
+    unitOfMeasure: null,
+    inventoryTracked: false,
+    displayOrder: 0,
+    imageObjectKey: null,
+    supplierName: null,
+    referenceCostCents: null,
+    promotionalPriceCents: null,
+    promotionStartsAt: null,
+    promotionEndsAt: null,
+    categoryId: null,
+    categoryName: null,
+    tags: [],
+    archived: false,
+    archivedAt: null,
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+    version: 0,
+    ...optionalOverrides,
+  };
+}

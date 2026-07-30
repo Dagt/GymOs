@@ -13,6 +13,7 @@ export type BenefitSummary = {
   validFrom: string | null;
   validUntil: string | null;
   status: "ACTIVE" | "INACTIVE";
+  planIds: string[];
 };
 
 export type BenefitPayload = {
@@ -29,6 +30,7 @@ export type BenefitPayload = {
   validFrom?: string | null;
   validUntil?: string | null;
   status: "ACTIVE" | "INACTIVE";
+  planIds?: string[];
 };
 
 export type ClientBenefitSummary = {

@@ -78,7 +78,7 @@ class SalesPaymentServiceTests {
 		GymOsPrincipal principal = new GymOsPrincipal(UUID.randomUUID(), organizationId, branchId, "owner", "Owner", Set.of());
 		OffsetDateTime now = OffsetDateTime.now();
 		SaleHeader sale = new SaleHeader(
-				saleId, "S-TEST", branchId, UUID.randomUUID(), "Cliente", "PENDING_PAYMENT",
+				saleId, "S-TEST", branchId, UUID.randomUUID(), "Cliente", "PENDING_PAYMENT", "RETAIL_SALE",
 				1_000, 0, 1_000, 0, 1_000, "MXN", null, now, now, now
 		);
 		when(salesRepository.saleHeader(organizationId, saleId)).thenReturn(Optional.of(sale));

@@ -1,7 +1,7 @@
 # 28. Registro vivo de hallazgos y deuda técnica
 
 Estado: VIGENTE / OBLIGATORIO
-Corte: 27 de julio de 2026
+Corte: 29 de julio de 2026
 
 ## 1. Propósito y regla de actualización
 
@@ -25,9 +25,9 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 | CLI-001 | P1 | Socios/CRM | ABIERTA | Falta auditoría completa de PII, duplicados e importaciones fallidas. | Política de exposición y pruebas CRUD/importación/multi-sucursal. |
 | CAT-001 | P2 | Catálogo | ABIERTA | Quedan compatibilidad legacy, alto volumen y ciclo de imágenes por validar. | Retirar contratos obsoletos y aprobar pruebas de volumen/archivos. |
 | SAL-001 | P0 | Ventas/pagos | ABIERTA | Concurrencia y conciliación financiera no tienen E2E integral. | Pruebas simultáneas e invariantes venta–pago–inventario–refund. |
-| MEM-001 | P1 | Membresías | ABIERTA | Semántica de inicio, fin y duración requiere auditoría integral. | Casos de borde y pruebas con zona horaria y renovación. |
 | BEN-001 | P1 | Beneficios | ABIERTA | Elegibilidad no tiene una fuente de verdad transversal demostrada. | Política única usada por membresía, reserva y acceso con pruebas. |
 | ACC-001 | P0 | Accesos | ABIERTA | Doble consumo, reintentos y privacidad requieren pruebas. | Consumo atómico, respuestas mínimas y matriz dispositivo/tenant. |
+| ACC-002 | P3 | Acceso físico | ACEPTADA | Adaptadores de proveedor, modo offline y telemetría de hardware se posponen por decisión de producto. No bloquean renovaciones, POS ni beneficios. | Reactivar únicamente cuando el hardware físico entre en el roadmap. |
 | SELF-001 | P0 | Autoservicio | ABIERTA | Token de terminal, rate limiting y privacidad necesitan hardening. | Threat model, límites, expiración y E2E de kiosco. |
 | BKG-001 | P1 | Reservas | ABIERTA | Falta E2E de colisiones, pagos, cancelación y otra sucursal. | Suite crítica de calendario y autorización en CI. |
 | INV-001 | P1 | Inventarios | ABIERTA | Transferencias y conteos no tienen paginación parametrizada completa. | Contratos paginados, UI y pruebas de volumen. |
@@ -44,6 +44,10 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 
 | ID | Módulo | Resolución | Evidencia |
 |---|---|---|---|
+| MEM-001 | Membresías/fechas | Definida duración inclusiva, continuidad al día siguiente, reinicio de vencidas, fecha operativa México y expiración después de gracia. | `MembershipActivationWindowCalculatorTests`, `MembershipRenewalWindowCalculatorTests`, `MembershipBusinessDateTests` y prueba PostgreSQL de expiración. |
+| MEM-002 | Membresías/concurrencia | V54 conserva periodos y una sola activa; el lock ahora separa selección de fila y relectura enriquecida para soportar el cambio concurrente de `sale_id`. | `MembershipCommercePersistenceIntegrationTests.concurrentRenewalsSerializeOnMembershipAndCreateConsecutivePeriods`. |
+| BEN-002 | Beneficios/accesos | La herencia `plan → ACCESS` y su revocación por vencimiento o cambio de plan quedaron demostradas sin hardware. | `MembershipCommercePersistenceIntegrationTests.pricingEligibilityAndAccessInheritanceReactToCurrentConfiguration`. |
+| POS-001 | POS/membresías | El catálogo conserva planes, pero el carrito y `POST /sales` rechazan su procesamiento genérico; alta, renovación y cambio generan ventas financieras contextualizadas. El lector consulta por código exacto fuera de la página local. | `SaleLineResolverTests`, `MembershipCommercePersistenceIntegrationTests`, 54 pruebas frontend, typecheck, lint y build en `feature/reception-pos-init`. |
 | COA-C01 | Coaches/catálogo | Corregida discrepancia `alias`/`alias_name`. | Repositorio alineado con V45. |
 | COA-C02 | Coaches/catálogo | Ejercicios SYSTEM protegidos contra edición y alias. | Servicio y `UPDATE` limitado a organización. |
 | COA-C03 | Coaches/rutinas | Corregido evento de publicación. | Auditoría `WORKOUT_PUBLISHED`. |

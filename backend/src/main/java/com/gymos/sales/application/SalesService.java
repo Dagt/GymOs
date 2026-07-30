@@ -2,6 +2,7 @@ package com.gymos.sales.application;
 
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.sales.api.operations.CreateMembershipPlanChangeSaleCommand;
+import com.gymos.sales.api.operations.CreateMembershipEnrollmentSaleCommand;
 import com.gymos.sales.api.operations.CreateMembershipRenewalSaleCommand;
 import com.gymos.sales.api.operations.MembershipSaleResult;
 import com.gymos.sales.api.operations.SalesOperations;
@@ -57,6 +58,12 @@ public class SalesService implements SalesOperations {
 
 	public SaleDetailResult create(GymOsPrincipal principal, CreateSaleCommand request, String correlationId) {
 		return pointOfSaleService.create(principal, request, correlationId);
+	}
+
+	@Override
+	@Transactional
+	public MembershipSaleResult createMembershipEnrollment(CreateMembershipEnrollmentSaleCommand command) {
+		return membershipSalesService.enroll(command);
 	}
 
 	@Override

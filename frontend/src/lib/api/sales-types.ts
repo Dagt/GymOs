@@ -8,6 +8,7 @@ export type SaleSummary = {
   clientId: string | null;
   clientName: string;
   status: SaleStatus;
+  businessContext: "RETAIL_SALE" | "MEMBERSHIP_ENROLLMENT" | "MEMBERSHIP_RENEWAL" | "MEMBERSHIP_PLAN_CHANGE" | string;
   totalCents: number;
   paidCents: number;
   balanceCents: number;
@@ -35,6 +36,14 @@ export type SaleItemDetail = {
   totalCents: number;
   refundedQuantity: number;
   createdAt: string;
+};
+
+export type AppliedBenefitDetail = {
+  benefitId: string;
+  code: string;
+  name: string;
+  discountCents: number;
+  applicationOrder: number;
 };
 
 export type PaymentDetail = {
@@ -81,6 +90,7 @@ export type MembershipDetail = {
 export type SaleDetailResponse = {
   sale: SaleHeader;
   items: SaleItemDetail[];
+  appliedBenefits: AppliedBenefitDetail[];
   payments: PaymentDetail[];
   refunds: RefundDetail[];
   memberships: MembershipDetail[];
@@ -126,6 +136,16 @@ export type PaymentMethodBreakdown = {
   rejectedCents: number;
 };
 
+export type SaleBusinessContextBreakdown = {
+  businessContext: SaleSummary["businessContext"];
+  saleCount: number;
+  subtotalCents: number;
+  discountCents: number;
+  totalCents: number;
+  paidCents: number;
+  balanceCents: number;
+};
+
 export type SalesReportResponse = {
   fromDate: string;
   toDate: string;
@@ -133,6 +153,7 @@ export type SalesReportResponse = {
   sales: SalesReportTotals;
   payments: PaymentReportTotals;
   salesByStatus: SaleStatusBreakdown[];
+  salesByBusinessContext: SaleBusinessContextBreakdown[];
   paymentsByMethod: PaymentMethodBreakdown[];
   recentSales: SaleSummary[];
 };

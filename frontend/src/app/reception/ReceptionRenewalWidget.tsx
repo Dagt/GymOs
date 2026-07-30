@@ -1,15 +1,18 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { MembershipQuoteSummary } from "@/components/MembershipQuoteSummary";
 import {
-  createSale,
+  enrollMembership,
   getClientMemberships,
   getPlans,
+  getMembershipQuote,
   renewMembership,
   searchClients,
   type ClientMembershipSummary,
   type ClientSummary,
   type PlanSummary,
+  type MembershipQuote,
   type StoredSession,
 } from "@/lib/api";
 
@@ -18,6 +21,7 @@ export function ReceptionRenewalWidget({ session }: { session: StoredSession }) 
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [selectedClient, setSelectedClient] = useState<ClientSummary | null>(null);
   const [membership, setMembership] = useState<ClientMembershipSummary | null>(null);
+  const [quote, setQuote] = useState<MembershipQuote | null>(null);
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState("");
   const [method, setMethod] = useState<"CASH" | "CARD_MANUAL" | "TRANSFER">("CASH");
@@ -32,7 +36,6 @@ export function ReceptionRenewalWidget({ session }: { session: StoredSession }) 
 
   useEffect(() => {
     if (!selectedClient) {
-      setMembership(null);
       return;
     }
     let active = true;
@@ -46,6 +49,23 @@ export function ReceptionRenewalWidget({ session }: { session: StoredSession }) 
       });
     return () => { active = false; };
   }, [selectedClient, session]);
+
+  useEffect(() => {
+    if (!selectedClient) return;
+    const planId = membership?.planId ?? selectedPlanId;
+    if (!planId) return;
+    let active = true;
+    getMembershipQuote(session.accessToken, selectedClient.id, planId)
+      .then((nextQuote) => {
+        if (active) setQuote(nextQuote);
+      })
+      .catch(() => {
+        if (active) setQuote(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [membership, selectedClient, selectedPlanId, session.accessToken]);
 
   async function handleSearch(e: FormEvent) {
     e.preventDefault();
@@ -75,7 +95,7 @@ export function ReceptionRenewalWidget({ session }: { session: StoredSession }) 
         validateNow: true,
         notes: "Renovación rápida desde inicio de recepción",
       });
-      setMessage(`Membresía renovada con éxito. Venta ${res.saleNumber} registrada.`);
+      setMessage(`Membresía renovada por ${formatMoney(res.totalCents, res.currency)}. Venta ${res.saleNumber} registrada.`);
       setMembership(res.membership || null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Error al renovar.");
@@ -92,27 +112,15 @@ export function ReceptionRenewalWidget({ session }: { session: StoredSession }) 
     try {
       const plan = plans.find((p) => p.id === selectedPlanId);
       if (!plan) return;
-      const targetProductId = (plan as any).productId || plan.id;
-      const res = await createSale(session.accessToken, {
+      const res = await enrollMembership(session.accessToken, {
         clientId: selectedClient.id,
-        items: [
-          {
-            productId: targetProductId,
-            quantity: 1,
-            discountCents: 0,
-          },
-        ],
-        discountCents: 0,
-        payment: {
-          method,
-          amountCents: plan.priceCents ?? 80000,
-          reference: null,
-          receiptObjectKey: null,
-          validateNow: true,
-          notes: "Venta de membresía inicial desde recepción",
-        },
+        planId: plan.id,
+        method,
+        reference: null,
+        validateNow: true,
+        notes: "Venta de membresía inicial desde recepción",
       });
-      setMessage(`Membresía inicial asignada con éxito. Venta ${res.sale.saleNumber} creada.`);
+      setMessage(`Membresía inicial asignada por ${formatMoney(res.totalCents, res.currency)}. Venta ${res.saleNumber} creada.`);
       const updatedMemberships = await getClientMemberships(session.accessToken, selectedClient.id).catch(() => []);
       if (updatedMemberships.length > 0) setMembership(updatedMemberships[0]);
     } catch (err) {
@@ -162,7 +170,7 @@ export function ReceptionRenewalWidget({ session }: { session: StoredSession }) 
             <button
               key={c.id}
               type="button"
-              onClick={() => { setSelectedClient(c); setClients([]); }}
+              onClick={() => { setSelectedClient(c); setQuote(null); setClients([]); }}
               className="p-2.5 rounded-lg bg-white border border-gray-100 hover:border-[var(--brand-primary)] text-left flex items-center justify-between transition-colors"
             >
               <strong className="text-sm text-gray-900">{c.firstName} {c.lastName}</strong>
@@ -180,7 +188,7 @@ export function ReceptionRenewalWidget({ session }: { session: StoredSession }) 
             </strong>
             <button
               type="button"
-              onClick={() => { setSelectedClient(null); setMembership(null); setMessage(null); setError(null); }}
+              onClick={() => { setSelectedClient(null); setMembership(null); setQuote(null); setMessage(null); setError(null); }}
               className="text-xs font-bold text-gray-500 hover:text-gray-900"
             >
               ✕ Cambiar socio
@@ -198,6 +206,7 @@ export function ReceptionRenewalWidget({ session }: { session: StoredSession }) 
               <p className="text-xs text-gray-500 font-medium">
                 Vigencia: {membership.startsOn} a {membership.endsOn}
               </p>
+              <MembershipQuoteSummary loading={false} quote={quote} />
 
               <div className="flex items-center gap-2 pt-2">
                 <label className="text-xs font-bold text-gray-600 flex items-center gap-1">
@@ -205,7 +214,7 @@ export function ReceptionRenewalWidget({ session }: { session: StoredSession }) 
                   <select
                     className="app-input text-xs h-8 px-2 py-0"
                     value={method}
-                    onChange={(e) => setMethod(e.target.value as any)}
+                    onChange={(e) => setMethod(e.target.value as "CASH" | "CARD_MANUAL" | "TRANSFER")}
                   >
                     <option value="CASH">Efectivo</option>
                     <option value="CARD_MANUAL">Tarjeta</option>
@@ -232,7 +241,10 @@ export function ReceptionRenewalWidget({ session }: { session: StoredSession }) 
                 <select
                   className="app-input text-xs h-9 flex-1"
                   value={selectedPlanId}
-                  onChange={(e) => setSelectedPlanId(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedPlanId(e.target.value);
+                    setQuote(null);
+                  }}
                 >
                   <option value="">Selecciona un Plan del Catálogo...</option>
                   {plans.map((p) => (
@@ -248,10 +260,18 @@ export function ReceptionRenewalWidget({ session }: { session: StoredSession }) 
                   + Asignar Membresía Inicial
                 </button>
               </div>
+              <MembershipQuoteSummary loading={false} quote={quote} />
             </div>
           )}
         </div>
       ) : null}
     </section>
   );
+}
+
+function formatMoney(cents: number, currency: string) {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency,
+  }).format(cents / 100);
 }

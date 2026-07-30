@@ -1,6 +1,8 @@
 package com.gymos.sales.infrastructure;
 
+import com.gymos.sales.api.operations.MembershipBenefitSnapshot;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -13,8 +15,8 @@ public class MembershipSaleCommandRepository {
 		this.jdbcClient = jdbcClient;
 	}
 
-	public void create(MembershipSaleRecord record) {
-		jdbcClient.sql("""
+	public boolean create(MembershipSaleRecord record) {
+		int inserted = jdbcClient.sql("""
 				INSERT INTO sale (
 				    id, organization_id, branch_id, client_id, sale_number, status,
 				    subtotal_cents, discount_cents, total_cents, paid_cents, balance_cents,
@@ -23,10 +25,13 @@ public class MembershipSaleCommandRepository {
 				)
 				VALUES (
 				    :id, :organizationId, :branchId, :clientId, :saleNumber, :status,
-				    :priceCents, 0, :priceCents, :paidCents, :balanceCents,
+				    :listPriceCents, :discountCents, :totalCents, :paidCents, :balanceCents,
 				    :currency, :notes, :occurredAt, :occurredAt, :occurredAt, :actorUserId, :actorUserId, 0,
 				    :idempotencyKey, :requestHash, :businessContext, :sourceMembershipId, :targetPlanId
 				)
+				ON CONFLICT (organization_id, idempotency_key)
+				    WHERE idempotency_key IS NOT NULL AND deleted_at IS NULL
+				DO NOTHING
 				""")
 				.param("id", record.saleId())
 				.param("organizationId", record.organizationId())
@@ -34,7 +39,9 @@ public class MembershipSaleCommandRepository {
 				.param("clientId", record.clientId())
 				.param("saleNumber", record.saleNumber())
 				.param("status", record.saleStatus())
-				.param("priceCents", record.priceCents())
+				.param("listPriceCents", record.listPriceCents())
+				.param("discountCents", record.discountCents())
+				.param("totalCents", record.totalCents())
 				.param("paidCents", record.paidCents())
 				.param("balanceCents", record.balanceCents())
 				.param("currency", record.currency())
@@ -47,6 +54,9 @@ public class MembershipSaleCommandRepository {
 				.param("sourceMembershipId", record.sourceMembershipId())
 				.param("targetPlanId", record.targetPlanId())
 				.update();
+		if (inserted == 0) {
+			return false;
+		}
 
 		jdbcClient.sql("""
 				INSERT INTO sale_item (
@@ -54,16 +64,42 @@ public class MembershipSaleCommandRepository {
 				    unit_price_cents, discount_cents, total_cents, created_at
 				)
 				VALUES (:id, :saleId, :organizationId, :productId, 'MEMBERSHIP_PLAN', :name, 1,
-				        :priceCents, 0, :priceCents, :occurredAt)
+				        :listPriceCents, :discountCents, :totalCents, :occurredAt)
 				""")
 				.param("id", UUID.randomUUID())
 				.param("saleId", record.saleId())
 				.param("organizationId", record.organizationId())
 				.param("productId", record.productId())
 				.param("name", record.planName())
-				.param("priceCents", record.priceCents())
+				.param("listPriceCents", record.listPriceCents())
+				.param("discountCents", record.discountCents())
+				.param("totalCents", record.totalCents())
 				.param("occurredAt", record.occurredAt())
 				.update();
+
+		for (int index = 0; index < record.appliedBenefits().size(); index++) {
+			MembershipBenefitSnapshot benefit = record.appliedBenefits().get(index);
+			jdbcClient.sql("""
+					INSERT INTO membership_sale_benefit (
+					    id, organization_id, sale_id, benefit_id, benefit_code_snapshot,
+					    benefit_name_snapshot, discount_cents, application_order, created_at
+					)
+					VALUES (
+					    :id, :organizationId, :saleId, :benefitId, :code,
+					    :name, :discountCents, :applicationOrder, :createdAt
+					)
+					""")
+					.param("id", UUID.randomUUID())
+					.param("organizationId", record.organizationId())
+					.param("saleId", record.saleId())
+					.param("benefitId", benefit.benefitId())
+					.param("code", benefit.code())
+					.param("name", benefit.name())
+					.param("discountCents", benefit.discountCents())
+					.param("applicationOrder", index)
+					.param("createdAt", record.occurredAt())
+					.update();
+		}
 
 		jdbcClient.sql("""
 				INSERT INTO payment (
@@ -74,7 +110,7 @@ public class MembershipSaleCommandRepository {
 				)
 				VALUES (
 				    :id, :organizationId, :branchId, :saleId, :clientId, :method, :status,
-				    :priceCents, :currency, :reference, NULL, :occurredAt,
+				    :totalCents, :currency, :reference, NULL, :occurredAt,
 				    :validatedAt, :validatedBy, :notes, :occurredAt, :occurredAt, :actorUserId, :actorUserId, 0,
 				    :paymentIdempotencyKey, :paymentRequestHash
 				)
@@ -86,7 +122,7 @@ public class MembershipSaleCommandRepository {
 				.param("clientId", record.clientId())
 				.param("method", record.paymentMethod())
 				.param("status", record.paymentStatus())
-				.param("priceCents", record.priceCents())
+				.param("totalCents", record.totalCents())
 				.param("currency", record.currency())
 				.param("reference", record.reference())
 				.param("occurredAt", record.occurredAt())
@@ -97,6 +133,7 @@ public class MembershipSaleCommandRepository {
 				.param("paymentIdempotencyKey", record.paymentIdempotencyKey())
 				.param("paymentRequestHash", record.paymentRequestHash())
 				.update();
+		return true;
 	}
 
 	public record MembershipSaleRecord(
@@ -114,10 +151,13 @@ public class MembershipSaleCommandRepository {
 			String saleStatus,
 			String paymentMethod,
 			String paymentStatus,
-			long priceCents,
+			long listPriceCents,
+			long discountCents,
+			long totalCents,
 			long paidCents,
 			long balanceCents,
 			String currency,
+			List<MembershipBenefitSnapshot> appliedBenefits,
 			String reference,
 			String notes,
 			String idempotencyKey,

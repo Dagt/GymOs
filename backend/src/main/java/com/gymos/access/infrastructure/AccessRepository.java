@@ -144,6 +144,138 @@ public class AccessRepository {
 				.optional();
 	}
 
+	public List<EffectiveAccessBenefitRecord> effectiveAccessBenefits(
+			UUID organizationId,
+			UUID branchId,
+			UUID clientId,
+			LocalDate today
+	) {
+		return jdbcClient.sql("""
+				SELECT DISTINCT b.id AS benefit_id, b.code, b.name,
+				       m.id AS membership_id, m.plan_id, cp.name AS plan_name
+				FROM membership m
+				JOIN membership_plan mp ON mp.id = m.plan_id
+				JOIN catalog_product cp ON cp.id = mp.product_id
+				JOIN benefit_membership_plan bmp
+				  ON bmp.membership_plan_id = m.plan_id
+				 AND bmp.organization_id = m.organization_id
+				JOIN benefit b
+				  ON b.id = bmp.benefit_id
+				 AND b.organization_id = m.organization_id
+				WHERE m.organization_id = :organizationId
+				  AND (m.branch_id = :branchId OR mp.multi_branch_access = true)
+				  AND m.client_id = :clientId
+				  AND m.status = 'ACTIVE'
+				  AND m.starts_on <= :today
+				  AND m.grace_ends_on >= :today
+				  AND m.deleted_at IS NULL
+				  AND b.benefit_type = 'ACCESS'
+				  AND b.status = 'ACTIVE'
+				  AND b.deleted_at IS NULL
+				  AND (b.branch_id IS NULL OR b.branch_id = :branchId)
+				  AND (b.valid_from IS NULL OR b.valid_from <= :today)
+				  AND (b.valid_until IS NULL OR b.valid_until >= :today)
+				ORDER BY b.name, b.id
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("clientId", clientId)
+				.param("today", today)
+				.query((resultSet, rowNumber) -> new EffectiveAccessBenefitRecord(
+						resultSet.getObject("benefit_id", UUID.class),
+						resultSet.getString("code"),
+						resultSet.getString("name"),
+						resultSet.getObject("membership_id", UUID.class),
+						resultSet.getObject("plan_id", UUID.class),
+						resultSet.getString("plan_name")
+				))
+				.list();
+	}
+
+	public List<UUID> deviceRequiredBenefitIds(UUID organizationId, UUID branchId, UUID deviceId) {
+		return jdbcClient.sql("""
+				SELECT adb.benefit_id
+				FROM access_device_benefit adb
+				JOIN access_device d
+				  ON d.id = adb.access_device_id
+				 AND d.organization_id = adb.organization_id
+				WHERE adb.organization_id = :organizationId
+				  AND adb.access_device_id = :deviceId
+				  AND d.branch_id = :branchId
+				  AND d.status = 'ACTIVE'
+				  AND d.deleted_at IS NULL
+				ORDER BY adb.benefit_id
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("deviceId", deviceId)
+				.query(UUID.class)
+				.list();
+	}
+
+	public boolean accessBenefitsExist(UUID organizationId, UUID branchId, List<UUID> benefitIds) {
+		if (benefitIds == null || benefitIds.isEmpty()) {
+			return true;
+		}
+		List<UUID> distinctIds = benefitIds.stream().distinct().toList();
+		Integer count = jdbcClient.sql("""
+				SELECT COUNT(*)
+				FROM benefit
+				WHERE organization_id = :organizationId
+				  AND id IN (:benefitIds)
+				  AND benefit_type = 'ACCESS'
+				  AND status = 'ACTIVE'
+				  AND deleted_at IS NULL
+				  AND (branch_id IS NULL OR branch_id = :branchId)
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("benefitIds", distinctIds)
+				.query(Integer.class)
+				.single();
+		return count == distinctIds.size();
+	}
+
+	public void replaceDeviceBenefits(
+			UUID organizationId,
+			UUID branchId,
+			UUID deviceId,
+			UUID actorUserId,
+			List<UUID> benefitIds
+	) {
+		jdbcClient.sql("""
+				DELETE FROM access_device_benefit
+				WHERE organization_id = :organizationId
+				  AND access_device_id = :deviceId
+				  AND EXISTS (
+				      SELECT 1
+				      FROM access_device d
+				      WHERE d.id = access_device_benefit.access_device_id
+				        AND d.organization_id = access_device_benefit.organization_id
+				        AND d.branch_id = :branchId
+				  )
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("deviceId", deviceId)
+				.update();
+		OffsetDateTime now = OffsetDateTime.now();
+		for (UUID benefitId : benefitIds.stream().distinct().toList()) {
+			jdbcClient.sql("""
+					INSERT INTO access_device_benefit (
+					    access_device_id, benefit_id, organization_id, created_at, created_by
+					)
+					VALUES (:deviceId, :benefitId, :organizationId, :now, :actorUserId)
+					""")
+					.param("deviceId", deviceId)
+					.param("benefitId", benefitId)
+					.param("organizationId", organizationId)
+					.param("now", now)
+					.param("actorUserId", actorUserId)
+					.update();
+		}
+	}
+
 	public Optional<TemporaryPassRecord> validTemporaryPass(UUID organizationId, UUID branchId, UUID clientId, OffsetDateTime now) {
 		return jdbcClient.sql("""
 				SELECT p.id, p.client_id, person.first_name || ' ' || person.last_name AS client_name,
@@ -529,6 +661,16 @@ public class AccessRepository {
 			LocalDate startsOn,
 			LocalDate endsOn,
 			LocalDate graceEndsOn
+	) {
+	}
+
+	public record EffectiveAccessBenefitRecord(
+			UUID benefitId,
+			String code,
+			String name,
+			UUID membershipId,
+			UUID planId,
+			String planName
 	) {
 	}
 

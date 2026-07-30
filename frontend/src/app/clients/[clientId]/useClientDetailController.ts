@@ -5,9 +5,11 @@ import { useParams } from "next/navigation";
 import type { FieldErrorMap } from "@/components/FormFields";
 import {
   changeMembershipPlan,
-  createSale,
+  enrollMembership,
   getClient,
   getClientMemberships,
+  getMembershipPeriods,
+  getMembershipQuote,
   getPlans,
   getStoredSession,
   renewMembership,
@@ -17,6 +19,8 @@ import {
   type ClientMembershipSummary,
   type ClientUpdatePayload,
   type PlanSummary,
+  type MembershipPeriodSummary,
+  type MembershipQuote,
   type RenewMembershipPayload,
   type StoredSession,
 } from "@/lib/api";
@@ -37,6 +41,8 @@ export function useClientDetailController() {
   const [session, setSession] = useState<StoredSession | null>(null);
   const [data, setData] = useState<ClientDetailResponse | null>(null);
   const [memberships, setMemberships] = useState<ClientMembershipSummary[]>([]);
+  const [membershipPeriods, setMembershipPeriods] = useState<Record<string, MembershipPeriodSummary[]>>({});
+  const [membershipQuote, setMembershipQuote] = useState<MembershipQuote | null>(null);
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [form, setForm] = useState<ClientUpdatePayload | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrorMap>({});
@@ -94,8 +100,11 @@ export function useClientDetailController() {
 
         if (mayReadMemberships) {
           try {
-            const loadedMemberships = await getClientMemberships(storedSession.accessToken, params.clientId);
-            if (active) setMemberships(loadedMemberships);
+            const snapshot = await loadMembershipSnapshot(storedSession.accessToken, params.clientId);
+            if (active) {
+              setMemberships(snapshot.memberships);
+              setMembershipPeriods(snapshot.periodsByMembership);
+            }
           } catch (membershipError) {
             if (active && mayManageMemberships) {
               setError(membershipError instanceof Error ? membershipError.message : "No fue posible cargar membresias.");
@@ -132,6 +141,25 @@ export function useClientDetailController() {
     };
   }, [params.clientId]);
 
+  useEffect(() => {
+    if (!session || !membershipAction) return;
+    const planId = membershipAction.type === "change"
+      ? targetPlanId
+      : membershipAction.membership.planId;
+    if (!planId) return;
+    let active = true;
+    getMembershipQuote(session.accessToken, params.clientId, planId)
+      .then((quote) => {
+        if (active) setMembershipQuote(quote);
+      })
+      .catch(() => {
+        if (active) setMembershipQuote(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [membershipAction, params.clientId, session, targetPlanId]);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session || !form || !canEditClient) return;
@@ -167,12 +195,14 @@ export function useClientDetailController() {
         validateNow: renewValidateNow,
         notes: "Renovacion desde ficha de socio",
       });
-      setMemberships(await getClientMemberships(session.accessToken, params.clientId));
+      const snapshot = await loadMembershipSnapshot(session.accessToken, params.clientId);
+      setMemberships(snapshot.memberships);
+      setMembershipPeriods(snapshot.periodsByMembership);
       setRenewReference("");
       setMembershipAction(null);
       setMessage(
         response.membership
-          ? `Membresia renovada hasta ${formatDay(response.membership.endsOn)}.`
+          ? `Membresia renovada hasta ${formatDay(response.membership.endsOn)} por ${formatMoney(response.totalCents, response.currency)}.`
           : `Venta ${response.saleNumber} creada con pago pendiente.`,
       );
     } catch (exception) {
@@ -191,28 +221,19 @@ export function useClientDetailController() {
       if (!activeMembership.id) {
         const selectedPlan = plans.find((p) => p.id === targetPlanId);
         if (!selectedPlan) return;
-        const res = await createSale(session.accessToken, {
+        const res = await enrollMembership(session.accessToken, {
           clientId: params.clientId,
-          items: [
-            {
-              productId: (selectedPlan as any).productId || selectedPlan.id,
-              quantity: 1,
-              discountCents: 0,
-            },
-          ],
-          discountCents: 0,
-          payment: {
-            method: renewMethod,
-            amountCents: selectedPlan.priceCents ?? 80000,
-            reference: renewReference,
-            receiptObjectKey: null,
-            validateNow: renewValidateNow,
-            notes: "Venta de membresía inicial",
-          },
+          planId: selectedPlan.id,
+          method: renewMethod,
+          reference: renewReference,
+          validateNow: renewValidateNow,
+          notes: "Venta de membresía inicial",
         });
-        setMemberships(await getClientMemberships(session.accessToken, params.clientId));
+        const snapshot = await loadMembershipSnapshot(session.accessToken, params.clientId);
+        setMemberships(snapshot.memberships);
+        setMembershipPeriods(snapshot.periodsByMembership);
         setMembershipAction(null);
-        setMessage(`Membresía inicial asignada. Venta ${res.sale.saleNumber} creada.`);
+        setMessage(`Membresía inicial asignada por ${formatMoney(res.totalCents, res.currency)}. Venta ${res.saleNumber} creada.`);
         return;
       }
 
@@ -224,12 +245,14 @@ export function useClientDetailController() {
         notes: "Cambio de plan desde ficha de socio",
       };
       const response = await changeMembershipPlan(session.accessToken, activeMembership.id, payload);
-      setMemberships(await getClientMemberships(session.accessToken, params.clientId));
+      const snapshot = await loadMembershipSnapshot(session.accessToken, params.clientId);
+      setMemberships(snapshot.memberships);
+      setMembershipPeriods(snapshot.periodsByMembership);
       setRenewReference("");
       setMembershipAction(null);
       setMessage(
         response.membership
-          ? `Plan cambiado a ${response.membership.planName}.`
+          ? `Plan cambiado a ${response.membership.planName} por ${formatMoney(response.totalCents, response.currency)}.`
           : `Venta ${response.saleNumber} creada.`,
       );
     } catch (exception) {
@@ -249,6 +272,7 @@ export function useClientDetailController() {
     if (type === "change") {
       setTargetPlanId((current) => current && current !== activeMembership.planId ? current : plans.find((plan) => plan.id !== activeMembership.planId)?.id || "");
     }
+    setMembershipQuote(null);
     setMembershipAction({ membership: activeMembership, type });
   }
 
@@ -275,6 +299,8 @@ export function useClientDetailController() {
     loading,
     membershipAction,
     memberships,
+    membershipPeriods,
+    membershipQuote: visibleMembershipQuote(membershipQuote, membershipAction, targetPlanId),
     message,
     plans,
     renewMethod,
@@ -295,6 +321,41 @@ export function useClientDetailController() {
     targetPlanId,
     updateField,
     openMembershipAction,
+  };
+}
+
+function visibleMembershipQuote(
+  quote: MembershipQuote | null,
+  action: MembershipAction | null,
+  targetPlanId: string,
+) {
+  if (!quote || !action) return null;
+  const expectedPlanId = action.type === "change" ? targetPlanId : action.membership.planId;
+  return quote.planId === expectedPlanId ? quote : null;
+}
+
+function formatMoney(cents: number, currency: string) {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency,
+  }).format(cents / 100);
+}
+
+async function loadMembershipSnapshot(accessToken: string, clientId: string) {
+  const memberships = await getClientMemberships(accessToken, clientId);
+  const periodEntries = await Promise.all(
+    memberships.map(async (membership) => {
+      try {
+        const periods = await getMembershipPeriods(accessToken, membership.id);
+        return [membership.id, periods] as const;
+      } catch {
+        return [membership.id, []] as const;
+      }
+    }),
+  );
+  return {
+    memberships,
+    periodsByMembership: Object.fromEntries(periodEntries) as Record<string, MembershipPeriodSummary[]>,
   };
 }
 

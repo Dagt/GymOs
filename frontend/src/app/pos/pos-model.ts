@@ -48,34 +48,15 @@ export function findProductByBarcodeOrSku(
   return null;
 }
 
-export function buildRenewalProduct(
-  membership: { id: string; planId: string; planName: string; priceCents?: number; currency?: string },
-  catalogProducts: ProductSummary[],
-): ProductSummary {
-  const catalogMatch = catalogProducts.find(
-    (p) => p.id === membership.planId || p.name.toLowerCase() === membership.planName.toLowerCase(),
-  );
+export function isMembershipPlanProduct(product: ProductSummary): boolean {
+  return product.productType === "MEMBERSHIP_PLAN"
+    || product.commercialSubtype === "MEMBERSHIP";
+}
 
-  if (catalogMatch) return catalogMatch;
-
-  return {
-    id: membership.planId,
-    name: `Renovación: ${membership.planName}`,
-    sku: `REN-${membership.planName.slice(0, 6).toUpperCase()}`,
-    description: "Renovación de membresía desde POS",
-    productType: "MEMBERSHIP_PLAN",
-    commercialSubtype: "MEMBERSHIP",
-    priceCents: membership.priceCents ?? 80000,
-    currency: membership.currency ?? "MXN",
-    taxable: false,
-    status: "ACTIVE",
-    barcode: null,
-    brand: null,
-    presentation: null,
-    unitOfMeasure: null,
-    inventoryTracked: false,
-    displayOrder: 0,
-    imageObjectKey: null,
-    supplierName: null,
-  } as unknown as ProductSummary;
+export async function resolveScannedProduct(
+  products: ProductSummary[],
+  code: string,
+  lookupByBarcode: (barcode: string) => Promise<ProductSummary>,
+): Promise<ProductSummary> {
+  return findProductByBarcodeOrSku(products, code) ?? lookupByBarcode(code.trim());
 }
