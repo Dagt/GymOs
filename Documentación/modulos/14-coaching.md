@@ -3,7 +3,7 @@
 Estado: `ESTABILIZADO`
 Rama de cierre: `feature/coaches-workouts`
 Código verificado: `e718fdf`
-Corte: 27 de julio de 2026
+Corte: 30 de julio de 2026
 
 ## Propósito y alcance V1
 
@@ -91,6 +91,8 @@ La consulta remota por el socio pertenece a una aplicación futura.
 - biblioteca de rutinas propias o globales según permiso;
 - sesiones y bloques múltiples reordenables con controles accesibles;
 - ejercicios libres o seleccionados del catálogo;
+- los ejercicios recién agregados conservan su estado abierto durante la
+  captura; escribir la primera letra ya no contrae la tarjeta;
 - cada ejercicio normal ocupa una sola fila esencial: nombre, series,
   repeticiones, carga y descanso;
 - `Personalizar series` abre una hoja lateral compacta con repeticiones y carga
@@ -148,7 +150,11 @@ La consulta remota por el socio pertenece a una aplicación futura.
   de infraestructura y ya no existe el service locator global `static volatile`
   que hacía depender el resultado del orden de arranque. Los lookups reciben los
   IDs de organización y sucursal, evitando resolver marca o equipo por nombres
-  ambiguos de otro tenant.
+  ambiguos de otro tenant;
+- la paleta documental conserva por separado color principal, acento y fondo
+  de la organización. El adaptador ya no consulta las columnas de marca por
+  sucursal retiradas en V27, por lo que una excepción opcional no sustituye el
+  acento configurado por una paleta gris.
 
 ### Métricas
 
@@ -195,20 +201,21 @@ La consulta remota por el socio pertenece a una aplicación futura.
 
 - backend: `gradlew clean test --no-daemon`, exitoso;
 - frontend: 33 pruebas, typecheck, lint y build de producción, exitosos;
-- E2E Playwright: 12 recorridos exitosos para constructor/publicación,
+- E2E Playwright: 13 recorridos exitosos para constructor/publicación,
   catálogo/aliases/medios, cancelación/reemplazo/métricas históricas y
   administración multi-sucursal del coach, incluyendo acceso directo a
   métricas para dueño y gerente sin superficies operativas, alta integral de
   Coach, identidad fija en el constructor, métricas personales y alineación
   visual de la tabla de Equipo, búsqueda reactiva de socio, asignación de una
   rutina `PUBLISHED`, prescripción progresiva/dropset en panel lateral y
-  descarga real del PDF;
+  descarga real del PDF, incluido el tecleo carácter por carácter en un
+  ejercicio recién agregado sin que se contraiga;
 - pruebas dedicadas de propiedad, permisos HTTP, comparación de periodos,
   series semanales, perfiles agregados, sincronización de sucursales, PDF corto
   y multipágina y ciclo de medios;
 - verificación visual del PDF moderno renderizado con Poppler, incluido un
-  documento con imagen real, sin recortes, superposiciones ni pérdida de
-  encabezado o pie;
+  documento con imagen real y otro con acento amarillo de organización, sin
+  recortes, superposiciones, pérdida de color, encabezado o pie;
 - `git diff --check`, exitoso.
 
 Los antiguos `COA-001` a `COA-007` y `COA-009` quedaron resueltos en

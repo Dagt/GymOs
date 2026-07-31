@@ -1898,6 +1898,9 @@ function ExerciseEditor({
   total: number;
 }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(
+    () => exerciseIndex === 0 || !exercise.exerciseName.trim(),
+  );
   const exerciseSummary = exercise.exerciseName.trim() || `Ejercicio ${exerciseIndex + 1}`;
   const setPlan = exercise.setPlan ?? [];
   const usesDetailedSets = setPlan.length > 0;
@@ -1952,7 +1955,11 @@ function ExerciseEditor({
   }
 
   return (
-    <details className="workout-exercise-card" open={exerciseIndex === 0 || !exercise.exerciseName.trim()}>
+    <details
+      className="workout-exercise-card"
+      onToggle={(event) => setEditorOpen(event.currentTarget.open)}
+      open={editorOpen}
+    >
       <summary>
         <span>
           <small>Ejercicio {exerciseIndex + 1} · bloque {blockIndex + 1}</small>
@@ -2604,4 +2611,3 @@ function normalizeRole(role: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 }
-

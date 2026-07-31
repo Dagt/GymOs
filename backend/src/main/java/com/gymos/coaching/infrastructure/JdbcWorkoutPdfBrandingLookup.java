@@ -25,9 +25,8 @@ public class JdbcWorkoutPdfBrandingLookup implements WorkoutPdfBrandingLookup {
 			String legacyPrimaryColor
 	) {
 		try {
-			Palette organization = findOrganization(organizationId, gymName, logoUrl)
+			return findOrganization(organizationId, gymName, logoUrl)
 					.orElseGet(() -> Palette.fallback(legacyPrimaryColor, logoUrl, gymName));
-			return applyBranchPresentationOverrides(organizationId, branchId, organization);
 		} catch (RuntimeException ignored) {
 			// Branding is optional and must never prevent document generation.
 			return Palette.fallback(legacyPrimaryColor, logoUrl, gymName);
@@ -54,30 +53,6 @@ public class JdbcWorkoutPdfBrandingLookup implements WorkoutPdfBrandingLookup {
 						clean(resultSet.getString("display_name"), gymName)
 				))
 				.optional();
-	}
-
-	private Palette applyBranchPresentationOverrides(
-			UUID organizationId, UUID branchId, Palette organization
-	) {
-		if (branchId == null) return organization;
-		return jdbcClient.sql("""
-				SELECT b.logo_url, b.brand_name
-				FROM branch b
-				WHERE b.id = :branchId
-				  AND b.organization_id = :organizationId
-				  AND b.deleted_at IS NULL
-				""")
-				.param("branchId", branchId)
-				.param("organizationId", organizationId)
-				.query((resultSet, rowNumber) -> new Palette(
-						organization.primaryColor(),
-						organization.accentColor(),
-						organization.surfaceColor(),
-						clean(resultSet.getString("logo_url"), organization.logoUrl()),
-						clean(resultSet.getString("brand_name"), organization.displayName())
-				))
-				.optional()
-				.orElse(organization);
 	}
 
 	private String clean(String value, String fallback) {

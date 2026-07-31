@@ -32,8 +32,6 @@ class WorkoutPdfLookupAdapterTests {
 				CREATE TABLE branch (
 				    id UUID PRIMARY KEY,
 				    organization_id UUID NOT NULL,
-				    logo_url VARCHAR(512),
-				    brand_name VARCHAR(255),
 				    deleted_at TIMESTAMP WITH TIME ZONE
 				)
 				""").update();
@@ -49,13 +47,13 @@ class WorkoutPdfLookupAdapterTests {
 	}
 
 	@Test
-	void lookupsUseExplicitTenantAndBranchIds() {
+	void lookupsUseExplicitTenantIdWithoutDependingOnRetiredBranchBranding() {
 		UUID otherOrganizationId = UUID.randomUUID();
 		insertOrganization(organizationId, "Gym Correcto", "#112233", "#445566", "#FFFFFF");
 		insertOrganization(otherOrganizationId, "Otro Gym", "#000000", "#000000", "#000000");
 		jdbcClient.sql("""
-				INSERT INTO branch (id, organization_id, logo_url, brand_name, deleted_at)
-				VALUES (:id, :organizationId, '/branch-logo.png', 'Sucursal Centro', NULL)
+				INSERT INTO branch (id, organization_id, deleted_at)
+				VALUES (:id, :organizationId, NULL)
 				""")
 				.param("id", branchId)
 				.param("organizationId", organizationId)
@@ -72,8 +70,8 @@ class WorkoutPdfLookupAdapterTests {
 		assertThat(equipment).contains("Polea Gym Correcto");
 		assertThat(branding.primaryColor()).isEqualTo("#112233");
 		assertThat(branding.accentColor()).isEqualTo("#445566");
-		assertThat(branding.logoUrl()).isEqualTo("/branch-logo.png");
-		assertThat(branding.displayName()).isEqualTo("Sucursal Centro");
+		assertThat(branding.logoUrl()).isEqualTo("/org-logo.png");
+		assertThat(branding.displayName()).isEqualTo("Gym Correcto");
 	}
 
 	@Test
@@ -106,7 +104,7 @@ class WorkoutPdfLookupAdapterTests {
 				    id, trade_name, brand_name, logo_url,
 				    primary_color, accent_color, surface_color
 				)
-				VALUES (:id, :name, :name, NULL, :primary, :accent, :surface)
+				VALUES (:id, :name, :name, '/org-logo.png', :primary, :accent, :surface)
 				""")
 				.param("id", id)
 				.param("name", name)

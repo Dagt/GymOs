@@ -37,6 +37,8 @@ import java.util.Set;
 import java.util.UUID;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.apache.pdfbox.rendering.ImageType;
+import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -353,6 +355,8 @@ class CoachingCatalogServiceTests {
 			assertThat(text).contains("GymOS Demo", "Fuerza base", "Diego García", "Sentadilla libre");
 			assertThat(text).contains("20", "40 kg", "50 kg", "35 kg", "90 s", "3-1-1");
 			assertThat(text).contains("INDICACIONES GENERALES", "Página 1 de");
+			BufferedImage rendered = new PDFRenderer(document).renderImageWithDPI(0, 72, ImageType.RGB);
+			assertThat(countPixels(rendered, 0xF5D90A)).isGreaterThan(100);
 		}
 	}
 
@@ -446,10 +450,21 @@ class CoachingCatalogServiceTests {
 
 	private WorkoutPdfDocumentMapper pdfMapper(ObjectMapper objectMapper) {
 		WorkoutPdfBrandingLookup branding = (organizationId, branchId, gymName, branchName, logoUrl, primaryColor) ->
-				WorkoutPdfBrandingLookup.Palette.fallback(primaryColor, logoUrl, gymName);
+				new WorkoutPdfBrandingLookup.Palette(
+						primaryColor, "#F5D90A", "#F4F7FB", logoUrl, gymName);
 		WorkoutPdfExerciseCatalogLookup exercises = (organizationId, exerciseId, exerciseName) ->
 				WorkoutPdfExerciseCatalogLookup.inferFromName(exerciseName);
 		return new WorkoutPdfDocumentMapper(objectMapper, branding, exercises);
+	}
+
+	private long countPixels(BufferedImage image, int rgb) {
+		long count = 0;
+		for (int y = 0; y < image.getHeight(); y++) {
+			for (int x = 0; x < image.getWidth(); x++) {
+				if ((image.getRGB(x, y) & 0xFFFFFF) == rgb) count++;
+			}
+		}
+		return count;
 	}
 
 	private ExerciseRecord exercise(UUID id, String name, String origin) {

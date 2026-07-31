@@ -55,12 +55,12 @@ public class CompactWorkoutPdfRenderer implements WorkoutPdfRenderer {
 			Color divider, Color accent, Color accentDark, Color accentSoft,
 			Color bannerText, Color logoPlate, Color headerLeft, Color headerRight
 	) {
-		static Theme light(Color accent) {
+		static Theme light(Color primary, Color accent, Color surface) {
 			Color darkAccent = blend(accent, Color.BLACK, .34f);
 			return new Theme(
-					Color.WHITE,
-					new Color(248, 250, 248),
-					new Color(244, 247, 245),
+					blend(surface, Color.WHITE, .82f),
+					blend(surface, Color.WHITE, .55f),
+					blend(surface, primary, .05f),
 					new Color(17, 24, 39),
 					new Color(55, 65, 81),
 					new Color(107, 114, 128),
@@ -70,8 +70,8 @@ public class CompactWorkoutPdfRenderer implements WorkoutPdfRenderer {
 					blend(accent, Color.WHITE, .90f),
 					Color.WHITE,
 					Color.WHITE,
-					new Color(8, 13, 12),
-					blend(accent, Color.BLACK, .48f)
+					blend(primary, Color.BLACK, .52f),
+					blend(primary, accent, .26f)
 			);
 		}
 
@@ -115,9 +115,10 @@ public class CompactWorkoutPdfRenderer implements WorkoutPdfRenderer {
 			this.pdf = pdf;
 			this.doc = doc;
 			this.dark = dark;
-			Color accent = parseColor(doc.branding().primaryColorHex(), new Color(107, 114, 128));
-			Color primary = parseColor(doc.branding().secondaryColorHex(), new Color(17, 17, 17));
-			this.theme = dark ? Theme.dark(primary, accent) : Theme.light(accent);
+			Color primary = parseColor(doc.branding().primaryColorHex(), new Color(17, 17, 17));
+			Color accent = parseColor(doc.branding().accentColorHex(), new Color(107, 114, 128));
+			Color surface = parseColor(doc.branding().surfaceColorHex(), Color.WHITE);
+			this.theme = dark ? Theme.dark(primary, accent) : Theme.light(primary, accent, surface);
 			this.logo = loadLogo(pdf, doc.branding().logoUrl(), assetOrigin);
 			newPage(false);
 		}

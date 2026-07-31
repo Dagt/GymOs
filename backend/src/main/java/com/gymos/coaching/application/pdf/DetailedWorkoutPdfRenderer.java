@@ -87,7 +87,7 @@ public class DetailedWorkoutPdfRenderer implements WorkoutPdfRenderer {
 		private Writer(PDDocument document, WorkoutPdfDocument data, String assetOrigin) throws IOException {
 			this.document = document;
 			this.data = data;
-			this.primary = parseColor(data.branding().primaryColorHex(), new Color(16, 185, 129));
+			this.primary = parseColor(data.branding().accentColorHex(), new Color(16, 185, 129));
 			this.primaryDark = blend(primary, Color.BLACK, 0.18f);
 			this.primarySoft = blend(primary, Color.WHITE, 0.91f);
 			this.logo = loadLogo(document, data.branding().logoUrl(), assetOrigin);
