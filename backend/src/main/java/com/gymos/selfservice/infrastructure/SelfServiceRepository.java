@@ -41,14 +41,19 @@ public class SelfServiceRepository {
 				  AND sst.status = 'ACTIVE'
 				  AND sst.deleted_at IS NULL
 				  AND b.deleted_at IS NULL
-				ORDER BY sst.created_at, sst.id
-				LIMIT 2
+				  AND (
+				      SELECT COUNT(*)
+				      FROM self_service_terminal candidate
+				      JOIN branch candidate_branch ON candidate_branch.id = candidate.branch_id
+				      WHERE candidate.device_code = :terminalCode
+				        AND candidate.status = 'ACTIVE'
+				        AND candidate.deleted_at IS NULL
+				        AND candidate_branch.deleted_at IS NULL
+				  ) = 1
 				""")
 				.param("terminalCode", terminalCode)
 				.query((resultSet, rowNumber) -> mapTerminal(resultSet))
-				.list()
-				.stream()
-				.reduce((first, second) -> null);
+				.optional();
 	}
 
 	private Optional<TerminalRecord> terminalForBranchContext(String terminalCode, UUID organizationId, UUID branchId) {
