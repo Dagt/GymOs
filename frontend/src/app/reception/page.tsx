@@ -159,13 +159,10 @@ export default function ReceptionPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {FOCUS_ACTIONS.map((action, index) => {
                 const isPrimary = index === 0;
-                const opensKiosk = action.accent === "kiosk";
                 return (
                   <Link
                     key={action.href}
                     href={action.href}
-                    target={opensKiosk ? "_blank" : undefined}
-                    rel={opensKiosk ? "noopener" : undefined}
                     className={`group relative flex flex-col p-6 rounded-2xl border-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl overflow-hidden ${
                       isPrimary 
                         ? "col-span-1 md:col-span-2 lg:col-span-2 shadow-lg" 
