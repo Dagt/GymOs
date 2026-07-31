@@ -28,6 +28,7 @@ documentación por módulo.
 16. `29-cronologia-ramas.md` — cronología Git y ramas activas/divergentes.
 17. `30-rediseño-pos-membresias-beneficios.md` — decisiones, implementación y evidencia para catálogo, POS, membresías y beneficios; hardware fuera de alcance.
 18. `31-diseño-automatizaciones-kiosco.md` — auditoría del estado real, fronteras, riesgos y diseño objetivo de automatizaciones y autoservicio.
+19. `32-transicion-identidad-terminales-kiosco.md` — alcance temporal de `KIOSK-MAIN`, corrección multi-tenant con V61 y diseño definitivo de terminales por sucursal con URL global.
 
 Documentación operativa y de seguridad vigente:
 
