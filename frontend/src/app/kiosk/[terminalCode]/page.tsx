@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { CSSProperties, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
   changeMembershipPlanFromKiosk,
+  clearSession,
   createKioskSession,
   endKioskSession,
   getStoredSession,
@@ -18,7 +19,6 @@ import {
   type KioskSessionResponse,
   type KioskSummaryResponse,
 } from "@/lib/api";
-import { createReceptionKioskSession } from "@/lib/api/selfservice";
 import {
   createKioskBooking,
   getKioskBookingAvailability,
@@ -27,6 +27,9 @@ import {
   type KioskBookingResource,
 } from "@/lib/kiosk-bookings";
 import { formatMexicanDateInput, parseMexicanDate, toDateInput } from "@/lib/date-time";
+import { consumeKioskLaunch } from "@/lib/kiosk-launch";
+
+const VERIFIED_INACTIVITY_MS = 3 * 60 * 1000;
 
 export default function KioskPage() {
   const params = useParams<{ terminalCode: string }>();
@@ -60,13 +63,21 @@ export default function KioskPage() {
       setLoading(true);
       setError(null);
       try {
-        const stored = getStoredSession();
-        const created = params.terminalCode === "reception"
-          ? await createReceptionSession(stored)
-          : await createKioskSession(params.terminalCode, {
-              organizationId: stored?.user.organizationId,
-              branchId: stored?.user.branchId,
-            });
+        let created: KioskSessionResponse;
+        if (params.terminalCode === "reception") {
+          clearSession();
+          created = consumeKioskLaunch(window.location.hash) as KioskSessionResponse;
+          window.history.replaceState(null, "", window.location.pathname);
+          if (!created) {
+            throw new Error("Abre el modo kiosco desde la pantalla de recepción.");
+          }
+        } else {
+          const stored = getStoredSession();
+          created = await createKioskSession(params.terminalCode, {
+            organizationId: stored?.user.organizationId,
+            branchId: stored?.user.branchId,
+          });
+        }
         if (active) setSession(created);
       } catch (exception) {
         if (active) setError(exception instanceof Error ? exception.message : "No fue posible iniciar kiosco.");
@@ -130,6 +141,28 @@ export default function KioskPage() {
       .catch((exception) => { if (active) setError(exception instanceof Error ? exception.message : "No fue posible consultar disponibilidad."); });
     return () => { active = false; };
   }, [bookingDate, resourceId, session, summary]);
+
+  useEffect(() => {
+    if (!session || !summary) return;
+
+    let timeout = window.setTimeout(closeForInactivity, VERIFIED_INACTIVITY_MS);
+    const reset = () => {
+      window.clearTimeout(timeout);
+      timeout = window.setTimeout(closeForInactivity, VERIFIED_INACTIVITY_MS);
+    };
+    const events: Array<keyof WindowEventMap> = ["pointerdown", "keydown", "touchstart"];
+    events.forEach((eventName) => window.addEventListener(eventName, reset, { passive: true }));
+
+    async function closeForInactivity() {
+      await endKioskSession(session.sessionId, session.sessionToken).catch(() => undefined);
+      window.location.replace("/kiosk/closed?reason=inactive");
+    }
+
+    return () => {
+      window.clearTimeout(timeout);
+      events.forEach((eventName) => window.removeEventListener(eventName, reset));
+    };
+  }, [session, summary]);
 
   async function reserve() {
     if (!session || !selectedSlot) return;
@@ -217,30 +250,41 @@ export default function KioskPage() {
 
   async function end() {
     if (session) await endKioskSession(session.sessionId, session.sessionToken).catch(() => undefined);
-    setSummary(null); setIdentifier(""); setBirthDateDisplay("");
-    setContactEmail(""); setContactPhone(""); setResources([]); setSlots([]); setSelectedSlot(null); setMessage("Sesion cerrada.");
     operationKeys.current.clear();
+    window.location.replace("/kiosk/closed");
   }
 
   if (loading) return <main className="kiosk-screen grid place-items-center px-6 text-white"><p className="kiosk-loading">Preparando pantalla de socios...</p></main>;
 
+  if (!session) {
+    return (
+      <main className="kiosk-screen grid place-items-center px-6 text-white">
+        <section className="kiosk-card kiosk-verify text-center">
+          <h1>No fue posible iniciar el kiosco</h1>
+          <p className="kiosk-muted mt-3">{error ?? "Vuelve a abrir el autoservicio desde recepción."}</p>
+          <button className="kiosk-secondary-action mt-5" onClick={() => window.close()} type="button">Cerrar pestaña</button>
+        </section>
+      </main>
+    );
+  }
+
   return (
     <main className="kiosk-screen text-white" style={{
-      "--brand-primary": session?.primaryColor ?? undefined,
-      "--brand-accent": session?.accentColor ?? undefined,
-      "--brand-surface": session?.surfaceColor ?? undefined,
+      "--brand-primary": session.primaryColor ?? undefined,
+      "--brand-accent": session.accentColor ?? undefined,
+      "--brand-surface": session.surfaceColor ?? undefined,
     } as CSSProperties}>
       <section className="kiosk-shell">
         <header className="kiosk-header">
           <div className="kiosk-brand-row">
-            {session?.logoUrl ? (
+            {session.logoUrl ? (
               <Image alt={session.brandName ?? session.organizationName ?? "Gimnasio"} className="kiosk-logo" height={72} src={session.logoUrl} unoptimized width={72} />
             ) : (
-              <span className="kiosk-logo-fallback">{(session?.brandName ?? session?.organizationName ?? "G").slice(0, 1)}</span>
+              <span className="kiosk-logo-fallback">{(session.brandName ?? session.organizationName ?? "G").slice(0, 1)}</span>
             )}
-            <div><p>Autoservicio</p><h1>{session?.brandName ?? session?.organizationName ?? session?.terminalName ?? "GymOS"}</h1><span>Membresías, reservas y datos personales en una sesión segura.</span></div>
+            <div><p>Autoservicio</p><h1>{session.brandName ?? session.organizationName ?? session.terminalName ?? "GymOS"}</h1><span>Membresías, reservas y datos personales en una sesión segura.</span></div>
           </div>
-          <aside><strong>Sesión segura</strong><span>Expira {session ? formatTime(session.expiresAt) : "N/A"}</span></aside>
+          <aside><strong>Sesión segura</strong><span>Expira {formatTime(session.expiresAt)}</span></aside>
         </header>
 
         {error ? <p className="kiosk-notice error">{error}</p> : null}
@@ -335,16 +379,6 @@ export default function KioskPage() {
       </section>
     </main>
   );
-}
-
-async function createReceptionSession(stored: ReturnType<typeof getStoredSession>) {
-  if (!stored) {
-    throw new Error("Inicia sesión en recepción antes de abrir el kiosco.");
-  }
-  if (!stored.user.branchId) {
-    throw new Error("Selecciona una sucursal antes de abrir el kiosco.");
-  }
-  return createReceptionKioskSession(stored.accessToken);
 }
 
 function formatMoney(cents: number, currency: string) { return new Intl.NumberFormat("es-MX", { style: "currency", currency }).format(cents / 100); }
