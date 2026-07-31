@@ -3,10 +3,12 @@ package com.gymos.sales.application;
 import com.gymos.common.api.BusinessException;
 import com.gymos.sales.application.command.CreateSaleCommand;
 import com.gymos.sales.application.command.ManualPaymentCommand;
+import com.gymos.sales.api.operations.MembershipBenefitSnapshot;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Comparator;
+import java.util.List;
 import java.util.UUID;
 
 final class SalesIdempotency {
@@ -61,20 +63,25 @@ final class SalesIdempotency {
 			UUID sourceMembershipId,
 			UUID targetPlanId,
 			UUID productId,
-			long priceCents,
+			long listPriceCents,
+			long discountCents,
+			long totalCents,
 			String currency,
+			List<MembershipBenefitSnapshot> appliedBenefits,
 			String method,
 			String reference,
 			boolean validateNow,
 			String notes,
 			String businessContext
 	) {
-		return sha256(String.join("|",
+		StringBuilder value = new StringBuilder(String.join("|",
 				"client=" + clientId,
 				"sourceMembership=" + sourceMembershipId,
 				"targetPlan=" + targetPlanId,
 				"product=" + productId,
-				"price=" + priceCents,
+				"listPrice=" + listPriceCents,
+				"discount=" + discountCents,
+				"total=" + totalCents,
 				"currency=" + normalized(currency),
 				"method=" + normalized(method).toUpperCase(),
 				"reference=" + normalized(reference),
@@ -82,6 +89,13 @@ final class SalesIdempotency {
 				"notes=" + normalized(notes),
 				"context=" + businessContext
 		));
+		appliedBenefits.stream()
+				.sorted(Comparator.comparing(snapshot -> snapshot.benefitId().toString()))
+				.forEach(snapshot -> value
+						.append("|benefit=").append(snapshot.benefitId())
+						.append(',').append(normalized(snapshot.code()))
+						.append(',').append(snapshot.discountCents()));
+		return sha256(value.toString());
 	}
 
 	static void ensureSameRequest(String existingHash, String requestedHash) {

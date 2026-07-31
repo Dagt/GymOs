@@ -137,10 +137,26 @@ class CatalogProductServiceTests {
 		verify(commands, never()).update(any());
 	}
 
+	@Test
+	void physicalProductRejectsUnitOutsideClosedCatalog() {
+		assertThatThrownBy(() -> service.createProduct(
+				principal,
+				command(0, "CUSTOM_BUCKET"),
+				"test"
+		))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.code()).isEqualTo("PRODUCT_UNIT_INVALID"));
+		verify(commands, never()).create(any());
+	}
+
 	private ProductCommand command(long version) {
+		return command(version, "PIECE");
+	}
+
+	private ProductCommand command(long version, String unitOfMeasure) {
 		return new ProductCommand(
 				"SKU-1", "Producto actualizado", null, "PHYSICAL", "GENERAL_PRODUCT", 1_000,
-				"MXN", true, "ACTIVE", "750123", null, null, null, true, 0,
+				"MXN", true, "ACTIVE", "750123", null, null, unitOfMeasure, true, 0,
 				"Proveedor malicioso", 1L, 900L, null, null, null, List.of(), version
 		);
 	}

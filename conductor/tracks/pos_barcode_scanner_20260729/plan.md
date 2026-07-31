@@ -1,0 +1,13 @@
+# Implementation Plan: POS Global Barcode Scanner Auto-Add
+
+## Phase 1: Barcode Detection Utility & Audio Feedback Helper [checkpoint: 9d9d280]
+- [x] Task: Create barcode scan detector utility and Web Audio feedback helper.
+    - [x] Write Tests: Create `frontend/src/app/pos/barcode-scanner.test.ts` testing buffer timing, keypress burst detection, and smart input bypass logic.
+    - [x] Implement Feature: Create `frontend/src/app/pos/barcode-scanner.ts` with `useBarcodeScanner` hook and Web Audio API sound generator.
+- [x] Task: Conductor - User Manual Verification 'Phase 1: Barcode Detection Utility & Audio Feedback Helper' (Protocol in workflow.md)
+
+## Phase 2: POS Page Integration & UI Feedback [checkpoint: ed84612]
+- [x] Task: Integrate global barcode scanner listener into POS page and cart feedback.
+    - [x] Write Tests: Update `frontend/src/app/pos/pos-model.test.ts` to test barcode lookup, auto-add to cart, and error state handling.
+    - [x] Implement Feature: Integrate `useBarcodeScanner` in `frontend/src/app/pos/page.tsx` and update `PosSections.tsx` for cart row highlight animations and scan error toasts.
+- [x] Task: Conductor - User Manual Verification 'Phase 2: POS Page Integration & UI Feedback' (Protocol in workflow.md)

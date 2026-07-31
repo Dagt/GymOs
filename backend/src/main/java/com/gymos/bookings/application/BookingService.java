@@ -5,7 +5,7 @@ import com.gymos.bookings.application.ResourceScheduleResolver.ResourceHours;
 import com.gymos.bookings.application.command.CreateBookingCommand;
 import com.gymos.bookings.application.command.CreateResourceCommand;
 import com.gymos.bookings.application.command.LinkBookingPaymentCommand;
-import com.gymos.bookings.infrastructure.BookingEligibilityRepository;
+import com.gymos.bookings.infrastructure.BookingPlanRepository;
 import com.gymos.bookings.infrastructure.BookingResourceRepository;
 import com.gymos.bookings.infrastructure.BookingResourceRepository.ResourceData;
 import com.gymos.bookings.infrastructure.BookingResourceRepository.ResourceRecord;
@@ -17,6 +17,9 @@ import com.gymos.bookings.infrastructure.ClientBookingConflictRepository;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.time.BusinessTime;
+import com.gymos.eligibility.api.EligibilityPolicy;
+import com.gymos.eligibility.api.EligibilityPolicy.EligibilityDecision;
+import com.gymos.eligibility.api.EligibilityPolicy.EligibilityRequest;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
@@ -34,7 +37,8 @@ public class BookingService {
 
 	private final BookingRepository bookingRepository;
 	private final BookingResourceRepository bookingResourceRepository;
-	private final BookingEligibilityRepository bookingEligibilityRepository;
+	private final BookingPlanRepository bookingPlanRepository;
+	private final EligibilityPolicy eligibilityPolicy;
 	private final ClientBookingConflictRepository clientBookingConflictRepository;
 	private final ResourceScheduleResolver resourceScheduleResolver;
 	private final AuditService auditService;
@@ -42,14 +46,16 @@ public class BookingService {
 	public BookingService(
 			BookingRepository bookingRepository,
 			BookingResourceRepository bookingResourceRepository,
-			BookingEligibilityRepository bookingEligibilityRepository,
+			BookingPlanRepository bookingPlanRepository,
+			EligibilityPolicy eligibilityPolicy,
 			ClientBookingConflictRepository clientBookingConflictRepository,
 			ResourceScheduleResolver resourceScheduleResolver,
 			AuditService auditService
 	) {
 		this.bookingRepository = bookingRepository;
 		this.bookingResourceRepository = bookingResourceRepository;
-		this.bookingEligibilityRepository = bookingEligibilityRepository;
+		this.bookingPlanRepository = bookingPlanRepository;
+		this.eligibilityPolicy = eligibilityPolicy;
 		this.clientBookingConflictRepository = clientBookingConflictRepository;
 		this.resourceScheduleResolver = resourceScheduleResolver;
 		this.auditService = auditService;
@@ -137,9 +143,6 @@ public class BookingService {
 	public BookingRecord createBooking(GymOsPrincipal principal, CreateBookingCommand command, String correlationId) {
 		requireBranch(principal);
 		ResourceRecord resource = activeResource(principal, command.resourceId());
-		if (!bookingEligibilityRepository.clientExists(principal.organizationId(), command.clientId())) {
-			throw new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta activo.");
-		}
 		if (command.startsAt() == null || command.endsAt() == null || !command.endsAt().isAfter(command.startsAt())) {
 			throw new BusinessException("BOOKING_RANGE_INVALID", "La reserva requiere un rango valido.");
 		}
@@ -149,14 +152,15 @@ public class BookingService {
 
 		OffsetDateTime localStart = command.startsAt().atZoneSameInstant(BusinessTime.DEFAULT_ZONE).toOffsetDateTime();
 		OffsetDateTime localEnd = command.endsAt().atZoneSameInstant(BusinessTime.DEFAULT_ZONE).toOffsetDateTime();
-		if (!bookingEligibilityRepository.hasEligibleMembershipForResource(
+		EligibilityDecision eligibility = eligibilityPolicy.evaluate(EligibilityRequest.booking(
 				principal.organizationId(),
 				principal.branchId(),
-				command.resourceId(),
 				command.clientId(),
-				localStart.toLocalDate()
-		)) {
-			throw new BusinessException("BOOKING_PLAN_NOT_ALLOWED", "El socio no tiene una membresia permitida para reservar este recurso.");
+				localStart.toLocalDate(),
+				new LinkedHashSet<>(resource.allowedPlanIds())
+		));
+		if (!eligibility.eligible()) {
+			throw bookingEligibilityException(eligibility);
 		}
 		if (!localStart.toLocalDate().equals(localEnd.toLocalDate())) {
 			throw new BusinessException("BOOKING_RANGE_INVALID", "La reserva debe iniciar y terminar el mismo dia.");
@@ -264,7 +268,7 @@ public class BookingService {
 		int capacity = Math.max(1, command.capacity());
 		int slotMinutes = Math.max(15, command.slotMinutes());
 		List<UUID> allowedPlanIds = command.allowedPlanIds() == null ? List.of() : new ArrayList<>(new LinkedHashSet<>(command.allowedPlanIds()));
-		if (!allowedPlanIds.isEmpty() && bookingEligibilityRepository.activePlanCount(principal.organizationId(), allowedPlanIds) != allowedPlanIds.size()) {
+		if (!allowedPlanIds.isEmpty() && bookingPlanRepository.activePlanCount(principal.organizationId(), allowedPlanIds) != allowedPlanIds.size()) {
 			throw new BusinessException("RESOURCE_ALLOWED_PLAN_INVALID", "Selecciona solo planes activos del gimnasio.");
 		}
 		ResourceData data = new ResourceData(
@@ -280,5 +284,19 @@ public class BookingService {
 	}
 
 	private record ResourceMutation(ResourceData data, List<UUID> allowedPlanIds) {
+	}
+
+	private BusinessException bookingEligibilityException(EligibilityDecision eligibility) {
+		return switch (eligibility.reason()) {
+			case CLIENT_NOT_FOUND -> new BusinessException(
+					"CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible.");
+			case CLIENT_NOT_ACTIVE -> new BusinessException(
+					"CLIENT_NOT_ACTIVE", "El cliente no esta activo.");
+			case ACTIVE_MEMBERSHIP_REQUIRED, PLAN_NOT_ALLOWED -> new BusinessException(
+					"BOOKING_PLAN_NOT_ALLOWED",
+					"El socio no tiene una membresia permitida para reservar este recurso.");
+			default -> new BusinessException(
+					"BOOKING_NOT_ELIGIBLE", "El socio no cumple la politica de elegibilidad para reservar.");
+		};
 	}
 }

@@ -39,7 +39,7 @@ export function InventoryToolbar({
         </p>
       </div>
       <div className="flex items-center gap-3">
-        <div className="flex items-center gap-2.5 rounded-lg border border-[#d8ddd2] bg-[#f7f9f6] px-3.5 py-2 text-xs">
+        <div className="flex items-center gap-2.5 rounded-lg border border-[var(--brand-line)] bg-[#f7f9f6] px-3.5 py-2 text-xs">
           <span className="font-semibold text-[#42514a]">Stock Negativo:</span>
           <button
             type="button"
@@ -48,7 +48,7 @@ export function InventoryToolbar({
             className={
               branchSettings?.allowNegativeStock
                 ? "rounded px-2.5 py-1 font-bold text-white bg-[#31543d] hover:bg-[#254231] transition"
-                : "rounded px-2.5 py-1 font-bold text-[#5d6b63] bg-[#eef1eb] hover:bg-[#dfe4dc] transition"
+                : "rounded px-2.5 py-1 font-bold text-[var(--brand-muted)] bg-[#eef1eb] hover:bg-[#dfe4dc] transition"
             }
           >
             {branchSettings?.allowNegativeStock ? "HABILITADO" : "BLOQUEADO"}
@@ -111,7 +111,7 @@ export function InventoryNavigation({
   activeTransfersCount?: number;
 }) {
   return (
-    <nav aria-label="Secciones de inventario" className="grid gap-2 rounded-xl border border-[#d8ddd2] bg-white p-2 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
+    <nav aria-label="Secciones de inventario" className="grid gap-2 rounded-xl border border-[var(--brand-line)] bg-white p-2 shadow-sm sm:grid-cols-2 lg:grid-cols-4">
       <button
         type="button"
         onClick={() => onChange("stock")}
@@ -276,7 +276,7 @@ export function InventoryStockPanel({
         ) : null}
 
         {!loading && stock.length === 0 ? (
-          <p className="mt-6 rounded-lg border border-dashed border-[#d8ddd2] p-8 text-center text-xs text-[#5d6b63]">
+          <p className="mt-6 rounded-lg border border-dashed border-[var(--brand-line)] p-8 text-center text-xs text-[var(--brand-muted)]">
             No hay productos que coincidan con la búsqueda.
           </p>
         ) : null}
@@ -293,7 +293,7 @@ export function InventoryStockPanel({
                   className={`rounded-lg border p-3.5 text-left transition ${
                     isSelected
                       ? "border-[#31543d] bg-[#f0f7f2] ring-1 ring-[#31543d]"
-                      : "border-[#d8ddd2] bg-white hover:border-[#86a390]"
+                      : "border-[var(--brand-line)] bg-white hover:border-[#86a390]"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -381,7 +381,7 @@ export function InventoryMovementSummary({
           />
         </dl>
       ) : (
-        <p className="text-xs text-[#5d6b63]">
+        <p className="text-xs text-[var(--brand-muted)]">
           Selecciona un producto de la lista para registrar compras, consumo interno, mermas o ajustes.
         </p>
       )}
@@ -409,7 +409,7 @@ export function InventoryAlertsPanel({
       </div>
 
       {lowStock.length === 0 ? (
-        <p className="text-xs text-[#5d6b63] flex-1 flex items-center justify-center py-4">
+        <p className="text-xs text-[var(--brand-muted)] flex-1 flex items-center justify-center py-4">
           Sin productos bajo el nivel mínimo de reorden.
         </p>
       ) : (
@@ -546,7 +546,7 @@ export function InventoryMovementsTable({
       ) : null}
 
       {!loading && movements.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-[#d8ddd2] p-8 text-center text-xs text-[#5d6b63]">
+        <p className="rounded-lg border border-dashed border-[var(--brand-line)] p-8 text-center text-xs text-[var(--brand-muted)]">
           No hay movimientos registrados que coincidan con los filtros seleccionados.
         </p>
       ) : null}
@@ -567,7 +567,7 @@ export function InventoryMovementsTable({
             <tbody>
               {movements.map((movement) => (
                 <tr className="border-b border-[#eef0eb] hover:bg-[#fafcf9] transition" key={movement.id}>
-                  <td className="py-3 pr-4 text-[#5d6b63]">{formatDateTime(movement.occurredAt)}</td>
+                  <td className="py-3 pr-4 text-[var(--brand-muted)]">{formatDateTime(movement.occurredAt)}</td>
                   <td className="py-3 pr-4 font-semibold text-[#111815]">{movement.productName}</td>
                   <td className="py-3 pr-4">
                     <span className="rounded bg-[#f0f4ef] px-2 py-0.5 text-[11px] font-semibold text-[#31543d]">
@@ -585,7 +585,7 @@ export function InventoryMovementsTable({
                   <td className="py-3 pr-4 text-[#42514a]">
                     {movement.quantityBefore} → {movement.quantityAfter}
                   </td>
-                  <td className="py-3 text-[#5d6b63]">{movement.reason}</td>
+                  <td className="py-3 text-[var(--brand-muted)]">{movement.reason}</td>
                 </tr>
               ))}
             </tbody>
@@ -628,7 +628,7 @@ export function InventoryAuditsCard({
               {activeCount.status}
             </span>
           </div>
-          <p className="text-[#5d6b63]">Iniciado el {formatDateTime(activeCount.createdAt)}</p>
+          <p className="text-[var(--brand-muted)]">Iniciado el {formatDateTime(activeCount.createdAt)}</p>
           <p className="text-[#42514a] font-medium">{activeCount.notes || "Sin observaciones adicionales"}</p>
         </div>
       ) : null}
@@ -636,13 +636,13 @@ export function InventoryAuditsCard({
       <div>
         <p className="app-eyebrow mb-2">Historial de Conteos Físicos</p>
         {counts.length === 0 ? (
-          <p className="rounded-lg border border-dashed border-[#d8ddd2] p-6 text-center text-xs text-[#5d6b63]">
+          <p className="rounded-lg border border-dashed border-[var(--brand-line)] p-6 text-center text-xs text-[var(--brand-muted)]">
             Sin historial de auditorías de conteo físico registradas.
           </p>
         ) : (
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 max-h-60 overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {counts.slice(0, 6).map((c) => (
-              <div className="rounded-lg border border-[#eef0eb] bg-[#fafbf9] p-3 text-xs flex flex-col justify-between gap-2" key={c.id}>
+              <div className="rounded-lg border border-[#eef0eb] bg-[var(--brand-surface)] p-3 text-xs flex flex-col justify-between gap-2" key={c.id}>
                 <div>
                   <span className="font-bold text-[#111815]">{formatDateTime(c.createdAt)}</span>
                   <p className="text-[#6f7a73] mt-0.5">{c.notes || "Sin notas"}</p>
@@ -695,13 +695,13 @@ export function InventoryTransfersCard({
       </div>
 
       {transfers.length === 0 ? (
-        <p className="rounded-lg border border-dashed border-[#d8ddd2] p-6 text-center text-xs text-[#5d6b63]">
+        <p className="rounded-lg border border-dashed border-[var(--brand-line)] p-6 text-center text-xs text-[var(--brand-muted)]">
           No hay registros de transferencias de inventario en esta sucursal.
         </p>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-2 max-h-[460px] overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {transfers.map((t) => (
-            <div className="rounded-lg border border-[#e4e8df] bg-[#fafbf9] p-4 text-xs flex flex-col justify-between gap-3" key={t.id}>
+            <div className="rounded-lg border border-[#e4e8df] bg-[var(--brand-surface)] p-4 text-xs flex flex-col justify-between gap-3" key={t.id}>
               <div className="space-y-2">
                 <div className="flex justify-between items-center border-b border-[#e8ece5] pb-2">
                   <span className="font-bold text-sm text-[#111815]">
@@ -711,7 +711,7 @@ export function InventoryTransfersCard({
                     {t.status}
                   </span>
                 </div>
-                {t.notes ? <p className="text-[#5d6b63]">{t.notes}</p> : null}
+                {t.notes ? <p className="text-[var(--brand-muted)]">{t.notes}</p> : null}
 
                 {t.items && t.items.length > 0 ? (
                   <div className="space-y-1 bg-white p-2.5 rounded border border-[#e8ece5] text-[11px]">
@@ -919,7 +919,7 @@ export function InventoryPhysicalCountDrawer({
     >
       <div className="grid gap-6">
         {!activeCount ? (
-          <div className="rounded-lg border border-[#d8ddd2] bg-[#fdfefc] p-4 grid gap-3">
+          <div className="rounded-lg border border-[var(--brand-line)] bg-[#fdfefc] p-4 grid gap-3">
             <h3 className="font-semibold text-sm text-[#111815]">Iniciar nueva sesión de conteo</h3>
             <label className="grid gap-1 text-xs font-semibold text-[#536158]">
               <span>Notas / Referencia</span>
@@ -947,7 +947,7 @@ export function InventoryPhysicalCountDrawer({
             <div className="flex items-center justify-between border-b border-[#e4e8df] pb-3">
               <div>
                 <h3 className="font-semibold text-sm">Conteo en Progreso</h3>
-                <p className="text-xs text-[#5d6b63]">Creado: {formatDateTime(activeCount.createdAt)}</p>
+                <p className="text-xs text-[var(--brand-muted)]">Creado: {formatDateTime(activeCount.createdAt)}</p>
               </div>
               <span className="rounded bg-[#eef7f0] px-2 py-1 text-xs font-semibold text-[#31543d]">
                 {activeCount.status}
@@ -958,14 +958,14 @@ export function InventoryPhysicalCountDrawer({
               {activeCount.items && activeCount.items.length > 0 ? (
                 activeCount.items.map((item) => (
                   <div
-                    className="rounded-lg border border-[#e4e8df] bg-[#fafbf9] p-3 grid sm:grid-cols-[1fr_auto] gap-2 items-center text-xs"
+                    className="rounded-lg border border-[#e4e8df] bg-[var(--brand-surface)] p-3 grid sm:grid-cols-[1fr_auto] gap-2 items-center text-xs"
                     key={item.id}
                   >
                     <div>
                       <p className="font-semibold text-sm text-[#111815]">{item.productName}</p>
                       <p className="text-[#6f7a73] mt-0.5">
                         SKU: {item.sku} · Sistema: <span className="font-bold text-[#111815]">{item.systemQuantity} u.</span> | Varianza:{" "}
-                        <span className={`font-bold ${(item.varianceQuantity ?? 0) < 0 ? "text-[#8c2f2f]" : (item.varianceQuantity ?? 0) > 0 ? "text-[#28733e]" : "text-[#5d6b63]"}`}>
+                        <span className={`font-bold ${(item.varianceQuantity ?? 0) < 0 ? "text-[#8c2f2f]" : (item.varianceQuantity ?? 0) > 0 ? "text-[#28733e]" : "text-[var(--brand-muted)]"}`}>
                           {item.varianceQuantity ?? 0} u.
                         </span>
                       </p>
@@ -986,7 +986,7 @@ export function InventoryPhysicalCountDrawer({
                   </div>
                 ))
               ) : (
-                <p className="text-xs text-[#5d6b63] p-4 text-center border border-dashed rounded-lg">
+                <p className="text-xs text-[var(--brand-muted)] p-4 text-center border border-dashed rounded-lg">
                   No hay productos registrados en el inventario para auditar.
                 </p>
               )}
@@ -1085,7 +1085,7 @@ export function InventoryTransferDrawer({
       title="Crear Transferencia entre Sucursales"
     >
       <div className="grid gap-4">
-        <div className="rounded-lg border border-[#d8ddd2] bg-[#fdfefc] p-4 grid gap-3 text-xs">
+        <div className="rounded-lg border border-[var(--brand-line)] bg-[#fdfefc] p-4 grid gap-3 text-xs">
           <Field label="Sucursal Destino">
             {destinationBranches.length === 0 ? (
               <p className="rounded border border-[#e5b7b7] bg-[#fff4f4] p-2.5 text-xs text-[#8c2f2f] font-medium">
@@ -1205,7 +1205,7 @@ function Pagination({
       >
         Anterior
       </button>
-      <span className="font-semibold text-[#5d6b63]">
+      <span className="font-semibold text-[var(--brand-muted)]">
         Página {page + 1} de {totalPages}
       </span>
       <button
@@ -1240,3 +1240,4 @@ function formatMoney(cents: number, currency: string) {
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("es-MX", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
 }
+

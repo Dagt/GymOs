@@ -43,6 +43,7 @@ test("reception navigation is limited to front desk work", () => {
   assert.ok(labels.includes("Caja / POS"));
   assert.ok(labels.includes("Socios"));
   assert.ok(labels.includes("Wellness"));
+  assert.equal(labels.includes("Renovaciones"), false);
   assert.equal(labels.includes("Equipo y accesos"), false);
   assert.equal(labels.includes("Datos y sucursales"), false);
 });

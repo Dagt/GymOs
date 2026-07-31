@@ -10,12 +10,14 @@ import com.gymos.sales.application.command.RequestRefundCommand;
 import com.gymos.sales.application.command.SaleItemCommand;
 import com.gymos.sales.application.result.SaleDetailResult;
 import com.gymos.sales.application.result.SalesReportResult;
+import com.gymos.sales.model.AppliedBenefitDetail;
 import com.gymos.sales.model.MembershipDetail;
 import com.gymos.sales.model.PaymentDetail;
 import com.gymos.sales.model.PaymentMethodBreakdown;
 import com.gymos.sales.model.PaymentReportTotals;
 import com.gymos.sales.model.RefundDetail;
 import com.gymos.sales.model.SaleHeader;
+import com.gymos.sales.model.SaleBusinessContextBreakdown;
 import com.gymos.sales.model.SaleItemDetail;
 import com.gymos.sales.model.SaleStatusBreakdown;
 import com.gymos.sales.model.SaleSummary;
@@ -130,7 +132,14 @@ public class SalesController {
 	}
 
 	private SaleDetailResponse toResponse(SaleDetailResult result) {
-		return new SaleDetailResponse(result.sale(), result.items(), result.payments(), result.refunds(), result.memberships());
+		return new SaleDetailResponse(
+				result.sale(),
+				result.items(),
+				result.appliedBenefits(),
+				result.payments(),
+				result.refunds(),
+				result.memberships()
+		);
 	}
 
 	private SalesReportResponse toResponse(SalesReportResult result) {
@@ -141,6 +150,7 @@ public class SalesController {
 				result.sales(),
 				result.payments(),
 				result.salesByStatus(),
+				result.salesByBusinessContext(),
 				result.paymentsByMethod(),
 				result.recentSales()
 		);
@@ -231,6 +241,7 @@ public class SalesController {
 	public record SaleDetailResponse(
 			SaleHeader sale,
 			List<SaleItemDetail> items,
+			List<AppliedBenefitDetail> appliedBenefits,
 			List<PaymentDetail> payments,
 			List<RefundDetail> refunds,
 			List<MembershipDetail> memberships
@@ -244,6 +255,7 @@ public class SalesController {
 			SalesReportTotals sales,
 			PaymentReportTotals payments,
 			List<SaleStatusBreakdown> salesByStatus,
+			List<SaleBusinessContextBreakdown> salesByBusinessContext,
 			List<PaymentMethodBreakdown> paymentsByMethod,
 			List<SaleSummary> recentSales
 	) {

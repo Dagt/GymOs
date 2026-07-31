@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 
 type TestUser = {
   userId: string;
@@ -75,6 +75,81 @@ test.describe("consolas por rol", () => {
     await expect(page.locator("body")).toContainText("Nuevo gimnasio");
   });
 
+  test("alta de gimnasio difiere el logo y lo persiste despues de crear el tenant", async ({ page }) => {
+    let legacyLogoRequests = 0;
+    let organizationCreates = 0;
+    let managedLogoUploads = 0;
+    const createdOrganization = {
+      ...org,
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      tradeName: "Nuevo Gym",
+      legalName: "Nuevo Gym S.A. de C.V.",
+      taxId: "NGYM260101AB1",
+      branchCount: 0,
+      activeBranchCount: 0,
+    };
+    await page.route("**/api/tenant-logo", async (route) => {
+      legacyLogoRequests += 1;
+      await route.fulfill({ status: 500, body: "legacy route must not be used" });
+    });
+    await bootAs(page, user({
+      console: "PLATFORM_OWNER",
+      platformAdmin: true,
+      roles: ["Administrador GymOS"],
+      permissions: ["platform.admin"],
+      branchId: null,
+    }), async (route, path) => {
+      if (route.request().method() === "POST" && path === "/organizations") {
+        organizationCreates += 1;
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify(createdOrganization),
+        });
+        return true;
+      }
+      if (
+        route.request().method() === "POST"
+        && path === `/organizations/${createdOrganization.id}/logo`
+      ) {
+        managedLogoUploads += 1;
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({
+            ...createdOrganization,
+            logoUrl: `/api/tenant-logo/${createdOrganization.id}?v=test`,
+          }),
+        });
+        return true;
+      }
+      return false;
+    });
+
+    await page.goto("/platform/gymnasiums");
+    await page.getByRole("button", { name: "Nuevo gimnasio" }).click();
+    await page.getByLabel("Nombre comercial").fill(createdOrganization.tradeName);
+    await page.getByLabel("Nombre legal").fill(createdOrganization.legalName);
+    await page.getByLabel("RFC").fill(createdOrganization.taxId);
+    await page.getByLabel("Email contacto").fill("contacto@nuevogym.test");
+    await page.getByLabel("Telefono contacto").fill("+524921234567");
+    await page.locator('.logo-upload-field input[type="file"]').setInputFiles({
+      name: "logo.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nWQAAAAASUVORK5CYII=",
+        "base64",
+      ),
+    });
+
+    await expect(page.getByText("Logo seleccionado")).toBeVisible();
+    expect(legacyLogoRequests).toBe(0);
+    await page.getByRole("button", { name: "Crear gimnasio" }).click();
+
+    await expect(page.getByText(/Gimnasio y logo creados/i)).toBeVisible();
+    expect(organizationCreates).toBe(1);
+    expect(managedLogoUploads).toBe(1);
+    expect(legacyLogoRequests).toBe(0);
+  });
+
   test("dueno de gimnasio ve direccion y administracion del tenant", async ({ page }) => {
     await bootAs(page, user({
       console: "TENANT_OWNER",
@@ -104,6 +179,8 @@ test.describe("consolas por rol", () => {
     await expect(page.locator("body")).toContainText("Administracion diaria");
     await expect(page.locator("body")).toContainText("Mostrador");
     await expect(page.getByRole("link", { name: /Gimnasios cliente/i })).toHaveCount(0);
+    await page.goto("/clients");
+    await expect(page.getByRole("button", { name: /Registrar Nuevo Socio/i })).toBeVisible();
   });
 
   test("recepcion entra a mostrador y no ve administracion", async ({ page }) => {
@@ -116,10 +193,14 @@ test.describe("consolas por rol", () => {
     await page.goto("/reception");
 
     await expect(page.getByRole("heading", { name: /Recepcion|Revolucion/i })).toBeVisible();
-    await expect(page.getByText(/Entraste como Recepcion/i)).toBeVisible();
-    await expect(page.getByText(/Cobrar venta o membresia/i)).toBeVisible();
+    await expect(page.getByLabel("Perfil activo").getByText("Recepcion")).toBeVisible();
+    await expect(page.getByText(/Cobrar venta o membres/i)).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Renovación y Asignación de Membresía/i })).toBeVisible();
+    await expect(page.locator('a[href="/reception/renewals"]')).toHaveCount(0);
     await expect(page.getByRole("link", { name: /Equipo/i })).toHaveCount(0);
     await expect(page.getByRole("link", { name: /Datos y sucursales/i })).toHaveCount(0);
+    await page.goto("/clients");
+    await expect(page.getByRole("button", { name: /Registrar Nuevo Socio/i })).toBeVisible();
   });
 
   test("Admin GymOS en soporte ve banda y regreso a administracion", async ({ page }) => {
@@ -139,10 +220,15 @@ test.describe("consolas por rol", () => {
   });
 });
 
-async function bootAs(page: Page, currentUser: TestUser) {
+async function bootAs(
+  page: Page,
+  currentUser: TestUser,
+  override?: (route: Route, path: string) => Promise<boolean>,
+) {
   await page.route("**/api/v1/**", async (route) => {
     const url = new URL(route.request().url());
     const path = url.pathname.replace(/^\/api\/v1/, "");
+    if (override && await override(route, path)) return;
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify(responseFor(path, currentUser)),

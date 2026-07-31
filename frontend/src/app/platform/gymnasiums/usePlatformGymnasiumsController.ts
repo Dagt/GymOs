@@ -10,6 +10,7 @@ import {
   selectBranch,
   selectOrganization,
   storeSession,
+  uploadManagedOrganizationLogo,
   updateOrganizationStatus,
   type BranchSummary,
   type CreateBranchPayload,
@@ -35,6 +36,7 @@ export function usePlatformGymnasiumsController() {
   const [showCreate, setShowCreate] = useState(false);
   const [showCreateBranch, setShowCreateBranch] = useState(false);
   const [form, setForm] = useState<CreateOrganizationPayload>(emptyOrganizationForm);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
   const [branchForm, setBranchForm] = useState<CreateBranchPayload>(emptyBranchForm);
   const [fieldErrors, setFieldErrors] = useState<FieldErrorMap>({});
   const [branchFieldErrors, setBranchFieldErrors] = useState<FieldErrorMap>({});
@@ -264,14 +266,41 @@ export function usePlatformGymnasiumsController() {
         contactPhone: normalizePhone(form.contactPhone ?? ""),
       };
       const created = await createOrganization(session.accessToken, payload);
+      let persistedOrganization = created;
+      let logoUploadError: string | null = null;
+      if (logoFile) {
+        try {
+          const branded = await uploadManagedOrganizationLogo(
+            session.accessToken,
+            created.id,
+            logoFile,
+          );
+          persistedOrganization = { ...created, ...branded };
+        } catch (exception) {
+          logoUploadError = exception instanceof Error
+            ? exception.message
+            : "No fue posible guardar el logo seleccionado.";
+        }
+      }
       setOrganizations((current) =>
-        [...current, created].sort((left, right) => left.tradeName.localeCompare(right.tradeName)),
+        [...current, persistedOrganization]
+          .sort((left, right) => left.tradeName.localeCompare(right.tradeName)),
       );
       setForm(emptyOrganizationForm);
+      setLogoFile(null);
       setShowCreate(false);
       setSelectedOrganizationId(created.id);
       setBranches([]);
-      setMessage("Gimnasio creado. Ahora crea sus sucursales, marca y usuarios desde su detalle.");
+      if (logoUploadError) {
+        setError(`El gimnasio se creo correctamente, pero el logo no pudo guardarse. ${logoUploadError}`);
+        setMessage("Gimnasio creado. Puedes volver a cargar el logo desde su detalle.");
+      } else {
+        setMessage(
+          logoFile
+            ? "Gimnasio y logo creados. Ahora agrega sus sucursales y usuarios."
+            : "Gimnasio creado. Ahora crea sus sucursales, marca y usuarios desde su detalle.",
+        );
+      }
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible crear el gimnasio.");
     } finally {
@@ -324,6 +353,21 @@ export function usePlatformGymnasiumsController() {
     }
   }
 
+  function openCreateOrganization() {
+    setForm(emptyOrganizationForm);
+    setLogoFile(null);
+    setFieldErrors({});
+    setError(null);
+    setMessage(null);
+    setShowCreate(true);
+  }
+
+  function closeCreateOrganization() {
+    setLogoFile(null);
+    setFieldErrors({});
+    setShowCreate(false);
+  }
+
   async function toggleOrganizationStatus() {
     if (!session || !selectedOrganization) {
       return;
@@ -367,6 +411,7 @@ export function usePlatformGymnasiumsController() {
     fieldErrors,
     filteredOrganizations,
     form,
+    logoFile,
     loading,
     message,
     organizations,
@@ -382,11 +427,13 @@ export function usePlatformGymnasiumsController() {
     activateOrganization,
     goToTenantSection,
     openBranchDrawer,
+    openCreateOrganization,
+    closeCreateOrganization,
     setBranchForm,
     setForm,
+    setLogoFile,
     setQuery,
     setSelectedOrganizationId,
-    setShowCreate,
     setShowCreateBranch,
     submitBranch,
     submitOrganization,

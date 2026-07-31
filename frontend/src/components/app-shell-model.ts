@@ -25,8 +25,9 @@ const memberWorkflowPermissions = [
   "client.create",
   "client.update",
   "membership.read",
-  "membership.create",
-  "membership.update",
+  "membership.renew",
+  "membership.change-plan",
+  "sale.create",
 ];
 
 const platformSections: NavigationSection[] = [
@@ -90,6 +91,7 @@ const managerSections: NavigationSection[] = [
       { label: "Reservas", href: "/bookings", hint: "Agenda", permissions: ["booking.read"] },
       { label: "Wellness", href: "/wellness", hint: "Bienestar", permissions: ["professional.read", "booking.read"] },
       { label: "Coaches", href: "/coaches", hint: "Rutinas", permissions: ["coach.read"] },
+      { label: "Beneficios", href: "/benefits", hint: "Promociones y convenios", permissions: ["benefit.read"] },
     ],
   },
   {
@@ -110,7 +112,6 @@ const receptionSections: NavigationSection[] = [
       { label: "Reservas", href: "/bookings", hint: "Agenda", permissions: ["booking.read"] },
       { label: "Wellness", href: "/wellness", hint: "Bienestar", permissions: ["professional.read", "booking.read"] },
       { label: "Ventas", href: "/reports/sales", hint: "Pagos pendientes", permissions: ["report.sales.read"] },
-      { label: "Beneficios", href: "/benefits", hint: "Aplicacion", permissions: ["benefit.read"] },
     ],
   },
 ];

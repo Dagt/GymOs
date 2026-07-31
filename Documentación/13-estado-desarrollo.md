@@ -1,8 +1,8 @@
 # 13. Estado actual de desarrollo
 
 Estado: FUENTE CANÓNICA / EN PROGRESO
-Corte: 27 de julio de 2026
-Código auditado: `feature/coaches-workouts` en `e718fdf`.
+Corte: 30 de julio de 2026
+Código auditado: árbol de trabajo de `feature/reception-pos-init`.
 
 ## 1. Cómo interpretar este documento
 
@@ -24,15 +24,17 @@ Ningún módulo se declara “completo” sólo por el nombre de una rama o comm
 
 | Módulo | Estado | Evidencia actual | Pendiente principal |
 |---|---|---|---|
-| [Plataforma, tenant y sucursales](modulos/01-organizations.md) | FUNCIONAL | Consolas separadas, selección de gimnasio/sucursal y contexto tenant | Matriz negativa multi-tenant y endurecimiento global |
-| [Identidad, sesiones y permisos](modulos/02-identity-security.md) | FUNCIONAL | Inicio/renovación de sesión, roles y permisos por endpoint | Refresh token seguro y autorización uniforme |
-| [Socios/CRM](modulos/05-clients.md) | FUNCIONAL | Alta, búsqueda, detalle y asociación con membresías | Cobertura CRUD y escenarios multi-sucursal |
-| [Catálogo comercial](modulos/06-catalog.md) | ESTABILIZADO | Productos, membresías, categorías y operación por sucursal | Paginación/consistencia transversal |
-| [Ventas y pagos manuales](modulos/07-sales.md) | FUNCIONAL | Ventas, partidas, pagos, validación y reembolsos | Pruebas integrales de concurrencia y conciliación |
-| [Membresías](modulos/08-memberships.md) y [kiosco](modulos/11-selfservice.md) | FUNCIONAL | Alta, renovación, cambio de plan y autoservicio | Revisar semántica de fechas y seguridad de sesión |
+| [Plataforma, tenant y sucursales](modulos/01-organizations.md) | FUNCIONAL | Consolas separadas, selección de gimnasio/sucursal, reparación de permisos del dueño en instalaciones limpias y marca persistente | Matriz negativa multi-tenant y endurecimiento global |
+| [Identidad, sesiones y permisos](modulos/02-identity-security.md) | FUNCIONAL | Inicio/renovación de sesión, roles y permisos por endpoint; 401 de autenticación separado de 403 de autorización | Refresh token seguro y autorización uniforme |
+| [Socios/CRM](modulos/05-clients.md) | FUNCIONAL | Alta, búsqueda, detalle, asociación con membresías y permisos de alta reparados para dueño, gerencia y recepción | Cobertura CRUD y escenarios multi-sucursal |
+| [Catálogo comercial](modulos/06-catalog.md) | ESTABILIZADO | Productos, membresías, categorías, unidad guiada y operación por sucursal | Paginación/consistencia transversal |
+| [Ventas y pagos manuales](modulos/07-sales.md) | FUNCIONAL | Venta minorista y membresías con contexto, partidas, pagos, snapshots de beneficios, reportes, validación, reembolsos e idempotencia concurrente | E2E integral venta–pago–inventario–refund (`SAL-001`) |
+| [Membresías](modulos/08-memberships.md) | ESTABILIZADO | Periodos y fechas inclusivas, expiración, activa única, cotización backend, alta/renovación/cambio separados y concurrencia PostgreSQL | E2E HTTP/navegador de pagos pendientes/rechazados |
+| [Beneficios](modulos/09-benefits.md) | ESTABILIZADO | Política transversal única para cotización de membresía, elegibilidad de reservas y acceso; descuentos con snapshot y ACCESS heredado/revocado dinámicamente por plan | Permisos negativos y concurrencia de asignaciones |
+| [Kiosco](modulos/11-selfservice.md) | FUNCIONAL | Consulta operativa y pagos dentro del gimnasio | Hardening de sesión y privacidad (`SELF-001`) |
 | [Reservas y recursos](modulos/12-bookings.md) | FUNCIONAL | Calendario, disponibilidad, restricciones por plan y recepción | Suite E2E y deuda UX residual |
 | [Inventarios](modulos/13-inventory.md) | ESTABILIZADO | Existencias, transferencias, conteos, valuación y movimientos | Paginación parametrizada y feedback por renglón |
-| [Coaches y rutinas](modulos/14-coaching.md) | ESTABILIZADO | Dueño y gerente limitados a métricas; Coach con constructor guiado y ejercicio esencial en una fila, detalle excepcional en panel lateral, catálogo compacto, asignación reactiva y métricas personales; histórico 4–52 semanas, CSV, PDF moderno con logo y 12 E2E | `COA-018`, `DB-001` y `OPS-001` |
+| [Coaches y rutinas](modulos/14-coaching.md) | ESTABILIZADO | Dueño y gerente limitados a métricas; Coach con constructor guiado, catálogo compacto, asignación reactiva, métricas personales y PDF moderno cuyos lookups respetan puertos de aplicación; histórico 4–52 semanas, CSV y 12 E2E | `COA-018`, `DB-001` y `OPS-001` |
 | [Wellness/profesionales](modulos/15-wellness.md) | ESTABILIZADO en esta rama | Directorio, servicios, disponibilidad, agenda, citas internas/externas, coordinación y permisos para dueño, gerente y recepción | Cobertura E2E y hardening multi-tenant transversal |
 | [Reportes generales](modulos/18-reporting.md) | PARCIAL | Reportes operativos por dominio | Definiciones KPI y cobertura homogénea |
 | [Producción/piloto](modulos/20-common-operations.md) | PLANIFICADO | Configuración y runbooks base | Observabilidad, backups, seguridad y piloto |

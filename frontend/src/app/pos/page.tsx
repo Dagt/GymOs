@@ -5,6 +5,7 @@ import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   createSale,
+  getProductByBarcode,
   getRecentSales,
   getStoredSession,
   searchClients,
@@ -14,6 +15,8 @@ import {
   type SaleSummary,
   type StoredSession,
 } from "@/lib/api";
+import { calculateSubtotal, isMembershipPlanProduct, resolveScannedProduct } from "./pos-model";
+import { playScanBeep, useBarcodeScanner } from "./barcode-scanner";
 import {
   type CartItem,
   type PaymentMethod,
@@ -41,6 +44,13 @@ export default function PosPage() {
   const [loading, setLoading] = useState(true);
   const [productLoading, setProductLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [highlightedProductId, setHighlightedProductId] = useState<string | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+
+  useBarcodeScanner({
+    onScan: (code) => void handleBarcodeScan(code),
+    enabled: Boolean(session),
+  });
 
   useEffect(() => {
     let active = true;
@@ -85,11 +95,15 @@ export default function PosPage() {
   }, [productQuery, session]);
 
   const subtotal = useMemo(
-    () => cart.reduce((sum, item) => sum + item.product.priceCents * item.quantity, 0),
+    () => calculateSubtotal(cart),
     [cart],
   );
 
-  function addProduct(product: ProductSummary) {
+  function addProduct(product: ProductSummary): boolean {
+    if (isMembershipPlanProduct(product)) {
+      setError("Los planes se gestionan desde la contratación o renovación de membresías.");
+      return false;
+    }
     setCart((current) => {
       const existing = current.find((item) => item.product.id === product.id);
       if (existing) {
@@ -99,6 +113,32 @@ export default function PosPage() {
       }
       return [...current, { product, quantity: 1 }];
     });
+    return true;
+  }
+
+  async function handleBarcodeScan(code: string) {
+    if (!session) return;
+    try {
+      const match = await resolveScannedProduct(
+        products,
+        code,
+        (barcode) => getProductByBarcode(session.accessToken, barcode),
+      );
+      if (!addProduct(match)) {
+        playScanBeep("error");
+        setScanError("Los planes se cobran desde el flujo de membresías.");
+        window.setTimeout(() => setScanError(null), 4000);
+        return;
+      }
+      playScanBeep("success");
+      setHighlightedProductId(match.id);
+      setScanError(null);
+      window.setTimeout(() => setHighlightedProductId(null), 1500);
+    } catch {
+      playScanBeep("error");
+      setScanError(`Código no encontrado: ${code}`);
+      window.setTimeout(() => setScanError(null), 4000);
+    }
   }
 
   function setQuantity(productId: string, quantity: number) {
@@ -165,53 +205,67 @@ export default function PosPage() {
 
   return (
     <AppShell
-      eyebrow="Recepcion / Caja"
+      eyebrow="Terminal de Venta"
       session={session}
-      subtitle="Venta rapida con pago manual y validacion interna."
-      title="Caja / POS"
+      subtitle={`Abierta por ${session.user.fullName}. Registra ventas con cobro inmediato.`}
+      title="Caja Registradora"
+      mode="operation"
     >
       {error ? <InlineError message={error} /> : null}
-      {message ? <Notice text={message} /> : null}
+      
+      <div className="flex flex-col gap-8 w-full max-w-[1600px] mx-auto">
+        {message ? (
+          <div className="p-4 rounded-2xl border-2 border-green-100 bg-green-50 text-green-700 font-black flex items-center gap-3 animate-in fade-in slide-in-from-top-4 shadow-sm">
+            <span className="text-xl">✅</span>
+            {message}
+          </div>
+        ) : null}
 
-      <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <section className="grid gap-6">
-          <ProductGrid
-            loading={productLoading}
-            productQuery={productQuery}
-            products={products}
-            onAddProduct={addProduct}
-            onProductQueryChange={setProductQuery}
-          />
-          <RecentSalesList sales={sales} />
-        </section>
+        <div className="grid gap-8 lg:grid-cols-[1fr_400px] xl:grid-cols-[1fr_480px]">
+          <div className="flex flex-col gap-8">
+            <ProductGrid
+              loading={productLoading}
+              productQuery={productQuery}
+              products={products}
+              onAddProduct={addProduct}
+              onProductQueryChange={setProductQuery}
+            />
+            <RecentSalesList sales={sales} />
+          </div>
 
-        <aside className="grid gap-6">
-          <PosClientSearch
-            clientQuery={clientQuery}
-            clients={clients}
-            onClientQueryChange={setClientQuery}
-            onSearch={submitClientSearch}
-            onSelectClient={setSelectedClient}
-            selectedClient={selectedClient}
-          />
-          <PosCartForm
-            cart={cart}
-            currency={products[0]?.currency ?? cart[0]?.product.currency ?? "MXN"}
-            onPaymentAmountChange={setPaymentAmount}
-            onPaymentMethodChange={setPaymentMethod}
-            onPaymentReferenceChange={setPaymentReference}
-            onQuantityChange={setQuantity}
-            onSubmit={submitSale}
-            onValidateNowChange={setValidateNow}
-            paymentAmount={paymentAmount}
-            paymentMethod={paymentMethod}
-            paymentReference={paymentReference}
-            saving={saving}
-            subtotal={subtotal}
-            validateNow={validateNow}
-          />
-        </aside>
-      </section>
+          <aside className="flex flex-col gap-8">
+            <div className="sticky top-6 flex flex-col gap-8">
+              <PosClientSearch
+                clientQuery={clientQuery}
+                clients={clients}
+                onClientQueryChange={setClientQuery}
+                onSearch={submitClientSearch}
+                onSelectClient={setSelectedClient}
+                selectedClient={selectedClient}
+              />
+              <PosCartForm
+                cart={cart}
+                currency={products[0]?.currency ?? cart[0]?.product.currency ?? "MXN"}
+                highlightedProductId={highlightedProductId}
+                onClearCart={() => setCart([])}
+                onPaymentAmountChange={setPaymentAmount}
+                onPaymentMethodChange={setPaymentMethod}
+                onPaymentReferenceChange={setPaymentReference}
+                onQuantityChange={setQuantity}
+                onSubmit={submitSale}
+                onValidateNowChange={setValidateNow}
+                paymentAmount={paymentAmount}
+                paymentMethod={paymentMethod}
+                paymentReference={paymentReference}
+                saving={saving}
+                scanError={scanError}
+                subtotal={subtotal}
+                validateNow={validateNow}
+              />
+            </div>
+          </aside>
+        </div>
+      </div>
     </AppShell>
   );
 }
@@ -223,8 +277,4 @@ function AuthRequired() {
       title="Inicia sesion para cobrar"
     />
   );
-}
-
-function Notice({ text }: { text: string }) {
-  return <p className="rounded-md border border-[#bad9c4] bg-[#eff8f1] px-3 py-2 text-sm text-[#31563c]">{text}</p>;
 }

@@ -1,5 +1,6 @@
 package com.gymos.common.security;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -26,10 +27,15 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableConfigurationProperties(SecurityProperties.class)
 public class SecurityConfig {
 	@Bean
-	SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
+	SecurityFilterChain securityFilterChain(
+			HttpSecurity http,
+			JwtAuthenticationFilter jwtAuthenticationFilter,
+			ObjectMapper objectMapper
+	) throws Exception {
 		return http.csrf(AbstractHttpConfigurer::disable).cors(Customizer.withDefaults())
 				.authorizeHttpRequests(authorize -> authorize
 						.requestMatchers("/actuator/health/**", "/api/v1/system/**", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/self-service/**", "/api/v1/openapi/**", "/api/v1/docs/**", "/swagger-ui/**").permitAll()
+						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/organizations/*/logo").permitAll()
 						.requestMatchers("/api/v1/auth/select-branch").hasAuthority("branch.read")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/roles", "/api/v1/users/internal").hasAuthority("user.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/users/internal").hasAuthority("user.manage")
@@ -43,19 +49,22 @@ public class SecurityConfig {
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/organizations/current/branches", "/api/v1/organizations/current/branches/*", "/api/v1/organizations/current/branches/**")
 								.hasAnyAuthority("branch.read", "organization.read", "inventory.manage", "inventory.transfer", "catalog.read")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/organizations/*/branches").hasAuthority("platform.admin")
-						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/organizations/current").hasAuthority("organization.read")
+						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/organizations/current")
+								.hasAnyAuthority("organization.read", "organization.update")
 						.requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/v1/organizations/current").hasAuthority("organization.update")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/organizations/current/logo").hasAuthority("organization.update")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/organizations/*/logo").hasAuthority("platform.admin")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/onboarding/**").hasAuthority("onboarding.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/onboarding/**").hasAuthority("onboarding.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/clients/*/workouts").hasAnyAuthority("workout.read.own", "workout.read.all")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/clients/imports").hasAuthority("client.import")
-						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/clients/*/benefits").hasAuthority("client.benefit.assign")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/clients/*/benefits").hasAnyAuthority("client.benefit.assign", "client.update", "client.create", "membership.update", "sale.create", "platform.admin")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/clients/**")
 								.hasAnyAuthority("client.read", "client.create", "client.update", "membership.read", "membership.create", "membership.update")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/clients")
 								.hasAnyAuthority("client.create", "platform.admin")
 						.requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/v1/clients/**").hasAuthority("client.update")
-						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/catalog/**").hasAuthority("catalog.read")
+						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/catalog/**").hasAnyAuthority("catalog.read", "membership.read", "sale.create", "client.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/catalog/products/*/image").hasAuthority("catalog.image.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/catalog/products/*/activate", "/api/v1/catalog/products/*/deactivate").hasAuthority("catalog.status.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/catalog/products/*/restore").hasAuthority("catalog.archive")
@@ -69,12 +78,14 @@ public class SecurityConfig {
 						.requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/catalog/products/*").hasAuthority("catalog.update")
 						.requestMatchers(org.springframework.http.HttpMethod.PATCH, "/api/v1/catalog/plans/*").hasAuthority("catalog.update")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/catalog/**").hasAuthority("catalog.create")
-						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/benefits/**").hasAuthority("benefit.read")
-						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/benefits/**").hasAuthority("benefit.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/benefits/**").hasAnyAuthority("benefit.read", "client.read", "membership.read", "sale.create")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/benefits/**").hasAnyAuthority("benefit.manage", "platform.admin")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/client-benefits/*/verify").hasAuthority("client.benefit.verify")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/memberships/**").hasAuthority("membership.read")
-						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/memberships/*/renew").hasAuthority("membership.renew")
-						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/memberships/*/change-plan").hasAuthority("membership.change-plan")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/memberships/*/renew").hasAnyAuthority("membership.renew", "membership.update", "sale.create")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/memberships/*/change-plan").hasAnyAuthority("membership.change-plan", "membership.update", "sale.create")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/membership-quotes").hasAnyAuthority("membership.read", "membership.update", "sale.create")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/membership-enrollments").hasAnyAuthority("membership.create", "membership.update", "sale.create")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/sales/reports/**").hasAuthority("report.sales.read")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/sales/**").hasAuthority("sale.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/sales").hasAuthority("sale.create")
@@ -86,8 +97,11 @@ public class SecurityConfig {
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/access/visit-passes/**").hasAuthority("visit.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/access/visit-passes/*/consume").hasAuthority("visit.consume")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/access/visit-passes").hasAuthority("visit.create")
+						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/access/clients/*/effective-benefits")
+								.hasAnyAuthority("access.read", "client.read", "membership.read", "benefit.read")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/access/**").hasAuthority("access.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/access/**").hasAuthority("access.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/v1/access/**").hasAuthority("access.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/inventory/**").hasAuthority("inventory.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/inventory/**").hasAuthority("inventory.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.PUT, "/api/v1/inventory/**").hasAuthority("inventory.manage")
@@ -131,7 +145,9 @@ public class SecurityConfig {
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/automations/**").hasAuthority("automation.manage")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/reports/owner-dashboard").hasAuthority("report.owner.read")
 						.anyRequest().authenticated())
-				.exceptionHandling(exceptions -> exceptions.authenticationEntryPoint(new StandardAuthenticationEntryPoint()))
+				.exceptionHandling(exceptions -> exceptions
+						.authenticationEntryPoint(new StandardAuthenticationEntryPoint(objectMapper))
+						.accessDeniedHandler(new StandardAccessDeniedHandler(objectMapper)))
 				.addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
 				.httpBasic(AbstractHttpConfigurer::disable).formLogin(AbstractHttpConfigurer::disable).build();
 	}

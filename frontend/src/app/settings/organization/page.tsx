@@ -9,6 +9,7 @@ import {
   getBranches,
   getCurrentOrganization,
   getStoredSession,
+  storeCurrentUser,
   updateBranch,
   updateOrganization,
   type BranchSummary,
@@ -213,6 +214,23 @@ export default function OrganizationSettingsPage() {
     setShowOrganizationDrawer(false);
   }
 
+  function applyUploadedLogo(logoUrl: string) {
+    setOrganization((current) => current ? { ...current, logoUrl } : current);
+    const currentSession = getStoredSession() ?? session;
+    if (currentSession) {
+      const nextSession = {
+        ...currentSession,
+        user: {
+          ...currentSession.user,
+          logoUrl,
+        },
+      };
+      storeCurrentUser(nextSession.user);
+      setSession(nextSession);
+    }
+    setMessage("Logo del gimnasio actualizado.");
+  }
+
   function openNewBranchDrawer() {
     setNewBranchForm(emptyBranchForm);
     setFieldErrors({});
@@ -290,7 +308,18 @@ export default function OrganizationSettingsPage() {
         </div>
       </section>
 
-      <OrganizationDrawer errors={fieldErrors} form={organizationForm} open={showOrganizationDrawer} saving={saving} onChange={setOrganizationForm} onClose={closeOrganizationDrawer} onSubmit={submitOrganization} />
+      <OrganizationDrawer
+        accessToken={session.accessToken}
+        errors={fieldErrors}
+        form={organizationForm}
+        open={showOrganizationDrawer}
+        organizationId={organization?.id ?? session.user.organizationId}
+        saving={saving}
+        onChange={setOrganizationForm}
+        onClose={closeOrganizationDrawer}
+        onLogoChange={applyUploadedLogo}
+        onSubmit={submitOrganization}
+      />
       <NewBranchDrawer errors={fieldErrors} form={newBranchForm} open={showNewBranchDrawer} saving={saving} onChange={setNewBranchForm} onClose={closeNewBranchDrawer} onSubmit={submitNewBranch} />
       <EditBranchDrawer branchId={selectedBranchId} branches={branches} errors={fieldErrors} form={branchForm} open={showEditBranchDrawer} saving={saving} onBranchSelect={selectEditableBranch} onChange={setBranchForm} onClose={closeEditBranchDrawer} onSubmit={submitBranch} />
     </AppShell>
@@ -299,8 +328,8 @@ export default function OrganizationSettingsPage() {
 
 function AuthRequired() {
   return (
-    <main className="grid min-h-screen place-items-center bg-[#f6f7f2] px-6 text-[#111815]">
-      <section className="w-full max-w-md rounded-lg border border-[#d8ddd2] bg-white p-6 shadow-sm">
+    <main className="grid min-h-screen place-items-center bg-[var(--brand-surface)] px-6 text-[#111815]">
+      <section className="w-full max-w-md rounded-lg border border-[var(--brand-line)] bg-white p-6 shadow-sm">
         <h1 className="text-2xl font-semibold">Necesitas iniciar sesion</h1>
         <Link className="mt-5 inline-flex h-11 items-center justify-center rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]" href="/login">
           Iniciar sesion

@@ -2,6 +2,7 @@ package com.gymos.sales.infrastructure;
 
 import com.gymos.sales.model.PaymentMethodBreakdown;
 import com.gymos.sales.model.PaymentReportTotals;
+import com.gymos.sales.model.SaleBusinessContextBreakdown;
 import com.gymos.sales.model.SaleStatusBreakdown;
 import com.gymos.sales.model.SalesReportTotals;
 import java.time.OffsetDateTime;
@@ -110,6 +111,45 @@ public class SalesReportRepository {
 				.query((resultSet, rowNumber) -> new SaleStatusBreakdown(
 						resultSet.getString("status"),
 						resultSet.getLong("sale_count"),
+						resultSet.getLong("total_cents"),
+						resultSet.getLong("paid_cents"),
+						resultSet.getLong("balance_cents")
+				))
+				.list();
+	}
+
+	public List<SaleBusinessContextBreakdown> salesByBusinessContext(
+			UUID organizationId,
+			UUID branchId,
+			OffsetDateTime from,
+			OffsetDateTime toExclusive
+	) {
+		return jdbcClient.sql("""
+				SELECT COALESCE(s.business_context, 'RETAIL_SALE') AS business_context,
+				       COUNT(*) AS sale_count,
+				       COALESCE(SUM(s.subtotal_cents), 0) AS subtotal_cents,
+				       COALESCE(SUM(s.discount_cents), 0) AS discount_cents,
+				       COALESCE(SUM(s.total_cents), 0) AS total_cents,
+				       COALESCE(SUM(s.paid_cents), 0) AS paid_cents,
+				       COALESCE(SUM(s.balance_cents), 0) AS balance_cents
+				FROM sale s
+				WHERE s.organization_id = :organizationId
+				  AND s.branch_id = :branchId
+				  AND s.sold_at >= :from
+				  AND s.sold_at < :toExclusive
+				  AND s.deleted_at IS NULL
+				GROUP BY COALESCE(s.business_context, 'RETAIL_SALE')
+				ORDER BY business_context
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("from", from)
+				.param("toExclusive", toExclusive)
+				.query((resultSet, rowNumber) -> new SaleBusinessContextBreakdown(
+						resultSet.getString("business_context"),
+						resultSet.getLong("sale_count"),
+						resultSet.getLong("subtotal_cents"),
+						resultSet.getLong("discount_cents"),
 						resultSet.getLong("total_cents"),
 						resultSet.getLong("paid_cents"),
 						resultSet.getLong("balance_cents")

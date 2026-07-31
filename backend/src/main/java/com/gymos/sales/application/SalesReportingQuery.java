@@ -1,12 +1,12 @@
 package com.gymos.sales.application;
 
 import com.gymos.common.api.BusinessException;
+import com.gymos.common.time.BusinessTime;
 import com.gymos.sales.application.result.SalesReportResult;
 import com.gymos.sales.infrastructure.SalesReadRepository;
 import com.gymos.sales.infrastructure.SalesReportRepository;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
@@ -21,7 +21,7 @@ class SalesReportingQuery {
 	}
 
 	SalesReportResult report(UUID organizationId, UUID branchId, LocalDate fromDate, LocalDate toDate) {
-		LocalDate resolvedTo = toDate == null ? LocalDate.now() : toDate;
+		LocalDate resolvedTo = toDate == null ? BusinessTime.today() : toDate;
 		LocalDate resolvedFrom = fromDate == null ? resolvedTo.minusDays(6) : fromDate;
 		if (resolvedFrom.isAfter(resolvedTo)) {
 			throw new BusinessException("REPORT_DATE_RANGE_INVALID", "La fecha inicial no puede ser posterior a la fecha final.");
@@ -30,8 +30,10 @@ class SalesReportingQuery {
 			throw new BusinessException("REPORT_DATE_RANGE_TOO_LARGE", "El reporte no puede cubrir mas de 370 dias.");
 		}
 
-		OffsetDateTime from = resolvedFrom.atStartOfDay().atOffset(ZoneOffset.UTC);
-		OffsetDateTime toExclusive = resolvedTo.plusDays(1).atStartOfDay().atOffset(ZoneOffset.UTC);
+		OffsetDateTime from = resolvedFrom.atStartOfDay(BusinessTime.DEFAULT_ZONE).toOffsetDateTime();
+		OffsetDateTime toExclusive = resolvedTo.plusDays(1)
+				.atStartOfDay(BusinessTime.DEFAULT_ZONE)
+				.toOffsetDateTime();
 		var sales = salesReportRepository.salesTotals(organizationId, branchId, from, toExclusive);
 		return new SalesReportResult(
 				resolvedFrom,
@@ -40,6 +42,7 @@ class SalesReportingQuery {
 				sales,
 				salesReportRepository.paymentTotals(organizationId, branchId, from, toExclusive),
 				salesReportRepository.salesByStatus(organizationId, branchId, from, toExclusive),
+				salesReportRepository.salesByBusinessContext(organizationId, branchId, from, toExclusive),
 				salesReportRepository.paymentsByMethod(organizationId, branchId, from, toExclusive),
 				salesReadRepository.recentSales(organizationId, branchId)
 		);

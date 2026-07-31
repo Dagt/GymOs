@@ -7,6 +7,7 @@ public record UpdateProfessionalCommand(
 		String phone,
 		String bio,
 		String officeLocation,
+		String engagementType,
 		String status
 ) {
 }

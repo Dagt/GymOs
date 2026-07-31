@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { isActive, resolveShellBrand, visibleSectionsForConsole } from "@/components/app-shell-model";
+import { FormError } from "@/components/FormFields";
 import { clearSession, getBranches, selectBranch, selectOrganization, storeSession, type StoredSession } from "@/lib/api";
 import { getConsoleProfile, isPlatformAdmin, isSupportMode, resolveUserConsole } from "@/lib/role-model";
 
@@ -151,8 +152,9 @@ export function AppShell({
       const selectedSession = await selectBranch(session.accessToken, branchId);
       storeSession(selectedSession);
       window.sessionStorage.removeItem(BRANCH_RECOVERY_KEY);
-      router.replace(pathname);
-      router.refresh();
+      // We use hard reload to ensure all contexts, themes and session hooks across the app 
+      // are fully synchronized with the new branch identity immediately.
+      window.location.reload();
     } finally {
       setSwitchingBranch(false);
     }
@@ -273,7 +275,7 @@ export function AppShell({
 
 export function LoadingScreen({ text = "Cargando..." }: { text?: string }) {
   return (
-    <main className="min-h-screen bg-[#eef1ed] p-6">
+    <main className="min-h-screen bg-[color:var(--brand-surface)] p-6">
       <section className="mx-auto flex min-h-[60vh] max-w-3xl items-center justify-center">
         <div className="app-card w-full max-w-md p-8 text-center" role="status" aria-live="polite">
           <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-4 border-[#d8ddd2] border-t-[#174f37]" aria-hidden="true" />
@@ -283,3 +285,8 @@ export function LoadingScreen({ text = "Cargando..." }: { text?: string }) {
     </main>
   );
 }
+
+export function InlineError({ message }: { message: string }) {
+  return <FormError message={message} />;
+}
+

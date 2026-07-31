@@ -1,5 +1,6 @@
 package com.gymos.sales.api.operations;
 
+import java.util.List;
 import java.util.UUID;
 
 public record CreateMembershipRenewalSaleCommand(
@@ -11,8 +12,11 @@ public record CreateMembershipRenewalSaleCommand(
 		UUID planId,
 		UUID productId,
 		String planName,
-		long priceCents,
+		long listPriceCents,
+		long discountCents,
+		long totalCents,
 		String currency,
+		List<MembershipBenefitSnapshot> appliedBenefits,
 		String method,
 		String reference,
 		boolean validateNow,

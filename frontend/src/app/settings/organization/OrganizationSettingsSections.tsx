@@ -131,7 +131,7 @@ export function TeamAccessCard() {
         <div className="min-w-0">
           <p className="app-eyebrow">Equipo</p>
           <h2 className="mt-2 text-xl font-semibold">Usuarios y permisos</h2>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-[#5d6b63]">
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-[var(--brand-muted)]">
             Crea cuentas para recepcion, gerencia, coaches y operacion, y limita las sucursales que puede usar cada persona.
           </p>
         </div>
@@ -144,16 +144,30 @@ export function TeamAccessCard() {
 }
 
 type OrganizationDrawerProps = {
+  accessToken: string;
   errors: FieldErrorMap;
   form: OrganizationUpdatePayload;
   open: boolean;
+  organizationId: string;
   saving: boolean;
   onChange: (form: OrganizationUpdatePayload) => void;
   onClose: () => void;
+  onLogoChange: (logoUrl: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 };
 
-export function OrganizationDrawer({ errors, form, open, saving, onChange, onClose, onSubmit }: OrganizationDrawerProps) {
+export function OrganizationDrawer({
+  accessToken,
+  errors,
+  form,
+  open,
+  organizationId,
+  saving,
+  onChange,
+  onClose,
+  onLogoChange,
+  onSubmit,
+}: OrganizationDrawerProps) {
   return (
     <AppDrawer
       description="Actualiza datos comerciales, contacto y marca visual que veran duenos, gerentes, recepcion y kiosco."
@@ -175,10 +189,14 @@ export function OrganizationDrawer({ errors, form, open, saving, onChange, onClo
         <p className="app-eyebrow">Marca del gimnasio</p>
         <TextField label="Nombre visible de marca" name="brandName" required={false} value={form.brandName ?? ""} onChange={(value) => onChange({ ...form, brandName: value })} />
         <LogoUploadField
+          accessToken={accessToken}
           disabled={saving}
           logoUrl={form.logoUrl}
-          tenantName={form.tradeName || form.brandName || form.legalName}
-          onChange={(logoUrl) => onChange({ ...form, logoUrl })}
+          organizationId={organizationId}
+          onChange={(logoUrl) => {
+            onChange({ ...form, logoUrl });
+            onLogoChange(logoUrl);
+          }}
         />
         <div className="grid gap-4 sm:grid-cols-3">
           <ColorField error={errors.primaryColor} label="Color principal" name="primaryColor" value={form.primaryColor ?? "#164E63"} onChange={(value) => onChange({ ...form, primaryColor: value })} />

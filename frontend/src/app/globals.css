@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  font-size: 14px;
   --background: #f4f7fb;
   --foreground: #111827;
   --brand-primary: #164e63;
@@ -184,32 +185,44 @@ th {
 .app-button-secondary,
 .app-button-soft {
   align-items: center;
-  border-radius: 0.5rem;
+  border-radius: 1rem;
   display: inline-flex;
-  font-size: 0.88rem;
-  font-weight: 800;
-  min-height: 2.55rem;
+  font-size: 0.9rem;
+  font-weight: 850;
+  min-height: 2.85rem;
   justify-content: center;
-  padding: 0 0.95rem;
-  transition: border-color 160ms ease, background-color 160ms ease, color 160ms ease, transform 160ms ease;
+  padding: 0 1.25rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
 }
 
 .app-button:hover,
 .app-button-secondary:hover,
 .app-button-soft:hover {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.1);
 }
 
 .app-button {
   background: var(--brand-primary);
-  border-bottom: 0.2rem solid var(--brand-accent);
+  border-bottom: 0.25rem solid var(--brand-accent);
   color: white;
+  box-shadow: 0 4px 12px rgba(22, 78, 99, 0.15);
+}
+
+.app-button:active {
+  transform: translateY(0);
+  border-bottom-width: 0.1rem;
 }
 
 .app-button-secondary {
-  background: color-mix(in srgb, var(--brand-accent) 10%, white);
-  border: 1px solid color-mix(in srgb, var(--brand-accent) 38%, var(--brand-line));
-  color: var(--brand-ink);
+  background: white;
+  border: 2px solid var(--brand-line);
+  color: var(--brand-primary);
+}
+
+.app-button-secondary:hover {
+  border-color: var(--brand-primary);
 }
 
 .app-button-soft {
@@ -219,21 +232,22 @@ th {
 
 .app-input {
   background: white;
-  border: 1px solid var(--brand-line);
-  border-radius: 0.5rem;
+  border: 2px solid var(--brand-line);
+  border-radius: 1rem;
   color: var(--brand-ink);
-  font-size: 0.92rem;
+  font-size: 0.95rem;
   font-weight: 650;
-  min-height: 2.75rem;
+  min-height: 3rem;
   outline: none;
-  padding: 0 0.85rem;
-  transition: border-color 160ms ease, box-shadow 160ms ease;
+  padding: 0 1.15rem;
+  transition: all 0.2s ease;
   width: 100%;
 }
 
 .app-input:focus {
-  border-color: color-mix(in srgb, var(--brand-primary) 52%, white);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 16%, transparent);
+  border-color: var(--brand-primary);
+  background-color: white;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-primary) 8%, transparent);
 }
 
 .app-input::placeholder {
@@ -425,20 +439,22 @@ th {
 .app-card {
   background: var(--brand-card);
   border: 1px solid var(--brand-line);
-  border-radius: 0.5rem;
-  box-shadow: 0 16px 44px rgba(15, 23, 42, 0.08);
+  border-radius: 1.25rem;
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.05);
 }
 
 .app-card-title {
   color: var(--brand-ink);
-  font-size: 1.15rem;
-  font-weight: 850;
+  font-size: 1.25rem;
+  font-weight: 900;
+  letter-spacing: -0.01em;
 }
 
 .app-card-copy {
   color: var(--brand-muted);
-  font-size: 0.9rem;
+  font-size: 0.95rem;
   line-height: 1.55;
+  font-weight: 500;
 }
 
 .app-pill {
@@ -1123,7 +1139,7 @@ th {
   background: var(--brand-surface);
   color: var(--brand-ink);
   display: grid;
-  grid-template-columns: 17rem minmax(0, 1fr);
+  grid-template-columns: 16rem minmax(0, 1fr);
   min-height: 100vh;
 }
 
@@ -1132,23 +1148,26 @@ th {
 }
 
 .admin-sidebar {
-  background:
-    linear-gradient(180deg, #0f172a, color-mix(in srgb, var(--brand-primary) 42%, #0f172a));
+  background: linear-gradient(180deg, var(--brand-primary), color-mix(in srgb, var(--brand-primary) 85%, var(--brand-accent)));
   color: white;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 1.25rem;
   max-height: 100vh;
   overflow-y: auto;
-  padding: 1.25rem;
+  padding: 1.5rem 1.25rem;
   position: sticky;
   top: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .admin-sidebar-brand {
   align-items: center;
   display: flex;
-  gap: 0.75rem;
+  flex-direction: column;
+  gap: 0.85rem;
+  text-align: center;
+  padding-bottom: 0.75rem;
 }
 
 .admin-sidebar-brand > span {
@@ -1159,18 +1178,19 @@ th {
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
-  border-radius: 0.5rem;
+  border-radius: 1.25rem;
   color: #0f172a;
   display: inline-flex;
   font-weight: 950;
-  height: 2.6rem;
+  height: 5rem;
   justify-content: center;
-  width: 2.6rem;
+  width: 5rem;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.25);
 }
 
 .admin-sidebar-brand > span.with-logo {
   background: white;
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  border: 2px solid rgba(255, 255, 255, 0.4);
   overflow: hidden;
 }
 
@@ -1182,19 +1202,28 @@ th {
 
 .admin-sidebar-brand div {
   display: grid;
-  min-width: 0;
+  gap: 0.1rem;
+  width: 100%;
 }
 
-.admin-sidebar-brand strong,
-.admin-sidebar-brand small {
+.admin-sidebar-brand strong {
+  font-size: 1.15rem;
+  font-weight: 950;
+  letter-spacing: -0.01em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .admin-sidebar-brand small {
-  color: rgba(255, 255, 255, 0.6);
-  margin-top: 0.15rem;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-sidebar nav {
@@ -1304,9 +1333,11 @@ th {
 }
 
 .admin-sidebar nav a.active {
-  background: color-mix(in srgb, var(--brand-accent) 13%, white);
-  border-left: 0.25rem solid var(--brand-accent);
-  color: #0f172a;
+  background: white;
+  border-radius: 0.75rem;
+  color: var(--brand-primary);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  border-left: 4px solid var(--brand-accent);
 }
 
 .admin-sidebar nav a.active span {
@@ -1365,137 +1396,197 @@ th {
 .admin-panel,
 .admin-action-card {
   border: 1px solid var(--brand-line);
-  border-radius: 0.75rem;
-  box-shadow: 0 18px 52px rgba(15, 23, 42, 0.08);
+  border-radius: 1.5rem;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
 }
 
 .admin-command-bar {
   align-items: center;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.94), color-mix(in srgb, var(--brand-accent) 6%, white)),
-    radial-gradient(circle at 96% 0%, color-mix(in srgb, var(--brand-primary) 10%, transparent), transparent 18rem);
+  background: linear-gradient(135deg, var(--brand-primary), color-mix(in srgb, var(--brand-primary) 80%, var(--brand-accent)));
+  border-color: color-mix(in srgb, var(--brand-primary) 85%, black);
+  border-radius: 2rem;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18);
   display: flex;
-  gap: 1rem;
+  gap: 1.5rem;
   justify-content: space-between;
-  padding: 1.2rem;
+  padding: 2.25rem 2.5rem;
+  position: relative;
+  overflow: hidden;
+  color: white;
+}
+
+.admin-command-bar::after {
+  background: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.04) 10px, rgba(255,255,255,0.04) 20px);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
 }
 
 .admin-command-bar p,
 .admin-panel-header p {
-  color: var(--brand-primary);
-  font-size: 0.74rem;
-  font-weight: 950;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.75rem;
+  font-weight: 900;
   text-transform: uppercase;
+  letter-spacing: 0.1em;
+  position: relative;
+  z-index: 10;
 }
 
 .admin-command-bar h1 {
-  font-size: clamp(1.8rem, 3vw, 3rem);
+  font-size: clamp(1.8rem, 3.5vw, 2.75rem);
   font-weight: 950;
   margin-top: 0.25rem;
+  color: white;
+  position: relative;
+  z-index: 10;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .admin-command-bar span,
 .admin-muted-text {
-  color: var(--brand-muted);
-  font-size: 0.92rem;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.95rem;
   line-height: 1.5;
+  position: relative;
+  z-index: 10;
+}
+
+.admin-muted-text {
+  color: var(--brand-muted);
 }
 
 .admin-command-actions {
   align-items: center;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.6rem;
+  gap: 0.85rem;
   justify-content: flex-end;
+  position: relative;
+  z-index: 10;
 }
 
 .admin-role-chip {
-  background: color-mix(in srgb, var(--brand-accent) 12%, white);
-  border: 1px solid var(--brand-accent-border);
-  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 1rem;
   display: grid;
-  gap: 0.08rem;
-  min-height: 3.05rem;
-  min-width: 9.8rem;
-  padding: 0.48rem 0.75rem;
+  gap: 0.05rem;
+  min-height: 3.5rem;
+  min-width: 10rem;
+  padding: 0.6rem 1rem;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
 }
 
 .admin-role-chip span {
-  color: var(--brand-muted);
-  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.65rem;
   font-weight: 900;
   line-height: 1.1;
   text-transform: uppercase;
 }
 
 .admin-role-chip strong {
-  color: var(--brand-ink);
-  font-size: 0.88rem;
-  font-weight: 900;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: white;
+  font-size: 1rem;
+  font-weight: 950;
 }
 
 .admin-branch-switcher {
-  background: color-mix(in srgb, var(--brand-primary) 8%, white);
-  border: 1px solid var(--brand-primary-border);
-  border-radius: 0.65rem;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 1rem;
   display: grid;
-  gap: 0.15rem;
-  min-width: 12rem;
-  padding: 0.45rem 0.6rem;
+  gap: 0.05rem;
+  min-height: 3.5rem;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+}
+
+.admin-branch-switcher:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
 }
 
 .admin-branch-switcher span {
-  color: var(--brand-muted);
-  font-size: 0.68rem;
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 0.65rem;
   font-weight: 900;
   text-transform: uppercase;
 }
 
 .admin-branch-switcher select {
   background: transparent;
-  color: var(--brand-ink);
-  font-size: 0.88rem;
-  font-weight: 850;
+  border: none;
+  color: white;
+  font-size: 1rem;
+  font-weight: 950;
   outline: none;
+  padding: 0;
+  margin-top: -2px;
+  cursor: pointer;
+}
+
+.admin-branch-switcher select option {
+  background: var(--brand-primary);
+  color: white;
 }
 
 .admin-search-box {
   align-items: center;
   background: white;
-  border: 1px solid var(--brand-line);
-  border-radius: 0.5rem;
+  border: 2px solid var(--brand-line);
+  border-radius: 1rem;
   display: grid;
   gap: 0.1rem;
   min-width: min(18rem, 100%);
-  padding: 0.45rem 0.75rem;
+  padding: 0.6rem 1rem;
+  transition: all 0.2s ease;
+}
+
+.admin-search-box:focus-within {
+  border-color: var(--brand-primary);
+  box-shadow: 0 4px 15px rgba(15, 23, 42, 0.08);
 }
 
 .admin-search-box span {
   color: var(--brand-muted);
-  font-size: 0.68rem;
+  font-size: 0.65rem;
   font-weight: 850;
   text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .admin-search-box input {
   border: 0;
+  background: transparent;
   color: var(--brand-ink);
   font-size: 0.95rem;
   font-weight: 750;
-  height: 1.55rem;
+  height: 1.8rem;
   outline: none;
 }
 
 .admin-link-grid a {
   background: white;
-  border: 1px solid var(--brand-line);
-  border-radius: 0.5rem;
+  border: 2px solid var(--brand-line);
+  border-radius: 1rem;
   color: var(--brand-ink);
   font-weight: 850;
-  padding: 0.75rem 0.9rem;
+  padding: 1rem 1.25rem;
+  transition: all 0.2s ease;
+}
+
+.admin-link-grid a:hover {
+  border-color: var(--brand-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0,0,0,0.05);
 }
 
 .app-drawer {
@@ -1603,15 +1694,16 @@ th {
 }
 
 .admin-action-card {
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), color-mix(in srgb, var(--brand-surface) 38%, white));
-  border: 1px solid var(--brand-line);
-  border-left: 0.25rem solid color-mix(in srgb, var(--brand-primary) 72%, var(--brand-accent));
-  border-radius: 0.5rem;
+  background: white;
+  border: 2px solid var(--brand-line);
+  border-radius: 1.5rem;
   display: grid;
-  min-height: 11.5rem;
-  padding: 1.15rem;
+  min-height: 10.5rem;
+  padding: 1.5rem;
   position: relative;
   overflow: hidden;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
 }
 
 .admin-action-card::after {
@@ -1637,13 +1729,17 @@ th {
 }
 
 .admin-action-card:hover {
-  border-color: color-mix(in srgb, var(--brand-primary) 38%, white);
-  transform: translateY(-2px);
+  border-color: var(--brand-primary);
+  transform: translateY(-4px);
+  box-shadow: 0 15px 35px rgba(15, 23, 42, 0.08);
 }
 
 .admin-panel {
-  background: rgba(255, 255, 255, 0.9);
-  padding: 1rem;
+  background: white;
+  border: 1px solid var(--brand-line);
+  border-radius: 1.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 4px 15px rgba(15, 23, 42, 0.02);
 }
 
 .admin-panel-header {
@@ -1654,9 +1750,10 @@ th {
 }
 
 .admin-panel-header h2 {
-  font-size: 1.2rem;
+  font-size: 1.35rem;
   font-weight: 950;
-  margin-top: 0.2rem;
+  color: var(--brand-primary);
+  letter-spacing: -0.02em;
 }
 
 .admin-panel-header a {
@@ -1672,13 +1769,14 @@ th {
 }
 
 .admin-report-metric {
-  background: color-mix(in srgb, var(--brand-primary) 7%, white);
-  border: 1px solid color-mix(in srgb, var(--brand-primary) 14%, var(--brand-line));
-  border-radius: 0.5rem;
+  background: white;
+  border: 1px solid var(--brand-line);
+  border-radius: 1.25rem;
   display: grid;
-  gap: 0.3rem;
-  min-height: 6rem;
-  padding: 0.9rem;
+  gap: 0.4rem;
+  min-height: 5.5rem;
+  padding: 1.25rem;
+  transition: all 0.2s ease;
 }
 
 .admin-report-metric.green {
@@ -4653,4 +4751,57 @@ button.admin-secondary-link:disabled {
   .workout-builder-actions > div {
     display: grid;
   }
+}
+
+/* --- UNIFICATION OVERRIDES --- */
+.admin-command-bar {
+  background: linear-gradient(135deg, var(--brand-primary), color-mix(in srgb, var(--brand-primary) 80%, var(--brand-accent))) !important;
+  border-color: color-mix(in srgb, var(--brand-primary) 85%, black) !important;
+  border-radius: 2rem !important;
+  box-shadow: 0 20px 50px rgba(15, 23, 42, 0.18) !important;
+  padding: 2.25rem 2.5rem !important;
+  color: white !important;
+  position: relative !important;
+  overflow: hidden !important;
+}
+
+.admin-command-bar::after {
+  background: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.04) 10px, rgba(255,255,255,0.04) 20px) !important;
+  content: "" !important;
+  inset: 0 !important;
+  pointer-events: none !important;
+  position: absolute !important;
+}
+
+.admin-command-bar h1 {
+  color: white !important;
+  font-weight: 950 !important;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+}
+
+.admin-command-bar p, .admin-command-bar span {
+  color: rgba(255, 255, 255, 0.8) !important;
+}
+
+.admin-role-chip, .admin-branch-switcher {
+  background: rgba(255, 255, 255, 0.12) !important;
+  backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  border-radius: 1rem !important;
+}
+
+.admin-role-chip strong, .admin-branch-switcher select {
+  color: white !important;
+}
+
+.app-card, .admin-panel {
+  border-radius: 1.5rem !important;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04) !important;
+  background-color: white !important;
+  border: 1px solid var(--brand-line) !important;
+}
+
+.app-button {
+  border-radius: 1rem !important;
+  font-weight: 900 !important;
 }

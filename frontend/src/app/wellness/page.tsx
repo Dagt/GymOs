@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { AuthRequired } from "@/components/AuthRequired";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { normalizePhone, validatePhone } from "@/components/form-validation";
-import { toDateInput } from "@/lib/date-time";
+import { localDateTimeToIso, toDateInput } from "@/lib/date-time";
 import {
   cancelWellnessAppointment,
   completeWellnessAppointment,
@@ -78,6 +78,7 @@ export default function WellnessPage() {
   const [modalServices, setModalServices] = useState<ProfessionalServiceSummary[]>([]);
   const [modalServiceId, setModalServiceId] = useState("");
   const [modalDate, setModalDate] = useState(todayIso);
+  const [externalRequestedTime, setExternalRequestedTime] = useState("10:00");
   const [modalSlots, setModalSlots] = useState<WellnessAvailabilitySlot[]>([]);
   const [selectedSlot, setSelectedSlot] = useState<WellnessAvailabilitySlot | null>(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
@@ -237,7 +238,11 @@ export default function WellnessPage() {
     setMessage(null);
 
     try {
-      const startsAtIso = `${data.date}T${data.time}:00Z`;
+      const startsAtIso = localDateTimeToIso(data.date, data.time);
+      if (!startsAtIso) {
+        setError("La fecha u hora acordada no es válida.");
+        return;
+      }
       await confirmWellnessAppointment(session.accessToken, coordinatingAppointment.id, {
         startsAt: startsAtIso,
         notes: data.notes,
@@ -286,6 +291,7 @@ export default function WellnessPage() {
     const initialProfId = professionals[0]?.id || "";
     setModalProfId(initialProfId);
     setSelectedSlot(null);
+    setExternalRequestedTime("10:00");
     setNotes("");
     setModalDate(agendaDate); // Pre-fills current calendar date!
     if (initialProfId && session) {
@@ -343,14 +349,23 @@ export default function WellnessPage() {
   ) {
     setLoadingSlots(true);
     try {
-      const [srvList, slotList] = await Promise.all([
-        getProfessionalServices(token, profId),
-        getProfessionalAvailabilitySlots(token, profId, srvId || undefined, dateStr),
-      ]);
+      const srvList = await getProfessionalServices(token, profId);
+      const resolvedServiceId = srvId || srvList[0]?.id || "";
       setModalServices(srvList);
-      if (srvList.length > 0 && !srvId) {
-        setModalServiceId(srvList[0].id);
+      setModalServiceId(resolvedServiceId);
+
+      const professional = professionals.find((candidate) => candidate.id === profId);
+      if (professional?.engagementType === "EXTERNAL") {
+        setModalSlots([]);
+        return;
       }
+
+      const slotList = await getProfessionalAvailabilitySlots(
+        token,
+        profId,
+        resolvedServiceId || undefined,
+        dateStr,
+      );
       setModalSlots(slotList);
     } catch {
       setModalSlots([]);
@@ -364,11 +379,22 @@ export default function WellnessPage() {
     if (!session || !selectedClient || !modalProfId) return;
 
     const modalProf = professionals.find((p) => p.id === modalProfId);
-    const isExternalProf = Boolean(modalProf && !modalProf.officeLocation);
-    const startsAtIso = selectedSlot?.startsAt || `${modalDate}T09:00:00Z`;
+    const isExternalProf = modalProf?.engagementType === "EXTERNAL";
+
+    if (isExternalProf && !externalRequestedTime) {
+      setError("Debes indicar una hora solicitada para la cita externa.");
+      return;
+    }
 
     if (!selectedSlot && !isExternalProf) {
       setError("Debes seleccionar un horario para la cita.");
+      return;
+    }
+
+    const startsAtIso = selectedSlot?.startsAt
+      ?? localDateTimeToIso(modalDate, externalRequestedTime);
+    if (!startsAtIso) {
+      setError("La fecha u hora solicitada no es válida.");
       return;
     }
 
@@ -387,7 +413,7 @@ export default function WellnessPage() {
       });
       setMessage(
         isExternalProf
-          ? `Solicitud enviada para ${selectedClient.firstName} ${selectedClient.lastName}. El especialista notificará sus horarios.`
+          ? `Solicitud registrada para ${selectedClient.firstName} ${selectedClient.lastName}. El horario queda pendiente de confirmación del especialista.`
           : `Cita agendada y confirmada para ${selectedClient.firstName} ${selectedClient.lastName}.`
       );
       setIsModalOpen(false);
@@ -416,8 +442,8 @@ export default function WellnessPage() {
     setProfDisplayName(p.displayName);
     setProfType(p.professionalType);
     setProfOfficeLocation(p.officeLocation || "");
-    const isDePlanta = Boolean(p.officeLocation);
-    setModality(isDePlanta ? "STAFF" : "EXTERNAL");
+    const isDePlanta = p.engagementType === "STAFF";
+    setModality(p.engagementType);
     setProfEmail(p.email || "");
     setProfPhone(p.phone || "");
     setProfBio(p.bio || "");
@@ -434,7 +460,7 @@ export default function WellnessPage() {
       setPrice(info.defaultPrice);
     }
 
-    if (session && p.id) {
+    if (session && p.id && isDePlanta) {
       getProfessionalAvailability(session.accessToken, p.id)
         .then((avail) => {
           setScheduleDays(
@@ -518,6 +544,7 @@ export default function WellnessPage() {
           displayName: profDisplayName,
           professionalType: profType,
           officeLocation: finalOfficeLoc,
+          engagementType: modality,
           email: profEmail || undefined,
           phone: formattedPhone,
           bio: profBio || undefined,
@@ -529,6 +556,7 @@ export default function WellnessPage() {
           displayName: profDisplayName,
           professionalType: profType,
           officeLocation: finalOfficeLoc,
+          engagementType: modality,
           email: profEmail || undefined,
           phone: formattedPhone,
           bio: profBio || undefined,
@@ -674,11 +702,13 @@ export default function WellnessPage() {
         appointmentDate={modalDate}
         clientQuery={clientQuery}
         clientResults={clientResults}
+        externalRequestedTime={externalRequestedTime}
         loadingSlots={loadingSlots}
         notes={notes}
         onAppointmentDateChange={handleModalDateChange}
         onClientQueryChange={handleClientQueryChange}
         onClose={handleCloseModal}
+        onExternalRequestedTimeChange={setExternalRequestedTime}
         onNotesChange={setNotes}
         onSelectClient={setSelectedClient}
         onSelectProfessional={handleModalProfChange}

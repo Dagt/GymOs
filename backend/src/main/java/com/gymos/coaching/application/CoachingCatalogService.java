@@ -45,15 +45,17 @@ public class CoachingCatalogService {
 	private final AuditService auditService;
 	private final ObjectMapper objectMapper;
 	private final SecurityProperties securityProperties;
+	private final WorkoutPdfDocumentMapper workoutPdfDocumentMapper;
 
 	public CoachingCatalogService(
 			CoachingCatalogRepository repository, AuditService auditService, ObjectMapper objectMapper,
-			SecurityProperties securityProperties
+			SecurityProperties securityProperties, WorkoutPdfDocumentMapper workoutPdfDocumentMapper
 	) {
 		this.repository = repository;
 		this.auditService = auditService;
 		this.objectMapper = objectMapper;
 		this.securityProperties = securityProperties;
+		this.workoutPdfDocumentMapper = workoutPdfDocumentMapper;
 	}
 
 	@Transactional(readOnly = true)
@@ -364,7 +366,8 @@ public class CoachingCatalogService {
 				principal.organizationId(), principal.branchId(), assignmentId, workoutReadScope(principal)
 		).orElseThrow(() -> new BusinessException("WORKOUT_ASSIGNMENT_NOT_FOUND", "La asignación no existe."));
 		try {
-			WorkoutPdfDocument doc = WorkoutPdfDocumentMapper.fromAssignmentData(data);
+			WorkoutPdfDocument doc = workoutPdfDocumentMapper.fromAssignmentData(
+					principal.organizationId(), principal.branchId(), data);
 			WorkoutPdfTemplate targetTemplate = template != null ? template : WorkoutPdfTemplate.COMPACT_LIGHT;
 			WorkoutPdfRenderer renderer = switch (targetTemplate) {
 				case COMPACT_LIGHT, COMPACT_DARK -> new CompactWorkoutPdfRenderer();

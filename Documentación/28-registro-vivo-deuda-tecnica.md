@@ -1,7 +1,7 @@
 # 28. Registro vivo de hallazgos y deuda técnica
 
 Estado: VIGENTE / OBLIGATORIO
-Corte: 27 de julio de 2026
+Corte: 30 de julio de 2026
 
 ## 1. Propósito y regla de actualización
 
@@ -25,9 +25,8 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 | CLI-001 | P1 | Socios/CRM | ABIERTA | Falta auditoría completa de PII, duplicados e importaciones fallidas. | Política de exposición y pruebas CRUD/importación/multi-sucursal. |
 | CAT-001 | P2 | Catálogo | ABIERTA | Quedan compatibilidad legacy, alto volumen y ciclo de imágenes por validar. | Retirar contratos obsoletos y aprobar pruebas de volumen/archivos. |
 | SAL-001 | P0 | Ventas/pagos | ABIERTA | Concurrencia y conciliación financiera no tienen E2E integral. | Pruebas simultáneas e invariantes venta–pago–inventario–refund. |
-| MEM-001 | P1 | Membresías | ABIERTA | Semántica de inicio, fin y duración requiere auditoría integral. | Casos de borde y pruebas con zona horaria y renovación. |
-| BEN-001 | P1 | Beneficios | ABIERTA | Elegibilidad no tiene una fuente de verdad transversal demostrada. | Política única usada por membresía, reserva y acceso con pruebas. |
 | ACC-001 | P0 | Accesos | ABIERTA | Doble consumo, reintentos y privacidad requieren pruebas. | Consumo atómico, respuestas mínimas y matriz dispositivo/tenant. |
+| ACC-002 | P3 | Acceso físico | ACEPTADA | Adaptadores de proveedor, modo offline y telemetría de hardware se posponen por decisión de producto. No bloquean renovaciones, POS ni beneficios. | Reactivar únicamente cuando el hardware físico entre en el roadmap. |
 | SELF-001 | P0 | Autoservicio | ABIERTA | Token de terminal, rate limiting y privacidad necesitan hardening. | Threat model, límites, expiración y E2E de kiosco. |
 | BKG-001 | P1 | Reservas | ABIERTA | Falta E2E de colisiones, pagos, cancelación y otra sucursal. | Suite crítica de calendario y autorización en CI. |
 | INV-001 | P1 | Inventarios | ABIERTA | Transferencias y conteos no tienen paginación parametrizada completa. | Contratos paginados, UI y pruebas de volumen. |
@@ -44,6 +43,16 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 
 | ID | Módulo | Resolución | Evidencia |
 |---|---|---|---|
+| AUTH-003 | Identidad/socios | Las migraciones de roles referenciaban `client.read`, `client.create` y `client.update` antes de que existieran; el seed local los creaba al final sólo para su dueño demo. V57 crea los tres permisos mediante Flyway y repara las plantillas de dueño, gerencia, recepción y administración para bases nuevas y existentes. | `DatabaseMigrationTests` en PostgreSQL limpio y E2E con “Registrar Nuevo Socio” visible para gerencia y recepción. |
+| CAT-002 | Catálogo | `unitOfMeasure` dejó de ser una captura abierta en el alta de productos. El frontend ofrece unidades comunes con claves canónicas, normaliza etiquetas heredadas y el backend rechaza valores fuera del contrato. | `catalog-units.test.ts`, `CatalogProductServiceTests.physicalProductRejectsUnitOutsideClosedCatalog` y E2E del selector de unidad. |
+| AUTH-002 | Identidad/organizaciones | Se corrigió la causa real del falso “sesión inválida” en Datos y sucursales: `organization.read` se usaba pero nunca había sido creado por Flyway, por lo que el seed local lo agregaba después de las migraciones sin asignarlo al rol global de dueño. V56 crea el permiso, repara todas las plantillas de dueño y el endpoint de lectura acepta también `organization.update`. Las denegaciones con JWT válido ahora responden 403 JSON y no 401 vacío. | `DatabaseMigrationTests.flywayAddsArchitecturalStabilizationColumns`, `SecurityAuthorizationTests.validJwtWithoutOrganizationPermissionReturnsForbiddenInsteadOfInvalidSession`, `organizationUpdateAuthorityCanReadCurrentOrganization` y smoke en Chromium con JWT de dueño sin `organization.read`. |
+| CFG-002 | Configuración/logo | La edición y el alta inicial dejaron de guardar el logo como archivo ignorado en `frontend/public/tenants`, que producía 500 al crear y 404 al clonar o reconstruir otra PC. El alta previsualiza el archivo, crea el tenant y después usa el endpoint administrado para persistirlo en MinIO; la ruta POST local heredada fue retirada. | `OrganizationLogoServiceTests`, endpoints `POST /organizations/current/logo` y `POST /organizations/{organizationId}/logo`, proxy de lectura `/api/tenant-logo/{organizationId}`, typecheck y E2E de alta inicial. |
+| BEN-001 | Beneficios/elegibilidad | Se creó el módulo transversal `eligibility` con una única política pública para cliente activo, fecha efectiva, sucursal, membresía vigente, planes permitidos, descuentos asignados y beneficios ACCESS heredados. Membresías, reservas y acceso consumen el mismo contrato; se retiraron las consultas paralelas de elegibilidad de cada módulo. | `DefaultEligibilityPolicyTests`, `BookingMembershipPlanIntegrationTests`, `MembershipCommercePersistenceIntegrationTests`, `MembershipPricingServiceTests` y `AccessBenefitDecisionTests`. |
+| COA-025 | Coaches/PDF/arquitectura | Los lookups PDF dejaron de inyectar `JdbcClient` en `application` y de publicar instancias globales `static volatile`. `WorkoutPdfDocumentMapper` recibe puertos explícitos con IDs de tenant/sucursal y los adaptadores JDBC viven en `coaching.infrastructure`. | `ArchitectureTests.applicationLayerDoesNotUseJdbcClient`, `CoachingCatalogServiceTests`, `WorkoutPdfExerciseCatalogLookupTests`, `WorkoutPdfLookupAdapterTests` y `CompactWorkoutPdfRendererRegressionTests`. |
+| MEM-001 | Membresías/fechas | Definida duración inclusiva, continuidad al día siguiente, reinicio de vencidas, fecha operativa México y expiración después de gracia. | `MembershipActivationWindowCalculatorTests`, `MembershipRenewalWindowCalculatorTests`, `MembershipBusinessDateTests` y prueba PostgreSQL de expiración. |
+| MEM-002 | Membresías/concurrencia | V54 conserva periodos y una sola activa; el lock ahora separa selección de fila y relectura enriquecida para soportar el cambio concurrente de `sale_id`. | `MembershipCommercePersistenceIntegrationTests.concurrentRenewalsSerializeOnMembershipAndCreateConsecutivePeriods`. |
+| BEN-002 | Beneficios/accesos | La herencia `plan → ACCESS` y su revocación por vencimiento o cambio de plan quedaron demostradas sin hardware. | `MembershipCommercePersistenceIntegrationTests.pricingEligibilityAndAccessInheritanceReactToCurrentConfiguration`. |
+| POS-001 | POS/membresías | El catálogo conserva planes, pero el carrito y `POST /sales` rechazan su procesamiento genérico; alta, renovación y cambio generan ventas financieras contextualizadas. El lector consulta por código exacto fuera de la página local. | `SaleLineResolverTests`, `MembershipCommercePersistenceIntegrationTests`, 54 pruebas frontend, typecheck, lint y build en `feature/reception-pos-init`. |
 | COA-C01 | Coaches/catálogo | Corregida discrepancia `alias`/`alias_name`. | Repositorio alineado con V45. |
 | COA-C02 | Coaches/catálogo | Ejercicios SYSTEM protegidos contra edición y alias. | Servicio y `UPDATE` limitado a organización. |
 | COA-C03 | Coaches/rutinas | Corregido evento de publicación. | Auditoría `WORKOUT_PUBLISHED`. |

@@ -61,6 +61,8 @@ import {
 
 type Tab = "builder" | "catalog" | "assignments" | "metrics";
 
+// Native coaches UX v1
+
 const EMPTY_EXERCISE_FORM: CreateExercisePayload = {
   name: "",
   description: "",
@@ -636,15 +638,10 @@ export default function CoachesPage() {
       updateBlockList(current, sessionIndex, blockIndex, updater));
   }
 
-  function addCatalogExercise(sessionIndex: number, blockIndex: number, exercise: Exercise) {
+  function addBlankExercise(sessionIndex: number, blockIndex: number) {
     mutateBlock(sessionIndex, blockIndex, (block) => ({
       ...block,
-      exercises: [...block.exercises, {
-        exerciseId: exercise.id,
-        exerciseName: exercise.name,
-        prescription: "",
-        optional: false,
-      }],
+      exercises: [...block.exercises, emptyExercise()],
     }));
   }
 
@@ -982,6 +979,7 @@ export default function CoachesPage() {
                         {block.exercises.map((exercise, exerciseIndex) => (
                           <ExerciseEditor
                             blockIndex={blockIndex}
+                            catalogExercises={exercisePage}
                             exercise={exercise}
                             exerciseIndex={exerciseIndex}
                             key={exerciseIndex}
@@ -1005,21 +1003,14 @@ export default function CoachesPage() {
                           ))}
                         </datalist>
                         <div className="workout-add-exercise">
-                          <select
-                            aria-label={`Agregar ejercicio de catálogo al bloque ${blockIndex + 1}`}
+                          <button
+                            aria-label={`Agregar ejercicio vacío al bloque ${blockIndex + 1}`}
                             className="rounded-lg border border-[#3b604b] bg-emerald-50/50 px-3 py-2 text-sm font-bold text-[#1e382b] transition-all hover:bg-emerald-100/70"
-                            defaultValue=""
-                            onChange={(event) => {
-                              const found = exercisePage.find((item) => item.id === event.target.value);
-                              if (found) addCatalogExercise(sessionIndex, blockIndex, found);
-                              event.target.value = "";
-                            }}
+                            onClick={() => addBlankExercise(sessionIndex, blockIndex)}
+                            type="button"
                           >
-                            <option value="">➕ Agregar ejercicio del catálogo…</option>
-                            {exercisePage.map((exercise) => (
-                              <option key={exercise.id} value={exercise.id}>{exercise.name}</option>
-                            ))}
-                          </select>
+                            + Agregar ejercicio
+                          </button>
                         </div>
                       </div>
                     </article>
@@ -1383,7 +1374,7 @@ export default function CoachesPage() {
                 </button>
               </div>
               <div>
-                <p className="mb-1 text-sm font-medium text-[#435249]">Socio</p>
+                <p className="mb-1 text-sm font-medium text-[var(--brand-ink)]">Socio</p>
                 <div className="flex max-w-2xl flex-wrap gap-2">
                   <input
                     className="app-input min-w-64 flex-1"
@@ -1887,6 +1878,7 @@ function GuidedSelect({
 
 function ExerciseEditor({
   blockIndex,
+  catalogExercises,
   exercise,
   exerciseIndex,
   listId,
@@ -1896,6 +1888,7 @@ function ExerciseEditor({
   total,
 }: {
   blockIndex: number;
+  catalogExercises: Exercise[];
   exercise: WorkoutExerciseDraft;
   exerciseIndex: number;
   listId: string;
@@ -1959,7 +1952,7 @@ function ExerciseEditor({
   }
 
   return (
-    <details className="workout-exercise-card" open={exerciseIndex === 0 || undefined}>
+    <details className="workout-exercise-card" open={exerciseIndex === 0 || !exercise.exerciseName.trim()}>
       <summary>
         <span>
           <small>Ejercicio {exerciseIndex + 1} · bloque {blockIndex + 1}</small>
@@ -1982,9 +1975,24 @@ function ExerciseEditor({
         <div className={`workout-exercise-quick-grid${usesDetailedSets ? " detailed" : ""}`}>
           <Field label="Ejercicio">
             <input
+              autoFocus={!exercise.exerciseName.trim()}
               className="app-input"
               list={listId}
-              onChange={(event) => onChange({ exerciseName: event.target.value, exerciseId: null })}
+              onChange={(event) => {
+                const value = event.target.value;
+                const normalizedValue = value.trim().toLocaleLowerCase("es-MX");
+                const match = catalogExercises.find((item) =>
+                  item.name.trim().toLocaleLowerCase("es-MX") === normalizedValue,
+                );
+                onChange({
+                  exerciseName: value,
+                  exerciseId: match?.id ?? null,
+                  equipment: match?.equipment ?? null,
+                  primaryMuscleGroup: match?.primaryMuscleGroup ?? null,
+                  movementPattern: match?.movementPattern ?? null,
+                });
+              }}
+              placeholder="Escribe para buscar en el catálogo"
               value={exercise.exerciseName}
             />
           </Field>
@@ -2135,8 +2143,11 @@ function ExerciseEditor({
                 {optionalDetailCount ? <em>{optionalDetailCount} con información</em> : null}
               </summary>
               <div>
-                <Field label="Indicación complementaria">
-                  <input className="app-input" onChange={(event) => onChange({ prescription: event.target.value })} placeholder="Subir carga si completa todas las repeticiones" value={exercise.prescription} />
+                <Field
+                  help="Variante, agarre, equipo, RPE, RIR o condición que completa las series y repeticiones."
+                  label="Complemento de la prescripción"
+                >
+                  <input className="app-input" onChange={(event) => onChange({ prescription: event.target.value })} placeholder="Ej. con mancuernas · agarre neutro · RIR 2" value={exercise.prescription} />
                 </Field>
                 <Field label="Tempo">
                   <input className="app-input" onChange={(event) => onChange({ tempo: event.target.value })} placeholder="3-1-1" value={exercise.tempo ?? ""} />
@@ -2150,8 +2161,11 @@ function ExerciseEditor({
                 <Field label="Agrupación">
                   <input className="app-input" onChange={(event) => onChange({ groupKey: event.target.value })} placeholder="A1 / circuito 1" value={exercise.groupKey ?? ""} />
                 </Field>
-                <Field label="Notas técnicas">
-                  <input className="app-input" onChange={(event) => onChange({ notes: event.target.value })} value={exercise.notes ?? ""} />
+                <Field
+                  help="Postura, ejecución, errores que deben evitarse, molestias o adaptaciones del movimiento."
+                  label="Indicaciones técnicas y seguridad"
+                >
+                  <input className="app-input" onChange={(event) => onChange({ notes: event.target.value })} placeholder="Ej. mantener los codos fijos y detener si aparece dolor" value={exercise.notes ?? ""} />
                 </Field>
                 <label className="workout-optional-check">
                   <input checked={exercise.optional ?? false} onChange={(event) => onChange({ optional: event.target.checked })} type="checkbox" />
@@ -2199,15 +2213,12 @@ function AssignmentTable({
   const [replacing, setReplacing] = useState<string | null>(null);
   const [replacementWorkoutId, setReplacementWorkoutId] = useState("");
 
-  async function downloadPdf(
-    assignment: AssignmentReport["details"][number],
-    template: "COMPACT_LIGHT" | "COMPACT_DARK" | "DETAILED" = "COMPACT_LIGHT"
-  ) {
+  async function downloadPdf(assignment: AssignmentReport["details"][number]) {
     setDownloading(assignment.id);
     onError("");
     try {
-      await downloadWorkoutPdf(session.accessToken, assignment.id, template);
-      onMessage(`PDF (${template === "COMPACT_LIGHT" ? "Claro" : template === "COMPACT_DARK" ? "Oscuro" : "Detallado"}) descargado.`);
+      await downloadWorkoutPdf(session.accessToken, assignment.id, "COMPACT_DARK");
+      onMessage("PDF descargado.");
     } catch (exception) {
       onError(errorMessage(exception));
     } finally {
@@ -2295,27 +2306,15 @@ function AssignmentTable({
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 {canDownloadPdf ? (
-                  <div className="inline-flex items-center rounded-lg border border-[#9eb2a5] bg-white p-0.5 shadow-sm">
-                    <button
-                      className="px-2.5 py-1.5 text-xs font-bold text-[#1e382b] hover:bg-emerald-50 rounded transition-all disabled:opacity-60"
-                      disabled={downloading === assignment.id}
-                      onClick={() => downloadPdf(assignment, "COMPACT_LIGHT")}
-                      title="PDF para impresión en papel (fondo claro)"
-                      type="button"
-                    >
-                      {downloading === assignment.id ? "Descargando…" : "📄 PDF Claro"}
-                    </button>
-                    <span className="text-stone-300 px-0.5">|</span>
-                    <button
-                      className="px-2.5 py-1.5 text-xs font-bold text-slate-800 hover:bg-stone-100 rounded transition-all disabled:opacity-60"
-                      disabled={downloading === assignment.id}
-                      onClick={() => downloadPdf(assignment, "COMPACT_DARK")}
-                      title="PDF visual oscuro para celular"
-                      type="button"
-                    >
-                      🌙 PDF Oscuro
-                    </button>
-                  </div>
+                  <button
+                    className="rounded-lg border border-[#9eb2a5] bg-white px-3 py-2 text-sm font-bold text-[#1e382b] transition-all hover:bg-emerald-50 disabled:opacity-60"
+                    disabled={downloading === assignment.id}
+                    onClick={() => downloadPdf(assignment)}
+                    title="Descargar rutina en PDF"
+                    type="button"
+                  >
+                    {downloading === assignment.id ? "Descargando…" : "Descargar PDF"}
+                  </button>
                 ) : null}
                 {canManage && assignment.status === "ACTIVE" ? (
                   <>
@@ -2423,10 +2422,11 @@ function OrderButtons({
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({ label, help, children }: { label: string; help?: string; children: React.ReactNode }) {
   return (
-    <label className="grid min-w-0 gap-1 text-sm font-medium text-[#435249]">
+    <label className="grid min-w-0 gap-1 text-sm font-medium text-[var(--brand-ink)]">
       <span>{label}</span>
+      {help ? <small className="text-xs font-normal leading-relaxed text-[#6b7d72]">{help}</small> : null}
       {children}
     </label>
   );
@@ -2604,3 +2604,4 @@ function normalizeRole(role: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 }
+

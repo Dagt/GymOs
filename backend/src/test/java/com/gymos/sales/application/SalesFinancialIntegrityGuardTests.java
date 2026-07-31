@@ -70,7 +70,7 @@ class SalesFinancialIntegrityGuardTests {
 		);
 		OffsetDateTime now = OffsetDateTime.now();
 		SaleHeader sale = new SaleHeader(
-				saleId, "S-TEST", branchId, UUID.randomUUID(), "Cliente", "PENDING_PAYMENT",
+				saleId, "S-TEST", branchId, UUID.randomUUID(), "Cliente", "PENDING_PAYMENT", "RETAIL_SALE",
 				totalCents, 0, totalCents, totalCents - balanceCents, balanceCents,
 				"MXN", null, now, now, now
 		);

@@ -3,11 +3,15 @@ package com.gymos.memberships.api;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.memberships.application.command.ChangeMembershipPlanCommand;
+import com.gymos.memberships.application.command.EnrollMembershipCommand;
 import com.gymos.memberships.application.command.RenewMembershipCommand;
 import com.gymos.memberships.application.result.MembershipSaleResult;
 import com.gymos.memberships.application.result.MembershipSummaryResult;
 import com.gymos.memberships.application.MembershipService;
+import com.gymos.memberships.application.MembershipPricingService;
+import com.gymos.memberships.application.result.MembershipQuoteResult;
 import com.gymos.memberships.infrastructure.MembershipRepository.MembershipSummary;
+import com.gymos.memberships.infrastructure.MembershipRepository.MembershipPeriodSummary;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -27,9 +31,35 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1")
 public class MembershipController {
 	private final MembershipService membershipService;
+	private final MembershipPricingService pricingService;
+	private final com.gymos.memberships.application.MembershipEnrollmentService enrollmentService;
 
-	public MembershipController(MembershipService membershipService) {
+	public MembershipController(
+			MembershipService membershipService,
+			MembershipPricingService pricingService,
+			com.gymos.memberships.application.MembershipEnrollmentService enrollmentService
+	) {
 		this.membershipService = membershipService;
+		this.pricingService = pricingService;
+		this.enrollmentService = enrollmentService;
+	}
+
+	@PostMapping("/membership-quotes")
+	MembershipQuoteResult quote(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@Valid @RequestBody MembershipQuoteRequest request
+	) {
+		return pricingService.quote(principal, request.clientId(), request.planId());
+	}
+
+	@PostMapping("/membership-enrollments")
+	RenewMembershipResponse enroll(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@Valid @RequestBody MembershipEnrollmentRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return toResponse(enrollmentService.enroll(
+				principal, request.toCommand(), correlationId(servletRequest)));
 	}
 
 	@GetMapping("/clients/{clientId}/memberships")
@@ -46,6 +76,14 @@ public class MembershipController {
 			@PathVariable UUID membershipId
 	) {
 		return membershipService.detail(principal, membershipId);
+	}
+
+	@GetMapping("/memberships/{membershipId}/periods")
+	List<MembershipPeriodSummary> periods(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID membershipId
+	) {
+		return membershipService.periods(principal, membershipId);
 	}
 
 	@PostMapping("/memberships/{membershipId}/renew")
@@ -95,6 +133,27 @@ public class MembershipController {
 	) {
 		ChangeMembershipPlanCommand toCommand() {
 			return new ChangeMembershipPlanCommand(targetPlanId, method, reference, validateNow, notes, idempotencyKey);
+		}
+	}
+
+	public record MembershipQuoteRequest(
+			@NotNull UUID clientId,
+			@NotNull UUID planId
+	) {
+	}
+
+	public record MembershipEnrollmentRequest(
+			@NotNull UUID clientId,
+			@NotNull UUID planId,
+			@NotNull @Pattern(regexp = "CASH|TRANSFER|CARD_MANUAL") String method,
+			@Size(max = 160) String reference,
+			boolean validateNow,
+			@Size(max = 2000) String notes,
+			@Size(max = 160) String idempotencyKey
+	) {
+		EnrollMembershipCommand toCommand() {
+			return new EnrollMembershipCommand(
+					clientId, planId, method, reference, validateNow, notes, idempotencyKey);
 		}
 	}
 

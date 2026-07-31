@@ -8,6 +8,9 @@ Estado: `FUNCIONAL`
 - roles y permisos aplicados en backend;
 - consolas y navegación condicionadas por rol;
 - rotación y gracia de refresh, suspensión y soporte de plataforma;
+- respuestas diferenciadas: `401 AUTHENTICATION_REQUIRED` sólo para ausencia o
+  invalidez de autenticación y `403 PERMISSION_DENIED` para un JWT válido sin
+  la autoridad requerida;
 - pruebas de autorización representativas.
 
 ## Pendiente

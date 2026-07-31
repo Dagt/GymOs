@@ -4,7 +4,9 @@ import com.gymos.audit.api.AuditService;
 import com.gymos.sales.api.events.PaymentRecordedV1;
 import com.gymos.sales.api.events.SaleCreatedV1;
 import com.gymos.sales.api.operations.CreateMembershipPlanChangeSaleCommand;
+import com.gymos.sales.api.operations.CreateMembershipEnrollmentSaleCommand;
 import com.gymos.sales.api.operations.CreateMembershipRenewalSaleCommand;
+import com.gymos.sales.api.operations.MembershipBenefitSnapshot;
 import com.gymos.sales.api.operations.MembershipSaleResult;
 import com.gymos.sales.infrastructure.MembershipSaleCommandRepository;
 import com.gymos.sales.infrastructure.MembershipSaleCommandRepository.MembershipSaleRecord;
@@ -12,6 +14,7 @@ import com.gymos.sales.infrastructure.SalesRepository;
 import com.gymos.sales.model.SaleHeader;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
@@ -38,13 +41,18 @@ class MembershipSalesService {
 		return create(MembershipSaleDraft.forRenewal(command));
 	}
 
+	MembershipSaleResult enroll(CreateMembershipEnrollmentSaleCommand command) {
+		return create(MembershipSaleDraft.forEnrollment(command));
+	}
+
 	MembershipSaleResult changePlan(CreateMembershipPlanChangeSaleCommand command) {
 		return create(MembershipSaleDraft.forPlanChange(command));
 	}
 
 	private MembershipSaleResult create(MembershipSaleDraft draft) {
 		String requestHash = SalesIdempotency.membershipSaleRequestHash(draft.clientId(), draft.sourceMembershipId(), draft.targetPlanId(), draft.productId(),
-				draft.priceCents(), draft.currency(), draft.method(), draft.reference(), draft.validateNow(), draft.notes(), draft.businessContext());
+				draft.listPriceCents(), draft.discountCents(), draft.totalCents(), draft.currency(), draft.appliedBenefits(),
+				draft.method(), draft.reference(), draft.validateNow(), draft.notes(), draft.businessContext());
 		String normalizedKey = SalesIdempotency.blankToNull(draft.idempotencyKey());
 		if (normalizedKey != null) {
 			var existing = salesRepository.saleHeaderByIdempotencyKey(draft.organizationId(), normalizedKey);
@@ -61,18 +69,29 @@ class MembershipSalesService {
 		boolean completed = draft.validateNow() || "CASH".equals(normalizedMethod);
 		String paymentStatus = completed ? "COMPLETED" : "PENDING_VALIDATION";
 		String saleStatus = completed ? "PAID" : "PENDING_PAYMENT";
-		long paidCents = completed ? draft.priceCents() : 0;
-		long balanceCents = completed ? 0 : draft.priceCents();
-		String paymentHash = SalesIdempotency.paymentRequestHash(draft.method(), draft.priceCents(), draft.reference(), null, draft.validateNow(), draft.notes());
-		commandRepository.create(new MembershipSaleRecord(saleId, paymentId, draft.organizationId(), draft.branchId(), draft.clientId(), draft.actorUserId(),
+		long paidCents = completed ? draft.totalCents() : 0;
+		long balanceCents = completed ? 0 : draft.totalCents();
+		String paymentHash = SalesIdempotency.paymentRequestHash(draft.method(), draft.totalCents(), draft.reference(), null, draft.validateNow(), draft.notes());
+		boolean created = commandRepository.create(new MembershipSaleRecord(saleId, paymentId, draft.organizationId(), draft.branchId(), draft.clientId(), draft.actorUserId(),
 				draft.sourceMembershipId(), draft.targetPlanId(), draft.productId(), draft.planName(), saleNumber, saleStatus, normalizedMethod, paymentStatus,
-				draft.priceCents(), paidCents, balanceCents, draft.currency(), SalesIdempotency.blankToNull(draft.reference()), SalesIdempotency.blankToNull(draft.notes()),
+				draft.listPriceCents(), draft.discountCents(), draft.totalCents(), paidCents, balanceCents, draft.currency(),
+				draft.appliedBenefits(),
+				SalesIdempotency.blankToNull(draft.reference()), SalesIdempotency.blankToNull(draft.notes()),
 				normalizedKey, requestHash, normalizedKey == null ? null : normalizedKey + ":payment", paymentHash,
 				draft.businessContext(), now, completed ? now : null, completed ? draft.actorUserId() : null));
+		if (!created) {
+			SaleHeader existing = salesRepository.saleHeaderByIdempotencyKey(draft.organizationId(), normalizedKey)
+					.orElseThrow(() -> new IllegalStateException("La venta idempotente existe pero no se pudo recuperar."));
+			SalesIdempotency.ensureSameRequest(
+					salesRepository.saleRequestHashByIdempotencyKey(draft.organizationId(), normalizedKey).orElse(null),
+					requestHash
+			);
+			return toResult(existing);
+		}
 		auditService.recordSystem(draft.organizationId(), draft.branchId(), draft.actorUserId(), "SALE_CREATED", "SALE", saleId, draft.businessContext(), null, draft.correlationId());
 		auditService.recordSystem(draft.organizationId(), draft.branchId(), draft.actorUserId(), "PAYMENT_RECORDED", "PAYMENT", paymentId, draft.businessContext(), null, draft.correlationId());
-		eventPublisher.publishEvent(new SaleCreatedV1("sale-created:" + saleId, draft.organizationId(), draft.branchId(), saleId, saleNumber, draft.businessContext(), draft.priceCents(), draft.currency(), now));
-		eventPublisher.publishEvent(new PaymentRecordedV1("payment-recorded:" + paymentId, draft.organizationId(), draft.branchId(), saleId, paymentId, normalizedMethod, paymentStatus, draft.priceCents(), draft.currency(), now));
+		eventPublisher.publishEvent(new SaleCreatedV1("sale-created:" + saleId, draft.organizationId(), draft.branchId(), saleId, saleNumber, draft.businessContext(), draft.totalCents(), draft.currency(), now));
+		eventPublisher.publishEvent(new PaymentRecordedV1("payment-recorded:" + paymentId, draft.organizationId(), draft.branchId(), saleId, paymentId, normalizedMethod, paymentStatus, draft.totalCents(), draft.currency(), now));
 		if (completed) completionService.publishIfNeeded(draft.organizationId(), saleId);
 		return toResult(salesRepository.saleHeader(draft.organizationId(), saleId).orElseThrow());
 	}
@@ -90,8 +109,11 @@ class MembershipSalesService {
 			UUID targetPlanId,
 			UUID productId,
 			String planName,
-			long priceCents,
+			long listPriceCents,
+			long discountCents,
+			long totalCents,
 			String currency,
+			List<MembershipBenefitSnapshot> appliedBenefits,
 			String method,
 			String reference,
 			boolean validateNow,
@@ -100,6 +122,31 @@ class MembershipSalesService {
 			String businessContext,
 			String correlationId
 	) {
+		static MembershipSaleDraft forEnrollment(CreateMembershipEnrollmentSaleCommand command) {
+			return new MembershipSaleDraft(
+					command.organizationId(),
+					command.branchId(),
+					command.actorUserId(),
+					command.clientId(),
+					null,
+					command.planId(),
+					command.productId(),
+					command.planName(),
+					command.listPriceCents(),
+					command.discountCents(),
+					command.totalCents(),
+					command.currency(),
+					command.appliedBenefits(),
+					command.method(),
+					command.reference(),
+					command.validateNow(),
+					command.notes(),
+					command.idempotencyKey(),
+					"MEMBERSHIP_ENROLLMENT",
+					command.correlationId()
+			);
+		}
+
 		static MembershipSaleDraft forRenewal(CreateMembershipRenewalSaleCommand command) {
 			return new MembershipSaleDraft(
 					command.organizationId(),
@@ -110,8 +157,11 @@ class MembershipSalesService {
 					command.planId(),
 					command.productId(),
 					command.planName(),
-					command.priceCents(),
+					command.listPriceCents(),
+					command.discountCents(),
+					command.totalCents(),
 					command.currency(),
+					command.appliedBenefits(),
 					command.method(),
 					command.reference(),
 					command.validateNow(),
@@ -132,8 +182,11 @@ class MembershipSalesService {
 					command.targetPlanId(),
 					command.productId(),
 					command.planName(),
-					command.priceCents(),
+					command.listPriceCents(),
+					command.discountCents(),
+					command.totalCents(),
 					command.currency(),
+					command.appliedBenefits(),
 					command.method(),
 					command.reference(),
 					command.validateNow(),

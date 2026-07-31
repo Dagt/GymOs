@@ -97,7 +97,8 @@ public class ClientRepository {
 				  AND c.deleted_at IS NULL
 				  AND p.deleted_at IS NULL
 				  AND (
-				      c.home_branch_id = :branchId
+				      c.home_branch_id IS NULL
+				      OR c.home_branch_id = :branchId
 				      OR EXISTS (
 				          SELECT 1
 				          FROM membership m
@@ -211,14 +212,45 @@ public class ClientRepository {
 		String normalizedStatus = status == null || status.isBlank() ? null : status.trim().toUpperCase();
 		StringBuilder sql = new StringBuilder("""
 				SELECT c.id AS client_id, p.first_name, p.last_name, p.maternal_last_name, p.phone, p.email,
-				       c.status AS client_status, c.joined_at, c.updated_at
+				       c.status AS client_status, current_membership.plan_name AS current_plan_name,
+				       current_membership.membership_status, c.joined_at, c.updated_at
 				FROM client c
 				JOIN person p ON p.id = c.person_id
+				LEFT JOIN LATERAL (
+				    SELECT product.name AS plan_name,
+				           CASE
+				               WHEN m.status = 'ACTIVE' AND m.grace_ends_on >= CURRENT_DATE THEN 'ACTIVE'
+				               ELSE 'EXPIRED'
+				           END AS membership_status
+				    FROM membership m
+				    JOIN membership_plan mp
+				      ON mp.id = m.plan_id
+				     AND mp.organization_id = m.organization_id
+				     AND mp.deleted_at IS NULL
+				    JOIN catalog_product product
+				      ON product.id = mp.product_id
+				     AND product.organization_id = m.organization_id
+				     AND product.deleted_at IS NULL
+				    WHERE m.organization_id = c.organization_id
+				      AND m.client_id = c.id
+				      AND m.status IN ('ACTIVE', 'EXPIRED')
+				      AND m.deleted_at IS NULL
+				    ORDER BY
+				        CASE
+				            WHEN m.status = 'ACTIVE' AND m.grace_ends_on >= CURRENT_DATE THEN 0
+				            WHEN m.status = 'ACTIVE' THEN 1
+				            ELSE 2
+				        END,
+				        m.grace_ends_on DESC,
+				        m.activated_at DESC
+				    LIMIT 1
+				) current_membership ON TRUE
 				WHERE c.organization_id = :organizationId
 				  AND c.deleted_at IS NULL
 				  AND p.deleted_at IS NULL
 				  AND (
-				      c.home_branch_id = :branchId
+				      c.home_branch_id IS NULL
+				      OR c.home_branch_id = :branchId
 				      OR EXISTS (
 				          SELECT 1
 				          FROM membership m
@@ -269,6 +301,8 @@ public class ClientRepository {
 						resultSet.getString("phone"),
 						resultSet.getString("email"),
 						resultSet.getString("client_status"),
+						resultSet.getString("current_plan_name"),
+						resultSet.getString("membership_status"),
 						resultSet.getObject("joined_at", OffsetDateTime.class),
 						resultSet.getObject("updated_at", OffsetDateTime.class)
 				))
@@ -304,6 +338,8 @@ public class ClientRepository {
 			String phone,
 			String email,
 			String status,
+			String currentPlanName,
+			String membershipStatus,
 			OffsetDateTime joinedAt,
 			OffsetDateTime updatedAt
 	) {

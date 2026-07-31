@@ -267,7 +267,7 @@ class SalesRefundServiceTests {
 
 	private SaleHeader sale(UUID saleId, UUID branchId, long paidCents) {
 		OffsetDateTime now = OffsetDateTime.now();
-		return new SaleHeader(saleId, "S-TEST", branchId, UUID.randomUUID(), "Cliente", "PAID",
+		return new SaleHeader(saleId, "S-TEST", branchId, UUID.randomUUID(), "Cliente", "PAID", "RETAIL_SALE",
 				5_000, 0, 5_000, paidCents, Math.max(0, 5_000 - paidCents), "MXN", null, now, now, now);
 	}
 }

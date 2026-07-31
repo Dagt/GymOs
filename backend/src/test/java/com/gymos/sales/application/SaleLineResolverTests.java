@@ -26,7 +26,7 @@ class SaleLineResolverTests {
 		UUID branchId = UUID.randomUUID();
 		UUID productId = UUID.randomUUID();
 		when(repository.productForSale(organizationId, branchId, productId)).thenReturn(Optional.of(
-				new ProductForSale(productId, "Mensualidad", "MEMBERSHIP_PLAN", 50000, "MXN")
+				new ProductForSale(productId, "Agua", "PHYSICAL", 50000, "MXN")
 		));
 
 		ResolvedSale result = resolver.resolve(
@@ -78,7 +78,7 @@ class SaleLineResolverTests {
 	}
 
 	@Test
-	void requiresClientForMembershipPlan() {
+	void rejectsMembershipPlanEvenWhenTheSaleHasAClient() {
 		SalesRepository repository = mock(SalesRepository.class);
 		SaleLineResolver resolver = new SaleLineResolver(repository);
 		UUID organizationId = UUID.randomUUID();
@@ -91,11 +91,11 @@ class SaleLineResolverTests {
 		BusinessException exception = assertThrows(BusinessException.class, () -> resolver.resolve(
 				organizationId,
 				branchId,
-				null,
+				UUID.randomUUID(),
 				List.of(new SaleItemCommand(productId, 1, 0)),
 				0
 		));
 
-		assertEquals("SALE_CLIENT_REQUIRED_FOR_PLAN", exception.code());
+		assertEquals("SALE_MEMBERSHIP_OPERATION_REQUIRED", exception.code());
 	}
 }

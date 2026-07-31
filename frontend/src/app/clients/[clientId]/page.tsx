@@ -5,6 +5,7 @@ import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import { FormError } from "@/components/FormFields";
 import {
+  ClientBenefitsSection,
   ClientProfileCard,
   ClientSummaryAside,
   EditClientDrawer,
@@ -78,6 +79,9 @@ export default function ClientDetailPage() {
           />
           {controller.canReadMemberships ? (
             <MembershipHistory
+              canChange={controller.canChangeMembership}
+              canEnroll={controller.canEnrollMembership}
+              canRenew={controller.canRenewMembership}
               changingMembershipId={controller.changingMembershipId}
               memberships={controller.memberships}
               onMembershipAction={controller.openMembershipAction}
@@ -85,9 +89,26 @@ export default function ClientDetailPage() {
               renewingMembershipId={controller.renewingMembershipId}
             />
           ) : null}
+          {controller.canReadBenefits ? (
+            <ClientBenefitsSection
+              canAssignBenefits={controller.canAssignBenefits}
+              canReadAccessBenefits={controller.canReadAccessBenefits}
+              canVerifyBenefits={controller.canVerifyBenefits}
+              clientId={controller.data.client.id}
+              refreshKey={controller.memberships
+                .map((membership) => `${membership.id}:${membership.planId}:${membership.status}:${membership.endsOn}`)
+                .join("|")}
+              session={controller.session}
+            />
+          ) : null}
         </section>
 
-        {!controller.limitedCoachView ? <ClientSummaryAside data={controller.data} /> : null}
+        {!controller.limitedCoachView ? (
+          <ClientSummaryAside
+            data={controller.data}
+            periodsByMembership={controller.membershipPeriods}
+          />
+        ) : null}
       </section>
 
       {controller.canEditClient ? (
@@ -106,6 +127,7 @@ export default function ClientDetailPage() {
         <MembershipActionDrawer
           action={controller.membershipAction}
           changingMembershipId={controller.changingMembershipId}
+          membershipQuote={controller.membershipQuote}
           plans={controller.plans}
           renewMethod={controller.renewMethod}
           renewReference={controller.renewReference}

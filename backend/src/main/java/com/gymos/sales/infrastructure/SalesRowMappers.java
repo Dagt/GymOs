@@ -20,6 +20,7 @@ final class SalesRowMappers {
 				resultSet.getObject("client_id", UUID.class),
 				resultSet.getString("client_name"),
 				resultSet.getString("status"),
+				resultSet.getString("business_context"),
 				resultSet.getLong("subtotal_cents"),
 				resultSet.getLong("discount_cents"),
 				resultSet.getLong("total_cents"),

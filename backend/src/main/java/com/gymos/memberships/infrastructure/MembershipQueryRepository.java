@@ -1,6 +1,7 @@
 package com.gymos.memberships.infrastructure;
 
 import com.gymos.memberships.infrastructure.MembershipRepository.MembershipSummary;
+import com.gymos.memberships.infrastructure.MembershipRepository.MembershipPeriodSummary;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -56,6 +57,61 @@ class MembershipQueryRepository {
 				.param("membershipId", membershipId)
 				.query(MembershipRowMappers::membershipSummary)
 				.optional();
+	}
+
+	Optional<MembershipSummary> byIdForUpdate(UUID organizationId, UUID branchId, UUID membershipId) {
+		Optional<UUID> lockedId = jdbcClient.sql("""
+				SELECT m.id
+				FROM membership m
+				JOIN membership_plan mp ON mp.id = m.plan_id
+				WHERE m.organization_id = :organizationId
+				  AND (m.branch_id = :branchId OR mp.multi_branch_access = true)
+				  AND m.id = :membershipId
+				  AND m.deleted_at IS NULL
+				FOR UPDATE OF m
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("membershipId", membershipId)
+				.query(UUID.class)
+				.optional();
+		return lockedId.isEmpty()
+				? Optional.empty()
+				: byId(organizationId, branchId, membershipId);
+	}
+
+	List<MembershipPeriodSummary> periods(UUID organizationId, UUID branchId, UUID membershipId) {
+		return jdbcClient.sql("""
+				SELECT period.id, period.membership_id, period.plan_id, cp.name AS plan_name,
+				       period.sale_id, sale.sale_number, period.operation_type,
+				       period.starts_on, period.ends_on, period.created_at
+				FROM membership_period period
+				JOIN membership membership ON membership.id = period.membership_id
+				JOIN membership_plan plan ON plan.id = period.plan_id
+				JOIN catalog_product cp ON cp.id = plan.product_id
+				JOIN sale sale ON sale.id = period.sale_id
+				WHERE period.organization_id = :organizationId
+				  AND period.membership_id = :membershipId
+				  AND (membership.branch_id = :branchId OR plan.multi_branch_access = true)
+				  AND membership.deleted_at IS NULL
+				ORDER BY period.created_at DESC, period.id DESC
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("membershipId", membershipId)
+				.query((resultSet, rowNumber) -> new MembershipPeriodSummary(
+						resultSet.getObject("id", UUID.class),
+						resultSet.getObject("membership_id", UUID.class),
+						resultSet.getObject("plan_id", UUID.class),
+						resultSet.getString("plan_name"),
+						resultSet.getObject("sale_id", UUID.class),
+						resultSet.getString("sale_number"),
+						resultSet.getString("operation_type"),
+						resultSet.getObject("starts_on", java.time.LocalDate.class),
+						resultSet.getObject("ends_on", java.time.LocalDate.class),
+						resultSet.getObject("created_at", java.time.OffsetDateTime.class)
+				))
+				.list();
 	}
 
 	Optional<MembershipSummary> bySaleAndPlan(UUID organizationId, UUID branchId, UUID saleId, UUID planId) {

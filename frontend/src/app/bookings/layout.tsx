@@ -8,3 +8,4 @@ export default function BookingsLayout({ children }: { children: ReactNode }) {
     </div>
   );
 }
+

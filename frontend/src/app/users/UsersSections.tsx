@@ -26,7 +26,7 @@ export function TeamOverview({ branches, roles, onCreateUser }: { branches: Bran
         <div><p>Equipo</p><h2>Usuarios por rol</h2></div>
         <button className="app-button" disabled={roles.length === 0 || branches.length === 0} onClick={onCreateUser} type="button">Crear usuario</button>
       </div>
-      <p className="mt-2 text-sm leading-6 text-[#5d6b63]">Administra accesos internos sin mezclar gimnasios ni sucursales. Los formularios de alta se abren en panel lateral para mantener esta vista limpia.</p>
+      <p className="mt-2 text-sm leading-6 text-[var(--brand-muted)]">Administra accesos internos sin mezclar gimnasios ni sucursales. Los formularios de alta se abren en panel lateral para mantener esta vista limpia.</p>
       {branches.length === 0 ? (
         <section className="team-warning"><strong>Primero crea una sucursal</strong><span>Sin sucursales no podras asignar acceso operativo a recepcion, coaches o gerencia.</span><Link href="/settings/organization">Crear sucursal</Link></section>
       ) : null}
@@ -192,7 +192,7 @@ export function CoachProfileDrawer({
       title={user ? `Perfil de ${user.fullName}` : "Perfil del coach"}
     >
       <form className="grid gap-4" onSubmit={onSubmit}>
-        <label className="grid gap-1 text-sm font-medium text-[#435249]">
+        <label className="grid gap-1 text-sm font-medium text-[var(--brand-ink)]">
           <span>Especialidades</span>
           <input
             className="app-input"
@@ -202,7 +202,7 @@ export function CoachProfileDrawer({
           />
         </label>
         <p className="-mt-3 text-xs text-[#637268]">Separa cada especialidad con una coma.</p>
-        <label className="grid gap-1 text-sm font-medium text-[#435249]">
+        <label className="grid gap-1 text-sm font-medium text-[var(--brand-ink)]">
           <span>Biografía</span>
           <textarea
             className="app-input min-h-28"
@@ -254,12 +254,12 @@ export function CreateUserDrawer({ branches, branchSelectionLocked, coachBio, co
               <p className="text-xs font-bold uppercase tracking-wide text-[#637268]">Información del Coach</p>
               <p className="mt-1 text-sm text-[#526159]">Estos datos complementan su cuenta; después se pueden actualizar sin tratarlo como un usuario distinto.</p>
             </div>
-            <label className="grid gap-1 text-sm font-medium text-[#435249]">
+            <label className="grid gap-1 text-sm font-medium text-[var(--brand-ink)]">
               <span>Especialidades</span>
               <input className="app-input" onChange={(event) => onCoachSpecialtiesChange(event.target.value)} placeholder="Fuerza, movilidad, rehabilitación" value={coachSpecialties} />
             </label>
             <p className="-mt-3 text-xs text-[#637268]">Separa cada especialidad con una coma.</p>
-            <label className="grid gap-1 text-sm font-medium text-[#435249]">
+            <label className="grid gap-1 text-sm font-medium text-[var(--brand-ink)]">
               <span>Biografía</span>
               <textarea className="app-input min-h-24" maxLength={4000} onChange={(event) => onCoachBioChange(event.target.value)} value={coachBio} />
             </label>
@@ -271,3 +271,4 @@ export function CreateUserDrawer({ branches, branchSelectionLocked, coachBio, co
     </AppDrawer>
   );
 }
+

@@ -25,10 +25,11 @@ class MembershipTenantIsolationTests {
 		MembershipOperationPolicy policy = new MembershipOperationPolicy(membershipRepository);
 		MembershipOperationIdempotency idempotency = new MembershipOperationIdempotency();
 		MembershipSaleResultResolver resultResolver = new MembershipSaleResultResolver(membershipRepository);
+		MembershipPricingService pricingService = mock(MembershipPricingService.class);
 		MembershipService service = new MembershipService(
 				new MembershipQueryService(membershipRepository),
-				new MembershipRenewalService(policy, idempotency, salesOperations, resultResolver),
-				new MembershipPlanChangeService(policy, idempotency, salesOperations, resultResolver)
+				new MembershipRenewalService(policy, idempotency, salesOperations, resultResolver, pricingService),
+				new MembershipPlanChangeService(policy, idempotency, salesOperations, resultResolver, pricingService)
 		);
 
 		UUID organizationId = UUID.randomUUID();

@@ -60,25 +60,25 @@ export function BookingDrawerForm({
   return (
     <form className="grid gap-4" onSubmit={onSubmit}>
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm text-[#5d6b63]">Captura los datos de la reserva. El sistema validara disponibilidad y membresia antes de guardar.</p>
+        <p className="text-sm text-[var(--brand-muted)]">Captura los datos de la reserva. El sistema validara disponibilidad y membresia antes de guardar.</p>
         {activeResource ? <span className="rounded-md bg-[var(--brand-surface)] px-3 py-2 text-xs font-semibold text-[var(--brand-primary)]">{activeResource.slotMinutes} min</span> : null}
       </div>
       <label className="mt-4 grid gap-2 text-sm font-medium">
         Recurso
-        <select className="h-11 rounded-md border border-[#cdd5ca] px-3" onChange={(event) => onSelectResource(event.target.value)} value={resourceId}>
+        <select className="h-11 rounded-md border border-[var(--brand-line)] px-3" onChange={(event) => onSelectResource(event.target.value)} value={resourceId}>
           {resources.map((resource) => <option key={resource.id} value={resource.id}>{resource.name}</option>)}
         </select>
       </label>
-      <p className="mt-3 rounded-md border border-[#d8ddd2] bg-[#f8faf8] px-3 py-2 text-xs text-[#5d6b63]">
+      <p className="mt-3 rounded-md border border-[var(--brand-line)] bg-[var(--brand-surface)] px-3 py-2 text-xs text-[var(--brand-muted)]">
         {activeResource?.allowedPlanNames ? <>Reservable por: <strong>{activeResource.allowedPlanNames}</strong></> : "Reservable por cualquier socio activo."}
       </p>
       <label className="mt-4 grid gap-2 text-sm font-medium">
         Buscar socio
-        <input className="h-11 rounded-md border border-[#cdd5ca] px-3" onChange={(event) => onClientQueryChange(event.target.value)} placeholder="Nombre, telefono o email" value={clientQuery} />
+        <input className="h-11 rounded-md border border-[var(--brand-line)] px-3" onChange={(event) => onClientQueryChange(event.target.value)} placeholder="Nombre, telefono o email" value={clientQuery} />
       </label>
       <div className="mt-2 grid gap-2">
         {clientResults.map((client) => (
-          <button className={`rounded-md border px-3 py-2 text-left text-sm ${client.id === selectedClient?.id ? "border-[var(--brand-primary)] bg-[var(--brand-surface)]" : "border-[#d8ddd2] bg-white"}`} key={client.id} onClick={() => onSelectClient(client)} type="button">
+          <button className={`rounded-md border px-3 py-2 text-left text-sm ${client.id === selectedClient?.id ? "border-[var(--brand-primary)] bg-[var(--brand-surface)]" : "border-[var(--brand-line)] bg-white"}`} key={client.id} onClick={() => onSelectClient(client)} type="button">
             <strong className="block">{client.firstName} {client.lastName}</strong>
             <span className="text-xs text-[#647067]">{client.phone || client.email || "Socio activo"}</span>
           </button>
@@ -88,21 +88,21 @@ export function BookingDrawerForm({
       <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_0.8fr]">
         <label className="grid gap-2 text-sm font-medium">
           Dia de inicio
-          <input className="h-11 rounded-md border border-[#cdd5ca] px-3" min={today} onChange={(event) => onSelectCalendarDate(event.target.value)} required type="date" value={startDate} />
+          <input className="h-11 rounded-md border border-[var(--brand-line)] px-3" min={today} onChange={(event) => onSelectCalendarDate(event.target.value)} required type="date" value={startDate} />
         </label>
         <label className="grid gap-2 text-sm font-medium">
           Hora
-          <input className={`h-11 rounded-md border px-3 ${selectedStartIsPast ? "border-red-500 bg-red-50" : "border-[#cdd5ca]"}`} min={minimumBookingTime} onChange={(event) => onStartTimeChange(event.target.value)} required step={300} type="time" value={startTime} />
+          <input className={`h-11 rounded-md border px-3 ${selectedStartIsPast ? "border-red-500 bg-red-50" : "border-[var(--brand-line)]"}`} min={minimumBookingTime} onChange={(event) => onStartTimeChange(event.target.value)} required step={300} type="time" value={startTime} />
         </label>
       </div>
       {selectedStartIsPast ? <p className="mt-2 text-sm font-medium text-red-700">Selecciona una hora posterior a la hora actual.</p> : null}
-      <div className="mt-3 rounded-md border border-[#d8ddd2] bg-[#f8faf8] px-3 py-2 text-sm">
+      <div className="mt-3 rounded-md border border-[var(--brand-line)] bg-[var(--brand-surface)] px-3 py-2 text-sm">
         <span className="block text-xs font-semibold uppercase text-[#647067]">Fin calculado</span>
         <strong>{computedEnd ? formatDateTime(computedEnd) : "Selecciona recurso, dia y hora"}</strong>
       </div>
       <label className="mt-4 grid gap-2 text-sm font-medium">
         Notas
-        <textarea className="min-h-20 rounded-md border border-[#cdd5ca] px-3 py-2" onChange={(event) => onNotesChange(event.target.value)} value={notes} />
+        <textarea className="min-h-20 rounded-md border border-[var(--brand-line)] px-3 py-2" onChange={(event) => onNotesChange(event.target.value)} value={notes} />
       </label>
       <button className="mt-5 h-11 w-full rounded-md bg-[var(--brand-primary)] px-4 text-sm font-semibold text-white shadow-sm disabled:opacity-60" disabled={saving || selectedDateIsPast || selectedStartIsPast || !resourceId || !selectedClient || !isValidTimeInput(startTime)} type="submit">
         Crear reserva
@@ -144,16 +144,16 @@ export function ResourceDrawerForm({
 }) {
   return (
     <form className="grid gap-4" onSubmit={onSubmit}>
-      <p className="text-sm text-[#5d6b63]">Configura una cancha, salon, area o recurso que pueda reservarse desde esta sucursal.</p>
-      <input className="h-11 w-full rounded-md border border-[#cdd5ca] px-3" onChange={(event) => onResourceNameChange(event.target.value)} placeholder="Nombre del recurso" required value={resourceName} />
+      <p className="text-sm text-[var(--brand-muted)]">Configura una cancha, salon, area o recurso que pueda reservarse desde esta sucursal.</p>
+      <input className="h-11 w-full rounded-md border border-[var(--brand-line)] px-3" onChange={(event) => onResourceNameChange(event.target.value)} placeholder="Nombre del recurso" required value={resourceName} />
       <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_130px]">
         <label className="grid gap-2 text-sm font-medium">
           Duracion
-          <input className="h-11 rounded-md border border-[#cdd5ca] px-3" min={1} onChange={(event) => onDurationValueChange(Number(event.target.value))} type="number" value={durationValue} />
+          <input className="h-11 rounded-md border border-[var(--brand-line)] px-3" min={1} onChange={(event) => onDurationValueChange(Number(event.target.value))} type="number" value={durationValue} />
         </label>
         <label className="grid gap-2 text-sm font-medium">
           Unidad
-          <select className="h-11 rounded-md border border-[#cdd5ca] px-3" onChange={(event) => onDurationUnitChange(event.target.value as DurationUnit)} value={durationUnit}>
+          <select className="h-11 rounded-md border border-[var(--brand-line)] px-3" onChange={(event) => onDurationUnitChange(event.target.value as DurationUnit)} value={durationUnit}>
             <option value="MINUTES">Minutos</option>
             <option value="HOURS">Horas</option>
           </select>
@@ -162,14 +162,14 @@ export function ResourceDrawerForm({
       <fieldset className="mt-5 grid gap-2">
         <legend className="text-sm font-semibold">Dias y horarios operativos</legend>
         {resourceSchedule.map((day) => (
-          <div className="grid grid-cols-[36px_1fr_92px_92px] items-center gap-2 rounded-md border border-[#d8ddd2] px-3 py-2 text-sm" key={day.key}>
+          <div className="grid grid-cols-[36px_1fr_92px_92px] items-center gap-2 rounded-md border border-[var(--brand-line)] px-3 py-2 text-sm" key={day.key}>
             <input aria-label={day.label} checked={day.enabled} className="h-4 w-4 accent-[var(--brand-primary)]" onChange={(event) => onUpdateResourceDay(day.key, { enabled: event.target.checked })} type="checkbox" />
             <span>
               <strong className="block">{day.shortLabel}</strong>
               <span className="text-xs text-[#647067]">{day.label}</span>
             </span>
-            <input className="h-10 rounded-md border border-[#cdd5ca] px-2" disabled={!day.enabled} onChange={(event) => onUpdateResourceDay(day.key, { opensAt: event.target.value })} type="time" value={day.opensAt} />
-            <input className="h-10 rounded-md border border-[#cdd5ca] px-2" disabled={!day.enabled} onChange={(event) => onUpdateResourceDay(day.key, { closesAt: event.target.value })} type="time" value={day.closesAt} />
+            <input className="h-10 rounded-md border border-[var(--brand-line)] px-2" disabled={!day.enabled} onChange={(event) => onUpdateResourceDay(day.key, { opensAt: event.target.value })} type="time" value={day.opensAt} />
+            <input className="h-10 rounded-md border border-[var(--brand-line)] px-2" disabled={!day.enabled} onChange={(event) => onUpdateResourceDay(day.key, { closesAt: event.target.value })} type="time" value={day.closesAt} />
           </div>
         ))}
       </fieldset>
@@ -177,7 +177,7 @@ export function ResourceDrawerForm({
         <legend className="text-sm font-semibold">Membresias que pueden reservar</legend>
         <p className="text-xs text-[#6f7a73]">Sin seleccionar planes, el recurso queda abierto para cualquier socio activo.</p>
         {plans.map((plan) => (
-          <label className="flex items-start gap-2 rounded-md border border-[#d8ddd2] px-3 py-2 text-sm" key={plan.id}>
+          <label className="flex items-start gap-2 rounded-md border border-[var(--brand-line)] px-3 py-2 text-sm" key={plan.id}>
             <input
               checked={resourceAllowedPlanIds.includes(plan.id)}
               className="mt-1 h-4 w-4 accent-[var(--brand-primary)]"
@@ -197,3 +197,4 @@ export function ResourceDrawerForm({
     </form>
   );
 }
+

@@ -135,12 +135,20 @@ La consulta remota por el socio pertenece a una aplicación futura.
 - modelo documental desacoplado (`WorkoutPdfDocument`, `WorkoutPdfSession`, `WorkoutPdfBlock`, `WorkoutPdfExercise`, `WorkoutPdfBranding`) mapeado desde la versión publicada de la asignación;
 - formateador de prescripción deportiva (`PrescriptionFormatter`) que condensa series/reps/carga en notación limpia de una sola línea (`3 × 12 / 10 / 8 · subir carga`, `3 × (8 + 15)`, `3 × 12 · RPE 8`);
 - PDF A4 reproducible con composición compacta y deportiva, encabezado liviano (menos del 15% de la primera página), ficha única de socio/coach/objetivo/vigencia, días continuos sin desperdiciar hojas, pie de página con folio, versión y numeración `Página X de Y`;
-- el logotipo relativo almacenado por la configuración (`/tenants/...`) se
-  resuelve únicamente contra el origen del frontend autorizado en CORS; las URL
-  externas siguen limitadas a HTTPS público y se conserva la inicial como
-  fallback;
+- los logotipos nuevos usan la ruta relativa versionada
+  `/api/tenant-logo/{organizationId}?v=...`, que el frontend resuelve desde
+  almacenamiento persistente; los enlaces heredados `/tenants/...` siguen
+  siendo compatibles. Ambos se resuelven únicamente contra el origen del
+  frontend autorizado en CORS; las URL externas siguen limitadas a HTTPS
+  público y se conserva la inicial como fallback;
 - el logotipo mantiene su proporción dentro del encabezado y cuenta con prueba
   automatizada de incrustación de una imagen real.
+- los lookups de marca y equipo del PDF son puertos de aplicación inyectados en
+  `WorkoutPdfDocumentMapper`; sus consultas JDBC están confinadas a adaptadores
+  de infraestructura y ya no existe el service locator global `static volatile`
+  que hacía depender el resultado del orden de arranque. Los lookups reciben los
+  IDs de organización y sucursal, evitando resolver marca o equipo por nombres
+  ambiguos de otro tenant.
 
 ### Métricas
 

@@ -9,16 +9,23 @@ import com.gymos.access.infrastructure.AccessRepository;
 import com.gymos.access.infrastructure.AccessRepository.AccessDecisionResponse;
 import com.gymos.access.infrastructure.AccessRepository.AccessDeviceRecord;
 import com.gymos.access.infrastructure.AccessRepository.AccessLogRecord;
-import com.gymos.access.infrastructure.AccessRepository.ActiveMembershipRecord;
 import com.gymos.access.infrastructure.AccessRepository.ClientAccessRecord;
+import com.gymos.access.infrastructure.AccessRepository.EffectiveAccessBenefitRecord;
 import com.gymos.access.infrastructure.AccessRepository.TemporaryPassRecord;
 import com.gymos.access.infrastructure.AccessRepository.VisitPassRecord;
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.common.time.BusinessTime;
+import com.gymos.eligibility.api.EligibilityPolicy;
+import com.gymos.eligibility.api.EligibilityPolicy.ActiveMembership;
+import com.gymos.eligibility.api.EligibilityPolicy.EligibilityDecision;
+import com.gymos.eligibility.api.EligibilityPolicy.EligibilityRequest;
+import com.gymos.eligibility.api.EligibilityPolicy.Reason;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,10 +34,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class AccessService {
 	private final AccessRepository accessRepository;
 	private final AuditService auditService;
+	private final EligibilityPolicy eligibilityPolicy;
 
-	public AccessService(AccessRepository accessRepository, AuditService auditService) {
+	public AccessService(
+			AccessRepository accessRepository,
+			AuditService auditService,
+			EligibilityPolicy eligibilityPolicy
+	) {
 		this.accessRepository = accessRepository;
 		this.auditService = auditService;
+		this.eligibilityPolicy = eligibilityPolicy;
 	}
 
 	@Transactional(readOnly = true)
@@ -52,21 +65,67 @@ public class AccessService {
 		return accessRepository.visitPasses(principal.organizationId(), principal.branchId(), clientId);
 	}
 
+	@Transactional(readOnly = true)
+	public List<EffectiveAccessBenefitRecord> effectiveBenefits(GymOsPrincipal principal, UUID clientId) {
+		requireBranch(principal);
+		EligibilityDecision eligibility = eligibilityPolicy.evaluate(EligibilityRequest.access(
+				principal.organizationId(), principal.branchId(), clientId, BusinessTime.today(), Set.of()));
+		if (eligibility.reason() == Reason.CLIENT_NOT_FOUND) {
+			throw new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible.");
+		}
+		if (!eligibility.eligible()) {
+			return List.of();
+		}
+		return eligibility.benefits().stream()
+				.map(benefit -> new EffectiveAccessBenefitRecord(
+						benefit.id(), benefit.code(), benefit.name(),
+						benefit.membershipId(), benefit.planId(), benefit.planName()))
+				.toList();
+	}
+
+	@Transactional
+	public List<UUID> replaceDeviceBenefits(GymOsPrincipal principal, UUID deviceId, List<UUID> benefitIds, String correlationId) {
+		requireBranch(principal);
+		AccessDeviceRecord device = accessRepository.devices(principal.organizationId(), principal.branchId()).stream()
+				.filter(candidate -> candidate.id().equals(deviceId))
+				.findFirst()
+				.orElseThrow(() -> new BusinessException("ACCESS_DEVICE_NOT_FOUND", "El dispositivo no existe en la sucursal."));
+		List<UUID> normalizedIds = benefitIds == null ? List.of() : benefitIds.stream().distinct().toList();
+		if (!accessRepository.accessBenefitsExist(principal.organizationId(), principal.branchId(), normalizedIds)) {
+			throw new BusinessException("ACCESS_BENEFIT_NOT_AVAILABLE", "Uno o mas beneficios de acceso no estan disponibles.");
+		}
+		accessRepository.replaceDeviceBenefits(
+				principal.organizationId(), principal.branchId(), device.id(), principal.userId(), normalizedIds);
+		auditService.record(principal, "ACCESS_DEVICE_BENEFITS_REPLACED", "ACCESS_DEVICE", device.id(),
+				"BACKOFFICE", "benefits=" + normalizedIds.size(), correlationId);
+		return accessRepository.deviceRequiredBenefitIds(
+				principal.organizationId(), principal.branchId(), device.id());
+	}
+
 	@Transactional
 	public AccessDecisionResponse requestAccess(GymOsPrincipal principal, AccessRequestCommand request, String correlationId) {
 		requireBranch(principal);
 		AccessDeviceRecord device = resolveDevice(principal, request.deviceCode());
 		ClientAccessRecord client = resolveClient(principal, request.clientId(), request.identifier());
 		OffsetDateTime now = OffsetDateTime.now();
+		List<UUID> requiredBenefitIds = accessRepository.deviceRequiredBenefitIds(
+				principal.organizationId(), principal.branchId(), device.id());
+		EligibilityDecision eligibility = eligibilityPolicy.evaluate(EligibilityRequest.access(
+				principal.organizationId(), principal.branchId(), client.id(), BusinessTime.today(),
+				Set.copyOf(requiredBenefitIds)));
+		ActiveMembership membership = eligibility.membership();
 
-		if (!"ACTIVE".equals(client.status())) {
-			return recordDecision(principal, device, client, null, null, "MEMBERSHIP_CHECK", "DENIED", "RECEPTION", "Cliente inactivo o suspendido.", now, correlationId);
-		}
-
-		ActiveMembershipRecord membership = accessRepository.activeMembership(principal.organizationId(), principal.branchId(), client.id(), LocalDate.now())
-				.orElse(null);
-		if (membership != null) {
+		if (eligibility.eligible()) {
 			return recordDecision(principal, device, client, membership.id(), null, "MEMBERSHIP_CHECK", "GRANTED", "RECEPTION", "Membresia activa hasta " + membership.endsOn() + ".", now, correlationId);
+		}
+		if (eligibility.reason() == Reason.CLIENT_NOT_ACTIVE) {
+			return recordDecision(principal, device, client, null, null, "MEMBERSHIP_CHECK", "DENIED",
+					"RECEPTION", "Cliente inactivo o suspendido.", now, correlationId);
+		}
+		if (eligibility.reason() == Reason.BENEFIT_NOT_GRANTED) {
+			return recordDecision(principal, device, client, membership.id(), null, "BENEFIT_CHECK",
+					"DENIED", "RECEPTION", "El plan no incluye el acceso requerido por el dispositivo.",
+					now, correlationId);
 		}
 
 		TemporaryPassRecord pass = accessRepository.validTemporaryPass(principal.organizationId(), principal.branchId(), client.id(), now)
@@ -124,7 +183,7 @@ public class AccessService {
 		if (!"ACTIVE".equals(client.status())) {
 			throw new BusinessException("CLIENT_NOT_ACTIVE", "Solo puedes crear paquetes de visita para clientes activos.");
 		}
-		LocalDate validFrom = request.validFrom() == null ? LocalDate.now() : request.validFrom();
+		LocalDate validFrom = request.validFrom() == null ? BusinessTime.today() : request.validFrom();
 		if (request.validUntil() != null && request.validUntil().isBefore(validFrom)) {
 			throw new BusinessException("VISIT_PASS_INVALID_RANGE", "La vigencia final no puede ser anterior al inicio.");
 		}
@@ -148,7 +207,7 @@ public class AccessService {
 		requireBranch(principal);
 		VisitPassRecord current = accessRepository.visitPass(principal.organizationId(), principal.branchId(), visitPassId)
 				.orElseThrow(() -> new BusinessException("VISIT_PASS_NOT_FOUND", "El paquete de visitas no esta disponible."));
-		LocalDate today = LocalDate.now();
+		LocalDate today = BusinessTime.today();
 		if (!"ACTIVE".equals(current.status())) {
 			throw new BusinessException("VISIT_PASS_NOT_ACTIVE", "El paquete de visitas no esta activo.");
 		}

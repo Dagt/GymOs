@@ -1,13 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
-import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired } from "@/components/AuthRequired";
+import { DAY_SIGNALS, FOCUS_ACTIONS } from "./reception-model";
 import {
-  clearSession,
   getBranches,
   getCurrentOrganization,
   getStoredSession,
@@ -17,67 +15,9 @@ import {
   type OrganizationSummary,
   type StoredSession,
 } from "@/lib/api";
-
-const focusActions = [
-  {
-    title: "Cobrar venta o membresia",
-    detail: "Productos, planes, renovaciones y pagos manuales desde caja.",
-    href: "/pos",
-    label: "Abrir caja",
-    accent: "money",
-  },
-  {
-    title: "Buscar o registrar socio",
-    detail: "Alta rapida, ficha, membresias, beneficios y notas.",
-    href: "/clients",
-    label: "Ir a socios",
-    accent: "people",
-  },
-  {
-    title: "Revisar ventas",
-    detail: "Pagos pendientes, saldos, comprobantes y operaciones recientes.",
-    href: "/reports/sales",
-    label: "Ver reporte",
-    accent: "report",
-  },
-  {
-    title: "Pantalla para socios",
-    detail: "Autoservicio para pagos, renovaciones y cambios de plan.",
-    href: "/kiosk/KIOSK-MAIN",
-    label: "Abrir kiosco",
-    accent: "kiosk",
-  },
-  {
-    title: "Reservas",
-    detail: "Agenda recursos, registra reservas y vincula pagos cuando aplique.",
-    href: "/bookings",
-    label: "Ver agenda",
-    accent: "bookings",
-  },
-  {
-    title: "Beneficios",
-    detail: "Consulta beneficios aplicables para socios y promociones activas.",
-    href: "/benefits",
-    label: "Ver beneficios",
-    accent: "benefits",
-  },
-  {
-    title: "Servicios de Bienestar",
-    detail: "Agendar citas, consultar especialistas, confirmación y estatus.",
-    href: "/wellness",
-    label: "Ver citas",
-    accent: "wellness",
-  },
-];
-
-const daySignals = [
-  { label: "Caja", value: "Lista", tone: "green" },
-  { label: "Pagos", value: "Por revisar", tone: "amber" },
-  { label: "Sucursal", value: "Activa", tone: "blue" },
-];
+import { ReceptionRenewalWidget } from "./ReceptionRenewalWidget";
 
 export default function ReceptionPage() {
-  const router = useRouter();
   const [session, setSession] = useState<StoredSession | null>(null);
   const [organization, setOrganization] = useState<OrganizationSummary | null>(null);
   const [branches, setBranches] = useState<BranchSummary[]>([]);
@@ -141,11 +81,6 @@ export default function ReceptionPage() {
   const receptionOrganizationName =
     organization?.tradeName ?? session?.user.brandName ?? session?.user.organizationName ?? "GymOS";
 
-  function logout() {
-    clearSession();
-    router.push("/login");
-  }
-
   async function switchBranch(branchId: string) {
     if (!session || branchId === session.user.branchId) {
       return;
@@ -185,7 +120,6 @@ export default function ReceptionPage() {
     <AppShell
       branchName={visibleBranchName}
       eyebrow="Recepcion"
-      hideSidebar={canOperate}
       mode={canOperate ? "operation" : undefined}
       organizationName={receptionOrganizationName}
       session={session}
@@ -206,79 +140,84 @@ export default function ReceptionPage() {
           onSwitchBranch={switchBranch}
         />
       ) : (
-        <section className="reception-home">
-          <section className="reception-identity-panel">
-            {session.user.logoUrl ? (
-              <Image alt={session.user.brandName ?? receptionOrganizationName} className="reception-brand-mark image" height={72} src={session.user.logoUrl} unoptimized width={72} />
-            ) : (
-              <div className="reception-brand-mark" aria-hidden="true">
-                {(session.user.brandName ?? receptionOrganizationName).slice(0, 1)}
-              </div>
-            )}
-            <div>
-              <p>{receptionOrganizationName}</p>
-              <h2>{visibleBranchName}</h2>
-              <span>
-                Entraste como Recepcion. Usuario: {session.user.fullName} ({session.user.username}).
-              </span>
-            </div>
-            <div className="reception-scope-card">
-              <span>Alcance</span>
-              <strong>Mostrador</strong>
-              <small>Clientes, ventas, pagos, membresias y reservas de la sucursal activa.</small>
-            </div>
-            <button onClick={logout} type="button">
-              Salir
-            </button>
+        <div className="flex flex-col gap-8 w-full max-w-7xl mx-auto">
+          {/* Daily Operational Signals Strip */}
+          <section className="admin-report-strip">
+            {DAY_SIGNALS.map((signal) => (
+              <ReportMetric
+                key={signal.label}
+                label={signal.label}
+                tone={signal.tone}
+                value={signal.value}
+              />
+            ))}
           </section>
 
-          <section className="reception-command-layout">
-            <section className="reception-action-rail" aria-label="Acciones de recepcion">
-              <Link className="reception-primary-command" href="/pos">
-                <span>Caja lista</span>
-                <strong>Cobrar venta o membresia</strong>
-                <p>Productos, planes, renovaciones y pagos manuales desde mostrador.</p>
-                <b>Abrir caja</b>
-              </Link>
-              <div className="reception-secondary-commands">
-                {focusActions.slice(1).map((action) => (
-                  <Link className={`reception-command ${action.accent}`} href={action.href} key={action.href}>
-                    <span>{action.title}</span>
-                    <strong>{action.label}</strong>
+          <ReceptionRenewalWidget session={session} />
+
+          {/* Main Hub Grid */}
+          <section>
+            <h3 className="text-lg font-black text-[color:var(--brand-primary)] mb-5 px-1 uppercase tracking-widest opacity-60">Módulos Operativos</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {FOCUS_ACTIONS.map((action, index) => {
+                const isPrimary = index === 0;
+                return (
+                  <Link
+                    key={action.href}
+                    href={action.href}
+                    className={`group relative flex flex-col p-6 rounded-2xl border-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl overflow-hidden ${
+                      isPrimary 
+                        ? "col-span-1 md:col-span-2 lg:col-span-2 shadow-lg" 
+                        : "shadow-sm bg-white"
+                    }`}
+                    style={isPrimary ? {
+                      background: `var(--brand-primary)`,
+                      borderColor: `color-mix(in srgb, var(--brand-primary) 80%, black)`,
+                      color: 'white'
+                    } : {
+                      background: `white`,
+                      borderColor: `var(--brand-line)`
+                    }}
+                  >
+                    {/* Decorative Background Blob */}
+                    <div 
+                      className={`absolute -top-24 -right-24 w-64 h-64 rounded-full blur-3xl transition-opacity duration-500 ${isPrimary ? 'opacity-20 group-hover:opacity-40' : 'opacity-[0.05] group-hover:opacity-10'}`}
+                      style={{ background: isPrimary ? 'white' : 'var(--brand-primary)' }}
+                    ></div>
+
+                    <div className="relative z-10 flex items-center justify-between mb-5">
+                      <span className={`text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full shadow-sm ${
+                        isPrimary 
+                          ? "bg-amber-400 text-slate-950 font-black" 
+                          : "bg-[color:var(--brand-surface)] text-[color:var(--brand-primary)] border border-[color:var(--brand-line)]"
+                      }`}>
+                        {action.title}
+                      </span>
+                    </div>
+                    
+                    <h3 className={`text-2xl font-black mb-3 relative z-10 drop-shadow-sm ${
+                      isPrimary ? "text-white" : "text-[color:var(--brand-ink)] group-hover:text-[color:var(--brand-primary)] transition-colors"
+                    }`}>
+                      {action.label}
+                    </h3>
+                    
+                    <p className={`text-base font-medium flex-grow relative z-10 ${
+                      isPrimary ? "text-white/90" : "text-[color:var(--brand-muted)]"
+                    }`}>
+                      {action.detail}
+                    </p>
+
+                    {isPrimary && (
+                      <div className="relative z-10 mt-6 inline-flex self-start items-center justify-center px-6 py-3 bg-white text-[color:var(--brand-primary)] text-sm font-black rounded-xl hover:bg-gray-50 transition-colors shadow-sm">
+                        Abrir módulo →
+                      </div>
+                    )}
                   </Link>
-                ))}
-              </div>
-            </section>
-
-            <aside className="reception-shift-panel">
-              <div>
-                <p>Turno actual</p>
-                <h2>Mostrador en operacion</h2>
-              </div>
-              <div className="reception-signal-list">
-                {daySignals.map((signal) => (
-                  <ReportMetric key={signal.label} label={signal.label} value={signal.value} tone={signal.tone} />
-                ))}
-              </div>
-              <div className="reception-next-panel">
-                <span>Siguiente accion</span>
-                <strong>Buscar socio o cobrar membresia</strong>
-              </div>
-            </aside>
-
-            <section className="reception-wide-strip">
-              <div>
-                <p>Operacion rapida</p>
-                <h2>Reservas, beneficios y ventas sin salir del flujo de mostrador</h2>
-              </div>
-              <div>
-                <Link href="/bookings">Agenda</Link>
-                <Link href="/benefits">Beneficios</Link>
-                <Link href="/reports/sales">Ventas</Link>
-              </div>
-            </section>
+                );
+              })}
+            </div>
           </section>
-        </section>
+        </div>
       )}
     </AppShell>
   );

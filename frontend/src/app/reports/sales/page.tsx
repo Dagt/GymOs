@@ -8,6 +8,7 @@ import {
   getSalesReport,
   getStoredSession,
   type PaymentMethodBreakdown,
+  type SaleBusinessContextBreakdown,
   type SaleStatusBreakdown,
   type SalesReportResponse,
   type StoredSession,
@@ -99,16 +100,16 @@ export default function SalesReportPage() {
     >
       <section className="grid gap-6">
         <form
-          className="grid gap-3 rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm md:grid-cols-[1fr_1fr_auto]"
+          className="grid gap-3 rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm md:grid-cols-[1fr_1fr_auto]"
           onSubmit={submitFilters}
         >
           <label className="grid gap-2 text-sm font-medium text-[#42514a]">
             Desde
-            <input className="h-11 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => setFromDate(event.target.value)} type="date" value={fromDate} />
+            <input className="h-11 rounded-md border border-[var(--brand-line)] px-3 text-sm" onChange={(event) => setFromDate(event.target.value)} type="date" value={fromDate} />
           </label>
           <label className="grid gap-2 text-sm font-medium text-[#42514a]">
             Hasta
-            <input className="h-11 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => setToDate(event.target.value)} type="date" value={toDate} />
+            <input className="h-11 rounded-md border border-[var(--brand-line)] px-3 text-sm" onChange={(event) => setToDate(event.target.value)} type="date" value={toDate} />
           </label>
           <button className="app-button h-11 self-end" disabled={refreshing} type="submit">
             {refreshing ? "Actualizando..." : "Actualizar"}
@@ -139,7 +140,7 @@ export default function SalesReportPage() {
             </section>
 
             <section className="grid gap-6 lg:grid-cols-2">
-              <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+              <section className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
                 <h2 className="text-xl font-semibold">Ventas por estado</h2>
                 <div className="mt-4 overflow-x-auto">
                   <table className="w-full min-w-[560px] border-collapse text-sm">
@@ -155,7 +156,7 @@ export default function SalesReportPage() {
                     <tbody>
                       {report.salesByStatus.length === 0 ? (
                         <tr>
-                          <td className="py-4 text-[#5d6b63]" colSpan={5}>
+                          <td className="py-4 text-[var(--brand-muted)]" colSpan={5}>
                             Sin ventas en el periodo.
                           </td>
                         </tr>
@@ -168,7 +169,7 @@ export default function SalesReportPage() {
                 </div>
               </section>
 
-              <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+              <section className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
                 <h2 className="text-xl font-semibold">Pagos por método</h2>
                 <div className="mt-4 overflow-x-auto">
                   <table className="w-full min-w-[620px] border-collapse text-sm">
@@ -184,7 +185,7 @@ export default function SalesReportPage() {
                     <tbody>
                       {report.paymentsByMethod.length === 0 ? (
                         <tr>
-                          <td className="py-4 text-[#5d6b63]" colSpan={5}>
+                          <td className="py-4 text-[var(--brand-muted)]" colSpan={5}>
                             Sin pagos en el periodo.
                           </td>
                         </tr>
@@ -196,13 +197,35 @@ export default function SalesReportPage() {
                   </table>
                 </div>
               </section>
+
+              <section className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
+                <h2 className="text-xl font-semibold">Ventas por tipo</h2>
+                <div className="mt-4 overflow-x-auto">
+                  <table className="w-full min-w-[620px] border-collapse text-sm">
+                    <thead className="text-left text-[#6f7a73]">
+                      <tr>
+                        <th className="border-b border-[#e4e8df] py-2 pr-3">Tipo</th>
+                        <th className="border-b border-[#e4e8df] py-2 pr-3">Ventas</th>
+                        <th className="border-b border-[#e4e8df] py-2 pr-3">Subtotal</th>
+                        <th className="border-b border-[#e4e8df] py-2 pr-3">Descuentos</th>
+                        <th className="border-b border-[#e4e8df] py-2">Cobrado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {report.salesByBusinessContext.map((row) => (
+                        <BusinessContextRow currency={currency} key={row.businessContext} row={row} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
             </section>
 
-            <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+            <section className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
                   <h2 className="text-xl font-semibold">Ventas recientes</h2>
-                  <p className="mt-1 text-sm text-[#5d6b63]">Últimas operaciones de la sucursal activa.</p>
+                  <p className="mt-1 text-sm text-[var(--brand-muted)]">Últimas operaciones de la sucursal activa.</p>
                 </div>
                 <Link className="text-sm font-semibold text-[#51735f]" href="/pos">
                   Abrir POS
@@ -211,13 +234,13 @@ export default function SalesReportPage() {
               <div className="mt-4 grid gap-3">
                 {report.recentSales.map((sale) => (
                   <Link
-                    className="rounded-md border border-[#d8ddd2] px-4 py-3 transition hover:border-[#51735f] hover:bg-[#f6f7f2]"
+                    className="rounded-md border border-[var(--brand-line)] px-4 py-3 transition hover:border-[#51735f] hover:bg-[var(--brand-surface)]"
                     href={`/sales/${sale.id}`}
                     key={sale.id}
                   >
                     <span className="block font-semibold">{sale.saleNumber}</span>
-                    <span className="mt-1 block text-sm text-[#5d6b63]">
-                      {sale.clientName} - {saleStatusLabel(sale.status)} - {formatMoney(sale.totalCents, sale.currency)}
+                    <span className="mt-1 block text-sm text-[var(--brand-muted)]">
+                      {sale.clientName} - {businessContextLabel(sale.businessContext)} - {saleStatusLabel(sale.status)} - {formatMoney(sale.totalCents, sale.currency)}
                     </span>
                   </Link>
                 ))}
@@ -235,7 +258,7 @@ function MetricCard({ label, value, detail }: { label: string; value: string; de
     <article className="app-card p-5">
       <p className="text-sm font-medium text-[#6f7a73]">{label}</p>
       <p className="mt-2 text-2xl font-semibold">{value}</p>
-      <p className="mt-2 text-sm text-[#5d6b63]">{detail}</p>
+      <p className="mt-2 text-sm text-[var(--brand-muted)]">{detail}</p>
     </article>
   );
 }
@@ -260,6 +283,18 @@ function PaymentMethodRow({ row, currency }: { row: PaymentMethodBreakdown; curr
       <td className="border-b border-[#eef1ea] py-3 pr-3">{formatMoney(row.completedCents, currency)}</td>
       <td className="border-b border-[#eef1ea] py-3 pr-3">{formatMoney(row.pendingCents, currency)}</td>
       <td className="border-b border-[#eef1ea] py-3">{formatMoney(row.rejectedCents, currency)}</td>
+    </tr>
+  );
+}
+
+function BusinessContextRow({ row, currency }: { row: SaleBusinessContextBreakdown; currency: string }) {
+  return (
+    <tr>
+      <td className="border-b border-[#eef1ea] py-3 pr-3 font-semibold">{businessContextLabel(row.businessContext)}</td>
+      <td className="border-b border-[#eef1ea] py-3 pr-3">{row.saleCount}</td>
+      <td className="border-b border-[#eef1ea] py-3 pr-3">{formatMoney(row.subtotalCents, currency)}</td>
+      <td className="border-b border-[#eef1ea] py-3 pr-3">{formatMoney(row.discountCents, currency)}</td>
+      <td className="border-b border-[#eef1ea] py-3">{formatMoney(row.paidCents, currency)}</td>
     </tr>
   );
 }
@@ -297,6 +332,16 @@ function paymentMethodLabel(method: string) {
     CARD_MANUAL: "Tarjeta manual",
   };
   return labels[method] ?? method;
+}
+
+function businessContextLabel(context: string) {
+  const labels: Record<string, string> = {
+    RETAIL_SALE: "Productos y servicios",
+    MEMBERSHIP_ENROLLMENT: "Contrataciones",
+    MEMBERSHIP_RENEWAL: "Renovaciones",
+    MEMBERSHIP_PLAN_CHANGE: "Cambios de plan",
+  };
+  return labels[context] ?? context;
 }
 
 function periodLabel(report: SalesReportResponse) {

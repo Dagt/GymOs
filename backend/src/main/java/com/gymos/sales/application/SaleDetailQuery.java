@@ -30,6 +30,7 @@ class SaleDetailQuery {
 		return new SaleDetailResult(
 				sale,
 				salesReadRepository.saleItems(organizationId, saleId),
+				salesReadRepository.appliedBenefits(organizationId, saleId),
 				salesReadRepository.payments(organizationId, saleId),
 				salesReadRepository.refunds(organizationId, saleId),
 				salesReadRepository.membershipsForSale(organizationId, saleId)

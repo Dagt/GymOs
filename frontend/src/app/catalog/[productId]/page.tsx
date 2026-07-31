@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired } from "@/components/AuthRequired";
+import { catalogUnitLabel } from "@/features/catalog/catalog-units";
 import { getStoredSession, type StoredSession } from "@/lib/api";
 import { getProductDetail } from "@/lib/api/catalog";
 import type { ProductDetail } from "@/lib/api/catalog-types";
@@ -75,7 +76,7 @@ export default function CatalogProductDetailPage() {
             <Detail label="Código de barras" value={product.barcode ?? "Sin código"} />
             <Detail label="Marca" value={product.brand ?? "Sin marca"} />
             <Detail label="Presentación" value={product.presentation ?? "Sin presentación"} />
-            <Detail label="Unidad" value={product.unitOfMeasure ?? "Sin unidad"} />
+            <Detail label="Unidad" value={catalogUnitLabel(product.unitOfMeasure)} />
             <Detail label="Inventario" value={product.inventoryTracked ? "Controlado" : "No controlado"} />
             <Detail label="Inicio promoción" value={formatDate(product.promotionStartsAt)} />
             <Detail label="Fin promoción" value={formatDate(product.promotionEndsAt)} />

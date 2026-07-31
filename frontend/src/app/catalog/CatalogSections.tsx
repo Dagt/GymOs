@@ -45,13 +45,13 @@ export function PlanList({ canUpdate, plans, onEditPlan }: PlanListProps) {
         <span className="text-sm text-[#6f7a73]">{plans.length}</span>
       </div>
       {plans.length === 0 ? (
-        <p className="mt-4 rounded-lg border border-dashed border-[#cdd5ca] p-6 text-center text-sm text-[#5d6b63]">
+        <p className="mt-4 rounded-lg border border-dashed border-[var(--brand-line)] p-6 text-center text-sm text-[var(--brand-muted)]">
           No hay planes en esta sucursal.
         </p>
       ) : (
         <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {plans.map((plan) => (
-            <article className="flex min-h-40 flex-col rounded-xl border border-[#d8ddd2] bg-[#fbfcfa] p-4" key={plan.id}>
+            <article className="flex min-h-40 flex-col rounded-xl border border-[var(--brand-line)] bg-[#fbfcfa] p-4" key={plan.id}>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-semibold text-[#111815]">{plan.name}</p>
@@ -65,7 +65,7 @@ export function PlanList({ canUpdate, plans, onEditPlan }: PlanListProps) {
                   {plan.status === "ACTIVE" ? "Activo" : "Inactivo"}
                 </span>
               </div>
-              <div className="mt-3 flex flex-wrap gap-2 text-xs text-[#5d6b63]">
+              <div className="mt-3 flex flex-wrap gap-2 text-xs text-[var(--brand-muted)]">
                 <span className="rounded-full bg-white px-2 py-1">{plan.durationDays} días</span>
                 {plan.graceDays > 0 ? <span className="rounded-full bg-white px-2 py-1">Gracia {plan.graceDays}</span> : null}
                 {plan.multiBranchAccess ? <span className="rounded-full bg-white px-2 py-1">Multi-sucursal</span> : null}
@@ -106,7 +106,7 @@ export function PlanDrawer({ editingPlanId, form, open, saving, onClose, onFormC
           <SelectField label="Estado" name="planStatus" options={[{ label: "Activo", value: "ACTIVE" }, { label: "Inactivo", value: "INACTIVE" }]} value={form.status} onChange={(value) => onFormChange({ ...form, status: value as MembershipPlanPayload["status"] })} />
         </div>
         <TextAreaField label="Beneficios" name="planBenefits" placeholder="Acceso general, clases grupales" value={form.benefitsJson} onChange={(value) => onFormChange({ ...form, benefitsJson: value })} />
-        <label className="flex h-11 items-center gap-3 rounded-md border border-[#cdd5ca] px-3 text-sm font-medium">
+        <label className="flex h-11 items-center gap-3 rounded-md border border-[var(--brand-line)] px-3 text-sm font-medium">
           <input checked={form.multiBranchAccess} className="h-4 w-4 accent-[var(--brand-primary)]" onChange={(event) => onFormChange({ ...form, multiBranchAccess: event.target.checked })} type="checkbox" />
           Acceso en todas las sucursales
         </label>
@@ -117,3 +117,4 @@ export function PlanDrawer({ editingPlanId, form, open, saving, onClose, onFormC
     </AppDrawer>
   );
 }
+

@@ -2,6 +2,7 @@ import type { FormEvent } from "react";
 import { AppDrawer } from "@/components/AppDrawer";
 import { NumberField, SelectField, TextAreaField, TextField } from "@/components/FormFields";
 import type { CatalogCategory, ProductPayload } from "@/lib/api";
+import { CATALOG_UNIT_OPTIONS } from "../catalog-units";
 
 type Props = {
   categories: CatalogCategory[];
@@ -61,6 +62,7 @@ export function CatalogProductDrawer({
       productType,
       commercialSubtype: productType === "PHYSICAL" ? "GENERAL_PRODUCT" : "GENERAL_SERVICE",
       inventoryTracked: productType === "PHYSICAL" ? form.inventoryTracked : false,
+      unitOfMeasure: productType === "PHYSICAL" ? form.unitOfMeasure ?? "PIECE" : null,
       referenceCostCents: productType === "PHYSICAL" ? form.referenceCostCents : null,
       supplierName: productType === "PHYSICAL" ? form.supplierName : null,
     });
@@ -97,7 +99,13 @@ export function CatalogProductDrawer({
                 <TextField label="Código de barras" name="productBarcode" placeholder="7501234567890" required={false} value={form.barcode ?? ""} onChange={(barcode) => change({ barcode: barcode || null })} />
                 <TextField label="Marca" name="productBrand" placeholder="Marca" required={false} value={form.brand ?? ""} onChange={(brand) => change({ brand: brand || null })} />
                 <TextField label="Presentación" name="productPresentation" placeholder="Bote de 30 porciones" required={false} value={form.presentation ?? ""} onChange={(presentation) => change({ presentation: presentation || null })} />
-                <TextField label="Unidad" name="productUnit" placeholder="Pieza" required={false} value={form.unitOfMeasure ?? ""} onChange={(unitOfMeasure) => change({ unitOfMeasure: unitOfMeasure || null })} />
+                <SelectField
+                  label="Unidad"
+                  name="productUnit"
+                  options={[...CATALOG_UNIT_OPTIONS]}
+                  value={form.unitOfMeasure ?? "PIECE"}
+                  onChange={(unitOfMeasure) => change({ unitOfMeasure })}
+                />
               </>
             ) : null}
             <TextField label="Etiquetas" name="productTags" placeholder="energía, cafeína, preentreno" required={false} value={tagsText} onChange={onTagsTextChange} />

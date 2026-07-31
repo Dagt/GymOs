@@ -10,6 +10,13 @@ export async function getBenefits(accessToken: string): Promise<BenefitSummary[]
   return apiFetch<BenefitSummary[]>("/benefits", accessToken);
 }
 
+export async function getClientBenefits(
+  accessToken: string,
+  clientId: string,
+): Promise<ClientBenefitSummary[]> {
+  return apiFetch<ClientBenefitSummary[]>(`/clients/${clientId}/benefits`, accessToken);
+}
+
 export async function createBenefit(
   accessToken: string,
   payload: BenefitPayload,

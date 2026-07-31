@@ -41,7 +41,7 @@ export default function PlatformGymnasiumsPage() {
       <section className="platform-layout">
         <PlatformGymnasiumList
           filteredOrganizations={platform.filteredOrganizations}
-          onCreateOrganization={() => platform.setShowCreate(true)}
+          onCreateOrganization={platform.openCreateOrganization}
           onQueryChange={platform.setQuery}
           onSelectOrganization={platform.setSelectedOrganizationId}
           organizationsCount={platform.organizations.length}
@@ -67,13 +67,14 @@ export default function PlatformGymnasiumsPage() {
 
       <AppDrawer
         description="Registra el tenant y su marca. Las sucursales se crean despues desde el detalle del gimnasio."
-        onClose={() => platform.setShowCreate(false)}
+        onClose={platform.closeCreateOrganization}
         open={platform.showCreate}
         title="Alta de gimnasio"
       >
         <OrganizationForm
           errors={platform.fieldErrors}
           form={platform.form}
+          onLogoFileChange={platform.setLogoFile}
           onChange={platform.setForm}
           onSubmit={platform.submitOrganization}
           saving={platform.saving}

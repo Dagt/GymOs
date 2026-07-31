@@ -9,14 +9,14 @@ class MembershipApplicationArchitectureTests {
 	@Test
 	void membershipRenewalDelegatesSharedOperationResponsibilities() {
 		assertThat(Arrays.stream(MembershipRenewalService.class.getDeclaredFields()).map(field -> field.getType().getSimpleName()).toList())
-				.containsExactlyInAnyOrder("MembershipOperationPolicy", "MembershipOperationIdempotency", "SalesOperations", "MembershipSaleResultResolver")
+				.containsExactlyInAnyOrder("MembershipOperationPolicy", "MembershipOperationIdempotency", "SalesOperations", "MembershipSaleResultResolver", "MembershipPricingService")
 				.doesNotContain("MembershipRepository");
 	}
 
 	@Test
 	void membershipPlanChangeDelegatesSharedOperationResponsibilities() {
 		assertThat(Arrays.stream(MembershipPlanChangeService.class.getDeclaredFields()).map(field -> field.getType().getSimpleName()).toList())
-				.containsExactlyInAnyOrder("MembershipOperationPolicy", "MembershipOperationIdempotency", "SalesOperations", "MembershipSaleResultResolver")
+				.containsExactlyInAnyOrder("MembershipOperationPolicy", "MembershipOperationIdempotency", "SalesOperations", "MembershipSaleResultResolver", "MembershipPricingService")
 				.doesNotContain("MembershipRepository");
 	}
 

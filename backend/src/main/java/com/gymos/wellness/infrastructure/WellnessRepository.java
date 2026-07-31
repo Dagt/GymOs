@@ -19,7 +19,8 @@ public class WellnessRepository {
 
 	public List<ProfessionalRecord> professionals(UUID organizationId, UUID branchId) {
 		return jdbcClient.sql("""
-				SELECT id, display_name, professional_type, email, phone, bio, office_location, status, created_at, updated_at
+				SELECT id, display_name, professional_type, email, phone, bio, office_location,
+				       engagement_type, status, created_at, updated_at
 				FROM professional
 				WHERE organization_id = :organizationId
 				  AND branch_id = :branchId
@@ -34,7 +35,8 @@ public class WellnessRepository {
 
 	public Optional<ProfessionalRecord> professional(UUID organizationId, UUID branchId, UUID professionalId) {
 		return jdbcClient.sql("""
-				SELECT id, display_name, professional_type, email, phone, bio, office_location, status, created_at, updated_at
+				SELECT id, display_name, professional_type, email, phone, bio, office_location,
+				       engagement_type, status, created_at, updated_at
 				FROM professional
 				WHERE organization_id = :organizationId
 				  AND branch_id = :branchId
@@ -54,11 +56,11 @@ public class WellnessRepository {
 		jdbcClient.sql("""
 				INSERT INTO professional (
 				    id, organization_id, branch_id, display_name, professional_type, email, phone,
-				    bio, office_location, status, created_at, updated_at, created_by, updated_by, version
+				    bio, office_location, engagement_type, status, created_at, updated_at, created_by, updated_by, version
 				)
 				VALUES (
 				    :id, :organizationId, :branchId, :displayName, :professionalType, :email, :phone,
-				    :bio, :officeLocation, 'ACTIVE', :createdAt, :updatedAt, :createdBy, :updatedBy, 0
+				    :bio, :officeLocation, :engagementType, 'ACTIVE', :createdAt, :updatedAt, :createdBy, :updatedBy, 0
 				)
 				""")
 				.param("id", professionalId)
@@ -70,6 +72,7 @@ public class WellnessRepository {
 				.param("phone", data.phone())
 				.param("bio", data.bio())
 				.param("officeLocation", data.officeLocation())
+				.param("engagementType", data.engagementType())
 				.param("createdAt", now)
 				.param("updatedAt", now)
 				.param("createdBy", actorUserId)
@@ -88,6 +91,7 @@ public class WellnessRepository {
 				    phone = :phone,
 				    bio = :bio,
 				    office_location = :officeLocation,
+				    engagement_type = :engagementType,
 				    status = :status,
 				    updated_at = :updatedAt,
 				    updated_by = :updatedBy,
@@ -106,6 +110,7 @@ public class WellnessRepository {
 				.param("phone", data.phone())
 				.param("bio", data.bio())
 				.param("officeLocation", data.officeLocation())
+				.param("engagementType", data.engagementType())
 				.param("status", data.status())
 				.param("updatedAt", now)
 				.param("updatedBy", actorUserId)
@@ -378,6 +383,7 @@ public class WellnessRepository {
 		StringBuilder sql = new StringBuilder("""
 				SELECT a.id, a.organization_id, a.branch_id, a.professional_id,
 				       p.display_name AS professional_name, p.professional_type, p.office_location,
+				       p.engagement_type AS professional_engagement_type,
 				       a.service_id, ps.name AS service_name, ps.duration_minutes, ps.price_cents,
 				       a.client_id, (cp.first_name || ' ' || cp.last_name) AS client_full_name, cp.email AS client_email, cp.phone AS client_phone,
 				       a.starts_at, a.ends_at, a.status, a.notes, a.cancellation_reason, a.confirmed_by_user_id, a.confirmed_at,
@@ -424,6 +430,7 @@ public class WellnessRepository {
 		return jdbcClient.sql("""
 				SELECT a.id, a.organization_id, a.branch_id, a.professional_id,
 				       p.display_name AS professional_name, p.professional_type, p.office_location,
+				       p.engagement_type AS professional_engagement_type,
 				       a.service_id, ps.name AS service_name, ps.duration_minutes, ps.price_cents,
 				       a.client_id, (cp.first_name || ' ' || cp.last_name) AS client_full_name, cp.email AS client_email, cp.phone AS client_phone,
 				       a.starts_at, a.ends_at, a.status, a.notes, a.cancellation_reason, a.confirmed_by_user_id, a.confirmed_at,
@@ -541,6 +548,7 @@ public class WellnessRepository {
 				resultSet.getString("phone"),
 				resultSet.getString("bio"),
 				resultSet.getString("office_location"),
+				resultSet.getString("engagement_type"),
 				resultSet.getString("status"),
 				resultSet.getObject("created_at", OffsetDateTime.class),
 				resultSet.getObject("updated_at", OffsetDateTime.class)
@@ -582,6 +590,7 @@ public class WellnessRepository {
 				resultSet.getString("professional_name"),
 				resultSet.getString("professional_type"),
 				resultSet.getString("office_location"),
+				resultSet.getString("professional_engagement_type"),
 				resultSet.getObject("service_id", UUID.class),
 				resultSet.getString("service_name"),
 				resultSet.getInt("duration_minutes"),
@@ -602,10 +611,10 @@ public class WellnessRepository {
 		);
 	}
 
-	public record CreateProfessionalData(String displayName, String professionalType, String email, String phone, String bio, String officeLocation) {
+	public record CreateProfessionalData(String displayName, String professionalType, String email, String phone, String bio, String officeLocation, String engagementType) {
 	}
 
-	public record UpdateProfessionalData(String displayName, String professionalType, String email, String phone, String bio, String officeLocation, String status) {
+	public record UpdateProfessionalData(String displayName, String professionalType, String email, String phone, String bio, String officeLocation, String engagementType, String status) {
 	}
 
 	public record CreateServiceData(String name, String serviceType, int durationMinutes, long priceCents, String currency) {
@@ -620,7 +629,7 @@ public class WellnessRepository {
 	public record CreateAppointmentData(UUID professionalId, UUID serviceId, UUID clientId, OffsetDateTime startsAt, OffsetDateTime endsAt, String status, String notes, UUID confirmedByUserId, OffsetDateTime confirmedAt) {
 	}
 
-	public record ProfessionalRecord(UUID id, String displayName, String professionalType, String email, String phone, String bio, String officeLocation, String status, OffsetDateTime createdAt, OffsetDateTime updatedAt) {
+	public record ProfessionalRecord(UUID id, String displayName, String professionalType, String email, String phone, String bio, String officeLocation, String engagementType, String status, OffsetDateTime createdAt, OffsetDateTime updatedAt) {
 	}
 
 	public record ProfessionalServiceRecord(UUID id, UUID professionalId, String name, String serviceType, int durationMinutes, long priceCents, String currency, String status, OffsetDateTime createdAt, OffsetDateTime updatedAt) {
@@ -637,6 +646,7 @@ public class WellnessRepository {
 			String professionalName,
 			String professionalType,
 			String officeLocation,
+			String professionalEngagementType,
 			UUID serviceId,
 			String serviceName,
 			int durationMinutes,

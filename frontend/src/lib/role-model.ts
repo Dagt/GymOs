@@ -158,7 +158,6 @@ const tenantOwnerRoutes = [
 
 const managerRoutes = [
   "/operations",
-  "/dashboard",
   "/reports",
   "/users",
   "/catalog",
@@ -168,6 +167,7 @@ const managerRoutes = [
   "/benefits",
   "/automations",
   "/clients",
+  "/clients/import",
   "/coaches",
   "/wellness",
   "/reception",
@@ -175,5 +175,5 @@ const managerRoutes = [
   "/sales",
 ];
 
-const receptionRoutes = ["/reception", "/pos", "/clients", "/sales", "/reports/sales", "/bookings", "/benefits", "/wellness"];
+const receptionRoutes = ["/reception", "/pos", "/clients", "/sales", "/reports/sales", "/bookings", "/wellness"];
 const coachRoutes = ["/coaches", "/clients"];

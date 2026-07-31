@@ -19,12 +19,12 @@ export function AccessDeviceSection({
   onDeviceCodeChange: (value: string) => void;
 }) {
   return (
-    <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+    <section className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
       <h2 className="text-xl font-semibold">Dispositivo</h2>
       <label className="mt-4 grid gap-2 text-sm font-medium text-[#42514a]">
         Puerta
         <select
-          className="h-10 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm"
+          className="h-10 rounded-md border border-[var(--brand-line)] bg-white px-3 text-sm"
           onChange={(event) => onDeviceCodeChange(event.target.value)}
           value={deviceCode}
         >
@@ -61,11 +61,11 @@ export function AccessClientSection({
   onSelectClient: (client: ClientSummary) => void;
 }) {
   return (
-    <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+    <section className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
       <h2 className="text-xl font-semibold">Cliente</h2>
       <form className="mt-4 flex gap-2" onSubmit={onSearch}>
         <input
-          className="h-10 min-w-0 flex-1 rounded-md border border-[#cdd5ca] px-3 text-sm"
+          className="h-10 min-w-0 flex-1 rounded-md border border-[var(--brand-line)] px-3 text-sm"
           onChange={(event) => onQueryChange(event.target.value)}
           placeholder="Nombre, email o telefono"
           value={query}
@@ -85,7 +85,7 @@ export function AccessClientSection({
             className={`rounded-md border px-3 py-3 text-left text-sm transition ${
               client.id === selectedClientId
                 ? "border-[#51735f] bg-[#eef7f0]"
-                : "border-[#d8ddd2] bg-white hover:border-[#51735f]"
+                : "border-[var(--brand-line)] bg-white hover:border-[#51735f]"
             }`}
             key={client.id}
             onClick={() => onSelectClient(client)}
@@ -102,7 +102,7 @@ export function AccessClientSection({
       <label className="mt-4 grid gap-2 text-sm font-medium text-[#42514a]">
         Identificador directo
         <input
-          className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm"
+          className="h-10 rounded-md border border-[var(--brand-line)] px-3 text-sm"
           onChange={(event) => onIdentifierChange(event.target.value)}
           placeholder="Email o telefono"
           value={identifier}
@@ -128,11 +128,11 @@ export function AccessDecisionSection({
   onEvaluate: () => void;
 }) {
   return (
-    <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+    <section className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div>
           <h2 className="text-xl font-semibold">Evaluacion</h2>
-          <p className="mt-2 text-sm text-[#5d6b63]">
+          <p className="mt-2 text-sm text-[var(--brand-muted)]">
             {selectedClient ? `${selectedClient.firstName} ${selectedClient.lastName}` : "Sin cliente seleccionado"}
           </p>
         </div>
@@ -186,12 +186,12 @@ export function ManualAccessSection({
   onOpenManually: () => void;
 }) {
   return (
-    <article className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+    <article className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
       <h2 className="text-xl font-semibold">Apertura manual</h2>
       <label className="mt-4 grid gap-2 text-sm font-medium text-[#42514a]">
         Motivo
         <textarea
-          className="min-h-24 rounded-md border border-[#cdd5ca] px-3 py-2 text-sm"
+          className="min-h-24 rounded-md border border-[var(--brand-line)] px-3 py-2 text-sm"
           onChange={(event) => onManualReasonChange(event.target.value)}
           value={manualReason}
         />
@@ -230,7 +230,7 @@ export function TemporaryPassSection({
   onTemporaryHoursChange: (value: number) => void;
 }) {
   return (
-    <article className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+    <article className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
       <h2 className="text-xl font-semibold">Pase temporal</h2>
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <NumberInput label="Horas" min={1} value={temporaryHours} onChange={onTemporaryHoursChange} />
@@ -239,7 +239,7 @@ export function TemporaryPassSection({
       <label className="mt-3 grid gap-2 text-sm font-medium text-[#42514a]">
         Motivo
         <textarea
-          className="min-h-20 rounded-md border border-[#cdd5ca] px-3 py-2 text-sm"
+          className="min-h-20 rounded-md border border-[var(--brand-line)] px-3 py-2 text-sm"
           onChange={(event) => onReasonChange(event.target.value)}
           value={reason}
         />
@@ -284,16 +284,16 @@ export function VisitPassesSection({
   onVisitPassTypeChange: (value: VisitPassType) => void;
 }) {
   return (
-    <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+    <section className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div>
           <h2 className="text-xl font-semibold">Paquetes de visitas</h2>
-          <p className="mt-1 text-sm text-[#5d6b63]">
+          <p className="mt-1 text-sm text-[var(--brand-muted)]">
             Crea paquetes sencillos y descuenta visitas desde recepcion.
           </p>
         </div>
         <button
-          className="h-10 rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f]"
+          className="h-10 rounded-md border border-[var(--brand-line)] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f]"
           disabled={!selectedClientId}
           onClick={onRefresh}
           type="button"
@@ -306,7 +306,7 @@ export function VisitPassesSection({
         <label className="grid gap-2 text-sm font-medium text-[#42514a]">
           Tipo
           <select
-            className="h-10 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm"
+            className="h-10 rounded-md border border-[var(--brand-line)] bg-white px-3 text-sm"
             onChange={(event) => onVisitPassTypeChange(event.target.value as VisitPassType)}
             value={visitPassType}
           >
@@ -332,7 +332,7 @@ export function VisitPassesSection({
 
       <div className="mt-5 grid gap-3">
         {visitPasses.length === 0 ? (
-          <p className="rounded-md border border-[#e4e8df] bg-[#fafbf8] px-3 py-3 text-sm text-[#5d6b63]">
+          <p className="rounded-md border border-[#e4e8df] bg-[#fafbf8] px-3 py-3 text-sm text-[var(--brand-muted)]">
             Selecciona un cliente para ver sus paquetes.
           </p>
         ) : (
@@ -346,7 +346,7 @@ export function VisitPassesSection({
                   </p>
                 </div>
                 <button
-                  className="h-9 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f] disabled:opacity-60"
+                  className="h-9 rounded-md border border-[var(--brand-line)] bg-white px-3 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f] disabled:opacity-60"
                   disabled={busy || pass.status !== "ACTIVE" || pass.remainingVisits < 1}
                   onClick={() => onConsumeVisit(pass.id)}
                   type="button"
@@ -370,11 +370,11 @@ export function AccessLogsSection({
   onRefreshLogs: () => void;
 }) {
   return (
-    <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
+    <section className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-xl font-semibold">Bitacora reciente</h2>
         <button
-          className="h-10 rounded-md border border-[#cdd5ca] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f]"
+          className="h-10 rounded-md border border-[var(--brand-line)] bg-white px-4 text-sm font-semibold text-[#42514a] transition hover:border-[#51735f]"
           onClick={onRefreshLogs}
           type="button"
         >
@@ -409,7 +409,7 @@ export function AccessLogsSection({
                 </td>
                 <td className="py-3 pr-4">{log.accessType}</td>
                 <td className="py-3 pr-4">{log.deviceName}</td>
-                <td className="py-3 text-[#5d6b63]">{log.reason}</td>
+                <td className="py-3 text-[var(--brand-muted)]">{log.reason}</td>
               </tr>
             ))}
           </tbody>
@@ -443,7 +443,7 @@ function NumberInput({
     <label className="grid gap-2 text-sm font-medium text-[#42514a]">
       {label}
       <input
-        className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm"
+        className="h-10 rounded-md border border-[var(--brand-line)] px-3 text-sm"
         min={min}
         onChange={(event) => onChange(Number(event.target.value))}
         type="number"
@@ -459,3 +459,4 @@ function formatDateTime(value: string) {
     timeStyle: "short",
   }).format(new Date(value));
 }
+

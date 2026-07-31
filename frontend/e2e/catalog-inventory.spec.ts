@@ -78,12 +78,13 @@ test.describe("catalogo e inventario", () => {
     });
 
     await page.goto("/catalog");
-    await expect(page.getByRole("heading", { name: "Catalogo" })).toBeVisible();
-    await page.getByPlaceholder("Nombre, SKU, etiqueta o codigo").fill("bebida");
+    await expect(page.getByRole("heading", { name: "Catálogo" })).toBeVisible();
+    await page.getByPlaceholder("Nombre, SKU o código").fill("bebida");
     await expect(page).toHaveURL(/q=bebida/);
     await page.getByRole("button", { name: "Editar", exact: true }).click();
-    await expect(page.getByLabel("Costo de referencia")).toBeVisible();
-    await page.getByLabel("Nombre").fill("Agua mineral");
+    await page.getByText("Costo y proveedor", { exact: true }).click();
+    await expect(page.getByLabel("Costo", { exact: true })).toBeVisible();
+    await page.getByPlaceholder("Agua 600 ml").fill("Agua mineral");
     await page.getByRole("button", { name: "Guardar cambios" }).click();
 
     await expect.poll(() => updatePayload?.version).toBe(4);
@@ -94,9 +95,23 @@ test.describe("catalogo e inventario", () => {
     await page.goto("/catalog");
     await page.getByRole("button", { name: "Editar", exact: true }).click();
 
-    await expect(page.getByLabel("Costo de referencia")).toHaveCount(0);
-    await expect(page.getByLabel("Proveedor principal")).toHaveCount(0);
+    await expect(page.getByLabel("Costo", { exact: true })).toHaveCount(0);
+    await expect(page.getByLabel("Proveedor", { exact: true })).toHaveCount(0);
     await expect(page.getByText("El producto tiene una imagen almacenada.")).toHaveCount(0);
+  });
+
+  test("alta de producto usa un selector cerrado de unidades comunes", async ({ page }) => {
+    await bootCatalog(page, owner());
+    await page.goto("/catalog");
+    await page.getByRole("button", { name: /Nuevo art.culo o cargo/i }).click();
+    await page.getByText(/M.s datos/i).click();
+
+    const unit = page.getByLabel("Unidad");
+    await expect(unit).toHaveJSProperty("tagName", "SELECT");
+    await expect(unit).toHaveValue("PIECE");
+    for (const label of ["Pieza", "Botella", "Lata", "Paquete", "Litro", "Kilogramo"]) {
+      await expect(unit).toContainText(label);
+    }
   });
 
   test("POS consulta el catalogo paginado y no descarga el endpoint completo", async ({ page }) => {
@@ -109,10 +124,28 @@ test.describe("catalogo e inventario", () => {
     });
 
     await page.goto("/pos");
-    await expect(page.getByRole("heading", { name: "Caja / POS" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Caja Registradora" })).toBeVisible();
     await expect(page.getByRole("button", { name: /Agua/ })).toBeVisible();
     expect(paginatedSearches).toBeGreaterThan(0);
     expect(completeCatalogRequests).toBe(0);
+  });
+
+  test("lector HID agrega por codigo de barras y acumula cantidad", async ({ page }) => {
+    await bootCatalog(page, owner());
+    await page.goto("/pos");
+    await expect(page.getByRole("button", { name: /Agua/ })).toBeVisible();
+
+    await page.keyboard.type(product.barcode, { delay: 5 });
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("heading", { name: "Carrito (1)" })).toBeVisible();
+    const cart = page.locator("form").filter({
+      has: page.getByRole("heading", { name: "Carrito (1)" }),
+    });
+    await expect(cart.locator('input[type="number"]').first()).toHaveValue("1");
+
+    await page.keyboard.type(product.barcode, { delay: 5 });
+    await page.keyboard.press("Enter");
+    await expect(cart.locator('input[type="number"]').first()).toHaveValue("2");
   });
 });
 

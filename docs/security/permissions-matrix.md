@@ -2,7 +2,7 @@
 
 Estado: VIGENTE / COBERTURA PARCIAL
 Fuente primaria: `backend/src/main/java/com/gymos/common/security/SecurityConfig.java`  
-Última revisión documental: 2026-07-26
+Última revisión documental: 2026-07-30
 
 Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe mantenerse alineada con pruebas de autorización. Los endpoints públicos no sustituyen validaciones de negocio ni rate limiting.
 
@@ -18,14 +18,17 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 | GET | `/api/v1/openapi/**` | docs | Público local | No | No | No | Pendiente perfil prod |
 | GET | `/api/v1/docs/**` | docs | Público local | No | No | No | Pendiente perfil prod |
 | GET | `/swagger-ui/**` | docs | Público local | No | No | No | Pendiente perfil prod |
+| GET | `/api/v1/organizations/*/logo` | organizations/storage | Público, sólo marca | Sí, por UUID | No | No | `organizationLogoReadIsPublic` |
 
 ## Autenticación y organización
 
 | Método | Endpoint | Módulo | Permiso | Organización | Sucursal | Auditoría | Prueba actual |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | POST | `/api/v1/auth/select-branch` | security | `branch.read` | Sí | Sí | Recomendado | `AuthServiceTests.selectingBranchWithoutUserAccessIsDenied` |
-| GET | `/api/v1/organizations/current` | organizations | `organization.read` | Sí | No | No | Pendiente |
+| GET | `/api/v1/organizations/current` | organizations | `organization.read` o `organization.update` | Sí | No | No | JWT negativo y compatibilidad de actualización |
 | PUT | `/api/v1/organizations/current` | organizations | `organization.update` | Sí | No | Sí | Pendiente |
+| POST | `/api/v1/organizations/current/logo` | organizations/storage | `organization.update` | Sí | No | Sí | `OrganizationLogoServiceTests` |
+| POST | `/api/v1/organizations/*/logo` | organizations/storage | `platform.admin` | Sí, destino explícito | No | Sí | autorización negativa y `platformAdministratorCanStoreLogoForNewlyCreatedOrganization` |
 | GET | `/api/v1/organizations/current/branches` | organizations | `branch.read` | Sí | No | No | Pendiente |
 | ANY | `/api/v1/organizations/current/branches/*` | organizations | `branch.update` | Sí | Sí | Sí | Pendiente |
 
@@ -41,7 +44,7 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 | Método | Endpoint | Módulo | Permiso | Organización | Sucursal | Auditoría | Prueba actual |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/clients/**` | clients | `client.read` | Sí | Según consulta | No | Pendiente |
-| POST | `/api/v1/clients` | clients | `client.create` | Sí | Sí | Sí | Pendiente |
+| POST | `/api/v1/clients` | clients | `client.create` | Sí | Sí | Sí | V57 en `DatabaseMigrationTests`; E2E gerencia/recepción |
 | PUT | `/api/v1/clients/**` | clients | `client.update` | Sí | Según recurso | Sí | Pendiente |
 | POST | `/api/v1/clients/imports` | clients | `client.import` | Sí | Opcional | Sí | `clientImportRequiresImportPermission` negativo |
 | POST | `/api/v1/clients/*/benefits` | benefits | `client.benefit.assign` | Sí | Según cliente | Sí | `clientBenefitAssignmentRequiresAssignPermission` negativo |
@@ -54,8 +57,8 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | GET | `/api/v1/catalog/**` | catalog | `catalog.read` | Sí | No | No | Pendiente |
 | POST | `/api/v1/catalog/**` | catalog | `catalog.manage` | Sí | No | Sí | Pendiente |
-| GET | `/api/v1/benefits/**` | benefits | `benefit.read` | Sí | No | No | Pendiente |
-| POST | `/api/v1/benefits/**` | benefits | `benefit.manage` | Sí | No | Sí | `benefitCreationRequiresManagePermission` negativo |
+| GET | `/api/v1/benefits/**` | benefits | `benefit.read` | Sí | Sí; actual + global explícito | No | Filtro en `BenefitService` |
+| POST | `/api/v1/benefits/**` | benefits | `benefit.manage` | Sí | Sí; sucursal activa por defecto | Sí | `benefitCreationRequiresManagePermission` negativo |
 | GET | `/api/v1/memberships/**` | memberships | `membership.read` | Sí | Sí | No | Pendiente |
 | POST | `/api/v1/memberships/*/renew` | memberships | `membership.renew` | Sí | Sí | Sí | Pendiente |
 | POST | `/api/v1/memberships/*/change-plan` | memberships | `membership.change-plan` | Sí | Sí | Sí | Pendiente |
@@ -80,6 +83,7 @@ Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe man
 | GET | `/api/v1/access/visit-passes/**` | access | `visit.read` | Sí | Sí | No | Pendiente |
 | POST | `/api/v1/access/visit-passes` | access | `visit.create` | Sí | Sí | Sí | `visitPassCreationRequiresVisitCreatePermission` negativo |
 | POST | `/api/v1/access/visit-passes/*/consume` | access | `visit.consume` | Sí | Sí | Sí | `visitPassConsumeRequiresVisitConsumePermission` negativo |
+| GET | `/api/v1/access/clients/*/effective-benefits` | access/clientes | `access.read`, `client.read`, `membership.read` o `benefit.read` | Sí | Sí | No | `clientReadersCanInspectEffectiveAccessBenefitsWithoutAccessAdministrationPermission` |
 | GET | `/api/v1/access/**` | access | `access.read` | Sí | Sí | No | Pendiente |
 | POST | `/api/v1/access/**` | access | `access.manage` | Sí | Sí | Sí | Pendiente |
 

@@ -4,7 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { type FieldErrorMap, normalizePhone } from "@/components/FormFields";
 import {
   createClient,
-  createSale,
+  enrollMembership,
   getCurrentUser,
   getPlans,
   getStoredSession,
@@ -225,19 +225,13 @@ function createInitialMembershipSale(
   plan: PlanSummary,
   form: ClientRegistrationForm,
 ) {
-  return createSale(accessToken, {
+  return enrollMembership(accessToken, {
     clientId,
-    items: [{ productId: plan.productId, quantity: 1, discountCents: 0 }],
-    discountCents: 0,
+    planId: plan.id,
+    method: form.paymentMethod,
+    reference: form.paymentReference || null,
+    validateNow: form.validateNow,
     notes: "Alta inicial de socio",
-    payment: {
-      method: form.paymentMethod,
-      amountCents: plan.priceCents,
-      reference: form.paymentReference || null,
-      receiptObjectKey: null,
-      validateNow: form.validateNow,
-      notes: "Pago de membresía inicial",
-    },
     idempotencyKey: `client-initial-membership:${clientId}:${plan.id}`,
   });
 }

@@ -213,7 +213,23 @@ Contrato implementado para alta/edicion de socio:
 - `gender`: solo `MALE` o `FEMALE`.
 - `phone`: formato `+52` seguido de 10 digitos.
 
-El alta de socio en frontend puede crear, despues del `POST /clients`, una venta de plan inicial usando `POST /sales` con un producto vinculado a `membership_plan`. La activacion de membresia sigue dependiendo de que el pago quede completado.
+El alta de socio en frontend puede contratar un plan después del `POST /clients`
+mediante `POST /membership-enrollments`. La activación de membresía sigue
+dependiendo de que el pago quede completado.
+
+La respuesta resumida de `GET /clients` incluye `currentPlanName` y
+`membershipStatus`. La vigencia se calcula al consultar: una membresía
+`ACTIVE` dentro de `grace_ends_on` se expone como `ACTIVE`; si su gracia ya
+terminó se expone como `EXPIRED` aunque el job de expiración aún no haya
+actualizado la fila. Las membresías canceladas no se presentan como plan actual.
+
+Autorización de alta:
+
+- `Dueno del gimnasio`, `Gerente` y `Recepcion` reciben `client.read`,
+  `client.create` y `client.update` desde Flyway;
+- `POST /clients` requiere `client.create` y sucursal activa;
+- después de aplicar V57 es necesario renovar la sesión para que el JWT refleje
+  los permisos reparados.
 
 Visibilidad por sucursal:
 
@@ -231,6 +247,7 @@ Autenticacion y sucursal activa:
 
 - `GET /catalog/products`
 - `GET /catalog/products/search`
+- `GET /catalog/products/by-barcode/{barcode}`
 - `POST /catalog/products`
 - `GET /catalog/products/{id}`
 - `PUT|PATCH /catalog/products/{id}`
@@ -244,6 +261,19 @@ Autenticacion y sucursal activa:
 - `PATCH|DELETE /catalog/categories/{id}`
 
 `GET /catalog/products/search` devuelve `items`, `page`, `size`, `totalElements` y `totalPages`. Acepta búsqueda por nombre, SKU, código de barras y etiqueta, además de filtros por tipo, categoría, estado y seguimiento de inventario.
+
+`GET /catalog/products/by-barcode/{barcode}` hace una consulta exacta de un
+producto activo de la sucursal y excluye planes. El POS lo usa como fallback
+cuando el código escaneado no está en la página local.
+
+`unitOfMeasure` ya no es texto libre en el alta web. Para productos físicos usa
+uno de los valores canónicos:
+
+`PIECE`, `BOTTLE`, `CAN`, `PACKAGE`, `BOX`, `BAG`, `SACHET`, `SERVING`,
+`TABLET`, `CAPSULE`, `MILLILITER`, `LITER`, `GRAM`, `KILOGRAM`.
+
+El backend rechaza cualquier valor no reconocido con
+`PRODUCT_UNIT_INVALID`. Los cargos y servicios no conservan unidad física.
 
 ## 6.5 Planes
 
@@ -286,13 +316,20 @@ Errores relevantes:
 
 - `GET /clients/{clientId}/memberships`
 - `GET /memberships/{id}`
+- `GET /memberships/{id}/periods`
+- `POST /membership-enrollments`
 - `POST /memberships/{id}/renew`
 - `POST /memberships/{id}/cancel`
 - `PATCH /memberships/{id}/auto-renew`
 - Nota implementada: `GET /clients/{clientId}/memberships` y `GET /memberships/{id}` exponen membresias por cliente y detalle por membresia.
-- Nota implementada: `POST /memberships/{id}/renew` crea una venta de renovacion, registra pago manual y activa una nueva membresia acumulativa cuando el pago queda completado.
-- Nota implementada: `POST /memberships/{id}/change-plan` crea una venta de cambio de plan, exige pago completado, cancela la membresia anterior y activa la nueva.
-- Nota implementada: una venta pagada que incluya un producto vinculado a `membership_plan` activa una membresia.
+- Nota implementada: `POST /membership-enrollments` crea la venta y el primer
+  periodo mediante el flujo específico de contratación.
+- Nota implementada: `POST /memberships/{id}/renew` crea una venta de renovación,
+  registra pago manual y extiende la membresía operativa cuando el pago queda
+  completado.
+- Nota implementada: `POST /memberships/{id}/change-plan` crea una venta de
+  cambio, exige pago completado y actualiza plan y periodo sin crear una segunda
+  membresía activa.
 - Nota implementada: si la membresia origen o destino pertenece a un plan con `multiBranchAccess`, el acceso del socio se agrega o remueve para todas las sucursales por regla de consulta, sin duplicar registros por sucursal.
 
 La activación ocurre como consecuencia de pago completado.
@@ -317,6 +354,11 @@ La activación ocurre como consecuencia de pago completado.
 - `POST /sales/{id}/checkout` (pendiente)
 - `POST /sales/{id}/cancel` (pendiente)
 - `POST /sales/{id}/refund` (pendiente)
+
+`POST /sales` es exclusivo para productos y servicios cotidianos. Si contiene
+un `MEMBERSHIP_PLAN`, responde `SALE_MEMBERSHIP_OPERATION_REQUIRED`; las ventas
+de planes se crean mediante los endpoints específicos de membresía y siguen
+formando parte de reportes, pagos y movimientos de caja.
 
 ## 6.9 Pagos
 
@@ -483,11 +525,20 @@ reserva para una aplicación futura.
 - `POST /professionals/{professionalId}/services`
 - `GET /professionals/{professionalId}/availability`
 - `POST /professionals/{professionalId}/availability`
+- `GET /professionals/{professionalId}/availability-slots`
+- `POST /wellness/appointments`
+- `GET /wellness/appointments`
+- `POST /wellness/appointments/{appointmentId}/confirm`
 
 Nota implementada Hito 5:
 - Los profesionales pertenecen siempre a la organizacion y sucursal activa.
+- `engagementType` es explícito (`STAFF` o `EXTERNAL`) e independiente de
+  `officeLocation`.
 - Los servicios profesionales mantienen precio, moneda, duracion, tipo y estado propio.
 - La disponibilidad se expresa por dia de semana y rango horario; el backend valida `day_of_week` entre 1 y 7 y que la hora de cierre sea posterior a la apertura.
+- Los profesionales externos no administran disponibilidad interna. Sus citas
+  reciben una fecha y hora solicitadas, nacen como `REQUESTED` y después pueden
+  coordinarse y confirmarse.
 
 ## 6.15 Automatizaciones
 
@@ -959,3 +1010,97 @@ Valores posibles de `console`:
 - Para `Coach`, persiste cuenta, sucursales, especialidades y biografia como una
   sola operacion; un fallo del perfil revierte el alta completa.
 - Los usuarios creados entran a su consola segun permisos/rol.
+## Extensiones de membresías y acceso — `feature/reception-pos-init`
+
+### Cotización de plan
+
+`POST /api/v1/membership-quotes`
+
+```json
+{ "clientId": "uuid", "planId": "uuid" }
+```
+
+Devuelve `listPriceCents`, `discountCents`, `totalCents`, `currency` y
+`appliedBenefits`. El servidor es la fuente de verdad.
+
+Cada elemento de `appliedBenefits` incluye `benefitId`, `code`, `name` y
+`discountCents`. El mismo conjunto se congela en la venta al ejecutar alta,
+renovación o cambio.
+
+### Alta inicial de membresía
+
+`POST /api/v1/membership-enrollments`
+
+Recibe socio, plan, método y validación de pago. Rechaza otra membresía activa,
+aplica la cotización de backend y registra venta, pago, periodo y activación.
+
+### Periodos de membresía
+
+`GET /api/v1/memberships/{membershipId}/periods`
+
+Devuelve alta/importación, renovaciones y cambios con plan, vigencia, venta y
+fecha de registro.
+
+Las fechas son inclusivas. Renovar antes del fin inicia el periodo nuevo al día
+siguiente; renovar una membresía vencida inicia en la fecha operativa actual.
+
+### Contexto financiero de membresías
+
+`GET /api/v1/sales` y el encabezado de
+`GET /api/v1/sales/{saleId}` incluyen `businessContext`.
+
+`GET /api/v1/sales/{saleId}` agrega `appliedBenefits`.
+
+`GET /api/v1/sales/reports/summary` agrega `salesByBusinessContext`, con conteo,
+subtotal, descuento, total, cobrado y saldo para:
+
+- `RETAIL_SALE`
+- `MEMBERSHIP_ENROLLMENT`
+- `MEMBERSHIP_RENEWAL`
+- `MEMBERSHIP_PLAN_CHANGE`
+
+### Accesos efectivos
+
+`GET /api/v1/access/clients/{clientId}/effective-benefits`
+
+Deriva los beneficios desde la membresía vigente y el plan actual.
+
+`PUT /api/v1/access/devices/{deviceId}/benefits`
+
+```json
+{ "benefitIds": ["uuid"] }
+```
+
+Reemplaza de forma auditable los accesos requeridos por el dispositivo.
+
+## Organización y marca persistente
+
+`GET /api/v1/organizations/current`
+
+- requiere `organization.read` o `organization.update`;
+- devuelve los datos y la marca de la organización activa;
+- no depende de una sucursal seleccionada.
+
+`POST /api/v1/organizations/current/logo`
+
+- requiere `organization.update`;
+- recibe `multipart/form-data` con la parte `file`;
+- acepta PNG, JPG o WebP de hasta 2 MB;
+- persiste el archivo en almacenamiento de objetos, audita el reemplazo y
+  devuelve la organización actualizada con una URL versionada.
+
+`POST /api/v1/organizations/{organizationId}/logo`
+
+- requiere `platform.admin`;
+- permite que el alta de plataforma cree primero el tenant y después persista
+  su logo sin entrar en modo soporte;
+- comparte validación, almacenamiento, auditoría y compensación transaccional
+  con la carga del gimnasio actual.
+
+`GET /api/v1/organizations/{organizationId}/logo`
+
+- lectura pública de la identidad visual no sensible;
+- sólo resuelve la referencia controlada de la organización, nunca una clave
+  de objeto proporcionada por el cliente;
+- el frontend la expone mediante
+  `/api/tenant-logo/{organizationId}?v={version}`.

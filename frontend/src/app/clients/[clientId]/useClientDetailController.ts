@@ -5,8 +5,11 @@ import { useParams } from "next/navigation";
 import type { FieldErrorMap } from "@/components/FormFields";
 import {
   changeMembershipPlan,
+  enrollMembership,
   getClient,
   getClientMemberships,
+  getMembershipPeriods,
+  getMembershipQuote,
   getPlans,
   getStoredSession,
   renewMembership,
@@ -16,6 +19,8 @@ import {
   type ClientMembershipSummary,
   type ClientUpdatePayload,
   type PlanSummary,
+  type MembershipPeriodSummary,
+  type MembershipQuote,
   type RenewMembershipPayload,
   type StoredSession,
 } from "@/lib/api";
@@ -25,6 +30,7 @@ import {
   toClientUpdateForm,
   validateClientUpdate,
 } from "./ClientDetailHelpers";
+import { resolveClientMembershipCapabilities } from "./client-membership-permissions";
 
 export type MembershipAction = {
   membership: ClientMembershipSummary;
@@ -36,6 +42,8 @@ export function useClientDetailController() {
   const [session, setSession] = useState<StoredSession | null>(null);
   const [data, setData] = useState<ClientDetailResponse | null>(null);
   const [memberships, setMemberships] = useState<ClientMembershipSummary[]>([]);
+  const [membershipPeriods, setMembershipPeriods] = useState<Record<string, MembershipPeriodSummary[]>>({});
+  const [membershipQuote, setMembershipQuote] = useState<MembershipQuote | null>(null);
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [form, setForm] = useState<ClientUpdatePayload | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrorMap>({});
@@ -54,8 +62,38 @@ export function useClientDetailController() {
 
   const canEditClient = useMemo(() => hasPermission(session, "client.update"), [session]);
   const canReadMemberships = useMemo(() => hasPermission(session, "membership.read"), [session]);
-  const canManageMemberships = useMemo(
-    () => hasPermission(session, "membership.update") && hasPermission(session, "sale.create") && hasPermission(session, "catalog.read"),
+  const membershipCapabilities = useMemo(
+    () => resolveClientMembershipCapabilities(session?.user),
+    [session],
+  );
+  const canEnrollMembership = membershipCapabilities.canEnroll;
+  const canRenewMembership = membershipCapabilities.canRenew;
+  const canChangeMembership = membershipCapabilities.canChange;
+  const canManageMemberships = membershipCapabilities.canManage;
+  const canReadBenefits = useMemo(
+    () => hasAnyPermission(session, ["benefit.read", "client.benefit.assign"]),
+    [session],
+  );
+  const canAssignBenefits = useMemo(
+    () => hasAnyPermission(session, [
+      "client.benefit.assign",
+      "client.update",
+      "client.create",
+      "sale.create",
+    ]),
+    [session],
+  );
+  const canReadAccessBenefits = useMemo(
+    () => hasAnyPermission(session, [
+      "access.read",
+      "client.read",
+      "membership.read",
+      "benefit.read",
+    ]),
+    [session],
+  );
+  const canVerifyBenefits = useMemo(
+    () => hasPermission(session, "client.benefit.verify"),
     [session],
   );
   const limitedCoachView = useMemo(
@@ -83,22 +121,24 @@ export function useClientDetailController() {
         setForm(toClientUpdateForm(response.client));
 
         const mayReadMemberships = hasPermission(storedSession, "membership.read");
-        const mayManageMemberships = hasPermission(storedSession, "membership.update")
-          && hasPermission(storedSession, "sale.create")
-          && hasPermission(storedSession, "catalog.read");
+        const mayLoadPlans = hasPermission(storedSession, "sale.create")
+          || hasPermission(storedSession, "membership.change-plan");
 
         if (mayReadMemberships) {
           try {
-            const loadedMemberships = await getClientMemberships(storedSession.accessToken, params.clientId);
-            if (active) setMemberships(loadedMemberships);
+            const snapshot = await loadMembershipSnapshot(storedSession.accessToken, params.clientId);
+            if (active) {
+              setMemberships(snapshot.memberships);
+              setMembershipPeriods(snapshot.periodsByMembership);
+            }
           } catch (membershipError) {
-            if (active && mayManageMemberships) {
+            if (active && mayLoadPlans) {
               setError(membershipError instanceof Error ? membershipError.message : "No fue posible cargar membresias.");
             }
           }
         }
 
-        if (mayManageMemberships) {
+        if (mayLoadPlans) {
           try {
             const loadedPlans = await getPlans(storedSession.accessToken);
             if (!active) return;
@@ -127,6 +167,25 @@ export function useClientDetailController() {
     };
   }, [params.clientId]);
 
+  useEffect(() => {
+    if (!session || !membershipAction) return;
+    const planId = membershipAction.type === "change"
+      ? targetPlanId
+      : membershipAction.membership.planId;
+    if (!planId) return;
+    let active = true;
+    getMembershipQuote(session.accessToken, params.clientId, planId)
+      .then((quote) => {
+        if (active) setMembershipQuote(quote);
+      })
+      .catch(() => {
+        if (active) setMembershipQuote(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [membershipAction, params.clientId, session, targetPlanId]);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session || !form || !canEditClient) return;
@@ -151,7 +210,7 @@ export function useClientDetailController() {
   }
 
   async function renew(activeMembership: ClientMembershipSummary) {
-    if (!session || !canManageMemberships) return;
+    if (!session || !canRenewMembership) return;
     setRenewingMembershipId(activeMembership.id);
     setError(null);
     setMessage(null);
@@ -162,12 +221,14 @@ export function useClientDetailController() {
         validateNow: renewValidateNow,
         notes: "Renovacion desde ficha de socio",
       });
-      setMemberships(await getClientMemberships(session.accessToken, params.clientId));
+      const snapshot = await loadMembershipSnapshot(session.accessToken, params.clientId);
+      setMemberships(snapshot.memberships);
+      setMembershipPeriods(snapshot.periodsByMembership);
       setRenewReference("");
       setMembershipAction(null);
       setMessage(
         response.membership
-          ? `Membresia renovada hasta ${formatDay(response.membership.endsOn)}.`
+          ? `Membresia renovada hasta ${formatDay(response.membership.endsOn)} por ${formatMoney(response.totalCents, response.currency)}.`
           : `Venta ${response.saleNumber} creada con pago pendiente.`,
       );
     } catch (exception) {
@@ -178,11 +239,31 @@ export function useClientDetailController() {
   }
 
   async function changePlan(activeMembership: ClientMembershipSummary) {
-    if (!session || !targetPlanId || !canManageMemberships) return;
-    setChangingMembershipId(activeMembership.id);
+    const allowed = activeMembership.id ? canChangeMembership : canEnrollMembership;
+    if (!session || !targetPlanId || !allowed) return;
+    setChangingMembershipId(activeMembership.id || "new");
     setError(null);
     setMessage(null);
     try {
+      if (!activeMembership.id) {
+        const selectedPlan = plans.find((p) => p.id === targetPlanId);
+        if (!selectedPlan) return;
+        const res = await enrollMembership(session.accessToken, {
+          clientId: params.clientId,
+          planId: selectedPlan.id,
+          method: renewMethod,
+          reference: renewReference,
+          validateNow: renewValidateNow,
+          notes: "Venta de membresía inicial",
+        });
+        const snapshot = await loadMembershipSnapshot(session.accessToken, params.clientId);
+        setMemberships(snapshot.memberships);
+        setMembershipPeriods(snapshot.periodsByMembership);
+        setMembershipAction(null);
+        setMessage(`Membresía inicial asignada por ${formatMoney(res.totalCents, res.currency)}. Venta ${res.saleNumber} creada.`);
+        return;
+      }
+
       const payload: ChangeMembershipPlanPayload = {
         targetPlanId,
         method: renewMethod,
@@ -191,12 +272,14 @@ export function useClientDetailController() {
         notes: "Cambio de plan desde ficha de socio",
       };
       const response = await changeMembershipPlan(session.accessToken, activeMembership.id, payload);
-      setMemberships(await getClientMemberships(session.accessToken, params.clientId));
+      const snapshot = await loadMembershipSnapshot(session.accessToken, params.clientId);
+      setMemberships(snapshot.memberships);
+      setMembershipPeriods(snapshot.periodsByMembership);
       setRenewReference("");
       setMembershipAction(null);
       setMessage(
         response.membership
-          ? `Plan cambiado a ${response.membership.planName}.`
+          ? `Plan cambiado a ${response.membership.planName} por ${formatMoney(response.totalCents, response.currency)}.`
           : `Venta ${response.saleNumber} creada.`,
       );
     } catch (exception) {
@@ -212,16 +295,35 @@ export function useClientDetailController() {
   }
 
   function openMembershipAction(activeMembership: ClientMembershipSummary, type: "renew" | "change") {
-    if (!canManageMemberships) return;
-    if (type === "change") {
-      setTargetPlanId((current) => current && current !== activeMembership.planId ? current : plans.find((plan) => plan.id !== activeMembership.planId)?.id || "");
+    const allowed = type === "renew"
+      ? canRenewMembership
+      : activeMembership.id
+        ? canChangeMembership
+        : canEnrollMembership;
+    if (!allowed) {
+      setError("Tu rol no permite realizar esta operación de membresía.");
+      return;
     }
+    setError(null);
+    setMessage(null);
+    if (type === "change") {
+      setTargetPlanId((current) => {
+        if (!activeMembership.id) {
+          return current || plans[0]?.id || "";
+        }
+        return current && current !== activeMembership.planId
+          ? current
+          : plans.find((plan) => plan.id !== activeMembership.planId)?.id || "";
+      });
+      setRenewValidateNow(true);
+    }
+    setMembershipQuote(null);
     setMembershipAction({ membership: activeMembership, type });
   }
 
   async function submitMembershipAction(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!membershipAction || !canManageMemberships) return;
+    if (!membershipAction) return;
     if (membershipAction.type === "change") {
       await changePlan(membershipAction.membership);
       return;
@@ -230,9 +332,16 @@ export function useClientDetailController() {
   }
 
   return {
+    canAssignBenefits,
+    canChangeMembership,
     canEditClient,
+    canEnrollMembership,
     canManageMemberships,
+    canReadAccessBenefits,
+    canReadBenefits,
     canReadMemberships,
+    canRenewMembership,
+    canVerifyBenefits,
     changingMembershipId,
     data,
     error,
@@ -242,6 +351,8 @@ export function useClientDetailController() {
     loading,
     membershipAction,
     memberships,
+    membershipPeriods,
+    membershipQuote: visibleMembershipQuote(membershipQuote, membershipAction, targetPlanId),
     message,
     plans,
     renewMethod,
@@ -265,10 +376,49 @@ export function useClientDetailController() {
   };
 }
 
+function visibleMembershipQuote(
+  quote: MembershipQuote | null,
+  action: MembershipAction | null,
+  targetPlanId: string,
+) {
+  if (!quote || !action) return null;
+  const expectedPlanId = action.type === "change" ? targetPlanId : action.membership.planId;
+  return quote.planId === expectedPlanId ? quote : null;
+}
+
+function formatMoney(cents: number, currency: string) {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency,
+  }).format(cents / 100);
+}
+
+async function loadMembershipSnapshot(accessToken: string, clientId: string) {
+  const memberships = await getClientMemberships(accessToken, clientId);
+  const periodEntries = await Promise.all(
+    memberships.map(async (membership) => {
+      try {
+        const periods = await getMembershipPeriods(accessToken, membership.id);
+        return [membership.id, periods] as const;
+      } catch {
+        return [membership.id, []] as const;
+      }
+    }),
+  );
+  return {
+    memberships,
+    periodsByMembership: Object.fromEntries(periodEntries) as Record<string, MembershipPeriodSummary[]>,
+  };
+}
+
 function hasPermission(session: StoredSession | null, permission: string) {
   return Boolean(
     session?.user.permissions.includes(permission)
       || session?.user.permissions.includes("platform.admin")
       || session?.user.platformAdmin,
   );
+}
+
+function hasAnyPermission(session: StoredSession | null, permissions: string[]) {
+  return permissions.some((permission) => hasPermission(session, permission));
 }
