@@ -2,6 +2,8 @@ import { apiFetch, normalizePayload } from "./client";
 import type {
   AutomationExecution,
   AutomationRule,
+  AutomationWorkItem,
+  AutomationWorkItemStatus,
   CreateAutomationPayload,
   CreateNotificationPayload,
   NotificationLog,
@@ -61,4 +63,40 @@ export async function getAutomationExecutions(
   ruleId: string,
 ): Promise<AutomationExecution[]> {
   return apiFetch<AutomationExecution[]>(`/automations/${ruleId}/executions`, accessToken);
+}
+
+export async function getAutomationWorkItems(
+  accessToken: string,
+  filters: { ruleId?: string; status?: AutomationWorkItemStatus; limit?: number } = {},
+): Promise<AutomationWorkItem[]> {
+  const params = new URLSearchParams();
+  if (filters.ruleId) params.set("ruleId", filters.ruleId);
+  if (filters.status) params.set("status", filters.status);
+  params.set("limit", String(filters.limit ?? 100));
+  return apiFetch<AutomationWorkItem[]>(`/automations/work-items?${params.toString()}`, accessToken);
+}
+
+export async function getAutomationWorkItem(
+  accessToken: string,
+  workItemId: string,
+): Promise<AutomationWorkItem> {
+  return apiFetch<AutomationWorkItem>(`/automations/work-items/${workItemId}`, accessToken);
+}
+
+export async function retryAutomationWorkItem(
+  accessToken: string,
+  workItemId: string,
+): Promise<AutomationWorkItem> {
+  return apiFetch<AutomationWorkItem>(`/automations/work-items/${workItemId}/retry`, accessToken, {
+    method: "POST",
+  });
+}
+
+export async function cancelAutomationWorkItem(
+  accessToken: string,
+  workItemId: string,
+): Promise<AutomationWorkItem> {
+  return apiFetch<AutomationWorkItem>(`/automations/work-items/${workItemId}/cancel`, accessToken, {
+    method: "POST",
+  });
 }
