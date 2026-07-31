@@ -4,6 +4,7 @@ import com.gymos.automations.application.AutomationService;
 import com.gymos.automations.application.command.CreateAutomationRuleCommand;
 import com.gymos.automations.infrastructure.AutomationRepository.AutomationExecutionRecord;
 import com.gymos.automations.infrastructure.AutomationRepository.AutomationRuleRecord;
+import com.gymos.automations.infrastructure.DurableAutomationRepository.WorkItemRecord;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -66,6 +68,39 @@ public class AutomationController {
 	@GetMapping("/{ruleId}/executions")
 	List<AutomationExecutionRecord> executions(@AuthenticationPrincipal GymOsPrincipal principal, @PathVariable UUID ruleId) {
 		return automationService.executions(principal, ruleId);
+	}
+
+	@GetMapping("/work-items")
+	List<WorkItemRecord> workItems(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@RequestParam(required = false) UUID ruleId,
+			@RequestParam(required = false) String status,
+			@RequestParam(defaultValue = "100") int limit
+	) {
+		return automationService.workItems(principal, ruleId, status, limit);
+	}
+
+	@GetMapping("/work-items/{workItemId}")
+	WorkItemRecord workItem(@AuthenticationPrincipal GymOsPrincipal principal, @PathVariable UUID workItemId) {
+		return automationService.workItem(principal, workItemId);
+	}
+
+	@PostMapping("/work-items/{workItemId}/retry")
+	WorkItemRecord retryWorkItem(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID workItemId,
+			HttpServletRequest servletRequest
+	) {
+		return automationService.retryWorkItem(principal, workItemId, correlationId(servletRequest));
+	}
+
+	@PostMapping("/work-items/{workItemId}/cancel")
+	WorkItemRecord cancelWorkItem(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID workItemId,
+			HttpServletRequest servletRequest
+	) {
+		return automationService.cancelWorkItem(principal, workItemId, correlationId(servletRequest));
 	}
 
 	private String correlationId(HttpServletRequest request) {
