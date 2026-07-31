@@ -48,6 +48,7 @@ public class SelfServiceService {
 	private static final int MAX_VERIFICATION_ATTEMPTS = 5;
 	private static final Duration BLOCK_DURATION = Duration.ofMinutes(10);
 	private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+	private static final String BRANCH_KIOSK_PREFIX = "KIOSK-BRANCH-";
 
 	private final SelfServiceRepository repository;
 	private final MembershipOperations membershipOperations;
@@ -76,16 +77,58 @@ public class SelfServiceService {
 	}
 
 	@Transactional
+	public CreateSessionResult createReceptionSession(
+			GymOsPrincipal principal,
+			String originIp,
+			String correlationId
+	) {
+		if (principal == null) {
+			throw new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesion para abrir el kiosco.");
+		}
+		if (principal.organizationId() == null || principal.branchId() == null) {
+			throw new BusinessException("BRANCH_REQUIRED", "Selecciona una sucursal antes de abrir el kiosco.");
+		}
+		rateLimiter.check("kiosk:create:ip:" + originIp, 30, Duration.ofMinutes(1));
+		rateLimiter.check("kiosk:create:branch:" + principal.branchId(), 20, Duration.ofMinutes(1));
+		String configurationCode = BRANCH_KIOSK_PREFIX + principal.branchId();
+		TerminalRecord terminal = repository.terminal(
+				configurationCode,
+				principal.organizationId(),
+				principal.branchId()
+		).orElseThrow(() -> new BusinessException(
+				"SELF_SERVICE_BRANCH_NOT_CONFIGURED",
+				"El autoservicio no esta configurado para la sucursal activa."
+		));
+		return createSessionForTerminal(
+				terminal,
+				principal.userId(),
+				originIp,
+				correlationId,
+				"RECEPTION"
+		);
+	}
+
+	@Transactional
 	public CreateSessionResult createSession(String terminalCode, UUID organizationId, UUID branchId, String originIp, String correlationId) {
 		rateLimiter.check("kiosk:create:ip:" + originIp, 30, Duration.ofMinutes(1));
 		rateLimiter.check("kiosk:create:terminal:" + terminalCode, 20, Duration.ofMinutes(1));
 		TerminalRecord terminal = repository.terminal(terminalCode, organizationId, branchId)
 				.orElseThrow(() -> new BusinessException("SELF_SERVICE_TERMINAL_NOT_FOUND", "El kiosco no esta disponible."));
+		return createSessionForTerminal(terminal, null, originIp, correlationId, terminal.deviceCode());
+	}
+
+	private CreateSessionResult createSessionForTerminal(
+			TerminalRecord terminal,
+			UUID actorUserId,
+			String originIp,
+			String correlationId,
+			String auditReference
+	) {
 		OffsetDateTime now = OffsetDateTime.now();
 		UUID sessionId = UUID.randomUUID();
 		String sessionToken = randomToken();
 		repository.createSession(sessionId, terminal.organizationId(), terminal.branchId(), terminal.id(), now, now.plusMinutes(SESSION_MINUTES), originIp, tokenHash(sessionToken));
-		auditService.recordSystem(terminal.organizationId(), terminal.branchId(), null, "SELF_SERVICE_SESSION_STARTED", "SELF_SERVICE_SESSION", sessionId, "SELF_SERVICE_KIOSK", terminal.deviceCode(), correlationId);
+		auditService.recordSystem(terminal.organizationId(), terminal.branchId(), actorUserId, "SELF_SERVICE_SESSION_STARTED", "SELF_SERVICE_SESSION", sessionId, "SELF_SERVICE_KIOSK", auditReference, correlationId);
 		return new CreateSessionResult(
 				sessionId,
 				sessionToken,
