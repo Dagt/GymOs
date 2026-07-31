@@ -36,8 +36,8 @@ export const FOCUS_ACTIONS: FocusAction[] = [
   },
   {
     title: "Pantalla para socios",
-    detail: "Autoservicio para pagos, renovaciones y cambios de plan.",
-    href: "/kiosk/KIOSK-MAIN",
+    detail: "Autoservicio web ligado a la organización y sucursal activas de recepción.",
+    href: "/kiosk/reception",
     label: "Abrir kiosco",
     accent: "kiosk",
   },
