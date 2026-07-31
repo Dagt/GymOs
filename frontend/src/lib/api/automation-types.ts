@@ -52,6 +52,35 @@ export type AutomationExecution = {
   occurredAt: string;
 };
 
+export type AutomationWorkItemStatus =
+  | "PENDING"
+  | "RUNNING"
+  | "RETRY_SCHEDULED"
+  | "SUCCEEDED"
+  | "DEAD_LETTER"
+  | "CANCELLED";
+
+export type AutomationWorkItem = {
+  id: string;
+  organizationId: string;
+  branchId: string | null;
+  ruleId: string;
+  idempotencyKey: string;
+  triggerReference: string | null;
+  status: AutomationWorkItemStatus;
+  attemptCount: number;
+  maxAttempts: number;
+  scheduledAt: string;
+  nextAttemptAt: string;
+  lockedUntil: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  lastError: string | null;
+  effectReferenceId: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type CreateAutomationPayload = {
   name: string;
   triggerType: string;
