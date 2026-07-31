@@ -5,6 +5,7 @@ import com.gymos.bookings.api.operations.BookingOperations.BookingResource;
 import com.gymos.bookings.api.operations.BookingOperations.BookingResult;
 import com.gymos.clients.api.operations.SelfServiceClientProfile;
 import com.gymos.common.api.Correlation;
+import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.memberships.api.operations.ChangeMembershipPlanOperationCommand;
 import com.gymos.memberships.api.operations.RenewMembershipOperationCommand;
 import com.gymos.selfservice.application.SelfServiceService;
@@ -18,9 +19,9 @@ import com.gymos.selfservice.infrastructure.SelfServiceRepository.PendingPayment
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.PlanOptionRecord;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
@@ -28,6 +29,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -45,6 +47,18 @@ public class SelfServiceController {
 	private final SelfServiceService selfServiceService;
 
 	public SelfServiceController(SelfServiceService selfServiceService) { this.selfServiceService = selfServiceService; }
+
+	@PostMapping("/reception/sessions")
+	CreateSessionResponse createReceptionSession(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			HttpServletRequest servletRequest
+	) {
+		return toResponse(selfServiceService.createReceptionSession(
+				principal,
+				servletRequest.getRemoteAddr(),
+				correlationId(servletRequest)
+		));
+	}
 
 	@PostMapping("/terminals/{terminalCode}/sessions")
 	CreateSessionResponse createSession(@PathVariable String terminalCode, @RequestHeader(name = "X-GymOS-Organization-Id", required = false) UUID organizationId, @RequestHeader(name = "X-GymOS-Branch-Id", required = false) UUID branchId, HttpServletRequest servletRequest) {
