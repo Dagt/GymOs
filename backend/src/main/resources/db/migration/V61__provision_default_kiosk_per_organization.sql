@@ -1,10 +1,27 @@
+-- NOTA DE TRANSICIÓN
+--
+-- Esta migración mantiene compatibilidad con el esquema temporal basado en
+-- `KIOSK-MAIN`. No define la identidad definitiva de los terminales.
+--
+-- Reglas temporales:
+--   * cada organización debe tener su propio registro `KIOSK-MAIN`;
+--   * recepción debe resolverlo con el contexto de organización y sucursal;
+--   * nunca debe utilizarse el terminal perteneciente a otro tenant;
+--   * en organizaciones con varias sucursales, esta migración lo asocia sólo
+--     para pruebas a la primera sucursal activa ordenada por created_at e id.
+--
+-- Diseño objetivo:
+--   * un terminal físico = un registro independiente;
+--   * una sucursal obligatoria por terminal;
+--   * una URL pública globalmente única por terminal;
+--   * una credencial provisionada y rotatable por dispositivo;
+--   * soporte para varios terminales por organización y por sucursal.
+--
+-- Cuando se implemente ese modelo deberán retirarse la dependencia operativa
+-- de `KIOSK-MAIN` y los fallbacks que permitan resolver códigos ambiguos.
+--
 -- Provisiona un terminal inicial por organización para que el acceso desde
 -- recepción nunca dependa del terminal perteneciente al tenant demo.
---
--- KIOSK-MAIN continúa siendo una etiqueta temporal. El diseño definitivo
--- reemplazará este código por un identificador público global y credenciales
--- de dispositivo, pero mientras tanto cada organización debe tener su propio
--- registro aislado.
 
 WITH default_branch AS (
     SELECT DISTINCT ON (b.organization_id)
