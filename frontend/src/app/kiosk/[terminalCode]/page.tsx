@@ -18,6 +18,7 @@ import {
   type KioskSessionResponse,
   type KioskSummaryResponse,
 } from "@/lib/api";
+import { createReceptionKioskSession } from "@/lib/api/selfservice";
 import {
   createKioskBooking,
   getKioskBookingAvailability,
@@ -60,10 +61,12 @@ export default function KioskPage() {
       setError(null);
       try {
         const stored = getStoredSession();
-        const created = await createKioskSession(params.terminalCode, {
-          organizationId: stored?.user.organizationId,
-          branchId: stored?.user.branchId,
-        });
+        const created = params.terminalCode === "reception"
+          ? await createReceptionSession(stored)
+          : await createKioskSession(params.terminalCode, {
+              organizationId: stored?.user.organizationId,
+              branchId: stored?.user.branchId,
+            });
         if (active) setSession(created);
       } catch (exception) {
         if (active) setError(exception instanceof Error ? exception.message : "No fue posible iniciar kiosco.");
@@ -235,7 +238,7 @@ export default function KioskPage() {
             ) : (
               <span className="kiosk-logo-fallback">{(session?.brandName ?? session?.organizationName ?? "G").slice(0, 1)}</span>
             )}
-            <div><p>Autoservicio</p><h1>{session?.brandName ?? session?.organizationName ?? session?.terminalName ?? params.terminalCode}</h1><span>Membresías, reservas y datos personales en una sesión segura.</span></div>
+            <div><p>Autoservicio</p><h1>{session?.brandName ?? session?.organizationName ?? session?.terminalName ?? "GymOS"}</h1><span>Membresías, reservas y datos personales en una sesión segura.</span></div>
           </div>
           <aside><strong>Sesión segura</strong><span>Expira {session ? formatTime(session.expiresAt) : "N/A"}</span></aside>
         </header>
@@ -317,7 +320,7 @@ export default function KioskPage() {
                     <label className="kiosk-field">Teléfono en formato +52<input className="kiosk-input compact" onChange={(event) => setContactPhone(event.target.value)} pattern="\+52\d{10}" placeholder="+521234567890" value={contactPhone} /></label>
                     <button className="kiosk-secondary-action mt-4 w-full" disabled={contactBusy || (!contactEmail.trim() && !contactPhone.trim())} type="submit">{contactBusy ? "Guardando..." : "Guardar datos"}</button>
                   </form>
-                ) : <p className="kiosk-muted mt-4">Este terminal no permite actualizar datos.</p>}
+                ) : <p className="kiosk-muted mt-4">Esta sucursal no permite actualizar datos desde autoservicio.</p>}
                 {summary.capabilities.autopayAllowed ? (
                   <div className="kiosk-feature-note">
                     <strong>Domiciliación</strong>
@@ -332,6 +335,16 @@ export default function KioskPage() {
       </section>
     </main>
   );
+}
+
+async function createReceptionSession(stored: ReturnType<typeof getStoredSession>) {
+  if (!stored) {
+    throw new Error("Inicia sesión en recepción antes de abrir el kiosco.");
+  }
+  if (!stored.user.branchId) {
+    throw new Error("Selecciona una sucursal antes de abrir el kiosco.");
+  }
+  return createReceptionKioskSession(stored.accessToken);
 }
 
 function formatMoney(cents: number, currency: string) { return new Intl.NumberFormat("es-MX", { style: "currency", currency }).format(cents / 100); }
