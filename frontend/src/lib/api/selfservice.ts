@@ -1,4 +1,4 @@
-import { normalizePayload, publicApiFetch } from "./client";
+import { apiFetch, normalizePayload, publicApiFetch } from "./client";
 import type {
   KioskContactUpdatePayload,
   KioskMembershipCheckoutPayload,
@@ -10,6 +10,14 @@ import type {
   KioskSummaryResponse,
   RenewMembershipResponse,
 } from "./selfservice-types";
+
+export async function createReceptionKioskSession(
+  accessToken: string,
+): Promise<KioskSessionResponse> {
+  return apiFetch<KioskSessionResponse>("/self-service/reception/sessions", accessToken, {
+    method: "POST",
+  });
+}
 
 export async function createKioskSession(
   terminalCode: string,
