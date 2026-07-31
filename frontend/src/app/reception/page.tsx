@@ -141,7 +141,6 @@ export default function ReceptionPage() {
         />
       ) : (
         <div className="flex flex-col gap-8 w-full max-w-7xl mx-auto">
-          {/* Daily Operational Signals Strip */}
           <section className="admin-report-strip">
             {DAY_SIGNALS.map((signal) => (
               <ReportMetric
@@ -155,16 +154,18 @@ export default function ReceptionPage() {
 
           <ReceptionRenewalWidget session={session} />
 
-          {/* Main Hub Grid */}
           <section>
             <h3 className="text-lg font-black text-[color:var(--brand-primary)] mb-5 px-1 uppercase tracking-widest opacity-60">Módulos Operativos</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {FOCUS_ACTIONS.map((action, index) => {
                 const isPrimary = index === 0;
+                const opensKiosk = action.accent === "kiosk";
                 return (
                   <Link
                     key={action.href}
                     href={action.href}
+                    target={opensKiosk ? "_blank" : undefined}
+                    rel={opensKiosk ? "noopener" : undefined}
                     className={`group relative flex flex-col p-6 rounded-2xl border-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl overflow-hidden ${
                       isPrimary 
                         ? "col-span-1 md:col-span-2 lg:col-span-2 shadow-lg" 
@@ -179,7 +180,6 @@ export default function ReceptionPage() {
                       borderColor: `var(--brand-line)`
                     }}
                   >
-                    {/* Decorative Background Blob */}
                     <div 
                       className={`absolute -top-24 -right-24 w-64 h-64 rounded-full blur-3xl transition-opacity duration-500 ${isPrimary ? 'opacity-20 group-hover:opacity-40' : 'opacity-[0.05] group-hover:opacity-10'}`}
                       style={{ background: isPrimary ? 'white' : 'var(--brand-primary)' }}
