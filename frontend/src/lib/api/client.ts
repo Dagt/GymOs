@@ -110,6 +110,7 @@ async function performRequest(path: string, init: RequestInit): Promise<Response
 async function readResponse<T>(response: Response, path: string): Promise<T> {
   if (!response.ok) {
     const error = await response.json().catch(() => null);
+    redirectTerminalKioskSession(path, error);
     throw new Error(formatApiError(response, path, error));
   }
 
@@ -216,6 +217,25 @@ function operationKey(...parts: string[]) {
     ? crypto.randomUUID()
     : `${Date.now()}`;
   return [...parts, random].join(":");
+}
+
+function redirectTerminalKioskSession(path: string, error: unknown) {
+  if (typeof window === "undefined" || !path.startsWith("/self-service/sessions/")) {
+    return;
+  }
+  const payload = isApiErrorPayload(error) ? error : null;
+  const reason = kioskClosureReason(payload?.code);
+  if (!reason || window.location.pathname === "/kiosk/closed") {
+    return;
+  }
+  window.location.replace(`/kiosk/closed?reason=${reason}`);
+}
+
+function kioskClosureReason(code: string | undefined) {
+  if (code === "SELF_SERVICE_SESSION_INACTIVE") return "inactive";
+  if (code === "SELF_SERVICE_SESSION_EXPIRED") return "expired";
+  if (code === "SELF_SERVICE_SESSION_CLOSED") return "closed";
+  return null;
 }
 
 function formatApiError(response: Response, path: string, error: unknown) {
