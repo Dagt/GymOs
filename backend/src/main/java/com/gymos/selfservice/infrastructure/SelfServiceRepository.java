@@ -120,18 +120,32 @@ public class SelfServiceRepository {
 
 	public Optional<SessionRecord> session(UUID sessionId) {
 		return jdbcClient.sql("""
+				WITH touched_session AS (
+				    UPDATE self_service_session
+				    SET updated_at = now(),
+				        version = version + 1
+				    WHERE id = :sessionId
+				      AND deleted_at IS NULL
+				      AND status = 'ACTIVE'
+				      AND expires_at > now()
+				      AND (
+				          client_id IS NULL
+				          OR updated_at >= now() - INTERVAL '3 minutes'
+				      )
+				    RETURNING id, organization_id, branch_id, terminal_id, client_id,
+				              status, started_at, expires_at, ended_at, verification_method,
+				              session_token_hash, verification_attempts, blocked_until
+				)
 				SELECT s.id, s.organization_id, s.branch_id, s.terminal_id, s.client_id,
 				       s.status, s.started_at, s.expires_at, s.ended_at, s.verification_method,
 				       s.session_token_hash, s.verification_attempts, s.blocked_until,
 				       t.allowed_actions_json::text AS allowed_actions_json
-				FROM self_service_session s
+				FROM touched_session s
 				JOIN self_service_terminal t
 				  ON t.id = s.terminal_id
 				 AND t.organization_id = s.organization_id
 				 AND t.status = 'ACTIVE'
 				 AND t.deleted_at IS NULL
-				WHERE s.id = :sessionId
-				  AND s.deleted_at IS NULL
 				""")
 				.param("sessionId", sessionId)
 				.query((resultSet, rowNumber) -> new SessionRecord(
@@ -198,6 +212,8 @@ public class SelfServiceRepository {
 				    updated_at = :updatedAt,
 				    version = version + 1
 				WHERE id = :sessionId
+				  AND status = 'ACTIVE'
+				  AND deleted_at IS NULL
 				""")
 				.param("clientId", clientId)
 				.param("expiresAt", expiresAt)
@@ -214,6 +230,8 @@ public class SelfServiceRepository {
 				    updated_at = :updatedAt,
 				    version = version + 1
 				WHERE id = :sessionId
+				  AND status = 'ACTIVE'
+				  AND deleted_at IS NULL
 				""")
 				.param("verificationAttempts", attempts)
 				.param("blockedUntil", blockedUntil)
@@ -231,6 +249,8 @@ public class SelfServiceRepository {
 				    updated_at = :updatedAt,
 				    version = version + 1
 				WHERE id = :sessionId
+				  AND status = 'ACTIVE'
+				  AND deleted_at IS NULL
 				""")
 				.param("endedAt", now)
 				.param("updatedAt", now)
