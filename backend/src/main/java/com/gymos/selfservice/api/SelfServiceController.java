@@ -9,6 +9,7 @@ import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.memberships.api.operations.ChangeMembershipPlanOperationCommand;
 import com.gymos.memberships.api.operations.RenewMembershipOperationCommand;
 import com.gymos.selfservice.application.SelfServiceService;
+import com.gymos.selfservice.application.SelfServiceVerificationGuard;
 import com.gymos.selfservice.application.command.VerifySessionCommand;
 import com.gymos.selfservice.application.result.CreateSessionResult;
 import com.gymos.selfservice.application.result.SelfServiceMembershipSaleResult;
@@ -45,19 +46,16 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/self-service")
 public class SelfServiceController {
 	private final SelfServiceService selfServiceService;
+	private final SelfServiceVerificationGuard verificationGuard;
 
-	public SelfServiceController(SelfServiceService selfServiceService) { this.selfServiceService = selfServiceService; }
+	public SelfServiceController(SelfServiceService selfServiceService, SelfServiceVerificationGuard verificationGuard) {
+		this.selfServiceService = selfServiceService;
+		this.verificationGuard = verificationGuard;
+	}
 
 	@PostMapping("/reception/sessions")
-	CreateSessionResponse createReceptionSession(
-			@AuthenticationPrincipal GymOsPrincipal principal,
-			HttpServletRequest servletRequest
-	) {
-		return toResponse(selfServiceService.createReceptionSession(
-				principal,
-				servletRequest.getRemoteAddr(),
-				correlationId(servletRequest)
-		));
+	CreateSessionResponse createReceptionSession(@AuthenticationPrincipal GymOsPrincipal principal, HttpServletRequest servletRequest) {
+		return toResponse(selfServiceService.createReceptionSession(principal, servletRequest.getRemoteAddr(), correlationId(servletRequest)));
 	}
 
 	@PostMapping("/terminals/{terminalCode}/sessions")
@@ -67,6 +65,7 @@ public class SelfServiceController {
 
 	@PostMapping("/sessions/{sessionId}/verify")
 	SelfServiceSummaryResponse verify(@PathVariable UUID sessionId, @Valid @RequestBody VerifySessionRequest request, @RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken, HttpServletRequest servletRequest) {
+		verificationGuard.check(request.identifier());
 		return toResponse(selfServiceService.verify(sessionId, sessionToken, request.toCommand(), correlationId(servletRequest), servletRequest.getRemoteAddr()));
 	}
 
@@ -105,24 +104,15 @@ public class SelfServiceController {
 		return toResponse(selfServiceService.changePlan(sessionId, sessionToken, membershipId, request.toCommand(), correlationId(servletRequest), servletRequest.getRemoteAddr()));
 	}
 
-	@PostMapping("/sessions/{sessionId}/end") @ResponseStatus(HttpStatus.NO_CONTENT)
-	void end(@PathVariable UUID sessionId, @RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken, HttpServletRequest servletRequest) { selfServiceService.end(sessionId, sessionToken, correlationId(servletRequest)); }
+	@PostMapping("/sessions/{sessionId}/end")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	void end(@PathVariable UUID sessionId, @RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken, HttpServletRequest servletRequest) {
+		selfServiceService.end(sessionId, sessionToken, correlationId(servletRequest));
+	}
 
 	@PatchMapping("/sessions/{sessionId}/contact-data")
-	SelfServiceClientProfile updateContact(
-			@PathVariable UUID sessionId,
-			@Valid @RequestBody UpdateContactRequest request,
-			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken,
-			HttpServletRequest servletRequest
-	) {
-		return selfServiceService.updateContact(
-				sessionId,
-				sessionToken,
-				request.email(),
-				request.phone(),
-				correlationId(servletRequest),
-				servletRequest.getRemoteAddr()
-		);
+	SelfServiceClientProfile updateContact(@PathVariable UUID sessionId, @Valid @RequestBody UpdateContactRequest request, @RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken, HttpServletRequest servletRequest) {
+		return selfServiceService.updateContact(sessionId, sessionToken, request.email(), request.phone(), correlationId(servletRequest), servletRequest.getRemoteAddr());
 	}
 
 	private String correlationId(HttpServletRequest request) { Object value = request.getAttribute(Correlation.ATTRIBUTE); return value == null ? "unknown" : value.toString(); }
@@ -134,10 +124,7 @@ public class SelfServiceController {
 	public record CreateBookingRequest(@NotNull UUID resourceId, @NotNull OffsetDateTime startsAt, @NotNull OffsetDateTime endsAt, @Size(max = 2000) String notes) {}
 	public record RenewMembershipRequest(@NotBlank @Size(max = 160) String idempotencyKey) { private RenewMembershipOperationCommand toCommand() { return new RenewMembershipOperationCommand("CARD_ONLINE", null, false, "Renovacion con tarjeta desde kiosco", idempotencyKey); } }
 	public record ChangePlanRequest(@NotNull UUID targetPlanId, @NotBlank @Size(max = 160) String idempotencyKey) { private ChangeMembershipPlanOperationCommand toCommand() { return new ChangeMembershipPlanOperationCommand(targetPlanId, "CARD_ONLINE", null, false, "Cambio de plan con tarjeta desde kiosco", idempotencyKey); } }
-	public record UpdateContactRequest(
-			@Email @Size(max = 180) String email,
-			@Pattern(regexp = "^$|^\\+52\\d{10}$") String phone
-	) {}
+	public record UpdateContactRequest(@Email @Size(max = 180) String email, @Pattern(regexp = "^$|^\\+52\\d{10}$") String phone) {}
 	public record CreateSessionResponse(UUID sessionId, String sessionToken, String terminalName, String organizationName, String brandName, String logoUrl, String primaryColor, String accentColor, String surfaceColor, OffsetDateTime expiresAt, boolean verified, SelfServiceCapabilities capabilities) {}
 	public record SelfServiceSummaryResponse(UUID sessionId, OffsetDateTime expiresAt, String clientName, SelfServiceClientProfile profile, SelfServiceCapabilities capabilities, List<MembershipRecord> memberships, List<PendingPaymentRecord> pendingPayments) {}
 	public record SelfServiceMembershipSaleResponse(UUID saleId, String saleNumber, String saleStatus, long totalCents, long paidCents, long balanceCents, String currency, com.gymos.selfservice.application.result.SelfServiceMembershipSummaryResult membership) {}
