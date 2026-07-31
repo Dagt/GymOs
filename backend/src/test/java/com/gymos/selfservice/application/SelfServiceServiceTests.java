@@ -19,11 +19,15 @@ import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.security.RateLimiter;
 import com.gymos.memberships.api.operations.MembershipOperations;
 import com.gymos.memberships.api.operations.RenewMembershipOperationCommand;
+import com.gymos.selfservice.application.command.VerifySessionCommand;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.SessionRecord;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.TerminalRecord;
+import com.gymos.selfservice.infrastructure.SelfServiceSessionStatusRepository;
+import com.gymos.selfservice.infrastructure.SelfServiceSessionStatusRepository.SessionStatusRecord;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Base64;
 import java.util.Optional;
@@ -34,11 +38,13 @@ import org.junit.jupiter.api.Test;
 
 class SelfServiceServiceTests {
 	private final SelfServiceRepository repository = mock(SelfServiceRepository.class);
+	private final SelfServiceSessionStatusRepository sessionStatuses = mock(SelfServiceSessionStatusRepository.class);
 	private final MembershipOperations memberships = mock(MembershipOperations.class);
 	private final ClientLookupOperations clients = mock(ClientLookupOperations.class);
 	private final BookingOperations bookings = mock(BookingOperations.class);
 	private final AuditService audit = mock(AuditService.class);
 	private final RateLimiter rateLimiter = mock(RateLimiter.class);
+	private final SelfServiceVerificationGuard verificationGuard = mock(SelfServiceVerificationGuard.class);
 	private final SelfServiceCapabilityPolicy capabilityPolicy =
 			new SelfServiceCapabilityPolicy(new ObjectMapper());
 
@@ -54,12 +60,14 @@ class SelfServiceServiceTests {
 	void setUp() {
 		service = new SelfServiceService(
 				repository,
+				sessionStatuses,
 				memberships,
 				clients,
 				bookings,
 				audit,
 				rateLimiter,
-				capabilityPolicy
+				capabilityPolicy,
+				verificationGuard
 		);
 	}
 
@@ -223,7 +231,98 @@ class SelfServiceServiceTests {
 		);
 	}
 
+	@Test
+	void verifyAppliesAggregateIdentityGuard() {
+		givenUnverifiedSession();
+		when(clients.verifyForSelfService(any())).thenReturn(Optional.empty());
+
+		assertThatThrownBy(() -> service.verify(
+				sessionId,
+				token,
+				new VerifySessionCommand("+52 492 290 0619", LocalDate.of(1992, 9, 15)),
+				"correlation",
+				"127.0.0.1"
+		)).isInstanceOf(BusinessException.class);
+
+		verify(verificationGuard).check("+52 492 290 0619");
+	}
+
+	@Test
+	void closedSessionHasDedicatedError() {
+		givenStatus("ENDED", clientId, OffsetDateTime.now().plusMinutes(10), OffsetDateTime.now());
+
+		assertSessionCode("SELF_SERVICE_SESSION_CLOSED");
+		verifyNoInteractions(repository);
+	}
+
+	@Test
+	void expiredSessionHasDedicatedError() {
+		givenStatus("ACTIVE", clientId, OffsetDateTime.now().minusSeconds(1), OffsetDateTime.now());
+
+		assertSessionCode("SELF_SERVICE_SESSION_EXPIRED");
+		verifyNoInteractions(repository);
+	}
+
+	@Test
+	void inactiveVerifiedSessionHasDedicatedError() {
+		givenStatus("ACTIVE", clientId, OffsetDateTime.now().plusMinutes(10), OffsetDateTime.now().minusMinutes(4));
+
+		assertSessionCode("SELF_SERVICE_SESSION_INACTIVE");
+		verifyNoInteractions(repository);
+	}
+
+	@Test
+	void invalidTokenIsRejectedBeforeSessionStateIsRevealed() {
+		givenStatus("ENDED", clientId, OffsetDateTime.now().minusMinutes(1), OffsetDateTime.now().minusMinutes(10));
+
+		assertThatThrownBy(() -> service.summary(sessionId, "incorrect-token"))
+				.isInstanceOfSatisfying(
+						BusinessException.class,
+						exception -> assertThat(exception.code()).isEqualTo("SELF_SERVICE_SESSION_INVALID")
+				);
+		verifyNoInteractions(repository);
+	}
+
+	private void assertSessionCode(String expectedCode) {
+		assertThatThrownBy(() -> service.summary(sessionId, token))
+				.isInstanceOfSatisfying(
+						BusinessException.class,
+						exception -> assertThat(exception.code()).isEqualTo(expectedCode)
+				);
+	}
+
+	private void givenUnverifiedSession() {
+		OffsetDateTime now = OffsetDateTime.now();
+		when(sessionStatuses.find(sessionId)).thenReturn(Optional.of(new SessionStatusRecord(
+				sessionId,
+				null,
+				"ACTIVE",
+				now.plusMinutes(10),
+				null,
+				now,
+				tokenHash(token)
+		)));
+		when(repository.session(sessionId)).thenReturn(Optional.of(new SessionRecord(
+				sessionId,
+				organizationId,
+				branchId,
+				UUID.randomUUID(),
+				null,
+				"ACTIVE",
+				now.minusMinutes(1),
+				now.plusMinutes(10),
+				null,
+				null,
+				tokenHash(token),
+				0,
+				null,
+				"{}"
+		)));
+	}
+
 	private void givenSession(String allowedActionsJson) {
+		OffsetDateTime now = OffsetDateTime.now();
+		givenStatus("ACTIVE", clientId, now.plusMinutes(10), now);
 		when(repository.session(sessionId)).thenReturn(Optional.of(new SessionRecord(
 				sessionId,
 				organizationId,
@@ -231,14 +330,26 @@ class SelfServiceServiceTests {
 				UUID.randomUUID(),
 				clientId,
 				"ACTIVE",
-				OffsetDateTime.now().minusMinutes(1),
-				OffsetDateTime.now().plusMinutes(10),
+				now.minusMinutes(1),
+				now.plusMinutes(10),
 				null,
 				"CONTACT_BIRTH_DATE",
 				tokenHash(token),
 				0,
 				null,
 				allowedActionsJson
+		)));
+	}
+
+	private void givenStatus(String status, UUID verifiedClientId, OffsetDateTime expiresAt, OffsetDateTime updatedAt) {
+		when(sessionStatuses.find(sessionId)).thenReturn(Optional.of(new SessionStatusRecord(
+				sessionId,
+				verifiedClientId,
+				status,
+				expiresAt,
+				"ENDED".equals(status) ? updatedAt : null,
+				updatedAt,
+				tokenHash(token)
 		)));
 	}
 
