@@ -1,8 +1,22 @@
-import type {
-  ChangeMembershipPlanPayload,
-  RenewMembershipPayload,
-  RenewMembershipResponse,
-} from "./membership-types";
+import type { RenewMembershipResponse } from "./membership-types";
+
+export type KioskCapabilities = {
+  membershipRenewalAllowed: boolean;
+  membershipPlanChangeAllowed: boolean;
+  resourceBookingAllowed: boolean;
+  wellnessBookingAllowed: boolean;
+  profileUpdateAllowed: boolean;
+  autopayAllowed: boolean;
+  onlineCardPaymentsReady: boolean;
+  recurringCardPaymentsReady: boolean;
+};
+
+export type KioskProfile = {
+  clientId: string;
+  displayName: string;
+  email: string | null;
+  phone: string | null;
+};
 
 export type KioskMembership = {
   id: string;
@@ -47,12 +61,15 @@ export type KioskSessionResponse = {
   surfaceColor: string | null;
   expiresAt: string;
   verified: boolean;
+  capabilities: KioskCapabilities;
 };
 
 export type KioskSummaryResponse = {
   sessionId: string;
   expiresAt: string;
   clientName: string;
+  profile: KioskProfile | null;
+  capabilities: KioskCapabilities;
   memberships: KioskMembership[];
   pendingPayments: KioskPendingPayment[];
 };
@@ -62,8 +79,17 @@ export type KioskSessionContext = {
   branchId?: string | null;
 };
 
-export type {
-  ChangeMembershipPlanPayload,
-  RenewMembershipPayload,
-  RenewMembershipResponse,
+export type KioskMembershipCheckoutPayload = {
+  idempotencyKey: string;
 };
+
+export type KioskPlanChangeCheckoutPayload = KioskMembershipCheckoutPayload & {
+  targetPlanId: string;
+};
+
+export type KioskContactUpdatePayload = {
+  email?: string | null;
+  phone?: string | null;
+};
+
+export type { RenewMembershipResponse };

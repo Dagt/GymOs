@@ -31,6 +31,7 @@ public class SelfServiceRepository {
 		}
 		return jdbcClient.sql("""
 				SELECT sst.id, sst.organization_id, sst.branch_id, sst.name, sst.device_code, sst.status,
+				       sst.allowed_actions_json::text AS allowed_actions_json,
 				       o.trade_name, o.brand_name, o.logo_url, o.primary_color, o.accent_color, o.surface_color
 				FROM self_service_terminal sst
 				JOIN organization o ON o.id = sst.organization_id
@@ -48,6 +49,7 @@ public class SelfServiceRepository {
 						resultSet.getString("name"),
 						resultSet.getString("device_code"),
 						resultSet.getString("status"),
+						resultSet.getString("allowed_actions_json"),
 						resultSet.getString("trade_name"),
 						resultSet.getString("brand_name"),
 						resultSet.getString("logo_url"),
@@ -61,6 +63,7 @@ public class SelfServiceRepository {
 	private Optional<TerminalRecord> terminalForBranchContext(String terminalCode, UUID organizationId, UUID branchId) {
 		return jdbcClient.sql("""
 				SELECT sst.id, sst.organization_id, sst.branch_id, sst.name, sst.device_code, sst.status,
+				       sst.allowed_actions_json::text AS allowed_actions_json,
 				       o.trade_name, o.brand_name, o.logo_url, o.primary_color, o.accent_color, o.surface_color
 				FROM self_service_terminal sst
 				JOIN organization o ON o.id = sst.organization_id
@@ -82,6 +85,7 @@ public class SelfServiceRepository {
 						resultSet.getString("name"),
 						resultSet.getString("device_code"),
 						resultSet.getString("status"),
+						resultSet.getString("allowed_actions_json"),
 						resultSet.getString("trade_name"),
 						resultSet.getString("brand_name"),
 						resultSet.getString("logo_url"),
@@ -95,6 +99,7 @@ public class SelfServiceRepository {
 	private Optional<TerminalRecord> terminalForOrganizationContext(String terminalCode, UUID organizationId) {
 		return jdbcClient.sql("""
 				SELECT sst.id, sst.organization_id, sst.branch_id, sst.name, sst.device_code, sst.status,
+				       sst.allowed_actions_json::text AS allowed_actions_json,
 				       o.trade_name, o.brand_name, o.logo_url, o.primary_color, o.accent_color, o.surface_color
 				FROM self_service_terminal sst
 				JOIN organization o ON o.id = sst.organization_id
@@ -116,6 +121,7 @@ public class SelfServiceRepository {
 						resultSet.getString("name"),
 						resultSet.getString("device_code"),
 						resultSet.getString("status"),
+						resultSet.getString("allowed_actions_json"),
 						resultSet.getString("trade_name"),
 						resultSet.getString("brand_name"),
 						resultSet.getString("logo_url"),
@@ -128,12 +134,18 @@ public class SelfServiceRepository {
 
 	public Optional<SessionRecord> session(UUID sessionId) {
 		return jdbcClient.sql("""
-				SELECT id, organization_id, branch_id, terminal_id, client_id,
-				       status, started_at, expires_at, ended_at, verification_method,
-				       session_token_hash, verification_attempts, blocked_until
-				FROM self_service_session
-				WHERE id = :sessionId
-				  AND deleted_at IS NULL
+				SELECT s.id, s.organization_id, s.branch_id, s.terminal_id, s.client_id,
+				       s.status, s.started_at, s.expires_at, s.ended_at, s.verification_method,
+				       s.session_token_hash, s.verification_attempts, s.blocked_until,
+				       t.allowed_actions_json::text AS allowed_actions_json
+				FROM self_service_session s
+				JOIN self_service_terminal t
+				  ON t.id = s.terminal_id
+				 AND t.organization_id = s.organization_id
+				 AND t.status = 'ACTIVE'
+				 AND t.deleted_at IS NULL
+				WHERE s.id = :sessionId
+				  AND s.deleted_at IS NULL
 				""")
 				.param("sessionId", sessionId)
 				.query((resultSet, rowNumber) -> new SessionRecord(
@@ -149,7 +161,8 @@ public class SelfServiceRepository {
 						resultSet.getString("verification_method"),
 						resultSet.getString("session_token_hash"),
 						resultSet.getInt("verification_attempts"),
-						resultSet.getObject("blocked_until", OffsetDateTime.class)
+						resultSet.getObject("blocked_until", OffsetDateTime.class),
+						resultSet.getString("allowed_actions_json")
 				))
 				.optional();
 	}
@@ -323,7 +336,21 @@ public class SelfServiceRepository {
 				.list();
 	}
 
-	public record TerminalRecord(UUID id, UUID organizationId, UUID branchId, String name, String deviceCode, String status, String tradeName, String brandName, String logoUrl, String primaryColor, String accentColor, String surfaceColor) {
+	public record TerminalRecord(
+			UUID id,
+			UUID organizationId,
+			UUID branchId,
+			String name,
+			String deviceCode,
+			String status,
+			String allowedActionsJson,
+			String tradeName,
+			String brandName,
+			String logoUrl,
+			String primaryColor,
+			String accentColor,
+			String surfaceColor
+	) {
 	}
 
 	public record SessionRecord(
@@ -339,7 +366,8 @@ public class SelfServiceRepository {
 			String verificationMethod,
 			String sessionTokenHash,
 			int verificationAttempts,
-			OffsetDateTime blockedUntil
+			OffsetDateTime blockedUntil,
+			String allowedActionsJson
 	) {
 	}
 

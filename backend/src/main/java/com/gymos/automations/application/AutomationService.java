@@ -15,12 +15,16 @@ import com.gymos.notifications.application.NotificationService;
 import com.gymos.notifications.application.NotificationService.CreateNotificationCommand;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AutomationService {
+	private static final Set<String> SUPPORTED_TRIGGERS = Set.of("MANUAL", "SCHEDULED");
+	private static final Set<String> SUPPORTED_ACTIONS = Set.of("CREATE_NOTIFICATION");
+
 	private final AutomationRepository automationRepository;
 	private final NotificationService notificationService;
 	private final AuditService auditService;
@@ -50,6 +54,9 @@ public class AutomationService {
 		String conditionJson = validJsonOrDefault(command.conditionJson());
 		String actionConfigJson = validJsonOrDefault(command.actionConfigJson());
 		String triggerType = required(command.triggerType(), "AUTOMATION_TRIGGER_REQUIRED", "La automatizacion necesita evento.").toUpperCase();
+		String actionType = required(command.actionType(), "AUTOMATION_ACTION_REQUIRED", "La automatizacion necesita accion.").toUpperCase();
+		requireSupportedDefinition(triggerType, actionType);
+		validateActionConfig(actionType, actionConfigJson);
 		int intervalMinutes = intervalMinutes(conditionJson);
 		UUID ruleId = automationRepository.createRule(
 				principal.organizationId(),
@@ -59,7 +66,7 @@ public class AutomationService {
 						required(command.name(), "AUTOMATION_NAME_REQUIRED", "La automatizacion necesita nombre."),
 						triggerType,
 						conditionJson,
-						required(command.actionType(), "AUTOMATION_ACTION_REQUIRED", "La automatizacion necesita accion.").toUpperCase(),
+						actionType,
 						actionConfigJson,
 						Math.max(0, Math.min(command.retryLimit(), 10)),
 						"SCHEDULED".equals(triggerType) ? "interval:" + intervalMinutes : null,
@@ -120,7 +127,7 @@ public class AutomationService {
 			String correlationId,
 			String auditOrigin
 	) {
-		String status = "COMPLETED";
+		String status = "SUCCEEDED";
 		String error = null;
 		try {
 			if ("CREATE_NOTIFICATION".equals(rule.actionType())) {
@@ -140,6 +147,11 @@ public class AutomationService {
 								null
 						),
 						correlationId
+				);
+			} else {
+				throw new BusinessException(
+						"AUTOMATION_ACTION_UNSUPPORTED",
+						"La accion configurada no esta soportada."
 				);
 			}
 		} catch (RuntimeException | JsonProcessingException exception) {
@@ -173,6 +185,41 @@ public class AutomationService {
 			return resolved;
 		} catch (JsonProcessingException exception) {
 			throw new BusinessException("AUTOMATION_JSON_INVALID", "La configuracion JSON de la automatizacion es invalida.");
+		}
+	}
+
+	private void requireSupportedDefinition(String triggerType, String actionType) {
+		if (!SUPPORTED_TRIGGERS.contains(triggerType)) {
+			throw new BusinessException(
+					"AUTOMATION_TRIGGER_UNSUPPORTED",
+					"Este disparador aun no tiene un consumidor implementado."
+			);
+		}
+		if (!SUPPORTED_ACTIONS.contains(actionType)) {
+			throw new BusinessException(
+					"AUTOMATION_ACTION_UNSUPPORTED",
+					"Esta accion aun no esta implementada."
+			);
+		}
+	}
+
+	private void validateActionConfig(String actionType, String actionConfigJson) {
+		if (!"CREATE_NOTIFICATION".equals(actionType)) {
+			return;
+		}
+		try {
+			JsonNode config = objectMapper.readTree(actionConfigJson);
+			if (text(config, "body", null) == null || text(config, "body", null).isBlank()) {
+				throw new BusinessException(
+						"AUTOMATION_NOTIFICATION_BODY_REQUIRED",
+						"La notificacion necesita un mensaje."
+				);
+			}
+		} catch (JsonProcessingException exception) {
+			throw new BusinessException(
+					"AUTOMATION_JSON_INVALID",
+					"La configuracion JSON de la automatizacion es invalida."
+			);
 		}
 	}
 

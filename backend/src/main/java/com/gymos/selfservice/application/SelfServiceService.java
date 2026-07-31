@@ -7,6 +7,7 @@ import com.gymos.bookings.api.operations.BookingOperations.BookingResource;
 import com.gymos.bookings.api.operations.BookingOperations.BookingResult;
 import com.gymos.clients.api.operations.ClientLookupOperations;
 import com.gymos.clients.api.operations.SelfServiceClientProfile;
+import com.gymos.clients.api.operations.UpdateSelfServiceContactCommand;
 import com.gymos.clients.api.operations.VerifyClientIdentityCommand;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
@@ -19,6 +20,7 @@ import com.gymos.selfservice.application.command.VerifySessionCommand;
 import com.gymos.selfservice.application.result.CreateSessionResult;
 import com.gymos.selfservice.application.result.SelfServiceMembershipSaleResult;
 import com.gymos.selfservice.application.result.SelfServiceMembershipSummaryResult;
+import com.gymos.selfservice.application.result.SelfServiceCapabilities;
 import com.gymos.selfservice.application.result.SelfServiceSummaryResult;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.MembershipRecord;
@@ -53,6 +55,7 @@ public class SelfServiceService {
 	private final BookingOperations bookingOperations;
 	private final AuditService auditService;
 	private final RateLimiter rateLimiter;
+	private final SelfServiceCapabilityPolicy capabilityPolicy;
 
 	public SelfServiceService(
 			SelfServiceRepository repository,
@@ -60,7 +63,8 @@ public class SelfServiceService {
 			ClientLookupOperations clientLookupOperations,
 			BookingOperations bookingOperations,
 			AuditService auditService,
-			RateLimiter rateLimiter
+			RateLimiter rateLimiter,
+			SelfServiceCapabilityPolicy capabilityPolicy
 	) {
 		this.repository = repository;
 		this.membershipOperations = membershipOperations;
@@ -68,6 +72,7 @@ public class SelfServiceService {
 		this.bookingOperations = bookingOperations;
 		this.auditService = auditService;
 		this.rateLimiter = rateLimiter;
+		this.capabilityPolicy = capabilityPolicy;
 	}
 
 	@Transactional
@@ -81,7 +86,20 @@ public class SelfServiceService {
 		String sessionToken = randomToken();
 		repository.createSession(sessionId, terminal.organizationId(), terminal.branchId(), terminal.id(), now, now.plusMinutes(SESSION_MINUTES), originIp, tokenHash(sessionToken));
 		auditService.recordSystem(terminal.organizationId(), terminal.branchId(), null, "SELF_SERVICE_SESSION_STARTED", "SELF_SERVICE_SESSION", sessionId, "SELF_SERVICE_KIOSK", terminal.deviceCode(), correlationId);
-		return new CreateSessionResult(sessionId, sessionToken, terminal.name(), terminal.tradeName(), terminal.brandName(), terminal.logoUrl(), terminal.primaryColor(), terminal.accentColor(), terminal.surfaceColor(), now.plusMinutes(SESSION_MINUTES), false);
+		return new CreateSessionResult(
+				sessionId,
+				sessionToken,
+				terminal.name(),
+				terminal.tradeName(),
+				terminal.brandName(),
+				terminal.logoUrl(),
+				terminal.primaryColor(),
+				terminal.accentColor(),
+				terminal.surfaceColor(),
+				now.plusMinutes(SESSION_MINUTES),
+				false,
+				capabilityPolicy.resolve(terminal.allowedActionsJson())
+		);
 	}
 
 	@Transactional
@@ -105,26 +123,38 @@ public class SelfServiceService {
 	public SelfServiceSummaryResult summary(UUID sessionId, String sessionToken) {
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
 		SelfServiceClientProfile client = clientLookupOperations.selfServiceProfile(session.organizationId(), session.clientId()).orElse(null);
+		SelfServiceCapabilities capabilities = capabilities(session);
 		List<MembershipRecord> memberships = repository.memberships(session.organizationId(), session.branchId(), session.clientId());
 		List<PendingPaymentRecord> pendingPayments = repository.pendingPayments(session.organizationId(), session.branchId(), session.clientId());
-		return new SelfServiceSummaryResult(session.id(), session.expiresAt(), client == null ? "Cliente" : client.displayName(), memberships, pendingPayments);
+		return new SelfServiceSummaryResult(
+				session.id(),
+				session.expiresAt(),
+				client == null ? "Socio" : client.displayName(),
+				client,
+				capabilities,
+				memberships,
+				pendingPayments
+		);
 	}
 
 	@Transactional(readOnly = true)
 	public List<PlanOptionRecord> membershipOptions(UUID sessionId, String sessionToken) {
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
+		capabilityPolicy.require(capabilities(session), SelfServiceCapability.MEMBERSHIP_PLAN_CHANGE);
 		return repository.planOptions(session.organizationId());
 	}
 
 	@Transactional(readOnly = true)
 	public List<BookingResource> bookingResources(UUID sessionId, String sessionToken) {
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
+		capabilityPolicy.require(capabilities(session), SelfServiceCapability.RESOURCE_BOOKING);
 		return bookingOperations.resources(session.organizationId(), session.branchId());
 	}
 
 	@Transactional(readOnly = true)
 	public List<BookingAvailability> bookingAvailability(UUID sessionId, String sessionToken, UUID resourceId, LocalDate date) {
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
+		capabilityPolicy.require(capabilities(session), SelfServiceCapability.RESOURCE_BOOKING);
 		return bookingOperations.availability(session.organizationId(), session.branchId(), resourceId, date);
 	}
 
@@ -133,6 +163,7 @@ public class SelfServiceService {
 		rateLimiter.check("kiosk:booking:ip:" + originIp, 30, Duration.ofMinutes(1));
 		rateLimiter.check("kiosk:booking:session:" + sessionId, 10, Duration.ofMinutes(1));
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
+		capabilityPolicy.require(capabilities(session), SelfServiceCapability.RESOURCE_BOOKING);
 		BookingResult booking = bookingOperations.createBooking(
 				session.organizationId(),
 				session.branchId(),
@@ -152,6 +183,9 @@ public class SelfServiceService {
 		rateLimiter.check("kiosk:renew:ip:" + originIp, 30, Duration.ofMinutes(1));
 		rateLimiter.check("kiosk:renew:session:" + sessionId, 5, Duration.ofMinutes(1));
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
+		SelfServiceCapabilities capabilities = capabilities(session);
+		capabilityPolicy.require(capabilities, SelfServiceCapability.MEMBERSHIP_RENEWAL);
+		capabilityPolicy.requireOnlineCardPayments(capabilities);
 		MembershipSaleOperationResult response = membershipOperations.renew(kioskPrincipal(session), membershipId, request, correlationId);
 		auditService.recordSystem(session.organizationId(), session.branchId(), null, "SELF_SERVICE_MEMBERSHIP_RENEWED", "MEMBERSHIP", membershipId, "SELF_SERVICE_KIOSK", null, correlationId);
 		return toResponse(response);
@@ -162,9 +196,47 @@ public class SelfServiceService {
 		rateLimiter.check("kiosk:change-plan:ip:" + originIp, 30, Duration.ofMinutes(1));
 		rateLimiter.check("kiosk:change-plan:session:" + sessionId, 5, Duration.ofMinutes(1));
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
+		SelfServiceCapabilities capabilities = capabilities(session);
+		capabilityPolicy.require(capabilities, SelfServiceCapability.MEMBERSHIP_PLAN_CHANGE);
+		capabilityPolicy.requireOnlineCardPayments(capabilities);
 		MembershipSaleOperationResult response = membershipOperations.changePlan(kioskPrincipal(session), membershipId, request, correlationId);
 		auditService.recordSystem(session.organizationId(), session.branchId(), null, "SELF_SERVICE_MEMBERSHIP_PLAN_CHANGED", "MEMBERSHIP", membershipId, "SELF_SERVICE_KIOSK", null, correlationId);
 		return toResponse(response);
+	}
+
+	@Transactional
+	public SelfServiceClientProfile updateContact(
+			UUID sessionId,
+			String sessionToken,
+			String email,
+			String phone,
+			String correlationId,
+			String originIp
+	) {
+		rateLimiter.check("kiosk:contact:ip:" + originIp, 30, Duration.ofMinutes(1));
+		rateLimiter.check("kiosk:contact:session:" + sessionId, 10, Duration.ofMinutes(1));
+		SessionRecord session = verifiedSession(sessionId, sessionToken);
+		capabilityPolicy.require(capabilities(session), SelfServiceCapability.PROFILE_UPDATE);
+		SelfServiceClientProfile profile = clientLookupOperations.updateSelfServiceContact(
+				new UpdateSelfServiceContactCommand(
+						session.organizationId(),
+						session.clientId(),
+						email,
+						phone
+				)
+		);
+		auditService.recordSystem(
+				session.organizationId(),
+				session.branchId(),
+				null,
+				"SELF_SERVICE_CONTACT_UPDATED",
+				"CLIENT",
+				session.clientId(),
+				"SELF_SERVICE_KIOSK",
+				null,
+				correlationId
+		);
+		return profile;
 	}
 
 	private SelfServiceMembershipSaleResult toResponse(MembershipSaleOperationResult result) {
@@ -182,6 +254,10 @@ public class SelfServiceService {
 		SessionRecord session = activeSession(sessionId, sessionToken);
 		if (session.clientId() == null) throw new BusinessException("SELF_SERVICE_SESSION_NOT_VERIFIED", "Primero verifica tu identidad.");
 		return session;
+	}
+
+	private SelfServiceCapabilities capabilities(SessionRecord session) {
+		return capabilityPolicy.resolve(session.allowedActionsJson());
 	}
 
 	private SessionRecord activeSession(UUID sessionId, String sessionToken) {

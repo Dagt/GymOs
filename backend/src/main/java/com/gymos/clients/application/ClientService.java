@@ -4,6 +4,7 @@ import com.gymos.audit.api.AuditService;
 import com.gymos.clients.api.operations.ClientLookupOperations;
 import com.gymos.clients.api.operations.ClientVerificationResult;
 import com.gymos.clients.api.operations.SelfServiceClientProfile;
+import com.gymos.clients.api.operations.UpdateSelfServiceContactCommand;
 import com.gymos.clients.api.operations.VerifyClientIdentityCommand;
 import com.gymos.clients.application.command.CreateClientCommand;
 import com.gymos.clients.application.command.UpdateClientCommand;
@@ -141,7 +142,43 @@ public class ClientService implements ClientLookupOperations {
 	@Transactional(readOnly = true)
 	public Optional<SelfServiceClientProfile> selfServiceProfile(UUID organizationId, UUID clientId) {
 		return clientRepository.selfServiceProfile(organizationId, clientId)
-				.map(client -> new SelfServiceClientProfile(client.id(), client.fullName()));
+				.map(this::toSelfServiceProfile);
+	}
+
+	@Override
+	@Transactional
+	public SelfServiceClientProfile updateSelfServiceContact(UpdateSelfServiceContactCommand command) {
+		var existing = clientRepository.selfServiceProfile(command.organizationId(), command.clientId())
+				.orElseThrow(() -> new BusinessException(
+						"CLIENT_NOT_FOUND",
+						"El socio no existe o no esta disponible."
+				));
+		String email = blankToNull(command.email());
+		String phone = blankToNull(command.phone());
+		if (email == null && phone == null) {
+			throw new BusinessException(
+					"SELF_SERVICE_CONTACT_REQUIRED",
+					"Conserva al menos un correo o telefono de contacto."
+			);
+		}
+		ensureUniqueContact(command.organizationId(), email, phone, existing.personId());
+		commandRepository.updateSelfServiceContact(
+				command.organizationId(),
+				existing.personId(),
+				email,
+				phone,
+				OffsetDateTime.now()
+		);
+		return selfServiceProfile(command.organizationId(), command.clientId()).orElseThrow();
+	}
+
+	private SelfServiceClientProfile toSelfServiceProfile(ClientRepository.SelfServiceClientRecord client) {
+		return new SelfServiceClientProfile(
+				client.id(),
+				client.fullName(),
+				client.email(),
+				client.phone()
+		);
 	}
 
 	private void ensureUniqueContact(UUID organizationId, String email, String phone, UUID excludedPersonId) {

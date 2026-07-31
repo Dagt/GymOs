@@ -4564,6 +4564,31 @@ button.admin-secondary-link:disabled {
   color: #dcfce7;
 }
 
+.kiosk-feature-note {
+  background: color-mix(in srgb, var(--brand-accent) 12%, rgba(255, 255, 255, 0.08));
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 38%, rgba(255, 255, 255, 0.14));
+  border-radius: 0.75rem;
+  color: rgba(255, 255, 255, 0.82);
+  display: grid;
+  gap: 0.35rem;
+  line-height: 1.55;
+  margin-top: 1rem;
+  padding: 1rem;
+}
+
+.kiosk-feature-note strong {
+  color: white;
+  font-weight: 950;
+}
+
+.kiosk-primary-action:disabled,
+.kiosk-secondary-action:disabled,
+.kiosk-end-action:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+  transform: none;
+}
+
 @media (max-width: 840px) {
   .kiosk-header,
   .kiosk-content-grid,

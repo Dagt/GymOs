@@ -129,12 +129,18 @@ export {
   getKioskMembershipOptions,
   getKioskSummary,
   renewMembershipFromKiosk,
+  updateKioskContactData,
   verifyKioskSession,
 } from "./api/selfservice";
 export type {
   KioskMembership,
+  KioskCapabilities,
+  KioskContactUpdatePayload,
+  KioskMembershipCheckoutPayload,
   KioskPendingPayment,
   KioskPlanOption,
+  KioskPlanChangeCheckoutPayload,
+  KioskProfile,
   KioskSessionContext,
   KioskSessionResponse,
   KioskSummaryResponse,

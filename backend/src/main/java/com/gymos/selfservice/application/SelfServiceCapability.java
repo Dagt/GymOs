@@ -1,0 +1,10 @@
+package com.gymos.selfservice.application;
+
+public enum SelfServiceCapability {
+	MEMBERSHIP_RENEWAL,
+	MEMBERSHIP_PLAN_CHANGE,
+	RESOURCE_BOOKING,
+	WELLNESS_BOOKING,
+	PROFILE_UPDATE,
+	AUTOPAY
+}

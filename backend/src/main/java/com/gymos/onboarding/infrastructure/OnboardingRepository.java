@@ -158,7 +158,7 @@ public class OnboardingRepository {
 				)
 				VALUES (
 				    :id, :organizationId, :branchId, :name, :deviceCode, 'ACTIVE',
-				    '{"renewal":true,"planChange":true,"pendingPayments":true}'::jsonb,
+				    '{"membershipRenewal":true,"membershipPlanChange":true,"resourceBooking":true,"wellnessBooking":true,"profileUpdate":true,"autopay":true}'::jsonb,
 				    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
 				)
 				""")

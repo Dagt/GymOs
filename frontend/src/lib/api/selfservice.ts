@@ -1,11 +1,13 @@
 import { normalizePayload, publicApiFetch } from "./client";
 import type {
-  ChangeMembershipPlanPayload,
+  KioskContactUpdatePayload,
+  KioskMembershipCheckoutPayload,
   KioskPlanOption,
+  KioskPlanChangeCheckoutPayload,
+  KioskProfile,
   KioskSessionContext,
   KioskSessionResponse,
   KioskSummaryResponse,
-  RenewMembershipPayload,
   RenewMembershipResponse,
 } from "./selfservice-types";
 
@@ -59,7 +61,7 @@ export async function renewMembershipFromKiosk(
   sessionId: string,
   sessionToken: string,
   membershipId: string,
-  payload: RenewMembershipPayload,
+  payload: KioskMembershipCheckoutPayload,
 ): Promise<RenewMembershipResponse> {
   return publicApiFetch<RenewMembershipResponse>(
     `/self-service/sessions/${sessionId}/membership-renewals/${membershipId}`,
@@ -75,7 +77,7 @@ export async function changeMembershipPlanFromKiosk(
   sessionId: string,
   sessionToken: string,
   membershipId: string,
-  payload: ChangeMembershipPlanPayload,
+  payload: KioskPlanChangeCheckoutPayload,
 ): Promise<RenewMembershipResponse> {
   return publicApiFetch<RenewMembershipResponse>(
     `/self-service/sessions/${sessionId}/membership-change-requests/${membershipId}`,
@@ -91,6 +93,18 @@ export async function endKioskSession(sessionId: string, sessionToken: string): 
   await publicApiFetch<void>(`/self-service/sessions/${sessionId}/end`, {
     method: "POST",
     headers: kioskSessionHeaders(sessionToken),
+  });
+}
+
+export async function updateKioskContactData(
+  sessionId: string,
+  sessionToken: string,
+  payload: KioskContactUpdatePayload,
+): Promise<KioskProfile> {
+  return publicApiFetch<KioskProfile>(`/self-service/sessions/${sessionId}/contact-data`, {
+    method: "PATCH",
+    headers: kioskSessionHeaders(sessionToken),
+    body: JSON.stringify(normalizePayload(payload)),
   });
 }
 

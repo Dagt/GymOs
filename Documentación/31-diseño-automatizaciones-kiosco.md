@@ -1,6 +1,6 @@
 # Diseño rector de Automatizaciones y Kiosco
 
-Estado: AUDITADO / DISEÑO OBJETIVO  
+Estado: DISEÑO APROBADO / IMPLEMENTACIÓN INICIADA
 Corte: 30 de julio de 2026  
 Rama: `feature/automations-self-service-kiosk`
 
@@ -14,12 +14,16 @@ declararse cerrado:
   interna. Los disparadores de membresías, pagos y reservas visibles en la
   interfaz no tienen consumidores de eventos. `retryLimit` se persiste pero no
   se usa y una acción desconocida termina registrada como completada.
-- **Kiosco está PARCIAL y no es seguro para piloto financiero**. La sesión
+- **Kiosco está PARCIAL y no es seguro todavía para un piloto financiero**. La sesión
   temporal, el token aleatorio, la verificación por contacto y fecha de
   nacimiento, los límites de frecuencia y el consumo de APIs públicas de otros
-  módulos son una buena base. Sin embargo, la interfaz envía pagos en efectivo
-  con `validateNow: true`, no se aplican las acciones autorizadas del terminal y
-  el código público `KIOSK-MAIN` es ambiguo entre gimnasios.
+  módulos son una buena base. El primer bloque ya retiró efectivo y
+  `validateNow`, aplica las capacidades y permite actualizar el contacto. Aún
+  no existe pasarela y el código público `KIOSK-MAIN` sigue siendo ambiguo entre
+  gimnasios. El producto
+  objetivo acepta **exclusivamente tarjeta de crédito o débito** para cualquier
+  operación con cobro; no habrá efectivo, transferencia ni tarjeta manual en
+  autoservicio.
 
 El diseño objetivo conserva una regla central: **Automatizaciones orquesta;
 Kiosco presenta y solicita; los módulos propietarios deciden y ejecutan**.
@@ -86,14 +90,14 @@ No es responsable de:
 
 | Prioridad | Hallazgo | Impacto |
 |---|---|---|
-| P0 | `MEMBERSHIP_EXPIRING`, `PAYMENT_COMPLETED` y `BOOKING_CONFIRMED` sólo existen como opciones visuales; no hay listeners ni una bandeja durable de eventos. | Se venden reglas que nunca se ejecutan automáticamente. |
+| PARCIAL | `MEMBERSHIP_EXPIRING`, `PAYMENT_COMPLETED` y `BOOKING_CONFIRMED` no tienen listeners ni bandeja durable; ya fueron retirados del alta en la interfaz hasta implementarlos. | Ya no se venden como funcionales, pero aún faltan sus consumidores. |
 | P0 | `retryLimit` no participa en la ejecución. Toda regla se reprograma incluso después de fallar. | No hay reintentos ni tratamiento real de fallos. |
 | P0 | Una caída después de crear el efecto y antes de registrar/reprogramar permite repetirlo al vencer el lock. | La exclusión concurrente no equivale a idempotencia ante fallos. |
 | P1 | Cualquier `actionType` es aceptado; si no es `CREATE_NOTIFICATION`, no hace nada y queda `COMPLETED`. | Falso positivo operativo. |
 | P1 | Sólo se valida que los JSON sean sintácticamente correctos. | Configuraciones inválidas llegan a ejecución. |
 | P1 | La documentación promete `SUCCEEDED`, `SKIPPED`, `FAILED`; el código usa `COMPLETED` y `FAILED`. | Contrato y observabilidad inconsistentes. |
-| P1 | La interfaz obliga a editar JSON y no muestra historial de ejecuciones, error, intento ni vista previa. | Alto riesgo de configuración y soporte difícil. |
-| P1 | La carga conjunta de reglas y notificaciones falla completa si el usuario puede leer automatizaciones pero no notificaciones. Los botones tampoco se ocultan por permiso. | La lectura y la administración no están desacopladas en UX. |
+| PARCIAL | El formulario inicial ya no obliga a editar JSON; aún no muestra historial de ejecuciones, error, intento ni vista previa. | Se redujo el riesgo de configuración, pero el diagnóstico sigue pendiente. |
+| RESUELTO EN UI | La carga conjunta de reglas y notificaciones fallaba si el usuario no podía leer notificaciones y los botones no se ocultaban por permiso. | Las cargas y acciones visibles ahora respetan permisos por separado. |
 | P2 | `automation.execute` y `automation.scheduler.manage` existen, pero las rutas sólo usan `automation.manage`. | Los permisos granulares no tienen efecto. |
 | P2 | El scheduler toma 25 reglas globales por fecha, sin equidad por tenant ni zona horaria de negocio. | Un tenant ruidoso puede retrasar a otros. |
 
@@ -112,6 +116,9 @@ Disparadores iniciales:
 - `BOOKING_CREATED`;
 - `BOOKING_CONFIRMED`;
 - `BOOKING_CANCELLED`.
+- `RECURRING_CHARGE_DUE`;
+- `RECURRING_CHARGE_SUCCEEDED`;
+- `RECURRING_CHARGE_FAILED`.
 
 Acciones iniciales:
 
@@ -119,6 +126,8 @@ Acciones iniciales:
 - `CREATE_STAFF_TASK`, si se incorpora una bandeja operativa;
 - `QUEUE_MESSAGE`, sólo cuando exista un adaptador de notificaciones con
   consentimiento, plantilla y proveedor.
+- `REQUEST_RECURRING_CHARGE`, únicamente a través del puerto público de pagos y
+  con una autorización de domiciliación vigente.
 
 Cada combinación debe publicar un esquema de configuración. La API rechaza
 tipos desconocidos y la interfaz presenta campos guiados; el JSON queda como
@@ -172,16 +181,16 @@ inicio, fin, siguiente intento, código de error y resumen sanitizado.
 
 | Prioridad | Hallazgo | Impacto |
 |---|---|---|
-| P0 | Renovar y cambiar plan envían `method: CASH` y `validateNow: true` desde un cliente público. | El socio puede autovalidar efectivo y activar una membresía sin intervención del personal. Viola PRD y SDS. |
-| P0 | `allowed_actions_json` no se lee ni se aplica. Además existen claves incompatibles: `renew/changePlan/payments` y `renewal/planChange/pendingPayments`; reservas no aparece en ninguna. | Un terminal no puede restringir sus capacidades y la configuración es decorativa. |
+| RESUELTO EN BLOQUE 0 | Renovar y cambiar plan enviaban `method: CASH` y `validateNow: true` desde un cliente público. | El contrato público ya no acepta esos campos y las operaciones permanecen bloqueadas hasta conectar tarjeta en línea. |
+| RESUELTO EN BLOQUE 0 | `allowed_actions_json` no se leía ni aplicaba y existían claves incompatibles. | V60 unifica las claves; backend y frontend aplican las capacidades efectivas. |
 | P0 | `KIOSK-MAIN` es único sólo dentro de una organización. Sin contexto autenticado, la consulta pública puede encontrar varios terminales. | El kiosco autónomo es ambiguo o produce error; los encabezados públicos de contexto no son identidad de dispositivo. |
 | P0 | No existe una credencial o vínculo de instalación del terminal. Conocer el código permite abrir sesiones desde cualquier cliente. | La ruta pública no demuestra que opere desde un dispositivo provisionado. |
 | P1 | No hay cierre automático por inactividad. `last_request_at` existe pero no se actualiza ni valida. | PII queda visible hasta 15 minutos aunque el usuario abandone la pantalla. |
 | P1 | El límite de intentos se aplica por sesión; crear sesiones nuevas reinicia el contador. No hay límite agregado por identificador anonimizado y terminal. | La protección contra adivinación se puede eludir. |
-| P1 | La interfaz impide renovar una membresía vencida y no permite contratar una membresía inicial. | Casos comunes de autoservicio quedan bloqueados. |
-| P1 | La llave de idempotencia se genera de nuevo en cada clic. Tras un timeout, el reintento humano usa otra llave. | Puede duplicar una intención comercial. |
+| PARCIAL | La interfaz ya contempla renovar una membresía vencida, pero no permite contratar una membresía inicial. | El alta inicial sigue pendiente del checkout con tarjeta. |
+| RESUELTO EN CLIENTE | La llave de idempotencia se generaba de nuevo en cada clic. | Ahora se conserva durante los reintentos de una misma intención; falta persistencia servidor/proveedor. |
 | P1 | No hay confirmación previa con cotización final, descuentos aplicados, método y estado esperado. | El socio no ve el compromiso antes de generar la operación. |
-| P1 | Los contratos documentan pagos, comprobantes y actualización de contacto, pero no están implementados; `contact-data` es un placeholder que no modifica nada. | La documentación sobredeclara capacidades. |
+| PARCIAL | `contact-data` ya actualiza y audita correo/teléfono; checkout, Wellness y domiciliación aún no existen. | Las capacidades no listas se comunican como preparación, no como operación disponible. |
 | P1 | No existe CRUD de terminales aunque está definido `selfservice.terminal.manage`. | No se pueden rotar credenciales, cambiar acciones, desactivar o consultar actividad desde la consola. |
 | P1 | No hay pruebas de servicio, persistencia ni E2E del recorrido del kiosco. | Los invariantes públicos y financieros no tienen regresión demostrable. |
 | P2 | `getRemoteAddr()` no documenta una política de proxies confiables. | Detrás de un proxy todos pueden compartir una IP o confiarse incorrectamente en encabezados. |
@@ -208,17 +217,18 @@ desactivar, rotar, copiar la URL y configurar capacidades.
 
 ### 6.2 Capacidades canónicas
 
-- `MEMBERSHIP_SUMMARY`;
-- `PENDING_PAYMENTS`;
-- `MEMBERSHIP_RENEWAL`;
-- `MEMBERSHIP_PLAN_CHANGE`;
-- `INITIAL_MEMBERSHIP`;
-- `BOOKING_CREATE`;
-- `CONTACT_UPDATE`;
-- `PAYMENT_PROOF_UPLOAD`.
+- `membershipRenewal`;
+- `membershipPlanChange`;
+- `resourceBooking`;
+- `wellnessBooking`;
+- `profileUpdate`;
+- `autopay`.
 
 El backend valida la capacidad en cada endpoint y la sesión devuelve sólo las
-capacidades efectivas. El frontend renderiza a partir de esa respuesta.
+capacidades efectivas. El frontend renderiza a partir de esa respuesta. La
+autorización comercial del terminal y la disponibilidad técnica son datos
+distintos: por ejemplo, `membershipRenewalAllowed=true` no habilita el botón si
+`onlineCardPaymentsReady=false`.
 
 ### 6.3 Sesión e identidad
 
@@ -241,19 +251,57 @@ Flujo obligatorio:
 2. Backend devuelve una cotización con lista, beneficio, descuento, total,
    vigencia resultante y estado esperado.
 3. El kiosco pide confirmación explícita.
-4. Efectivo, transferencia y tarjeta manual siempre generan pago
-   `PENDING_VALIDATION`; el cliente público no envía ni controla
-   `validateNow`.
-5. Sólo `PaymentCompletedV1`, originado por validación autorizada o webhook
-   firmado de una futura pasarela, activa la renovación o el cambio.
-6. El kiosco muestra folio y “pendiente de revisión” o confirmación final.
+4. Backend crea una intención `CARD_ONLINE` y solicita una sesión efímera al
+   proveedor. El navegador nunca envía método, referencia ni `validateNow`.
+5. Los campos sensibles se capturan en componentes alojados/tokenizados por la
+   pasarela; GymOS no recibe PAN completo ni CVV.
+6. Sólo `PaymentCompletedV1`, originado por un webhook firmado, idempotente y
+   conciliado con importe/moneda, activa la renovación, el cambio o una reserva
+   con costo.
+7. El kiosco muestra confirmación final o un estado recuperable; nunca marca
+   pago por la respuesta del navegador.
 
 La llave de idempotencia se crea al iniciar la intención y se conserva hasta
 obtener un resultado definitivo. Renovación vencida, alta inicial y cambio
 deben usar los mismos cotizadores, descuentos y política transversal de
 elegibilidad que recepción.
 
-### 6.5 Privacidad y experiencia
+Las reservas incluidas en el plan o con total cero se confirman directamente.
+Una reserva de recurso o bienestar con total mayor a cero permanece retenida
+por tiempo limitado hasta recibir el evento de pago completado.
+
+### 6.5 Domiciliación
+
+La domiciliación no es “guardar una tarjeta” en GymOS. Debe funcionar así:
+
+1. El socio acepta términos, frecuencia, importe o regla de cálculo y política
+   de cancelación.
+2. La pasarela tokeniza la tarjeta y devuelve identificadores opacos de cliente,
+   método y mandato.
+3. GymOS almacena sólo proveedor, identificadores opacos, marca/últimos cuatro,
+   vencimiento, consentimiento versionado y estado.
+4. La membresía conserva la preferencia de renovación automática, pero no datos
+   de tarjeta.
+5. Automatizaciones materializa el intento próximo; Pagos ejecuta el cargo.
+6. Un webhook firmado publica éxito o fallo. Membresías sólo renueva con éxito.
+7. Los fallos usan reintentos acotados, aviso al socio y estado
+   `PAST_DUE`; nunca generan múltiples cargos por la misma vigencia.
+8. El socio puede pausar/cancelar la autorización y sustituir su método.
+
+Tablas objetivo:
+
+- `payment_customer`;
+- `stored_payment_method`;
+- `recurring_payment_mandate`;
+- `payment_intent`;
+- `payment_attempt`;
+- `provider_webhook_event`.
+
+No se almacenarán PAN, banda, NIP ni CVV. La selección de proveedor debe
+considerar tokenización, 3DS, webhooks firmados, cargos recurrentes, reembolsos
+y conciliación en México.
+
+### 6.6 Privacidad y experiencia
 
 - pantalla táctil de una sola tarea por paso;
 - resumen mínimo, sin historial financiero completo;
@@ -270,12 +318,14 @@ elegibilidad que recepción.
 
 ### Bloque 0 — Seguridad y verdad funcional
 
-1. Forzar pagos manuales pendientes; retirar `validateNow` del contrato público.
+1. Retirar efectivo, transferencia, tarjeta manual y `validateNow` del contrato
+   público; bloquear operaciones financieras mientras no exista pasarela.
 2. Definir y aplicar capacidades del terminal.
-3. Sustituir el código público ambiguo por identidad global de terminal.
-4. Limitar Automatizaciones a disparadores/acciones realmente soportados o
+3. Implementar actualización acotada de datos de contacto.
+4. Sustituir el código público ambiguo por identidad global de terminal.
+5. Limitar Automatizaciones a disparadores/acciones realmente soportados o
    implementar sus consumidores antes de mostrarlos.
-5. Rechazar acciones desconocidas y alinear estados de ejecución.
+6. Rechazar acciones desconocidas y alinear estados de ejecución.
 
 ### Bloque 1 — Durabilidad
 
@@ -291,7 +341,9 @@ elegibilidad que recepción.
 2. Historial y diagnóstico de ejecuciones.
 3. Administración de terminales y capacidades.
 4. Cotización/confirmación de membresía, vencidas y alta inicial.
-5. Pagos pendientes, comprobante y contacto permitido.
+5. Catálogo y reserva de recursos y profesionales de bienestar.
+6. Actualización de datos permitidos.
+7. Administración de método y consentimiento de domiciliación.
 
 ### Bloque 3 — Piloto
 
@@ -313,12 +365,39 @@ Automatizaciones podrá subir a `ESTABILIZADO` cuando:
 
 Kiosco podrá subir a `ESTABILIZADO` cuando:
 
-- ningún cliente público pueda aprobar un pago manual;
+- no exista método manual en el contrato público y ningún navegador pueda
+  aprobar un pago;
 - cada endpoint aplique capacidades del terminal;
 - una URL identifique inequívocamente una instalación provisionada;
 - la sesión cierre por inactividad y resista creación masiva de sesiones;
 - renovación vigente/vencida, alta, cambio, reserva y pago pendiente tengan E2E;
 - se demuestre que no activa membresía sin `PaymentCompletedV1`;
+- la domiciliación no pueda duplicar un cargo ni renovar después de revocar el
+  consentimiento;
 - consola, auditoría, telemetría y runbook permitan operarlo en un gimnasio.
 
 El hardware de control de acceso físico permanece fuera de este alcance.
+
+## 9. Primer bloque implementado
+
+El 30 de julio de 2026 inició el Bloque 0:
+
+- capacidades canónicas leídas desde `allowed_actions_json`, devueltas a la
+  sesión y aplicadas en backend para reservas, membresías y perfil;
+- compatibilidad temporal de lectura con las claves antiguas y migración V60 a
+  un único contrato;
+- `onlineCardPaymentsReady=false` y
+  `recurringCardPaymentsReady=false` mientras no exista adaptador real;
+- renovación y cambio de plan bloqueados antes de tocar ventas/membresías;
+- el contrato público ya no acepta método, referencia ni `validateNow`;
+- actualización real y auditada de correo/teléfono desde una sesión verificada;
+- frontend sin efectivo ni pagos manuales, preparado para tarjeta,
+  domiciliación y Wellness;
+- idempotencia estable en el navegador durante reintentos de una misma
+  intención;
+- Automatizaciones acepta nuevas reglas sólo para disparadores reales
+  (`MANUAL`, `SCHEDULED`) y acción `CREATE_NOTIFICATION`; las opciones ficticias
+  se retiraron de la interfaz.
+- pruebas unitarias de política/servicio y E2E de navegador demuestran que no
+  aparece pago manual, la tarjeta queda cerrada sin proveedor y el contacto se
+  actualiza mediante el contrato permitido.

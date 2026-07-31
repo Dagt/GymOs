@@ -145,7 +145,9 @@ public class ClientRepository {
 	) {
 		String normalizedIdentifier = identifier == null ? "" : identifier.trim().toLowerCase();
 		return jdbcClient.sql("""
-				SELECT c.id AS client_id, TRIM(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) AS full_name
+				SELECT c.id AS client_id, p.id AS person_id,
+				       TRIM(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) AS full_name,
+				       p.email, p.phone
 				FROM client c
 				JOIN person p ON p.id = c.person_id
 				WHERE c.organization_id = :organizationId
@@ -182,14 +184,19 @@ public class ClientRepository {
 				.param("birthDate", birthDate)
 				.query((resultSet, rowNumber) -> new SelfServiceClientRecord(
 						resultSet.getObject("client_id", UUID.class),
-						resultSet.getString("full_name")
+						resultSet.getObject("person_id", UUID.class),
+						resultSet.getString("full_name"),
+						resultSet.getString("email"),
+						resultSet.getString("phone")
 				))
 				.optional();
 	}
 
 	public Optional<SelfServiceClientRecord> selfServiceProfile(UUID organizationId, UUID clientId) {
 		return jdbcClient.sql("""
-				SELECT c.id AS client_id, TRIM(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) AS full_name
+				SELECT c.id AS client_id, p.id AS person_id,
+				       TRIM(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) AS full_name,
+				       p.email, p.phone
 				FROM client c
 				JOIN person p ON p.id = c.person_id
 				WHERE c.organization_id = :organizationId
@@ -202,7 +209,10 @@ public class ClientRepository {
 				.param("clientId", clientId)
 				.query((resultSet, rowNumber) -> new SelfServiceClientRecord(
 						resultSet.getObject("client_id", UUID.class),
-						resultSet.getString("full_name")
+						resultSet.getObject("person_id", UUID.class),
+						resultSet.getString("full_name"),
+						resultSet.getString("email"),
+						resultSet.getString("phone")
 				))
 				.optional();
 	}
@@ -378,6 +388,6 @@ public class ClientRepository {
 	) {
 	}
 
-	public record SelfServiceClientRecord(UUID id, String fullName) {
+	public record SelfServiceClientRecord(UUID id, UUID personId, String fullName, String email, String phone) {
 	}
 }

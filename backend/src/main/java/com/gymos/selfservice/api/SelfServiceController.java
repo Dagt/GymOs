@@ -3,6 +3,7 @@ package com.gymos.selfservice.api;
 import com.gymos.bookings.api.operations.BookingOperations.BookingAvailability;
 import com.gymos.bookings.api.operations.BookingOperations.BookingResource;
 import com.gymos.bookings.api.operations.BookingOperations.BookingResult;
+import com.gymos.clients.api.operations.SelfServiceClientProfile;
 import com.gymos.common.api.Correlation;
 import com.gymos.memberships.api.operations.ChangeMembershipPlanOperationCommand;
 import com.gymos.memberships.api.operations.RenewMembershipOperationCommand;
@@ -10,6 +11,7 @@ import com.gymos.selfservice.application.SelfServiceService;
 import com.gymos.selfservice.application.command.VerifySessionCommand;
 import com.gymos.selfservice.application.result.CreateSessionResult;
 import com.gymos.selfservice.application.result.SelfServiceMembershipSaleResult;
+import com.gymos.selfservice.application.result.SelfServiceCapabilities;
 import com.gymos.selfservice.application.result.SelfServiceSummaryResult;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.MembershipRecord;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.PendingPaymentRecord;
@@ -18,6 +20,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
@@ -91,19 +94,37 @@ public class SelfServiceController {
 	@PostMapping("/sessions/{sessionId}/end") @ResponseStatus(HttpStatus.NO_CONTENT)
 	void end(@PathVariable UUID sessionId, @RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken, HttpServletRequest servletRequest) { selfServiceService.end(sessionId, sessionToken, correlationId(servletRequest)); }
 
-	@PatchMapping("/sessions/{sessionId}/contact-data") @ResponseStatus(HttpStatus.NO_CONTENT)
-	void contactDataPlaceholder(@PathVariable UUID sessionId, @RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken) { selfServiceService.summary(sessionId, sessionToken); }
+	@PatchMapping("/sessions/{sessionId}/contact-data")
+	SelfServiceClientProfile updateContact(
+			@PathVariable UUID sessionId,
+			@Valid @RequestBody UpdateContactRequest request,
+			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken,
+			HttpServletRequest servletRequest
+	) {
+		return selfServiceService.updateContact(
+				sessionId,
+				sessionToken,
+				request.email(),
+				request.phone(),
+				correlationId(servletRequest),
+				servletRequest.getRemoteAddr()
+		);
+	}
 
 	private String correlationId(HttpServletRequest request) { Object value = request.getAttribute(Correlation.ATTRIBUTE); return value == null ? "unknown" : value.toString(); }
-	private CreateSessionResponse toResponse(CreateSessionResult result) { return new CreateSessionResponse(result.sessionId(), result.sessionToken(), result.terminalName(), result.organizationName(), result.brandName(), result.logoUrl(), result.primaryColor(), result.accentColor(), result.surfaceColor(), result.expiresAt(), result.verified()); }
-	private SelfServiceSummaryResponse toResponse(SelfServiceSummaryResult result) { return new SelfServiceSummaryResponse(result.sessionId(), result.expiresAt(), result.clientName(), result.memberships(), result.pendingPayments()); }
+	private CreateSessionResponse toResponse(CreateSessionResult result) { return new CreateSessionResponse(result.sessionId(), result.sessionToken(), result.terminalName(), result.organizationName(), result.brandName(), result.logoUrl(), result.primaryColor(), result.accentColor(), result.surfaceColor(), result.expiresAt(), result.verified(), result.capabilities()); }
+	private SelfServiceSummaryResponse toResponse(SelfServiceSummaryResult result) { return new SelfServiceSummaryResponse(result.sessionId(), result.expiresAt(), result.clientName(), result.profile(), result.capabilities(), result.memberships(), result.pendingPayments()); }
 	private SelfServiceMembershipSaleResponse toResponse(SelfServiceMembershipSaleResult result) { return new SelfServiceMembershipSaleResponse(result.saleId(), result.saleNumber(), result.saleStatus(), result.totalCents(), result.paidCents(), result.balanceCents(), result.currency(), result.membership()); }
 
 	public record VerifySessionRequest(@NotBlank String identifier, @NotNull LocalDate birthDate) { private VerifySessionCommand toCommand() { return new VerifySessionCommand(identifier, birthDate); } }
 	public record CreateBookingRequest(@NotNull UUID resourceId, @NotNull OffsetDateTime startsAt, @NotNull OffsetDateTime endsAt, @Size(max = 2000) String notes) {}
-	public record RenewMembershipRequest(@NotBlank @Pattern(regexp = "CASH|TRANSFER|CARD_MANUAL") String method, @Size(max = 160) String reference, boolean validateNow, @Size(max = 2000) String notes, @Size(max = 160) String idempotencyKey) { private RenewMembershipOperationCommand toCommand() { return new RenewMembershipOperationCommand(method, reference, validateNow, notes, idempotencyKey); } }
-	public record ChangePlanRequest(@NotNull UUID targetPlanId, @NotBlank @Pattern(regexp = "CASH|TRANSFER|CARD_MANUAL") String method, @Size(max = 160) String reference, boolean validateNow, @Size(max = 2000) String notes, @Size(max = 160) String idempotencyKey) { private ChangeMembershipPlanOperationCommand toCommand() { return new ChangeMembershipPlanOperationCommand(targetPlanId, method, reference, validateNow, notes, idempotencyKey); } }
-	public record CreateSessionResponse(UUID sessionId, String sessionToken, String terminalName, String organizationName, String brandName, String logoUrl, String primaryColor, String accentColor, String surfaceColor, OffsetDateTime expiresAt, boolean verified) {}
-	public record SelfServiceSummaryResponse(UUID sessionId, OffsetDateTime expiresAt, String clientName, List<MembershipRecord> memberships, List<PendingPaymentRecord> pendingPayments) {}
+	public record RenewMembershipRequest(@NotBlank @Size(max = 160) String idempotencyKey) { private RenewMembershipOperationCommand toCommand() { return new RenewMembershipOperationCommand("CARD_ONLINE", null, false, "Renovacion con tarjeta desde kiosco", idempotencyKey); } }
+	public record ChangePlanRequest(@NotNull UUID targetPlanId, @NotBlank @Size(max = 160) String idempotencyKey) { private ChangeMembershipPlanOperationCommand toCommand() { return new ChangeMembershipPlanOperationCommand(targetPlanId, "CARD_ONLINE", null, false, "Cambio de plan con tarjeta desde kiosco", idempotencyKey); } }
+	public record UpdateContactRequest(
+			@Email @Size(max = 180) String email,
+			@Pattern(regexp = "^$|^\\+52\\d{10}$") String phone
+	) {}
+	public record CreateSessionResponse(UUID sessionId, String sessionToken, String terminalName, String organizationName, String brandName, String logoUrl, String primaryColor, String accentColor, String surfaceColor, OffsetDateTime expiresAt, boolean verified, SelfServiceCapabilities capabilities) {}
+	public record SelfServiceSummaryResponse(UUID sessionId, OffsetDateTime expiresAt, String clientName, SelfServiceClientProfile profile, SelfServiceCapabilities capabilities, List<MembershipRecord> memberships, List<PendingPaymentRecord> pendingPayments) {}
 	public record SelfServiceMembershipSaleResponse(UUID saleId, String saleNumber, String saleStatus, long totalCents, long paidCents, long balanceCents, String currency, com.gymos.selfservice.application.result.SelfServiceMembershipSummaryResult membership) {}
 }
