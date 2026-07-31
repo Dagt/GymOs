@@ -40,6 +40,8 @@ All notable changes to GymOS will be documented in this file.
 - Separate Wellness professional modality from office location so external
   professionals can retain their consultation address and receive appointment
   requests without internal availability schedules.
+- Show each member's current plan and effective membership status in the client
+  list with muted active, expired and no-membership treatments.
 
 ## 0.6.5
 

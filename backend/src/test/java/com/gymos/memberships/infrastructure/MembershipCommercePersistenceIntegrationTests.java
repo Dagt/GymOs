@@ -2,6 +2,7 @@ package com.gymos.memberships.infrastructure;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.gymos.clients.infrastructure.ClientRepository;
 import com.gymos.eligibility.api.EligibilityPolicy.EligibleBenefit;
 import com.gymos.eligibility.api.EligibilityPolicy.EligibilityRequest;
 import com.gymos.eligibility.application.DefaultEligibilityPolicy;
@@ -38,6 +39,7 @@ class MembershipCommercePersistenceIntegrationTests {
 	private DataSource dataSource;
 	private JdbcClient jdbcClient;
 	private MembershipRepository memberships;
+	private ClientRepository clients;
 	private UUID organizationId;
 	private UUID branchId;
 	private UUID clientId;
@@ -59,6 +61,7 @@ class MembershipCommercePersistenceIntegrationTests {
 				new MembershipEventRepository(jdbcClient),
 				new MembershipCommandRepository(jdbcClient)
 		);
+		clients = new ClientRepository(jdbcClient);
 		organizationId = UUID.randomUUID();
 		branchId = UUID.randomUUID();
 		clientId = UUID.randomUUID();
@@ -123,6 +126,44 @@ class MembershipCommercePersistenceIntegrationTests {
 		assertThat(memberships.byId(organizationId, branchId, membershipId).orElseThrow().status())
 				.isEqualTo("EXPIRED");
 		assertThat(memberships.hasOtherActiveMembership(organizationId, clientId, null)).isFalse();
+	}
+
+	@Test
+	void clientSearchProjectsTheCurrentMembershipPlanAsActive() {
+		LocalDate today = LocalDate.now();
+		UUID saleId = insertSale("S-CLIENT-ACTIVE", "MEMBERSHIP_ENROLLMENT", 10_000, 0);
+		insertMembership(
+				UUID.randomUUID(),
+				firstPlanId,
+				saleId,
+				today.minusDays(5),
+				today.plusDays(24),
+				today.plusDays(27)
+		);
+
+		var client = clients.search(organizationId, branchId, null, null, 10).getFirst();
+
+		assertThat(client.currentPlanName()).isEqualTo("Plan mensual");
+		assertThat(client.membershipStatus()).isEqualTo("ACTIVE");
+	}
+
+	@Test
+	void clientSearchProjectsAnOverdueActiveRowAsExpired() {
+		LocalDate today = LocalDate.now();
+		UUID saleId = insertSale("S-CLIENT-EXPIRED", "MEMBERSHIP_ENROLLMENT", 10_000, 0);
+		insertMembership(
+				UUID.randomUUID(),
+				firstPlanId,
+				saleId,
+				today.minusDays(40),
+				today.minusDays(6),
+				today.minusDays(3)
+		);
+
+		var client = clients.search(organizationId, branchId, null, null, 10).getFirst();
+
+		assertThat(client.currentPlanName()).isEqualTo("Plan mensual");
+		assertThat(client.membershipStatus()).isEqualTo("EXPIRED");
 	}
 
 	@Test

@@ -5,6 +5,28 @@ const membershipId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 const currentPlanId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
 const targetPlanId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 
+test("la lista de socios muestra plan actual y vigencia con colores tenues", async ({ page }) => {
+  await bootMemberWorkflow(page, async (route, path) => {
+    if (route.request().method() === "GET" && path === "/clients") {
+      return fulfill(route, [
+        clientSummary("Andrea", "Full", "ACTIVE"),
+        clientSummary("Sylvia", "Regular", "EXPIRED"),
+      ]);
+    }
+    return false;
+  });
+
+  await page.goto("/clients");
+
+  const activeRow = page.getByRole("link", { name: /Andrea Prueba/i });
+  await expect(activeRow).toContainText("Plan: Full");
+  await expect(activeRow.getByText("ACTIVA", { exact: true })).toHaveClass(/bg-\[#E4EDCF\]/);
+
+  const expiredRow = page.getByRole("link", { name: /Sylvia Prueba/i });
+  await expect(expiredRow).toContainText("Plan: Regular");
+  await expect(expiredRow.getByText("VENCIDA", { exact: true })).toHaveClass(/bg-\[#F3D9D5\]/);
+});
+
 test("la ficha muestra beneficios, asigna descuentos y ejecuta el cambio de plan", async ({ page }) => {
   let currentMembership = membership(currentPlanId, "Plan Base", "2026-08-20");
   let inheritedAccess = [
@@ -359,6 +381,22 @@ function plan(id: string, name: string, priceCents: number) {
     status: "ACTIVE",
     createdAt: "2026-07-01T12:00:00Z",
     updatedAt: "2026-07-01T12:00:00Z",
+  };
+}
+
+function clientSummary(firstName: string, currentPlanName: string, membershipStatus: "ACTIVE" | "EXPIRED") {
+  return {
+    id: `${firstName === "Andrea" ? "18181818" : "19191919"}-1818-4181-8181-181818181818`,
+    firstName,
+    lastName: "Prueba",
+    maternalLastName: null,
+    phone: "+524921111111",
+    email: `${firstName.toLowerCase()}@example.test`,
+    status: "ACTIVE",
+    currentPlanName,
+    membershipStatus,
+    joinedAt: "2026-07-01T12:00:00Z",
+    updatedAt: "2026-07-30T12:00:00Z",
   };
 }
 

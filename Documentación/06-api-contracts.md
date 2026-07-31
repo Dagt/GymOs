@@ -217,6 +217,12 @@ El alta de socio en frontend puede contratar un plan después del `POST /clients
 mediante `POST /membership-enrollments`. La activación de membresía sigue
 dependiendo de que el pago quede completado.
 
+La respuesta resumida de `GET /clients` incluye `currentPlanName` y
+`membershipStatus`. La vigencia se calcula al consultar: una membresía
+`ACTIVE` dentro de `grace_ends_on` se expone como `ACTIVE`; si su gracia ya
+terminó se expone como `EXPIRED` aunque el job de expiración aún no haya
+actualizado la fila. Las membresías canceladas no se presentan como plan actual.
+
 Autorización de alta:
 
 - `Dueno del gimnasio`, `Gerente` y `Recepcion` reciben `client.read`,

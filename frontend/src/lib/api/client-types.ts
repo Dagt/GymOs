@@ -6,6 +6,8 @@ export type ClientSummary = {
   phone: string | null;
   email: string | null;
   status: "ACTIVE" | "INACTIVE" | "SUSPENDED";
+  currentPlanName: string | null;
+  membershipStatus: "ACTIVE" | "EXPIRED" | null;
   joinedAt: string;
   updatedAt: string;
 };

@@ -10,6 +10,7 @@ import {
   TextField,
 } from "@/components/FormFields";
 import type { ClientSummary, PlanSummary } from "@/lib/api";
+import { clientMembershipStatus } from "./client-list-model";
 import {
   clientFullName,
   formatMoney,
@@ -93,24 +94,35 @@ export function ClientList({ clients, loading }: ClientListProps) {
         {!loading && clients.length === 0 ? (
           <p className="py-6 text-center text-xs text-gray-400 font-bold italic bg-gray-50 rounded-xl border-2 border-dashed border-gray-100">No hay socios para mostrar.</p>
         ) : null}
-        {clients.map((client) => (
-          <Link
-            className="group flex items-center justify-between px-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:border-[color:var(--brand-primary)] hover:shadow-sm transition-all duration-200"
-            href={`/clients/${client.id}`}
-            key={client.id}
-          >
-            <div className="flex items-center gap-3">
-              <span className="w-2 h-2 rounded-full bg-[color:var(--brand-primary)] opacity-40 group-hover:opacity-100 transition-opacity"></span>
-              <div className="flex flex-col">
-                <span className="font-bold text-gray-900 group-hover:text-[color:var(--brand-primary)] transition-colors text-sm leading-tight">{clientFullName(client)}</span>
-                <span className="text-[0.65rem] font-bold text-gray-400 uppercase tracking-wider mt-0.5">
-                  {client.phone || "Sin teléfono"} • {client.email || "Sin email"} • {client.status}
-                </span>
+        {clients.map((client) => {
+          const membershipStatus = clientMembershipStatus(client);
+          return (
+            <Link
+              className="group flex items-center justify-between px-4 py-2.5 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:border-[color:var(--brand-primary)] hover:shadow-sm transition-all duration-200"
+              href={`/clients/${client.id}`}
+              key={client.id}
+            >
+              <div className="flex items-center gap-3">
+                <span className="w-2 h-2 rounded-full bg-[color:var(--brand-primary)] opacity-40 group-hover:opacity-100 transition-opacity"></span>
+                <div className="flex flex-col">
+                  <span className="font-bold text-gray-900 group-hover:text-[color:var(--brand-primary)] transition-colors text-sm leading-tight">{clientFullName(client)}</span>
+                  <span className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[0.65rem] font-bold uppercase tracking-wider text-gray-400">
+                    <span>{client.phone || "Sin teléfono"}</span>
+                    <span aria-hidden>•</span>
+                    <span>{client.email || "Sin email"}</span>
+                    <span aria-hidden>•</span>
+                    <span className="text-gray-600">Plan: {client.currentPlanName || "Sin plan"}</span>
+                    <span aria-hidden>•</span>
+                    <span className={`rounded-full border px-2 py-0.5 tracking-wide ${membershipStatus.className}`}>
+                      {membershipStatus.label}
+                    </span>
+                  </span>
+                </div>
               </div>
-            </div>
-            <span className="w-6 h-6 rounded-md bg-white border border-gray-100 flex items-center justify-center text-[color:var(--brand-primary)] text-xs font-bold group-hover:bg-[color:var(--brand-primary)] group-hover:text-white transition-all">➔</span>
-          </Link>
-        ))}
+              <span className="w-6 h-6 rounded-md bg-white border border-gray-100 flex items-center justify-center text-[color:var(--brand-primary)] text-xs font-bold group-hover:bg-[color:var(--brand-primary)] group-hover:text-white transition-all">➔</span>
+            </Link>
+          );
+        })}
       </div>
     </section>
   );
@@ -242,4 +254,3 @@ export function CreateClientDrawer({
     </AppDrawer>
   );
 }
-

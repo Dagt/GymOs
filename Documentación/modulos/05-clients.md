@@ -9,6 +9,8 @@ Estado: `FUNCIONAL`
 - membresía inicial y pago de entrada;
 - importación de socios;
 - detalle frontend y operación por sucursal.
+- el listado proyecta el plan operativo actual y su vigencia: `ACTIVA` en
+  pistache tenue, `VENCIDA` en rojo tenue y `SIN MEMBRESÍA` en neutral;
 - ficha operativa con membresía, periodos, accesos heredados del plan y
   descuentos asignados directamente al socio;
 - asignación de beneficios económicos desde la ficha, con expiración
@@ -32,6 +34,7 @@ Estado: `FUNCIONAL`
 - pruebas negativas multi-sucursal;
 - puertos de aplicación consistentes (`GEN-002`).
 
-Última evidencia: `DatabaseMigrationTests` sobre PostgreSQL limpio y E2E de
-botón de alta visible para gerencia y recepción; `member-workflows.spec.ts`
-valida beneficios, accesos y cambio de plan desde la ficha, 30-jul-2026.
+Última evidencia: `DatabaseMigrationTests` sobre PostgreSQL limpio, proyección
+de plan vigente validada sobre PostgreSQL y E2E de botón de alta visible para
+gerencia y recepción; `member-workflows.spec.ts` valida el listado, beneficios,
+accesos y cambio de plan desde la ficha, 30-jul-2026.
