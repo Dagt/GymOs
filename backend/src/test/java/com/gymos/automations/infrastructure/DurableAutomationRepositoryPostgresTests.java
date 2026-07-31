@@ -3,6 +3,7 @@ package com.gymos.automations.infrastructure;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -78,9 +79,9 @@ class DurableAutomationRepositoryPostgresTests {
 
 	@Test
 	void expiredLeaseReturnsToRetryWithoutDoubleCountingTheAttempt() {
-		OffsetDateTime now = OffsetDateTime.now();
+		OffsetDateTime now = OffsetDateTime.now().truncatedTo(ChronoUnit.MICROS);
 		var item = repository.enqueue(
-				organizationId, branchId, ruleId, "recoverable", null, 3, now.minusMinutes(1)
+				organizationId, branchId, ruleId, "recoverable", null, 3, now.minusMinutes(20)
 		);
 		assertThat(repository.claim(item.id(), now.minusMinutes(10), now.minusMinutes(5))).isTrue();
 
@@ -99,9 +100,9 @@ class DurableAutomationRepositoryPostgresTests {
 
 	@Test
 	void expiredLeaseMovesToDeadLetterWhenAttemptsAreExhausted() {
-		OffsetDateTime now = OffsetDateTime.now();
+		OffsetDateTime now = OffsetDateTime.now().truncatedTo(ChronoUnit.MICROS);
 		var item = repository.enqueue(
-				organizationId, branchId, ruleId, "exhausted", null, 1, now.minusMinutes(1)
+				organizationId, branchId, ruleId, "exhausted", null, 1, now.minusMinutes(20)
 		);
 		assertThat(repository.claim(item.id(), now.minusMinutes(10), now.minusMinutes(5))).isTrue();
 
