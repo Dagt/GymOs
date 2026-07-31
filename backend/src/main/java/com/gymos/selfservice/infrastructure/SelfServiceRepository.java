@@ -18,17 +18,18 @@ public class SelfServiceRepository {
 
 	public Optional<TerminalRecord> terminal(String terminalCode, UUID organizationId, UUID branchId) {
 		if (organizationId != null && branchId != null) {
-			Optional<TerminalRecord> terminal = terminalForBranchContext(terminalCode, organizationId, branchId);
-			if (terminal.isPresent()) {
-				return terminal;
-			}
+			return terminalForBranchContext(terminalCode, organizationId, branchId);
 		}
 		if (organizationId != null) {
-			Optional<TerminalRecord> terminal = terminalForOrganizationContext(terminalCode, organizationId);
-			if (terminal.isPresent()) {
-				return terminal;
-			}
+			return terminalForOrganizationContext(terminalCode, organizationId);
 		}
+		if (branchId != null) {
+			return Optional.empty();
+		}
+		return terminalWithoutContext(terminalCode);
+	}
+
+	private Optional<TerminalRecord> terminalWithoutContext(String terminalCode) {
 		return jdbcClient.sql("""
 				SELECT sst.id, sst.organization_id, sst.branch_id, sst.name, sst.device_code, sst.status,
 				       sst.allowed_actions_json::text AS allowed_actions_json,
@@ -40,24 +41,14 @@ public class SelfServiceRepository {
 				  AND sst.status = 'ACTIVE'
 				  AND sst.deleted_at IS NULL
 				  AND b.deleted_at IS NULL
+				ORDER BY sst.created_at, sst.id
+				LIMIT 2
 				""")
 				.param("terminalCode", terminalCode)
-				.query((resultSet, rowNumber) -> new TerminalRecord(
-						resultSet.getObject("id", UUID.class),
-						resultSet.getObject("organization_id", UUID.class),
-						resultSet.getObject("branch_id", UUID.class),
-						resultSet.getString("name"),
-						resultSet.getString("device_code"),
-						resultSet.getString("status"),
-						resultSet.getString("allowed_actions_json"),
-						resultSet.getString("trade_name"),
-						resultSet.getString("brand_name"),
-						resultSet.getString("logo_url"),
-						resultSet.getString("primary_color"),
-						resultSet.getString("accent_color"),
-						resultSet.getString("surface_color")
-				))
-				.optional();
+				.query((resultSet, rowNumber) -> mapTerminal(resultSet))
+				.list()
+				.stream()
+				.reduce((first, second) -> null);
 	}
 
 	private Optional<TerminalRecord> terminalForBranchContext(String terminalCode, UUID organizationId, UUID branchId) {
@@ -78,21 +69,7 @@ public class SelfServiceRepository {
 				.param("terminalCode", terminalCode)
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
-				.query((resultSet, rowNumber) -> new TerminalRecord(
-						resultSet.getObject("id", UUID.class),
-						resultSet.getObject("organization_id", UUID.class),
-						resultSet.getObject("branch_id", UUID.class),
-						resultSet.getString("name"),
-						resultSet.getString("device_code"),
-						resultSet.getString("status"),
-						resultSet.getString("allowed_actions_json"),
-						resultSet.getString("trade_name"),
-						resultSet.getString("brand_name"),
-						resultSet.getString("logo_url"),
-						resultSet.getString("primary_color"),
-						resultSet.getString("accent_color"),
-						resultSet.getString("surface_color")
-				))
+				.query((resultSet, rowNumber) -> mapTerminal(resultSet))
 				.optional();
 	}
 
@@ -114,22 +91,26 @@ public class SelfServiceRepository {
 				""")
 				.param("terminalCode", terminalCode)
 				.param("organizationId", organizationId)
-				.query((resultSet, rowNumber) -> new TerminalRecord(
-						resultSet.getObject("id", UUID.class),
-						resultSet.getObject("organization_id", UUID.class),
-						resultSet.getObject("branch_id", UUID.class),
-						resultSet.getString("name"),
-						resultSet.getString("device_code"),
-						resultSet.getString("status"),
-						resultSet.getString("allowed_actions_json"),
-						resultSet.getString("trade_name"),
-						resultSet.getString("brand_name"),
-						resultSet.getString("logo_url"),
-						resultSet.getString("primary_color"),
-						resultSet.getString("accent_color"),
-						resultSet.getString("surface_color")
-				))
+				.query((resultSet, rowNumber) -> mapTerminal(resultSet))
 				.optional();
+	}
+
+	private TerminalRecord mapTerminal(java.sql.ResultSet resultSet) throws java.sql.SQLException {
+		return new TerminalRecord(
+				resultSet.getObject("id", UUID.class),
+				resultSet.getObject("organization_id", UUID.class),
+				resultSet.getObject("branch_id", UUID.class),
+				resultSet.getString("name"),
+				resultSet.getString("device_code"),
+				resultSet.getString("status"),
+				resultSet.getString("allowed_actions_json"),
+				resultSet.getString("trade_name"),
+				resultSet.getString("brand_name"),
+				resultSet.getString("logo_url"),
+				resultSet.getString("primary_color"),
+				resultSet.getString("accent_color"),
+				resultSet.getString("surface_color")
+		);
 	}
 
 	public Optional<SessionRecord> session(UUID sessionId) {
