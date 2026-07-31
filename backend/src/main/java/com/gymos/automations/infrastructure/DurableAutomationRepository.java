@@ -58,11 +58,7 @@ public class DurableAutomationRepository {
 	}
 
 	public Optional<WorkItemRecord> byIdempotencyKey(UUID organizationId, String idempotencyKey) {
-		return jdbcClient.sql("""
-				SELECT id, organization_id, branch_id, rule_id, idempotency_key,
-				       trigger_reference, status, attempt_count, max_attempts,
-				       scheduled_at, next_attempt_at, locked_until, started_at,
-				       finished_at, last_error, effect_reference_id, created_at, updated_at
+		return jdbcClient.sql(selectColumns() + """
 				FROM automation_work_item
 				WHERE organization_id = :organizationId
 				  AND idempotency_key = :idempotencyKey
@@ -74,11 +70,7 @@ public class DurableAutomationRepository {
 	}
 
 	public Optional<WorkItemRecord> workItem(UUID id) {
-		return jdbcClient.sql("""
-				SELECT id, organization_id, branch_id, rule_id, idempotency_key,
-				       trigger_reference, status, attempt_count, max_attempts,
-				       scheduled_at, next_attempt_at, locked_until, started_at,
-				       finished_at, last_error, effect_reference_id, created_at, updated_at
+		return jdbcClient.sql(selectColumns() + """
 				FROM automation_work_item
 				WHERE id = :id
 				""")
@@ -87,12 +79,47 @@ public class DurableAutomationRepository {
 				.optional();
 	}
 
+	public Optional<WorkItemRecord> workItem(UUID organizationId, UUID branchId, UUID id) {
+		return jdbcClient.sql(selectColumns() + """
+				FROM automation_work_item
+				WHERE id = :id
+				  AND organization_id = :organizationId
+				  AND (branch_id = :branchId OR branch_id IS NULL)
+				""")
+				.param("id", id)
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.query(this::map)
+				.optional();
+	}
+
+	public List<WorkItemRecord> workItems(
+			UUID organizationId,
+			UUID branchId,
+			UUID ruleId,
+			String status,
+			int limit
+	) {
+		return jdbcClient.sql(selectColumns() + """
+				FROM automation_work_item
+				WHERE organization_id = :organizationId
+				  AND (branch_id = :branchId OR branch_id IS NULL)
+				  AND (:ruleId IS NULL OR rule_id = :ruleId)
+				  AND (:status IS NULL OR status = :status)
+				ORDER BY created_at DESC
+				LIMIT :limit
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("ruleId", ruleId)
+				.param("status", status)
+				.param("limit", Math.max(1, Math.min(limit, 200)))
+				.query(this::map)
+				.list();
+	}
+
 	public List<WorkItemRecord> due(OffsetDateTime now, int limit) {
-		return jdbcClient.sql("""
-				SELECT id, organization_id, branch_id, rule_id, idempotency_key,
-				       trigger_reference, status, attempt_count, max_attempts,
-				       scheduled_at, next_attempt_at, locked_until, started_at,
-				       finished_at, last_error, effect_reference_id, created_at, updated_at
+		return jdbcClient.sql(selectColumns() + """
 				FROM automation_work_item
 				WHERE status IN ('PENDING', 'RETRY_SCHEDULED')
 				  AND next_attempt_at <= :now
@@ -182,6 +209,62 @@ public class DurableAutomationRepository {
 				.param("error", truncate(error))
 				.param("now", now)
 				.update();
+	}
+
+	public boolean retryDeadLetter(UUID organizationId, UUID branchId, UUID id) {
+		OffsetDateTime now = OffsetDateTime.now();
+		return jdbcClient.sql("""
+				UPDATE automation_work_item
+				SET status = 'RETRY_SCHEDULED',
+				    attempt_count = 0,
+				    next_attempt_at = :now,
+				    locked_until = NULL,
+				    started_at = NULL,
+				    finished_at = NULL,
+				    last_error = NULL,
+				    effect_reference_id = NULL,
+				    updated_at = :now,
+				    version = version + 1
+				WHERE id = :id
+				  AND organization_id = :organizationId
+				  AND (branch_id = :branchId OR branch_id IS NULL)
+				  AND status = 'DEAD_LETTER'
+				""")
+				.param("id", id)
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("now", now)
+				.update() == 1;
+	}
+
+	public boolean cancel(UUID organizationId, UUID branchId, UUID id) {
+		OffsetDateTime now = OffsetDateTime.now();
+		return jdbcClient.sql("""
+				UPDATE automation_work_item
+				SET status = 'CANCELLED',
+				    finished_at = :now,
+				    locked_until = NULL,
+				    updated_at = :now,
+				    version = version + 1
+				WHERE id = :id
+				  AND organization_id = :organizationId
+				  AND (branch_id = :branchId OR branch_id IS NULL)
+				  AND status IN ('PENDING', 'RETRY_SCHEDULED')
+				""")
+				.param("id", id)
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("now", now)
+				.update() == 1;
+	}
+
+	private String selectColumns() {
+		return """
+				SELECT id, organization_id, branch_id, rule_id, idempotency_key,
+				       trigger_reference, status, attempt_count, max_attempts,
+				       scheduled_at, next_attempt_at, locked_until, started_at,
+				       finished_at, last_error, effect_reference_id, created_at, updated_at
+				""";
 	}
 
 	private WorkItemRecord map(java.sql.ResultSet rs, int rowNumber) throws java.sql.SQLException {
