@@ -16,6 +16,7 @@ import com.gymos.common.security.GymOsPrincipal;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -25,6 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 public class AutomationService {
 	private static final Set<String> SUPPORTED_TRIGGERS = Set.of("MANUAL", "SCHEDULED");
 	private static final Set<String> SUPPORTED_ACTIONS = Set.of("CREATE_NOTIFICATION");
+	private static final Set<String> WORK_ITEM_STATUSES = Set.of(
+			"PENDING", "RUNNING", "RETRY_SCHEDULED", "SUCCEEDED", "DEAD_LETTER", "CANCELLED"
+	);
 	private static final Duration WORK_LEASE = Duration.ofMinutes(5);
 
 	private final AutomationRepository automationRepository;
@@ -106,38 +110,73 @@ public class AutomationService {
 		String reference = blankToNull(triggerReference);
 		String occurrence = reference == null ? UUID.randomUUID().toString() : reference;
 		WorkItemRecord workItem = durableRepository.enqueue(
-				rule.organizationId(),
-				rule.branchId(),
-				rule.id(),
+				rule.organizationId(), rule.branchId(), rule.id(),
 				"manual:" + rule.id() + ":" + occurrence,
-				reference,
-				rule.retryLimit() + 1,
-				OffsetDateTime.now()
+				reference, rule.retryLimit() + 1, OffsetDateTime.now()
 		);
 		return processWorkItem(workItem.id(), principal.userId(), correlationId, "BACKOFFICE");
+	}
+
+	@Transactional(readOnly = true)
+	public List<WorkItemRecord> workItems(GymOsPrincipal principal, UUID ruleId, String status, int limit) {
+		requireBranch(principal);
+		if (ruleId != null) requireRule(principal, ruleId);
+		return durableRepository.workItems(
+				principal.organizationId(), principal.branchId(), ruleId, normalizeWorkStatus(status), limit
+		);
+	}
+
+	@Transactional(readOnly = true)
+	public WorkItemRecord workItem(GymOsPrincipal principal, UUID workItemId) {
+		return requireWorkItem(principal, workItemId);
+	}
+
+	public WorkItemRecord retryWorkItem(GymOsPrincipal principal, UUID workItemId, String correlationId) {
+		WorkItemRecord workItem = requireWorkItem(principal, workItemId);
+		if (!"DEAD_LETTER".equals(workItem.status())) {
+			throw new BusinessException(
+					"AUTOMATION_WORK_ITEM_NOT_RETRYABLE",
+					"Solo las ocurrencias en dead letter pueden reiniciarse manualmente."
+			);
+		}
+		if (!durableRepository.retryDeadLetter(principal.organizationId(), principal.branchId(), workItemId)) {
+			throw new BusinessException("AUTOMATION_WORK_ITEM_CONFLICT", "La ocurrencia cambio de estado antes del reintento.");
+		}
+		auditService.record(principal, "AUTOMATION_WORK_ITEM_RETRIED", "AUTOMATION_WORK_ITEM", workItemId, "BACKOFFICE", null, correlationId);
+		processWorkItem(workItemId, principal.userId(), correlationId, "BACKOFFICE");
+		return requireWorkItem(principal, workItemId);
+	}
+
+	@Transactional
+	public WorkItemRecord cancelWorkItem(GymOsPrincipal principal, UUID workItemId, String correlationId) {
+		WorkItemRecord workItem = requireWorkItem(principal, workItemId);
+		if (!Set.of("PENDING", "RETRY_SCHEDULED").contains(workItem.status())) {
+			throw new BusinessException(
+					"AUTOMATION_WORK_ITEM_NOT_CANCELLABLE",
+					"Solo pueden cancelarse ocurrencias pendientes o programadas para reintento."
+			);
+		}
+		if (!durableRepository.cancel(principal.organizationId(), principal.branchId(), workItemId)) {
+			throw new BusinessException("AUTOMATION_WORK_ITEM_CONFLICT", "La ocurrencia cambio de estado antes de cancelarla.");
+		}
+		auditService.record(principal, "AUTOMATION_WORK_ITEM_CANCELLED", "AUTOMATION_WORK_ITEM", workItemId, "BACKOFFICE", null, correlationId);
+		return requireWorkItem(principal, workItemId);
 	}
 
 	public int runDueScheduledRules() {
 		OffsetDateTime now = OffsetDateTime.now();
 		for (AutomationRuleRecord rule : automationRepository.dueScheduledRules(now, 25)) {
-			if (!automationRepository.claimScheduledRule(rule.id(), now, now.plus(WORK_LEASE))) {
-				continue;
-			}
+			if (!automationRepository.claimScheduledRule(rule.id(), now, now.plus(WORK_LEASE))) continue;
 			OffsetDateTime occurrenceAt = rule.nextRunAt() == null ? now : rule.nextRunAt();
 			try {
 				durableRepository.enqueue(
-						rule.organizationId(),
-						rule.branchId(),
-						rule.id(),
+						rule.organizationId(), rule.branchId(), rule.id(),
 						"scheduled:" + rule.id() + ":" + occurrenceAt,
-						"scheduled:" + occurrenceAt,
-						rule.retryLimit() + 1,
-						occurrenceAt
+						"scheduled:" + occurrenceAt, rule.retryLimit() + 1, occurrenceAt
 				);
 			} finally {
 				automationRepository.rescheduleRule(
-						rule.id(),
-						OffsetDateTime.now().plusMinutes(intervalMinutes(rule.conditionJson()))
+						rule.id(), OffsetDateTime.now().plusMinutes(intervalMinutes(rule.conditionJson()))
 				);
 			}
 		}
@@ -150,15 +189,10 @@ public class AutomationService {
 		return processed;
 	}
 
-	private AutomationExecutionRecord processWorkItem(
-			UUID workItemId,
-			UUID actorUserId,
-			String correlationId,
-			String auditOrigin
-	) {
+	private AutomationExecutionRecord processWorkItem(UUID workItemId, UUID actorUserId, String correlationId, String auditOrigin) {
 		WorkItemRecord current = durableRepository.workItem(workItemId)
 				.orElseThrow(() -> new BusinessException("AUTOMATION_WORK_ITEM_NOT_FOUND", "La ocurrencia de automatizacion no existe."));
-		if ("SUCCEEDED".equals(current.status()) || "DEAD_LETTER".equals(current.status())) {
+		if (Set.of("SUCCEEDED", "DEAD_LETTER", "CANCELLED").contains(current.status())) {
 			return latestExecution(current);
 		}
 
@@ -173,14 +207,10 @@ public class AutomationService {
 		String error = null;
 		try {
 			AutomationRuleRecord rule = automationRepository.rule(
-					claimed.organizationId(),
-					claimed.branchId(),
-					claimed.ruleId()
+					claimed.organizationId(), claimed.branchId(), claimed.ruleId()
 			).orElseThrow(() -> new BusinessException("AUTOMATION_RULE_NOT_FOUND", "La automatizacion no existe o no esta disponible."));
 			UUID effectReferenceId = claimed.effectReferenceId();
-			if (effectReferenceId == null) {
-				effectReferenceId = actionExecutor.execute(rule, actorUserId, correlationId);
-			}
+			if (effectReferenceId == null) effectReferenceId = actionExecutor.execute(rule, actorUserId, correlationId);
 			durableRepository.markSucceeded(claimed.id(), effectReferenceId);
 			executionStatus = "SUCCEEDED";
 		} catch (RuntimeException exception) {
@@ -195,23 +225,13 @@ public class AutomationService {
 		}
 
 		UUID executionId = automationRepository.createExecution(
-				claimed.organizationId(),
-				claimed.branchId(),
-				claimed.ruleId(),
-				executionStatus,
-				claimed.triggerReference(),
-				error
+				claimed.organizationId(), claimed.branchId(), claimed.ruleId(),
+				executionStatus, claimed.triggerReference(), error
 		);
 		auditService.recordSystem(
-				claimed.organizationId(),
-				claimed.branchId(),
-				actorUserId,
-				"AUTOMATION_EXECUTED",
-				"AUTOMATION_EXECUTION",
-				executionId,
-				auditOrigin,
-				executionStatus,
-				correlationId
+				claimed.organizationId(), claimed.branchId(), actorUserId,
+				"AUTOMATION_EXECUTED", "AUTOMATION_EXECUTION", executionId,
+				auditOrigin, executionStatus, correlationId
 		);
 		return automationRepository.executions(claimed.organizationId(), claimed.branchId(), claimed.ruleId()).stream()
 				.filter(execution -> execution.id().equals(executionId))
@@ -227,8 +247,7 @@ public class AutomationService {
 				})
 				.findFirst()
 				.orElseThrow(() -> new BusinessException(
-						"AUTOMATION_EXECUTION_NOT_FOUND",
-						"No se encontro el resultado de la ocurrencia."
+						"AUTOMATION_EXECUTION_NOT_FOUND", "No se encontro el resultado de la ocurrencia."
 				));
 	}
 
@@ -247,6 +266,24 @@ public class AutomationService {
 		requireBranch(principal);
 		return automationRepository.rule(principal.organizationId(), principal.branchId(), ruleId)
 				.orElseThrow(() -> new BusinessException("AUTOMATION_RULE_NOT_FOUND", "La automatizacion no existe o no esta disponible."));
+	}
+
+	private WorkItemRecord requireWorkItem(GymOsPrincipal principal, UUID workItemId) {
+		requireBranch(principal);
+		return durableRepository.workItem(principal.organizationId(), principal.branchId(), workItemId)
+				.orElseThrow(() -> new BusinessException(
+						"AUTOMATION_WORK_ITEM_NOT_FOUND", "La ocurrencia no existe o no esta disponible."
+				));
+	}
+
+	private String normalizeWorkStatus(String status) {
+		String normalized = blankToNull(status);
+		if (normalized == null) return null;
+		normalized = normalized.toUpperCase(Locale.ROOT);
+		if (!WORK_ITEM_STATUSES.contains(normalized)) {
+			throw new BusinessException("AUTOMATION_WORK_ITEM_STATUS_INVALID", "El estado solicitado no es valido.");
+		}
+		return normalized;
 	}
 
 	private String validJsonOrDefault(String value) {
