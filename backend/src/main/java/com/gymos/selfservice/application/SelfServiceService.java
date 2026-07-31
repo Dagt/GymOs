@@ -28,6 +28,8 @@ import com.gymos.selfservice.infrastructure.SelfServiceRepository.PendingPayment
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.PlanOptionRecord;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.SessionRecord;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.TerminalRecord;
+import com.gymos.selfservice.infrastructure.SelfServiceSessionStatusRepository;
+import com.gymos.selfservice.infrastructure.SelfServiceSessionStatusRepository.SessionStatusRecord;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -47,33 +49,40 @@ public class SelfServiceService {
 	private static final int SESSION_MINUTES = 15;
 	private static final int MAX_VERIFICATION_ATTEMPTS = 5;
 	private static final Duration BLOCK_DURATION = Duration.ofMinutes(10);
+	private static final Duration VERIFIED_SESSION_INACTIVITY = Duration.ofMinutes(3);
 	private static final SecureRandom SECURE_RANDOM = new SecureRandom();
 	private static final String BRANCH_KIOSK_PREFIX = "KIOSK-BRANCH-";
 
 	private final SelfServiceRepository repository;
+	private final SelfServiceSessionStatusRepository sessionStatusRepository;
 	private final MembershipOperations membershipOperations;
 	private final ClientLookupOperations clientLookupOperations;
 	private final BookingOperations bookingOperations;
 	private final AuditService auditService;
 	private final RateLimiter rateLimiter;
 	private final SelfServiceCapabilityPolicy capabilityPolicy;
+	private final SelfServiceVerificationGuard verificationGuard;
 
 	public SelfServiceService(
 			SelfServiceRepository repository,
+			SelfServiceSessionStatusRepository sessionStatusRepository,
 			MembershipOperations membershipOperations,
 			ClientLookupOperations clientLookupOperations,
 			BookingOperations bookingOperations,
 			AuditService auditService,
 			RateLimiter rateLimiter,
-			SelfServiceCapabilityPolicy capabilityPolicy
+			SelfServiceCapabilityPolicy capabilityPolicy,
+			SelfServiceVerificationGuard verificationGuard
 	) {
 		this.repository = repository;
+		this.sessionStatusRepository = sessionStatusRepository;
 		this.membershipOperations = membershipOperations;
 		this.clientLookupOperations = clientLookupOperations;
 		this.bookingOperations = bookingOperations;
 		this.auditService = auditService;
 		this.rateLimiter = rateLimiter;
 		this.capabilityPolicy = capabilityPolicy;
+		this.verificationGuard = verificationGuard;
 	}
 
 	@Transactional
@@ -150,6 +159,7 @@ public class SelfServiceService {
 		rateLimiter.check("kiosk:verify:ip:" + originIp, 60, Duration.ofMinutes(1));
 		rateLimiter.check("kiosk:verify:session:" + sessionId, 10, Duration.ofMinutes(1));
 		SessionRecord session = activeSession(sessionId, sessionToken);
+		verificationGuard.check(request.identifier());
 		ensureNotBlocked(session);
 		var client = clientLookupOperations.verifyForSelfService(new VerifyClientIdentityCommand(session.organizationId(), session.branchId(), request.identifier(), request.birthDate())).orElse(null);
 		if (client == null) {
@@ -162,7 +172,7 @@ public class SelfServiceService {
 		return summary(sessionId, sessionToken);
 	}
 
-	@Transactional(readOnly = true)
+	@Transactional
 	public SelfServiceSummaryResult summary(UUID sessionId, String sessionToken) {
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
 		SelfServiceClientProfile client = clientLookupOperations.selfServiceProfile(session.organizationId(), session.clientId()).orElse(null);
@@ -180,21 +190,21 @@ public class SelfServiceService {
 		);
 	}
 
-	@Transactional(readOnly = true)
+	@Transactional
 	public List<PlanOptionRecord> membershipOptions(UUID sessionId, String sessionToken) {
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
 		capabilityPolicy.require(capabilities(session), SelfServiceCapability.MEMBERSHIP_PLAN_CHANGE);
 		return repository.planOptions(session.organizationId());
 	}
 
-	@Transactional(readOnly = true)
+	@Transactional
 	public List<BookingResource> bookingResources(UUID sessionId, String sessionToken) {
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
 		capabilityPolicy.require(capabilities(session), SelfServiceCapability.RESOURCE_BOOKING);
 		return bookingOperations.resources(session.organizationId(), session.branchId());
 	}
 
-	@Transactional(readOnly = true)
+	@Transactional
 	public List<BookingAvailability> bookingAvailability(UUID sessionId, String sessionToken, UUID resourceId, LocalDate date) {
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
 		capabilityPolicy.require(capabilities(session), SelfServiceCapability.RESOURCE_BOOKING);
@@ -304,10 +314,42 @@ public class SelfServiceService {
 	}
 
 	private SessionRecord activeSession(UUID sessionId, String sessionToken) {
-		SessionRecord session = repository.session(sessionId).orElseThrow(() -> new BusinessException("SELF_SERVICE_SESSION_NOT_FOUND", "La sesion no existe."));
-		if (session.sessionTokenHash() == null || sessionToken == null || !MessageDigest.isEqual(session.sessionTokenHash().getBytes(StandardCharsets.UTF_8), tokenHash(sessionToken).getBytes(StandardCharsets.UTF_8))) throw new BusinessException("SELF_SERVICE_SESSION_INVALID", "La sesion del kiosco no es valida.");
-		if (!"ACTIVE".equals(session.status()) || session.expiresAt().isBefore(OffsetDateTime.now())) throw new BusinessException("SELF_SERVICE_SESSION_EXPIRED", "La sesion del kiosco expiro.");
-		return session;
+		SessionStatusRecord persisted = sessionStatusRepository.find(sessionId)
+				.orElseThrow(() -> new BusinessException("SELF_SERVICE_SESSION_NOT_FOUND", "La sesion no existe."));
+		validateToken(persisted.sessionTokenHash(), sessionToken);
+		validateState(persisted, OffsetDateTime.now());
+		return repository.session(sessionId).orElseThrow(() -> {
+			SessionStatusRecord latest = sessionStatusRepository.find(sessionId).orElse(null);
+			if (latest == null) {
+				return new BusinessException("SELF_SERVICE_SESSION_NOT_FOUND", "La sesion no existe.");
+			}
+			validateToken(latest.sessionTokenHash(), sessionToken);
+			validateState(latest, OffsetDateTime.now());
+			return new BusinessException("SELF_SERVICE_SESSION_UNAVAILABLE", "La sesion del kiosco no esta disponible.");
+		});
+	}
+
+	private void validateToken(String storedHash, String sessionToken) {
+		if (storedHash == null || sessionToken == null || !MessageDigest.isEqual(
+				storedHash.getBytes(StandardCharsets.UTF_8),
+				tokenHash(sessionToken).getBytes(StandardCharsets.UTF_8)
+		)) {
+			throw new BusinessException("SELF_SERVICE_SESSION_INVALID", "La sesion del kiosco no es valida.");
+		}
+	}
+
+	private void validateState(SessionStatusRecord session, OffsetDateTime now) {
+		if (!"ACTIVE".equals(session.status())) {
+			throw new BusinessException("SELF_SERVICE_SESSION_CLOSED", "La sesion del kiosco ya fue cerrada.");
+		}
+		if (session.expiresAt() == null || !session.expiresAt().isAfter(now)) {
+			throw new BusinessException("SELF_SERVICE_SESSION_EXPIRED", "La sesion del kiosco expiro.");
+		}
+		if (session.verified()
+				&& session.updatedAt() != null
+				&& session.updatedAt().isBefore(now.minus(VERIFIED_SESSION_INACTIVITY))) {
+			throw new BusinessException("SELF_SERVICE_SESSION_INACTIVE", "La sesion se cerro por inactividad.");
+		}
 	}
 
 	private void ensureNotBlocked(SessionRecord session) {
