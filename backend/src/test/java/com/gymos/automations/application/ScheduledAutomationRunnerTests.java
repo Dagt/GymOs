@@ -1,6 +1,7 @@
 package com.gymos.automations.application;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 
@@ -13,14 +14,20 @@ class ScheduledAutomationRunnerTests {
 	void recoversAndMaterializesDomainEventsBeforeProcessingDueRules() {
 		AutomationService service = mock(AutomationService.class);
 		AutomationLeaseRecoveryRepository recovery = mock(AutomationLeaseRecoveryRepository.class);
-		MembershipExpiryTriggerScanner scanner = mock(MembershipExpiryTriggerScanner.class);
-		ScheduledAutomationRunner runner = new ScheduledAutomationRunner(service, recovery, scanner);
+		MembershipExpiryTriggerScanner expiring = mock(MembershipExpiryTriggerScanner.class);
+		MembershipExpiredTriggerScanner expired = mock(MembershipExpiredTriggerScanner.class);
+		AutomationDomainEventService domainEvents = mock(AutomationDomainEventService.class);
+		ScheduledAutomationRunner runner = new ScheduledAutomationRunner(
+				service, recovery, expiring, expired, domainEvents
+		);
 
 		runner.runDueRules();
 
-		InOrder order = inOrder(recovery, scanner, service);
+		InOrder order = inOrder(recovery, expiring, expired, domainEvents, service);
 		order.verify(recovery).recoverExpiredLeases(any());
-		order.verify(scanner).materialize(any());
+		order.verify(expiring).materialize(any());
+		order.verify(expired).materialize(any());
+		order.verify(domainEvents).processPending(eq(250));
 		order.verify(service).runDueScheduledRules();
 	}
 }
