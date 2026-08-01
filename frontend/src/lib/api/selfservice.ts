@@ -1,10 +1,14 @@
 import { apiFetch, normalizePayload, publicApiFetch } from "./client";
 import type {
+  CreateKioskPaymentIntentPayload,
+  CreateKioskQuotePayload,
   KioskContactUpdatePayload,
   KioskMembershipCheckoutPayload,
+  KioskPaymentIntent,
   KioskPlanOption,
   KioskPlanChangeCheckoutPayload,
   KioskProfile,
+  KioskQuote,
   KioskSessionContext,
   KioskSessionResponse,
   KioskSummaryResponse,
@@ -62,6 +66,30 @@ export async function getKioskMembershipOptions(
 ): Promise<KioskPlanOption[]> {
   return publicApiFetch<KioskPlanOption[]>(`/self-service/sessions/${sessionId}/membership-options`, {
     headers: kioskSessionHeaders(sessionToken),
+  });
+}
+
+export async function createKioskQuote(
+  sessionId: string,
+  sessionToken: string,
+  payload: CreateKioskQuotePayload,
+): Promise<KioskQuote> {
+  return publicApiFetch<KioskQuote>(`/self-service/sessions/${sessionId}/quotes`, {
+    method: "POST",
+    headers: kioskSessionHeaders(sessionToken),
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function createKioskPaymentIntent(
+  sessionId: string,
+  sessionToken: string,
+  payload: CreateKioskPaymentIntentPayload,
+): Promise<KioskPaymentIntent> {
+  return publicApiFetch<KioskPaymentIntent>(`/self-service/sessions/${sessionId}/payment-intents`, {
+    method: "POST",
+    headers: kioskSessionHeaders(sessionToken),
+    body: JSON.stringify(normalizePayload(payload)),
   });
 }
 
