@@ -1,12 +1,16 @@
 import { apiFetch, normalizePayload } from "./client";
 import type {
+  ArchivedAutomationRule,
   AutomationExecution,
+  AutomationPreview,
   AutomationRule,
+  AutomationRuleRevision,
   AutomationWorkItem,
   AutomationWorkItemStatus,
   CreateAutomationPayload,
   CreateNotificationPayload,
   NotificationLog,
+  UpdateAutomationPayload,
 } from "./automation-types";
 
 export async function getNotifications(accessToken: string, limit = 80): Promise<NotificationLog[]> {
@@ -35,6 +39,47 @@ export async function createAutomation(
     method: "POST",
     body: JSON.stringify(normalizePayload(payload)),
   });
+}
+
+export async function updateAutomation(
+  accessToken: string,
+  ruleId: string,
+  payload: UpdateAutomationPayload,
+): Promise<AutomationRule> {
+  return apiFetch<AutomationRule>(`/automations/${ruleId}`, accessToken, {
+    method: "PUT",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function duplicateAutomation(accessToken: string, ruleId: string): Promise<AutomationRule> {
+  return apiFetch<AutomationRule>(`/automations/${ruleId}/duplicate`, accessToken, { method: "POST" });
+}
+
+export async function archiveAutomation(accessToken: string, ruleId: string): Promise<void> {
+  await apiFetch<void>(`/automations/${ruleId}`, accessToken, { method: "DELETE" });
+}
+
+export async function restoreAutomation(
+  accessToken: string,
+  ruleId: string,
+): Promise<ArchivedAutomationRule> {
+  return apiFetch<ArchivedAutomationRule>(`/automations/${ruleId}/restore`, accessToken, { method: "POST" });
+}
+
+export async function getAutomationVersions(
+  accessToken: string,
+  ruleId: string,
+): Promise<AutomationRuleRevision[]> {
+  return apiFetch<AutomationRuleRevision[]>(`/automations/${ruleId}/versions`, accessToken);
+}
+
+export async function previewAutomation(
+  accessToken: string,
+  ruleId: string,
+  limit = 25,
+): Promise<AutomationPreview> {
+  return apiFetch<AutomationPreview>(`/automations/${ruleId}/preview?limit=${limit}`, accessToken);
 }
 
 export async function setAutomationStatus(
