@@ -19,7 +19,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class DomainAutomationRuleService {
     private static final Set<String> IMPLEMENTED_TRIGGERS = Set.of(
             "MEMBERSHIP_EXPIRING",
-            "MEMBERSHIP_EXPIRED"
+            "MEMBERSHIP_EXPIRED",
+            "MEMBERSHIP_RENEWED",
+            "MEMBERSHIP_CANCELLED",
+            "PAYMENT_COMPLETED",
+            "PAYMENT_FAILED",
+            "BOOKING_CREATED",
+            "BOOKING_CANCELLED"
     );
 
     private final AutomationRepository automationRepository;
