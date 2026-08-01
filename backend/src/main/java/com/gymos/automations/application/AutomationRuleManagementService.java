@@ -24,7 +24,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AutomationRuleManagementService {
     private static final Set<String> SUPPORTED_TRIGGERS = Set.of(
-            "MANUAL", "SCHEDULED", "MEMBERSHIP_EXPIRING"
+            "MANUAL",
+            "SCHEDULED",
+            "MEMBERSHIP_EXPIRING",
+            "MEMBERSHIP_EXPIRED",
+            "MEMBERSHIP_RENEWED",
+            "MEMBERSHIP_CANCELLED",
+            "PAYMENT_COMPLETED",
+            "PAYMENT_FAILED",
+            "BOOKING_CREATED",
+            "BOOKING_CANCELLED"
     );
     private static final Set<String> SUPPORTED_ACTIONS = Set.of("CREATE_NOTIFICATION");
 
