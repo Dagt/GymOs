@@ -13,28 +13,31 @@ public class ScheduledAutomationRunner {
 	private final MembershipExpiryTriggerScanner membershipExpiryScanner;
 	private final MembershipExpiredTriggerScanner membershipExpiredScanner;
 	private final AutomationDomainEventService domainEventService;
+	private final AutomationMetrics metrics;
 
 	public ScheduledAutomationRunner(
 			AutomationService automationService,
 			AutomationLeaseRecoveryRepository leaseRecoveryRepository,
 			MembershipExpiryTriggerScanner membershipExpiryScanner,
 			MembershipExpiredTriggerScanner membershipExpiredScanner,
-			AutomationDomainEventService domainEventService
+			AutomationDomainEventService domainEventService,
+			AutomationMetrics metrics
 	) {
 		this.automationService = automationService;
 		this.leaseRecoveryRepository = leaseRecoveryRepository;
 		this.membershipExpiryScanner = membershipExpiryScanner;
 		this.membershipExpiredScanner = membershipExpiredScanner;
 		this.domainEventService = domainEventService;
+		this.metrics = metrics;
 	}
 
 	@Scheduled(fixedDelayString = "${gymos.automation.scheduler-delay-ms:60000}")
 	public void runDueRules() {
-		leaseRecoveryRepository.recoverExpiredLeases(OffsetDateTime.now());
+		metrics.measure("lease_recovery", () -> leaseRecoveryRepository.recoverExpiredLeases(OffsetDateTime.now()));
 		LocalDate today = LocalDate.now();
-		membershipExpiryScanner.materialize(today);
-		membershipExpiredScanner.materialize(today);
-		domainEventService.processPending(250);
-		automationService.runDueScheduledRules();
+		metrics.measure("membership_expiring", () -> membershipExpiryScanner.materialize(today));
+		metrics.measure("membership_expired", () -> membershipExpiredScanner.materialize(today));
+		metrics.measure("domain_events", () -> domainEventService.processPending(250));
+		metrics.measure("work_queue", automationService::runDueScheduledRules);
 	}
 }
