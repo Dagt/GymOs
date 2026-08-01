@@ -19,7 +19,8 @@ public class AutomationRepository {
 		return jdbcClient.sql("""
 				SELECT organization_id, branch_id, id, name, trigger_type, condition_json::text AS condition_json,
 				       action_type, action_config_json::text AS action_config_json,
-				       status, retry_limit, schedule_cron, next_run_at, locked_until, created_at, updated_at
+				       status, retry_limit, schedule_cron, next_run_at, locked_until,
+				       version, created_at, updated_at
 				FROM automation_rule
 				WHERE organization_id = :organizationId
 				  AND (branch_id = :branchId OR branch_id IS NULL)
@@ -36,7 +37,8 @@ public class AutomationRepository {
 		return jdbcClient.sql("""
 				SELECT organization_id, branch_id, id, name, trigger_type, condition_json::text AS condition_json,
 				       action_type, action_config_json::text AS action_config_json,
-				       status, retry_limit, schedule_cron, next_run_at, locked_until, created_at, updated_at
+				       status, retry_limit, schedule_cron, next_run_at, locked_until,
+				       version, created_at, updated_at
 				FROM automation_rule
 				WHERE organization_id = :organizationId
 				  AND (branch_id = :branchId OR branch_id IS NULL)
@@ -159,7 +161,8 @@ public class AutomationRepository {
 		return jdbcClient.sql("""
 				SELECT organization_id, branch_id, id, name, trigger_type, condition_json::text AS condition_json,
 				       action_type, action_config_json::text AS action_config_json,
-				       status, retry_limit, schedule_cron, next_run_at, locked_until, created_at, updated_at
+				       status, retry_limit, schedule_cron, next_run_at, locked_until,
+				       version, created_at, updated_at
 				FROM automation_rule
 				WHERE status = 'ENABLED'
 				  AND trigger_type = 'SCHEDULED'
@@ -172,6 +175,25 @@ public class AutomationRepository {
 				""")
 				.param("now", now)
 				.param("limit", limit)
+				.query(this::mapRule)
+				.list();
+	}
+
+	public List<AutomationRuleRecord> enabledRulesByTrigger(String triggerType, int limit) {
+		return jdbcClient.sql("""
+				SELECT organization_id, branch_id, id, name, trigger_type, condition_json::text AS condition_json,
+				       action_type, action_config_json::text AS action_config_json,
+				       status, retry_limit, schedule_cron, next_run_at, locked_until,
+				       version, created_at, updated_at
+				FROM automation_rule
+				WHERE status = 'ENABLED'
+				  AND trigger_type = :triggerType
+				  AND deleted_at IS NULL
+				ORDER BY created_at
+				LIMIT :limit
+				""")
+				.param("triggerType", triggerType)
+				.param("limit", Math.max(1, Math.min(limit, 500)))
 				.query(this::mapRule)
 				.list();
 	}
@@ -229,6 +251,7 @@ public class AutomationRepository {
 				resultSet.getString("schedule_cron"),
 				resultSet.getObject("next_run_at", OffsetDateTime.class),
 				resultSet.getObject("locked_until", OffsetDateTime.class),
+				resultSet.getLong("version"),
 				resultSet.getObject("created_at", OffsetDateTime.class),
 				resultSet.getObject("updated_at", OffsetDateTime.class)
 		);
@@ -251,11 +274,10 @@ public class AutomationRepository {
 			String scheduleCron,
 			OffsetDateTime nextRunAt,
 			OffsetDateTime lockedUntil,
+			long version,
 			OffsetDateTime createdAt,
 			OffsetDateTime updatedAt
-	) {
-	}
+	) {}
 
-	public record AutomationExecutionRecord(UUID id, UUID ruleId, String status, String triggerReference, String errorMessage, OffsetDateTime occurredAt) {
-	}
+	public record AutomationExecutionRecord(UUID id, UUID ruleId, String status, String triggerReference, String errorMessage, OffsetDateTime occurredAt) {}
 }
