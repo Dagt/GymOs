@@ -45,6 +45,7 @@ export default function AutomationsPage() {
   const [name, setName] = useState("");
   const [triggerType, setTriggerType] = useState("MANUAL");
   const [intervalMinutes, setIntervalMinutes] = useState(1440);
+  const [daysBeforeExpiry, setDaysBeforeExpiry] = useState(7);
   const [ruleSubject, setRuleSubject] = useState("Recordatorio GymOS");
   const [ruleBody, setRuleBody] = useState("");
   const [notificationBody, setNotificationBody] = useState("");
@@ -123,12 +124,15 @@ export default function AutomationsPage() {
     setError(null);
     setMessage(null);
     try {
+      const conditionJson = triggerType === "SCHEDULED"
+        ? JSON.stringify({ intervalMinutes })
+        : triggerType === "MEMBERSHIP_EXPIRING"
+          ? JSON.stringify({ daysBeforeExpiry })
+          : "{}";
       const created = await createAutomation(session.accessToken, {
         name,
         triggerType,
-        conditionJson: triggerType === "SCHEDULED"
-          ? JSON.stringify({ intervalMinutes })
-          : "{}",
+        conditionJson,
         actionType: "CREATE_NOTIFICATION",
         actionConfigJson: JSON.stringify({
           channel: "IN_APP",
@@ -280,7 +284,7 @@ export default function AutomationsPage() {
       {message ? <Notice tone="ok" text={message} /> : null}
 
       <section className="grid gap-4 md:grid-cols-3">
-        <AutomationPurpose description="Avisar al equipo o al socio antes de un vencimiento, una cita o una tarea pendiente." title="Recordar y avisar" />
+        <AutomationPurpose description="Avisar antes del vencimiento de membresías con una ocurrencia idempotente por socio y fecha." title="Vencimientos" />
         <AutomationPurpose description="Cuando exista domiciliación, programará el intento y reaccionará al resultado de la pasarela sin activar membresías por sí sola." title="Cobros recurrentes" />
         <AutomationPurpose description="Crear seguimiento después de pagos, reservas o incidencias sin depender de que alguien recuerde hacerlo." title="Dar seguimiento" />
       </section>
@@ -392,6 +396,7 @@ export default function AutomationsPage() {
           <select className="h-10 rounded-md border border-[var(--brand-line)] bg-white px-3 text-sm" onChange={(event) => setTriggerType(event.target.value)} value={triggerType}>
             <option value="MANUAL">Manual</option>
             <option value="SCHEDULED">Programada por intervalo</option>
+            <option value="MEMBERSHIP_EXPIRING">Membresía próxima a vencer</option>
           </select>
           {triggerType === "SCHEDULED" ? (
             <label className="grid gap-2 text-sm font-medium text-[#42514a]">
@@ -400,10 +405,17 @@ export default function AutomationsPage() {
               <small>Ejemplos: 60 = cada hora, 1440 = cada día, 10080 = cada semana.</small>
             </label>
           ) : null}
+          {triggerType === "MEMBERSHIP_EXPIRING" ? (
+            <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+              Avisar cuántos días antes del vencimiento
+              <input className="h-10 rounded-md border border-[var(--brand-line)] px-3 text-sm" max={90} min={1} onChange={(event) => setDaysBeforeExpiry(Number(event.target.value))} type="number" value={daysBeforeExpiry} />
+              <small>El motor crea una sola ocurrencia por regla, membresía y fecha de vencimiento.</small>
+            </label>
+          ) : null}
           <input className="h-10 rounded-md border border-[var(--brand-line)] px-3 text-sm" onChange={(event) => setRuleSubject(event.target.value)} placeholder="Asunto de la notificación" value={ruleSubject} />
           <label className="grid gap-2 text-sm font-medium text-[#42514a]">
             Mensaje interno
-            <textarea className="min-h-28 rounded-md border border-[var(--brand-line)] px-3 py-2 text-sm" onChange={(event) => setRuleBody(event.target.value)} placeholder="Describe qué debe revisar el equipo." value={ruleBody} />
+            <textarea className="min-h-28 rounded-md border border-[var(--brand-line)] px-3 py-2 text-sm" onChange={(event) => setRuleBody(event.target.value)} placeholder="Puedes usar {{endsOn}}, {{daysBeforeExpiry}}, {{membershipId}} o {{clientId}}." value={ruleBody} />
           </label>
           <button className="form-primary-button" disabled={saving || !name.trim() || !ruleBody.trim()} type="submit">Crear regla</button>
         </form>
