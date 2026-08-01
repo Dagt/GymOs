@@ -10,15 +10,17 @@ import org.mockito.InOrder;
 
 class ScheduledAutomationRunnerTests {
 	@Test
-	void recoversExpiredLeasesBeforeProcessingDueRules() {
+	void recoversAndMaterializesDomainEventsBeforeProcessingDueRules() {
 		AutomationService service = mock(AutomationService.class);
 		AutomationLeaseRecoveryRepository recovery = mock(AutomationLeaseRecoveryRepository.class);
-		ScheduledAutomationRunner runner = new ScheduledAutomationRunner(service, recovery);
+		MembershipExpiryTriggerScanner scanner = mock(MembershipExpiryTriggerScanner.class);
+		ScheduledAutomationRunner runner = new ScheduledAutomationRunner(service, recovery, scanner);
 
 		runner.runDueRules();
 
-		InOrder order = inOrder(recovery, service);
+		InOrder order = inOrder(recovery, scanner, service);
 		order.verify(recovery).recoverExpiredLeases(any());
+		order.verify(scanner).materialize(any());
 		order.verify(service).runDueScheduledRules();
 	}
 }
