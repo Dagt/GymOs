@@ -90,3 +90,43 @@ export type CreateAutomationPayload = {
   actionConfigJson?: string | null;
   retryLimit: number;
 };
+
+export type UpdateAutomationPayload = CreateAutomationPayload;
+
+export type AutomationRuleRevision = {
+  id: string;
+  ruleId: string;
+  definitionVersion: number;
+  name: string;
+  triggerType: string;
+  conditionJson: string;
+  actionType: string;
+  actionConfigJson: string;
+  retryLimit: number;
+  scheduleCron: string | null;
+  nextRunAt: string | null;
+  changeType: string;
+  changedBy: string | null;
+  changedAt: string;
+};
+
+export type AutomationPreviewMatch = {
+  reference: string;
+  summary: string;
+  clientId: string | null;
+  effectiveDate: string | null;
+};
+
+export type AutomationPreview = {
+  ruleId: string;
+  definitionVersion: number;
+  triggerType: string;
+  matchCount: number;
+  matches: AutomationPreviewMatch[];
+};
+
+export type ArchivedAutomationRule = {
+  id: string;
+  name: string;
+  archivedAt: string;
+};
