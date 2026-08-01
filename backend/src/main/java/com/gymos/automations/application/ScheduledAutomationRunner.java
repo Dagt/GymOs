@@ -11,21 +11,26 @@ public class ScheduledAutomationRunner {
 	private final AutomationService automationService;
 	private final AutomationLeaseRecoveryRepository leaseRecoveryRepository;
 	private final MembershipExpiryTriggerScanner membershipExpiryScanner;
+	private final MembershipExpiredTriggerScanner membershipExpiredScanner;
 
 	public ScheduledAutomationRunner(
 			AutomationService automationService,
 			AutomationLeaseRecoveryRepository leaseRecoveryRepository,
-			MembershipExpiryTriggerScanner membershipExpiryScanner
+			MembershipExpiryTriggerScanner membershipExpiryScanner,
+			MembershipExpiredTriggerScanner membershipExpiredScanner
 	) {
 		this.automationService = automationService;
 		this.leaseRecoveryRepository = leaseRecoveryRepository;
 		this.membershipExpiryScanner = membershipExpiryScanner;
+		this.membershipExpiredScanner = membershipExpiredScanner;
 	}
 
 	@Scheduled(fixedDelayString = "${gymos.automation.scheduler-delay-ms:60000}")
 	public void runDueRules() {
 		leaseRecoveryRepository.recoverExpiredLeases(OffsetDateTime.now());
-		membershipExpiryScanner.materialize(LocalDate.now());
+		LocalDate today = LocalDate.now();
+		membershipExpiryScanner.materialize(today);
+		membershipExpiredScanner.materialize(today);
 		automationService.runDueScheduledRules();
 	}
 }
