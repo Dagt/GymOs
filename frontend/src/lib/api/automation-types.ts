@@ -39,6 +39,7 @@ export type AutomationRule = {
   scheduleCron: string | null;
   nextRunAt: string | null;
   lockedUntil: string | null;
+  version: number;
   createdAt: string;
   updatedAt: string;
 };
