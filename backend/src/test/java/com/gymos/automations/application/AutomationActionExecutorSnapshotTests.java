@@ -3,6 +3,7 @@ package com.gymos.automations.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -37,7 +38,7 @@ class AutomationActionExecutorSnapshotTests {
 		assertThat(result).isEqualTo(notificationId);
 		ArgumentCaptor<CreateNotificationCommand> command = ArgumentCaptor.forClass(CreateNotificationCommand.class);
 		verify(notifications).createSystem(
-				eq(snapshot.organizationId()), eq(snapshot.branchId()), eq(null),
+				eq(snapshot.organizationId()), eq(snapshot.branchId()), isNull(),
 				command.capture(), eq("correlation")
 		);
 		assertThat(command.getValue().subject()).isEqualTo("Vencimiento");
