@@ -16,6 +16,10 @@ public class AutomationRuleSnapshotRepository {
 	}
 
 	public AutomationRuleSnapshot store(UUID workItemId, AutomationRuleRecord rule) {
+		return store(workItemId, rule, rule.actionConfigJson());
+	}
+
+	public AutomationRuleSnapshot store(UUID workItemId, AutomationRuleRecord rule, String actionConfigJson) {
 		jdbcClient.sql("""
 				INSERT INTO automation_rule_snapshot (
 				    work_item_id, organization_id, branch_id, rule_id, rule_version,
@@ -38,7 +42,7 @@ public class AutomationRuleSnapshotRepository {
 				.param("triggerType", rule.triggerType())
 				.param("conditionJson", rule.conditionJson())
 				.param("actionType", rule.actionType())
-				.param("actionConfigJson", rule.actionConfigJson())
+				.param("actionConfigJson", actionConfigJson)
 				.param("retryLimit", rule.retryLimit())
 				.param("createdAt", OffsetDateTime.now())
 				.update();
