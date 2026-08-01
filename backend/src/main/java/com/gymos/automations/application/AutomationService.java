@@ -9,6 +9,8 @@ import com.gymos.automations.infrastructure.AutomationRepository;
 import com.gymos.automations.infrastructure.AutomationRepository.AutomationExecutionRecord;
 import com.gymos.automations.infrastructure.AutomationRepository.AutomationRuleRecord;
 import com.gymos.automations.infrastructure.AutomationRepository.CreateRuleData;
+import com.gymos.automations.infrastructure.AutomationRuleSnapshotRepository;
+import com.gymos.automations.infrastructure.AutomationRuleSnapshotRepository.AutomationRuleSnapshot;
 import com.gymos.automations.infrastructure.DurableAutomationRepository;
 import com.gymos.automations.infrastructure.DurableAutomationRepository.WorkItemRecord;
 import com.gymos.common.api.BusinessException;
@@ -24,7 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AutomationService {
-	private static final Set<String> SUPPORTED_TRIGGERS = Set.of("MANUAL", "SCHEDULED");
+	private static final Set<String> SUPPORTED_TRIGGERS = Set.of(
+			"MANUAL", "SCHEDULED", "MEMBERSHIP_EXPIRING"
+	);
 	private static final Set<String> SUPPORTED_ACTIONS = Set.of("CREATE_NOTIFICATION");
 	private static final Set<String> WORK_ITEM_STATUSES = Set.of(
 			"PENDING", "RUNNING", "RETRY_SCHEDULED", "SUCCEEDED", "DEAD_LETTER", "CANCELLED"
@@ -33,6 +37,7 @@ public class AutomationService {
 
 	private final AutomationRepository automationRepository;
 	private final DurableAutomationRepository durableRepository;
+	private final AutomationRuleSnapshotRepository snapshotRepository;
 	private final AutomationActionExecutor actionExecutor;
 	private final AuditService auditService;
 	private final ObjectMapper objectMapper;
@@ -40,12 +45,14 @@ public class AutomationService {
 	public AutomationService(
 			AutomationRepository automationRepository,
 			DurableAutomationRepository durableRepository,
+			AutomationRuleSnapshotRepository snapshotRepository,
 			AutomationActionExecutor actionExecutor,
 			AuditService auditService,
 			ObjectMapper objectMapper
 	) {
 		this.automationRepository = automationRepository;
 		this.durableRepository = durableRepository;
+		this.snapshotRepository = snapshotRepository;
 		this.actionExecutor = actionExecutor;
 		this.auditService = auditService;
 		this.objectMapper = objectMapper;
@@ -62,9 +69,10 @@ public class AutomationService {
 		requireBranch(principal);
 		String conditionJson = validJsonOrDefault(command.conditionJson());
 		String actionConfigJson = validJsonOrDefault(command.actionConfigJson());
-		String triggerType = required(command.triggerType(), "AUTOMATION_TRIGGER_REQUIRED", "La automatizacion necesita evento.").toUpperCase();
-		String actionType = required(command.actionType(), "AUTOMATION_ACTION_REQUIRED", "La automatizacion necesita accion.").toUpperCase();
+		String triggerType = required(command.triggerType(), "AUTOMATION_TRIGGER_REQUIRED", "La automatizacion necesita evento.").toUpperCase(Locale.ROOT);
+		String actionType = required(command.actionType(), "AUTOMATION_ACTION_REQUIRED", "La automatizacion necesita accion.").toUpperCase(Locale.ROOT);
 		requireSupportedDefinition(triggerType, actionType);
+		validateConditionConfig(triggerType, conditionJson);
 		validateActionConfig(actionType, actionConfigJson);
 		int intervalMinutes = intervalMinutes(conditionJson);
 		UUID ruleId = automationRepository.createRule(
@@ -102,6 +110,7 @@ public class AutomationService {
 		return requireRule(principal, ruleId);
 	}
 
+	@Transactional
 	public AutomationExecutionRecord execute(GymOsPrincipal principal, UUID ruleId, String triggerReference, String correlationId) {
 		AutomationRuleRecord rule = requireRule(principal, ruleId);
 		if (!"ENABLED".equals(rule.status())) {
@@ -114,6 +123,7 @@ public class AutomationService {
 				"manual:" + rule.id() + ":" + occurrence,
 				reference, rule.retryLimit() + 1, OffsetDateTime.now()
 		);
+		snapshotRepository.store(workItem.id(), rule);
 		return processWorkItem(workItem.id(), principal.userId(), correlationId, "BACKOFFICE");
 	}
 
@@ -163,24 +173,45 @@ public class AutomationService {
 		return requireWorkItem(principal, workItemId);
 	}
 
+	@Transactional
+	public WorkItemRecord enqueueDomainOccurrence(
+			AutomationRuleRecord rule,
+			String idempotencyKey,
+			String triggerReference,
+			OffsetDateTime scheduledAt,
+			String actionConfigJson
+	) {
+		WorkItemRecord workItem = durableRepository.enqueue(
+				rule.organizationId(), rule.branchId(), rule.id(), idempotencyKey,
+				triggerReference, rule.retryLimit() + 1, scheduledAt
+		);
+		snapshotRepository.store(workItem.id(), rule, actionConfigJson);
+		return workItem;
+	}
+
+	@Transactional
 	public int runDueScheduledRules() {
 		OffsetDateTime now = OffsetDateTime.now();
 		for (AutomationRuleRecord rule : automationRepository.dueScheduledRules(now, 25)) {
 			if (!automationRepository.claimScheduledRule(rule.id(), now, now.plus(WORK_LEASE))) continue;
 			OffsetDateTime occurrenceAt = rule.nextRunAt() == null ? now : rule.nextRunAt();
 			try {
-				durableRepository.enqueue(
+				WorkItemRecord workItem = durableRepository.enqueue(
 						rule.organizationId(), rule.branchId(), rule.id(),
 						"scheduled:" + rule.id() + ":" + occurrenceAt,
 						"scheduled:" + occurrenceAt, rule.retryLimit() + 1, occurrenceAt
 				);
+				snapshotRepository.store(workItem.id(), rule);
 			} finally {
 				automationRepository.rescheduleRule(
 						rule.id(), OffsetDateTime.now().plusMinutes(intervalMinutes(rule.conditionJson()))
 				);
 			}
 		}
+		return processDueWorkItems();
+	}
 
+	public int processDueWorkItems() {
 		int processed = 0;
 		for (WorkItemRecord workItem : durableRepository.due(OffsetDateTime.now(), 25)) {
 			processWorkItem(workItem.id(), null, "automation-scheduler", "SCHEDULER");
@@ -206,11 +237,10 @@ public class AutomationService {
 		String executionStatus;
 		String error = null;
 		try {
-			AutomationRuleRecord rule = automationRepository.rule(
-					claimed.organizationId(), claimed.branchId(), claimed.ruleId()
-			).orElseThrow(() -> new BusinessException("AUTOMATION_RULE_NOT_FOUND", "La automatizacion no existe o no esta disponible."));
+			AutomationRuleSnapshot snapshot = snapshotRepository.snapshot(claimed.id())
+					.orElseGet(() -> snapshotCurrentRule(claimed));
 			UUID effectReferenceId = claimed.effectReferenceId();
-			if (effectReferenceId == null) effectReferenceId = actionExecutor.execute(rule, actorUserId, correlationId);
+			if (effectReferenceId == null) effectReferenceId = actionExecutor.execute(snapshot, actorUserId, correlationId);
 			durableRepository.markSucceeded(claimed.id(), effectReferenceId);
 			executionStatus = "SUCCEEDED";
 		} catch (RuntimeException exception) {
@@ -237,6 +267,16 @@ public class AutomationService {
 				.filter(execution -> execution.id().equals(executionId))
 				.findFirst()
 				.orElseThrow();
+	}
+
+	private AutomationRuleSnapshot snapshotCurrentRule(WorkItemRecord workItem) {
+		AutomationRuleRecord rule = automationRepository.rule(
+				workItem.organizationId(), workItem.branchId(), workItem.ruleId()
+		).orElseThrow(() -> new BusinessException(
+				"AUTOMATION_RULE_SNAPSHOT_NOT_FOUND",
+				"La ocurrencia no tiene una instantanea ejecutable de la regla."
+		));
+		return snapshotRepository.store(workItem.id(), rule);
 	}
 
 	private AutomationExecutionRecord latestExecution(WorkItemRecord workItem) {
@@ -302,6 +342,22 @@ public class AutomationService {
 		}
 		if (!SUPPORTED_ACTIONS.contains(actionType)) {
 			throw new BusinessException("AUTOMATION_ACTION_UNSUPPORTED", "Esta accion aun no esta implementada.");
+		}
+	}
+
+	private void validateConditionConfig(String triggerType, String conditionJson) {
+		if (!"MEMBERSHIP_EXPIRING".equals(triggerType)) return;
+		try {
+			JsonNode condition = objectMapper.readTree(conditionJson);
+			int days = condition.path("daysBeforeExpiry").asInt(7);
+			if (days < 1 || days > 90) {
+				throw new BusinessException(
+						"AUTOMATION_EXPIRY_DAYS_INVALID",
+						"Los dias antes del vencimiento deben estar entre 1 y 90."
+				);
+			}
+		} catch (JsonProcessingException exception) {
+			throw new BusinessException("AUTOMATION_JSON_INVALID", "La configuracion JSON de la automatizacion es invalida.");
 		}
 	}
 
