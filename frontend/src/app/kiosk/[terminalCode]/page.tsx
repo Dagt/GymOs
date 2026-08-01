@@ -4,18 +4,20 @@ import Image from "next/image";
 import { useParams } from "next/navigation";
 import { CSSProperties, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import {
-  changeMembershipPlanFromKiosk,
   clearSession,
+  createKioskPaymentIntent,
+  createKioskQuote,
   createKioskSession,
   endKioskSession,
-  getStoredSession,
   getKioskMembershipOptions,
-  getKioskSummary,
-  renewMembershipFromKiosk,
+  getStoredSession,
   updateKioskContactData,
   verifyKioskSession,
   type KioskMembership,
+  type KioskPaymentIntent,
   type KioskPlanOption,
+  type KioskQuote,
+  type KioskQuoteOperation,
   type KioskSessionResponse,
   type KioskSummaryResponse,
 } from "@/lib/api";
@@ -46,6 +48,8 @@ export default function KioskPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [workingMembershipId, setWorkingMembershipId] = useState<string | null>(null);
+  const [quote, setQuote] = useState<KioskQuote | null>(null);
+  const [paymentIntent, setPaymentIntent] = useState<KioskPaymentIntent | null>(null);
   const [resources, setResources] = useState<KioskBookingResource[]>([]);
   const [resourceId, setResourceId] = useState("");
   const [bookingDate, setBookingDate] = useState(() => toDateInput(new Date()));
@@ -68,9 +72,7 @@ export default function KioskPage() {
           clearSession();
           created = consumeKioskLaunch(window.location.hash) as KioskSessionResponse;
           window.history.replaceState(null, "", window.location.pathname);
-          if (!created) {
-            throw new Error("Abre el modo kiosco desde la pantalla de recepción.");
-          }
+          if (!created) throw new Error("Abre el modo kiosco desde la pantalla de recepción.");
         } else {
           const stored = getStoredSession();
           created = await createKioskSession(params.terminalCode, {
@@ -134,17 +136,17 @@ export default function KioskPage() {
     getKioskBookingAvailability(session.sessionId, session.sessionToken, resourceId, bookingDate)
       .then((items) => {
         if (!active) return;
-        const future = items.filter((item) => item.available && new Date(item.startsAt).getTime() > Date.now());
-        setSlots(future);
+        setSlots(items.filter((item) => item.available && new Date(item.startsAt).getTime() > Date.now()));
         setSelectedSlot(null);
       })
-      .catch((exception) => { if (active) setError(exception instanceof Error ? exception.message : "No fue posible consultar disponibilidad."); });
+      .catch((exception) => {
+        if (active) setError(exception instanceof Error ? exception.message : "No fue posible consultar disponibilidad.");
+      });
     return () => { active = false; };
   }, [bookingDate, resourceId, session, summary]);
 
   useEffect(() => {
     if (!session || !summary) return;
-
     let timeout = window.setTimeout(closeForInactivity, VERIFIED_INACTIVITY_MS);
     const reset = () => {
       window.clearTimeout(timeout);
@@ -152,12 +154,10 @@ export default function KioskPage() {
     };
     const events: Array<keyof WindowEventMap> = ["pointerdown", "keydown", "touchstart"];
     events.forEach((eventName) => window.addEventListener(eventName, reset, { passive: true }));
-
     async function closeForInactivity() {
       await endKioskSession(session.sessionId, session.sessionToken).catch(() => undefined);
       window.location.replace("/kiosk/closed?reason=inactive");
     }
-
     return () => {
       window.clearTimeout(timeout);
       events.forEach((eventName) => window.removeEventListener(eventName, reset));
@@ -188,42 +188,57 @@ export default function KioskPage() {
     }
   }
 
-  async function renew(membership: KioskMembership) {
-    if (!session || !summary?.capabilities.onlineCardPaymentsReady) return;
-    setWorkingMembershipId(membership.id); setError(null); setMessage(null);
+  async function requestQuote(membership: KioskMembership, operationType: KioskQuoteOperation) {
+    if (!session) return;
+    setWorkingMembershipId(membership.id);
+    setError(null);
+    setMessage(null);
+    setPaymentIntent(null);
     try {
-      const response = await renewMembershipFromKiosk(session.sessionId, session.sessionToken, membership.id, {
-        idempotencyKey: stableOperationKey(
-          operationKeys.current,
-          "kiosk-renewal",
-          session.sessionId,
-          membership.id,
-        ),
+      const created = await createKioskQuote(session.sessionId, session.sessionToken, {
+        operationType,
+        membershipId: membership.id,
+        planId: operationType === "PLAN_CHANGE" ? targetPlanId : membership.planId,
       });
-      setSummary(await getKioskSummary(session.sessionId, session.sessionToken));
-      setMessage(response.membership ? `Renovada hasta ${formatDay(response.membership.endsOn)}.` : "Pago pendiente.");
-    } catch (exception) { setError(exception instanceof Error ? exception.message : "No fue posible renovar."); }
-    finally { setWorkingMembershipId(null); }
+      setQuote(created);
+      setMessage("Revisa el importe antes de continuar al pago.");
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible generar la cotización.");
+    } finally {
+      setWorkingMembershipId(null);
+    }
   }
 
-  async function changePlan(membership: KioskMembership) {
-    if (!session || !targetPlanId || !summary?.capabilities.onlineCardPaymentsReady) return;
-    setWorkingMembershipId(membership.id); setError(null); setMessage(null);
+  async function continueToPayment() {
+    if (!session || !quote) return;
+    setWorkingMembershipId(quote.membershipId);
+    setError(null);
     try {
-      const response = await changeMembershipPlanFromKiosk(session.sessionId, session.sessionToken, membership.id, {
-        targetPlanId,
+      const intent = await createKioskPaymentIntent(session.sessionId, session.sessionToken, {
+        quoteId: quote.id,
         idempotencyKey: stableOperationKey(
           operationKeys.current,
-          "kiosk-plan-change",
+          "kiosk-checkout",
           session.sessionId,
-          membership.id,
-          targetPlanId,
+          quote.id,
         ),
+        successUrl: `${window.location.origin}/kiosk/payment-result?status=success`,
+        cancelUrl: `${window.location.origin}/kiosk/payment-result?status=cancelled`,
       });
-      setSummary(await getKioskSummary(session.sessionId, session.sessionToken));
-      setMessage(response.membership ? `Nuevo plan activo: ${response.membership.planName}.` : "Solicitud registrada.");
-    } catch (exception) { setError(exception instanceof Error ? exception.message : "No fue posible cambiar plan."); }
-    finally { setWorkingMembershipId(null); }
+      setPaymentIntent(intent);
+      if (intent.checkoutUrl) {
+        window.location.assign(intent.checkoutUrl);
+        return;
+      }
+      if (!intent.clientSecret) {
+        throw new Error("La pasarela no devolvió una sesión de pago utilizable.");
+      }
+      setMessage("La intención de pago fue creada. Falta montar el componente alojado del proveedor.");
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible iniciar el pago.");
+    } finally {
+      setWorkingMembershipId(null);
+    }
   }
 
   async function updateContact(event: FormEvent<HTMLFormElement>) {
@@ -296,26 +311,36 @@ export default function KioskPage() {
             <input className="kiosk-input" onChange={(event) => setIdentifier(event.target.value)} placeholder="Correo o teléfono" required value={identifier} />
             <label className="kiosk-field">
               Fecha de nacimiento
-              <input
-                aria-label="Fecha de nacimiento en formato día mes año"
-                autoComplete="bday"
-                className="kiosk-input compact"
-                inputMode="numeric"
-                maxLength={10}
-                onChange={(event) => setBirthDateDisplay(formatMexicanDateInput(event.target.value))}
-                placeholder="DD/MM/AAAA"
-                required
-                type="text"
-                value={birthDateDisplay}
-              />
+              <input aria-label="Fecha de nacimiento" autoComplete="bday" className="kiosk-input compact" inputMode="numeric" maxLength={10} onChange={(event) => setBirthDateDisplay(formatMexicanDateInput(event.target.value))} placeholder="DD/MM/AAAA" required type="text" value={birthDateDisplay} />
               <small>Formato: día/mes/año, por ejemplo 25/08/1990.</small>
             </label>
             <button className="kiosk-primary-action" type="submit">Continuar de forma segura</button>
           </form>
         ) : (
           <section className="grid gap-5">
+            {quote ? (
+              <section className="kiosk-card" aria-live="polite">
+                <div className="kiosk-step"><span>2</span><div><h2>Confirma tu cotización</h2><p>El importe fue calculado por GymOS y vence {formatTime(quote.expiresAt)}.</p></div></div>
+                <div className="mt-4 grid gap-2 text-sm">
+                  <p className="flex justify-between"><span>Plan</span><strong>{quote.planName}</strong></p>
+                  <p className="flex justify-between"><span>Precio de lista</span><strong>{formatMoney(quote.listPriceCents, quote.currency)}</strong></p>
+                  <p className="flex justify-between"><span>Descuentos</span><strong>-{formatMoney(quote.discountCents, quote.currency)}</strong></p>
+                  <p className="flex justify-between border-t border-white/20 pt-3 text-lg"><span>Total</span><strong>{formatMoney(quote.totalCents, quote.currency)}</strong></p>
+                </div>
+                {parseBenefits(quote.benefitsJson).length > 0 ? (
+                  <div className="kiosk-feature-note mt-4">{parseBenefits(quote.benefitsJson).map((benefit) => <span key={benefit.code}>{benefit.name}: -{formatMoney(benefit.discountCents, quote.currency)}</span>)}</div>
+                ) : null}
+                {!summary.capabilities.onlineCardPaymentsReady ? <p className="kiosk-feature-note mt-4">La cotización está disponible, pero el proveedor de pagos aún no está configurado.</p> : null}
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <button className="kiosk-primary-action small" disabled={!summary.capabilities.onlineCardPaymentsReady || workingMembershipId !== null} onClick={continueToPayment} type="button">Continuar al pago</button>
+                  <button className="kiosk-secondary-action" onClick={() => { setQuote(null); setPaymentIntent(null); }} type="button">Cancelar</button>
+                </div>
+                {paymentIntent ? <p className="kiosk-muted mt-3">Estado de pago: {paymentIntent.status}</p> : null}
+              </section>
+            ) : null}
+
             {summary.capabilities.resourceBookingAllowed ? <section className="kiosk-card">
-              <div className="kiosk-step"><span>2</span><div><h2>Reserva un recurso</h2><p>Sólo ves horarios disponibles; nunca los datos de otros socios.</p></div></div>
+              <div className="kiosk-step"><span>3</span><div><h2>Reserva un recurso</h2><p>Sólo ves horarios disponibles; nunca los datos de otros socios.</p></div></div>
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="kiosk-field">Recurso<select className="kiosk-input compact" onChange={(event) => setResourceId(event.target.value)} value={resourceId}>{resources.map((resource) => <option key={resource.id} value={resource.id}>{resource.name}</option>)}</select></label>
                 <label className="kiosk-field">Día<input className="kiosk-input compact" min={toDateInput(new Date())} onChange={(event) => setBookingDate(event.target.value)} type="date" value={bookingDate} /></label>
@@ -329,19 +354,13 @@ export default function KioskPage() {
             </section> : null}
 
             {summary.capabilities.wellnessBookingAllowed ? (
-              <section className="kiosk-card">
-                <div className="kiosk-step"><span>3</span><div><h2>Profesionales de bienestar</h2><p>El catálogo de profesionales, servicios y horarios se incorporará en el siguiente bloque.</p></div></div>
-                <p className="kiosk-feature-note">Las consultas con costo abrirán un pago seguro con tarjeta antes de confirmar la cita.</p>
-              </section>
+              <section className="kiosk-card"><div className="kiosk-step"><span>4</span><div><h2>Profesionales de bienestar</h2><p>El catálogo de profesionales y servicios se habilitará mediante el mismo flujo de cotización y pago.</p></div></div></section>
             ) : null}
 
             <section className="kiosk-content-grid">
               <div className="kiosk-card">
                 <div className="kiosk-member-header"><span>Hola</span><h2>{summary.clientName}</h2></div>
                 {summary.capabilities.membershipPlanChangeAllowed ? <label className="kiosk-field">Nuevo plan<select className="kiosk-input compact" onChange={(event) => setTargetPlanId(event.target.value)} value={targetPlanId}>{plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} - {formatMoney(plan.priceCents, plan.currency)}</option>)}</select></label> : null}
-                {!summary.capabilities.onlineCardPaymentsReady && (summary.capabilities.membershipRenewalAllowed || summary.capabilities.membershipPlanChangeAllowed) ? (
-                  <p className="kiosk-feature-note">La renovación y el cambio de plan usarán exclusivamente tarjeta de crédito o débito. Se habilitarán al conectar la pasarela de pagos.</p>
-                ) : null}
                 <div className="kiosk-membership-list">
                   {summary.memberships.length === 0 ? <p className="kiosk-muted">No hay membresías registradas.</p> : null}
                   {summary.memberships.map((membership) => (
@@ -349,15 +368,15 @@ export default function KioskPage() {
                       <div><span>{membership.status}</span><h3>{membership.planName}</h3></div>
                       <p>{membership.status} - {formatDay(membership.startsOn)} a {formatDay(membership.endsOn)}</p>
                       <div className="kiosk-action-grid">
-                        {summary.capabilities.membershipRenewalAllowed ? <button className="kiosk-primary-action small" disabled={workingMembershipId !== null || !summary.capabilities.onlineCardPaymentsReady || membership.status === "CANCELLED"} onClick={() => renew(membership)} type="button">{workingMembershipId === membership.id ? "Procesando..." : "Renovar con tarjeta"}</button> : null}
-                        {summary.capabilities.membershipPlanChangeAllowed ? <button className="kiosk-secondary-action" disabled={workingMembershipId !== null || !summary.capabilities.onlineCardPaymentsReady || membership.status !== "ACTIVE" || !targetPlanId || targetPlanId === membership.planId} onClick={() => changePlan(membership)} type="button">Cambiar plan</button> : null}
+                        {summary.capabilities.membershipRenewalAllowed ? <button className="kiosk-primary-action small" disabled={workingMembershipId !== null || membership.status === "CANCELLED"} onClick={() => requestQuote(membership, "RENEWAL")} type="button">{workingMembershipId === membership.id ? "Cotizando..." : "Cotizar renovación"}</button> : null}
+                        {summary.capabilities.membershipPlanChangeAllowed ? <button className="kiosk-secondary-action" disabled={workingMembershipId !== null || membership.status !== "ACTIVE" || !targetPlanId || targetPlanId === membership.planId} onClick={() => requestQuote(membership, "PLAN_CHANGE")} type="button">Cotizar cambio</button> : null}
                       </div>
                     </article>
                   ))}
                 </div>
               </div>
               <aside className="kiosk-card kiosk-side-card">
-                <div className="kiosk-step"><span>4</span><div><h2>Mis datos</h2><p>Actualiza el contacto que usa tu gimnasio.</p></div></div>
+                <div className="kiosk-step"><span>5</span><div><h2>Mis datos</h2><p>Actualiza el contacto que usa tu gimnasio.</p></div></div>
                 {summary.capabilities.profileUpdateAllowed ? (
                   <form onSubmit={updateContact}>
                     <label className="kiosk-field">Correo<input className="kiosk-input compact" onChange={(event) => setContactEmail(event.target.value)} type="email" value={contactEmail} /></label>
@@ -365,12 +384,7 @@ export default function KioskPage() {
                     <button className="kiosk-secondary-action mt-4 w-full" disabled={contactBusy || (!contactEmail.trim() && !contactPhone.trim())} type="submit">{contactBusy ? "Guardando..." : "Guardar datos"}</button>
                   </form>
                 ) : <p className="kiosk-muted mt-4">Esta sucursal no permite actualizar datos desde autoservicio.</p>}
-                {summary.capabilities.autopayAllowed ? (
-                  <div className="kiosk-feature-note">
-                    <strong>Domiciliación</strong>
-                    <span>Podrás autorizar cobros recurrentes cuando la pasarela permita guardar un método tokenizado.</span>
-                  </div>
-                ) : null}
+                {summary.capabilities.autopayAllowed ? <div className="kiosk-feature-note"><strong>Domiciliación</strong><span>Requiere que la pasarela soporte tokenización recurrente.</span></div> : null}
                 <button className="kiosk-end-action" onClick={end} type="button">Cerrar sesión</button>
               </aside>
             </section>
@@ -381,6 +395,17 @@ export default function KioskPage() {
   );
 }
 
+type QuoteBenefit = { code: string; name: string; discountCents: number };
+
+function parseBenefits(value: string): QuoteBenefit[] {
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) ? parsed as QuoteBenefit[] : [];
+  } catch {
+    return [];
+  }
+}
+
 function formatMoney(cents: number, currency: string) { return new Intl.NumberFormat("es-MX", { style: "currency", currency }).format(cents / 100); }
 function formatDay(value: string) { return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${value}T00:00:00Z`)); }
 function formatTime(value: string) { return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value)); }
@@ -389,9 +414,7 @@ function stableOperationKey(keys: Map<string, string>, ...parts: string[]) {
   const operation = parts.join(":");
   const existing = keys.get(operation);
   if (existing) return existing;
-  const random = typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}`;
+  const random = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `${Date.now()}`;
   const created = [...parts, random].join(":");
   keys.set(operation, created);
   return created;
