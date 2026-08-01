@@ -32,7 +32,7 @@ public class MembershipExpiryTriggerScanner {
 	}
 
 	public int materialize(LocalDate today) {
-		int created = 0;
+		int matched = 0;
 		for (AutomationRuleRecord rule : automationRepository.enabledRulesByTrigger("MEMBERSHIP_EXPIRING", 200)) {
 			int days = daysBeforeExpiry(rule.conditionJson());
 			for (ExpiringMembership membership : membershipRepository.find(
@@ -45,10 +45,10 @@ public class MembershipExpiryTriggerScanner {
 						today.atStartOfDay().atOffset(ZoneOffset.UTC),
 						actionConfig(rule, membership, days)
 				);
-				created++;
+				matched++;
 			}
 		}
-		return created;
+		return matched;
 	}
 
 	private String actionConfig(AutomationRuleRecord rule, ExpiringMembership membership, int days) {
@@ -57,7 +57,10 @@ public class MembershipExpiryTriggerScanner {
 			ObjectNode config = parsed != null && parsed.isObject()
 					? (ObjectNode) parsed.deepCopy()
 					: objectMapper.createObjectNode();
-			ObjectNode variables = config.withObject("variables");
+			JsonNode existingVariables = config.get("variables");
+			ObjectNode variables = existingVariables instanceof ObjectNode objectNode
+					? objectNode
+					: config.putObject("variables");
 			variables.put("membershipId", membership.id().toString());
 			variables.put("clientId", membership.clientId().toString());
 			variables.put("planId", membership.planId().toString());
