@@ -4,19 +4,29 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.common.api.BusinessException;
+import com.gymos.payments.api.OnlinePaymentGateway;
 import com.gymos.selfservice.application.result.SelfServiceCapabilities;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
 public class SelfServiceCapabilityPolicy {
 	private final ObjectMapper objectMapper;
+	private final OnlinePaymentGateway paymentGateway;
 
 	public SelfServiceCapabilityPolicy(ObjectMapper objectMapper) {
+		this(objectMapper, null);
+	}
+
+	@Autowired
+	public SelfServiceCapabilityPolicy(ObjectMapper objectMapper, OnlinePaymentGateway paymentGateway) {
 		this.objectMapper = objectMapper;
+		this.paymentGateway = paymentGateway;
 	}
 
 	public SelfServiceCapabilities resolve(String allowedActionsJson) {
 		JsonNode actions = parse(allowedActionsJson);
+		boolean onlinePaymentsReady = paymentGateway != null && paymentGateway.available();
 		return new SelfServiceCapabilities(
 				enabled(actions, "membershipRenewal", "renewal", "renew"),
 				enabled(actions, "membershipPlanChange", "planChange", "changePlan"),
@@ -24,7 +34,7 @@ public class SelfServiceCapabilityPolicy {
 				enabled(actions, "wellnessBooking", "wellness"),
 				enabled(actions, "profileUpdate", "contactUpdate", "profile"),
 				enabled(actions, "autopay", "recurringPayment", "domiciliation"),
-				false,
+				onlinePaymentsReady,
 				false
 		);
 	}
