@@ -15,18 +15,18 @@ public class AutomationMetrics {
 
     public int measure(String stage, IntSupplier operation) {
         Timer.Sample sample = Timer.start(meterRegistry);
+        String outcome = "success";
         try {
             int count = operation.getAsInt();
             meterRegistry.counter("gymos.automations.stage.items", "stage", stage, "outcome", "success")
                     .increment(count);
             return count;
         } catch (RuntimeException exception) {
-            meterRegistry.counter("gymos.automations.stage.runs", "stage", stage, "outcome", "failure")
-                    .increment();
+            outcome = "failure";
             throw exception;
         } finally {
-            sample.stop(meterRegistry.timer("gymos.automations.stage.duration", "stage", stage));
-            meterRegistry.counter("gymos.automations.stage.runs", "stage", stage, "outcome", "success")
+            sample.stop(meterRegistry.timer("gymos.automations.stage.duration", "stage", stage, "outcome", outcome));
+            meterRegistry.counter("gymos.automations.stage.runs", "stage", stage, "outcome", outcome)
                     .increment();
         }
     }
