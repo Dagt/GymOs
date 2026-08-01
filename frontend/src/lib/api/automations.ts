@@ -13,6 +13,17 @@ import type {
   UpdateAutomationPayload,
 } from "./automation-types";
 
+const DOMAIN_TRIGGERS = new Set([
+  "MEMBERSHIP_EXPIRING",
+  "MEMBERSHIP_EXPIRED",
+  "MEMBERSHIP_RENEWED",
+  "MEMBERSHIP_CANCELLED",
+  "PAYMENT_COMPLETED",
+  "PAYMENT_FAILED",
+  "BOOKING_CREATED",
+  "BOOKING_CANCELLED",
+]);
+
 export async function getNotifications(accessToken: string, limit = 80): Promise<NotificationLog[]> {
   return apiFetch<NotificationLog[]>(`/notifications?limit=${limit}`, accessToken);
 }
@@ -35,9 +46,20 @@ export async function createAutomation(
   accessToken: string,
   payload: CreateAutomationPayload,
 ): Promise<AutomationRule> {
-  return apiFetch<AutomationRule>("/automations", accessToken, {
+  const domainRule = DOMAIN_TRIGGERS.has(payload.triggerType);
+  const endpoint = domainRule ? "/automations/domain-rules" : "/automations";
+  const body = domainRule
+    ? {
+        name: payload.name,
+        triggerType: payload.triggerType,
+        conditionJson: payload.conditionJson,
+        actionConfigJson: payload.actionConfigJson,
+        retryLimit: payload.retryLimit,
+      }
+    : payload;
+  return apiFetch<AutomationRule>(endpoint, accessToken, {
     method: "POST",
-    body: JSON.stringify(normalizePayload(payload)),
+    body: JSON.stringify(normalizePayload(body)),
   });
 }
 
