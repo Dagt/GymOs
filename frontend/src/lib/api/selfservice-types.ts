@@ -92,4 +92,49 @@ export type KioskContactUpdatePayload = {
   phone?: string | null;
 };
 
+export type KioskQuoteOperation = "RENEWAL" | "PLAN_CHANGE";
+
+export type KioskQuote = {
+  id: string;
+  membershipId: string | null;
+  operationType: KioskQuoteOperation;
+  planId: string;
+  planName: string;
+  listPriceCents: number;
+  discountCents: number;
+  totalCents: number;
+  currency: string;
+  benefitsJson: string;
+  status: "ACTIVE" | "CONSUMED" | "EXPIRED" | "CANCELLED";
+  expiresAt: string;
+};
+
+export type KioskPaymentIntent = {
+  id: string;
+  quoteId: string;
+  provider: string;
+  providerIntentId: string | null;
+  amountCents: number;
+  currency: string;
+  status: "CREATED" | "PENDING" | "SUCCEEDED" | "FAILED" | "CANCELLED" | "EXPIRED";
+  checkoutUrl: string | null;
+  clientSecret: string | null;
+  expiresAt: string | null;
+  completedAt: string | null;
+  lastError: string | null;
+};
+
+export type CreateKioskQuotePayload = {
+  operationType: KioskQuoteOperation;
+  membershipId?: string | null;
+  planId?: string | null;
+};
+
+export type CreateKioskPaymentIntentPayload = {
+  quoteId: string;
+  idempotencyKey: string;
+  successUrl: string;
+  cancelUrl: string;
+};
+
 export type { RenewMembershipResponse };
