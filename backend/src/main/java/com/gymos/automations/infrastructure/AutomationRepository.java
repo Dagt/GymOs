@@ -20,7 +20,7 @@ public class AutomationRepository {
 				SELECT organization_id, branch_id, id, name, trigger_type, condition_json::text AS condition_json,
 				       action_type, action_config_json::text AS action_config_json,
 				       status, retry_limit, schedule_cron, next_run_at, locked_until,
-				       version, created_at, updated_at
+				       definition_version AS rule_version, created_at, updated_at
 				FROM automation_rule
 				WHERE organization_id = :organizationId
 				  AND (branch_id = :branchId OR branch_id IS NULL)
@@ -38,7 +38,7 @@ public class AutomationRepository {
 				SELECT organization_id, branch_id, id, name, trigger_type, condition_json::text AS condition_json,
 				       action_type, action_config_json::text AS action_config_json,
 				       status, retry_limit, schedule_cron, next_run_at, locked_until,
-				       version, created_at, updated_at
+				       definition_version AS rule_version, created_at, updated_at
 				FROM automation_rule
 				WHERE organization_id = :organizationId
 				  AND (branch_id = :branchId OR branch_id IS NULL)
@@ -59,12 +59,12 @@ public class AutomationRepository {
 				INSERT INTO automation_rule (
 				    id, organization_id, branch_id, name, trigger_type, condition_json,
 				    action_type, action_config_json, status, retry_limit, schedule_cron, next_run_at,
-				    created_at, updated_at, created_by, updated_by, version
+				    created_at, updated_at, created_by, updated_by, version, definition_version
 				)
 				VALUES (
 				    :id, :organizationId, :branchId, :name, :triggerType, CAST(:conditionJson AS jsonb),
 				    :actionType, CAST(:actionConfigJson AS jsonb), 'ENABLED', :retryLimit, :scheduleCron, :nextRunAt,
-				    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
+				    :createdAt, :updatedAt, :createdBy, :updatedBy, 0, 1
 				)
 				""")
 				.param("id", ruleId)
@@ -162,7 +162,7 @@ public class AutomationRepository {
 				SELECT organization_id, branch_id, id, name, trigger_type, condition_json::text AS condition_json,
 				       action_type, action_config_json::text AS action_config_json,
 				       status, retry_limit, schedule_cron, next_run_at, locked_until,
-				       version, created_at, updated_at
+				       definition_version AS rule_version, created_at, updated_at
 				FROM automation_rule
 				WHERE status = 'ENABLED'
 				  AND trigger_type = 'SCHEDULED'
@@ -184,7 +184,7 @@ public class AutomationRepository {
 				SELECT organization_id, branch_id, id, name, trigger_type, condition_json::text AS condition_json,
 				       action_type, action_config_json::text AS action_config_json,
 				       status, retry_limit, schedule_cron, next_run_at, locked_until,
-				       version, created_at, updated_at
+				       definition_version AS rule_version, created_at, updated_at
 				FROM automation_rule
 				WHERE status = 'ENABLED'
 				  AND trigger_type = :triggerType
@@ -251,14 +251,13 @@ public class AutomationRepository {
 				resultSet.getString("schedule_cron"),
 				resultSet.getObject("next_run_at", OffsetDateTime.class),
 				resultSet.getObject("locked_until", OffsetDateTime.class),
-				resultSet.getLong("version"),
+				resultSet.getLong("rule_version"),
 				resultSet.getObject("created_at", OffsetDateTime.class),
 				resultSet.getObject("updated_at", OffsetDateTime.class)
 		);
 	}
 
-	public record CreateRuleData(String name, String triggerType, String conditionJson, String actionType, String actionConfigJson, int retryLimit, String scheduleCron, OffsetDateTime nextRunAt) {
-	}
+	public record CreateRuleData(String name, String triggerType, String conditionJson, String actionType, String actionConfigJson, int retryLimit, String scheduleCron, OffsetDateTime nextRunAt) {}
 
 	public record AutomationRuleRecord(
 			UUID organizationId,
