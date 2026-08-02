@@ -65,7 +65,7 @@ public class DomainAutomationRuleService {
                         required(command.name(), "AUTOMATION_NAME_REQUIRED"),
                         triggerType,
                         conditionJson,
-                        "CREATE_NOTIFICATION",
+                        "SEND_CUSTOMER_MESSAGE",
                         actionConfigJson,
                         Math.max(0, Math.min(command.retryLimit(), 10)),
                         null,
@@ -73,7 +73,7 @@ public class DomainAutomationRuleService {
                 )
         );
         auditService.record(principal, "AUTOMATION_RULE_CREATED", "AUTOMATION_RULE", id,
-                "BACKOFFICE", "domain-trigger:" + triggerType, correlationId);
+                "BACKOFFICE", "customer-message:" + triggerType, correlationId);
         return automationRepository.rule(principal.organizationId(), principal.branchId(), id).orElseThrow();
     }
 
@@ -82,7 +82,27 @@ public class DomainAutomationRuleService {
             JsonNode condition = objectMapper.readTree(conditionJson);
             JsonNode action = objectMapper.readTree(actionConfigJson);
             if (action.path("body").asText("").isBlank()) {
-                throw new BusinessException("AUTOMATION_NOTIFICATION_BODY_REQUIRED", "La notificacion necesita un mensaje.");
+                throw new BusinessException("AUTOMATION_MESSAGE_BODY_REQUIRED", "La comunicacion necesita un mensaje.");
+            }
+            JsonNode channels = action.path("channels");
+            if (!channels.isArray() || channels.isEmpty()) {
+                throw new BusinessException("AUTOMATION_CHANNEL_REQUIRED", "Selecciona correo y/o WhatsApp.");
+            }
+            channels.forEach(channel -> {
+                String value = channel.asText("").toUpperCase(Locale.ROOT);
+                if (!Set.of("EMAIL", "WHATSAPP").contains(value)) {
+                    throw new BusinessException(
+                            "AUTOMATION_CHANNEL_UNSUPPORTED",
+                            "En la fase actual solo se permiten EMAIL y WHATSAPP."
+                    );
+                }
+            });
+            String communicationType = action.path("communicationType").asText("OPERATIONAL").toUpperCase(Locale.ROOT);
+            if (!Set.of("OPERATIONAL", "MARKETING").contains(communicationType)) {
+                throw new BusinessException(
+                        "AUTOMATION_COMMUNICATION_TYPE_INVALID",
+                        "El tipo de comunicacion debe ser OPERATIONAL o MARKETING."
+                );
             }
             if ("MEMBERSHIP_EXPIRING".equals(triggerType)) {
                 int days = condition.path("daysBeforeExpiry").asInt(0);
