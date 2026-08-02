@@ -12,8 +12,8 @@ import com.gymos.memberships.api.operations.RenewMembershipOperationCommand;
 import com.gymos.memberships.application.command.ChangeMembershipPlanCommand;
 import com.gymos.memberships.application.command.RenewMembershipCommand;
 import com.gymos.memberships.application.result.MembershipSaleResult;
-import com.gymos.memberships.infrastructure.MembershipRepository.MembershipSummary;
 import com.gymos.memberships.infrastructure.MembershipRepository.MembershipPeriodSummary;
+import com.gymos.memberships.infrastructure.MembershipRepository.MembershipSummary;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
@@ -66,7 +66,15 @@ public class MembershipService implements MembershipOperations {
 			String correlationId
 	) {
 		MembershipSaleResult result = renewalService.renew(principal, membershipId, command, correlationId);
-		publishRenewed(principal, membershipId, result.saleId(), result.saleStatus());
+		if (result.membership() != null) {
+			publish(principal, "MEMBERSHIP_RENEWED", "membership-renewed:" + membershipId + ":" + result.saleId(),
+					Map.of(
+							"membershipId", membershipId.toString(),
+							"saleId", result.saleId().toString(),
+							"saleStatus", result.saleStatus() == null ? "UNKNOWN" : result.saleStatus(),
+							"endsOn", result.membership().endsOn().toString()
+					));
+		}
 		return result;
 	}
 
@@ -79,11 +87,7 @@ public class MembershipService implements MembershipOperations {
 			String correlationId
 	) {
 		return MembershipResultMapper.toOperationResult(renew(principal, membershipId, new RenewMembershipCommand(
-				command.method(),
-				command.reference(),
-				command.validateNow(),
-				command.notes(),
-				command.idempotencyKey()
+				command.method(), command.reference(), command.validateNow(), command.notes(), command.idempotencyKey()
 		), correlationId));
 	}
 
@@ -95,7 +99,15 @@ public class MembershipService implements MembershipOperations {
 			String correlationId
 	) {
 		MembershipSaleResult result = planChangeService.changePlan(principal, membershipId, command, correlationId);
-		publishChanged(principal, membershipId, command.targetPlanId(), result.saleId(), result.saleStatus());
+		if (result.membership() != null) {
+			publish(principal, "MEMBERSHIP_PLAN_CHANGED", "membership-plan-changed:" + membershipId + ":" + result.saleId(),
+					Map.of(
+							"membershipId", membershipId.toString(),
+							"targetPlanId", command.targetPlanId().toString(),
+							"saleId", result.saleId().toString(),
+							"saleStatus", result.saleStatus() == null ? "UNKNOWN" : result.saleStatus()
+					));
+		}
 		return result;
 	}
 
@@ -108,51 +120,16 @@ public class MembershipService implements MembershipOperations {
 			String correlationId
 	) {
 		return MembershipResultMapper.toOperationResult(changePlan(principal, membershipId, new ChangeMembershipPlanCommand(
-				command.targetPlanId(),
-				command.method(),
-				command.reference(),
-				command.validateNow(),
-				command.notes(),
-				command.idempotencyKey()
+				command.targetPlanId(), command.method(), command.reference(), command.validateNow(),
+				command.notes(), command.idempotencyKey()
 		), correlationId));
-	}
-
-	private void publishRenewed(GymOsPrincipal principal, UUID membershipId, UUID saleId, String saleStatus) {
-		publish(principal, "MEMBERSHIP_RENEWED", "membership-renewed:" + membershipId + ":" + saleId,
-				Map.of(
-						"membershipId", membershipId.toString(),
-						"saleId", saleId.toString(),
-						"saleStatus", saleStatus == null ? "UNKNOWN" : saleStatus
-				));
-	}
-
-	private void publishChanged(
-			GymOsPrincipal principal,
-			UUID membershipId,
-			UUID targetPlanId,
-			UUID saleId,
-			String saleStatus
-	) {
-		publish(principal, "MEMBERSHIP_RENEWED", "membership-plan-changed:" + membershipId + ":" + saleId,
-				Map.of(
-						"membershipId", membershipId.toString(),
-						"targetPlanId", targetPlanId.toString(),
-						"saleId", saleId.toString(),
-						"saleStatus", saleStatus == null ? "UNKNOWN" : saleStatus,
-						"operation", "PLAN_CHANGE"
-				));
 	}
 
 	private void publish(GymOsPrincipal principal, String eventType, String eventId, Map<String, String> payload) {
 		try {
 			domainEvents.publish(new DomainEvent(
-					principal.organizationId(),
-					principal.branchId(),
-					eventType,
-					eventId,
-					1,
-					OffsetDateTime.now(),
-					objectMapper.writeValueAsString(payload)
+					principal.organizationId(), principal.branchId(), eventType, eventId, 1,
+					OffsetDateTime.now(), objectMapper.writeValueAsString(payload)
 			));
 		} catch (JsonProcessingException exception) {
 			throw new IllegalStateException("Could not serialize membership domain event", exception);
