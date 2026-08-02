@@ -20,7 +20,9 @@ public class DomainAutomationRuleService {
     private static final Set<String> IMPLEMENTED_TRIGGERS = Set.of(
             "MEMBERSHIP_EXPIRING",
             "MEMBERSHIP_EXPIRED",
+            "MEMBERSHIP_CREATED",
             "MEMBERSHIP_RENEWED",
+            "MEMBERSHIP_PLAN_CHANGED",
             "MEMBERSHIP_CANCELLED",
             "PAYMENT_COMPLETED",
             "PAYMENT_FAILED",
@@ -56,9 +58,7 @@ public class DomainAutomationRuleService {
         String actionConfigJson = validJson(command.actionConfigJson());
         validate(triggerType, conditionJson, actionConfigJson);
         UUID id = automationRepository.createRule(
-                principal.organizationId(),
-                principal.branchId(),
-                principal.userId(),
+                principal.organizationId(), principal.branchId(), principal.userId(),
                 new CreateRuleData(
                         required(command.name(), "AUTOMATION_NAME_REQUIRED"),
                         triggerType,
