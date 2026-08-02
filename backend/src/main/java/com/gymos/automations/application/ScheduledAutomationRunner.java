@@ -1,6 +1,7 @@
 package com.gymos.automations.application;
 
 import com.gymos.automations.infrastructure.AutomationLeaseRecoveryRepository;
+import com.gymos.communications.application.OutboundMessageDispatcher;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -13,6 +14,7 @@ public class ScheduledAutomationRunner {
 	private final MembershipExpiryTriggerScanner membershipExpiryScanner;
 	private final MembershipExpiredTriggerScanner membershipExpiredScanner;
 	private final AutomationDomainEventService domainEventService;
+	private final OutboundMessageDispatcher outboundMessageDispatcher;
 	private final AutomationMetrics metrics;
 
 	public ScheduledAutomationRunner(
@@ -21,6 +23,7 @@ public class ScheduledAutomationRunner {
 			MembershipExpiryTriggerScanner membershipExpiryScanner,
 			MembershipExpiredTriggerScanner membershipExpiredScanner,
 			AutomationDomainEventService domainEventService,
+			OutboundMessageDispatcher outboundMessageDispatcher,
 			AutomationMetrics metrics
 	) {
 		this.automationService = automationService;
@@ -28,6 +31,7 @@ public class ScheduledAutomationRunner {
 		this.membershipExpiryScanner = membershipExpiryScanner;
 		this.membershipExpiredScanner = membershipExpiredScanner;
 		this.domainEventService = domainEventService;
+		this.outboundMessageDispatcher = outboundMessageDispatcher;
 		this.metrics = metrics;
 	}
 
@@ -39,5 +43,6 @@ public class ScheduledAutomationRunner {
 		metrics.measure("membership_expired", () -> membershipExpiredScanner.materialize(today));
 		metrics.measure("domain_events", () -> domainEventService.processPending(250));
 		metrics.measure("work_queue", automationService::runDueScheduledRules);
+		metrics.measure("outbound_messages", () -> outboundMessageDispatcher.dispatchDue(250));
 	}
 }
