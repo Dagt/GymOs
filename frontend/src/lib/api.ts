@@ -124,7 +124,10 @@ export type {
 } from "./api/membership-types";
 export {
   changeMembershipPlanFromKiosk,
+  createKioskPaymentIntent,
+  createKioskQuote,
   createKioskSession,
+  createReceptionKioskSession,
   endKioskSession,
   getKioskMembershipOptions,
   getKioskSummary,
@@ -133,14 +136,19 @@ export {
   verifyKioskSession,
 } from "./api/selfservice";
 export type {
-  KioskMembership,
+  CreateKioskPaymentIntentPayload,
+  CreateKioskQuotePayload,
   KioskCapabilities,
   KioskContactUpdatePayload,
+  KioskMembership,
   KioskMembershipCheckoutPayload,
+  KioskPaymentIntent,
   KioskPendingPayment,
-  KioskPlanOption,
   KioskPlanChangeCheckoutPayload,
+  KioskPlanOption,
   KioskProfile,
+  KioskQuote,
+  KioskQuoteOperation,
   KioskSessionContext,
   KioskSessionResponse,
   KioskSummaryResponse,
