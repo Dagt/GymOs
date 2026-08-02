@@ -16,12 +16,16 @@ import type {
 const DOMAIN_TRIGGERS = new Set([
   "MEMBERSHIP_EXPIRING",
   "MEMBERSHIP_EXPIRED",
+  "MEMBERSHIP_CREATED",
   "MEMBERSHIP_RENEWED",
+  "MEMBERSHIP_PLAN_CHANGED",
   "MEMBERSHIP_CANCELLED",
   "PAYMENT_COMPLETED",
   "PAYMENT_FAILED",
   "BOOKING_CREATED",
   "BOOKING_CANCELLED",
+  "WELLNESS_APPOINTMENT_CREATED",
+  "WELLNESS_APPOINTMENT_CANCELLED",
 ]);
 
 export async function getNotifications(accessToken: string, limit = 80): Promise<NotificationLog[]> {
@@ -53,7 +57,7 @@ export async function createAutomation(
         name: payload.name,
         triggerType: payload.triggerType,
         conditionJson: payload.conditionJson,
-        actionConfigJson: payload.actionConfigJson,
+        actionConfigJson: normalizeCustomerMessageConfig(payload.actionConfigJson, payload.name),
         retryLimit: payload.retryLimit,
       }
     : payload;
@@ -165,5 +169,26 @@ export async function cancelAutomationWorkItem(
 ): Promise<AutomationWorkItem> {
   return apiFetch<AutomationWorkItem>(`/automations/work-items/${workItemId}/cancel`, accessToken, {
     method: "POST",
+  });
+}
+
+function normalizeCustomerMessageConfig(value: string | null | undefined, fallbackSubject: string) {
+  let parsed: Record<string, unknown> = {};
+  try {
+    parsed = value ? JSON.parse(value) as Record<string, unknown> : {};
+  } catch {
+    parsed = {};
+  }
+  const channels = Array.isArray(parsed.channels)
+    ? parsed.channels
+    : ["EMAIL", "WHATSAPP"];
+  return JSON.stringify({
+    ...parsed,
+    channel: undefined,
+    channels,
+    subject: typeof parsed.subject === "string" ? parsed.subject : fallbackSubject,
+    templateCode: typeof parsed.templateCode === "string" ? parsed.templateCode : null,
+    templateVersion: typeof parsed.templateVersion === "number" ? parsed.templateVersion : 1,
+    communicationType: typeof parsed.communicationType === "string" ? parsed.communicationType : "OPERATIONAL",
   });
 }
