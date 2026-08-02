@@ -23,6 +23,7 @@ public class AutomationDomainEventService implements AutomationDomainEvents {
             "PAYMENT_FAILED",
             "BOOKING_CREATED",
             "BOOKING_CANCELLED",
+            "MEMBERSHIP_CREATED",
             "MEMBERSHIP_RENEWED",
             "MEMBERSHIP_CANCELLED"
     );
@@ -50,13 +51,9 @@ public class AutomationDomainEventService implements AutomationDomainEvents {
         String eventType = normalizeEventType(event.eventType());
         validatePayload(event.payloadJson());
         DomainEventRecord stored = eventRepository.append(
-                event.organizationId(),
-                event.branchId(),
-                eventType,
-                required(event.eventId(), "eventId"),
-                Math.max(1, event.eventVersion()),
-                event.occurredAt() == null ? OffsetDateTime.now() : event.occurredAt(),
-                event.payloadJson()
+                event.organizationId(), event.branchId(), eventType,
+                required(event.eventId(), "eventId"), Math.max(1, event.eventVersion()),
+                event.occurredAt() == null ? OffsetDateTime.now() : event.occurredAt(), event.payloadJson()
         );
         return stored.id();
     }
@@ -94,8 +91,7 @@ public class AutomationDomainEventService implements AutomationDomainEvents {
         try {
             JsonNode actionNode = objectMapper.readTree(rule.actionConfigJson());
             ObjectNode action = actionNode != null && actionNode.isObject()
-                    ? (ObjectNode) actionNode.deepCopy()
-                    : objectMapper.createObjectNode();
+                    ? (ObjectNode) actionNode.deepCopy() : objectMapper.createObjectNode();
             JsonNode payload = objectMapper.readTree(event.payloadJson());
             ObjectNode variables = action.withObject("variables");
             variables.put("eventId", event.eventId());
@@ -134,9 +130,7 @@ public class AutomationDomainEventService implements AutomationDomainEvents {
     }
 
     private String required(String value, String field) {
-        if (value == null || value.isBlank()) {
-            throw new IllegalArgumentException(field + " is required");
-        }
+        if (value == null || value.isBlank()) throw new IllegalArgumentException(field + " is required");
         return value.trim();
     }
 }
