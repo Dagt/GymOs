@@ -1,5 +1,9 @@
 package com.gymos.memberships.application;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gymos.automations.api.operations.AutomationDomainEvents;
+import com.gymos.automations.api.operations.AutomationDomainEvents.DomainEvent;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.time.BusinessTime;
@@ -10,6 +14,8 @@ import com.gymos.memberships.infrastructure.MembershipRepository;
 import com.gymos.memberships.infrastructure.MembershipRepository.PlanForRenewal;
 import com.gymos.sales.api.operations.CreateMembershipEnrollmentSaleCommand;
 import com.gymos.sales.api.operations.SalesOperations;
+import java.time.OffsetDateTime;
+import java.util.Map;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,19 +26,25 @@ public class MembershipEnrollmentService {
 	private final MembershipOperationIdempotency idempotency;
 	private final SalesOperations salesOperations;
 	private final MembershipSaleResultResolver resultResolver;
+	private final AutomationDomainEvents domainEvents;
+	private final ObjectMapper objectMapper;
 
 	public MembershipEnrollmentService(
 			MembershipRepository membershipRepository,
 			MembershipPricingService pricingService,
 			MembershipOperationIdempotency idempotency,
 			SalesOperations salesOperations,
-			MembershipSaleResultResolver resultResolver
+			MembershipSaleResultResolver resultResolver,
+			AutomationDomainEvents domainEvents,
+			ObjectMapper objectMapper
 	) {
 		this.membershipRepository = membershipRepository;
 		this.pricingService = pricingService;
 		this.idempotency = idempotency;
 		this.salesOperations = salesOperations;
 		this.resultResolver = resultResolver;
+		this.domainEvents = domainEvents;
+		this.objectMapper = objectMapper;
 	}
 
 	@Transactional
@@ -74,6 +86,33 @@ public class MembershipEnrollmentService {
 				idempotency.resolve("membership-enrollment", command.clientId(), command.idempotencyKey()),
 				correlationId
 		));
-		return resultResolver.resolve(principal, sale, plan);
+		MembershipSaleResult result = resultResolver.resolve(principal, sale, plan);
+		publishCreated(principal, command, result);
+		return result;
+	}
+
+	private void publishCreated(
+			GymOsPrincipal principal,
+			EnrollMembershipCommand command,
+			MembershipSaleResult result
+	) {
+		try {
+			domainEvents.publish(new DomainEvent(
+					principal.organizationId(),
+					principal.branchId(),
+					"MEMBERSHIP_CREATED",
+					"membership-created:" + command.clientId() + ":" + result.saleId(),
+					1,
+					OffsetDateTime.now(),
+					objectMapper.writeValueAsString(Map.of(
+							"clientId", command.clientId().toString(),
+							"planId", command.planId().toString(),
+							"saleId", result.saleId().toString(),
+							"saleStatus", result.saleStatus() == null ? "UNKNOWN" : result.saleStatus()
+					))
+			));
+		} catch (JsonProcessingException exception) {
+			throw new IllegalStateException("Could not serialize membership enrollment event", exception);
+		}
 	}
 }
