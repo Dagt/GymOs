@@ -92,7 +92,7 @@ export type KioskContactUpdatePayload = {
   phone?: string | null;
 };
 
-export type KioskQuoteOperation = "RENEWAL" | "PLAN_CHANGE";
+export type KioskQuoteOperation = "ENROLLMENT" | "RENEWAL" | "PLAN_CHANGE";
 
 export type KioskQuote = {
   id: string;
