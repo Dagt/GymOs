@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.common.api.BusinessException;
 import com.gymos.payments.api.OnlinePaymentGateway;
+import com.gymos.payments.api.RecurringPaymentProvider;
 import com.gymos.selfservice.application.result.SelfServiceCapabilities;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -13,20 +14,27 @@ import org.springframework.stereotype.Component;
 public class SelfServiceCapabilityPolicy {
 	private final ObjectMapper objectMapper;
 	private final OnlinePaymentGateway paymentGateway;
+	private final RecurringPaymentProvider recurringPaymentProvider;
 
 	public SelfServiceCapabilityPolicy(ObjectMapper objectMapper) {
-		this(objectMapper, null);
+		this(objectMapper, null, null);
 	}
 
 	@Autowired
-	public SelfServiceCapabilityPolicy(ObjectMapper objectMapper, OnlinePaymentGateway paymentGateway) {
+	public SelfServiceCapabilityPolicy(
+			ObjectMapper objectMapper,
+			OnlinePaymentGateway paymentGateway,
+			RecurringPaymentProvider recurringPaymentProvider
+	) {
 		this.objectMapper = objectMapper;
 		this.paymentGateway = paymentGateway;
+		this.recurringPaymentProvider = recurringPaymentProvider;
 	}
 
 	public SelfServiceCapabilities resolve(String allowedActionsJson) {
 		JsonNode actions = parse(allowedActionsJson);
 		boolean onlinePaymentsReady = paymentGateway != null && paymentGateway.available();
+		boolean recurringPaymentsReady = recurringPaymentProvider != null && recurringPaymentProvider.available();
 		return new SelfServiceCapabilities(
 				enabled(actions, "membershipRenewal", "renewal", "renew"),
 				enabled(actions, "membershipPlanChange", "planChange", "changePlan"),
@@ -35,7 +43,7 @@ public class SelfServiceCapabilityPolicy {
 				enabled(actions, "profileUpdate", "contactUpdate", "profile"),
 				enabled(actions, "autopay", "recurringPayment", "domiciliation"),
 				onlinePaymentsReady,
-				false
+				recurringPaymentsReady
 		);
 	}
 
