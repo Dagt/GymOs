@@ -8,6 +8,8 @@ import com.gymos.automations.infrastructure.OutboundMessageRepository.CreateOutb
 import com.gymos.clients.api.operations.ClientLookupOperations;
 import com.gymos.clients.api.operations.SelfServiceClientProfile;
 import com.gymos.common.api.BusinessException;
+import com.gymos.communications.infrastructure.CommunicationPreferenceRepository;
+import com.gymos.communications.infrastructure.CommunicationPreferenceRepository.CommunicationPreference;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -18,15 +20,18 @@ import org.springframework.stereotype.Service;
 public class CustomerMessageQueue {
     private final ClientLookupOperations clients;
     private final OutboundMessageRepository messages;
+    private final CommunicationPreferenceRepository preferences;
     private final ObjectMapper objectMapper;
 
     public CustomerMessageQueue(
             ClientLookupOperations clients,
             OutboundMessageRepository messages,
+            CommunicationPreferenceRepository preferences,
             ObjectMapper objectMapper
     ) {
         this.clients = clients;
         this.messages = messages;
+        this.preferences = preferences;
         this.objectMapper = objectMapper;
     }
 
@@ -47,6 +52,7 @@ public class CustomerMessageQueue {
         String templateCode = text(config, "templateCode", snapshot.triggerType());
         int templateVersion = Math.max(1, config.path("templateVersion").asInt(1));
         String communicationType = text(config, "communicationType", "OPERATIONAL").toUpperCase(Locale.ROOT);
+        CommunicationPreference preference = preferences.resolve(snapshot.organizationId(), clientId);
         String subject = render(text(config, "subject", snapshot.ruleName()), variables, client);
         String body = render(text(config, "body", ""), variables, client);
         if (body.isBlank()) {
@@ -55,7 +61,14 @@ public class CustomerMessageQueue {
 
         for (String channel : channels) {
             String recipient = recipient(channel, client);
-            String status = recipient == null ? "UNDELIVERABLE" : "PENDING";
+            String status;
+            if (!preference.allows(channel, communicationType)) {
+                status = "CANCELLED";
+            } else if (recipient == null) {
+                status = "UNDELIVERABLE";
+            } else {
+                status = "PENDING";
+            }
             String idempotencyKey = String.join(":",
                     "customer-message",
                     snapshot.workItemId().toString(),
@@ -95,8 +108,8 @@ public class CustomerMessageQueue {
 
     private void addChannel(List<String> result, String value) {
         String channel = value == null ? "" : value.trim().toUpperCase(Locale.ROOT);
-        if (!List.of("EMAIL", "WHATSAPP", "PUSH").contains(channel)) {
-            throw new BusinessException("AUTOMATION_CHANNEL_UNSUPPORTED", "El canal configurado no esta soportado.");
+        if (!List.of("EMAIL", "WHATSAPP").contains(channel)) {
+            throw new BusinessException("AUTOMATION_CHANNEL_UNSUPPORTED", "El canal configurado no esta soportado en esta fase.");
         }
         if (!result.contains(channel)) result.add(channel);
     }
@@ -105,7 +118,6 @@ public class CustomerMessageQueue {
         return switch (channel) {
             case "EMAIL" -> normalizeEmail(client.email());
             case "WHATSAPP" -> normalizePhone(client.phone());
-            case "PUSH" -> null;
             default -> null;
         };
     }
