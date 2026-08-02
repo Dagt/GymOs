@@ -1,5 +1,9 @@
 package com.gymos.memberships.application;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gymos.automations.api.operations.AutomationDomainEvents;
+import com.gymos.automations.api.operations.AutomationDomainEvents.DomainEvent;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.memberships.api.operations.ChangeMembershipPlanOperationCommand;
 import com.gymos.memberships.api.operations.MembershipOperations;
@@ -10,7 +14,9 @@ import com.gymos.memberships.application.command.RenewMembershipCommand;
 import com.gymos.memberships.application.result.MembershipSaleResult;
 import com.gymos.memberships.infrastructure.MembershipRepository.MembershipSummary;
 import com.gymos.memberships.infrastructure.MembershipRepository.MembershipPeriodSummary;
+import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,15 +26,21 @@ public class MembershipService implements MembershipOperations {
 	private final MembershipQueryService queryService;
 	private final MembershipRenewalService renewalService;
 	private final MembershipPlanChangeService planChangeService;
+	private final AutomationDomainEvents domainEvents;
+	private final ObjectMapper objectMapper;
 
 	public MembershipService(
 			MembershipQueryService queryService,
 			MembershipRenewalService renewalService,
-			MembershipPlanChangeService planChangeService
+			MembershipPlanChangeService planChangeService,
+			AutomationDomainEvents domainEvents,
+			ObjectMapper objectMapper
 	) {
 		this.queryService = queryService;
 		this.renewalService = renewalService;
 		this.planChangeService = planChangeService;
+		this.domainEvents = domainEvents;
+		this.objectMapper = objectMapper;
 	}
 
 	@Transactional
@@ -53,7 +65,9 @@ public class MembershipService implements MembershipOperations {
 			RenewMembershipCommand command,
 			String correlationId
 	) {
-		return renewalService.renew(principal, membershipId, command, correlationId);
+		MembershipSaleResult result = renewalService.renew(principal, membershipId, command, correlationId);
+		publishRenewed(principal, membershipId, result.saleId(), result.saleStatus());
+		return result;
 	}
 
 	@Override
@@ -80,7 +94,9 @@ public class MembershipService implements MembershipOperations {
 			ChangeMembershipPlanCommand command,
 			String correlationId
 	) {
-		return planChangeService.changePlan(principal, membershipId, command, correlationId);
+		MembershipSaleResult result = planChangeService.changePlan(principal, membershipId, command, correlationId);
+		publishChanged(principal, membershipId, command.targetPlanId(), result.saleId(), result.saleStatus());
+		return result;
 	}
 
 	@Override
@@ -99,5 +115,47 @@ public class MembershipService implements MembershipOperations {
 				command.notes(),
 				command.idempotencyKey()
 		), correlationId));
+	}
+
+	private void publishRenewed(GymOsPrincipal principal, UUID membershipId, UUID saleId, String saleStatus) {
+		publish(principal, "MEMBERSHIP_RENEWED", "membership-renewed:" + membershipId + ":" + saleId,
+				Map.of(
+						"membershipId", membershipId.toString(),
+						"saleId", saleId.toString(),
+						"saleStatus", saleStatus == null ? "UNKNOWN" : saleStatus
+				));
+	}
+
+	private void publishChanged(
+			GymOsPrincipal principal,
+			UUID membershipId,
+			UUID targetPlanId,
+			UUID saleId,
+			String saleStatus
+	) {
+		publish(principal, "MEMBERSHIP_RENEWED", "membership-plan-changed:" + membershipId + ":" + saleId,
+				Map.of(
+						"membershipId", membershipId.toString(),
+						"targetPlanId", targetPlanId.toString(),
+						"saleId", saleId.toString(),
+						"saleStatus", saleStatus == null ? "UNKNOWN" : saleStatus,
+						"operation", "PLAN_CHANGE"
+				));
+	}
+
+	private void publish(GymOsPrincipal principal, String eventType, String eventId, Map<String, String> payload) {
+		try {
+			domainEvents.publish(new DomainEvent(
+					principal.organizationId(),
+					principal.branchId(),
+					eventType,
+					eventId,
+					1,
+					OffsetDateTime.now(),
+					objectMapper.writeValueAsString(payload)
+			));
+		} catch (JsonProcessingException exception) {
+			throw new IllegalStateException("Could not serialize membership domain event", exception);
+		}
 	}
 }
