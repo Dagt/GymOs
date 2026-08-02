@@ -27,7 +27,9 @@ public class DomainAutomationRuleService {
             "PAYMENT_COMPLETED",
             "PAYMENT_FAILED",
             "BOOKING_CREATED",
-            "BOOKING_CANCELLED"
+            "BOOKING_CANCELLED",
+            "WELLNESS_APPOINTMENT_CREATED",
+            "WELLNESS_APPOINTMENT_CANCELLED"
     );
 
     private final AutomationRepository automationRepository;
