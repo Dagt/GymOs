@@ -23,6 +23,8 @@ public class AutomationDomainEventService implements AutomationDomainEvents {
             "PAYMENT_FAILED",
             "BOOKING_CREATED",
             "BOOKING_CANCELLED",
+            "WELLNESS_APPOINTMENT_CREATED",
+            "WELLNESS_APPOINTMENT_CANCELLED",
             "MEMBERSHIP_CREATED",
             "MEMBERSHIP_RENEWED",
             "MEMBERSHIP_PLAN_CHANGED",
