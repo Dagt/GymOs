@@ -8,6 +8,8 @@ import com.gymos.automations.api.operations.AutomationDomainEvents.DomainEvent;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.memberships.api.operations.ChangeMembershipPlanOperationCommand;
+import com.gymos.memberships.api.operations.EnrollMembershipOperationCommand;
+import com.gymos.memberships.api.operations.MembershipEnrollmentOperations;
 import com.gymos.memberships.api.operations.MembershipOperations;
 import com.gymos.memberships.api.operations.MembershipQuoteOperations;
 import com.gymos.memberships.api.operations.MembershipQuoteOperations.Quote;
@@ -26,7 +28,6 @@ import com.gymos.selfservice.infrastructure.SelfServiceRepository.MembershipReco
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.SessionRecord;
 import java.time.Duration;
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -42,6 +43,7 @@ public class SelfServiceCheckoutService {
     private final SelfServiceCheckoutRepository checkoutRepository;
     private final MembershipQuoteOperations quoteOperations;
     private final MembershipOperations membershipOperations;
+    private final MembershipEnrollmentOperations enrollmentOperations;
     private final SelfServiceCapabilityPolicy capabilityPolicy;
     private final OnlinePaymentGateway paymentGateway;
     private final AutomationDomainEvents automationDomainEvents;
@@ -54,6 +56,7 @@ public class SelfServiceCheckoutService {
             SelfServiceCheckoutRepository checkoutRepository,
             MembershipQuoteOperations quoteOperations,
             MembershipOperations membershipOperations,
+            MembershipEnrollmentOperations enrollmentOperations,
             SelfServiceCapabilityPolicy capabilityPolicy,
             OnlinePaymentGateway paymentGateway,
             AutomationDomainEvents automationDomainEvents,
@@ -65,6 +68,7 @@ public class SelfServiceCheckoutService {
         this.checkoutRepository = checkoutRepository;
         this.quoteOperations = quoteOperations;
         this.membershipOperations = membershipOperations;
+        this.enrollmentOperations = enrollmentOperations;
         this.capabilityPolicy = capabilityPolicy;
         this.paymentGateway = paymentGateway;
         this.automationDomainEvents = automationDomainEvents;
@@ -95,25 +99,28 @@ public class SelfServiceCheckoutService {
             if (resolvedPlanId == null) {
                 throw new BusinessException("SELF_SERVICE_PLAN_REQUIRED", "Selecciona el plan destino.");
             }
+        } else if ("ENROLLMENT".equals(operation)) {
+            capabilityPolicy.require(capabilities, SelfServiceCapability.MEMBERSHIP_PLAN_CHANGE);
+            if (resolvedPlanId == null) {
+                throw new BusinessException("SELF_SERVICE_PLAN_REQUIRED", "Selecciona el plan que deseas contratar.");
+            }
+            if (!selfServiceRepository.memberships(
+                    session.organizationId(), session.branchId(), session.clientId()
+            ).isEmpty()) {
+                throw new BusinessException(
+                        "SELF_SERVICE_ENROLLMENT_NOT_AVAILABLE",
+                        "La membresia inicial solo esta disponible para socios sin membresias registradas."
+                );
+            }
+            membershipId = null;
         } else {
             throw new BusinessException("SELF_SERVICE_OPERATION_UNSUPPORTED", "La operacion comercial no esta soportada.");
         }
         Quote quote = quoteOperations.quote(kioskPrincipal(session), session.clientId(), resolvedPlanId);
         QuoteRecord stored = checkoutRepository.createQuote(new CreateQuoteData(
-                session.organizationId(),
-                session.branchId(),
-                session.id(),
-                session.clientId(),
-                membershipId,
-                operation,
-                quote.planId(),
-                quote.planName(),
-                quote.listPriceCents(),
-                quote.discountCents(),
-                quote.totalCents(),
-                quote.currency(),
-                benefitsJson(quote),
-                OffsetDateTime.now().plus(QUOTE_TTL)
+                session.organizationId(), session.branchId(), session.id(), session.clientId(), membershipId,
+                operation, quote.planId(), quote.planName(), quote.listPriceCents(), quote.discountCents(),
+                quote.totalCents(), quote.currency(), benefitsJson(quote), OffsetDateTime.now().plus(QUOTE_TTL)
         ));
         auditService.recordSystem(
                 session.organizationId(), session.branchId(), null,
@@ -153,33 +160,18 @@ public class SelfServiceCheckoutService {
         if (existing != null) return existing;
 
         CreateIntentResult providerIntent = paymentGateway.createIntent(new CreateIntentRequest(
-                key,
-                quote.totalCents(),
-                quote.currency(),
-                quote.operationType() + " - " + quote.planName(),
+                key, quote.totalCents(), quote.currency(), quote.operationType() + " - " + quote.planName(),
                 Map.of(
                         "quoteId", quote.id().toString(),
                         "sessionId", session.id().toString(),
                         "clientId", session.clientId().toString()
-                ),
-                successUrl,
-                cancelUrl
+                ), successUrl, cancelUrl
         ));
         PaymentIntentRecord intent = checkoutRepository.createPaymentIntent(new CreatePaymentIntentData(
-                session.organizationId(),
-                session.branchId(),
-                session.id(),
-                session.clientId(),
-                quote.id(),
-                paymentGateway.provider(),
-                providerIntent.providerIntentId(),
-                key,
-                quote.totalCents(),
-                quote.currency(),
-                normalizeProviderStatus(providerIntent.status()),
-                providerIntent.checkoutUrl(),
-                providerIntent.clientSecret(),
-                providerIntent.expiresAt()
+                session.organizationId(), session.branchId(), session.id(), session.clientId(), quote.id(),
+                paymentGateway.provider(), providerIntent.providerIntentId(), key, quote.totalCents(), quote.currency(),
+                normalizeProviderStatus(providerIntent.status()), providerIntent.checkoutUrl(),
+                providerIntent.clientSecret(), providerIntent.expiresAt()
         ));
         auditService.recordSystem(
                 session.organizationId(), session.branchId(), null,
@@ -197,9 +189,7 @@ public class SelfServiceCheckoutService {
         WebhookResult webhook = paymentGateway.verifyWebhook(payload, signature);
         PaymentIntentRecord intent = checkoutRepository.paymentIntentByProvider(
                 paymentGateway.provider(), webhook.providerIntentId()
-        ).orElseThrow(() -> new BusinessException(
-                "PAYMENT_INTENT_NOT_FOUND", "La intencion de pago no existe."
-        ));
+        ).orElseThrow(() -> new BusinessException("PAYMENT_INTENT_NOT_FOUND", "La intencion de pago no existe."));
         if (webhook.amountCents() != intent.amountCents()
                 || !webhook.currency().equalsIgnoreCase(intent.currency())) {
             checkoutRepository.updatePaymentStatus(
@@ -231,30 +221,32 @@ public class SelfServiceCheckoutService {
             throw new BusinessException("SELF_SERVICE_QUOTE_CONSUMED", "La cotizacion ya fue utilizada o expiro.");
         }
         GymOsPrincipal principal = new GymOsPrincipal(
-                null, intent.organizationId(), intent.branchId(),
-                "payment-webhook", "Pasarela", Set.of()
+                null, intent.organizationId(), intent.branchId(), "payment-webhook", "Pasarela", Set.of()
         );
         String operationKey = "kiosk-payment:" + intent.id();
         if ("RENEWAL".equals(quote.operationType())) {
             membershipOperations.renew(
-                    principal,
-                    quote.membershipId(),
+                    principal, quote.membershipId(),
                     new RenewMembershipOperationCommand(
                             "CARD_ONLINE", webhook.providerIntentId(), true,
                             "Pago confirmado por webhook", operationKey
-                    ),
-                    correlationId
+                    ), correlationId
             );
-            publishMembershipEvent(intent, quote, "MEMBERSHIP_RENEWED", webhook);
         } else if ("PLAN_CHANGE".equals(quote.operationType())) {
             membershipOperations.changePlan(
-                    principal,
-                    quote.membershipId(),
+                    principal, quote.membershipId(),
                     new ChangeMembershipPlanOperationCommand(
                             quote.planId(), "CARD_ONLINE", webhook.providerIntentId(), true,
                             "Pago confirmado por webhook", operationKey
-                    ),
-                    correlationId
+                    ), correlationId
+            );
+        } else if ("ENROLLMENT".equals(quote.operationType())) {
+            enrollmentOperations.enroll(
+                    principal,
+                    new EnrollMembershipOperationCommand(
+                            quote.clientId(), quote.planId(), "CARD_ONLINE", webhook.providerIntentId(), true,
+                            "Pago confirmado por webhook", operationKey
+                    ), correlationId
             );
         }
         checkoutRepository.updatePaymentStatus(
@@ -287,12 +279,7 @@ public class SelfServiceCheckoutService {
             String reason
     ) {
         automationDomainEvents.publish(new DomainEvent(
-                intent.organizationId(),
-                intent.branchId(),
-                eventType,
-                webhook.eventId(),
-                1,
-                webhook.occurredAt(),
+                intent.organizationId(), intent.branchId(), eventType, webhook.eventId(), 1, webhook.occurredAt(),
                 json(Map.of(
                         "paymentIntentId", intent.id().toString(),
                         "providerIntentId", webhook.providerIntentId(),
@@ -300,28 +287,6 @@ public class SelfServiceCheckoutService {
                         "currency", intent.currency(),
                         "status", eventType,
                         "reason", reason == null ? "" : reason
-                ))
-        ));
-    }
-
-    private void publishMembershipEvent(
-            PaymentIntentRecord intent,
-            QuoteRecord quote,
-            String eventType,
-            WebhookResult webhook
-    ) {
-        automationDomainEvents.publish(new DomainEvent(
-                intent.organizationId(),
-                intent.branchId(),
-                eventType,
-                eventType + ":" + intent.id(),
-                1,
-                webhook.occurredAt(),
-                json(Map.of(
-                        "membershipId", quote.membershipId().toString(),
-                        "clientId", quote.clientId().toString(),
-                        "planId", quote.planId().toString(),
-                        "paymentIntentId", intent.id().toString()
                 ))
         ));
     }
