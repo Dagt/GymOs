@@ -8,6 +8,8 @@ import {
   type StoredSession,
 } from "@/lib/api";
 
+type ToggleKey = "emailOperationalEnabled" | "whatsappOperationalEnabled" | "emailMarketingEnabled" | "whatsappMarketingEnabled";
+
 export function CommunicationPreferencesCard({ clientId, session }: { clientId: string; session: StoredSession }) {
   const [value, setValue] = useState<CommunicationPreference | null>(null);
   const [saving, setSaving] = useState(false);
@@ -40,7 +42,7 @@ export function CommunicationPreferencesCard({ clientId, session }: { clientId: 
     } finally { setSaving(false); }
   }
 
-  const toggle = (key: keyof CommunicationPreference) => setValue((current) => current ? { ...current, [key]: !current[key] } : current);
+  const toggle = (key: ToggleKey) => setValue((current) => current ? { ...current, [key]: !current[key] } : current);
 
   return (
     <section className="app-card p-5">
