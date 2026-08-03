@@ -1,17 +1,21 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
-import { clearKioskLaunch } from "@/lib/kiosk-launch";
+
+function clearEphemeralBrowserState() {
+  window.sessionStorage.clear();
+  window.history.replaceState(null, "", window.location.pathname);
+}
 
 export default function KioskLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     const closeRestoredPage = (event: PageTransitionEvent) => {
       if (!event.persisted) return;
-      clearKioskLaunch();
+      clearEphemeralBrowserState();
       window.location.replace("/kiosk/closed?reason=restored");
     };
     const blockBackNavigation = () => {
-      clearKioskLaunch();
+      clearEphemeralBrowserState();
       window.location.replace("/kiosk/closed?reason=navigation");
     };
 
