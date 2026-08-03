@@ -1,5 +1,6 @@
 export * from "./api/types";
 export * from "./api/auth";
+export * from "./api/communications";
 export {
   createBranch,
   createOrganization,
