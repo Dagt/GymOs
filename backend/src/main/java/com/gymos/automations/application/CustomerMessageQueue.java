@@ -3,6 +3,8 @@ package com.gymos.automations.application;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.automations.infrastructure.AutomationRuleSnapshotRepository.AutomationRuleSnapshot;
+import com.gymos.automations.infrastructure.CommunicationTemplateResolver;
+import com.gymos.automations.infrastructure.CommunicationTemplateResolver.ResolvedTemplate;
 import com.gymos.automations.infrastructure.OutboundMessageRepository;
 import com.gymos.automations.infrastructure.OutboundMessageRepository.CreateOutboundMessageData;
 import com.gymos.clients.api.operations.ClientLookupOperations;
@@ -21,17 +23,20 @@ public class CustomerMessageQueue {
     private final ClientLookupOperations clients;
     private final OutboundMessageRepository messages;
     private final CommunicationPreferenceRepository preferences;
+    private final CommunicationTemplateResolver templates;
     private final ObjectMapper objectMapper;
 
     public CustomerMessageQueue(
             ClientLookupOperations clients,
             OutboundMessageRepository messages,
             CommunicationPreferenceRepository preferences,
+            CommunicationTemplateResolver templates,
             ObjectMapper objectMapper
     ) {
         this.clients = clients;
         this.messages = messages;
         this.preferences = preferences;
+        this.templates = templates;
         this.objectMapper = objectMapper;
     }
 
@@ -49,17 +54,30 @@ public class CustomerMessageQueue {
         }
 
         UUID batchId = UUID.randomUUID();
-        String templateCode = text(config, "templateCode", snapshot.triggerType());
-        int templateVersion = Math.max(1, config.path("templateVersion").asInt(1));
+        String templateCode = text(config, "templateCode", snapshot.triggerType()).toUpperCase(Locale.ROOT);
+        String locale = text(config, "locale", "es-MX");
         String communicationType = text(config, "communicationType", "OPERATIONAL").toUpperCase(Locale.ROOT);
         CommunicationPreference preference = preferences.resolve(snapshot.organizationId(), clientId);
-        String subject = render(text(config, "subject", snapshot.ruleName()), variables, client);
-        String body = render(text(config, "body", ""), variables, client);
-        if (body.isBlank()) {
-            throw new BusinessException("AUTOMATION_MESSAGE_BODY_REQUIRED", "La comunicacion necesita contenido.");
-        }
 
         for (String channel : channels) {
+            ResolvedTemplate resolved = templates.active(
+                    snapshot.organizationId(), snapshot.branchId(), templateCode, channel, locale
+            ).orElse(null);
+            int templateVersion = resolved == null
+                    ? Math.max(1, config.path("templateVersion").asInt(1))
+                    : resolved.version();
+            String subjectTemplate = resolved == null
+                    ? text(config, "subject", snapshot.ruleName())
+                    : resolved.subject();
+            String bodyTemplate = resolved == null
+                    ? text(config, "body", "")
+                    : resolved.body();
+            String subject = render(subjectTemplate == null ? "" : subjectTemplate, variables, client);
+            String body = render(bodyTemplate, variables, client);
+            if (body.isBlank()) {
+                throw new BusinessException("AUTOMATION_MESSAGE_BODY_REQUIRED", "La comunicacion necesita contenido.");
+            }
+
             String recipient = recipient(channel, client);
             String status;
             if (!preference.allows(channel, communicationType)) {
@@ -77,20 +95,10 @@ public class CustomerMessageQueue {
             );
             messages.enqueue(new CreateOutboundMessageData(
                     batchId,
-                    snapshot.organizationId(),
-                    snapshot.branchId(),
-                    snapshot.ruleId(),
-                    snapshot.workItemId(),
-                    clientId,
-                    channel,
-                    recipient,
+                    snapshot.organizationId(), snapshot.branchId(), snapshot.ruleId(), snapshot.workItemId(),
+                    clientId, channel, recipient,
                     "EMAIL".equals(channel) ? subject : null,
-                    body,
-                    templateCode,
-                    templateVersion,
-                    communicationType,
-                    status,
-                    idempotencyKey
+                    body, templateCode, templateVersion, communicationType, status, idempotencyKey
             ));
         }
         return batchId;
@@ -98,11 +106,8 @@ public class CustomerMessageQueue {
 
     private List<String> channels(JsonNode node) {
         List<String> result = new ArrayList<>();
-        if (node.isArray()) {
-            node.forEach(item -> addChannel(result, item.asText("")));
-        } else if (node.isTextual()) {
-            addChannel(result, node.asText());
-        }
+        if (node.isArray()) node.forEach(item -> addChannel(result, item.asText("")));
+        else if (node.isTextual()) addChannel(result, node.asText());
         return result;
     }
 
@@ -145,6 +150,9 @@ public class CustomerMessageQueue {
                 var entry = fields.next();
                 result = result.replace("{{" + entry.getKey() + "}}", entry.getValue().asText(""));
             }
+        }
+        if (result.matches("(?s).*\\{\\{[A-Za-z][A-Za-z0-9_]*}}.*")) {
+            throw new BusinessException("COMMUNICATION_TEMPLATE_VARIABLE_MISSING", "Faltan variables para renderizar la plantilla.");
         }
         return result;
     }
