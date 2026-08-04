@@ -31,6 +31,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -38,7 +39,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-@Testcontainers
+@Tag("postgres-integration")
+@Testcontainers(disabledWithoutDocker = true)
 class BookingMembershipPlanIntegrationTests {
 	@Container
 	static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18-alpine");
@@ -80,7 +82,8 @@ class BookingMembershipPlanIntegrationTests {
 				new DefaultEligibilityPolicy(new EligibilityRepository(jdbcClient)),
 				new ClientBookingConflictRepository(jdbcClient),
 				new ResourceScheduleResolver(new ObjectMapper()),
-				new AuditService(jdbcClient)
+				new AuditService(jdbcClient),
+				org.mockito.Mockito.mock(org.springframework.context.ApplicationEventPublisher.class)
 		);
 		seedTenantCatalogAndMembers();
 	}
@@ -155,6 +158,29 @@ class BookingMembershipPlanIntegrationTests {
 		assertThat(bookingService.resources(principal))
 				.extracting(ResourceRecord::id)
 				.doesNotContain(resource.id());
+	}
+
+	@Test
+	void availabilityStopsAtClosingTimeWithoutWrappingToTheNextDay() {
+		ResourceRecord resource = bookingService.createResource(
+				principal,
+				new CreateResourceCommand(
+						"Cancha vespertina", "COURT", 1, 120,
+						LocalTime.of(12, 0), LocalTime.of(22, 0), null, java.util.List.of()
+				),
+				"availability-closing-time"
+		);
+
+		var slots = bookingService.availability(principal, resource.id(), BusinessTime.today().plusDays(2));
+
+		assertThat(slots).hasSize(5);
+		assertThat(slots)
+				.extracting(slot -> slot.startsAt().toLocalTime())
+				.containsExactly(
+						LocalTime.of(12, 0), LocalTime.of(14, 0), LocalTime.of(16, 0),
+						LocalTime.of(18, 0), LocalTime.of(20, 0)
+				);
+		assertThat(slots.getLast().endsAt().toLocalTime()).isEqualTo(LocalTime.of(22, 0));
 	}
 
 	private void seedTenantCatalogAndMembers() {

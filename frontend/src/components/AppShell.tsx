@@ -43,17 +43,21 @@ export function AppShell({
   const router = useRouter();
   const [resolvedBranch, setResolvedBranch] = useState<BranchOption | null>(null);
   const [availableBranches, setAvailableBranches] = useState<BranchOption[]>([]);
+  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [switchingBranch, setSwitchingBranch] = useState(false);
+  const [failedBrandLogoUrl, setFailedBrandLogoUrl] = useState<string | null>(null);
 
   const consoleType = resolveUserConsole(session.user);
   const role = getConsoleProfile(session.user);
+  const platformAdmin = isPlatformAdmin(session.user);
+  const supportMode = isSupportMode(session.user);
   const hasBranch = mode === "operation" ? true : Boolean(branchName || session.user.branchId);
   const visibleBranch =
     branchName
     ?? (resolvedBranch?.branchId === session.user.branchId ? resolvedBranch.name : null)
     ?? (session.user.branchId ? "Sucursal seleccionada" : "Sin sucursal");
   const permissionSet = new Set(session.user.permissions);
-  const showStaticBranchChip = variant !== "platform" && !isPlatformAdmin(session.user) && consoleType !== "TENANT_OWNER";
+  const showStaticBranchChip = variant !== "platform" && !platformAdmin && consoleType !== "TENANT_OWNER";
   const isSingleBranchOperationalUser =
     (consoleType === "TENANT_MANAGER" || consoleType === "RECEPTION" || consoleType === "COACH")
     && availableBranches.length <= 1;
@@ -70,9 +74,13 @@ export function AppShell({
     variant,
     visibleBranch,
   });
+  const showBrandLogo = Boolean(brand.logoUrl) && failedBrandLogoUrl !== brand.logoUrl;
+  const activeNavigationLabel = sections
+    .flatMap((section) => section.links)
+    .find((item) => isActive(pathname, item.href))?.label ?? "Navegación";
 
   useEffect(() => {
-    if (variant === "platform" || (isPlatformAdmin(session.user) && !isSupportMode(session.user))) {
+    if (variant === "platform" || (platformAdmin && !supportMode)) {
       return;
     }
     let cancelled = false;
@@ -95,13 +103,13 @@ export function AppShell({
     return () => {
       cancelled = true;
     };
-  }, [branchName, session.accessToken, session.user.branchId, variant]);
+  }, [branchName, platformAdmin, session.accessToken, session.user.branchId, supportMode, variant]);
 
   useEffect(() => {
     if (
       hasBranch
       || variant === "platform"
-      || isPlatformAdmin(session.user)
+      || platformAdmin
       || consoleType === "TENANT_OWNER"
       || !session.user.organizationId
     ) {
@@ -137,7 +145,7 @@ export function AppShell({
     return () => {
       cancelled = true;
     };
-  }, [consoleType, hasBranch, pathname, router, session.accessToken, session.user.branchId, session.user.organizationId, session.user.userId, variant]);
+  }, [consoleType, hasBranch, pathname, platformAdmin, router, session.accessToken, session.user.branchId, session.user.organizationId, session.user.userId, variant]);
 
   function logout() {
     clearSession();
@@ -161,12 +169,14 @@ export function AppShell({
   }
 
   return (
-    <main className={`admin-console ${hideSidebar ? "no-sidebar" : ""} ${isSupportMode(session.user) ? "support-mode" : ""}`}>
+    <main className={`admin-console ${hideSidebar ? "no-sidebar" : ""} ${supportMode ? "support-mode" : ""}`}>
       {!hideSidebar ? (
         <aside className="admin-sidebar">
           <div className="admin-sidebar-brand">
-            <span className={brand.logoUrl ? "with-logo" : undefined}>
-              {brand.logoUrl ? <Image alt="" height={48} src={brand.logoUrl} unoptimized width={48} /> : "G"}
+            <span className={showBrandLogo ? "with-logo" : undefined}>
+              {showBrandLogo ? (
+                <Image alt="" height={48} onError={() => setFailedBrandLogoUrl(brand.logoUrl ?? null)} src={brand.logoUrl!} unoptimized width={48} />
+              ) : brand.name.slice(0, 1).toUpperCase()}
             </span>
             <div>
               <strong>{brand.name}</strong>
@@ -180,13 +190,29 @@ export function AppShell({
             <span>{role.description}</span>
           </section>
 
-          {isPlatformAdmin(session.user) && !pathname.startsWith("/platform") ? (
+          {platformAdmin && !pathname.startsWith("/platform") ? (
             <Link className="admin-platform-return" href="/platform/gymnasiums">
               Volver a administracion de gimnasios
             </Link>
           ) : null}
 
-          <nav aria-label="Menu principal">
+          <button
+            aria-controls="admin-main-navigation"
+            aria-expanded={mobileNavigationOpen}
+            className="admin-mobile-nav-toggle"
+            onClick={() => setMobileNavigationOpen((current) => !current)}
+            type="button"
+          >
+            <span>Menú</span>
+            <strong>{activeNavigationLabel}</strong>
+            <span aria-hidden="true">{mobileNavigationOpen ? "Cerrar" : "Abrir"}</span>
+          </button>
+
+          <nav
+            aria-label="Menú principal"
+            className={mobileNavigationOpen ? "mobile-open" : undefined}
+            id="admin-main-navigation"
+          >
             {sections.map((section) => (
               <details className="admin-nav-section" key={section.title} open={sections.length === 1 || section.links.some((item) => isActive(pathname, item.href))}>
                 <summary>{section.title}</summary>
@@ -196,6 +222,7 @@ export function AppShell({
                     className={isActive(pathname, item.href) ? "active" : undefined}
                     href={item.href}
                     key={item.href}
+                    onClick={() => setMobileNavigationOpen(false)}
                   >
                     <strong>{item.label}</strong>
                     <span>{item.hint}</span>
@@ -214,7 +241,7 @@ export function AppShell({
       ) : null}
 
       <section className="admin-workspace">
-        {isSupportMode(session.user) ? (
+        {supportMode ? (
           <section className="support-banner" role="status">
             <strong>Modo soporte GymOS</strong>
             <span>Estas operando dentro de este gimnasio para apoyar al cliente. Las acciones quedan auditadas.</span>
@@ -261,8 +288,8 @@ export function AppShell({
                 Caja, recepcion, membresias, reservas y kiosco necesitan una sucursal activa para operar sin mezclar sedes.
               </span>
             </div>
-            <Link href={isPlatformAdmin(session.user) ? "/platform/gymnasiums" : "/settings/organization"}>
-              {isPlatformAdmin(session.user) ? "Ir a gimnasios" : "Ir a sucursales"}
+            <Link href={platformAdmin ? "/platform/gymnasiums" : "/settings/organization"}>
+              {platformAdmin ? "Ir a gimnasios" : "Ir a sucursales"}
             </Link>
           </section>
         ) : null}
@@ -289,4 +316,3 @@ export function LoadingScreen({ text = "Cargando..." }: { text?: string }) {
 export function InlineError({ message }: { message: string }) {
   return <FormError message={message} />;
 }
-

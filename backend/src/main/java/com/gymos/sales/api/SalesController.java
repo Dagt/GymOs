@@ -3,6 +3,8 @@ package com.gymos.sales.api;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.sales.application.SalesService;
+import com.gymos.sales.application.SalesProviderPaymentService;
+import com.gymos.payments.api.MercadoPagoPointOperations;
 import com.gymos.sales.application.command.CreateSaleCommand;
 import com.gymos.sales.application.command.ManualPaymentCommand;
 import com.gymos.sales.application.command.RefundItemCommand;
@@ -49,9 +51,19 @@ import org.springframework.web.multipart.MultipartFile;
 @RequestMapping("/api/v1/sales")
 public class SalesController {
 	private final SalesService salesService;
+	private final SalesProviderPaymentService providerPaymentService;
 
-	public SalesController(SalesService salesService) {
+	public SalesController(SalesService salesService, SalesProviderPaymentService providerPaymentService) {
 		this.salesService = salesService;
+		this.providerPaymentService = providerPaymentService;
+	}
+
+	@PostMapping("/payments/{paymentId}/mercado-pago-order")
+	MercadoPagoPointOperations.PointOrderResult createMercadoPagoOrder(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID paymentId
+	) {
+		return providerPaymentService.createMercadoPagoOrder(principal, paymentId);
 	}
 
 	@GetMapping
@@ -192,7 +204,7 @@ public class SalesController {
 	}
 
 	public record ManualPaymentRequest(
-			@NotNull @Pattern(regexp = "CASH|TRANSFER|CARD_MANUAL") String method,
+			@NotNull @Pattern(regexp = "CASH|TRANSFER|CARD_MANUAL|CARD_MERCADO_PAGO") String method,
 			@Min(1) long amountCents,
 			@Size(max = 160) String reference,
 			@Size(max = 512) String receiptObjectKey,

@@ -1,11 +1,15 @@
-import { normalizePayload, publicApiFetch } from "./client";
+import { apiFetch, normalizePayload, publicApiFetch } from "./client";
 import type {
   KioskContactUpdatePayload,
+  KioskAutopayMandate,
+  KioskAutopaySetupResult,
+  KioskAutopayTerms,
   KioskMembershipCheckoutPayload,
+  KioskMembershipEnrollmentCheckoutPayload,
   KioskPlanOption,
+  KioskMembershipQuote,
   KioskPlanChangeCheckoutPayload,
   KioskProfile,
-  KioskSessionContext,
   KioskSessionResponse,
   KioskSummaryResponse,
   RenewMembershipResponse,
@@ -13,17 +17,15 @@ import type {
 
 export async function createKioskSession(
   terminalCode: string,
-  context: KioskSessionContext = {},
+  accessToken: string,
 ): Promise<KioskSessionResponse> {
-  const headers: HeadersInit = {};
-  if (context.organizationId && context.branchId) {
-    headers["X-GymOS-Organization-Id"] = context.organizationId;
-    headers["X-GymOS-Branch-Id"] = context.branchId;
-  }
-  return publicApiFetch<KioskSessionResponse>(`/self-service/terminals/${terminalCode}/sessions`, {
+  return apiFetch<KioskSessionResponse>(`/self-service/terminals/${terminalCode}/sessions`, accessToken, {
     method: "POST",
-    headers,
   });
+}
+
+export async function launchKioskSession(accessToken: string): Promise<KioskSessionResponse> {
+  return apiFetch<KioskSessionResponse>("/self-service/kiosk-sessions", accessToken, { method: "POST" });
 }
 
 export async function verifyKioskSession(
@@ -57,6 +59,16 @@ export async function getKioskMembershipOptions(
   });
 }
 
+export async function getKioskMembershipQuote(
+  sessionId: string,
+  sessionToken: string,
+  planId: string,
+): Promise<KioskMembershipQuote> {
+  return publicApiFetch<KioskMembershipQuote>(`/self-service/sessions/${sessionId}/membership-quotes/${planId}`, {
+    headers: kioskSessionHeaders(sessionToken),
+  });
+}
+
 export async function renewMembershipFromKiosk(
   sessionId: string,
   sessionToken: string,
@@ -65,6 +77,21 @@ export async function renewMembershipFromKiosk(
 ): Promise<RenewMembershipResponse> {
   return publicApiFetch<RenewMembershipResponse>(
     `/self-service/sessions/${sessionId}/membership-renewals/${membershipId}`,
+    {
+      method: "POST",
+      headers: kioskSessionHeaders(sessionToken),
+      body: JSON.stringify(normalizePayload(payload)),
+    },
+  );
+}
+
+export async function enrollMembershipFromKiosk(
+  sessionId: string,
+  sessionToken: string,
+  payload: KioskMembershipEnrollmentCheckoutPayload,
+): Promise<RenewMembershipResponse> {
+  return publicApiFetch<RenewMembershipResponse>(
+    `/self-service/sessions/${sessionId}/membership-enrollments`,
     {
       method: "POST",
       headers: kioskSessionHeaders(sessionToken),
@@ -96,6 +123,16 @@ export async function endKioskSession(sessionId: string, sessionToken: string): 
   });
 }
 
+export async function resetKioskSession(
+  sessionId: string,
+  sessionToken: string,
+): Promise<KioskSessionResponse> {
+  return publicApiFetch<KioskSessionResponse>(`/self-service/sessions/${sessionId}/reset`, {
+    method: "POST",
+    headers: kioskSessionHeaders(sessionToken),
+  });
+}
+
 export async function updateKioskContactData(
   sessionId: string,
   sessionToken: string,
@@ -106,6 +143,62 @@ export async function updateKioskContactData(
     headers: kioskSessionHeaders(sessionToken),
     body: JSON.stringify(normalizePayload(payload)),
   });
+}
+
+export async function getKioskAutopayTerms(
+  sessionId: string,
+  sessionToken: string,
+  membershipId: string,
+): Promise<KioskAutopayTerms> {
+  return publicApiFetch<KioskAutopayTerms>(
+    `/self-service/sessions/${sessionId}/autopay/${membershipId}/terms`,
+    { headers: kioskSessionHeaders(sessionToken) },
+  );
+}
+
+export async function getKioskAutopayMandate(
+  sessionId: string,
+  sessionToken: string,
+  membershipId: string,
+): Promise<KioskAutopayMandate | undefined> {
+  return publicApiFetch<KioskAutopayMandate | undefined>(
+    `/self-service/sessions/${sessionId}/autopay/${membershipId}`,
+    { headers: kioskSessionHeaders(sessionToken) },
+  );
+}
+
+export async function setupKioskAutopay(
+  sessionId: string,
+  sessionToken: string,
+  membershipId: string,
+  termsVersion: string,
+  idempotencyKey: string,
+  replaceExisting = false,
+): Promise<KioskAutopaySetupResult> {
+  return publicApiFetch<KioskAutopaySetupResult>(
+    `/self-service/sessions/${sessionId}/autopay/${membershipId}/setup`,
+    {
+      method: "POST",
+      headers: kioskSessionHeaders(sessionToken),
+      body: JSON.stringify({ termsVersion, accepted: true, idempotencyKey, replaceExisting }),
+    },
+  );
+}
+
+export async function revokeKioskAutopay(
+  sessionId: string,
+  sessionToken: string,
+  membershipId: string,
+  reason: string,
+): Promise<KioskAutopayMandate> {
+  return publicApiFetch<KioskAutopayMandate>(
+    `/self-service/sessions/${sessionId}/autopay/${membershipId}/revoke`,
+    {
+      method: "POST",
+      headers: kioskSessionHeaders(sessionToken),
+      body: JSON.stringify({ reason }),
+    },
+  );
 }
 
 function kioskSessionHeaders(sessionToken: string): HeadersInit {

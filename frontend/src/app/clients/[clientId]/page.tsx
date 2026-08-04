@@ -128,6 +128,8 @@ export default function ClientDetailPage() {
           action={controller.membershipAction}
           changingMembershipId={controller.changingMembershipId}
           membershipQuote={controller.membershipQuote}
+          manualCardEnabled={controller.manualCardEnabled}
+          mercadoPagoEnabled={controller.mercadoPagoEnabled}
           plans={controller.plans}
           renewMethod={controller.renewMethod}
           renewReference={controller.renewReference}

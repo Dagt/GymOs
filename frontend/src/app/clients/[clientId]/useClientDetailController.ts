@@ -1,15 +1,17 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import type { FieldErrorMap } from "@/components/FormFields";
 import {
   changeMembershipPlan,
+  createMercadoPagoPointOrder,
   enrollMembership,
   getClient,
   getClientMemberships,
   getMembershipPeriods,
   getMembershipQuote,
+  getPaymentConfiguration,
   getPlans,
   getStoredSession,
   renewMembership,
@@ -59,6 +61,9 @@ export function useClientDetailController() {
   const [saving, setSaving] = useState(false);
   const [showEditDrawer, setShowEditDrawer] = useState(false);
   const [membershipAction, setMembershipAction] = useState<MembershipAction | null>(null);
+  const [manualCardEnabled, setManualCardEnabled] = useState(false);
+  const [mercadoPagoEnabled, setMercadoPagoEnabled] = useState(false);
+  const membershipOperationKey = useRef<string | null>(null);
 
   const canEditClient = useMemo(() => hasPermission(session, "client.update"), [session]);
   const canReadMemberships = useMemo(() => hasPermission(session, "membership.read"), [session]);
@@ -149,6 +154,20 @@ export function useClientDetailController() {
             if (active) setError(planError instanceof Error ? planError.message : "No fue posible cargar planes.");
           }
         }
+
+        if (mayLoadPlans && hasPermission(storedSession, "payment.settings.read")) {
+          try {
+            const paymentConfiguration = await getPaymentConfiguration(storedSession.accessToken);
+            if (active) {
+              setManualCardEnabled(paymentConfiguration.receptionManualTerminalEnabled);
+              setMercadoPagoEnabled(paymentConfiguration.mercadoPagoReady);
+            }
+          } catch (paymentError) {
+            if (active) {
+              setError(paymentError instanceof Error ? paymentError.message : "No fue posible cargar los medios de pago.");
+            }
+          }
+        }
       } catch (exception) {
         if (active) {
           setError(exception instanceof Error ? exception.message : "No fue posible cargar socio.");
@@ -218,14 +237,17 @@ export function useClientDetailController() {
       const response = await renewMembership(session.accessToken, activeMembership.id, {
         method: renewMethod,
         reference: renewReference,
-        validateNow: renewValidateNow,
+        validateNow: renewMethod === "CARD_MERCADO_PAGO" ? false : renewValidateNow,
         notes: "Renovacion desde ficha de socio",
+        idempotencyKey: operationKey("renew", activeMembership.id),
       });
+      await sendToMercadoPagoPoint(response.paymentId);
       const snapshot = await loadMembershipSnapshot(session.accessToken, params.clientId);
       setMemberships(snapshot.memberships);
       setMembershipPeriods(snapshot.periodsByMembership);
       setRenewReference("");
       setMembershipAction(null);
+      membershipOperationKey.current = null;
       setMessage(
         response.membership
           ? `Membresia renovada hasta ${formatDay(response.membership.endsOn)} por ${formatMoney(response.totalCents, response.currency)}.`
@@ -253,14 +275,19 @@ export function useClientDetailController() {
           planId: selectedPlan.id,
           method: renewMethod,
           reference: renewReference,
-          validateNow: renewValidateNow,
+          validateNow: renewMethod === "CARD_MERCADO_PAGO" ? false : renewValidateNow,
+          idempotencyKey: operationKey("enroll", selectedPlan.id),
           notes: "Venta de membresía inicial",
         });
+        await sendToMercadoPagoPoint(res.paymentId);
         const snapshot = await loadMembershipSnapshot(session.accessToken, params.clientId);
         setMemberships(snapshot.memberships);
         setMembershipPeriods(snapshot.periodsByMembership);
         setMembershipAction(null);
-        setMessage(`Membresía inicial asignada por ${formatMoney(res.totalCents, res.currency)}. Venta ${res.saleNumber} creada.`);
+        membershipOperationKey.current = null;
+        setMessage(renewMethod === "CARD_MERCADO_PAGO"
+          ? `Cobro de la venta ${res.saleNumber} enviado a Point. La membresia se activara al confirmar el webhook.`
+          : `Membresía inicial asignada por ${formatMoney(res.totalCents, res.currency)}. Venta ${res.saleNumber} creada.`);
         return;
       }
 
@@ -268,15 +295,18 @@ export function useClientDetailController() {
         targetPlanId,
         method: renewMethod,
         reference: renewReference,
-        validateNow: renewValidateNow,
+        validateNow: renewMethod === "CARD_MERCADO_PAGO" ? false : renewValidateNow,
         notes: "Cambio de plan desde ficha de socio",
+        idempotencyKey: operationKey("change", activeMembership.id, targetPlanId),
       };
       const response = await changeMembershipPlan(session.accessToken, activeMembership.id, payload);
+      await sendToMercadoPagoPoint(response.paymentId);
       const snapshot = await loadMembershipSnapshot(session.accessToken, params.clientId);
       setMemberships(snapshot.memberships);
       setMembershipPeriods(snapshot.periodsByMembership);
       setRenewReference("");
       setMembershipAction(null);
+      membershipOperationKey.current = null;
       setMessage(
         response.membership
           ? `Plan cambiado a ${response.membership.planName} por ${formatMoney(response.totalCents, response.currency)}.`
@@ -306,6 +336,7 @@ export function useClientDetailController() {
     }
     setError(null);
     setMessage(null);
+    membershipOperationKey.current = null;
     if (type === "change") {
       setTargetPlanId((current) => {
         if (!activeMembership.id) {
@@ -331,6 +362,22 @@ export function useClientDetailController() {
     await renew(membershipAction.membership);
   }
 
+  function selectRenewMethod(method: RenewMembershipPayload["method"]) {
+    setRenewMethod(method);
+    if (method === "CARD_MERCADO_PAGO") setRenewValidateNow(false);
+  }
+
+  function operationKey(...parts: string[]) {
+    membershipOperationKey.current ??= `client-membership:${parts.join(":")}:${crypto.randomUUID()}`;
+    return membershipOperationKey.current;
+  }
+
+  async function sendToMercadoPagoPoint(paymentId: string | null) {
+    if (renewMethod !== "CARD_MERCADO_PAGO") return;
+    if (!paymentId) throw new Error("La venta no devolvio el pago para enviar a Point.");
+    await createMercadoPagoPointOrder(session!.accessToken, paymentId);
+  }
+
   return {
     canAssignBenefits,
     canChangeMembership,
@@ -353,6 +400,8 @@ export function useClientDetailController() {
     memberships,
     membershipPeriods,
     membershipQuote: visibleMembershipQuote(membershipQuote, membershipAction, targetPlanId),
+    manualCardEnabled,
+    mercadoPagoEnabled,
     message,
     plans,
     renewMethod,
@@ -362,7 +411,7 @@ export function useClientDetailController() {
     saving,
     session,
     setMembershipAction,
-    setRenewMethod,
+    setRenewMethod: selectRenewMethod,
     setRenewReference,
     setRenewValidateNow,
     setShowEditDrawer,

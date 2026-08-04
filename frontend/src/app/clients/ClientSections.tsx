@@ -133,6 +133,8 @@ type CreateClientDrawerProps = {
   createdClientId: string | null;
   errors: FieldErrorMap;
   form: ClientRegistrationForm;
+  manualCardEnabled: boolean;
+  mercadoPagoEnabled: boolean;
   open: boolean;
   plans: PlanSummary[];
   saving: boolean;
@@ -146,6 +148,8 @@ export function CreateClientDrawer({
   createdClientId,
   errors,
   form,
+  manualCardEnabled,
+  mercadoPagoEnabled,
   open,
   plans,
   saving,
@@ -217,15 +221,16 @@ export function CreateClientDrawer({
                     <select className="app-input font-bold" id="paymentMethod" onChange={(event) => onFormChange("paymentMethod", event.target.value)} value={form.paymentMethod}>
                       <option value="CASH">Efectivo</option>
                       <option value="TRANSFER">Transferencia</option>
-                      <option value="CARD_MANUAL">Tarjeta manual</option>
+                      {manualCardEnabled ? <option value="CARD_MANUAL">Tarjeta manual</option> : null}
+                      {mercadoPagoEnabled ? <option value="CARD_MERCADO_PAGO">Mercado Pago Point</option> : null}
                     </select>
                   </label>
                   <TextField label="Referencia de pago" name="paymentReference" required={false} value={form.paymentReference} onChange={(value) => onFormChange("paymentReference", value)} />
                 </div>
 
                 <label className="flex items-center gap-3 p-4 rounded-xl bg-white border border-[var(--brand-line)] cursor-pointer group shadow-sm">
-                  <input checked={form.validateNow} className="w-5 h-5 rounded border-2 border-gray-300 text-[color:var(--brand-primary)] focus:ring-[color:var(--brand-primary)]/20" onChange={(event) => onFormChange("validateNow", event.target.checked)} type="checkbox" />
-                  <span className="text-sm font-black text-gray-700 group-hover:text-[color:var(--brand-primary)] transition-colors">Validar pago automáticamente</span>
+                  <input checked={form.validateNow} className="w-5 h-5 rounded border-2 border-gray-300 text-[color:var(--brand-primary)] focus:ring-[color:var(--brand-primary)]/20" disabled={form.paymentMethod === "CARD_MERCADO_PAGO"} onChange={(event) => onFormChange("validateNow", event.target.checked)} type="checkbox" />
+                  <span className="text-sm font-black text-gray-700 group-hover:text-[color:var(--brand-primary)] transition-colors">{form.paymentMethod === "CARD_MERCADO_PAGO" ? "Confirmación automática por webhook" : "Validar pago automáticamente"}</span>
                 </label>
               </div>
             ) : null}

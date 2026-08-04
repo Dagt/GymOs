@@ -43,6 +43,7 @@ Ya contenidas en `main`, sin commits exclusivos: `backup/system-updated-2026-07-
 | Rama activa/divergente | Situación | Acción |
 |---|---|---|
 | `feature/coaches-workouts` | Coaches V1 estabilizado hasta `e718fdf`; la versión cerrada de Wellness fue reaplicada y validada en `922c0ce`/`4eac4d5`. | Publicar la documentación actualizada y abrir PR hacia `main`. |
+| `feature/automations-self-service-kiosk` | Kiosco de navegador, proveedores, domiciliación completa, automatizaciones durables, telemetría tenant, historiales paginados y suites PostgreSQL/Stripe opt-in en desarrollo sobre `origin/main`. | Ejecutar las suites de infraestructura con Docker y secretos Stripe test, publicar evidencia y cerrar hardening antes de PR. |
 | `feature/wellness-services` | Su commit funcional `4a7a7d1` ya fue auditado y reaplicado sobre el árbol actual; la rama remota conserva historia divergente. | Mantener como referencia; no fusionar de nuevo. |
 | `feature/code-simplification-rebasion-and-refactor` | Un commit exclusivo y seis de main ausentes. | Auditar commit y rebase. |
 | `feature/catalog-inventory-enhancement-plan` | Historia fuertemente divergente. | No fusionar directamente; extraer cambios útiles. |

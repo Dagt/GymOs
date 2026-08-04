@@ -1,6 +1,7 @@
 import type { RenewMembershipResponse } from "./membership-types";
 
 export type KioskCapabilities = {
+  membershipEnrollmentAllowed: boolean;
   membershipRenewalAllowed: boolean;
   membershipPlanChangeAllowed: boolean;
   resourceBookingAllowed: boolean;
@@ -32,7 +33,7 @@ export type KioskPendingPayment = {
   id: string;
   saleId: string;
   saleNumber: string;
-  method: "CASH" | "TRANSFER" | "CARD_MANUAL";
+  method: "CASH" | "TRANSFER" | "CARD_MANUAL" | "CARD_ONLINE";
   status: "PENDING_VALIDATION";
   amountCents: number;
   currency: string;
@@ -47,6 +48,17 @@ export type KioskPlanOption = {
   currency: string;
   durationDays: number;
   graceDays: number;
+};
+
+export type KioskMembershipQuote = {
+  clientId: string;
+  planId: string;
+  planName: string;
+  listPriceCents: number;
+  discountCents: number;
+  totalCents: number;
+  currency: string;
+  appliedBenefits: Array<{ benefitId: string; code: string; name: string; discountCents: number }>;
 };
 
 export type KioskSessionResponse = {
@@ -72,6 +84,22 @@ export type KioskSummaryResponse = {
   capabilities: KioskCapabilities;
   memberships: KioskMembership[];
   pendingPayments: KioskPendingPayment[];
+  paymentActivity: KioskPaymentActivity[];
+};
+
+export type KioskPaymentActivity = {
+  id: string;
+  saleId: string;
+  saleNumber: string;
+  method: string;
+  status: string;
+  amountCents: number;
+  currency: string;
+  receivedAt: string;
+  provider: string | null;
+  receiptUrl: string | null;
+  checkoutUrl: string | null;
+  providerUpdatedAt: string | null;
 };
 
 export type KioskSessionContext = {
@@ -83,8 +111,52 @@ export type KioskMembershipCheckoutPayload = {
   idempotencyKey: string;
 };
 
+export type KioskMembershipEnrollmentCheckoutPayload = KioskMembershipCheckoutPayload & {
+  planId: string;
+};
+
 export type KioskPlanChangeCheckoutPayload = KioskMembershipCheckoutPayload & {
   targetPlanId: string;
+};
+
+export type KioskAutopayTerms = {
+  termsVersion: string;
+  consentText: string;
+  amountRule: "CURRENT_MEMBERSHIP_RENEWAL_TOTAL";
+  currentPriceCents: number;
+  currency: string;
+  nextChargeOn: string;
+};
+
+export type KioskAutopayMandate = {
+  id: string;
+  membershipId: string;
+  planId: string;
+  status: "PENDING_SETUP" | "ACTIVE" | "PAST_DUE" | "PAUSED" | "REVOKED" | "REPLACED";
+  provider: "STRIPE";
+  brand: string | null;
+  lastFour: string | null;
+  expiresMonth: number | null;
+  expiresYear: number | null;
+  termsVersion: string;
+  amountRule: string;
+  consentedAt: string;
+  nextChargeOn: string;
+  consecutiveFailures: number;
+  lastError: string | null;
+  revokedAt: string | null;
+  canReplacePaymentMethod: boolean;
+  recoveryMessage: string | null;
+};
+
+export type KioskAutopaySetupResult = {
+  mandateId: string;
+  status: string;
+  providerOperationId: string | null;
+  providerSessionId: string | null;
+  checkoutUrl: string | null;
+  termsVersion: string;
+  nextChargeOn: string;
 };
 
 export type KioskContactUpdatePayload = {

@@ -7,6 +7,8 @@ import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   addManualPayment,
+  createMercadoPagoPointOrder,
+  getPaymentConfiguration,
   getSale,
   getStoredSession,
   rejectPayment,
@@ -55,6 +57,8 @@ export default function SaleDetailPage() {
   const [rejectingPaymentId, setRejectingPaymentId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [paymentForm, setPaymentForm] = useState(INITIAL_PAYMENT_FORM);
+  const [manualCardEnabled, setManualCardEnabled] = useState(false);
+  const [mercadoPagoEnabled, setMercadoPagoEnabled] = useState(false);
   const [refundForm, setRefundForm] = useState(INITIAL_REFUND_FORM);
 
   useEffect(() => {
@@ -69,8 +73,15 @@ export default function SaleDetailPage() {
       }
       setSession(storedSession);
       try {
-        const response = await getSale(storedSession.accessToken, params.saleId);
-        if (active) setData(response);
+        const [response, paymentConfiguration] = await Promise.all([
+          getSale(storedSession.accessToken, params.saleId),
+          getPaymentConfiguration(storedSession.accessToken),
+        ]);
+        if (active) {
+          setData(response);
+          setManualCardEnabled(paymentConfiguration.receptionManualTerminalEnabled);
+          setMercadoPagoEnabled(paymentConfiguration.mercadoPagoReady);
+        }
       } catch (exception) {
         if (active) setError(messageFrom(exception, "No fue posible cargar venta."));
       } finally {
@@ -121,19 +132,25 @@ export default function SaleDetailPage() {
     const amountCents = paymentForm.amount.trim()
       ? Math.round(Number(paymentForm.amount) * 100)
       : data.sale.balanceCents;
-    const succeeded = await runAction(
-      () => addManualPayment(session.accessToken, data.sale.id, {
+    setError(null);
+    try {
+      const response = await addManualPayment(session.accessToken, data.sale.id, {
         method: paymentForm.method,
         amountCents,
         reference: paymentForm.reference,
         receiptObjectKey: null,
-        validateNow: paymentForm.validateNow,
+        validateNow: paymentForm.method === "CARD_MERCADO_PAGO" ? false : paymentForm.validateNow,
         notes: null,
-      }),
-      "No fue posible registrar pago.",
-    );
-    if (succeeded) {
+      });
+      if (paymentForm.method === "CARD_MERCADO_PAGO") {
+        const payment = [...response.payments].reverse().find((item) => item.method === "CARD_MERCADO_PAGO" && item.status === "PENDING_VALIDATION");
+        if (!payment) throw new Error("No se encontro el pago pendiente para enviar a Point.");
+        await createMercadoPagoPointOrder(session.accessToken, payment.id);
+      }
+      setData(response);
       setPaymentForm((current) => ({ ...current, amount: "", reference: "" }));
+    } catch (exception) {
+      setError(messageFrom(exception, "No fue posible registrar el pago o enviarlo a Point."));
     }
   }
 
@@ -196,7 +213,9 @@ export default function SaleDetailPage() {
         <SalePaymentsSection
           data={data}
           form={paymentForm}
-          onFormChange={setPaymentForm}
+          manualCardEnabled={manualCardEnabled}
+          mercadoPagoEnabled={mercadoPagoEnabled}
+          onFormChange={(next) => setPaymentForm(next.method === "CARD_MERCADO_PAGO" ? { ...next, validateNow: false } : next)}
           onReject={reject}
           onRejectReasonChange={setRejectReason}
           onSubmit={submitPayment}

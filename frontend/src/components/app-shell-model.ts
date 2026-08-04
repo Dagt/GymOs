@@ -54,7 +54,7 @@ const ownerSections: NavigationSection[] = [
       { label: "Operacion", href: "/operations", hint: "Pendientes y herramientas", permissions: ["operations.read", "inventory.read", "booking.read"] },
       { label: "Socios", href: "/clients", hint: "Altas, fichas y membresias", permissions: memberWorkflowPermissions },
       { label: "Equipo y accesos", href: "/users", hint: "Duenos, gerentes y staff", permissions: ["user.read"] },
-      { label: "Datos y sucursales", href: "/settings/organization", hint: "Marca, sedes y contacto", permissions: ["organization.update", "branch.update"] },
+      { label: "Configuración", href: "/settings/organization", hint: "Sucursales, cobros, kiosco y correo", permissions: ["organization.update", "branch.update"] },
       { label: "Catalogo", href: "/catalog", hint: "Planes y productos", permissions: ["catalog.read"] },
       { label: "Inventario", href: "/inventory", hint: "Stock y movimientos", permissions: ["inventory.read"] },
       { label: "Reservas", href: "/bookings", hint: "Agenda y recursos", permissions: ["booking.read"] },
@@ -66,6 +66,7 @@ const ownerSections: NavigationSection[] = [
     title: "Mostrador",
     links: [
       { label: "Caja / POS", href: "/pos", hint: "Ventas y pagos", permissions: ["sale.create"] },
+      { label: "Pantalla para socios", href: "/kiosk/browser", hint: "Abrir kiosco seguro", permissions: ["selfservice.session.launch"] },
       { label: "Accesos", href: "/access", hint: "Visitas y pases", permissions: ["access.read", "visit.read"] },
       { label: "Beneficios", href: "/benefits", hint: "Promos y reglas", permissions: ["benefit.read"] },
     ],
@@ -92,12 +93,14 @@ const managerSections: NavigationSection[] = [
       { label: "Wellness", href: "/wellness", hint: "Bienestar", permissions: ["professional.read", "booking.read"] },
       { label: "Coaches", href: "/coaches", hint: "Rutinas", permissions: ["coach.read"] },
       { label: "Beneficios", href: "/benefits", hint: "Promociones y convenios", permissions: ["benefit.read"] },
+      { label: "Automatizaciones", href: "/automations", hint: "Reglas, avisos e historial", permissions: ["automation.read"] },
     ],
   },
   {
     title: "Mostrador",
     links: [
       { label: "Caja / POS", href: "/pos", hint: "Ventas", permissions: ["sale.create"] },
+      { label: "Pantalla para socios", href: "/kiosk/browser", hint: "Abrir kiosco seguro", permissions: ["selfservice.session.launch"] },
     ],
   },
 ];
@@ -112,6 +115,7 @@ const receptionSections: NavigationSection[] = [
       { label: "Reservas", href: "/bookings", hint: "Agenda", permissions: ["booking.read"] },
       { label: "Wellness", href: "/wellness", hint: "Bienestar", permissions: ["professional.read", "booking.read"] },
       { label: "Ventas", href: "/reports/sales", hint: "Pagos pendientes", permissions: ["report.sales.read"] },
+      { label: "Pantalla para socios", href: "/kiosk/browser", hint: "Abrir kiosco seguro", permissions: ["selfservice.session.launch"] },
     ],
   },
 ];

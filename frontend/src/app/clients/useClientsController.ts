@@ -4,8 +4,10 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { type FieldErrorMap, normalizePhone } from "@/components/FormFields";
 import {
   createClient,
+  createMercadoPagoPointOrder,
   enrollMembership,
   getCurrentUser,
+  getPaymentConfiguration,
   getPlans,
   getStoredSession,
   searchClients,
@@ -33,6 +35,8 @@ export function useClientsController() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showCreateClient, setShowCreateClient] = useState(false);
+  const [manualCardEnabled, setManualCardEnabled] = useState(false);
+  const [mercadoPagoEnabled, setMercadoPagoEnabled] = useState(false);
 
   const canCreateClient = useMemo(() => canRegisterClients(session), [session]);
   const canCreateMembershipSale = useMemo(
@@ -60,10 +64,15 @@ export function useClientsController() {
         const activePlans = canLoadPlans
           ? await getPlans(refreshedSession.accessToken).then((loaded) => loaded.filter((plan) => plan.status === "ACTIVE"))
           : [];
+        const paymentConfiguration = canLoadPlans && hasPermission(refreshedSession, "payment.settings.read")
+          ? await getPaymentConfiguration(refreshedSession.accessToken)
+          : null;
         if (!active) return;
         setSession(getStoredSession() ?? refreshedSession);
         setClients(results);
         setPlans(activePlans);
+        setManualCardEnabled(Boolean(paymentConfiguration?.receptionManualTerminalEnabled));
+        setMercadoPagoEnabled(Boolean(paymentConfiguration?.mercadoPagoReady));
       } catch (exception) {
         if (active) {
           setError(exception instanceof Error ? exception.message : "No fue posible cargar socios.");
@@ -161,7 +170,9 @@ export function useClientsController() {
       } else {
         try {
           await createInitialMembershipSale(activeSession.accessToken, clientId, selectedPlan, form);
-          setMessage("Socio registrado con membresía inicial.");
+          setMessage(form.paymentMethod === "CARD_MERCADO_PAGO"
+            ? "Socio registrado. El cobro inicial fue enviado a Point y la membresia se activara al confirmar el webhook."
+            : "Socio registrado con membresía inicial.");
         } catch (exception) {
           setMessage("El socio sí quedó registrado. Puedes abrir su ficha y agregar la membresía después.");
           operationError = prependStep("No fue posible registrar la membresía o el pago inicial", exception);
@@ -179,7 +190,11 @@ export function useClientsController() {
   }
 
   function updateForm(field: keyof ClientRegistrationForm, value: string | boolean) {
-    setForm((current) => ({ ...current, [field]: value }));
+    setForm((current) => ({
+      ...current,
+      [field]: value,
+      ...(field === "paymentMethod" && value === "CARD_MERCADO_PAGO" ? { validateNow: false } : {}),
+    }));
   }
 
   return {
@@ -191,6 +206,8 @@ export function useClientsController() {
     fieldErrors,
     form,
     loading,
+    manualCardEnabled,
+    mercadoPagoEnabled,
     message,
     plans,
     query,
@@ -219,21 +236,26 @@ function normalizeClientPayload(form: ClientRegistrationForm): ClientPayload {
   };
 }
 
-function createInitialMembershipSale(
+async function createInitialMembershipSale(
   accessToken: string,
   clientId: string,
   plan: PlanSummary,
   form: ClientRegistrationForm,
 ) {
-  return enrollMembership(accessToken, {
+  const result = await enrollMembership(accessToken, {
     clientId,
     planId: plan.id,
     method: form.paymentMethod,
     reference: form.paymentReference || null,
-    validateNow: form.validateNow,
+    validateNow: form.paymentMethod === "CARD_MERCADO_PAGO" ? false : form.validateNow,
     notes: "Alta inicial de socio",
     idempotencyKey: `client-initial-membership:${clientId}:${plan.id}`,
   });
+  if (form.paymentMethod === "CARD_MERCADO_PAGO") {
+    if (!result.paymentId) throw new Error("La venta inicial no devolvio el pago para enviar a Point.");
+    await createMercadoPagoPointOrder(accessToken, result.paymentId);
+  }
+  return result;
 }
 
 function hasPermission(session: StoredSession | null, permission: string) {

@@ -8,24 +8,62 @@ Estado: `PARCIAL`
 - programación por intervalo con `next_run_at` y reclamo condicional mediante
   `locked_until`;
 - acción inicial `CREATE_NOTIFICATION` sobre la cola interna;
-- alta limitada a disparadores realmente ejecutables (`MANUAL`, `SCHEDULED`) y
-  acción soportada `CREATE_NOTIFICATION`;
+- alta limitada a disparadores realmente ejecutables: `MANUAL`, `SCHEDULED`,
+  `PAYMENT_COMPLETED`, `PAYMENT_PENDING_VALIDATION`, `BOOKING_CREATED`,
+  `BOOKING_CONFIRMED`, `BOOKING_CANCELLED`, `MEMBERSHIP_EXPIRING` y
+  `MEMBERSHIP_EXPIRED`, además de `RECURRING_CHARGE_DUE`,
+  `RECURRING_CHARGE_SUCCEEDED` y `RECURRING_CHARGE_FAILED`;
+- acción soportada `CREATE_NOTIFICATION`;
 - validación del mensaje y rechazo de tipos desconocidos;
-- formulario guiado para intervalo, asunto y mensaje, con explicación de casos
-  de uso;
+- condiciones tipadas y validadas por disparador: intervalo, días previos al
+  vencimiento, plan, método/monto de pago, contexto comercial y recurso;
+- formulario guiado para intervalo, vencimiento, filtros de pago, asunto y
+  mensaje, sin edición de JSON;
 - registro de ejecuciones y auditoría;
 - aislamiento de consultas administrativas por organización y sucursal;
-- permisos de lectura y administración.
+- permisos de lectura, ejecución y administración;
+- efecto `CREATE_NOTIFICATION` idempotente por regla y ocurrencia programada;
+- persistencia de fallos separada de la transacción que crea la notificación;
+- reserva durable de cada intento en `PROCESSING` antes de crear el efecto, de
+  modo que una caída intermedia retome la misma llave;
+- `retryLimit` efectivo con backoff exponencial acotado, identidad estable de
+  ocurrencia, estado `RETRY_SCHEDULED` y cierre `DEAD_LETTER`;
+- bandeja durable `automation_trigger_event` con payload tipado, lease,
+  reintento y deduplicación para eventos de pagos, reservas y membresías;
+- eventos públicos de creación y cambio de estado de reservas;
+- productor transaccional de membresías por vencer/vencidas, con marcador
+  diario y una identidad de ocurrencia estable por membresía y vigencia;
+- reglas heredadas con disparadores sin consumidor se conservan deshabilitadas
+  y no pueden reactivarse hasta que su contrato sea soportado;
+- historial operativo en la interfaz con estado, intento, referencia,
+  duración y error sanitizado, paginado en servidor con total estable;
+- bandeja de fallos definitivos con reintento/descarte manual, motivo
+  obligatorio, auditoría y paginación estable en servidor;
+- vista previa guiada de la notificación antes de crear una regla.
+- productores y consumidores durables para inicio, éxito y fallo de cada
+  ocurrencia domiciliada, incluyendo plan, intento y agotamiento de reintentos.
+- contadores y tiempos Micrometer por `organization_id`, disparador y resultado,
+  exportables en `/actuator/metrics` y `/actuator/prometheus`;
+- pruebas Testcontainers para exclusión mutua de leases, deduplicación del inbox,
+  recuperación tras vencimiento y paginación aislada por tenant.
+- selección equitativa del scheduler por organización: un tenant con backlog no
+  puede agotar el lote antes de que otros tenants obtengan turno;
+- pausa y reanudación por tenant con `automation.scheduler.manage`, motivo
+  auditado y exclusión atómica tanto al seleccionar como al reclamar trabajo;
+- tablero operativo por sucursal con pendientes, reintentos, dead letters y
+  leases vencidos, más gauges periódicos y reglas Prometheus de alerta.
 
 ## Pendiente
 
-- implementar entrega durable para disparadores de membresía, pago, reserva y
-  cobro recurrente antes de volver a mostrarlos en la interfaz;
-- aplicar contratos tipados de disparador, condición y acción;
-- usar `retryLimit`, backoff, estado terminal e idempotencia durable;
-- evitar duplicados después de una caída entre efecto y confirmación;
-- completar estados de reintento/fallo terminal y permisos granulares;
-- historial operativo, vista previa, observabilidad y pruebas de concurrencia.
+- repetir la suite `postgresIntegrationTest` en CI; el corte local ejecutó 30
+  escenarios PostgreSQL reales sin fallos ni omisiones;
+- ejecutar los escenarios E2E conectados en el ambiente de integración para
+  conservar evidencia de aislamiento, expiración y recuperación extremo a
+  extremo.
+
+Decisión de producto: no se implementarán recursos reservables con costo ni
+servicios de wellness con costo. Las automatizaciones de reservas se limitan a
+los flujos incluidos/sin cobro existentes.
 
 Deuda rectora: `AUT-001`.
 

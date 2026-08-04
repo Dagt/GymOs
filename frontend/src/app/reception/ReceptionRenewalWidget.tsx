@@ -1,12 +1,14 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { MembershipQuoteSummary } from "@/components/MembershipQuoteSummary";
 import {
   changeMembershipPlan,
+  createMercadoPagoPointOrder,
   enrollMembership,
   getClientMemberships,
   getMembershipQuote,
+  getPaymentConfiguration,
   getPlans,
   renewMembership,
   searchClients,
@@ -17,7 +19,7 @@ import {
   type StoredSession,
 } from "@/lib/api";
 
-type PaymentMethod = "CASH" | "CARD_MANUAL" | "TRANSFER";
+type PaymentMethod = "CASH" | "CARD_MANUAL" | "CARD_MERCADO_PAGO" | "TRANSFER";
 
 export function ReceptionRenewalWidget({ session }: { session: StoredSession }) {
   const [query, setQuery] = useState("");
@@ -29,11 +31,14 @@ export function ReceptionRenewalWidget({ session }: { session: StoredSession }) 
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("CASH");
+  const [manualCardEnabled, setManualCardEnabled] = useState(false);
+  const [mercadoPagoEnabled, setMercadoPagoEnabled] = useState(false);
   const [reference, setReference] = useState("");
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const membershipOperationKey = useRef<string | null>(null);
 
   const activePlans = useMemo(
     () => plans.filter((plan) => plan.status === "ACTIVE"),
@@ -48,8 +53,15 @@ export function ReceptionRenewalWidget({ session }: { session: StoredSession }) 
   );
 
   useEffect(() => {
-    getPlans(session.accessToken)
-      .then((items) => setPlans(items.filter((plan) => plan.status === "ACTIVE")))
+    Promise.all([
+      getPlans(session.accessToken),
+      getPaymentConfiguration(session.accessToken),
+    ])
+      .then(([items, paymentConfiguration]) => {
+        setPlans(items.filter((plan) => plan.status === "ACTIVE"));
+        setManualCardEnabled(paymentConfiguration.receptionManualTerminalEnabled);
+        setMercadoPagoEnabled(paymentConfiguration.mercadoPagoReady);
+      })
       .catch(() => setError("No fue posible cargar los planes disponibles."));
   }, [session.accessToken]);
 
@@ -127,10 +139,13 @@ export function ReceptionRenewalWidget({ session }: { session: StoredSession }) 
     setError(null);
     setMessage(null);
     try {
+      const idempotencyKey = membershipOperationKey.current ?? `reception-membership:${crypto.randomUUID()}`;
+      membershipOperationKey.current = idempotencyKey;
       const payment = {
         method,
         reference: reference.trim() || null,
-        validateNow: true,
+        validateNow: method !== "CARD_MERCADO_PAGO",
+        idempotencyKey,
       };
       if (!membership) {
         const result = await enrollMembership(session.accessToken, {
@@ -139,9 +154,11 @@ export function ReceptionRenewalWidget({ session }: { session: StoredSession }) 
           planId: targetPlanId,
           notes: "Venta de membresía inicial desde recepción",
         });
+        await sendToMercadoPagoPoint(result.paymentId);
         setMessage(
           `Membresía inicial asignada por ${formatMoney(result.totalCents, result.currency)}. Venta ${result.saleNumber} creada.`,
         );
+        if (method === "CARD_MERCADO_PAGO") setMessage(`Cobro de la venta ${result.saleNumber} enviado a Point. La membresia se activara al confirmar el webhook.`);
       } else if (changesPlan) {
         if (membership.status !== "ACTIVE") {
           throw new Error("Sólo una membresía activa puede cambiar de plan. Renueva primero el plan vencido.");
@@ -155,17 +172,21 @@ export function ReceptionRenewalWidget({ session }: { session: StoredSession }) 
             notes: "Cambio de plan desde inicio de recepción",
           },
         );
+        await sendToMercadoPagoPoint(result.paymentId);
         setMessage(
           `Plan cambiado por ${formatMoney(result.totalCents, result.currency)}. Venta ${result.saleNumber} registrada.`,
         );
+        if (method === "CARD_MERCADO_PAGO") setMessage(`Cobro de la venta ${result.saleNumber} enviado a Point. El plan cambiara al confirmar el webhook.`);
       } else {
         const result = await renewMembership(session.accessToken, membership.id, {
           ...payment,
           notes: "Renovación desde inicio de recepción",
         });
+        await sendToMercadoPagoPoint(result.paymentId);
         setMessage(
           `Membresía renovada por ${formatMoney(result.totalCents, result.currency)}. Venta ${result.saleNumber} registrada.`,
         );
+        if (method === "CARD_MERCADO_PAGO") setMessage(`Cobro de la venta ${result.saleNumber} enviado a Point. La renovacion se aplicara al confirmar el webhook.`);
       }
 
       const updated = await getClientMemberships(
@@ -173,6 +194,7 @@ export function ReceptionRenewalWidget({ session }: { session: StoredSession }) 
         selectedClient.id,
       );
       setMembership(operationalMembership(updated));
+      membershipOperationKey.current = null;
       setSelectedPlanId("");
       setReference("");
     } catch (exception) {
@@ -187,6 +209,7 @@ export function ReceptionRenewalWidget({ session }: { session: StoredSession }) 
   }
 
   function clearSelectedClient() {
+    membershipOperationKey.current = null;
     setSelectedClient(null);
     setMembership(null);
     setQuote(null);
@@ -195,6 +218,12 @@ export function ReceptionRenewalWidget({ session }: { session: StoredSession }) 
     setQuoteLoading(false);
     setMessage(null);
     setError(null);
+  }
+
+  async function sendToMercadoPagoPoint(paymentId: string | null) {
+    if (method !== "CARD_MERCADO_PAGO") return;
+    if (!paymentId) throw new Error("La venta se registro, pero no se encontro el pago para enviar a Point.");
+    await createMercadoPagoPointOrder(session.accessToken, paymentId);
   }
 
   return (
@@ -353,7 +382,8 @@ export function ReceptionRenewalWidget({ session }: { session: StoredSession }) 
                 value={method}
               >
                 <option value="CASH">Efectivo</option>
-                <option value="CARD_MANUAL">Tarjeta</option>
+                {manualCardEnabled ? <option value="CARD_MANUAL">Tarjeta</option> : null}
+                {mercadoPagoEnabled ? <option value="CARD_MERCADO_PAGO">Mercado Pago Point</option> : null}
                 <option value="TRANSFER">Transferencia</option>
               </select>
             </label>

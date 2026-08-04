@@ -14,5 +14,6 @@ public class ScheduledAutomationRunner {
 	@Scheduled(fixedDelayString = "${gymos.automation.scheduler-delay-ms:60000}")
 	public void runDueRules() {
 		automationService.runDueScheduledRules();
+		automationService.runDueTriggerEvents();
 	}
 }

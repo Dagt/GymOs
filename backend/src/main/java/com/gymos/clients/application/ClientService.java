@@ -153,8 +153,8 @@ public class ClientService implements ClientLookupOperations {
 						"CLIENT_NOT_FOUND",
 						"El socio no existe o no esta disponible."
 				));
-		String email = blankToNull(command.email());
-		String phone = blankToNull(command.phone());
+		String email = command.email() == null ? existing.email() : blankToNull(command.email());
+		String phone = command.phone() == null ? existing.phone() : blankToNull(command.phone());
 		if (email == null && phone == null) {
 			throw new BusinessException(
 					"SELF_SERVICE_CONTACT_REQUIRED",
@@ -176,9 +176,33 @@ public class ClientService implements ClientLookupOperations {
 		return new SelfServiceClientProfile(
 				client.id(),
 				client.fullName(),
-				client.email(),
-				client.phone()
+				maskEmail(client.email()),
+				maskPhone(client.phone())
 		);
+	}
+
+	private String maskEmail(String email) {
+		if (email == null || email.isBlank()) {
+			return null;
+		}
+		int separator = email.indexOf('@');
+		if (separator <= 0) {
+			return "***";
+		}
+		String local = email.substring(0, separator);
+		String visible = local.substring(0, Math.min(2, local.length()));
+		return visible + "***" + email.substring(separator);
+	}
+
+	private String maskPhone(String phone) {
+		if (phone == null || phone.isBlank()) {
+			return null;
+		}
+		String digits = phone.replaceAll("\\D", "");
+		if (digits.length() < 4) {
+			return "***";
+		}
+		return "***" + digits.substring(digits.length() - 4);
 	}
 
 	private void ensureUniqueContact(UUID organizationId, String email, String phone, UUID excludedPersonId) {

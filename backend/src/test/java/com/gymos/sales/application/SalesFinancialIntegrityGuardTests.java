@@ -57,10 +57,28 @@ class SalesFinancialIntegrityGuardTests {
 						assertThat(exception.code()).isEqualTo("REFUND_EXCEEDS_PAYMENT"));
 	}
 
+	@Test
+	void providerManagedPaymentCannotBeValidatedOrRejectedManually() {
+		Fixture fixture = fixture(5_000, 5_000);
+		when(fixture.salesRepository().payment(fixture.organizationId(), fixture.paymentId()))
+				.thenReturn(Optional.of(payment(fixture.paymentId(), "CARD_MERCADO_PAGO", "PENDING_VALIDATION", 5_000)));
+
+		assertThatThrownBy(() -> fixture.guard().guardValidatedPayment(fixture.principal(), fixture.paymentId()))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.code()).isEqualTo("PROVIDER_PAYMENT_MANUAL_VALIDATION_FORBIDDEN"));
+		assertThatThrownBy(() -> fixture.guard().guardProviderPaymentRejection(fixture.principal(), fixture.paymentId()))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.code()).isEqualTo("PROVIDER_PAYMENT_MANUAL_REJECTION_FORBIDDEN"));
+	}
+
 	private Fixture fixture(long totalCents, long balanceCents) {
 		SalesRepository salesRepository = mock(SalesRepository.class);
 		SalesFinancialIntegrityRepository integrityRepository = mock(SalesFinancialIntegrityRepository.class);
-		SalesFinancialIntegrityGuard guard = new SalesFinancialIntegrityGuard(salesRepository, integrityRepository);
+		SalesFinancialIntegrityGuard guard = new SalesFinancialIntegrityGuard(
+				salesRepository,
+				integrityRepository,
+				mock(com.gymos.payments.api.PaymentConfigurationOperations.class)
+		);
 		UUID organizationId = UUID.randomUUID();
 		UUID branchId = UUID.randomUUID();
 		UUID saleId = UUID.randomUUID();
@@ -79,8 +97,12 @@ class SalesFinancialIntegrityGuardTests {
 	}
 
 	private PaymentDetail payment(UUID paymentId, String status, long amountCents) {
+		return payment(paymentId, "TRANSFER", status, amountCents);
+	}
+
+	private PaymentDetail payment(UUID paymentId, String method, String status, long amountCents) {
 		OffsetDateTime now = OffsetDateTime.now();
-		return new PaymentDetail(paymentId, "TRANSFER", status, amountCents, "MXN", null, null, now, null, null);
+		return new PaymentDetail(paymentId, method, status, amountCents, "MXN", null, null, now, null, null);
 	}
 
 	private record Fixture(

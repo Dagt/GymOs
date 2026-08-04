@@ -10,7 +10,7 @@ import type { ClientPayload, ClientSummary } from "@/lib/api";
 
 export type ClientRegistrationForm = ClientPayload & {
   planId: string;
-  paymentMethod: "CASH" | "TRANSFER" | "CARD_MANUAL";
+  paymentMethod: "CASH" | "TRANSFER" | "CARD_MANUAL" | "CARD_MERCADO_PAGO";
   paymentReference: string;
   validateNow: boolean;
 };

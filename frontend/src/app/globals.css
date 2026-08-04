@@ -1308,6 +1308,10 @@ th {
   padding: 0.8rem 0.85rem;
 }
 
+.admin-mobile-nav-toggle {
+  display: none;
+}
+
 .admin-sidebar nav a {
   border-radius: 0.5rem;
   color: rgba(255, 255, 255, 0.72);
@@ -4184,9 +4188,41 @@ button.admin-secondary-link:disabled {
     position: static;
   }
 
-  .admin-sidebar nav {
+  .admin-sidebar nav.mobile-open {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .admin-sidebar nav:not(.mobile-open) {
+    display: none;
+  }
+
+  .admin-mobile-nav-toggle {
+    align-items: center;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 0.65rem;
+    color: white;
+    display: grid;
+    gap: 0.1rem;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    min-height: 3rem;
+    padding: 0.6rem 0.75rem;
+    text-align: left;
+  }
+
+  .admin-mobile-nav-toggle > span {
+    color: rgba(255, 255, 255, 0.62);
+    font-size: 0.72rem;
+    font-weight: 850;
+    text-transform: uppercase;
+  }
+
+  .admin-mobile-nav-toggle > strong {
+    overflow: hidden;
+    padding-inline: 0.6rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .admin-sidebar {
@@ -4211,6 +4247,72 @@ button.admin-secondary-link:disabled {
 }
 
 @media (max-width: 640px) {
+  .admin-sidebar {
+    gap: 0.7rem;
+    padding: 0.8rem;
+  }
+
+  .admin-sidebar-brand {
+    flex-direction: row;
+    gap: 0.7rem;
+    padding-bottom: 0;
+    text-align: left;
+  }
+
+  .admin-sidebar-brand > span {
+    border-radius: 0.75rem;
+    flex: 0 0 auto;
+    height: 3rem;
+    width: 3rem;
+  }
+
+  .admin-user-card {
+    gap: 0.05rem;
+    padding: 0.65rem 0.75rem;
+  }
+
+  .admin-user-card strong {
+    font-size: 0.92rem;
+  }
+
+  .admin-user-card span {
+    display: none;
+  }
+
+  .admin-platform-return {
+    padding: 0.65rem 0.75rem;
+  }
+
+  .admin-sidebar nav.mobile-open {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-sidebar-footer {
+    align-items: center;
+    display: grid;
+    gap: 0.15rem 0.65rem;
+    grid-template-columns: minmax(0, 1fr) auto;
+    padding-top: 0.65rem;
+  }
+
+  .admin-sidebar-footer span,
+  .admin-sidebar-footer small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .admin-sidebar-footer small {
+    margin-top: 0;
+  }
+
+  .admin-sidebar-footer button {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    min-height: 2.35rem;
+    padding-inline: 0.85rem;
+  }
+
   .workout-builder-steps,
   .workout-review-metrics {
     grid-template-columns: 1fr;
@@ -4286,6 +4388,7 @@ button.admin-secondary-link:disabled {
 }
 
 .kiosk-shell {
+  align-content: start;
   display: grid;
   gap: 1.25rem;
   margin: 0 auto;

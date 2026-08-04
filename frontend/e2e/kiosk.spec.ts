@@ -6,9 +6,22 @@ const planId = "33333333-3333-4333-8333-333333333333";
 
 test("el kiosco aplica capacidades, no ofrece pago manual y actualiza contacto", async ({ page }) => {
   let contactPayload: Record<string, unknown> | null = null;
+  await page.addInitScript(() => {
+    window.sessionStorage.setItem("gymos.accessToken", "reception-access-token");
+    window.sessionStorage.setItem("gymos.refreshToken", "reception-refresh-token");
+    window.sessionStorage.setItem("gymos.currentUser", JSON.stringify({
+      id: "77777777-7777-4777-8777-777777777777",
+      username: "recepcion",
+      fullName: "Recepcion Prueba",
+      organizationId: "88888888-8888-4888-8888-888888888888",
+      branchId: "99999999-9999-4999-8999-999999999999",
+      permissions: ["selfservice.session.launch"],
+      roles: ["Recepcion"],
+    }));
+  });
   await mockKiosk(page, async (route, path) => {
     const method = route.request().method();
-    if (method === "POST" && path === "/self-service/terminals/KIOSK-MAIN/sessions") {
+    if (method === "POST" && path === "/self-service/kiosk-sessions") {
       return fulfill(route, sessionResponse());
     }
     if (method === "POST" && path === `/self-service/sessions/${sessionId}/verify`) {
@@ -30,8 +43,8 @@ test("el kiosco aplica capacidades, no ofrece pago manual y actualiza contacto",
       return fulfill(route, {
         clientId: "55555555-5555-4555-8555-555555555555",
         displayName: "Andrea Socia",
-        email: contactPayload.email,
-        phone: contactPayload.phone,
+        email: "nu***@example.com",
+        phone: "***7890",
       });
     }
     return false;
@@ -43,12 +56,14 @@ test("el kiosco aplica capacidades, no ofrece pago manual y actualiza contacto",
   await page.getByRole("button", { name: "Continuar de forma segura" }).click();
 
   await expect(page.getByText(/exclusivamente tarjeta de crédito o débito/i)).toBeVisible();
-  await expect(page.getByText("Profesionales de bienestar")).toBeVisible();
+  await expect(page.locator(".kiosk-side-card .kiosk-step > span")).toHaveText("2");
+  await expect(page.getByText("Activa", { exact: true })).toBeVisible();
+  await expect(page.getByText("Profesionales de bienestar")).toHaveCount(0);
   await expect(page.getByLabel("Referencia de pago")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Renovar con tarjeta" })).toBeDisabled();
 
-  await page.getByLabel("Correo").fill("nuevo@example.com");
-  await page.getByLabel("Teléfono en formato +52").fill("+521234567890");
+  await page.getByLabel("Nuevo correo").fill("nuevo@example.com");
+  await page.getByLabel("Nuevo teléfono en formato +52").fill("+521234567890");
   await page.getByRole("button", { name: "Guardar datos" }).click();
 
   await expect(page.getByText("Tus datos de contacto se actualizaron correctamente.")).toBeVisible();
@@ -58,11 +73,286 @@ test("el kiosco aplica capacidades, no ofrece pago manual y actualiza contacto",
   });
 });
 
+test("una apertura directa explica que no existe un ID de computadora que capturar", async ({ page }) => {
+  await page.goto("/kiosk/browser");
+
+  await expect(page.getByRole("heading", { name: "Abre esta pantalla desde recepción" })).toBeVisible();
+  await expect(page.getByText(/No necesitas registrar esta computadora ni capturar un identificador de terminal/i)).toBeVisible();
+  await expect(page.getByRole("link", { name: "Ir a iniciar sesión" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Continuar de forma segura" })).toHaveCount(0);
+});
+
+test("una recarga recupera el modo kiosco y borra al socio anterior", async ({ page }) => {
+  let resetRequests = 0;
+  await page.addInitScript((storedSession) => {
+    window.sessionStorage.setItem("gymos.kioskBrowserSession", JSON.stringify(storedSession));
+  }, sessionResponse());
+  await mockKiosk(page, async (route, path) => {
+    if (route.request().method() === "POST" && path === `/self-service/sessions/${sessionId}/reset`) {
+      resetRequests += 1;
+      return fulfill(route, sessionResponse());
+    }
+    return false;
+  });
+
+  await page.goto("/kiosk/browser");
+
+  await expect(page.getByRole("heading", { name: "Verifica tu identidad" })).toBeVisible();
+  await expect(page.getByPlaceholder("Correo o teléfono")).toHaveValue("");
+  expect(resetRequests).toBeGreaterThan(0);
+});
+
+test("un socio sin membresia puede abrir Stripe Checkout con una intencion idempotente", async ({ page }) => {
+  let enrollmentPayload: Record<string, unknown> | null = null;
+  await page.addInitScript(() => {
+    window.sessionStorage.setItem("gymos.accessToken", "reception-access-token");
+    window.sessionStorage.setItem("gymos.refreshToken", "reception-refresh-token");
+    window.sessionStorage.setItem("gymos.currentUser", JSON.stringify({
+      id: "77777777-7777-4777-8777-777777777777",
+      username: "recepcion",
+      fullName: "Recepcion Prueba",
+      organizationId: "88888888-8888-4888-8888-888888888888",
+      branchId: "99999999-9999-4999-8999-999999999999",
+      permissions: ["selfservice.session.launch"],
+      roles: ["Recepcion"],
+    }));
+  });
+  await mockKiosk(page, async (route, path) => {
+    const method = route.request().method();
+    if (method === "POST" && path === "/self-service/kiosk-sessions") {
+      return fulfill(route, sessionResponse());
+    }
+    if (method === "POST" && path === `/self-service/sessions/${sessionId}/verify`) {
+      return fulfill(route, {
+        ...summaryResponse(),
+        memberships: [],
+        capabilities: {
+          ...capabilities(),
+          membershipEnrollmentAllowed: true,
+          membershipRenewalAllowed: false,
+          membershipPlanChangeAllowed: false,
+          wellnessBookingAllowed: false,
+          autopayAllowed: false,
+          onlineCardPaymentsReady: true,
+        },
+      });
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/membership-options`) {
+      return fulfill(route, [{
+        id: planId,
+        productId: "44444444-4444-4444-8444-444444444444",
+        name: "Plan mensual",
+        priceCents: 79900,
+        currency: "MXN",
+        durationDays: 30,
+        graceDays: 3,
+      }]);
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/membership-quotes/${planId}`) {
+      return fulfill(route, membershipQuote());
+    }
+    if (method === "POST" && path === `/self-service/sessions/${sessionId}/membership-enrollments`) {
+      enrollmentPayload = route.request().postDataJSON() as Record<string, unknown>;
+      return fulfill(route, {
+        saleId: "66666666-6666-4666-8666-666666666666",
+        saleNumber: "V-001",
+        saleStatus: "PENDING_PAYMENT",
+        totalCents: 79900,
+        paidCents: 0,
+        balanceCents: 79900,
+        currency: "MXN",
+        membership: null,
+        paymentId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        providerOperationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        checkoutUrl: "http://127.0.0.1:3000/kiosk/checkout/result?status=success",
+        checkoutStatus: "OPEN",
+      });
+    }
+    return false;
+  });
+
+  await page.goto("/kiosk/KIOSK-MAIN");
+  await page.getByPlaceholder("Correo o teléfono").fill("andrea@example.com");
+  await page.getByLabel("Fecha de nacimiento en formato día mes año").fill("10/05/1994");
+  await page.getByRole("button", { name: "Continuar de forma segura" }).click();
+  page.once("dialog", (dialog) => dialog.accept());
+  await page.getByRole("button", { name: "Contratar este plan con tarjeta" }).click();
+
+  await expect(page.getByRole("heading", { name: "Estamos verificando el resultado" })).toBeVisible();
+  expect(enrollmentPayload?.planId).toBe(planId);
+  expect(enrollmentPayload?.idempotencyKey).toEqual(expect.stringContaining(`kiosk-enrollment:${sessionId}:${planId}:`));
+  const persistedKeys = await page.evaluate(() => window.sessionStorage.getItem("gymos.kioskOperationKeys"));
+  expect(persistedKeys).toContain("kiosk-enrollment");
+});
+
+test("muestra comprobante y permite recuperar una domiciliacion PAST_DUE con otra tarjeta", async ({ page }) => {
+  let setupPayload: Record<string, unknown> | null = null;
+  await page.addInitScript(() => {
+    window.sessionStorage.setItem("gymos.accessToken", "reception-access-token");
+    window.sessionStorage.setItem("gymos.refreshToken", "reception-refresh-token");
+    window.sessionStorage.setItem("gymos.currentUser", JSON.stringify({
+      id: "77777777-7777-4777-8777-777777777777",
+      username: "recepcion",
+      fullName: "Recepcion Prueba",
+      organizationId: "88888888-8888-4888-8888-888888888888",
+      branchId: "99999999-9999-4999-8999-999999999999",
+      permissions: ["selfservice.session.launch"],
+      roles: ["Recepcion"],
+    }));
+  });
+  await mockKiosk(page, async (route, path) => {
+    const method = route.request().method();
+    if (method === "POST" && path === "/self-service/kiosk-sessions") return fulfill(route, sessionResponse());
+    if (method === "POST" && path === `/self-service/sessions/${sessionId}/verify`) {
+      return fulfill(route, {
+        ...summaryResponse(),
+        capabilities: { ...capabilities(), recurringCardPaymentsReady: true, onlineCardPaymentsReady: true },
+        paymentActivity: [{
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          saleId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+          saleNumber: "V-0099",
+          method: "CARD_ONLINE",
+          status: "COMPLETED",
+          amountCents: 79900,
+          currency: "MXN",
+          receivedAt: "2026-08-03T10:00:00Z",
+          provider: "STRIPE",
+          receiptUrl: "https://pay.stripe.com/receipts/test",
+          checkoutUrl: null,
+          providerUpdatedAt: "2026-08-03T10:01:00Z",
+        }],
+      });
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/membership-options`) return fulfill(route, []);
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/autopay/${membershipId}`) {
+      return fulfill(route, {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        membershipId,
+        planId,
+        status: "PAST_DUE",
+        provider: "STRIPE",
+        brand: "visa",
+        lastFour: "4242",
+        expiresMonth: 12,
+        expiresYear: 2030,
+        termsVersion: "2026-08-03",
+        amountRule: "CURRENT_MEMBERSHIP_RENEWAL_TOTAL",
+        consentedAt: "2026-07-01T10:00:00Z",
+        nextChargeOn: "2026-08-31",
+        consecutiveFailures: 2,
+        lastError: "requires_action",
+        revokedAt: null,
+        canReplacePaymentMethod: true,
+        recoveryMessage: "El ultimo cargo no se completo.",
+      });
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/autopay/${membershipId}/terms`) {
+      return fulfill(route, { ...membershipQuote(), termsVersion: "2026-08-03", consentText: "Autorizo los cargos recurrentes.", amountRule: "CURRENT_MEMBERSHIP_RENEWAL_TOTAL", currentPriceCents: 79900, nextChargeOn: "2026-08-31" });
+    }
+    if (method === "POST" && path === `/self-service/sessions/${sessionId}/autopay/${membershipId}/setup`) {
+      setupPayload = route.request().postDataJSON() as Record<string, unknown>;
+      return fulfill(route, { mandateId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", status: "PENDING_SETUP", providerOperationId: null, providerSessionId: "cs_replace", checkoutUrl: "http://127.0.0.1:3000/kiosk/checkout/result?status=autopay-success", termsVersion: "2026-08-03", nextChargeOn: "2026-08-31" });
+    }
+    return false;
+  });
+
+  await page.goto("/kiosk/KIOSK-MAIN");
+  await page.getByPlaceholder(/Correo o tel/).fill("andrea@example.com");
+  await page.getByLabel(/Fecha de nacimiento/).fill("10/05/1994");
+  await page.getByRole("button", { name: "Continuar de forma segura" }).click();
+  await expect(page.getByRole("link", { name: "Ver comprobante" })).toHaveAttribute("href", "https://pay.stripe.com/receipts/test");
+  await page.getByRole("button", { name: /Administrar domiciliaci/ }).click();
+  await page.getByText(/Acepto nuevamente los t/).click();
+  await page.getByRole("button", { name: "Actualizar tarjeta en Stripe" }).click();
+  expect(setupPayload?.replaceExisting).toBe(true);
+  expect(setupPayload?.idempotencyKey).toEqual(expect.stringContaining("kiosk-autopay-replace"));
+});
+
+test("el socio acepta terminos versionados antes de tokenizar la domiciliacion", async ({ page }) => {
+  let setupPayload: Record<string, unknown> | null = null;
+  await page.addInitScript(() => {
+    window.sessionStorage.setItem("gymos.accessToken", "reception-access-token");
+    window.sessionStorage.setItem("gymos.refreshToken", "reception-refresh-token");
+    window.sessionStorage.setItem("gymos.currentUser", JSON.stringify({
+      id: "77777777-7777-4777-8777-777777777777",
+      username: "recepcion",
+      fullName: "Recepcion Prueba",
+      organizationId: "88888888-8888-4888-8888-888888888888",
+      branchId: "99999999-9999-4999-8999-999999999999",
+      permissions: ["selfservice.session.launch"],
+      roles: ["Recepcion"],
+    }));
+  });
+  await mockKiosk(page, async (route, path) => {
+    const method = route.request().method();
+    if (method === "POST" && path === "/self-service/kiosk-sessions") {
+      return fulfill(route, sessionResponse());
+    }
+    if (method === "POST" && path === `/self-service/sessions/${sessionId}/verify`) {
+      return fulfill(route, {
+        ...summaryResponse(),
+        capabilities: {
+          ...capabilities(),
+          wellnessBookingAllowed: false,
+          recurringCardPaymentsReady: true,
+          onlineCardPaymentsReady: true,
+        },
+      });
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/membership-options`) {
+      return fulfill(route, []);
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/autopay/${membershipId}`) {
+      return fulfill(route, null);
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/autopay/${membershipId}/terms`) {
+      return fulfill(route, {
+        termsVersion: "2026-08-03",
+        consentText: "Autorizo cargos automáticos para renovar mi membresía.",
+        amountRule: "CURRENT_MEMBERSHIP_RENEWAL_TOTAL",
+        currentPriceCents: 79900,
+        currency: "MXN",
+        nextChargeOn: "2026-07-31",
+      });
+    }
+    if (method === "POST" && path === `/self-service/sessions/${sessionId}/autopay/${membershipId}/setup`) {
+      setupPayload = route.request().postDataJSON() as Record<string, unknown>;
+      return fulfill(route, {
+        mandateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        status: "PENDING_SETUP",
+        providerOperationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        providerSessionId: "cs_setup",
+        checkoutUrl: "http://127.0.0.1:3000/kiosk/checkout/result?status=autopay-success",
+        termsVersion: "2026-08-03",
+        nextChargeOn: "2026-07-31",
+      });
+    }
+    return false;
+  });
+
+  await page.goto("/kiosk/KIOSK-MAIN");
+  await page.getByPlaceholder("Correo o teléfono").fill("andrea@example.com");
+  await page.getByLabel("Fecha de nacimiento en formato día mes año").fill("10/05/1994");
+  await page.getByRole("button", { name: "Continuar de forma segura" }).click();
+  await page.getByRole("button", { name: "Administrar domiciliación" }).click();
+
+  await expect(page.getByText("Autorizo cargos automáticos para renovar mi membresía.")).toBeVisible();
+  const continueButton = page.getByRole("button", { name: "Continuar a captura segura de tarjeta" });
+  await expect(continueButton).toBeDisabled();
+  await page.getByText("Acepto expresamente esta autorización").click();
+  await continueButton.click();
+
+  await expect(page.getByRole("heading", { name: "Estamos verificando el resultado" })).toBeVisible();
+  expect(setupPayload?.accepted).toBe(true);
+  expect(setupPayload?.termsVersion).toBe("2026-08-03");
+  expect(setupPayload?.idempotencyKey).toEqual(expect.stringContaining(`kiosk-autopay:${sessionId}:${membershipId}:2026-08-03:`));
+});
+
 async function mockKiosk(
   page: Page,
   handler: (route: Route, path: string) => Promise<boolean>,
 ) {
-  await page.route("http://localhost:8080/api/v1/**", async (route) => {
+  await page.route("**/api/v1/**", async (route) => {
     const path = new URL(route.request().url()).pathname.replace("/api/v1", "");
     if (await handler(route, path)) return;
     await route.fulfill({
@@ -84,10 +374,11 @@ async function fulfill(route: Route, body: unknown) {
 
 function capabilities() {
   return {
+    membershipEnrollmentAllowed: false,
     membershipRenewalAllowed: true,
     membershipPlanChangeAllowed: true,
     resourceBookingAllowed: false,
-    wellnessBookingAllowed: true,
+    wellnessBookingAllowed: false,
     profileUpdateAllowed: true,
     autopayAllowed: true,
     onlineCardPaymentsReady: false,
@@ -106,7 +397,7 @@ function sessionResponse() {
     primaryColor: "#20191A",
     accentColor: "#F5D90A",
     surfaceColor: "#F4F7FB",
-    expiresAt: "2026-07-31T03:00:00Z",
+    expiresAt: "2099-07-31T03:00:00Z",
     verified: false,
     capabilities: capabilities(),
   };
@@ -115,13 +406,13 @@ function sessionResponse() {
 function summaryResponse() {
   return {
     sessionId,
-    expiresAt: "2026-07-31T03:00:00Z",
+    expiresAt: "2099-07-31T03:00:00Z",
     clientName: "Andrea Socia",
     profile: {
       clientId: "55555555-5555-4555-8555-555555555555",
       displayName: "Andrea Socia",
-      email: "andrea@example.com",
-      phone: "+525555555555",
+      email: "an***@example.com",
+      phone: "***5555",
     },
     capabilities: capabilities(),
     memberships: [{
@@ -134,5 +425,19 @@ function summaryResponse() {
       graceEndsOn: "2026-08-03",
     }],
     pendingPayments: [],
+    paymentActivity: [],
+  };
+}
+
+function membershipQuote() {
+  return {
+    clientId: "55555555-5555-4555-8555-555555555555",
+    planId,
+    planName: "Plan mensual",
+    listPriceCents: 89900,
+    discountCents: 10000,
+    totalCents: 79900,
+    currency: "MXN",
+    appliedBenefits: [],
   };
 }

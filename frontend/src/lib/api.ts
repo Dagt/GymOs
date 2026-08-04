@@ -75,6 +75,7 @@ export type {
 export * from "./api/benefits";
 export {
   addManualPayment,
+  createMercadoPagoPointOrder,
   createSale,
   getRecentSales,
   getSale,
@@ -89,6 +90,7 @@ export type {
   AppliedBenefitDetail,
   ManualPaymentPayload,
   MembershipDetail,
+  MercadoPagoPointOrder,
   PaymentDetail,
   PaymentMethodBreakdown,
   PaymentReportTotals,
@@ -125,18 +127,31 @@ export type {
 export {
   changeMembershipPlanFromKiosk,
   createKioskSession,
+  enrollMembershipFromKiosk,
   endKioskSession,
+  getKioskAutopayMandate,
+  getKioskAutopayTerms,
+  launchKioskSession,
   getKioskMembershipOptions,
+  getKioskMembershipQuote,
   getKioskSummary,
   renewMembershipFromKiosk,
+  resetKioskSession,
+  revokeKioskAutopay,
+  setupKioskAutopay,
   updateKioskContactData,
   verifyKioskSession,
 } from "./api/selfservice";
 export type {
   KioskMembership,
+  KioskAutopayMandate,
+  KioskAutopaySetupResult,
+  KioskAutopayTerms,
   KioskCapabilities,
   KioskContactUpdatePayload,
   KioskMembershipCheckoutPayload,
+  KioskMembershipQuote,
+  KioskMembershipEnrollmentCheckoutPayload,
   KioskPendingPayment,
   KioskPlanOption,
   KioskPlanChangeCheckoutPayload,
@@ -322,20 +337,49 @@ export {
   createAutomation,
   createNotification,
   executeAutomation,
+  getAutomationDeadLetters,
   getAutomationExecutions,
+  getAutomationOperations,
+  getAutomationScheduler,
   getAutomations,
   getNotifications,
+  getEmailNotificationConfiguration,
+  updateEmailNotificationConfiguration,
+  sendTestEmail,
+  retryNotificationEmail,
+  recoverAutomationDeadLetter,
   setAutomationStatus,
+  setAutomationScheduler,
 } from "./api/automations";
 export type {
+  AutomationDeadLetter,
   AutomationExecution,
+  AutomationExecutionPage,
+  AutomationOperations,
+  AutomationSchedulerStatus,
+  AutomationRecoveryResult,
   AutomationRule,
   CreateAutomationPayload,
   CreateNotificationPayload,
   NotificationLog,
+  EmailNotificationConfiguration,
+  UpdateEmailNotificationConfiguration,
 } from "./api/automation-types";
 export * from "./api/reporting";
 export * from "./api/onboarding";
+export * from "./api/payment-settings";
+export * from "./api/kiosk-settings";
+export type {
+  MercadoPagoTerminal,
+  PaymentHistoryPage,
+  PaymentConfiguration,
+  PaymentWebhookHistory,
+  PaymentProviderLink,
+  PaymentOperations,
+  RecurringChargeHistory,
+  RecurringMandateHistory,
+  UpdatePaymentConfigurationPayload,
+} from "./api/payment-settings-types";
 export {
   createInternalUser,
   getInternalUsers,

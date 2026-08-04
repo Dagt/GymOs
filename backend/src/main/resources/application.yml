@@ -45,14 +45,58 @@ springdoc:
 gymos:
   seed:
     enabled: ${GYMOS_SEED_ENABLED:false}
+  memberships:
+    expiration-delay-ms: ${GYMOS_MEMBERSHIP_EXPIRATION_DELAY_MS:60000}
+    expiring-horizon-days: ${GYMOS_MEMBERSHIP_EXPIRING_HORIZON_DAYS:90}
   security:
     cors-allowed-origins: ${GYMOS_CORS_ALLOWED_ORIGINS:http://localhost:3000}
     jwt-secret: ${GYMOS_JWT_SECRET:dev-only-change-this-secret-before-production-please}
     access-token-seconds: ${GYMOS_ACCESS_TOKEN_SECONDS:900}
     reception-access-token-seconds: ${GYMOS_RECEPTION_ACCESS_TOKEN_SECONDS:86400}
     refresh-token-days: ${GYMOS_REFRESH_TOKEN_DAYS:7}
+    # Comma-separated CIDRs. Forwarded/X-Forwarded-For are ignored unless the direct peer is trusted.
+    trusted-proxies: ${GYMOS_TRUSTED_PROXIES:}
   storage:
     endpoint: ${GYMOS_MINIO_ENDPOINT:http://localhost:9000}
     access-key: ${GYMOS_MINIO_ACCESS_KEY:gymos}
     secret-key: ${GYMOS_MINIO_SECRET_KEY:gymos-secret}
     bucket: ${GYMOS_MINIO_BUCKET:gymos-receipts}
+  payment-providers:
+    credential-key: ${GYMOS_PAYMENT_CREDENTIAL_KEY:dev-only-payment-credential-key-change-in-production}
+    frontend-base-url: ${GYMOS_FRONTEND_BASE_URL:http://localhost:3000}
+    reconciliation-delay-ms: ${GYMOS_PAYMENT_RECONCILIATION_DELAY_MS:60000}
+    recurring-delay-ms: ${GYMOS_RECURRING_BILLING_DELAY_MS:60000}
+    operations-monitor-delay-ms: ${GYMOS_PAYMENT_OPERATIONS_MONITOR_DELAY_MS:60000}
+    stripe:
+      secret-key: ${GYMOS_STRIPE_SECRET_KEY:}
+      webhook-secret: ${GYMOS_STRIPE_WEBHOOK_SECRET:}
+      return-url: ${GYMOS_STRIPE_RETURN_URL:http://localhost:3000/settings/organization?payment=stripe-return}
+      refresh-url: ${GYMOS_STRIPE_REFRESH_URL:http://localhost:3000/settings/organization?payment=stripe-refresh}
+      api-base-url: ${GYMOS_STRIPE_API_BASE_URL:https://api.stripe.com}
+    mercado-pago:
+      client-id: ${GYMOS_MERCADO_PAGO_CLIENT_ID:}
+      client-secret: ${GYMOS_MERCADO_PAGO_CLIENT_SECRET:}
+      redirect-uri: ${GYMOS_MERCADO_PAGO_REDIRECT_URI:http://localhost:8080/api/v1/payment-settings/mercado-pago/oauth/callback}
+      webhook-secret: ${GYMOS_MERCADO_PAGO_WEBHOOK_SECRET:}
+      api-base-url: ${GYMOS_MERCADO_PAGO_API_BASE_URL:https://api.mercadopago.com}
+      authorization-base-url: ${GYMOS_MERCADO_PAGO_AUTHORIZATION_BASE_URL:https://auth.mercadopago.com.mx/authorization}
+  notifications:
+    dispatch-delay-ms: ${GYMOS_NOTIFICATION_DISPATCH_DELAY_MS:30000}
+    operations-monitor-delay-ms: ${GYMOS_NOTIFICATION_MONITOR_DELAY_MS:60000}
+    batch-size: ${GYMOS_NOTIFICATION_BATCH_SIZE:50}
+    lease-seconds: ${GYMOS_NOTIFICATION_LEASE_SECONDS:120}
+    max-attempts: ${GYMOS_NOTIFICATION_MAX_ATTEMPTS:5}
+    frontend-base-url: ${GYMOS_FRONTEND_BASE_URL:http://localhost:3000}
+    preference-key: ${GYMOS_NOTIFICATION_PREFERENCE_KEY:dev-only-notification-preference-key-change-in-production}
+    smtp:
+      enabled: ${GYMOS_SMTP_ENABLED:false}
+      host: ${GYMOS_SMTP_HOST:}
+      port: ${GYMOS_SMTP_PORT:587}
+      username: ${GYMOS_SMTP_USERNAME:}
+      password: ${GYMOS_SMTP_PASSWORD:}
+      auth: ${GYMOS_SMTP_AUTH:true}
+      start-tls: ${GYMOS_SMTP_STARTTLS:true}
+      ssl: ${GYMOS_SMTP_SSL:false}
+      connection-timeout-ms: ${GYMOS_SMTP_CONNECTION_TIMEOUT_MS:10000}
+      read-timeout-ms: ${GYMOS_SMTP_READ_TIMEOUT_MS:10000}
+      write-timeout-ms: ${GYMOS_SMTP_WRITE_TIMEOUT_MS:10000}

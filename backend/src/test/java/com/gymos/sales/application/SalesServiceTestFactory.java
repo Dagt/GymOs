@@ -2,6 +2,7 @@ package com.gymos.sales.application;
 
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.storage.ObjectStorageService;
+import com.gymos.payments.api.PaymentConfigurationOperations;
 import com.gymos.sales.infrastructure.MembershipSaleCommandRepository;
 import com.gymos.sales.infrastructure.SaleCommandRepository;
 import com.gymos.sales.infrastructure.SalePaymentCompletionRepository;
@@ -12,6 +13,8 @@ import com.gymos.sales.infrastructure.SalesReportRepository;
 import com.gymos.sales.infrastructure.SalesRepository;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.simple.JdbcClient;
+
+import static org.mockito.Mockito.mock;
 
 final class SalesServiceTestFactory {
 	private SalesServiceTestFactory() {
@@ -29,7 +32,7 @@ final class SalesServiceTestFactory {
 				new SalesPaymentLifecycleService(lookupService, paymentCommandRepository, completionService, auditService, eventPublisher));
 		MembershipSalesService membershipSalesService = new MembershipSalesService(
 				salesRepository, new MembershipSaleCommandRepository(jdbcClient), completionService,
-				auditService, eventPublisher);
+				mock(PaymentConfigurationOperations.class), auditService, eventPublisher);
 		SalesReadRepository salesReadRepository = new SalesReadRepository(jdbcClient);
 		SaleDetailQuery saleDetailQuery = new SaleDetailQuery(salesRepository, salesReadRepository);
 		SaleCreationService saleCreationService = new SaleCreationService(salesRepository, new SaleLineResolver(salesRepository),

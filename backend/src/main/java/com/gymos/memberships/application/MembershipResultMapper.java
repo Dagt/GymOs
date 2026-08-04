@@ -22,7 +22,8 @@ final class MembershipResultMapper {
 				sale.paidCents(),
 				sale.balanceCents(),
 				sale.currency(),
-				toSummaryResult(membership)
+				toSummaryResult(membership),
+				sale.paymentId()
 		);
 	}
 
@@ -35,7 +36,8 @@ final class MembershipResultMapper {
 				result.paidCents(),
 				result.balanceCents(),
 				result.currency(),
-				toOperationSummary(result.membership())
+				toOperationSummary(result.membership()),
+				result.paymentId()
 		);
 	}
 

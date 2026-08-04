@@ -46,8 +46,6 @@ export default function OnboardingPage() {
   const [branch, setBranch] = useState<BranchUpdatePayload | null>(null);
   const [plan, setPlan] = useState(defaultPlan);
   const [product, setProduct] = useState(defaultProduct);
-  const [kioskTerminalCode, setKioskTerminalCode] = useState("KIOSK-MAIN");
-  const [kioskName, setKioskName] = useState("Kiosco principal");
   const [result, setResult] = useState<PilotSetupResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -123,8 +121,8 @@ export default function OnboardingPage() {
         branch,
         plans: [plan],
         products: [product],
-        kioskTerminalCode,
-        kioskName,
+        kioskTerminalCode: "KIOSK-MAIN",
+        kioskName: "Kiosco de sucursal",
       };
       const response = await applyPilotSetup(session.accessToken, payload);
       setChecklist(response.checklist);
@@ -202,9 +200,10 @@ export default function OnboardingPage() {
               <Field label="SKU producto" value={product.sku} onChange={(value) => setProduct({ ...product, sku: value })} />
               <Field label="Nombre producto" value={product.name} onChange={(value) => setProduct({ ...product, name: value })} />
               <NumberField label="Precio producto en centavos" value={product.priceCents} onChange={(value) => setProduct({ ...product, priceCents: value })} />
-              <Field label="Codigo kiosco" value={kioskTerminalCode} onChange={setKioskTerminalCode} />
-              <Field label="Nombre kiosco" value={kioskName} onChange={setKioskName} />
             </div>
+            <p className="mt-4 rounded-md border border-[var(--brand-line)] bg-[var(--brand-surface)] p-3 text-sm text-[var(--brand-muted)]">
+              Se creara automaticamente un perfil logico de kiosco para la sucursal. No necesitas registrar ni asignar cada computadora.
+            </p>
             <button className="form-primary-button mt-5" disabled={saving} type="submit">
               Aplicar setup operativo
             </button>
@@ -214,7 +213,7 @@ export default function OnboardingPage() {
           {result ? (
             <Message
               tone="success"
-              text={`Setup aplicado. Productos creados: ${result.productsCreated}. Planes creados: ${result.plansCreated}. Kiosco nuevo: ${result.kioskCreated ? "si" : "no"}.`}
+              text={`Setup aplicado. Productos creados: ${result.productsCreated}. Planes creados: ${result.plansCreated}. Perfil de kiosco nuevo: ${result.kioskCreated ? "si" : "no"}.`}
             />
           ) : null}
         </form>
@@ -272,4 +271,3 @@ function Message({ tone, text }: { tone: "success" | "error"; text: string }) {
     : "border-[#e5b7b7] bg-[#fff4f4] text-[#8c2f2f]";
   return <p className={`rounded-md border px-3 py-2 text-sm ${className}`}>{text}</p>;
 }
-

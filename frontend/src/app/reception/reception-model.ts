@@ -36,9 +36,9 @@ export const FOCUS_ACTIONS: FocusAction[] = [
   },
   {
     title: "Pantalla para socios",
-    detail: "Autoservicio para pagos, renovaciones y cambios de plan.",
-    href: "/kiosk/KIOSK-MAIN",
-    label: "Abrir kiosco",
+    detail: "Autoservicio seguro para membresías, pagos Stripe, reservas gratuitas y datos de contacto. No requiere registrar esta computadora.",
+    href: "/kiosk/browser",
+    label: "Abrir kiosco seguro",
     accent: "kiosk",
   },
   {

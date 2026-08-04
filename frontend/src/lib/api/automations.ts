@@ -1,10 +1,18 @@
 import { apiFetch, normalizePayload } from "./client";
 import type {
+  AutomationDeadLetter,
+  AutomationDeadLetterPage,
   AutomationExecution,
+  AutomationExecutionPage,
+  AutomationRecoveryResult,
   AutomationRule,
   CreateAutomationPayload,
   CreateNotificationPayload,
   NotificationLog,
+  AutomationOperations,
+  AutomationSchedulerStatus,
+  EmailNotificationConfiguration,
+  UpdateEmailNotificationConfiguration,
 } from "./automation-types";
 
 export async function getNotifications(accessToken: string, limit = 80): Promise<NotificationLog[]> {
@@ -19,6 +27,39 @@ export async function createNotification(
     method: "POST",
     body: JSON.stringify(normalizePayload(payload)),
   });
+}
+
+export async function getEmailNotificationConfiguration(
+  accessToken: string,
+): Promise<EmailNotificationConfiguration> {
+  return apiFetch<EmailNotificationConfiguration>("/notifications/email-configuration", accessToken);
+}
+
+export async function updateEmailNotificationConfiguration(
+  accessToken: string,
+  payload: UpdateEmailNotificationConfiguration,
+): Promise<EmailNotificationConfiguration> {
+  return apiFetch<EmailNotificationConfiguration>("/notifications/email-configuration", accessToken, {
+    method: "PUT",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function sendTestEmail(
+  accessToken: string,
+  recipient: string,
+): Promise<NotificationLog> {
+  return apiFetch<NotificationLog>("/notifications/email-configuration/test", accessToken, {
+    method: "POST",
+    body: JSON.stringify({ recipient }),
+  });
+}
+
+export async function retryNotificationEmail(
+  accessToken: string,
+  notificationId: string,
+): Promise<NotificationLog> {
+  return apiFetch<NotificationLog>(`/notifications/${notificationId}/retry`, accessToken, { method: "POST" });
 }
 
 export async function getAutomations(accessToken: string): Promise<AutomationRule[]> {
@@ -59,6 +100,55 @@ export async function executeAutomation(
 export async function getAutomationExecutions(
   accessToken: string,
   ruleId: string,
-): Promise<AutomationExecution[]> {
-  return apiFetch<AutomationExecution[]>(`/automations/${ruleId}/executions`, accessToken);
+  page = 0,
+  size = 25,
+): Promise<AutomationExecutionPage> {
+  return apiFetch<AutomationExecutionPage>(
+    `/automations/${ruleId}/executions?page=${page}&size=${size}`,
+    accessToken,
+  );
+}
+
+export async function getAutomationDeadLetters(
+  accessToken: string,
+	page = 0,
+	size = 25,
+): Promise<AutomationDeadLetterPage> {
+  return apiFetch<AutomationDeadLetterPage>(`/automations/dead-letters?page=${page}&size=${size}`, accessToken);
+}
+
+export async function getAutomationOperations(accessToken: string): Promise<AutomationOperations> {
+  return apiFetch<AutomationOperations>("/automations/operations", accessToken);
+}
+
+export async function getAutomationScheduler(accessToken: string): Promise<AutomationSchedulerStatus> {
+  return apiFetch<AutomationSchedulerStatus>("/automations/scheduler", accessToken);
+}
+
+export async function setAutomationScheduler(
+  accessToken: string,
+  paused: boolean,
+  reason?: string,
+): Promise<AutomationSchedulerStatus> {
+  return apiFetch<AutomationSchedulerStatus>(`/automations/scheduler/${paused ? "pause" : "resume"}`, accessToken, {
+    method: "POST",
+    body: JSON.stringify({ reason: reason ?? null }),
+  });
+}
+
+export async function recoverAutomationDeadLetter(
+  accessToken: string,
+  deadLetterId: string,
+  action: "retry" | "discard",
+  source: AutomationDeadLetter["source"],
+  reason: string,
+): Promise<AutomationRecoveryResult> {
+  return apiFetch<AutomationRecoveryResult>(
+    `/automations/dead-letters/${deadLetterId}/${action}`,
+    accessToken,
+    {
+      method: "POST",
+      body: JSON.stringify({ source, reason }),
+    },
+  );
 }

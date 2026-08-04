@@ -35,7 +35,7 @@ export type MembershipQuote = {
 };
 
 export type RenewMembershipPayload = {
-  method: "CASH" | "TRANSFER" | "CARD_MANUAL";
+  method: "CASH" | "TRANSFER" | "CARD_MANUAL" | "CARD_MERCADO_PAGO";
   reference?: string | null;
   validateNow: boolean;
   notes?: string | null;
@@ -60,4 +60,8 @@ export type RenewMembershipResponse = {
   balanceCents: number;
   currency: string;
   membership: ClientMembershipSummary | null;
+  paymentId: string | null;
+  providerOperationId?: string | null;
+  checkoutUrl?: string | null;
+  checkoutStatus?: string | null;
 };

@@ -10,6 +10,9 @@ import com.gymos.eligibility.api.EligibilityPolicy.EligibilityRequest;
 import com.gymos.eligibility.api.EligibilityPolicy.Reason;
 import com.gymos.memberships.application.result.MembershipQuoteResult;
 import com.gymos.memberships.application.result.MembershipQuoteResult.AppliedBenefit;
+import com.gymos.memberships.api.operations.MembershipPricingOperations;
+import com.gymos.memberships.api.operations.MembershipPricingOperations.AppliedBenefitView;
+import com.gymos.memberships.api.operations.MembershipPricingOperations.MembershipQuoteView;
 import com.gymos.memberships.infrastructure.MembershipRepository;
 import com.gymos.memberships.infrastructure.MembershipRepository.PlanForRenewal;
 import java.util.ArrayList;
@@ -20,7 +23,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class MembershipPricingService {
+public class MembershipPricingService implements MembershipPricingOperations {
 	private final MembershipRepository membershipRepository;
 	private final EligibilityPolicy eligibilityPolicy;
 
@@ -41,6 +44,19 @@ public class MembershipPricingService {
 		PlanForRenewal plan = membershipRepository.planForRenewal(principal.organizationId(), planId)
 				.orElseThrow(() -> new BusinessException("PLAN_NOT_AVAILABLE", "El plan no esta disponible."));
 		return quote(principal.organizationId(), principal.branchId(), clientId, plan);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public MembershipQuoteView quoteForCheckout(GymOsPrincipal principal, UUID clientId, UUID planId) {
+		MembershipQuoteResult quote = quote(principal, clientId, planId);
+		return new MembershipQuoteView(
+				quote.clientId(), quote.planId(), quote.planName(), quote.listPriceCents(),
+				quote.discountCents(), quote.totalCents(), quote.currency(),
+				quote.appliedBenefits().stream()
+						.map(item -> new AppliedBenefitView(item.benefitId(), item.code(), item.name(), item.discountCents()))
+						.toList()
+		);
 	}
 
 	MembershipQuoteResult quote(

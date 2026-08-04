@@ -64,11 +64,11 @@ export function OrganizationOverviewCard({ form, onEdit }: OrganizationOverviewC
           Editar gimnasio
         </button>
       </div>
-      <div className="mt-5 grid gap-4 md:grid-cols-3">
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">
         <article className="min-w-0 rounded-xl border border-[#dbe4ee] bg-white p-4">
           <span className="text-xs font-semibold uppercase text-[#64748b]">Marca</span>
           <strong className="mt-2 block break-words text-lg">{form.brandName || form.tradeName}</strong>
-          <p className="mt-2 break-all text-sm text-[#64748b]">{form.contactEmail}</p>
+          <p className="mt-2 break-words text-sm text-[#64748b] [overflow-wrap:anywhere]">{form.contactEmail}</p>
         </article>
         <article className="min-w-0 rounded-xl border border-[#dbe4ee] bg-white p-4">
           <span className="text-xs font-semibold uppercase text-[#64748b]">Moneda</span>

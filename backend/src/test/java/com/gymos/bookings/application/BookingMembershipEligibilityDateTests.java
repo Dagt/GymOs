@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.audit.api.AuditService;
 import com.gymos.bookings.application.command.CreateBookingCommand;
+import com.gymos.bookings.api.events.BookingCreatedV1;
 import com.gymos.bookings.infrastructure.BookingPlanRepository;
 import com.gymos.bookings.infrastructure.BookingResourceRepository;
 import com.gymos.bookings.infrastructure.BookingResourceRepository.ResourceRecord;
@@ -30,6 +31,8 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 
 class BookingMembershipEligibilityDateTests {
 	@Test
@@ -40,6 +43,7 @@ class BookingMembershipEligibilityDateTests {
 		EligibilityPolicy eligibilityPolicy = mock(EligibilityPolicy.class);
 		ClientBookingConflictRepository conflictRepository = mock(ClientBookingConflictRepository.class);
 		AuditService auditService = mock(AuditService.class);
+		ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
 		ResourceScheduleResolver scheduleResolver = new ResourceScheduleResolver(new ObjectMapper());
 		BookingService service = new BookingService(
 				bookingRepository,
@@ -48,7 +52,8 @@ class BookingMembershipEligibilityDateTests {
 				eligibilityPolicy,
 				conflictRepository,
 				scheduleResolver,
-				auditService
+				auditService,
+				eventPublisher
 		);
 
 		UUID organizationId = UUID.randomUUID();
@@ -121,5 +126,13 @@ class BookingMembershipEligibilityDateTests {
 						&& request.branchId().equals(branchId)
 						&& request.clientId().equals(clientId)
 						&& request.effectiveOn().equals(bookingDate)));
+		ArgumentCaptor<Object> eventCaptor = ArgumentCaptor.forClass(Object.class);
+		verify(eventPublisher).publishEvent(eventCaptor.capture());
+		BookingCreatedV1 createdEvent = (BookingCreatedV1) eventCaptor.getValue();
+		assertEquals(organizationId, createdEvent.organizationId());
+		assertEquals(branchId, createdEvent.branchId());
+		assertEquals(bookingId, createdEvent.bookingId());
+		assertEquals(clientId, createdEvent.clientId());
+		assertEquals(resourceId, createdEvent.resourceId());
 	}
 }

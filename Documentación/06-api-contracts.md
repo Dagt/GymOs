@@ -158,25 +158,63 @@ Estado comercial de gimnasio cliente:
 
 ## 6.1.2 Kiosco de autoservicio
 
+- `POST /self-service/kiosk-sessions` — requiere JWT y
+  `selfservice.session.launch`; selecciona el perfil lógico de la sucursal.
 - `POST /self-service/terminals/{terminalCode}/sessions`
 - `POST /self-service/sessions/{sessionId}/verify`
 - `GET /self-service/sessions/{sessionId}/summary`
 - `GET /self-service/sessions/{sessionId}/membership-options`
-- `POST /self-service/sessions/{sessionId}/membership-renewals`
-- `POST /self-service/sessions/{sessionId}/membership-change-requests`
-- `GET /self-service/sessions/{sessionId}/pending-payments`
-- `POST /self-service/sessions/{sessionId}/payments`
-- `POST /self-service/sessions/{sessionId}/payment-proofs`
+- `POST /self-service/sessions/{sessionId}/membership-enrollments`
+- `POST /self-service/sessions/{sessionId}/membership-renewals/{membershipId}`
+- `POST /self-service/sessions/{sessionId}/membership-change-requests/{membershipId}`
 - `PATCH /self-service/sessions/{sessionId}/contact-data`
+- `GET /self-service/sessions/{sessionId}/autopay/{membershipId}/terms`
+- `GET /self-service/sessions/{sessionId}/autopay/{membershipId}`
+- `POST /self-service/sessions/{sessionId}/autopay/{membershipId}/setup`
+- `POST /self-service/sessions/{sessionId}/autopay/{membershipId}/revoke`
 - `POST /self-service/sessions/{sessionId}/end`
+- `POST /self-service/sessions/{sessionId}/reset` — limpia identidad y datos
+  visibles para el siguiente socio, conservando sólo el modo kiosco.
 
 Los endpoints de autoservicio sólo exponen acciones permitidas para clientes en una sesión temporal de kiosco. Las reglas de pagos, membresías, beneficios y permisos se validan en backend.
+
+La creación inicial ya no es pública. Recepción abre el modo kiosco desde su
+sesión y el frontend elimina inmediatamente sus tokens operativos. El código
+`KIOSK-MAIN` es una etiqueta/configuración lógica, no una identidad de
+computadora ni una credencial.
+
+`autopay/setup` exige la versión vigente del consentimiento, aceptación
+explícita y llave idempotente. Devuelve una URL de Stripe Checkout en modo
+`setup`; GymOS no recibe PAN ni CVV. El estado sólo cambia a `ACTIVE` después
+del webhook firmado y de consultar autoritativamente Session, SetupIntent y
+PaymentMethod. `autopay/revoke` impide nuevas ocurrencias e intenta cancelar
+PaymentIntents iniciados que aún sean cancelables.
+
+El modo de navegador dura como máximo doce horas. Después de verificar a un
+socio, tres minutos de inactividad limpian su identidad y dejan la pantalla
+lista para el siguiente; no se asigna ningún identificador a la computadora.
+
+## 6.1.3 Configuración de cobros
+
+- `GET /payment-settings` — lectura efectiva para roles operativos autorizados.
+- `PUT /payment-settings` — dueño o administrador configura:
+  `receptionManualTerminalEnabled`, `receptionMercadoPagoEnabled`,
+  `mercadoPagoTerminalId`, `stripeSelfCheckoutEnabled` y
+  `stripeRecurringEnabled`.
+
+Mercado Pago o Stripe no pueden habilitarse antes de vincular su cuenta. La
+terminal manual de recepción puede operar sin integración y genera pagos
+pendientes de validación. Stripe pertenece exclusivamente al self checkout y a
+la domiciliación del socio.
 
 La sesion publica de kiosco usa logo, nombre visible y colores del gimnasio al que pertenece el terminal. La sucursal vinculada define el contexto operativo del kiosco, no una marca visual propia.
 
 Cuando el frontend abre `/kiosk/{terminalCode}` desde una sesion autenticada, envia `X-GymOS-Organization-Id` y `X-GymOS-Branch-Id` para resolver correctamente codigos comunes como `KIOSK-MAIN` dentro del gimnasio activo.
 
 Nota implementada Hito 3: las acciones de renovacion y cambio de plan reciben `{membershipId}` en la ruta concreta:
+- `POST /self-service/sessions/{sessionId}/membership-enrollments` recibe
+  `{ "planId": "uuid", "idempotencyKey": "..." }` y crea una venta/pago
+  pendiente antes de abrir Stripe Checkout;
 - `POST /self-service/sessions/{sessionId}/membership-renewals/{membershipId}`
 - `POST /self-service/sessions/{sessionId}/membership-change-requests/{membershipId}`
 
@@ -548,20 +586,51 @@ Nota implementada Hito 5:
 - `POST /automations/{ruleId}/disable`
 - `POST /automations/{ruleId}/execute`
 - `GET /automations/{ruleId}/executions`
+- `GET /automations/dead-letters?limit=100`
+- `POST /automations/dead-letters/{deadLetterId}/retry`
+- `POST /automations/dead-letters/{deadLetterId}/discard`
 
 Nota implementada Hito 5:
 - Las reglas tienen `triggerType`, `conditionJson`, `actionType`, `actionConfigJson`, `status` y `retryLimit`.
+- Disparadores ejecutables: `MANUAL`, `SCHEDULED`, `PAYMENT_COMPLETED`,
+  `PAYMENT_PENDING_VALIDATION`, `BOOKING_CREATED`, `BOOKING_CONFIRMED` y
+  `BOOKING_CANCELLED`, además de `MEMBERSHIP_EXPIRING` y
+  `MEMBERSHIP_EXPIRED`.
+- `conditionJson` se valida por disparador y sólo acepta los campos tipados:
+  `intervalMinutes`; `daysBefore`/`planId`; `method`/`minimumAmountCents`;
+  `businessContext`; o `resourceId`, según corresponda.
 - `actionType = CREATE_NOTIFICATION` crea una notificacion interna en `notification_log`.
-- Las ejecuciones registran estado `SUCCEEDED`, `SKIPPED` o `FAILED`, referencia del disparador y error cuando aplique.
+- Las ejecuciones registran `PROCESSING`, `SUCCEEDED`, `FAILED`,
+  `RETRY_SCHEDULED`, `DEAD_LETTER` o `DISCARDED`, referencia, llave idempotente, versión de regla, intento,
+  inicio, fin y error sanitizado cuando aplique.
+- `GET /automations/{ruleId}/executions` devuelve hasta 100 ejecuciones
+  recientes de la regla dentro del tenant y sucursal activos.
+- La lectura requiere `automation.read`; la ejecución manual acepta
+  `automation.execute` o `automation.manage`; crear, habilitar y deshabilitar
+  requieren `automation.manage`.
+- La bandeja de fallos requiere `automation.read`. Reintentar o descartar
+  exige `automation.manage`, origen `EVENT`/`EXECUTION` y un motivo auditable.
 
 ## 6.16 Notificaciones
 
 - `GET /notifications?limit=50`
 - `POST /notifications`
+- `GET /notifications/email-configuration`
+- `PUT /notifications/email-configuration`
+- `POST /notifications/email-configuration/test`
+- `PUT /notifications/email-preferences`
+- `POST /notifications/{notificationId}/retry`
 
-Nota implementada Hito 5:
-- La V1 registra notificaciones internas y auditorias de envio en `notification_log`.
-- Los canales externos reales quedan preparados por contrato y no se conectan aun a proveedores de email, SMS o WhatsApp.
+Contrato vigente:
+- `IN_APP` registra la notificación para operación interna;
+- `EMAIL` resuelve destinatario directo, socio o usuario, valida preferencias y
+  crea una entrega durable;
+- la configuración tenant nunca recibe host, usuario ni contraseña: sólo
+  habilitación, clave del proveedor, remitente y `Reply-To`;
+- el adaptador SMTP toma conexión y secretos exclusivamente del entorno;
+- los estados externos son `QUEUED`, `PROCESSING`, `RETRY_SCHEDULED`, `SENT`,
+  `SUPPRESSED` y `DEAD_LETTER`;
+- `WHATSAPP` y `PUSH` permanecen rechazados hasta que exista su adaptador.
 
 ## 6.17 Reportes
 
@@ -659,7 +728,7 @@ Permisos por endpoint interno:
 - `report.coaches.read`
 - `professional.read`, `professional.manage`
 - `notification.read`, `notification.manage`
-- `automation.read`, `automation.manage`
+- `automation.read`, `automation.execute`, `automation.manage`
 - `report.owner.read`
 - `onboarding.manage`
 - `client.import`
@@ -894,6 +963,56 @@ Comportamiento:
 - Al terminar, la regla se reprograma sumando nuevamente `intervalMinutes`.
 - Las ejecuciones se registran en `automation_execution` y, para `CREATE_NOTIFICATION`, se encola una notificacion interna.
 
+## Hito 7 - Eventos durables de Automatizaciones
+
+Los eventos públicos de ventas, reservas y ciclo de membresía se materializan de forma
+transaccional en `automation_trigger_event`. Un worker reclama cada ocurrencia
+con lease y ejecuta las reglas habilitadas del mismo gimnasio y alcance de
+sucursal.
+
+Eventos consumidos:
+
+- `PaymentCompletedV1` -> `PAYMENT_COMPLETED`;
+- `PaymentRecordedV1` con estado `PENDING_VALIDATION` ->
+  `PAYMENT_PENDING_VALIDATION`;
+- `BookingCreatedV1` -> `BOOKING_CREATED`;
+- `BookingStatusChangedV1` a `CONFIRMED` o `CANCELLED` -> disparador homónimo.
+- `MembershipExpiringV1` -> `MEMBERSHIP_EXPIRING`, una vez por día dentro del
+  horizonte configurado y con ocurrencia estable por fecha final;
+- `MembershipExpiredV1` -> `MEMBERSHIP_EXPIRED`, una vez aplicada la fecha de
+  gracia y reclamado el marcador de publicación;
+- `RecurringChargeDueV1`, `RecurringChargeSucceededV1` y
+  `RecurringChargeFailedV1` -> disparadores `RECURRING_CHARGE_*` homónimos.
+
+La referencia del evento y la versión funcional de la regla forman una llave
+estable. Un reinicio después de crear la notificación, registrar la ejecución o
+vencer el lease retoma la ocurrencia sin duplicar el efecto. Los cargos
+domiciliados basan la referencia en la ocurrencia de vigencia, por lo que un
+webhook o worker repetido no duplica la notificación.
+
+Los fallos agotados aparecen en la bandeja `dead-letters`. El reintento vuelve
+a poner la ocurrencia durable en cola sin cambiar su identidad; el descarte
+cierra la ejecución u ocurrencia y permite continuar con las demás reglas. Las
+dos decisiones exigen motivo y producen auditoría.
+
+Historial de ejecuciones:
+
+- `GET /api/v1/automations/{ruleId}/executions?page=0&size=25`;
+- responde `{ items, page, size, totalElements, totalPages }`;
+- `page` se normaliza a cero y `size` queda acotado entre 1 y 100;
+- la consulta exige `automation.read` y filtra organización, sucursal y regla.
+
+Historial operativo de pagos, disponible con `payment.settings.read`:
+
+- `GET /api/v1/payment-settings/history/mandates?page=0&size=25`;
+- `GET /api/v1/payment-settings/history/recurring-charges?page=0&size=25`;
+- `GET /api/v1/payment-settings/history/webhooks?page=0&size=25`.
+
+Los tres contratos usan la misma envoltura paginada, se filtran siempre por la
+organización del JWT y no exponen PAN, CVV, payload del proveedor, token de
+método de pago ni hash del webhook. El historial de mandatos limita la tarjeta
+a marca, últimos cuatro y vencimiento.
+
 ## Hito 7.7 - Consolas, marca tenant y administracion de plataforma
 
 ### Auth
@@ -1104,3 +1223,32 @@ Reemplaza de forma auditable los accesos requeridos por el dispositivo.
   de objeto proporcionada por el cliente;
 - el frontend la expone mediante
   `/api/tenant-logo/{organizationId}?v={version}`.
+
+## Configuración e integración de proveedores de pago
+
+Todos los endpoints de configuración requieren `payment.settings.manage`, salvo
+la consulta, que también acepta `payment.settings.read`.
+
+- `POST /api/v1/payment-settings/stripe/connect`: crea/reutiliza la cuenta
+  Express del gimnasio y devuelve un Account Link temporal.
+- `POST /api/v1/payment-settings/stripe/refresh`: consulta a Stripe y sólo
+  marca conexión cuando `details_submitted` y `charges_enabled` son verdaderos.
+- `POST /api/v1/payment-settings/mercado-pago/connect`: inicia OAuth con estado
+  de un solo uso y PKCE.
+- `GET /api/v1/payment-settings/mercado-pago/oauth/callback`: consume el estado,
+  intercambia el código y redirige a configuración.
+- `GET /api/v1/payment-settings/mercado-pago/terminals`: lista las Point de la
+  cuenta conectada.
+- `PUT /api/v1/payment-settings/mercado-pago/terminal`: selecciona la Point y la
+  configura en modo PDV. No identifica la computadora donde corre el kiosco.
+- `POST /api/v1/sales/payments/{paymentId}/mercado-pago-order`: envía el monto
+  pendiente a la Point seleccionada; reintentar conserva la misma Order.
+
+Webhooks públicos con verificación criptográfica:
+
+- `POST /api/v1/payment-webhooks/stripe`;
+- `POST /api/v1/payment-webhooks/mercado-pago`.
+
+El retorno del navegador y el cuerpo del webhook no son fuente suficiente para
+completar el pago. El backend consulta la sesión/Order al proveedor y concilia
+monto, moneda y contexto antes de actualizar ventas o membresías.

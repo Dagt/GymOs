@@ -1,6 +1,8 @@
 package com.gymos.bookings.application;
 
 import com.gymos.audit.api.AuditService;
+import com.gymos.bookings.api.events.BookingCreatedV1;
+import com.gymos.bookings.api.events.BookingStatusChangedV1;
 import com.gymos.bookings.application.ResourceScheduleResolver.ResourceHours;
 import com.gymos.bookings.application.command.CreateBookingCommand;
 import com.gymos.bookings.application.command.CreateResourceCommand;
@@ -21,6 +23,7 @@ import com.gymos.eligibility.api.EligibilityPolicy;
 import com.gymos.eligibility.api.EligibilityPolicy.EligibilityDecision;
 import com.gymos.eligibility.api.EligibilityPolicy.EligibilityRequest;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -30,6 +33,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.ApplicationEventPublisher;
 
 @Service
 public class BookingService {
@@ -42,6 +46,7 @@ public class BookingService {
 	private final ClientBookingConflictRepository clientBookingConflictRepository;
 	private final ResourceScheduleResolver resourceScheduleResolver;
 	private final AuditService auditService;
+	private final ApplicationEventPublisher eventPublisher;
 
 	public BookingService(
 			BookingRepository bookingRepository,
@@ -50,7 +55,8 @@ public class BookingService {
 			EligibilityPolicy eligibilityPolicy,
 			ClientBookingConflictRepository clientBookingConflictRepository,
 			ResourceScheduleResolver resourceScheduleResolver,
-			AuditService auditService
+			AuditService auditService,
+			ApplicationEventPublisher eventPublisher
 	) {
 		this.bookingRepository = bookingRepository;
 		this.bookingResourceRepository = bookingResourceRepository;
@@ -59,6 +65,7 @@ public class BookingService {
 		this.clientBookingConflictRepository = clientBookingConflictRepository;
 		this.resourceScheduleResolver = resourceScheduleResolver;
 		this.auditService = auditService;
+		this.eventPublisher = eventPublisher;
 	}
 
 	@Transactional(readOnly = true)
@@ -115,9 +122,10 @@ public class BookingService {
 			return List.of();
 		}
 		List<AvailabilitySlot> slots = new ArrayList<>();
-		LocalTime cursor = hours.get().opensAt();
-		while (!cursor.plusMinutes(resource.slotMinutes()).isAfter(hours.get().closesAt())) {
-			OffsetDateTime startsAt = resolvedDate.atTime(cursor).atZone(BusinessTime.DEFAULT_ZONE).toOffsetDateTime();
+		LocalDateTime cursor = resolvedDate.atTime(hours.get().opensAt());
+		LocalDateTime closesAt = resolvedDate.atTime(hours.get().closesAt());
+		while (!cursor.plusMinutes(resource.slotMinutes()).isAfter(closesAt)) {
+			OffsetDateTime startsAt = cursor.atZone(BusinessTime.DEFAULT_ZONE).toOffsetDateTime();
 			OffsetDateTime endsAt = startsAt.plusMinutes(resource.slotMinutes());
 			int reserved = bookingRepository.overlappingBookings(principal.organizationId(), principal.branchId(), resourceId, startsAt, endsAt);
 			slots.add(new AvailabilitySlot(startsAt, endsAt, reserved, resource.capacity(), reserved < resource.capacity()));
@@ -195,7 +203,14 @@ public class BookingService {
 				new CreateBookingData(command.resourceId(), command.clientId(), command.startsAt(), command.endsAt(), blankToNull(command.notes()))
 		);
 		auditService.record(principal, "BOOKING_CREATED", "BOOKING", bookingId, "RECEPTION", null, correlationId);
-		return detail(principal, bookingId);
+		BookingRecord created = detail(principal, bookingId);
+		OffsetDateTime occurredAt = OffsetDateTime.now();
+		eventPublisher.publishEvent(new BookingCreatedV1(
+				"booking-created:" + bookingId,
+				principal.organizationId(), principal.branchId(), bookingId,
+				created.clientId(), created.resourceId(), created.startsAt(), created.endsAt(), occurredAt
+		));
+		return created;
 	}
 
 	@Transactional
@@ -215,7 +230,9 @@ public class BookingService {
 		}
 		bookingRepository.updateStatus(principal.organizationId(), principal.branchId(), bookingId, targetStatus, principal.userId());
 		auditService.record(principal, "BOOKING_" + targetStatus, "BOOKING", bookingId, "RECEPTION", targetStatus, correlationId);
-		return detail(principal, bookingId);
+		BookingRecord updated = detail(principal, bookingId);
+		publishStatusChanged(principal, current, updated);
+		return updated;
 	}
 
 	@Transactional
@@ -234,7 +251,21 @@ public class BookingService {
 			bookingRepository.updateStatus(principal.organizationId(), principal.branchId(), bookingId, "CONFIRMED", principal.userId());
 			auditService.record(principal, "BOOKING_CONFIRMED", "BOOKING", bookingId, "RECEPTION", "Pago vinculado", correlationId);
 		}
-		return detail(principal, bookingId);
+		BookingRecord updated = detail(principal, bookingId);
+		if (!current.status().equals(updated.status())) {
+			publishStatusChanged(principal, current, updated);
+		}
+		return updated;
+	}
+
+	private void publishStatusChanged(GymOsPrincipal principal, BookingRecord previous, BookingRecord updated) {
+		OffsetDateTime occurredAt = OffsetDateTime.now();
+		eventPublisher.publishEvent(new BookingStatusChangedV1(
+				"booking-status:" + updated.id() + ":" + updated.status(),
+				principal.organizationId(), principal.branchId(), updated.id(),
+				updated.clientId(), updated.resourceId(), previous.status(), updated.status(),
+				updated.startsAt(), updated.endsAt(), occurredAt
+		));
 	}
 
 	private ResourceRecord activeResource(GymOsPrincipal principal, UUID resourceId) {

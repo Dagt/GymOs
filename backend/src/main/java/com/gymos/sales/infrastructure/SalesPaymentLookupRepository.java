@@ -42,4 +42,20 @@ class SalesPaymentLookupRepository {
 				.query(UUID.class)
 				.optional();
 	}
+
+	Optional<UUID> paymentIdForSale(UUID organizationId, UUID saleId) {
+		return jdbcClient.sql("""
+				SELECT id
+				FROM payment
+				WHERE organization_id = :organizationId
+				  AND sale_id = :saleId
+				  AND deleted_at IS NULL
+				ORDER BY created_at, id
+				LIMIT 1
+				""")
+				.param("organizationId", organizationId)
+				.param("saleId", saleId)
+				.query(UUID.class)
+				.optional();
+	}
 }

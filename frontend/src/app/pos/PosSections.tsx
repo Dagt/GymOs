@@ -12,7 +12,7 @@ export type CartItem = {
   quantity: number;
 };
 
-export type PaymentMethod = "CASH" | "TRANSFER" | "CARD_MANUAL";
+export type PaymentMethod = "CASH" | "TRANSFER" | "CARD_MANUAL" | "CARD_MERCADO_PAGO";
 
 export function ProductGrid({
   loading,
@@ -219,6 +219,8 @@ export function PosCartForm({
   cart,
   currency,
   highlightedProductId,
+    manualCardEnabled,
+    mercadoPagoEnabled,
   paymentAmount,
   paymentMethod,
   paymentReference,
@@ -237,6 +239,8 @@ export function PosCartForm({
   cart: CartItem[];
   currency: string;
   highlightedProductId?: string | null;
+    manualCardEnabled: boolean;
+    mercadoPagoEnabled: boolean;
   paymentAmount: string;
   paymentMethod: PaymentMethod;
   paymentReference: string;
@@ -348,7 +352,8 @@ export function PosCartForm({
               >
                 <option value="CASH">Efectivo</option>
                 <option value="TRANSFER">Transf.</option>
-                <option value="CARD_MANUAL">Tarjeta</option>
+                  {manualCardEnabled ? <option value="CARD_MANUAL">Tarjeta</option> : null}
+                  {mercadoPagoEnabled ? <option value="CARD_MERCADO_PAGO">Mercado Pago Point</option> : null}
               </select>
             </div>
             <div className="flex flex-col gap-1.5">
@@ -374,13 +379,16 @@ export function PosCartForm({
           </div>
 
           <label className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 border-2 border-transparent hover:border-gray-100 transition-all cursor-pointer group">
-            <input
-              checked={validateNow}
+              <input
+                checked={validateNow}
               className="w-4 h-4 rounded border-2 border-gray-300 text-[color:var(--brand-primary)] focus:ring-[color:var(--brand-primary)]/20 cursor-pointer"
-              onChange={(event) => onValidateNowChange(event.target.checked)}
+                disabled={paymentMethod === "CARD_MERCADO_PAGO"}
+                onChange={(event) => onValidateNowChange(event.target.checked)}
               type="checkbox"
             />
-            <span className="text-[0.7rem] font-black text-gray-600 group-hover:text-[color:var(--brand-primary)] transition-colors uppercase tracking-tighter">Validar pago ahora</span>
+              <span className="text-[0.7rem] font-black text-gray-600 group-hover:text-[color:var(--brand-primary)] transition-colors uppercase tracking-tighter">
+                {paymentMethod === "CARD_MERCADO_PAGO" ? "Se confirmara automaticamente por webhook" : "Validar pago ahora"}
+              </span>
           </label>
         </div>
       </div>

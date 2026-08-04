@@ -1,6 +1,7 @@
 package com.gymos.sales.application;
 
 import com.gymos.audit.api.AuditService;
+import com.gymos.payments.api.PaymentConfigurationOperations;
 import com.gymos.sales.api.events.PaymentRecordedV1;
 import com.gymos.sales.api.events.SaleCreatedV1;
 import com.gymos.sales.api.operations.CreateMembershipPlanChangeSaleCommand;
@@ -25,14 +26,17 @@ class MembershipSalesService {
 	private final SalesRepository salesRepository;
 	private final MembershipSaleCommandRepository commandRepository;
 	private final SalePaymentCompletionService completionService;
+	private final PaymentConfigurationOperations paymentConfigurationOperations;
 	private final AuditService auditService;
 	private final ApplicationEventPublisher eventPublisher;
 
 	MembershipSalesService(SalesRepository salesRepository, MembershipSaleCommandRepository commandRepository,
-			SalePaymentCompletionService completionService, AuditService auditService, ApplicationEventPublisher eventPublisher) {
+			SalePaymentCompletionService completionService, PaymentConfigurationOperations paymentConfigurationOperations,
+			AuditService auditService, ApplicationEventPublisher eventPublisher) {
 		this.salesRepository = salesRepository;
 		this.commandRepository = commandRepository;
 		this.completionService = completionService;
+		this.paymentConfigurationOperations = paymentConfigurationOperations;
 		this.auditService = auditService;
 		this.eventPublisher = eventPublisher;
 	}
@@ -58,15 +62,16 @@ class MembershipSalesService {
 			var existing = salesRepository.saleHeaderByIdempotencyKey(draft.organizationId(), normalizedKey);
 			if (existing.isPresent()) {
 				SalesIdempotency.ensureSameRequest(salesRepository.saleRequestHashByIdempotencyKey(draft.organizationId(), normalizedKey).orElse(null), requestHash);
-				return toResult(existing.get());
+				return toResult(draft.organizationId(), existing.get());
 			}
 		}
+		paymentConfigurationOperations.requireReceptionMethod(draft.organizationId(), draft.method());
 		OffsetDateTime now = OffsetDateTime.now();
 		UUID saleId = UUID.randomUUID();
 		UUID paymentId = UUID.randomUUID();
 		String saleNumber = "S-" + now.format(SALE_NUMBER_FORMAT) + "-" + saleId.toString().substring(0, 6).toUpperCase();
 		String normalizedMethod = draft.method().trim().toUpperCase();
-		boolean completed = draft.validateNow() || "CASH".equals(normalizedMethod);
+		boolean completed = draft.totalCents() == 0 || draft.validateNow() || "CASH".equals(normalizedMethod);
 		String paymentStatus = completed ? "COMPLETED" : "PENDING_VALIDATION";
 		String saleStatus = completed ? "PAID" : "PENDING_PAYMENT";
 		long paidCents = completed ? draft.totalCents() : 0;
@@ -86,18 +91,19 @@ class MembershipSalesService {
 					salesRepository.saleRequestHashByIdempotencyKey(draft.organizationId(), normalizedKey).orElse(null),
 					requestHash
 			);
-			return toResult(existing);
+			return toResult(draft.organizationId(), existing);
 		}
 		auditService.recordSystem(draft.organizationId(), draft.branchId(), draft.actorUserId(), "SALE_CREATED", "SALE", saleId, draft.businessContext(), null, draft.correlationId());
 		auditService.recordSystem(draft.organizationId(), draft.branchId(), draft.actorUserId(), "PAYMENT_RECORDED", "PAYMENT", paymentId, draft.businessContext(), null, draft.correlationId());
 		eventPublisher.publishEvent(new SaleCreatedV1("sale-created:" + saleId, draft.organizationId(), draft.branchId(), saleId, saleNumber, draft.businessContext(), draft.totalCents(), draft.currency(), now));
 		eventPublisher.publishEvent(new PaymentRecordedV1("payment-recorded:" + paymentId, draft.organizationId(), draft.branchId(), saleId, paymentId, normalizedMethod, paymentStatus, draft.totalCents(), draft.currency(), now));
 		if (completed) completionService.publishIfNeeded(draft.organizationId(), saleId);
-		return toResult(salesRepository.saleHeader(draft.organizationId(), saleId).orElseThrow());
+		return toResult(draft.organizationId(), salesRepository.saleHeader(draft.organizationId(), saleId).orElseThrow());
 	}
 
-	private MembershipSaleResult toResult(SaleHeader sale) {
-		return new MembershipSaleResult(sale.id(), sale.saleNumber(), sale.status(), sale.totalCents(), sale.paidCents(), sale.balanceCents(), sale.currency(), "PAID".equals(sale.status()));
+	private MembershipSaleResult toResult(UUID organizationId, SaleHeader sale) {
+		UUID paymentId = salesRepository.paymentIdForSale(organizationId, sale.id()).orElse(null);
+		return new MembershipSaleResult(sale.id(), sale.saleNumber(), sale.status(), sale.totalCents(), sale.paidCents(), sale.balanceCents(), sale.currency(), "PAID".equals(sale.status()), paymentId);
 	}
 
 	private record MembershipSaleDraft(

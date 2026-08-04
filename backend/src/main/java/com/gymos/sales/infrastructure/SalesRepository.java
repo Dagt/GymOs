@@ -112,4 +112,8 @@ public class SalesRepository {
 	public Optional<UUID> saleIdForPayment(UUID organizationId, UUID paymentId) {
 		return paymentLookup.saleIdForPayment(organizationId, paymentId);
 	}
+
+	public Optional<UUID> paymentIdForSale(UUID organizationId, UUID saleId) {
+		return paymentLookup.paymentIdForSale(organizationId, saleId);
+	}
 }

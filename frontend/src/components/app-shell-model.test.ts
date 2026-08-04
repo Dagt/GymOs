@@ -24,7 +24,7 @@ test("tenant owner navigation keeps management and client access visible", () =>
   assert.ok(labels.includes("Metricas del negocio"));
   assert.ok(labels.includes("Socios"));
   assert.ok(labels.includes("Equipo y accesos"));
-  assert.ok(labels.includes("Datos y sucursales"));
+  assert.ok(labels.includes("Configuración"));
 });
 
 test("reception navigation is limited to front desk work", () => {
@@ -33,7 +33,7 @@ test("reception navigation is limited to front desk work", () => {
     hasBranch: true,
     permissions: new Set([
       "client.read", "sale.create", "booking.read", "professional.read",
-      "report.sales.read", "benefit.read",
+      "report.sales.read", "benefit.read", "selfservice.session.launch",
     ]),
     variant: "tenant",
   });
@@ -43,20 +43,22 @@ test("reception navigation is limited to front desk work", () => {
   assert.ok(labels.includes("Caja / POS"));
   assert.ok(labels.includes("Socios"));
   assert.ok(labels.includes("Wellness"));
+  assert.ok(labels.includes("Pantalla para socios"));
   assert.equal(labels.includes("Renovaciones"), false);
   assert.equal(labels.includes("Equipo y accesos"), false);
-  assert.equal(labels.includes("Datos y sucursales"), false);
+  assert.equal(labels.includes("Configuración"), false);
 });
 
-test("manager navigation exposes the completed Wellness module", () => {
+test("manager navigation exposes Wellness and automation monitoring", () => {
   const sections = visibleSectionsForConsole({
     consoleType: "TENANT_MANAGER",
     hasBranch: true,
-    permissions: new Set(["booking.read", "professional.read"]),
+    permissions: new Set(["booking.read", "professional.read", "automation.read"]),
     variant: "tenant",
   });
 
   assert.ok(sectionLabels(sections).includes("Wellness"));
+  assert.ok(sectionLabels(sections).includes("Automatizaciones"));
 });
 
 test("branchless tenant users only see setup-safe links", () => {
@@ -67,7 +69,7 @@ test("branchless tenant users only see setup-safe links", () => {
     variant: "tenant",
   });
 
-  assert.deepEqual(sectionLabels(sections), ["Equipo y accesos", "Datos y sucursales"]);
+  assert.deepEqual(sectionLabels(sections), ["Equipo y accesos", "Configuración"]);
 });
 
 test("platform shell uses neutral GymOS brand outside support mode", () => {
