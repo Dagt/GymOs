@@ -1,6 +1,6 @@
 # Autoservicio y kiosco
 
-Estado: `PARCIAL`
+Estado: `LISTO PARA ACEPTACIÓN` (la validación externa de Stripe sandbox se ejecuta por separado)
 
 ## Implementado
 
@@ -17,7 +17,8 @@ Estado: `PARCIAL`
 - marca tenant y superficie sin navegación administrativa.
 - lanzamiento desde recepción con permiso dedicado, sin registrar una
   computadora o navegador;
-- eliminación de credenciales de recepción al entrar en modo kiosco;
+- apertura en una pestaña aislada sin colocar la credencial de kiosco en la URL;
+  recepción conserva su consola y la pestaña pública elimina el traspaso al consumirlo;
 - cierre por inactividad, reinicio para el siguiente socio y límite operativo
   de doce horas;
 - contacto enmascarado, PATCH parcial y respuestas `no-store`;
@@ -58,6 +59,8 @@ Estado: `PARCIAL`
   crear la venta o abandonar GymOS para abrir Stripe Checkout;
 - configuración administrativa de capacidades por sucursal, sin alta ni
   asignación de computadoras o terminales físicas;
+- citas wellness gratuitas desde el kiosco; la API sólo lista servicios activos
+  con precio cero y rechaza cualquier servicio con costo;
 - resolución de IP que ignora `Forwarded`/`X-Forwarded-For` salvo cuando el peer
   inmediato pertenece a los CIDR configurados en `GYMOS_TRUSTED_PROXIES`;
 - diagnóstico de mandatos `PAST_DUE`/`PAUSED` y sustitución consentida del
@@ -70,8 +73,8 @@ Estado: `PARCIAL`
 ## Pendiente
 
 - ejecutar `stripeTest` con credenciales Stripe exclusivamente test y cuenta
-  Connect sandbox. En este corte `postgresIntegrationTest` pasó 30 escenarios
-  reales y el E2E de kiosco pasó 4 recorridos; Stripe omitió sus 3 escenarios
+  Connect sandbox. En este corte `postgresIntegrationTest` pasó 34 escenarios
+  reales y el E2E de kiosco pasó 7 recorridos; Stripe omitió sus 3 escenarios
   porque el entorno no contiene `GYMOS_STRIPE_TEST_SECRET_KEY`;
 - ejecutar los recorridos E2E y las suites conectadas en el ambiente de
   integración para publicar evidencia multi-tenant, expiración, concurrencia y

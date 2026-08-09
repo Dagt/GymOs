@@ -123,6 +123,9 @@ class DatabaseMigrationTests {
 			assertThat(roleHasPermission(connection, "Gerente", "client.read")).isTrue();
 			assertThat(roleHasPermission(connection, "Gerente", "client.create")).isTrue();
 			assertThat(roleHasPermission(connection, "Gerente", "client.update")).isTrue();
+			assertThat(roleHasPermission(connection, "Gerente", "payment.settings.manage")).isTrue();
+			assertThat(roleHasPermission(connection, "Gerente", "selfservice.settings.manage")).isTrue();
+			assertThat(roleHasPermission(connection, "Gerente", "notification.settings.manage")).isTrue();
 			assertThat(roleHasPermission(connection, "Recepcion", "client.read")).isTrue();
 			assertThat(roleHasPermission(connection, "Recepcion", "client.create")).isTrue();
 			assertThat(roleHasPermission(connection, "Recepcion", "client.update")).isTrue();

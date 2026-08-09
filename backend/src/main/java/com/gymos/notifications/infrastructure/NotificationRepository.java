@@ -208,6 +208,22 @@ public class NotificationRepository {
 				.param("actorUserId", actorUserId).update();
 	}
 
+	public EmailPreferenceRecord emailPreference(UUID organizationId, String recipientHash) {
+		return jdbcClient.sql("""
+				SELECT COALESCE(preference.email_enabled, true) AS email_enabled,
+				       COALESCE(preference.marketing_email_enabled, false) AS marketing_email_enabled,
+				       preference.updated_at
+				FROM (SELECT 1) seed
+				LEFT JOIN notification_recipient_preference preference
+				  ON preference.organization_id = :organizationId
+				 AND preference.recipient_hash = :recipientHash
+				""").param("organizationId", organizationId).param("recipientHash", recipientHash)
+				.query((rs, row) -> new EmailPreferenceRecord(
+						rs.getBoolean("email_enabled"), rs.getBoolean("marketing_email_enabled"),
+						rs.getObject("updated_at", OffsetDateTime.class)
+				)).single();
+	}
+
 	public List<UUID> dueEmailIds(OffsetDateTime now, int limit) {
 		return jdbcClient.sql("""
 				SELECT id FROM (
@@ -383,6 +399,9 @@ public class NotificationRepository {
 			UUID organizationId, boolean emailEnabled, String emailProviderKey, String fromEmail,
 			String fromName, String replyTo, OffsetDateTime updatedAt
 	) {
+	}
+
+	public record EmailPreferenceRecord(boolean emailEnabled, boolean marketingEnabled, OffsetDateTime updatedAt) {
 	}
 
 	public record EmailDeliveryRecord(

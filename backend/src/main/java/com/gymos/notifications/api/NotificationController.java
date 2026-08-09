@@ -5,6 +5,7 @@ import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.notifications.application.NotificationService;
 import com.gymos.notifications.application.NotificationService.CreateNotificationCommand;
 import com.gymos.notifications.application.NotificationService.EmailConfigurationView;
+import com.gymos.notifications.application.NotificationService.EmailPreferenceView;
 import com.gymos.notifications.application.NotificationService.UpdateEmailConfigurationCommand;
 import com.gymos.notifications.infrastructure.NotificationRepository.NotificationRecord;
 import jakarta.servlet.http.HttpServletRequest;
@@ -86,6 +87,14 @@ public class NotificationController {
 				principal, request.recipient(), request.emailEnabled(), request.marketingEnabled(),
 				correlationId(servletRequest)
 		);
+	}
+
+	@GetMapping("/email-preferences")
+	EmailPreferenceView emailPreference(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@RequestParam @Email @Size(max = 180) String recipient
+	) {
+		return notificationService.emailPreference(principal, recipient);
 	}
 
 	@PostMapping("/{notificationId}/retry")

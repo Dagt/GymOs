@@ -61,6 +61,17 @@ test("manager navigation exposes Wellness and automation monitoring", () => {
   assert.ok(sectionLabels(sections).includes("Automatizaciones"));
 });
 
+test("manager navigation exposes operational configuration when authorized", () => {
+  const sections = visibleSectionsForConsole({
+    consoleType: "TENANT_MANAGER",
+    hasBranch: true,
+    permissions: new Set(["payment.settings.manage"]),
+    variant: "tenant",
+  });
+
+  assert.ok(sectionLabels(sections).includes("Configuración"));
+});
+
 test("branchless tenant users only see setup-safe links", () => {
   const sections = visibleSectionsForConsole({
     consoleType: "TENANT_OWNER",

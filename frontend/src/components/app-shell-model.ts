@@ -66,7 +66,7 @@ const ownerSections: NavigationSection[] = [
     title: "Mostrador",
     links: [
       { label: "Caja / POS", href: "/pos", hint: "Ventas y pagos", permissions: ["sale.create"] },
-      { label: "Pantalla para socios", href: "/kiosk/browser", hint: "Abrir kiosco seguro", permissions: ["selfservice.session.launch"] },
+      { label: "Pantalla para socios", href: "/kiosk/launch", hint: "Abrir kiosco seguro", permissions: ["selfservice.session.launch"] },
       { label: "Accesos", href: "/access", hint: "Visitas y pases", permissions: ["access.read", "visit.read"] },
       { label: "Beneficios", href: "/benefits", hint: "Promos y reglas", permissions: ["benefit.read"] },
     ],
@@ -87,6 +87,7 @@ const managerSections: NavigationSection[] = [
     links: [
       { label: "Socios", href: "/clients", hint: "Altas y fichas", permissions: memberWorkflowPermissions },
       { label: "Equipo", href: "/users", hint: "Usuarios autorizados", permissions: ["user.read"] },
+      { label: "Configuración", href: "/settings/organization", hint: "Cobros, kiosco y correo", permissions: ["payment.settings.manage", "selfservice.settings.manage", "notification.settings.manage"] },
       { label: "Catalogo", href: "/catalog", hint: "Planes y productos", permissions: ["catalog.read"] },
       { label: "Inventario", href: "/inventory", hint: "Stock", permissions: ["inventory.read"] },
       { label: "Reservas", href: "/bookings", hint: "Agenda", permissions: ["booking.read"] },
@@ -100,7 +101,7 @@ const managerSections: NavigationSection[] = [
     title: "Mostrador",
     links: [
       { label: "Caja / POS", href: "/pos", hint: "Ventas", permissions: ["sale.create"] },
-      { label: "Pantalla para socios", href: "/kiosk/browser", hint: "Abrir kiosco seguro", permissions: ["selfservice.session.launch"] },
+      { label: "Pantalla para socios", href: "/kiosk/launch", hint: "Abrir kiosco seguro", permissions: ["selfservice.session.launch"] },
     ],
   },
 ];
@@ -115,7 +116,7 @@ const receptionSections: NavigationSection[] = [
       { label: "Reservas", href: "/bookings", hint: "Agenda", permissions: ["booking.read"] },
       { label: "Wellness", href: "/wellness", hint: "Bienestar", permissions: ["professional.read", "booking.read"] },
       { label: "Ventas", href: "/reports/sales", hint: "Pagos pendientes", permissions: ["report.sales.read"] },
-      { label: "Pantalla para socios", href: "/kiosk/browser", hint: "Abrir kiosco seguro", permissions: ["selfservice.session.launch"] },
+      { label: "Pantalla para socios", href: "/kiosk/launch", hint: "Abrir kiosco seguro", permissions: ["selfservice.session.launch"] },
     ],
   },
 ];

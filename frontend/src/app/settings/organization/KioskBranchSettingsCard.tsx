@@ -8,7 +8,8 @@ import {
 } from "@/lib/api";
 
 type EditableKey = "membershipEnrollmentAllowed" | "membershipRenewalAllowed" |
-  "membershipPlanChangeAllowed" | "resourceBookingAllowed" | "profileUpdateAllowed" | "autopayAllowed";
+  "membershipPlanChangeAllowed" | "resourceBookingAllowed" | "wellnessBookingAllowed" |
+  "profileUpdateAllowed" | "autopayAllowed";
 
 const options: Array<{ key: EditableKey; title: string; description: string }> = [
   { key: "membershipEnrollmentAllowed", title: "Comprar membresía", description: "Alta y pago en Stripe desde el navegador." },
@@ -16,6 +17,7 @@ const options: Array<{ key: EditableKey; title: string; description: string }> =
   { key: "membershipPlanChangeAllowed", title: "Cambiar de plan", description: "Aplica la cotización final antes del pago." },
   { key: "autopayAllowed", title: "Domiciliación", description: "Consentimiento y tarjeta tokenizada con Stripe." },
   { key: "resourceBookingAllowed", title: "Reservas gratuitas", description: "No habilita recursos ni wellness con costo." },
+  { key: "wellnessBookingAllowed", title: "Citas wellness gratuitas", description: "Muestra únicamente servicios activos con precio cero." },
   { key: "profileUpdateAllowed", title: "Actualizar contacto", description: "Correo y teléfono del socio verificado." },
 ];
 
@@ -50,6 +52,7 @@ export function KioskBranchSettingsCard({ accessToken }: { accessToken: string }
         membershipRenewal: capabilities.membershipRenewalAllowed,
         membershipPlanChange: capabilities.membershipPlanChangeAllowed,
         resourceBooking: capabilities.resourceBookingAllowed,
+        wellnessBooking: capabilities.wellnessBookingAllowed,
         profileUpdate: capabilities.profileUpdateAllowed,
         autopay: capabilities.autopayAllowed,
       });
@@ -75,7 +78,7 @@ export function KioskBranchSettingsCard({ accessToken }: { accessToken: string }
         <div className="max-w-md rounded-lg border border-[var(--brand-line)] bg-[var(--brand-surface)] p-4 text-sm">
           <strong className="block">Cómo abrirlo</strong>
           <span className="mt-1 block leading-5 text-[var(--brand-muted)]">
-            Inicia sesión con una cuenta de recepción, elige la sucursal y usa “Abrir kiosco” desde su pantalla de inicio. GymOS cerrará el acceso administrativo en esa pantalla.
+            Inicia sesión con una cuenta de recepción, elige la sucursal y usa “Abrir kiosco” desde su pantalla de inicio. GymOS abrirá otra pestaña sin acceso administrativo y conservará recepción disponible para el personal.
           </span>
         </div>
       </div>

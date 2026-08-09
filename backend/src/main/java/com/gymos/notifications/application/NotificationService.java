@@ -182,14 +182,27 @@ public class NotificationService {
 			GymOsPrincipal principal, String recipient, boolean emailEnabled,
 			boolean marketingEnabled, String correlationId
 	) {
-		requirePrincipal(principal);
+		requirePreferenceManagement(principal);
 		String normalized = normalizeEmail(recipient, true);
 		notificationRepository.setEmailPreference(
-				principal.organizationId(), recipientHasher.hash(normalized), emailEnabled, marketingEnabled, principal.userId()
+				principal.organizationId(), recipientHasher.hash(normalized), emailEnabled,
+				emailEnabled && marketingEnabled, principal.userId()
 		);
 		auditService.record(
 				principal, "NOTIFICATION_EMAIL_PREFERENCE_UPDATED", "ORGANIZATION",
 				principal.organizationId(), "SETTINGS", null, correlationId
+		);
+	}
+
+	@Transactional(readOnly = true)
+	public EmailPreferenceView emailPreference(GymOsPrincipal principal, String recipient) {
+		requirePreferenceManagement(principal);
+		String normalized = normalizeEmail(recipient, true);
+		var preference = notificationRepository.emailPreference(
+				principal.organizationId(), recipientHasher.hash(normalized)
+		);
+		return new EmailPreferenceView(
+				preference.emailEnabled(), preference.marketingEnabled(), preference.updatedAt()
 		);
 	}
 
@@ -310,6 +323,19 @@ public class NotificationService {
 		}
 	}
 
+	private void requirePreferenceManagement(GymOsPrincipal principal) {
+		requirePrincipal(principal);
+		if (!principal.permissions().contains("client.update")
+				&& !principal.permissions().contains("notification.manage")
+				&& !principal.permissions().contains("notification.settings.manage")
+				&& !principal.permissions().contains("platform.admin")) {
+			throw new BusinessException(
+					"NOTIFICATION_PREFERENCE_FORBIDDEN",
+					"No tienes permiso para administrar las preferencias de correo."
+			);
+		}
+	}
+
 	public record CreateNotificationCommand(
 			String channel,
 			String recipient,
@@ -342,6 +368,9 @@ public class NotificationService {
 			String fromName, String replyTo, boolean providerAvailable, boolean ready,
 			OffsetDateTime updatedAt
 	) {
+	}
+
+	public record EmailPreferenceView(boolean emailEnabled, boolean marketingEnabled, OffsetDateTime updatedAt) {
 	}
 
 	private record ResolvedRecipient(String email, String displayName) {

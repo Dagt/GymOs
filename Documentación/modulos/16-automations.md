@@ -1,6 +1,6 @@
 # Automatizaciones
 
-Estado: `PARCIAL`
+Estado: `LISTO PARA ACEPTACIÓN` (la validación externa de Stripe sandbox se ejecuta por separado)
 
 ## Implementado
 
@@ -55,7 +55,7 @@ Estado: `PARCIAL`
 
 ## Pendiente
 
-- repetir la suite `postgresIntegrationTest` en CI; el corte local ejecutó 30
+- repetir la suite `postgresIntegrationTest` en CI; el corte local ejecutó 34
   escenarios PostgreSQL reales sin fallos ni omisiones;
 - ejecutar los escenarios E2E conectados en el ambiente de integración para
   conservar evidencia de aislamiento, expiración y recuperación extremo a

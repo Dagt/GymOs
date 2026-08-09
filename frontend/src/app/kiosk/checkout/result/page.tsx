@@ -11,8 +11,8 @@ export default function KioskCheckoutResultPage() {
           autorización de domiciliación únicamente cuando reciba el webhook firmado y consulte
           el estado autoritativo en Stripe.
         </p>
-        <Link className="app-button mt-7 inline-flex" href="/kiosk/browser">
-          Volver al kiosco
+        <Link className="app-button mt-7 inline-flex" href="/kiosk/launch">
+          Abrir nuevamente desde recepción
         </Link>
       </section>
     </main>

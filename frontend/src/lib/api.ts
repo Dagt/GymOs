@@ -126,7 +126,6 @@ export type {
 } from "./api/membership-types";
 export {
   changeMembershipPlanFromKiosk,
-  createKioskSession,
   enrollMembershipFromKiosk,
   endKioskSession,
   getKioskAutopayMandate,
@@ -343,8 +342,10 @@ export {
   getAutomationScheduler,
   getAutomations,
   getNotifications,
+  getEmailRecipientPreference,
   getEmailNotificationConfiguration,
   updateEmailNotificationConfiguration,
+  updateEmailRecipientPreference,
   sendTestEmail,
   retryNotificationEmail,
   recoverAutomationDeadLetter,
@@ -363,7 +364,9 @@ export type {
   CreateNotificationPayload,
   NotificationLog,
   EmailNotificationConfiguration,
+  EmailRecipientPreference,
   UpdateEmailNotificationConfiguration,
+  UpdateEmailRecipientPreference,
 } from "./api/automation-types";
 export * from "./api/reporting";
 export * from "./api/onboarding";

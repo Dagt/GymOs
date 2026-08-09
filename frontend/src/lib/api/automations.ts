@@ -12,6 +12,8 @@ import type {
   AutomationOperations,
   AutomationSchedulerStatus,
   EmailNotificationConfiguration,
+  EmailRecipientPreference,
+  UpdateEmailRecipientPreference,
   UpdateEmailNotificationConfiguration,
 } from "./automation-types";
 
@@ -60,6 +62,26 @@ export async function retryNotificationEmail(
   notificationId: string,
 ): Promise<NotificationLog> {
   return apiFetch<NotificationLog>(`/notifications/${notificationId}/retry`, accessToken, { method: "POST" });
+}
+
+export async function getEmailRecipientPreference(
+  accessToken: string,
+  recipient: string,
+): Promise<EmailRecipientPreference> {
+  return apiFetch<EmailRecipientPreference>(
+    `/notifications/email-preferences?recipient=${encodeURIComponent(recipient)}`,
+    accessToken,
+  );
+}
+
+export async function updateEmailRecipientPreference(
+  accessToken: string,
+  payload: UpdateEmailRecipientPreference,
+): Promise<void> {
+  await apiFetch<void>("/notifications/email-preferences", accessToken, {
+    method: "PUT",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
 }
 
 export async function getAutomations(accessToken: string): Promise<AutomationRule[]> {

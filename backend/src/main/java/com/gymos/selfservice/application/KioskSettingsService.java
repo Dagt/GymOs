@@ -56,7 +56,7 @@ public class KioskSettingsService {
 				new BranchKioskConfigurationData(
 						command.membershipEnrollment(), command.membershipRenewal(),
 						command.membershipPlanChange(), command.resourceBooking(),
-						command.profileUpdate(), command.autopay()
+						command.wellnessBooking(), command.profileUpdate(), command.autopay()
 				)
 		)) {
 			throw new BusinessException("KIOSK_BRANCH_NOT_FOUND", "La sucursal no existe o no esta activa.");
@@ -80,7 +80,7 @@ public class KioskSettingsService {
 	public record UpdateKioskSettings(
 			boolean membershipEnrollment, boolean membershipRenewal,
 			boolean membershipPlanChange, boolean resourceBooking,
-			boolean profileUpdate, boolean autopay
+			boolean wellnessBooking, boolean profileUpdate, boolean autopay
 	) {}
 
 	public record BranchKioskSettings(

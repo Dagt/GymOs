@@ -18,6 +18,7 @@ import {
   statusLabel,
 } from "./ClientDetailHelpers";
 import { useClientDetailController } from "./useClientDetailController";
+import { EmailPreferencesCard } from "./EmailPreferencesCard";
 
 export default function ClientDetailPage() {
   const controller = useClientDetailController();
@@ -77,6 +78,12 @@ export default function ClientDetailPage() {
             client={controller.data.client}
             onEdit={() => controller.setShowEditDrawer(true)}
           />
+          {controller.canEditClient && controller.data.client.email ? (
+            <EmailPreferencesCard
+              accessToken={controller.session.accessToken}
+              recipient={controller.data.client.email}
+            />
+          ) : null}
           {controller.canReadMemberships ? (
             <MembershipHistory
               canChange={controller.canChangeMembership}

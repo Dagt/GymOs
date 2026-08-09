@@ -59,6 +59,18 @@ export type UpdateEmailNotificationConfiguration = {
   replyTo?: string | null;
 };
 
+export type EmailRecipientPreference = {
+  emailEnabled: boolean;
+  marketingEnabled: boolean;
+  updatedAt: string | null;
+};
+
+export type UpdateEmailRecipientPreference = {
+  recipient: string;
+  emailEnabled: boolean;
+  marketingEnabled: boolean;
+};
+
 export type AutomationRule = {
   organizationId: string;
   branchId: string | null;

@@ -58,6 +58,7 @@ const sale = {
   }],
   refunds: [],
   memberships: [],
+  appliedBenefits: [],
 };
 
 test("registra devolucion por cantidad y solicita reposicion de inventario", async ({ page }) => {
@@ -100,7 +101,7 @@ test("registra devolucion por cantidad y solicita reposicion de inventario", asy
   await expect(page.getByRole("heading", { name: "S-REFUND-1" })).toBeVisible();
   await page.getByLabel("Devolver productos y cantidades especificas").check();
   await page.getByLabel(/Agua/).check();
-  await page.getByLabel("Cantidad").fill("2");
+  await page.getByRole("spinbutton", { name: "Cantidad" }).fill("2");
   await page.getByLabel("Motivo").fill("Producto devuelto");
   await page.getByRole("button", { name: "Registrar reembolso" }).click();
 

@@ -50,7 +50,7 @@ test("el kiosco aplica capacidades, no ofrece pago manual y actualiza contacto",
     return false;
   });
 
-  await page.goto("/kiosk/KIOSK-MAIN");
+  await openLaunchedKiosk(page);
   await page.getByPlaceholder("Correo o teléfono").fill("andrea@example.com");
   await page.getByLabel("Fecha de nacimiento en formato día mes año").fill("10/05/1994");
   await page.getByRole("button", { name: "Continuar de forma segura" }).click();
@@ -171,7 +171,7 @@ test("un socio sin membresia puede abrir Stripe Checkout con una intencion idemp
     return false;
   });
 
-  await page.goto("/kiosk/KIOSK-MAIN");
+  await openLaunchedKiosk(page);
   await page.getByPlaceholder("Correo o teléfono").fill("andrea@example.com");
   await page.getByLabel("Fecha de nacimiento en formato día mes año").fill("10/05/1994");
   await page.getByRole("button", { name: "Continuar de forma segura" }).click();
@@ -256,7 +256,7 @@ test("muestra comprobante y permite recuperar una domiciliacion PAST_DUE con otr
     return false;
   });
 
-  await page.goto("/kiosk/KIOSK-MAIN");
+  await openLaunchedKiosk(page);
   await page.getByPlaceholder(/Correo o tel/).fill("andrea@example.com");
   await page.getByLabel(/Fecha de nacimiento/).fill("10/05/1994");
   await page.getByRole("button", { name: "Continuar de forma segura" }).click();
@@ -330,7 +330,7 @@ test("el socio acepta terminos versionados antes de tokenizar la domiciliacion",
     return false;
   });
 
-  await page.goto("/kiosk/KIOSK-MAIN");
+  await openLaunchedKiosk(page);
   await page.getByPlaceholder("Correo o teléfono").fill("andrea@example.com");
   await page.getByLabel("Fecha de nacimiento en formato día mes año").fill("10/05/1994");
   await page.getByRole("button", { name: "Continuar de forma segura" }).click();
@@ -346,6 +346,82 @@ test("el socio acepta terminos versionados antes de tokenizar la domiciliacion",
   expect(setupPayload?.accepted).toBe(true);
   expect(setupPayload?.termsVersion).toBe("2026-08-03");
   expect(setupPayload?.idempotencyKey).toEqual(expect.stringContaining(`kiosk-autopay:${sessionId}:${membershipId}:2026-08-03:`));
+});
+
+test("el kiosco agenda únicamente servicios wellness gratuitos", async ({ page }) => {
+  const professionalId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const serviceId = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
+  const startsAt = "2099-08-01T16:00:00Z";
+  let appointmentPayload: Record<string, unknown> | null = null;
+
+  await mockKiosk(page, async (route, path) => {
+    const method = route.request().method();
+    if (method === "POST" && path === `/self-service/sessions/${sessionId}/verify`) {
+      return fulfill(route, {
+        ...summaryResponse(),
+        capabilities: { ...capabilities(), wellnessBookingAllowed: true },
+      });
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/membership-options`) {
+      return fulfill(route, []);
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/wellness/professionals`) {
+      return fulfill(route, [{
+        id: professionalId,
+        displayName: "Dra. Ana Ruiz",
+        professionalType: "NUTRITIONIST",
+        bio: null,
+        officeLocation: "Consultorio 1",
+        engagementType: "STAFF",
+      }]);
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/wellness/professionals/${professionalId}/services`) {
+      return fulfill(route, [{
+        id: serviceId,
+        professionalId,
+        name: "Orientación inicial",
+        serviceType: "CONSULTATION",
+        durationMinutes: 30,
+        priceCents: 0,
+        currency: "MXN",
+      }]);
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/wellness/professionals/${professionalId}/availability`) {
+      return fulfill(route, appointmentPayload ? [] : [{ startsAt, endsAt: "2099-08-01T16:30:00Z", available: true }]);
+    }
+    if (method === "POST" && path === `/self-service/sessions/${sessionId}/wellness/appointments`) {
+      appointmentPayload = route.request().postDataJSON() as Record<string, unknown>;
+      return fulfill(route, {
+        id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        professionalId,
+        professionalName: "Dra. Ana Ruiz",
+        serviceId,
+        serviceName: "Orientación inicial",
+        priceCents: 0,
+        startsAt,
+        endsAt: "2099-08-01T16:30:00Z",
+        status: "CONFIRMED",
+      });
+    }
+    return false;
+  });
+
+  await openLaunchedKiosk(page);
+  await page.getByPlaceholder(/Correo o tel/).fill("andrea@example.com");
+  await page.getByLabel(/Fecha de nacimiento/).fill("10/05/1994");
+  await page.getByRole("button", { name: "Continuar de forma segura" }).click();
+
+  await expect(page.getByRole("heading", { name: "Agenda una cita wellness gratuita" })).toBeVisible();
+  await expect(page.getByLabel("Servicio gratuito")).toContainText("Orientación inicial");
+  await page.getByRole("button", { name: /\d{2}:\d{2}/ }).click();
+  await page.getByRole("button", { name: "Confirmar cita gratuita" }).click();
+
+  await expect(page.getByText("Tu cita con Dra. Ana Ruiz fue creada correctamente.")).toBeVisible();
+  expect(appointmentPayload).toEqual({
+    professionalId,
+    serviceId,
+    startsAt,
+  });
 });
 
 async function mockKiosk(
@@ -401,6 +477,17 @@ function sessionResponse() {
     verified: false,
     capabilities: capabilities(),
   };
+}
+
+async function openLaunchedKiosk(page: Page) {
+  const encoded = Buffer.from(JSON.stringify(sessionResponse()), "utf8")
+    .toString("base64")
+    .replaceAll("+", "-")
+    .replaceAll("/", "_")
+    .replaceAll("=", "");
+  await page.goto("about:blank");
+  await page.evaluate((transfer) => { window.name = transfer; }, encoded);
+  await page.goto("/kiosk/reception");
 }
 
 function summaryResponse() {

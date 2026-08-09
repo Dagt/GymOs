@@ -71,20 +71,6 @@ public class SelfServiceController {
 		));
 	}
 
-	@PostMapping("/terminals/{terminalCode}/sessions")
-	CreateSessionResponse createSession(
-			@PathVariable String terminalCode,
-			@AuthenticationPrincipal GymOsPrincipal principal,
-			HttpServletRequest servletRequest
-	) {
-		return toResponse(selfServiceService.createSession(
-				terminalCode,
-				principal,
-				clientIpResolver.resolve(servletRequest),
-				correlationId(servletRequest)
-		));
-	}
-
 	@PostMapping("/sessions/{sessionId}/verify")
 	SelfServiceSummaryResponse verify(@PathVariable UUID sessionId, @Valid @RequestBody VerifySessionRequest request, @RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken, HttpServletRequest servletRequest) {
 		return toResponse(selfServiceService.verify(sessionId, sessionToken, request.toCommand(), correlationId(servletRequest), clientIpResolver.resolve(servletRequest)));

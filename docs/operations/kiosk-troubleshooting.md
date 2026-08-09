@@ -9,11 +9,15 @@
 
 ## Checks
 
-1. Confirm the branch kiosk profile is active in Organization settings.
-2. Confirm the reception account launched the kiosk in the expected organization and branch. No computer ID is registered.
-3. Confirm local clock and backend clock are aligned.
-4. Confirm `X-Self-Service-Session-Token` is sent after verification.
-5. Check rate limiting and blocked-until state.
+1. Confirm the branch kiosk profile and its capabilities are active in Organization settings.
+2. Confirm the reception account selected the expected organization and branch, opened `/kiosk/launch`, and allowed the new tab. No computer ID is registered.
+3. Confirm the kiosk arrived at `/kiosk/reception`. Opening that route directly is intentionally rejected because it lacks the one-time browser handoff.
+4. Confirm local clock and backend clock are aligned.
+5. Confirm `X-Self-Service-Session-Token` is sent after verification.
+6. Check rate limiting and blocked-until state.
+
+For wellness, only active services with `price_cents = 0` are returned. A paid
+service is rejected by the backend even if a client attempts to submit its ID.
 
 ## Data Safety
 

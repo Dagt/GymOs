@@ -122,7 +122,7 @@ public class SelfServiceRepository {
 				           'membershipRenewal', :membershipRenewal,
 				           'membershipPlanChange', :membershipPlanChange,
 				           'resourceBooking', :resourceBooking,
-				           'wellnessBooking', false,
+					           'wellnessBooking', :wellnessBooking,
 				           'profileUpdate', :profileUpdate,
 				           'autopay', :autopay
 				       ), :now, :now, :actorUserId, :actorUserId, 0
@@ -145,6 +145,7 @@ public class SelfServiceRepository {
 				.param("membershipRenewal", data.membershipRenewal())
 				.param("membershipPlanChange", data.membershipPlanChange())
 				.param("resourceBooking", data.resourceBooking())
+				.param("wellnessBooking", data.wellnessBooking())
 				.param("profileUpdate", data.profileUpdate())
 				.param("autopay", data.autopay())
 				.param("now", now)
@@ -620,7 +621,7 @@ public class SelfServiceRepository {
 	public record BranchKioskConfigurationData(
 			boolean membershipEnrollment, boolean membershipRenewal,
 			boolean membershipPlanChange, boolean resourceBooking,
-			boolean profileUpdate, boolean autopay
+			boolean wellnessBooking, boolean profileUpdate, boolean autopay
 	) {}
 
 	public record SelfServicePaymentRecord(

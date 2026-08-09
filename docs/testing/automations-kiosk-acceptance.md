@@ -9,7 +9,7 @@ Esta guía reúne el alcance funcional implementado y los recorridos recomendado
 | Dueño del gimnasio | `Configuración` en el menú | Configurar cobros, Stripe, capacidades del kiosco y correo. |
 | Administrador GymOS en soporte | Entrar al gimnasio y seleccionar una sucursal | Puede revisar y configurar el mismo alcance con auditoría de soporte. |
 | Gerente | `Automatizaciones` | Consultar reglas, historial y estado operativo según sus permisos. |
-| Recepción | `Inicio recepción` → `Abrir kiosco seguro` | Convertir la pantalla actual en autoservicio restringido para socios. |
+| Recepción | `Inicio recepción` → `Abrir kiosco seguro` | Abrir una pestaña separada de autoservicio; recepción conserva su consola. |
 | Dueño o administrador | `Automatizaciones` | Crear reglas, ejecutar pruebas, pausar el procesamiento y recuperar fallos según sus permisos. |
 
 ## Preparación inicial
@@ -29,8 +29,8 @@ Esta guía reúne el alcance funcional implementado y los recorridos recomendado
 ### Apertura sin registro de computadoras
 
 - Recepción abre `/reception` y selecciona `Abrir kiosco seguro`.
-- GymOS crea o reutiliza la configuración lógica de la sucursal y abre `/kiosk/browser`.
-- La sesión administrativa se elimina de esa pantalla; el socio no recibe acceso al POS, clientes, reportes ni otras funciones de recepción.
+- GymOS crea o reutiliza la configuración lógica de la sucursal y abre `/kiosk/reception` en otra pestaña mediante un traspaso temporal que no aparece en la URL.
+- La pestaña del kiosco no conserva la sesión administrativa; la pestaña de recepción sigue disponible para el personal. El socio no recibe acceso al POS, clientes, reportes ni otras funciones.
 - Si alguien abre la URL directamente sin una sesión de recepción, la pantalla explica cómo iniciar correctamente. No solicita un ID de computadora.
 - La pantalla puede maximizarse o ponerse en modo pantalla completa desde el navegador.
 
@@ -76,7 +76,8 @@ Esta guía reúne el alcance funcional implementado y los recorridos recomendado
 
 - Actualización opcional de correo y teléfono, habilitable por sucursal.
 - Reserva de recursos gratuitos con consulta de disponibilidad y protección de datos de otros socios.
-- Los recursos reservables con costo y los servicios de wellness con costo no están implementados ni se ofrecen en el kiosco.
+- Reserva de citas wellness gratuitas con selección de profesional, servicio y horario.
+- Los recursos reservables con costo y los servicios de wellness con costo no están implementados ni se exponen en el kiosco; el backend también los rechaza.
 
 ## Configuración del kiosco por sucursal
 
@@ -87,6 +88,7 @@ En `Configuración` → `Kiosco web` (`/settings/organization#kiosk-settings`) s
 - cambiar de plan;
 - domiciliación con Stripe;
 - reservas gratuitas;
+- citas wellness gratuitas;
 - actualización de contacto.
 
 La tarjeta muestra por sucursal si Stripe Checkout y la domiciliación están listos. Activar una capacidad no sustituye la conexión de Stripe: mientras el proveedor no esté listo, el kiosco explica el requisito y bloquea el cobro.

@@ -15,15 +15,6 @@ import type {
   RenewMembershipResponse,
 } from "./selfservice-types";
 
-export async function createKioskSession(
-  terminalCode: string,
-  accessToken: string,
-): Promise<KioskSessionResponse> {
-  return apiFetch<KioskSessionResponse>(`/self-service/terminals/${terminalCode}/sessions`, accessToken, {
-    method: "POST",
-  });
-}
-
 export async function launchKioskSession(accessToken: string): Promise<KioskSessionResponse> {
   return apiFetch<KioskSessionResponse>("/self-service/kiosk-sessions", accessToken, { method: "POST" });
 }

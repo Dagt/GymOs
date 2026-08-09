@@ -135,16 +135,6 @@ public class SelfServiceService {
 		return createSession(terminal, principal.userId(), originIp, correlationId);
 	}
 
-	@Transactional
-	public CreateSessionResult createSession(String terminalCode, GymOsPrincipal principal, String originIp, String correlationId) {
-		requireLaunchContext(principal);
-		rateLimiter.check("kiosk:create:ip:" + originIp, 30, Duration.ofMinutes(1));
-		rateLimiter.check("kiosk:create:terminal:" + terminalCode, 20, Duration.ofMinutes(1));
-		TerminalRecord terminal = repository.terminal(terminalCode, principal.organizationId(), principal.branchId())
-				.orElseThrow(() -> new BusinessException("SELF_SERVICE_TERMINAL_NOT_FOUND", "El kiosco no esta disponible."));
-		return createSession(terminal, principal.userId(), originIp, correlationId);
-	}
-
 	private CreateSessionResult createSession(TerminalRecord terminal, UUID launchedByUserId, String originIp, String correlationId) {
 		OffsetDateTime now = OffsetDateTime.now();
 		OffsetDateTime browserExpiresAt = now.plus(BROWSER_MODE_MAX_DURATION);
@@ -512,6 +502,15 @@ public class SelfServiceService {
 	private SessionRecord verifiedSession(UUID sessionId, String sessionToken) {
 		SessionRecord session = activeSession(sessionId, sessionToken);
 		if (session.clientId() == null) throw new BusinessException("SELF_SERVICE_SESSION_NOT_VERIFIED", "Primero verifica tu identidad.");
+		return session;
+	}
+
+	@Transactional
+	public SessionRecord verifiedSession(
+			UUID sessionId, String sessionToken, SelfServiceCapability capability
+	) {
+		SessionRecord session = verifiedSession(sessionId, sessionToken);
+		capabilityPolicy.require(capabilities(session), capability);
 		return session;
 	}
 

@@ -239,6 +239,28 @@ class SecurityAuthorizationTests {
 	}
 
 	@Test
+	@WithMockUser(authorities = "notification.read")
+	void emailPreferenceMutationRequiresClientOrNotificationManagement() throws Exception {
+		mockMvc.perform(put("/api/v1/notifications/email-preferences")
+				.contentType("application/json")
+				.content("{\"recipient\":\"socio@example.com\",\"emailEnabled\":true,\"marketingEnabled\":false}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(authorities = "client.update")
+	void clientEditorsCanReachEmailPreferences() throws Exception {
+		var read = mockMvc.perform(get("/api/v1/notifications/email-preferences")
+				.param("recipient", "socio@example.com")).andReturn();
+		var update = mockMvc.perform(put("/api/v1/notifications/email-preferences")
+				.contentType("application/json")
+				.content("{\"recipient\":\"socio@example.com\",\"emailEnabled\":true,\"marketingEnabled\":false}"))
+				.andReturn();
+		assertThat(read.getResponse().getStatus()).isNotIn(401, 403);
+		assertThat(update.getResponse().getStatus()).isNotIn(401, 403);
+	}
+
+	@Test
 	@WithMockUser(authorities = "client.create")
 	void clientImportRequiresImportPermission() throws Exception {
 		mockMvc.perform(post("/api/v1/clients/imports").contentType("application/json").content("{}"))
@@ -302,9 +324,10 @@ class SecurityAuthorizationTests {
 	}
 
 	@Test
-	void selfServiceSessionCreationRequiresKioskLaunchPermission() throws Exception {
+	@WithMockUser(authorities = "selfservice.session.launch")
+	void legacyTerminalSessionCreationIsNotAvailable() throws Exception {
 		mockMvc.perform(post("/api/v1/self-service/terminals/UNKNOWN/sessions"))
-				.andExpect(status().isUnauthorized());
+				.andExpect(status().isNotFound());
 	}
 
 	@Test

@@ -25,6 +25,7 @@ export type UpdateKioskBranchSettings = {
   membershipRenewal: boolean;
   membershipPlanChange: boolean;
   resourceBooking: boolean;
+  wellnessBooking: boolean;
   profileUpdate: boolean;
   autopay: boolean;
 };

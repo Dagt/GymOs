@@ -160,7 +160,6 @@ Estado comercial de gimnasio cliente:
 
 - `POST /self-service/kiosk-sessions` — requiere JWT y
   `selfservice.session.launch`; selecciona el perfil lógico de la sucursal.
-- `POST /self-service/terminals/{terminalCode}/sessions`
 - `POST /self-service/sessions/{sessionId}/verify`
 - `GET /self-service/sessions/{sessionId}/summary`
 - `GET /self-service/sessions/{sessionId}/membership-options`
@@ -175,13 +174,20 @@ Estado comercial de gimnasio cliente:
 - `POST /self-service/sessions/{sessionId}/end`
 - `POST /self-service/sessions/{sessionId}/reset` — limpia identidad y datos
   visibles para el siguiente socio, conservando sólo el modo kiosco.
+- `GET /self-service/sessions/{sessionId}/wellness/professionals`
+- `GET /self-service/sessions/{sessionId}/wellness/professionals/{professionalId}/services`
+- `GET /self-service/sessions/{sessionId}/wellness/professionals/{professionalId}/availability`
+- `POST /self-service/sessions/{sessionId}/wellness/appointments` — sólo
+  acepta servicios activos con costo cero.
 
 Los endpoints de autoservicio sólo exponen acciones permitidas para clientes en una sesión temporal de kiosco. Las reglas de pagos, membresías, beneficios y permisos se validan en backend.
 
 La creación inicial ya no es pública. Recepción abre el modo kiosco desde su
 sesión y el frontend elimina inmediatamente sus tokens operativos. El código
-`KIOSK-MAIN` es una etiqueta/configuración lógica, no una identidad de
-computadora ni una credencial.
+`KIOSK-MAIN` permanece únicamente como una etiqueta/configuración lógica
+interna, no como identidad de computadora ni credencial. La ruta pública
+heredada por `terminalCode` fue eliminada: el único inicio válido requiere la
+sesión autenticada de recepción.
 
 `autopay/setup` exige la versión vigente del consentimiento, aceptación
 explícita y llave idempotente. Devuelve una URL de Stripe Checkout en modo
@@ -209,7 +215,10 @@ la domiciliación del socio.
 
 La sesion publica de kiosco usa logo, nombre visible y colores del gimnasio al que pertenece el terminal. La sucursal vinculada define el contexto operativo del kiosco, no una marca visual propia.
 
-Cuando el frontend abre `/kiosk/{terminalCode}` desde una sesion autenticada, envia `X-GymOS-Organization-Id` y `X-GymOS-Branch-Id` para resolver correctamente codigos comunes como `KIOSK-MAIN` dentro del gimnasio activo.
+El frontend abre `/kiosk/launch` desde recepción, solicita la sesión limitada y
+la entrega a una pestaña nueva mediante almacenamiento efímero del navegador.
+La credencial no se coloca en la URL y se borra al consumirla. La pestaña
+administrativa conserva recepción; la del kiosco queda aislada.
 
 Nota implementada Hito 3: las acciones de renovacion y cambio de plan reciben `{membershipId}` en la ruta concreta:
 - `POST /self-service/sessions/{sessionId}/membership-enrollments` recibe
@@ -222,7 +231,7 @@ Cambio Hito 3.5 final:
 - `POST /self-service/sessions/{sessionId}/verify` ahora recibe `{ "identifier": "email o telefono", "birthDate": "YYYY-MM-DD" }`.
 - Contrato anterior: `{ "identifier": "email o telefono" }`.
 - Razon: evitar verificacion debil y reducir riesgo de enumeracion de clientes.
-- Impacto frontend: `/kiosk/[terminalCode]` solicita fecha de nacimiento y envia ambos campos.
+- Impacto frontend: `/kiosk/reception` solicita fecha de nacimiento y envía ambos campos.
 
 ## 6.2 Personas
 
@@ -685,10 +694,13 @@ Nota implementada Hito 6:
 
 ## 6.20 Cambios Hito 3.5
 
-Contratos HTTP preservados:
-- No se eliminaron rutas existentes de ventas, pagos, membresias ni kiosco.
+Contratos HTTP vigentes:
+- Se preservan las rutas de ventas, pagos y membresías. La ruta pública
+  heredada de alta por `terminalCode` se retiró por seguridad y fue sustituida
+  por `POST /self-service/kiosk-sessions` autenticado.
 - `ManualPaymentRequest`, renovacion, cambio de plan y creacion de venta aceptan `idempotencyKey` opcional.
-- `POST /self-service/terminals/{terminalCode}/sessions` ahora devuelve tambien `sessionToken`.
+- `POST /self-service/kiosk-sessions` devuelve `sessionToken` para la pestaña
+  restringida.
 - Las rutas de sesion de kiosco requieren header `X-Self-Service-Session-Token`.
 
 API interna publica:

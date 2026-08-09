@@ -2,7 +2,6 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useParams } from "next/navigation";
 import { CSSProperties, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   changeMembershipPlanFromKiosk,
@@ -11,10 +10,8 @@ import {
   getKioskMembershipQuote,
   getKioskAutopayMandate,
   getKioskAutopayTerms,
-  getStoredSession,
   getKioskMembershipOptions,
   getKioskSummary,
-  launchKioskSession,
   renewMembershipFromKiosk,
   resetKioskSession,
   revokeKioskAutopay,
@@ -35,13 +32,22 @@ import {
   type KioskAvailabilitySlot,
   type KioskBookingResource,
 } from "@/lib/kiosk-bookings";
+import {
+  createKioskWellnessAppointment,
+  getKioskWellnessAvailability,
+  getKioskWellnessProfessionals,
+  getKioskWellnessServices,
+  type KioskWellnessAvailability,
+  type KioskWellnessProfessional,
+  type KioskWellnessService,
+} from "@/lib/kiosk-wellness";
 import { formatMexicanDateInput, parseMexicanDate, toDateInput } from "@/lib/date-time";
+import { consumeKioskLaunch } from "@/lib/kiosk-launch";
 
 const KIOSK_BROWSER_SESSION_KEY = "gymos.kioskBrowserSession";
 const KIOSK_OPERATION_KEYS = "gymos.kioskOperationKeys";
 
 export default function KioskPage() {
-  const params = useParams<{ terminalCode: string }>();
   const [session, setSession] = useState<KioskSessionResponse | null>(null);
   const [summary, setSummary] = useState<KioskSummaryResponse | null>(null);
   const [plans, setPlans] = useState<KioskPlanOption[]>([]);
@@ -62,6 +68,15 @@ export default function KioskPage() {
   const [selectedSlot, setSelectedSlot] = useState<KioskAvailabilitySlot | null>(null);
   const [bookingNotes, setBookingNotes] = useState("");
   const [bookingBusy, setBookingBusy] = useState(false);
+  const [wellnessProfessionals, setWellnessProfessionals] = useState<KioskWellnessProfessional[]>([]);
+  const [wellnessProfessionalId, setWellnessProfessionalId] = useState("");
+  const [wellnessServices, setWellnessServices] = useState<KioskWellnessService[]>([]);
+  const [wellnessServiceId, setWellnessServiceId] = useState("");
+  const [wellnessDate, setWellnessDate] = useState(() => toDateInput(new Date()));
+  const [wellnessSlots, setWellnessSlots] = useState<KioskWellnessAvailability[]>([]);
+  const [wellnessSlot, setWellnessSlot] = useState<KioskWellnessAvailability | null>(null);
+  const [wellnessNotes, setWellnessNotes] = useState("");
+  const [wellnessBusy, setWellnessBusy] = useState(false);
   const [autopayMembership, setAutopayMembership] = useState<KioskMembership | null>(null);
   const [autopayMandate, setAutopayMandate] = useState<KioskAutopayMandate | null>(null);
   const [autopayTerms, setAutopayTerms] = useState<KioskAutopayTerms | null>(null);
@@ -86,11 +101,9 @@ export default function KioskPage() {
           if (active) setSession(reset);
           return;
         }
-        const stored = getStoredSession();
-        if (!stored) {
-          throw new Error("Recepción debe iniciar sesión y abrir el modo kiosco desde su consola.");
-        }
-        const created = await launchKioskSession(stored.accessToken);
+        const created = consumeKioskLaunch(window.name);
+        window.name = "";
+        if (!created) throw new Error("Abre el modo kiosco desde la pantalla de recepción.");
         writeBrowserKioskSession(created);
         clearPersistedOperationKeys();
         clearSession();
@@ -103,7 +116,7 @@ export default function KioskPage() {
     }
     void start();
     return () => { active = false; };
-  }, [params.terminalCode]);
+  }, []);
 
   async function verify(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -120,13 +133,16 @@ export default function KioskPage() {
         identifier,
         birthDate,
       );
-      const [options, bookingResources] = await Promise.all([
+      const [options, bookingResources, professionals] = await Promise.all([
         nextSummary.capabilities.membershipPlanChangeAllowed
           || nextSummary.capabilities.membershipEnrollmentAllowed
           ? getKioskMembershipOptions(session.sessionId, session.sessionToken)
           : Promise.resolve([]),
         nextSummary.capabilities.resourceBookingAllowed
           ? getKioskBookingResources(session.sessionId, session.sessionToken)
+          : Promise.resolve([]),
+        nextSummary.capabilities.wellnessBookingAllowed
+          ? getKioskWellnessProfessionals(session.sessionId, session.sessionToken)
           : Promise.resolve([]),
       ]);
       setSummary(nextSummary);
@@ -136,6 +152,8 @@ export default function KioskPage() {
       setTargetPlanId(options[0]?.id ?? "");
       setResources(bookingResources);
       setResourceId(bookingResources[0]?.id ?? "");
+      setWellnessProfessionals(professionals);
+      setWellnessProfessionalId(professionals[0]?.id ?? "");
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible verificar.");
     }
@@ -159,6 +177,50 @@ export default function KioskPage() {
     return () => { active = false; };
   }, [bookingDate, resourceId, session, summary]);
 
+  useEffect(() => {
+    if (!session || !summary?.capabilities.wellnessBookingAllowed || !wellnessProfessionalId) {
+      setWellnessServices([]);
+      setWellnessServiceId("");
+      return;
+    }
+    let active = true;
+    getKioskWellnessServices(session.sessionId, session.sessionToken, wellnessProfessionalId)
+      .then((items) => {
+        if (!active) return;
+        setWellnessServices(items);
+        setWellnessServiceId(items[0]?.id ?? "");
+      })
+      .catch((exception) => {
+        if (active) setError(exception instanceof Error ? exception.message : "No fue posible cargar los servicios wellness.");
+      });
+    return () => { active = false; };
+  }, [session, summary, wellnessProfessionalId]);
+
+  useEffect(() => {
+    if (!session || !wellnessProfessionalId || !wellnessServiceId || !wellnessDate) {
+      setWellnessSlots([]);
+      setWellnessSlot(null);
+      return;
+    }
+    let active = true;
+    getKioskWellnessAvailability(
+      session.sessionId,
+      session.sessionToken,
+      wellnessProfessionalId,
+      wellnessServiceId,
+      wellnessDate,
+    )
+      .then((items) => {
+        if (!active) return;
+        setWellnessSlots(items.filter((item) => item.available && new Date(item.startsAt).getTime() > Date.now()));
+        setWellnessSlot(null);
+      })
+      .catch((exception) => {
+        if (active) setError(exception instanceof Error ? exception.message : "No fue posible consultar la agenda wellness.");
+      });
+    return () => { active = false; };
+  }, [session, wellnessDate, wellnessProfessionalId, wellnessServiceId]);
+
   async function reserve() {
     if (!session || !selectedSlot) return;
     setBookingBusy(true);
@@ -180,6 +242,36 @@ export default function KioskPage() {
       setError(exception instanceof Error ? exception.message : "No fue posible crear la reserva.");
     } finally {
       setBookingBusy(false);
+    }
+  }
+
+  async function reserveWellness() {
+    if (!session || !wellnessSlot || !wellnessServiceId) return;
+    setWellnessBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const appointment = await createKioskWellnessAppointment(session.sessionId, session.sessionToken, {
+        professionalId: wellnessProfessionalId,
+        serviceId: wellnessServiceId,
+        startsAt: wellnessSlot.startsAt,
+        notes: wellnessNotes.trim() || undefined,
+      });
+      setMessage(`Tu cita con ${appointment.professionalName} fue creada correctamente.`);
+      setWellnessNotes("");
+      const items = await getKioskWellnessAvailability(
+        session.sessionId,
+        session.sessionToken,
+        wellnessProfessionalId,
+        wellnessServiceId,
+        wellnessDate,
+      );
+      setWellnessSlots(items.filter((item) => item.available && new Date(item.startsAt).getTime() > Date.now()));
+      setWellnessSlot(null);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible crear la cita wellness.");
+    } finally {
+      setWellnessBusy(false);
     }
   }
 
@@ -388,6 +480,8 @@ export default function KioskPage() {
     setSession(reset);
     setSummary(null); setIdentifier(""); setBirthDateDisplay("");
     setContactEmail(""); setContactPhone(""); setResources([]); setSlots([]); setSelectedSlot(null); setMessage(messageText);
+    setWellnessProfessionals([]); setWellnessProfessionalId(""); setWellnessServices([]); setWellnessServiceId("");
+    setWellnessSlots([]); setWellnessSlot(null); setWellnessNotes("");
     setAutopayMembership(null); setAutopayMandate(null); setAutopayTerms(null); setAutopayAccepted(false);
     operationKeys.current.clear();
     clearPersistedOperationKeys();
@@ -437,7 +531,8 @@ export default function KioskPage() {
 
   if (loading) return <main className="kiosk-screen grid place-items-center px-6 text-white"><p className="kiosk-loading">Preparando pantalla de socios...</p></main>;
 
-  const paymentStep = 2 + (summary?.capabilities.resourceBookingAllowed ? 1 : 0);
+  const wellnessStep = 2 + (summary?.capabilities.resourceBookingAllowed ? 1 : 0);
+  const paymentStep = wellnessStep + (summary?.capabilities.wellnessBookingAllowed ? 1 : 0);
   const profileStep = paymentStep + (summary?.paymentActivity.length ? 1 : 0);
 
   return (
@@ -508,6 +603,102 @@ export default function KioskPage() {
               <label className="kiosk-field mt-4">Nota opcional<textarea className="kiosk-input" onChange={(event) => setBookingNotes(event.target.value)} placeholder="Indicaciones para tu reserva" value={bookingNotes} /></label>
               <button className="kiosk-primary-action mt-4" disabled={!selectedSlot || bookingBusy} onClick={reserve} type="button">{bookingBusy ? "Reservando..." : "Confirmar reserva"}</button>
             </section> : null}
+
+            {summary.capabilities.wellnessBookingAllowed ? (
+              <section className="kiosk-card">
+                <div className="kiosk-step">
+                  <span>{wellnessStep}</span>
+                  <div>
+                    <h2>Agenda una cita wellness gratuita</h2>
+                    <p>El kiosco sólo muestra servicios activos sin costo. Los servicios de pago no están disponibles aquí.</p>
+                  </div>
+                </div>
+                {wellnessProfessionals.length > 0 ? (
+                  <>
+                    <div className="grid gap-3 md:grid-cols-3">
+                      <label className="kiosk-field">
+                        Profesional
+                        <select
+                          className="kiosk-input compact"
+                          onChange={(event) => setWellnessProfessionalId(event.target.value)}
+                          value={wellnessProfessionalId}
+                        >
+                          {wellnessProfessionals.map((professional) => (
+                            <option key={professional.id} value={professional.id}>{professional.displayName}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="kiosk-field">
+                        Servicio gratuito
+                        <select
+                          className="kiosk-input compact"
+                          disabled={wellnessServices.length === 0}
+                          onChange={(event) => setWellnessServiceId(event.target.value)}
+                          value={wellnessServiceId}
+                        >
+                          {wellnessServices.map((service) => (
+                            <option key={service.id} value={service.id}>
+                              {service.name} · {service.durationMinutes} min
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="kiosk-field">
+                        Día
+                        <input
+                          className="kiosk-input compact"
+                          min={toDateInput(new Date())}
+                          onChange={(event) => setWellnessDate(event.target.value)}
+                          type="date"
+                          value={wellnessDate}
+                        />
+                      </label>
+                    </div>
+                    {wellnessServices.length === 0 ? (
+                      <p className="kiosk-muted mt-4">Este profesional no tiene servicios gratuitos disponibles.</p>
+                    ) : (
+                      <>
+                        <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+                          {wellnessSlots.map((slot) => (
+                            <button
+                              className={wellnessSlot?.startsAt === slot.startsAt ? "kiosk-primary-action small" : "kiosk-secondary-action"}
+                              key={slot.startsAt}
+                              onClick={() => setWellnessSlot(slot)}
+                              type="button"
+                            >
+                              {formatSlot(slot.startsAt)}
+                            </button>
+                          ))}
+                          {wellnessSlots.length === 0 ? (
+                            <p className="kiosk-muted col-span-full">No hay horarios disponibles para este día.</p>
+                          ) : null}
+                        </div>
+                        <label className="kiosk-field mt-4">
+                          Nota opcional
+                          <textarea
+                            className="kiosk-input"
+                            maxLength={2000}
+                            onChange={(event) => setWellnessNotes(event.target.value)}
+                            placeholder="Indicaciones para el profesional"
+                            value={wellnessNotes}
+                          />
+                        </label>
+                        <button
+                          className="kiosk-primary-action mt-4"
+                          disabled={!wellnessSlot || wellnessBusy}
+                          onClick={() => void reserveWellness()}
+                          type="button"
+                        >
+                          {wellnessBusy ? "Agendando..." : "Confirmar cita gratuita"}
+                        </button>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <p className="kiosk-muted">No hay profesionales wellness disponibles en esta sucursal.</p>
+                )}
+              </section>
+            ) : null}
 
             {summary.paymentActivity.length > 0 ? (
               <section className="kiosk-card">
