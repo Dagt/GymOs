@@ -72,8 +72,9 @@ En Checkout usa cualquier fecha futura y cualquier CVC de tres dígitos:
 | Escenario | Tarjeta test | Resultado esperado |
 | --- | --- | --- |
 | Pago exitoso | `4242 4242 4242 4242` | Stripe confirma el pago; GymOS activa o extiende una sola vez. |
-| Autenticación 3DS | `4000 0025 0000 3155` | Checkout solicita autenticación; en un cargo posterior off-session puede quedar `requires_action`. |
-| Fondos insuficientes | `4000 0000 0000 9995` | El cargo se rechaza y no extiende la membresía. |
+| Autenticación 3DS interactiva | `4000 0025 0000 3155` | Checkout o Setup solicita autenticación cuando corresponde. Si se autoriza correctamente para uso futuro, Stripe puede permitir cargos posteriores. |
+| Fondos insuficientes en Checkout | `4000 0000 0000 9995` | El pago inmediato se rechaza y no extiende la membresía. Esta tarjeta no debe usarse para alta de domiciliación porque Stripe no permite adjuntarla. |
+| Falla después de guardar la tarjeta | `4000 0000 0000 0341` | La tarjeta se adjunta durante Setup, pero el cargo posterior se rechaza; permite probar recuperación y sustitución del método. |
 
 Recorridos mínimos:
 
@@ -83,8 +84,11 @@ Recorridos mínimos:
    venta, el pago ni la extensión de membresía.
 4. En `Domiciliación`, acepta el consentimiento, tokeniza la tarjeta y comprueba
    marca, últimos cuatro, siguiente fecha y estado del mandato.
-5. Ejecuta el ciclo recurrente con la tarjeta exitosa y después con escenarios
-   `requires_action` y rechazo. Comprueba reintentos y estado `PAST_DUE`.
+5. Ejecuta el ciclo recurrente con la tarjeta exitosa y después con
+   `4000 0000 0000 0341`. Comprueba reintentos, estado `PAST_DUE`, recuperación
+   y sustitución. El caso off-session `requires_action` se reproduce de forma
+   determinista en `stripeTest` mediante el PaymentMethod sandbox
+   `pm_card_authenticationRequired`.
 6. Sustituye la tarjeta y revoca el mandato desde el kiosco.
 7. Revisa `Configuración` → `Historial técnico`: cargos, mandatos y webhooks
    deben estar paginados, aislados al gimnasio y sin datos sensibles.
