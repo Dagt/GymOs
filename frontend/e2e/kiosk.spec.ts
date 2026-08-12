@@ -56,12 +56,12 @@ test("el kiosco aplica capacidades, no ofrece pago manual y actualiza contacto",
   await page.getByRole("button", { name: "Continuar de forma segura" }).click();
 
   await expect(page.getByText(/exclusivamente tarjeta de crédito o débito/i)).toBeVisible();
-  await expect(page.locator(".kiosk-side-card .kiosk-step > span")).toHaveText("2");
   await expect(page.getByText("Activa", { exact: true })).toBeVisible();
   await expect(page.getByText("Profesionales de bienestar")).toHaveCount(0);
   await expect(page.getByLabel("Referencia de pago")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Renovar con tarjeta" })).toBeDisabled();
 
+  await page.getByRole("button", { name: /^Mis datos /i }).click();
   await page.getByLabel("Nuevo correo").fill("nuevo@example.com");
   await page.getByLabel("Nuevo teléfono en formato +52").fill("+521234567890");
   await page.getByRole("button", { name: "Guardar datos" }).click();
@@ -260,8 +260,9 @@ test("muestra comprobante y permite recuperar una domiciliacion PAST_DUE con otr
   await page.getByPlaceholder(/Correo o tel/).fill("andrea@example.com");
   await page.getByLabel(/Fecha de nacimiento/).fill("10/05/1994");
   await page.getByRole("button", { name: "Continuar de forma segura" }).click();
+  await page.getByRole("button", { name: /Mis pagos/i }).click();
   await expect(page.getByRole("link", { name: "Ver comprobante" })).toHaveAttribute("href", "https://pay.stripe.com/receipts/test");
-  await page.getByRole("button", { name: /Administrar domiciliaci/ }).click();
+  await page.getByRole("button", { name: /^Domiciliaci/ }).click();
   await page.getByText(/Acepto nuevamente los t/).click();
   await page.getByRole("button", { name: "Actualizar tarjeta en Stripe" }).click();
   expect(setupPayload?.replaceExisting).toBe(true);
@@ -410,6 +411,8 @@ test("el kiosco agenda únicamente servicios wellness gratuitos", async ({ page 
   await page.getByPlaceholder(/Correo o tel/).fill("andrea@example.com");
   await page.getByLabel(/Fecha de nacimiento/).fill("10/05/1994");
   await page.getByRole("button", { name: "Continuar de forma segura" }).click();
+
+  await page.getByRole("button", { name: /^Wellness/i }).click();
 
   await expect(page.getByRole("heading", { name: "Agenda una cita wellness gratuita" })).toBeVisible();
   await expect(page.getByLabel("Servicio gratuito")).toContainText("Orientación inicial");

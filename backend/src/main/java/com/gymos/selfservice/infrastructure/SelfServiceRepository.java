@@ -421,7 +421,7 @@ public class SelfServiceRepository {
 				.optional();
 	}
 
-	public List<PlanOptionRecord> planOptions(UUID organizationId) {
+	public List<PlanOptionRecord> planOptions(UUID organizationId, UUID branchId) {
 		return jdbcClient.sql("""
 				SELECT mp.id, mp.product_id, cp.name, cp.price_cents, cp.currency,
 				       mp.duration_days, mp.grace_days
@@ -432,9 +432,17 @@ public class SelfServiceRepository {
 				  AND mp.deleted_at IS NULL
 				  AND cp.status = 'ACTIVE'
 				  AND cp.deleted_at IS NULL
+				  AND EXISTS (
+				      SELECT 1
+				      FROM catalog_product_branch cpb
+				      WHERE cpb.organization_id = mp.organization_id
+				        AND cpb.product_id = mp.product_id
+				        AND cpb.branch_id = :branchId
+				  )
 				ORDER BY cp.price_cents, cp.name
 				""")
 				.param("organizationId", organizationId)
+				.param("branchId", branchId)
 				.query((resultSet, rowNumber) -> new PlanOptionRecord(
 						resultSet.getObject("id", UUID.class),
 						resultSet.getObject("product_id", UUID.class),

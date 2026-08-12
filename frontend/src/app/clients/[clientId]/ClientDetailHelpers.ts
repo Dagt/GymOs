@@ -42,7 +42,7 @@ export function validateClientUpdate(form: ClientUpdatePayload) {
   addError(errors, "lastName", validateRequired(form.lastName, "Apellido paterno"));
   addError(errors, "phone", validatePhone(form.phone ?? "", true));
   addError(errors, "email", validateEmail(form.email ?? "", false));
-  addError(errors, "birthDate", validateIsoDate(form.birthDate ?? "", "Fecha de nacimiento", false));
+  addError(errors, "birthDate", validateIsoDate(form.birthDate ?? "", "Fecha de nacimiento", true));
   addError(errors, "gender", validateGender(form.gender ?? "", false));
   return errors;
 }

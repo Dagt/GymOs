@@ -50,6 +50,8 @@ import { PaymentOperationsHistoryCard } from "./PaymentOperationsHistoryCard";
 import { KioskBranchSettingsCard } from "./KioskBranchSettingsCard";
 import { NotificationEmailSettingsCard } from "./NotificationEmailSettingsCard";
 
+type OperationalSection = "guide" | "payments" | "kiosk" | "email" | "history";
+
 export default function OrganizationSettingsPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
   const [organization, setOrganization] = useState<OrganizationSummary | null>(null);
@@ -69,6 +71,7 @@ export default function OrganizationSettingsPage() {
   const [branchPanelHeight, setBranchPanelHeight] = useState<number | null>(null);
   const [paymentConfiguration, setPaymentConfiguration] = useState<PaymentConfiguration | null>(null);
   const [mercadoPagoTerminals, setMercadoPagoTerminals] = useState<MercadoPagoTerminal[]>([]);
+  const [operationalSection, setOperationalSection] = useState<OperationalSection>("guide");
   const settingsColumnRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -130,6 +133,13 @@ export default function OrganizationSettingsPage() {
     };
   }, []);
 
+  useEffect(() => {
+    const synchronizeSection = () => setOperationalSection(operationalSectionFromHash(window.location.hash));
+    synchronizeSection();
+    window.addEventListener("hashchange", synchronizeSection);
+    return () => window.removeEventListener("hashchange", synchronizeSection);
+  }, []);
+
   useLayoutEffect(() => {
     const settingsColumn = settingsColumnRef.current;
     if (!settingsColumn) return;
@@ -154,6 +164,14 @@ export default function OrganizationSettingsPage() {
 
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
   const persistedOrganizationForm = organization ? toOrganizationForm(organization) : organizationForm;
+  const canManageOrganization = Boolean(session?.user.permissions.includes("organization.update") || session?.user.permissions.includes("platform.admin"));
+  const canManageBranches = Boolean(session?.user.permissions.includes("branch.update") || session?.user.permissions.includes("platform.admin"));
+
+  function selectOperationalSection(section: OperationalSection) {
+    setOperationalSection(section);
+    const hash = operationalSectionHash(section);
+    window.history.replaceState({}, "", `${window.location.pathname}${window.location.search}${hash}`);
+  }
 
   async function submitOrganization(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -416,26 +434,45 @@ export default function OrganizationSettingsPage() {
       {error ? <p className="form-message error">{error}</p> : null}
       {message ? <p className="form-message success">{message}</p> : null}
 
-      <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-        <div className="grid min-w-0 gap-5" ref={settingsColumnRef}>
-          <OrganizationOverviewCard form={persistedOrganizationForm} onEdit={openOrganizationDrawer} />
-          <TeamAccessCard />
-        </div>
-        <div
-          className="min-h-0 min-w-0 overflow-hidden"
-          style={branchPanelHeight ? { height: `${branchPanelHeight}px` } : undefined}
-        >
-          <BranchesOverviewCard branches={branches} onEditBranch={openEditBranch} onNewBranch={openNewBranchDrawer} />
-        </div>
-      </section>
+      {canManageOrganization || canManageBranches ? (
+        <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+          {canManageOrganization ? (
+            <div className="grid min-w-0 gap-5" ref={settingsColumnRef}>
+              <OrganizationOverviewCard form={persistedOrganizationForm} onEdit={openOrganizationDrawer} />
+              <TeamAccessCard />
+            </div>
+          ) : null}
+          {canManageBranches ? (
+            <div
+              className="min-h-0 min-w-0 overflow-hidden"
+              style={branchPanelHeight ? { height: `${branchPanelHeight}px` } : undefined}
+            >
+              <BranchesOverviewCard branches={branches} onEditBranch={openEditBranch} onNewBranch={openNewBranchDrawer} />
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <OperationalSettingsNavigation
+        activeSection={operationalSection}
         showEmail={session.user.permissions.includes("notification.settings.manage") || session.user.permissions.includes("platform.admin")}
         showKiosk={session.user.permissions.includes("selfservice.settings.manage") || session.user.permissions.includes("platform.admin")}
         showPayments={Boolean(paymentConfiguration)}
+        onSelect={selectOperationalSection}
       />
 
-      {paymentConfiguration ? (
+      {operationalSection === "guide" ? (
+        <OperationalSettingsGuide
+          branchCount={branches.length}
+          configuration={paymentConfiguration}
+          showEmail={session.user.permissions.includes("notification.settings.manage") || session.user.permissions.includes("platform.admin")}
+          showKiosk={session.user.permissions.includes("selfservice.settings.manage") || session.user.permissions.includes("platform.admin")}
+          showPayments={Boolean(paymentConfiguration)}
+          onSelect={selectOperationalSection}
+        />
+      ) : null}
+
+      {operationalSection === "payments" && paymentConfiguration ? (
         <PaymentConfigurationCard
           key={`${paymentConfiguration.receptionManualTerminalEnabled}-${paymentConfiguration.receptionMercadoPagoEnabled}-${paymentConfiguration.mercadoPagoConnected}-${paymentConfiguration.mercadoPagoTerminalId ?? "none"}-${paymentConfiguration.stripeSelfCheckoutEnabled}-${paymentConfiguration.stripeRecurringEnabled}-${paymentConfiguration.stripeConnected}-${paymentConfiguration.stripeAccountId ?? "none"}`}
           canManage={session.user.permissions.includes("payment.settings.manage") || session.user.permissions.includes("platform.admin")}
@@ -451,70 +488,202 @@ export default function OrganizationSettingsPage() {
         />
       ) : null}
 
-      {session.user.permissions.includes("selfservice.settings.manage") || session.user.permissions.includes("platform.admin") ? (
-        <KioskBranchSettingsCard accessToken={session.accessToken} />
+      {operationalSection === "kiosk" && (session.user.permissions.includes("selfservice.settings.manage") || session.user.permissions.includes("platform.admin")) ? (
+        <KioskBranchSettingsCard
+          accessToken={session.accessToken}
+          activeBranchId={activeBranch?.id}
+        />
       ) : null}
 
-      {session.user.permissions.includes("notification.settings.manage") || session.user.permissions.includes("platform.admin") ? (
+      {operationalSection === "email" && (session.user.permissions.includes("notification.settings.manage") || session.user.permissions.includes("platform.admin")) ? (
         <NotificationEmailSettingsCard accessToken={session.accessToken} />
       ) : null}
 
-      {paymentConfiguration ? <PaymentOperationsHistoryCard accessToken={session.accessToken} /> : null}
+      {operationalSection === "history" && paymentConfiguration ? <PaymentOperationsHistoryCard accessToken={session.accessToken} /> : null}
 
-      <OrganizationDrawer
-        accessToken={session.accessToken}
-        errors={fieldErrors}
-        form={organizationForm}
-        open={showOrganizationDrawer}
-        organizationId={organization?.id ?? session.user.organizationId}
-        saving={saving}
-        onChange={setOrganizationForm}
-        onClose={closeOrganizationDrawer}
-        onLogoChange={applyUploadedLogo}
-        onSubmit={submitOrganization}
-      />
-      <NewBranchDrawer errors={fieldErrors} form={newBranchForm} open={showNewBranchDrawer} saving={saving} onChange={setNewBranchForm} onClose={closeNewBranchDrawer} onSubmit={submitNewBranch} />
-      <EditBranchDrawer branchId={selectedBranchId} branches={branches} errors={fieldErrors} form={branchForm} open={showEditBranchDrawer} saving={saving} onBranchSelect={selectEditableBranch} onChange={setBranchForm} onClose={closeEditBranchDrawer} onSubmit={submitBranch} />
+      {canManageOrganization ? (
+        <OrganizationDrawer
+          accessToken={session.accessToken}
+          errors={fieldErrors}
+          form={organizationForm}
+          open={showOrganizationDrawer}
+          organizationId={organization?.id ?? session.user.organizationId}
+          saving={saving}
+          onChange={setOrganizationForm}
+          onClose={closeOrganizationDrawer}
+          onLogoChange={applyUploadedLogo}
+          onSubmit={submitOrganization}
+        />
+      ) : null}
+      {canManageBranches ? (
+        <>
+          <NewBranchDrawer errors={fieldErrors} form={newBranchForm} open={showNewBranchDrawer} saving={saving} onChange={setNewBranchForm} onClose={closeNewBranchDrawer} onSubmit={submitNewBranch} />
+          <EditBranchDrawer branchId={selectedBranchId} branches={branches} errors={fieldErrors} form={branchForm} open={showEditBranchDrawer} saving={saving} onBranchSelect={selectEditableBranch} onChange={setBranchForm} onClose={closeEditBranchDrawer} onSubmit={submitBranch} />
+        </>
+      ) : null}
     </AppShell>
   );
 }
 
 function OperationalSettingsNavigation({
+  activeSection,
   showEmail,
   showKiosk,
   showPayments,
+  onSelect,
 }: {
+  activeSection: OperationalSection;
   showEmail: boolean;
   showKiosk: boolean;
   showPayments: boolean;
+  onSelect: (section: OperationalSection) => void;
 }) {
   if (!showEmail && !showKiosk && !showPayments) return null;
   return (
     <nav aria-label="Configuración operativa" className="app-card grid gap-4 p-5">
       <div>
         <p className="app-eyebrow">Configuración operativa</p>
-        <h2 className="mt-1 text-xl font-semibold">Cobros, kiosco y comunicaciones</h2>
+        <h2 className="mt-1 text-xl font-semibold">¿Qué quieres configurar?</h2>
         <p className="mt-1 text-sm text-[var(--brand-muted)]">
-          Usa estos accesos para llegar directamente a cada bloque. Los cambios se aplican sólo al gimnasio activo.
+          Elige una tarea. Mostraremos sólo ese bloque y los cambios se aplicarán al gimnasio activo.
         </p>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {showPayments ? <SettingsAnchor description="Terminal manual, Mercado Pago y Stripe." href="#payment-settings" label="Medios de cobro" /> : null}
-        {showKiosk ? <SettingsAnchor description="Funciones permitidas por sucursal." href="#kiosk-settings" label="Kiosco web" /> : null}
-        {showEmail ? <SettingsAnchor description="Remitente y prueba del proveedor." href="#email-settings" label="Correo electrónico" /> : null}
-        {showPayments ? <SettingsAnchor description="Cargos, consentimientos y webhooks." href="#payment-operations" label="Historial de Stripe" /> : null}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <SettingsSectionButton active={activeSection === "guide"} description="Orden recomendado y dependencias." label="Empezar aquí" onClick={() => onSelect("guide")} />
+        {showPayments ? <SettingsSectionButton active={activeSection === "payments"} description="Terminal manual, Mercado Pago y Stripe." label="Medios de cobro" onClick={() => onSelect("payments")} /> : null}
+        {showKiosk ? <SettingsSectionButton active={activeSection === "kiosk"} description="Funciones permitidas por sucursal." label="Kiosco web" onClick={() => onSelect("kiosk")} /> : null}
+        {showEmail ? <SettingsSectionButton active={activeSection === "email"} description="Remitente y prueba del proveedor." label="Correo electrónico" onClick={() => onSelect("email")} /> : null}
+        {showPayments ? <SettingsSectionButton active={activeSection === "history"} description="Sólo diagnóstico de Stripe." label="Historial técnico" onClick={() => onSelect("history")} /> : null}
       </div>
     </nav>
   );
 }
 
-function SettingsAnchor({ description, href, label }: { description: string; href: string; label: string }) {
+function SettingsSectionButton({
+  active,
+  description,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  description: string;
+  label: string;
+  onClick: () => void;
+}) {
   return (
-    <a className="rounded-lg border border-[var(--brand-line)] bg-[var(--brand-surface)] p-4 transition hover:border-[var(--brand-primary)]" href={href}>
+    <button
+      aria-pressed={active}
+      className={`rounded-lg border p-4 text-left transition ${active ? "border-[var(--brand-primary)] bg-[#edf5ef]" : "border-[var(--brand-line)] bg-[var(--brand-surface)] hover:border-[var(--brand-primary)]"}`}
+      onClick={onClick}
+      type="button"
+    >
       <strong className="block text-sm">{label}</strong>
       <span className="mt-1 block text-xs leading-5 text-[var(--brand-muted)]">{description}</span>
-    </a>
+    </button>
   );
+}
+
+function OperationalSettingsGuide({
+  branchCount,
+  configuration,
+  showEmail,
+  showKiosk,
+  showPayments,
+  onSelect,
+}: {
+  branchCount: number;
+  configuration: PaymentConfiguration | null;
+  showEmail: boolean;
+  showKiosk: boolean;
+  showPayments: boolean;
+  onSelect: (section: OperationalSection) => void;
+}) {
+  const receptionStatus = configuration?.receptionManualTerminalEnabled
+    ? "La terminal independiente está habilitada."
+    : "Aún no se eligió cómo registrar pagos con tarjeta en recepción.";
+  const stripeStatus = configuration?.stripeConnected
+    ? "Stripe está vinculado; revisa qué funciones deseas activar."
+    : "Stripe es opcional y sólo se necesita para pagos y domiciliaciones del kiosco.";
+
+  return (
+    <section className="app-card grid gap-5 p-5" id="operational-guide">
+      <div>
+        <p className="app-eyebrow">Ruta recomendada</p>
+        <h2 className="mt-1 text-xl font-semibold">Prepara la operación en este orden</h2>
+        <p className="mt-1 text-sm text-[var(--brand-muted)]">
+          No necesitas activar todo. La terminal manual puede funcionar sin Mercado Pago, Stripe ni correo.
+        </p>
+      </div>
+      <div className="grid gap-4 lg:grid-cols-3">
+        {showPayments ? (
+          <SetupStep description={`${receptionStatus} ${stripeStatus}`} number="1" onClick={() => onSelect("payments")} title="Elige cómo cobrar" />
+        ) : null}
+        {showKiosk ? (
+          <SetupStep
+            description={`Activa por cada una de tus ${branchCount} sucursales sólo las acciones que verá el socio. No se registran computadoras.`}
+            number="2"
+            onClick={() => onSelect("kiosk")}
+            title="Define el kiosco"
+          />
+        ) : null}
+        {showEmail ? (
+          <SetupStep
+            description="Configúralo únicamente si quieres enviar correos. Las notificaciones internas funcionan sin proveedor SMTP."
+            number="3"
+            onClick={() => onSelect("email")}
+            title="Conecta el correo"
+          />
+        ) : null}
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--brand-line)] bg-[var(--brand-surface)] p-4">
+        <div>
+          <strong className="text-sm">Después crea las automatizaciones</strong>
+          <p className="mt-1 text-xs text-[var(--brand-muted)]">Encontrarás recetas para avisos de membresías, pagos, reservas y domiciliaciones.</p>
+        </div>
+        <Link className="app-button" href="/automations">Ir a automatizaciones</Link>
+      </div>
+    </section>
+  );
+}
+
+function SetupStep({
+  description,
+  number,
+  onClick,
+  title,
+}: {
+  description: string;
+  number: string;
+  onClick: () => void;
+  title: string;
+}) {
+  return (
+    <article className="rounded-lg border border-[var(--brand-line)] p-4">
+      <span className="inline-grid h-8 w-8 place-items-center rounded-full bg-[var(--brand-primary)] text-sm font-bold text-white">{number}</span>
+      <h3 className="mt-3 font-semibold">{title}</h3>
+      <p className="mt-2 min-h-20 text-sm leading-6 text-[var(--brand-muted)]">{description}</p>
+      <button aria-label={`Abrir configuración: ${title}`} className="app-button-secondary mt-4" onClick={onClick} type="button">Abrir configuración</button>
+    </article>
+  );
+}
+
+function operationalSectionFromHash(hash: string): OperationalSection {
+  return ({
+    "#payment-settings": "payments",
+    "#kiosk-settings": "kiosk",
+    "#email-settings": "email",
+    "#payment-operations": "history",
+  } as Record<string, OperationalSection>)[hash] ?? "guide";
+}
+
+function operationalSectionHash(section: OperationalSection) {
+  return ({
+    guide: "#operational-guide",
+    payments: "#payment-settings",
+    kiosk: "#kiosk-settings",
+    email: "#email-settings",
+    history: "#payment-operations",
+  } as Record<OperationalSection, string>)[section];
 }
 
 function PaymentConfigurationCard({

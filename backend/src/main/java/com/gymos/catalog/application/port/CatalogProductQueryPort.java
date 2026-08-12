@@ -24,6 +24,8 @@ public interface CatalogProductQueryPort {
 
 	Optional<ProductSummaryView> findActiveByBarcode(UUID organizationId, UUID branchId, String barcode);
 
+	Optional<ProductSummaryView> findBySku(UUID organizationId, String sku);
+
 	boolean skuExists(UUID organizationId, String sku, UUID excludedProductId);
 
 	boolean barcodeExists(UUID organizationId, String barcode, UUID excludedProductId);

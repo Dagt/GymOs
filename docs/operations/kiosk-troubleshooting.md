@@ -69,3 +69,6 @@ secret is absent. It covers idempotent replay, an interruption between create
 and confirm, successful off-session confirmation, `requires_action` and an
 insufficient-funds decline. The regular unit suite separately verifies signed
 webhook deduplication and provider timeout mapping.
+
+For the full manual setup, Stripe CLI forwarding, sandbox cards and expected UI
+results, follow [`../testing/stripe-kiosk-test-mode.md`](../testing/stripe-kiosk-test-mode.md).

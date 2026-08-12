@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.audit.api.AuditService;
 import com.gymos.bookings.api.operations.BookingOperations;
+import com.gymos.bookings.api.operations.BookingOperations.BookingResource;
 import com.gymos.clients.api.operations.ClientLookupOperations;
 import com.gymos.clients.api.operations.SelfServiceClientProfile;
 import com.gymos.clients.api.operations.UpdateSelfServiceContactCommand;
@@ -38,6 +39,7 @@ import java.time.OffsetDateTime;
 import java.time.LocalDate;
 import java.util.Base64;
 import java.util.Optional;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -181,7 +183,7 @@ class SelfServiceServiceTests {
 				{"resourceBooking":false}
 				""");
 
-		assertThatThrownBy(() -> service.bookingResources(sessionId, token))
+		assertThatThrownBy(() -> service.bookingResources(sessionId, token, LocalDate.now()))
 				.isInstanceOfSatisfying(
 						BusinessException.class,
 						exception -> assertThat(exception.code())
@@ -189,6 +191,20 @@ class SelfServiceServiceTests {
 				);
 
 		verifyNoInteractions(bookings);
+	}
+
+	@Test
+	void resourceCatalogIsRequestedForTheVerifiedClientAndSelectedDate() {
+		givenSession("""
+				{"resourceBooking":true}
+				""");
+		LocalDate selectedDate = LocalDate.now().plusDays(2);
+		when(bookings.eligibleResources(organizationId, branchId, clientId, selectedDate))
+				.thenReturn(List.<BookingResource>of());
+
+		assertThat(service.bookingResources(sessionId, token, selectedDate)).isEmpty();
+
+		verify(bookings).eligibleResources(organizationId, branchId, clientId, selectedDate);
 	}
 
 	@Test

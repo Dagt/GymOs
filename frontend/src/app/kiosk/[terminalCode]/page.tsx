@@ -46,6 +46,7 @@ import { consumeKioskLaunch } from "@/lib/kiosk-launch";
 
 const KIOSK_BROWSER_SESSION_KEY = "gymos.kioskBrowserSession";
 const KIOSK_OPERATION_KEYS = "gymos.kioskOperationKeys";
+type KioskPanel = "memberships" | "resources" | "wellness" | "payments" | "profile" | "autopay";
 
 export default function KioskPage() {
   const [session, setSession] = useState<KioskSessionResponse | null>(null);
@@ -83,6 +84,7 @@ export default function KioskPage() {
   const [autopayAccepted, setAutopayAccepted] = useState(false);
   const [autopayBusy, setAutopayBusy] = useState(false);
   const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
+  const [activePanel, setActivePanel] = useState<KioskPanel>("memberships");
   const operationKeys = useRef(new Map<string, string>());
 
   const birthDate = useMemo(() => parseMexicanDate(birthDateDisplay) ?? "", [birthDateDisplay]);
@@ -139,13 +141,14 @@ export default function KioskPage() {
           ? getKioskMembershipOptions(session.sessionId, session.sessionToken)
           : Promise.resolve([]),
         nextSummary.capabilities.resourceBookingAllowed
-          ? getKioskBookingResources(session.sessionId, session.sessionToken)
+          ? getKioskBookingResources(session.sessionId, session.sessionToken, bookingDate)
           : Promise.resolve([]),
         nextSummary.capabilities.wellnessBookingAllowed
           ? getKioskWellnessProfessionals(session.sessionId, session.sessionToken)
           : Promise.resolve([]),
       ]);
       setSummary(nextSummary);
+      setActivePanel("memberships");
       setContactEmail("");
       setContactPhone("");
       setPlans(options);
@@ -158,6 +161,25 @@ export default function KioskPage() {
       setError(exception instanceof Error ? exception.message : "No fue posible verificar.");
     }
   }
+
+  useEffect(() => {
+    if (!session || !summary?.capabilities.resourceBookingAllowed || !bookingDate) {
+      setResources([]);
+      setResourceId("");
+      return;
+    }
+    let active = true;
+    getKioskBookingResources(session.sessionId, session.sessionToken, bookingDate)
+      .then((items) => {
+        if (!active) return;
+        setResources(items);
+        setResourceId((current) => items.some((item) => item.id === current) ? current : (items[0]?.id ?? ""));
+      })
+      .catch((exception) => {
+        if (active) setError(exception instanceof Error ? exception.message : "No fue posible cargar los recursos disponibles.");
+      });
+    return () => { active = false; };
+  }, [bookingDate, session, summary]);
 
   useEffect(() => {
     if (!session || !summary?.capabilities.resourceBookingAllowed || !resourceId || !bookingDate) {
@@ -383,6 +405,7 @@ export default function KioskPage() {
 
   async function openAutopay(membership: KioskMembership) {
     if (!session || !summary?.capabilities.autopayAllowed) return;
+    setActivePanel("autopay");
     setAutopayMembership(membership);
     setAutopayMandate(null);
     setAutopayTerms(null);
@@ -483,6 +506,7 @@ export default function KioskPage() {
     setWellnessProfessionals([]); setWellnessProfessionalId(""); setWellnessServices([]); setWellnessServiceId("");
     setWellnessSlots([]); setWellnessSlot(null); setWellnessNotes("");
     setAutopayMembership(null); setAutopayMandate(null); setAutopayTerms(null); setAutopayAccepted(false);
+    setActivePanel("memberships");
     operationKeys.current.clear();
     clearPersistedOperationKeys();
   }, [session]);
@@ -530,10 +554,6 @@ export default function KioskPage() {
   }, [session]);
 
   if (loading) return <main className="kiosk-screen grid place-items-center px-6 text-white"><p className="kiosk-loading">Preparando pantalla de socios...</p></main>;
-
-  const wellnessStep = 2 + (summary?.capabilities.resourceBookingAllowed ? 1 : 0);
-  const paymentStep = wellnessStep + (summary?.capabilities.wellnessBookingAllowed ? 1 : 0);
-  const profileStep = paymentStep + (summary?.paymentActivity.length ? 1 : 0);
 
   return (
     <main className="kiosk-screen text-white" style={{
@@ -590,8 +610,39 @@ export default function KioskPage() {
           </form>
         ) : (
           <section className="grid gap-5">
-            {summary.capabilities.resourceBookingAllowed ? <section className="kiosk-card">
-              <div className="kiosk-step"><span>2</span><div><h2>Reserva un recurso</h2><p>Sólo ves horarios disponibles; nunca los datos de otros socios.</p></div></div>
+            <section className="kiosk-dashboard-hero">
+              <div>
+                <p>Sesión del socio</p>
+                <h2>Hola, {summary.clientName}</h2>
+                <span>Elige una opción. Sólo verás funciones habilitadas para esta sucursal.</span>
+              </div>
+              <button className="kiosk-end-action" onClick={() => void resetClientSession()} type="button">
+                Terminar sesión y borrar mis datos
+              </button>
+            </section>
+
+            <nav aria-label="Opciones de autoservicio" className="kiosk-panel-navigation">
+              <KioskPanelButton active={activePanel === "memberships"} description="Estado, compra o renovación" label="Membresías" onClick={() => setActivePanel("memberships")} />
+              {summary.capabilities.resourceBookingAllowed ? <KioskPanelButton active={activePanel === "resources"} description="Espacios incluidos en tu plan" label="Reservar" onClick={() => setActivePanel("resources")} /> : null}
+              {summary.capabilities.wellnessBookingAllowed ? <KioskPanelButton active={activePanel === "wellness"} description="Citas gratuitas disponibles" label="Wellness" onClick={() => setActivePanel("wellness")} /> : null}
+              {summary.paymentActivity.length > 0 ? <KioskPanelButton active={activePanel === "payments"} description="Cargos y comprobantes" label="Mis pagos" onClick={() => setActivePanel("payments")} /> : null}
+              {summary.capabilities.profileUpdateAllowed ? <KioskPanelButton active={activePanel === "profile"} description="Correo y teléfono" label="Mis datos" onClick={() => setActivePanel("profile")} /> : null}
+              {summary.capabilities.autopayAllowed ? (
+                <KioskPanelButton
+                  active={activePanel === "autopay"}
+                  description="Tarjeta para renovación"
+                  label="Domiciliación"
+                  onClick={() => {
+                    const membership = summary.memberships.find((item) => item.status === "ACTIVE") ?? summary.memberships[0];
+                    if (membership) void openAutopay(membership);
+                    else setActivePanel("autopay");
+                  }}
+                />
+              ) : null}
+            </nav>
+
+            {activePanel === "resources" && summary.capabilities.resourceBookingAllowed ? <section className="kiosk-card">
+              <div className="kiosk-step"><span>R</span><div><h2>Reserva un recurso</h2><p>Sólo aparecen recursos incluidos en tu membresía para el día seleccionado.</p></div></div>
               <div className="grid gap-3 md:grid-cols-2">
                 <label className="kiosk-field">Recurso<select className="kiosk-input compact" onChange={(event) => setResourceId(event.target.value)} value={resourceId}>{resources.map((resource) => <option key={resource.id} value={resource.id}>{resource.name}</option>)}</select></label>
                 <label className="kiosk-field">Día<input className="kiosk-input compact" min={toDateInput(new Date())} onChange={(event) => setBookingDate(event.target.value)} type="date" value={bookingDate} /></label>
@@ -604,10 +655,10 @@ export default function KioskPage() {
               <button className="kiosk-primary-action mt-4" disabled={!selectedSlot || bookingBusy} onClick={reserve} type="button">{bookingBusy ? "Reservando..." : "Confirmar reserva"}</button>
             </section> : null}
 
-            {summary.capabilities.wellnessBookingAllowed ? (
+            {activePanel === "wellness" && summary.capabilities.wellnessBookingAllowed ? (
               <section className="kiosk-card">
                 <div className="kiosk-step">
-                  <span>{wellnessStep}</span>
+                  <span>W</span>
                   <div>
                     <h2>Agenda una cita wellness gratuita</h2>
                     <p>El kiosco sólo muestra servicios activos sin costo. Los servicios de pago no están disponibles aquí.</p>
@@ -700,9 +751,9 @@ export default function KioskPage() {
               </section>
             ) : null}
 
-            {summary.paymentActivity.length > 0 ? (
+            {activePanel === "payments" && summary.paymentActivity.length > 0 ? (
               <section className="kiosk-card">
-                <div className="kiosk-step"><span>{paymentStep}</span><div><h2>Mis pagos con tarjeta</h2><p>Consulta cargos pendientes, rechazados y comprobantes emitidos por Stripe.</p></div></div>
+                <div className="kiosk-step"><span>$</span><div><h2>Mis pagos con tarjeta</h2><p>Consulta cargos pendientes, rechazados y comprobantes emitidos por Stripe.</p></div></div>
                 <div className="mt-4 grid gap-3">
                   {summary.paymentActivity.map((payment) => (
                     <article className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--brand-line)] p-3" key={payment.id}>
@@ -721,9 +772,9 @@ export default function KioskPage() {
               </section>
             ) : null}
 
-            <section className="kiosk-content-grid">
+            {activePanel === "memberships" ? <section className="kiosk-content-grid kiosk-content-grid-single">
               <div className="kiosk-card">
-                <div className="kiosk-member-header"><span>Hola</span><h2>{summary.clientName}</h2></div>
+                <div className="kiosk-member-header"><span>Mi cuenta</span><h2>Membresías</h2></div>
                 {(summary.capabilities.membershipEnrollmentAllowed || summary.capabilities.membershipPlanChangeAllowed) ? <label className="kiosk-field">Plan<select className="kiosk-input compact" onChange={(event) => setTargetPlanId(event.target.value)} value={targetPlanId}>{plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} - {formatMoney(plan.priceCents, plan.currency)}</option>)}</select></label> : null}
                 {!summary.capabilities.onlineCardPaymentsReady && (summary.capabilities.membershipEnrollmentAllowed || summary.capabilities.membershipRenewalAllowed || summary.capabilities.membershipPlanChangeAllowed) ? (
                   <p className="kiosk-feature-note">La contratación, renovación y el cambio de plan usarán exclusivamente tarjeta de crédito o débito. Se habilitarán al conectar la pasarela de pagos.</p>
@@ -752,8 +803,12 @@ export default function KioskPage() {
                   ))}
                 </div>
               </div>
-              <aside className="kiosk-card kiosk-side-card">
-                <div className="kiosk-step"><span>{profileStep}</span><div><h2>Mis datos</h2><p>Actualiza el contacto que usa tu gimnasio.</p></div></div>
+            </section> : null}
+
+            {activePanel === "profile" && summary.capabilities.profileUpdateAllowed ? (
+              <section className="kiosk-content-grid kiosk-content-grid-single">
+                <aside className="kiosk-card kiosk-side-card">
+                <div className="kiosk-step"><span>D</span><div><h2>Mis datos</h2><p>Actualiza el contacto que usa tu gimnasio.</p></div></div>
                 {summary.capabilities.profileUpdateAllowed ? (
                   <form onSubmit={updateContact}>
                     <p className="kiosk-muted">Actual: {summary.profile?.email ?? "sin correo"} / {summary.profile?.phone ?? "sin teléfono"}</p>
@@ -761,7 +816,15 @@ export default function KioskPage() {
                     <label className="kiosk-field">Nuevo teléfono en formato +52<input className="kiosk-input compact" onChange={(event) => setContactPhone(event.target.value)} pattern="\+52\d{10}" placeholder="Deja vacío para conservarlo" value={contactPhone} /></label>
                     <button className="kiosk-secondary-action mt-4 w-full" disabled={contactBusy || (!contactEmail.trim() && !contactPhone.trim())} type="submit">{contactBusy ? "Guardando..." : "Guardar datos"}</button>
                   </form>
-                ) : <p className="kiosk-muted mt-4">Esta sucursal no permite actualizar datos desde el kiosco.</p>}
+                ) : null}
+              </aside>
+              </section>
+            ) : null}
+
+            {activePanel === "autopay" && summary.capabilities.autopayAllowed ? (
+              <section className="kiosk-content-grid kiosk-content-grid-single">
+                <aside className="kiosk-card kiosk-side-card">
+                <div className="kiosk-step"><span>A</span><div><h2>Domiciliación</h2><p>Administra la tarjeta autorizada para renovar tu membresía.</p></div></div>
                 {summary.capabilities.autopayAllowed ? (
                   <div className="kiosk-feature-note grid gap-3">
                     <strong>Domiciliación con Stripe</strong>
@@ -804,13 +867,37 @@ export default function KioskPage() {
                     ) : null}
                   </div>
                 ) : null}
-                <button className="kiosk-end-action" onClick={() => void resetClientSession()} type="button">Terminar y borrar mis datos</button>
               </aside>
-            </section>
+              </section>
+            ) : null}
           </section>
         )}
       </section>
     </main>
+  );
+}
+
+function KioskPanelButton({
+  active,
+  description,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  description: string;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      aria-pressed={active}
+      className={active ? "kiosk-panel-button active" : "kiosk-panel-button"}
+      onClick={onClick}
+      type="button"
+    >
+      <strong>{label}</strong>
+      <span>{description}</span>
+    </button>
   );
 }
 

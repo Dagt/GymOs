@@ -256,7 +256,9 @@ Contrato implementado para alta/edicion de socio:
 - `firstName`: nombre.
 - `lastName`: apellido paterno.
 - `maternalLastName`: apellido materno opcional.
-- `birthDate`: ISO `YYYY-MM-DD` en API; frontend lo captura como `dd/mm/aaaa`.
+- `birthDate`: obligatorio en alta, edición e importación; usa ISO `YYYY-MM-DD`
+  en API y el frontend lo captura como `dd/mm/aaaa`. Una fecha futura se rechaza
+  como error de negocio y nunca debe terminar en un error 500.
 - `gender`: solo `MALE` o `FEMALE`.
 - `phone`: formato `+52` seguido de 10 digitos.
 
@@ -352,6 +354,11 @@ El backend rechaza cualquier valor no reconocido con
 `multiBranchAccess=true` marca el plan como valido para todas las sucursales activas del gimnasio. La venta y la membresia conservan la sucursal donde se originaron, pero las consultas de socios, acceso, kiosco y detalle de membresias aceptan esa membresia desde cualquier sucursal del mismo tenant.
 
 `PATCH /catalog/plans/{planId}` permite gestionar planes ya creados sin cambiar el SKU: nombre, descripcion, precio, moneda, duracion, gracia, beneficios, `multiBranchAccess` y estado.
+
+El SKU es único dentro del gimnasio, no por sucursal. Si `POST /catalog/plans`
+recibe en otra sucursal el SKU de un plan existente, vincula ese mismo plan a la
+sucursal activa y devuelve el plan; no crea un duplicado. Si el SKU pertenece a
+otro tipo de producto, responde `PRODUCT_SKU_ALREADY_EXISTS`.
 
 Errores relevantes:
 

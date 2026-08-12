@@ -135,6 +135,33 @@ class BookingMembershipPlanIntegrationTests {
 	}
 
 	@Test
+	void kioskEligibleCatalogHidesRestrictedResourcesBeforeAvailabilityIsRequested() {
+		ResourceRecord restricted = bookingService.createResource(
+				principal,
+				new CreateResourceCommand("Sauna restringido", "ROOM", 1, 60,
+						LocalTime.of(6, 0), LocalTime.of(22, 0), null, java.util.List.of(allowedPlanId)),
+				"resource-eligibility"
+		);
+		ResourceRecord open = bookingService.createResource(
+				principal,
+				new CreateResourceCommand("Sala abierta", "ROOM", 1, 60,
+						LocalTime.of(6, 0), LocalTime.of(22, 0), null, java.util.List.of()),
+				"resource-eligibility"
+		);
+		LocalDate date = BusinessTime.today().plusDays(2);
+
+		assertThat(bookingService.eligibleResources(principal, clientWithoutMembershipId, date))
+				.extracting(ResourceRecord::id)
+				.contains(open.id())
+				.doesNotContain(restricted.id());
+		assertThatThrownBy(() -> bookingService.availabilityForClient(
+				principal, clientWithoutMembershipId, restricted.id(), date
+		))
+				.isInstanceOfSatisfying(BusinessException.class,
+						exception -> assertThat(exception.code()).isEqualTo("BOOKING_PLAN_NOT_ALLOWED"));
+	}
+
+	@Test
 	void resourceCanBeUpdatedAndSoftDeleted() {
 		ResourceRecord resource = bookingService.createResource(
 				principal,

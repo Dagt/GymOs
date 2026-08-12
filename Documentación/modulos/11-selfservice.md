@@ -8,7 +8,9 @@ Estado: `LISTO PARA ACEPTACIÓN` (la validación externa de Stripe sandbox se ej
 - verificación genérica de socio por contacto y fecha de nacimiento;
 - rate limiting, bloqueo por intentos y auditoría;
 - resumen de membresía y pagos pendientes;
-- reserva de recursos mediante la API pública del módulo propietario;
+- reserva de recursos mediante la API pública del módulo propietario; el catálogo
+  oculta desde el inicio los recursos para los que la membresía del socio no es
+  elegible y vuelve a validar la elegibilidad al consultar horarios y reservar;
 - capacidades canónicas por perfil lógico de sucursal, expuestas a la sesión y aplicadas en cada
   endpoint implementado;
 - actualización real y auditada de correo/teléfono desde sesión verificada;
@@ -28,7 +30,8 @@ Estado: `LISTO PARA ACEPTACIÓN` (la validación externa de Stripe sandbox se ej
 - vinculación Stripe Connect por gimnasio y Checkout alojado para renovación o
   cambio de plan;
 - contratación de membresía inicial desde el kiosco, con selección de plan,
-  venta/pago pendiente y activación exclusiva por webhook conciliado;
+  venta/pago pendiente y activación exclusiva por webhook conciliado; sólo se
+  muestran planes asociados a la sucursal activa;
 - venta y pago pendientes antes de abandonar GymOS, con idempotencia estable
   y persistida durante la sesión del navegador para recuperar un fallo de red
   o un regreso desde Stripe;
@@ -58,7 +61,11 @@ Estado: `LISTO PARA ACEPTACIÓN` (la validación externa de Stripe sandbox se ej
 - cotización autoritativa final, incluidos beneficios y descuento, antes de
   crear la venta o abandonar GymOS para abrir Stripe Checkout;
 - configuración administrativa de capacidades por sucursal, sin alta ni
-  asignación de computadoras o terminales físicas;
+  asignación de computadoras o terminales físicas; la pantalla muestra una sola
+  configuración correspondiente a la sucursal elegida en el selector global;
+- navegación del socio organizada por tareas (`Membresías`, `Reservar`,
+  `Wellness`, `Pagos`, `Mis datos` y `Domiciliación`) para evitar mezclar todos
+  los formularios en una sola pantalla;
 - citas wellness gratuitas desde el kiosco; la API sólo lista servicios activos
   con precio cero y rechaza cualquier servicio con costo;
 - resolución de IP que ignora `Forwarded`/`X-Forwarded-For` salvo cuando el peer
@@ -73,7 +80,7 @@ Estado: `LISTO PARA ACEPTACIÓN` (la validación externa de Stripe sandbox se ej
 ## Pendiente
 
 - ejecutar `stripeTest` con credenciales Stripe exclusivamente test y cuenta
-  Connect sandbox. En este corte `postgresIntegrationTest` pasó 34 escenarios
+  Connect sandbox. En este corte `postgresIntegrationTest` pasó 37 escenarios
   reales y el E2E de kiosco pasó 7 recorridos; Stripe omitió sus 3 escenarios
   porque el entorno no contiene `GYMOS_STRIPE_TEST_SECRET_KEY`;
 - ejecutar los recorridos E2E y las suites conectadas en el ambiente de
@@ -90,3 +97,4 @@ Diseño objetivo: `../31-diseño-automatizaciones-kiosco.md`.
 
 Runbook: `../../docs/operations/kiosk-troubleshooting.md`.
 Operación Stripe: `../../docs/operations/stripe-automation-recovery.md`.
+Pruebas Stripe: `../../docs/testing/stripe-kiosk-test-mode.md`.

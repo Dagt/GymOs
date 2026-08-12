@@ -29,6 +29,70 @@ import {
   type StoredSession,
 } from "@/lib/api";
 
+type RuleChannel = "IN_APP" | "EMAIL";
+
+type AutomationRecipe = {
+  id: string;
+  title: string;
+  description: string;
+  triggerType: string;
+  channel: RuleChannel;
+  subject: string;
+  body: string;
+  daysBefore?: number;
+  minutesBefore?: number;
+};
+
+const AUTOMATION_RECIPES: AutomationRecipe[] = [
+  {
+    id: "membership-expiring-email",
+    title: "Avisar que la membresía vencerá",
+    description: "Tres días antes, envía un correo al socio con su fecha de vencimiento.",
+    triggerType: "MEMBERSHIP_EXPIRING",
+    channel: "EMAIL",
+    subject: "Tu membresía vence pronto",
+    body: "Hola {{recipientName}}, tu membresía vence el {{endsOn}}. Acércate a recepción para renovarla.",
+    daysBefore: 3,
+  },
+  {
+    id: "payment-pending-team",
+    title: "Revisar un pago pendiente",
+    description: "Avisa al equipo cuando un pago necesita validación en GymOS.",
+    triggerType: "PAYMENT_PENDING_VALIDATION",
+    channel: "IN_APP",
+    subject: "Pago pendiente de validar",
+    body: "Hay un pago pendiente de validación. Revisa el comprobante y confirma o rechaza el cobro.",
+  },
+  {
+    id: "booking-reminder-email",
+    title: "Recordar una reservación",
+    description: "Un día antes, envía al socio la fecha y hora de su próxima reserva.",
+    triggerType: "BOOKING_REMINDER",
+    channel: "EMAIL",
+    subject: "Te esperamos en tu reservación",
+    body: "Hola {{recipientName}}, recuerda que tienes una reservación el {{startsAt}}. Si no puedes asistir, comunícate con recepción.",
+    minutesBefore: 1440,
+  },
+  {
+    id: "booking-cancelled-team",
+    title: "Dar seguimiento a una cancelación",
+    description: "Crea un aviso interno cuando se cancela una reserva incluida.",
+    triggerType: "BOOKING_CANCELLED",
+    channel: "IN_APP",
+    subject: "Reserva cancelada",
+    body: "Se canceló una reserva. Revisa si el socio necesita reagendar o recibir seguimiento.",
+  },
+  {
+    id: "recurring-charge-failed-email",
+    title: "Avisar que falló una domiciliación",
+    description: "Informa al socio que debe actualizar su método de pago en el kiosco.",
+    triggerType: "RECURRING_CHARGE_FAILED",
+    channel: "EMAIL",
+    subject: "No pudimos procesar tu renovación",
+    body: "Hola {{recipientName}}, no pudimos procesar tu renovación. Abre el kiosco para actualizar tu tarjeta.",
+  },
+];
+
 export default function AutomationsPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
   const [rules, setRules] = useState<AutomationRule[]>([]);
@@ -46,15 +110,16 @@ export default function AutomationsPage() {
   const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [name, setName] = useState("");
-  const [triggerType, setTriggerType] = useState("MANUAL");
+  const [triggerType, setTriggerType] = useState("MEMBERSHIP_EXPIRING");
   const [intervalMinutes, setIntervalMinutes] = useState(1440);
   const [daysBefore, setDaysBefore] = useState(3);
+  const [bookingReminderMinutes, setBookingReminderMinutes] = useState(1440);
   const [paymentMethod, setPaymentMethod] = useState("ALL");
   const [minimumAmountPesos, setMinimumAmountPesos] = useState("");
   const [paymentContext, setPaymentContext] = useState("ALL");
   const [ruleSubject, setRuleSubject] = useState("Recordatorio GymOS");
   const [ruleBody, setRuleBody] = useState("");
-  const [ruleChannel, setRuleChannel] = useState<"IN_APP" | "EMAIL">("IN_APP");
+  const [ruleChannel, setRuleChannel] = useState<RuleChannel>("IN_APP");
   const [notificationBody, setNotificationBody] = useState("");
   const [notificationChannel, setNotificationChannel] = useState<"IN_APP" | "EMAIL">("IN_APP");
   const [notificationRecipient, setNotificationRecipient] = useState("");
@@ -65,6 +130,7 @@ export default function AutomationsPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [showRuleDrawer, setShowRuleDrawer] = useState(false);
   const [showNotificationDrawer, setShowNotificationDrawer] = useState(false);
+  const [showOperationalDetails, setShowOperationalDetails] = useState(false);
   const [recoveryTarget, setRecoveryTarget] = useState<AutomationDeadLetter | null>(null);
   const [recoveryAction, setRecoveryAction] = useState<"retry" | "discard">("retry");
   const [recoveryReason, setRecoveryReason] = useState("");
@@ -167,6 +233,30 @@ export default function AutomationsPage() {
     }
   }
 
+  function openRecipe(recipe?: AutomationRecipe) {
+    if (recipe) {
+      setName(recipe.title);
+      setTriggerType(recipe.triggerType);
+      setRuleChannel(recipe.channel);
+      setRuleSubject(recipe.subject);
+      setRuleBody(recipe.body);
+      if (recipe.daysBefore) setDaysBefore(recipe.daysBefore);
+      if (recipe.minutesBefore) setBookingReminderMinutes(recipe.minutesBefore);
+    } else {
+      setName("");
+      setTriggerType("MEMBERSHIP_EXPIRING");
+      setRuleChannel("IN_APP");
+      setRuleSubject("Recordatorio GymOS");
+      setRuleBody("");
+      setDaysBefore(3);
+      setBookingReminderMinutes(1440);
+      setPaymentMethod("ALL");
+      setPaymentContext("ALL");
+      setMinimumAmountPesos("");
+    }
+    setShowRuleDrawer(true);
+  }
+
   async function submitRule(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session) {
@@ -181,6 +271,7 @@ export default function AutomationsPage() {
         triggerType,
         conditionJson: JSON.stringify(buildCondition({
           daysBefore,
+          bookingReminderMinutes,
           intervalMinutes,
           minimumAmountPesos,
           paymentContext,
@@ -198,7 +289,7 @@ export default function AutomationsPage() {
       });
       setName("");
       setRuleBody("");
-      setMessage(`${created.name} creada.`);
+      setMessage(`Automatización “${created.name}” creada y activa.`);
       await refresh(session);
       setShowRuleDrawer(false);
     } catch (exception) {
@@ -228,7 +319,7 @@ export default function AutomationsPage() {
       });
       setNotificationBody("");
       setNotificationRecipient("");
-      setMessage("Notificación en cola.");
+      setMessage("Aviso agregado a la cola de entrega.");
       await refresh(session);
       setShowNotificationDrawer(false);
     } catch (exception) {
@@ -332,6 +423,9 @@ export default function AutomationsPage() {
   }
 
   const selectedRule = rules.find((rule) => rule.id === selectedRuleId) ?? null;
+  const hasOperationalIssues = Boolean(
+    operations && (operations.alertLevel !== "HEALTHY" || operations.deadLetterEvents + operations.deadLetterExecutions > 0),
+  );
 
   if (loading) {
     return <LoadingScreen text="Cargando automatizaciones..." />;
@@ -357,22 +451,39 @@ export default function AutomationsPage() {
         <div>
           <p>Centro de automatización</p>
           <h2>Trabajo que GymOS ejecuta por ti</h2>
-          <span>Una regla detecta un momento, comprueba condiciones y realiza una acción con historial.</span>
+          <span>Elige qué debe ocurrir, a quién avisar y el mensaje. GymOS repetirá la tarea automáticamente.</span>
         </div>
         <div className="flex flex-wrap gap-3">
-          <button className="app-button-secondary" onClick={() => refresh()} type="button">Actualizar</button>
+          <button className="app-button-secondary" onClick={() => setShowOperationalDetails((current) => !current)} type="button">
+            {showOperationalDetails ? "Ocultar monitoreo" : "Ver monitoreo avanzado"}
+          </button>
           {hasPermission(session, "notification.manage") ? <button className="app-button-secondary" onClick={() => setShowNotificationDrawer(true)} type="button">
-            Notificación manual
+            Enviar aviso ahora
           </button> : null}
-          {hasPermission(session, "automation.manage") ? <button className="app-button" onClick={() => setShowRuleDrawer(true)} type="button">Nueva regla</button> : null}
+          {hasPermission(session, "automation.manage") ? <button className="app-button" onClick={() => openRecipe()} type="button">Crear automatización</button> : null}
         </div>
       </section>
+
+      {hasPermission(session, "automation.manage") ? (
+        <section className="app-card grid gap-4 p-5">
+          <div>
+            <p className="app-eyebrow">Recetas listas para adaptar</p>
+            <h2 className="mt-1 text-xl font-semibold">Empieza con un caso común</h2>
+            <p className="mt-1 text-sm text-[var(--brand-muted)]">En una organización nueva no se crean reglas automáticamente. Estas recetas sólo preparan el formulario: podrás revisar todo antes de crear y activar una.</p>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            {AUTOMATION_RECIPES.map((recipe) => (
+              <AutomationRecipeCard key={recipe.id} onUse={() => openRecipe(recipe)} recipe={recipe} />
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className="rounded-lg border border-[var(--brand-line)] bg-white p-4 text-sm shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <strong>¿Vas a enviar correos?</strong>
-            <p className="mt-1 text-[var(--brand-muted)]">Primero conecta el proveedor y define el remitente; después selecciona “Correo al socio” al crear la regla.</p>
+            <strong>¿Quieres avisar por correo?</strong>
+            <p className="mt-1 text-[var(--brand-muted)]">Configura el proveedor y el remitente antes de usar una receta de correo. Los avisos internos para el equipo no necesitan esta configuración.</p>
           </div>
           <Link className="app-button-secondary" href="/settings/organization#email-settings">Configurar correo</Link>
         </div>
@@ -381,7 +492,7 @@ export default function AutomationsPage() {
       {error ? <InlineError message={error} /> : null}
       {message ? <Notice tone="ok" text={message} /> : null}
 
-      {operations ? (
+      {operations && (showOperationalDetails || hasOperationalIssues) ? (
         <section className={`rounded-lg border p-5 ${operations.alertLevel === "CRITICAL" ? "border-[#e5b7b7] bg-[#fff7f7]" : "border-[var(--brand-line)] bg-white"}`}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
@@ -392,36 +503,42 @@ export default function AutomationsPage() {
               </p>
               {scheduler?.reason ? <p className="mt-2 text-sm">Motivo de pausa: {scheduler.reason}</p> : null}
             </div>
-            {hasPermission(session, "automation.scheduler.manage") || hasPermission(session, "platform.admin") ? (
-              <button className={scheduler?.paused ? "app-button" : "app-button-secondary"} disabled={saving} onClick={() => void toggleScheduler()} type="button">
-                {scheduler?.paused ? "Reanudar procesamiento" : "Pausar procesamiento"}
-              </button>
-            ) : null}
+            <div className="flex flex-wrap gap-2">
+              <button className="app-button-secondary" onClick={() => void refresh()} type="button">Actualizar estado</button>
+              {hasPermission(session, "automation.scheduler.manage") || hasPermission(session, "platform.admin") ? (
+                <button className={scheduler?.paused ? "app-button" : "app-button-secondary"} disabled={saving} onClick={() => void toggleScheduler()} type="button">
+                  {scheduler?.paused ? "Reanudar todo" : "Pausar todas"}
+                </button>
+              ) : null}
+            </div>
           </div>
         </section>
       ) : null}
 
       <section className="grid gap-4 md:grid-cols-3">
         <AutomationPurpose
-          description="Avisar al equipo o al socio antes de un vencimiento, una cita o una tarea pendiente."
-          title="Recordar y avisar"
+          description="Selecciona un evento real: vencimiento, pago, reserva o domiciliación."
+          eyebrow="Paso 1"
+          title="Elige el momento"
         />
         <AutomationPurpose
-          description="Programa el cargo por vigencia, procesa los resultados de Stripe y extiende la membresía una sola vez después de confirmar el pago."
-          title="Cobros recurrentes"
+          description="Usa un aviso interno para el equipo o un correo cuando el evento identifica al socio."
+          eyebrow="Paso 2"
+          title="Elige quién recibe"
         />
         <AutomationPurpose
-          description="Crear seguimiento después de pagos, reservas o incidencias sin depender de que alguien recuerde hacerlo."
-          title="Dar seguimiento"
+          description="GymOS registra cada intento, reintenta fallos y conserva el historial para revisión."
+          eyebrow="Paso 3"
+          title="Revisa y activa"
         />
       </section>
 
       <Notice
         tone="ok"
-        text="Las reglas manuales, programadas y los eventos de pagos, reservas, membresías o domiciliaciones crean notificaciones con cola durable e idempotente. Los cobros recurrentes ya procesan éxito, fallo, reintento y recuperación. Recursos reservables y wellness con costo permanecen fuera del alcance definido."
+        text="Puedes automatizar avisos sobre pagos, reservas incluidas, membresías y domiciliaciones. Los recursos reservables y servicios wellness con costo permanecen fuera del alcance definido."
       />
 
-      <section className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
+      {showOperationalDetails || deadLetterTotalElements > 0 ? <section className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <p className="app-eyebrow">Recuperación operativa</p>
@@ -473,15 +590,15 @@ export default function AutomationsPage() {
             </div> : null}
           </div>
         )}
-      </section>
+      </section> : null}
 
       <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
         <section className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-semibold">Reglas</h2>
+          <h2 className="text-xl font-semibold">Automatizaciones configuradas</h2>
           <div className="mt-4 grid gap-3">
             {rules.length === 0 ? (
               <p className="rounded-md border border-[#e4e8df] bg-[#fafbf8] px-3 py-3 text-sm text-[var(--brand-muted)]">
-                No hay reglas configuradas.
+                Aún no hay automatizaciones. Elige una receta o crea una desde cero.
               </p>
             ) : null}
             {rules.map((rule) => (
@@ -500,8 +617,8 @@ export default function AutomationsPage() {
                   <RuleStatus status={rule.status} />
                 </div>
                 <div className="mt-4 flex flex-wrap gap-2">
-                  <button className="h-9 rounded-md border border-[var(--brand-line)] px-3 text-xs font-semibold" onClick={() => loadHistory(rule)} type="button">Historial</button>
-                  {isSupportedTrigger(rule.triggerType) && hasAnyPermission(session, "automation.execute", "automation.manage") ? <button className="h-9 rounded-md border border-[var(--brand-line)] px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50" disabled={rule.status !== "ENABLED"} onClick={() => runRule(rule)} type="button">Ejecutar prueba</button> : null}
+                  <button className="h-9 rounded-md border border-[var(--brand-line)] px-3 text-xs font-semibold" onClick={() => loadHistory(rule)} type="button">Ver actividad</button>
+                  {isSupportedTrigger(rule.triggerType) && hasAnyPermission(session, "automation.execute", "automation.manage") ? <button className="h-9 rounded-md border border-[var(--brand-line)] px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50" disabled={rule.status !== "ENABLED"} onClick={() => runRule(rule)} type="button">Probar ahora</button> : null}
                   {hasPermission(session, "automation.manage") ? <>
                   <button className="h-9 rounded-md border border-[var(--brand-line)] px-3 text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-50" disabled={!isSupportedTrigger(rule.triggerType) && rule.status !== "ENABLED"} onClick={() => changeRule(rule, rule.status === "ENABLED" ? "disable" : "enable")} type="button">
                     {rule.status === "ENABLED" ? "Deshabilitar" : "Habilitar"}
@@ -514,7 +631,7 @@ export default function AutomationsPage() {
         </section>
 
         <section className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
-          <h2 className="text-xl font-semibold">Notificaciones</h2>
+          <h2 className="text-xl font-semibold">Entregas recientes</h2>
           <div className="mt-4 grid gap-3">
             {notifications.length === 0 ? (
               <p className="rounded-md border border-[#e4e8df] bg-[#fafbf8] px-3 py-3 text-sm text-[var(--brand-muted)]">
@@ -584,18 +701,23 @@ export default function AutomationsPage() {
       ) : null}
 
       <AppDrawer
-        description="Define el disparador y la acción que GymOS ejecutará cuando se cumpla la condición."
+        description="Completa tres pasos. Antes de guardar verás exactamente cuándo se ejecutará y qué mensaje se entregará."
         onClose={() => setShowRuleDrawer(false)}
         open={showRuleDrawer}
-        title="Nueva regla"
+        title="Crear automatización"
       >
         <form className="grid gap-4" onSubmit={submitRule}>
+          <div className="grid grid-cols-3 gap-2 text-center text-xs font-semibold text-[var(--brand-muted)]">
+            <span className="rounded-md bg-[var(--brand-surface)] px-2 py-2">1. Cuándo</span>
+            <span className="rounded-md bg-[var(--brand-surface)] px-2 py-2">2. A quién</span>
+            <span className="rounded-md bg-[var(--brand-surface)] px-2 py-2">3. Mensaje</span>
+          </div>
           <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-            Nombre de la regla
+            Nombre para reconocerla
             <input className="h-10 rounded-md border border-[var(--brand-line)] px-3 text-sm" onChange={(event) => setName(event.target.value)} placeholder="Ej. Avisar membresías por vencer" required value={name} />
           </label>
           <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-            Cuándo debe ejecutarse
+            1. ¿Cuándo debe ejecutarse?
             <select className="h-10 rounded-md border border-[var(--brand-line)] bg-white px-3 text-sm" onChange={(event) => {
               const nextTrigger = event.target.value;
               setTriggerType(nextTrigger);
@@ -612,12 +734,13 @@ export default function AutomationsPage() {
               <option value="RECURRING_CHARGE_FAILED">Cuando falla una domiciliación</option>
               <option value="BOOKING_CREATED">Cuando se crea una reserva</option>
               <option value="BOOKING_CONFIRMED">Cuando se confirma una reserva</option>
+              <option value="BOOKING_REMINDER">Antes de una reservación</option>
               <option value="BOOKING_CANCELLED">Cuando se cancela una reserva</option>
             </select>
           </label>
           <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-            Canal de entrega
-            <select className="h-10 rounded-md border border-[var(--brand-line)] bg-white px-3 text-sm" onChange={(event) => setRuleChannel(event.target.value as "IN_APP" | "EMAIL")} value={ruleChannel}>
+            2. ¿A quién debe avisar?
+            <select className="h-10 rounded-md border border-[var(--brand-line)] bg-white px-3 text-sm" onChange={(event) => setRuleChannel(event.target.value as RuleChannel)} value={ruleChannel}>
               <option value="IN_APP">Notificación interna para el equipo</option>
               <option disabled={!supportsClientEmail(triggerType)} value="EMAIL">Correo al socio relacionado</option>
             </select>
@@ -649,6 +772,24 @@ export default function AutomationsPage() {
                 type="number"
                 value={daysBefore}
               />
+            </label>
+          ) : null}
+          {triggerType === "BOOKING_REMINDER" ? (
+            <label className="grid gap-2 text-sm font-medium text-[#42514a]">
+              ¿Con cuánta anticipación debe avisar?
+              <select
+                className="h-10 rounded-md border border-[var(--brand-line)] bg-white px-3 text-sm"
+                onChange={(event) => setBookingReminderMinutes(Number(event.target.value))}
+                value={bookingReminderMinutes}
+              >
+                <option value={60}>1 hora antes</option>
+                <option value={180}>3 horas antes</option>
+                <option value={720}>12 horas antes</option>
+                <option value={1440}>1 día antes</option>
+                <option value={2880}>2 días antes</option>
+                <option value={10080}>7 días antes</option>
+              </select>
+              <small>Si el sistema estuvo detenido, enviará el recordatorio al recuperarse siempre que la reserva aún no haya comenzado.</small>
             </label>
           ) : null}
           {triggerType === "PAYMENT_PENDING_VALIDATION" ? (
@@ -691,7 +832,7 @@ export default function AutomationsPage() {
             </label>
           ) : null}
           <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-            Asunto
+            3. Asunto
             <input
               className="h-10 rounded-md border border-[var(--brand-line)] px-3 text-sm"
               onChange={(event) => setRuleSubject(event.target.value)}
@@ -700,7 +841,7 @@ export default function AutomationsPage() {
             />
           </label>
           <label className="grid gap-2 text-sm font-medium text-[#42514a]">
-            {ruleChannel === "EMAIL" ? "Contenido del correo" : "Mensaje interno"}
+            {ruleChannel === "EMAIL" ? "3. Contenido del correo" : "3. Mensaje interno"}
             <textarea
               className="min-h-28 rounded-md border border-[var(--brand-line)] px-3 py-2 text-sm"
               onChange={(event) => setRuleBody(event.target.value)}
@@ -711,12 +852,12 @@ export default function AutomationsPage() {
           <section className="rounded-md border border-[var(--brand-line)] bg-[var(--brand-surface)] p-3 text-sm">
             <p className="font-semibold">Vista previa</p>
             <p className="mt-2 text-xs uppercase tracking-wide text-[var(--brand-muted)]">{triggerLabel(triggerType)}</p>
-            <p className="mt-1 text-xs text-[var(--brand-muted)]">{conditionDescription({ daysBefore, intervalMinutes, minimumAmountPesos, paymentContext, paymentMethod, triggerType })}</p>
+            <p className="mt-1 text-xs text-[var(--brand-muted)]">{conditionDescription({ bookingReminderMinutes, daysBefore, intervalMinutes, minimumAmountPesos, paymentContext, paymentMethod, triggerType })}</p>
             <p className="mt-2 font-semibold">{ruleSubject.trim() || name.trim() || "Sin asunto"}</p>
             <p className="mt-1 whitespace-pre-wrap text-[var(--brand-muted)]">{ruleBody.trim() || "Escribe el mensaje que recibirá el equipo."}</p>
             <p className="mt-2 text-xs text-[var(--brand-muted)]">La regla reintenta hasta 3 veces; si no se recupera, aparece en “Fallos definitivos”. Los correos conservan además su propia cola de entrega.</p>
           </section>
-          <button className="form-primary-button" disabled={saving || !name.trim() || !ruleBody.trim()} type="submit">Crear regla</button>
+          <button className="form-primary-button" disabled={saving || !name.trim() || !ruleBody.trim()} type="submit">Guardar y activar</button>
         </form>
       </AppDrawer>
 
@@ -724,7 +865,7 @@ export default function AutomationsPage() {
         description="Envía una notificación interna o un correo transaccional sin crear una regla automática."
         onClose={() => setShowNotificationDrawer(false)}
         open={showNotificationDrawer}
-        title="Notificación manual"
+        title="Enviar aviso ahora"
       >
         <form className="grid gap-4" onSubmit={submitNotification}>
           <label className="grid gap-2 text-sm font-medium">
@@ -741,7 +882,7 @@ export default function AutomationsPage() {
             </>
           ) : null}
           <label className="grid gap-2 text-sm font-medium">Mensaje<textarea className="min-h-28 w-full rounded-md border border-[var(--brand-line)] px-3 py-2 text-sm" onChange={(event) => setNotificationBody(event.target.value)} placeholder="Mensaje" value={notificationBody} /></label>
-          <button className="form-primary-button" disabled={saving || !notificationBody.trim() || (notificationChannel === "EMAIL" && (!notificationRecipient || !notificationSubject))} type="submit">Encolar</button>
+          <button className="form-primary-button" disabled={saving || !notificationBody.trim() || (notificationChannel === "EMAIL" && (!notificationRecipient || !notificationSubject))} type="submit">Enviar aviso</button>
         </form>
       </AppDrawer>
 
@@ -779,6 +920,7 @@ export default function AutomationsPage() {
 }
 
 type ConditionInput = {
+  bookingReminderMinutes: number;
   daysBefore: number;
   intervalMinutes: number;
   minimumAmountPesos: string;
@@ -790,6 +932,7 @@ type ConditionInput = {
 function buildCondition(input: ConditionInput): Record<string, number | string> {
   if (input.triggerType === "SCHEDULED") return { intervalMinutes: input.intervalMinutes };
   if (input.triggerType === "MEMBERSHIP_EXPIRING") return { daysBefore: input.daysBefore };
+  if (input.triggerType === "BOOKING_REMINDER") return { minutesBefore: input.bookingReminderMinutes };
   if (input.triggerType === "PAYMENT_COMPLETED") {
     return input.paymentContext === "ALL" ? {} : { businessContext: input.paymentContext };
   }
@@ -807,6 +950,7 @@ function buildCondition(input: ConditionInput): Record<string, number | string> 
 function conditionDescription(input: ConditionInput) {
   if (input.triggerType === "SCHEDULED") return `Cada ${input.intervalMinutes} minutos.`;
   if (input.triggerType === "MEMBERSHIP_EXPIRING") return `${input.daysBefore} días antes de la fecha de vencimiento.`;
+  if (input.triggerType === "BOOKING_REMINDER") return bookingReminderDescription(input.bookingReminderMinutes);
   if (input.triggerType === "PAYMENT_COMPLETED") {
     return input.paymentContext === "ALL" ? "Para cualquier tipo de venta." : `Sólo para ${paymentContextLabel(input.paymentContext).toLowerCase()}.`;
   }
@@ -818,15 +962,40 @@ function conditionDescription(input: ConditionInput) {
   return "Se ejecuta para todas las ocurrencias de este evento.";
 }
 
+function bookingReminderDescription(minutes: number) {
+  if (minutes % 1440 === 0) {
+    const days = minutes / 1440;
+    return `${days} ${days === 1 ? "día" : "días"} antes de la reservación.`;
+  }
+  if (minutes % 60 === 0) {
+    const hours = minutes / 60;
+    return `${hours} ${hours === 1 ? "hora" : "horas"} antes de la reservación.`;
+  }
+  return `${minutes} minutos antes de la reservación.`;
+}
+
 function Notice({ tone, text }: { tone: "ok" | "error"; text: string }) {
   const styles = tone === "ok" ? "border-[var(--brand-line)] bg-[var(--brand-surface)] text-[#31563c]" : "border-[#e5b7b7] bg-[#fff4f4] text-[#8c2f2f]";
   return <p className={`rounded-md border px-3 py-2 text-sm ${styles}`}>{text}</p>;
 }
 
-function AutomationPurpose({ description, title }: { description: string; title: string }) {
+function AutomationRecipeCard({ onUse, recipe }: { onUse: () => void; recipe: AutomationRecipe }) {
+  return (
+    <article className="flex min-h-56 flex-col rounded-lg border border-[var(--brand-line)] bg-[var(--brand-surface)] p-4">
+      <span className="w-fit rounded-full bg-white px-2 py-1 text-xs font-semibold text-[var(--brand-muted)]">
+        {recipe.channel === "EMAIL" ? "Correo al socio" : "Aviso al equipo"}
+      </span>
+      <h3 className="mt-3 font-semibold">{recipe.title}</h3>
+      <p className="mt-2 flex-1 text-sm leading-6 text-[var(--brand-muted)]">{recipe.description}</p>
+      <button aria-label={`Usar receta: ${recipe.title}`} className="app-button-secondary mt-4 w-full" onClick={onUse} type="button">Usar esta receta</button>
+    </article>
+  );
+}
+
+function AutomationPurpose({ description, eyebrow, title }: { description: string; eyebrow: string; title: string }) {
   return (
     <article className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
-      <p className="app-eyebrow">Para qué sirve</p>
+      <p className="app-eyebrow">{eyebrow}</p>
       <h2 className="mt-2 text-lg font-semibold">{title}</h2>
       <p className="mt-2 text-sm leading-6 text-[var(--brand-muted)]">{description}</p>
     </article>
@@ -857,6 +1026,7 @@ function triggerLabel(triggerType: string) {
     RECURRING_CHARGE_FAILED: "Domiciliación fallida",
     BOOKING_CREATED: "Reserva creada",
     BOOKING_CONFIRMED: "Reserva confirmada",
+    BOOKING_REMINDER: "Recordatorio de reservación",
     BOOKING_CANCELLED: "Reserva cancelada",
   } as Record<string, string>)[triggerType] ?? triggerType;
 }
@@ -921,6 +1091,7 @@ function isSupportedTrigger(triggerType: string) {
     "RECURRING_CHARGE_FAILED",
     "BOOKING_CREATED",
     "BOOKING_CONFIRMED",
+    "BOOKING_REMINDER",
     "BOOKING_CANCELLED",
   ].includes(triggerType);
 }
@@ -935,6 +1106,7 @@ function supportsClientEmail(triggerType: string) {
     "RECURRING_CHARGE_FAILED",
     "BOOKING_CREATED",
     "BOOKING_CONFIRMED",
+    "BOOKING_REMINDER",
     "BOOKING_CANCELLED",
   ].includes(triggerType);
 }

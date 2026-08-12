@@ -53,7 +53,7 @@ export function EditClientDrawer({
           <TextField error={errors.maternalLastName} label="Apellido materno" name="maternalLastName" required={false} value={form.maternalLastName ?? ""} onChange={(value) => onFieldChange("maternalLastName", value)} />
           <PhoneField error={errors.phone} label="Telefono" name="phone" required value={form.phone ?? ""} onChange={(value) => onFieldChange("phone", value)} />
           <EmailField error={errors.email} label="Email" name="email" value={form.email ?? ""} onChange={(value) => onFieldChange("email", value)} />
-          <DateField error={errors.birthDate} label="Fecha de nacimiento" name="birthDate" value={form.birthDate ?? ""} onChange={(value) => onFieldChange("birthDate", value)} />
+          <DateField error={errors.birthDate} label="Fecha de nacimiento" name="birthDate" required value={form.birthDate ?? ""} onChange={(value) => onFieldChange("birthDate", value)} />
           <GenderField error={errors.gender} label="Genero" name="gender" value={form.gender ?? ""} onChange={(value) => onFieldChange("gender", value)} />
         </div>
         <label className="form-field" htmlFor="status">

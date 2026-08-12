@@ -115,6 +115,9 @@ export function canAccessRoute(user: CurrentUser, pathname: string) {
     return tenantOwnerRoutes.some((route) => matches(pathname, route));
   }
   if (console === "TENANT_MANAGER") {
+    if (matches(pathname, "/settings/organization")) {
+      return hasAny(user, ["payment.settings.manage", "selfservice.settings.manage", "notification.settings.manage"]);
+    }
     return managerRoutes.some((route) => matches(pathname, route));
   }
   if (console === "RECEPTION") {
@@ -159,6 +162,7 @@ const tenantOwnerRoutes = [
 const managerRoutes = [
   "/operations",
   "/reports",
+  "/settings/organization",
   "/users",
   "/catalog",
   "/access",

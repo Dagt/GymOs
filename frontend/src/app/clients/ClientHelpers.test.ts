@@ -2,6 +2,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import type { ClientSummary } from "@/lib/api";
 import { clientMembershipStatus } from "./client-list-model.ts";
+import { emptyClientForm, validateClientForm } from "./ClientHelpers.ts";
+
+test("requires a birth date before registering a client", () => {
+  const errors = validateClientForm({
+    ...emptyClientForm,
+    firstName: "Andrea",
+    lastName: "Landeros",
+    phone: "+525512345678",
+  }, false);
+
+  assert.match(errors.birthDate ?? "", /obligatori[oa]/i);
+});
 
 test("shows active memberships with a muted pistachio treatment", () => {
   const presentation = clientMembershipStatus(client({ membershipStatus: "ACTIVE" }));

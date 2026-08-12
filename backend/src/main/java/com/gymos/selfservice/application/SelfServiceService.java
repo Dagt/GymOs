@@ -204,7 +204,7 @@ public class SelfServiceService {
 	public List<PlanOptionRecord> membershipOptions(UUID sessionId, String sessionToken) {
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
 		capabilityPolicy.requireMembershipOptions(capabilities(session));
-		return repository.planOptions(session.organizationId());
+		return repository.planOptions(session.organizationId(), session.branchId());
 	}
 
 	@Transactional(readOnly = true)
@@ -217,17 +217,21 @@ public class SelfServiceService {
 	}
 
 	@Transactional
-	public List<BookingResource> bookingResources(UUID sessionId, String sessionToken) {
+	public List<BookingResource> bookingResources(UUID sessionId, String sessionToken, LocalDate date) {
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
 		capabilityPolicy.require(capabilities(session), SelfServiceCapability.RESOURCE_BOOKING);
-		return bookingOperations.resources(session.organizationId(), session.branchId());
+		return bookingOperations.eligibleResources(
+				session.organizationId(), session.branchId(), session.clientId(), date
+		);
 	}
 
 	@Transactional
 	public List<BookingAvailability> bookingAvailability(UUID sessionId, String sessionToken, UUID resourceId, LocalDate date) {
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
 		capabilityPolicy.require(capabilities(session), SelfServiceCapability.RESOURCE_BOOKING);
-		return bookingOperations.availability(session.organizationId(), session.branchId(), resourceId, date);
+		return bookingOperations.eligibleAvailability(
+				session.organizationId(), session.branchId(), session.clientId(), resourceId, date
+		);
 	}
 
 	@Transactional

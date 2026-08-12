@@ -21,7 +21,13 @@ const options: Array<{ key: EditableKey; title: string; description: string }> =
   { key: "profileUpdateAllowed", title: "Actualizar contacto", description: "Correo y teléfono del socio verificado." },
 ];
 
-export function KioskBranchSettingsCard({ accessToken }: { accessToken: string }) {
+export function KioskBranchSettingsCard({
+  accessToken,
+  activeBranchId,
+}: {
+  accessToken: string;
+  activeBranchId?: string | null;
+}) {
   const [items, setItems] = useState<KioskBranchSettings[]>([]);
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -30,10 +36,12 @@ export function KioskBranchSettingsCard({ accessToken }: { accessToken: string }
   useEffect(() => {
     let active = true;
     getKioskBranchSettings(accessToken)
-      .then((loaded) => { if (active) setItems(loaded); })
+      .then((loaded) => {
+        if (active) setItems(activeBranchId ? loaded.filter((item) => item.branchId === activeBranchId) : []);
+      })
       .catch((exception) => { if (active) setError(exception instanceof Error ? exception.message : "No fue posible cargar el kiosco."); });
     return () => { active = false; };
-  }, [accessToken]);
+  }, [accessToken, activeBranchId]);
 
   function toggle(branchId: string, key: EditableKey) {
     setItems((current) => current.map((item) => item.branchId === branchId
@@ -69,7 +77,7 @@ export function KioskBranchSettingsCard({ accessToken }: { accessToken: string }
     <section className="app-card grid scroll-mt-6 gap-5 p-5" id="kiosk-settings">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-        <p className="app-eyebrow">Kiosco web por sucursal</p>
+        <p className="app-eyebrow">Kiosco web de la sucursal actual</p>
         <h2 className="mt-1 text-xl font-semibold">Funciones disponibles para el socio</h2>
         <p className="mt-1 text-sm text-[var(--brand-muted)]">
           Esta configuración es lógica: recepción abre el kiosco en cualquier navegador; no se registra ni asigna una computadora.
@@ -88,7 +96,7 @@ export function KioskBranchSettingsCard({ accessToken }: { accessToken: string }
       {error ? <p className="form-message error" role="alert">{error}</p> : null}
       {message ? <p className="form-message success" role="status">{message}</p> : null}
       <div className="grid gap-4">
-        {items.length === 0 && !error ? <p className="text-sm text-[var(--brand-muted)]">No hay sucursales activas para configurar.</p> : null}
+        {items.length === 0 && !error ? <p className="text-sm text-[var(--brand-muted)]">Selecciona una sucursal activa para configurar su kiosco.</p> : null}
         {items.map((item) => (
           <article className="rounded-lg border border-[var(--brand-line)] p-4" key={item.branchId}>
             <div className="flex flex-wrap items-start justify-between gap-3">

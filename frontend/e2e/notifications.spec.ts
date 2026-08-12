@@ -59,16 +59,18 @@ test("una automatizacion de membresia puede enviar correo al socio del evento", 
   });
 
   await page.goto("/automations");
-  await page.getByRole("button", { name: "Nueva regla" }).click();
+  await page.getByRole("button", { name: "Usar receta: Avisar que la membresía vencerá" }).click();
   const drawer = page.getByRole("dialog");
-  await drawer.getByLabel("Nombre de la regla").fill("Aviso por correo");
+  await expect(drawer.getByLabel("Nombre para reconocerla")).toHaveValue("Avisar que la membresía vencerá");
+  await expect(drawer.getByLabel("2. ¿A quién debe avisar?")).toHaveValue("EMAIL");
+  await drawer.getByLabel("Nombre para reconocerla").fill("Aviso por correo");
   await drawer.locator("select").nth(0).selectOption("MEMBERSHIP_EXPIRING");
   await drawer.locator("select").nth(1).selectOption("EMAIL");
   await drawer.getByPlaceholder("Asunto de la notificación").fill("Tu membresia vence pronto");
   await drawer.locator("textarea").fill("Hola {{recipientName}}, tu membresia vence el {{endsOn}}.");
-  await drawer.getByRole("button", { name: "Crear regla" }).click();
+  await drawer.getByRole("button", { name: "Guardar y activar" }).click();
 
-  await expect(page.getByText("Aviso por correo creada.")).toBeVisible();
+  await expect(page.getByText("Automatización “Aviso por correo” creada y activa.")).toBeVisible();
   expect(createdPayload).not.toBeNull();
   const action = JSON.parse(String(createdPayload?.actionConfigJson)) as Record<string, unknown>;
   expect(action).toMatchObject({

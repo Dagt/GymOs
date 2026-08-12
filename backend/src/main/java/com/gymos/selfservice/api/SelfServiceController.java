@@ -96,8 +96,8 @@ public class SelfServiceController {
 	}
 
 	@GetMapping("/sessions/{sessionId}/booking-resources")
-	List<BookingResource> bookingResources(@PathVariable UUID sessionId, @RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken) {
-		return selfServiceService.bookingResources(sessionId, sessionToken);
+	List<BookingResource> bookingResources(@PathVariable UUID sessionId, @RequestParam LocalDate date, @RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken) {
+		return selfServiceService.bookingResources(sessionId, sessionToken, date);
 	}
 
 	@GetMapping("/sessions/{sessionId}/booking-availability")

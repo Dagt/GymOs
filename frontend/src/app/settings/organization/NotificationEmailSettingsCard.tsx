@@ -98,31 +98,37 @@ export function NotificationEmailSettingsCard({ accessToken }: { accessToken: st
         <p className="app-eyebrow">Notificaciones</p>
         <h2 className="text-xl font-semibold">Correo electrónico</h2>
         <p className="mt-2 text-sm text-[var(--brand-muted)]">
-          GymOS conserva la cola, reintentos y trazabilidad. Las credenciales SMTP se configuran como secretos del despliegue, nunca en esta pantalla.
+          Esta sección tiene dos pasos: el equipo técnico conecta al proveedor y después el gimnasio define el remitente. Las automatizaciones internas no necesitan correo.
         </p>
         </div>
         <a className="app-button-secondary" href="/automations">Ir a automatizaciones</a>
       </div>
 
       <div className={`rounded-md border p-4 text-sm ${configuration.providerAvailable ? "border-[#b9d8c6] bg-[#f2faf5]" : "border-[#ead6a3] bg-[#fffaf0]"}`}>
-        <strong>{configuration.providerAvailable ? "Proveedor SMTP conectado" : "Proveedor SMTP pendiente"}</strong>
+        <strong>{configuration.providerAvailable ? "Paso técnico completado" : "Paso técnico pendiente"}</strong>
         <p className="mt-1 text-[var(--brand-muted)]">
           {configuration.providerAvailable
-            ? "El entorno tiene host y credenciales disponibles."
-            : "Configura GYMOS_SMTP_ENABLED, GYMOS_SMTP_HOST, GYMOS_SMTP_USERNAME y GYMOS_SMTP_PASSWORD en el servidor."}
+            ? "El proveedor ya está conectado. Completa el remitente, habilita las entregas y envía una prueba."
+            : "Pide al responsable técnico que conecte el proveedor SMTP. Mientras tanto puedes preparar el nombre y correo que verán los socios."}
         </p>
+        {!configuration.providerAvailable ? (
+          <details className="mt-3 text-xs text-[var(--brand-muted)]">
+            <summary className="cursor-pointer font-semibold text-[#42514a]">Datos para el responsable técnico</summary>
+            <p className="mt-2">Debe configurar en el servidor: GYMOS_SMTP_ENABLED, GYMOS_SMTP_HOST, GYMOS_SMTP_USERNAME y GYMOS_SMTP_PASSWORD.</p>
+          </details>
+        ) : null}
       </div>
 
       <form className="grid gap-4 md:grid-cols-2" onSubmit={save}>
-        <label className="grid gap-2 text-sm font-medium">
-          Proveedor
-          <select className="app-input" onChange={(event) => setDraft({ ...draft, providerKey: event.target.value })} value={draft.providerKey}>
-            <option value="SMTP">SMTP estándar</option>
-          </select>
-        </label>
+        <div className="rounded-md border border-[var(--brand-line)] bg-[var(--brand-surface)] p-4 text-sm">
+          <span className="text-xs text-[var(--brand-muted)]">Tipo de conexión</span>
+          <strong className="mt-1 block">SMTP estándar</strong>
+          <span className="mt-1 block text-xs text-[var(--brand-muted)]">Compatible con el proveedor que elijas.</span>
+        </div>
         <label className="grid gap-2 text-sm font-medium">
           Nombre del remitente
           <input className="app-input" maxLength={160} onChange={(event) => setDraft({ ...draft, fromName: event.target.value })} placeholder="Mi gimnasio" value={draft.fromName} />
+          <small className="font-normal text-[var(--brand-muted)]">Ejemplo: Appex Fitness.</small>
         </label>
         <label className="grid gap-2 text-sm font-medium">
           Correo remitente
@@ -142,7 +148,7 @@ export function NotificationEmailSettingsCard({ accessToken }: { accessToken: st
           <span><strong>Habilitar entregas por correo</strong><small className="mt-1 block">Las automatizaciones podrán escribir al correo registrado del socio.</small></span>
         </label>
         <button className="app-button w-fit" disabled={saving || (draft.emailEnabled && !draft.fromEmail)} type="submit">
-          {saving ? "Guardando..." : "Guardar configuración"}
+          {saving ? "Guardando..." : "Guardar remitente"}
         </button>
       </form>
 

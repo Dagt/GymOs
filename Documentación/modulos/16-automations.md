@@ -10,15 +10,18 @@ Estado: `LISTO PARA ACEPTACIÓN` (la validación externa de Stripe sandbox se ej
 - acción inicial `CREATE_NOTIFICATION` sobre la cola interna;
 - alta limitada a disparadores realmente ejecutables: `MANUAL`, `SCHEDULED`,
   `PAYMENT_COMPLETED`, `PAYMENT_PENDING_VALIDATION`, `BOOKING_CREATED`,
-  `BOOKING_CONFIRMED`, `BOOKING_CANCELLED`, `MEMBERSHIP_EXPIRING` y
+  `BOOKING_CONFIRMED`, `BOOKING_CANCELLED`, `BOOKING_REMINDER`, `MEMBERSHIP_EXPIRING` y
   `MEMBERSHIP_EXPIRED`, además de `RECURRING_CHARGE_DUE`,
   `RECURRING_CHARGE_SUCCEEDED` y `RECURRING_CHARGE_FAILED`;
 - acción soportada `CREATE_NOTIFICATION`;
 - validación del mensaje y rechazo de tipos desconocidos;
 - condiciones tipadas y validadas por disparador: intervalo, días previos al
   vencimiento, plan, método/monto de pago, contexto comercial y recurso;
-- formulario guiado para intervalo, vencimiento, filtros de pago, asunto y
-  mensaje, sin edición de JSON;
+- inicio guiado con recetas para membresía por vencer, pago pendiente, recordatorio
+  previo de reservación, reserva cancelada y fallo de domiciliación, sin guardar
+  hasta que el usuario revise;
+- formulario en tres pasos (`cuándo`, `a quién` y `mensaje`) para intervalo,
+  vencimiento, filtros de pago, asunto y contenido, sin edición de JSON;
 - registro de ejecuciones y auditoría;
 - aislamiento de consultas administrativas por organización y sucursal;
 - permisos de lectura, ejecución y administración;
@@ -33,6 +36,9 @@ Estado: `LISTO PARA ACEPTACIÓN` (la validación externa de Stripe sandbox se ej
 - eventos públicos de creación y cambio de estado de reservas;
 - productor transaccional de membresías por vencer/vencidas, con marcador
   diario y una identidad de ocurrencia estable por membresía y vigencia;
+- productor durable de recordatorios de reservación que selecciona reservas
+  próximas según la anticipación de cada regla, deduplica por regla, versión y
+  reservación, y respeta el aislamiento y la pausa del tenant;
 - reglas heredadas con disparadores sin consumidor se conservan deshabilitadas
   y no pueden reactivarse hasta que su contrato sea soportado;
 - historial operativo en la interfaz con estado, intento, referencia,
@@ -50,12 +56,23 @@ Estado: `LISTO PARA ACEPTACIÓN` (la validación externa de Stripe sandbox se ej
   puede agotar el lote antes de que otros tenants obtengan turno;
 - pausa y reanudación por tenant con `automation.scheduler.manage`, motivo
   auditado y exclusión atómica tanto al seleccionar como al reclamar trabajo;
-- tablero operativo por sucursal con pendientes, reintentos, dead letters y
-  leases vencidos, más gauges periódicos y reglas Prometheus de alerta.
+- tablero operativo avanzado por sucursal con pendientes, reintentos, dead
+  letters y leases vencidos, oculto durante la operación normal y visible
+  automáticamente ante incidencias, más gauges y reglas Prometheus de alerta;
+- configuración operativa dividida en guía inicial, cobros, kiosco, correo e
+  historial técnico, mostrando un solo bloque a la vez.
+
+## Reglas iniciales
+
+Las organizaciones nuevas no reciben automatizaciones activas de manera
+automática. Las recetas de la interfaz sólo preparan un borrador entendible y el
+usuario debe revisarlo y seleccionar `Guardar y activar`. La base de demostración
+histórica conserva una regla sembrada para el gimnasio demo; no forma parte del
+onboarding normal ni se replica a otros gimnasios.
 
 ## Pendiente
 
-- repetir la suite `postgresIntegrationTest` en CI; el corte local ejecutó 34
+- repetir la suite `postgresIntegrationTest` en CI; el corte local ejecutó 37
   escenarios PostgreSQL reales sin fallos ni omisiones;
 - ejecutar los escenarios E2E conectados en el ambiente de integración para
   conservar evidencia de aislamiento, expiración y recuperación extremo a

@@ -186,6 +186,63 @@ class AutomationPostgresConcurrencyIntegrationTests {
 				.doesNotContain(tenant.organizationId());
 	}
 
+	@Test
+	void bookingReminderBecomesDueInsideItsWindowAndIsDeduplicatedByRuleOccurrence() {
+		UUID personId = UUID.randomUUID();
+		UUID clientId = UUID.randomUUID();
+		UUID resourceId = UUID.randomUUID();
+		UUID bookingId = UUID.randomUUID();
+		UUID reminderRuleId = UUID.randomUUID();
+		OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+		OffsetDateTime startsAt = now.plusHours(12);
+		jdbcClient.sql("""
+				INSERT INTO person (id, organization_id, first_name, last_name, birth_date, status, created_at, updated_at, version)
+				VALUES (:id, :organizationId, 'Socio', 'Recordatorio', '1990-01-01', 'ACTIVE', now(), now(), 0)
+				""").param("id", personId).param("organizationId", tenant.organizationId()).update();
+		jdbcClient.sql("""
+				INSERT INTO client (id, organization_id, person_id, home_branch_id, status, joined_at, created_at, updated_at, version)
+				VALUES (:id, :organizationId, :personId, :branchId, 'ACTIVE', now(), now(), now(), 0)
+				""").param("id", clientId).param("organizationId", tenant.organizationId())
+				.param("personId", personId).param("branchId", tenant.branchId()).update();
+		jdbcClient.sql("""
+				INSERT INTO resource (id, organization_id, branch_id, name, resource_type, capacity, slot_minutes,
+				 status, opens_at, closes_at, created_at, updated_at, version)
+				VALUES (:id, :organizationId, :branchId, 'Cancha recordatorio', 'COURT', 1, 60,
+				 'ACTIVE', '06:00', '22:00', now(), now(), 0)
+				""").param("id", resourceId).param("organizationId", tenant.organizationId())
+				.param("branchId", tenant.branchId()).update();
+		jdbcClient.sql("""
+				INSERT INTO booking (id, organization_id, branch_id, resource_id, client_id, status,
+				 starts_at, ends_at, created_at, updated_at, version)
+				VALUES (:id, :organizationId, :branchId, :resourceId, :clientId, 'CONFIRMED',
+				 :startsAt, :endsAt, now(), now(), 0)
+				""").param("id", bookingId).param("organizationId", tenant.organizationId())
+				.param("branchId", tenant.branchId()).param("resourceId", resourceId)
+				.param("clientId", clientId).param("startsAt", startsAt).param("endsAt", startsAt.plusHours(1)).update();
+		jdbcClient.sql("""
+				INSERT INTO automation_rule (
+				 id, organization_id, branch_id, name, trigger_type, condition_json,
+				 action_type, action_config_json, status, retry_limit, created_at, updated_at, version)
+				VALUES (:id, :organizationId, :branchId, 'Recordar reserva', 'BOOKING_REMINDER',
+				 '{"minutesBefore":1440}', 'CREATE_NOTIFICATION', '{"channel":"EMAIL","body":"Te esperamos"}',
+				 'ENABLED', 3, now(), now(), 0)
+				""").param("id", reminderRuleId).param("organizationId", tenant.organizationId())
+				.param("branchId", tenant.branchId()).update();
+
+		var reminders = repository.dueBookingReminders(now, 10);
+		assertThat(reminders).singleElement().satisfies(reminder -> {
+			assertThat(reminder.bookingId()).isEqualTo(bookingId);
+			assertThat(reminder.ruleId()).isEqualTo(reminderRuleId);
+			assertThat(reminder.minutesBefore()).isEqualTo(1440);
+		});
+
+		String reference = "booking-reminder:" + bookingId + ":" + reminderRuleId + ":v0";
+		repository.enqueueTriggerEvent(
+				tenant.organizationId(), tenant.branchId(), "BOOKING_REMINDER", reference, "{}"
+		);
+		assertThat(repository.dueBookingReminders(now, 10)).isEmpty();
+	}
+
 	private TenantRule seedTenant(String code) {
 		UUID organizationId = UUID.randomUUID();
 		UUID branchId = UUID.randomUUID();

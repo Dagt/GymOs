@@ -525,6 +525,73 @@ public class AutomationRepository {
 				.list();
 	}
 
+	public List<BookingReminderCandidate> dueBookingReminders(OffsetDateTime now, int limit) {
+		return jdbcClient.sql("""
+				WITH reminder_candidates AS (
+				    SELECT rule.organization_id,
+				           booking.branch_id,
+				           rule.id AS rule_id,
+				           rule.version AS rule_version,
+				           booking.id AS booking_id,
+				           booking.client_id,
+				           booking.resource_id,
+				           booking.starts_at,
+				           booking.ends_at,
+				           COALESCE((rule.condition_json ->> 'minutesBefore')::integer, 1440) AS minutes_before,
+				           row_number() OVER (
+				               PARTITION BY rule.organization_id ORDER BY booking.starts_at, rule.id, booking.id
+				           ) AS tenant_rank
+				    FROM automation_rule rule
+				    JOIN booking
+				      ON booking.organization_id = rule.organization_id
+				     AND (rule.branch_id IS NULL OR booking.branch_id = rule.branch_id)
+				    WHERE rule.trigger_type = 'BOOKING_REMINDER'
+				      AND rule.status = 'ENABLED'
+				      AND rule.deleted_at IS NULL
+				      AND booking.deleted_at IS NULL
+				      AND booking.status IN ('RESERVED', 'CONFIRMED')
+				      AND booking.starts_at > :now
+				      AND booking.starts_at <= :now + make_interval(
+				          mins => COALESCE((rule.condition_json ->> 'minutesBefore')::integer, 1440)
+				      )
+				      AND NOT EXISTS (
+				          SELECT 1
+				          FROM automation_trigger_event event
+				          WHERE event.organization_id = rule.organization_id
+				            AND event.trigger_type = 'BOOKING_REMINDER'
+				            AND event.trigger_reference = CONCAT(
+				                'booking-reminder:', booking.id, ':', rule.id, ':v', rule.version
+				            )
+				      )
+				      AND NOT EXISTS (
+				          SELECT 1
+				          FROM automation_scheduler_control control
+				          WHERE control.organization_id = rule.organization_id AND control.paused
+				      )
+				)
+				SELECT organization_id, branch_id, rule_id, rule_version, booking_id,
+				       client_id, resource_id, starts_at, ends_at, minutes_before
+				FROM reminder_candidates
+				ORDER BY tenant_rank, starts_at, organization_id, rule_id, booking_id
+				LIMIT :limit
+				""")
+				.param("now", now)
+				.param("limit", limit)
+				.query((rs, row) -> new BookingReminderCandidate(
+						rs.getObject("organization_id", UUID.class),
+						rs.getObject("branch_id", UUID.class),
+						rs.getObject("rule_id", UUID.class),
+						rs.getLong("rule_version"),
+						rs.getObject("booking_id", UUID.class),
+						rs.getObject("client_id", UUID.class),
+						rs.getObject("resource_id", UUID.class),
+						rs.getObject("starts_at", OffsetDateTime.class),
+						rs.getObject("ends_at", OffsetDateTime.class),
+						rs.getInt("minutes_before")
+				))
+				.list();
+	}
+
 	public Optional<AutomationExecutionRecord> executionForTrigger(
 			UUID organizationId,
 			UUID ruleId,
@@ -881,4 +948,10 @@ public class AutomationRepository {
 	) {}
 
 	public record AutomationOperationContext(UUID organizationId, UUID branchId) {}
+
+	public record BookingReminderCandidate(
+			UUID organizationId, UUID branchId, UUID ruleId, long ruleVersion,
+			UUID bookingId, UUID clientId, UUID resourceId,
+			OffsetDateTime startsAt, OffsetDateTime endsAt, int minutesBefore
+	) {}
 }

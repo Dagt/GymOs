@@ -66,8 +66,32 @@ class CatalogMembershipPlanService {
 	PlanView createMembershipPlan(GymOsPrincipal principal, CreateMembershipPlanCommand request, String correlationId) {
 		CatalogAccessGuard.requireBranch(principal);
 		String sku = request.sku().trim().toUpperCase();
-		if (products.skuExists(principal.organizationId(), sku, null)) {
-			throw new BusinessException("PRODUCT_SKU_ALREADY_EXISTS", "Ya existe un producto o plan con ese codigo.");
+		ProductSummaryView existingProduct = products.findBySku(principal.organizationId(), sku).orElse(null);
+		if (existingProduct != null) {
+			if (!"MEMBERSHIP_PLAN".equals(existingProduct.productType())) {
+				throw new BusinessException(
+						"PRODUCT_SKU_ALREADY_EXISTS",
+						"Ese codigo ya pertenece a otro articulo del gimnasio. Usa un codigo distinto."
+				);
+			}
+			PlanView existingPlan = plans.findPlanByProduct(
+					principal.organizationId(), existingProduct.id()
+			).orElseThrow(() -> new BusinessException(
+					"PLAN_CONFIGURATION_INCOMPLETE",
+					"El codigo pertenece a un plan incompleto. Contacta a soporte antes de continuar."
+			));
+			OffsetDateTime now = OffsetDateTime.now();
+			productCommands.attachBranch(
+					principal.organizationId(), principal.branchId(), existingProduct.id(), principal.userId(), now
+			);
+			auditService.record(
+					principal, "PLAN_ATTACHED_TO_BRANCH", "MEMBERSHIP_PLAN", existingPlan.id(),
+					"BACKOFFICE", "SKU " + sku, correlationId
+			);
+			return plans.findPlan(principal.organizationId(), principal.branchId(), existingPlan.id())
+					.orElseThrow(() -> new BusinessException(
+							"PLAN_NOT_FOUND", "No fue posible habilitar el plan en esta sucursal."
+					));
 		}
 
 		UUID productId = UUID.randomUUID();

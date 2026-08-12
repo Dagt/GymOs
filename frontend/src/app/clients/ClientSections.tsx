@@ -178,7 +178,7 @@ export function CreateClientDrawer({
             <TextField error={errors.maternalLastName} label="Apellido materno" name="maternalLastName" required={false} value={form.maternalLastName ?? ""} onChange={(value) => onFormChange("maternalLastName", value)} />
             <PhoneField error={errors.phone} label="Teléfono" name="phone" required value={form.phone ?? ""} onChange={(value) => onFormChange("phone", value)} />
             <EmailField error={errors.email} label="Email" name="email" value={form.email ?? ""} onChange={(value) => onFormChange("email", value)} />
-            <DateField error={errors.birthDate} label="Fecha de nacimiento" name="birthDate" value={form.birthDate ?? ""} onChange={(value) => onFormChange("birthDate", value)} />
+            <DateField error={errors.birthDate} label="Fecha de nacimiento" name="birthDate" required value={form.birthDate ?? ""} onChange={(value) => onFormChange("birthDate", value)} />
             <GenderField error={errors.gender} label="Género" name="gender" value={form.gender ?? ""} onChange={(value) => onFormChange("gender", value)} />
           </div>
           <label className="flex flex-col gap-2" htmlFor="notes">

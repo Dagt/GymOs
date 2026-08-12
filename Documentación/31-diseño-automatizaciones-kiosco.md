@@ -43,7 +43,7 @@ declararse cerrado:
   reintentarse o descartarse con auditoría. Los eventos de domiciliación ya
   entran por la misma bandeja; el historial está paginado y las métricas se
   separan por tenant. Las pruebas PostgreSQL de concurrencia/caída ejecutaron
-  34 escenarios reales sin fallos ni omisiones; falta repetirlas en CI.
+  37 escenarios reales sin fallos ni omisiones; falta repetirlas en CI.
 - **Kiosco está LISTO PARA ACEPTACIÓN funcional y todavía requiere evidencia
   externa antes de un piloto financiero**. El lanzamiento autenticado, la sesión restringida, privacidad,
   inactividad, capacidades, Stripe Checkout y la domiciliación tokenizada y
@@ -130,7 +130,7 @@ No es responsable de:
 |---|---|---|
 | RESUELTO | Pagos, reservas, ciclo de membresía y cargos domiciliados tienen listeners/productores y bandeja durable. | Los disparadores visibles cuentan con productor y consumidor reales. |
 | RESUELTO | `retryLimit` participa en ejecuciones programadas y de eventos con backoff acotado y cierre `DEAD_LETTER`. | Los fallos ya tienen presupuesto y estado terminal. |
-| RESUELTO Y EJECUTADO | La notificación y la ejecución usan llaves idempotentes estables; Testcontainers cubre competencia de leases, deduplicación, vencimiento, equidad y paginación tenant. | El corte ejecutó 34 escenarios PostgreSQL reales sin fallos ni omisiones. |
+| RESUELTO Y EJECUTADO | La notificación y la ejecución usan llaves idempotentes estables; Testcontainers cubre competencia de leases, deduplicación, vencimiento, equidad y paginación tenant. | El corte ejecutó 37 escenarios PostgreSQL reales sin fallos ni omisiones. |
 | RESUELTO | El alta rechaza `actionType` y disparadores desconocidos. | Ya no se registran falsos positivos por acciones inexistentes. |
 | RESUELTO | `conditionJson` valida campos, tipos, rangos e identificadores según cada disparador y la UI sólo presenta campos guiados. | Las reglas visibles no aceptan condiciones ambiguas o desconocidas. |
 | RESUELTO | Los estados operativos son `PROCESSING`, `SUCCEEDED`, `FAILED`, `RETRY_SCHEDULED` y `DEAD_LETTER`. | API, persistencia e interfaz comparten el mismo diagnóstico. |
@@ -231,7 +231,7 @@ inicio, fin, siguiente intento, código de error y resumen sanitizado.
 | RESUELTO | El kiosco obtiene una cotización autoritativa y confirma plan, lista, descuento y total antes de generar la operación Stripe. | El socio ve el compromiso final antes de abandonar GymOS. |
 | RESUELTO | `contact-data`, Checkout y domiciliación tokenizada/revocable ya operan desde la sesión verificada. | El kiosco sólo ofrece domiciliación cuando Stripe recurrente está habilitado por el gimnasio. |
 | RESUELTO SEGÚN PRODUCTO | No existe CRUD de computadoras/terminales físicas. | Las capacidades se administran por sucursal; cualquier navegador abierto por recepción usa el perfil lógico. |
-| IMPLEMENTADO, VALIDACIÓN EXTERNA PENDIENTE | Las pruebas unitarias pasaron 318 escenarios backend y 67 frontend; Testcontainers PostgreSQL pasó 34 y el E2E de kiosco pasó 7 recorridos. La suite E2E completa cubre 38 recorridos. La suite Stripe test está lista y sus 3 escenarios se omiten si no hay secreto sandbox. | Falta ejecutar `stripeTest` con `GYMOS_STRIPE_TEST_SECRET_KEY`/cuenta Connect test y publicar esa evidencia en CI. |
+| IMPLEMENTADO, VALIDACIÓN EXTERNA PENDIENTE | Las pruebas unitarias pasaron 321 escenarios backend y 68 frontend; Testcontainers PostgreSQL pasó 37 y el E2E de kiosco pasó 7 recorridos. La suite E2E completa cubre 39 recorridos. La suite Stripe test está lista y sus 3 escenarios se omiten si no hay secreto sandbox. | Falta ejecutar `stripeTest` con `GYMOS_STRIPE_TEST_SECRET_KEY`/cuenta Connect test y publicar esa evidencia en CI. |
 | RESUELTO | La IP efectiva sólo acepta `Forwarded`/`X-Forwarded-For` si el peer inmediato está en `GYMOS_TRUSTED_PROXIES` y recorre la cadena de derecha a izquierda. | Se evita confiar en cabeceras falsificadas sin romper límites detrás de proxies declarados. |
 
 ## 6. Diseño objetivo del Kiosco

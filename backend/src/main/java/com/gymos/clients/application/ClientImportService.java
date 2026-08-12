@@ -140,12 +140,16 @@ public class ClientImportService {
 		if (!isBlank(row.email()) && !row.email().contains("@")) {
 			return rowResult(row, "ERROR", "Email invalido.", null);
 		}
-		if (!isBlank(row.birthDate())) {
-			try {
-				LocalDate.parse(row.birthDate());
-			} catch (RuntimeException exception) {
-				return rowResult(row, "ERROR", "birthDate debe usar formato YYYY-MM-DD.", null);
+		if (isBlank(row.birthDate())) {
+			return rowResult(row, "ERROR", "birthDate es obligatorio.", null);
+		}
+		try {
+			LocalDate birthDate = LocalDate.parse(row.birthDate());
+			if (birthDate.isAfter(LocalDate.now())) {
+				return rowResult(row, "ERROR", "birthDate no puede estar en el futuro.", null);
 			}
+		} catch (RuntimeException exception) {
+			return rowResult(row, "ERROR", "birthDate debe usar formato YYYY-MM-DD.", null);
 		}
 		String emailKey = lower(row.email());
 		String phoneKey = normalize(row.phone());

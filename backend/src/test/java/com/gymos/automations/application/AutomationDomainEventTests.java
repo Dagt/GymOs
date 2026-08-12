@@ -16,6 +16,7 @@ import com.gymos.automations.infrastructure.AutomationRepository;
 import com.gymos.automations.infrastructure.AutomationRepository.AutomationExecutionRecord;
 import com.gymos.automations.infrastructure.AutomationRepository.AutomationRuleRecord;
 import com.gymos.automations.infrastructure.AutomationRepository.AutomationTriggerEventRecord;
+import com.gymos.automations.infrastructure.AutomationRepository.BookingReminderCandidate;
 import com.gymos.notifications.application.NotificationService;
 import com.gymos.notifications.application.NotificationService.CreateNotificationCommand;
 import java.time.OffsetDateTime;
@@ -239,6 +240,27 @@ class AutomationDomainEventTests {
 
 		verify(repository, never()).startExecution(any(), any(), any(), anyLong(), any(), any(), any());
 		verify(repository).finishTriggerEvent(eq(event.id()), eq("COMPLETED"), any(), eq(null));
+	}
+
+	@Test
+	void dueBookingReminderCreatesOneDurableTargetedOccurrence() {
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		UUID ruleId = UUID.randomUUID();
+		UUID bookingId = UUID.randomUUID();
+		OffsetDateTime startsAt = OffsetDateTime.now().plusDays(1);
+		BookingReminderCandidate reminder = new BookingReminderCandidate(
+				organizationId, branchId, ruleId, 4L, bookingId, UUID.randomUUID(), UUID.randomUUID(),
+				startsAt, startsAt.plusHours(1), 1440
+		);
+		when(repository.dueBookingReminders(any(), eq(250))).thenReturn(List.of(reminder));
+
+		assertThat(service.enqueueDueBookingReminders()).isEqualTo(1);
+
+		String reference = "booking-reminder:" + bookingId + ":" + ruleId + ":v4";
+		verify(repository).enqueueTriggerEvent(
+				eq(organizationId), eq(branchId), eq("BOOKING_REMINDER"), eq(reference), anyString()
+		);
 	}
 
 	private AutomationRuleRecord rule(String triggerType, long version) {

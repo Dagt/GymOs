@@ -18,6 +18,7 @@ import com.gymos.clients.infrastructure.ClientRepository.ClientSummary;
 import com.gymos.clients.infrastructure.ClientRepository.ClientTimelineEntry;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -41,6 +42,7 @@ public class ClientService implements ClientLookupOperations {
 	public ClientDetailResult create(GymOsPrincipal principal, CreateClientCommand request, String correlationId) {
 		requirePrincipal(principal);
 		requireBranch(principal);
+		requireBirthDate(request.birthDate());
 		String email = blankToNull(request.email());
 		String phone = blankToNull(request.phone());
 		ensureUniqueContact(principal.organizationId(), email, phone, null);
@@ -97,6 +99,7 @@ public class ClientService implements ClientLookupOperations {
 		requireBranch(principal);
 		ClientDetail existing = clientRepository.findDetail(principal.organizationId(), principal.branchId(), clientId)
 				.orElseThrow(() -> new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible."));
+		requireBirthDate(request.birthDate());
 		String email = blankToNull(request.email());
 		String phone = blankToNull(request.phone());
 		ensureUniqueContact(principal.organizationId(), email, phone, existing.personId());
@@ -223,6 +226,15 @@ public class ClientService implements ClientLookupOperations {
 	private void requireBranch(GymOsPrincipal principal) {
 		if (principal.branchId() == null) {
 			throw new BusinessException("BRANCH_REQUIRED", "Selecciona una sucursal para continuar.");
+		}
+	}
+
+	private void requireBirthDate(LocalDate birthDate) {
+		if (birthDate == null) {
+			throw new BusinessException("CLIENT_BIRTH_DATE_REQUIRED", "La fecha de nacimiento es obligatoria.");
+		}
+		if (birthDate.isAfter(LocalDate.now())) {
+			throw new BusinessException("CLIENT_BIRTH_DATE_INVALID", "La fecha de nacimiento no puede estar en el futuro.");
 		}
 	}
 

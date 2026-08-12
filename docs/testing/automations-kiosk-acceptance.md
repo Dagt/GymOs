@@ -15,14 +15,14 @@ Esta guía reúne el alcance funcional implementado y los recorridos recomendado
 ## Preparación inicial
 
 1. Entra a `Configuración` (`/settings/organization`).
-2. Usa el índice `Cobros, kiosco y comunicaciones` para navegar entre los cuatro bloques.
-3. En `Medios de cobro`, deja habilitada al menos una opción de recepción:
+2. Abre `Empezar aquí`. La pantalla muestra qué es obligatorio, qué es opcional y el orden recomendado; sólo presenta un bloque de configuración a la vez.
+3. Entra a `Medios de cobro` y deja habilitada al menos una opción de recepción:
    - terminal física independiente, con validación manual posterior en GymOS; o
    - Mercado Pago Point integrado, después de vincular la cuenta y elegir la terminal Point.
 4. Para pagos del socio en kiosco, vincula Stripe y habilita `Stripe para self checkout`.
 5. Para cargos recurrentes, habilita además `Domiciliación con Stripe`.
-6. En `Kiosco web`, elige por sucursal qué acciones puede realizar el socio y guarda cada sucursal.
-7. En `Correo electrónico`, configura el remitente. El proveedor SMTP sólo aparecerá conectado cuando el despliegue tenga sus secretos.
+6. Elige la sucursal en el selector de la esquina superior derecha. En `Kiosco web`, decide qué acciones puede realizar el socio en esa sucursal y guarda. Para configurar otra, cambia primero el selector global.
+7. En `Correo electrónico`, configura el remitente sólo si usarás correos. Las notificaciones internas funcionan sin SMTP. El bloque separa el paso técnico de conexión y el paso operativo del gimnasio.
 
 ## Funcionalidades del kiosco
 
@@ -46,6 +46,7 @@ Esta guía reúne el alcance funcional implementado y los recorridos recomendado
 ### Membresías con Stripe Checkout
 
 - Consulta de planes activos y precio.
+- El catálogo sólo muestra planes asociados a la sucursal desde la que se abrió el kiosco.
 - Cotización final antes de confirmar una contratación, renovación o cambio de plan.
 - Contratación de una membresía para un socio que todavía no tiene una.
 - Renovación de membresía vigente o vencida según las reglas del dominio.
@@ -76,6 +77,7 @@ Esta guía reúne el alcance funcional implementado y los recorridos recomendado
 
 - Actualización opcional de correo y teléfono, habilitable por sucursal.
 - Reserva de recursos gratuitos con consulta de disponibilidad y protección de datos de otros socios.
+- Los recursos restringidos por plan se ocultan antes de mostrar el catálogo o sus horarios; la API vuelve a validar la elegibilidad al reservar.
 - Reserva de citas wellness gratuitas con selección de profesional, servicio y horario.
 - Los recursos reservables con costo y los servicios de wellness con costo no están implementados ni se exponen en el kiosco; el backend también los rechaza.
 
@@ -91,21 +93,26 @@ En `Configuración` → `Kiosco web` (`/settings/organization#kiosk-settings`) s
 - citas wellness gratuitas;
 - actualización de contacto.
 
-La tarjeta muestra por sucursal si Stripe Checkout y la domiciliación están listos. Activar una capacidad no sustituye la conexión de Stripe: mientras el proveedor no esté listo, el kiosco explica el requisito y bloquea el cobro.
+La tarjeta muestra únicamente la sucursal activa del selector superior y señala si Stripe Checkout y la domiciliación están listos. Activar una capacidad no sustituye la conexión de Stripe: mientras el proveedor no esté listo, el kiosco explica el requisito y bloquea el cobro.
 
 ## Funcionalidades de automatizaciones
 
 ### Creación de reglas
 
-En `Automatizaciones` (`/automations`) se crea una regla con:
+En `Automatizaciones` (`/automations`) primero se elige una receta común o `Crear automatización`. Las organizaciones nuevas no incluyen reglas activas por defecto. Las recetas sólo precargan el formulario: no guardan ni activan nada hasta confirmar. El formulario presenta tres pasos:
 
-- nombre;
-- momento de ejecución;
+- cuándo debe ejecutarse;
+- a quién debe avisar;
+- qué asunto y mensaje entregar.
+
+También permite revisar:
+
+- nombre para reconocer la automatización;
 - condición tipada cuando corresponde;
-- canal interno o correo al socio;
-- asunto y contenido;
 - vista previa antes de guardar;
 - límite de reintentos de la regla.
+
+Las recetas incluidas cubren membresía por vencer, pago pendiente de validar, recordatorio previo de reservación, reserva cancelada y fallo de domiciliación.
 
 ### Disparadores disponibles
 
@@ -117,6 +124,7 @@ En `Automatizaciones` (`/automations`) se crea una regla con:
 - membresía vencida;
 - inicio, éxito y fallo de un cobro domiciliado;
 - reserva creada, confirmada o cancelada.
+- recordatorio previo de reservación, configurable entre 15 minutos y 7 días antes.
 
 Los eventos que identifican a un socio permiten `Correo al socio`. Los eventos manuales o programados sin socio relacionado sólo permiten una notificación interna, evitando destinatarios ambiguos.
 
@@ -133,6 +141,7 @@ Los eventos que identifican a un socio permiten `Correo al socio`. Los eventos m
 
 ### Operación y recuperación
 
+- El botón `Ver monitoreo avanzado` muestra la operación técnica; si existe una incidencia crítica, el bloque se hace visible automáticamente.
 - Estado saludable, de advertencia o crítico separado por gimnasio.
 - Conteos de eventos pendientes, reintentos, bloqueos vencidos y fallos definitivos.
 - Pausa y reanudación del procesador por tenant con motivo auditado.
@@ -152,7 +161,7 @@ Los eventos que identifican a un socio permiten `Correo al socio`. Los eventos m
 
 ## Historiales de Stripe
 
-En `Configuración` → `Historial de Stripe` (`/settings/organization#payment-operations`) están paginados:
+En `Configuración` → `Historial técnico` (`/settings/organization#payment-operations`) están paginados:
 
 - cargos recurrentes;
 - consentimientos/mandatos;
@@ -182,15 +191,16 @@ Se muestran estados, intentos, referencias enmascaradas y errores sanitizados. N
 
 ### C. Automatización interna
 
-1. Crea una regla manual con canal `Notificación interna`.
-2. Habilítala y usa `Ejecutar prueba`.
-3. Abre su historial y confirma una ejecución completada.
-4. Confirma la notificación en la columna de notificaciones.
+1. Elige la receta `Revisar un pago pendiente`.
+2. Revisa los tres pasos, cambia el texto si lo deseas y selecciona `Guardar y activar`.
+3. Usa `Probar ahora`.
+4. Abre `Ver actividad` y confirma una ejecución completada.
+5. Confirma el aviso en `Entregas recientes`.
 
 ### D. Automatización por correo
 
-1. Conecta SMTP y envía el correo de prueba desde `Configuración`.
-2. Crea una regla `Membresía por vencer` con `Correo al socio`.
+1. Conecta SMTP, guarda el remitente y envía el correo de prueba desde `Configuración`.
+2. Elige la receta `Avisar que la membresía vencerá`.
 3. Usa asunto y variables como `{{recipientName}}` y `{{endsOn}}`.
 4. Genera el evento y confirma que el mensaje pasa de `En cola` a `Enviada`.
 5. Simula un proveedor caído, agota los intentos y usa `Reintentar correo` después de recuperar el proveedor.
@@ -212,3 +222,5 @@ Se muestran estados, intentos, referencias enmascaradas y errores sanitizados. N
 6. Activa una domiciliación, ejecuta un cargo, sustituye la tarjeta y revoca el mandato.
 
 Las pruebas del bloque F requieren credenciales y webhooks reales de Stripe test; el resto puede probarse con la infraestructura local y un servidor SMTP de desarrollo.
+
+El procedimiento detallado, variables, tarjetas de prueba y resultados esperados se encuentran en [`stripe-kiosk-test-mode.md`](stripe-kiosk-test-mode.md).

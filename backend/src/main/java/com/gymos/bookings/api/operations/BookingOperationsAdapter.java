@@ -19,8 +19,12 @@ class BookingOperationsAdapter implements BookingOperations {
 	}
 
 	@Override
-	public List<BookingResource> resources(UUID organizationId, UUID branchId) {
-		return bookingService.resources(principal(organizationId, branchId)).stream()
+	public List<BookingResource> eligibleResources(
+			UUID organizationId, UUID branchId, UUID clientId, LocalDate date
+	) {
+		return bookingService.eligibleResources(
+				principal(organizationId, branchId), clientId, date
+		).stream()
 				.map(resource -> new BookingResource(
 						resource.id(),
 						resource.name(),
@@ -38,8 +42,12 @@ class BookingOperationsAdapter implements BookingOperations {
 	}
 
 	@Override
-	public List<BookingAvailability> availability(UUID organizationId, UUID branchId, UUID resourceId, LocalDate date) {
-		return bookingService.availability(principal(organizationId, branchId), resourceId, date).stream()
+	public List<BookingAvailability> eligibleAvailability(
+			UUID organizationId, UUID branchId, UUID clientId, UUID resourceId, LocalDate date
+	) {
+		return bookingService.availabilityForClient(
+				principal(organizationId, branchId), clientId, resourceId, date
+		).stream()
 				.map(slot -> new BookingAvailability(
 						slot.startsAt(),
 						slot.endsAt(),

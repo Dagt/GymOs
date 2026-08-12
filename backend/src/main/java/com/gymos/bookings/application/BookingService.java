@@ -74,6 +74,15 @@ public class BookingService {
 		return bookingResourceRepository.resources(principal.organizationId(), principal.branchId());
 	}
 
+	@Transactional(readOnly = true)
+	public List<ResourceRecord> eligibleResources(GymOsPrincipal principal, UUID clientId, LocalDate date) {
+		requireBranch(principal);
+		LocalDate resolvedDate = date == null ? BusinessTime.today() : date;
+		return bookingResourceRepository.resources(principal.organizationId(), principal.branchId()).stream()
+				.filter(resource -> bookingEligibility(principal, clientId, resource, resolvedDate).eligible())
+				.toList();
+	}
+
 	@Transactional
 	public ResourceRecord createResource(GymOsPrincipal principal, CreateResourceCommand command, String correlationId) {
 		requireBranch(principal);
@@ -132,6 +141,20 @@ public class BookingService {
 			cursor = cursor.plusMinutes(resource.slotMinutes());
 		}
 		return slots;
+	}
+
+	@Transactional(readOnly = true)
+	public List<AvailabilitySlot> availabilityForClient(
+			GymOsPrincipal principal, UUID clientId, UUID resourceId, LocalDate date
+	) {
+		requireBranch(principal);
+		LocalDate resolvedDate = date == null ? BusinessTime.today() : date;
+		ResourceRecord resource = activeResource(principal, resourceId);
+		EligibilityDecision eligibility = bookingEligibility(principal, clientId, resource, resolvedDate);
+		if (!eligibility.eligible()) {
+			throw bookingEligibilityException(eligibility);
+		}
+		return availability(principal, resourceId, resolvedDate);
 	}
 
 	@Transactional(readOnly = true)
@@ -329,5 +352,14 @@ public class BookingService {
 			default -> new BusinessException(
 					"BOOKING_NOT_ELIGIBLE", "El socio no cumple la politica de elegibilidad para reservar.");
 		};
+	}
+
+	private EligibilityDecision bookingEligibility(
+			GymOsPrincipal principal, UUID clientId, ResourceRecord resource, LocalDate date
+	) {
+		return eligibilityPolicy.evaluate(EligibilityRequest.booking(
+				principal.organizationId(), principal.branchId(), clientId, date,
+				new LinkedHashSet<>(resource.allowedPlanIds())
+		));
 	}
 }

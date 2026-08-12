@@ -11,6 +11,7 @@ import com.gymos.automations.infrastructure.AutomationRepository.AutomationDeadL
 import com.gymos.automations.infrastructure.AutomationRepository.AutomationRuleRecord;
 import com.gymos.automations.infrastructure.AutomationRepository.AutomationTriggerEventRecord;
 import com.gymos.automations.infrastructure.AutomationRepository.AutomationOperationsRecord;
+import com.gymos.automations.infrastructure.AutomationRepository.BookingReminderCandidate;
 import com.gymos.automations.infrastructure.AutomationRepository.SchedulerStatusRecord;
 import com.gymos.automations.infrastructure.AutomationRepository.CreateRuleData;
 import com.gymos.common.api.BusinessException;
@@ -40,17 +41,20 @@ public class AutomationService {
 	private static final Set<String> SUPPORTED_TRIGGERS = Set.of(
 			"MANUAL", "SCHEDULED", "PAYMENT_COMPLETED", "PAYMENT_PENDING_VALIDATION",
 			"BOOKING_CREATED", "BOOKING_CONFIRMED", "BOOKING_CANCELLED",
+			"BOOKING_REMINDER",
 			"MEMBERSHIP_EXPIRING", "MEMBERSHIP_EXPIRED",
 			"RECURRING_CHARGE_DUE", "RECURRING_CHARGE_SUCCEEDED", "RECURRING_CHARGE_FAILED"
 	);
 	private static final Set<String> DOMAIN_EVENT_TRIGGERS = Set.of(
 			"PAYMENT_COMPLETED", "PAYMENT_PENDING_VALIDATION",
 			"BOOKING_CREATED", "BOOKING_CONFIRMED", "BOOKING_CANCELLED",
+			"BOOKING_REMINDER",
 			"MEMBERSHIP_EXPIRING", "MEMBERSHIP_EXPIRED",
 			"RECURRING_CHARGE_DUE", "RECURRING_CHARGE_SUCCEEDED", "RECURRING_CHARGE_FAILED"
 	);
 	private static final Set<String> CLIENT_EMAIL_TRIGGERS = Set.of(
 			"PAYMENT_COMPLETED", "BOOKING_CREATED", "BOOKING_CONFIRMED", "BOOKING_CANCELLED",
+			"BOOKING_REMINDER",
 			"MEMBERSHIP_EXPIRING", "MEMBERSHIP_EXPIRED", "RECURRING_CHARGE_DUE",
 			"RECURRING_CHARGE_SUCCEEDED", "RECURRING_CHARGE_FAILED"
 	);
@@ -309,6 +313,31 @@ public class AutomationService {
 			}
 		}
 		return processed;
+	}
+
+	public int enqueueDueBookingReminders() {
+		int enqueued = 0;
+		for (BookingReminderCandidate reminder : automationRepository.dueBookingReminders(
+				OffsetDateTime.now(), 250
+		)) {
+			String reference = "booking-reminder:" + reminder.bookingId()
+					+ ":" + reminder.ruleId() + ":v" + reminder.ruleVersion();
+			enqueueDomainEvent(
+					reminder.organizationId(), reminder.branchId(), "BOOKING_REMINDER", reference,
+					Map.of(
+							"occurrenceKey", reference,
+							"targetRuleId", reminder.ruleId(),
+							"bookingId", reminder.bookingId(),
+							"clientId", reminder.clientId(),
+							"resourceId", reminder.resourceId(),
+							"startsAt", reminder.startsAt().toString(),
+							"endsAt", reminder.endsAt().toString(),
+							"minutesBefore", reminder.minutesBefore()
+					)
+			);
+			enqueued++;
+		}
+		return enqueued;
 	}
 
 	private void processTriggerEvent(AutomationTriggerEventRecord event) {
@@ -602,7 +631,7 @@ public class AutomationService {
 		boolean queued = switch (rule.triggerType()) {
 			case "SCHEDULED" -> automationRepository.requeueScheduledRule(rule.id(), execution.triggerReference());
 			case "PAYMENT_COMPLETED", "PAYMENT_PENDING_VALIDATION",
-					"BOOKING_CREATED", "BOOKING_CONFIRMED", "BOOKING_CANCELLED",
+					"BOOKING_CREATED", "BOOKING_CONFIRMED", "BOOKING_CANCELLED", "BOOKING_REMINDER",
 					"MEMBERSHIP_EXPIRING", "MEMBERSHIP_EXPIRED",
 					"RECURRING_CHARGE_DUE", "RECURRING_CHARGE_SUCCEEDED", "RECURRING_CHARGE_FAILED" -> automationRepository.requeueTriggerEvent(
 						principal.organizationId(), principal.branchId(), rule.triggerType(), execution.triggerReference()
@@ -792,6 +821,7 @@ public class AutomationService {
 				case "PAYMENT_PENDING_VALIDATION" -> Set.of("method", "minimumAmountCents");
 				case "PAYMENT_COMPLETED" -> Set.of("businessContext");
 				case "BOOKING_CREATED", "BOOKING_CONFIRMED", "BOOKING_CANCELLED" -> Set.of("resourceId");
+				case "BOOKING_REMINDER" -> Set.of("minutesBefore", "resourceId");
 				case "RECURRING_CHARGE_DUE" -> Set.of("planId");
 				case "RECURRING_CHARGE_SUCCEEDED" -> Set.of("planId", "minimumAmountCents");
 				case "RECURRING_CHARGE_FAILED" -> Set.of("planId", "exhausted");
@@ -817,6 +847,13 @@ public class AutomationService {
 				integerCondition(
 						condition, "daysBefore", 3, 1, 90,
 						"AUTOMATION_DAYS_BEFORE_INVALID", "Los dias de anticipacion deben estar entre 1 y 90."
+				);
+			}
+			if ("BOOKING_REMINDER".equals(triggerType)) {
+				integerCondition(
+						condition, "minutesBefore", 1440, 15, 10080,
+						"AUTOMATION_BOOKING_REMINDER_INVALID",
+						"La anticipacion de la reserva debe estar entre 15 minutos y 7 dias."
 				);
 			}
 			validateOptionalUuid(condition, "planId");
@@ -903,6 +940,10 @@ public class AutomationService {
 				case "PAYMENT_COMPLETED" -> matchesOptionalText(condition, payload, "businessContext");
 				case "BOOKING_CREATED", "BOOKING_CONFIRMED", "BOOKING_CANCELLED" ->
 						matchesOptionalIdentifier(condition, payload, "resourceId");
+				case "BOOKING_REMINDER" ->
+						rule.id().toString().equals(text(payload, "targetRuleId", ""))
+								&& condition.path("minutesBefore").asInt(1440) == payload.path("minutesBefore").asInt()
+								&& matchesOptionalIdentifier(condition, payload, "resourceId");
 				case "RECURRING_CHARGE_DUE" -> matchesOptionalIdentifier(condition, payload, "planId");
 				case "RECURRING_CHARGE_SUCCEEDED" ->
 						matchesOptionalIdentifier(condition, payload, "planId")

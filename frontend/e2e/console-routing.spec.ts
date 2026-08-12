@@ -181,8 +181,55 @@ test.describe("consolas por rol", () => {
     await page.getByText("Administracion diaria", { exact: true }).click();
     await expect(page.getByRole("link", { name: /Automatizaciones/i })).toBeVisible();
     await expect(page.getByRole("link", { name: /Gimnasios cliente/i })).toHaveCount(0);
+    await page.locator('a[href="/settings/organization"]').click();
+    await expect(page).toHaveURL(/\/settings\/organization/);
+    await expect(page.getByRole("heading", { name: "Configuración del gimnasio" })).toBeVisible();
+    await page.goto("/bookings");
+    await expect(page.getByRole("button", { name: "Crear recurso" })).toBeVisible();
+    await page.goto("/benefits");
+    await expect(page.getByRole("button", { name: "Crear beneficio" })).toBeVisible();
     await page.goto("/clients");
     await expect(page.getByRole("button", { name: /Registrar Nuevo Socio/i })).toBeVisible();
+  });
+
+  test("configuracion de kiosco muestra una sola vez la sucursal seleccionada", async ({ page }) => {
+    await bootAs(page, user({
+      console: "TENANT_OWNER",
+      roles: ["Dueno del gimnasio"],
+      permissions: ownerPermissions().concat("selfservice.settings.manage"),
+    }), async (route, path) => {
+      if (path === "/kiosk-settings/branches") {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify(branches.map((branch) => ({
+            branchId: branch.id,
+            branchName: branch.name,
+            status: "ACTIVE",
+            capabilities: {
+              membershipEnrollmentAllowed: false,
+              membershipRenewalAllowed: false,
+              membershipPlanChangeAllowed: false,
+              resourceBookingAllowed: true,
+              wellnessBookingAllowed: false,
+              profileUpdateAllowed: true,
+              autopayAllowed: false,
+              onlineCardPaymentsReady: false,
+              recurringCardPaymentsReady: false,
+            },
+            updatedAt: null,
+          }))),
+        });
+        return true;
+      }
+      return false;
+    });
+
+    await page.goto("/settings/organization#kiosk-settings");
+    await page.getByRole("button", { name: /Kiosco web/i }).click();
+
+    const kioskSettings = page.locator("#kiosk-settings");
+    await expect(kioskSettings.getByRole("heading", { name: "Centro" })).toBeVisible();
+    await expect(kioskSettings.getByRole("heading", { name: "Revolucion 115" })).toHaveCount(0);
   });
 
   test("recepcion entra a mostrador y no ve administracion", async ({ page }) => {
@@ -290,11 +337,12 @@ test.describe("consolas por rol", () => {
     });
 
     await page.goto("/settings/organization");
+    await page.getByRole("button", { name: /Correo electrónico/ }).click();
     await expect(page.getByRole("heading", { name: "Correo electrónico" })).toBeVisible();
     await page.getByLabel("Nombre del remitente").fill("Appex Fitness");
     await page.getByLabel("Correo remitente").fill("notificaciones@appex.com");
     await page.getByText("Habilitar entregas por correo").click();
-    await page.getByRole("button", { name: "Guardar configuración" }).click();
+    await page.getByRole("button", { name: "Guardar remitente" }).click();
     await expect(page.getByText("Correo habilitado y listo para entregar.")).toBeVisible();
     expect(savedConfiguration).toMatchObject({
       enabled: true,
@@ -437,8 +485,14 @@ function managerPermissions() {
     "sale.create",
     "report.sales.read",
     "benefit.read",
+    "benefit.manage",
+    "resource.read",
+    "resource.manage",
     "coach.read",
     "automation.read",
+    "payment.settings.manage",
+    "selfservice.settings.manage",
+    "notification.settings.manage",
     "selfservice.session.launch",
   ];
 }

@@ -604,6 +604,20 @@ Migraciones nuevas:
 - `V69__operations_history_pagination.sql`: agrega índices tenant/fecha/ID para
   paginar de forma estable mandatos, cargos recurrentes, webhooks y ejecuciones
   de automatización sin escanear registros de otras organizaciones.
+- `V70__automation_operations_and_kiosk_configuration.sql`: agrega control de
+  pausa del scheduler, permisos operativos y configuración de capacidades del
+  kiosco por perfil lógico de sucursal.
+- `V71__provider_payment_receipts.sql`: conserva la referencia segura del
+  comprobante emitido por el proveedor.
+- `V72__durable_email_delivery.sql`: agrega configuración por tenant y cola
+  durable de entrega de correo.
+- `V73__manager_operational_configuration_permissions.sql`: permite al gerente
+  configurar cobros, kiosco y correo sin otorgarle edición del gimnasio ni de
+  sucursales.
+- `V74__manager_catalog_kiosk_and_client_integrity.sql`: concede al gerente la
+  administración de beneficios y recursos reservables; la fecha de nacimiento
+  obligatoria se valida en los contratos de socio para no imponerla a otros
+  tipos de persona.
 - `V15__hito6_productization_onboarding_imports.sql`: agrega bitacora de importacion inicial de clientes y permisos `onboarding.manage` y `client.import`.
 - `V23__membership_plan_multi_branch_access.sql`: agrega `membership_plan.multi_branch_access` para planes con acceso a todas las sucursales del tenant.
 - `V24__resource_allowed_membership_plans.sql`: agrega planes permitidos por recurso para restringir reservas segun membresia vigente.

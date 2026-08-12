@@ -7,9 +7,13 @@ import java.util.List;
 import java.util.UUID;
 
 public interface BookingOperations {
-	List<BookingResource> resources(UUID organizationId, UUID branchId);
+	List<BookingResource> eligibleResources(
+			UUID organizationId, UUID branchId, UUID clientId, LocalDate date
+	);
 
-	List<BookingAvailability> availability(UUID organizationId, UUID branchId, UUID resourceId, LocalDate date);
+	List<BookingAvailability> eligibleAvailability(
+			UUID organizationId, UUID branchId, UUID clientId, UUID resourceId, LocalDate date
+	);
 
 	BookingResult createBooking(
 			UUID organizationId,
