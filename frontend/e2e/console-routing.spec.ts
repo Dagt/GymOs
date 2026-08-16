@@ -161,7 +161,8 @@ test.describe("consolas por rol", () => {
 
     await expect(page.getByRole("heading", { name: /Panel ejecutivo|Dashboard|Metricas/i })).toBeVisible();
     await expect(page.getByLabel("Perfil activo").getByText("Dueño del gimnasio")).toBeVisible();
-    await expect(page.locator("body")).toContainText("Administracion del gimnasio");
+    await expect(page.locator("body")).toContainText("Gestión operativa");
+    await expect(page.locator("body")).toContainText("Administración");
     await expect(page.locator("body")).toContainText("Configuración");
   });
 
@@ -176,10 +177,12 @@ test.describe("consolas por rol", () => {
 
     await expect(page.getByRole("heading", { name: /Operacion diaria/i })).toBeVisible();
     await expect(page.getByLabel("Perfil activo").getByText("Gerente")).toBeVisible();
-    await expect(page.locator("body")).toContainText("Administracion diaria");
+    await expect(page.locator("body")).toContainText("Gestión operativa");
+    await expect(page.locator("body")).toContainText("Administración");
     await expect(page.locator("body")).toContainText("Mostrador");
-    await page.getByText("Administracion diaria", { exact: true }).click();
+    await page.getByText("Administración", { exact: true }).click();
     await expect(page.getByRole("link", { name: /Automatizaciones/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Beneficios/i })).toBeVisible();
     await expect(page.getByRole("link", { name: /Gimnasios cliente/i })).toHaveCount(0);
     await page.locator('a[href="/settings/organization"]').click();
     await expect(page).toHaveURL(/\/settings\/organization/);

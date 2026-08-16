@@ -15,16 +15,19 @@ test("tenant owner navigation keeps management and client access visible", () =>
       "branch.update",
       "catalog.read",
       "booking.read",
+      "benefit.read",
       "sale.create",
     ]),
     variant: "tenant",
   });
 
   const labels = sectionLabels(sections);
-  assert.ok(labels.includes("Metricas del negocio"));
+  assert.ok(labels.includes("Métricas del negocio"));
   assert.ok(labels.includes("Socios"));
   assert.ok(labels.includes("Equipo y accesos"));
   assert.ok(labels.includes("Configuración"));
+  assert.deepEqual(sectionLinks(sections, "Administración"), ["Equipo y accesos", "Catálogo", "Beneficios", "Configuración"]);
+  assert.equal(sectionLinks(sections, "Mostrador").includes("Beneficios"), false);
 });
 
 test("reception navigation is limited to front desk work", () => {
@@ -39,7 +42,7 @@ test("reception navigation is limited to front desk work", () => {
   });
 
   const labels = sectionLabels(sections);
-  assert.ok(labels.includes("Inicio recepcion"));
+  assert.ok(labels.includes("Inicio recepción"));
   assert.ok(labels.includes("Caja / POS"));
   assert.ok(labels.includes("Socios"));
   assert.ok(labels.includes("Wellness"));
@@ -47,6 +50,9 @@ test("reception navigation is limited to front desk work", () => {
   assert.equal(labels.includes("Renovaciones"), false);
   assert.equal(labels.includes("Equipo y accesos"), false);
   assert.equal(labels.includes("Configuración"), false);
+  assert.deepEqual(sectionLinks(sections, "Mostrador"), ["Inicio recepción", "Caja / POS", "Pantalla para socios"]);
+  assert.deepEqual(sectionLinks(sections, "Atención a socios"), ["Socios", "Reservas", "Wellness"]);
+  assert.deepEqual(sectionLinks(sections, "Seguimiento"), ["Ventas y pagos"]);
 });
 
 test("manager navigation exposes Wellness and automation monitoring", () => {
@@ -70,6 +76,18 @@ test("manager navigation exposes operational configuration when authorized", () 
   });
 
   assert.ok(sectionLabels(sections).includes("Configuración"));
+});
+
+test("manager navigation keeps benefits in administration instead of front desk", () => {
+  const sections = visibleSectionsForConsole({
+    consoleType: "TENANT_MANAGER",
+    hasBranch: true,
+    permissions: new Set(["benefit.read", "sale.create", "selfservice.session.launch"]),
+    variant: "tenant",
+  });
+
+  assert.deepEqual(sectionLinks(sections, "Administración"), ["Beneficios"]);
+  assert.deepEqual(sectionLinks(sections, "Mostrador"), ["Caja / POS", "Pantalla para socios"]);
 });
 
 test("branchless tenant users only see setup-safe links", () => {
@@ -137,11 +155,15 @@ test("manager without active branch keeps only setup-safe navigation", () => {
     variant: "tenant",
   });
 
-  assert.deepEqual(sectionLabels(sections), ["Equipo"]);
+  assert.deepEqual(sectionLabels(sections), ["Equipo y accesos"]);
 });
 
 function sectionLabels(sections: ReturnType<typeof visibleSectionsForConsole>) {
   return sections.flatMap((section) => section.links.map((link) => link.label));
+}
+
+function sectionLinks(sections: ReturnType<typeof visibleSectionsForConsole>, title: string) {
+  return sections.find((section) => section.title === title)?.links.map((link) => link.label) ?? [];
 }
 
 function user(overrides: Partial<CurrentUser> = {}): CurrentUser {

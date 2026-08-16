@@ -313,6 +313,13 @@ Correccion Hito 7.9:
 - Si un gimnasio todavia no tiene sucursales, el detalle muestra un estado vacio claro y mantiene disponible la accion de crear sucursal.
 - El Admin GymOS puede crear tenants completos sin dejarlos "a medias"; sucursales, usuarios y marca avanzada son pasos explicitos del detalle del cliente.
 - El menu lateral usa secciones plegables; la seccion activa queda abierta y las demas permanecen compactas para reducir saturacion visual.
+- La navegación de dueño y gerente se agrupa por propósito: `Dirección` o
+  `Gerencia`, `Gestión operativa`, `Administración` y `Mostrador`. Beneficios,
+  catálogo, automatizaciones y configuración pertenecen a `Administración`;
+  `Mostrador` se reserva para POS, accesos físicos y apertura del kiosco.
+- La consola de recepción separa `Mostrador`, `Atención a socios` y
+  `Seguimiento`, evitando mezclar reportes de pagos con las acciones inmediatas
+  de caja.
 - En pantallas de configuracion sin sucursal activa, el menu lateral oculta modulos operativos que requieren sucursal y conserva solo opciones de configuracion seguras.
 - El login y refresh de usuarios tenant reciben la primera sucursal accesible cuando existe; si una sesion guardada queda sin sucursal, `AppShell` intenta recuperar el contexto con `select-organization`.
 - Las pantallas operativas de gerencia (`/inventory`, `/bookings`, `/coaches`) usan el mismo `AppShell` lateral que dashboard, ventas, usuarios y catalogo.
