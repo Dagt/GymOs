@@ -43,14 +43,13 @@ import {
   NewBranchDrawer,
   OrganizationDrawer,
   OrganizationOverviewCard,
-  SettingsSummary,
   TeamAccessCard,
 } from "./OrganizationSettingsSections";
 import { PaymentOperationsHistoryCard } from "./PaymentOperationsHistoryCard";
 import { KioskBranchSettingsCard } from "./KioskBranchSettingsCard";
 import { NotificationEmailSettingsCard } from "./NotificationEmailSettingsCard";
 
-type OperationalSection = "guide" | "payments" | "kiosk" | "email" | "history";
+type OperationalSection = "payments" | "kiosk" | "email" | "history";
 
 export default function OrganizationSettingsPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
@@ -71,7 +70,7 @@ export default function OrganizationSettingsPage() {
   const [branchPanelHeight, setBranchPanelHeight] = useState<number | null>(null);
   const [paymentConfiguration, setPaymentConfiguration] = useState<PaymentConfiguration | null>(null);
   const [mercadoPagoTerminals, setMercadoPagoTerminals] = useState<MercadoPagoTerminal[]>([]);
-  const [operationalSection, setOperationalSection] = useState<OperationalSection>("guide");
+  const [operationalSection, setOperationalSection] = useState<OperationalSection>("payments");
   const settingsColumnRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -88,11 +87,15 @@ export default function OrganizationSettingsPage() {
       setLoading(true);
       setError(null);
       try {
+        const canManageOrganizationProfile = storedSession.user.permissions.includes("organization.update")
+          || storedSession.user.permissions.includes("platform.admin");
         const canReadPaymentSettings = storedSession.user.permissions.includes("payment.settings.read")
           || storedSession.user.permissions.includes("payment.settings.manage")
           || storedSession.user.permissions.includes("platform.admin");
         const [currentOrganization, availableBranches, currentPaymentConfiguration] = await Promise.all([
-          getCurrentOrganization(storedSession.accessToken),
+          canManageOrganizationProfile
+            ? getCurrentOrganization(storedSession.accessToken)
+            : Promise.resolve(null),
           getBranches(storedSession.accessToken),
           canReadPaymentSettings ? getPaymentConfiguration(storedSession.accessToken) : Promise.resolve(null),
         ]);
@@ -112,7 +115,9 @@ export default function OrganizationSettingsPage() {
           return;
         }
         setPaymentConfiguration(resolvedPaymentConfiguration);
-        setOrganizationForm(toOrganizationForm(currentOrganization));
+        if (currentOrganization) {
+          setOrganizationForm(toOrganizationForm(currentOrganization));
+        }
         const branch = availableBranches.find((item) => item.id === storedSession.user.branchId) ?? availableBranches[0];
         if (branch) {
           setSelectedBranchId(branch.id);
@@ -166,6 +171,16 @@ export default function OrganizationSettingsPage() {
   const persistedOrganizationForm = organization ? toOrganizationForm(organization) : organizationForm;
   const canManageOrganization = Boolean(session?.user.permissions.includes("organization.update") || session?.user.permissions.includes("platform.admin"));
   const canManageBranches = Boolean(session?.user.permissions.includes("branch.update") || session?.user.permissions.includes("platform.admin"));
+  const canManageKioskSettings = Boolean(session?.user.permissions.includes("selfservice.settings.manage") || session?.user.permissions.includes("platform.admin"));
+  const canManageEmailSettings = Boolean(session?.user.permissions.includes("notification.settings.manage") || session?.user.permissions.includes("platform.admin"));
+  const availableOperationalSections: OperationalSection[] = [
+    ...(paymentConfiguration ? ["payments", "history"] as OperationalSection[] : []),
+    ...(canManageKioskSettings ? ["kiosk"] as OperationalSection[] : []),
+    ...(canManageEmailSettings ? ["email"] as OperationalSection[] : []),
+  ];
+  const activeOperationalSection = availableOperationalSections.includes(operationalSection)
+    ? operationalSection
+    : availableOperationalSections[0] ?? operationalSection;
 
   function selectOperationalSection(section: OperationalSection) {
     setOperationalSection(section);
@@ -398,7 +413,7 @@ export default function OrganizationSettingsPage() {
   if (!session) return <AuthRequired />;
   if (loading) return <LoadingScreen text="Cargando datos y sucursales..." />;
 
-  if (!organizationForm || !persistedOrganizationForm) {
+  if (canManageOrganization && (!organizationForm || !persistedOrganizationForm)) {
     return (
       <AppShell
         branchName={activeBranch?.name}
@@ -406,7 +421,6 @@ export default function OrganizationSettingsPage() {
         mode={activeBranch ? "operation" : "setup"}
         organizationName={session.user.organizationName}
         session={session}
-        subtitle="Administra la cadena o gimnasio, crea varias sucursales y prepara el acceso del equipo."
         title="Configuración del gimnasio"
       >
         <p className="form-message error">{error ?? "No fue posible cargar los datos del gimnasio."}</p>
@@ -419,24 +433,16 @@ export default function OrganizationSettingsPage() {
       branchName={activeBranch?.name}
       eyebrow="Administracion"
       mode={activeBranch ? "operation" : "setup"}
-      organizationName={organization?.tradeName}
+      organizationName={organization?.tradeName ?? session.user.organizationName}
       session={session}
-      subtitle="Marca, sucursales, medios de cobro, kiosco y canales de comunicación en un solo lugar."
       title="Configuración del gimnasio"
     >
-      <SettingsSummary
-        activeBranchName={activeBranch?.name}
-        branchCount={branches.length}
-        legalName={organization?.legalName}
-        tradeName={organization?.tradeName}
-      />
-
       {error ? <p className="form-message error">{error}</p> : null}
       {message ? <p className="form-message success">{message}</p> : null}
 
       {canManageOrganization || canManageBranches ? (
         <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-          {canManageOrganization ? (
+          {canManageOrganization && persistedOrganizationForm ? (
             <div className="grid min-w-0 gap-5" ref={settingsColumnRef}>
               <OrganizationOverviewCard form={persistedOrganizationForm} onEdit={openOrganizationDrawer} />
               <TeamAccessCard />
@@ -454,25 +460,14 @@ export default function OrganizationSettingsPage() {
       ) : null}
 
       <OperationalSettingsNavigation
-        activeSection={operationalSection}
-        showEmail={session.user.permissions.includes("notification.settings.manage") || session.user.permissions.includes("platform.admin")}
-        showKiosk={session.user.permissions.includes("selfservice.settings.manage") || session.user.permissions.includes("platform.admin")}
+        activeSection={activeOperationalSection}
+        showEmail={canManageEmailSettings}
+        showKiosk={canManageKioskSettings}
         showPayments={Boolean(paymentConfiguration)}
         onSelect={selectOperationalSection}
       />
 
-      {operationalSection === "guide" ? (
-        <OperationalSettingsGuide
-          branchCount={branches.length}
-          configuration={paymentConfiguration}
-          showEmail={session.user.permissions.includes("notification.settings.manage") || session.user.permissions.includes("platform.admin")}
-          showKiosk={session.user.permissions.includes("selfservice.settings.manage") || session.user.permissions.includes("platform.admin")}
-          showPayments={Boolean(paymentConfiguration)}
-          onSelect={selectOperationalSection}
-        />
-      ) : null}
-
-      {operationalSection === "payments" && paymentConfiguration ? (
+      {activeOperationalSection === "payments" && paymentConfiguration ? (
         <PaymentConfigurationCard
           key={`${paymentConfiguration.receptionManualTerminalEnabled}-${paymentConfiguration.receptionMercadoPagoEnabled}-${paymentConfiguration.mercadoPagoConnected}-${paymentConfiguration.mercadoPagoTerminalId ?? "none"}-${paymentConfiguration.stripeSelfCheckoutEnabled}-${paymentConfiguration.stripeRecurringEnabled}-${paymentConfiguration.stripeConnected}-${paymentConfiguration.stripeAccountId ?? "none"}`}
           canManage={session.user.permissions.includes("payment.settings.manage") || session.user.permissions.includes("platform.admin")}
@@ -488,20 +483,20 @@ export default function OrganizationSettingsPage() {
         />
       ) : null}
 
-      {operationalSection === "kiosk" && (session.user.permissions.includes("selfservice.settings.manage") || session.user.permissions.includes("platform.admin")) ? (
+      {activeOperationalSection === "kiosk" && canManageKioskSettings ? (
         <KioskBranchSettingsCard
           accessToken={session.accessToken}
           activeBranchId={activeBranch?.id}
         />
       ) : null}
 
-      {operationalSection === "email" && (session.user.permissions.includes("notification.settings.manage") || session.user.permissions.includes("platform.admin")) ? (
+      {activeOperationalSection === "email" && canManageEmailSettings ? (
         <NotificationEmailSettingsCard accessToken={session.accessToken} />
       ) : null}
 
-      {operationalSection === "history" && paymentConfiguration ? <PaymentOperationsHistoryCard accessToken={session.accessToken} /> : null}
+      {activeOperationalSection === "history" && paymentConfiguration ? <PaymentOperationsHistoryCard accessToken={session.accessToken} /> : null}
 
-      {canManageOrganization ? (
+      {canManageOrganization && organizationForm ? (
         <OrganizationDrawer
           accessToken={session.accessToken}
           errors={fieldErrors}
@@ -540,20 +535,12 @@ function OperationalSettingsNavigation({
 }) {
   if (!showEmail && !showKiosk && !showPayments) return null;
   return (
-    <nav aria-label="Configuración operativa" className="app-card grid gap-4 p-5">
-      <div>
-        <p className="app-eyebrow">Configuración operativa</p>
-        <h2 className="mt-1 text-xl font-semibold">¿Qué quieres configurar?</h2>
-        <p className="mt-1 text-sm text-[var(--brand-muted)]">
-          Elige una tarea. Mostraremos sólo ese bloque y los cambios se aplicarán al gimnasio activo.
-        </p>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <SettingsSectionButton active={activeSection === "guide"} description="Orden recomendado y dependencias." label="Empezar aquí" onClick={() => onSelect("guide")} />
-        {showPayments ? <SettingsSectionButton active={activeSection === "payments"} description="Terminal manual, Mercado Pago y Stripe." label="Medios de cobro" onClick={() => onSelect("payments")} /> : null}
-        {showKiosk ? <SettingsSectionButton active={activeSection === "kiosk"} description="Funciones permitidas por sucursal." label="Kiosco web" onClick={() => onSelect("kiosk")} /> : null}
-        {showEmail ? <SettingsSectionButton active={activeSection === "email"} description="Remitente y prueba del proveedor." label="Correo electrónico" onClick={() => onSelect("email")} /> : null}
-        {showPayments ? <SettingsSectionButton active={activeSection === "history"} description="Sólo diagnóstico de Stripe." label="Historial técnico" onClick={() => onSelect("history")} /> : null}
+    <nav aria-label="Configuración operativa" className="app-card p-4">
+      <div className="flex flex-wrap gap-2">
+        {showPayments ? <SettingsSectionButton active={activeSection === "payments"} label="Medios de cobro" onClick={() => onSelect("payments")} /> : null}
+        {showKiosk ? <SettingsSectionButton active={activeSection === "kiosk"} label="Kiosco web" onClick={() => onSelect("kiosk")} /> : null}
+        {showEmail ? <SettingsSectionButton active={activeSection === "email"} label="Correo electrónico" onClick={() => onSelect("email")} /> : null}
+        {showPayments ? <SettingsSectionButton active={activeSection === "history"} label="Historial técnico" onClick={() => onSelect("history")} /> : null}
       </div>
     </nav>
   );
@@ -561,109 +548,22 @@ function OperationalSettingsNavigation({
 
 function SettingsSectionButton({
   active,
-  description,
   label,
   onClick,
 }: {
   active: boolean;
-  description: string;
   label: string;
   onClick: () => void;
 }) {
   return (
     <button
       aria-pressed={active}
-      className={`rounded-lg border p-4 text-left transition ${active ? "border-[var(--brand-primary)] bg-[#edf5ef]" : "border-[var(--brand-line)] bg-[var(--brand-surface)] hover:border-[var(--brand-primary)]"}`}
+      className={`rounded-md border px-4 py-2 text-sm font-semibold transition ${active ? "border-[var(--brand-primary)] bg-[#edf5ef]" : "border-[var(--brand-line)] bg-white hover:border-[var(--brand-primary)]"}`}
       onClick={onClick}
       type="button"
     >
-      <strong className="block text-sm">{label}</strong>
-      <span className="mt-1 block text-xs leading-5 text-[var(--brand-muted)]">{description}</span>
+      {label}
     </button>
-  );
-}
-
-function OperationalSettingsGuide({
-  branchCount,
-  configuration,
-  showEmail,
-  showKiosk,
-  showPayments,
-  onSelect,
-}: {
-  branchCount: number;
-  configuration: PaymentConfiguration | null;
-  showEmail: boolean;
-  showKiosk: boolean;
-  showPayments: boolean;
-  onSelect: (section: OperationalSection) => void;
-}) {
-  const receptionStatus = configuration?.receptionManualTerminalEnabled
-    ? "La terminal independiente está habilitada."
-    : "Aún no se eligió cómo registrar pagos con tarjeta en recepción.";
-  const stripeStatus = configuration?.stripeConnected
-    ? "Stripe está vinculado; revisa qué funciones deseas activar."
-    : "Stripe es opcional y sólo se necesita para pagos y domiciliaciones del kiosco.";
-
-  return (
-    <section className="app-card grid gap-5 p-5" id="operational-guide">
-      <div>
-        <p className="app-eyebrow">Ruta recomendada</p>
-        <h2 className="mt-1 text-xl font-semibold">Prepara la operación en este orden</h2>
-        <p className="mt-1 text-sm text-[var(--brand-muted)]">
-          No necesitas activar todo. La terminal manual puede funcionar sin Mercado Pago, Stripe ni correo.
-        </p>
-      </div>
-      <div className="grid gap-4 lg:grid-cols-3">
-        {showPayments ? (
-          <SetupStep description={`${receptionStatus} ${stripeStatus}`} number="1" onClick={() => onSelect("payments")} title="Elige cómo cobrar" />
-        ) : null}
-        {showKiosk ? (
-          <SetupStep
-            description={`Activa por cada una de tus ${branchCount} sucursales sólo las acciones que verá el socio. No se registran computadoras.`}
-            number="2"
-            onClick={() => onSelect("kiosk")}
-            title="Define el kiosco"
-          />
-        ) : null}
-        {showEmail ? (
-          <SetupStep
-            description="Configúralo únicamente si quieres enviar correos. Las notificaciones internas funcionan sin proveedor SMTP."
-            number="3"
-            onClick={() => onSelect("email")}
-            title="Conecta el correo"
-          />
-        ) : null}
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--brand-line)] bg-[var(--brand-surface)] p-4">
-        <div>
-          <strong className="text-sm">Después crea las automatizaciones</strong>
-          <p className="mt-1 text-xs text-[var(--brand-muted)]">Encontrarás recetas para avisos de membresías, pagos, reservas y domiciliaciones.</p>
-        </div>
-        <Link className="app-button" href="/automations">Ir a automatizaciones</Link>
-      </div>
-    </section>
-  );
-}
-
-function SetupStep({
-  description,
-  number,
-  onClick,
-  title,
-}: {
-  description: string;
-  number: string;
-  onClick: () => void;
-  title: string;
-}) {
-  return (
-    <article className="rounded-lg border border-[var(--brand-line)] p-4">
-      <span className="inline-grid h-8 w-8 place-items-center rounded-full bg-[var(--brand-primary)] text-sm font-bold text-white">{number}</span>
-      <h3 className="mt-3 font-semibold">{title}</h3>
-      <p className="mt-2 min-h-20 text-sm leading-6 text-[var(--brand-muted)]">{description}</p>
-      <button aria-label={`Abrir configuración: ${title}`} className="app-button-secondary mt-4" onClick={onClick} type="button">Abrir configuración</button>
-    </article>
   );
 }
 
@@ -673,12 +573,11 @@ function operationalSectionFromHash(hash: string): OperationalSection {
     "#kiosk-settings": "kiosk",
     "#email-settings": "email",
     "#payment-operations": "history",
-  } as Record<string, OperationalSection>)[hash] ?? "guide";
+  } as Record<string, OperationalSection>)[hash] ?? "payments";
 }
 
 function operationalSectionHash(section: OperationalSection) {
   return ({
-    guide: "#operational-guide",
     payments: "#payment-settings",
     kiosk: "#kiosk-settings",
     email: "#email-settings",
@@ -713,13 +612,7 @@ function PaymentConfigurationCard({
 
   return (
     <section className="app-card grid scroll-mt-6 gap-5 p-5" id="payment-settings">
-      <div>
-        <p className="app-eyebrow">Cobros</p>
-        <h2 className="text-xl font-semibold">Recepción y pagos del kiosco</h2>
-        <p className="mt-2 text-sm text-[var(--brand-muted)]">
-          El kiosco funciona en cualquier navegador y no se registra por computadora. Aquí sólo eliges cómo cobra recepción y si Stripe está disponible para el autoservicio.
-        </p>
-      </div>
+      <h2 className="text-xl font-semibold">Recepción y pagos del kiosco</h2>
       <label className="flex items-start gap-3 rounded-md border border-[var(--brand-line)] p-4">
         <input
           checked={draft.receptionManualTerminalEnabled}
@@ -727,7 +620,7 @@ function PaymentConfigurationCard({
           onChange={(event) => setDraft({ ...draft, receptionManualTerminalEnabled: event.target.checked })}
           type="checkbox"
         />
-        <span><strong>Terminal independiente en recepción</strong><small className="mt-1 block">Recepción captura el monto en su terminal física y después valida el pago manualmente en GymOS.</small></span>
+        <strong>Terminal independiente en recepción</strong>
       </label>
       <label className="flex items-start gap-3 rounded-md border border-[var(--brand-line)] p-4">
         <input
@@ -736,7 +629,7 @@ function PaymentConfigurationCard({
           onChange={(event) => setDraft({ ...draft, receptionMercadoPagoEnabled: event.target.checked })}
           type="checkbox"
         />
-        <span><strong>Mercado Pago Point integrado</strong><small className="mt-1 block">{draft.mercadoPagoConnected ? `Cuenta vinculada. Terminal: ${draft.mercadoPagoTerminalId ?? "por seleccionar"}.` : "Pendiente de vincular la cuenta de Mercado Pago mediante OAuth."}</small></span>
+        <span><strong>Mercado Pago Point integrado</strong><small className="mt-1 block">{draft.mercadoPagoConnected ? `Vinculado · ${draft.mercadoPagoTerminalId ?? "sin terminal"}` : "No vinculado"}</small></span>
       </label>
       {canManage ? (
         <div className="flex flex-wrap items-center gap-3">
@@ -772,7 +665,7 @@ function PaymentConfigurationCard({
           onChange={(event) => setDraft({ ...draft, stripeSelfCheckoutEnabled: event.target.checked, stripeRecurringEnabled: event.target.checked ? draft.stripeRecurringEnabled : false })}
           type="checkbox"
         />
-        <span><strong>Stripe para self checkout</strong><small className="mt-1 block">{draft.stripeConnected ? "Cuenta vinculada para Checkout alojado." : "Pendiente de vincular Stripe; GymOS no almacenará números de tarjeta ni CVV."}</small></span>
+        <span><strong>Stripe para self checkout</strong><small className="mt-1 block">{draft.stripeConnected ? "Vinculado" : "No vinculado"}</small></span>
       </label>
       {canManage ? (
         <div className="flex flex-wrap gap-3">
@@ -793,7 +686,7 @@ function PaymentConfigurationCard({
           onChange={(event) => setDraft({ ...draft, stripeRecurringEnabled: event.target.checked })}
           type="checkbox"
         />
-        <span><strong>Domiciliación con Stripe</strong><small className="mt-1 block">El socio tokeniza su tarjeta y acepta los términos en el kiosco. GymOS crea una renovación por vigencia y sólo la extiende después de conciliar el PaymentIntent de Stripe.</small></span>
+        <strong>Domiciliación con Stripe</strong>
       </label>
       {canManage ? <button className="app-button w-fit" disabled={saving} onClick={() => void onSave(draft)} type="button">{saving ? "Guardando..." : "Guardar configuración de cobro"}</button> : null}
     </section>

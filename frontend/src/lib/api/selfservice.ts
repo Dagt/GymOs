@@ -1,4 +1,5 @@
 import { apiFetch, normalizePayload, publicApiFetch } from "./client";
+import { normalizeKioskIdentifier } from "../kiosk-identifier";
 import type {
   KioskContactUpdatePayload,
   KioskAutopayMandate,
@@ -28,7 +29,7 @@ export async function verifyKioskSession(
   return publicApiFetch<KioskSummaryResponse>(`/self-service/sessions/${sessionId}/verify`, {
     method: "POST",
     headers: kioskSessionHeaders(sessionToken),
-    body: JSON.stringify({ identifier, birthDate }),
+    body: JSON.stringify({ identifier: normalizeKioskIdentifier(identifier), birthDate }),
   });
 }
 

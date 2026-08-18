@@ -589,7 +589,7 @@ export default function KioskPage() {
         ) : !summary ? (
           <form className="kiosk-card kiosk-verify" onSubmit={verify}>
             <div className="kiosk-step"><span>1</span><div><h2>Verifica tu identidad</h2><p>Usa los datos registrados en recepción.</p></div></div>
-            <input className="kiosk-input" onChange={(event) => setIdentifier(event.target.value)} placeholder="Correo o teléfono" required value={identifier} />
+            <input autoComplete="username" className="kiosk-input" onChange={(event) => setIdentifier(event.target.value)} placeholder="Correo o teléfono (10 dígitos)" required value={identifier} />
             <label className="kiosk-field">
               Fecha de nacimiento
               <input

@@ -430,4 +430,23 @@ class SecurityAuthorizationTests {
 		var result = mockMvc.perform(get("/api/v1/kiosk-settings/branches")).andReturn();
 		assertThat(result.getResponse().getStatus()).isNotIn(401, 403);
 	}
+
+	@Test
+	@WithMockUser(authorities = {
+			"organization.read", "branch.read", "payment.settings.read", "payment.settings.manage",
+			"selfservice.settings.manage", "notification.settings.manage"
+	})
+	void managerPermissionBundleCanReachEveryOperationalSettingsEndpoint() throws Exception {
+		var organization = mockMvc.perform(get("/api/v1/organizations/current")).andReturn();
+		var branches = mockMvc.perform(get("/api/v1/organizations/current/branches")).andReturn();
+		var payments = mockMvc.perform(get("/api/v1/payment-settings")).andReturn();
+		var kiosk = mockMvc.perform(get("/api/v1/kiosk-settings/branches")).andReturn();
+		var email = mockMvc.perform(get("/api/v1/notifications/email-configuration")).andReturn();
+
+		assertThat(organization.getResponse().getStatus()).isNotIn(401, 403);
+		assertThat(branches.getResponse().getStatus()).isNotIn(401, 403);
+		assertThat(payments.getResponse().getStatus()).isNotIn(401, 403);
+		assertThat(kiosk.getResponse().getStatus()).isNotIn(401, 403);
+		assertThat(email.getResponse().getStatus()).isNotIn(401, 403);
+	}
 }

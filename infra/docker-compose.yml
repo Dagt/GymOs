@@ -65,6 +65,12 @@ services:
       GYMOS_MINIO_SECRET_KEY: gymos-secret
       GYMOS_MINIO_BUCKET: gymos-receipts
       GYMOS_SEED_ENABLED: "true"
+      GYMOS_PAYMENT_CREDENTIAL_KEY: ${GYMOS_PAYMENT_CREDENTIAL_KEY:-dev-only-payment-credential-key-change-in-production}
+      GYMOS_FRONTEND_BASE_URL: ${GYMOS_FRONTEND_BASE_URL:-http://localhost:3000}
+      GYMOS_STRIPE_SECRET_KEY: ${GYMOS_STRIPE_SECRET_KEY:-}
+      GYMOS_STRIPE_WEBHOOK_SECRET: ${GYMOS_STRIPE_WEBHOOK_SECRET:-}
+      GYMOS_STRIPE_RETURN_URL: ${GYMOS_STRIPE_RETURN_URL:-http://localhost:3000/settings/organization?payment=stripe-return}
+      GYMOS_STRIPE_REFRESH_URL: ${GYMOS_STRIPE_REFRESH_URL:-http://localhost:3000/settings/organization?payment=stripe-refresh}
       GYMOS_NOTIFICATION_PREFERENCE_KEY: ${GYMOS_NOTIFICATION_PREFERENCE_KEY:-local-notification-preference-key-change-outside-development}
       GYMOS_SMTP_ENABLED: ${GYMOS_SMTP_ENABLED:-false}
       GYMOS_SMTP_HOST: ${GYMOS_SMTP_HOST:-}

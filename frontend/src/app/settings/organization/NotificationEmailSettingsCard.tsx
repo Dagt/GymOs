@@ -93,50 +93,24 @@ export function NotificationEmailSettingsCard({ accessToken }: { accessToken: st
 
   return (
     <section className="app-card grid scroll-mt-6 gap-5 p-5" id="email-settings">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-        <p className="app-eyebrow">Notificaciones</p>
-        <h2 className="text-xl font-semibold">Correo electrónico</h2>
-        <p className="mt-2 text-sm text-[var(--brand-muted)]">
-          Esta sección tiene dos pasos: el equipo técnico conecta al proveedor y después el gimnasio define el remitente. Las automatizaciones internas no necesitan correo.
-        </p>
-        </div>
-        <a className="app-button-secondary" href="/automations">Ir a automatizaciones</a>
-      </div>
+      <h2 className="text-xl font-semibold">Correo electrónico</h2>
 
-      <div className={`rounded-md border p-4 text-sm ${configuration.providerAvailable ? "border-[#b9d8c6] bg-[#f2faf5]" : "border-[#ead6a3] bg-[#fffaf0]"}`}>
-        <strong>{configuration.providerAvailable ? "Paso técnico completado" : "Paso técnico pendiente"}</strong>
-        <p className="mt-1 text-[var(--brand-muted)]">
-          {configuration.providerAvailable
-            ? "El proveedor ya está conectado. Completa el remitente, habilita las entregas y envía una prueba."
-            : "Pide al responsable técnico que conecte el proveedor SMTP. Mientras tanto puedes preparar el nombre y correo que verán los socios."}
-        </p>
-        {!configuration.providerAvailable ? (
-          <details className="mt-3 text-xs text-[var(--brand-muted)]">
-            <summary className="cursor-pointer font-semibold text-[#42514a]">Datos para el responsable técnico</summary>
-            <p className="mt-2">Debe configurar en el servidor: GYMOS_SMTP_ENABLED, GYMOS_SMTP_HOST, GYMOS_SMTP_USERNAME y GYMOS_SMTP_PASSWORD.</p>
-          </details>
-        ) : null}
-      </div>
+      <strong className={`w-fit rounded-full border px-3 py-1 text-sm ${configuration.providerAvailable ? "border-[#b9d8c6] bg-[#f2faf5] text-[#31543d]" : "border-[#ead6a3] bg-[#fffaf0] text-[#745b00]"}`}>
+        {configuration.providerAvailable ? "Proveedor disponible" : "Proveedor no disponible"}
+      </strong>
 
       <form className="grid gap-4 md:grid-cols-2" onSubmit={save}>
-        <div className="rounded-md border border-[var(--brand-line)] bg-[var(--brand-surface)] p-4 text-sm">
-          <span className="text-xs text-[var(--brand-muted)]">Tipo de conexión</span>
-          <strong className="mt-1 block">SMTP estándar</strong>
-          <span className="mt-1 block text-xs text-[var(--brand-muted)]">Compatible con el proveedor que elijas.</span>
-        </div>
         <label className="grid gap-2 text-sm font-medium">
           Nombre del remitente
-          <input className="app-input" maxLength={160} onChange={(event) => setDraft({ ...draft, fromName: event.target.value })} placeholder="Mi gimnasio" value={draft.fromName} />
-          <small className="font-normal text-[var(--brand-muted)]">Ejemplo: Appex Fitness.</small>
+          <input className="app-input" maxLength={160} onChange={(event) => setDraft({ ...draft, fromName: event.target.value })} value={draft.fromName} />
         </label>
         <label className="grid gap-2 text-sm font-medium">
           Correo remitente
-          <input className="app-input" maxLength={180} onChange={(event) => setDraft({ ...draft, fromEmail: event.target.value })} placeholder="notificaciones@gimnasio.com" type="email" value={draft.fromEmail} />
+          <input className="app-input" maxLength={180} onChange={(event) => setDraft({ ...draft, fromEmail: event.target.value })} type="email" value={draft.fromEmail} />
         </label>
         <label className="grid gap-2 text-sm font-medium">
           Responder a (opcional)
-          <input className="app-input" maxLength={180} onChange={(event) => setDraft({ ...draft, replyTo: event.target.value })} placeholder="recepcion@gimnasio.com" type="email" value={draft.replyTo} />
+          <input className="app-input" maxLength={180} onChange={(event) => setDraft({ ...draft, replyTo: event.target.value })} type="email" value={draft.replyTo} />
         </label>
         <label className="flex items-start gap-3 rounded-md border border-[var(--brand-line)] p-4 md:col-span-2">
           <input
@@ -145,7 +119,7 @@ export function NotificationEmailSettingsCard({ accessToken }: { accessToken: st
             onChange={(event) => setDraft({ ...draft, emailEnabled: event.target.checked })}
             type="checkbox"
           />
-          <span><strong>Habilitar entregas por correo</strong><small className="mt-1 block">Las automatizaciones podrán escribir al correo registrado del socio.</small></span>
+          <strong>Habilitar entregas por correo</strong>
         </label>
         <button className="app-button w-fit" disabled={saving || (draft.emailEnabled && !draft.fromEmail)} type="submit">
           {saving ? "Guardando..." : "Guardar remitente"}
@@ -154,7 +128,7 @@ export function NotificationEmailSettingsCard({ accessToken }: { accessToken: st
 
       {configuration.ready ? (
         <div className="grid gap-3 border-t border-[var(--brand-line)] pt-5 sm:grid-cols-[minmax(0,1fr)_auto]">
-          <input className="app-input" onChange={(event) => setTestRecipient(event.target.value)} placeholder="correo@ejemplo.com" type="email" value={testRecipient} />
+          <input aria-label="Destinatario de prueba" className="app-input" onChange={(event) => setTestRecipient(event.target.value)} type="email" value={testRecipient} />
           <button className="app-button secondary" disabled={saving || !testRecipient} onClick={() => void test()} type="button">Enviar prueba</button>
         </div>
       ) : null}

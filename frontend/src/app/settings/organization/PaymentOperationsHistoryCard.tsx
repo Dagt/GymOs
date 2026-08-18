@@ -79,13 +79,7 @@ export function PaymentOperationsHistoryCard({ accessToken }: { accessToken: str
 
   return (
     <section className="app-card grid scroll-mt-6 gap-4 p-5" id="payment-operations">
-      <div>
-        <p className="app-eyebrow">Operación de pagos</p>
-        <h2 className="text-xl font-semibold">Historial de domiciliación y webhooks</h2>
-        <p className="mt-2 text-sm text-[var(--brand-muted)]">
-          Información aislada para este gimnasio. Los datos completos de tarjeta y los payloads del proveedor no se muestran.
-        </p>
-      </div>
+      <h2 className="text-xl font-semibold">Historial de domiciliación y webhooks</h2>
       {operations ? (
         <div className={`rounded-md border p-4 ${operations.alertLevel === "CRITICAL" ? "border-[#e5b7b7] bg-[#fff7f7]" : "border-[var(--brand-line)] bg-[var(--brand-surface)]"}`}>
           <strong>{operations.alertLevel === "HEALTHY" ? "Procesamiento saludable" : "Pagos requieren atención"}</strong>

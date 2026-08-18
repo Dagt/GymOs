@@ -34,6 +34,7 @@ $env:GYMOS_STRIPE_SECRET_KEY = "sk_test_..."
 $env:GYMOS_STRIPE_WEBHOOK_SECRET = "whsec_..." # se obtiene al iniciar Stripe CLI
 $env:GYMOS_STRIPE_RETURN_URL = "http://localhost:3000/settings/organization?payment=stripe-return"
 $env:GYMOS_STRIPE_REFRESH_URL = "http://localhost:3000/settings/organization?payment=stripe-refresh"
+$env:GYMOS_PAYMENT_CREDENTIAL_KEY = "una-clave-local-estable-y-privada"
 ```
 
 Inicia PostgreSQL, Redis, backend y frontend con el procedimiento habitual.
@@ -42,7 +43,7 @@ cuentas Connect al backend:
 
 ```powershell
 stripe login
-stripe listen --events checkout.session.completed,payment_intent.succeeded,payment_intent.payment_failed,charge.succeeded,charge.failed --forward-connect-to http://localhost:8080/api/v1/payment-webhooks/stripe
+stripe listen --events checkout.session.completed,checkout.session.async_payment_succeeded,payment_intent.succeeded,payment_intent.payment_failed --forward-connect-to http://localhost:8080/api/v1/payment-webhooks/stripe
 ```
 
 Copia el `whsec_...` mostrado por ese comando a

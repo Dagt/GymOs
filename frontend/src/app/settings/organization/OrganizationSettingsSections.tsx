@@ -18,35 +18,6 @@ import type {
   OrganizationUpdatePayload,
 } from "@/lib/api";
 
-type SettingsSummaryProps = {
-  activeBranchName?: string;
-  branchCount: number;
-  legalName?: string;
-  tradeName?: string;
-};
-
-export function SettingsSummary({ activeBranchName, branchCount, legalName, tradeName }: SettingsSummaryProps) {
-  return (
-    <section className="settings-summary">
-      <article>
-        <span>Gimnasio actual</span>
-        <strong>{tradeName}</strong>
-        <p>{legalName}</p>
-      </article>
-      <article>
-        <span>Sucursales</span>
-        <strong>{branchCount}</strong>
-        <p>{branchCount === 1 ? "Una sucursal registrada." : "Sucursales registradas para este gimnasio."}</p>
-      </article>
-      <article>
-        <span>Sucursal operativa</span>
-        <strong>{activeBranchName ?? "Sin seleccionar"}</strong>
-        <p>Se elige desde Gimnasios para entrar al contexto de trabajo.</p>
-      </article>
-    </section>
-  );
-}
-
 type OrganizationOverviewCardProps = {
   form: OrganizationUpdatePayload;
   onEdit: () => void;
@@ -106,8 +77,7 @@ export function BranchesOverviewCard({ branches, onEditBranch, onNewBranch }: Br
       <div className="mt-5 grid min-h-0 gap-4 xl:flex-1 xl:grid-cols-1 xl:content-start xl:overflow-y-auto xl:[scrollbar-width:none] xl:[&::-webkit-scrollbar]:hidden">
         {branches.length === 0 ? (
           <section className="admin-empty-card">
-            <strong>Aun no hay sucursales</strong>
-            <span>Crea la primera para poder operar caja, recepcion y reportes.</span>
+            <strong>No hay sucursales.</strong>
           </section>
         ) : null}
         {branches.map((branch) => (
@@ -131,9 +101,6 @@ export function TeamAccessCard() {
         <div className="min-w-0">
           <p className="app-eyebrow">Equipo</p>
           <h2 className="mt-2 text-xl font-semibold">Usuarios y permisos</h2>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-[var(--brand-muted)]">
-            Crea cuentas para recepcion, gerencia, coaches y operacion, y limita las sucursales que puede usar cada persona.
-          </p>
         </div>
         <Link className="admin-secondary-link shrink-0" href="/users">
           Abrir equipo y accesos
@@ -170,7 +137,6 @@ export function OrganizationDrawer({
 }: OrganizationDrawerProps) {
   return (
     <AppDrawer
-      description="Actualiza datos comerciales, contacto y marca visual que veran duenos, gerentes, recepcion y kiosco."
       onClose={onClose}
       open={open}
       title="Editar gimnasio"
@@ -224,7 +190,6 @@ type NewBranchDrawerProps = {
 export function NewBranchDrawer({ errors, form, open, saving, onChange, onClose, onSubmit }: NewBranchDrawerProps) {
   return (
     <AppDrawer
-      description="Crea una sede operativa para caja, recepcion, usuarios y reportes."
       onClose={onClose}
       open={open}
       title="Crear sucursal"
@@ -271,7 +236,6 @@ export function EditBranchDrawer({
 }: EditBranchDrawerProps) {
   return (
     <AppDrawer
-      description="Edita nombre, codigo, telefono y zona horaria de la sucursal seleccionada."
       onClose={onClose}
       open={open}
       title="Editar sucursal"

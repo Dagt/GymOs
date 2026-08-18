@@ -27,7 +27,7 @@ export async function apiFetch<T>(
   }
 
   let response = await authenticatedRequest(path, tokenUsed, init);
-  if (response.status !== 401) {
+  if (response.status !== 401 && response.status !== 403) {
     return readResponse<T>(response, path);
   }
 
@@ -35,7 +35,7 @@ export async function apiFetch<T>(
   if (newerToken && newerToken !== tokenUsed) {
     tokenUsed = newerToken;
     response = await authenticatedRequest(path, tokenUsed, init);
-    if (response.status !== 401) {
+    if (response.status !== 401 && response.status !== 403) {
       return readResponse<T>(response, path);
     }
   }

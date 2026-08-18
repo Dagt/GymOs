@@ -11,14 +11,14 @@ type EditableKey = "membershipEnrollmentAllowed" | "membershipRenewalAllowed" |
   "membershipPlanChangeAllowed" | "resourceBookingAllowed" | "wellnessBookingAllowed" |
   "profileUpdateAllowed" | "autopayAllowed";
 
-const options: Array<{ key: EditableKey; title: string; description: string }> = [
-  { key: "membershipEnrollmentAllowed", title: "Comprar membresía", description: "Alta y pago en Stripe desde el navegador." },
-  { key: "membershipRenewalAllowed", title: "Renovar membresía", description: "Cotiza, confirma y paga una renovación." },
-  { key: "membershipPlanChangeAllowed", title: "Cambiar de plan", description: "Aplica la cotización final antes del pago." },
-  { key: "autopayAllowed", title: "Domiciliación", description: "Consentimiento y tarjeta tokenizada con Stripe." },
-  { key: "resourceBookingAllowed", title: "Reservas gratuitas", description: "No habilita recursos ni wellness con costo." },
-  { key: "wellnessBookingAllowed", title: "Citas wellness gratuitas", description: "Muestra únicamente servicios activos con precio cero." },
-  { key: "profileUpdateAllowed", title: "Actualizar contacto", description: "Correo y teléfono del socio verificado." },
+const options: Array<{ key: EditableKey; title: string }> = [
+  { key: "membershipEnrollmentAllowed", title: "Comprar membresía" },
+  { key: "membershipRenewalAllowed", title: "Renovar membresía" },
+  { key: "membershipPlanChangeAllowed", title: "Cambiar de plan" },
+  { key: "autopayAllowed", title: "Domiciliación" },
+  { key: "resourceBookingAllowed", title: "Reservas gratuitas" },
+  { key: "wellnessBookingAllowed", title: "Citas wellness gratuitas" },
+  { key: "profileUpdateAllowed", title: "Actualizar contacto" },
 ];
 
 export function KioskBranchSettingsCard({
@@ -75,24 +75,7 @@ export function KioskBranchSettingsCard({
 
   return (
     <section className="app-card grid scroll-mt-6 gap-5 p-5" id="kiosk-settings">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-        <p className="app-eyebrow">Kiosco web de la sucursal actual</p>
-        <h2 className="mt-1 text-xl font-semibold">Funciones disponibles para el socio</h2>
-        <p className="mt-1 text-sm text-[var(--brand-muted)]">
-          Esta configuración es lógica: recepción abre el kiosco en cualquier navegador; no se registra ni asigna una computadora.
-        </p>
-        </div>
-        <div className="max-w-md rounded-lg border border-[var(--brand-line)] bg-[var(--brand-surface)] p-4 text-sm">
-          <strong className="block">Cómo abrirlo</strong>
-          <span className="mt-1 block leading-5 text-[var(--brand-muted)]">
-            Inicia sesión con una cuenta de recepción, elige la sucursal y usa “Abrir kiosco” desde su pantalla de inicio. GymOS abrirá otra pestaña sin acceso administrativo y conservará recepción disponible para el personal.
-          </span>
-        </div>
-      </div>
-      <p className="rounded-md border border-[var(--brand-line)] bg-white p-3 text-sm text-[var(--brand-muted)]">
-        Las compras, renovaciones, cambios de plan y domiciliaciones sólo se activan cuando Stripe está conectado. Las reservas aquí son gratuitas; recursos y wellness con costo no forman parte del alcance.
-      </p>
+      <h2 className="text-xl font-semibold">Funciones disponibles para el socio</h2>
       {error ? <p className="form-message error" role="alert">{error}</p> : null}
       {message ? <p className="form-message success" role="status">{message}</p> : null}
       <div className="grid gap-4">
@@ -118,7 +101,7 @@ export function KioskBranchSettingsCard({
               {options.map((option) => (
                 <label className="flex cursor-pointer gap-3 rounded-md border border-[var(--brand-line)] p-3" key={option.key}>
                   <input checked={item.capabilities[option.key]} onChange={() => toggle(item.branchId, option.key)} type="checkbox" />
-                  <span><strong className="block text-sm">{option.title}</strong><small className="text-[var(--brand-muted)]">{option.description}</small></span>
+                  <strong className="text-sm">{option.title}</strong>
                 </label>
               ))}
             </div>
