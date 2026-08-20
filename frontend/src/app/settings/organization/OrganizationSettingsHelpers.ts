@@ -35,9 +35,9 @@ export function toOrganizationForm(organization: OrganizationSummary): Organizat
     contactPhone: organization.contactPhone ?? "",
     brandName: organization.brandName ?? organization.tradeName,
     logoUrl: organization.logoUrl ?? "",
-    primaryColor: organization.primaryColor ?? "#164E63",
-    accentColor: organization.accentColor ?? "#F59E0B",
-    surfaceColor: organization.surfaceColor ?? "#F4F7FB",
+    primaryColor: organization.primaryColor ?? "#093D3A",
+    accentColor: organization.accentColor ?? "#18C8B2",
+    surfaceColor: organization.surfaceColor ?? "#F2F8F7",
   };
 }
 

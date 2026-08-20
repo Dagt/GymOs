@@ -107,9 +107,9 @@ public class OrganizationService {
 					blankToNull(request.contactPhone()),
 					defaultBrandName(request.brandName(), request.tradeName()),
 					blankToNull(request.logoUrl()),
-					defaultColor(request.primaryColor(), "#164E63"),
-					defaultColor(request.accentColor(), "#F59E0B"),
-					defaultColor(request.surfaceColor(), "#F4F7FB"),
+					defaultColor(request.primaryColor(), "#093D3A"),
+					defaultColor(request.accentColor(), "#18C8B2"),
+					defaultColor(request.surfaceColor(), "#F2F8F7"),
 					now
 			));
 			if (hasBranchRequest(request)) {
@@ -154,9 +154,9 @@ public class OrganizationService {
 				blankToNull(request.contactPhone()),
 				defaultBrandName(request.brandName(), request.tradeName()),
 				blankToNull(request.logoUrl()),
-				defaultColor(request.primaryColor(), "#164E63"),
-				defaultColor(request.accentColor(), "#F59E0B"),
-				defaultColor(request.surfaceColor(), "#F4F7FB"),
+				defaultColor(request.primaryColor(), "#093D3A"),
+				defaultColor(request.accentColor(), "#18C8B2"),
+				defaultColor(request.surfaceColor(), "#F2F8F7"),
 				now
 		));
 		auditService.record(principal, "ORGANIZATION_UPDATED", "ORGANIZATION", principal.organizationId(), "RECEPTION", null, correlationId);

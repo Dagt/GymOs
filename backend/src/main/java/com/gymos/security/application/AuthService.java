@@ -289,7 +289,7 @@ public class AuthService {
 
 	private CurrentUserResult toResponse(GymOsPrincipal principal) {
 		AuthQueryRepository.OrganizationTheme theme = authQueryRepository.organizationTheme(principal.organizationId())
-				.orElse(new AuthQueryRepository.OrganizationTheme("GymOS", null, null, "#164E63", "#F59E0B", "#F4F7FB"));
+				.orElse(new AuthQueryRepository.OrganizationTheme("GymFort", null, null, "#093D3A", "#18C8B2", "#F2F8F7"));
 		return new CurrentUserResult(
 				principal.userId(),
 				principal.organizationId(),

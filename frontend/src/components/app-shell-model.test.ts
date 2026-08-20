@@ -118,7 +118,7 @@ test("platform shell uses neutral GymFort brand outside support mode", () => {
     variant: "platform",
     visibleBranch: "Centro",
   }), {
-    logoUrl: "/brand/gymfort-symbol.svg",
+    logoUrl: "/gymfort_web_assets/gymfort-isotipo-128.png",
     name: "GymFort Plataforma",
     scope: "CRM de gimnasios",
   });

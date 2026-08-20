@@ -165,9 +165,9 @@ export function OrganizationDrawer({
           }}
         />
         <div className="grid gap-4 sm:grid-cols-3">
-          <ColorField error={errors.primaryColor} label="Color principal" name="primaryColor" value={form.primaryColor ?? "#164E63"} onChange={(value) => onChange({ ...form, primaryColor: value })} />
-          <ColorField error={errors.accentColor} label="Color acento" name="accentColor" value={form.accentColor ?? "#F59E0B"} onChange={(value) => onChange({ ...form, accentColor: value })} />
-          <ColorField error={errors.surfaceColor} label="Color fondo" name="surfaceColor" value={form.surfaceColor ?? "#F4F7FB"} onChange={(value) => onChange({ ...form, surfaceColor: value })} />
+          <ColorField error={errors.primaryColor} label="Color principal" name="primaryColor" value={form.primaryColor ?? "#093D3A"} onChange={(value) => onChange({ ...form, primaryColor: value })} />
+          <ColorField error={errors.accentColor} label="Color acento" name="accentColor" value={form.accentColor ?? "#18C8B2"} onChange={(value) => onChange({ ...form, accentColor: value })} />
+          <ColorField error={errors.surfaceColor} label="Color fondo" name="surfaceColor" value={form.surfaceColor ?? "#F2F8F7"} onChange={(value) => onChange({ ...form, surfaceColor: value })} />
         </div>
         <button className="form-primary-button" disabled={saving} type="submit">
           Guardar gimnasio

@@ -58,7 +58,7 @@ const branches = [
 ];
 
 test.describe("consolas por rol", () => {
-  test("Admin GymOS entra al CRM de gimnasios cliente", async ({ page }) => {
+  test("Admin GymFort entra al CRM de gimnasios cliente", async ({ page }) => {
     await bootAs(page, user({
       console: "PLATFORM_OWNER",
       platformAdmin: true,
@@ -70,7 +70,7 @@ test.describe("consolas por rol", () => {
     await page.goto("/platform/gymnasiums");
 
     await expect(page.getByRole("heading", { name: /CRM de gimnasios cliente/i })).toBeVisible();
-    await expect(page.getByLabel("Perfil activo").getByText("Admin GymOS")).toBeVisible();
+    await expect(page.getByLabel("Perfil activo").getByText("Admin GymFort")).toBeVisible();
     await expect(page.locator("body")).toContainText("CRM de gimnasios");
     await expect(page.locator("body")).toContainText("Nuevo gimnasio");
   });
@@ -256,7 +256,7 @@ test.describe("consolas por rol", () => {
     await expect(page.getByRole("button", { name: /Registrar Nuevo Socio/i })).toBeVisible();
   });
 
-  test("Admin GymOS en soporte ve banda y regreso a administracion", async ({ page }) => {
+  test("Admin GymFort en soporte ve banda y regreso a administracion", async ({ page }) => {
     await bootAs(page, user({
       console: "TENANT_OWNER",
       platformAdmin: true,
@@ -267,9 +267,9 @@ test.describe("consolas por rol", () => {
 
     await page.goto("/dashboard");
 
-    await expect(page.getByText("Modo soporte GymOS")).toBeVisible();
+    await expect(page.getByText("Modo soporte GymFort")).toBeVisible();
     await expect(page.getByRole("link", { name: /Volver a administracion de gimnasios/i })).toBeVisible();
-    await expect(page.getByLabel("Perfil activo").getByText("Soporte GymOS")).toBeVisible();
+    await expect(page.getByLabel("Perfil activo").getByText("Soporte GymFort")).toBeVisible();
   });
 
   test("dueno configura el remitente SMTP y encola un correo de prueba", async ({ page }) => {
@@ -354,7 +354,7 @@ test.describe("consolas por rol", () => {
       fromName: "Appex Fitness",
     });
 
-    await page.getByPlaceholder("correo@ejemplo.com").fill("qa@appex.com");
+    await page.getByLabel("Destinatario de prueba").fill("qa@appex.com");
     await page.getByRole("button", { name: "Enviar prueba" }).click();
     await expect(page.getByText(/Correo de prueba en cola/)).toBeVisible();
     expect(testRecipient).toBe("qa@appex.com");

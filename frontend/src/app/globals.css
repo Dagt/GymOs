@@ -1023,6 +1023,7 @@ th {
 }
 
 .login-screen {
+  --brand-action: color-mix(in srgb, var(--brand-primary) 78%, #06231f);
   background:
     radial-gradient(circle at 18% 12%, color-mix(in srgb, var(--brand-accent) 18%, transparent), transparent 22rem),
     linear-gradient(135deg, #f8fafc, #edf7f6);
@@ -5088,4 +5089,272 @@ button.admin-secondary-link:disabled {
 .app-button {
   border-radius: 1rem !important;
   font-weight: 900 !important;
+}
+
+/* --- GYMFORT PRODUCT SYSTEM -------------------------------------------------
+   El shell mantiene una estructura consistente; primary, accent y surface
+   continúan viniendo del tema de cada gimnasio. */
+.landing-brand-banner {
+  align-items: center;
+  background-color: #061915;
+  background-image: url("/gymfort_web_assets/gymfort-banner-1920x600.png");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  display: flex;
+  min-height: 360px;
+  padding: 60px max(5vw, 24px);
+}
+
+.landing-brand-banner > div {
+  margin-left: auto;
+  max-width: 540px;
+  padding-right: 5vw;
+}
+
+.landing-brand-banner p {
+  color: #38f0d2;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+}
+
+.landing-brand-banner h2 {
+  font-size: clamp(30px, 3.5vw, 48px);
+  letter-spacing: -.04em;
+  line-height: 1.05;
+  margin: 16px 0;
+}
+
+.landing-brand-banner span { color: #8ca39e; line-height: 1.7; }
+
+.admin-console {
+  --shell-dark: color-mix(in srgb, var(--brand-primary) 30%, #041512);
+  --shell-dark-soft: color-mix(in srgb, var(--brand-primary) 22%, #0a2420);
+  --brand-action: color-mix(in srgb, var(--brand-primary) 78%, #06231f);
+  background:
+    radial-gradient(circle at 90% 0%, color-mix(in srgb, var(--brand-accent) 9%, transparent), transparent 32rem),
+    var(--brand-surface);
+  grid-template-columns: 17.5rem minmax(0, 1fr);
+}
+
+.admin-sidebar {
+  background: linear-gradient(180deg, var(--shell-dark), color-mix(in srgb, var(--shell-dark) 88%, black));
+  border-right: 1px solid color-mix(in srgb, var(--brand-accent) 22%, transparent);
+  gap: 1rem;
+  padding: 1.25rem 1rem;
+}
+
+.admin-sidebar-brand {
+  align-items: center;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  flex-direction: row;
+  gap: .75rem;
+  padding: .25rem .35rem 1rem;
+  text-align: left;
+}
+
+.admin-sidebar-brand > span,
+.admin-sidebar-brand > span.with-logo {
+  background: rgba(255,255,255,.04);
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 32%, transparent);
+  border-radius: .65rem;
+  box-shadow: 0 10px 30px rgba(0,0,0,.22);
+  flex: 0 0 auto;
+  height: 3.1rem;
+  padding: .35rem;
+  width: 3.1rem;
+}
+
+.admin-sidebar-brand > span img { object-fit: contain; }
+.admin-sidebar-brand div { min-width: 0; text-align: left; }
+.admin-sidebar-brand strong { font-size: 1rem; letter-spacing: -.02em; }
+.admin-sidebar-brand small { color: rgba(221,244,239,.52); font-size: .65rem; }
+
+.admin-user-card {
+  background: rgba(255,255,255,.035);
+  border-color: rgba(255,255,255,.08);
+  border-radius: .65rem;
+  padding: .75rem;
+}
+
+.admin-user-card strong { font-size: .95rem; }
+.admin-user-card span { color: rgba(218,239,234,.55); font-size: .72rem; }
+.admin-sidebar nav { gap: .55rem; }
+
+.admin-nav-section,
+.admin-nav-section:first-child {
+  border: 0;
+  border-radius: .5rem;
+  gap: .2rem;
+  padding: 0;
+}
+
+.admin-nav-section summary {
+  background: transparent;
+  border-radius: .4rem;
+  color: rgba(218,239,234,.42);
+  font-size: .62rem;
+  letter-spacing: .12em;
+  padding: .45rem .65rem;
+}
+
+.admin-sidebar nav a {
+  border: 1px solid transparent;
+  border-radius: .55rem;
+  color: rgba(230,248,244,.65);
+  padding: .62rem .7rem;
+}
+
+.admin-sidebar nav a:hover {
+  background: rgba(255,255,255,.045);
+  border-color: rgba(255,255,255,.06);
+}
+
+.admin-sidebar nav a.active {
+  background: color-mix(in srgb, var(--brand-accent) 13%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 25%, transparent);
+  border-left: 3px solid var(--brand-accent);
+  border-radius: .55rem;
+  box-shadow: none;
+  color: color-mix(in srgb, var(--brand-accent) 78%, white);
+}
+
+.admin-sidebar nav a.active span { color: rgba(222,244,239,.55); }
+.admin-sidebar-footer { border-color: rgba(255,255,255,.08); gap: .55rem; }
+.admin-sidebar-footer button {
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: .55rem;
+  color: rgba(240,252,249,.8);
+}
+
+.admin-workspace { gap: 1rem; padding: clamp(1rem, 2.4vw, 2rem); }
+
+.admin-command-bar {
+  background:
+    radial-gradient(circle at 92% 15%, color-mix(in srgb, var(--brand-accent) 18%, transparent), transparent 15rem),
+    linear-gradient(120deg, var(--shell-dark), var(--shell-dark-soft)) !important;
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 18%, transparent) !important;
+  border-radius: .85rem !important;
+  box-shadow: 0 16px 45px rgba(3,24,21,.15) !important;
+  min-height: 8.5rem;
+  padding: 1.65rem 1.8rem !important;
+}
+
+.admin-command-bar::after {
+  background: linear-gradient(90deg, var(--brand-accent), transparent 32%) !important;
+  bottom: auto !important;
+  height: 2px !important;
+}
+
+.admin-command-bar h1 {
+  font-size: clamp(1.7rem, 3vw, 2.35rem) !important;
+  letter-spacing: -.04em !important;
+  text-shadow: none !important;
+}
+
+.admin-command-bar p { color: color-mix(in srgb, var(--brand-accent) 70%, white) !important; }
+.admin-command-bar span { color: rgba(225,244,239,.68) !important; }
+
+.admin-role-chip,
+.admin-branch-switcher {
+  background: rgba(255,255,255,.045) !important;
+  border: 1px solid rgba(255,255,255,.11) !important;
+  border-radius: .6rem !important;
+  box-shadow: none;
+  min-height: 3.25rem;
+}
+
+.admin-role-chip strong { font-size: .82rem; }
+.admin-branch-switcher select { background: transparent; }
+
+.app-card,
+.admin-panel,
+.admin-action-card,
+.admin-workspace .bg-white {
+  background-color: color-mix(in srgb, white 96%, var(--brand-surface)) !important;
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 10%, var(--brand-line)) !important;
+  border-radius: .75rem !important;
+  box-shadow: 0 12px 35px rgba(9,42,37,.055) !important;
+}
+
+.admin-workspace .rounded-lg,
+.admin-workspace .rounded-xl { border-radius: .75rem !important; }
+.admin-workspace .rounded-md { border-radius: .55rem !important; }
+
+.app-button,
+.form-primary-button,
+.admin-workspace button[type="submit"] {
+  background: var(--brand-action) !important;
+  border: 1px solid color-mix(in srgb, var(--brand-action) 84%, black) !important;
+  border-bottom: 1px solid color-mix(in srgb, var(--brand-action) 84%, black) !important;
+  border-radius: .55rem !important;
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--brand-primary) 16%, transparent);
+  color: white !important;
+  font-weight: 800 !important;
+}
+
+.app-button:hover,
+.form-primary-button:hover,
+.admin-workspace button[type="submit"]:hover {
+  background: color-mix(in srgb, var(--brand-action) 86%, var(--brand-accent)) !important;
+}
+
+.app-button-secondary,
+.app-button-soft {
+  border-radius: .55rem !important;
+  box-shadow: none;
+}
+
+.admin-workspace .app-button-secondary {
+  background: color-mix(in srgb, var(--brand-accent) 7%, white) !important;
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 28%, var(--brand-line)) !important;
+  color: var(--brand-action) !important;
+}
+
+.app-input,
+.admin-workspace input,
+.admin-workspace select,
+.admin-workspace textarea {
+  border-color: color-mix(in srgb, var(--brand-primary) 12%, var(--brand-line));
+  border-radius: .55rem;
+}
+
+.admin-workspace table thead,
+.admin-workspace th { background: color-mix(in srgb, var(--brand-primary) 5%, white); }
+.admin-workspace th { color: color-mix(in srgb, var(--brand-primary) 70%, #263b37); }
+.admin-panel-header p { color: var(--brand-primary); }
+
+.login-screen {
+  background:
+    radial-gradient(circle at 15% 10%, color-mix(in srgb, var(--brand-accent) 16%, transparent), transparent 27rem),
+    #061513;
+}
+
+.login-card {
+  border: 1px solid rgba(78,213,192,.16);
+  border-radius: .9rem;
+  box-shadow: 0 35px 100px rgba(0,0,0,.42);
+  overflow: hidden;
+}
+
+.login-hero {
+  background: linear-gradient(145deg, #061815, #0a2924);
+}
+
+.login-brand-logo { height: auto; margin-bottom: 1.25rem; width: min(216px, 75%); }
+.login-form-logo { background: #071a17; border-radius: .5rem; height: auto; padding: .45rem .65rem; width: 178px; }
+.login-form-panel button { background: var(--brand-action); border: 1px solid color-mix(in srgb, var(--brand-action) 84%, black); border-bottom: 0; border-radius: .55rem; color: white; }
+
+@media (max-width: 900px) {
+  .landing-brand-banner { background-image: url("/gymfort_web_assets/gymfort-banner-1200x400.png"); min-height: 300px; }
+  .landing-brand-banner > div { background: rgba(5,22,19,.78); border-radius: .75rem; margin: 0 0 0 auto; max-width: 480px; padding: 1.5rem; }
+}
+
+@media (max-width: 600px) {
+  .landing-brand-banner { background-position: 28% center; min-height: 380px; }
+  .landing-brand-banner > div { align-self: end; margin: 0; }
+  .admin-command-bar { border-radius: .75rem !important; min-height: auto; padding: 1.25rem !important; }
 }

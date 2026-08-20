@@ -219,14 +219,14 @@ export function resolveShellBrand({
 }): ShellBrand {
   if (variant === "platform" || (isPlatformAdmin(session.user) && !isSupportMode(session.user))) {
     return {
-      logoUrl: "/brand/gymfort-symbol.svg",
+      logoUrl: "/gymfort_web_assets/gymfort-isotipo-128.png",
       name: "GymFort Plataforma",
       scope: "CRM de gimnasios",
     };
   }
 
   return {
-    logoUrl: session.user.logoUrl ?? "/brand/gymfort-symbol.svg",
+    logoUrl: session.user.logoUrl ?? "/gymfort_web_assets/gymfort-isotipo-128.png",
     name: organizationName ?? session.user.brandName ?? session.user.organizationName ?? "GymFort",
     scope: visibleBranch,
   };

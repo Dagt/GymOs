@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
 import { getStoredSession, login, storeSession } from "@/lib/api";
@@ -43,7 +44,7 @@ export default function LoginPage() {
     return (
       <main className="admin-empty-state">
         <section>
-          <p>GymFort</p>
+          <Image className="login-brand-logo" src="/gymfort_web_assets/gymfort-logo-navbar-96px.png" alt="GymFort" width={216} height={40} priority />
           <h1>Abriendo tu panel...</h1>
           <span>Tu sesion sigue activa en este navegador.</span>
         </section>
@@ -71,7 +72,7 @@ export default function LoginPage() {
         <section className="login-form-panel">
           <div className="login-form-header">
             <div>
-              <p>GymFort</p>
+              <Image className="login-form-logo" src="/gymfort_web_assets/gymfort-logo-navbar-96px.png" alt="GymFort" width={178} height={33} />
               <h2>Iniciar sesion</h2>
               <span>Al validar tus credenciales entraras automaticamente al panel correcto.</span>
             </div>

@@ -9,7 +9,14 @@ export const metadata: Metadata = {
   description: "Plataforma todo en uno para administrar miembros, accesos, ventas, reservas, inventario y reportes de gimnasios.",
   applicationName: "GymFort",
   keywords: ["software para gimnasios", "gestión de gimnasios", "membresías", "control de acceso", "GymFort"],
-  icons: { icon: "/brand/gymfort-symbol.svg" },
+  icons: {
+    icon: [
+      { url: "/gymfort_web_assets/gymfort-icon-16x16.png", sizes: "16x16", type: "image/png" },
+      { url: "/gymfort_web_assets/gymfort-icon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/gymfort_web_assets/gymfort-icon-192x192.png", sizes: "192x192", type: "image/png" },
+    ],
+    apple: "/gymfort_web_assets/gymfort-icon-180x180.png",
+  },
   openGraph: {
     title: "GymFort | Todo tu gimnasio. Un solo sistema.",
     description: "Centraliza la operación de tu gimnasio y enfócate en crecer.",
@@ -27,6 +34,7 @@ export default function RootLayout({
     <html
       lang="es"
       className="h-full antialiased"
+      data-scroll-behavior="smooth"
     >
       <body className="min-h-full flex flex-col">
         <SessionRouteGuard />
