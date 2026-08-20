@@ -27,6 +27,7 @@ documentación por módulo.
 15. `28-registro-vivo-deuda-tecnica.md` — lista única de hallazgos y deuda.
 16. `29-cronologia-ramas.md` — cronología Git y ramas activas/divergentes.
 17. `30-rediseño-pos-membresias-beneficios.md` — decisiones, implementación y evidencia para catálogo, POS, membresías y beneficios; hardware fuera de alcance.
+18. `31-diseño-automatizaciones-kiosco.md` — auditoría del estado real, fronteras, riesgos y diseño objetivo de automatizaciones y autoservicio.
 
 Documentación operativa y de seguridad vigente:
 

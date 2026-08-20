@@ -2,7 +2,7 @@ import Link from "next/link";
 
 export function AuthRequired({
   title = "Inicia sesion para continuar",
-  message = "Usa una cuenta autorizada para ver esta seccion de GymOS.",
+  message = "Usa una cuenta autorizada para ver esta sección de GymFort.",
 }: {
   title?: string;
   message?: string;

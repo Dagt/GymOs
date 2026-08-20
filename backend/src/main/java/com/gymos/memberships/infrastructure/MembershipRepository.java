@@ -147,6 +147,22 @@ public class MembershipRepository {
 		return commands.expireAllDueMemberships(businessDate);
 	}
 
+	public List<MembershipLifecycleRecord> unpublishedExpiringMemberships(
+			LocalDate businessDate,
+			int horizonDays,
+			int limit
+	) {
+		return commands.unpublishedExpiringMemberships(businessDate, horizonDays, limit);
+	}
+
+	public boolean recordExpiringOccurrence(MembershipLifecycleRecord membership, LocalDate businessDate) {
+		return commands.recordExpiringOccurrence(membership, businessDate);
+	}
+
+	public List<MembershipLifecycleRecord> claimUnpublishedExpiredMemberships(int limit) {
+		return commands.claimUnpublishedExpiredMemberships(limit);
+	}
+
 	public record MembershipSummary(
 			UUID id,
 			UUID clientId,
@@ -185,6 +201,17 @@ public class MembershipRepository {
 			LocalDate startsOn,
 			LocalDate endsOn,
 			OffsetDateTime createdAt
+	) {
+	}
+
+	public record MembershipLifecycleRecord(
+			UUID organizationId,
+			UUID branchId,
+			UUID membershipId,
+			UUID clientId,
+			UUID planId,
+			LocalDate endsOn,
+			LocalDate graceEndsOn
 	) {
 	}
 }

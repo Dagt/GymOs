@@ -53,7 +53,7 @@ export function EditClientDrawer({
           <TextField error={errors.maternalLastName} label="Apellido materno" name="maternalLastName" required={false} value={form.maternalLastName ?? ""} onChange={(value) => onFieldChange("maternalLastName", value)} />
           <PhoneField error={errors.phone} label="Telefono" name="phone" required value={form.phone ?? ""} onChange={(value) => onFieldChange("phone", value)} />
           <EmailField error={errors.email} label="Email" name="email" value={form.email ?? ""} onChange={(value) => onFieldChange("email", value)} />
-          <DateField error={errors.birthDate} label="Fecha de nacimiento" name="birthDate" value={form.birthDate ?? ""} onChange={(value) => onFieldChange("birthDate", value)} />
+          <DateField error={errors.birthDate} label="Fecha de nacimiento" name="birthDate" required value={form.birthDate ?? ""} onChange={(value) => onFieldChange("birthDate", value)} />
           <GenderField error={errors.gender} label="Genero" name="gender" value={form.gender ?? ""} onChange={(value) => onFieldChange("gender", value)} />
         </div>
         <label className="form-field" htmlFor="status">
@@ -80,6 +80,8 @@ export function MembershipActionDrawer({
   action,
   changingMembershipId,
   membershipQuote,
+  manualCardEnabled,
+  mercadoPagoEnabled,
   onClose,
   onMethodChange,
   onReferenceChange,
@@ -96,6 +98,8 @@ export function MembershipActionDrawer({
   action: MembershipAction | null;
   changingMembershipId: string | null;
   membershipQuote: MembershipQuote | null;
+  manualCardEnabled: boolean;
+  mercadoPagoEnabled: boolean;
   onClose: () => void;
   onMethodChange: (value: RenewMembershipPayload["method"]) => void;
   onReferenceChange: (value: string) => void;
@@ -148,6 +152,8 @@ export function MembershipActionDrawer({
           </section>
           <MembershipControls
             membershipQuote={membershipQuote}
+            manualCardEnabled={manualCardEnabled}
+            mercadoPagoEnabled={mercadoPagoEnabled}
             mode={action.type}
             plans={availablePlans}
             renewMethod={renewMethod}
@@ -192,6 +198,8 @@ export function MembershipActionDrawer({
 
 function MembershipControls({
   membershipQuote,
+  manualCardEnabled,
+  mercadoPagoEnabled,
   mode,
   plans,
   renewMethod,
@@ -204,6 +212,8 @@ function MembershipControls({
   onValidateNowChange,
 }: {
   membershipQuote: MembershipQuote | null;
+  manualCardEnabled: boolean;
+  mercadoPagoEnabled: boolean;
   mode: "renew" | "change";
   plans: PlanSummary[];
   renewMethod: RenewMembershipPayload["method"];
@@ -223,7 +233,8 @@ function MembershipControls({
           <select className="app-input" id="renewMethod" onChange={(event) => onMethodChange(event.target.value as RenewMembershipPayload["method"])} value={renewMethod}>
             <option value="CASH">Efectivo</option>
             <option value="TRANSFER">Transferencia</option>
-            <option value="CARD_MANUAL">Tarjeta manual</option>
+            {manualCardEnabled ? <option value="CARD_MANUAL">Tarjeta manual</option> : null}
+            {mercadoPagoEnabled ? <option value="CARD_MERCADO_PAGO">Mercado Pago Point</option> : null}
           </select>
         </label>
         <TextField label="Referencia" name="renewReference" required={false} value={renewReference} onChange={onReferenceChange} />
@@ -243,12 +254,12 @@ function MembershipControls({
       ) : null}
       <label className="mt-3 flex items-center gap-2 text-sm font-medium text-[#42514a]">
         <input
-          checked={mode === "change" ? true : renewValidateNow}
-          disabled={mode === "change"}
+          checked={renewMethod === "CARD_MERCADO_PAGO" ? false : mode === "change" ? true : renewValidateNow}
+          disabled={mode === "change" || renewMethod === "CARD_MERCADO_PAGO"}
           onChange={(event) => onValidateNowChange(event.target.checked)}
           type="checkbox"
         />
-        {mode === "change" ? "Validar pago y aplicar el cambio ahora" : "Validar pago ahora"}
+        {renewMethod === "CARD_MERCADO_PAGO" ? "Confirmacion automatica por webhook" : mode === "change" ? "Validar pago y aplicar el cambio ahora" : "Validar pago ahora"}
       </label>
       <div className="mt-3">
         <MembershipQuoteSummary loading={false} quote={membershipQuote} />

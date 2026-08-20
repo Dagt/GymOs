@@ -79,6 +79,16 @@ class CatalogProductQueryRepository {
 				.query(CatalogRowMappers.productSummary()).optional();
 	}
 
+	Optional<ProductSummaryView> findBySku(UUID organizationId, String sku) {
+		String sql = baseSelect() + " WHERE cp.organization_id=:organizationId"
+				+ " AND UPPER(cp.sku)=:sku AND cp.deleted_at IS NULL AND cp.archived_at IS NULL";
+		return jdbcClient.sql(sql)
+				.param("organizationId", organizationId)
+				.param("sku", sku.trim().toUpperCase())
+				.query(CatalogRowMappers.productSummary())
+				.optional();
+	}
+
 	private Optional<ProductSummaryView> find(UUID organizationId, UUID branchId, UUID productId, boolean includeArchived) {
 		String archived = includeArchived ? "" : " AND cp.archived_at IS NULL";
 		String sql = baseSelect() + " WHERE cp.organization_id=:organizationId" + availability(branchId)

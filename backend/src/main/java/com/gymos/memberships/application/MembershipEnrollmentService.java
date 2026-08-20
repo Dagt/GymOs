@@ -3,6 +3,9 @@ package com.gymos.memberships.application;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.time.BusinessTime;
+import com.gymos.memberships.api.operations.EnrollMembershipOperationCommand;
+import com.gymos.memberships.api.operations.MembershipEnrollmentOperations;
+import com.gymos.memberships.api.operations.MembershipSaleOperationResult;
 import com.gymos.memberships.application.command.EnrollMembershipCommand;
 import com.gymos.memberships.application.result.MembershipQuoteResult;
 import com.gymos.memberships.application.result.MembershipSaleResult;
@@ -14,7 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class MembershipEnrollmentService {
+public class MembershipEnrollmentService implements MembershipEnrollmentOperations {
 	private final MembershipRepository membershipRepository;
 	private final MembershipPricingService pricingService;
 	private final MembershipOperationIdempotency idempotency;
@@ -75,5 +78,27 @@ public class MembershipEnrollmentService {
 				correlationId
 		));
 		return resultResolver.resolve(principal, sale, plan);
+	}
+
+	@Override
+	@Transactional
+	public MembershipSaleOperationResult enroll(
+			GymOsPrincipal principal,
+			EnrollMembershipOperationCommand command,
+			String correlationId
+	) {
+		return MembershipResultMapper.toOperationResult(enroll(
+				principal,
+				new EnrollMembershipCommand(
+						command.clientId(),
+						command.planId(),
+						command.method(),
+						command.reference(),
+						command.validateNow(),
+						command.notes(),
+						command.idempotencyKey()
+				),
+				correlationId
+		));
 	}
 }

@@ -10,6 +10,14 @@ public record SelfServiceMembershipSaleResult(
 		long paidCents,
 		long balanceCents,
 		String currency,
-		SelfServiceMembershipSummaryResult membership
+		SelfServiceMembershipSummaryResult membership,
+		UUID paymentId,
+		UUID providerOperationId,
+		String checkoutUrl,
+		String checkoutStatus
 ) {
+	public SelfServiceMembershipSaleResult(UUID saleId, String saleNumber, String saleStatus, long totalCents,
+			long paidCents, long balanceCents, String currency, SelfServiceMembershipSummaryResult membership) {
+		this(saleId, saleNumber, saleStatus, totalCents, paidCents, balanceCents, currency, membership, null, null, null, null);
+	}
 }

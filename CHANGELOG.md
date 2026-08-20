@@ -42,6 +42,12 @@ All notable changes to GymOS will be documented in this file.
   requests without internal availability schedules.
 - Show each member's current plan and effective membership status in the client
   list with muted active, expired and no-membership treatments.
+- Start the safe self-service kiosk foundation with canonical terminal
+  capabilities, audited contact updates and card-only financial contracts that
+  remain closed until a real payment gateway is connected.
+- Make Automations expose only working manual/scheduled notification rules,
+  reject unsupported definitions and explain its operational purpose in the
+  administrative interface.
 
 ## 0.6.5
 

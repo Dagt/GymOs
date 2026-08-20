@@ -36,8 +36,9 @@ async function request<T>(path: string, sessionToken: string, init: RequestInit 
   return response.json() as Promise<T>;
 }
 
-export function getKioskBookingResources(sessionId: string, sessionToken: string) {
-  return request<KioskBookingResource[]>(`/self-service/sessions/${sessionId}/booking-resources`, sessionToken);
+export function getKioskBookingResources(sessionId: string, sessionToken: string, date: string) {
+  const params = new URLSearchParams({ date });
+  return request<KioskBookingResource[]>(`/self-service/sessions/${sessionId}/booking-resources?${params.toString()}`, sessionToken);
 }
 
 export function getKioskBookingAvailability(sessionId: string, sessionToken: string, resourceId: string, date: string) {

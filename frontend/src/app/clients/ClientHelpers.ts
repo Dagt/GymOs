@@ -5,12 +5,12 @@ import {
   validateIsoDate,
   validatePhone,
   validateRequired,
-} from "@/components/FormFields";
+} from "../../components/form-validation.ts";
 import type { ClientPayload, ClientSummary } from "@/lib/api";
 
 export type ClientRegistrationForm = ClientPayload & {
   planId: string;
-  paymentMethod: "CASH" | "TRANSFER" | "CARD_MANUAL";
+  paymentMethod: "CASH" | "TRANSFER" | "CARD_MANUAL" | "CARD_MERCADO_PAGO";
   paymentReference: string;
   validateNow: boolean;
 };
@@ -37,7 +37,7 @@ export function validateClientForm(form: ClientRegistrationForm, requiresPlan: b
   addError(errors, "lastName", validateRequired(form.lastName, "Apellido paterno"));
   addError(errors, "phone", validatePhone(form.phone ?? "", true));
   addError(errors, "email", validateEmail(form.email ?? "", false));
-  addError(errors, "birthDate", validateIsoDate(form.birthDate ?? "", "Fecha de nacimiento", false));
+  addError(errors, "birthDate", validateIsoDate(form.birthDate ?? "", "Fecha de nacimiento", true));
   addError(errors, "gender", validateGender(form.gender ?? "", false));
   if (requiresPlan && !form.planId) {
     errors.planId = "Selecciona la membresia inicial.";

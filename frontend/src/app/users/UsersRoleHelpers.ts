@@ -9,8 +9,8 @@ import type { CreateInternalUserPayload, InternalUserSummary, RoleOption } from 
 
 export function displayRoleName(roleName: string) {
   const normalized = normalizeRoleName(roleName);
-  if (normalized.includes("admin") && normalized.includes("gymos")) {
-    return "Admin GymOS";
+  if (normalized.includes("admin") && (normalized.includes("gymos") || normalized.includes("gymfort"))) {
+    return "Admin GymFort";
   }
   if (normalized === "administrador" || normalized.includes("owner")) {
     return "Dueno del gimnasio";
@@ -32,7 +32,7 @@ export function displayRoleName(roleName: string) {
 
 export function canShowRoleForSession(currentRoles: string[], roleName: string, platformAdmin: boolean) {
   const label = displayRoleName(roleName);
-  if (label === "Admin GymOS") {
+  if (label === "Admin GymFort") {
     return false;
   }
   if (platformAdmin) {
@@ -75,7 +75,7 @@ export function canManageUserForSession(currentRoles: string[], targetRoles: str
 
 export function roleDescription(roleName: string, fallback?: string | null) {
   const label = displayRoleName(roleName);
-  if (label === "Admin GymOS") {
+  if (label === "Admin GymFort") {
     return "Crea gimnasios cliente y entra en modo soporte auditable.";
   }
   if (label === "Dueno del gimnasio") {

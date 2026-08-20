@@ -329,7 +329,9 @@ function paymentMethodLabel(method: string) {
   const labels: Record<string, string> = {
     CASH: "Efectivo",
     TRANSFER: "Transferencia",
-    CARD_MANUAL: "Tarjeta manual",
+      CARD_MANUAL: "Tarjeta manual",
+      CARD_MERCADO_PAGO: "Mercado Pago Point",
+      CARD_ONLINE: "Stripe Checkout",
   };
   return labels[method] ?? method;
 }

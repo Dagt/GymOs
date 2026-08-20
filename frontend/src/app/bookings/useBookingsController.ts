@@ -157,9 +157,10 @@ export function useBookingsController() {
   const activeResource = resources.find((resource) => resource.id === resourceId) ?? null;
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
   const selectedClient = visibleClientResults.find((client) => client.id === clientId) ?? null;
-  const roleNames = session?.user.roles.map((role) => role.toLowerCase()) ?? [];
-  const isTenantOwner = roleNames.some((role) => role.includes("dueno") || role.includes("dueño"));
-  const canManageResources = Boolean(session?.user.permissions.includes("resource.manage") && (session.user.platformAdmin || isTenantOwner));
+  const canManageResources = Boolean(
+    session?.user.permissions.includes("resource.manage")
+      || session?.user.permissions.includes("platform.admin"),
+  );
   const durationMinutes = Math.max(1, durationUnit === "HOURS" ? durationValue * 60 : durationValue);
   const selectedDateIsPast = isPastDate(startDate);
   const selectedStartIsPast = isPastDateTime(startDate, startTime);

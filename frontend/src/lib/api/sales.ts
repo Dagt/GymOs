@@ -2,6 +2,7 @@ import { apiFetch, normalizePayload, withIdempotency } from "./client";
 import type {
   CreateSalePayload,
   ManualPaymentPayload,
+  MercadoPagoPointOrder,
   SaleDetailResponse,
   SaleRefundPayload,
   SalesReportResponse,
@@ -93,5 +94,14 @@ export async function uploadPaymentReceipt(
   return apiFetch<SaleDetailResponse>(`/sales/payments/${paymentId}/receipt`, accessToken, {
     method: "POST",
     body,
+  });
+}
+
+export async function createMercadoPagoPointOrder(
+  accessToken: string,
+  paymentId: string,
+): Promise<MercadoPagoPointOrder> {
+  return apiFetch<MercadoPagoPointOrder>(`/sales/payments/${paymentId}/mercado-pago-order`, accessToken, {
+    method: "POST",
   });
 }

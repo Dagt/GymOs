@@ -82,7 +82,9 @@ No debe existir una opción lateral ni una tarjeta de navegación separada para
 ## 8.2.2 Recursos reservables
 
 - La agenda permite crear reservas a perfiles operativos con `booking.manage`.
-- La creacion, edicion y eliminacion de recursos se muestra solo a Admin GymOS en soporte o dueno del gimnasio con `resource.manage`.
+- La creacion, edicion y eliminacion de recursos se muestra a Admin GymOS en
+  soporte, dueño o gerente que tenga `resource.manage`; recepción sólo conserva
+  la operación de reservas.
 - Las acciones de recurso deben vivir en el mismo lenguaje visual de la agenda y abrir panel/modal, no formularios permanentes que saturen la pagina.
 - La eliminacion de recurso siempre pide confirmacion y debe mostrar error claro si hay reservas activas.
 
@@ -100,7 +102,8 @@ Debe permitir alta rápida y alta completa.
 
 Correccion implementada:
 - El formulario de socios usa nombre, apellido paterno y apellido materno.
-- La fecha de nacimiento se captura visualmente como `dd/mm/aaaa` y se envia a la API como `YYYY-MM-DD`.
+- La fecha de nacimiento es obligatoria, se captura visualmente como
+  `dd/mm/aaaa` y se envia a la API como `YYYY-MM-DD` tanto en alta como edición.
 - El genero es un desplegable con solo `Hombre` y `Mujer`.
 - El alta de socio incluye plan inicial y metodo de pago; si el pago queda validado, la membresia se activa por el flujo existente de ventas.
 - La ficha del socio usa el mismo `AppShell` lateral que el resto del sistema y separa datos personales, membresias y actividad.
@@ -275,7 +278,10 @@ Consolas:
 - `PLATFORM_OWNER`: entra a `/platform/gymnasiums`. Administra CRM de gimnasios cliente, configuracion base y soporte auditable.
 - `TENANT_OWNER`: entra a `/dashboard`. Ve metricas, salud del negocio, sucursales, equipo y administracion de su gimnasio.
 - El dueño recibe automaticamente la primera sucursal activa permitida al iniciar sesion; puede cambiar de sucursal desde el selector del shell antes de crear recursos, socios u operaciones locales.
-- `TENANT_MANAGER`: entra a `/operations`. Gestiona operacion diaria, pendientes, agenda, inventario y equipo autorizado; no ve `/settings/organization`.
+- `TENANT_MANAGER`: entra a `/operations`. Gestiona operacion diaria, pendientes,
+  agenda, inventario y equipo autorizado. Puede abrir `/settings/organization`
+  cuando tiene permisos operativos de cobro, kiosco o correo, pero no ve los
+  controles para editar la marca ni crear/modificar sucursales.
 - `RECEPTION`: entra a `/reception`. Ve recepcion, POS, socios, ventas y reportes operativos permitidos.
 - `COACH`: entra a `/coaches`. Ve coaches, rutinas y asignaciones permitidas.
 
@@ -307,6 +313,13 @@ Correccion Hito 7.9:
 - Si un gimnasio todavia no tiene sucursales, el detalle muestra un estado vacio claro y mantiene disponible la accion de crear sucursal.
 - El Admin GymOS puede crear tenants completos sin dejarlos "a medias"; sucursales, usuarios y marca avanzada son pasos explicitos del detalle del cliente.
 - El menu lateral usa secciones plegables; la seccion activa queda abierta y las demas permanecen compactas para reducir saturacion visual.
+- La navegación de dueño y gerente se agrupa por propósito: `Dirección` o
+  `Gerencia`, `Gestión operativa`, `Administración` y `Mostrador`. Beneficios,
+  catálogo, automatizaciones y configuración pertenecen a `Administración`;
+  `Mostrador` se reserva para POS, accesos físicos y apertura del kiosco.
+- La consola de recepción separa `Mostrador`, `Atención a socios` y
+  `Seguimiento`, evitando mezclar reportes de pagos con las acciones inmediatas
+  de caja.
 - En pantallas de configuracion sin sucursal activa, el menu lateral oculta modulos operativos que requieren sucursal y conserva solo opciones de configuracion seguras.
 - El login y refresh de usuarios tenant reciben la primera sucursal accesible cuando existe; si una sesion guardada queda sin sucursal, `AppShell` intenta recuperar el contexto con `select-organization`.
 - Las pantallas operativas de gerencia (`/inventory`, `/bookings`, `/coaches`) usan el mismo `AppShell` lateral que dashboard, ventas, usuarios y catalogo.
@@ -345,7 +358,10 @@ Formularios:
   los roles; `Datos de Coach` es una accion adicional en linea, no una fila o
   panel especial.
 - Un gerente no ve ni puede seleccionar `Dueno del gimnasio` ni `Gerente` al crear o modificar usuarios; solo puede asignar roles operativos permitidos.
-- Un gerente no ve la entrada `Datos y sucursales` y `canAccessRoute` no permite abrir `/settings/organization` con esa consola.
+- Un gerente no ve controles de `Datos y sucursales`; `canAccessRoute` sólo le
+  permite abrir `/settings/organization` cuando tiene alguno de
+  `payment.settings.manage`, `selfservice.settings.manage` o
+  `notification.settings.manage`.
 - `/users` permite cambiar el rol de usuarios existentes desde la tabla, excepto la propia cuenta del usuario autenticado.
 - `AppShell` resuelve el nombre real de la sucursal activa cuando una pagina no carga la lista de sucursales por si misma, evitando mostrar solo "Sucursal seleccionada".
 - Beneficios, accesos y automatizaciones deben renderizarse dentro del shell lateral unificado.

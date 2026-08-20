@@ -56,7 +56,9 @@ export function useCatalogPlanEditor(
       await reload();
       const wasEditing = Boolean(editingId);
       close();
-      setMessage(wasEditing ? "Plan de membresia actualizado." : "Plan de membresia creado.");
+      setMessage(wasEditing
+        ? "Plan de membresía actualizado."
+        : "Plan disponible en esta sucursal. Si el código ya existía en el gimnasio, se reutilizó el mismo plan sin duplicarlo.");
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible guardar plan.");
     } finally {

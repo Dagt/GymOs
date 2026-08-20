@@ -25,9 +25,9 @@ export const emptyOrganizationForm: CreateOrganizationPayload = {
   contactPhone: "",
   brandName: "",
   logoUrl: "",
-  primaryColor: "#164E63",
-  accentColor: "#F59E0B",
-  surfaceColor: "#F4F7FB",
+  primaryColor: "#093D3A",
+  accentColor: "#18C8B2",
+  surfaceColor: "#F2F8F7",
 };
 
 export const emptyBranchForm: CreateBranchPayload = {
@@ -68,9 +68,9 @@ export function OrganizationForm({
         onFileChange={onLogoFileChange}
       />
       <div className="platform-color-grid">
-        <TextField error={errors.primaryColor} label="Color principal" name="primaryColor" value={form.primaryColor ?? "#164E63"} onChange={(value) => onChange({ ...form, primaryColor: value })} />
-        <TextField error={errors.accentColor} label="Color acento" name="accentColor" value={form.accentColor ?? "#F59E0B"} onChange={(value) => onChange({ ...form, accentColor: value })} />
-        <TextField error={errors.surfaceColor} label="Color fondo" name="surfaceColor" value={form.surfaceColor ?? "#F4F7FB"} onChange={(value) => onChange({ ...form, surfaceColor: value })} />
+        <TextField error={errors.primaryColor} label="Color principal" name="primaryColor" value={form.primaryColor ?? "#093D3A"} onChange={(value) => onChange({ ...form, primaryColor: value })} />
+        <TextField error={errors.accentColor} label="Color acento" name="accentColor" value={form.accentColor ?? "#18C8B2"} onChange={(value) => onChange({ ...form, accentColor: value })} />
+        <TextField error={errors.surfaceColor} label="Color fondo" name="surfaceColor" value={form.surfaceColor ?? "#F2F8F7"} onChange={(value) => onChange({ ...form, surfaceColor: value })} />
       </div>
       <button className="form-primary-button" disabled={saving} type="submit">Crear gimnasio</button>
     </form>

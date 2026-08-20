@@ -4,6 +4,7 @@ import com.gymos.audit.api.AuditService;
 import com.gymos.clients.api.operations.ClientLookupOperations;
 import com.gymos.clients.api.operations.ClientVerificationResult;
 import com.gymos.clients.api.operations.SelfServiceClientProfile;
+import com.gymos.clients.api.operations.UpdateSelfServiceContactCommand;
 import com.gymos.clients.api.operations.VerifyClientIdentityCommand;
 import com.gymos.clients.application.command.CreateClientCommand;
 import com.gymos.clients.application.command.UpdateClientCommand;
@@ -17,6 +18,7 @@ import com.gymos.clients.infrastructure.ClientRepository.ClientSummary;
 import com.gymos.clients.infrastructure.ClientRepository.ClientTimelineEntry;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -40,6 +42,7 @@ public class ClientService implements ClientLookupOperations {
 	public ClientDetailResult create(GymOsPrincipal principal, CreateClientCommand request, String correlationId) {
 		requirePrincipal(principal);
 		requireBranch(principal);
+		requireBirthDate(request.birthDate());
 		String email = blankToNull(request.email());
 		String phone = blankToNull(request.phone());
 		ensureUniqueContact(principal.organizationId(), email, phone, null);
@@ -96,6 +99,7 @@ public class ClientService implements ClientLookupOperations {
 		requireBranch(principal);
 		ClientDetail existing = clientRepository.findDetail(principal.organizationId(), principal.branchId(), clientId)
 				.orElseThrow(() -> new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible."));
+		requireBirthDate(request.birthDate());
 		String email = blankToNull(request.email());
 		String phone = blankToNull(request.phone());
 		ensureUniqueContact(principal.organizationId(), email, phone, existing.personId());
@@ -141,7 +145,67 @@ public class ClientService implements ClientLookupOperations {
 	@Transactional(readOnly = true)
 	public Optional<SelfServiceClientProfile> selfServiceProfile(UUID organizationId, UUID clientId) {
 		return clientRepository.selfServiceProfile(organizationId, clientId)
-				.map(client -> new SelfServiceClientProfile(client.id(), client.fullName()));
+				.map(this::toSelfServiceProfile);
+	}
+
+	@Override
+	@Transactional
+	public SelfServiceClientProfile updateSelfServiceContact(UpdateSelfServiceContactCommand command) {
+		var existing = clientRepository.selfServiceProfile(command.organizationId(), command.clientId())
+				.orElseThrow(() -> new BusinessException(
+						"CLIENT_NOT_FOUND",
+						"El socio no existe o no esta disponible."
+				));
+		String email = command.email() == null ? existing.email() : blankToNull(command.email());
+		String phone = command.phone() == null ? existing.phone() : blankToNull(command.phone());
+		if (email == null && phone == null) {
+			throw new BusinessException(
+					"SELF_SERVICE_CONTACT_REQUIRED",
+					"Conserva al menos un correo o telefono de contacto."
+			);
+		}
+		ensureUniqueContact(command.organizationId(), email, phone, existing.personId());
+		commandRepository.updateSelfServiceContact(
+				command.organizationId(),
+				existing.personId(),
+				email,
+				phone,
+				OffsetDateTime.now()
+		);
+		return selfServiceProfile(command.organizationId(), command.clientId()).orElseThrow();
+	}
+
+	private SelfServiceClientProfile toSelfServiceProfile(ClientRepository.SelfServiceClientRecord client) {
+		return new SelfServiceClientProfile(
+				client.id(),
+				client.fullName(),
+				maskEmail(client.email()),
+				maskPhone(client.phone())
+		);
+	}
+
+	private String maskEmail(String email) {
+		if (email == null || email.isBlank()) {
+			return null;
+		}
+		int separator = email.indexOf('@');
+		if (separator <= 0) {
+			return "***";
+		}
+		String local = email.substring(0, separator);
+		String visible = local.substring(0, Math.min(2, local.length()));
+		return visible + "***" + email.substring(separator);
+	}
+
+	private String maskPhone(String phone) {
+		if (phone == null || phone.isBlank()) {
+			return null;
+		}
+		String digits = phone.replaceAll("\\D", "");
+		if (digits.length() < 4) {
+			return "***";
+		}
+		return "***" + digits.substring(digits.length() - 4);
 	}
 
 	private void ensureUniqueContact(UUID organizationId, String email, String phone, UUID excludedPersonId) {
@@ -162,6 +226,15 @@ public class ClientService implements ClientLookupOperations {
 	private void requireBranch(GymOsPrincipal principal) {
 		if (principal.branchId() == null) {
 			throw new BusinessException("BRANCH_REQUIRED", "Selecciona una sucursal para continuar.");
+		}
+	}
+
+	private void requireBirthDate(LocalDate birthDate) {
+		if (birthDate == null) {
+			throw new BusinessException("CLIENT_BIRTH_DATE_REQUIRED", "La fecha de nacimiento es obligatoria.");
+		}
+		if (birthDate.isAfter(LocalDate.now())) {
+			throw new BusinessException("CLIENT_BIRTH_DATE_INVALID", "La fecha de nacimiento no puede estar en el futuro.");
 		}
 	}
 

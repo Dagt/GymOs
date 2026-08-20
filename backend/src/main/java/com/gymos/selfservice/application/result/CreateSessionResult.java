@@ -14,6 +14,7 @@ public record CreateSessionResult(
 		String accentColor,
 		String surfaceColor,
 		OffsetDateTime expiresAt,
-		boolean verified
+		boolean verified,
+		SelfServiceCapabilities capabilities
 ) {
 }

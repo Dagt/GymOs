@@ -1,15 +1,49 @@
 # Notificaciones
 
-Estado: `PARCIAL`
+Estado: `FUNCIONAL PARA EMAIL / PREPARADO PARA EXTENSIÓN`
 
 ## Implementado
 
-- modelos y operaciones base de notificación;
-- permisos de lectura/administración;
-- integración inicial con eventos de negocio.
+- registro multicanal con `IN_APP` y `EMAIL` como canales ejecutables;
+- contrato desacoplado `EmailDeliveryPort`, sin dependencias de Automatizaciones
+  hacia SMTP ni hacia un proveedor comercial;
+- adaptador SMTP configurable exclusivamente mediante secretos de entorno;
+- configuración por gimnasio de habilitación, proveedor, remitente, nombre y
+  `Reply-To`, administrable por dueño o administrador;
+- envío manual de prueba y envío directo desde el centro de Automatizaciones;
+- resolución tenant de correo para destinatarios `CLIENT` y `USER`;
+- automatizaciones de pagos, membresías, domiciliaciones y reservas capaces de
+  enviar al socio del evento sin capturar manualmente su dirección;
+- variables de evento (`{{endsOn}}`, `{{amountCents}}`, etc.) y
+  `{{recipientName}}` en asunto/cuerpo;
+- cola PostgreSQL durable con leasing atómico, recuperación de leases vencidos,
+  equidad entre tenants y `Message-ID` estable;
+- cinco intentos con backoff exponencial, `DEAD_LETTER` y reintento manual;
+- idempotencia de creación y cabeceras estables para deduplicación del
+  proveedor;
+- preferencias protegidas con HMAC-SHA-256, revalidadas antes de enviar, y
+  estado `SUPPRESSED`;
+- correo promocional bloqueado por defecto sin consentimiento explícito;
+- métricas y tiempos Micrometer por tenant, gauges operativos y reglas
+  Prometheus;
+- pruebas unitarias del servicio, dispatcher y adaptador, además de pruebas
+  PostgreSQL reales de concurrencia, recuperación y aislamiento.
 
-## Pendiente
+## Pendiente de operación
 
-- proveedores reales, plantillas y preferencias;
-- reintentos, deduplicación e idempotencia;
-- privacidad de datos y trazabilidad de entrega.
+- elegir el proveedor SMTP, configurar sus secretos y verificar el dominio
+  remitente en el ambiente de integración/producción;
+- validar reputación, límites, SPF, DKIM, DMARC y entregabilidad con el proveedor
+  elegido;
+- incorporar webhooks de rebote/queja si el proveedor seleccionado los ofrece.
+
+## Evolución posterior
+
+- WhatsApp: adaptador separado, plantillas aprobadas y consentimiento por
+  destinatario;
+- push móvil: registro de dispositivos/tokens revocables y adaptador del
+  proveedor de push;
+- campañas promocionales: flujo público de suscripción/baja antes de habilitar
+  su creación en la interfaz.
+
+Runbook: `../../docs/operations/email-delivery.md`.

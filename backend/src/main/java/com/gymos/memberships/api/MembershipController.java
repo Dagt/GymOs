@@ -112,7 +112,7 @@ public class MembershipController {
 	}
 
 	public record RenewMembershipRequest(
-			@NotNull @Pattern(regexp = "CASH|TRANSFER|CARD_MANUAL") String method,
+			@NotNull @Pattern(regexp = "CASH|TRANSFER|CARD_MANUAL|CARD_MERCADO_PAGO") String method,
 			@Size(max = 160) String reference,
 			boolean validateNow,
 			@Size(max = 2000) String notes,
@@ -125,7 +125,7 @@ public class MembershipController {
 
 	public record ChangePlanRequest(
 			@NotNull UUID targetPlanId,
-			@NotNull @Pattern(regexp = "CASH|TRANSFER|CARD_MANUAL") String method,
+			@NotNull @Pattern(regexp = "CASH|TRANSFER|CARD_MANUAL|CARD_MERCADO_PAGO") String method,
 			@Size(max = 160) String reference,
 			boolean validateNow,
 			@Size(max = 2000) String notes,
@@ -145,7 +145,7 @@ public class MembershipController {
 	public record MembershipEnrollmentRequest(
 			@NotNull UUID clientId,
 			@NotNull UUID planId,
-			@NotNull @Pattern(regexp = "CASH|TRANSFER|CARD_MANUAL") String method,
+			@NotNull @Pattern(regexp = "CASH|TRANSFER|CARD_MANUAL|CARD_MERCADO_PAGO") String method,
 			@Size(max = 160) String reference,
 			boolean validateNow,
 			@Size(max = 2000) String notes,
@@ -165,7 +165,8 @@ public class MembershipController {
 			long paidCents,
 			long balanceCents,
 			String currency,
-			MembershipSummaryResult membership
+			MembershipSummaryResult membership,
+			UUID paymentId
 	) {
 	}
 
@@ -178,7 +179,8 @@ public class MembershipController {
 				result.paidCents(),
 				result.balanceCents(),
 				result.currency(),
-				result.membership()
+				result.membership(),
+				result.paymentId()
 		);
 	}
 }

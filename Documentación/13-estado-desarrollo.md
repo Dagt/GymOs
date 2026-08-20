@@ -1,8 +1,8 @@
 # 13. Estado actual de desarrollo
 
 Estado: FUENTE CANÓNICA / EN PROGRESO
-Corte: 30 de julio de 2026
-Código auditado: árbol de trabajo de `feature/reception-pos-init`.
+Corte: 3 de agosto de 2026
+Código auditado: árbol de trabajo de `feature/automations-self-service-kiosk`.
 
 ## 1. Cómo interpretar este documento
 
@@ -31,11 +31,13 @@ Ningún módulo se declara “completo” sólo por el nombre de una rama o comm
 | [Ventas y pagos manuales](modulos/07-sales.md) | FUNCIONAL | Venta minorista y membresías con contexto, partidas, pagos, snapshots de beneficios, reportes, validación, reembolsos e idempotencia concurrente | E2E integral venta–pago–inventario–refund (`SAL-001`) |
 | [Membresías](modulos/08-memberships.md) | ESTABILIZADO | Periodos y fechas inclusivas, expiración, activa única, cotización backend, alta/renovación/cambio separados y concurrencia PostgreSQL | E2E HTTP/navegador de pagos pendientes/rechazados |
 | [Beneficios](modulos/09-benefits.md) | ESTABILIZADO | Política transversal única para cotización de membresía, elegibilidad de reservas y acceso; descuentos con snapshot y ACCESS heredado/revocado dinámicamente por plan | Permisos negativos y concurrencia de asignaciones |
-| [Kiosco](modulos/11-selfservice.md) | FUNCIONAL | Consulta operativa y pagos dentro del gimnasio | Hardening de sesión y privacidad (`SELF-001`) |
+| [Kiosco](modulos/11-selfservice.md) | LISTO PARA ACEPTACIÓN | Lanzamiento autenticado sin registrar computadoras, sesión restringida, capacidades por sucursal, Stripe Checkout, domiciliación completa, wellness gratuito, telemetría por tenant, historiales paginados y 37 escenarios PostgreSQL + 7 E2E de kiosco aprobados | Ejecutar `stripeTest` con credenciales sandbox y publicar evidencia conectada en CI (`SELF-001`) |
 | [Reservas y recursos](modulos/12-bookings.md) | FUNCIONAL | Calendario, disponibilidad, restricciones por plan y recepción | Suite E2E y deuda UX residual |
 | [Inventarios](modulos/13-inventory.md) | ESTABILIZADO | Existencias, transferencias, conteos, valuación y movimientos | Paginación parametrizada y feedback por renglón |
 | [Coaches y rutinas](modulos/14-coaching.md) | ESTABILIZADO | Dueño y gerente limitados a métricas; Coach con constructor guiado, catálogo compacto, asignación reactiva, métricas personales y PDF moderno cuyos lookups respetan puertos de aplicación; histórico 4–52 semanas, CSV y 12 E2E | `COA-018`, `DB-001` y `OPS-001` |
 | [Wellness/profesionales](modulos/15-wellness.md) | ESTABILIZADO en esta rama | Directorio, servicios, disponibilidad, agenda, citas internas/externas, coordinación y permisos para dueño, gerente y recepción | Cobertura E2E y hardening multi-tenant transversal |
+| [Automatizaciones](modulos/16-automations.md) | LISTO PARA ACEPTACIÓN | Reglas manuales/programadas, recordatorios previos de reservación, inbox durable, idempotencia versionada, reintentos, scheduler justo y pausable por tenant, telemetría/alertas, historiales paginados y 37 escenarios PostgreSQL aprobados | Repetir PostgreSQL y E2E conectado en CI (`AUT-001`) |
+| [Notificaciones](modulos/17-notifications.md) | FUNCIONAL PARA EMAIL | Entrega SMTP desacoplada, configuración tenant, cola durable, reintentos, preferencias, telemetría, 33 escenarios PostgreSQL globales y E2E administrativo | Conectar proveedor, verificar dominio y probar entregabilidad real (`NOT-001`) |
 | [Reportes generales](modulos/18-reporting.md) | PARCIAL | Reportes operativos por dominio | Definiciones KPI y cobertura homogénea |
 | [Producción/piloto](modulos/20-common-operations.md) | PLANIFICADO | Configuración y runbooks base | Observabilidad, backups, seguridad y piloto |
 

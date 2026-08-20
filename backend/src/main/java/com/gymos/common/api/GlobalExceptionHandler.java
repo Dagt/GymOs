@@ -13,6 +13,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -49,6 +50,12 @@ public class GlobalExceptionHandler {
 	ResponseEntity<ApiError> handleAuthentication(AuthenticationException exception, HttpServletRequest request) {
 		return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
 				.body(ApiError.of("BAD_CREDENTIALS", "Usuario o contrasena incorrectos.", Map.of(), correlationId(request)));
+	}
+
+	@ExceptionHandler(NoResourceFoundException.class)
+	ResponseEntity<ApiError> handleNotFound(NoResourceFoundException exception, HttpServletRequest request) {
+		return ResponseEntity.status(HttpStatus.NOT_FOUND)
+				.body(ApiError.of("RESOURCE_NOT_FOUND", "El recurso solicitado no existe.", Map.of(), correlationId(request)));
 	}
 
 	@ExceptionHandler(Exception.class)

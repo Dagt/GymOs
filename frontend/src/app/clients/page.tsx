@@ -47,6 +47,8 @@ export default function ClientsPage() {
         createdClientId={controller.createdClientId}
         errors={controller.fieldErrors}
         form={controller.form}
+        manualCardEnabled={controller.manualCardEnabled}
+        mercadoPagoEnabled={controller.mercadoPagoEnabled}
         open={controller.showCreateClient}
         plans={controller.plans}
         saving={controller.saving}
@@ -66,4 +68,3 @@ function AuthRequired() {
     />
   );
 }
-

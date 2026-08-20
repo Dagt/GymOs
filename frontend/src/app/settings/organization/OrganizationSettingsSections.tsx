@@ -18,35 +18,6 @@ import type {
   OrganizationUpdatePayload,
 } from "@/lib/api";
 
-type SettingsSummaryProps = {
-  activeBranchName?: string;
-  branchCount: number;
-  legalName?: string;
-  tradeName?: string;
-};
-
-export function SettingsSummary({ activeBranchName, branchCount, legalName, tradeName }: SettingsSummaryProps) {
-  return (
-    <section className="settings-summary">
-      <article>
-        <span>Gimnasio actual</span>
-        <strong>{tradeName}</strong>
-        <p>{legalName}</p>
-      </article>
-      <article>
-        <span>Sucursales</span>
-        <strong>{branchCount}</strong>
-        <p>{branchCount === 1 ? "Una sucursal registrada." : "Sucursales registradas para este gimnasio."}</p>
-      </article>
-      <article>
-        <span>Sucursal operativa</span>
-        <strong>{activeBranchName ?? "Sin seleccionar"}</strong>
-        <p>Se elige desde Gimnasios para entrar al contexto de trabajo.</p>
-      </article>
-    </section>
-  );
-}
-
 type OrganizationOverviewCardProps = {
   form: OrganizationUpdatePayload;
   onEdit: () => void;
@@ -64,11 +35,11 @@ export function OrganizationOverviewCard({ form, onEdit }: OrganizationOverviewC
           Editar gimnasio
         </button>
       </div>
-      <div className="mt-5 grid gap-4 md:grid-cols-3">
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">
         <article className="min-w-0 rounded-xl border border-[#dbe4ee] bg-white p-4">
           <span className="text-xs font-semibold uppercase text-[#64748b]">Marca</span>
           <strong className="mt-2 block break-words text-lg">{form.brandName || form.tradeName}</strong>
-          <p className="mt-2 break-all text-sm text-[#64748b]">{form.contactEmail}</p>
+          <p className="mt-2 break-words text-sm text-[#64748b] [overflow-wrap:anywhere]">{form.contactEmail}</p>
         </article>
         <article className="min-w-0 rounded-xl border border-[#dbe4ee] bg-white p-4">
           <span className="text-xs font-semibold uppercase text-[#64748b]">Moneda</span>
@@ -106,8 +77,7 @@ export function BranchesOverviewCard({ branches, onEditBranch, onNewBranch }: Br
       <div className="mt-5 grid min-h-0 gap-4 xl:flex-1 xl:grid-cols-1 xl:content-start xl:overflow-y-auto xl:[scrollbar-width:none] xl:[&::-webkit-scrollbar]:hidden">
         {branches.length === 0 ? (
           <section className="admin-empty-card">
-            <strong>Aun no hay sucursales</strong>
-            <span>Crea la primera para poder operar caja, recepcion y reportes.</span>
+            <strong>No hay sucursales.</strong>
           </section>
         ) : null}
         {branches.map((branch) => (
@@ -131,9 +101,6 @@ export function TeamAccessCard() {
         <div className="min-w-0">
           <p className="app-eyebrow">Equipo</p>
           <h2 className="mt-2 text-xl font-semibold">Usuarios y permisos</h2>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-[var(--brand-muted)]">
-            Crea cuentas para recepcion, gerencia, coaches y operacion, y limita las sucursales que puede usar cada persona.
-          </p>
         </div>
         <Link className="admin-secondary-link shrink-0" href="/users">
           Abrir equipo y accesos
@@ -170,7 +137,6 @@ export function OrganizationDrawer({
 }: OrganizationDrawerProps) {
   return (
     <AppDrawer
-      description="Actualiza datos comerciales, contacto y marca visual que veran duenos, gerentes, recepcion y kiosco."
       onClose={onClose}
       open={open}
       title="Editar gimnasio"
@@ -199,9 +165,9 @@ export function OrganizationDrawer({
           }}
         />
         <div className="grid gap-4 sm:grid-cols-3">
-          <ColorField error={errors.primaryColor} label="Color principal" name="primaryColor" value={form.primaryColor ?? "#164E63"} onChange={(value) => onChange({ ...form, primaryColor: value })} />
-          <ColorField error={errors.accentColor} label="Color acento" name="accentColor" value={form.accentColor ?? "#F59E0B"} onChange={(value) => onChange({ ...form, accentColor: value })} />
-          <ColorField error={errors.surfaceColor} label="Color fondo" name="surfaceColor" value={form.surfaceColor ?? "#F4F7FB"} onChange={(value) => onChange({ ...form, surfaceColor: value })} />
+          <ColorField error={errors.primaryColor} label="Color principal" name="primaryColor" value={form.primaryColor ?? "#093D3A"} onChange={(value) => onChange({ ...form, primaryColor: value })} />
+          <ColorField error={errors.accentColor} label="Color acento" name="accentColor" value={form.accentColor ?? "#18C8B2"} onChange={(value) => onChange({ ...form, accentColor: value })} />
+          <ColorField error={errors.surfaceColor} label="Color fondo" name="surfaceColor" value={form.surfaceColor ?? "#F2F8F7"} onChange={(value) => onChange({ ...form, surfaceColor: value })} />
         </div>
         <button className="form-primary-button" disabled={saving} type="submit">
           Guardar gimnasio
@@ -224,7 +190,6 @@ type NewBranchDrawerProps = {
 export function NewBranchDrawer({ errors, form, open, saving, onChange, onClose, onSubmit }: NewBranchDrawerProps) {
   return (
     <AppDrawer
-      description="Crea una sede operativa para caja, recepcion, usuarios y reportes."
       onClose={onClose}
       open={open}
       title="Crear sucursal"
@@ -271,7 +236,6 @@ export function EditBranchDrawer({
 }: EditBranchDrawerProps) {
   return (
     <AppDrawer
-      description="Edita nombre, codigo, telefono y zona horaria de la sucursal seleccionada."
       onClose={onClose}
       open={open}
       title="Editar sucursal"

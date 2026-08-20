@@ -62,6 +62,23 @@ test.describe("coaches y rutinas", () => {
     });
   });
 
+  test("mantiene abierto un ejercicio nuevo mientras se escribe su nombre", async ({ page }) => {
+    await bootCoaching(page);
+
+    await page.goto("/coaches");
+    await page.getByLabel("Título").fill("Rutina sin colapsos");
+    await page.getByRole("button", { name: "Continuar a días y ejercicios" }).click();
+    await page.getByRole("button", { name: "Agregar ejercicio vacío al bloque 1" }).click();
+
+    const newExerciseCard = page.locator("details.workout-exercise-card").nth(1);
+    const newExerciseInput = page.getByRole("combobox", { name: "Ejercicio", exact: true }).nth(1);
+    await expect(newExerciseCard).toHaveAttribute("open", "");
+    await newExerciseInput.pressSequentially("Peso muerto");
+
+    await expect(newExerciseInput).toHaveValue("Peso muerto");
+    await expect(newExerciseCard).toHaveAttribute("open", "");
+  });
+
   test("define series progresivas y un tramo descendente sin notación libre", async ({ page }) => {
     let createdPayload: Record<string, unknown> | null = null;
     await bootCoaching(page, async (route, path) => {
@@ -80,7 +97,8 @@ test.describe("coaches y rutinas", () => {
     await page.getByLabel("Título").fill("Pirámide E2E");
     await page.getByRole("button", { name: "Continuar a días y ejercicios" }).click();
     await page.getByRole("combobox", { name: "Ejercicio", exact: true }).fill("Curl con barra");
-    await page.getByRole("button", { name: "Personalizar series" }).click();
+    await page.getByRole("button", { name: "Más opciones" }).click();
+    await page.getByRole("button", { name: "Personalizar cada serie" }).click();
     await page.getByLabel("Repeticiones de serie 1", { exact: true }).fill("20");
     await page.getByLabel("Carga de serie 1", { exact: true }).fill("20 kg");
     await page.getByLabel("Repeticiones de serie 2", { exact: true }).fill("15");
@@ -281,8 +299,8 @@ test.describe("coaches y rutinas", () => {
     const downloadPromise = page.waitForEvent("download");
     await page.getByRole("button", { name: "Descargar PDF" }).click();
     const download = await downloadPromise;
-    expect(download.suggestedFilename()).toBe(`rutina-${assignmentId}.pdf`);
-    await expect(page.getByText("PDF de “Fuerza base” descargado.")).toBeVisible();
+    expect(download.suggestedFilename()).toBe(`rutina-${assignmentId}-compact_dark.pdf`);
+    await expect(page.getByText("PDF descargado.")).toBeVisible();
   });
 
   test("cancela con motivo y filtra sus métricas históricas por socio", async ({ page }) => {

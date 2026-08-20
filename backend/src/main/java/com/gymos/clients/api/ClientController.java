@@ -16,6 +16,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
@@ -98,7 +99,7 @@ public class ClientController {
 			@NotBlank @Size(max = 120) String firstName,
 			@NotBlank @Size(max = 120) String lastName,
 			@Size(max = 120) String maternalLastName,
-			LocalDate birthDate,
+			@NotNull LocalDate birthDate,
 			@Pattern(regexp = "MALE|FEMALE") String gender,
 			@Pattern(regexp = MX_PHONE) String phone,
 			@Email @Size(max = 180) String email,
@@ -114,7 +115,7 @@ public class ClientController {
 			@NotBlank @Size(max = 120) String firstName,
 			@NotBlank @Size(max = 120) String lastName,
 			@Size(max = 120) String maternalLastName,
-			LocalDate birthDate,
+			@NotNull LocalDate birthDate,
 			@Pattern(regexp = "MALE|FEMALE") String gender,
 			@Pattern(regexp = MX_PHONE) String phone,
 			@Email @Size(max = 180) String email,

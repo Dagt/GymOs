@@ -84,6 +84,8 @@ export function SaleItemsSection({ data }: { data: SaleDetailResponse }) {
 export function SalePaymentsSection({
   data,
   form,
+    manualCardEnabled,
+    mercadoPagoEnabled,
   validatingPaymentId,
   uploadingPaymentId,
   rejectingPaymentId,
@@ -97,6 +99,8 @@ export function SalePaymentsSection({
 }: {
   data: SaleDetailResponse;
   form: PaymentFormState;
+    manualCardEnabled: boolean;
+    mercadoPagoEnabled: boolean;
   validatingPaymentId: string | null;
   uploadingPaymentId: string | null;
   rejectingPaymentId: string | null;
@@ -117,7 +121,10 @@ export function SalePaymentsSection({
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="grid gap-2 text-sm font-medium text-[#42514a]">Metodo
               <select className="h-10 rounded-md border border-[#cdd5ca] bg-white px-3 text-sm" onChange={(event) => onFormChange({ ...form, method: event.target.value as ManualPaymentPayload["method"] })} value={form.method}>
-                <option value="CASH">Efectivo</option><option value="TRANSFER">Transferencia</option><option value="CARD_MANUAL">Tarjeta manual</option>
+                <option value="CASH">Efectivo</option>
+                <option value="TRANSFER">Transferencia</option>
+                  {manualCardEnabled ? <option value="CARD_MANUAL">Tarjeta manual</option> : null}
+                  {mercadoPagoEnabled ? <option value="CARD_MERCADO_PAGO">Mercado Pago Point</option> : null}
               </select>
             </label>
             <label className="grid gap-2 text-sm font-medium text-[#42514a]">Monto
@@ -127,8 +134,9 @@ export function SalePaymentsSection({
           <label className="grid gap-2 text-sm font-medium text-[#42514a]">Referencia
             <input className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => onFormChange({ ...form, reference: event.target.value })} value={form.reference} />
           </label>
-          <label className="flex items-center gap-2 text-sm font-medium text-[#42514a]">
-            <input checked={form.validateNow} onChange={(event) => onFormChange({ ...form, validateNow: event.target.checked })} type="checkbox" /> Validar pago ahora
+            <label className="flex items-center gap-2 text-sm font-medium text-[#42514a]">
+              <input checked={form.validateNow} disabled={form.method === "CARD_MERCADO_PAGO"} onChange={(event) => onFormChange({ ...form, validateNow: event.target.checked })} type="checkbox" />
+              {form.method === "CARD_MERCADO_PAGO" ? "Confirmacion automatica por webhook" : "Validar pago ahora"}
           </label>
           <button className="h-10 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]" type="submit">Registrar pago</button>
         </form>
@@ -147,12 +155,16 @@ function PaymentCard({ payment, validating, uploading, rejecting, rejectReason, 
   payment: PaymentDetail; validating: boolean; uploading: boolean; rejecting: boolean; rejectReason: string;
   onValidate: (paymentId: string) => void; onUpload: (paymentId: string, file: File | null) => void; onReject: (paymentId: string) => void; onRejectReasonChange: (value: string) => void;
 }) {
+  const providerManaged = payment.method === "CARD_MERCADO_PAGO" || payment.method === "CARD_ONLINE";
   return (
     <article className="rounded-md border border-[#d8ddd2] px-4 py-3">
       <div className="flex items-start justify-between gap-3"><div><p className="font-semibold">{payment.method}</p><p className="mt-1 text-sm text-[#5d6b63]">{payment.status} - {payment.reference ?? "Sin referencia"}</p></div><p className="font-semibold">{formatMoney(payment.amountCents, payment.currency)}</p></div>
       {payment.receiptObjectKey ? <p className="mt-2 break-all text-xs text-[#6f7a73]">Comprobante: {payment.receiptObjectKey}</p> : null}
       <label className="mt-3 grid gap-2 text-sm font-medium text-[#42514a]">Comprobante<input className="text-sm" disabled={uploading} onChange={(event) => onUpload(payment.id, event.target.files?.[0] ?? null)} type="file" /></label>
-      {payment.status === "PENDING_VALIDATION" ? (
+      {payment.status === "PENDING_VALIDATION" && providerManaged ? (
+        <p className="mt-3 rounded-md bg-[#f2f5f1] p-3 text-sm text-[#42514a]">Esperando confirmacion firmada de Mercado Pago. Este pago no admite validacion manual.</p>
+      ) : null}
+      {payment.status === "PENDING_VALIDATION" && !providerManaged ? (
         <div className="mt-3 grid gap-2">
           <button className="h-10 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white disabled:opacity-60" disabled={validating} onClick={() => onValidate(payment.id)} type="button">{validating ? "Validando..." : "Validar pago"}</button>
           <input className="h-10 rounded-md border border-[#cdd5ca] px-3 text-sm" onChange={(event) => onRejectReasonChange(event.target.value)} placeholder="Motivo de rechazo" value={rejectReason} />

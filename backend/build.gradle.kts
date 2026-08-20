@@ -25,10 +25,12 @@ extra["testcontainersVersion"] = "1.21.3"
 
 dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
+	runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 	implementation("org.springframework.boot:spring-boot-starter-aspectj")
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
 	implementation("org.springframework.boot:spring-boot-starter-data-redis")
 	implementation("org.springframework.boot:spring-boot-starter-flyway")
+	implementation("org.springframework.boot:spring-boot-starter-mail")
 	implementation("org.springframework.boot:spring-boot-starter-security")
 	implementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server")
 	implementation("org.springframework.boot:spring-boot-starter-validation")
@@ -65,4 +67,30 @@ dependencyManagement {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+}
+
+tasks.named<Test>("test") {
+	useJUnitPlatform {
+		excludeTags("stripe-test", "postgres-integration")
+	}
+}
+
+tasks.register<Test>("stripeTest") {
+	description = "Runs opt-in tests against Stripe test mode."
+	group = "verification"
+	testClassesDirs = sourceSets["test"].output.classesDirs
+	classpath = sourceSets["test"].runtimeClasspath
+	useJUnitPlatform {
+		includeTags("stripe-test")
+	}
+}
+
+tasks.register<Test>("postgresIntegrationTest") {
+	description = "Runs PostgreSQL concurrency and recovery integration tests."
+	group = "verification"
+	testClassesDirs = sourceSets["test"].output.classesDirs
+	classpath = sourceSets["test"].runtimeClasspath
+	useJUnitPlatform {
+		includeTags("postgres-integration")
+	}
 }

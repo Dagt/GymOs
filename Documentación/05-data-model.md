@@ -433,6 +433,9 @@ pagos, comisiones ni caja.
 - action_config_json
 - status
 - retry_limit
+- next_run_at
+- locked_until
+- current_trigger_reference
 - version
 - deleted_at
 
@@ -442,8 +445,50 @@ pagos, comisiones ni caja.
 - rule_id
 - status
 - trigger_reference
+- occurrence_reference
 - error_message
+- idempotency_key
+- attempt_number
+- rule_version
+- started_at
+- finished_at
 - occurred_at
+
+### automation_trigger_event
+- organization_id
+- branch_id
+- trigger_type
+- trigger_reference
+- payload_json
+- status
+- attempt_number
+- available_at
+- locked_until
+- last_error
+- completed_at
+- version
+
+Regla:
+- una ocurrencia de dominio es única por organización, tipo y referencia;
+- el worker usa `locked_until` como lease recuperable y conserva la misma
+  referencia al reintentar;
+- una ejecución es única por organización, regla y llave idempotente.
+- `occurrence_reference` desacopla la identidad funcional de la referencia de
+  entrega; por ejemplo, varios escaneos diarios de una membresía conservan una
+  sola ocurrencia por fecha de vencimiento.
+
+### membership_lifecycle_occurrence
+- organization_id
+- branch_id
+- membership_id
+- event_type
+- effective_on
+- created_at
+
+Regla: el marcador único por membresía, tipo y fecha efectiva impide publicar
+dos veces el aviso diario de membresía por vencer. `membership` conserva
+`expired_event_published_at` para reclamar exactamente una vez la publicación
+de vencimiento después de aplicar el periodo de gracia.
 
 ### client_import_batch
 - organization_id
@@ -528,6 +573,51 @@ Migraciones nuevas:
 - `V12__hito4_inventory_sale_idempotency.sql`: agrega indice unico para movimientos automaticos de inventario por venta y producto.
 - `V13__hito5_coaches_workouts.sql`: agrega coaches, rutinas versionadas, asignaciones a clientes, permisos y datos demo de coaching.
 - `V14__hito5_wellness_notifications_automations.sql`: agrega profesionales de bienestar, servicios, disponibilidad, notificaciones, automatizaciones y dashboard del dueno.
+- `V61__browser_kiosk_security.sql`: registra quién abrió el modo kiosco,
+  incorpora `selfservice.session.launch`, permite un perfil lógico equivalente
+  por sucursal y deja capacidades futuras cerradas por defecto.
+- `V62__organization_payment_configuration.sql`: separa modalidades de cobro de
+  recepción, Mercado Pago Point y Stripe por organización.
+- `V63__automation_notification_idempotency.sql`: agrega llaves idempotentes a
+  notificaciones y ejecuciones de automatización, junto con intento, inicio/fin
+  e identidad persistente del trigger en reintento.
+- `V64__payment_provider_integrations.sql`: agrega
+  `payment_provider_connection`, `payment_provider_oauth_request`,
+  `payment_provider_operation` y `payment_provider_webhook_event`; separa
+  credenciales cifradas, autorización efímera, intención local idempotente y
+  deduplicación/reintento de notificaciones de proveedor.
+- `V65__kiosk_membership_enrollment.sql`: habilita explícitamente la capacidad
+  lógica `membershipEnrollment` en los perfiles de kiosco existentes y en el
+  valor por defecto, sin registrar ni asignar computadoras.
+- `V66__automation_domain_event_inbox.sql`: agrega la bandeja durable de
+  ocurrencias de pago/reserva, su payload tipado y conserva `rule_version` en
+  cada ejecución para que reintentos y diagnóstico usen una identidad estable.
+- `V67__automation_membership_lifecycle_and_recovery.sql`: agrega los
+  marcadores de publicación del ciclo de membresía y
+  `automation_execution.occurrence_reference` para deduplicar una ocurrencia
+  funcional aunque llegue mediante distintas entregas diarias.
+- `V68__stripe_recurring_billing.sql`: agrega `payment_customer`,
+  `stored_payment_method`, `recurring_payment_mandate` y
+  `recurring_charge_occurrence`; relaciona operaciones de proveedor con
+  mandato/ocurrencia y conserva únicamente referencias tokenizadas y máscara
+  de tarjeta.
+- `V69__operations_history_pagination.sql`: agrega índices tenant/fecha/ID para
+  paginar de forma estable mandatos, cargos recurrentes, webhooks y ejecuciones
+  de automatización sin escanear registros de otras organizaciones.
+- `V70__automation_operations_and_kiosk_configuration.sql`: agrega control de
+  pausa del scheduler, permisos operativos y configuración de capacidades del
+  kiosco por perfil lógico de sucursal.
+- `V71__provider_payment_receipts.sql`: conserva la referencia segura del
+  comprobante emitido por el proveedor.
+- `V72__durable_email_delivery.sql`: agrega configuración por tenant y cola
+  durable de entrega de correo.
+- `V73__manager_operational_configuration_permissions.sql`: permite al gerente
+  configurar cobros, kiosco y correo sin otorgarle edición del gimnasio ni de
+  sucursales.
+- `V74__manager_catalog_kiosk_and_client_integrity.sql`: concede al gerente la
+  administración de beneficios y recursos reservables; la fecha de nacimiento
+  obligatoria se valida en los contratos de socio para no imponerla a otros
+  tipos de persona.
 - `V15__hito6_productization_onboarding_imports.sql`: agrega bitacora de importacion inicial de clientes y permisos `onboarding.manage` y `client.import`.
 - `V23__membership_plan_multi_branch_access.sql`: agrega `membership_plan.multi_branch_access` para planes con acceso a todas las sucursales del tenant.
 - `V24__resource_allowed_membership_plans.sql`: agrega planes permitidos por recurso para restringir reservas segun membresia vigente.
@@ -627,3 +717,22 @@ Notas:
 
 - Los roles de tenant nunca deben otorgar `platform.admin`.
 - El acceso de soporte no depende de `user_branch_access`; se controla por `platform.admin` y se marca en el token como `supportMode`.
+
+## Extensión V72 - Entrega durable de correo
+
+`V72__durable_email_delivery.sql` amplía `notification_log` con categoría,
+destinatario tipado, cuerpo HTML opcional, proveedor, identificador externo,
+intentos, disponibilidad y lease. Agrega:
+
+- `notification_channel_configuration`: habilitación, proveedor y remitente por
+  organización, sin credenciales;
+- `notification_recipient_preference`: preferencias por tenant identificadas
+  mediante HMAC-SHA-256 de la dirección;
+- `ix_notification_delivery_queue`: selección de correo vencido sin recorrer el
+  histórico;
+- `notification.settings.manage`: permiso exclusivo para dueño, administración
+  tenant y administración GymOS.
+
+La cola conserva `organization_id`; tanto la selección justa como el claim y
+las consultas de preferencia incluyen el tenant. Los secretos SMTP permanecen
+fuera del modelo relacional.

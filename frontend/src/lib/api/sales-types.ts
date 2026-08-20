@@ -1,5 +1,6 @@
 export type SaleStatus = "PENDING_PAYMENT" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
-export type PaymentMethod = "CASH" | "TRANSFER" | "CARD_MANUAL";
+export type PaymentMethod = "CASH" | "TRANSFER" | "CARD_MANUAL" | "CARD_MERCADO_PAGO" | "CARD_ONLINE";
+export type ReceptionPaymentMethod = Exclude<PaymentMethod, "CARD_ONLINE">;
 export type PaymentStatus = "PENDING_VALIDATION" | "COMPLETED" | "REJECTED" | "CANCELLED";
 
 export type SaleSummary = {
@@ -165,7 +166,7 @@ export type SaleItemPayload = {
 };
 
 export type ManualPaymentPayload = {
-  method: PaymentMethod;
+  method: ReceptionPaymentMethod;
   amountCents: number;
   reference?: string | null;
   receiptObjectKey?: string | null;
@@ -195,4 +196,10 @@ export type CreateSalePayload = {
   notes?: string | null;
   payment?: ManualPaymentPayload | null;
   idempotencyKey?: string | null;
+};
+
+export type MercadoPagoPointOrder = {
+  operationId: string;
+  providerOrderId: string;
+  status: string;
 };

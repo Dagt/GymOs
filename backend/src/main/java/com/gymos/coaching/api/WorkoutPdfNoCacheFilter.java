@@ -19,7 +19,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class WorkoutPdfNoCacheFilter extends OncePerRequestFilter {
 
-    static final String RENDERER_VERSION = "compact-dark-v2";
+    static final String RENDERER_VERSION = "compact-dark-v3";
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {

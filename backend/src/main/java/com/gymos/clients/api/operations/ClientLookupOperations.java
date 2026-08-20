@@ -7,4 +7,6 @@ public interface ClientLookupOperations {
 	Optional<ClientVerificationResult> verifyForSelfService(VerifyClientIdentityCommand command);
 
 	Optional<SelfServiceClientProfile> selfServiceProfile(UUID organizationId, UUID clientId);
+
+	SelfServiceClientProfile updateSelfServiceContact(UpdateSelfServiceContactCommand command);
 }

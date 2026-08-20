@@ -40,7 +40,7 @@ export function getConsoleProfile(user: CurrentUser): ConsoleProfile {
   if (console === "PLATFORM_OWNER") {
     return {
       console,
-      label: "Admin GymOS",
+      label: "Admin GymFort",
       description: "Vende, crea, configura y da soporte a gimnasios cliente.",
       homePath: "/platform/gymnasiums",
     };
@@ -48,7 +48,7 @@ export function getConsoleProfile(user: CurrentUser): ConsoleProfile {
   if (console === "TENANT_OWNER") {
     return {
       console,
-      label: user.supportMode ? "Soporte GymOS" : "Dueño del gimnasio",
+      label: user.supportMode ? "Soporte GymFort" : "Dueño del gimnasio",
       description: user.supportMode
         ? "Estas dentro de este gimnasio para apoyar al cliente."
         : "Metricas, sucursales, equipo y decisiones del negocio.",
@@ -96,7 +96,7 @@ export function isSupportMode(user: CurrentUser) {
 
 export function canAccessRoute(user: CurrentUser, pathname: string) {
   const console = resolveUserConsole(user);
-  if (pathname === "/" || pathname === "/login" || pathname.startsWith("/kiosk")) {
+  if (publicRoutes.some((route) => matches(pathname, route)) || pathname.startsWith("/kiosk")) {
     return true;
   }
   if (pathname.startsWith("/platform")) {
@@ -115,6 +115,9 @@ export function canAccessRoute(user: CurrentUser, pathname: string) {
     return tenantOwnerRoutes.some((route) => matches(pathname, route));
   }
   if (console === "TENANT_MANAGER") {
+    if (matches(pathname, "/settings/organization")) {
+      return hasAny(user, ["payment.settings.manage", "selfservice.settings.manage", "notification.settings.manage"]);
+    }
     return managerRoutes.some((route) => matches(pathname, route));
   }
   if (console === "RECEPTION") {
@@ -159,6 +162,7 @@ const tenantOwnerRoutes = [
 const managerRoutes = [
   "/operations",
   "/reports",
+  "/settings/organization",
   "/users",
   "/catalog",
   "/access",
@@ -177,3 +181,4 @@ const managerRoutes = [
 
 const receptionRoutes = ["/reception", "/pos", "/clients", "/sales", "/reports/sales", "/bookings", "/wellness"];
 const coachRoutes = ["/coaches", "/clients"];
+const publicRoutes = ["/", "/login", "/privacy-policy", "/terms-of-service", "/support", "/privacidad", "/terminos"];

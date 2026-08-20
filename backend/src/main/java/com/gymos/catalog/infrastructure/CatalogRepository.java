@@ -32,6 +32,7 @@ public class CatalogRepository implements CatalogProductQueryPort, CatalogPlanQu
 	@Override public Optional<ProductSummaryView> findProductIncludingArchived(UUID organizationId, UUID branchId, UUID productId) { return products.findIncludingArchived(organizationId, branchId, productId); }
 	@Override public Optional<ProductSummaryView> findActiveByBarcode(UUID organizationId, String barcode) { return products.findActiveByBarcode(organizationId, barcode); }
 	@Override public Optional<ProductSummaryView> findActiveByBarcode(UUID organizationId, UUID branchId, String barcode) { return products.findActiveByBarcode(organizationId, branchId, barcode); }
+	@Override public Optional<ProductSummaryView> findBySku(UUID organizationId, String sku) { return products.findBySku(organizationId, sku); }
 	@Override public boolean skuExists(UUID organizationId, String sku, UUID excludedProductId) { return skus.exists(organizationId, sku, excludedProductId); }
 	@Override public boolean barcodeExists(UUID organizationId, String barcode, UUID excludedProductId) { return skus.barcodeExists(organizationId, barcode, excludedProductId); }
 	@Override public ProductPageView search(UUID organizationId, ProductSearchCriteria criteria) { return products.search(organizationId, criteria); }
@@ -40,6 +41,7 @@ public class CatalogRepository implements CatalogProductQueryPort, CatalogPlanQu
 	@Override public List<PlanView> listPlans(UUID organizationId, UUID branchId) { return plans.list(organizationId, branchId); }
 	@Override public Optional<PlanView> findPlan(UUID organizationId, UUID planId) { return plans.find(organizationId, planId); }
 	@Override public Optional<PlanView> findPlan(UUID organizationId, UUID branchId, UUID planId) { return plans.find(organizationId, branchId, planId); }
+	@Override public Optional<PlanView> findPlanByProduct(UUID organizationId, UUID productId) { return plans.findByProduct(organizationId, productId); }
 
 	public List<ProductSummaryView> products(UUID organizationId) { return listProducts(organizationId); }
 	public Optional<ProductSummaryView> product(UUID organizationId, UUID productId) { return findProduct(organizationId, productId); }

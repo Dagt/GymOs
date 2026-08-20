@@ -2,6 +2,7 @@ package com.gymos.memberships.infrastructure;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -210,6 +211,102 @@ class MembershipCommandRepository {
 				""")
 				.param("businessDate", businessDate)
 				.update();
+	}
+
+	List<MembershipRepository.MembershipLifecycleRecord> unpublishedExpiringMemberships(
+			LocalDate businessDate,
+			int horizonDays,
+			int limit
+	) {
+		return jdbcClient.sql("""
+				SELECT m.organization_id, m.branch_id, m.id AS membership_id,
+				       m.client_id, m.plan_id, m.ends_on, m.grace_ends_on
+				FROM membership m
+				WHERE m.status = 'ACTIVE'
+				  AND m.deleted_at IS NULL
+				  AND m.ends_on BETWEEN :businessDate AND :horizonDate
+				  AND NOT EXISTS (
+				      SELECT 1
+				      FROM membership_lifecycle_occurrence occurrence
+				      WHERE occurrence.organization_id = m.organization_id
+				        AND occurrence.membership_id = m.id
+				        AND occurrence.event_type = 'EXPIRING'
+				        AND occurrence.effective_on = :businessDate
+				  )
+				ORDER BY m.ends_on, m.id
+				LIMIT :limit
+				""")
+				.param("businessDate", businessDate)
+				.param("horizonDate", businessDate.plusDays(horizonDays))
+				.param("limit", limit)
+				.query(this::mapLifecycleRecord)
+				.list();
+	}
+
+	boolean recordExpiringOccurrence(MembershipRepository.MembershipLifecycleRecord membership, LocalDate businessDate) {
+		return jdbcClient.sql("""
+				INSERT INTO membership_lifecycle_occurrence (
+				    id, organization_id, branch_id, membership_id,
+				    event_type, effective_on, created_at
+				)
+				VALUES (
+				    :id, :organizationId, :branchId, :membershipId,
+				    'EXPIRING', :effectiveOn, :createdAt
+				)
+				ON CONFLICT (organization_id, membership_id, event_type, effective_on)
+				DO NOTHING
+				""")
+				.param("id", UUID.randomUUID())
+				.param("organizationId", membership.organizationId())
+				.param("branchId", membership.branchId())
+				.param("membershipId", membership.membershipId())
+				.param("effectiveOn", businessDate)
+				.param("createdAt", OffsetDateTime.now())
+				.update() == 1;
+	}
+
+	List<MembershipRepository.MembershipLifecycleRecord> claimUnpublishedExpiredMemberships(int limit) {
+		OffsetDateTime now = OffsetDateTime.now();
+		return jdbcClient.sql("""
+				WITH pending AS (
+				    SELECT id
+				    FROM membership
+				    WHERE status = 'EXPIRED'
+				      AND expired_event_published_at IS NULL
+				      AND deleted_at IS NULL
+				    ORDER BY grace_ends_on, id
+				    FOR UPDATE SKIP LOCKED
+				    LIMIT :limit
+				)
+				UPDATE membership membership
+				SET expired_event_published_at = :publishedAt,
+				    updated_at = :publishedAt,
+				    version = version + 1
+				FROM pending
+				WHERE membership.id = pending.id
+				RETURNING membership.organization_id, membership.branch_id,
+				          membership.id AS membership_id, membership.client_id,
+				          membership.plan_id, membership.ends_on, membership.grace_ends_on
+				""")
+				.param("limit", limit)
+				.param("publishedAt", now)
+				.query(this::mapLifecycleRecord)
+				.list();
+	}
+
+	private MembershipRepository.MembershipLifecycleRecord mapLifecycleRecord(
+			java.sql.ResultSet resultSet,
+			int rowNumber
+	) throws java.sql.SQLException {
+		return new MembershipRepository.MembershipLifecycleRecord(
+				resultSet.getObject("organization_id", UUID.class),
+				resultSet.getObject("branch_id", UUID.class),
+				resultSet.getObject("membership_id", UUID.class),
+				resultSet.getObject("client_id", UUID.class),
+				resultSet.getObject("plan_id", UUID.class),
+				resultSet.getObject("ends_on", LocalDate.class),
+				resultSet.getObject("grace_ends_on", LocalDate.class)
+		);
 	}
 
 	int expireMembershipIfDue(UUID organizationId, UUID membershipId, LocalDate businessDate) {

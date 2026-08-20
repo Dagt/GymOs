@@ -14,11 +14,11 @@ type ThemeConfig = {
 };
 
 const defaultTheme: ThemeConfig = {
-  name: "GymOS",
+  name: "GymFort",
   logoUrl: "",
-  primary: "#164E63",
-  accent: "#F59E0B",
-  surface: "#F4F7FB",
+  primary: "#093D3A",
+  accent: "#18C8B2",
+  surface: "#F2F8F7",
 };
 
 export function TenantThemeProvider() {
@@ -72,7 +72,7 @@ function themeFromUser(user: CurrentUser): ThemeConfig {
 
 function applyTheme(theme: ThemeConfig) {
   const root = document.documentElement;
-  root.style.setProperty("--brand-name", `"${theme.name || "GymOS"}"`);
+  root.style.setProperty("--brand-name", `"${theme.name || "GymFort"}"`);
   root.style.setProperty("--brand-logo-url", theme.logoUrl ? `url("${theme.logoUrl}")` : "none");
   root.style.setProperty("--brand-primary", theme.primary || defaultTheme.primary);
   root.style.setProperty("--brand-accent", theme.accent || defaultTheme.accent);

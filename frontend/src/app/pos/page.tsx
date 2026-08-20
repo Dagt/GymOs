@@ -1,10 +1,12 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   createSale,
+  createMercadoPagoPointOrder,
+  getPaymentConfiguration,
   getProductByBarcode,
   getRecentSales,
   getStoredSession,
@@ -36,6 +38,8 @@ export default function PosPage() {
   const [selectedClient, setSelectedClient] = useState<ClientSummary | null>(null);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("CASH");
+  const [manualCardEnabled, setManualCardEnabled] = useState(false);
+  const [mercadoPagoEnabled, setMercadoPagoEnabled] = useState(false);
   const [paymentReference, setPaymentReference] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [validateNow, setValidateNow] = useState(true);
@@ -46,6 +50,7 @@ export default function PosPage() {
   const [saving, setSaving] = useState(false);
   const [highlightedProductId, setHighlightedProductId] = useState<string | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
+  const saleOperationKey = useRef<string | null>(null);
 
   useBarcodeScanner({
     onScan: (code) => void handleBarcodeScan(code),
@@ -60,8 +65,15 @@ export default function PosPage() {
       if (!storedSession) { setLoading(false); return; }
       setSession(storedSession);
       try {
-        const recentSales = await getRecentSales(storedSession.accessToken);
-        if (active) setSales(recentSales);
+        const [recentSales, paymentConfiguration] = await Promise.all([
+          getRecentSales(storedSession.accessToken),
+          getPaymentConfiguration(storedSession.accessToken),
+        ]);
+        if (active) {
+          setSales(recentSales);
+          setManualCardEnabled(paymentConfiguration.receptionManualTerminalEnabled);
+          setMercadoPagoEnabled(paymentConfiguration.mercadoPagoReady);
+        }
       } catch (exception) {
         if (active) setError(exception instanceof Error ? exception.message : "No fue posible cargar POS.");
       } finally {
@@ -168,6 +180,8 @@ export default function PosPage() {
     setMessage(null);
     try {
       const amountCents = paymentAmount.trim() ? Math.round(Number(paymentAmount) * 100) : subtotal;
+      const idempotencyKey = saleOperationKey.current ?? `pos:${crypto.randomUUID()}`;
+      saleOperationKey.current = idempotencyKey;
       const sale = await createSale(session.accessToken, {
         clientId: selectedClient?.id ?? null,
         items: cart.map((item) => ({
@@ -182,11 +196,20 @@ export default function PosPage() {
           amountCents,
           reference: paymentReference,
           receiptObjectKey: null,
-          validateNow,
+          validateNow: paymentMethod === "CARD_MERCADO_PAGO" ? false : validateNow,
           notes: null,
         } : null,
+        idempotencyKey,
       });
-      setMessage(`Venta ${sale.sale.saleNumber} registrada.`);
+      if (paymentMethod === "CARD_MERCADO_PAGO") {
+        const payment = sale.payments.find((item) => item.method === "CARD_MERCADO_PAGO" && item.status === "PENDING_VALIDATION");
+        if (!payment) throw new Error("La venta se registro, pero no se encontro el pago pendiente para enviar a Point.");
+        await createMercadoPagoPointOrder(session.accessToken, payment.id);
+        setMessage(`Cobro de la venta ${sale.sale.saleNumber} enviado a la terminal Point. Esperando confirmacion.`);
+      } else {
+        setMessage(`Venta ${sale.sale.saleNumber} registrada.`);
+      }
+      saleOperationKey.current = null;
       setCart([]);
       setPaymentReference("");
       setSelectedClient(null);
@@ -247,9 +270,14 @@ export default function PosPage() {
                 cart={cart}
                 currency={products[0]?.currency ?? cart[0]?.product.currency ?? "MXN"}
                 highlightedProductId={highlightedProductId}
+                  manualCardEnabled={manualCardEnabled}
+                  mercadoPagoEnabled={mercadoPagoEnabled}
                 onClearCart={() => setCart([])}
                 onPaymentAmountChange={setPaymentAmount}
-                onPaymentMethodChange={setPaymentMethod}
+                  onPaymentMethodChange={(method) => {
+                    setPaymentMethod(method);
+                    if (method === "CARD_MERCADO_PAGO") setValidateNow(false);
+                  }}
                 onPaymentReferenceChange={setPaymentReference}
                 onQuantityChange={setQuantity}
                 onSubmit={submitSale}

@@ -1,0 +1,74 @@
+groups:
+  - name: gymos-tenant-operations
+    rules:
+      - alert: GymOsAutomationDeadLetter
+        expr: gymos_automation_backlog{status="dead_letter"} > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Automation dead letters for tenant {{ $labels.organization_id }}"
+          description: "Branch {{ $labels.branch_id }} has {{ $value }} dead-letter automation items."
+
+      - alert: GymOsAutomationExpiredLease
+        expr: gymos_automation_expired_leases > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Expired automation lease for tenant {{ $labels.organization_id }}"
+          description: "Branch {{ $labels.branch_id }} has {{ $value }} expired processing leases."
+
+      - alert: GymOsStripeWebhookFailure
+        expr: gymos_payment_operations{state="failed_webhooks"} > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Stripe webhook failures for tenant {{ $labels.organization_id }}"
+          description: "There are {{ $value }} failed provider webhooks requiring recovery."
+
+      - alert: GymOsPaymentOperationStale
+        expr: gymos_payment_operations{state="stale"} > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Stale payment operation for tenant {{ $labels.organization_id }}"
+          description: "There are {{ $value }} provider operations without a terminal outcome."
+
+      - alert: GymOsRecurringChargeLeaseExpired
+        expr: gymos_recurring_expired_leases > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Expired recurring-charge lease for tenant {{ $labels.organization_id }}"
+          description: "There are {{ $value }} recurring-charge workers eligible for lease recovery."
+
+      - alert: GymOsRecurringMandatePastDue
+        expr: gymos_recurring_mandates{state="past_due"} > 0
+        for: 30m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Past-due recurring mandates for tenant {{ $labels.organization_id }}"
+          description: "There are {{ $value }} members who may need a payment-method recovery."
+
+      - alert: GymOsEmailDeadLetter
+        expr: gymos_notification_queue_dead_letters > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Email dead letters for tenant {{ $labels.organization_id }}"
+          description: "There are {{ $value }} emails that exhausted delivery retries."
+
+      - alert: GymOsEmailExpiredLease
+        expr: gymos_notification_queue_expired_leases > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Expired email delivery lease for tenant {{ $labels.organization_id }}"
+          description: "There are {{ $value }} email deliveries eligible for worker recovery."

@@ -14,7 +14,6 @@ import {
   type PlanSummary,
   type StoredSession,
 } from "@/lib/api";
-import { resolveUserConsole } from "@/lib/role-model";
 
 const defaultForm: BenefitPayload = {
   code: "",
@@ -40,10 +39,10 @@ export default function BenefitsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showBenefitDrawer, setShowBenefitDrawer] = useState(false);
 
-  const canManageBenefits = session
-    ? session.user.platformAdmin ||
-      ["TENANT_OWNER", "TENANT_MANAGER", "PLATFORM_OWNER"].includes(resolveUserConsole(session.user))
-    : false;
+  const canManageBenefits = Boolean(
+    session?.user.permissions.includes("benefit.manage")
+      || session?.user.permissions.includes("platform.admin"),
+  );
 
   useEffect(() => {
     let active = true;

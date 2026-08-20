@@ -116,6 +116,31 @@ public class ClientCommandRepository {
 				.update();
 	}
 
+	public void updateSelfServiceContact(
+			UUID organizationId,
+			UUID personId,
+			String email,
+			String phone,
+			OffsetDateTime now
+	) {
+		jdbcClient.sql("""
+				UPDATE person
+				SET email = :email,
+				    phone = :phone,
+				    updated_at = :updatedAt,
+				    version = version + 1
+				WHERE id = :personId
+				  AND organization_id = :organizationId
+				  AND deleted_at IS NULL
+				""")
+				.param("email", email)
+				.param("phone", phone)
+				.param("updatedAt", now)
+				.param("personId", personId)
+				.param("organizationId", organizationId)
+				.update();
+	}
+
 	public record CreateClientRecord(
 			UUID organizationId,
 			UUID branchId,

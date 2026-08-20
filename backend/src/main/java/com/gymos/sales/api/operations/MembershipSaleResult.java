@@ -10,6 +10,11 @@ public record MembershipSaleResult(
 		long paidCents,
 		long balanceCents,
 		String currency,
-		boolean paymentCompleted
+		boolean paymentCompleted,
+		UUID paymentId
 ) {
+	public MembershipSaleResult(UUID saleId, String saleNumber, String saleStatus, long totalCents,
+			long paidCents, long balanceCents, String currency, boolean paymentCompleted) {
+		this(saleId, saleNumber, saleStatus, totalCents, paidCents, balanceCents, currency, paymentCompleted, null);
+	}
 }

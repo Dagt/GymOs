@@ -135,19 +135,26 @@ test.describe("catalogo e inventario", () => {
     await page.goto("/pos");
     await expect(page.getByRole("button", { name: /Agua/ })).toBeVisible();
 
-    await page.keyboard.type(product.barcode, { delay: 5 });
-    await page.keyboard.press("Enter");
+    await scanBarcode(page, product.barcode);
     await expect(page.getByRole("heading", { name: "Carrito (1)" })).toBeVisible();
     const cart = page.locator("form").filter({
       has: page.getByRole("heading", { name: "Carrito (1)" }),
     });
     await expect(cart.locator('input[type="number"]').first()).toHaveValue("1");
 
-    await page.keyboard.type(product.barcode, { delay: 5 });
-    await page.keyboard.press("Enter");
+    await scanBarcode(page, product.barcode);
     await expect(cart.locator('input[type="number"]').first()).toHaveValue("2");
   });
 });
+
+async function scanBarcode(page: Page, barcode: string) {
+  await page.evaluate((code) => {
+    for (const key of code) {
+      window.dispatchEvent(new KeyboardEvent("keydown", { key }));
+    }
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+  }, barcode);
+}
 
 async function bootCatalog(
   page: Page,

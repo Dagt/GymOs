@@ -58,7 +58,7 @@ const branches = [
 ];
 
 test.describe("consolas por rol", () => {
-  test("Admin GymOS entra al CRM de gimnasios cliente", async ({ page }) => {
+  test("Admin GymFort entra al CRM de gimnasios cliente", async ({ page }) => {
     await bootAs(page, user({
       console: "PLATFORM_OWNER",
       platformAdmin: true,
@@ -70,7 +70,7 @@ test.describe("consolas por rol", () => {
     await page.goto("/platform/gymnasiums");
 
     await expect(page.getByRole("heading", { name: /CRM de gimnasios cliente/i })).toBeVisible();
-    await expect(page.getByLabel("Perfil activo").getByText("Admin GymOS")).toBeVisible();
+    await expect(page.getByLabel("Perfil activo").getByText("Admin GymFort")).toBeVisible();
     await expect(page.locator("body")).toContainText("CRM de gimnasios");
     await expect(page.locator("body")).toContainText("Nuevo gimnasio");
   });
@@ -161,8 +161,9 @@ test.describe("consolas por rol", () => {
 
     await expect(page.getByRole("heading", { name: /Panel ejecutivo|Dashboard|Metricas/i })).toBeVisible();
     await expect(page.getByLabel("Perfil activo").getByText("Dueño del gimnasio")).toBeVisible();
-    await expect(page.locator("body")).toContainText("Administracion del gimnasio");
-    await expect(page.locator("body")).toContainText("Datos y sucursales");
+    await expect(page.locator("body")).toContainText("Gestión operativa");
+    await expect(page.locator("body")).toContainText("Administración");
+    await expect(page.locator("body")).toContainText("Configuración");
   });
 
   test("gerente conserva menu operativo sin rutas de plataforma", async ({ page }) => {
@@ -176,11 +177,62 @@ test.describe("consolas por rol", () => {
 
     await expect(page.getByRole("heading", { name: /Operacion diaria/i })).toBeVisible();
     await expect(page.getByLabel("Perfil activo").getByText("Gerente")).toBeVisible();
-    await expect(page.locator("body")).toContainText("Administracion diaria");
+    await expect(page.locator("body")).toContainText("Gestión operativa");
+    await expect(page.locator("body")).toContainText("Administración");
     await expect(page.locator("body")).toContainText("Mostrador");
+    await page.getByText("Administración", { exact: true }).click();
+    await expect(page.getByRole("link", { name: /Automatizaciones/i })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Beneficios/i })).toBeVisible();
     await expect(page.getByRole("link", { name: /Gimnasios cliente/i })).toHaveCount(0);
+    await page.locator('a[href="/settings/organization"]').click();
+    await expect(page).toHaveURL(/\/settings\/organization/);
+    await expect(page.getByRole("heading", { name: "Configuración del gimnasio" })).toBeVisible();
+    await page.goto("/bookings");
+    await expect(page.getByRole("button", { name: "Crear recurso" })).toBeVisible();
+    await page.goto("/benefits");
+    await expect(page.getByRole("button", { name: "Crear beneficio" })).toBeVisible();
     await page.goto("/clients");
     await expect(page.getByRole("button", { name: /Registrar Nuevo Socio/i })).toBeVisible();
+  });
+
+  test("configuracion de kiosco muestra una sola vez la sucursal seleccionada", async ({ page }) => {
+    await bootAs(page, user({
+      console: "TENANT_OWNER",
+      roles: ["Dueno del gimnasio"],
+      permissions: ownerPermissions().concat("selfservice.settings.manage"),
+    }), async (route, path) => {
+      if (path === "/kiosk-settings/branches") {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify(branches.map((branch) => ({
+            branchId: branch.id,
+            branchName: branch.name,
+            status: "ACTIVE",
+            capabilities: {
+              membershipEnrollmentAllowed: false,
+              membershipRenewalAllowed: false,
+              membershipPlanChangeAllowed: false,
+              resourceBookingAllowed: true,
+              wellnessBookingAllowed: false,
+              profileUpdateAllowed: true,
+              autopayAllowed: false,
+              onlineCardPaymentsReady: false,
+              recurringCardPaymentsReady: false,
+            },
+            updatedAt: null,
+          }))),
+        });
+        return true;
+      }
+      return false;
+    });
+
+    await page.goto("/settings/organization#kiosk-settings");
+    await page.getByRole("button", { name: /Kiosco web/i }).click();
+
+    const kioskSettings = page.locator("#kiosk-settings");
+    await expect(kioskSettings.getByRole("heading", { name: "Centro" })).toBeVisible();
+    await expect(kioskSettings.getByRole("heading", { name: "Revolucion 115" })).toHaveCount(0);
   });
 
   test("recepcion entra a mostrador y no ve administracion", async ({ page }) => {
@@ -195,15 +247,16 @@ test.describe("consolas por rol", () => {
     await expect(page.getByRole("heading", { name: /Recepcion|Revolucion/i })).toBeVisible();
     await expect(page.getByLabel("Perfil activo").getByText("Recepcion")).toBeVisible();
     await expect(page.getByText(/Cobrar venta o membres/i)).toBeVisible();
-    await expect(page.getByRole("heading", { name: /Renovación y Asignación de Membresía/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Renovar, asignar o cambiar plan/i })).toBeVisible();
     await expect(page.locator('a[href="/reception/renewals"]')).toHaveCount(0);
     await expect(page.getByRole("link", { name: /Equipo/i })).toHaveCount(0);
-    await expect(page.getByRole("link", { name: /Datos y sucursales/i })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /Configuración/i })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "Pantalla para socios", exact: true })).toBeVisible();
     await page.goto("/clients");
     await expect(page.getByRole("button", { name: /Registrar Nuevo Socio/i })).toBeVisible();
   });
 
-  test("Admin GymOS en soporte ve banda y regreso a administracion", async ({ page }) => {
+  test("Admin GymFort en soporte ve banda y regreso a administracion", async ({ page }) => {
     await bootAs(page, user({
       console: "TENANT_OWNER",
       platformAdmin: true,
@@ -214,9 +267,97 @@ test.describe("consolas por rol", () => {
 
     await page.goto("/dashboard");
 
-    await expect(page.getByText("Modo soporte GymOS")).toBeVisible();
+    await expect(page.getByText("Modo soporte GymFort")).toBeVisible();
     await expect(page.getByRole("link", { name: /Volver a administracion de gimnasios/i })).toBeVisible();
-    await expect(page.getByLabel("Perfil activo").getByText("Soporte GymOS")).toBeVisible();
+    await expect(page.getByLabel("Perfil activo").getByText("Soporte GymFort")).toBeVisible();
+  });
+
+  test("dueno configura el remitente SMTP y encola un correo de prueba", async ({ page }) => {
+    let savedConfiguration: Record<string, unknown> | null = null;
+    let testRecipient: string | null = null;
+    const emailConfiguration = {
+      organizationId: org.id,
+      emailEnabled: false,
+      providerKey: "SMTP",
+      fromEmail: null,
+      fromName: null,
+      replyTo: null,
+      providerAvailable: true,
+      ready: false,
+      updatedAt: null,
+    };
+    await bootAs(page, user({
+      console: "TENANT_OWNER",
+      roles: ["Dueno del gimnasio"],
+      permissions: ownerPermissions().concat("notification.read", "notification.manage", "notification.settings.manage"),
+    }), async (route, path) => {
+      if (path === "/notifications/email-configuration" && route.request().method() === "GET") {
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify(emailConfiguration) });
+        return true;
+      }
+      if (path === "/notifications/email-configuration" && route.request().method() === "PUT") {
+        savedConfiguration = route.request().postDataJSON() as Record<string, unknown>;
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({ ...emailConfiguration, ...savedConfiguration, emailEnabled: true, ready: true }),
+        });
+        return true;
+      }
+      if (path === "/notifications/email-configuration/test" && route.request().method() === "POST") {
+        testRecipient = (route.request().postDataJSON() as { recipient: string }).recipient;
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({
+            id: "99999999-9999-4999-8999-999999999999",
+            channel: "EMAIL",
+            recipient: testRecipient,
+            subject: "Prueba de correo de GymOS",
+            body: "Mensaje",
+            bodyHtml: null,
+            status: "QUEUED",
+            category: "TRANSACTIONAL",
+            recipientType: "DIRECT",
+            recipientId: null,
+            triggerType: "MANUAL_TEST",
+            referenceType: "ORGANIZATION",
+            referenceId: org.id,
+            scheduledAt: null,
+            sentAt: null,
+            errorMessage: null,
+            providerKey: null,
+            providerMessageId: null,
+            attemptCount: 0,
+            availableAt: new Date().toISOString(),
+            lockedUntil: null,
+            lastAttemptAt: null,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          }),
+        });
+        return true;
+      }
+      return false;
+    });
+
+    await page.goto("/settings/organization");
+    await page.getByRole("button", { name: /Correo electrónico/ }).click();
+    await expect(page.getByRole("heading", { name: "Correo electrónico" })).toBeVisible();
+    await page.getByLabel("Nombre del remitente").fill("Appex Fitness");
+    await page.getByLabel("Correo remitente").fill("notificaciones@appex.com");
+    await page.getByText("Habilitar entregas por correo").click();
+    await page.getByRole("button", { name: "Guardar remitente" }).click();
+    await expect(page.getByText("Correo habilitado y listo para entregar.")).toBeVisible();
+    expect(savedConfiguration).toMatchObject({
+      enabled: true,
+      providerKey: "SMTP",
+      fromEmail: "notificaciones@appex.com",
+      fromName: "Appex Fitness",
+    });
+
+    await page.getByLabel("Destinatario de prueba").fill("qa@appex.com");
+    await page.getByRole("button", { name: "Enviar prueba" }).click();
+    await expect(page.getByText(/Correo de prueba en cola/)).toBeVisible();
+    expect(testRecipient).toBe("qa@appex.com");
   });
 });
 
@@ -329,6 +470,7 @@ function ownerPermissions() {
     "coach.read",
     "professional.read",
     "automation.read",
+    "selfservice.session.launch",
   ];
 }
 
@@ -346,7 +488,15 @@ function managerPermissions() {
     "sale.create",
     "report.sales.read",
     "benefit.read",
+    "benefit.manage",
+    "resource.read",
+    "resource.manage",
     "coach.read",
+    "automation.read",
+    "payment.settings.manage",
+    "selfservice.settings.manage",
+    "notification.settings.manage",
+    "selfservice.session.launch",
   ];
 }
 
@@ -360,5 +510,6 @@ function receptionPermissions() {
     "booking.manage",
     "report.sales.read",
     "benefit.read",
+    "selfservice.session.launch",
   ];
 }

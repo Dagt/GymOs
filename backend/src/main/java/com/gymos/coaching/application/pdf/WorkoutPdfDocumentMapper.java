@@ -46,8 +46,9 @@ public final class WorkoutPdfDocumentMapper {
 				data.branchName(),
 				data.contactPhone(),
 				resolvedLogo,
+				palette.primaryColor(),
 				palette.accentColor(),
-				palette.primaryColor()
+				palette.surfaceColor()
 		);
 
 		List<WorkoutPdfSession> sessions = new ArrayList<>();

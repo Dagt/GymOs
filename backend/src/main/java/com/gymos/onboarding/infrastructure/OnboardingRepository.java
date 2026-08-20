@@ -141,10 +141,12 @@ public class OnboardingRepository {
 				SELECT COUNT(*)
 				FROM self_service_terminal
 				WHERE organization_id = :organizationId
+				  AND branch_id = :branchId
 				  AND device_code = :deviceCode
 				  AND deleted_at IS NULL
 				""")
 				.param("organizationId", organizationId)
+				.param("branchId", branchId)
 				.param("deviceCode", deviceCode)
 				.query(Integer.class)
 				.single();
@@ -158,7 +160,7 @@ public class OnboardingRepository {
 				)
 				VALUES (
 				    :id, :organizationId, :branchId, :name, :deviceCode, 'ACTIVE',
-				    '{"renewal":true,"planChange":true,"pendingPayments":true}'::jsonb,
+			    '{"membershipEnrollment":true,"membershipRenewal":true,"membershipPlanChange":true,"resourceBooking":true,"wellnessBooking":false,"profileUpdate":true,"autopay":true}'::jsonb,
 				    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
 				)
 				""")

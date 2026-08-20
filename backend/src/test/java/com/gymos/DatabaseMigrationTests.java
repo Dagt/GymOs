@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -23,7 +24,8 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 
-@Testcontainers
+@Tag("postgres-integration")
+@Testcontainers(disabledWithoutDocker = true)
 class DatabaseMigrationTests {
 	@Container
 	static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18-alpine");
@@ -121,6 +123,14 @@ class DatabaseMigrationTests {
 			assertThat(roleHasPermission(connection, "Gerente", "client.read")).isTrue();
 			assertThat(roleHasPermission(connection, "Gerente", "client.create")).isTrue();
 			assertThat(roleHasPermission(connection, "Gerente", "client.update")).isTrue();
+			assertThat(roleHasPermission(connection, "Gerente", "organization.read")).isTrue();
+			assertThat(roleHasPermission(connection, "Gerente", "branch.read")).isTrue();
+			assertThat(roleHasPermission(connection, "Gerente", "payment.settings.read")).isTrue();
+			assertThat(roleHasPermission(connection, "Gerente", "payment.settings.manage")).isTrue();
+			assertThat(roleHasPermission(connection, "Gerente", "selfservice.settings.manage")).isTrue();
+			assertThat(roleHasPermission(connection, "Gerente", "notification.settings.manage")).isTrue();
+			assertThat(roleHasPermission(connection, "Gerente", "benefit.manage")).isTrue();
+			assertThat(roleHasPermission(connection, "Gerente", "resource.manage")).isTrue();
 			assertThat(roleHasPermission(connection, "Recepcion", "client.read")).isTrue();
 			assertThat(roleHasPermission(connection, "Recepcion", "client.create")).isTrue();
 			assertThat(roleHasPermission(connection, "Recepcion", "client.update")).isTrue();

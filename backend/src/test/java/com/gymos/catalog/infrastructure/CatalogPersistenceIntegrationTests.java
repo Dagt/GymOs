@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.gymos.catalog.application.port.CatalogProductCommandPort.ProductMutation;
+import com.gymos.selfservice.infrastructure.SelfServiceRepository;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -16,7 +18,8 @@ import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-@Testcontainers
+@Tag("postgres-integration")
+@Testcontainers(disabledWithoutDocker = true)
 class CatalogPersistenceIntegrationTests {
 	@Container
 	static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18-alpine");
@@ -64,6 +67,32 @@ class CatalogPersistenceIntegrationTests {
 				.extracting(com.gymos.catalog.application.query.ProductSummaryView::id)
 				.containsExactly(productId);
 		assertThat(productQueries.list(organizationId, secondBranchId)).isEmpty();
+	}
+
+	@Test
+	void kioskMembershipOptionsAreVisibleOnlyInTheAttachedBranch() {
+		UUID productId = UUID.randomUUID();
+		UUID planId = UUID.randomUUID();
+		OffsetDateTime now = OffsetDateTime.now();
+		products.create(new ProductMutation(
+				organizationId, productId, "PLAN-CENTRO", "Plan Centro", null,
+				"MEMBERSHIP_PLAN", 75_000, "MXN", true, "ACTIVE",
+				null, null, null, null, false, 0, null, now, userId
+		));
+		products.attachBranch(organizationId, firstBranchId, productId, userId, now);
+		jdbcClient.sql("""
+				INSERT INTO membership_plan (
+				 id, organization_id, product_id, duration_days, grace_days,
+				 benefits_json, multi_branch_access, status, created_at, updated_at, version)
+				VALUES (:id, :organizationId, :productId, 30, 3, '{}'::jsonb, false, 'ACTIVE', now(), now(), 0)
+				""").param("id", planId).param("organizationId", organizationId)
+				.param("productId", productId).update();
+		SelfServiceRepository kiosk = new SelfServiceRepository(jdbcClient);
+
+		assertThat(kiosk.planOptions(organizationId, firstBranchId))
+				.extracting(SelfServiceRepository.PlanOptionRecord::id)
+				.containsExactly(planId);
+		assertThat(kiosk.planOptions(organizationId, secondBranchId)).isEmpty();
 	}
 
 	@Test

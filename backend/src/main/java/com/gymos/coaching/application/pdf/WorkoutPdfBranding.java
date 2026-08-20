@@ -6,7 +6,8 @@ public record WorkoutPdfBranding(
 		String contactPhone,
 		String logoUrl,
 		String primaryColorHex,
-		String secondaryColorHex
+		String accentColorHex,
+		String surfaceColorHex
 ) {
 	public static WorkoutPdfBranding defaultBranding() {
 		return new WorkoutPdfBranding(
@@ -14,8 +15,9 @@ public record WorkoutPdfBranding(
 				"Sucursal",
 				null,
 				null,
+				"#111111",
 				"#6B7280",
-				"#111111"
+				"#FFFFFF"
 		);
 	}
 }

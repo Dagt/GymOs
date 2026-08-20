@@ -10,7 +10,7 @@ import { canAccessRoute } from "../../lib/role-model.ts";
 import type { CurrentUser } from "../../lib/api/auth-types.ts";
 
 test("normalizes user-facing role names", () => {
-  assert.equal(displayRoleName("Administrador GymOS"), "Admin GymOS");
+  assert.equal(displayRoleName("Administrador GymOS"), "Admin GymFort");
   assert.equal(displayRoleName("Administrador"), "Dueno del gimnasio");
   assert.equal(displayRoleName("Gerente"), "Gerente");
   assert.equal(displayRoleName("Recepcion y caja"), "Recepcion");
@@ -63,4 +63,24 @@ test("receptionist role cannot access /benefits route", () => {
 
   assert.equal(canAccessRoute(receptionUser, "/benefits"), false);
   assert.equal(canAccessRoute(receptionUser, "/pos"), true);
+});
+
+test("public policy and support routes stay available for authenticated users", () => {
+  const receptionUser: CurrentUser = {
+    userId: "user-1",
+    organizationId: "organization-1",
+    branchId: "branch-1",
+    username: "reception@gymfort.mx",
+    fullName: "Recepcionista Test",
+    roles: ["Recepcion y caja"],
+    permissions: ["sale.create", "client.create"],
+    console: "RECEPTION",
+    platformAdmin: false,
+    supportMode: false,
+    organizationName: "GymFort Test",
+  };
+
+  for (const route of ["/privacy-policy", "/terms-of-service", "/support"]) {
+    assert.equal(canAccessRoute(receptionUser, route), true, `${route} should be public`);
+  }
 });

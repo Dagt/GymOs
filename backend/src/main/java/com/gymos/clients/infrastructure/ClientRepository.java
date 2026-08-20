@@ -143,9 +143,11 @@ public class ClientRepository {
 			String identifier,
 			LocalDate birthDate
 	) {
-		String normalizedIdentifier = identifier == null ? "" : identifier.trim().toLowerCase();
+		SelfServiceIdentifiers identifiers = selfServiceIdentifiers(identifier);
 		return jdbcClient.sql("""
-				SELECT c.id AS client_id, TRIM(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) AS full_name
+				SELECT c.id AS client_id, p.id AS person_id,
+				       TRIM(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) AS full_name,
+				       p.email, p.phone
 				FROM client c
 				JOIN person p ON p.id = c.person_id
 				WHERE c.organization_id = :organizationId
@@ -154,8 +156,13 @@ public class ClientRepository {
 				  AND p.deleted_at IS NULL
 				  AND p.birth_date = :birthDate
 				  AND (
-				      LOWER(COALESCE(p.email, '')) = :identifier
-				      OR LOWER(COALESCE(p.phone, '')) = :identifier
+				      (:emailIdentifier <> '' AND LOWER(TRIM(COALESCE(p.email, ''))) = :emailIdentifier)
+				      OR (
+				          :phoneIdentifier <> ''
+				          AND REGEXP_REPLACE(COALESCE(p.phone, ''), '[^0-9]', '', 'g') IN (
+				              :phoneIdentifier, :localPhoneIdentifier, :legacyPhoneIdentifier
+				          )
+				      )
 				  )
 				  AND EXISTS (
 				      SELECT 1
@@ -178,18 +185,46 @@ public class ClientRepository {
 				""")
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
-				.param("identifier", normalizedIdentifier)
+				.param("emailIdentifier", identifiers.email())
+				.param("phoneIdentifier", identifiers.phone())
+				.param("localPhoneIdentifier", identifiers.localPhone())
+				.param("legacyPhoneIdentifier", identifiers.legacyPhone())
 				.param("birthDate", birthDate)
 				.query((resultSet, rowNumber) -> new SelfServiceClientRecord(
 						resultSet.getObject("client_id", UUID.class),
-						resultSet.getString("full_name")
+						resultSet.getObject("person_id", UUID.class),
+						resultSet.getString("full_name"),
+						resultSet.getString("email"),
+						resultSet.getString("phone")
 				))
 				.optional();
 	}
 
+	static SelfServiceIdentifiers selfServiceIdentifiers(String identifier) {
+		String normalized = identifier == null ? "" : identifier.trim().toLowerCase();
+		if (normalized.contains("@")) {
+			return new SelfServiceIdentifiers(normalized, "", "", "");
+		}
+		String digits = normalized.replaceAll("\\D", "");
+		if (digits.length() == 10) {
+			return new SelfServiceIdentifiers("", "52" + digits, digits, "521" + digits);
+		}
+		if (digits.length() == 12 && digits.startsWith("52")) {
+			String local = digits.substring(2);
+			return new SelfServiceIdentifiers("", digits, local, "521" + local);
+		}
+		if (digits.length() == 13 && digits.startsWith("521")) {
+			String local = digits.substring(3);
+			return new SelfServiceIdentifiers("", "52" + local, local, digits);
+		}
+		return new SelfServiceIdentifiers("", digits, digits, digits);
+	}
+
 	public Optional<SelfServiceClientRecord> selfServiceProfile(UUID organizationId, UUID clientId) {
 		return jdbcClient.sql("""
-				SELECT c.id AS client_id, TRIM(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) AS full_name
+				SELECT c.id AS client_id, p.id AS person_id,
+				       TRIM(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) AS full_name,
+				       p.email, p.phone
 				FROM client c
 				JOIN person p ON p.id = c.person_id
 				WHERE c.organization_id = :organizationId
@@ -202,7 +237,10 @@ public class ClientRepository {
 				.param("clientId", clientId)
 				.query((resultSet, rowNumber) -> new SelfServiceClientRecord(
 						resultSet.getObject("client_id", UUID.class),
-						resultSet.getString("full_name")
+						resultSet.getObject("person_id", UUID.class),
+						resultSet.getString("full_name"),
+						resultSet.getString("email"),
+						resultSet.getString("phone")
 				))
 				.optional();
 	}
@@ -378,6 +416,9 @@ public class ClientRepository {
 	) {
 	}
 
-	public record SelfServiceClientRecord(UUID id, String fullName) {
+	public record SelfServiceClientRecord(UUID id, UUID personId, String fullName, String email, String phone) {
+	}
+
+	record SelfServiceIdentifiers(String email, String phone, String localPhone, String legacyPhone) {
 	}
 }

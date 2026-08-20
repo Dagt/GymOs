@@ -13,4 +13,6 @@ public interface CatalogPlanQueryPort {
 	Optional<PlanView> findPlan(UUID organizationId, UUID planId);
 
 	Optional<PlanView> findPlan(UUID organizationId, UUID branchId, UUID planId);
+
+	Optional<PlanView> findPlanByProduct(UUID organizationId, UUID productId);
 }
