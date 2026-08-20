@@ -5,6 +5,7 @@ import "./globals.css";
 import "./workout-pdf-single-template.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://gymfort.mx"),
   title: { default: "GymFort | Gestión inteligente para gimnasios", template: "%s | GymFort" },
   description: "Plataforma todo en uno para administrar miembros, accesos, ventas, reservas, inventario y reportes de gimnasios.",
   applicationName: "GymFort",
@@ -22,6 +23,9 @@ export const metadata: Metadata = {
     description: "Centraliza la operación de tu gimnasio y enfócate en crecer.",
     type: "website",
     locale: "es_MX",
+    url: "https://gymfort.mx",
+    siteName: "GymFort",
+    images: [{ url: "/gymfort_web_assets/gymfort-banner-1920x600.png", width: 1920, height: 600, alt: "GymFort" }],
   },
 };
 

@@ -27,7 +27,7 @@ export default function Home() {
   return <main className="landing-page">
     <header className="landing-nav">
       <Link className="landing-logo" href="/" aria-label="GymFort, inicio"><Image src="/gymfort_web_assets/gymfort-logo-navbar-96px.png" alt="GymFort" width={216} height={40} priority /></Link>
-      <nav aria-label="Navegación principal"><a href="#solucion">Solución</a><a href="#funciones">Funciones</a><a href="#como-funciona">Cómo funciona</a><a href="#contacto">Contacto</a></nav>
+      <nav aria-label="Navegación principal"><a href="#solucion">Solución</a><a href="#funciones">Funciones</a><a href="#como-funciona">Cómo funciona</a><Link href="/support">Soporte</Link><a href="#contacto">Contacto</a></nav>
       <div className="landing-nav-actions">{ready && session ? <button onClick={logout}>Salir</button> : null}<Link className="landing-login" href={destination}>{session ? "Ir a mi panel" : "Iniciar sesión"}</Link></div>
     </header>
 
@@ -41,6 +41,6 @@ export default function Home() {
     <section className="landing-section" id="funciones"><div className="landing-section-heading"><p>Una operación conectada</p><h2>Lo que necesitas para administrar mejor</h2><span>GymFort reúne las áreas críticas de tu gimnasio y ayuda a tu equipo a trabajar con una sola fuente de información.</span></div><div className="feature-grid">{features.map(([icon,title,text]) => <article key={title}><span>{icon}</span><h3>{title}</h3><p>{text}</p></article>)}</div></section>
     <section className="landing-steps" id="como-funciona"><div><p>Simple desde el primer día</p><h2>De la configuración a una operación más fuerte.</h2><span>La plataforma acompaña el flujo real de tu negocio sin agregar complejidad innecesaria.</span></div><ol>{steps.map(([title,text], index) => <li key={title}><b>0{index + 1}</b><section><h3>{title}</h3><p>{text}</p></section></li>)}</ol></section>
     <section className="landing-contact" id="contacto"><div><p>¿Quieres conocer GymFort?</p><h2>Conversemos sobre la operación de tu gimnasio.</h2><span>Cuéntanos qué necesitas y te ayudaremos a evaluar si GymFort es adecuado para tu equipo.</span></div><a href="mailto:contacto@gymfort.mx?subject=Quiero%20conocer%20GymFort">contacto@gymfort.mx <span>→</span></a></section>
-    <footer className="landing-footer"><div><Image src="/gymfort_web_assets/gymfort-logo-navbar-96px.png" alt="GymFort" width={194} height={36} /><p>Software de gestión para gimnasios y centros deportivos.</p></div><nav><Link href="/privacidad">Privacidad</Link><Link href="/terminos">Términos de servicio</Link><a href="mailto:contacto@gymfort.mx">Contacto</a></nav><small>© {new Date().getFullYear()} GymFort. Todos los derechos reservados.</small></footer>
+    <footer className="landing-footer"><div><Image src="/gymfort_web_assets/gymfort-logo-navbar-96px.png" alt="GymFort" width={194} height={36} /><p>Software de gestión para gimnasios y centros deportivos.</p></div><nav><Link href="/privacy-policy">Privacidad</Link><Link href="/terms-of-service">Términos de servicio</Link><Link href="/support">Soporte</Link><a href="mailto:contacto@gymfort.mx">Contacto</a></nav><small>© {new Date().getFullYear()} GymFort. Todos los derechos reservados.</small></footer>
   </main>;
 }

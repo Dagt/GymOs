@@ -96,7 +96,7 @@ export function isSupportMode(user: CurrentUser) {
 
 export function canAccessRoute(user: CurrentUser, pathname: string) {
   const console = resolveUserConsole(user);
-  if (pathname === "/" || pathname === "/login" || pathname.startsWith("/kiosk")) {
+  if (publicRoutes.some((route) => matches(pathname, route)) || pathname.startsWith("/kiosk")) {
     return true;
   }
   if (pathname.startsWith("/platform")) {
@@ -181,3 +181,4 @@ const managerRoutes = [
 
 const receptionRoutes = ["/reception", "/pos", "/clients", "/sales", "/reports/sales", "/bookings", "/wellness"];
 const coachRoutes = ["/coaches", "/clients"];
+const publicRoutes = ["/", "/login", "/privacy-policy", "/terms-of-service", "/support", "/privacidad", "/terminos"];
