@@ -43,7 +43,7 @@ export function TeamOverview({ branches, roles, onCreateUser }: { branches: Bran
 export function TeamContextCard({ branches, organization, session, roles, users }: { branches: BranchSummary[]; organization: OrganizationSummary | null; session: StoredSession; roles: RoleOption[]; users: InternalUserSummary[] }) {
   return (
     <section className="team-side"><section className="app-card p-5"><p className="app-eyebrow">Contexto</p><h2 className="mt-2 text-xl font-semibold">Alcance operativo</h2><div className="team-context-list">
-      <article><span>Gimnasio</span><strong>{organization?.tradeName ?? session.user.organizationName ?? "GymOS"}</strong></article>
+      <article><span>Gimnasio</span><strong>{organization?.tradeName ?? session.user.organizationName ?? "GymFort"}</strong></article>
       <article><span>Sucursales</span><strong>{branches.length}</strong></article>
       <article><span>Usuarios activos</span><strong>{users.filter((user) => user.status === "ACTIVE").length}</strong></article>
       <article><span>Roles disponibles</span><strong>{roles.length}</strong></article>
@@ -271,4 +271,3 @@ export function CreateUserDrawer({ branches, branchSelectionLocked, coachBio, co
     </AppDrawer>
   );
 }
-

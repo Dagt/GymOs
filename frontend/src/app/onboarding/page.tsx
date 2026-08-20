@@ -146,7 +146,7 @@ export default function OnboardingPage() {
     <AppShell
       eyebrow="Configuracion"
       session={session}
-      subtitle="Configura datos comerciales minimos para mostrar y operar GymOS con un gimnasio real."
+      subtitle="Configura los datos comerciales mínimos para operar GymFort con un gimnasio real."
       title="Onboarding operativo"
     >
       <section className="grid gap-6 lg:grid-cols-[0.9fr_1.3fr]">

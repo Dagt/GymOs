@@ -569,7 +569,7 @@ export default function KioskPage() {
             ) : (
               <span className="kiosk-logo-fallback">{(session?.brandName ?? session?.organizationName ?? "G").slice(0, 1)}</span>
             )}
-            <div><p>Autoservicio</p><h1>{session?.brandName ?? session?.organizationName ?? session?.terminalName ?? "GymOS"}</h1><span>Membresías, reservas y datos personales en una sesión segura.</span></div>
+            <div><p>Autoservicio</p><h1>{session?.brandName ?? session?.organizationName ?? session?.terminalName ?? "GymFort"}</h1><span>Membresías, reservas y datos personales en una sesión segura.</span></div>
           </div>
           <aside>
             <strong>{session ? "Sesión segura" : "Modo kiosco"}</strong>

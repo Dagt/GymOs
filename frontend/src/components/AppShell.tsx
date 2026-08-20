@@ -243,7 +243,7 @@ export function AppShell({
       <section className="admin-workspace">
         {supportMode ? (
           <section className="support-banner" role="status">
-            <strong>Modo soporte GymOS</strong>
+            <strong>Modo soporte GymFort</strong>
             <span>Estas operando dentro de este gimnasio para apoyar al cliente. Las acciones quedan auditadas.</span>
           </section>
         ) : null}

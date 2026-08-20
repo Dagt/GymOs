@@ -27,7 +27,7 @@ export default function KioskLaunchPage() {
     }
     const kioskWindow = window.open("about:blank", "_blank");
     if (!kioskWindow) {
-      setError("El navegador bloqueó la nueva pestaña. Permite ventanas emergentes para GymOS y vuelve a intentar.");
+      setError("El navegador bloqueó la nueva pestaña. Permite ventanas emergentes para GymFort y vuelve a intentar.");
       return;
     }
     kioskWindow.opener = null;
@@ -50,7 +50,7 @@ export default function KioskLaunchPage() {
       <section className="w-full max-w-2xl rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl">
         <p className="text-xs font-black uppercase tracking-[0.25em] text-white/60">Recepción</p>
         <h1 className="mt-3 text-3xl font-black">Abrir kiosco para socios</h1>
-        <p className="mt-4 text-white/75">GymOS abrirá una pestaña separada con una sesión limitada. La caja, el POS y la sesión administrativa permanecerán fuera del kiosco.</p>
+        <p className="mt-4 text-white/75">GymFort abrirá una pestaña separada con una sesión limitada. La caja, el POS y la sesión administrativa permanecerán fuera del kiosco.</p>
         <ol className="mt-6 grid gap-3 text-sm text-white/80 sm:grid-cols-3">
           <li className="rounded-xl border border-white/10 bg-white/5 p-4"><strong className="block text-white">1. Abrir</strong>No registres esta computadora ni le asignes un ID.</li>
           <li className="rounded-xl border border-white/10 bg-white/5 p-4"><strong className="block text-white">2. Maximizar</strong>Deja la pestaña a pantalla completa para el socio.</li>

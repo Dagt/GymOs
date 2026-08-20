@@ -43,7 +43,7 @@ export default function LoginPage() {
     return (
       <main className="admin-empty-state">
         <section>
-          <p>GymOS</p>
+          <p>GymFort</p>
           <h1>Abriendo tu panel...</h1>
           <span>Tu sesion sigue activa en este navegador.</span>
         </section>
@@ -58,10 +58,10 @@ export default function LoginPage() {
           <p>Acceso seguro</p>
           <h1>Entra directo a tu panel.</h1>
           <span>
-            GymOS identifica tu rol y te lleva a administracion de plataforma, gerencia o recepcion sin pasos extra.
+            GymFort identifica tu rol y te lleva a administración de plataforma, gerencia o recepción sin pasos extra.
           </span>
           <div>
-            <small>Admin GymOS</small>
+            <small>Admin GymFort</small>
             <small>Dueño del gimnasio</small>
             <small>Gerente</small>
             <small>Recepcion y caja</small>
@@ -71,7 +71,7 @@ export default function LoginPage() {
         <section className="login-form-panel">
           <div className="login-form-header">
             <div>
-              <p>GymOS</p>
+              <p>GymFort</p>
               <h2>Iniciar sesion</h2>
               <span>Al validar tus credenciales entraras automaticamente al panel correcto.</span>
             </div>
@@ -84,7 +84,7 @@ export default function LoginPage() {
               <input
                 autoComplete="username"
                 onChange={(event) => setUsername(event.target.value)}
-                placeholder="admin@gymos.local"
+                placeholder="tu@empresa.com"
                 value={username}
               />
             </label>
@@ -103,7 +103,7 @@ export default function LoginPage() {
             {error ? <p className="login-error">{error}</p> : null}
 
             <button disabled={loading} type="submit">
-              {loading ? "Validando acceso..." : "Entrar a GymOS"}
+              {loading ? "Validando acceso..." : "Entrar a GymFort"}
             </button>
           </form>
         </section>
@@ -111,4 +111,3 @@ export default function LoginPage() {
     </main>
   );
 }
-

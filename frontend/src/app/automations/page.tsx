@@ -54,13 +54,13 @@ export default function AutomationsPage() {
   const [paymentMethod, setPaymentMethod] = useState("ALL");
   const [minimumAmountPesos, setMinimumAmountPesos] = useState("");
   const [paymentContext, setPaymentContext] = useState("ALL");
-  const [ruleSubject, setRuleSubject] = useState("Recordatorio GymOS");
+  const [ruleSubject, setRuleSubject] = useState("Recordatorio GymFort");
   const [ruleBody, setRuleBody] = useState("");
   const [ruleChannel, setRuleChannel] = useState<RuleChannel>("IN_APP");
   const [notificationBody, setNotificationBody] = useState("");
   const [notificationChannel, setNotificationChannel] = useState<"IN_APP" | "EMAIL">("IN_APP");
   const [notificationRecipient, setNotificationRecipient] = useState("");
-  const [notificationSubject, setNotificationSubject] = useState("Mensaje de GymOS");
+  const [notificationSubject, setNotificationSubject] = useState("Mensaje de GymFort");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);

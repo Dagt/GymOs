@@ -1001,7 +1001,7 @@ export function CreateAppointmentModal({
                   🌐 Atención Externa / Por Solicitud
                 </strong>
                 <p className="leading-relaxed">
-                  Este profesional no usa los horarios internos de GymOS. La fecha y hora se registrarán como solicitud y podrán ajustarse al coordinar con el especialista.
+                  Este profesional no usa los horarios internos de GymFort. La fecha y hora se registrarán como solicitud y podrán ajustarse al coordinar con el especialista.
                 </p>
                 <p className="text-[11px] font-bold text-sky-800">
                   ✓ Estatus inicial de la cita: SOLICITADA (Pending confirmation).

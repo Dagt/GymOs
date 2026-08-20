@@ -27,9 +27,9 @@ export default function PlatformGymnasiumsPage() {
   return (
     <AppShell
       branchName={platform.activeBranch?.name}
-      eyebrow="Plataforma GymOS"
+      eyebrow="Plataforma GymFort"
       mode="setup"
-      organizationName="GymOS"
+      organizationName="GymFort"
       session={platform.session}
       subtitle="Tus clientes, sus sucursales, marca, usuarios y acceso de soporte en un solo lugar."
       title="CRM de gimnasios cliente"

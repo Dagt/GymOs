@@ -7,7 +7,7 @@ export default function KioskCheckoutResultPage() {
         <p className="app-eyebrow">Self checkout</p>
         <h1 className="mt-2 text-3xl font-black">Estamos verificando el resultado</h1>
         <p className="mt-4 text-sm leading-6 text-[var(--brand-muted)]">
-          El regreso desde Stripe no se toma como comprobante. GymOS confirmará el pago o la
+          El regreso desde Stripe no se toma como comprobante. GymFort confirmará el pago o la
           autorización de domiciliación únicamente cuando reciba el webhook firmado y consulte
           el estado autoritativo en Stripe.
         </p>

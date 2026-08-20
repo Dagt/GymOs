@@ -101,7 +101,7 @@ test("branchless tenant users only see setup-safe links", () => {
   assert.deepEqual(sectionLabels(sections), ["Equipo y accesos", "Configuración"]);
 });
 
-test("platform shell uses neutral GymOS brand outside support mode", () => {
+test("platform shell uses neutral GymFort brand outside support mode", () => {
   const session: StoredSession = {
     accessToken: "token",
     refreshToken: "refresh",
@@ -118,8 +118,8 @@ test("platform shell uses neutral GymOS brand outside support mode", () => {
     variant: "platform",
     visibleBranch: "Centro",
   }), {
-    logoUrl: null,
-    name: "GymOS Plataforma",
+    logoUrl: "/brand/gymfort-symbol.svg",
+    name: "GymFort Plataforma",
     scope: "CRM de gimnasios",
   });
 });

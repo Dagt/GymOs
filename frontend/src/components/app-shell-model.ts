@@ -32,7 +32,7 @@ const memberWorkflowPermissions = [
 
 const platformSections: NavigationSection[] = [
   {
-    title: "Negocio GymOS",
+    title: "Negocio GymFort",
     links: [
       { label: "Gimnasios cliente", href: "/platform/gymnasiums", hint: "CRM, tenants y soporte", permissions: ["platform.admin"] },
     ],
@@ -219,15 +219,15 @@ export function resolveShellBrand({
 }): ShellBrand {
   if (variant === "platform" || (isPlatformAdmin(session.user) && !isSupportMode(session.user))) {
     return {
-      logoUrl: null,
-      name: "GymOS Plataforma",
+      logoUrl: "/brand/gymfort-symbol.svg",
+      name: "GymFort Plataforma",
       scope: "CRM de gimnasios",
     };
   }
 
   return {
-    logoUrl: session.user.logoUrl,
-    name: organizationName ?? session.user.brandName ?? session.user.organizationName ?? "GymOS",
+    logoUrl: session.user.logoUrl ?? "/brand/gymfort-symbol.svg",
+    name: organizationName ?? session.user.brandName ?? session.user.organizationName ?? "GymFort",
     scope: visibleBranch,
   };
 }

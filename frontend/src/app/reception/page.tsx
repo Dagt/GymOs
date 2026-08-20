@@ -79,7 +79,7 @@ export default function ReceptionPage() {
   const canOperate = Boolean(session?.user.branchId);
   const visibleBranchName = activeBranch?.name ?? (session?.user.branchId ? "Sucursal activa" : null);
   const receptionOrganizationName =
-    organization?.tradeName ?? session?.user.brandName ?? session?.user.organizationName ?? "GymOS";
+    organization?.tradeName ?? session?.user.brandName ?? session?.user.organizationName ?? "GymFort";
 
   async function switchBranch(branchId: string) {
     if (!session || branchId === session.user.branchId) {

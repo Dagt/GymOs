@@ -10,7 +10,7 @@ import { canAccessRoute } from "../../lib/role-model.ts";
 import type { CurrentUser } from "../../lib/api/auth-types.ts";
 
 test("normalizes user-facing role names", () => {
-  assert.equal(displayRoleName("Administrador GymOS"), "Admin GymOS");
+  assert.equal(displayRoleName("Administrador GymOS"), "Admin GymFort");
   assert.equal(displayRoleName("Administrador"), "Dueno del gimnasio");
   assert.equal(displayRoleName("Gerente"), "Gerente");
   assert.equal(displayRoleName("Recepcion y caja"), "Recepcion");

@@ -1,6 +1,6 @@
-# GymOS Frontend
+# GymFort Frontend
 
-Aplicacion web interna de GymOS para recepcion, administracion y kiosco.
+Aplicación web de GymFort para recepción, administración y kiosco.
 
 ## Comandos
 
