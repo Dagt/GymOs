@@ -253,9 +253,9 @@ Implementacion frontend:
 Reglas de producto:
 - La personalizacion visual ya pertenece al gimnasio/tenant y se persiste en backend.
 - El panel de plataforma conserva tema neutral; gerencia, recepción, coaches y
-  kiosco usan la marca del gimnasio activo. La atribución GymFort aparece en
-  una franja de producto independiente, por encima de la tarjeta de marca
-  tenant y separada de la identidad de la sesión.
+  kiosco usan la marca del gimnasio activo. En el menú lateral tenant aparecen
+  primero el logo, nombre del gimnasio y sucursal; debajo se muestra la sesión
+  activa y la atribución GymFort queda discreta y permanente en el pie.
 - La marca tambien viaja en `CurrentUser` para que roles sin permiso de administracion puedan ver logo, color principal, acento y fondo del gimnasio activo.
 - Ninguna regla de negocio se mueve al frontend.
 - Los formularios deben usar etiquetas de negocio entendibles para recepcion y administracion.
@@ -375,10 +375,14 @@ Formularios:
 - Éxitos, advertencias y errores se presentan mediante el sistema global de
   notificaciones flotantes. Debe mantenerse visible sin importar el scroll,
   admitir cierre, semántica accesible y evitar banners locales duplicados.
-- Automatizaciones y Configuración usan centros de control oscuros, tipografía,
-  tarjetas y espaciado del `AppShell`. Configuración separa el resumen del
+- Automatizaciones y Configuración usan el mismo encabezado oscuro y las mismas
+  superficies claras, tipografía, tarjetas y espaciado del resto de `AppShell`,
+  tomando Catálogo como referencia. Configuración separa el resumen del
   gimnasio de una navegación fija de servicios conectados; Automatizaciones
   separa acciones, salud operativa, reglas y entregas recientes.
+- Los títulos de grupo del menú lateral tienen mayor jerarquía tipográfica que
+  los enlaces internos; la descripción activa permanece secundaria para evitar
+  que submenús extensos compitan con la estructura principal.
 - Gerencia ve los interruptores operativos de una cuenta Stripe existente, pero
   los botones de conectar/refrescar sólo aparecen con
   `payment.provider.stripe.manage` o `platform.admin`.

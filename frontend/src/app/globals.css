@@ -6140,3 +6140,267 @@ button.admin-secondary-link:disabled {
 
   .app-notice { width: 100%; }
 }
+
+/* --- TENANT-FIRST SIDEBAR AND UNIFIED ADMIN WORKSPACES ------------------ */
+.admin-sidebar .admin-sidebar-brand {
+  background: rgba(255, 255, 255, .045);
+  border: 1px solid rgba(255, 255, 255, .09);
+  border-radius: .75rem;
+  gap: .75rem;
+  padding: .75rem;
+}
+
+.admin-sidebar .admin-sidebar-brand > span,
+.admin-sidebar .admin-sidebar-brand > span.with-logo {
+  height: 3rem;
+  width: 3rem;
+}
+
+.admin-sidebar .admin-sidebar-brand strong {
+  display: -webkit-box;
+  font-size: 1.02rem;
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.admin-sidebar .admin-sidebar-brand small {
+  color: rgba(226, 244, 240, .62);
+  font-size: .68rem;
+}
+
+.admin-session-card {
+  align-items: center;
+  background: rgba(255, 255, 255, .025);
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: .65rem;
+  display: grid;
+  gap: .65rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: .7rem .75rem;
+}
+
+.admin-session-card button {
+  background: rgba(255, 255, 255, .075);
+  border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: .5rem;
+  color: rgba(242, 252, 249, .86);
+  cursor: pointer;
+  font-size: .72rem;
+  font-weight: 850;
+  min-height: 2.15rem;
+  padding: .35rem .65rem;
+}
+
+.admin-session-card button:hover {
+  background: rgba(255, 255, 255, .12);
+  color: white;
+}
+
+.admin-nav-section summary {
+  color: rgba(228, 245, 241, .68);
+  font-size: .8rem;
+  letter-spacing: .08em;
+  padding: .55rem .65rem;
+}
+
+.admin-sidebar nav a {
+  padding: .55rem .7rem;
+}
+
+.admin-sidebar nav a strong {
+  font-size: .76rem;
+  font-weight: 820;
+}
+
+.admin-sidebar nav a span {
+  font-size: .62rem;
+}
+
+.admin-sidebar-footer {
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, .08);
+  display: flex;
+  justify-content: center;
+  margin-top: auto;
+  padding-top: .9rem;
+}
+
+.admin-product-footer {
+  align-items: center;
+  display: inline-flex;
+  justify-content: center;
+  opacity: .72;
+  padding: .25rem;
+  transition: opacity 150ms ease;
+}
+
+.admin-product-footer:hover {
+  opacity: 1;
+}
+
+.admin-product-footer img {
+  height: auto;
+  object-fit: contain;
+  width: 6.8rem;
+}
+
+.settings-console .settings-overview-card,
+.settings-console .settings-detail-panel,
+.automation-control-bar,
+.automation-health-panel,
+.automation-panel {
+  background: color-mix(in srgb, white 97%, var(--brand-surface)) !important;
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 10%, var(--brand-line)) !important;
+  border-radius: .75rem;
+  box-shadow: 0 12px 35px rgba(9, 42, 37, .055) !important;
+  color: var(--brand-ink);
+}
+
+.settings-overview-card .admin-panel-header h2,
+.settings-overview-card .app-eyebrow,
+.settings-overview-card > div > h2,
+.settings-detail-panel > h2,
+.settings-detail-panel h3,
+.settings-detail-panel label,
+.settings-detail-panel > strong,
+.automation-control-bar h2,
+.automation-health-panel h2,
+.automation-panel h2 {
+  color: var(--brand-ink);
+}
+
+.settings-overview-card .admin-panel-header p,
+.settings-overview-card .admin-muted-text,
+.settings-detail-panel p,
+.settings-detail-panel small,
+.settings-detail-panel [class*="text-[var(--brand-muted)]"],
+.automation-control-bar span,
+.automation-health-panel p,
+.automation-panel [class*="text-[var(--brand-muted)]"],
+.automation-panel [class*="text-[#6f7a73]"] {
+  color: var(--brand-muted) !important;
+}
+
+.settings-overview-card article,
+.settings-overview-card .admin-empty-card,
+.settings-detail-panel > label,
+.settings-detail-panel article,
+.settings-detail-panel form label.rounded-md,
+.settings-detail-panel > div.rounded-md,
+.automations-console .automation-record,
+.automation-panel > div > p,
+.automation-panel > p {
+  background: color-mix(in srgb, var(--brand-surface) 56%, white) !important;
+  border-color: color-mix(in srgb, var(--brand-primary) 10%, var(--brand-line)) !important;
+  color: var(--brand-ink);
+}
+
+.settings-overview-card article p,
+.settings-overview-card article span {
+  color: var(--brand-muted) !important;
+}
+
+.settings-overview-card .admin-secondary-link,
+.settings-overview-card article .admin-text-button {
+  color: var(--brand-action);
+}
+
+.settings-section-nav {
+  align-items: center;
+  background: color-mix(in srgb, white 97%, var(--brand-surface));
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 10%, var(--brand-line));
+  border-radius: .75rem;
+  box-shadow: 0 10px 28px rgba(9, 42, 37, .045);
+  color: var(--brand-ink);
+  display: flex;
+  gap: 1.25rem;
+  justify-content: space-between;
+  padding: .85rem 1rem;
+  position: sticky;
+  top: .75rem;
+  z-index: 20;
+}
+
+.settings-section-nav p,
+.automation-control-bar p {
+  color: var(--brand-primary);
+}
+
+.settings-section-nav span {
+  color: var(--brand-muted);
+}
+
+.settings-section-tab {
+  background: color-mix(in srgb, var(--brand-surface) 64%, white) !important;
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 10%, var(--brand-line)) !important;
+  color: color-mix(in srgb, var(--brand-primary) 74%, var(--brand-ink)) !important;
+}
+
+.settings-section-tab:hover {
+  background: color-mix(in srgb, var(--brand-accent) 8%, white) !important;
+  border-color: color-mix(in srgb, var(--brand-accent) 35%, var(--brand-line)) !important;
+  color: var(--brand-action) !important;
+}
+
+.settings-section-tab.active {
+  background: var(--brand-action) !important;
+  border-color: var(--brand-action) !important;
+  color: white !important;
+}
+
+.settings-detail-panel input:not([type="checkbox"]):not([type="radio"]),
+.settings-detail-panel select,
+.settings-detail-panel textarea {
+  background: white !important;
+  border-color: color-mix(in srgb, var(--brand-primary) 12%, var(--brand-line)) !important;
+  color: var(--brand-ink) !important;
+}
+
+.settings-detail-panel table,
+.automation-panel table {
+  color: var(--brand-ink);
+}
+
+.settings-detail-panel table thead,
+.settings-detail-panel table th,
+.automation-panel table thead,
+.automation-panel table th {
+  background: color-mix(in srgb, var(--brand-primary) 5%, white) !important;
+  color: color-mix(in srgb, var(--brand-primary) 70%, #263b37) !important;
+}
+
+.settings-detail-panel table tr,
+.automation-panel table tr {
+  border-color: var(--brand-line) !important;
+}
+
+.automation-health-panel.critical {
+  background: linear-gradient(145deg, #fff7f7, #fff1f2) !important;
+  border-color: #fecaca !important;
+}
+
+.automations-console .automation-record {
+  border-radius: .6rem;
+  color: var(--brand-ink);
+}
+
+.automation-panel [class*="text-[#8c2f2f]"] {
+  color: #8c2f2f !important;
+}
+
+@media (max-width: 640px) {
+  .admin-session-card {
+    padding: .65rem .7rem;
+  }
+
+  .admin-sidebar-footer {
+    display: flex;
+    grid-template-columns: none;
+    justify-content: flex-start;
+    padding-top: .7rem;
+  }
+}

@@ -62,12 +62,11 @@ del código, migraciones y pruebas.
 - El retorno del navegador desde Stripe no confirma un cobro. Webhook firmado y
   consulta autoritativa producen, de forma idempotente, venta, pago, recibo y
   periodo de membresía.
-- Configuración y Automatizaciones usan centros de control oscuros, segmentados
-  y consistentes con el resto del shell; los mensajes se muestran como
+- Configuración y Automatizaciones comparten las superficies claras de Catálogo,
+  el encabezado oscuro y el espaciado del shell; los mensajes se muestran como
   notificaciones flotantes accesibles, visibles sin importar el scroll.
-- La marca del gimnasio personaliza la experiencia tenant, pero GymFort mantiene
-  atribución permanente como producto en una franja propia, separada del usuario
-  de sesión y de la tarjeta de marca tenant.
+- El menú prioriza logo, gimnasio y sucursal; después muestra usuario y salida.
+  GymFort conserva atribución permanente y discreta en el pie del lateral.
 
 ## 4. Validación del corte
 

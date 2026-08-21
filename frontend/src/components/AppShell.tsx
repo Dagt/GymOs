@@ -175,10 +175,6 @@ export function AppShell({
       <div className="app-notice-region" id="app-notice-region" />
       {!hideSidebar ? (
         <aside className="admin-sidebar">
-          <Link aria-label="Ir al inicio de GymFort" className="admin-product-masthead" href={role.homePath}>
-            <Image alt="GymFort" height={27} src="/gymfort_web_assets/gymfort-logo-horizontal-white.png" width={122} />
-          </Link>
-
           <div className="admin-sidebar-brand">
             <span className={showBrandLogo ? "with-logo" : undefined}>
               {showBrandLogo ? (
@@ -191,10 +187,12 @@ export function AppShell({
             </div>
           </div>
 
-          <section className="admin-user-card" aria-label="Perfil activo">
-            <p>Entraste como</p>
-            <strong>{role.label}</strong>
-            <span>{role.description}</span>
+          <section className="admin-session-card" aria-label="Sesión activa">
+            <div className="admin-session-identity">
+              <span>{session.user.fullName}</span>
+              <small>{session.user.username}</small>
+            </div>
+            <button onClick={logout} type="button">Salir</button>
           </section>
 
           {platformAdmin && !pathname.startsWith("/platform") ? (
@@ -240,11 +238,9 @@ export function AppShell({
           </nav>
 
           <div className="admin-sidebar-footer">
-            <div className="admin-session-identity">
-              <span>{session.user.fullName}</span>
-              <small>{session.user.username}</small>
-            </div>
-            <button onClick={logout} type="button">Salir</button>
+            <Link aria-label="Ir al inicio de GymFort" className="admin-product-footer" href={role.homePath}>
+              <Image alt="GymFort" height={27} src="/gymfort_web_assets/gymfort-logo-horizontal-white.png" width={122} />
+            </Link>
           </div>
         </aside>
       ) : null}

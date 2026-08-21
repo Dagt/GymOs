@@ -7,10 +7,11 @@ nombre técnico interno durante la transición de marca.
 
 - Adopt the visible GymFort product identity while preserving compatible
   internal `gymos` packages, variables and data identifiers.
-- Add permanent GymFort product attribution in its own sidebar masthead,
-  separated from the tenant logo and signed-in user identity.
-- Unify Automations and Organization settings with the dark application shell
-  and replace page-top feedback boxes with accessible floating notifications.
+- Put the tenant logo, gym name and active branch first in the sidebar; move the
+  signed-in user controls below it and keep GymFort attribution in the footer.
+- Align Automations and Organization settings with the same light workspace
+  surfaces used by Catalog while retaining the shared dark command header, and
+  replace page-top feedback boxes with accessible floating notifications.
 - Add Stripe Connect, hosted Checkout, signed webhooks, reconciliation,
   receipts, recurring card mandates, retries and tenant-scoped histories.
 - Support kiosk membership enrollment, renewal and plan changes only after
