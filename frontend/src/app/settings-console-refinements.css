@@ -1,0 +1,68 @@
+/* Configuration workspace refinements.
+   Keep tenant color on first-level surfaces and use neutral controls inside them. */
+.settings-services-shell {
+  background: color-mix(in srgb, white 97%, var(--brand-surface));
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 10%, var(--brand-line));
+  border-radius: .75rem;
+  box-shadow: 0 12px 35px rgba(9, 42, 37, .055);
+  overflow: hidden;
+}
+
+.settings-services-shell .settings-section-nav {
+  background: color-mix(in srgb, var(--brand-surface) 36%, white);
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--brand-primary) 10%, var(--brand-line));
+  border-radius: 0;
+  box-shadow: none;
+  position: static;
+  top: auto;
+}
+
+.settings-services-shell .settings-detail-panel {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+.settings-services-shell .settings-group-card {
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--brand-primary) 4%, white),
+      color-mix(in srgb, var(--brand-accent) 8%, white)
+    ) !important;
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 16%, var(--brand-line)) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .82);
+}
+
+.settings-services-shell .settings-option-row,
+.settings-services-shell .settings-branch-container {
+  background: white !important;
+  border-color: color-mix(in srgb, var(--brand-primary) 12%, var(--brand-line)) !important;
+  box-shadow: none !important;
+}
+
+.settings-services-shell .settings-option-row.is-disabled {
+  background: color-mix(in srgb, var(--brand-surface) 22%, white) !important;
+}
+
+.settings-services-shell .settings-action-strip {
+  background: color-mix(in srgb, var(--brand-surface) 38%, white) !important;
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 8%, var(--brand-line));
+}
+
+.settings-services-shell .settings-info-panel {
+  background: white !important;
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 12%, var(--brand-line)) !important;
+}
+
+.settings-services-shell .settings-section-tabs {
+  align-items: center;
+}
+
+@media (max-width: 980px) {
+  .settings-services-shell .settings-section-nav {
+    align-items: stretch;
+  }
+}
