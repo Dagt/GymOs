@@ -90,7 +90,7 @@ gymos:
     preference-key: ${GYMOS_NOTIFICATION_PREFERENCE_KEY:dev-only-notification-preference-key-change-in-production}
     smtp:
       enabled: ${GYMOS_SMTP_ENABLED:false}
-      provider-name: ${GYMOS_SMTP_PROVIDER_NAME:Zoho Mail}
+      provider-name: ${GYMOS_SMTP_PROVIDER_NAME:ZeptoMail}
       host: ${GYMOS_SMTP_HOST:}
       port: ${GYMOS_SMTP_PORT:587}
       username: ${GYMOS_SMTP_USERNAME:}
