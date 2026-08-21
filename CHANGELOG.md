@@ -9,14 +9,21 @@ nombre técnico interno durante la transición de marca.
   internal `gymos` packages, variables and data identifiers.
 - Put the tenant logo, gym name and active branch first in the sidebar; move the
   signed-in user controls below it and keep GymFort attribution in the footer.
-- Clarify sidebar hierarchy with stronger section/child separation and a more
-  visible current-page treatment without changing the GymFort visual language.
+- Clarify sidebar hierarchy with stronger section/child separation, tree cues
+  and a more visible current-page/section treatment without changing the GymFort
+  visual language.
+- Retire the redundant `Operación diaria` page and route; managers now land on
+  the first useful authorized workspace, prioritizing executive indicators.
 - Align Automations and Organization settings with the same light workspace
   surfaces used by Catalog while retaining the shared dark command header, and
   replace page-top feedback boxes with accessible floating notifications.
-- Replace payment and kiosk capability checkboxes with toggles, group reception
-  and Stripe settings, make manual terminal/Mercado Pago mutually exclusive and
-  enforce Stripe readiness for dependent kiosk capabilities.
+- Join connected-service tabs to their active configuration panel and reserve
+  tenant gradient/tint for first-level groups while keeping nested controls
+  neutral and readable.
+- Replace payment and kiosk capability checkboxes with tenant-aware toggles whose
+  outline/knob use the primary color and whose active track uses the accent;
+  group reception and Stripe settings, make manual terminal/Mercado Pago mutually
+  exclusive and enforce Stripe readiness for dependent kiosk capabilities.
 - Add Stripe Connect, hosted Checkout, signed webhooks, reconciliation,
   receipts, recurring card mandates, retries and tenant-scoped histories.
 - Support kiosk membership enrollment, renewal and plan changes only after
