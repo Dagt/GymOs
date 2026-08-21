@@ -65,7 +65,9 @@ public record NotificationProperties(
 
 		public String displayName() {
 			if (providerName != null) return providerName;
-			return host != null && host.toLowerCase(Locale.ROOT).contains("zoho") ? "Zoho Mail" : "Servidor SMTP";
+			if (host != null && host.toLowerCase(Locale.ROOT).contains("zeptomail")) return "ZeptoMail";
+			if (host != null && host.toLowerCase(Locale.ROOT).contains("zoho")) return "Zoho Mail";
+			return "Servidor SMTP";
 		}
 
 		public String preferredFromAddress() {
@@ -85,7 +87,7 @@ public record NotificationProperties(
 
 		private static Smtp disabled() {
 			return new Smtp(
-					false, "Zoho Mail", null, 587, null, null, List.of(),
+					false, "ZeptoMail", null, 587, null, null, List.of(),
 					true, true, true, false, true, 10000, 10000, 10000
 			);
 		}
