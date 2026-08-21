@@ -118,6 +118,9 @@ export function canAccessRoute(user: CurrentUser, pathname: string) {
     return tenantOwnerRoutes.some((route) => matches(pathname, route));
   }
   if (console === "TENANT_MANAGER") {
+    if (matches(pathname, "/dashboard")) {
+      return user.permissions.includes("report.owner.read");
+    }
     if (matches(pathname, "/settings/organization")) {
       return hasAny(user, ["payment.settings.manage", "selfservice.settings.manage", "notification.settings.manage"]);
     }
@@ -139,7 +142,8 @@ function hasAny(user: CurrentUser, permissions: string[]) {
 }
 
 function managerHomePath(user: CurrentUser) {
-  if (hasAny(user, ["report.owner.read", "report.sales.read"])) return "/dashboard";
+  if (user.permissions.includes("report.owner.read")) return "/dashboard";
+  if (user.permissions.includes("report.sales.read")) return "/reports/sales";
   if (hasAny(user, ["client.read", "client.create", "client.update", "membership.read", "membership.renew", "membership.change-plan"])) return "/clients";
   if (user.permissions.includes("booking.read")) return "/bookings";
   if (user.permissions.includes("professional.read")) return "/wellness";
@@ -151,7 +155,7 @@ function managerHomePath(user: CurrentUser) {
   if (user.permissions.includes("catalog.read")) return "/catalog";
   if (user.permissions.includes("benefit.read")) return "/benefits";
   if (user.permissions.includes("automation.read")) return "/automations";
-  return "/dashboard";
+  return "/clients";
 }
 
 function isKnownConsole(value: string): value is UserConsole {
@@ -183,7 +187,6 @@ const tenantOwnerRoutes = [
 ];
 
 const managerRoutes = [
-  "/dashboard",
   "/reports",
   "/settings/organization",
   "/users",
