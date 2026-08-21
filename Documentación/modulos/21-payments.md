@@ -7,6 +7,11 @@ Estado: FUNCIONAL / LISTO PARA ACEPTACIÓN CONECTADA
 
 - Configuración tenant para terminal manual de recepción, Mercado Pago Point,
   Stripe self checkout y Stripe recurrente.
+- Terminal manual y Mercado Pago Point son modalidades excluyentes: activar una
+  apaga la otra en la interfaz y el backend rechaza estados con ambas activas.
+- Stripe self checkout gobierna las capacidades pagadas del kiosco; si está
+  deshabilitado, compra, renovación y cambio de plan quedan bloqueados. La
+  domiciliación del kiosco exige además Stripe recurrente habilitado.
 - Conexiones de proveedor y credenciales cifradas fuera de los contratos web.
 - Stripe Connect con cuenta Express y Account Links; Checkout alojado para
   contratación, renovación, cambio de plan y otros cobros del kiosco.
@@ -43,7 +48,8 @@ esa ruta, y webhooks públicos endurecidos en
 ## Evidencia
 
 - Pruebas unitarias de configuración, firma, conciliación, idempotencia y
-  recurrencia dentro de la suite backend.
+  recurrencia dentro de la suite backend, incluida la exclusividad entre
+  terminal independiente y Mercado Pago y las dependencias Stripe del kiosco.
 - Integración PostgreSQL opt-in mediante `postgresIntegrationTest`.
 - Contrato Stripe opt-in mediante `stripeTest`, que rechaza llaves live.
 - Recorridos manuales test de Checkout, retorno, webhook, recibo y domiciliación.
