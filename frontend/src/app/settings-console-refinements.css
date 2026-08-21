@@ -1,6 +1,6 @@
 /* Configuration workspace refinements.
-   Keep the workspace neutral, reserve tenant gradients for the actual option cards,
-   and avoid nested tinted surfaces. */
+   Reuse the same tenant-card treatment already present in Datos y marca/Sedes,
+   and keep section grouping structural rather than card-within-card. */
 .settings-console .settings-section-nav {
   background: white;
   border: 1px solid color-mix(in srgb, var(--brand-primary) 10%, var(--brand-line));
@@ -25,41 +25,26 @@
   margin-top: -1.25rem;
 }
 
-.settings-console .settings-group-card {
-  background: white !important;
-  border: 1px solid var(--brand-line) !important;
-  box-shadow: none !important;
+/* Same visual formula as the existing organization/branch summary cards. */
+.settings-console .settings-option-row {
+  background: color-mix(in srgb, var(--brand-surface) 56%, white) !important;
+  border-color: color-mix(in srgb, var(--brand-primary) 10%, var(--brand-line)) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .78) !important;
 }
 
-.settings-console .settings-option-row {
-  background:
-    linear-gradient(
-      135deg,
-      color-mix(in srgb, var(--brand-primary) 4%, white),
-      color-mix(in srgb, var(--brand-accent) 8%, white)
-    ) !important;
-  border-color: color-mix(in srgb, var(--brand-primary) 12%, var(--brand-line)) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .78) !important;
+.settings-console .settings-option-row.is-disabled {
+  background: color-mix(in srgb, var(--brand-surface) 34%, white) !important;
 }
 
 .settings-console .settings-branch-container {
   background: white !important;
-  border-color: color-mix(in srgb, var(--brand-primary) 12%, var(--brand-line)) !important;
+  border-color: color-mix(in srgb, var(--brand-primary) 10%, var(--brand-line)) !important;
   box-shadow: none !important;
-}
-
-.settings-console .settings-option-row.is-disabled {
-  background: color-mix(in srgb, var(--brand-surface) 24%, white) !important;
-}
-
-.settings-console .settings-action-strip {
-  background: color-mix(in srgb, var(--brand-surface) 28%, white) !important;
-  border: 1px solid color-mix(in srgb, var(--brand-primary) 8%, var(--brand-line));
 }
 
 .settings-console .settings-info-panel {
   background: white !important;
-  border: 1px solid color-mix(in srgb, var(--brand-primary) 12%, var(--brand-line)) !important;
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 10%, var(--brand-line)) !important;
 }
 
 .settings-console .settings-section-tabs {
