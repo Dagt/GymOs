@@ -18,7 +18,10 @@ class NotificationRecipientHasherTests {
 	private NotificationProperties properties(String key) {
 		return new NotificationProperties(
 				30000, 60000, 50, 120, 5, "http://localhost:3000", key,
-				new NotificationProperties.Smtp(false, null, 587, null, null, true, true, false, 10000, 10000, 10000)
+				new NotificationProperties.Smtp(
+						false, "Zoho Mail", null, 587, null, null, java.util.List.of(),
+						true, true, true, false, true, 10000, 10000, 10000
+				)
 		);
 	}
 }

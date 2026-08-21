@@ -95,7 +95,10 @@ class NotificationDeliveryServiceTests {
 	private NotificationProperties properties() {
 		return new NotificationProperties(
 				30000, 60000, 50, 120, 5, "http://localhost:3000", "preference-test-key",
-				new NotificationProperties.Smtp(false, null, 587, null, null, true, true, false, 10000, 10000, 10000)
+				new NotificationProperties.Smtp(
+						false, "Zoho Mail", null, 587, null, null, List.of(),
+						true, true, true, false, true, 10000, 10000, 10000
+				)
 		);
 	}
 }

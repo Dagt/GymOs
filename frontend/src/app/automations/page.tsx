@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import Link from "next/link";
 import { AppDrawer } from "@/components/AppDrawer";
 import { AppNotice } from "@/components/AppNotice";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
@@ -14,6 +15,7 @@ import {
   getAutomationOperations,
   getAutomationScheduler,
   getAutomations,
+  getEmailNotificationConfiguration,
   getNotifications,
   getStoredSession,
   recoverAutomationDeadLetter,
@@ -25,6 +27,7 @@ import {
   type AutomationExecution,
   type AutomationOperations,
   type AutomationSchedulerStatus,
+  type EmailNotificationConfiguration,
   type NotificationLog,
   type StoredSession,
 } from "@/lib/api";
@@ -41,6 +44,7 @@ export default function AutomationsPage() {
   const [deadLetterTotalElements, setDeadLetterTotalElements] = useState(0);
   const [operations, setOperations] = useState<AutomationOperations | null>(null);
   const [scheduler, setScheduler] = useState<AutomationSchedulerStatus | null>(null);
+  const [emailConfiguration, setEmailConfiguration] = useState<EmailNotificationConfiguration | null>(null);
   const [executions, setExecutions] = useState<AutomationExecution[]>([]);
   const [executionPage, setExecutionPage] = useState(0);
   const [executionTotalPages, setExecutionTotalPages] = useState(0);
@@ -87,7 +91,7 @@ export default function AutomationsPage() {
       }
       setSession(stored);
       try {
-        const [loadedRules, loadedNotifications, loadedDeadLetters, loadedOperations, loadedScheduler] = await Promise.all([
+        const [loadedRules, loadedNotifications, loadedDeadLetters, loadedOperations, loadedScheduler, loadedEmailConfiguration] = await Promise.all([
           getAutomations(stored.accessToken),
           hasPermission(stored, "notification.read")
             ? getNotifications(stored.accessToken)
@@ -95,6 +99,9 @@ export default function AutomationsPage() {
           getAutomationDeadLetters(stored.accessToken),
           getAutomationOperations(stored.accessToken),
           getAutomationScheduler(stored.accessToken),
+          hasAnyPermission(stored, "notification.read", "notification.settings.manage", "platform.admin")
+            ? getEmailNotificationConfiguration(stored.accessToken)
+            : Promise.resolve(null),
         ]);
         if (active) {
           setRules(loadedRules);
@@ -104,6 +111,7 @@ export default function AutomationsPage() {
           setDeadLetterTotalElements(loadedDeadLetters.totalElements);
           setOperations(loadedOperations);
           setScheduler(loadedScheduler);
+          setEmailConfiguration(loadedEmailConfiguration);
         }
       } catch (exception) {
         if (active) {
@@ -126,7 +134,7 @@ export default function AutomationsPage() {
     if (!activeSession) {
       return;
     }
-    const [loadedRules, loadedNotifications, loadedDeadLetters, loadedOperations, loadedScheduler] = await Promise.all([
+    const [loadedRules, loadedNotifications, loadedDeadLetters, loadedOperations, loadedScheduler, loadedEmailConfiguration] = await Promise.all([
       getAutomations(activeSession.accessToken),
       hasPermission(activeSession, "notification.read")
         ? getNotifications(activeSession.accessToken)
@@ -134,6 +142,9 @@ export default function AutomationsPage() {
       getAutomationDeadLetters(activeSession.accessToken),
       getAutomationOperations(activeSession.accessToken),
       getAutomationScheduler(activeSession.accessToken),
+      hasAnyPermission(activeSession, "notification.read", "notification.settings.manage", "platform.admin")
+        ? getEmailNotificationConfiguration(activeSession.accessToken)
+        : Promise.resolve(null),
     ]);
     setRules(loadedRules);
     setNotifications(loadedNotifications);
@@ -143,6 +154,7 @@ export default function AutomationsPage() {
     setDeadLetterTotalElements(loadedDeadLetters.totalElements);
     setOperations(loadedOperations);
     setScheduler(loadedScheduler);
+    setEmailConfiguration(loadedEmailConfiguration);
   }
 
   async function loadDeadLetters(page: number) {
@@ -190,6 +202,10 @@ export default function AutomationsPage() {
     if (!session) {
       return;
     }
+    if (ruleChannel === "EMAIL" && !emailConfiguration?.ready) {
+      setError("Primero configura y verifica el canal de correo en ConfiguraciÃ³n.");
+      return;
+    }
     setSaving(true);
     setError(null);
     setMessage(null);
@@ -230,6 +246,10 @@ export default function AutomationsPage() {
   async function submitNotification(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session) {
+      return;
+    }
+    if (notificationChannel === "EMAIL" && !emailConfiguration?.ready) {
+      setError("El canal de correo todavÃ­a no estÃ¡ listo. ConfigÃºralo y envÃ­a una prueba real primero.");
       return;
     }
     setSaving(true);
@@ -392,6 +412,24 @@ export default function AutomationsPage() {
           {hasPermission(session, "automation.manage") ? <button className="app-button" onClick={openRuleDrawer} type="button">Crear automatización</button> : null}
         </div>
       </section>
+
+      {emailConfiguration ? (
+        <section className={`automation-email-channel ${emailConfiguration.ready ? "ready" : "pending"}`}>
+          <div className="automation-email-channel-icon" aria-hidden="true">@</div>
+          <div>
+            <p>Correo automatizado</p>
+            <h2>{emailConfiguration.ready ? `${emailConfiguration.providerName} listo` : "Canal pendiente de configurar"}</h2>
+            <span>
+              {emailConfiguration.ready
+                ? `${emailConfiguration.fromEmail} · ${emailConfiguration.lastVerifiedAt ? "entrega real verificada" : "falta enviar la prueba final"}`
+                : "Las reglas de correo no se pueden activar hasta configurar el servidor y el remitente."}
+            </span>
+          </div>
+          {hasAnyPermission(session, "notification.settings.manage", "platform.admin") ? (
+            <Link href="/settings/organization#email-settings">{emailConfiguration.ready ? "Revisar canal" : "Configurar correo"}</Link>
+          ) : null}
+        </section>
+      ) : null}
 
       {error ? <InlineError message={error} /> : null}
       {message ? <AppNotice message={message} tone="success" /> : null}
@@ -610,7 +648,7 @@ export default function AutomationsPage() {
             Canal
             <select className="h-10 rounded-md border border-[var(--brand-line)] bg-white px-3 text-sm" onChange={(event) => setRuleChannel(event.target.value as RuleChannel)} value={ruleChannel}>
               <option value="IN_APP">Notificación interna para el equipo</option>
-              <option disabled={!supportsClientEmail(triggerType)} value="EMAIL">Correo al socio relacionado</option>
+              <option disabled={!supportsClientEmail(triggerType) || !emailConfiguration?.ready} value="EMAIL">Correo al socio relacionado</option>
             </select>
           </label>
           {triggerType === "SCHEDULED" ? (
@@ -725,7 +763,7 @@ export default function AutomationsPage() {
             Canal de entrega
             <select className="app-input" onChange={(event) => setNotificationChannel(event.target.value as "IN_APP" | "EMAIL")} value={notificationChannel}>
               <option value="IN_APP">Notificación interna</option>
-              <option value="EMAIL">Correo electrónico</option>
+              <option disabled={!emailConfiguration?.ready} value="EMAIL">Correo electrónico</option>
             </select>
           </label>
           {notificationChannel === "EMAIL" ? (

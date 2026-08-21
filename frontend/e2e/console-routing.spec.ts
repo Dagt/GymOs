@@ -278,7 +278,7 @@ test.describe("consolas por rol", () => {
   test("dueno configura el remitente SMTP y encola un correo de prueba", async ({ page }) => {
     let savedConfiguration: Record<string, unknown> | null = null;
     let testRecipient: string | null = null;
-    const emailConfiguration = {
+    let emailConfiguration = {
       organizationId: org.id,
       emailEnabled: false,
       providerKey: "SMTP",
@@ -287,6 +287,11 @@ test.describe("consolas por rol", () => {
       replyTo: null,
       providerAvailable: true,
       ready: false,
+      providerName: "Zoho Mail",
+      preferredFromEmail: "notificaciones@appex.com",
+      fromEmailRestricted: true,
+      allowedFromEmails: ["notificaciones@appex.com"],
+      lastVerifiedAt: null as string | null,
       updatedAt: null,
     };
     await bootAs(page, user({
@@ -300,14 +305,23 @@ test.describe("consolas por rol", () => {
       }
       if (path === "/notifications/email-configuration" && route.request().method() === "PUT") {
         savedConfiguration = route.request().postDataJSON() as Record<string, unknown>;
+        emailConfiguration = {
+          ...emailConfiguration,
+          emailEnabled: true,
+          fromEmail: String(savedConfiguration.fromEmail),
+          fromName: String(savedConfiguration.fromName),
+          replyTo: savedConfiguration.replyTo ? String(savedConfiguration.replyTo) : null,
+          ready: true,
+        };
         await route.fulfill({
           contentType: "application/json",
-          body: JSON.stringify({ ...emailConfiguration, ...savedConfiguration, emailEnabled: true, ready: true }),
+          body: JSON.stringify(emailConfiguration),
         });
         return true;
       }
       if (path === "/notifications/email-configuration/test" && route.request().method() === "POST") {
         testRecipient = (route.request().postDataJSON() as { recipient: string }).recipient;
+        emailConfiguration = { ...emailConfiguration, lastVerifiedAt: new Date().toISOString() };
         await route.fulfill({
           contentType: "application/json",
           body: JSON.stringify({
@@ -317,7 +331,7 @@ test.describe("consolas por rol", () => {
             subject: "Prueba de correo de GymOS",
             body: "Mensaje",
             bodyHtml: null,
-            status: "QUEUED",
+            status: "SENT",
             category: "TRANSACTIONAL",
             recipientType: "DIRECT",
             recipientId: null,
@@ -325,7 +339,7 @@ test.describe("consolas por rol", () => {
             referenceType: "ORGANIZATION",
             referenceId: org.id,
             scheduledAt: null,
-            sentAt: null,
+            sentAt: new Date().toISOString(),
             errorMessage: null,
             providerKey: null,
             providerMessageId: null,
@@ -344,7 +358,7 @@ test.describe("consolas por rol", () => {
 
     await page.goto("/settings/organization");
     await page.getByRole("button", { name: /Correo electrónico/ }).click();
-    await expect(page.getByRole("heading", { name: "Correo electrónico" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Correo real con Zoho Mail" })).toBeVisible();
     await page.getByLabel("Nombre del remitente").fill("Appex Fitness");
     await page.getByLabel("Correo remitente").fill("notificaciones@appex.com");
     await page.getByText("Habilitar entregas por correo").click();
@@ -358,8 +372,8 @@ test.describe("consolas por rol", () => {
     });
 
     await page.getByLabel("Destinatario de prueba").fill("qa@appex.com");
-    await page.getByRole("button", { name: "Enviar prueba" }).click();
-    await expect(page.getByText(/Correo de prueba en cola/)).toBeVisible();
+    await page.getByRole("button", { name: "Enviar y verificar" }).click();
+    await expect(page.getByText(/aceptó el correo de prueba/)).toBeVisible();
     expect(testRecipient).toBe("qa@appex.com");
   });
 });
@@ -398,6 +412,24 @@ function responseFor(path: string, currentUser: TestUser) {
   }
   if (path === "/organizations/current/branches" || path.endsWith("/branches")) {
     return branches;
+  }
+  if (path === "/notifications/email-configuration") {
+    return {
+      organizationId: org.id,
+      emailEnabled: false,
+      providerKey: "SMTP",
+      fromEmail: null,
+      fromName: null,
+      replyTo: null,
+      providerAvailable: false,
+      ready: false,
+      providerName: "Zoho Mail",
+      preferredFromEmail: null,
+      fromEmailRestricted: false,
+      allowedFromEmails: [],
+      lastVerifiedAt: null,
+      updatedAt: null,
+    };
   }
   if (path.startsWith("/reports/owner-dashboard")) {
     return {

@@ -57,6 +57,23 @@ public class NotificationDeliveryService {
 		return processed;
 	}
 
+	public boolean deliverNow(java.util.UUID organizationId, java.util.UUID notificationId) {
+		if (providers.values().stream().noneMatch(EmailDeliveryPort::available)) return false;
+		OffsetDateTime now = OffsetDateTime.now();
+		if (!repository.claimEmail(organizationId, notificationId, now, now.plusSeconds(properties.leaseSeconds()))) {
+			return false;
+		}
+		EmailDeliveryRecord delivery = repository.emailDelivery(notificationId).orElse(null);
+		if (delivery == null || !organizationId.equals(delivery.organizationId())) {
+			repository.markDeliveryFailure(
+					notificationId, false, now, "No fue posible cargar la entrega de prueba.", now
+			);
+			return false;
+		}
+		deliver(delivery);
+		return true;
+	}
+
 	private void deliver(EmailDeliveryRecord delivery) {
 		var sample = telemetry.start();
 		OffsetDateTime now = OffsetDateTime.now();

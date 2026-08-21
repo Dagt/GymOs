@@ -10,8 +10,8 @@ dominios no almacenan secretos ni confían en datos devueltos por el navegador.
 - Pagos: terminal manual, Mercado Pago OAuth/Point y Stripe
   Connect/Checkout/Setup/off-session.
 - Correo: `EmailDeliveryPort` con adaptador SMTP, cola durable y configuración
-  de remitente por tenant. Zoho es el proveedor objetivo pendiente de
-  validación real.
+  de remitente por tenant. El perfil Zoho, remitentes autorizados, prueba
+  inmediata y evidencia de última verificación ya están implementados.
 - Almacenamiento: MinIO/S3 para logos, medios, comprobantes y documentos.
 - Acceso físico, biometría, WhatsApp, push y facturación: puertos previstos,
   adaptadores productivos fuera del corte.
@@ -30,13 +30,15 @@ dominios no almacenan secretos ni confían en datos devueltos por el navegador.
 
 ## 9.3 Correo
 
-El backend recibe host, puerto, usuario, contraseña, TLS/SSL y timeouts SMTP por
-entorno. Cada gimnasio configura remitente, reply-to y habilitación, no las
-credenciales del proveedor. La cola usa lease, backoff, dead letter,
-preferencias y destinatarios enmascarados/HMAC.
+El backend recibe proveedor visible, host, puerto, usuario, contraseña,
+remitentes autorizados, TLS/SSL y timeouts SMTP por entorno. Cada gimnasio
+configura nombre, reply-to y habilitación, no las credenciales. La cola usa
+lease, backoff, dead letter, preferencias y destinatarios enmascarados/HMAC.
 
-La integración Zoho debe reutilizar este puerto, verificar SPF/DKIM/DMARC y
-documentar límites y credenciales sin acoplar el dominio a Zoho.
+Zoho reutiliza el puerto desacoplado. La prueba administrativa intenta la
+entrega inmediatamente, clasifica autenticación/configuración como fallo
+permanente y conserva la última entrega de prueba `SENT`. SPF/DKIM/DMARC,
+reputación y credenciales reales siguen siendo responsabilidades del ambiente.
 
 ## 9.4 Despliegue local
 

@@ -19,8 +19,11 @@ no almacena PAN ni CVV; los efectos financieros se confirman mediante webhook
 firmado y conciliación autoritativa.
 
 El correo transaccional dispone de cola durable, leasing, reintentos,
-preferencias y adaptador SMTP. La integración y validación específica con Zoho
-es el siguiente bloque de trabajo y todavía no se considera implementada.
+preferencias y un perfil seguro para Zoho SMTP. La prueba desde Configuración
+realiza una entrega inmediata, conserva evidencia de la última verificación y
+las automatizaciones sólo habilitan el canal cuando el servidor y el remitente
+están listos. La activación en cada ambiente aún requiere credenciales, dominio
+y DNS del operador; consulta la [guía de Zoho](docs/operations/zoho-email.md).
 
 Consulta el [estado canónico](Documentación/13-estado-desarrollo.md), el
 [índice por módulos](Documentación/modulos/README.md) y la

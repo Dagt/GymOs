@@ -90,13 +90,17 @@ gymos:
     preference-key: ${GYMOS_NOTIFICATION_PREFERENCE_KEY:dev-only-notification-preference-key-change-in-production}
     smtp:
       enabled: ${GYMOS_SMTP_ENABLED:false}
+      provider-name: ${GYMOS_SMTP_PROVIDER_NAME:Zoho Mail}
       host: ${GYMOS_SMTP_HOST:}
       port: ${GYMOS_SMTP_PORT:587}
       username: ${GYMOS_SMTP_USERNAME:}
       password: ${GYMOS_SMTP_PASSWORD:}
+      allowed-from-addresses: ${GYMOS_SMTP_ALLOWED_FROM_ADDRESSES:}
       auth: ${GYMOS_SMTP_AUTH:true}
       start-tls: ${GYMOS_SMTP_STARTTLS:true}
+      start-tls-required: ${GYMOS_SMTP_STARTTLS_REQUIRED:true}
       ssl: ${GYMOS_SMTP_SSL:false}
+      check-server-identity: ${GYMOS_SMTP_CHECK_SERVER_IDENTITY:true}
       connection-timeout-ms: ${GYMOS_SMTP_CONNECTION_TIMEOUT_MS:10000}
       read-timeout-ms: ${GYMOS_SMTP_READ_TIMEOUT_MS:10000}
       write-timeout-ms: ${GYMOS_SMTP_WRITE_TIMEOUT_MS:10000}

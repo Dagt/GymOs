@@ -7,6 +7,7 @@ import com.gymos.notifications.application.NotificationProperties;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import java.util.UUID;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 
@@ -15,7 +16,8 @@ class SmtpEmailDeliveryAdapterTests {
 	void smtpAdapterBuildsMessageWithStableDeliveryHeaders() throws Exception {
 		CapturingMailSender sender = new CapturingMailSender();
 		var smtp = new NotificationProperties.Smtp(
-				true, "smtp.test", 587, "user", "secret", true, true, false, 10000, 10000, 10000
+				true, "SMTP de prueba", "smtp.test", 587, "user", "secret", List.of("envios@gymos.test"),
+				true, true, true, false, true, 10000, 10000, 10000
 		);
 		var adapter = new SmtpEmailDeliveryAdapter(smtp, sender);
 		UUID notificationId = UUID.randomUUID();
@@ -32,6 +34,24 @@ class SmtpEmailDeliveryAdapterTests {
 		assertThat(sender.message.getSubject()).isEqualTo("Tu membresia");
 		assertThat(sender.message.getHeader("X-GymOS-Notification-Id", null)).isEqualTo(notificationId.toString());
 		assertThat(sender.message.getHeader("X-GymOS-Idempotency-Key", null)).isEqualTo("notification:key");
+	}
+
+	@Test
+	void smtpAdapterRejectsSenderOutsideAuthorizedAliasesWithoutRetry() {
+		CapturingMailSender sender = new CapturingMailSender();
+		var smtp = new NotificationProperties.Smtp(
+				true, "Zoho Mail", "smtppro.zoho.com", 587, "envios@gymos.test", "secret",
+				List.of("envios@gymos.test"), true, true, true, false, true, 10000, 10000, 10000
+		);
+		var adapter = new SmtpEmailDeliveryAdapter(smtp, sender);
+
+		org.assertj.core.api.Assertions.assertThatThrownBy(() -> adapter.deliver(new EmailMessage(
+				UUID.randomUUID(), UUID.randomUUID(), "otro@gymos.test", "Mi gimnasio",
+				null, "socio@example.com", "Asunto", "Mensaje", null, "notification:key"
+		))).isInstanceOfSatisfying(
+				com.gymos.notifications.api.EmailDeliveryPort.DeliveryException.class,
+				exception -> assertThat(exception.retryable()).isFalse()
+		);
 	}
 
 	private static final class CapturingMailSender extends JavaMailSenderImpl {

@@ -12,8 +12,9 @@ comercio y membresías, reservas, inventario, coaches, wellness,
 automatizaciones y correo durable.
 
 La identidad comercial visible es GymFort. `GymOS`/`gymos` continúa en nombres
-técnicos para mantener compatibilidad. La siguiente línea de trabajo es la
-integración real y validación de correo con Zoho; no está declarada terminada.
+técnicos para mantener compatibilidad. El perfil Zoho y la verificación SMTP
+inmediata están implementados; falta activar credenciales y DNS reales en el
+ambiente de integración antes de declarar entregabilidad productiva.
 
 Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún
 módulo se considera completo por el nombre de una rama: la evidencia proviene
@@ -39,7 +40,7 @@ del código, migraciones y pruebas.
 | [Coaches](modulos/14-coaching.md) | ESTABILIZADO | Perfiles, catálogo, rutinas versionadas, asignación, métricas, CSV y PDF | Cleanup durable de medios (`COA-018`) |
 | [Wellness](modulos/15-wellness.md) | ESTABILIZADO | Profesionales, servicios, disponibilidad, agenda y citas | E2E y hardening multi-tenant |
 | [Automatizaciones](modulos/16-automations.md) | FUNCIONAL / ACEPTACIÓN | Reglas, recetas, inbox durable, leases, reintentos, pausa, historial y telemetría | Mantener pruebas PostgreSQL/CI |
-| [Notificaciones](modulos/17-notifications.md) | FUNCIONAL SMTP | Cola durable, preferencias, remitente tenant, prueba y recuperación | Zoho, dominio y entregabilidad reales (`NOT-001`) |
+| [Notificaciones](modulos/17-notifications.md) | FUNCIONAL ZOHO/SMTP | Cola durable, remitentes autorizados, prueba inmediata, preferencias y recuperación | Credenciales/DNS y entregabilidad del ambiente (`NOT-001`) |
 | [Reportes](modulos/18-reporting.md) | PARCIAL | Reportes por dominio y métricas de coaches/operación | Definiciones KPI y filtros homogéneos (`REP-001`) |
 | [Auditoría](modulos/19-audit.md) | FUNCIONAL | Registro de mutaciones sensibles y motivos operativos | Matriz/retención/inmutabilidad (`AUD-001`) |
 | [Operación común](modulos/20-common-operations.md) | FUNCIONAL PARA LOCAL | Errores correlacionados, Flyway, métricas, Docker, CI y runbooks | Restore, staging y simulacros (`DB-001`, `OPS-001`) |
@@ -87,8 +88,8 @@ no sustituye automatizar el contrato sandbox en CI.
 
 ## 5. Próximo bloque
 
-1. Integrar Zoho como proveedor SMTP real sin acoplar el dominio de
-   notificaciones a un proveedor.
+1. Activar el perfil Zoho con credenciales protegidas en integración y ejecutar
+   la prueba real documentada.
 2. Verificar SPF, DKIM, DMARC, remitente, reply-to, rebotes y entregabilidad.
 3. Ejecutar Stripe sandbox automatizado y escenarios de recuperación conectados.
 4. Cerrar deuda de autorización multi-tenant, migración limpia/upgrade,

@@ -50,10 +50,12 @@ del documento 13 ni la deuda del 28.
 
 ## En curso inmediato
 
-### Integración Zoho
+### Activación operativa de Zoho
 
-- Configurar Zoho SMTP mediante el puerto existente.
-- Documentar secretos y parámetros sin guardarlos por tenant.
+- Inyectar las credenciales Zoho del ambiente mediante el perfil SMTP ya
+  implementado, sin guardarlas por tenant.
+- Ejecutar y conservar evidencia de la prueba real inmediata desde
+  Configuración.
 - Verificar dominio, SPF, DKIM y DMARC.
 - Probar remitente/reply-to, TLS, timeouts, reintentos y dead letter.
 - Validar entregabilidad real y estrategia de rebotes/quejas disponible.

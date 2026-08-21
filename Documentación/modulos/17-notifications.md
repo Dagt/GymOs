@@ -8,12 +8,13 @@ Estado: `FUNCIONAL PARA EMAIL / PREPARADO PARA EXTENSIÓN`
 - registro multicanal con `IN_APP` y `EMAIL` como canales ejecutables;
 - contrato desacoplado `EmailDeliveryPort`, sin dependencias de Automatizaciones
   hacia SMTP ni hacia un proveedor comercial;
-- Zoho es el siguiente proveedor objetivo; conexión, dominio y entregabilidad
-  real aún no se consideran implementados;
+- perfil operativo para Zoho Mail con TLS requerido, validación de identidad del
+  servidor y lista de buzones/alias autorizados;
 - adaptador SMTP configurable exclusivamente mediante secretos de entorno;
 - configuración por gimnasio de habilitación, proveedor, remitente, nombre y
   `Reply-To`, administrable por dueño, gerente autorizado o soporte;
-- envío manual de prueba y envío directo desde el centro de Automatizaciones;
+- prueba síncrona con estado real de aceptación SMTP, última verificación
+  exitosa y envío directo desde el centro de Automatizaciones;
 - resolución tenant de correo para destinatarios `CLIENT` y `USER`;
 - automatizaciones de pagos, membresías, domiciliaciones y reservas capaces de
   enviar al socio del evento sin capturar manualmente su dirección;
@@ -34,8 +35,8 @@ Estado: `FUNCIONAL PARA EMAIL / PREPARADO PARA EXTENSIÓN`
 
 ## Pendiente de operación
 
-- elegir el proveedor SMTP, configurar sus secretos y verificar el dominio
-  remitente en el ambiente de integración/producción;
+- inyectar credenciales reales y verificar el dominio remitente en cada ambiente
+  de integración/producción conforme a `docs/operations/zoho-email.md`;
 - validar reputación, límites, SPF, DKIM, DMARC y entregabilidad con el proveedor
   elegido;
 - incorporar webhooks de rebote/queja si el proveedor seleccionado los ofrece.
