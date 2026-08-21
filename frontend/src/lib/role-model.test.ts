@@ -3,11 +3,19 @@ import assert from "node:assert/strict";
 import { canAccessRoute, getConsoleProfile } from "./role-model.ts";
 import type { CurrentUser } from "./api/types.ts";
 
-test("manager with reporting access starts in dashboard and cannot open removed operations route", () => {
-  const user = manager(["report.sales.read", "client.read"]);
+test("manager with executive reporting access starts in dashboard and cannot open removed operations route", () => {
+  const user = manager(["report.owner.read", "report.sales.read", "client.read"]);
 
   assert.equal(getConsoleProfile(user).homePath, "/dashboard");
+  assert.equal(canAccessRoute(user, "/dashboard"), true);
   assert.equal(canAccessRoute(user, "/operations"), false);
+});
+
+test("manager with sales reporting but no executive dashboard starts in sales report", () => {
+  const user = manager(["report.sales.read", "client.read"]);
+
+  assert.equal(getConsoleProfile(user).homePath, "/reports/sales");
+  assert.equal(canAccessRoute(user, "/dashboard"), false);
 });
 
 test("manager without reporting access starts in first useful authorized workflow", () => {
