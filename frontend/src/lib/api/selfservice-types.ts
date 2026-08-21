@@ -27,6 +27,7 @@ export type KioskMembership = {
   startsOn: string;
   endsOn: string;
   graceEndsOn: string;
+  managedAtCurrentBranch: boolean;
 };
 
 export type KioskPendingPayment = {

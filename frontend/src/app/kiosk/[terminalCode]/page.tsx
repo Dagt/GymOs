@@ -685,7 +685,7 @@ export default function KioskPage() {
               {summary.capabilities.wellnessBookingAllowed ? <KioskPanelButton active={activePanel === "wellness"} description="Citas gratuitas disponibles" label="Wellness" onClick={() => setActivePanel("wellness")} /> : null}
               {summary.paymentActivity.length > 0 ? <KioskPanelButton active={activePanel === "payments"} description="Cargos y comprobantes" label="Mis pagos" onClick={() => setActivePanel("payments")} /> : null}
               {summary.capabilities.profileUpdateAllowed ? <KioskPanelButton active={activePanel === "profile"} description="Correo y teléfono" label="Mis datos" onClick={() => setActivePanel("profile")} /> : null}
-              {summary.capabilities.autopayAllowed ? (
+              {summary.capabilities.autopayAllowed && activeMembership?.managedAtCurrentBranch ? (
                 <KioskPanelButton
                   active={activePanel === "autopay"}
                   description="Tarjeta para renovación"
@@ -840,7 +840,9 @@ export default function KioskPage() {
                   <h2>{activeMembership ? "Membresía actual" : "Contrata una membresía"}</h2>
                   <p className="kiosk-section-intro">
                     {activeMembership
-                      ? "Consulta tu vigencia y elige exactamente qué quieres hacer. Nada cambia hasta que revises el importe y completes el pago."
+                      ? activeMembership.managedAtCurrentBranch
+                        ? "Consulta tu vigencia y elige exactamente qué quieres hacer. Nada cambia hasta que revises el importe y completes el pago."
+                        : "Tu membresía multi-sucursal es válida aquí para acceso y reservas. Su renovación, cambio de plan y domiciliación se administran en la sucursal donde la contrataste."
                       : "Elige el plan que quieres contratar. Verás el importe final antes de ir al pago seguro con Stripe."}
                   </p>
                 </div>
@@ -889,7 +891,7 @@ export default function KioskPage() {
                       </div>
                     </article>
 
-                    <div className="kiosk-membership-actions">
+                    {activeMembership.managedAtCurrentBranch ? <div className="kiosk-membership-actions">
                       {summary.capabilities.membershipRenewalAllowed ? (
                         <article className="kiosk-membership-action-card">
                           <span className="kiosk-action-number">1</span>
@@ -927,7 +929,11 @@ export default function KioskPage() {
                           <button className="kiosk-secondary-action kiosk-full-action" disabled={autopayBusy} onClick={() => void openAutopay(activeMembership)} type="button">Administrar domiciliación</button>
                         </article>
                       ) : null}
-                    </div>
+                    </div> : (
+                      <p className="kiosk-feature-note">
+                        Esta membresía pertenece a otra sucursal. Puedes usar aquí los accesos y recursos incluidos en el plan, pero los cobros y cambios se realizan únicamente en su sucursal de origen.
+                      </p>
+                    )}
                   </>
                 ) : (
                   <div className="kiosk-enrollment-flow">
@@ -936,7 +942,7 @@ export default function KioskPage() {
                       <p>Puedes contratar una nueva o, si tu plan anterior venció, renovarlo.</p>
                     </div>
 
-                    {lastExpiredMembership && summary.capabilities.membershipRenewalAllowed ? (
+                    {lastExpiredMembership?.managedAtCurrentBranch && summary.capabilities.membershipRenewalAllowed ? (
                       <article className="kiosk-membership-action-card renewal">
                         <span className="kiosk-action-number">R</span>
                         <div><h3>Renovar tu plan anterior</h3><p><strong>{lastExpiredMembership.planName}</strong> venció el {formatDay(lastExpiredMembership.endsOn)}.</p></div>

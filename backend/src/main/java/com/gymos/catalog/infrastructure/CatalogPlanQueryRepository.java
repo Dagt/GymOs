@@ -79,8 +79,8 @@ class CatalogPlanQueryRepository {
 
 	private String availability(UUID branchId) {
 		if (branchId == null) return "";
-		return " AND EXISTS (SELECT 1 FROM catalog_product_branch cpb"
+		return " AND (mp.multi_branch_access = true OR EXISTS (SELECT 1 FROM catalog_product_branch cpb"
 				+ " WHERE cpb.organization_id=mp.organization_id AND cpb.product_id=mp.product_id"
-				+ " AND cpb.branch_id=:branchId)";
+				+ " AND cpb.branch_id=:branchId))";
 	}
 }

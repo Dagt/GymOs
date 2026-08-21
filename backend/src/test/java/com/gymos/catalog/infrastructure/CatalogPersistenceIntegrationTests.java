@@ -27,6 +27,7 @@ class CatalogPersistenceIntegrationTests {
 	private JdbcClient jdbcClient;
 	private CatalogProductCommandRepository products;
 	private CatalogProductQueryRepository productQueries;
+	private CatalogPlanQueryRepository planQueries;
 	private UUID organizationId;
 	private UUID secondOrganizationId;
 	private UUID firstBranchId;
@@ -42,6 +43,7 @@ class CatalogPersistenceIntegrationTests {
 		jdbcClient = JdbcClient.create(dataSource);
 		products = new CatalogProductCommandRepository(jdbcClient);
 		productQueries = new CatalogProductQueryRepository(jdbcClient);
+		planQueries = new CatalogPlanQueryRepository(jdbcClient);
 		organizationId = UUID.randomUUID();
 		secondOrganizationId = UUID.randomUUID();
 		firstBranchId = UUID.randomUUID();
@@ -93,6 +95,32 @@ class CatalogPersistenceIntegrationTests {
 				.extracting(SelfServiceRepository.PlanOptionRecord::id)
 				.containsExactly(planId);
 		assertThat(kiosk.planOptions(organizationId, secondBranchId)).isEmpty();
+	}
+
+	@Test
+	void multiBranchPlanIsVisibleForSecondaryResourceConfigurationWithoutBeingSoldThere() {
+		UUID productId = UUID.randomUUID();
+		UUID planId = UUID.randomUUID();
+		OffsetDateTime now = OffsetDateTime.now();
+		products.create(new ProductMutation(
+				organizationId, productId, "PLAN-MULTI", "Plan Multi Sucursal", null,
+				"MEMBERSHIP_PLAN", 95_000, "MXN", true, "ACTIVE",
+				null, null, null, null, false, 0, null, now, userId
+		));
+		products.attachBranch(organizationId, firstBranchId, productId, userId, now);
+		jdbcClient.sql("""
+				INSERT INTO membership_plan (
+				 id, organization_id, product_id, duration_days, grace_days,
+				 benefits_json, multi_branch_access, status, created_at, updated_at, version)
+				VALUES (:id, :organizationId, :productId, 30, 3, '{}'::jsonb, true, 'ACTIVE', now(), now(), 0)
+				""").param("id", planId).param("organizationId", organizationId)
+				.param("productId", productId).update();
+
+		assertThat(planQueries.list(organizationId, secondBranchId))
+				.extracting(com.gymos.catalog.application.query.PlanView::id)
+				.containsExactly(planId);
+		assertThat(new SelfServiceRepository(jdbcClient).planOptions(organizationId, secondBranchId))
+				.isEmpty();
 	}
 
 	@Test

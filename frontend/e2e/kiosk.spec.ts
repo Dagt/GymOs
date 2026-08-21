@@ -84,6 +84,48 @@ test("una apertura directa explica que no existe un ID de computadora que captur
   await expect(page.getByRole("button", { name: "Continuar de forma segura" })).toHaveCount(0);
 });
 
+test("una membresia multi-sucursal permite reservar pero se administra en su sucursal de origen", async ({ page }) => {
+  await mockKiosk(page, async (route, path) => {
+    const method = route.request().method();
+    if (method === "POST" && path === "/self-service/kiosk-sessions") return fulfill(route, sessionResponse());
+    if (method === "POST" && path === `/self-service/sessions/${sessionId}/verify`) {
+      const summary = summaryResponse();
+      return fulfill(route, {
+        ...summary,
+        capabilities: {
+          ...summary.capabilities,
+          resourceBookingAllowed: true,
+          autopayAllowed: true,
+          onlineCardPaymentsReady: true,
+          recurringCardPaymentsReady: true,
+        },
+        memberships: summary.memberships.map((membership) => ({
+          ...membership,
+          managedAtCurrentBranch: false,
+        })),
+      });
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/membership-options`) {
+      return fulfill(route, []);
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/booking-resources`) {
+      return fulfill(route, []);
+    }
+    return false;
+  });
+
+  await openLaunchedKiosk(page);
+  await page.getByPlaceholder(/Correo o tel/).fill("andrea@example.com");
+  await page.getByLabel(/Fecha de nacimiento/).fill("10/05/1994");
+  await page.getByRole("button", { name: "Continuar de forma segura" }).click();
+
+  await expect(page.getByText(/membresía multi-sucursal es válida aquí para acceso y reservas/i)).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Reservar /i })).toBeVisible();
+  await expect(page.getByRole("button", { name: /Revisar renovación/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /Cambiar a otro plan/i })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: /^Domiciliación /i })).toHaveCount(0);
+});
+
 test("una recarga recupera el modo kiosco y borra al socio anterior", async ({ page }) => {
   let resetRequests = 0;
   await page.addInitScript((storedSession) => {
@@ -455,7 +497,7 @@ test("el socio acepta terminos versionados antes de tokenizar la domiciliacion",
   await expect(page.getByText("VISA •••• 4242")).toBeVisible();
   expect(setupPayload?.accepted).toBe(true);
   expect(setupPayload?.termsVersion).toBe("2026-08-03");
-  expect(setupPayload?.idempotencyKey).toEqual(expect.stringContaining(`kiosk-autopay:${sessionId}:${membershipId}:2026-08-03:`));
+  expect(setupPayload?.idempotencyKey).toEqual(expect.stringMatching(/^kiosk-autopay:[0-9a-f-]+$/));
 });
 
 test("el kiosco agenda únicamente servicios wellness gratuitos", async ({ page }) => {
@@ -622,6 +664,7 @@ function summaryResponse() {
       startsOn: "2026-07-01",
       endsOn: "2026-07-31",
       graceEndsOn: "2026-08-03",
+      managedAtCurrentBranch: true,
     }],
     pendingPayments: [],
     paymentActivity: [],

@@ -189,6 +189,37 @@ class SelfServiceServiceTests {
 	}
 
 	@Test
+	void renewalOfMultiBranchMembershipMustBeManagedAtItsOriginBranch() {
+		givenSession("""
+				{"membershipRenewal":true}
+				""");
+		when(paymentConfigurationService.configuration(organizationId)).thenReturn(new PaymentConfigurationView(
+				true, false, null, null, false, true, false, "acct_test", true
+		));
+		UUID membershipId = UUID.randomUUID();
+		when(repository.membershipBelongsToBranch(organizationId, branchId, clientId, membershipId))
+				.thenReturn(false);
+
+		assertThatThrownBy(() -> service.renew(
+				sessionId,
+				token,
+				membershipId,
+				new RenewMembershipOperationCommand(
+						"CARD_ONLINE", null, false, null, "kiosk:test:remote"
+				),
+				"correlation",
+				"127.0.0.1"
+		))
+				.isInstanceOfSatisfying(
+						BusinessException.class,
+						exception -> assertThat(exception.code())
+								.isEqualTo("MEMBERSHIP_HOME_BRANCH_REQUIRED")
+				);
+
+		verifyNoInteractions(memberships);
+	}
+
+	@Test
 	void resourceEndpointEnforcesTerminalCapabilities() {
 		givenSession("""
 				{"resourceBooking":false}

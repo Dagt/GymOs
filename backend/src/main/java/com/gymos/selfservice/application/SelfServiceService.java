@@ -261,6 +261,7 @@ public class SelfServiceService {
 		SelfServiceCapabilities capabilities = capabilities(session);
 		capabilityPolicy.require(capabilities, SelfServiceCapability.MEMBERSHIP_RENEWAL);
 		capabilityPolicy.requireOnlineCardPayments(capabilities);
+		requireMembershipManagedAtCurrentBranch(session, membershipId);
 		MembershipSaleOperationResult response = membershipOperations.renew(kioskPrincipal(session), membershipId, request, correlationId);
 		var checkout = stripeCheckout(session, response, "Renovacion de membresia", request.idempotencyKey());
 		auditService.recordSystem(session.organizationId(), session.branchId(), null, "SELF_SERVICE_MEMBERSHIP_CHECKOUT_STARTED", "SALE", response.saleId(), "SELF_SERVICE_KIOSK", null, correlationId);
@@ -308,6 +309,7 @@ public class SelfServiceService {
 		SelfServiceCapabilities capabilities = capabilities(session);
 		capabilityPolicy.require(capabilities, SelfServiceCapability.MEMBERSHIP_PLAN_CHANGE);
 		capabilityPolicy.requireOnlineCardPayments(capabilities);
+		requireMembershipManagedAtCurrentBranch(session, membershipId);
 		MembershipSaleOperationResult response = membershipOperations.changePlan(kioskPrincipal(session), membershipId, request, correlationId);
 		var checkout = stripeCheckout(session, response, "Cambio de plan de membresia", request.idempotencyKey());
 		auditService.recordSystem(session.organizationId(), session.branchId(), null, "SELF_SERVICE_MEMBERSHIP_CHECKOUT_STARTED", "SALE", response.saleId(), "SELF_SERVICE_KIOSK", null, correlationId);
@@ -528,6 +530,17 @@ public class SelfServiceService {
 				paymentConfiguration.stripeCheckoutReady(),
 				paymentConfiguration.stripeRecurringReady()
 		);
+	}
+
+	private void requireMembershipManagedAtCurrentBranch(SessionRecord session, UUID membershipId) {
+		if (!repository.membershipBelongsToBranch(
+				session.organizationId(), session.branchId(), session.clientId(), membershipId
+		)) {
+			throw new BusinessException(
+					"MEMBERSHIP_HOME_BRANCH_REQUIRED",
+					"Renovaciones, cambios de plan y domiciliacion deben administrarse en la sucursal donde se contrato la membresia."
+			);
+		}
 	}
 
 	private SessionRecord activeSession(UUID sessionId, String sessionToken) {
