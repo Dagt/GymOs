@@ -40,7 +40,7 @@ class SmtpEmailDeliveryAdapterTests {
 	void smtpAdapterRejectsSenderOutsideAuthorizedAliasesWithoutRetry() {
 		CapturingMailSender sender = new CapturingMailSender();
 		var smtp = new NotificationProperties.Smtp(
-				true, "Zoho Mail", "smtppro.zoho.com", 587, "envios@gymos.test", "secret",
+				true, "ZeptoMail", "smtp.zeptomail.com", 587, "emailapikey", "secret",
 				List.of("envios@gymos.test"), true, true, true, false, true, 10000, 10000, 10000
 		);
 		var adapter = new SmtpEmailDeliveryAdapter(smtp, sender);
