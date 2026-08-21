@@ -1144,14 +1144,16 @@ function stableOperationKey(keys: Map<string, string>, ...parts: string[]) {
   if (existing) return existing;
   const persisted = readPersistedOperationKeys();
   const persistedKey = persisted[operation];
-  if (persistedKey) {
+  if (persistedKey && persistedKey.length <= 160) {
     keys.set(operation, persistedKey);
     return persistedKey;
   }
   const random = typeof crypto !== "undefined" && "randomUUID" in crypto
     ? crypto.randomUUID()
     : `${Date.now()}`;
-  const created = [...parts, random].join(":");
+  // The API caps idempotency keys at 160 characters. Keep the full operation
+  // identity only as the local map key and send a compact, collision-safe key.
+  const created = `${parts[0]}:${random}`;
   keys.set(operation, created);
   persisted[operation] = created;
   if (typeof window !== "undefined") {

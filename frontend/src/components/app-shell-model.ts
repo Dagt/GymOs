@@ -111,7 +111,6 @@ const managerSections: NavigationSection[] = [
     title: "Mostrador",
     links: [
       { label: "Caja / POS", href: "/pos", hint: "Ventas", permissions: ["sale.create"] },
-      { label: "Pantalla para socios", href: "/kiosk/launch", hint: "Abrir kiosco seguro", permissions: ["selfservice.session.launch"] },
     ],
   },
 ];

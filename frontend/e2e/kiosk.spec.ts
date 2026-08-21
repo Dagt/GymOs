@@ -211,7 +211,7 @@ test("un socio sin membresia puede abrir Stripe Checkout con una intencion idemp
   await expect(page.getByRole("heading", { name: "Pago confirmado" })).toBeVisible();
   await expect(page.getByText("$799.00")).toBeVisible();
   expect(enrollmentPayload?.planId).toBe(planId);
-  expect(enrollmentPayload?.idempotencyKey).toEqual(expect.stringContaining(`kiosk-enrollment:${sessionId}:${planId}:`));
+  expect(enrollmentPayload?.idempotencyKey).toEqual(expect.stringMatching(/^kiosk-enrollment:[0-9a-f-]+$/));
   const persistedKeys = await page.evaluate(() => window.sessionStorage.getItem("gymos.kioskOperationKeys"));
   expect(persistedKeys).toContain("kiosk-enrollment");
 });
