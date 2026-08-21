@@ -3,6 +3,7 @@ import { SessionRouteGuard } from "@/components/SessionRouteGuard";
 import { TenantThemeProvider } from "@/components/TenantThemeProvider";
 import "./globals.css";
 import "./admin-hierarchy.css";
+import "./settings-console-refinements.css";
 import "./workout-pdf-single-template.css";
 
 export const metadata: Metadata = {
