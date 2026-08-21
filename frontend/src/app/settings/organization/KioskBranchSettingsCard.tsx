@@ -24,25 +24,25 @@ const paymentOptions: KioskOption[] = [
   {
     key: "membershipEnrollmentAllowed",
     title: "Comprar membresía",
-    description: "Permite contratar una membresía y pagarla con Stripe desde el kiosco.",
+    description: "Compra y pago con Stripe.",
     requirement: "ONLINE_CARD",
   },
   {
     key: "membershipRenewalAllowed",
     title: "Renovar membresía",
-    description: "Permite renovar una membresía activa mediante self checkout.",
+    description: "Renovación y pago desde el kiosco.",
     requirement: "ONLINE_CARD",
   },
   {
     key: "membershipPlanChangeAllowed",
     title: "Cambiar de plan",
-    description: "Permite cambiar de plan cuando el ajuste requiere pago con Stripe.",
+    description: "Cambio de plan cuando requiere un cobro.",
     requirement: "ONLINE_CARD",
   },
   {
     key: "autopayAllowed",
     title: "Domiciliación",
-    description: "Permite activar o administrar cobros recurrentes desde el kiosco.",
+    description: "Alta y gestión de cobros recurrentes.",
     requirement: "RECURRING_CARD",
   },
 ];
@@ -51,19 +51,19 @@ const serviceOptions: KioskOption[] = [
   {
     key: "resourceBookingAllowed",
     title: "Reservas gratuitas",
-    description: "Permite reservar recursos o clases disponibles para el socio.",
+    description: "Reserva recursos o clases disponibles.",
     requirement: null,
   },
   {
     key: "wellnessBookingAllowed",
     title: "Citas wellness gratuitas",
-    description: "Permite gestionar citas wellness disponibles sin pago en línea.",
+    description: "Gestiona citas wellness sin pago en línea.",
     requirement: null,
   },
   {
     key: "profileUpdateAllowed",
     title: "Actualizar contacto",
-    description: "Permite al socio corregir su correo y teléfono desde autoservicio.",
+    description: "Permite corregir correo y teléfono.",
     requirement: null,
   },
 ];
@@ -122,14 +122,11 @@ export function KioskBranchSettingsCard({
 
   return (
     <section className="app-card settings-detail-panel grid scroll-mt-6 gap-5 p-5" id="kiosk-settings">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="app-eyebrow">Kiosco web</p>
-          <h2 className="mt-2 text-xl font-semibold">Funciones disponibles para el socio</h2>
-          <p className="mt-2 max-w-3xl text-sm text-[var(--brand-muted)]">
-            Las funciones que requieren Stripe sólo pueden activarse cuando el medio de cobro correspondiente está habilitado en Medios de cobro.
-          </p>
-        </div>
+      <div>
+        <h2 className="text-xl font-semibold">Kiosco web</h2>
+        <p className="mt-2 max-w-3xl text-sm text-[var(--brand-muted)]">
+          Elige qué puede hacer el socio en la sucursal.
+        </p>
       </div>
       {error ? <AppNotice message={error} tone="error" /> : null}
       {message ? <AppNotice message={message} tone="success" /> : null}
@@ -137,17 +134,8 @@ export function KioskBranchSettingsCard({
         {items.length === 0 && !error ? <p className="text-sm text-[var(--brand-muted)]">Selecciona una sucursal activa para configurar su kiosco.</p> : null}
         {items.map((item) => (
           <article className="settings-branch-container rounded-xl border p-5" key={item.branchId}>
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--brand-line)] pb-4">
-              <div>
-                <h3 className="text-lg font-semibold">{item.branchName}</h3>
-                <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
-                  <ReadinessBadge ready={item.capabilities.onlineCardPaymentsReady} text="Stripe self checkout" />
-                  <ReadinessBadge ready={item.capabilities.recurringCardPaymentsReady} text="Domiciliación" />
-                  <span className="rounded-full bg-[#eef1f3] px-2.5 py-1 text-[#42514a]">
-                    {item.status === "ACTIVE" ? "Kiosco preparado" : "Se preparará al primer uso"}
-                  </span>
-                </div>
-              </div>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--brand-line)] pb-4">
+              <h3 className="text-lg font-semibold">{item.branchName}</h3>
               <button className="app-button" disabled={saving === item.branchId} onClick={() => void save(item)} type="button">
                 {saving === item.branchId ? "Guardando..." : "Guardar sucursal"}
               </button>
@@ -157,14 +145,12 @@ export function KioskBranchSettingsCard({
               <KioskOptionGroup
                 item={item}
                 options={paymentOptions}
-                subtitle="Compra, renovación, cambio de plan y domiciliación dependen de la configuración global de Stripe."
                 title="Pagos y membresías"
                 onToggle={toggle}
               />
               <KioskOptionGroup
                 item={item}
                 options={serviceOptions}
-                subtitle="Funciones de autoservicio que no dependen del canal de pago con tarjeta."
                 title="Servicios y perfil"
                 onToggle={toggle}
               />
@@ -179,22 +165,17 @@ export function KioskBranchSettingsCard({
 function KioskOptionGroup({
   item,
   options,
-  subtitle,
   title,
   onToggle,
 }: {
   item: KioskBranchSettings;
   options: KioskOption[];
-  subtitle: string;
   title: string;
   onToggle: (branchId: string, key: EditableKey, checked: boolean) => void;
 }) {
   return (
     <section className="settings-group-card grid content-start gap-3 rounded-xl p-4">
-      <div className="pb-1">
-        <h4 className="font-semibold">{title}</h4>
-        <p className="mt-1 text-xs leading-5 text-[var(--brand-muted)]">{subtitle}</p>
-      </div>
+      <h4 className="font-semibold">{title}</h4>
       {options.map((option) => {
         const disabled = !requirementReady(item, option.requirement);
         const checked = !disabled && item.capabilities[option.key];
@@ -226,15 +207,7 @@ function requirementReady(item: KioskBranchSettings, requirement: Requirement) {
 }
 
 function requirementMessage(requirement: Requirement) {
-  if (requirement === "ONLINE_CARD") return "Habilita Stripe para self checkout en Medios de cobro para activar esta función.";
-  if (requirement === "RECURRING_CARD") return "Habilita la domiciliación con Stripe en Medios de cobro para activar esta función.";
+  if (requirement === "ONLINE_CARD") return "Activa self checkout con Stripe en Medios de cobro.";
+  if (requirement === "RECURRING_CARD") return "Activa domiciliación con Stripe en Medios de cobro.";
   return "Esta función no está disponible.";
-}
-
-function ReadinessBadge({ ready, text }: { ready: boolean; text: string }) {
-  return (
-    <span className={`rounded-full px-2.5 py-1 ${ready ? "bg-[#eef7f0] text-[#31543d]" : "bg-[#fff7dd] text-[#745b00]"}`}>
-      {text}: {ready ? "listo" : "pendiente"}
-    </span>
-  );
 }
