@@ -9,9 +9,14 @@ nombre técnico interno durante la transición de marca.
   internal `gymos` packages, variables and data identifiers.
 - Put the tenant logo, gym name and active branch first in the sidebar; move the
   signed-in user controls below it and keep GymFort attribution in the footer.
+- Clarify sidebar hierarchy with stronger section/child separation and a more
+  visible current-page treatment without changing the GymFort visual language.
 - Align Automations and Organization settings with the same light workspace
   surfaces used by Catalog while retaining the shared dark command header, and
   replace page-top feedback boxes with accessible floating notifications.
+- Replace payment and kiosk capability checkboxes with toggles, group reception
+  and Stripe settings, make manual terminal/Mercado Pago mutually exclusive and
+  enforce Stripe readiness for dependent kiosk capabilities.
 - Add Stripe Connect, hosted Checkout, signed webhooks, reconciliation,
   receipts, recurring card mandates, retries and tenant-scoped histories.
 - Support kiosk membership enrollment, renewal and plan changes only after
@@ -27,8 +32,8 @@ nombre técnico interno durante la transición de marca.
   may enable or disable an existing connection, while owners/support connect
   and refresh it.
 - Add durable email delivery with SMTP, leases, retries, preferences,
-  suppression, tenant sender settings and operational metrics. Zoho provider
-  validation remains upcoming.
+  suppression, tenant sender settings and operational metrics; use ZeptoMail as
+  the transactional SMTP profile while preserving the provider abstraction.
 - Add a pinned Stripe CLI `v1.50.3` Docker profile and CI verification.
 
 - Consolidate documentation into one canonical status file per module.
