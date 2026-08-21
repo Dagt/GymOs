@@ -5710,3 +5710,113 @@ button.admin-secondary-link:disabled {
   .landing-brand-banner > div { align-self: end; margin: 0; }
   .admin-command-bar { border-radius: .75rem !important; min-height: auto; padding: 1.25rem !important; }
 }
+
+/* --- SHARED FEEDBACK, PRODUCT SIGNATURE AND OPERATIONAL SURFACES ----------- */
+.app-notice-region {
+  bottom: clamp(1rem, 3vw, 2rem);
+  display: flex;
+  flex-direction: column-reverse;
+  gap: .7rem;
+  max-width: min(30rem, calc(100vw - 2rem));
+  position: fixed;
+  right: clamp(1rem, 3vw, 2rem);
+  width: max-content;
+  z-index: 300;
+}
+
+.app-notice {
+  align-items: flex-start;
+  animation: app-notice-enter 180ms ease-out;
+  background: #fff;
+  border: 1px solid rgba(15, 23, 42, .12);
+  border-left: .3rem solid currentColor;
+  border-radius: .75rem;
+  box-shadow: 0 22px 60px rgba(3, 24, 21, .24);
+  color: #19332d;
+  display: grid;
+  gap: .8rem;
+  grid-template-columns: 2.5rem minmax(0, 1fr) auto;
+  max-width: 100%;
+  padding: .95rem;
+  width: max-content;
+}
+
+.app-notice-error { color: #a51d32; }
+.app-notice-success { color: #146b50; }
+.app-notice-info { color: #245b78; }
+
+.app-notice-icon {
+  align-items: center;
+  background: color-mix(in srgb, currentColor 10%, white);
+  border-radius: .6rem;
+  display: inline-flex;
+  font-size: 1.1rem;
+  font-weight: 950;
+  height: 2.5rem;
+  justify-content: center;
+  width: 2.5rem;
+}
+
+.app-notice div { color: var(--brand-ink); min-width: 0; }
+.app-notice strong { display: block; font-size: .86rem; font-weight: 950; }
+.app-notice p { color: var(--brand-muted); font-size: .82rem; line-height: 1.45; margin-top: .2rem; overflow-wrap: anywhere; }
+.app-notice button {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: #6b7773 !important;
+  cursor: pointer;
+  font-size: 1.35rem;
+  line-height: 1;
+  min-height: 2rem;
+  padding: .1rem .25rem !important;
+}
+
+@keyframes app-notice-enter {
+  from { opacity: 0; transform: translateY(.75rem) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.admin-product-signature {
+  align-items: flex-start;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+  display: flex;
+  flex-direction: column;
+  gap: .15rem;
+  margin-bottom: .25rem;
+  padding: 0 0 .8rem;
+}
+
+.admin-product-signature img { height: auto; max-width: 6.75rem; object-fit: contain; }
+.admin-product-signature small { color: rgba(221,244,239,.48); font-size: .61rem; letter-spacing: .08em; text-transform: uppercase; }
+
+.automations-console .admin-workspace,
+.settings-console .admin-workspace {
+  background:
+    radial-gradient(circle at 95% 5%, color-mix(in srgb, var(--brand-accent) 10%, transparent), transparent 27rem),
+    linear-gradient(180deg, color-mix(in srgb, var(--brand-primary) 4%, var(--brand-surface)), var(--brand-surface));
+}
+
+.automations-console .admin-workspace .bg-white,
+.settings-console .app-card,
+.settings-console .admin-workspace .bg-white {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--brand-primary) 5%, white), color-mix(in srgb, var(--brand-accent) 4%, white)) !important;
+  border-color: color-mix(in srgb, var(--brand-primary) 18%, var(--brand-line)) !important;
+}
+
+.automations-console article,
+.settings-console label.rounded-md {
+  background: color-mix(in srgb, var(--brand-surface) 70%, white);
+}
+
+@media (max-width: 640px) {
+  .app-notice-region {
+    bottom: 1rem;
+    left: 1rem;
+    max-width: none;
+    right: 1rem;
+    width: auto;
+  }
+
+  .app-notice { width: 100%; }
+}

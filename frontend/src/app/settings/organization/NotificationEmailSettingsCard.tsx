@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { AppNotice } from "@/components/AppNotice";
 import {
   getEmailNotificationConfiguration,
   sendTestEmail,
@@ -133,8 +134,8 @@ export function NotificationEmailSettingsCard({ accessToken }: { accessToken: st
         </div>
       ) : null}
 
-      {error ? <p className="form-message error" role="alert">{error}</p> : null}
-      {message ? <p className="form-message success" role="status">{message}</p> : null}
+      {error ? <AppNotice message={error} tone="error" /> : null}
+      {message ? <AppNotice message={message} tone="success" /> : null}
     </section>
   );
 }

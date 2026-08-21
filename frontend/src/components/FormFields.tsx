@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { AppNotice } from "@/components/AppNotice";
 export {
   normalizePhone,
   normalizeRfc,
@@ -213,13 +214,7 @@ export function GenderField(props: Omit<BaseProps, "placeholder">) {
 }
 
 export function FormError({ message }: { message: string }) {
-  const [main, details] = splitDetails(message);
-  return (
-    <section className="form-error-box" role="alert">
-      <strong>{main}</strong>
-      {details ? <details><summary>Ver detalle tecnico</summary><span>{details}</span></details> : null}
-    </section>
-  );
+  return <AppNotice message={message} tone="error" />;
 }
 
 function FieldFrame({
@@ -247,14 +242,6 @@ function FieldFrame({
       {error ? <small className="form-field-error">{error}</small> : help ? <small>{help}</small> : null}
     </label>
   );
-}
-
-function splitDetails(message: string) {
-  const index = message.indexOf(" (");
-  if (index < 0) {
-    return [message, ""] as const;
-  }
-  return [message.slice(0, index), message.slice(index + 1)] as const;
 }
 
 function isoDateToDisplay(value: string) {

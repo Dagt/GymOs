@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AppNotice } from "@/components/AppNotice";
 import {
   getKioskBranchSettings,
   updateKioskBranchSettings,
@@ -76,8 +77,8 @@ export function KioskBranchSettingsCard({
   return (
     <section className="app-card grid scroll-mt-6 gap-5 p-5" id="kiosk-settings">
       <h2 className="text-xl font-semibold">Funciones disponibles para el socio</h2>
-      {error ? <p className="form-message error" role="alert">{error}</p> : null}
-      {message ? <p className="form-message success" role="status">{message}</p> : null}
+      {error ? <AppNotice message={error} tone="error" /> : null}
+      {message ? <AppNotice message={message} tone="success" /> : null}
       <div className="grid gap-4">
         {items.length === 0 && !error ? <p className="text-sm text-[var(--brand-muted)]">Selecciona una sucursal activa para configurar su kiosco.</p> : null}
         {items.map((item) => (

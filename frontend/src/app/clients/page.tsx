@@ -1,6 +1,7 @@
 "use client";
 
 import { AppShell, LoadingScreen } from "@/components/AppShell";
+import { AppNotice } from "@/components/AppNotice";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import { FormError } from "@/components/FormFields";
 import {
@@ -32,7 +33,7 @@ export default function ClientsPage() {
       <ClientSearchBar query={controller.query} onQueryChange={controller.setQuery} onSubmit={controller.submitSearch} />
 
       {controller.error ? <FormError message={controller.error} /> : null}
-      {controller.message ? <p className="form-message success">{controller.message}</p> : null}
+      {controller.message ? <AppNotice message={controller.message} tone="success" /> : null}
 
       <section className="grid gap-6">
         <ClientToolbar

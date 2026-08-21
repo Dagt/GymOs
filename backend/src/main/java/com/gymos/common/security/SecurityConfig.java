@@ -103,6 +103,10 @@ public class SecurityConfig {
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/sales/payments/*/receipt").hasAuthority("payment.receipt.upload")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/payment-settings/mercado-pago/terminals")
 								.hasAnyAuthority("payment.settings.manage", "platform.admin")
+						.requestMatchers(org.springframework.http.HttpMethod.POST,
+								"/api/v1/payment-settings/stripe/connect",
+								"/api/v1/payment-settings/stripe/refresh")
+								.hasAnyAuthority("payment.provider.stripe.manage", "platform.admin")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/payment-settings", "/api/v1/payment-settings/**")
 								.hasAnyAuthority("payment.settings.read", "payment.settings.manage", "platform.admin")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/payment-settings/**")

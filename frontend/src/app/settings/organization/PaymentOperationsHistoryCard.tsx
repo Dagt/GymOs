@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AppNotice } from "@/components/AppNotice";
 import {
   getPaymentWebhookHistory,
   getPaymentOperations,
@@ -93,7 +94,7 @@ export function PaymentOperationsHistoryCard({ accessToken }: { accessToken: str
         <HistoryTab active={kind === "mandates"} label="Consentimientos" onClick={() => select("mandates")} />
         <HistoryTab active={kind === "webhooks"} label="Webhooks" onClick={() => select("webhooks")} />
       </div>
-      {error ? <p className="form-message error">{error}</p> : null}
+      {error ? <AppNotice message={error} tone="error" /> : null}
       {loading ? <p className="text-sm text-[var(--brand-muted)]">Cargando historial...</p> : null}
       {!loading && history?.items.length === 0 ? (
         <p className="rounded-md border border-[var(--brand-line)] bg-[var(--brand-surface)] p-3 text-sm text-[var(--brand-muted)]">

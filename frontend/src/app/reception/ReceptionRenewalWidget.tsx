@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { MembershipQuoteSummary } from "@/components/MembershipQuoteSummary";
+import { AppNotice } from "@/components/AppNotice";
 import {
   changeMembershipPlan,
   createMercadoPagoPointOrder,
@@ -239,8 +240,8 @@ export function ReceptionRenewalWidget({ session }: { session: StoredSession }) 
         Busca al socio, revisa el precio final y registra la operación sin salir del inicio.
       </p>
 
-      {message ? <p className="form-message success mt-4">{message}</p> : null}
-      {error ? <p className="form-message error mt-4">{error}</p> : null}
+      {message ? <AppNotice message={message} tone="success" /> : null}
+      {error ? <AppNotice message={error} tone="error" /> : null}
 
       <form className="mt-4 flex flex-col gap-2 sm:flex-row" onSubmit={handleSearch}>
         <input

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AppNotice } from "@/components/AppNotice";
 import {
   getEmailRecipientPreference,
   updateEmailRecipientPreference,
@@ -123,8 +124,8 @@ export function EmailPreferencesCard({
         </div>
       ) : null}
 
-      {error ? <p className="form-message error" role="alert">{error}</p> : null}
-      {message ? <p className="form-message success" role="status">{message}</p> : null}
+      {error ? <AppNotice message={error} tone="error" /> : null}
+      {message ? <AppNotice message={message} tone="success" /> : null}
       {preference ? (
         <button className="app-button w-fit" disabled={saving} onClick={() => void save()} type="button">
           {saving ? "Guardando..." : "Guardar preferencias"}

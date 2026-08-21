@@ -161,6 +161,7 @@ test.describe("consolas por rol", () => {
 
     await expect(page.getByRole("heading", { name: /Panel ejecutivo|Dashboard|Metricas/i })).toBeVisible();
     await expect(page.getByLabel("Perfil activo").getByText("Dueño del gimnasio")).toBeVisible();
+    await expect(page.getByRole("img", { name: "GymFort" })).toBeVisible();
     await expect(page.locator("body")).toContainText("Gestión operativa");
     await expect(page.locator("body")).toContainText("Administración");
     await expect(page.locator("body")).toContainText("Configuración");
@@ -187,6 +188,8 @@ test.describe("consolas por rol", () => {
     await page.locator('a[href="/settings/organization"]').click();
     await expect(page).toHaveURL(/\/settings\/organization/);
     await expect(page.getByRole("heading", { name: "Configuración del gimnasio" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Vincular Stripe|Continuar configuración de Stripe/i })).toHaveCount(0);
+    await expect(page.getByText(/cuenta de Stripe sólo puede vincularla o modificarla el dueño/i)).toBeVisible();
     await page.goto("/bookings");
     await expect(page.getByRole("button", { name: "Crear recurso" })).toBeVisible();
     await page.goto("/benefits");

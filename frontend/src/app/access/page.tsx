@@ -1,6 +1,7 @@
 "use client";
 
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
+import { AppNotice } from "@/components/AppNotice";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   AccessClientSection,
@@ -58,7 +59,7 @@ export default function AccessPage() {
 
         <section className="grid gap-6">
           {access.error ? <InlineError message={access.error} /> : null}
-          {access.message ? <Notice text={access.message} /> : null}
+          {access.message ? <AppNotice message={access.message} tone="success" /> : null}
 
           <AccessDecisionSection
             busy={access.busy}
@@ -108,14 +109,6 @@ export default function AccessPage() {
         </section>
       </section>
     </AppShell>
-  );
-}
-
-function Notice({ text }: { text: string }) {
-  return (
-    <p className="rounded-md border border-[#bfd6c7] bg-[#f0f7f2] px-3 py-2 text-sm text-[#31543d]">
-      {text}
-    </p>
   );
 }
 

@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { AppDrawer } from "@/components/AppDrawer";
+import { AppNotice } from "@/components/AppNotice";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
@@ -370,6 +371,7 @@ export default function AutomationsPage() {
   return (
     <AppShell
       eyebrow="Administracion"
+      pageClassName="automations-console"
       session={session}
       title="Automatizaciones"
     >
@@ -384,7 +386,7 @@ export default function AutomationsPage() {
       </section>
 
       {error ? <InlineError message={error} /> : null}
-      {message ? <Notice tone="ok" text={message} /> : null}
+      {message ? <AppNotice message={message} tone="success" /> : null}
 
       {operations && (showOperationalDetails || hasOperationalIssues) ? (
         <section className={`rounded-lg border p-5 ${operations.alertLevel === "CRITICAL" ? "border-[#e5b7b7] bg-[#fff7f7]" : "border-[var(--brand-line)] bg-white"}`}>
@@ -784,11 +786,6 @@ function buildCondition(input: ConditionInput): Record<string, number | string> 
     return condition;
   }
   return {};
-}
-
-function Notice({ tone, text }: { tone: "ok" | "error"; text: string }) {
-  const styles = tone === "ok" ? "border-[var(--brand-line)] bg-[var(--brand-surface)] text-[#31563c]" : "border-[#e5b7b7] bg-[#fff4f4] text-[#8c2f2f]";
-  return <p className={`rounded-md border px-3 py-2 text-sm ${styles}`}>{text}</p>;
 }
 
 function formatDateTime(value: string) {

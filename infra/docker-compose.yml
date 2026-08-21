@@ -109,6 +109,22 @@ services:
     depends_on:
       - backend
 
+  stripe-listener:
+    image: stripe/stripe-cli:v1.50.3
+    profiles: ["stripe"]
+    command:
+      - listen
+      - --api-key
+      - ${GYMOS_STRIPE_SECRET_KEY:-}
+      - --events
+      - checkout.session.completed,checkout.session.async_payment_succeeded,payment_intent.succeeded,payment_intent.payment_failed
+      - --forward-connect-to
+      - http://backend:8080/api/v1/payment-webhooks/stripe
+    depends_on:
+      backend:
+        condition: service_started
+    restart: unless-stopped
+
 volumes:
   postgres-data:
   redis-data:

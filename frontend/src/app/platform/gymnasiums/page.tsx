@@ -1,6 +1,7 @@
 "use client";
 
 import { AppDrawer } from "@/components/AppDrawer";
+import { AppNotice } from "@/components/AppNotice";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired } from "@/components/AuthRequired";
 import { FormError } from "@/components/FormFields";
@@ -36,7 +37,7 @@ export default function PlatformGymnasiumsPage() {
       variant="platform"
     >
       {platform.error ? <FormError message={platform.error} /> : null}
-      {platform.message ? <p className="form-message success">{platform.message}</p> : null}
+      {platform.message ? <AppNotice message={platform.message} tone="success" /> : null}
 
       <section className="platform-layout">
         <PlatformGymnasiumList

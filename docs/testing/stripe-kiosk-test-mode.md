@@ -52,8 +52,9 @@ aplicación verifica la firma; un secreto de otro listener debe ser rechazado.
 
 ## 3. Configurar el gimnasio
 
-1. Entra como dueño, gerente autorizado o administrador de soporte y selecciona
-   la sucursal que vas a probar.
+1. Entra como dueño o administrador de soporte y selecciona la sucursal que vas
+   a probar. Sólo estos perfiles pueden vincular o volver a verificar la cuenta
+   de Stripe.
 2. Ve a `Configuración` → `Medios de cobro`.
 3. Selecciona `Vincular Stripe`, completa el onboarding de la cuenta Express en
    modo test y usa `Verificar conexión de Stripe`.
@@ -65,6 +66,13 @@ aplicación verifica la firma; un secreto de otro listener debe ser rechazado.
    nacimiento. Asigna la membresía o deja al socio sin ella según el caso.
 7. Desde `Inicio recepción`, selecciona `Abrir kiosco seguro` y verifica al socio
    con contacto y fecha de nacimiento.
+
+Un gerente puede realizar los pasos 4 y 5 para activar o desactivar el uso de
+una cuenta que el dueño ya vinculó, pero no puede crear, sustituir ni verificar
+la cuenta Stripe del gimnasio.
+
+Como alternativa a instalar Stripe CLI en Windows, el repositorio incluye el
+perfil Docker `stripe`; consulta [`../../infra/README.md`](../../infra/README.md).
 
 ## 4. Tarjetas y escenarios manuales
 

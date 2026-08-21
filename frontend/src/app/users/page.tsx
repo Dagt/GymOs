@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
+import { AppNotice } from "@/components/AppNotice";
 import { AuthRequired } from "@/components/AuthRequired";
 import {
   FieldErrorMap,
@@ -359,7 +360,7 @@ export default function UsersPage() {
       title="Equipo y accesos"
     >
       {error ? <FormError message={error} /> : null}
-      {message ? <p className="form-message success">{message}</p> : null}
+      {message ? <AppNotice message={message} tone="success" /> : null}
 
       <section className="team-layout">
         <TeamOverview branches={branches} roles={selectableRoles} onCreateUser={openCreateUser} />
@@ -413,4 +414,3 @@ export default function UsersPage() {
     </AppShell>
   );
 }
-
