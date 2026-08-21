@@ -99,6 +99,7 @@ export default function KioskPage() {
   const [failedLogoUrl, setFailedLogoUrl] = useState<string | null>(null);
   const [activePanel, setActivePanel] = useState<KioskPanel>("memberships");
   const operationKeys = useRef(new Map<string, string>());
+  const membershipCheckoutInFlight = useRef(false);
 
   const birthDate = useMemo(() => parseMexicanDate(birthDateDisplay) ?? "", [birthDateDisplay]);
   const activeMembership = useMemo(
@@ -121,6 +122,11 @@ export default function KioskPage() {
     () => plans.find((plan) => plan.id === targetPlanId) ?? null,
     [plans, targetPlanId],
   );
+  const visiblePaymentActivity = useMemo(
+    () => collapseRepeatedPendingPayments(summary?.paymentActivity ?? []),
+    [summary],
+  );
+  const hiddenPendingPaymentCount = (summary?.paymentActivity.length ?? 0) - visiblePaymentActivity.length;
 
   useEffect(() => {
     let active = true;
@@ -355,7 +361,8 @@ export default function KioskPage() {
   }
 
   async function completeMembershipCheckout() {
-    if (!session || !membershipReview || !summary?.capabilities.onlineCardPaymentsReady) return;
+    if (!session || !membershipReview || !summary?.capabilities.onlineCardPaymentsReady || membershipCheckoutInFlight.current) return;
+    membershipCheckoutInFlight.current = true;
     const { kind, membership, quote } = membershipReview;
     const workingId = membership?.id ?? "enrollment";
     setWorkingMembershipId(workingId);
@@ -420,6 +427,7 @@ export default function KioskPage() {
     } catch (exception) {
       setMembershipError(membershipCheckoutError(exception));
     } finally {
+      membershipCheckoutInFlight.current = false;
       setWorkingMembershipId(null);
     }
   }
@@ -804,8 +812,11 @@ export default function KioskPage() {
             {activePanel === "payments" && summary.paymentActivity.length > 0 ? (
               <section className="kiosk-card">
                 <div className="kiosk-step"><span>$</span><div><h2>Mis pagos con tarjeta</h2><p>Consulta cargos pendientes, rechazados y comprobantes emitidos por Stripe.</p></div></div>
+                {hiddenPendingPaymentCount > 0 ? (
+                  <p className="kiosk-feature-note mt-4">Se agruparon {hiddenPendingPaymentCount} intentos pendientes repetidos. No representan cargos completados.</p>
+                ) : null}
                 <div className="mt-4 grid gap-3">
-                  {summary.paymentActivity.map((payment) => (
+                  {visiblePaymentActivity.map((payment) => (
                     <article className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-[var(--brand-line)] p-3" key={payment.id}>
                       <div>
                         <strong className="block">{payment.saleNumber} · {formatMoney(payment.amountCents, payment.currency)}</strong>
@@ -1084,8 +1095,24 @@ function membershipQuoteError(exception: unknown) {
 function membershipCheckoutError(exception: unknown) {
   const rawMessage = exception instanceof Error ? exception.message : "";
   const providerDetail = rawMessage.match(/Detalle:\s*(.+?)(?=\s+\(\d{3}\s|$)/)?.[1];
-  const detail = providerDetail ? ` Stripe indicó: ${providerDetail}` : "";
+  const apiMessage = rawMessage.match(/^(.+?)\s+\(4\d{2}\s/)?.[1];
+  const detail = providerDetail
+    ? ` Stripe indicó: ${providerDetail}`
+    : apiMessage && !apiMessage.startsWith("No se pudo conectar")
+      ? ` Motivo: ${apiMessage}`
+      : "";
   return `No pudimos abrir el pago. No se realizó ningún cargo ni cambio en tu membresía.${detail}${supportReference(exception)}`;
+}
+
+function collapseRepeatedPendingPayments(payments: KioskSummaryResponse["paymentActivity"]) {
+  const pendingKeys = new Set<string>();
+  return payments.filter((payment) => {
+    if (!["OPEN", "PENDING_VALIDATION"].includes(payment.status)) return true;
+    const key = `${payment.amountCents}:${payment.currency}`;
+    if (pendingKeys.has(key)) return false;
+    pendingKeys.add(key);
+    return true;
+  });
 }
 
 function supportReference(exception: unknown) {

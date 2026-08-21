@@ -266,19 +266,19 @@ export default function KioskCheckoutResultPage() {
 
   return (
     <main
-      className="grid min-h-screen place-items-center bg-[var(--brand-surface)] p-5 text-[#13251c]"
+      className="grid min-h-screen place-items-center bg-[radial-gradient(circle_at_top_left,var(--brand-primary),#08171c_55%,#050d10)] p-5 text-white"
       style={style}
     >
-      <section className="w-full max-w-2xl overflow-hidden rounded-[2rem] border border-[#d8e0da] bg-white shadow-2xl">
+      <section className="w-full max-w-2xl overflow-hidden rounded-[2rem] border border-white/20 bg-[#102a32]/95 shadow-2xl backdrop-blur">
         <div className="h-2 bg-[var(--brand-accent)]" />
         <div className="p-7 text-center sm:p-10">
           <p className="text-xs font-black uppercase tracking-[0.18em] text-[var(--brand-primary)]">Pago seguro con Stripe</p>
           <StatusMark phase={view.phase} />
           <h1 className="mt-5 text-3xl font-black tracking-tight sm:text-4xl">{view.title}</h1>
-          <p className="mx-auto mt-4 max-w-lg text-base leading-7 text-[#506057]">{view.message}</p>
+          <p className="mx-auto mt-4 max-w-lg text-base leading-7 text-white/75">{view.message}</p>
 
           {view.phase === "CHECKING" ? (
-            <div className="mx-auto mt-7 flex max-w-md items-center justify-center gap-3 rounded-2xl bg-[#f4f7f5] px-5 py-4 text-sm font-bold text-[#405047]" role="status">
+            <div className="mx-auto mt-7 flex max-w-md items-center justify-center gap-3 rounded-2xl border border-white/15 bg-white/10 px-5 py-4 text-sm font-bold text-white/80" role="status">
               <span className="h-5 w-5 animate-spin rounded-full border-2 border-[#aab7af] border-t-[var(--brand-primary)]" />
               Esta comprobación puede tardar unos segundos
             </div>
@@ -306,7 +306,7 @@ export default function KioskCheckoutResultPage() {
             </button>
           </div>
 
-          <p className="mt-6 text-xs leading-5 text-[#68766e]">
+          <p className="mt-6 text-xs leading-5 text-white/55">
             GymFort confirma pagos y autorizaciones únicamente mediante el webhook firmado y el estado consultado directamente en Stripe.
           </p>
         </div>
@@ -335,14 +335,14 @@ function StatusMark({ phase }: { phase: ResultPhase }) {
 
 function MandateSummary({ mandate }: { mandate: KioskAutopayMandate }) {
   return (
-    <dl className="mx-auto mt-7 grid max-w-lg gap-3 rounded-2xl border border-[#dce4df] bg-[#f7faf8] p-5 text-left sm:grid-cols-2">
+    <dl className="mx-auto mt-7 grid max-w-lg gap-3 rounded-2xl border border-white/15 bg-white/10 p-5 text-left sm:grid-cols-2">
       <div>
-        <dt className="text-xs font-black uppercase tracking-wide text-[#68766e]">Tarjeta autorizada</dt>
-        <dd className="mt-1 font-black text-[#1b3024]">{mandate.brand?.toUpperCase() ?? "Tarjeta"} •••• {mandate.lastFour ?? "----"}</dd>
+        <dt className="text-xs font-black uppercase tracking-wide text-white/55">Tarjeta autorizada</dt>
+        <dd className="mt-1 font-black text-white">{mandate.brand?.toUpperCase() ?? "Tarjeta"} •••• {mandate.lastFour ?? "----"}</dd>
       </div>
       <div>
-        <dt className="text-xs font-black uppercase tracking-wide text-[#68766e]">Próximo cargo</dt>
-        <dd className="mt-1 font-black text-[#1b3024]">{formatDay(mandate.nextChargeOn)}</dd>
+        <dt className="text-xs font-black uppercase tracking-wide text-white/55">Próximo cargo</dt>
+        <dd className="mt-1 font-black text-white">{formatDay(mandate.nextChargeOn)}</dd>
       </div>
     </dl>
   );
@@ -350,9 +350,9 @@ function MandateSummary({ mandate }: { mandate: KioskAutopayMandate }) {
 
 function PaymentSummary({ payment }: { payment: KioskPaymentActivity }) {
   return (
-    <div className="mx-auto mt-7 max-w-lg rounded-2xl border border-[#dce4df] bg-[#f7faf8] p-5 text-left">
-      <p className="text-xs font-black uppercase tracking-wide text-[#68766e]">Importe confirmado</p>
-      <p className="mt-1 text-2xl font-black text-[#1b3024]">{formatMoney(payment.amountCents, payment.currency)}</p>
+    <div className="mx-auto mt-7 max-w-lg rounded-2xl border border-white/15 bg-white/10 p-5 text-left">
+      <p className="text-xs font-black uppercase tracking-wide text-white/55">Importe confirmado</p>
+      <p className="mt-1 text-2xl font-black text-white">{formatMoney(payment.amountCents, payment.currency)}</p>
       {payment.receiptUrl ? (
         <a className="mt-3 inline-flex font-black text-[var(--brand-primary)] underline" href={payment.receiptUrl} rel="noreferrer" target="_blank">
           Ver comprobante de Stripe
