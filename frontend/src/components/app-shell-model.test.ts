@@ -78,7 +78,7 @@ test("manager navigation exposes operational configuration when authorized", () 
   assert.ok(sectionLabels(sections).includes("Configuración"));
 });
 
-test("manager navigation keeps benefits in administration instead of front desk", () => {
+test("manager navigation keeps benefits in administration and cannot launch kiosks", () => {
   const sections = visibleSectionsForConsole({
     consoleType: "TENANT_MANAGER",
     hasBranch: true,
@@ -87,7 +87,7 @@ test("manager navigation keeps benefits in administration instead of front desk"
   });
 
   assert.deepEqual(sectionLinks(sections, "Administración"), ["Beneficios"]);
-  assert.deepEqual(sectionLinks(sections, "Mostrador"), ["Caja / POS", "Pantalla para socios"]);
+  assert.deepEqual(sectionLinks(sections, "Mostrador"), ["Caja / POS"]);
 });
 
 test("branchless tenant users only see setup-safe links", () => {

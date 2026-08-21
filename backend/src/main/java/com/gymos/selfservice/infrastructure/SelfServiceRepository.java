@@ -359,7 +359,8 @@ public class SelfServiceRepository {
 	public List<MembershipRecord> memberships(UUID organizationId, UUID branchId, UUID clientId) {
 		return jdbcClient.sql("""
 				SELECT m.id, m.plan_id, cp.name AS plan_name, m.status,
-				       m.starts_on, m.ends_on, m.grace_ends_on
+				       m.starts_on, m.ends_on, m.grace_ends_on,
+				       (m.branch_id = :branchId) AS managed_at_current_branch
 				FROM membership m
 				JOIN membership_plan mp ON mp.id = m.plan_id
 				JOIN catalog_product cp ON cp.id = mp.product_id
@@ -380,9 +381,35 @@ public class SelfServiceRepository {
 						resultSet.getString("status"),
 						resultSet.getObject("starts_on", LocalDate.class),
 						resultSet.getObject("ends_on", LocalDate.class),
-						resultSet.getObject("grace_ends_on", LocalDate.class)
+						resultSet.getObject("grace_ends_on", LocalDate.class),
+						resultSet.getBoolean("managed_at_current_branch")
 				))
 				.list();
+	}
+
+	public boolean membershipBelongsToBranch(
+			UUID organizationId,
+			UUID branchId,
+			UUID clientId,
+			UUID membershipId
+	) {
+		return jdbcClient.sql("""
+				SELECT EXISTS (
+				    SELECT 1
+				    FROM membership
+				    WHERE organization_id = :organizationId
+				      AND branch_id = :branchId
+				      AND client_id = :clientId
+				      AND id = :membershipId
+				      AND deleted_at IS NULL
+				)
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("clientId", clientId)
+				.param("membershipId", membershipId)
+				.query(Boolean.class)
+				.single();
 	}
 
 	public Optional<AutopayMembershipRecord> autopayMembership(
@@ -589,7 +616,8 @@ public class SelfServiceRepository {
 			String status,
 			LocalDate startsOn,
 			LocalDate endsOn,
-			LocalDate graceEndsOn
+			LocalDate graceEndsOn,
+			boolean managedAtCurrentBranch
 	) {
 	}
 

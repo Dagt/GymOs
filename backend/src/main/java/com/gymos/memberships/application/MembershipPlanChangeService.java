@@ -54,7 +54,7 @@ class MembershipPlanChangeService {
 				"El plan seleccionado no esta disponible."
 		);
 		String method = command.method().trim().toUpperCase();
-		policy.requireCompletedPlanChangePayment(command.validateNow(), method);
+		policy.requirePlanChangePaymentCanBeStarted(command.validateNow(), method);
 		MembershipQuoteResult quote = pricingService.quote(
 				principal.organizationId(), principal.branchId(), current.clientId(), plan);
 

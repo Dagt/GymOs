@@ -45,6 +45,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.transaction.annotation.Transactional;
 
 class SelfServiceServiceTests {
 	private final SelfServiceRepository repository = mock(SelfServiceRepository.class);
@@ -85,6 +86,16 @@ class SelfServiceServiceTests {
 				stripeCheckoutOperations,
 				stripeRecurringOperations
 		);
+	}
+
+	@Test
+	void membershipQuoteUsesWritableTransactionBecauseSessionValidationUpdatesActivity() throws Exception {
+		Transactional transaction = SelfServiceService.class
+				.getMethod("membershipQuote", UUID.class, String.class, UUID.class)
+				.getAnnotation(Transactional.class);
+
+		assertThat(transaction).isNotNull();
+		assertThat(transaction.readOnly()).isFalse();
 	}
 
 	@Test
@@ -172,6 +183,37 @@ class SelfServiceServiceTests {
 						BusinessException.class,
 						exception -> assertThat(exception.code())
 								.isEqualTo("SELF_SERVICE_CARD_PAYMENTS_NOT_READY")
+				);
+
+		verifyNoInteractions(memberships);
+	}
+
+	@Test
+	void renewalOfMultiBranchMembershipMustBeManagedAtItsOriginBranch() {
+		givenSession("""
+				{"membershipRenewal":true}
+				""");
+		when(paymentConfigurationService.configuration(organizationId)).thenReturn(new PaymentConfigurationView(
+				true, false, null, null, false, true, false, "acct_test", true
+		));
+		UUID membershipId = UUID.randomUUID();
+		when(repository.membershipBelongsToBranch(organizationId, branchId, clientId, membershipId))
+				.thenReturn(false);
+
+		assertThatThrownBy(() -> service.renew(
+				sessionId,
+				token,
+				membershipId,
+				new RenewMembershipOperationCommand(
+						"CARD_ONLINE", null, false, null, "kiosk:test:remote"
+				),
+				"correlation",
+				"127.0.0.1"
+		))
+				.isInstanceOfSatisfying(
+						BusinessException.class,
+						exception -> assertThat(exception.code())
+								.isEqualTo("MEMBERSHIP_HOME_BRANCH_REQUIRED")
 				);
 
 		verifyNoInteractions(memberships);

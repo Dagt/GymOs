@@ -113,6 +113,53 @@ class BookingMembershipPlanIntegrationTests {
 	}
 
 	@Test
+	void multiBranchMembershipCanReserveAllowedResourceAtSecondaryBranch() {
+		UUID secondaryBranchId = UUID.randomUUID();
+		insertBranch(secondaryBranchId, "NORTE");
+		jdbcClient.sql("UPDATE membership_plan SET multi_branch_access=true WHERE id=:planId")
+				.param("planId", allowedPlanId)
+				.update();
+		GymOsPrincipal secondaryPrincipal = new GymOsPrincipal(
+				userId,
+				organizationId,
+				secondaryBranchId,
+				"test.reception",
+				"Test Reception",
+				Set.of("booking.manage", "resource.manage")
+		);
+		ResourceRecord secondarySauna = bookingService.createResource(
+				secondaryPrincipal,
+				new CreateResourceCommand(
+						"Sauna Norte", "ROOM", 1, 60,
+						LocalTime.of(6, 0), LocalTime.of(22, 0), null,
+						java.util.List.of(allowedPlanId)
+				),
+				"multi-branch-booking"
+		);
+		LocalDate date = BusinessTime.today().plusDays(2);
+		OffsetDateTime startsAt = date.atTime(12, 0)
+				.atZone(BusinessTime.DEFAULT_ZONE)
+				.toOffsetDateTime();
+
+		assertThat(bookingService.eligibleResources(secondaryPrincipal, eligibleClientId, date))
+				.extracting(ResourceRecord::id)
+				.contains(secondarySauna.id());
+		BookingRecord booking = bookingService.createBooking(
+				secondaryPrincipal,
+				new CreateBookingCommand(
+						secondarySauna.id(), eligibleClientId, startsAt, startsAt.plusHours(1), null
+				),
+				"multi-branch-booking"
+		);
+
+		assertThat(booking.status()).isEqualTo("RESERVED");
+		assertThat(jdbcClient.sql("SELECT branch_id FROM booking WHERE id=:id")
+				.param("id", booking.id())
+				.query(UUID.class)
+				.single()).isEqualTo(secondaryBranchId);
+	}
+
+	@Test
 	void bookingAllowedResourceRejectsClientWithoutActiveMembership() {
 		ResourceRecord sauna = bookingService.createResource(
 				principal,
@@ -276,14 +323,19 @@ class BookingMembershipPlanIntegrationTests {
 				""")
 				.param("id", organizationId)
 				.update();
+		insertBranch(branchId, "CENTRO");
+	}
+
+	private void insertBranch(UUID id, String code) {
 		jdbcClient.sql("""
 				INSERT INTO branch (
 				    id, organization_id, name, code, timezone, status, created_at, updated_at, version
 				)
-				VALUES (:id, :organizationId, 'Centro', 'CENTRO', 'America/Mexico_City', 'ACTIVE', now(), now(), 0)
+				VALUES (:id, :organizationId, :code, :code, 'America/Mexico_City', 'ACTIVE', now(), now(), 0)
 				""")
-				.param("id", branchId)
+				.param("id", id)
 				.param("organizationId", organizationId)
+				.param("code", code)
 				.update();
 	}
 

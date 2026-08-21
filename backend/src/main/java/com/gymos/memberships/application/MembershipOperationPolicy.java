@@ -63,8 +63,9 @@ class MembershipOperationPolicy {
 		}
 	}
 
-	void requireCompletedPlanChangePayment(boolean validateNow, String method) {
-		if (!validateNow && !"CASH".equals(method.trim().toUpperCase())) {
+	void requirePlanChangePaymentCanBeStarted(boolean validateNow, String method) {
+		String normalizedMethod = method.trim().toUpperCase();
+		if (!validateNow && !"CASH".equals(normalizedMethod) && !"CARD_ONLINE".equals(normalizedMethod)) {
 			throw new BusinessException("PLAN_CHANGE_REQUIRES_COMPLETED_PAYMENT", "El cambio de plan requiere pago completado.");
 		}
 	}

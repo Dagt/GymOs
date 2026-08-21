@@ -1,6 +1,7 @@
 package com.gymos.memberships.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -54,6 +55,20 @@ class MembershipOperationPolicyTests {
 				principal, membershipId, "MEMBERSHIP_NOT_CHANGEABLE", "No modificable"))
 				.isInstanceOfSatisfying(BusinessException.class,
 						exception -> assertThat(exception.code()).isEqualTo("MEMBERSHIP_NOT_CHANGEABLE"));
+	}
+
+	@Test
+	void onlineCardPlanChangeCanWaitForStripeConfirmation() {
+		assertThatCode(() -> policy.requirePlanChangePaymentCanBeStarted(false, "CARD_ONLINE"))
+				.doesNotThrowAnyException();
+	}
+
+	@Test
+	void unvalidatedManualPlanChangeStillRequiresCompletedPayment() {
+		assertThatThrownBy(() -> policy.requirePlanChangePaymentCanBeStarted(false, "TRANSFER"))
+				.isInstanceOfSatisfying(BusinessException.class,
+						exception -> assertThat(exception.code())
+								.isEqualTo("PLAN_CHANGE_REQUIRES_COMPLETED_PAYMENT"));
 	}
 
 	private MembershipSummary membership(String status) {

@@ -23,6 +23,7 @@ import com.gymos.payments.infrastructure.PaymentProviderRepository;
 import com.gymos.payments.infrastructure.PaymentProviderRepository.OperationRecord;
 import com.gymos.payments.infrastructure.RecurringBillingRepository;
 import com.gymos.payments.infrastructure.RecurringBillingRepository.ChargeRecord;
+import com.gymos.payments.infrastructure.RecurringBillingRepository.CustomerRecord;
 import com.gymos.payments.infrastructure.RecurringBillingRepository.MandateRecord;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -68,6 +69,64 @@ class StripeRecurringBillingServiceTests {
 				assertThat(exception.code()).isEqualTo("RECURRING_CONSENT_REQUIRED"));
 
 		verify(recurringRepository, never()).createPendingMandate(any());
+	}
+
+	@Test
+	void setupCheckoutUsesOnlySupportedSetupIntentParameters() throws Exception {
+		RecurringMembershipContext context = context();
+		UUID customerId = UUID.randomUUID();
+		UUID mandateId = UUID.randomUUID();
+		UUID operationId = UUID.randomUUID();
+		CustomerRecord customer = new CustomerRecord(
+				customerId, context.organizationId(), context.clientId(), "STRIPE", "cus_test"
+		);
+		MandateRecord mandate = new MandateRecord(
+				mandateId, context.organizationId(), context.branchId(), context.clientId(),
+				context.membershipId(), context.planId(), customerId, "cus_test", null, null,
+				"STRIPE", "PENDING_SETUP", null, null, null, null,
+				StripeRecurringBillingService.TERMS_VERSION, "Consentimiento",
+				StripeRecurringBillingService.AMOUNT_RULE, OffsetDateTime.now(),
+				"SELF_SERVICE_KIOSK", "setup-key", context.nextChargeOn(), 0, null, null
+		);
+		OperationRecord pendingOperation = new OperationRecord(
+				operationId, context.organizationId(), context.branchId(), "STRIPE", "SETUP_SESSION",
+				null, null, context.clientId(), mandateId, null, null, "stripe-setup:setup-key",
+				"CREATED", 0, "MXN", null, "{}", null
+		);
+		OperationRecord createdOperation = new OperationRecord(
+				operationId, context.organizationId(), context.branchId(), "STRIPE", "SETUP_SESSION",
+				null, null, context.clientId(), mandateId, null, "cs_setup", "stripe-setup:setup-key",
+				"OPEN", 0, "MXN", "https://checkout.stripe.test/setup", "{}", null
+		);
+
+		when(configurationRepository.configuration(context.organizationId())).thenReturn(readyConfiguration());
+		when(recurringRepository.reserveCustomer(context.organizationId(), context.clientId())).thenReturn(customer);
+		when(recurringRepository.createPendingMandate(any())).thenReturn(mandateId);
+		when(recurringRepository.mandate(mandateId)).thenReturn(Optional.of(mandate));
+		when(providerRepository.createOperation(any())).thenReturn(operationId);
+		when(providerRepository.operation(operationId)).thenReturn(
+				Optional.of(pendingOperation), Optional.of(createdOperation)
+		);
+		when(http.exchange(
+				eq("POST"), eq("https://stripe.test/v1/checkout/sessions"), any(), any(),
+				eq("application/x-www-form-urlencoded")
+		)).thenReturn(objectMapper.readTree(
+				"{\"id\":\"cs_setup\",\"url\":\"https://checkout.stripe.test/setup\",\"status\":\"open\"}"
+		));
+
+		service.beginSetup(new BeginMandateSetupCommand(
+				context, StripeRecurringBillingService.TERMS_VERSION, true,
+				"setup-key", "SELF_SERVICE_KIOSK", "correlation"
+		));
+
+		ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
+		verify(http).exchange(
+				eq("POST"), eq("https://stripe.test/v1/checkout/sessions"), any(), body.capture(),
+				eq("application/x-www-form-urlencoded")
+		);
+		assertThat(body.getValue()).contains("mode=setup");
+		assertThat(body.getValue()).contains("setup_intent_data%5Bmetadata%5D%5Bgymos_mandate_id%5D");
+		assertThat(body.getValue()).doesNotContain("setup_intent_data%5Busage%5D");
 	}
 
 	@Test
