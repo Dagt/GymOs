@@ -67,11 +67,11 @@ test("reception navigation is limited to front desk work", () => {
   assert.deepEqual(sectionLinks(sections, "Seguimiento"), ["Ventas y pagos"]);
 });
 
-test("manager navigation exposes Wellness and automation monitoring without daily operations", () => {
+test("manager navigation exposes Wellness, automation monitoring and executive indicators when authorized", () => {
   const sections = visibleSectionsForConsole({
     consoleType: "TENANT_MANAGER",
     hasBranch: true,
-    permissions: new Set(["booking.read", "professional.read", "automation.read", "report.sales.read"]),
+    permissions: new Set(["booking.read", "professional.read", "automation.read", "report.sales.read", "report.owner.read"]),
     variant: "tenant",
   });
 
