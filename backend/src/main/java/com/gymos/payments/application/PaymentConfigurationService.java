@@ -39,6 +39,12 @@ public class PaymentConfigurationService implements PaymentConfigurationOperatio
 	) {
 		requireTenant(principal);
 		PaymentConfigurationView current = repository.configuration(principal.organizationId());
+		if (command.receptionManualTerminalEnabled() && command.receptionMercadoPagoEnabled()) {
+			throw new BusinessException(
+					"RECEPTION_CARD_METHOD_EXCLUSIVE",
+					"Selecciona una sola forma de cobro con tarjeta en recepcion: terminal independiente o Mercado Pago Point."
+			);
+		}
 		if (command.receptionMercadoPagoEnabled()
 				&& (!current.mercadoPagoConnected() || blank(command.mercadoPagoTerminalId()))) {
 			throw new BusinessException(
