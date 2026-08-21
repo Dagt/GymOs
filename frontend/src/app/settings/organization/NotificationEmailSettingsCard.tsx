@@ -153,7 +153,7 @@ export function NotificationEmailSettingsCard({ accessToken }: { accessToken: st
               value={draft.fromEmail}
             />
           )}
-          {configuration.fromEmailRestricted ? <small>Zoho sólo permite el buzón autenticado o alias autorizados en el servidor.</small> : null}
+          {configuration.fromEmailRestricted ? <small>{configuration.providerName} sólo permite aquí los remitentes verificados y asociados al Agent configurado.</small> : null}
         </label>
         <label className="grid gap-2 text-sm font-medium">
           Responder a (opcional)
