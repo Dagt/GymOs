@@ -136,7 +136,7 @@ export function KioskBranchSettingsCard({
       <div className="grid gap-4">
         {items.length === 0 && !error ? <p className="text-sm text-[var(--brand-muted)]">Selecciona una sucursal activa para configurar su kiosco.</p> : null}
         {items.map((item) => (
-          <article className="rounded-xl border border-[var(--brand-line)] bg-white p-5" key={item.branchId}>
+          <article className="settings-branch-container rounded-xl border p-5" key={item.branchId}>
             <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--brand-line)] pb-4">
               <div>
                 <h3 className="text-lg font-semibold">{item.branchName}</h3>
@@ -190,7 +190,7 @@ function KioskOptionGroup({
   onToggle: (branchId: string, key: EditableKey, checked: boolean) => void;
 }) {
   return (
-    <section className="grid content-start gap-3 rounded-xl border border-[var(--brand-line)] bg-[var(--brand-surface)] p-4">
+    <section className="settings-group-card grid content-start gap-3 rounded-xl p-4">
       <div className="pb-1">
         <h4 className="font-semibold">{title}</h4>
         <p className="mt-1 text-xs leading-5 text-[var(--brand-muted)]">{subtitle}</p>
@@ -199,7 +199,7 @@ function KioskOptionGroup({
         const disabled = !requirementReady(item, option.requirement);
         const checked = !disabled && item.capabilities[option.key];
         return (
-          <div className={`flex items-start justify-between gap-4 rounded-lg border border-[var(--brand-line)] p-4 ${disabled ? "bg-[#f3f6f5]" : "bg-white"}`} key={option.key}>
+          <div className={`settings-option-row flex items-start justify-between gap-4 rounded-lg border p-4 ${disabled ? "is-disabled" : ""}`} key={option.key}>
             <div className="min-w-0">
               <strong className="block text-sm">{option.title}</strong>
               <span className="mt-1 block text-xs leading-5 text-[var(--brand-muted)]">
