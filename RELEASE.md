@@ -1,27 +1,22 @@
-# Release Process
+# Proceso de release
 
-## Versioning
+GymFort usa versionado semántico. El nombre técnico `GymOS` puede permanecer en
+artefactos internos hasta completar una migración compatible.
 
-GymOS uses semantic versioning.
+- `MAJOR`: cambio incompatible de producto, datos o contrato.
+- `MINOR`: funcionalidad nueva compatible.
+- `PATCH`: corrección o mejora operacional segura.
 
-- `MAJOR`: incompatible product or data-contract changes.
-- `MINOR`: new backwards-compatible functionality.
-- `PATCH`: bug fixes and safe operational updates.
+## Checklist
 
-## Release Checklist
+1. Confirmar CI verde y `git diff --check`.
+2. Ejecutar pruebas backend y migraciones PostgreSQL.
+3. Ejecutar pruebas frontend, lint, typecheck, build y E2E críticos.
+4. Validar y construir Docker Compose.
+5. Si afecta pagos, verificar Stripe CLI fijado y recorrer sandbox con webhook.
+6. Si afecta correo, verificar cola, reintento, remitente y entregabilidad del proveedor.
+7. Revisar migración desde cero y upgrade de una base de referencia.
+8. Actualizar `CHANGELOG.md`, estado, módulos, deuda y runbooks.
+9. Ejecutar smoke test, registrar evidencia y etiquetar el commit.
 
-1. Confirm CI is green.
-2. Confirm backend tests pass.
-3. Confirm frontend lint, typecheck and build pass.
-4. Confirm Docker Compose config and build pass.
-5. Tag the release commit.
-6. Publish release notes from `CHANGELOG.md`.
-7. Record smoke test evidence.
-
-## Pilot Tags
-
-Pilot releases use the format:
-
-```text
-v0.x.y-pilot.n
-```
+Las versiones piloto usan `v0.x.y-pilot.n`.

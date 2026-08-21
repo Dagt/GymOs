@@ -1,82 +1,60 @@
 # 29. Cronología y situación de ramas
 
 Estado: AUDITADO
-Corte remoto: 27 de julio de 2026
-Base comparada: `origin/main` en `f44708d`
+Corte: 21 de agosto de 2026
+Rama de trabajo: `feature/automations-zoho-email`
+Base integrada: PR #10, merge `52a72bc`
 
-## 1. Criterio
+## 1. Situación vigente
 
-La pertenencia a `main` se determinó por ancestros de Git, no por nombres. Una rama detrás sin commits exclusivos es histórica y no debe fusionarse otra vez. Una rama divergente requiere revisión o rebase.
+`fix/kiosk-memberships-stripe` se integró a `main` mediante el PR #10. A partir
+de ese merge se creó `feature/automations-zoho-email`, que contiene el
+endurecimiento menor previo a Zoho: identidad GymFort, estilo administrativo,
+feedback global, permisos Stripe y verificación del contenedor Stripe CLI.
 
-## 2. Línea de tiempo integrada
+El corte funcional auditado es `88a6b58` y está publicado en
+`origin/feature/automations-zoho-email`; la sincronización documental posterior
+no cambia ese comportamiento. La implementación específica de Zoho todavía no
+comenzó y esta rama es el lugar de trabajo previsto.
 
-| Fecha | Hito verificable |
-|---|---|
-| 13–16 jul | Fundación, identidad, ventas, membresías, operación, servicios avanzados, productización y preparación administrativa |
-| 17 jul | Arquitectura frontend y separación de consolas |
-| 18–20 jul | Correcciones multi-tenant, CRM, membresías y reservas |
-| 20 jul | Integración de experiencia y validaciones de reservas |
-| 22 jul | Integración de simplificación/refactor general |
-| 24 jul | Cierre integral de catálogo y operación por sucursal |
-| 25 jul | Integración de endurecimiento de inventarios por PR #6 |
-| 26 jul | Coaches/rutinas en rama; todavía no integrado en main |
-| 26 jul | Sanitización documental global: fichas por módulo y retiro de documentos transitorios |
-| 26 jul | Cierre funcional de Coaches/rutinas en `84a5fd3`: seguridad `own/all`, constructor, medios, trazabilidad, métricas paginadas, PDF A4 y E2E |
-| 26 jul | Ampliación en `8162814`: perfiles avanzados multi-sucursal, filtro directo por socio y métricas históricas de 4–52 semanas |
-| 26 jul | Corrección `0066c0b`: dueño limitado a métricas, perfiles consolidados en Equipo y reparación de usuarios Coach existentes |
-| 26 jul | Corrección `3933aa5`: filtros UUID tipados y eliminación del `500` reproducido sobre PostgreSQL persistente |
-| 26 jul | Corrección `5dd0e47`: métricas independientes de lectura de rutinas y alcance exclusivo de tablero para dueño/gerente |
-| 26 jul | Corrección `602d37b`: alta transaccional de datos Coach dentro de Equipo y restauración del layout uniforme de usuarios |
-| 26 jul | Rediseño `d1d5124`: Equipo compacto, constructor progresivo, catálogo guiado y métricas personales del Coach |
-| 26 jul | Catálogo `9af72e7`: equipos reutilizables por organización, scroll interno y tarjetas uniformes |
-| 26 jul | Corrección `1f69dfa`: tarjetas compactas con descripción elidida y alta de equipo desacoplada de la cuadrícula |
-| 26 jul | Restauración `922c0ce`: reaplicación de la versión cerrada de Wellness sobre Coaches con migraciones V50/V51 |
-| 26 jul | Estabilización `4eac4d5`: confirmación interna/externa, hooks, migración idempotente y navegación probada de Wellness |
-| 26 jul | Corrección `6bb92c2`: asignación `PUBLISHED`, búsqueda reactiva, constructor en tres pasos y tarjetas de ejercicios de 88 px |
-| 27 jul | Mejora `fbdfa65`: series uniformes/detalladas con dropsets, descarga PDF reparada y documento A4 rediseñado/verificado |
-| 27 jul | Refinamiento `e718fdf`: ejercicio esencial en una fila, detalle por serie en panel lateral y PDF ligero con carga segura del logo interno |
-
-## 3. Inventario de ramas remotas
-
-Ya contenidas en `main`, sin commits exclusivos: `backup/system-updated-2026-07-20`, ramas `feature/hito-*`, `feature/bookings-experience-and-validation`, `feature/frontend-architecture-stabilization`, `feature/platform-tenant-role-ux-correction` y `feature/inventory-operations-hardening`. Son referencia histórica, no trabajo por fusionar.
-
-| Rama activa/divergente | Situación | Acción |
+| Rama | Estado | Acción |
 |---|---|---|
-| `feature/coaches-workouts` | Coaches V1 estabilizado hasta `e718fdf`; la versión cerrada de Wellness fue reaplicada y validada en `922c0ce`/`4eac4d5`. | Publicar la documentación actualizada y abrir PR hacia `main`. |
-| `feature/automations-self-service-kiosk` | Kiosco de navegador, proveedores, domiciliación completa, automatizaciones durables, telemetría tenant, historiales paginados y suites PostgreSQL/Stripe opt-in en desarrollo sobre `origin/main`. | Ejecutar las suites de infraestructura con Docker y secretos Stripe test, publicar evidencia y cerrar hardening antes de PR. |
-| `feature/wellness-services` | Su commit funcional `4a7a7d1` ya fue auditado y reaplicado sobre el árbol actual; la rama remota conserva historia divergente. | Mantener como referencia; no fusionar de nuevo. |
-| `feature/code-simplification-rebasion-and-refactor` | Un commit exclusivo y seis de main ausentes. | Auditar commit y rebase. |
-| `feature/catalog-inventory-enhancement-plan` | Historia fuertemente divergente. | No fusionar directamente; extraer cambios útiles. |
+| `main` | Base estable con PR #10 integrado | Recibir cambios sólo por PR verde |
+| `fix/kiosk-memberships-stripe` | Integrada | Histórica; no fusionar otra vez |
+| `feature/automations-zoho-email` | Activa, publicada | Continuar Zoho y abrir PR al cerrar aceptación |
+| `feature/automations-self-service-kiosk` | Ancestro funcional integrado por la línea de fix/PR | Referencia histórica |
+| `feature/coaches-workouts` | Trabajo de coaches ya incorporado en la evolución del árbol | No fusionar lateralmente sin auditoría |
+| `feature/wellness-services` | Funcionalidad reaplicada en la historia vigente | Referencia; no fusionar de nuevo |
 
-## 4. Incidente de alcance del 26 de julio
+Las ramas antiguas `feature/hito-*`, backups y ramas de estabilización ya
+contenidas en `main` son únicamente historia. Una rama divergente nunca se
+considera pendiente sólo por conservar commits: se compara por ancestros y se
+extraen cambios útiles mediante PR/cherry-pick controlado.
 
-Coaches incorporó `4a7a7d1` de Wellness mediante `f3cdf74` y después `907c530`.
-La sanitización lo retiró explícitamente con `08ec1a8`, aunque Coaches había
-nacido después de ese cierre. La revisión posterior determinó que el retiro
-también eliminó agenda, citas, permisos y navegación ya terminados.
+## 2. Hitos integrados
 
-La versión funcional se reaplicó en `922c0ce`, sin recuperar los documentos
-residuales retirados durante la sanitización. Sus migraciones se renumeraron a
-V50/V51 para coexistir con V45–V49 de Coaches y se estabilizó contra el árbol
-actual en `4eac4d5`. La rama remota de Wellness queda como referencia histórica,
-no como una fusión pendiente.
+| Periodo | Hito |
+|---|---|
+| 13–25 jul 2026 | Fundación, multi-tenant, identidad, CRM, catálogo, POS, membresías, reservas, inventario, consolas y operación por sucursal |
+| 26–27 jul | Coaches/rutinas, perfiles, catálogo de ejercicios, métricas, PDF y restauración de Wellness |
+| 30 jul–3 ago | Automatizaciones durables, kiosco lógico, proveedores, Stripe Checkout/recurrencia, correo durable y observabilidad |
+| agosto | Integración y corrección de membresías Stripe, idempotencia, beneficios, retornos, pagos y planes multi-sucursal |
+| 20 ago | PR #10 integra `fix/kiosk-memberships-stripe` en `main` |
+| 21 ago | `88a6b58`: estilo administrativo, atribución GymFort, feedback global, permisos Stripe y Stripe CLI en Docker/CI |
 
-## 5. Regla futura
+## 3. Evidencia del corte
 
-1. Una rama representa un módulo u objetivo.
-2. Antes de fusionar: `fetch`, comparación con `origin/main`, pruebas y revisión documental.
-3. Trabajo ajeno se integra por cherry-pick o PR propio, no por merge lateral.
-4. Todo cierre actualiza documentos 13, 28 y 29.
-5. Las ramas históricas sólo se eliminan por decisión explícita.
+- backend Gradle exitoso;
+- 77 pruebas frontend, lint, typecheck y build exitosos;
+- 8 E2E de ruteo por consola exitosos;
+- Docker Compose válido;
+- `stripe/stripe-cli:v1.50.3` descargado y ejecutado realmente.
 
-## 6. Sanitización documental global
+## 4. Regla futura
 
-Se consolidaron los planes, prompts, cierres y auditorías transitorias en:
-
-- `13-estado-desarrollo.md`;
-- `modulos/`, con una ficha por módulo;
-- `28-registro-vivo-deuda-tecnica.md`;
-- este documento para la historia de ramas.
-
-Los archivos residuales fueron eliminados del árbol vigente. Su contenido sigue
-disponible en el historial Git anterior a esta sanitización.
+1. Una rama representa un objetivo claro.
+2. Antes de integrar: `fetch`, comparación contra `origin/main`, pruebas,
+   revisión documental y PR.
+3. No hacer merges laterales de ramas históricas.
+4. Todo cierre material actualiza documentos 13, 28, 29 y fichas afectadas.
+5. Las ramas remotas sólo se eliminan por decisión explícita.

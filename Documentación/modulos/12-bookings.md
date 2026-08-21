@@ -1,11 +1,14 @@
 # Reservas y recursos
 
 Estado: `FUNCIONAL`
+Última revisión: 21 de agosto de 2026
 
 ## Implementado
 
 - recursos reservables y horarios;
 - disponibilidad y calendario mensual;
+- reservas elegibles en sucursales secundarias para planes multi-sucursal y
+  pago Stripe cuando el recurso requiere cobro;
 - creación y transiciones de reserva;
 - restricciones por plan/membresía;
 - vínculo de pago y operación desde recepción;

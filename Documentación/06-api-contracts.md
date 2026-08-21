@@ -203,15 +203,17 @@ lista para el siguiente; no se asigna ningún identificador a la computadora.
 ## 6.1.3 Configuración de cobros
 
 - `GET /payment-settings` — lectura efectiva para roles operativos autorizados.
-- `PUT /payment-settings` — dueño o administrador configura:
+- `PUT /payment-settings` — dueño, gerente autorizado o soporte configura:
   `receptionManualTerminalEnabled`, `receptionMercadoPagoEnabled`,
   `mercadoPagoTerminalId`, `stripeSelfCheckoutEnabled` y
   `stripeRecurringEnabled`.
 
 Mercado Pago o Stripe no pueden habilitarse antes de vincular su cuenta. La
 terminal manual de recepción puede operar sin integración y genera pagos
-pendientes de validación. Stripe pertenece exclusivamente al self checkout y a
-la domiciliación del socio.
+pendientes de validación. Stripe pertenece al self checkout y a la
+domiciliación del socio. Gerencia puede activar o desactivar estas modalidades
+si la cuenta ya está vinculada, pero no puede crear, sustituir ni verificar la
+cuenta Stripe.
 
 La sesion publica de kiosco usa logo, nombre visible y colores del gimnasio al que pertenece el terminal. La sucursal vinculada define el contexto operativo del kiosco, no una marca visual propia.
 
@@ -467,7 +469,9 @@ Nota implementada Hito 4:
 - Acciones implementadas: `confirm`, `check-in`, `complete` y `cancel`.
 - UX implementada en `/bookings`: la reserva se crea buscando socio por texto, seleccionando recurso, dia y hora de inicio; la hora final se calcula con `slotMinutes` del recurso.
 - UX implementada en `/bookings`: la creacion de recurso captura duracion manual y horario por dia operativo. Mientras no exista tabla dedicada de horario por recurso/dia, la UI serializa ese horario en `resource.notes` y mantiene `opensAt`/`closesAt` como rango operativo agregado para compatibilidad con la API vigente.
-- La UI base no muestra pago de reserva porque las reservas operativas se consideran incluidas en la membresia permitida. El endpoint tecnico de pago vinculado queda reservado para casos especiales o evolucion posterior.
+- Las reservas incluidas en el plan no generan cobro. Cuando un recurso exige
+  pago, el flujo crea pago pendiente y puede abrir Stripe Checkout; el webhook
+  confirmado actualiza la reserva y su movimiento de caja de forma idempotente.
 
 ## 6.12 Accesos
 
@@ -734,6 +738,7 @@ Permisos por endpoint interno:
 - `catalog.read`, `catalog.manage`
 - `sale.read`, `sale.create`
 - `payment.manual.create`, `payment.manual.validate`, `payment.manual.reject`, `payment.receipt.upload`
+- `payment.settings.read`, `payment.settings.manage`, `payment.provider.stripe.manage`
 - `membership.read`, `membership.renew`, `membership.change-plan`
 - `report.sales.read`
 - `access.read`, `access.manage`, `access.manual.open`
@@ -1077,7 +1082,8 @@ Reglas:
 
 - `primaryColor`, `accentColor` y `surfaceColor` deben usar formato hexadecimal `#RRGGBB`.
 - La marca se guarda por organizacion/gimnasio. Gerencia, recepcion, coaches, kiosco y pantallas internas usan siempre la marca del tenant activo.
-- La consola de Administrador GymOS conserva marca neutral de plataforma.
+- La consola de plataforma conserva tema neutral y atribución GymFort; las
+  consolas tenant combinan esa atribución con la marca del gimnasio.
 
 ### Usuarios internos
 
@@ -1148,7 +1154,7 @@ Valores posibles de `console`:
 - Para `Coach`, persiste cuenta, sucursales, especialidades y biografia como una
   sola operacion; un fallo del perfil revierte el alta completa.
 - Los usuarios creados entran a su consola segun permisos/rol.
-## Extensiones de membresías y acceso — `feature/reception-pos-init`
+## Extensiones vigentes de membresías y acceso
 
 ### Cotización de plan
 
@@ -1245,13 +1251,16 @@ Reemplaza de forma auditable los accesos requeridos por el dispositivo.
 
 ## Configuración e integración de proveedores de pago
 
-Todos los endpoints de configuración requieren `payment.settings.manage`, salvo
-la consulta, que también acepta `payment.settings.read`.
+Los endpoints operativos de configuración requieren `payment.settings.manage`,
+salvo la consulta, que también acepta `payment.settings.read`. Conectar o
+refrescar Stripe exige `payment.provider.stripe.manage` o `platform.admin`.
 
 - `POST /api/v1/payment-settings/stripe/connect`: crea/reutiliza la cuenta
   Express del gimnasio y devuelve un Account Link temporal.
 - `POST /api/v1/payment-settings/stripe/refresh`: consulta a Stripe y sólo
   marca conexión cuando `details_submitted` y `charges_enabled` son verdaderos.
+- Estos dos endpoints no aceptan `payment.settings.manage` por sí solo: un
+  gerente puede encender/apagar una conexión existente, no administrarla.
 - `POST /api/v1/payment-settings/mercado-pago/connect`: inicia OAuth con estado
   de un solo uso y PKCE.
 - `GET /api/v1/payment-settings/mercado-pago/oauth/callback`: consume el estado,

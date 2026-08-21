@@ -26,7 +26,7 @@ El primer hito debe incluir una aplicación Next.js funcional con:
 
 ## 8.1.2 Kiosco de autoservicio
 
-GymOS debe contemplar una experiencia de pantalla táctil para clientes dentro del gimnasio.
+GymFort debe contemplar una experiencia de pantalla táctil para clientes dentro del gimnasio.
 
 Principios:
 - Interfaz muy simple, con botones grandes y texto legible a distancia corta.
@@ -42,8 +42,8 @@ Funciones esperadas:
 - Pagos pendientes.
 - Renovación de membresía.
 - Solicitud de cambio de plan.
-- Inicio de pago manual.
-- Carga o captura de comprobante.
+- Cotización y redirección a Stripe Checkout/Setup cuando existe un cobro.
+- Consulta de estado y comprobante confirmado por proveedor.
 - Actualización de teléfono, correo y contacto de emergencia cuando esté permitido.
 
 ## 8.2 Layout de recepción
@@ -252,7 +252,9 @@ Implementacion frontend:
 
 Reglas de producto:
 - La personalizacion visual ya pertenece al gimnasio/tenant y se persiste en backend.
-- El panel de Administrador GymOS conserva marca neutral de plataforma; gerencia, recepcion, coaches y kiosco usan la marca del gimnasio activo.
+- El panel de plataforma conserva tema neutral; gerencia, recepción, coaches y
+  kiosco usan la marca del gimnasio activo. La atribución GymFort aparece de
+  forma permanente junto a la marca tenant.
 - La marca tambien viaja en `CurrentUser` para que roles sin permiso de administracion puedan ver logo, color principal, acento y fondo del gimnasio activo.
 - Ninguna regla de negocio se mueve al frontend.
 - Los formularios deben usar etiquetas de negocio entendibles para recepcion y administracion.
@@ -329,9 +331,9 @@ Correccion Hito 7.9:
 
 Modo soporte:
 - Admin GymOS entra a un gimnasio con `supportMode = true`.
-- El shell muestra banda "Modo soporte GymOS".
+- El shell muestra la banda "Modo soporte GymFort".
 - Las acciones quedan auditadas con origen `PLATFORM_SUPPORT`.
-- Fuera de soporte, Admin GymOS mantiene marca neutral de plataforma.
+- Fuera de soporte, Admin GymOS mantiene la marca neutral de GymFort.
 
 Marca por gimnasio:
 - `TenantThemeProvider` aplica tokens CSS desde la organizacion activa.
@@ -340,8 +342,9 @@ Marca por gimnasio:
 - La marca lateral usa los colores del tenant y muestra el logo configurado cuando `logoUrl` existe.
 - Las sucursales no tienen marca propia; todas heredan logo y colores configurados en el gimnasio.
 - El logo se carga desde un selector de archivo, no escribiendo una URL manualmente.
-- Los logos cargados desde frontend local se guardan en `frontend/public/tenants/<slug-del-gimnasio>/logo.*` y se exponen como `/tenants/<slug-del-gimnasio>/logo.*`.
-- Docker Compose monta `frontend/public/tenants` en el contenedor frontend para preservar logos cargados durante pruebas locales.
+- Los logos se persisten mediante los endpoints administrados de organizaciones
+  y almacenamiento S3-compatible; el frontend usa el proxy de lectura
+  `/api/tenant-logo/{organizationId}` y no escribe archivos del repositorio.
 - `primaryColor` se usa en acciones principales y titulos; `accentColor` se usa en bordes activos, chips, botones secundarios y detalles de marca; `surfaceColor` se usa como fondo real de la consola tenant.
 
 Formularios:
@@ -366,6 +369,16 @@ Formularios:
 - `AppShell` resuelve el nombre real de la sucursal activa cuando una pagina no carga la lista de sucursales por si misma, evitando mostrar solo "Sucursal seleccionada".
 - Beneficios, accesos y automatizaciones deben renderizarse dentro del shell lateral unificado.
 - Los errores de backend deben mostrar mensaje, codigo y `correlationId` cuando existan.
+- Éxitos, advertencias y errores se presentan mediante el sistema global de
+  notificaciones flotantes. Debe mantenerse visible sin importar el scroll,
+  admitir cierre, semántica accesible y evitar banners locales duplicados.
+- Automatizaciones y Configuración usan la misma superficie oscura, tipografía,
+  tarjetas y espaciado que el resto del `AppShell`.
+- Gerencia ve los interruptores operativos de una cuenta Stripe existente, pero
+  los botones de conectar/refrescar sólo aparecen con
+  `payment.provider.stripe.manage` o `platform.admin`.
+- La apertura de `/kiosk/launch` sólo aparece con
+  `selfservice.session.launch`; el rol Gerente no lo recibe.
 - `/reception` no debe depender de permisos administrativos como lectura completa de organizacion. Si el usuario tiene `branchId`, debe mostrar dashboard operativo aunque no pueda consultar `/organizations/current`.
 - El estado sin sucursal para recepcion no debe mostrar onboarding, alta de gimnasio ni configuracion de tenant; solo selector de sucursal permitida o instruccion de pedir acceso al dueño/gerente.
 - Si un usuario de recepcion tiene exactamente una sucursal permitida pero la sesion guardada no trae `branchId`, el frontend debe seleccionarla automaticamente antes de pintar la consola.

@@ -1,80 +1,69 @@
-# GymOS — Documentación Maestra
+# GymFort — documentación maestra
 
-Versión: 0.2  
-Estado: ESTRUCTURA CANÓNICA
-Fecha base: 26 de julio de 2026
+Versión documental: 0.8
+Estado: FUENTE CANÓNICA
+Corte: 21 de agosto de 2026
 
-GymOS es una plataforma web modular para la administración integral de gimnasios
-y centros de bienestar. Esta carpeta separa especificación, estado, deuda y
-documentación por módulo.
+GymFort es la identidad comercial vigente. `GymOS`/`gymos` permanece como nombre
+técnico histórico en paquetes Java, variables, base de datos y algunos artefactos;
+una migración de marca no debe romper contratos ni datos existentes.
 
-## Documentos
+## Fuentes canónicas
 
-1. `01-constitution.md` — Constitución del proyecto y principios no negociables.
-2. `02-prd.md` — Product Requirements Document.
-3. `03-sds.md` — Software Design Specification.
-4. `04-domain-model.md` — Modelo de dominio, agregados, estados, invariantes y eventos.
-5. `05-data-model.md` — Modelo físico de datos, tablas, relaciones e índices.
-6. `06-api-contracts.md` — Contratos API propuestos.
-7. `07-use-cases.md` — Casos de uso, flujos, errores y criterios de aceptación.
-8. `08-frontend-spec.md` — Especificación funcional de frontend web.
-9. `09-integrations-infrastructure.md` — Integraciones, despliegue, observabilidad y seguridad operacional.
-10. `10-ai-development.md` — Estrategia de desarrollo asistido por IA y prompts maestros.
-11. `11-roadmap.md` — Orden de implementación, épicas y entregables.
-12. `12-decisiones-fundacionales.md` — Decisiones confirmadas sobre producto vendible, multi-organización, sucursales, primer hito, seguridad, pagos e infraestructura local.
-13. `13-estado-desarrollo.md` — resumen canónico vigente de la plataforma.
-14. `modulos/` — un documento de estado por cada módulo backend.
-15. `28-registro-vivo-deuda-tecnica.md` — lista única de hallazgos y deuda.
-16. `29-cronologia-ramas.md` — cronología Git y ramas activas/divergentes.
-17. `30-rediseño-pos-membresias-beneficios.md` — decisiones, implementación y evidencia para catálogo, POS, membresías y beneficios; hardware fuera de alcance.
-18. `31-diseño-automatizaciones-kiosco.md` — auditoría del estado real, fronteras, riesgos y diseño objetivo de automatizaciones y autoservicio.
+1. `01-constitution.md`: principios no negociables.
+2. `02-prd.md`: requisitos de producto y actores.
+3. `03-sds.md`: arquitectura del monolito modular.
+4. `04-domain-model.md`: agregados, invariantes y eventos.
+5. `05-data-model.md`: tablas, relaciones, índices y migraciones.
+6. `06-api-contracts.md`: contratos HTTP y permisos.
+7. `07-use-cases.md`: recorridos y criterios de aceptación.
+8. `08-frontend-spec.md`: experiencia web, marca y feedback.
+9. `09-integrations-infrastructure.md`: proveedores, despliegue y observabilidad.
+10. `10-ai-development.md`: reglas de desarrollo asistido.
+11. `11-roadmap.md`: implementado, en curso y siguiente.
+12. `12-decisiones-fundacionales.md`: decisiones arquitectónicas y de producto.
+13. `13-estado-desarrollo.md`: resumen vigente de todo el proyecto.
+14. `modulos/`: estado técnico y funcional por módulo.
+15. `28-registro-vivo-deuda-tecnica.md`: único registro de deuda activa.
+16. `29-cronologia-ramas.md`: integración y situación Git.
+17. `30-rediseño-pos-membresias-beneficios.md`: diseño consolidado de comercio.
+18. `31-diseño-automatizaciones-kiosco.md`: diseño consolidado de autoservicio y automatización.
 
-Documentación operativa y de seguridad vigente:
+Fuentes operativas complementarias:
 
-- `../docs/operations/` — despliegue, rollback, backup, restore, incidentes y soporte.
-- `../docs/security/` — permisos y verificación multi-tenant.
+- `../docs/operations/`: despliegue, respaldo, incidentes, correo, kiosco y Stripe.
+- `../docs/security/`: permisos y verificación multi-tenant.
+- `../docs/testing/`: aceptación funcional y Stripe sandbox.
+- `../infra/README.md`: ejecución local y perfil Docker de Stripe CLI.
 
-### Regla de mantenimiento documental
+## Alcance implementado
 
-Todo cambio material debe actualizar en el mismo commit la ficha correspondiente
-en `modulos/`, el resumen 13 y la deuda 28. Si cambia la integración de ramas,
-también debe actualizar el documento 29. No deben crearse prompts, planes de
-acción, cierres ni bitácoras nuevas como fuentes paralelas: Git conserva el
-historial.
+La versión piloto cubre organizaciones y sucursales, identidad/RBAC, clientes,
+catálogo, ventas, pagos manuales y por proveedor, membresías, beneficios,
+acceso, reservas, inventario, coaches, wellness, automatizaciones,
+notificaciones, reportes, auditoría, configuración y kiosco web.
 
-## Alcance de la versión 1
+Stripe Checkout y la domiciliación ya forman parte del producto. Los cambios de
+membresía y demás efectos financieros solo se aplican después del webhook
+firmado y conciliado. Los planes multi-sucursal conservan la sucursal de origen
+de la membresía, pero habilitan consulta, acceso, reservas y kiosco en las otras
+sucursales activas del mismo gimnasio.
 
-La versión 1 incluye toda la operación interna del gimnasio:
+El correo transaccional dispone de infraestructura SMTP durable. Zoho es el
+proveedor objetivo del siguiente bloque; conexión real, dominio y
+entregabilidad siguen pendientes de validación.
 
-- Organizaciones y sucursales.
-- Personas y clientes.
-- Usuarios, roles y permisos.
-- Planes, membresías, renovaciones y visitas.
-- Pagos en efectivo, transferencia y tarjeta.
-- Kiosco de autoservicio en gimnasio para consultas, pagos y membresías.
-- Punto de venta.
-- Inventario.
-- Reservas de recursos y servicios.
-- Control de acceso e integración con torniquetes.
-- Entrenadores y rutinas.
-- Profesionales de bienestar.
-- Notificaciones y automatizaciones.
-- Reportes y dashboards.
-- Auditoría y configuración.
+Quedan fuera de V1: aplicación móvil/portal remoto completo del socio, cobros
+entre coach y socio, hardware de acceso offline y WhatsApp/push productivos.
 
-La aplicación móvil o portal remoto de clientes queda fuera de la versión 1, pero la arquitectura debe dejarla preparada. El kiosco de autoservicio dentro del gimnasio sí queda contemplado para V1.
+## Reglas de mantenimiento
 
-### Precisión de alcance para Coaches y rutinas
-
-En V1, GymOS permite que el coach consulte y amplíe un catálogo de ejercicios, cree y versione rutinas estructuradas, asigne una versión específica a un socio, conserve el historial y genere un PDF imprimible. Dueño y gerente sólo consultan métricas por coach o socio con históricos de 4 a 52 semanas; la cuenta, el perfil y las sucursales del coach se administran como un único usuario en Gestión del equipo.
-
-Las rutinas **no se cobran por medio de GymOS**. Los cobros en efectivo acordados entre coach y socio son externos a la plataforma y no generan venta, pago, comisión, ingreso ni movimiento de caja. La consulta remota de la rutina por el socio se reserva para una aplicación futura.
-
-## Decisiones fundacionales
-
-- GymOS debe ser un producto vendible desde la primera versión operativa.
-- Debe soportar gimnasios independientes y cadenas con varias sucursales desde el modelo base.
-- El primer hito debe incluir frontend web y autenticación real.
-- Los pagos de V1 se procesan de forma interna y manual, excepto los cobros externos entre coaches y socios, que no forman parte del sistema.
-- Debe poder implementarse un kiosco interno de autoservicio para clientes.
-- La estructura recomendada es monorepo con backend, frontend, infraestructura y documentación.
+1. El código y las pruebas verificadas son la evidencia; la documentación debe
+   corregirse cuando discrepe.
+2. Todo cambio material actualiza la ficha de módulo, este índice si cambia el
+   mapa, el documento 13 y la deuda 28 cuando corresponda.
+3. Cambios de endpoint, permiso o migración actualizan 05, 06 y la matriz de
+   permisos.
+4. Cambios operativos actualizan `docs/operations`, `docs/testing` o `infra`.
+5. No crear cierres, prompts o listas de pendientes paralelas; Git conserva el
+   historial y el documento 28 conserva la deuda activa.

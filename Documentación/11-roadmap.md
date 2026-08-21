@@ -1,230 +1,91 @@
-# 11. Roadmap de Implementación
+# 11. Roadmap de implementación
 
-## Fase 0 — Cimientos
+Corte: 21 de agosto de 2026
 
-- Monorepo.
-- CI/CD.
-- Docker.
-- Docker Compose local con PostgreSQL, Redis y MinIO.
-- Estructura Spring Modulith.
-- Estructura Next.js.
-- Convenciones.
-- Manejo de errores.
-- Auditoría.
-- Autenticación completa inicial.
-- JWT de corta duración.
-- Refresh tokens revocables.
-- Roles y permisos.
-- Contexto de organización y sucursal.
-- Registro técnico de kioscos de autoservicio.
-- Flyway.
-- OpenAPI.
-- Observabilidad.
+Este documento expresa secuencia y estado, no sustituye el estado verificable
+del documento 13 ni la deuda del 28.
 
-## Fase 1 — Identidad y clientes
+## Entregado para piloto
 
-- Organization.
-- Branch.
-- Person.
-- User.
-- Roles.
-- Permisos.
-- Client.
-- Alta.
-- Búsqueda.
-- Ficha.
-- Frontend de login.
-- Frontend de recepción inicial.
-- Frontend de alta y ficha de cliente.
-- Base visual para modo kiosco.
+### Cimientos y SaaS multi-tenant
 
-## Fase 2 — Catálogo y ventas
+- Monorepo, Spring Modulith, Next.js, Flyway, PostgreSQL, Redis y MinIO.
+- JWT/refresh, RBAC granular, organización, sucursal, soporte y auditoría.
+- Consolas separadas para plataforma, dueño, gerente, recepción y coach.
+- Identidad GymFort permanente más personalización visual por gimnasio.
 
-- Product.
-- Plan.
-- Benefit.
-- Sale.
-- SaleItem.
-- Payment.
-- POS.
-- Pagos internos/manuales: efectivo, transferencia y registro manual de tarjeta.
+### Operación del gimnasio
 
-## Fase 3 — Membresías
+- CRM de socios, importación, catálogo, POS, caja y reportes operativos.
+- Membresías con periodos inclusivos, alta, renovación, cambio y beneficios.
+- Acceso lógico, visitas, inventario, reservas y recursos.
+- Coaches, ejercicios, rutinas versionadas, asignaciones, métricas, CSV y PDF.
+- Profesionales wellness, servicios, disponibilidad, agenda y citas.
 
-- Alta.
-- Activación.
-- Renovación.
-- Expiración.
-- Beneficios de estudiante.
-- Recordatorios.
-- Renovación desde kiosco.
-- Solicitud de cambio de membresía desde kiosco.
+### Pagos y autoservicio
 
-## Fase 3.1 — Autoservicio en kiosco
+- Efectivo, transferencia y terminal externa con validación manual.
+- Mercado Pago OAuth/Point.
+- Stripe Connect, Checkout, Setup, webhook, conciliación y recibos.
+- Domiciliación con consentimiento, cargos por vigencia, reintentos,
+  recuperación, cambio de tarjeta y revocación.
+- Kiosco lógico por sucursal, abierto sólo por Recepción, con sesión aislada,
+  membresías, pagos, reservas, wellness y actualización de contacto.
+- Elegibilidad de planes multi-sucursal en sedes secundarias.
 
-- Registro y configuración de terminales.
-- Sesiones temporales de cliente.
-- Resumen de membresía.
-- Pagos pendientes.
-- Inicio de pagos manuales.
-- Carga de comprobantes.
-- Renovación y cambio de plan con validación backend.
-- Cierre automático por inactividad.
-- Auditoría de acciones de autoservicio.
+### Automatización y correo
 
-## Fase 4 — Control de acceso
+- Reglas manuales, programadas y por eventos de pagos, membresías y reservas.
+- Inbox durable, idempotencia, leasing, reintentos, dead letters, pausa por
+  tenant, historial y métricas.
+- Cola SMTP durable, configuración de remitente, preferencias, prueba y
+  recuperación.
 
-- Puerto.
-- Adaptador inicial.
-- Accesos.
-- Excepciones.
-- Bitácora.
-- Acceso temporal.
+### Calidad y operación local
 
-## Fase 5 — Inventario
+- Suites backend/frontend y E2E críticos.
+- PostgreSQL y Stripe sandbox como suites opt-in.
+- Docker Compose, perfil Stripe CLI fijado, CI de build/config y runbooks.
+- Sistema visual unificado y notificaciones flotantes globales.
 
-- Existencias.
-- Movimientos.
-- Ventas.
-- Mermas.
-- Alertas.
+## En curso inmediato
 
-## Fase 6 — Reservas
+### Integración Zoho
 
-- Recursos.
-- Disponibilidad.
-- Booking.
-- Cancelaciones.
-- Sauna.
-- Tina.
-- Clases.
-- Consultorios.
+- Configurar Zoho SMTP mediante el puerto existente.
+- Documentar secretos y parámetros sin guardarlos por tenant.
+- Verificar dominio, SPF, DKIM y DMARC.
+- Probar remitente/reply-to, TLS, timeouts, reintentos y dead letter.
+- Validar entregabilidad real y estrategia de rebotes/quejas disponible.
 
-## Fase 7 — Coaches y bienestar
+### Aceptación conectada
 
-- Coaches vinculados con usuarios y alcance por sucursal.
-- Catálogo amplio, buscable y extensible de ejercicios.
-- Constructor de rutinas por sesiones, bloques y prescripciones flexibles.
-- Borradores, publicación y versionado inmutable.
-- Asignación idempotente a socios y PDF imprimible.
-- Métricas semanales por coach, socio y sucursal.
-- Profesionales.
-- Servicios.
-- Agenda.
+- Ejecutar `stripeTest` en CI protegido con cuenta Connect test.
+- Ampliar E2E de timeout, reintento, recuperación y webhook duplicado.
+- Validar cancelación/reembolso autoritativo por proveedor.
+- Mantener regresión de membresías/reservas multi-sucursal.
 
-Para Coaches y rutinas, quedan fuera de esta fase el cobro por plataforma, registro
-del efectivo del coach, comisiones y app remota del socio. El plan ejecutable es
-el que quedó cerrado en `84a5fd3` y ampliado con perfiles multi-sucursal,
-filtro directo por socio e histórico semanal en `8162814`; su estado y
-evidencia se mantienen en `modulos/14-coaching.md`.
+## Antes de producción
 
-## Fase 8 — Automatizaciones y reportes
+- Matriz completa de autorización por tenant/sucursal y mutaciones auditadas.
+- Migración limpia y upgrade de una base de referencia.
+- Staging, HTTPS, escaneo de imágenes y secretos gestionados.
+- Simulacro documentado de backup/restore contra RPO/RTO.
+- Dashboards/alertas operativos y respuesta a incidentes ensayada.
+- Pruebas de volumen y concurrencia para comercio, inventario y reservas.
+- Manuales por rol y piloto controlado con feedback.
 
-- Motor de eventos.
-- Notificaciones.
-- Dashboards.
-- Reportes.
+## Fuera de V1
 
-## Fase 9 - Hito 6: Productizacion por codigo
-
-- Checklist vendible dentro de la aplicacion.
-- Onboarding piloto de organizacion y sucursal activa.
-- Creacion idempotente de catalogo base: planes, productos y kiosco.
-- Importacion inicial de clientes por CSV.
-- Dry-run y resultado por fila para importaciones.
-- Permisos `onboarding.manage` y `client.import`.
-- Pantallas `/onboarding` y `/clients/import`.
-
-## Fase 10 - Hito 6.5: Rediseño frontend y experiencia comercial
-
-- Sistema visual frontend con tokens de marca.
-- Navegacion principal por areas: Operacion, Gestion y Direccion.
-- Portada como centro operativo del producto.
-- Login, recepcion, dashboard, reporte de ventas y configuracion alineados a una UI moderna.
-- Personalizacion local de nombre visible, colores y logo para demos y pilotos.
-- Sin cambios de contrato HTTP ni reglas de negocio en frontend.
-
-## Fase 11 - Hito 7: Preparacion administrativa y piloto comercial
-
-- Capacitacion.
-- Scripts y politica de backups.
-- Checklist de venta e instalacion.
-- Checklist de produccion.
-- Entorno staging formal.
-- Manual operativo para el gimnasio piloto.
-- Ejecucion del piloto con datos reales.
-- Registro de feedback, pricing, soporte y procesos comerciales.
-
-## Hito 7.1 - Calidad y regresion
-
-Estado: IN_PROGRESS
-
-- Suite transversal multi-tenant.
-- Regresion de autenticacion, ventas, pagos, membresias, kiosco, inventario, reservas, acceso e importacion.
-- Pruebas de concurrencia e idempotencia.
-- Testcontainers como base para flujos criticos.
-
-## Hito 7.2 - Refactorizacion tecnica
-
-Estado: IN_PROGRESS
-
-- Separacion gradual de servicios grandes por casos de uso.
-- Eliminacion de `JdbcClient` en `application`.
-- Division del cliente frontend API por dominio.
-- Extraccion de paginas frontend grandes en componentes y hooks.
-
-## Hito 7.3 - Operacion y produccion
-
-Estado: IN_PROGRESS
-
-- Perfiles `local`, `test`, `development`, `staging` y `production`.
-- Seed demo limitado a `local`.
-- Reverse proxy, HTTPS, backups, restore, observabilidad y runbooks.
-- CI ampliado con validacion Docker.
-
-## Hito 7.4 - Cierre funcional minimo
-
-Estado: PLANNED
-
-- Beneficios.
-- Expiracion y recordatorios de membresia.
-- Renovacion automatica con pasarela abstracta.
-- Visitas.
-- Cancelaciones y reembolsos.
-- Reservas pagadas.
-- Automatizaciones programadas y correo.
-
-## Hito 7.5 - Preparacion del piloto
-
-Estado: PLANNED
-
-- Checklist operativo del gimnasio piloto.
-- Plantillas de importacion.
-- Manuales por rol.
-- Operacion paralela.
-- Feedback, soporte y pricing.
-
-## Hito 8 - Integraciones reales
-
-- Torniquetes, reconocimiento facial, WhatsApp, SMS, pasarela de pagos, facturacion, webhooks y modo offline.
-
-## Hito 9 - Aplicacion de clientes
-
-- Login cliente, membresia, pagos, reservas, rutinas, notificaciones, perfil, QR e historial.
-
-## Hito 10 - SaaS avanzado
-
-- Provisionamiento, suscripciones B2B, licenciamiento, modulos contratados, facturacion GymOS y marketplace.
+- Aplicación móvil o portal remoto completo del socio.
+- Pagos, comisiones o efectivo acordados directamente entre coach y socio.
+- Integración productiva de torniquetes/biometría y modo offline.
+- WhatsApp, push, facturación y marketplace SaaS avanzados.
 
 ## Definición de terminado
 
-Una funcionalidad está terminada cuando:
-
-- Cumple criterios de aceptación.
-- Tiene pruebas.
-- Tiene migración.
-- Tiene documentación.
-- Tiene auditoría.
-- Tiene permisos.
-- Tiene manejo de errores.
-- Está desplegada en staging.
+Una capacidad está terminada cuando tiene contrato, permisos, reglas de tenant y
+sucursal, migración cuando aplica, auditoría, errores seguros, pruebas,
+documentación y validación en el entorno objetivo. Para proveedores externos se
+requiere además evidencia sandbox/productiva controlada y runbook de
+recuperación.

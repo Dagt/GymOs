@@ -1,6 +1,7 @@
 # Auditoría
 
 Estado: `FUNCIONAL`
+Última revisión: 21 de agosto de 2026
 
 ## Implementado
 

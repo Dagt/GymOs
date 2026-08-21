@@ -1,11 +1,11 @@
 # 12. Decisiones Fundacionales
 
-Estado: confirmado  
-Fecha: 13 de julio de 2026
+Estado: confirmado y actualizado
+Última revisión: 21 de agosto de 2026
 
 ## 12.1 Objetivo comercial
 
-GymOS debe construirse como producto vendible desde la primera versión operativa. Los primeros clientes objetivo son gimnasios concretos, pero la solución no debe quedar acoplada a una operación específica.
+GymFort debe construirse como producto vendible desde la primera versión operativa. Los primeros clientes objetivo son gimnasios concretos, pero la solución no debe quedar acoplada a una operación específica.
 
 ## 12.2 Modelo comercial y operativo
 
@@ -45,27 +45,35 @@ La autenticación no será simulada en el primer hito. Debe incluir:
 
 ## 12.5 Pagos V1
 
-Los pagos de la primera versión se procesan internamente y de forma manual:
+Los pagos de la primera versión admiten modalidades manuales e integradas:
 
 - Efectivo.
 - Transferencia con comprobante y validación manual.
-- Tarjeta registrada manualmente si el gimnasio usa terminal externa.
+- Tarjeta procesada en terminal externa y registrada para validación manual.
+- Mercado Pago Point integrado en recepción.
+- Stripe Checkout y Setup alojados para kiosco y domiciliación.
 
-Las pasarelas externas quedan fuera del primer alcance obligatorio, pero deben existir puertos para integrarlas posteriormente.
+El navegador nunca confirma un pago. Webhooks firmados, consulta autoritativa e
+idempotencia controlan los efectos comerciales.
 
 ## 12.5.1 Kiosco de autoservicio
 
-GymOS debe permitir implementar una pantalla o kiosco dentro del gimnasio para que los clientes puedan:
+GymFort debe permitir implementar una pantalla o kiosco dentro del gimnasio para que los clientes puedan:
 
 - Consultar su membresía.
 - Ver pagos pendientes.
 - Renovar membresía.
 - Solicitar cambio de plan.
-- Iniciar pagos internos/manuales.
-- Cargar comprobantes.
+- Contratar, renovar o cambiar plan mediante Stripe Checkout.
+- Autorizar, sustituir o revocar domiciliación con captura alojada.
+- Consultar pagos y comprobantes conciliados.
 - Actualizar datos de contacto permitidos.
 
 El kiosco usa sesiones temporales y restringidas. No es una sesión administrativa ni reemplaza al portal móvil/remoto. Ninguna regla de negocio se ejecuta en el frontend del kiosco.
+
+Sólo Recepción abre la sesión para socios. Gerencia configura las capacidades y
+puede activar/desactivar una cuenta Stripe ya vinculada, pero conectar o
+refrescar esa cuenta corresponde al dueño o soporte de plataforma.
 
 ## 12.6 Repositorio e infraestructura local
 

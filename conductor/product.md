@@ -1,17 +1,33 @@
-# Product Guide: GymOS
+# Product Guide: GymFort
+
+Last reviewed: 2026-08-21.
+
+> `GymFort` is the customer-facing product name. `GymOS` and `gymos` remain in historical package names, database identifiers and configuration keys until a separate technical migration is approved.
 
 ## Overview
-GymOS is a modular platform designed for the comprehensive operation of gyms and wellness centers. It serves as a unified system to manage the entire lifecycle of gym operations, from member onboarding to daily facility management.
 
-## Target Audience
-The platform caters to both **Franchise Chains** requiring centralized, multi-location management and **Independent Gyms** needing simplified, robust operational tools.
+GymFort is a modular platform for operating gyms and wellness centers. It covers tenant and branch administration, staff security, onboarding, clients, memberships, benefits, access, bookings, coaching, wellness, inventory, point of sale, payments, self-service, automations, notifications, reporting and audit.
 
-## Core Differentiators
-- **Multi-Tenant Operations:** A strong foundational architecture that seamlessly manages multiple branches and organizations from a single, centralized platform.
-- **Self-Service Automation:** Empowering members to manage their own memberships, bookings, and payments, reducing the burden on administrative staff.
+## Target audience
 
-## Key Value Proposition
-The primary value proposition for gym owners is to drastically **Reduce Operational Overhead** by automating time-consuming tasks such as billing, access control, and general administration.
+- Multi-branch gym organizations that need centralized governance with branch-level operation.
+- Independent gyms that need an integrated operational system without assembling several tools.
+- Members who use the self-service kiosk to manage memberships, bookings, contact data, card payments and recurring-payment authorization.
 
-## Primary Operational Focus
-The core focus of GymOS is **Holistic Administration and Data-Driven Insights**. It provides tools to manage every aspect of gym operations while delivering critical metrics to owners regarding profitability, client retention, and financial health. Furthermore, it aims to reduce operational friction by streamlining user-facing processes, such as making reservations for rooms and amenities.
+## Current differentiators
+
+- Strong organization and branch isolation, with explicit permissions and audit evidence.
+- Multi-branch memberships whose origin is preserved while valid access and bookings work at eligible branches.
+- Self-service flows with expiring sessions and a payment lifecycle that survives browser redirects.
+- Stripe Connect, Checkout, Setup, recurring charges, signed webhooks and receipts integrated in test mode.
+- Durable automations and notifications. SMTP delivery exists; production-oriented Zoho Mail configuration is the next integration milestone.
+
+## Value proposition
+
+Reduce operational overhead while preserving control: automate repetitive work, allow members to resolve routine needs, and give owners and staff traceable operational and financial information.
+
+## Product principles
+
+- No membership, reservation or financial effect is considered final until the authoritative backend workflow confirms it.
+- The member experience must be clear and forgiving; sensitive actions remain explicit and auditable.
+- Tenant branding is supported, but GymFort attribution remains visible throughout the product.

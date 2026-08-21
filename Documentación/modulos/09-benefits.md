@@ -1,6 +1,7 @@
 # Beneficios y elegibilidad
 
 Estado: `ESTABILIZADO`
+Última revisión: 21 de agosto de 2026
 
 ## Implementado
 
@@ -13,7 +14,7 @@ Estado: `ESTABILIZADO`
 
 - consumo concurrente de pases de visita;
 - pruebas negativas exhaustivas de permisos y aislamiento.
-## Evolución en `feature/reception-pos-init`
+## Estado vigente de elegibilidad
 
 Los beneficios de tipo `ACCESS` administran desde el propio beneficio los planes
 que los conceden. La relación muchos-a-muchos se persiste en

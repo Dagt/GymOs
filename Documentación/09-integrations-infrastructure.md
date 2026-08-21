@@ -1,169 +1,82 @@
-# 9. Integraciones e Infraestructura
+# 9. Integraciones e infraestructura
 
-## 9.1 Puertos externos
+Corte: 21 de agosto de 2026
 
-### AccessControlProvider
-- registerIdentity
-- updateIdentity
-- revokeIdentity
-- openAccessPoint
-- createTemporaryAccess
-- receiveAccessEvent
-- healthCheck
+## 9.1 Arquitectura de proveedores
 
-### BiometricProvider
-- enrollFace
-- updateFace
-- removeFace
-- matchReference
+Los proveedores externos se aíslan detrás de puertos de aplicación. Los
+dominios no almacenan secretos ni confían en datos devueltos por el navegador.
 
-### PaymentGateway
-- createPaymentIntent
-- confirmPayment
-- cancelPayment
-- refundPayment
-- queryPaymentStatus
-- handleWebhook
+- Pagos: terminal manual, Mercado Pago OAuth/Point y Stripe
+  Connect/Checkout/Setup/off-session.
+- Correo: `EmailDeliveryPort` con adaptador SMTP, cola durable y configuración
+  de remitente por tenant. Zoho es el proveedor objetivo pendiente de
+  validación real.
+- Almacenamiento: MinIO/S3 para logos, medios, comprobantes y documentos.
+- Acceso físico, biometría, WhatsApp, push y facturación: puertos previstos,
+  adaptadores productivos fuera del corte.
 
-### EmailProvider
-- send
-- validateTemplate
-- healthCheck
+## 9.2 Stripe y Mercado Pago
 
-### MessagingProvider
-- sendWhatsApp
-- sendTemplate
-- queryStatus
+- Las credenciales permanecen en secretos del backend; nunca en
+  `NEXT_PUBLIC_*`, imágenes o Git.
+- Stripe usa cuenta Express conectada por gimnasio, Account Links y captura
+  alojada. GymFort conserva sólo identificadores opacos y máscara.
+- Mercado Pago usa OAuth/PKCE, selección de Point y órdenes idempotentes.
+- Todo pago se persiste pendiente antes de invocar al proveedor.
+- Webhook firmado más consulta autoritativa concilian monto, moneda, tenant,
+  sucursal, venta, pago y método antes de publicar efectos.
+- Los workers recuperan operaciones no terminales y preservan idempotencia.
 
-### StorageProvider
-- upload
-- download
-- delete
-- generateSignedUrl
+## 9.3 Correo
 
-Implementación local recomendada:
-- MinIO en Docker Compose.
-- Buckets separados para fotos, comprobantes y documentos.
-- URLs firmadas para acceso temporal.
-- Ningún archivo binario debe guardarse directamente en PostgreSQL.
+El backend recibe host, puerto, usuario, contraseña, TLS/SSL y timeouts SMTP por
+entorno. Cada gimnasio configura remitente, reply-to y habilitación, no las
+credenciales del proveedor. La cola usa lease, backoff, dead letter,
+preferencias y destinatarios enmascarados/HMAC.
 
-### InvoiceProvider
-- createInvoice
-- cancelInvoice
-- queryInvoice
+La integración Zoho debe reutilizar este puerto, verificar SPF/DKIM/DMARC y
+documentar límites y credenciales sin acoplar el dominio a Zoho.
 
-## 9.2 Resiliencia
+## 9.4 Despliegue local
 
-- Timeouts.
-- Reintentos con backoff.
-- Circuit breaker.
-- Dead-letter queue o registro de fallos.
-- Idempotencia.
-- Health checks.
-- Alertas.
+Docker Compose levanta frontend, backend, PostgreSQL 18, Redis 8 y MinIO. El
+perfil opcional `stripe` usa `stripe/stripe-cli:v1.50.3` para reenviar eventos
+Connect. El primer arranque entrega un `whsec_...` que debe inyectarse al backend
+antes de validar firmas.
 
-## 9.3 Despliegue
+El repositorio contiene perfiles `local`, `test`, `development`, `staging` y
+`production`, proxy de ejemplo, Prometheus y scripts de backup/restore. El seed
+demo sólo se habilita en `local`.
 
-Componentes:
-- frontend Next.js
-- backend Spring Boot
-- PostgreSQL
-- Redis
-- reverse proxy
-- almacenamiento S3 compatible
+## 9.5 CI/CD vigente
 
-Estructura de repositorio recomendada:
-- `backend/`
-- `frontend/`
-- `infra/`
-- `Documentación/`
+El pipeline ejecuta pruebas backend, pruebas/lint/typecheck/build frontend,
+validación y build de Compose. También descarga la imagen fijada de Stripe CLI
+y ejecuta su comando de versión. Permanecen pendientes despliegue automático a
+staging, escaneo formal de imágenes, simulacro restore y `stripeTest` con
+secretos sandbox protegidos.
 
-El despliegue inicial debe poder correr en una VPS o cloud pequeña con Docker Compose, sin impedir una evolución posterior a infraestructura más avanzada.
+## 9.6 Observabilidad y resiliencia
 
-Entornos:
-- local
-- development
-- staging
-- production
+- Correlation ID y errores sanitizados.
+- Métricas Prometheus de pagos, recurrencia, webhooks, automatizaciones y correo
+  con etiquetas acotadas por tenant/sucursal.
+- Idempotencia, timeouts, backoff, leasing recuperable y dead letters.
+- Alertas para backlog, lease vencido, fallos de proveedor y correo definitivo.
+- Auditoría separada de logs técnicos; nunca PAN, CVV, secretos o payloads
+  sensibles.
 
-## 9.4 CI/CD
+## 9.7 Kiosco
 
-Pipeline:
-1. lint
-2. unit tests
-3. architecture tests
-4. integration tests
-5. build
-6. image scan
-7. deploy staging
-8. smoke tests
-9. production deploy
-10. rollback automático si aplica
+El kiosco es un perfil lógico por sucursal, no una computadora registrada.
+Recepción crea el handoff de navegador; la pestaña elimina tokens
+administrativos y usa una sesión temporal con `no-store`, rate limit,
+inactividad, verificación del socio y capacidades cerradas por defecto.
 
-## 9.5 Observabilidad
+## 9.8 Operación
 
-- Logs estructurados.
-- Correlation ID.
-- Métricas.
-- Trazas.
-- Dashboard técnico.
-- Alertas.
-- Auditoría separada de logs.
-
-## 9.6 Backups
-
-- PostgreSQL diario.
-- Retención configurable.
-- Copia externa.
-- Pruebas de restauración.
-- Documentar RPO y RTO.
-
-## 9.7 Seguridad operacional
-
-- HTTPS obligatorio.
-- Secretos fuera del repositorio.
-- Rotación de credenciales.
-- CORS restringido.
-- Rate limiting.
-- Dependencias escaneadas.
-- Principio de mínimo privilegio.
-
-## 9.8 Kioscos de autoservicio
-
-Los kioscos son dispositivos o navegadores controlados dentro de una sucursal.
-
-Requisitos:
-- Registro de terminal por organización y sucursal.
-- Identificador de terminal no sensible.
-- Sesiones de cliente con expiración corta.
-- Cierre automático por inactividad.
-- Modo de pantalla completa recomendado.
-- Restricción de rutas al flujo de autoservicio.
-- No almacenar tokens de cliente persistentes en el dispositivo.
-- Auditoría con origen `SELF_SERVICE_KIOSK`.
-
-## 9.9 Operacion piloto
-
-Artefactos agregados:
-
-- Variables de entorno: `infra/.env.example`.
-- Reverse proxy HTTPS: `infra/caddy/Caddyfile.example`.
-- Prometheus: `infra/monitoring/prometheus.yml`.
-- Backup: `scripts/backup-postgres.ps1`.
-- Restore: `scripts/restore-postgres.ps1`.
-
-Runbooks:
-
-- `docs/operations/deployment.md`
-- `docs/operations/backup.md`
-- `docs/operations/restore.md`
-- `docs/operations/incident-response.md`
-- `docs/operations/rollback.md`
-- `docs/operations/secret-rotation.md`
-- `docs/operations/kiosk-troubleshooting.md`
-- `docs/operations/access-device-troubleshooting.md`
-- `docs/operations/database-maintenance.md`
-
-RPO piloto: 24 horas.
-
-RTO piloto: 4 horas.
+Runbooks vigentes: `docs/operations/` para despliegue, rollback, backup, restore,
+incidentes, secretos, correo, kiosco, Stripe y mantenimiento. RPO piloto: 24
+horas. RTO piloto: 4 horas. Ambos deben validarse mediante simulacro antes de
+producción.

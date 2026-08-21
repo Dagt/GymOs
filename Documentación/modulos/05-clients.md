@@ -1,11 +1,14 @@
 # Socios y CRM
 
 Estado: `FUNCIONAL`
+Última revisión: 21 de agosto de 2026
 
 ## Implementado
 
 - alta, búsqueda, consulta y actualización de socios;
 - información personal y contacto;
+- visibilidad en sedes secundarias cuando la membresía activa permite acceso
+  multi-sucursal;
 - membresía inicial y pago de entrada;
 - importación de socios;
 - detalle frontend y operación por sucursal.

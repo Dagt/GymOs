@@ -1,60 +1,66 @@
 # Operación del correo electrónico
 
-GymOS incluye cola durable, leasing, reintentos, preferencias, métricas y un
-adaptador SMTP. Las credenciales del proveedor pertenecen al entorno de
-ejecución y nunca se guardan por gimnasio en la base de datos.
+Corte: 21 de agosto de 2026
 
-## Conectar un proveedor SMTP
+GymFort incluye cola durable, leasing, reintentos, preferencias, métricas y
+adaptador SMTP. Zoho es el siguiente proveedor objetivo, pero su conexión y
+entregabilidad real todavía no están validadas. Las credenciales pertenecen al
+entorno y nunca se guardan por gimnasio.
 
-Configurar como secretos del backend:
+## Variables del backend
 
-- `GYMOS_SMTP_ENABLED=true`;
-- `GYMOS_SMTP_HOST` y `GYMOS_SMTP_PORT`;
-- `GYMOS_SMTP_USERNAME` y `GYMOS_SMTP_PASSWORD` cuando el servidor use
-  autenticación;
-- `GYMOS_NOTIFICATION_PREFERENCE_KEY`, clave aleatoria independiente para
-  calcular HMAC de destinatarios en preferencias;
-- `GYMOS_SMTP_AUTH`, `GYMOS_SMTP_STARTTLS` y `GYMOS_SMTP_SSL` según el
-  proveedor;
-- los timeouts `GYMOS_SMTP_*_TIMEOUT_MS` cuando la red lo requiera.
+- `GYMOS_SMTP_ENABLED=true`
+- `GYMOS_SMTP_HOST`, `GYMOS_SMTP_PORT`
+- `GYMOS_SMTP_USERNAME`, `GYMOS_SMTP_PASSWORD`
+- `GYMOS_SMTP_AUTH`, `GYMOS_SMTP_STARTTLS`, `GYMOS_SMTP_SSL`
+- `GYMOS_SMTP_CONNECTION_TIMEOUT_MS`
+- `GYMOS_SMTP_READ_TIMEOUT_MS`
+- `GYMOS_SMTP_WRITE_TIMEOUT_MS`
+- `GYMOS_NOTIFICATION_PREFERENCE_KEY`: clave aleatoria para HMAC de destinatarios
 
-Después de reiniciar el backend, un dueño o administrador debe abrir
-Configuración del gimnasio > Correo electrónico, definir remitente y
-`Reply-To`, habilitar el canal y enviar una prueba. El dominio del remitente
-debe estar verificado en el proveedor y publicar SPF, DKIM y DMARC conforme a
-sus instrucciones.
+No usar variables `NEXT_PUBLIC_*`, archivos versionados ni configuración tenant
+para secretos SMTP.
+
+## Activación tenant
+
+Después de reiniciar backend, dueño, gerente autorizado o soporte abre
+Configuración → Correo, define remitente/reply-to, habilita el canal y envía una
+prueba. El dominio debe estar verificado por el proveedor con SPF, DKIM y DMARC.
 
 ## Estados y recuperación
 
-Los correos recorren `QUEUED`, `PROCESSING`, `RETRY_SCHEDULED` y `SENT`.
-Después de agotar los intentos quedan en `DEAD_LETTER`; desde Automatizaciones
-pueden devolverse manualmente a la cola. `SUPPRESSED` indica que una preferencia
-vigente impidió contactar al destinatario.
+`QUEUED` → `PROCESSING` → `SENT`. Los errores recuperables pasan a
+`RETRY_SCHEDULED` con backoff; al agotar intentos pasan a `DEAD_LETTER` y pueden
+reintentarse desde Automatizaciones después de corregir la causa. `SUPPRESSED`
+indica preferencia vigente.
 
-El worker usa un lease recuperable y selección equitativa entre tenants. Los
-timeouts tienen backoff exponencial acotado. Cada entrega incluye
-`X-GymOS-Notification-Id`, `X-GymOS-Idempotency-Key` y un `Message-ID` estable.
-SMTP no ofrece una transacción distribuida entre aceptar el mensaje y marcarlo
-en PostgreSQL, por lo que la garantía es al menos una vez; se debe conservar el
-identificador estable al implementar adaptadores API para deduplicar en el
-proveedor.
+El worker usa lease recuperable y selección justa entre tenants. SMTP ofrece
+entrega al menos una vez: `X-GymOS-Notification-Id`,
+`X-GymOS-Idempotency-Key` y `Message-ID` estable permiten rastrear/reducir
+duplicados sin exponer destinatarios.
 
-Alertas relevantes:
+Alertas y métricas:
 
-- `GymOsEmailDeadLetter`;
-- `GymOsEmailExpiredLease`;
-- métricas `gymos.notification.delivery` y
-  `gymos.notification.delivery.duration`, siempre con `organization_id`.
+- `GymOsEmailDeadLetter`
+- `GymOsEmailExpiredLease`
+- `gymos.notification.delivery`
+- `gymos.notification.delivery.duration`
 
-## Privacidad y evolución multicanal
+## Checklist Zoho pendiente
 
-Las direcciones de preferencia se comparan mediante HMAC-SHA-256; la tabla de
-preferencias no duplica el correo en texto claro. Una baja se revalida justo
-antes de entregar. Los mensajes promocionales se suprimen por defecto hasta
-que exista consentimiento explícito.
+1. Crear credencial específica de aplicación/SMTP según la política de la cuenta.
+2. Elegir host/puerto/TLS correctos para la región y plan contratado.
+3. Publicar y validar SPF, DKIM y DMARC.
+4. Probar remitente, reply-to, TLS, timeouts y contraseña rotada.
+5. Confirmar una entrega real y el comportamiento de rechazo, límite y timeout.
+6. Documentar rebotes/quejas si el servicio contratado expone señales útiles.
 
-Los adaptadores futuros deben implementar `EmailDeliveryPort` o el puerto
-equivalente del nuevo canal. WhatsApp necesitará plantillas/opt-in aprobados y
-push necesitará un registro tenant de dispositivos y tokens revocables. Ninguno
-de esos canales debe reutilizar credenciales SMTP ni introducir secretos en
-`notification_log`.
+No marcar Zoho como operativo hasta completar este checklist en el entorno
+objetivo.
+
+## Privacidad
+
+Las preferencias comparan direcciones mediante HMAC-SHA-256 y se revalidan
+antes de entregar. Logs e historiales enmascaran destinatarios. Marketing se
+suprime por defecto hasta disponer de consentimiento explícito; el alcance
+actual es transaccional y operativo.

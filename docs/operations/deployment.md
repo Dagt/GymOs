@@ -1,45 +1,48 @@
-# Deployment Runbook
+# Despliegue piloto
 
-## Scope
+Corte: 21 de agosto de 2026
 
-This runbook describes the minimum deployment path for a GymOS pilot environment.
+## Entornos
 
-## Environments
+- `local`: seed demo permitido.
+- `test`: pruebas automatizadas, seed deshabilitado.
+- `development`: validación compartida.
+- `staging`: ensayo similar a producción.
+- `production`: datos reales, seed deshabilitado.
 
-- `local`: developer machine, demo seed allowed.
-- `test`: automated tests, seed disabled.
-- `development`: shared non-production validation.
-- `staging`: production-like pilot rehearsal.
-- `production`: real gym data, seed disabled.
+## Configuración obligatoria
 
-## Required Configuration
+Inyectar por entorno/gestor de secretos:
 
-Set every value through environment variables. Do not use demo credentials outside `local`.
+- base: `SPRING_PROFILES_ACTIVE`, `GYMOS_SEED_ENABLED=false`, base de datos,
+  Redis, MinIO, JWT, CORS y `NEXT_PUBLIC_API_BASE_URL`;
+- Stripe: `GYMOS_STRIPE_SECRET_KEY`, `GYMOS_STRIPE_WEBHOOK_SECRET`, URLs de
+  retorno/refresco y `GYMOS_PAYMENT_CREDENTIAL_KEY`;
+- Mercado Pago: credenciales/callback y clave de cifrado según el entorno;
+- correo: `GYMOS_SMTP_*` y `GYMOS_NOTIFICATION_PREFERENCE_KEY`;
+- proxy: `GYMOS_TRUSTED_PROXIES` sólo para balanceadores directos.
 
-- `SPRING_PROFILES_ACTIVE`
-- `GYMOS_DB_URL`
-- `GYMOS_DB_USERNAME`
-- `GYMOS_DB_PASSWORD`
-- `GYMOS_REDIS_HOST`
-- `GYMOS_REDIS_PORT`
-- `GYMOS_MINIO_ENDPOINT`
-- `GYMOS_MINIO_ACCESS_KEY`
-- `GYMOS_MINIO_SECRET_KEY`
-- `GYMOS_MINIO_BUCKET`
-- `GYMOS_JWT_SECRET`
-- `GYMOS_CORS_ALLOWED_ORIGINS`
-- `GYMOS_SEED_ENABLED=false`
-- `NEXT_PUBLIC_API_BASE_URL`
+Nunca usar credenciales demo fuera de `local`, secretos en imágenes/Git ni
+llaves de backend en `NEXT_PUBLIC_*`.
 
-## Deployment Steps
+## Pasos
 
-1. Build backend and frontend images from a tagged commit.
-2. Apply database migrations automatically at backend startup.
-3. Start PostgreSQL, Redis, object storage, backend and frontend.
-4. Check `/actuator/health` and `/api/v1/system/info`.
-5. Run smoke tests for login, branch selection, client creation, sale, payment and reporting.
-6. Confirm `GYMOS_SEED_ENABLED=false` in staging and production.
+1. Construir imágenes desde un commit etiquetado con CI verde.
+2. Validar migración limpia y upgrade de una base de referencia.
+3. Iniciar PostgreSQL, Redis, MinIO, backend y frontend.
+4. Validar `/actuator/health` y `/api/v1/system/info`.
+5. Configurar proxy HTTPS, CORS y orígenes de retorno.
+6. Registrar webhooks Stripe/Mercado Pago y probar firmas/idempotencia.
+7. Si se habilita correo, probar SMTP/remitente y entregabilidad.
+8. Ejecutar smoke de login, sucursal, socio, venta, pago, membresía, reserva,
+   kiosco y reporte.
+9. Confirmar seed deshabilitado, backup programado, métricas y alertas.
 
-## Roll Forward
+El perfil Docker `stripe` es para desarrollo/test local; producción debe usar un
+endpoint público HTTPS registrado en Stripe, no un listener CLI permanente.
 
-Prefer forward fixes with a new tagged image and migration. Do not edit applied migrations.
+## Roll forward
+
+Preferir una nueva imagen etiquetada y una migración nueva. No editar
+migraciones ya aplicadas. Usar `rollback.md` sólo cuando un roll forward seguro
+no sea viable y nunca revertir el esquema de forma destructiva sin plan de datos.

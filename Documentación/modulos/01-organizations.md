@@ -1,11 +1,13 @@
 # Organizaciones y sucursales
 
 Estado: `FUNCIONAL`
+Última revisión: 21 de agosto de 2026
 Código: `backend/.../organizations`, `/platform/gymnasiums`, `/settings/organization`, `/users`
 
 ## Implementado
 
 - organizaciones multi-tenant y múltiples sucursales;
+- identidad visible GymFort permanente junto a la marca configurable del tenant;
 - consola separada de plataforma y tenant;
 - selección explícita de gimnasio y sucursal;
 - alta y actualización de sucursales;

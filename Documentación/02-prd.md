@@ -2,9 +2,9 @@
 
 ## 2.1 Objetivo del producto
 
-GymOS debe permitir que un gimnasio opere el 100% de su actividad interna en una sola herramienta web, sin depender de hojas de cálculo, mensajes informales o sistemas desconectados.
+GymFort debe permitir que un gimnasio opere el 100% de su actividad interna en una sola herramienta web, sin depender de hojas de cálculo, mensajes informales o sistemas desconectados.
 
-El producto debe ser vendible desde su primera versión operativa. Aunque los primeros clientes objetivo sean gimnasios específicos, GymOS debe diseñarse como SaaS reutilizable para gimnasios independientes y cadenas con varias sucursales.
+El producto debe ser vendible desde su primera versión operativa. Aunque los primeros clientes objetivo sean gimnasios específicos, GymFort debe diseñarse como SaaS reutilizable para gimnasios independientes y cadenas con varias sucursales.
 
 ## 2.2 Usuarios
 
@@ -12,7 +12,7 @@ El producto debe ser vendible desde su primera versión operativa. Aunque los pr
 Acceso total a configuración, seguridad, integraciones y auditoría.
 
 ### Administrador de plataforma
-Rol interno del proveedor de GymOS. Puede administrar organizaciones cliente, planes comerciales, parámetros globales, soporte técnico y operaciones de mantenimiento autorizadas.
+Rol interno del proveedor de GymFort. En datos existentes puede conservar el nombre técnico `Administrador GymOS`. Puede administrar organizaciones cliente, planes comerciales, parámetros globales, soporte técnico y operaciones de mantenimiento autorizadas.
 
 ### Propietario / Gerente
 Acceso a métricas, reportes, configuración de negocio y supervisión.
@@ -24,13 +24,13 @@ Acceso operativo y reportes de una sucursal específica, según permisos asignad
 Usuario operativo principal. Debe poder registrar clientes, cobrar, renovar, vender, reservar y resolver excepciones con velocidad.
 
 ### Coach
-Puede administrar su perfil, consultar o ampliar el catálogo de ejercicios, crear y versionar rutinas, asignarlas a socios dentro de su alcance y descargar el PDF imprimible. No registra cobros de rutinas en GymOS.
+Puede administrar su perfil, consultar o ampliar el catálogo de ejercicios, crear y versionar rutinas, asignarlas a socios dentro de su alcance y descargar el PDF imprimible. No registra cobros de rutinas en GymFort.
 
 ### Profesional de bienestar
 Puede administrar servicios, disponibilidad y citas.
 
 ### Cliente
-Actor externo contemplado desde el diseño. Puede interactuar con GymOS desde un kiosco o pantalla de autoservicio dentro del gimnasio. La app móvil o portal remoto completo no se construye en V1.
+Actor externo contemplado desde el diseño. Puede interactuar con GymFort desde un kiosco o pantalla de autoservicio dentro del gimnasio. La app móvil o portal remoto completo no se construye en V1.
 
 ### Cliente en kiosco
 Cliente usando una pantalla compartida dentro del gimnasio. Puede consultar información limitada, iniciar pagos, renovar o solicitar cambio de membresía y actualizar datos permitidos mediante una sesión temporal y restringida.
@@ -95,12 +95,14 @@ Cliente usando una pantalla compartida dentro del gimnasio. Puede consultar info
 - Tarjeta.
 - Registro de comprobantes.
 - Validación manual de transferencias.
-- Procesamiento interno y manual en V1.
-- Inicio de pagos desde kiosco de autoservicio.
-- Integración futura con pasarela.
+- Procesamiento manual en recepción y procesamiento integrado por proveedor.
+- Inicio de pagos alojados en Stripe desde kiosco de autoservicio.
+- Mercado Pago Point integrado para recepción cuando exista una cuenta vinculada.
+- Domiciliación mediante tarjeta tokenizada, consentimiento revocable y cobro
+  recurrente por cada vigencia.
 - Recibos y notificaciones.
 
-Los pagos cubiertos por este apartado corresponden a productos y servicios comercializados por el gimnasio. Los acuerdos o cobros en efectivo entre coach y socio por una rutina se realizan fuera de GymOS y no generan ventas, pagos, comisiones, ingresos ni movimientos de caja en la plataforma.
+Los pagos cubiertos por este apartado corresponden a productos y servicios comercializados por el gimnasio. Los acuerdos o cobros en efectivo entre coach y socio por una rutina se realizan fuera de GymFort y no generan ventas, pagos, comisiones, ingresos ni movimientos de caja en la plataforma.
 
 ### Kiosco de autoservicio
 - Pantalla interna para uso de clientes dentro del gimnasio.
@@ -109,8 +111,8 @@ Los pagos cubiertos por este apartado corresponden a productos y servicios comer
 - Consulta de pagos pendientes.
 - Renovación de membresía.
 - Solicitud de cambio de plan.
-- Inicio de pago interno/manual.
-- Carga o captura de comprobante cuando aplique.
+- Cotización autoritativa e inicio de Stripe Checkout para operaciones con costo.
+- Consulta del estado y comprobante confirmado por proveedor.
 - Actualización de datos personales permitidos.
 - Sesiones temporales con cierre automático.
 - Auditoría de acciones realizadas desde kiosco.
@@ -183,7 +185,7 @@ Las rutinas creadas o asignadas por coaches no son artículos del POS en V1.
 Reglas de alcance:
 
 - La creación o asignación de una rutina no genera una venta ni un pago.
-- El efectivo cobrado directamente por el coach no se registra en GymOS.
+- El efectivo cobrado directamente por el coach no se registra en GymFort.
 - Las métricas miden involucramiento operativo, no ingresos ni comisiones.
 - La aplicación móvil o portal remoto para que el socio consulte su rutina queda fuera de V1.
 - El dominio y los contratos deben quedar preparados para que una futura app consuma la versión asignada.

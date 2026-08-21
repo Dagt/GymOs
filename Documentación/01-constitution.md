@@ -2,7 +2,7 @@
 
 ## 1.1 Propósito
 
-Esta constitución es la referencia oficial y vinculante para el diseño, desarrollo, prueba y mantenimiento de GymOS. Cuando exista contradicción entre el código, una implementación generada por IA y este documento, prevalece esta constitución hasta que se apruebe un cambio formal.
+Esta constitución es la referencia oficial y vinculante para el diseño, desarrollo, prueba y mantenimiento de GymFort (repositorio técnico GymOS). Cuando exista contradicción entre el código, una implementación generada por IA y este documento, prevalece esta constitución hasta que se apruebe un cambio formal.
 
 ## 1.2 Misión
 
@@ -10,9 +10,9 @@ Desarrollar una plataforma SaaS de clase empresarial que permita a gimnasios y c
 
 ## 1.3 Visión
 
-Convertir GymOS en el sistema operativo de referencia para negocios de entrenamiento y bienestar, integrando personas, servicios, recursos, membresías, pagos, accesos, reservas, profesionales y analítica en una sola plataforma extensible.
+Convertir GymFort en el sistema operativo de referencia para negocios de entrenamiento y bienestar, integrando personas, servicios, recursos, membresías, pagos, accesos, reservas, profesionales y analítica en una sola plataforma extensible.
 
-GymOS debe nacer como producto comercializable, no como una implementación a medida para un solo gimnasio. La primera versión debe poder operar gimnasios independientes y dejar soporte real para cadenas con varias sucursales desde el modelo, la seguridad, la configuración y los datos.
+GymFort debe nacer como producto comercializable, no como una implementación a medida para un solo gimnasio. La primera versión debe poder operar gimnasios independientes y dejar soporte real para cadenas con varias sucursales desde el modelo, la seguridad, la configuración y los datos.
 
 ## 1.4 Objetivos estratégicos
 
@@ -112,7 +112,12 @@ Infraestructura:
 - La primera versión debe incluir frontend web desde el primer hito útil.
 - La autenticación debe ser real desde el inicio: JWT de corta duración, refresh tokens, roles y permisos.
 - El sistema debe modelar `Organization` y `Branch` desde la base para permitir venta a gimnasios independientes y cadenas.
-- Los pagos de V1 se procesan internamente de forma manual: efectivo, transferencia validada manualmente y registro manual de tarjeta si aplica.
-- La integración con pasarelas externas queda preparada mediante puertos, pero no es obligatoria para la primera versión vendible.
+- V1 admite efectivo, transferencia y terminal externa con validación manual,
+  además de proveedores integrados. Stripe Checkout/Setup atiende el kiosco y
+  Mercado Pago Point atiende recepción cuando el gimnasio los vincula.
+- Ningún retorno del navegador confirma un pago: los efectos comerciales se
+  aplican sólo con webhook firmado, consulta autoritativa e idempotencia.
 - El almacenamiento local recomendado para fotos y comprobantes es S3-compatible mediante MinIO en Docker Compose.
-- El kiosco de autoservicio forma parte de la visión V1 como pantalla interna del gimnasio, con sesiones temporales, permisos restringidos y auditoría.
+- El kiosco de autoservicio forma parte de V1 como pantalla interna del gimnasio,
+  con apertura exclusiva de Recepción, sesiones temporales, permisos
+  restringidos, privacidad y auditoría.

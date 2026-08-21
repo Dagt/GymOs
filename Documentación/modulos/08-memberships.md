@@ -1,11 +1,16 @@
 # Membresías
 
-Estado: `FUNCIONAL`
+Estado: `ESTABILIZADO`
+Última revisión: 21 de agosto de 2026
 
 ## Implementado
 
 - alta, activación, renovación y cambio de plan;
 - vínculo con ventas y pagos;
+- Checkout para alta, renovación y cambio; ningún efecto se aplica antes del
+  pago confirmado;
+- la membresía conserva sucursal de origen aunque un plan multi-sucursal
+  habilite uso en otras sedes;
 - vigencia, estado, visitas y operación en kiosco;
 - planes multi-sucursal y restricciones de reservas.
 
@@ -13,7 +18,7 @@ Estado: `FUNCIONAL`
 
 - E2E HTTP/navegador con pagos rechazados y validación posterior;
 - parametrizar zona operativa por tenant si GymOS sale del alcance México.
-## Evolución en `feature/reception-pos-init`
+## Estado vigente de los periodos y operaciones
 
 El catálogo visual sigue incluyendo planes y sus operaciones generan ventas,
 pagos, métricas y movimientos de caja. V54 incorpora `membership_period`,

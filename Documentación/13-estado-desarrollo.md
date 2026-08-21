@@ -1,136 +1,96 @@
 # 13. Estado actual de desarrollo
 
 Estado: FUENTE CANÓNICA / EN PROGRESO
-Corte: 3 de agosto de 2026
-Código auditado: árbol de trabajo de `feature/automations-self-service-kiosk`.
+Corte: 21 de agosto de 2026
+Código auditado: `feature/automations-zoho-email` en `88a6b58`.
 
-## 1. Cómo interpretar este documento
+## 1. Resumen ejecutivo
 
-Este archivo responde únicamente qué existe hoy en el código. El detalle se
-mantiene en `modulos/`, los pendientes en `28-registro-vivo-deuda-tecnica.md` y
-la situación de ramas en `29-cronologia-ramas.md`.
+GymFort ya opera como monolito modular multi-tenant y multi-sucursal. El piloto
+incluye las consolas SaaS y de gimnasio, recepción/POS, kiosco aislado,
+comercio y membresías, reservas, inventario, coaches, wellness,
+automatizaciones y correo durable.
 
-Estados permitidos:
+La identidad comercial visible es GymFort. `GymOS`/`gymos` continúa en nombres
+técnicos para mantener compatibilidad. La siguiente línea de trabajo es la
+integración real y validación de correo con Zoho; no está declarada terminada.
 
-- `FUNCIONAL`: el flujo principal existe en backend y frontend.
-- `PARCIAL`: existe una base utilizable, pero faltan contratos, UX o pruebas.
-- `ESTABILIZADO`: funcional, con cobertura y validaciones suficientes para piloto.
-- `PLANIFICADO`: documentado, sin implementación completa.
-- `NO AUDITADO`: no hay evidencia reciente suficiente para elevar el estado.
+Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún
+módulo se considera completo por el nombre de una rama: la evidencia proviene
+del código, migraciones y pruebas.
 
-Ningún módulo se declara “completo” sólo por el nombre de una rama o commit.
+## 2. Estado por módulo
 
-## 2. Resumen ejecutivo por módulo
-
-| Módulo | Estado | Evidencia actual | Pendiente principal |
+| Módulo | Estado | Implementado | Pendiente principal |
 |---|---|---|---|
-| [Plataforma, tenant y sucursales](modulos/01-organizations.md) | FUNCIONAL | Consolas separadas, selección de gimnasio/sucursal, reparación de permisos del dueño en instalaciones limpias y marca persistente | Matriz negativa multi-tenant y endurecimiento global |
-| [Identidad, sesiones y permisos](modulos/02-identity-security.md) | FUNCIONAL | Inicio/renovación de sesión, roles y permisos por endpoint; 401 de autenticación separado de 403 de autorización | Refresh token seguro y autorización uniforme |
-| [Socios/CRM](modulos/05-clients.md) | FUNCIONAL | Alta, búsqueda, detalle, asociación con membresías y permisos de alta reparados para dueño, gerencia y recepción | Cobertura CRUD y escenarios multi-sucursal |
-| [Catálogo comercial](modulos/06-catalog.md) | ESTABILIZADO | Productos, membresías, categorías, unidad guiada y operación por sucursal | Paginación/consistencia transversal |
-| [Ventas y pagos manuales](modulos/07-sales.md) | FUNCIONAL | Venta minorista y membresías con contexto, partidas, pagos, snapshots de beneficios, reportes, validación, reembolsos e idempotencia concurrente | E2E integral venta–pago–inventario–refund (`SAL-001`) |
-| [Membresías](modulos/08-memberships.md) | ESTABILIZADO | Periodos y fechas inclusivas, expiración, activa única, cotización backend, alta/renovación/cambio separados y concurrencia PostgreSQL | E2E HTTP/navegador de pagos pendientes/rechazados |
-| [Beneficios](modulos/09-benefits.md) | ESTABILIZADO | Política transversal única para cotización de membresía, elegibilidad de reservas y acceso; descuentos con snapshot y ACCESS heredado/revocado dinámicamente por plan | Permisos negativos y concurrencia de asignaciones |
-| [Kiosco](modulos/11-selfservice.md) | LISTO PARA ACEPTACIÓN | Lanzamiento autenticado sin registrar computadoras, sesión restringida, capacidades por sucursal, Stripe Checkout, domiciliación completa, wellness gratuito, telemetría por tenant, historiales paginados y 37 escenarios PostgreSQL + 7 E2E de kiosco aprobados | Ejecutar `stripeTest` con credenciales sandbox y publicar evidencia conectada en CI (`SELF-001`) |
-| [Reservas y recursos](modulos/12-bookings.md) | FUNCIONAL | Calendario, disponibilidad, restricciones por plan y recepción | Suite E2E y deuda UX residual |
-| [Inventarios](modulos/13-inventory.md) | ESTABILIZADO | Existencias, transferencias, conteos, valuación y movimientos | Paginación parametrizada y feedback por renglón |
-| [Coaches y rutinas](modulos/14-coaching.md) | ESTABILIZADO | Dueño y gerente limitados a métricas; Coach con constructor guiado, catálogo compacto, asignación reactiva, métricas personales y PDF moderno cuyos lookups respetan puertos de aplicación; histórico 4–52 semanas, CSV y 12 E2E | `COA-018`, `DB-001` y `OPS-001` |
-| [Wellness/profesionales](modulos/15-wellness.md) | ESTABILIZADO en esta rama | Directorio, servicios, disponibilidad, agenda, citas internas/externas, coordinación y permisos para dueño, gerente y recepción | Cobertura E2E y hardening multi-tenant transversal |
-| [Automatizaciones](modulos/16-automations.md) | LISTO PARA ACEPTACIÓN | Reglas manuales/programadas, recordatorios previos de reservación, inbox durable, idempotencia versionada, reintentos, scheduler justo y pausable por tenant, telemetría/alertas, historiales paginados y 37 escenarios PostgreSQL aprobados | Repetir PostgreSQL y E2E conectado en CI (`AUT-001`) |
-| [Notificaciones](modulos/17-notifications.md) | FUNCIONAL PARA EMAIL | Entrega SMTP desacoplada, configuración tenant, cola durable, reintentos, preferencias, telemetría, 33 escenarios PostgreSQL globales y E2E administrativo | Conectar proveedor, verificar dominio y probar entregabilidad real (`NOT-001`) |
-| [Reportes generales](modulos/18-reporting.md) | PARCIAL | Reportes operativos por dominio | Definiciones KPI y cobertura homogénea |
-| [Producción/piloto](modulos/20-common-operations.md) | PLANIFICADO | Configuración y runbooks base | Observabilidad, backups, seguridad y piloto |
+| [Organizaciones](modulos/01-organizations.md) | FUNCIONAL | Plataforma, tenants, sucursales, equipo, soporte y marca persistente | Matriz negativa transversal (`ORG-001`) |
+| [Identidad y seguridad](modulos/02-identity-security.md) | FUNCIONAL | JWT, refresh revocable, selección de sucursal, RBAC y separación 401/403 | Endurecer almacenamiento/rotación de refresh (`AUTH-001`) |
+| [Configuración](modulos/03-configuration.md) | FUNCIONAL | Marca tenant, cobros, kiosco y correo por permisos; UI unificada | Completar ciclo de eliminación/reemplazo de logo (`CFG-001`) |
+| [Onboarding](modulos/04-onboarding.md) | FUNCIONAL | Checklist, setup piloto idempotente e importación inicial | Recuperación probada de altas parciales (`ONB-001`) |
+| [Socios](modulos/05-clients.md) | FUNCIONAL | Alta, búsqueda, detalle, importación y visibilidad multi-sucursal | PII, duplicados y pruebas CRUD (`CLI-001`) |
+| [Catálogo](modulos/06-catalog.md) | ESTABILIZADO | Productos, planes, categorías, unidades y asociación por sucursal | Volumen, legacy y archivos (`CAT-001`) |
+| [Ventas](modulos/07-sales.md) | FUNCIONAL | POS, ventas contextualizadas, pagos, reembolsos, recibos e inventario | Concurrencia/conciliación E2E (`SAL-001`) |
+| [Membresías](modulos/08-memberships.md) | ESTABILIZADO | Periodos inclusivos, activa única, alta, renovación, cambio y cotización | E2E financiero completo |
+| [Beneficios/elegibilidad](modulos/09-benefits.md) | ESTABILIZADO | Descuentos y acceso heredado mediante política transversal | Concurrencia y negativos de permisos |
+| [Acceso](modulos/10-access.md) | FUNCIONAL | Visitas, decisión por membresía/beneficio y bitácora | Doble consumo/privacidad (`ACC-001`); hardware offline fuera de alcance |
+| [Kiosco](modulos/11-selfservice.md) | FUNCIONAL / ACEPTACIÓN | Apertura solo por Recepción, sesión aislada, membresías, pagos, domiciliación, reservas, wellness y datos | Publicar ejecución automatizada de Stripe sandbox (`SELF-001`) |
+| [Reservas](modulos/12-bookings.md) | FUNCIONAL | Recursos, disponibilidad, pago y acceso desde sucursal secundaria con plan multi-sucursal | Colisiones/cancelación/E2E (`BKG-001`) |
+| [Inventario](modulos/13-inventory.md) | ESTABILIZADO | Existencias, movimientos, transferencias, conteos y valuación | Paginación y feedback por partida (`INV-001`, `INV-002`) |
+| [Coaches](modulos/14-coaching.md) | ESTABILIZADO | Perfiles, catálogo, rutinas versionadas, asignación, métricas, CSV y PDF | Cleanup durable de medios (`COA-018`) |
+| [Wellness](modulos/15-wellness.md) | ESTABILIZADO | Profesionales, servicios, disponibilidad, agenda y citas | E2E y hardening multi-tenant |
+| [Automatizaciones](modulos/16-automations.md) | FUNCIONAL / ACEPTACIÓN | Reglas, recetas, inbox durable, leases, reintentos, pausa, historial y telemetría | Mantener pruebas PostgreSQL/CI |
+| [Notificaciones](modulos/17-notifications.md) | FUNCIONAL SMTP | Cola durable, preferencias, remitente tenant, prueba y recuperación | Zoho, dominio y entregabilidad reales (`NOT-001`) |
+| [Reportes](modulos/18-reporting.md) | PARCIAL | Reportes por dominio y métricas de coaches/operación | Definiciones KPI y filtros homogéneos (`REP-001`) |
+| [Auditoría](modulos/19-audit.md) | FUNCIONAL | Registro de mutaciones sensibles y motivos operativos | Matriz/retención/inmutabilidad (`AUD-001`) |
+| [Operación común](modulos/20-common-operations.md) | FUNCIONAL PARA LOCAL | Errores correlacionados, Flyway, métricas, Docker, CI y runbooks | Restore, staging y simulacros (`DB-001`, `OPS-001`) |
+| [Pagos](modulos/21-payments.md) | FUNCIONAL / ACEPTACIÓN | Manuales, Mercado Pago, Stripe Connect/Checkout, webhooks, recibos y recurrencia | Sandbox CI y reembolso/cancelación por proveedor (`PAY-001`) |
 
-## 3. Estado verificable de Coaches y rutinas
+## 3. Decisiones operativas vigentes
 
-El módulo permite:
+- La venta y la membresía conservan la sucursal donde se originaron. Un plan
+  `multiBranchAccess=true` permite que el socio sea reconocido, acceda y reserve
+  en cualquier sucursal activa del tenant.
+- Si desde una sucursal secundaria se contrata un plan local, la nueva operación
+  queda contextualizada en esa sucursal; no se reasigna silenciosamente la
+  membresía original antes de confirmar el pago.
+- Solo Recepción recibe `selfservice.session.launch`. Dueño y gerente configuran
+  capacidades, pero no abren sesiones de socios desde su consola.
+- Gerencia conserva `payment.settings.manage` para activar/desactivar modalidades
+  ya vinculadas. Conectar o refrescar Stripe exige
+  `payment.provider.stripe.manage` o `platform.admin`.
+- El retorno del navegador desde Stripe no confirma un cobro. Webhook firmado y
+  consulta autoritativa producen, de forma idempotente, venta, pago, recibo y
+  periodo de membresía.
+- Las páginas administrativas usan el mismo sistema visual oscuro y los
+  mensajes se muestran como notificaciones flotantes accesibles, visibles sin
+  importar el scroll.
+- La marca del gimnasio personaliza la experiencia tenant, pero GymFort mantiene
+  atribución permanente como producto.
 
-- crear coaches y administrar especialidades, biografía, estado y múltiples
-  sucursales desde Gestión del equipo;
-- consultar y ampliar un catálogo de ejercicios SYSTEM y propios;
-- crear y editar ejercicios en un panel guiado con taxonomía controlada,
-  detalles técnicos progresivos, medios y nombres alternativos;
-- crear equipos durante el alta de un ejercicio y reutilizarlos desde una lista
-  reconstruida para toda la organización;
-- recorrer el catálogo dentro de una superficie con scroll y tarjetas compactas
-  de 88 px; la descripción se consulta bajo demanda y no ocupa espacio en la fila;
-- crear un equipo desde un bloque independiente que no desplaza ni deforma los
-  selectores de grupo muscular y equipo;
-- crear rutinas estructuradas en sesiones, bloques y ejercicios;
-- usar un constructor guiado en tres pasos —datos generales, días/ejercicios y
-  revisión/guardado— con cada ejercicio normal reducido a nombre, series,
-  repeticiones, carga y descanso en una sola fila;
-- prescribir series iguales directamente o abrir una hoja lateral compacta para
-  personalizar repeticiones/carga por serie y tramos sin descanso; al cerrarla,
-  una síntesis sustituye todas las tarjetas y campos detallados;
-- consultar tempo, duración, distancia, agrupación, opcionalidad y notas sólo
-  bajo `Más opciones`, sin perder los datos avanzados existentes;
-- regresar desde la revisión usando los pasos superiores, sin una segunda acción
-  redundante junto a guardar y publicar;
-- guardar y editar el borrador vigente sin crear una versión en cada guardado;
-- publicar versiones inmutables y consultar su historial;
-- duplicar rutinas;
-- buscar socios activos automáticamente a partir de dos caracteres y asignar
-  una versión publicada con idempotencia;
-- completar, cancelar o reemplazar asignaciones conservando trazabilidad;
-- exigir motivo de cancelación y mostrar el vínculo de reemplazo;
-- consultar métricas paginadas por periodo, coach y socio, comparadas contra el
-  periodo anterior;
-- consultar gráficas históricas de 4 a 52 semanas para asignaciones, socios
-  únicos y primeras rutinas, con semanas sin actividad explícitas;
-- buscar y aplicar directamente el filtro de socio en la pantalla de métricas,
-  incluyendo reporte, histórico y CSV;
-- exportar CSV y descargar de forma controlada un PDF A4 compacto y deportivo con elección de variante visual (`COMPACT_LIGHT` para impresión en papel o `COMPACT_DARK` para consulta visual en celular), respaldado por un motor documental desacoplado (`WorkoutPdfDocumentMapper`, `PrescriptionFormatter`, `CompactWorkoutPdfRenderer`) que condensa rutinas de 4-5 días en 2-3 páginas con logo del gimnasio, cabecera ligera, notaciones sintéticas (`3 × 12 / 10 / 8 · subir carga`, `3 × (8 + 15)`), folio y numeración `Página X de Y`;
-- cargar y administrar medios de ejercicios;
-- separar alcance propio del coach y alcance global de reportes para
-  dueño/gerencia;
-- adaptar la vista del coach a métricas personales, sin selector global,
-  conteos del equipo ni comparación redundante consigo mismo;
-- limitar a dueño y gerente al tablero de métricas como vista predeterminada,
-  sin pestaña redundante ni carga/exposición de constructor, ejercicios,
-  asignación, PDF o mutaciones del historial;
-- autorizar los reportes con `coach.metrics.read` sin exigir lectura operativa
-  de rutinas;
-- crear usuarios Coach desde el mismo alta de Equipo, incluyendo especialidades,
-  biografía y sucursales en una sola transacción y sin romper el layout común;
-- administrar Equipo en una tabla visual plana y responsiva, con roles/contexto
-  compactos y sin tarjetas anidadas por usuario.
+## 4. Validación del corte
 
-El alcance funcional V1 está cerrado y estabilizado. El cierre base está en
-`84a5fd3`, la ampliación de perfiles e histórico en `8162814`, la corrección de
-alcance/UX en `0066c0b`, la compatibilidad PostgreSQL real en `3933aa5` y el
-alcance analítico de supervisores en `5dd0e47`, la integración del alta Coach
-en Equipo en `602d37b`, el rediseño UX en `d1d5124` y el catálogo reutilizable
-en `9af72e7`, con compactación y alineación corregidas en `1f69dfa`. Los
-flujos de asignación y construcción se corrigieron en `6bb92c2`; la
-prescripción estructurada y el PDF se cerraron en `fbdfa65`, y su compactación,
-composición moderna y carga segura del logo interno en `e718fdf`. Los hallazgos
-específicos `COA-001` a `COA-007`, `COA-009` a `COA-017` y `COA-019` a `COA-024`
-pasaron al
-historial
-resuelto del documento 28.
+Sobre `88a6b58` se verificó:
 
-## 4. Verificación del corte
+- suite backend Gradle exitosa;
+- 77 pruebas unitarias de frontend exitosas;
+- lint, typecheck y build de producción exitosos;
+- 8 recorridos Playwright de ruteo por consola exitosos;
+- `docker compose config` exitoso;
+- descarga y ejecución real de `stripe/stripe-cli:v1.50.3` exitosa.
 
-Validación ejecutada sobre el árbol saneado:
+La suite `stripeTest` permanece opt-in porque requiere `sk_test_...` y, para la
+topología completa, una cuenta Connect test. Las pruebas manuales realizadas en
+modo Stripe test confirmaron Checkout, webhook y domiciliación; esa evidencia
+no sustituye automatizar el contrato sandbox en CI.
 
-- backend: `gradlew clean test --no-daemon`, exitoso;
-- frontend: 33 pruebas, typecheck, lint y build de producción, exitosos;
-- E2E específico de Coaches/Equipo: 12 recorridos Playwright exitosos;
-- cobertura dedicada: propiedad `own/all`, permiso de perfiles, métricas,
-  histórico semanal, perfil multi-sucursal, prescripción detallada, descarga,
-  paginación e incrustación real del logo del PDF y medios;
-- prueba PostgreSQL de filtros UUID nulos para biblioteca, resumen, detalle,
-  desempeño y tendencia;
-- comprobación de whitespace Git: exitosa.
+## 5. Próximo bloque
 
-Al finalizar cada iteración se debe registrar aquí el commit auditado, suites
-ejecutadas, módulos afectados y deuda nueva o cerrada en el documento 28.
+1. Integrar Zoho como proveedor SMTP real sin acoplar el dominio de
+   notificaciones a un proveedor.
+2. Verificar SPF, DKIM, DMARC, remitente, reply-to, rebotes y entregabilidad.
+3. Ejecutar Stripe sandbox automatizado y escenarios de recuperación conectados.
+4. Cerrar deuda de autorización multi-tenant, migración limpia/upgrade,
+   backup/restore y observabilidad de piloto.
 
-## 5. Reglas de mantenimiento
-
-1. Actualizar este documento en el mismo commit que cambie materialmente el estado de un módulo.
-2. No duplicar listas de pendientes: registrar el identificador del documento 28.
-3. Mantener el detalle en `modulos/` y la cronología Git en el documento 29.
-4. No usar porcentajes sin criterios cerrados y evidencia reproducible.
-5. Si código, pruebas y documentación discrepan, prevalece el código verificado y la documentación debe corregirse.
+El detalle vive en `modulos/`, la deuda única en el documento 28 y la situación
+Git en el documento 29.

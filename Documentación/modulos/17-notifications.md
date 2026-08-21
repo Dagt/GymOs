@@ -1,15 +1,18 @@
 # Notificaciones
 
 Estado: `FUNCIONAL PARA EMAIL / PREPARADO PARA EXTENSIÓN`
+Última revisión: 21 de agosto de 2026
 
 ## Implementado
 
 - registro multicanal con `IN_APP` y `EMAIL` como canales ejecutables;
 - contrato desacoplado `EmailDeliveryPort`, sin dependencias de Automatizaciones
   hacia SMTP ni hacia un proveedor comercial;
+- Zoho es el siguiente proveedor objetivo; conexión, dominio y entregabilidad
+  real aún no se consideran implementados;
 - adaptador SMTP configurable exclusivamente mediante secretos de entorno;
 - configuración por gimnasio de habilitación, proveedor, remitente, nombre y
-  `Reply-To`, administrable por dueño o administrador;
+  `Reply-To`, administrable por dueño, gerente autorizado o soporte;
 - envío manual de prueba y envío directo desde el centro de Automatizaciones;
 - resolución tenant de correo para destinatarios `CLIENT` y `USER`;
 - automatizaciones de pagos, membresías, domiciliaciones y reservas capaces de

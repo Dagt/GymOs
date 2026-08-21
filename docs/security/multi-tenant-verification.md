@@ -1,13 +1,13 @@
-# GymOS Multi-Tenant Verification Plan
+# Plan de verificación multi-tenant de GymFort
 
 Estado: VIGENTE / EJECUCIÓN PARCIAL
-Última revisión documental: 2026-07-26
+Última revisión documental: 2026-08-21
 
 La deuda y criterios pendientes derivados de este plan se registran en
 `../../Documentación/28-registro-vivo-deuda-tecnica.md` (`GEN-001` y deudas por
 módulo).
 
-GymOS debe aislar cada operación por `organization_id` y, cuando el flujo sea físico o localizable, por `branch_id`. Este documento define la estrategia mínima de pruebas y revisión para declarar el aislamiento apto para piloto.
+GymFort debe aislar cada operación por `organization_id` y, cuando el flujo sea físico o localizable, por `branch_id`. Este documento define la estrategia mínima de pruebas y revisión para declarar el aislamiento apto para piloto.
 
 ## Principios
 
@@ -26,6 +26,7 @@ GymOS debe aislar cada operación por `organization_id` y, cuando el flujo sea f
 | Cliente/persona | Sí | No siempre | lectura o edición cruzada |
 | Venta | Sí | Sí | pago/reembolso de venta ajena |
 | Pago | Sí | Sí | validación o recibo ajeno |
+| Conexión/webhook/mandato Stripe | Sí | Según operación | cuenta, evento o cargo de otro tenant |
 | Membresía | Sí | Sí | activación/renovación cruzada |
 | Kiosco | Sí | Sí | terminal pública de otro gimnasio |
 | Acceso | Sí | Sí | apertura/registro en sucursal equivocada |
@@ -57,6 +58,10 @@ Cada caso debe crearse con dos organizaciones (`org_a`, `org_b`) y al menos una 
 | MT-ACCESS-001 | Consumir visita de `org_b` | 404/403 |
 | MT-INVENTORY-001 | Crear movimiento sobre stock de `org_b` | 404/403 |
 | MT-BOOKING-001 | Vincular pago de `org_a` a reserva de `org_b` | 404/403 |
+| MT-PAY-001 | Consultar operación, mandato o webhook Stripe de `org_b` | 404/403 |
+| MT-PAY-002 | Webhook firmado de `org_b` intenta completar venta de `org_a` | evento rechazado/sin efecto |
+| MT-MULTI-001 | Plan multi-sucursal de `org_a` se usa en sucursal de `org_b` | rechazo genérico; nunca cruza tenant |
+| MT-MULTI-002 | Plan multi-sucursal se usa en otra sucursal activa de la misma organización | permitido, conservando origen de membresía y destino de reserva |
 | MT-AUTO-001 | Ejecutar automatización de `org_b` | 404/403 |
 | MT-REPORT-001 | Reporte de `org_a` incluye datos de `org_b` | test falla si aparece agregado cruzado |
 | MT-FILE-001 | Descargar o asociar recibo con key de `org_b` | 404/403 |

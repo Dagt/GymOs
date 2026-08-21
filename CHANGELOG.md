@@ -1,8 +1,30 @@
 # Changelog
 
-All notable changes to GymOS will be documented in this file.
+Los cambios relevantes de GymFort se documentan aquí. `GymOS` permanece como
+nombre técnico interno durante la transición de marca.
 
 ## 0.7.0-pilot-readiness - Unreleased
+
+- Adopt the visible GymFort product identity while preserving compatible
+  internal `gymos` packages, variables and data identifiers.
+- Add permanent GymFort product attribution alongside tenant-configured logos.
+- Unify Automations and Organization settings with the dark application shell
+  and replace page-top feedback boxes with accessible floating notifications.
+- Add Stripe Connect, hosted Checkout, signed webhooks, reconciliation,
+  receipts, recurring card mandates, retries and tenant-scoped histories.
+- Support kiosk membership enrollment, renewal and plan changes only after
+  confirmed payment, with idempotent sales, payments and membership periods.
+- Support multi-branch plan access in secondary branches, including eligible
+  kiosk lookup and reservations while retaining membership origin ownership.
+- Restrict kiosk launch to Reception; managers can configure kiosk capabilities
+  but cannot open a member session.
+- Split Stripe account management from operational payment switches: managers
+  may enable or disable an existing connection, while owners/support connect
+  and refresh it.
+- Add durable email delivery with SMTP, leases, retries, preferences,
+  suppression, tenant sender settings and operational metrics. Zoho provider
+  validation remains upcoming.
+- Add a pinned Stripe CLI `v1.50.3` Docker profile and CI verification.
 
 - Consolidate documentation into one canonical status file per module.
 - Add the live technical-debt register and audited branch chronology.

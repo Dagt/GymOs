@@ -1,7 +1,9 @@
 # Pruebas de Stripe para kiosco y domiciliación
 
+Corte: 21 de agosto de 2026
+
 Esta guía separa dos verificaciones diferentes: el contrato automatizado contra
-la API sandbox de Stripe y el recorrido manual de GymOS de extremo a extremo.
+la API sandbox de Stripe y el recorrido manual de GymFort de extremo a extremo.
 Nunca uses llaves ni tarjetas reales.
 
 ## 1. Suite automatizada contra Stripe test
@@ -72,7 +74,8 @@ una cuenta que el dueño ya vinculó, pero no puede crear, sustituir ni verifica
 la cuenta Stripe del gimnasio.
 
 Como alternativa a instalar Stripe CLI en Windows, el repositorio incluye el
-perfil Docker `stripe`; consulta [`../../infra/README.md`](../../infra/README.md).
+perfil Docker `stripe` con `stripe/stripe-cli:v1.50.3`; consulta
+[`../../infra/README.md`](../../infra/README.md).
 
 ## 4. Tarjetas y escenarios manuales
 
@@ -80,7 +83,7 @@ En Checkout usa cualquier fecha futura y cualquier CVC de tres dígitos:
 
 | Escenario | Tarjeta test | Resultado esperado |
 | --- | --- | --- |
-| Pago exitoso | `4242 4242 4242 4242` | Stripe confirma el pago; GymOS activa o extiende una sola vez. |
+| Pago exitoso | `4242 4242 4242 4242` | Stripe confirma el pago; GymFort activa o extiende una sola vez. |
 | Autenticación 3DS interactiva | `4000 0025 0000 3155` | Checkout o Setup solicita autenticación cuando corresponde. Si se autoriza correctamente para uso futuro, Stripe puede permitir cargos posteriores. |
 | Fondos insuficientes en Checkout | `4000 0000 0000 9995` | El pago inmediato se rechaza y no extiende la membresía. Esta tarjeta no debe usarse para alta de domiciliación porque Stripe no permite adjuntarla. |
 | Falla después de guardar la tarjeta | `4000 0000 0000 0341` | La tarjeta se adjunta durante Setup, pero el cargo posterior se rechaza; permite probar recuperación y sustitución del método. |
@@ -101,6 +104,11 @@ Recorridos mínimos:
 6. Sustituye la tarjeta y revoca el mandato desde el kiosco.
 7. Revisa `Configuración` → `Historial técnico`: cargos, mandatos y webhooks
    deben estar paginados, aislados al gimnasio y sin datos sensibles.
+8. Paga una reserva con costo y confirma exactamente un movimiento de caja y
+   una reserva confirmada después del webhook.
+9. Con un plan multi-sucursal originado en A, abre el kiosco desde Recepción en
+   B y confirma reconocimiento, historial permitido y reserva elegible sin
+   mover silenciosamente la membresía de origen.
 
 ## 5. Recuperación e idempotencia
 

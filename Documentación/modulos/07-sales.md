@@ -1,11 +1,14 @@
 # Ventas, pagos y devoluciones
 
 Estado: `FUNCIONAL`
+Última revisión: 21 de agosto de 2026
 
 ## Implementado
 
 - ventas con partidas e instantáneas comerciales;
 - pagos manuales en efectivo, transferencia y tarjeta;
+- pagos administrados por Stripe/Mercado Pago, recibos, operaciones pendientes
+  e idempotencia ante reintentos/webhooks;
 - validación y rechazo de pagos;
 - idempotencia y vínculo con membresías;
 - reembolsos totales o parciales por producto/cantidad;
@@ -17,7 +20,7 @@ Estado: `FUNCIONAL`
 - concurrencia y conciliación financiera de extremo a extremo;
 - cobertura de todos los permisos y UUID ajenos (`GEN-001`);
 - E2E crítico de venta–pago–inventario–devolución (`GEN-004`).
-## Evolución en `feature/reception-pos-init`
+## Estado vigente del comercio de membresías
 
 Las renovaciones y cambios de plan siguen registrados en Sales/Payments y, por
 lo tanto, alimentan movimientos de dinero, métricas y cortes de caja. El

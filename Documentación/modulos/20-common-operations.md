@@ -1,10 +1,13 @@
 # Base común, datos y operación
 
-Estado: `FUNCIONAL` para desarrollo / `PLANIFICADO` para producción
+Estado: `FUNCIONAL` para local y CI / `PARCIAL` para producción
+Última revisión: 21 de agosto de 2026
 
 ## Implementado
 
 - Spring Boot, PostgreSQL, Flyway y frontend Next.js;
+- Docker Compose con PostgreSQL 18, Redis 8, MinIO y perfil opcional Stripe CLI
+  `v1.50.3`, verificado también por CI;
 - manejo común de errores, correlación, tiempo y seguridad;
 - Docker Compose y health checks;
 - runbooks de despliegue, rollback, backup, restore e incidentes;

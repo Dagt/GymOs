@@ -1,10 +1,12 @@
 # Automatizaciones
 
-Estado: `LISTO PARA ACEPTACIÓN` (la validación externa de Stripe sandbox se ejecuta por separado)
+Estado: `FUNCIONAL / LISTO PARA ACEPTACIÓN`
+Última revisión: 21 de agosto de 2026
 
 ## Implementado
 
 - alta, consulta, habilitación, deshabilitación y ejecución manual de reglas;
+- interfaz integrada al tema oscuro y feedback global de GymFort;
 - programación por intervalo con `next_run_at` y reclamo condicional mediante
   `locked_until`;
 - acción inicial `CREATE_NOTIFICATION` sobre la cola interna;

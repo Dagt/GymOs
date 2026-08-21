@@ -1,6 +1,7 @@
 # Inventarios
 
 Estado: `ESTABILIZADO`
+Última revisión: 21 de agosto de 2026
 
 ## Implementado
 
@@ -18,4 +19,5 @@ Estado: `ESTABILIZADO`
 - indicador de guardado por renglón (`INV-002`);
 - pruebas de concurrencia y alto volumen.
 
-Última integración: PR #6 en `main`, 25-jul-2026.
+Base histórica: PR #6. Última revisión dentro del árbol integrado actual:
+21-ago-2026.

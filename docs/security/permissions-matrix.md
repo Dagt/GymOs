@@ -1,143 +1,78 @@
-# GymOS Permissions Matrix
+# Matriz de permisos
 
 Estado: VIGENTE / COBERTURA PARCIAL
 Fuente primaria: `backend/src/main/java/com/gymos/common/security/SecurityConfig.java`  
-Última revisión documental: 2026-07-30
+Última revisión: 21 de agosto de 2026
 
-Esta matriz documenta el permiso mínimo esperado por endpoint interno. Debe mantenerse alineada con pruebas de autorización. Los endpoints públicos no sustituyen validaciones de negocio ni rate limiting.
+Esta matriz resume el permiso mínimo HTTP. Los servicios deben volver a validar
+organización, sucursal, propiedad y estado del recurso; una coincidencia de ruta
+no sustituye autorización de negocio.
 
-## Endpoints públicos
+## Rutas públicas endurecidas
 
-| Método | Endpoint | Módulo | Permiso | Organización | Sucursal | Auditoría | Prueba actual |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/actuator/health/**` | ops | Público | No | No | No | Pendiente hardening prod |
-| GET | `/api/v1/system/**` | common | Público | No | No | No | Pendiente |
-| POST | `/api/v1/auth/login` | security | Público | No | No | No | Pendiente |
-| POST | `/api/v1/auth/refresh` | security | Público | No | No | No | Pendiente |
-| ANY | `/api/v1/self-service/**` | selfservice | Público endurecido | Sí, por terminal | Sí, por terminal | Sí | `selfServiceSessionCreationIsPublic` parcial |
-| GET | `/api/v1/openapi/**` | docs | Público local | No | No | No | Pendiente perfil prod |
-| GET | `/api/v1/docs/**` | docs | Público local | No | No | No | Pendiente perfil prod |
-| GET | `/swagger-ui/**` | docs | Público local | No | No | No | Pendiente perfil prod |
-| GET | `/api/v1/organizations/*/logo` | organizations/storage | Público, sólo marca | Sí, por UUID | No | No | `organizationLogoReadIsPublic` |
+| Ruta | Regla adicional |
+|---|---|
+| `/api/v1/auth/login`, `/api/v1/auth/refresh` | Credenciales/refresh válidos y rate limit aplicable |
+| `/api/v1/self-service/**` excepto alta de sesión | Token temporal, sesión activa, tenant/sucursal y capacidad |
+| `POST /api/v1/self-service/kiosk-sessions` | No es pública: `selfservice.session.launch` o `platform.admin` |
+| `/api/v1/payment-webhooks/**` | Firma del proveedor, inbox durable, deduplicación y conciliación |
+| Callback OAuth Mercado Pago | `state` de un solo uso y PKCE |
+| `GET /api/v1/organizations/*/logo` | Sólo marca pública por UUID; sin datos tenant adicionales |
+| Health/system/docs | Deben restringirse por perfil antes de producción |
 
-## Autenticación y organización
+## Familias internas
 
-| Método | Endpoint | Módulo | Permiso | Organización | Sucursal | Auditoría | Prueba actual |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| POST | `/api/v1/auth/select-branch` | security | `branch.read` | Sí | Sí | Recomendado | `AuthServiceTests.selectingBranchWithoutUserAccessIsDenied` |
-| GET | `/api/v1/organizations/current` | organizations | `organization.read` o `organization.update` | Sí | No | No | JWT negativo y compatibilidad de actualización |
-| PUT | `/api/v1/organizations/current` | organizations | `organization.update` | Sí | No | Sí | Pendiente |
-| POST | `/api/v1/organizations/current/logo` | organizations/storage | `organization.update` | Sí | No | Sí | `OrganizationLogoServiceTests` |
-| POST | `/api/v1/organizations/*/logo` | organizations/storage | `platform.admin` | Sí, destino explícito | No | Sí | autorización negativa y `platformAdministratorCanStoreLogoForNewlyCreatedOrganization` |
-| GET | `/api/v1/organizations/current/branches` | organizations | `branch.read` | Sí | No | No | Pendiente |
-| ANY | `/api/v1/organizations/current/branches/*` | organizations | `branch.update` | Sí | Sí | Sí | Pendiente |
+| Superficie | Lectura | Mutación/operación |
+|---|---|---|
+| Organización | `organization.read` | `organization.update`; alta/estado tenant: `platform.admin` |
+| Sucursales | `branch.read` | `branch.create`, `branch.update` |
+| Equipo | `user.read` | `user.manage` con filtro de roles/sucursales |
+| Onboarding | `onboarding.manage` | `onboarding.manage` |
+| Clientes | `client.read` | `client.create`, `client.update`, `client.import` |
+| Catálogo | `catalog.read` y compatibilidades de consumo | `catalog.create`, `catalog.update`, `catalog.status.manage`, `catalog.archive`, `catalog.image.manage`, `catalog.category.manage` |
+| Beneficios | `benefit.read` o lectores efectivos | `benefit.manage`, `client.benefit.assign`, `client.benefit.verify` |
+| Membresías | `membership.read` | `membership.create/update/renew/change-plan` o `sale.create` según flujo |
+| Ventas | `sale.read`, `report.sales.read` | `sale.create`, `sale.refund` |
+| Pagos manuales | lectura por venta | `payment.manual.create/validate/reject`, `payment.receipt.upload` |
+| Acceso/visitas | `access.read`, `visit.read` | `access.manage`, `visit.create`, `visit.consume` |
+| Inventario | `inventory.read` | `inventory.manage` |
+| Recursos/reservas | `resource.read`, `booking.read` | `resource.manage`, `booking.manage`, `booking.payment.manage` |
+| Coaches | `coach.read`, `coach.metrics.read` | `coach.manage`, `coach.profile.manage` |
+| Ejercicios/rutinas | `exercise.read`, `workout.read.own/all` | `exercise.create/manage`, `workout.manage.own/all`, `workout.assign`, `workout.pdf.download` |
+| Wellness | `professional.read` o `booking.read` | `professional.manage` o `booking.manage` |
+| Notificaciones | `notification.read` | `notification.manage`; SMTP tenant: `notification.settings.manage` |
+| Automatizaciones | `automation.read` | `automation.manage`, `automation.execute`, `automation.scheduler.manage` |
+| Reporte dueño | `report.owner.read` | No aplica |
 
-## Onboarding
+## Separaciones críticas vigentes
 
-| Método | Endpoint | Módulo | Permiso | Organización | Sucursal | Auditoría | Prueba actual |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/onboarding/**` | onboarding | `onboarding.manage` | Sí | No | No | `onboardingRequiresOnboardingPermission` negativo |
-| POST | `/api/v1/onboarding/**` | onboarding | `onboarding.manage` | Sí | Sí cuando aplica | Sí | `onboardingRequiresOnboardingPermission` negativo |
+| Acción | Permiso | Roles esperados |
+|---|---|---|
+| Abrir una sesión de kiosco | `selfservice.session.launch` | Recepción; soporte mediante `platform.admin` |
+| Configurar capacidades del kiosco | `selfservice.settings.manage` | Dueño, gerente autorizado, soporte |
+| Consultar cobros | `payment.settings.read` o `payment.settings.manage` | Roles autorizados |
+| Activar/desactivar modalidades | `payment.settings.manage` | Dueño, gerente autorizado, soporte |
+| Conectar/refrescar Stripe | `payment.provider.stripe.manage` | Dueño y soporte; no gerente |
+| Configurar correo tenant | `notification.settings.manage` | Dueño, gerente autorizado, soporte |
 
-## Clientes
+V76 retira el lanzamiento del kiosco a Gerencia. V77 separa administrar la
+cuenta Stripe de sus interruptores operativos. El frontend oculta acciones por
+permiso, pero el backend es autoritativo.
 
-| Método | Endpoint | Módulo | Permiso | Organización | Sucursal | Auditoría | Prueba actual |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/clients/**` | clients | `client.read` | Sí | Según consulta | No | Pendiente |
-| POST | `/api/v1/clients` | clients | `client.create` | Sí | Sí | Sí | V57 en `DatabaseMigrationTests`; E2E gerencia/recepción |
-| PUT | `/api/v1/clients/**` | clients | `client.update` | Sí | Según recurso | Sí | Pendiente |
-| POST | `/api/v1/clients/imports` | clients | `client.import` | Sí | Opcional | Sí | `clientImportRequiresImportPermission` negativo |
-| POST | `/api/v1/clients/*/benefits` | benefits | `client.benefit.assign` | Sí | Según cliente | Sí | `clientBenefitAssignmentRequiresAssignPermission` negativo |
-| POST | `/api/v1/client-benefits/*/verify` | benefits | `client.benefit.verify` | Sí | Según beneficio | Sí | `clientBenefitVerificationRequiresVerifyPermission` negativo |
-| GET | `/api/v1/clients/*/workouts` | coaching | `workout.read.own/all` | Sí | Sí; coach propio | No | `CoachingServiceSecurityTests` |
+## Reglas de rol relevantes
 
-## Catálogo, beneficios y membresías
+- Gerencia no crea/modifica dueño, gerente ni administrador de plataforma.
+- Dueño y gerente sólo consultan métricas de coaches; no reciben por defecto las
+  operaciones `workout.*` del Coach.
+- Recepción puede operar POS, socios, reservas y kiosco según sus permisos, pero
+  no administrar tenant/proveedores.
+- Soporte usa `platform.admin`, contexto tenant explícito y auditoría
+  `PLATFORM_SUPPORT`.
 
-| Método | Endpoint | Módulo | Permiso | Organización | Sucursal | Auditoría | Prueba actual |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/catalog/**` | catalog | `catalog.read` | Sí | No | No | Pendiente |
-| POST | `/api/v1/catalog/**` | catalog | `catalog.manage` | Sí | No | Sí | Pendiente |
-| GET | `/api/v1/benefits/**` | benefits | `benefit.read` | Sí | Sí; actual + global explícito | No | Filtro en `BenefitService` |
-| POST | `/api/v1/benefits/**` | benefits | `benefit.manage` | Sí | Sí; sucursal activa por defecto | Sí | `benefitCreationRequiresManagePermission` negativo |
-| GET | `/api/v1/memberships/**` | memberships | `membership.read` | Sí | Sí | No | Pendiente |
-| POST | `/api/v1/memberships/*/renew` | memberships | `membership.renew` | Sí | Sí | Sí | Pendiente |
-| POST | `/api/v1/memberships/*/change-plan` | memberships | `membership.change-plan` | Sí | Sí | Sí | Pendiente |
+## Brechas de cobertura
 
-## Ventas, pagos y reembolsos
-
-| Método | Endpoint | Módulo | Permiso | Organización | Sucursal | Auditoría | Prueba actual |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/sales/reports/**` | sales/reporting | `report.sales.read` | Sí | Sí | No | `salesReportRequiresReportPermission` negativo |
-| GET | `/api/v1/sales/**` | sales | `sale.read` | Sí | Sí | No | Pendiente |
-| POST | `/api/v1/sales` | sales | `sale.create` | Sí | Sí | Sí | `saleCreationRequiresSaleCreatePermission` negativo |
-| POST | `/api/v1/sales/*/refunds` | sales | `sale.refund` | Sí | Sí | Sí | `saleRefundRequiresRefundPermission` negativo |
-| POST | `/api/v1/sales/*/payments` | sales | `payment.manual.create` | Sí | Sí | Sí | Pendiente |
-| POST | `/api/v1/sales/payments/*/validate` | sales | `payment.manual.validate` | Sí | Sí | Sí | Pendiente |
-| POST | `/api/v1/sales/payments/*/reject` | sales | `payment.manual.reject` | Sí | Sí | Sí | Pendiente |
-| POST | `/api/v1/sales/payments/*/receipt` | sales/storage | `payment.receipt.upload` | Sí | Sí | Sí | Pendiente |
-
-## Accesos y visitas
-
-| Método | Endpoint | Módulo | Permiso | Organización | Sucursal | Auditoría | Prueba actual |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/access/visit-passes/**` | access | `visit.read` | Sí | Sí | No | Pendiente |
-| POST | `/api/v1/access/visit-passes` | access | `visit.create` | Sí | Sí | Sí | `visitPassCreationRequiresVisitCreatePermission` negativo |
-| POST | `/api/v1/access/visit-passes/*/consume` | access | `visit.consume` | Sí | Sí | Sí | `visitPassConsumeRequiresVisitConsumePermission` negativo |
-| GET | `/api/v1/access/clients/*/effective-benefits` | access/clientes | `access.read`, `client.read`, `membership.read` o `benefit.read` | Sí | Sí | No | `clientReadersCanInspectEffectiveAccessBenefitsWithoutAccessAdministrationPermission` |
-| GET | `/api/v1/access/**` | access | `access.read` | Sí | Sí | No | Pendiente |
-| POST | `/api/v1/access/**` | access | `access.manage` | Sí | Sí | Sí | Pendiente |
-
-## Inventario y reservas
-
-| Método | Endpoint | Módulo | Permiso | Organización | Sucursal | Auditoría | Prueba actual |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/inventory/**` | inventory | `inventory.read` | Sí | Sí | No | Pendiente |
-| POST | `/api/v1/inventory/**` | inventory | `inventory.manage` | Sí | Sí | Sí | Pendiente |
-| GET | `/api/v1/resources/**` | bookings | `resource.read` | Sí | Sí | No | Pendiente |
-| POST | `/api/v1/resources/**` | bookings | `resource.manage` | Sí | Sí | Sí | Pendiente |
-| GET | `/api/v1/bookings/**` | bookings | `booking.read` | Sí | Sí | No | Pendiente |
-| POST | `/api/v1/bookings/**` | bookings | `booking.manage` | Sí | Sí | Sí | `bookingCreationRequiresManagePermission` negativo |
-| POST | `/api/v1/bookings/*/payments` | bookings | `booking.payment.manage` | Sí | Sí | Sí | `bookingPaymentRequiresPaymentManagePermission` negativo |
-
-## Coaching, wellness, notificaciones y automatizaciones
-
-| Método | Endpoint | Módulo | Permiso | Organización | Sucursal | Auditoría | Prueba actual |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| GET | `/api/v1/coaches/**` | coaching | `coach.read` | Sí | Sí | No | Pendiente |
-| POST | `/api/v1/coaches/**` | coaching | `coach.manage` | Sí | Sí | Sí | `coachCreationRequiresManagePermission` negativo |
-| GET/PUT | `/api/v1/coaches/profiles/**` | coaching | `coach.profile.manage` | Sí | Sólo sucursales administrables | PUT | `advancedCoachProfilesRequireDedicatedPermission`; `CoachingServiceSecurityTests`; E2E |
-| GET | `/api/v1/workouts/**` | coaching | `workout.read.own/all` | Sí | Sí; coach propio/global | No | `CoachingServiceSecurityTests`; permiso legacy negativo |
-| POST/PUT | `/api/v1/workouts/**` | coaching | `workout.manage.own/all` | Sí | Sí; coach propio/global | Sí | `CoachingServiceSecurityTests`; `workoutAssignmentRequiresManagePermission` |
-| GET | `/api/v1/reports/coaches` | coaching/reporting | `report.coaches.read` | Sí | Sí | No | Pendiente |
-| GET | `/api/v1/exercises/**` | coaching | `exercise.read` | Sí | Según origen | No | Implementado; negativos completos pendientes |
-| POST/PUT/DELETE | `/api/v1/exercises/**` | coaching | `exercise.create` / `exercise.manage` | Sí | Propio/organización | Sí | SYSTEM inmutable, propiedad y medios probados |
-| PATCH | `/api/v1/exercises/**` | coaching | `exercise.manage` | Sí | Organización | Sí | `exerciseMutationRequiresCreateOrManagePermission` |
-| GET | `/api/v1/workout-versions/**` | coaching | `workout.read.own/all` | Sí | Sí; coach propio/global | No | Filtro de sucursal y propiedad |
-| POST | `/api/v1/workout-assignments` | coaching | `workout.assign` | Sí | Sí | Sí | Implementado con idempotencia |
-| PATCH | `/api/v1/workout-assignments/**` | coaching | `workout.assign` | Sí | Sí; coach propio/global | Sí | Motivo obligatorio y negativo de permiso |
-| POST | `/api/v1/workout-assignments/*/replace` | coaching | `workout.assign` | Sí | Sí; coach propio/global | Sí | E2E de reemplazo e idempotencia |
-| GET | `/api/v1/workout-assignments/*/pdf` | coaching | `workout.pdf.download` | Sí | Sí; coach propio/global | No | PDFBox y filtro de propiedad |
-| GET | `/api/v1/reports/coaches/workout-assignments/**` | coaching/reporting | `coach.metrics.read` | Sí | Sí; coach propio/global | No | Comparación, filtro socio/coach, tendencia 4–52 semanas, paginación y E2E |
-
-Regla de rol vigente: `Dueno del gimnasio` sólo conserva `coach.read`,
-`coach.metrics.read` y `coach.profile.manage`. No recibe permisos de ejercicios,
-rutinas, asignación o PDF. La edición del perfil se presenta exclusivamente en
-`/users`; `/coaches` es una vista de métricas para el dueño.
-| GET | `/api/v1/professionals/**` | wellness | `professional.read` | Sí | Sí | No | Pendiente |
-| POST | `/api/v1/professionals/**` | wellness | `professional.manage` | Sí | Sí | Sí | `professionalCreationRequiresManagePermission` negativo |
-| GET | `/api/v1/notifications/**` | notifications | `notification.read` | Sí | No | No | Pendiente |
-| POST | `/api/v1/notifications/**` | notifications | `notification.manage` | Sí | No | Sí | `notificationCreationRequiresManagePermission` negativo |
-| GET | `/api/v1/automations/**` | automations | `automation.read` | Sí | No | No | Pendiente |
-| POST | `/api/v1/automations/**` | automations | `automation.manage` | Sí | No | Sí | `automationCreationRequiresManagePermission` negativo |
-| GET | `/api/v1/reports/owner-dashboard` | reporting | `report.owner.read` | Sí | Opcional | No | Pendiente |
-
-## Brechas inmediatas
-
-1. Convertir cada fila `Pendiente` en prueba MVC o integración.
-2. Dividir endpoints públicos por perfil: OpenAPI/Swagger no deben quedar públicos en producción sin decisión explícita.
-3. Mantener pruebas de regresión de la separación: Coach opera sólo sus
-   rutinas/asignaciones; dueño consulta únicamente métricas; gerente queda
-   limitado por organización y sucursales autorizadas.
-4. Agregar prueba negativa de selección de sucursal ajena.
-5. Agregar prueba negativa de UUID ajeno por módulo crítico.
-6. Verificar que toda operación marcada con auditoría escriba realmente `audit_log`.
+1. Convertir cada familia en pruebas positivas y negativas por rol, tenant,
+   sucursal y UUID ajeno (`GEN-001`).
+2. Deshabilitar docs/actuator públicos en producción mediante perfil.
+3. Verificar que cada mutación sensible escriba `audit_log` (`AUD-001`).
+4. Mantener regresión explícita de V76/V77 y de planes multi-sucursal.

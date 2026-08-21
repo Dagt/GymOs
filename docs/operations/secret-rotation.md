@@ -24,6 +24,10 @@ y enviar un correo de prueba desde Configuración del gimnasio. La contraseña
 nunca se captura ni persiste en la configuración tenant. Véase
 `email-delivery.md`.
 
+Para Zoho, rotar una contraseña/credencial específica de aplicación en el
+gestor de secretos, validar TLS y entrega real y revocar la anterior sólo
+después de la prueba. No documentar el valor ni copiarlo a configuración tenant.
+
 `GYMOS_NOTIFICATION_PREFERENCE_KEY` no debe rotarse sin una migración que
 recalcule las preferencias existentes; cambiarla directamente haría que las
 bajas previas dejaran de coincidir con el HMAC del destinatario.
