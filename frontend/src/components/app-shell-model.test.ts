@@ -26,6 +26,7 @@ test("tenant owner navigation keeps management and client access visible", () =>
   assert.ok(labels.includes("Socios"));
   assert.ok(labels.includes("Equipo y accesos"));
   assert.ok(labels.includes("Configuración"));
+  assert.equal(labels.includes("Operación diaria"), false);
   assert.deepEqual(sectionLinks(sections, "Administración"), ["Equipo y accesos", "Catálogo", "Beneficios", "Configuración"]);
   assert.equal(sectionLinks(sections, "Mostrador").includes("Beneficios"), false);
 });
@@ -66,16 +67,19 @@ test("reception navigation is limited to front desk work", () => {
   assert.deepEqual(sectionLinks(sections, "Seguimiento"), ["Ventas y pagos"]);
 });
 
-test("manager navigation exposes Wellness and automation monitoring", () => {
+test("manager navigation exposes Wellness and automation monitoring without daily operations", () => {
   const sections = visibleSectionsForConsole({
     consoleType: "TENANT_MANAGER",
     hasBranch: true,
-    permissions: new Set(["booking.read", "professional.read", "automation.read"]),
+    permissions: new Set(["booking.read", "professional.read", "automation.read", "report.sales.read"]),
     variant: "tenant",
   });
 
-  assert.ok(sectionLabels(sections).includes("Wellness"));
-  assert.ok(sectionLabels(sections).includes("Automatizaciones"));
+  const labels = sectionLabels(sections);
+  assert.ok(labels.includes("Wellness"));
+  assert.ok(labels.includes("Automatizaciones"));
+  assert.ok(labels.includes("Indicadores"));
+  assert.equal(labels.includes("Operación diaria"), false);
 });
 
 test("manager navigation exposes operational configuration when authorized", () => {
