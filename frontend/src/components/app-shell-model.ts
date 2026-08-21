@@ -43,7 +43,7 @@ const ownerSections: NavigationSection[] = [
   {
     title: "Dirección",
     links: [
-      { label: "Métricas del negocio", href: "/dashboard", hint: "Ingresos, socios y salud", permissions: ["report.owner.read", "report.sales.read"] },
+      { label: "Métricas del negocio", href: "/dashboard", hint: "Ingresos, socios y salud", permissions: ["report.owner.read"] },
       { label: "Ventas y pagos", href: "/reports/sales", hint: "Reportes financieros", permissions: ["report.sales.read"] },
     ],
   },
@@ -80,7 +80,7 @@ const managerSections: NavigationSection[] = [
   {
     title: "Gerencia",
     links: [
-      { label: "Indicadores", href: "/dashboard", hint: "Resumen ejecutivo", permissions: ["report.owner.read", "report.sales.read"] },
+      { label: "Indicadores", href: "/dashboard", hint: "Resumen ejecutivo", permissions: ["report.owner.read"] },
       { label: "Ventas y pagos", href: "/reports/sales", hint: "Pagos y saldos", permissions: ["report.sales.read"] },
     ],
   },
