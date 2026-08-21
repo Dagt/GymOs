@@ -47,17 +47,20 @@ No guardar llaves Stripe en imágenes, commits o variables `NEXT_PUBLIC_*`.
 Para tarjetas sandbox y recorridos consulta
 [`../docs/testing/stripe-kiosk-test-mode.md`](../docs/testing/stripe-kiosk-test-mode.md).
 
-## Correo real con Zoho Mail
+## Correo transaccional con ZeptoMail
 
-El backend ya incluye el cliente SMTP, la cola durable y el worker; Zoho es un
-servicio externo y no requiere un contenedor adicional. Configura los valores
-`GYMOS_SMTP_*` de `infra/.env.example`, recrea `backend` y ejecuta la prueba real
-desde **Configuración > Correo electrónico**. El remitente debe coincidir con el
-buzón autenticado o un alias autorizado.
+El backend ya incluye el cliente SMTP, la cola durable y el worker; ZeptoMail es
+un servicio externo y no requiere un contenedor adicional. Configura los valores
+`GYMOS_SMTP_*` de `infra/.env.example` con las credenciales de **Agent > SMTP/API**,
+recrea `backend` y ejecuta la prueba real desde **Configuración > Correo electrónico**.
 
-La guía completa, incluyendo TLS, contraseña de aplicación, SPF, DKIM, DMARC y
-diagnóstico, está en
-[`../docs/operations/zoho-email.md`](../docs/operations/zoho-email.md).
+Los `From` admitidos deben estar verificados y asociados al Agent. El `Reply-To`
+permanece configurable por gimnasio para que las respuestas lleguen a su propia
+bandeja.
+
+La guía completa, incluyendo TLS, remitentes, SPF, DKIM, DMARC y diagnóstico,
+está en
+[`../docs/operations/zeptomail-email.md`](../docs/operations/zeptomail-email.md).
 
 ## Datos y observabilidad
 
