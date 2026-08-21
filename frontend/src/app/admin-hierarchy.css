@@ -26,15 +26,38 @@
 .admin-nav-section summary {
   background: transparent;
   color: rgba(228, 245, 241, 0.76);
-  font-size: 0.74rem;
-  font-weight: 900;
+  font-size: 0.76rem;
+  font-weight: 920;
   letter-spacing: 0.12em;
-  padding: 0.5rem 0.65rem 0.42rem;
+  padding: 0.52rem 0.65rem 0.44rem 1.18rem;
+  position: relative;
   text-transform: uppercase;
 }
 
+.admin-nav-section summary::before {
+  background: rgba(226, 246, 241, 0.22);
+  border-radius: 999px;
+  content: "";
+  height: 1rem;
+  left: 0.58rem;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0.16rem;
+}
+
 .admin-nav-section[open] summary {
-  color: rgba(240, 252, 249, 0.92);
+  color: rgba(240, 252, 249, 0.94);
+}
+
+.admin-nav-section:has(> a.active) summary {
+  background: rgba(255, 255, 255, 0.035);
+  color: white;
+}
+
+.admin-nav-section:has(> a.active) summary::before {
+  background: var(--brand-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-accent) 12%, transparent);
 }
 
 .admin-nav-section summary::after {
@@ -47,9 +70,21 @@
   border-left: 2px solid rgba(218, 239, 234, 0.12);
   border-radius: 0 0.55rem 0.55rem 0;
   color: rgba(230, 248, 244, 0.72);
-  margin-left: 0.65rem;
-  padding: 0.58rem 0.72rem 0.58rem 0.9rem;
+  margin-left: 0.78rem;
+  padding: 0.6rem 0.72rem 0.6rem 1rem;
   position: relative;
+}
+
+.admin-nav-section > a::before {
+  background: rgba(226, 246, 241, 0.3);
+  border-radius: 999px;
+  content: "";
+  height: 0.26rem;
+  left: -0.13rem;
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 0.26rem;
 }
 
 .admin-nav-section > a strong {
@@ -67,12 +102,17 @@
 .admin-nav-section > a:hover {
   background: rgba(255, 255, 255, 0.05);
   border-color: rgba(255, 255, 255, 0.07);
-  border-left-color: rgba(218, 239, 234, 0.28);
+  border-left-color: color-mix(in srgb, var(--brand-accent) 28%, rgba(218, 239, 234, 0.28));
+  color: white;
+}
+
+.admin-nav-section > a:hover::before {
+  background: color-mix(in srgb, var(--brand-accent) 45%, white);
 }
 
 .admin-nav-section > a.active {
-  background: color-mix(in srgb, var(--brand-accent) 14%, transparent);
-  border: 1px solid color-mix(in srgb, var(--brand-accent) 30%, transparent);
+  background: color-mix(in srgb, var(--brand-accent) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 34%, transparent);
   border-left: 4px solid var(--brand-accent);
   border-radius: 0.55rem;
   color: color-mix(in srgb, var(--brand-accent) 82%, white);
@@ -82,14 +122,10 @@
 
 .admin-nav-section > a.active::before {
   background: var(--brand-accent);
-  border-radius: 999px;
-  content: "";
-  height: 0.38rem;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-accent) 10%, transparent);
+  height: 0.42rem;
   left: -0.2rem;
-  position: absolute;
-  top: 50%;
-  transform: translate(-50%, -50%);
-  width: 0.38rem;
+  width: 0.42rem;
 }
 
 .admin-nav-section > a.active strong {
