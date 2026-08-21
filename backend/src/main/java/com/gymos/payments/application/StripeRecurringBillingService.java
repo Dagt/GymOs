@@ -158,7 +158,6 @@ public class StripeRecurringBillingService implements StripeRecurringOperations 
 		body.put("customer", customer.externalCustomerId());
 		body.put("currency", normalizeCurrency(context.currency()).toLowerCase());
 		body.put("payment_method_types[0]", "card");
-		body.put("setup_intent_data[usage]", "off_session");
 		body.put("success_url", frontendUrl("/kiosk/checkout/result?status=autopay-success&session_id={CHECKOUT_SESSION_ID}"));
 		body.put("cancel_url", frontendUrl("/kiosk/checkout/result?status=autopay-cancelled"));
 		body.put("client_reference_id", context.membershipId());

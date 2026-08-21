@@ -19,6 +19,7 @@ import {
   updateKioskContactData,
   verifyKioskSession,
   type KioskMembership,
+  type KioskMembershipQuote,
   type KioskAutopayMandate,
   type KioskAutopayTerms,
   type KioskPlanOption,
@@ -47,6 +48,12 @@ import { consumeKioskLaunch } from "@/lib/kiosk-launch";
 const KIOSK_BROWSER_SESSION_KEY = "gymos.kioskBrowserSession";
 const KIOSK_OPERATION_KEYS = "gymos.kioskOperationKeys";
 type KioskPanel = "memberships" | "resources" | "wellness" | "payments" | "profile" | "autopay";
+type MembershipCheckoutKind = "enrollment" | "renewal" | "change";
+type MembershipCheckoutReview = {
+  kind: MembershipCheckoutKind;
+  membership: KioskMembership | null;
+  quote: KioskMembershipQuote;
+};
 
 export default function KioskPage() {
   const [session, setSession] = useState<KioskSessionResponse | null>(null);
@@ -62,6 +69,8 @@ export default function KioskPage() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [workingMembershipId, setWorkingMembershipId] = useState<string | null>(null);
+  const [membershipReview, setMembershipReview] = useState<MembershipCheckoutReview | null>(null);
+  const [membershipError, setMembershipError] = useState<string | null>(null);
   const [resources, setResources] = useState<KioskBookingResource[]>([]);
   const [resourceId, setResourceId] = useState("");
   const [bookingDate, setBookingDate] = useState(() => toDateInput(new Date()));
@@ -88,6 +97,26 @@ export default function KioskPage() {
   const operationKeys = useRef(new Map<string, string>());
 
   const birthDate = useMemo(() => parseMexicanDate(birthDateDisplay) ?? "", [birthDateDisplay]);
+  const activeMembership = useMemo(
+    () => summary?.memberships.find((membership) => membership.status === "ACTIVE") ?? null,
+    [summary],
+  );
+  const lastExpiredMembership = useMemo(
+    () => summary?.memberships.find((membership) => membership.status === "EXPIRED") ?? null,
+    [summary],
+  );
+  const previousMemberships = useMemo(
+    () => summary?.memberships.filter((membership) => membership.id !== activeMembership?.id) ?? [],
+    [activeMembership, summary],
+  );
+  const changePlans = useMemo(
+    () => plans.filter((plan) => plan.id !== activeMembership?.planId),
+    [activeMembership, plans],
+  );
+  const selectedTargetPlan = useMemo(
+    () => plans.find((plan) => plan.id === targetPlanId) ?? null,
+    [plans, targetPlanId],
+  );
 
   useEffect(() => {
     let active = true;
@@ -149,10 +178,13 @@ export default function KioskPage() {
       ]);
       setSummary(nextSummary);
       setActivePanel("memberships");
+      setMembershipReview(null);
+      setMembershipError(null);
       setContactEmail("");
       setContactPhone("");
       setPlans(options);
-      setTargetPlanId(options[0]?.id ?? "");
+      const currentPlanId = nextSummary.memberships.find((membership) => membership.status === "ACTIVE")?.planId;
+      setTargetPlanId(options.find((plan) => plan.id !== currentPlanId)?.id ?? options[0]?.id ?? "");
       setResources(bookingResources);
       setResourceId(bookingResources[0]?.id ?? "");
       setWellnessProfessionals(professionals);
@@ -297,88 +329,86 @@ export default function KioskPage() {
     }
   }
 
-  async function renew(membership: KioskMembership) {
-    if (!session || !summary?.capabilities.onlineCardPaymentsReady) return;
-    setWorkingMembershipId(membership.id); setError(null); setMessage(null);
+  async function reviewMembershipCheckout(
+    kind: MembershipCheckoutKind,
+    planId: string,
+    membership: KioskMembership | null = null,
+  ) {
+    if (!session || !summary?.capabilities.onlineCardPaymentsReady || !planId) return;
+    setWorkingMembershipId(membership?.id ?? "enrollment");
+    setMembershipReview(null);
+    setMembershipError(null);
+    setError(null);
+    setMessage(null);
     try {
-        if (!await confirmMembershipQuote(membership.planId, "renovación")) return;
-        const response = await renewMembershipFromKiosk(session.sessionId, session.sessionToken, membership.id, {
-        idempotencyKey: stableOperationKey(
-          operationKeys.current,
-          "kiosk-renewal",
-          session.sessionId,
-          membership.id,
-        ),
-        });
-        if (response.checkoutUrl) {
-          window.location.assign(response.checkoutUrl);
-          return;
-        }
-        setSummary(await getKioskSummary(session.sessionId, session.sessionToken));
-      setMessage(response.membership ? `Renovada hasta ${formatDay(response.membership.endsOn)}.` : "Pago pendiente.");
-    } catch (exception) { setError(exception instanceof Error ? exception.message : "No fue posible renovar."); }
-    finally { setWorkingMembershipId(null); }
-  }
-
-  async function enrollMembership() {
-    if (!session || !targetPlanId || !summary?.capabilities.onlineCardPaymentsReady) return;
-    setWorkingMembershipId("enrollment"); setError(null); setMessage(null);
-    try {
-      if (!await confirmMembershipQuote(targetPlanId, "contratación")) return;
-      const response = await enrollMembershipFromKiosk(session.sessionId, session.sessionToken, {
-        planId: targetPlanId,
-        idempotencyKey: stableOperationKey(
-          operationKeys.current,
-          "kiosk-enrollment",
-          session.sessionId,
-          targetPlanId,
-        ),
-      });
-      if (response.checkoutUrl) {
-        window.location.assign(response.checkoutUrl);
-        return;
-      }
-      setSummary(await getKioskSummary(session.sessionId, session.sessionToken));
-      setMessage("La contratacion quedo pendiente de confirmacion del pago.");
+      const quote = await getKioskMembershipQuote(session.sessionId, session.sessionToken, planId);
+      setMembershipReview({ kind, membership, quote });
     } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible contratar la membresía.");
+      setMembershipError(membershipQuoteError(exception));
     } finally {
       setWorkingMembershipId(null);
     }
   }
 
-  async function changePlan(membership: KioskMembership) {
-    if (!session || !targetPlanId || !summary?.capabilities.onlineCardPaymentsReady) return;
-    setWorkingMembershipId(membership.id); setError(null); setMessage(null);
+  async function completeMembershipCheckout() {
+    if (!session || !membershipReview || !summary?.capabilities.onlineCardPaymentsReady) return;
+    const { kind, membership, quote } = membershipReview;
+    const workingId = membership?.id ?? "enrollment";
+    setWorkingMembershipId(workingId);
+    setMembershipError(null);
+    setError(null);
+    setMessage(null);
     try {
-        if (!await confirmMembershipQuote(targetPlanId, "cambio de plan")) return;
-        const response = await changeMembershipPlanFromKiosk(session.sessionId, session.sessionToken, membership.id, {
-        targetPlanId,
-        idempotencyKey: stableOperationKey(
-          operationKeys.current,
-          "kiosk-plan-change",
-          session.sessionId,
-          membership.id,
-          targetPlanId,
-        ),
-        });
-        if (response.checkoutUrl) {
-          window.location.assign(response.checkoutUrl);
-          return;
-        }
-        setSummary(await getKioskSummary(session.sessionId, session.sessionToken));
-      setMessage(response.membership ? `Nuevo plan activo: ${response.membership.planName}.` : "Solicitud registrada.");
-    } catch (exception) { setError(exception instanceof Error ? exception.message : "No fue posible cambiar plan."); }
-    finally { setWorkingMembershipId(null); }
-  }
-
-  async function confirmMembershipQuote(planId: string, operation: string): Promise<boolean> {
-    if (!session) return false;
-    const quote = await getKioskMembershipQuote(session.sessionId, session.sessionToken, planId);
-    const discount = quote.discountCents > 0 ? `\nDescuento: -${formatMoney(quote.discountCents, quote.currency)}` : "";
-    return window.confirm(
-      `${quote.planName}\nPrecio de lista: ${formatMoney(quote.listPriceCents, quote.currency)}${discount}\nTotal final: ${formatMoney(quote.totalCents, quote.currency)}\n\n¿Confirmas la ${operation} y continuar a Stripe?`,
-    );
+      const response = kind === "enrollment"
+        ? await enrollMembershipFromKiosk(session.sessionId, session.sessionToken, {
+          planId: quote.planId,
+          idempotencyKey: stableOperationKey(
+            operationKeys.current,
+            "kiosk-enrollment",
+            session.sessionId,
+            quote.planId,
+          ),
+        })
+        : kind === "renewal" && membership
+          ? await renewMembershipFromKiosk(session.sessionId, session.sessionToken, membership.id, {
+            idempotencyKey: stableOperationKey(
+              operationKeys.current,
+              "kiosk-renewal",
+              session.sessionId,
+              membership.id,
+            ),
+          })
+          : kind === "change" && membership
+            ? await changeMembershipPlanFromKiosk(session.sessionId, session.sessionToken, membership.id, {
+              targetPlanId: quote.planId,
+              idempotencyKey: stableOperationKey(
+                operationKeys.current,
+                "kiosk-plan-change",
+                session.sessionId,
+                membership.id,
+                quote.planId,
+              ),
+            })
+            : null;
+      if (!response) return;
+      if (response.checkoutUrl) {
+        window.location.assign(response.checkoutUrl);
+        return;
+      }
+      setSummary(await getKioskSummary(session.sessionId, session.sessionToken));
+      setMembershipReview(null);
+      if (kind === "renewal") {
+        setMessage(response.membership ? `Renovada hasta ${formatDay(response.membership.endsOn)}.` : "Pago pendiente.");
+      } else if (kind === "change") {
+        setMessage(response.membership ? `Nuevo plan activo: ${response.membership.planName}.` : "Solicitud registrada.");
+      } else {
+        setMessage("La contratación quedó pendiente de confirmación del pago.");
+      }
+    } catch (exception) {
+      setMembershipError(membershipCheckoutError(exception));
+    } finally {
+      setWorkingMembershipId(null);
+    }
   }
 
   async function updateContact(event: FormEvent<HTMLFormElement>) {
@@ -774,34 +804,154 @@ export default function KioskPage() {
 
             {activePanel === "memberships" ? <section className="kiosk-content-grid kiosk-content-grid-single">
               <div className="kiosk-card">
-                <div className="kiosk-member-header"><span>Mi cuenta</span><h2>Membresías</h2></div>
-                {(summary.capabilities.membershipEnrollmentAllowed || summary.capabilities.membershipPlanChangeAllowed) ? <label className="kiosk-field">Plan<select className="kiosk-input compact" onChange={(event) => setTargetPlanId(event.target.value)} value={targetPlanId}>{plans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} - {formatMoney(plan.priceCents, plan.currency)}</option>)}</select></label> : null}
+                <div className="kiosk-member-header">
+                  <span>{activeMembership ? "Tu membresía" : "Comienza aquí"}</span>
+                  <h2>{activeMembership ? "Membresía actual" : "Contrata una membresía"}</h2>
+                  <p className="kiosk-section-intro">
+                    {activeMembership
+                      ? "Consulta tu vigencia y elige exactamente qué quieres hacer. Nada cambia hasta que revises el importe y completes el pago."
+                      : "Elige el plan que quieres contratar. Verás el importe final antes de ir al pago seguro con Stripe."}
+                  </p>
+                </div>
                 {!summary.capabilities.onlineCardPaymentsReady && (summary.capabilities.membershipEnrollmentAllowed || summary.capabilities.membershipRenewalAllowed || summary.capabilities.membershipPlanChangeAllowed) ? (
-                  <p className="kiosk-feature-note">La contratación, renovación y el cambio de plan usarán exclusivamente tarjeta de crédito o débito. Se habilitarán al conectar la pasarela de pagos.</p>
+                  <p className="kiosk-feature-note">Los pagos con tarjeta todavía no están disponibles. Tu membresía no será modificada; solicita apoyo en recepción.</p>
                 ) : null}
-                <div className="kiosk-membership-list">
-                  {summary.memberships.length === 0 ? (
-                    <div className="grid gap-3">
-                      <p className="kiosk-muted">No hay membresías registradas.</p>
-                      {summary.capabilities.membershipEnrollmentAllowed ? (
-                        <button className="kiosk-primary-action small" disabled={workingMembershipId !== null || !summary.capabilities.onlineCardPaymentsReady || !targetPlanId} onClick={enrollMembership} type="button">
-                          {workingMembershipId === "enrollment" ? "Preparando pago..." : "Contratar este plan con tarjeta"}
-                        </button>
-                      ) : null}
+
+                {membershipError ? <div className="kiosk-membership-error" role="alert">{membershipError}</div> : null}
+
+                {membershipReview ? (
+                  <section aria-label="Revisión de membresía" className="kiosk-membership-review">
+                    <div>
+                      <span>Último paso antes del pago</span>
+                      <h3>{membershipActionTitle(membershipReview.kind)}</h3>
+                      <p>Revisa el importe. Tu membresía sólo cambiará cuando Stripe confirme el pago.</p>
                     </div>
-                  ) : null}
-                  {summary.memberships.map((membership) => (
-                    <article className="kiosk-membership-card" key={membership.id}>
-                      <div><span>{membershipStatusLabel(membership.status)}</span><h3>{membership.planName}</h3></div>
-                      <p>{membershipStatusLabel(membership.status)} · {formatDay(membership.startsOn)} a {formatDay(membership.endsOn)}</p>
-                      <div className="kiosk-action-grid">
-                        {summary.capabilities.membershipRenewalAllowed ? <button className="kiosk-primary-action small" disabled={workingMembershipId !== null || !summary.capabilities.onlineCardPaymentsReady || membership.status === "CANCELLED"} onClick={() => renew(membership)} type="button">{workingMembershipId === membership.id ? "Procesando..." : "Renovar con tarjeta"}</button> : null}
-                        {summary.capabilities.membershipPlanChangeAllowed ? <button className="kiosk-secondary-action" disabled={workingMembershipId !== null || !summary.capabilities.onlineCardPaymentsReady || membership.status !== "ACTIVE" || !targetPlanId || targetPlanId === membership.planId} onClick={() => changePlan(membership)} type="button">Cambiar plan</button> : null}
-                        {summary.capabilities.autopayAllowed && membership.status === "ACTIVE" ? <button className="kiosk-secondary-action" disabled={autopayBusy} onClick={() => void openAutopay(membership)} type="button">Administrar domiciliación</button> : null}
+                    <dl className="kiosk-quote-breakdown">
+                      <div><dt>Plan</dt><dd>{membershipReview.quote.planName}</dd></div>
+                      <div><dt>Precio de lista</dt><dd>{formatMoney(membershipReview.quote.listPriceCents, membershipReview.quote.currency)}</dd></div>
+                      {membershipReview.quote.discountCents > 0 ? <div><dt>Descuentos</dt><dd>-{formatMoney(membershipReview.quote.discountCents, membershipReview.quote.currency)}</dd></div> : null}
+                      <div className="total"><dt>Total a pagar</dt><dd>{formatMoney(membershipReview.quote.totalCents, membershipReview.quote.currency)}</dd></div>
+                    </dl>
+                    {membershipReview.quote.appliedBenefits.length > 0 ? (
+                      <p className="kiosk-quote-benefits">Beneficios aplicados: {membershipReview.quote.appliedBenefits.map((benefit) => benefit.name).join(", ")}.</p>
+                    ) : null}
+                    <div className="kiosk-review-actions">
+                      <button className="kiosk-secondary-action" disabled={workingMembershipId !== null} onClick={() => setMembershipReview(null)} type="button">Volver sin cambios</button>
+                      <button className="kiosk-primary-action small" disabled={workingMembershipId !== null} onClick={() => void completeMembershipCheckout()} type="button">
+                        {workingMembershipId !== null ? "Abriendo Stripe..." : "Confirmar y continuar a Stripe"}
+                      </button>
+                    </div>
+                  </section>
+                ) : null}
+
+                {activeMembership ? (
+                  <>
+                    <article className="kiosk-current-membership">
+                      <div className="kiosk-current-membership-heading">
+                        <div><span className="kiosk-status-pill active">Activa</span><h3>{activeMembership.planName}</h3></div>
+                        <strong>Vigente hasta {formatDay(activeMembership.endsOn)}</strong>
+                      </div>
+                      <div className="kiosk-membership-dates">
+                        <span><small>Inicio</small>{formatDay(activeMembership.startsOn)}</span>
+                        <span><small>Fin</small>{formatDay(activeMembership.endsOn)}</span>
+                        <span><small>Periodo de gracia</small>Hasta {formatDay(activeMembership.graceEndsOn)}</span>
                       </div>
                     </article>
-                  ))}
-                </div>
+
+                    <div className="kiosk-membership-actions">
+                      {summary.capabilities.membershipRenewalAllowed ? (
+                        <article className="kiosk-membership-action-card">
+                          <span className="kiosk-action-number">1</span>
+                          <div><h3>Renovar el mismo plan</h3><p>Conserva <strong>{activeMembership.planName}</strong> y extiende su vigencia.</p></div>
+                          <button className="kiosk-primary-action small" disabled={workingMembershipId !== null || !summary.capabilities.onlineCardPaymentsReady} onClick={() => void reviewMembershipCheckout("renewal", activeMembership.planId, activeMembership)} type="button">
+                            {workingMembershipId === activeMembership.id ? "Calculando importe..." : `Revisar renovación de ${activeMembership.planName}`}
+                          </button>
+                        </article>
+                      ) : null}
+
+                      {summary.capabilities.membershipPlanChangeAllowed ? (
+                        <article className="kiosk-membership-action-card">
+                          <span className="kiosk-action-number">2</span>
+                          <div><h3>Cambiar a otro plan</h3><p>Selecciona el nuevo plan. Tu plan actual no aparece como opción de cambio.</p></div>
+                          {changePlans.length > 0 ? (
+                            <>
+                              <label className="kiosk-field">Nuevo plan
+                                <select className="kiosk-input compact" onChange={(event) => { setTargetPlanId(event.target.value); setMembershipReview(null); setMembershipError(null); }} value={changePlans.some((plan) => plan.id === targetPlanId) ? targetPlanId : ""}>
+                                  {changePlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} · {formatMoney(plan.priceCents, plan.currency)}</option>)}
+                                </select>
+                              </label>
+                              {selectedTargetPlan && selectedTargetPlan.id !== activeMembership.planId ? <p className="kiosk-plan-summary">{formatMoney(selectedTargetPlan.priceCents, selectedTargetPlan.currency)} · {selectedTargetPlan.durationDays} días</p> : null}
+                              <button className="kiosk-secondary-action kiosk-full-action" disabled={workingMembershipId !== null || !summary.capabilities.onlineCardPaymentsReady || !selectedTargetPlan || selectedTargetPlan.id === activeMembership.planId} onClick={() => selectedTargetPlan && void reviewMembershipCheckout("change", selectedTargetPlan.id, activeMembership)} type="button">
+                                {selectedTargetPlan && selectedTargetPlan.id !== activeMembership.planId ? `Revisar cambio a ${selectedTargetPlan.name}` : "Selecciona otro plan"}
+                              </button>
+                            </>
+                          ) : <p className="kiosk-muted">No hay otro plan disponible para cambiar en este momento.</p>}
+                        </article>
+                      ) : null}
+
+                      {summary.capabilities.autopayAllowed ? (
+                        <article className="kiosk-membership-action-card">
+                          <span className="kiosk-action-number">A</span>
+                          <div><h3>Domiciliación</h3><p>Autoriza o sustituye la tarjeta usada para las renovaciones automáticas.</p></div>
+                          <button className="kiosk-secondary-action kiosk-full-action" disabled={autopayBusy} onClick={() => void openAutopay(activeMembership)} type="button">Administrar domiciliación</button>
+                        </article>
+                      ) : null}
+                    </div>
+                  </>
+                ) : (
+                  <div className="kiosk-enrollment-flow">
+                    <div className="kiosk-empty-membership">
+                      <strong>No tienes una membresía activa</strong>
+                      <p>Puedes contratar una nueva o, si tu plan anterior venció, renovarlo.</p>
+                    </div>
+
+                    {lastExpiredMembership && summary.capabilities.membershipRenewalAllowed ? (
+                      <article className="kiosk-membership-action-card renewal">
+                        <span className="kiosk-action-number">R</span>
+                        <div><h3>Renovar tu plan anterior</h3><p><strong>{lastExpiredMembership.planName}</strong> venció el {formatDay(lastExpiredMembership.endsOn)}.</p></div>
+                        <button className="kiosk-secondary-action kiosk-full-action" disabled={workingMembershipId !== null || !summary.capabilities.onlineCardPaymentsReady} onClick={() => void reviewMembershipCheckout("renewal", lastExpiredMembership.planId, lastExpiredMembership)} type="button">
+                          {workingMembershipId === lastExpiredMembership.id ? "Calculando importe..." : `Revisar renovación de ${lastExpiredMembership.planName}`}
+                        </button>
+                      </article>
+                    ) : null}
+
+                    {summary.capabilities.membershipEnrollmentAllowed ? (
+                      <section className="kiosk-plan-picker">
+                        <div><span>Planes disponibles</span><h3>Elige una nueva membresía</h3></div>
+                        {plans.length > 0 ? (
+                          <>
+                            <div aria-label="Planes disponibles" className="kiosk-plan-options" role="radiogroup">
+                              {plans.map((plan) => (
+                                <button aria-checked={targetPlanId === plan.id} className={targetPlanId === plan.id ? "kiosk-plan-option selected" : "kiosk-plan-option"} key={plan.id} onClick={() => { setTargetPlanId(plan.id); setMembershipReview(null); setMembershipError(null); }} role="radio" type="button">
+                                  <strong>{plan.name}</strong>
+                                  <span>{formatMoney(plan.priceCents, plan.currency)}</span>
+                                  <small>{plan.durationDays} días · {plan.graceDays} días de gracia</small>
+                                </button>
+                              ))}
+                            </div>
+                            <button className="kiosk-primary-action small" disabled={workingMembershipId !== null || !summary.capabilities.onlineCardPaymentsReady || !selectedTargetPlan} onClick={() => selectedTargetPlan && void reviewMembershipCheckout("enrollment", selectedTargetPlan.id)} type="button">
+                              {workingMembershipId === "enrollment" ? "Calculando importe..." : selectedTargetPlan ? `Revisar contratación de ${selectedTargetPlan.name}` : "Elige un plan"}
+                            </button>
+                          </>
+                        ) : <p className="kiosk-muted">No hay planes disponibles para contratación. Solicita apoyo en recepción.</p>}
+                      </section>
+                    ) : null}
+                  </div>
+                )}
+
+                {previousMemberships.length > 0 ? (
+                  <details className="kiosk-membership-history">
+                    <summary>Membresías anteriores ({previousMemberships.length})</summary>
+                    <div className="kiosk-membership-list">
+                      {previousMemberships.map((membership) => (
+                        <article className="kiosk-membership-card" key={membership.id}>
+                          <div><span>{membershipStatusLabel(membership.status)}</span><h3>{membership.planName}</h3></div>
+                          <p>{formatDay(membership.startsOn)} a {formatDay(membership.endsOn)}</p>
+                        </article>
+                      ))}
+                    </div>
+                  </details>
+                ) : null}
               </div>
             </section> : null}
 
@@ -899,6 +1049,29 @@ function KioskPanelButton({
       <span>{description}</span>
     </button>
   );
+}
+
+function membershipActionTitle(kind: MembershipCheckoutKind) {
+  if (kind === "renewal") return "Renovación de membresía";
+  if (kind === "change") return "Cambio de plan";
+  return "Contratación de membresía";
+}
+
+function membershipQuoteError(exception: unknown) {
+  return `No pudimos calcular el importe final. No se realizó ningún cargo ni cambio en tu membresía. Intenta nuevamente o solicita apoyo en recepción.${supportReference(exception)}`;
+}
+
+function membershipCheckoutError(exception: unknown) {
+  const rawMessage = exception instanceof Error ? exception.message : "";
+  const providerDetail = rawMessage.match(/Detalle:\s*(.+?)(?=\s+\(\d{3}\s|$)/)?.[1];
+  const detail = providerDetail ? ` Stripe indicó: ${providerDetail}` : "";
+  return `No pudimos abrir el pago. No se realizó ningún cargo ni cambio en tu membresía.${detail}${supportReference(exception)}`;
+}
+
+function supportReference(exception: unknown) {
+  const rawMessage = exception instanceof Error ? exception.message : "";
+  const correlationId = rawMessage.match(/CorrelationId:\s*([a-zA-Z0-9-]+)/)?.[1];
+  return correlationId ? ` Referencia para soporte: ${correlationId}.` : "";
 }
 
 

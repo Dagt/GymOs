@@ -4771,6 +4771,305 @@ button.admin-secondary-link:disabled {
   text-transform: uppercase;
 }
 
+.kiosk-section-intro {
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.55;
+  margin-top: 0.75rem;
+  max-width: 58rem;
+}
+
+.kiosk-membership-error {
+  background: rgba(127, 29, 29, 0.48);
+  border: 1px solid rgba(252, 165, 165, 0.38);
+  border-radius: 0.85rem;
+  color: #fecaca;
+  font-weight: 800;
+  line-height: 1.5;
+  margin-top: 1rem;
+  padding: 1rem;
+}
+
+.kiosk-membership-review {
+  background: color-mix(in srgb, var(--brand-accent) 14%, rgba(255, 255, 255, 0.08));
+  border: 2px solid color-mix(in srgb, var(--brand-accent) 65%, white);
+  border-radius: 1rem;
+  display: grid;
+  gap: 1rem;
+  margin-top: 1rem;
+  padding: 1.2rem;
+}
+
+.kiosk-membership-review > div:first-child > span,
+.kiosk-plan-picker > div:first-child > span {
+  color: var(--brand-accent);
+  font-size: 0.78rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.kiosk-membership-review h3,
+.kiosk-plan-picker h3 {
+  font-size: 1.35rem;
+  font-weight: 950;
+  margin-top: 0.2rem;
+}
+
+.kiosk-membership-review p {
+  color: rgba(255, 255, 255, 0.74);
+  line-height: 1.5;
+  margin-top: 0.35rem;
+}
+
+.kiosk-quote-breakdown {
+  background: rgba(5, 15, 28, 0.28);
+  border-radius: 0.8rem;
+  padding: 0.35rem 1rem;
+}
+
+.kiosk-quote-breakdown > div {
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  padding: 0.7rem 0;
+}
+
+.kiosk-quote-breakdown > div:last-child {
+  border-bottom: 0;
+}
+
+.kiosk-quote-breakdown dt {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.kiosk-quote-breakdown dd {
+  font-weight: 900;
+  text-align: right;
+}
+
+.kiosk-quote-breakdown .total {
+  color: var(--brand-accent);
+  font-size: 1.12rem;
+}
+
+.kiosk-quote-benefits {
+  font-size: 0.9rem;
+}
+
+.kiosk-review-actions {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: minmax(12rem, 0.55fr) minmax(16rem, 1fr);
+}
+
+.kiosk-review-actions .kiosk-primary-action {
+  margin-top: 0;
+}
+
+.kiosk-current-membership {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--brand-accent) 16%, rgba(255, 255, 255, 0.08)), rgba(255, 255, 255, 0.06));
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 48%, rgba(255, 255, 255, 0.14));
+  border-radius: 1rem;
+  margin-top: 1rem;
+  padding: 1.2rem;
+}
+
+.kiosk-current-membership-heading {
+  align-items: start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.kiosk-current-membership-heading h3 {
+  font-size: clamp(1.5rem, 3vw, 2.2rem);
+  font-weight: 950;
+  margin-top: 0.5rem;
+}
+
+.kiosk-current-membership-heading > strong {
+  color: var(--brand-accent);
+  text-align: right;
+}
+
+.kiosk-status-pill {
+  border-radius: 999px;
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 950;
+  padding: 0.35rem 0.65rem;
+  text-transform: uppercase;
+}
+
+.kiosk-status-pill.active {
+  background: rgba(74, 222, 128, 0.2);
+  color: #bbf7d0;
+}
+
+.kiosk-membership-dates {
+  display: grid;
+  gap: 0.7rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 1rem;
+}
+
+.kiosk-membership-dates > span {
+  background: rgba(5, 15, 28, 0.24);
+  border-radius: 0.7rem;
+  display: grid;
+  font-weight: 850;
+  gap: 0.2rem;
+  padding: 0.75rem;
+}
+
+.kiosk-membership-dates small {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.72rem;
+  font-weight: 750;
+  text-transform: uppercase;
+}
+
+.kiosk-membership-actions {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 1rem;
+}
+
+.kiosk-membership-action-card {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0.9rem;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 1rem;
+}
+
+.kiosk-membership-action-card.renewal {
+  margin-top: 1rem;
+}
+
+.kiosk-membership-action-card h3 {
+  font-size: 1.08rem;
+  font-weight: 950;
+}
+
+.kiosk-membership-action-card p {
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.45;
+  margin-top: 0.35rem;
+}
+
+.kiosk-membership-action-card .kiosk-primary-action,
+.kiosk-membership-action-card .kiosk-full-action {
+  margin-top: auto;
+}
+
+.kiosk-action-number {
+  align-items: center;
+  background: var(--brand-accent);
+  border-radius: 999px;
+  color: #07111f;
+  display: inline-flex;
+  font-size: 0.8rem;
+  font-weight: 950;
+  height: 2rem;
+  justify-content: center;
+  margin-bottom: 0.75rem;
+  width: 2rem;
+}
+
+.kiosk-full-action {
+  min-height: 3.3rem;
+  width: 100%;
+}
+
+.kiosk-plan-summary {
+  font-size: 0.86rem;
+  font-weight: 850;
+  padding: 0.6rem 0;
+}
+
+.kiosk-enrollment-flow {
+  margin-top: 1rem;
+}
+
+.kiosk-empty-membership {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px dashed rgba(255, 255, 255, 0.28);
+  border-radius: 0.9rem;
+  padding: 1rem;
+}
+
+.kiosk-empty-membership strong {
+  font-size: 1.1rem;
+  font-weight: 950;
+}
+
+.kiosk-empty-membership p {
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 0.35rem;
+}
+
+.kiosk-plan-picker {
+  margin-top: 1.25rem;
+}
+
+.kiosk-plan-options {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+  margin-top: 0.8rem;
+}
+
+.kiosk-plan-option {
+  background: rgba(255, 255, 255, 0.07);
+  border: 2px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0.85rem;
+  color: white;
+  display: grid;
+  gap: 0.25rem;
+  min-height: 7rem;
+  padding: 1rem;
+  text-align: left;
+}
+
+.kiosk-plan-option.selected {
+  background: color-mix(in srgb, var(--brand-accent) 15%, rgba(255, 255, 255, 0.07));
+  border-color: var(--brand-accent);
+  box-shadow: inset 0 -3px 0 var(--brand-accent);
+}
+
+.kiosk-plan-option strong {
+  font-size: 1.05rem;
+  font-weight: 950;
+}
+
+.kiosk-plan-option span {
+  color: var(--brand-accent);
+  font-size: 1.2rem;
+  font-weight: 950;
+}
+
+.kiosk-plan-option small {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.kiosk-membership-history {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+}
+
+.kiosk-membership-history summary {
+  color: rgba(255, 255, 255, 0.76);
+  cursor: pointer;
+  font-weight: 850;
+}
+
 .kiosk-field {
   color: rgba(255, 255, 255, 0.76);
   display: grid;
@@ -4885,8 +5184,19 @@ button.admin-secondary-link:disabled {
 @media (max-width: 840px) {
   .kiosk-header,
   .kiosk-content-grid,
-  .kiosk-action-grid {
+  .kiosk-action-grid,
+  .kiosk-membership-actions,
+  .kiosk-membership-dates,
+  .kiosk-review-actions {
     grid-template-columns: 1fr;
+  }
+
+  .kiosk-current-membership-heading {
+    flex-direction: column;
+  }
+
+  .kiosk-current-membership-heading > strong {
+    text-align: left;
   }
 
   .kiosk-header {

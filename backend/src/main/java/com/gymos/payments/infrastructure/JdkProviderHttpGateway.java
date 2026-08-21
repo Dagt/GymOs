@@ -48,9 +48,11 @@ class JdkProviderHttpGateway implements ProviderHttpGateway {
 					: HttpRequest.BodyPublishers.ofString(resolvedBody));
 			HttpResponse<String> response = httpClient.send(builder.build(), HttpResponse.BodyHandlers.ofString());
 			if (response.statusCode() < 200 || response.statusCode() >= 300) {
+				String providerDetail = providerErrorDetail(response.body());
 				throw new BusinessException(
 						"PAYMENT_PROVIDER_HTTP_ERROR",
 						"El proveedor de pagos rechazo la operacion (HTTP " + response.statusCode() + ")."
+								+ (providerDetail == null ? "" : " Detalle: " + providerDetail)
 				);
 			}
 			return response.body() == null || response.body().isBlank()
@@ -65,6 +67,20 @@ class JdkProviderHttpGateway implements ProviderHttpGateway {
 			throw new BusinessException("PAYMENT_PROVIDER_TIMEOUT", "El proveedor de pagos no respondio a tiempo.");
 		} catch (Exception exception) {
 			throw new BusinessException("PAYMENT_PROVIDER_UNAVAILABLE", "No fue posible comunicarse con el proveedor de pagos.");
+		}
+	}
+
+	private String providerErrorDetail(String responseBody) {
+		if (responseBody == null || responseBody.isBlank()) return null;
+		try {
+			JsonNode payload = objectMapper.readTree(responseBody);
+			String detail = payload.path("error").path("message").asText(null);
+			if (detail == null || detail.isBlank()) detail = payload.path("message").asText(null);
+			if (detail == null || detail.isBlank()) return null;
+			String normalized = detail.replaceAll("[\\r\\n\\t]+", " ").trim();
+			return normalized.length() <= 240 ? normalized : normalized.substring(0, 240) + "...";
+		} catch (Exception ignored) {
+			return null;
 		}
 	}
 }

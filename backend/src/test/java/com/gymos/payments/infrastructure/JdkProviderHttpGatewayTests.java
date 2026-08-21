@@ -13,6 +13,32 @@ import org.junit.jupiter.api.Test;
 
 class JdkProviderHttpGatewayTests {
 	@Test
+	void includesSafeProviderMessageForRejectedRequests() throws Exception {
+		HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+		server.createContext("/rejected", exchange -> {
+			byte[] response = "{\"error\":{\"message\":\"Received unknown parameter: setup_intent_data[usage]\"}}".getBytes();
+			exchange.getResponseHeaders().add("Content-Type", "application/json");
+			exchange.sendResponseHeaders(400, response.length);
+			exchange.getResponseBody().write(response);
+			exchange.close();
+		});
+		server.start();
+		try {
+			var gateway = new JdkProviderHttpGateway(
+					new ObjectMapper(), Duration.ofSeconds(1), Duration.ofSeconds(1)
+			);
+			String url = "http://127.0.0.1:" + server.getAddress().getPort() + "/rejected";
+			assertThatThrownBy(() -> gateway.exchange("POST", url, Map.of(), "mode=setup", "application/x-www-form-urlencoded"))
+					.isInstanceOfSatisfying(BusinessException.class, exception -> {
+						assertThat(exception.code()).isEqualTo("PAYMENT_PROVIDER_HTTP_ERROR");
+						assertThat(exception.getMessage()).contains("Received unknown parameter: setup_intent_data[usage]");
+					});
+		} finally {
+			server.stop(0);
+		}
+	}
+
+	@Test
 	void reportsTimeoutWithRecoverableProviderCode() throws Exception {
 		HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
 		server.createContext("/slow", exchange -> {
