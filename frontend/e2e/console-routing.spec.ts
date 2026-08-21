@@ -165,19 +165,21 @@ test.describe("consolas por rol", () => {
     await expect(page.locator("body")).toContainText("Gestión operativa");
     await expect(page.locator("body")).toContainText("Administración");
     await expect(page.locator("body")).toContainText("Configuración");
+    await expect(page.getByRole("link", { name: "Operación diaria" })).toHaveCount(0);
   });
 
-  test("gerente conserva menu operativo sin rutas de plataforma", async ({ page }) => {
+  test("gerente conserva menu operativo sin la pagina redundante de operacion diaria", async ({ page }) => {
     await bootAs(page, user({
       console: "TENANT_MANAGER",
       roles: ["Gerente"],
       permissions: managerPermissions(),
     }));
 
-    await page.goto("/operations");
+    await page.goto("/dashboard");
 
-    await expect(page.getByRole("heading", { name: /Operacion diaria/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Panel ejecutivo|Dashboard|Metricas/i })).toBeVisible();
     await expect(page.getByLabel("Perfil activo").getByText("Gerente")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Operación diaria" })).toHaveCount(0);
     await expect(page.locator("body")).toContainText("Gestión operativa");
     await expect(page.locator("body")).toContainText("Administración");
     await expect(page.locator("body")).toContainText("Mostrador");
@@ -287,7 +289,7 @@ test.describe("consolas por rol", () => {
       replyTo: null,
       providerAvailable: true,
       ready: false,
-      providerName: "Zoho Mail",
+      providerName: "ZeptoMail",
       preferredFromEmail: "notificaciones@appex.com",
       fromEmailRestricted: true,
       allowedFromEmails: ["notificaciones@appex.com"],
@@ -328,7 +330,7 @@ test.describe("consolas por rol", () => {
             id: "99999999-9999-4999-8999-999999999999",
             channel: "EMAIL",
             recipient: testRecipient,
-            subject: "Prueba de correo de GymOS",
+            subject: "Prueba de correo de GymFort",
             body: "Mensaje",
             bodyHtml: null,
             status: "SENT",
@@ -358,7 +360,7 @@ test.describe("consolas por rol", () => {
 
     await page.goto("/settings/organization");
     await page.getByRole("button", { name: /Correo electrónico/ }).click();
-    await expect(page.getByRole("heading", { name: "Correo real con Zoho Mail" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Correo real con ZeptoMail" })).toBeVisible();
     await page.getByLabel("Nombre del remitente").fill("Appex Fitness");
     await page.getByLabel("Correo remitente").fill("notificaciones@appex.com");
     await page.getByText("Habilitar entregas por correo").click();
@@ -423,7 +425,7 @@ function responseFor(path: string, currentUser: TestUser) {
       replyTo: null,
       providerAvailable: false,
       ready: false,
-      providerName: "Zoho Mail",
+      providerName: "ZeptoMail",
       preferredFromEmail: null,
       fromEmailRestricted: false,
       allowedFromEmails: [],
@@ -484,7 +486,6 @@ function ownerPermissions() {
   return [
     "report.owner.read",
     "report.sales.read",
-    "operations.read",
     "inventory.read",
     "booking.read",
     "booking.manage",
@@ -511,7 +512,6 @@ function ownerPermissions() {
 
 function managerPermissions() {
   return [
-    "operations.read",
     "booking.read",
     "booking.manage",
     "inventory.read",
