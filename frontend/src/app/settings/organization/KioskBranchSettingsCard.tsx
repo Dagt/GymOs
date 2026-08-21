@@ -21,60 +21,19 @@ type KioskOption = {
 };
 
 const paymentOptions: KioskOption[] = [
-  {
-    key: "membershipEnrollmentAllowed",
-    title: "Comprar membresía",
-    description: "Compra y pago con Stripe.",
-    requirement: "ONLINE_CARD",
-  },
-  {
-    key: "membershipRenewalAllowed",
-    title: "Renovar membresía",
-    description: "Renovación y pago desde el kiosco.",
-    requirement: "ONLINE_CARD",
-  },
-  {
-    key: "membershipPlanChangeAllowed",
-    title: "Cambiar de plan",
-    description: "Cambio de plan cuando requiere un cobro.",
-    requirement: "ONLINE_CARD",
-  },
-  {
-    key: "autopayAllowed",
-    title: "Domiciliación",
-    description: "Alta y gestión de cobros recurrentes.",
-    requirement: "RECURRING_CARD",
-  },
+  { key: "membershipEnrollmentAllowed", title: "Comprar membresía", description: "Compra y pago con Stripe.", requirement: "ONLINE_CARD" },
+  { key: "membershipRenewalAllowed", title: "Renovar membresía", description: "Renovación y pago desde el kiosco.", requirement: "ONLINE_CARD" },
+  { key: "membershipPlanChangeAllowed", title: "Cambiar de plan", description: "Cambio de plan cuando requiere un cobro.", requirement: "ONLINE_CARD" },
+  { key: "autopayAllowed", title: "Domiciliación", description: "Alta y gestión de cobros recurrentes.", requirement: "RECURRING_CARD" },
 ];
 
 const serviceOptions: KioskOption[] = [
-  {
-    key: "resourceBookingAllowed",
-    title: "Reservas gratuitas",
-    description: "Reserva recursos o clases disponibles.",
-    requirement: null,
-  },
-  {
-    key: "wellnessBookingAllowed",
-    title: "Citas wellness gratuitas",
-    description: "Gestiona citas wellness sin pago en línea.",
-    requirement: null,
-  },
-  {
-    key: "profileUpdateAllowed",
-    title: "Actualizar contacto",
-    description: "Permite corregir correo y teléfono.",
-    requirement: null,
-  },
+  { key: "resourceBookingAllowed", title: "Reservas gratuitas", description: "Reserva recursos o clases disponibles.", requirement: null },
+  { key: "wellnessBookingAllowed", title: "Citas wellness gratuitas", description: "Gestiona citas wellness sin pago en línea.", requirement: null },
+  { key: "profileUpdateAllowed", title: "Actualizar contacto", description: "Permite corregir correo y teléfono.", requirement: null },
 ];
 
-export function KioskBranchSettingsCard({
-  accessToken,
-  activeBranchId,
-}: {
-  accessToken: string;
-  activeBranchId?: string | null;
-}) {
+export function KioskBranchSettingsCard({ accessToken, activeBranchId }: { accessToken: string; activeBranchId?: string | null }) {
   const [items, setItems] = useState<KioskBranchSettings[]>([]);
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -83,9 +42,7 @@ export function KioskBranchSettingsCard({
   useEffect(() => {
     let active = true;
     getKioskBranchSettings(accessToken)
-      .then((loaded) => {
-        if (active) setItems(activeBranchId ? loaded.filter((item) => item.branchId === activeBranchId) : []);
-      })
+      .then((loaded) => { if (active) setItems(activeBranchId ? loaded.filter((item) => item.branchId === activeBranchId) : []); })
       .catch((exception) => { if (active) setError(exception instanceof Error ? exception.message : "No fue posible cargar el kiosco."); });
     return () => { active = false; };
   }, [accessToken, activeBranchId]);
@@ -124,9 +81,7 @@ export function KioskBranchSettingsCard({
     <section className="app-card settings-detail-panel grid scroll-mt-6 gap-5 p-5" id="kiosk-settings">
       <div>
         <h2 className="text-xl font-semibold">Kiosco web</h2>
-        <p className="mt-2 max-w-3xl text-sm text-[var(--brand-muted)]">
-          Elige qué puede hacer el socio en la sucursal.
-        </p>
+        <p className="mt-2 max-w-3xl text-sm text-[var(--brand-muted)]">Elige qué puede hacer el socio en la sucursal.</p>
       </div>
       {error ? <AppNotice message={error} tone="error" /> : null}
       {message ? <AppNotice message={message} tone="success" /> : null}
@@ -141,19 +96,9 @@ export function KioskBranchSettingsCard({
               </button>
             </div>
 
-            <div className="mt-5 grid gap-4 xl:grid-cols-2">
-              <KioskOptionGroup
-                item={item}
-                options={paymentOptions}
-                title="Pagos y membresías"
-                onToggle={toggle}
-              />
-              <KioskOptionGroup
-                item={item}
-                options={serviceOptions}
-                title="Servicios y perfil"
-                onToggle={toggle}
-              />
+            <div className="mt-5 grid gap-8 xl:grid-cols-2">
+              <KioskOptionGroup item={item} options={paymentOptions} title="Pagos y membresías" onToggle={toggle} />
+              <KioskOptionGroup item={item} options={serviceOptions} title="Servicios y perfil" onToggle={toggle} />
             </div>
           </article>
         ))}
@@ -162,37 +107,27 @@ export function KioskBranchSettingsCard({
   );
 }
 
-function KioskOptionGroup({
-  item,
-  options,
-  title,
-  onToggle,
-}: {
+function KioskOptionGroup({ item, options, title, onToggle }: {
   item: KioskBranchSettings;
   options: KioskOption[];
   title: string;
   onToggle: (branchId: string, key: EditableKey, checked: boolean) => void;
 }) {
   return (
-    <section className="settings-group-card grid content-start gap-3 rounded-xl p-4">
-      <h4 className="font-semibold">{title}</h4>
+    <section className="grid content-start gap-3">
+      <h4 className="border-b border-[var(--brand-line)] pb-3 font-semibold">{title}</h4>
       {options.map((option) => {
         const disabled = !requirementReady(item, option.requirement);
         const checked = !disabled && item.capabilities[option.key];
         return (
-          <div className={`settings-option-row flex items-start justify-between gap-4 rounded-lg border p-4 ${disabled ? "is-disabled" : ""}`} key={option.key}>
+          <div className={`settings-option-row flex items-start justify-between gap-4 rounded-xl border p-4 ${disabled ? "is-disabled" : ""}`} key={option.key}>
             <div className="min-w-0">
               <strong className="block text-sm">{option.title}</strong>
               <span className="mt-1 block text-xs leading-5 text-[var(--brand-muted)]">
                 {disabled ? requirementMessage(option.requirement) : option.description}
               </span>
             </div>
-            <ToggleSwitch
-              checked={checked}
-              disabled={disabled}
-              label={`${option.title} en ${item.branchName}`}
-              onChange={(next) => onToggle(item.branchId, option.key, next)}
-            />
+            <ToggleSwitch checked={checked} disabled={disabled} label={`${option.title} en ${item.branchName}`} onChange={(next) => onToggle(item.branchId, option.key, next)} />
           </div>
         );
       })}
