@@ -65,13 +65,13 @@ export function PaymentConfigurationCard({
             Separa cómo cobras en mostrador de los servicios de Stripe que habilitan pagos y domiciliación en el kiosco.
           </p>
         </div>
-        <span className="rounded-full border border-[var(--brand-line)] bg-[var(--brand-surface)] px-3 py-1.5 text-xs font-semibold text-[var(--brand-muted)]">
+        <span className="rounded-full border border-[var(--brand-line)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--brand-muted)]">
           Configuración del gimnasio
         </span>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
-        <article className="grid content-start gap-4 rounded-xl border border-[var(--brand-line)] bg-white p-5">
+        <article className="settings-group-card grid content-start gap-4 rounded-xl p-5">
           <div className="border-b border-[var(--brand-line)] pb-4">
             <p className="app-eyebrow">Mostrador</p>
             <h3 className="mt-2 text-lg font-semibold">Cobro con terminal en recepción</h3>
@@ -99,7 +99,7 @@ export function PaymentConfigurationCard({
           />
 
           {canManage ? (
-            <div className="grid gap-3 rounded-lg bg-[var(--brand-surface)] p-4">
+            <div className="settings-action-strip grid gap-3 rounded-lg p-4">
               <div className="flex flex-wrap gap-2">
                 <button className="app-button-secondary" disabled={saving} onClick={() => void onConnectMercadoPago()} type="button">
                   {draft.mercadoPagoConnected ? "Volver a vincular Mercado Pago" : "Vincular Mercado Pago"}
@@ -132,7 +132,7 @@ export function PaymentConfigurationCard({
           ) : null}
         </article>
 
-        <article className="grid content-start gap-4 rounded-xl border border-[var(--brand-line)] bg-white p-5">
+        <article className="settings-group-card grid content-start gap-4 rounded-xl p-5">
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--brand-line)] pb-4">
             <div>
               <p className="app-eyebrow">Stripe</p>
@@ -167,7 +167,7 @@ export function PaymentConfigurationCard({
           />
 
           {canManageStripeAccount ? (
-            <div className="flex flex-wrap gap-2 rounded-lg bg-[var(--brand-surface)] p-4">
+            <div className="settings-action-strip flex flex-wrap gap-2 rounded-lg p-4">
               <button className="app-button-secondary" disabled={saving} onClick={() => void onConnectStripe()} type="button">
                 {draft.stripeAccountId ? "Continuar configuración de Stripe" : "Vincular Stripe"}
               </button>
@@ -178,12 +178,12 @@ export function PaymentConfigurationCard({
               ) : null}
             </div>
           ) : (
-            <p className="rounded-lg border border-[var(--brand-line)] bg-[var(--brand-surface)] px-4 py-3 text-sm text-[var(--brand-muted)]">
+            <p className="settings-info-panel rounded-lg px-4 py-3 text-sm text-[var(--brand-muted)]">
               La cuenta de Stripe sólo puede vincularla o modificarla el dueño del gimnasio. Cuando esté conectada podrás administrar su uso operativo.
             </p>
           )}
 
-          <div className="rounded-lg border border-[var(--brand-line)] bg-[var(--brand-surface)] p-4 text-sm text-[var(--brand-muted)]">
+          <div className="settings-info-panel rounded-lg p-4 text-sm text-[var(--brand-muted)]">
             <strong className="block text-[var(--brand-ink)]">Dependencia con Kiosco web</strong>
             <span className="mt-1 block">
               Si self checkout o domiciliación están apagados aquí, sus toggles dependientes aparecerán deshabilitados en la configuración del kiosco.
@@ -217,7 +217,7 @@ function PaymentToggleRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <div className={`flex items-start justify-between gap-4 rounded-lg border border-[var(--brand-line)] p-4 ${disabled ? "bg-[#f7f9f8]" : "bg-white"}`}>
+    <div className={`settings-option-row flex items-start justify-between gap-4 rounded-lg border p-4 ${disabled ? "is-disabled" : ""}`}>
       <div className="min-w-0">
         <strong className="block text-sm">{label}</strong>
         <span className="mt-1 block text-xs leading-5 text-[var(--brand-muted)]">{description}</span>
