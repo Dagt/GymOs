@@ -59,8 +59,8 @@ export function getConsoleProfile(user: CurrentUser): ConsoleProfile {
     return {
       console,
       label: "Gerente",
-      description: "Operacion diaria, pendientes, equipo y administracion autorizada.",
-      homePath: "/operations",
+      description: "Indicadores, socios, operación y administración autorizada.",
+      homePath: managerHomePath(user),
     };
   }
   if (console === "RECEPTION") {
@@ -138,6 +138,22 @@ function hasAny(user: CurrentUser, permissions: string[]) {
   return permissions.some((permission) => user.permissions.includes(permission));
 }
 
+function managerHomePath(user: CurrentUser) {
+  if (hasAny(user, ["report.owner.read", "report.sales.read"])) return "/dashboard";
+  if (hasAny(user, ["client.read", "client.create", "client.update", "membership.read", "membership.renew", "membership.change-plan"])) return "/clients";
+  if (user.permissions.includes("booking.read")) return "/bookings";
+  if (user.permissions.includes("professional.read")) return "/wellness";
+  if (user.permissions.includes("coach.read")) return "/coaches";
+  if (user.permissions.includes("inventory.read")) return "/inventory";
+  if (user.permissions.includes("sale.create")) return "/pos";
+  if (hasAny(user, ["payment.settings.manage", "selfservice.settings.manage", "notification.settings.manage"])) return "/settings/organization";
+  if (user.permissions.includes("user.read")) return "/users";
+  if (user.permissions.includes("catalog.read")) return "/catalog";
+  if (user.permissions.includes("benefit.read")) return "/benefits";
+  if (user.permissions.includes("automation.read")) return "/automations";
+  return "/dashboard";
+}
+
 function isKnownConsole(value: string): value is UserConsole {
   return ["PLATFORM_OWNER", "TENANT_OWNER", "TENANT_MANAGER", "RECEPTION", "COACH"].includes(value);
 }
@@ -148,7 +164,6 @@ function matches(pathname: string, route: string) {
 
 const tenantOwnerRoutes = [
   "/dashboard",
-  "/operations",
   "/reports",
   "/settings/organization",
   "/users",
@@ -168,7 +183,7 @@ const tenantOwnerRoutes = [
 ];
 
 const managerRoutes = [
-  "/operations",
+  "/dashboard",
   "/reports",
   "/settings/organization",
   "/users",
