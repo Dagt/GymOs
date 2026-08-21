@@ -50,7 +50,6 @@ const ownerSections: NavigationSection[] = [
   {
     title: "Gestión operativa",
     links: [
-      { label: "Operación diaria", href: "/operations", hint: "Pendientes y herramientas", permissions: ["operations.read", "inventory.read", "booking.read"] },
       { label: "Socios", href: "/clients", hint: "Altas, fichas y membresías", permissions: memberWorkflowPermissions },
       { label: "Reservas", href: "/bookings", hint: "Agenda y recursos", permissions: ["booking.read"] },
       { label: "Wellness", href: "/wellness", hint: "Bienestar", permissions: ["professional.read"] },
@@ -81,7 +80,6 @@ const managerSections: NavigationSection[] = [
   {
     title: "Gerencia",
     links: [
-      { label: "Operación diaria", href: "/operations", hint: "Pendientes y herramientas", permissions: ["operations.read", "booking.read", "inventory.read"] },
       { label: "Indicadores", href: "/dashboard", hint: "Resumen ejecutivo", permissions: ["report.owner.read", "report.sales.read"] },
       { label: "Ventas y pagos", href: "/reports/sales", hint: "Pagos y saldos", permissions: ["report.sales.read"] },
     ],
