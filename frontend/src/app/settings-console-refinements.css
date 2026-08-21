@@ -1,17 +1,24 @@
 /* Configuration workspace refinements.
-   Keep tenant color on first-level surfaces and use neutral controls inside them. */
+   Keep the workspace neutral, reserve tenant gradients for the actual option cards,
+   and avoid nested tinted surfaces. */
 .settings-console .settings-section-nav {
-  background: color-mix(in srgb, var(--brand-surface) 36%, white);
+  background: white;
   border: 1px solid color-mix(in srgb, var(--brand-primary) 10%, var(--brand-line));
   border-bottom: 0;
   border-radius: .75rem .75rem 0 0;
   box-shadow: none;
+  justify-content: flex-end;
+  padding: .65rem .8rem;
   position: static;
   top: auto;
 }
 
+.settings-console .settings-section-nav > div:first-child {
+  display: none;
+}
+
 .settings-console .settings-section-nav + .settings-detail-panel {
-  background: color-mix(in srgb, white 97%, var(--brand-surface)) !important;
+  background: white !important;
   border-radius: 0 0 .75rem .75rem !important;
   border-top: 1px solid color-mix(in srgb, var(--brand-primary) 10%, var(--brand-line)) !important;
   box-shadow: 0 12px 35px rgba(9, 42, 37, .055) !important;
@@ -19,17 +26,22 @@
 }
 
 .settings-console .settings-group-card {
+  background: white !important;
+  border: 1px solid var(--brand-line) !important;
+  box-shadow: none !important;
+}
+
+.settings-console .settings-option-row {
   background:
     linear-gradient(
       135deg,
       color-mix(in srgb, var(--brand-primary) 4%, white),
       color-mix(in srgb, var(--brand-accent) 8%, white)
     ) !important;
-  border: 1px solid color-mix(in srgb, var(--brand-primary) 16%, var(--brand-line)) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .82);
+  border-color: color-mix(in srgb, var(--brand-primary) 12%, var(--brand-line)) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .78) !important;
 }
 
-.settings-console .settings-option-row,
 .settings-console .settings-branch-container {
   background: white !important;
   border-color: color-mix(in srgb, var(--brand-primary) 12%, var(--brand-line)) !important;
@@ -37,11 +49,11 @@
 }
 
 .settings-console .settings-option-row.is-disabled {
-  background: color-mix(in srgb, var(--brand-surface) 22%, white) !important;
+  background: color-mix(in srgb, var(--brand-surface) 24%, white) !important;
 }
 
 .settings-console .settings-action-strip {
-  background: color-mix(in srgb, var(--brand-surface) 38%, white) !important;
+  background: color-mix(in srgb, var(--brand-surface) 28%, white) !important;
   border: 1px solid color-mix(in srgb, var(--brand-primary) 8%, var(--brand-line));
 }
 
@@ -57,5 +69,6 @@
 @media (max-width: 980px) {
   .settings-console .settings-section-nav {
     align-items: stretch;
+    justify-content: flex-start;
   }
 }
