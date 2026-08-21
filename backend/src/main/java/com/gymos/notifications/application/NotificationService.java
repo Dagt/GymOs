@@ -157,7 +157,8 @@ public class NotificationService {
 		if (command.enabled() && "SMTP".equals(providerKey) && !smtpProperties.allowsFromAddress(fromEmail)) {
 			throw new BusinessException(
 					"NOTIFICATION_FROM_EMAIL_NOT_AUTHORIZED",
-					"El correo remitente no esta autorizado en Zoho. Usa el buzon o uno de sus alias verificados."
+					"El correo remitente no esta autorizado en " + smtpProperties.displayName()
+							+ ". Usa un remitente verificado y asociado al Agent configurado."
 			);
 		}
 		EmailConfigurationRecord updated = notificationRepository.upsertEmailConfiguration(
