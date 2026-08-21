@@ -64,13 +64,11 @@ export function PaymentConfigurationCard({
         </p>
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-2">
-        <article className="settings-group-card grid content-start gap-4 rounded-xl p-5">
-          <div className="border-b border-[var(--brand-line)] pb-4">
+      <div className="grid gap-8 xl:grid-cols-2">
+        <div className="grid content-start gap-4">
+          <div className="border-b border-[var(--brand-line)] pb-3">
             <h3 className="text-lg font-semibold">Mostrador</h3>
-            <p className="mt-1 text-sm text-[var(--brand-muted)]">
-              Elige una modalidad: terminal externa o Mercado Pago Point.
-            </p>
+            <p className="mt-1 text-sm text-[var(--brand-muted)]">Terminal externa o Mercado Pago Point.</p>
           </div>
 
           <PaymentToggleRow
@@ -92,13 +90,13 @@ export function PaymentConfigurationCard({
           />
 
           {canManage ? (
-            <div className="settings-action-strip grid gap-3 rounded-lg p-4">
+            <div className="grid gap-3 pt-1">
               <div className="flex flex-wrap gap-2">
-                <button className="app-button-secondary" disabled={saving} onClick={() => void onConnectMercadoPago()} type="button">
+                <button className="app-button" disabled={saving} onClick={() => void onConnectMercadoPago()} type="button">
                   {draft.mercadoPagoConnected ? "Volver a vincular Mercado Pago" : "Vincular Mercado Pago"}
                 </button>
                 {draft.mercadoPagoConnected ? (
-                  <button className="app-button-secondary" disabled={saving} onClick={() => void onLoadMercadoPagoTerminals()} type="button">
+                  <button className="app-button" disabled={saving} onClick={() => void onLoadMercadoPagoTerminals()} type="button">
                     Consultar terminales Point
                   </button>
                 ) : null}
@@ -123,15 +121,13 @@ export function PaymentConfigurationCard({
               ) : null}
             </div>
           ) : null}
-        </article>
+        </div>
 
-        <article className="settings-group-card grid content-start gap-4 rounded-xl p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--brand-line)] pb-4">
+        <div className="grid content-start gap-4">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--brand-line)] pb-3">
             <div>
               <h3 className="text-lg font-semibold">Stripe</h3>
-              <p className="mt-1 text-sm text-[var(--brand-muted)]">
-                Activa pagos de autoservicio y cobros recurrentes.
-              </p>
+              <p className="mt-1 text-sm text-[var(--brand-muted)]">Autoservicio y cobros recurrentes.</p>
             </div>
             <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${draft.stripeConnected ? "bg-[#eef7f0] text-[#31543d]" : "bg-[#fff7dd] text-[#745b00]"}`}>
               {draft.stripeConnected ? "Vinculado" : "Pendiente"}
@@ -159,22 +155,22 @@ export function PaymentConfigurationCard({
           />
 
           {canManageStripeAccount ? (
-            <div className="settings-action-strip flex flex-wrap gap-2 rounded-lg p-4">
-              <button className="app-button-secondary" disabled={saving} onClick={() => void onConnectStripe()} type="button">
+            <div className="flex flex-wrap gap-2 pt-1">
+              <button className="app-button" disabled={saving} onClick={() => void onConnectStripe()} type="button">
                 {draft.stripeAccountId ? "Continuar configuración de Stripe" : "Vincular Stripe"}
               </button>
               {draft.stripeAccountId ? (
-                <button className="app-button-secondary" disabled={saving} onClick={() => void onRefreshStripe()} type="button">
+                <button className="app-button" disabled={saving} onClick={() => void onRefreshStripe()} type="button">
                   Verificar conexión de Stripe
                 </button>
               ) : null}
             </div>
           ) : (
-            <p className="settings-info-panel rounded-lg px-4 py-3 text-sm text-[var(--brand-muted)]">
+            <p className="pt-1 text-sm text-[var(--brand-muted)]">
               La cuenta de Stripe sólo puede vincularla o modificarla el dueño del gimnasio.
             </p>
           )}
-        </article>
+        </div>
       </div>
 
       {canManage ? (
@@ -202,7 +198,7 @@ function PaymentToggleRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <div className={`settings-option-row flex items-start justify-between gap-4 rounded-lg border p-4 ${disabled ? "is-disabled" : ""}`}>
+    <div className={`settings-option-row flex items-start justify-between gap-4 rounded-xl border p-4 ${disabled ? "is-disabled" : ""}`}>
       <div className="min-w-0">
         <strong className="block text-sm">{label}</strong>
         <span className="mt-1 block text-xs leading-5 text-[var(--brand-muted)]">{description}</span>
