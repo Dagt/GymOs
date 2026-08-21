@@ -45,6 +45,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.transaction.annotation.Transactional;
 
 class SelfServiceServiceTests {
 	private final SelfServiceRepository repository = mock(SelfServiceRepository.class);
@@ -85,6 +86,16 @@ class SelfServiceServiceTests {
 				stripeCheckoutOperations,
 				stripeRecurringOperations
 		);
+	}
+
+	@Test
+	void membershipQuoteUsesWritableTransactionBecauseSessionValidationUpdatesActivity() throws Exception {
+		Transactional transaction = SelfServiceService.class
+				.getMethod("membershipQuote", UUID.class, String.class, UUID.class)
+				.getAnnotation(Transactional.class);
+
+		assertThat(transaction).isNotNull();
+		assertThat(transaction.readOnly()).isFalse();
 	}
 
 	@Test

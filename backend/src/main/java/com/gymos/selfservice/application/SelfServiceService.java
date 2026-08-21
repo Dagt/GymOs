@@ -207,7 +207,7 @@ public class SelfServiceService {
 		return repository.planOptions(session.organizationId(), session.branchId());
 	}
 
-	@Transactional(readOnly = true)
+	@Transactional
 	public MembershipQuoteView membershipQuote(UUID sessionId, String sessionToken, UUID planId) {
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
 		capabilityPolicy.requireMembershipOptions(capabilities(session));
