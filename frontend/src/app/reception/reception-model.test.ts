@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { getFocusActions, getQuickActions, getReceptionDensityConfig } from "./reception-model.ts";
+import { getFocusActions, getQuickActions, getReceptionDensityConfig, getVisibleFocusActions } from "./reception-model.ts";
 
 test("reception model omits the redundant renewal navigation card", () => {
   const actions = getFocusActions();
@@ -20,5 +20,9 @@ test("reception model provides data-dense layout configuration for hybrid contex
   const config = getReceptionDensityConfig();
   assert.equal(config.density, "compact");
   assert.equal(config.dataDenseAdmin, true);
-  assert.equal(config.signalsCount, 3);
+});
+
+test("reception actions hide kiosk launch unless the session is allowed to open it", () => {
+  assert.equal(getVisibleFocusActions(false).some((action) => action.href === "/kiosk/launch"), false);
+  assert.equal(getVisibleFocusActions(true).some((action) => action.href === "/kiosk/launch"), true);
 });

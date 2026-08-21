@@ -14,7 +14,7 @@ no sustituye autorización de negocio.
 |---|---|
 | `/api/v1/auth/login`, `/api/v1/auth/refresh` | Credenciales/refresh válidos y rate limit aplicable |
 | `/api/v1/self-service/**` excepto alta de sesión | Token temporal, sesión activa, tenant/sucursal y capacidad |
-| `POST /api/v1/self-service/kiosk-sessions` | No es pública: `selfservice.session.launch` o `platform.admin` |
+| `POST /api/v1/self-service/kiosk-sessions` | No es pública: exige `selfservice.session.launch` y un rol exclusivo de Recepción |
 | `/api/v1/payment-webhooks/**` | Firma del proveedor, inbox durable, deduplicación y conciliación |
 | Callback OAuth Mercado Pago | `state` de un solo uso y PKCE |
 | `GET /api/v1/organizations/*/logo` | Sólo marca pública por UUID; sin datos tenant adicionales |
@@ -48,16 +48,17 @@ no sustituye autorización de negocio.
 
 | Acción | Permiso | Roles esperados |
 |---|---|---|
-| Abrir una sesión de kiosco | `selfservice.session.launch` | Recepción; soporte mediante `platform.admin` |
+| Abrir una sesión de kiosco | `selfservice.session.launch` | Sólo Recepción; dueño, administrador, gerente y soporte quedan excluidos |
 | Configurar capacidades del kiosco | `selfservice.settings.manage` | Dueño, gerente autorizado, soporte |
 | Consultar cobros | `payment.settings.read` o `payment.settings.manage` | Roles autorizados |
 | Activar/desactivar modalidades | `payment.settings.manage` | Dueño, gerente autorizado, soporte |
 | Conectar/refrescar Stripe | `payment.provider.stripe.manage` | Dueño y soporte; no gerente |
 | Configurar correo tenant | `notification.settings.manage` | Dueño, gerente autorizado, soporte |
 
-V76 retira el lanzamiento del kiosco a Gerencia. V77 separa administrar la
-cuenta Stripe de sus interruptores operativos. El frontend oculta acciones por
-permiso, pero el backend es autoritativo.
+V78 deja el lanzamiento del kiosco exclusivamente en Recepción y elimina la
+excepción histórica de `platform.admin`. V77 separa administrar la cuenta
+Stripe de sus interruptores operativos. El frontend oculta acciones por rol y
+permiso, pero el backend vuelve a validar ambos y es autoritativo.
 
 ## Reglas de rol relevantes
 
@@ -67,7 +68,7 @@ permiso, pero el backend es autoritativo.
 - Recepción puede operar POS, socios, reservas y kiosco según sus permisos, pero
   no administrar tenant/proveedores.
 - Soporte usa `platform.admin`, contexto tenant explícito y auditoría
-  `PLATFORM_SUPPORT`.
+  `PLATFORM_SUPPORT`, pero no puede iniciar kioscos de socios.
 
 ## Brechas de cobertura
 
@@ -75,4 +76,4 @@ permiso, pero el backend es autoritativo.
    sucursal y UUID ajeno (`GEN-001`).
 2. Deshabilitar docs/actuator públicos en producción mediante perfil.
 3. Verificar que cada mutación sensible escriba `audit_log` (`AUD-001`).
-4. Mantener regresión explícita de V76/V77 y de planes multi-sucursal.
+4. Mantener regresión explícita de V77/V78 y de planes multi-sucursal.

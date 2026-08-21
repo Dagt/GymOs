@@ -6,7 +6,8 @@ Estado: `FUNCIONAL / LISTO PARA ACEPTACIÓN CONECTADA`
 ## Implementado
 
 - sesión temporal con token aleatorio almacenado como hash;
-- apertura exclusiva desde Recepción; Gerencia configura pero no lanza sesiones;
+- apertura exclusiva desde Recepción; dueño, administrador, gerente y soporte
+  pueden configurar lo permitido por sus permisos, pero no lanzan sesiones;
 - verificación genérica de socio por contacto y fecha de nacimiento;
 - membresías, pagos, reservas y domiciliación disponibles también en una sede
   secundaria cuando el plan vigente es multi-sucursal;

@@ -39,7 +39,7 @@ public class SecurityConfig {
 								"/api/v1/payment-settings/mercado-pago/oauth/callback").permitAll()
 						.requestMatchers(org.springframework.http.HttpMethod.POST,
 								"/api/v1/self-service/kiosk-sessions")
-								.hasAnyAuthority("selfservice.session.launch", "platform.admin")
+								.hasAuthority("selfservice.session.launch")
 						.requestMatchers("/actuator/health/**", "/api/v1/system/**", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/self-service/**", "/api/v1/openapi/**", "/api/v1/docs/**", "/swagger-ui/**").permitAll()
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/organizations/*/logo").permitAll()
 						.requestMatchers("/api/v1/auth/select-branch").hasAuthority("branch.read")

@@ -253,8 +253,9 @@ Implementacion frontend:
 Reglas de producto:
 - La personalizacion visual ya pertenece al gimnasio/tenant y se persiste en backend.
 - El panel de plataforma conserva tema neutral; gerencia, recepción, coaches y
-  kiosco usan la marca del gimnasio activo. La atribución GymFort aparece de
-  forma permanente junto a la marca tenant.
+  kiosco usan la marca del gimnasio activo. La atribución GymFort aparece en
+  una franja de producto independiente, por encima de la tarjeta de marca
+  tenant y separada de la identidad de la sesión.
 - La marca tambien viaja en `CurrentUser` para que roles sin permiso de administracion puedan ver logo, color principal, acento y fondo del gimnasio activo.
 - Ninguna regla de negocio se mueve al frontend.
 - Los formularios deben usar etiquetas de negocio entendibles para recepcion y administracion.
@@ -263,7 +264,8 @@ Correccion UX posterior:
 - La pagina inicial no debe mostrar informacion tecnica de stack, hitos ni estado de desarrollo.
 - La pagina inicial debe funcionar como entrada por rol: administracion, recepcion y kiosco.
 - La administracion no debe mostrar todos los modulos al mismo nivel visual.
-- Las acciones frecuentes deben tener prioridad: cobrar, buscar socio, reportar ventas y abrir kiosco.
+- Las acciones frecuentes deben tener prioridad: cobrar, buscar socio y
+  reportar ventas; abrir kiosco se ofrece únicamente dentro de Recepción.
 - Las herramientas menos frecuentes deben agruparse en secciones secundarias o plegables.
 - Los permisos y datos internos del usuario no deben ocupar espacio principal en la vista administrativa.
 - La paleta debe combinar color principal, acento y tonos funcionales para evitar una interfaz monotona.
@@ -318,7 +320,8 @@ Correccion Hito 7.9:
 - La navegación de dueño y gerente se agrupa por propósito: `Dirección` o
   `Gerencia`, `Gestión operativa`, `Administración` y `Mostrador`. Beneficios,
   catálogo, automatizaciones y configuración pertenecen a `Administración`;
-  `Mostrador` se reserva para POS, accesos físicos y apertura del kiosco.
+  `Mostrador` se reserva para POS y accesos físicos. La apertura del kiosco no
+  forma parte de las consolas de dueño, administrador o gerente.
 - La consola de recepción separa `Mostrador`, `Atención a socios` y
   `Seguimiento`, evitando mezclar reportes de pagos con las acciones inmediatas
   de caja.
@@ -372,17 +375,24 @@ Formularios:
 - Éxitos, advertencias y errores se presentan mediante el sistema global de
   notificaciones flotantes. Debe mantenerse visible sin importar el scroll,
   admitir cierre, semántica accesible y evitar banners locales duplicados.
-- Automatizaciones y Configuración usan la misma superficie oscura, tipografía,
-  tarjetas y espaciado que el resto del `AppShell`.
+- Automatizaciones y Configuración usan centros de control oscuros, tipografía,
+  tarjetas y espaciado del `AppShell`. Configuración separa el resumen del
+  gimnasio de una navegación fija de servicios conectados; Automatizaciones
+  separa acciones, salud operativa, reglas y entregas recientes.
 - Gerencia ve los interruptores operativos de una cuenta Stripe existente, pero
   los botones de conectar/refrescar sólo aparecen con
   `payment.provider.stripe.manage` o `platform.admin`.
-- La apertura de `/kiosk/launch` sólo aparece con
-  `selfservice.session.launch`; el rol Gerente no lo recibe.
+- La apertura de `/kiosk/launch` sólo aparece cuando la consola resuelta es
+  `RECEPTION` y existe `selfservice.session.launch`. Dueño, administrador,
+  gerente y soporte no ven la acción, no acceden por URL directa y el backend
+  rechaza la creación de sesión aunque exista una concesión heredada.
 - `/reception` no debe depender de permisos administrativos como lectura completa de organizacion. Si el usuario tiene `branchId`, debe mostrar dashboard operativo aunque no pueda consultar `/organizations/current`.
 - El estado sin sucursal para recepcion no debe mostrar onboarding, alta de gimnasio ni configuracion de tenant; solo selector de sucursal permitida o instruccion de pedir acceso al dueño/gerente.
 - Si un usuario de recepcion tiene exactamente una sucursal permitida pero la sesion guardada no trae `branchId`, el frontend debe seleccionarla automaticamente antes de pintar la consola.
-- La portada de recepcion usa `AppShell` sin menu lateral y muestra una tarjeta superior con marca, sucursal, perfil, usuario, alcance y cierre de sesion.
+- La portada de recepción usa `AppShell` sin menú lateral y muestra una tarjeta
+  superior con marca, sucursal, perfil, usuario, alcance y cierre de sesión.
+- La portada no muestra una banda decorativa de `Caja lista`, `Pagos por revisar`
+  o `Sucursal activa`; prioriza búsqueda de socio y acciones operativas reales.
 - Las acciones de recepcion se agrupan en la misma cuadricula: caja/POS, socios, ventas, kiosco, reservas y beneficios. No se usa una seccion desplegable secundaria para herramientas normales de mostrador.
 - La paleta de recepcion debe derivar de la marca del tenant (`primaryColor`, `accentColor`, `surfaceColor`) y no de colores fijos por modulo.
 - El dashboard de recepcion prioriza una banda visual con el color principal y acciones asimetricas; evita verse como una lista plana de tarjetas independientes.

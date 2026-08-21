@@ -79,7 +79,7 @@ export function PaymentOperationsHistoryCard({ accessToken }: { accessToken: str
   }
 
   return (
-    <section className="app-card grid scroll-mt-6 gap-4 p-5" id="payment-operations">
+    <section className="app-card settings-detail-panel grid scroll-mt-6 gap-4 p-5" id="payment-operations">
       <h2 className="text-xl font-semibold">Historial de domiciliación y webhooks</h2>
       {operations ? (
         <div className={`rounded-md border p-4 ${operations.alertLevel === "CRITICAL" ? "border-[#e5b7b7] bg-[#fff7f7]" : "border-[var(--brand-line)] bg-[var(--brand-surface)]"}`}>

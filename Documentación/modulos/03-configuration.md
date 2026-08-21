@@ -8,7 +8,10 @@ Estado: `FUNCIONAL`
 - nombre, marca y logotipo por organización;
 - configuración diferenciada de plataforma y tenant;
 - cobros, capacidades de kiosco y remitente de correo por permisos separados;
-- interfaz oscura unificada y feedback mediante notificaciones flotantes;
+- centro de control oscuro con resumen, servicios conectados segmentados y
+  navegación operativa fija, más feedback mediante notificaciones flotantes;
+- atribución GymFort separada de la tarjeta de marca tenant y de la identidad
+  de la sesión para evitar saturación en el menú lateral;
 - propagación de marca a consola, recepción y kiosco;
 - carga y reemplazo de PNG/JPG/WebP de hasta 2 MB en almacenamiento de objetos,
   con URL versionada y proxy público de sólo lectura;

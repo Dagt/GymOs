@@ -6,7 +6,7 @@ import {
   canShowRoleForSession,
   displayRoleName,
 } from "./UsersRoleHelpers.ts";
-import { canAccessRoute } from "../../lib/role-model.ts";
+import { canAccessRoute, canLaunchKiosk } from "../../lib/role-model.ts";
 import type { CurrentUser } from "../../lib/api/auth-types.ts";
 
 test("normalizes user-facing role names", () => {
@@ -84,3 +84,34 @@ test("public policy and support routes stay available for authenticated users", 
     assert.equal(canAccessRoute(receptionUser, route), true, `${route} should be public`);
   }
 });
+
+test("only reception can open the kiosk even when another role inherits the permission", () => {
+  const receptionUser = kioskUser({ console: "RECEPTION", roles: ["Recepcion"] });
+  const ownerUser = kioskUser({ console: "TENANT_OWNER", roles: ["Dueno del gimnasio"] });
+  const managerUser = kioskUser({ console: "TENANT_MANAGER", roles: ["Gerente"] });
+  const platformUser = kioskUser({ console: "PLATFORM_OWNER", roles: ["Administrador GymOS"], platformAdmin: true });
+
+  assert.equal(canLaunchKiosk(receptionUser), true);
+  assert.equal(canAccessRoute(receptionUser, "/kiosk/launch"), true);
+  for (const user of [ownerUser, managerUser, platformUser]) {
+    assert.equal(canLaunchKiosk(user), false);
+    assert.equal(canAccessRoute(user, "/kiosk/launch"), false);
+  }
+});
+
+function kioskUser(overrides: Partial<CurrentUser>): CurrentUser {
+  return {
+    userId: "user-kiosk",
+    organizationId: "organization-1",
+    branchId: "branch-1",
+    username: "user@gymfort.mx",
+    fullName: "Usuario Kiosco",
+    roles: [],
+    permissions: ["selfservice.session.launch"],
+    console: "RECEPTION",
+    platformAdmin: false,
+    supportMode: false,
+    organizationName: "GymFort Test",
+    ...overrides,
+  };
+}

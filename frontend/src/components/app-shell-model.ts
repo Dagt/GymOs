@@ -73,7 +73,6 @@ const ownerSections: NavigationSection[] = [
     links: [
       { label: "Caja / POS", href: "/pos", hint: "Ventas y pagos", permissions: ["sale.create"] },
       { label: "Accesos", href: "/access", hint: "Visitas y pases", permissions: ["access.read", "visit.read"] },
-      { label: "Pantalla para socios", href: "/kiosk/launch", hint: "Abrir kiosco seguro", permissions: ["selfservice.session.launch"] },
     ],
   },
 ];

@@ -175,6 +175,10 @@ export function AppShell({
       <div className="app-notice-region" id="app-notice-region" />
       {!hideSidebar ? (
         <aside className="admin-sidebar">
+          <Link aria-label="Ir al inicio de GymFort" className="admin-product-masthead" href={role.homePath}>
+            <Image alt="GymFort" height={27} src="/gymfort_web_assets/gymfort-logo-horizontal-white.png" width={122} />
+          </Link>
+
           <div className="admin-sidebar-brand">
             <span className={showBrandLogo ? "with-logo" : undefined}>
               {showBrandLogo ? (
@@ -236,12 +240,10 @@ export function AppShell({
           </nav>
 
           <div className="admin-sidebar-footer">
-            <div className="admin-product-signature">
-              <Image alt="GymFort" height={24} src="/gymfort_web_assets/gymfort-logo-horizontal-white.png" width={108} />
-              <small>Plataforma de gestión</small>
+            <div className="admin-session-identity">
+              <span>{session.user.fullName}</span>
+              <small>{session.user.username}</small>
             </div>
-            <span>{session.user.fullName}</span>
-            <small>{session.user.username}</small>
             <button onClick={logout} type="button">Salir</button>
           </div>
         </aside>

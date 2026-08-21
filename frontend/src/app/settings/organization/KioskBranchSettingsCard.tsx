@@ -75,7 +75,7 @@ export function KioskBranchSettingsCard({
   }
 
   return (
-    <section className="app-card grid scroll-mt-6 gap-5 p-5" id="kiosk-settings">
+    <section className="app-card settings-detail-panel grid scroll-mt-6 gap-5 p-5" id="kiosk-settings">
       <h2 className="text-xl font-semibold">Funciones disponibles para el socio</h2>
       {error ? <AppNotice message={error} tone="error" /> : null}
       {message ? <AppNotice message={message} tone="success" /> : null}

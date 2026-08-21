@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired } from "@/components/AuthRequired";
-import { DAY_SIGNALS, FOCUS_ACTIONS } from "./reception-model";
+import { getVisibleFocusActions } from "./reception-model";
 import {
   getBranches,
   getCurrentOrganization,
@@ -16,6 +16,7 @@ import {
   type StoredSession,
 } from "@/lib/api";
 import { ReceptionRenewalWidget } from "./ReceptionRenewalWidget";
+import { canLaunchKiosk } from "@/lib/role-model";
 
 export default function ReceptionPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
@@ -80,6 +81,7 @@ export default function ReceptionPage() {
   const visibleBranchName = activeBranch?.name ?? (session?.user.branchId ? "Sucursal activa" : null);
   const receptionOrganizationName =
     organization?.tradeName ?? session?.user.brandName ?? session?.user.organizationName ?? "GymFort";
+  const focusActions = session ? getVisibleFocusActions(canLaunchKiosk(session.user)) : [];
 
   async function switchBranch(branchId: string) {
     if (!session || branchId === session.user.branchId) {
@@ -141,25 +143,13 @@ export default function ReceptionPage() {
         />
       ) : (
         <div className="flex flex-col gap-8 w-full max-w-7xl mx-auto">
-          {/* Daily Operational Signals Strip */}
-          <section className="admin-report-strip">
-            {DAY_SIGNALS.map((signal) => (
-              <ReportMetric
-                key={signal.label}
-                label={signal.label}
-                tone={signal.tone}
-                value={signal.value}
-              />
-            ))}
-          </section>
-
           <ReceptionRenewalWidget session={session} />
 
           {/* Main Hub Grid */}
           <section>
             <h3 className="text-lg font-black text-[color:var(--brand-primary)] mb-5 px-1 uppercase tracking-widest opacity-60">Módulos Operativos</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {FOCUS_ACTIONS.map((action, index) => {
+              {focusActions.map((action, index) => {
                 const isPrimary = index === 0;
                 return (
                   <Link
@@ -281,14 +271,5 @@ function ReceptionBranchSetup({
         </section>
       </aside>
     </section>
-  );
-}
-
-function ReportMetric({ label, value, tone }: { label: string; value: string; tone: string }) {
-  return (
-    <article className={`admin-report-metric ${tone}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
   );
 }

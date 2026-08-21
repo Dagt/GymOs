@@ -96,6 +96,9 @@ export function isSupportMode(user: CurrentUser) {
 
 export function canAccessRoute(user: CurrentUser, pathname: string) {
   const console = resolveUserConsole(user);
+  if (matches(pathname, "/kiosk/launch")) {
+    return canLaunchKiosk(user);
+  }
   if (publicRoutes.some((route) => matches(pathname, route)) || pathname.startsWith("/kiosk")) {
     return true;
   }
@@ -124,6 +127,11 @@ export function canAccessRoute(user: CurrentUser, pathname: string) {
     return receptionRoutes.some((route) => matches(pathname, route));
   }
   return coachRoutes.some((route) => matches(pathname, route));
+}
+
+export function canLaunchKiosk(user: CurrentUser) {
+  return resolveUserConsole(user) === "RECEPTION"
+    && user.permissions.includes("selfservice.session.launch");
 }
 
 function hasAny(user: CurrentUser, permissions: string[]) {

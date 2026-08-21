@@ -50,8 +50,10 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Base64;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
@@ -587,6 +589,21 @@ public class SelfServiceService {
 	private void requireLaunchContext(GymOsPrincipal principal) {
 		if (principal == null || principal.userId() == null || principal.organizationId() == null) {
 			throw new BusinessException("AUTHENTICATION_REQUIRED", "Inicia sesion para abrir el kiosco.");
+		}
+		boolean receptionRole = principal.roles().stream()
+				.map(role -> role.toLowerCase(Locale.ROOT))
+				.anyMatch(role -> role.contains("recepcion") || role.contains("recepción") || role.contains("reception"));
+		boolean elevatedRole = principal.roles().stream()
+				.map(role -> role.toLowerCase(Locale.ROOT))
+				.anyMatch(role -> role.contains("dueno")
+						|| role.contains("dueño")
+						|| role.contains("owner")
+						|| role.contains("administrador")
+						|| role.contains("admin")
+						|| role.contains("gerente")
+						|| role.contains("manager"));
+		if (!receptionRole || elevatedRole) {
+			throw new AccessDeniedException("Solo el personal de recepcion puede abrir el kiosco.");
 		}
 		if (principal.branchId() == null) {
 			throw new BusinessException("BRANCH_REQUIRED", "Selecciona una sucursal antes de abrir el kiosco.");

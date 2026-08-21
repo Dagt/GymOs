@@ -131,9 +131,14 @@ class DatabaseMigrationTests {
 			assertThat(roleHasPermission(connection, "Gerente", "notification.settings.manage")).isTrue();
 			assertThat(roleHasPermission(connection, "Gerente", "benefit.manage")).isTrue();
 			assertThat(roleHasPermission(connection, "Gerente", "resource.manage")).isTrue();
+			assertThat(roleHasPermission(connection, "Gerente", "selfservice.session.launch")).isFalse();
+			assertThat(roleHasPermission(connection, "Dueno del gimnasio", "selfservice.session.launch")).isFalse();
+			assertThat(roleHasPermission(connection, "Administrador", "selfservice.session.launch")).isFalse();
+			assertThat(roleHasPermission(connection, "Administrador GymOS", "selfservice.session.launch")).isFalse();
 			assertThat(roleHasPermission(connection, "Recepcion", "client.read")).isTrue();
 			assertThat(roleHasPermission(connection, "Recepcion", "client.create")).isTrue();
 			assertThat(roleHasPermission(connection, "Recepcion", "client.update")).isTrue();
+			assertThat(roleHasPermission(connection, "Recepcion", "selfservice.session.launch")).isTrue();
 			assertThat(columnExists(connection, "branch", "primary_color")).isFalse();
 			assertThat(columnExists(connection, "branch", "accent_color")).isFalse();
 			assertThat(columnExists(connection, "branch", "surface_color")).isFalse();

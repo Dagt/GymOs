@@ -2,7 +2,7 @@
 
 Estado: FUENTE CANÓNICA / EN PROGRESO
 Corte: 21 de agosto de 2026
-Código auditado: `feature/automations-zoho-email` en `88a6b58`.
+Código auditado: `feature/automations-zoho-email`, incluyendo V78.
 
 ## 1. Resumen ejecutivo
 
@@ -53,30 +53,33 @@ del código, migraciones y pruebas.
 - Si desde una sucursal secundaria se contrata un plan local, la nueva operación
   queda contextualizada en esa sucursal; no se reasigna silenciosamente la
   membresía original antes de confirmar el pago.
-- Solo Recepción recibe `selfservice.session.launch`. Dueño y gerente configuran
-  capacidades, pero no abren sesiones de socios desde su consola.
+- Solo Recepción recibe `selfservice.session.launch`. Dueño, administrador,
+  gerente y soporte configuran únicamente lo permitido por su rol, pero no
+  abren sesiones de socios desde su consola.
 - Gerencia conserva `payment.settings.manage` para activar/desactivar modalidades
   ya vinculadas. Conectar o refrescar Stripe exige
   `payment.provider.stripe.manage` o `platform.admin`.
 - El retorno del navegador desde Stripe no confirma un cobro. Webhook firmado y
   consulta autoritativa producen, de forma idempotente, venta, pago, recibo y
   periodo de membresía.
-- Las páginas administrativas usan el mismo sistema visual oscuro y los
-  mensajes se muestran como notificaciones flotantes accesibles, visibles sin
-  importar el scroll.
+- Configuración y Automatizaciones usan centros de control oscuros, segmentados
+  y consistentes con el resto del shell; los mensajes se muestran como
+  notificaciones flotantes accesibles, visibles sin importar el scroll.
 - La marca del gimnasio personaliza la experiencia tenant, pero GymFort mantiene
-  atribución permanente como producto.
+  atribución permanente como producto en una franja propia, separada del usuario
+  de sesión y de la tarjeta de marca tenant.
 
 ## 4. Validación del corte
 
-Sobre `88a6b58` se verificó:
+Sobre la rama vigente se verificó:
 
-- suite backend Gradle exitosa;
-- 77 pruebas unitarias de frontend exitosas;
+- migración V78 sobre PostgreSQL limpio y suites críticas de autorización HTTP
+  y servicio de autoservicio exitosas;
+- 80 pruebas unitarias de frontend exitosas;
 - lint, typecheck y build de producción exitosos;
-- 8 recorridos Playwright de ruteo por consola exitosos;
-- `docker compose config` exitoso;
-- descarga y ejecución real de `stripe/stripe-cli:v1.50.3` exitosa.
+- revisión visual local de Configuración, marca tenant y atribución GymFort;
+- en el corte anterior, 8 recorridos Playwright de ruteo por consola,
+  `docker compose config` y ejecución real de `stripe/stripe-cli:v1.50.3`.
 
 La suite `stripeTest` permanece opt-in porque requiere `sk_test_...` y, para la
 topología completa, una cuenta Connect test. Las pruebas manuales realizadas en

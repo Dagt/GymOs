@@ -5,7 +5,7 @@ Last reviewed: 2026-08-21.
 ## Backend
 - **Language:** Java 25
 - **Framework:** Spring Boot 4.1.0 with Spring Modulith 2.1 for modular architecture.
-- **Data access and migrations:** Spring JDBC/JPA as required by each module and Flyway migrations through V77.
+- **Data access and migrations:** Spring JDBC/JPA as required by each module and Flyway migrations through V78.
 
 ## Frontend
 - **Language:** TypeScript

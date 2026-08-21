@@ -31,8 +31,9 @@ aplicación no consultan tablas ajenas directamente.
 
 ## 3. Seguridad del kiosco
 
-- `selfservice.session.launch` pertenece a Recepción; soporte de plataforma
-  conserva acceso explícito. V76 lo retira de Gerencia.
+- `selfservice.session.launch` pertenece exclusivamente a Recepción. V78 elimina
+  las concesiones heredadas de dueño, administrador, gerente y soporte; el
+  backend además valida que el principal tenga un rol puro de Recepción.
 - Handoff de navegador de un solo uso sin IDs ni secretos en la URL.
 - Verificación genérica por correo/teléfono y fecha de nacimiento.
 - PII enmascarada, respuestas `no-store` y acción para borrar la sesión.

@@ -89,11 +89,11 @@ export function NotificationEmailSettingsCard({ accessToken }: { accessToken: st
   }
 
   if (!configuration) {
-    return <section className="app-card p-5 text-sm text-[var(--brand-muted)]">Cargando configuración de correo...</section>;
+    return <section className="app-card settings-detail-panel p-5 text-sm text-[var(--brand-muted)]">Cargando configuración de correo...</section>;
   }
 
   return (
-    <section className="app-card grid scroll-mt-6 gap-5 p-5" id="email-settings">
+    <section className="app-card settings-detail-panel grid scroll-mt-6 gap-5 p-5" id="email-settings">
       <h2 className="text-xl font-semibold">Correo electrónico</h2>
 
       <strong className={`w-fit rounded-full border px-3 py-1 text-sm ${configuration.providerAvailable ? "border-[#b9d8c6] bg-[#f2faf5] text-[#31543d]" : "border-[#ead6a3] bg-[#fffaf0] text-[#745b00]"}`}>

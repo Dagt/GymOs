@@ -6,7 +6,8 @@ Estado: `FUNCIONAL / LISTO PARA ACEPTACIÓN`
 ## Implementado
 
 - alta, consulta, habilitación, deshabilitación y ejecución manual de reglas;
-- interfaz integrada al tema oscuro y feedback global de GymFort;
+- centro de control oscuro con acciones, salud operativa, reglas y entregas en
+  superficies diferenciadas, integrado al feedback global de GymFort;
 - programación por intervalo con `next_run_at` y reclamo condicional mediante
   `locked_until`;
 - acción inicial `CREATE_NOTIFICATION` sobre la cola interna;

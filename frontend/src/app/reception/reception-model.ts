@@ -6,12 +6,6 @@ export type FocusAction = {
   accent: string;
 };
 
-export type DaySignal = {
-  label: string;
-  value: string;
-  tone: "green" | "amber" | "blue" | "red";
-};
-
 export const FOCUS_ACTIONS: FocusAction[] = [
   {
     title: "Cobrar venta o membresía",
@@ -57,23 +51,15 @@ export const FOCUS_ACTIONS: FocusAction[] = [
   },
 ];
 
-export const DAY_SIGNALS: DaySignal[] = [
-  { label: "Caja", value: "Lista", tone: "green" },
-  { label: "Pagos", value: "Por revisar", tone: "amber" },
-  { label: "Sucursal", value: "Activa", tone: "blue" },
-];
-
 export type ReceptionDensityConfig = {
   density: "compact";
   dataDenseAdmin: true;
-  signalsCount: number;
 };
 
 export function getReceptionDensityConfig(): ReceptionDensityConfig {
   return {
     density: "compact",
     dataDenseAdmin: true,
-    signalsCount: DAY_SIGNALS.length,
   };
 }
 
@@ -81,8 +67,8 @@ export function getFocusActions(): FocusAction[] {
   return FOCUS_ACTIONS;
 }
 
-export function getDaySignals(): DaySignal[] {
-  return DAY_SIGNALS;
+export function getVisibleFocusActions(canLaunchKiosk: boolean): FocusAction[] {
+  return FOCUS_ACTIONS.filter((action) => action.href !== "/kiosk/launch" || canLaunchKiosk);
 }
 
 export function getQuickActions(): { primary: FocusAction; secondary: FocusAction[] } {

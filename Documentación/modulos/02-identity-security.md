@@ -7,8 +7,8 @@ Estado: `FUNCIONAL`
 
 - login, refresh, selección de sucursal y contexto de sesión;
 - roles y permisos aplicados en backend;
-- V76 limita el lanzamiento de kiosco a Recepción y V77 separa administración
-  de cuenta Stripe de su configuración operativa;
+- V78 limita estrictamente el lanzamiento de kiosco a Recepción y V77 separa
+  administración de cuenta Stripe de su configuración operativa;
 - consolas y navegación condicionadas por rol;
 - rotación y gracia de refresh, suspensión y soporte de plataforma;
 - respuestas diferenciadas: `401 AUTHENTICATION_REQUIRED` sólo para ausencia o

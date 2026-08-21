@@ -627,6 +627,9 @@ Migraciones nuevas:
   `payment.provider.stripe.manage`, lo concede a dueño/soporte y lo separa de
   `payment.settings.manage`, que el gerente conserva para activar o desactivar
   una conexión existente.
+- `V78__restrict_kiosk_launch_strictly_to_reception.sql`: conserva
+  `selfservice.session.launch` únicamente en los roles de Recepción y elimina
+  concesiones heredadas de dueño, administrador, gerente o soporte.
 - `V15__hito6_productization_onboarding_imports.sql`: agrega bitacora de importacion inicial de clientes y permisos `onboarding.manage` y `client.import`.
 - `V23__membership_plan_multi_branch_access.sql`: agrega `membership_plan.multi_branch_access` para planes con acceso a todas las sucursales del tenant.
 - `V24__resource_allowed_membership_plans.sql`: agrega planes permitidos por recurso para restringir reservas segun membresia vigente.

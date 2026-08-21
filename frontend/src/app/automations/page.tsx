@@ -373,23 +373,31 @@ export default function AutomationsPage() {
       eyebrow="Administracion"
       pageClassName="automations-console"
       session={session}
+      subtitle="Supervisa reglas, avisos y recuperaciones sin perder de vista la salud del procesamiento."
       title="Automatizaciones"
     >
-      <section className="flex flex-wrap justify-end gap-3">
-        <button className="app-button-secondary" onClick={() => setShowOperationalDetails((current) => !current)} type="button">
-          {showOperationalDetails ? "Ocultar monitoreo" : "Ver monitoreo"}
-        </button>
-        {hasPermission(session, "notification.manage") ? <button className="app-button-secondary" onClick={() => setShowNotificationDrawer(true)} type="button">
-          Enviar aviso
-        </button> : null}
-        {hasPermission(session, "automation.manage") ? <button className="app-button" onClick={openRuleDrawer} type="button">Crear automatización</button> : null}
+      <section className="automation-control-bar">
+        <div>
+          <p>Centro de control</p>
+          <h2>Reglas, entregas y salud operativa</h2>
+          <span>{rules.length} reglas configuradas · {notifications.length} entregas recientes</span>
+        </div>
+        <div className="automation-control-actions">
+          <button className="app-button-secondary" onClick={() => setShowOperationalDetails((current) => !current)} type="button">
+            {showOperationalDetails ? "Ocultar monitoreo" : "Ver monitoreo"}
+          </button>
+          {hasPermission(session, "notification.manage") ? <button className="app-button-secondary" onClick={() => setShowNotificationDrawer(true)} type="button">
+            Enviar aviso
+          </button> : null}
+          {hasPermission(session, "automation.manage") ? <button className="app-button" onClick={openRuleDrawer} type="button">Crear automatización</button> : null}
+        </div>
       </section>
 
       {error ? <InlineError message={error} /> : null}
       {message ? <AppNotice message={message} tone="success" /> : null}
 
       {operations && (showOperationalDetails || hasOperationalIssues) ? (
-        <section className={`rounded-lg border p-5 ${operations.alertLevel === "CRITICAL" ? "border-[#e5b7b7] bg-[#fff7f7]" : "border-[var(--brand-line)] bg-white"}`}>
+        <section className={`automation-health-panel ${operations.alertLevel === "CRITICAL" ? "critical" : "healthy"}`}>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="mt-1 text-xl font-semibold">{operations.alertLevel === "HEALTHY" ? "Procesamiento saludable" : "Automatizaciones requieren atención"}</h2>
@@ -410,7 +418,7 @@ export default function AutomationsPage() {
         </section>
       ) : null}
 
-      {showOperationalDetails || deadLetterTotalElements > 0 ? <section className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
+      {showOperationalDetails || deadLetterTotalElements > 0 ? <section className="automation-panel p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="mt-1 text-xl font-semibold">Fallos definitivos</h2>
@@ -460,8 +468,8 @@ export default function AutomationsPage() {
         )}
       </section> : null}
 
-      <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-        <section className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
+      <section className="automation-primary-grid">
+        <section className="automation-panel p-5">
           <h2 className="text-xl font-semibold">Automatizaciones configuradas</h2>
           <div className="mt-4 grid gap-3">
             {rules.length === 0 ? (
@@ -470,7 +478,7 @@ export default function AutomationsPage() {
               </p>
             ) : null}
             {rules.map((rule) => (
-              <article className="rounded-md border border-[var(--brand-line)] p-4" key={rule.id}>
+              <article className="automation-record p-4" key={rule.id}>
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-semibold">{rule.name}</p>
@@ -498,7 +506,7 @@ export default function AutomationsPage() {
           </div>
         </section>
 
-        <section className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
+        <section className="automation-panel p-5">
           <h2 className="text-xl font-semibold">Entregas recientes</h2>
           <div className="mt-4 grid gap-3">
             {notifications.length === 0 ? (
@@ -507,7 +515,7 @@ export default function AutomationsPage() {
               </p>
             ) : null}
             {notifications.map((notification) => (
-              <article className="rounded-md border border-[var(--brand-line)] p-4" key={notification.id}>
+              <article className="automation-record p-4" key={notification.id}>
                 <p className="font-semibold">{notification.subject ?? notification.channel}</p>
                 <p className="mt-1 text-sm text-[var(--brand-muted)]">{notification.body}</p>
                 <p className="mt-3 text-xs text-[#6f7a73]">
@@ -524,7 +532,7 @@ export default function AutomationsPage() {
       </section>
 
       {selectedRule ? (
-        <section className="rounded-lg border border-[var(--brand-line)] bg-white p-5 shadow-sm">
+        <section className="automation-panel p-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h2 className="mt-1 text-xl font-semibold">{selectedRule.name}</h2>

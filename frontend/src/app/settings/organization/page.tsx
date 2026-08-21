@@ -441,13 +441,14 @@ export default function OrganizationSettingsPage() {
       organizationName={organization?.tradeName ?? session.user.organizationName}
       pageClassName="settings-console"
       session={session}
+      subtitle="Organiza identidad, sucursales y servicios conectados desde un solo centro de control."
       title="Configuración del gimnasio"
     >
       {error ? <AppNotice message={error} tone="error" /> : null}
       {message ? <AppNotice message={message} tone="success" /> : null}
 
       {canManageOrganization || canManageBranches ? (
-        <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <section className="settings-overview-grid">
           {canManageOrganization && persistedOrganizationForm ? (
             <div className="grid min-w-0 gap-5" ref={settingsColumnRef}>
               <OrganizationOverviewCard form={persistedOrganizationForm} onEdit={openOrganizationDrawer} />
@@ -542,8 +543,12 @@ function OperationalSettingsNavigation({
 }) {
   if (!showEmail && !showKiosk && !showPayments) return null;
   return (
-    <nav aria-label="Configuración operativa" className="app-card p-4">
-      <div className="flex flex-wrap gap-2">
+    <nav aria-label="Configuración operativa" className="settings-section-nav">
+      <div>
+        <p>Servicios conectados</p>
+        <span>Selecciona el bloque que deseas configurar.</span>
+      </div>
+      <div className="settings-section-tabs">
         {showPayments ? <SettingsSectionButton active={activeSection === "payments"} label="Medios de cobro" onClick={() => onSelect("payments")} /> : null}
         {showKiosk ? <SettingsSectionButton active={activeSection === "kiosk"} label="Kiosco web" onClick={() => onSelect("kiosk")} /> : null}
         {showEmail ? <SettingsSectionButton active={activeSection === "email"} label="Correo electrónico" onClick={() => onSelect("email")} /> : null}
@@ -565,7 +570,7 @@ function SettingsSectionButton({
   return (
     <button
       aria-pressed={active}
-      className={`rounded-md border px-4 py-2 text-sm font-semibold transition ${active ? "border-[var(--brand-primary)] bg-[#edf5ef]" : "border-[var(--brand-line)] bg-white hover:border-[var(--brand-primary)]"}`}
+      className={`settings-section-tab ${active ? "active" : ""}`}
       onClick={onClick}
       type="button"
     >
@@ -620,7 +625,7 @@ function PaymentConfigurationCard({
   const [draft, setDraft] = useState(configuration);
 
   return (
-    <section className="app-card grid scroll-mt-6 gap-5 p-5" id="payment-settings">
+    <section className="app-card settings-detail-panel grid scroll-mt-6 gap-5 p-5" id="payment-settings">
       <h2 className="text-xl font-semibold">Recepción y pagos del kiosco</h2>
       <label className="flex items-start gap-3 rounded-md border border-[var(--brand-line)] p-4">
         <input

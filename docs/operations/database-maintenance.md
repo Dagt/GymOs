@@ -1,6 +1,6 @@
 # Database Maintenance
 
-Last reviewed: 2026-08-21. The current Flyway schema version is V77.
+Last reviewed: 2026-08-21. The current Flyway schema version is V78.
 
 ## Routine Tasks
 

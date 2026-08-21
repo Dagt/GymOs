@@ -30,6 +30,17 @@ test("tenant owner navigation keeps management and client access visible", () =>
   assert.equal(sectionLinks(sections, "Mostrador").includes("Beneficios"), false);
 });
 
+test("tenant owner never receives the kiosk launch link from inherited permissions", () => {
+  const sections = visibleSectionsForConsole({
+    consoleType: "TENANT_OWNER",
+    hasBranch: true,
+    permissions: new Set(["sale.create", "selfservice.session.launch"]),
+    variant: "tenant",
+  });
+
+  assert.equal(sectionLabels(sections).includes("Pantalla para socios"), false);
+});
+
 test("reception navigation is limited to front desk work", () => {
   const sections = visibleSectionsForConsole({
     consoleType: "RECEPTION",

@@ -7,7 +7,8 @@ nombre técnico interno durante la transición de marca.
 
 - Adopt the visible GymFort product identity while preserving compatible
   internal `gymos` packages, variables and data identifiers.
-- Add permanent GymFort product attribution alongside tenant-configured logos.
+- Add permanent GymFort product attribution in its own sidebar masthead,
+  separated from the tenant logo and signed-in user identity.
 - Unify Automations and Organization settings with the dark application shell
   and replace page-top feedback boxes with accessible floating notifications.
 - Add Stripe Connect, hosted Checkout, signed webhooks, reconciliation,
@@ -16,8 +17,11 @@ nombre técnico interno durante la transición de marca.
   confirmed payment, with idempotent sales, payments and membership periods.
 - Support multi-branch plan access in secondary branches, including eligible
   kiosk lookup and reservations while retaining membership origin ownership.
-- Restrict kiosk launch to Reception; managers can configure kiosk capabilities
-  but cannot open a member session.
+- Restrict kiosk launch strictly to Reception in navigation, direct routes,
+  HTTP security and business authorization; owners, administrators, managers
+  and platform support cannot open a member session.
+- Simplify the Reception home by removing the non-actionable cash/payment/branch
+  signal strip and keeping the operational actions in focus.
 - Split Stripe account management from operational payment switches: managers
   may enable or disable an existing connection, while owners/support connect
   and refresh it.
