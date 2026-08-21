@@ -3,15 +3,19 @@
 Corte: 21 de agosto de 2026
 
 GymFort incluye cola durable, leasing, reintentos, preferencias, métricas y
-adaptador SMTP. Zoho es el siguiente proveedor objetivo, pero su conexión y
-entregabilidad real todavía no están validadas. Las credenciales pertenecen al
-entorno y nunca se guardan por gimnasio.
+adaptador SMTP. El perfil operativo actual usa ZeptoMail como servicio de correo
+transaccional; las credenciales pertenecen al entorno y nunca se guardan por
+gimnasio. La identidad visible (`From`, nombre y `Reply-To`) permanece
+configurada por tenant dentro de los remitentes verificados del Agent.
 
 ## Variables del backend
 
 - `GYMOS_SMTP_ENABLED=true`
-- `GYMOS_SMTP_HOST`, `GYMOS_SMTP_PORT`
-- `GYMOS_SMTP_USERNAME`, `GYMOS_SMTP_PASSWORD`
+- `GYMOS_SMTP_PROVIDER_NAME=ZeptoMail`
+- `GYMOS_SMTP_HOST=smtp.zeptomail.com`
+- `GYMOS_SMTP_PORT=587`
+- `GYMOS_SMTP_USERNAME`, `GYMOS_SMTP_PASSWORD`: valores de **Agent > SMTP/API**
+- `GYMOS_SMTP_ALLOWED_FROM_ADDRESSES`: remitentes verificados permitidos
 - `GYMOS_SMTP_AUTH`, `GYMOS_SMTP_STARTTLS`, `GYMOS_SMTP_SSL`
 - `GYMOS_SMTP_CONNECTION_TIMEOUT_MS`
 - `GYMOS_SMTP_READ_TIMEOUT_MS`
@@ -25,7 +29,11 @@ para secretos SMTP.
 
 Después de reiniciar backend, dueño, gerente autorizado o soporte abre
 Configuración → Correo, define remitente/reply-to, habilita el canal y envía una
-prueba. El dominio debe estar verificado por el proveedor con SPF, DKIM y DMARC.
+prueba. El dominio del `From` debe estar verificado y asociado al Mail Agent de
+ZeptoMail. SPF, DKIM y DMARC deben estar publicados antes de producción.
+
+El `Reply-To` puede apuntar a la bandeja propia del gimnasio aunque la entrega se
+realice mediante la infraestructura transaccional central de GymFort.
 
 ## Estados y recuperación
 
@@ -46,17 +54,18 @@ Alertas y métricas:
 - `gymos.notification.delivery`
 - `gymos.notification.delivery.duration`
 
-## Checklist Zoho pendiente
+## Checklist ZeptoMail
 
-1. Crear credencial específica de aplicación/SMTP según la política de la cuenta.
-2. Elegir host/puerto/TLS correctos para la región y plan contratado.
-3. Publicar y validar SPF, DKIM y DMARC.
-4. Probar remitente, reply-to, TLS, timeouts y contraseña rotada.
-5. Confirmar una entrega real y el comportamiento de rechazo, límite y timeout.
-6. Documentar rebotes/quejas si el servicio contratado expone señales útiles.
+1. Crear o seleccionar el Mail Agent de GymFort.
+2. Copiar las credenciales desde **Agent > SMTP/API**.
+3. Usar `smtp.zeptomail.com:587` con TLS/STARTTLS.
+4. Asociar y verificar los dominios/remitentes que se usarán como `From`.
+5. Publicar y validar SPF, DKIM y DMARC.
+6. Configurar `GYMOS_SMTP_ALLOWED_FROM_ADDRESSES` con las identidades aprobadas.
+7. Confirmar una entrega real desde Configuración → Correo.
+8. Revisar **Processed emails** en ZeptoMail ante rechazos o problemas de entregabilidad.
 
-No marcar Zoho como operativo hasta completar este checklist en el entorno
-objetivo.
+Runbook detallado: `docs/operations/zeptomail-email.md`.
 
 ## Privacidad
 
