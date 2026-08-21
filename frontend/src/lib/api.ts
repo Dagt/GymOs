@@ -152,6 +152,7 @@ export type {
   KioskMembershipQuote,
   KioskMembershipEnrollmentCheckoutPayload,
   KioskPendingPayment,
+  KioskPaymentActivity,
   KioskPlanOption,
   KioskPlanChangeCheckoutPayload,
   KioskProfile,

@@ -106,6 +106,7 @@ test("una recarga recupera el modo kiosco y borra al socio anterior", async ({ p
 
 test("un socio sin membresia puede abrir Stripe Checkout con una intencion idempotente", async ({ page }) => {
   let enrollmentPayload: Record<string, unknown> | null = null;
+  let paymentCompleted = false;
   await page.addInitScript(() => {
     window.sessionStorage.setItem("gymos.accessToken", "reception-access-token");
     window.sessionStorage.setItem("gymos.refreshToken", "reception-refresh-token");
@@ -153,8 +154,29 @@ test("un socio sin membresia puede abrir Stripe Checkout con una intencion idemp
     if (method === "GET" && path === `/self-service/sessions/${sessionId}/membership-quotes/${planId}`) {
       return fulfill(route, membershipQuote());
     }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/summary`) {
+      return fulfill(route, {
+        ...summaryResponse(),
+        memberships: [],
+        paymentActivity: paymentCompleted ? [{
+          id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          saleId: "66666666-6666-4666-8666-666666666666",
+          saleNumber: "V-001",
+          method: "CARD_ONLINE",
+          status: "COMPLETED",
+          amountCents: 79900,
+          currency: "MXN",
+          receivedAt: "2026-08-20T15:00:00Z",
+          provider: "STRIPE",
+          receiptUrl: "https://pay.stripe.com/receipts/test",
+          checkoutUrl: null,
+          providerUpdatedAt: "2026-08-20T15:00:01Z",
+        }] : [],
+      });
+    }
     if (method === "POST" && path === `/self-service/sessions/${sessionId}/membership-enrollments`) {
       enrollmentPayload = route.request().postDataJSON() as Record<string, unknown>;
+      paymentCompleted = true;
       return fulfill(route, {
         saleId: "66666666-6666-4666-8666-666666666666",
         saleNumber: "V-001",
@@ -166,7 +188,7 @@ test("un socio sin membresia puede abrir Stripe Checkout con una intencion idemp
         membership: null,
         paymentId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         providerOperationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-        checkoutUrl: "http://127.0.0.1:3000/kiosk/checkout/result?status=success",
+        checkoutUrl: "http://127.0.0.1:3000/kiosk/checkout/result?status=success&session_id=cs_payment",
         checkoutStatus: "OPEN",
       });
     }
@@ -186,7 +208,8 @@ test("un socio sin membresia puede abrir Stripe Checkout con una intencion idemp
   await expect(review.getByText("$799.00")).toBeVisible();
   await page.getByRole("button", { name: "Confirmar y continuar a Stripe" }).click();
 
-  await expect(page.getByRole("heading", { name: "Estamos verificando el resultado" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Pago confirmado" })).toBeVisible();
+  await expect(page.getByText("$799.00")).toBeVisible();
   expect(enrollmentPayload?.planId).toBe(planId);
   expect(enrollmentPayload?.idempotencyKey).toEqual(expect.stringContaining(`kiosk-enrollment:${sessionId}:${planId}:`));
   const persistedKeys = await page.evaluate(() => window.sessionStorage.getItem("gymos.kioskOperationKeys"));
@@ -315,7 +338,7 @@ test("muestra comprobante y permite recuperar una domiciliacion PAST_DUE con otr
     }
     if (method === "POST" && path === `/self-service/sessions/${sessionId}/autopay/${membershipId}/setup`) {
       setupPayload = route.request().postDataJSON() as Record<string, unknown>;
-      return fulfill(route, { mandateId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", status: "PENDING_SETUP", providerOperationId: null, providerSessionId: "cs_replace", checkoutUrl: "http://127.0.0.1:3000/kiosk/checkout/result?status=autopay-success", termsVersion: "2026-08-03", nextChargeOn: "2026-08-31" });
+      return fulfill(route, { mandateId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", status: "PENDING_SETUP", providerOperationId: null, providerSessionId: "cs_replace", checkoutUrl: "http://127.0.0.1:3000/kiosk/checkout/result?status=autopay-success&session_id=cs_replace", termsVersion: "2026-08-03", nextChargeOn: "2026-08-31" });
     }
     return false;
   });
@@ -335,6 +358,7 @@ test("muestra comprobante y permite recuperar una domiciliacion PAST_DUE con otr
 
 test("el socio acepta terminos versionados antes de tokenizar la domiciliacion", async ({ page }) => {
   let setupPayload: Record<string, unknown> | null = null;
+  let setupStarted = false;
   await page.addInitScript(() => {
     window.sessionStorage.setItem("gymos.accessToken", "reception-access-token");
     window.sessionStorage.setItem("gymos.refreshToken", "reception-refresh-token");
@@ -368,7 +392,26 @@ test("el socio acepta terminos versionados antes de tokenizar la domiciliacion",
       return fulfill(route, []);
     }
     if (method === "GET" && path === `/self-service/sessions/${sessionId}/autopay/${membershipId}`) {
-      return fulfill(route, null);
+      return fulfill(route, setupStarted ? {
+        id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        membershipId,
+        planId,
+        status: "ACTIVE",
+        provider: "STRIPE",
+        brand: "visa",
+        lastFour: "4242",
+        expiresMonth: 12,
+        expiresYear: 2030,
+        termsVersion: "2026-08-03",
+        amountRule: "CURRENT_MEMBERSHIP_RENEWAL_TOTAL",
+        consentedAt: "2026-08-03T10:00:00Z",
+        nextChargeOn: "2026-08-31",
+        consecutiveFailures: 0,
+        lastError: null,
+        revokedAt: null,
+        canReplacePaymentMethod: true,
+        recoveryMessage: null,
+      } : null);
     }
     if (method === "GET" && path === `/self-service/sessions/${sessionId}/autopay/${membershipId}/terms`) {
       return fulfill(route, {
@@ -382,12 +425,13 @@ test("el socio acepta terminos versionados antes de tokenizar la domiciliacion",
     }
     if (method === "POST" && path === `/self-service/sessions/${sessionId}/autopay/${membershipId}/setup`) {
       setupPayload = route.request().postDataJSON() as Record<string, unknown>;
+      setupStarted = true;
       return fulfill(route, {
         mandateId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         status: "PENDING_SETUP",
         providerOperationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         providerSessionId: "cs_setup",
-        checkoutUrl: "http://127.0.0.1:3000/kiosk/checkout/result?status=autopay-success",
+        checkoutUrl: "http://127.0.0.1:3000/kiosk/checkout/result?status=autopay-success&session_id=cs_setup",
         termsVersion: "2026-08-03",
         nextChargeOn: "2026-07-31",
       });
@@ -407,7 +451,8 @@ test("el socio acepta terminos versionados antes de tokenizar la domiciliacion",
   await page.getByText("Acepto expresamente esta autorización").click();
   await continueButton.click();
 
-  await expect(page.getByRole("heading", { name: "Estamos verificando el resultado" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Domiciliación activada" })).toBeVisible();
+  await expect(page.getByText("VISA •••• 4242")).toBeVisible();
   expect(setupPayload?.accepted).toBe(true);
   expect(setupPayload?.termsVersion).toBe("2026-08-03");
   expect(setupPayload?.idempotencyKey).toEqual(expect.stringContaining(`kiosk-autopay:${sessionId}:${membershipId}:2026-08-03:`));

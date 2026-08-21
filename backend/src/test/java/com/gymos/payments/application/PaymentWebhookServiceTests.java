@@ -31,7 +31,10 @@ import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.ApplicationEventPublisher;
 
 class PaymentWebhookServiceTests {
@@ -114,6 +117,24 @@ class PaymentWebhookServiceTests {
 		service.stripe(payload, signature);
 
 		verify(repository).operationByExternalId("STRIPE", "pi_checkout");
+		verifyNoInteractions(eventPublisher);
+	}
+
+	@Test
+	@ExtendWith(OutputCaptureExtension.class)
+	void stripeReportsUnmatchedCheckoutSession(CapturedOutput output) throws Exception {
+		String payload = "{\"id\":\"evt_unmatched_checkout\",\"type\":\"checkout.session.completed\",\"account\":\"acct_test\",\"data\":{\"object\":{\"id\":\"cs_unmatched\"}}}";
+		long timestamp = Instant.now().getEpochSecond();
+		String signature = "t=" + timestamp + ",v1=" + hmac(WEBHOOK_SECRET, timestamp + "." + payload);
+		when(repository.operationByExternalId("STRIPE", "cs_unmatched")).thenReturn(Optional.empty());
+
+		service.stripe(payload, signature);
+
+		assertThat(output)
+				.contains("Unmatched Stripe Checkout webhook")
+				.contains("evt_unmatched_checkout")
+				.contains("cs_unmatched")
+				.contains("acct_test");
 		verifyNoInteractions(eventPublisher);
 	}
 

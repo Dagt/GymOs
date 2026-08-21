@@ -43,9 +43,13 @@ import {
   type KioskWellnessService,
 } from "@/lib/kiosk-wellness";
 import { formatMexicanDateInput, parseMexicanDate, toDateInput } from "@/lib/date-time";
+import {
+  KIOSK_BROWSER_SESSION_KEY,
+  writeKioskAutopayReturn,
+  writeKioskPaymentReturn,
+} from "@/lib/kiosk-autopay-return";
 import { consumeKioskLaunch } from "@/lib/kiosk-launch";
 
-const KIOSK_BROWSER_SESSION_KEY = "gymos.kioskBrowserSession";
 const KIOSK_OPERATION_KEYS = "gymos.kioskOperationKeys";
 type KioskPanel = "memberships" | "resources" | "wellness" | "payments" | "profile" | "autopay";
 type MembershipCheckoutKind = "enrollment" | "renewal" | "change";
@@ -392,6 +396,15 @@ export default function KioskPage() {
             : null;
       if (!response) return;
       if (response.checkoutUrl) {
+        if (response.paymentId) {
+          writeKioskPaymentReturn(window.sessionStorage, {
+            sessionId: session.sessionId,
+            paymentId: response.paymentId,
+            saleId: response.saleId,
+            returnPath: window.location.pathname,
+            startedAt: new Date().toISOString(),
+          });
+        }
         window.location.assign(response.checkoutUrl);
         return;
       }
@@ -481,6 +494,13 @@ export default function KioskPage() {
         replacing,
       );
       if (response.checkoutUrl) {
+        writeKioskAutopayReturn(window.sessionStorage, {
+          sessionId: session.sessionId,
+          membershipId: autopayMembership.id,
+          providerSessionId: response.providerSessionId,
+          returnPath: window.location.pathname,
+          startedAt: new Date().toISOString(),
+        });
         window.location.assign(response.checkoutUrl);
         return;
       }

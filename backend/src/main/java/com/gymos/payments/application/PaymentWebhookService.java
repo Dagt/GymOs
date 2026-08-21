@@ -19,12 +19,15 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import org.springframework.context.ApplicationEventPublisher;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 @Service
 public class PaymentWebhookService {
+	private static final Logger LOGGER = LoggerFactory.getLogger(PaymentWebhookService.class);
 	private static final long SIGNATURE_TOLERANCE_SECONDS = 300;
 	private final PaymentProviderProperties properties;
 	private final ObjectMapper objectMapper;
@@ -92,7 +95,21 @@ public class PaymentWebhookService {
 		// Stripe also emits payment_intent events for Checkout payments whose GymOS
 		// operation is keyed by the Checkout Session. They are valid but not the
 		// authoritative event used by that flow.
-		if (operation == null) return;
+		if (operation == null) {
+			String connectedAccount = event.path("account").asText("platform");
+			if (eventType.startsWith("checkout.session.")) {
+				LOGGER.warn(
+						"Unmatched Stripe Checkout webhook. eventId={} eventType={} externalOperationId={} connectedAccount={}",
+						eventId, eventType, externalId, connectedAccount
+				);
+			} else {
+				LOGGER.debug(
+						"Ignoring Stripe webhook without a direct operation match. eventId={} eventType={} externalOperationId={} connectedAccount={}",
+						eventId, eventType, externalId, connectedAccount
+				);
+			}
+			return;
+		}
 		if (!repository.registerWebhook("STRIPE", eventId, eventType, PaymentProviderEncoding.sha256Hex(rawBody), operation.organizationId())) {
 			webhookMetric(operation, "STRIPE", eventType, "duplicate");
 			return;
