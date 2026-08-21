@@ -57,32 +57,25 @@ export function PaymentConfigurationCard({
 
   return (
     <section className="app-card settings-detail-panel grid scroll-mt-6 gap-5 p-5" id="payment-settings">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <p className="app-eyebrow">Medios de cobro</p>
-          <h2 className="mt-2 text-xl font-semibold">Recepción y pagos digitales</h2>
-          <p className="mt-2 max-w-3xl text-sm text-[var(--brand-muted)]">
-            Separa cómo cobras en mostrador de los servicios de Stripe que habilitan pagos y domiciliación en el kiosco.
-          </p>
-        </div>
-        <span className="rounded-full border border-[var(--brand-line)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--brand-muted)]">
-          Configuración del gimnasio
-        </span>
+      <div>
+        <h2 className="text-xl font-semibold">Medios de cobro</h2>
+        <p className="mt-2 max-w-3xl text-sm text-[var(--brand-muted)]">
+          Configura cómo cobra recepción y qué pagos con Stripe puede ofrecer el kiosco.
+        </p>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-2">
         <article className="settings-group-card grid content-start gap-4 rounded-xl p-5">
           <div className="border-b border-[var(--brand-line)] pb-4">
-            <p className="app-eyebrow">Mostrador</p>
-            <h3 className="mt-2 text-lg font-semibold">Cobro con terminal en recepción</h3>
+            <h3 className="text-lg font-semibold">Mostrador</h3>
             <p className="mt-1 text-sm text-[var(--brand-muted)]">
-              Elige una sola modalidad. La terminal independiente y Mercado Pago Point son excluyentes.
+              Elige una modalidad: terminal externa o Mercado Pago Point.
             </p>
           </div>
 
           <PaymentToggleRow
             checked={draft.receptionManualTerminalEnabled}
-            description="Registra en GymFort un cobro realizado en una terminal externa, sin integración automática."
+            description="Registra pagos realizados en una terminal externa."
             disabled={!canManage}
             label="Terminal independiente"
             onChange={setManualTerminal}
@@ -91,10 +84,10 @@ export function PaymentConfigurationCard({
           <PaymentToggleRow
             checked={draft.receptionMercadoPagoEnabled}
             description={draft.mercadoPagoConnected
-              ? `Cuenta vinculada${draft.mercadoPagoTerminalId ? ` · terminal ${draft.mercadoPagoTerminalId}` : " · selecciona una terminal Point"}`
-              : "Vincula Mercado Pago antes de habilitar el cobro integrado."}
+              ? `Terminal Point vinculada${draft.mercadoPagoTerminalId ? ` · ${draft.mercadoPagoTerminalId}` : " · selecciona una terminal"}`
+              : "Vincula Mercado Pago para usar una terminal Point integrada."}
             disabled={!canManage || !draft.mercadoPagoConnected}
-            label="Mercado Pago Point integrado"
+            label="Mercado Pago Point"
             onChange={setMercadoPago}
           />
 
@@ -135,32 +128,31 @@ export function PaymentConfigurationCard({
         <article className="settings-group-card grid content-start gap-4 rounded-xl p-5">
           <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--brand-line)] pb-4">
             <div>
-              <p className="app-eyebrow">Stripe</p>
-              <h3 className="mt-2 text-lg font-semibold">Pagos del kiosco y domiciliación</h3>
+              <h3 className="text-lg font-semibold">Stripe</h3>
               <p className="mt-1 text-sm text-[var(--brand-muted)]">
-                Estas opciones gobiernan qué capacidades de pago pueden activarse después en cada kiosco.
+                Activa pagos de autoservicio y cobros recurrentes.
               </p>
             </div>
             <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${draft.stripeConnected ? "bg-[#eef7f0] text-[#31543d]" : "bg-[#fff7dd] text-[#745b00]"}`}>
-              {draft.stripeConnected ? "Stripe vinculado" : "Stripe pendiente"}
+              {draft.stripeConnected ? "Vinculado" : "Pendiente"}
             </span>
           </div>
 
           <PaymentToggleRow
             checked={draft.stripeSelfCheckoutEnabled}
             description={draft.stripeConnected
-              ? "Permite habilitar compras, renovaciones y cambios de plan pagados con Stripe desde el kiosco."
-              : "Vincula Stripe antes de habilitar pagos en autoservicio."}
+              ? "Compras, renovaciones y cambios de plan desde el kiosco."
+              : "Vincula Stripe para habilitar pagos en autoservicio."}
             disabled={!canManage || !draft.stripeConnected}
-            label="Stripe para self checkout"
+            label="Self checkout con Stripe"
             onChange={setStripeCheckout}
           />
 
           <PaymentToggleRow
             checked={draft.stripeRecurringEnabled}
             description={draft.stripeSelfCheckoutEnabled
-              ? "Permite que el kiosco ofrezca alta y administración de domiciliación con Stripe."
-              : "Primero habilita Stripe para self checkout."}
+              ? "Domiciliación y cobros recurrentes desde el kiosco."
+              : "Primero habilita self checkout con Stripe."}
             disabled={!canManage || !draft.stripeConnected || !draft.stripeSelfCheckoutEnabled}
             label="Domiciliación con Stripe"
             onChange={(checked) => setDraft((current) => ({ ...current, stripeRecurringEnabled: checked }))}
@@ -179,16 +171,9 @@ export function PaymentConfigurationCard({
             </div>
           ) : (
             <p className="settings-info-panel rounded-lg px-4 py-3 text-sm text-[var(--brand-muted)]">
-              La cuenta de Stripe sólo puede vincularla o modificarla el dueño del gimnasio. Cuando esté conectada podrás administrar su uso operativo.
+              La cuenta de Stripe sólo puede vincularla o modificarla el dueño del gimnasio.
             </p>
           )}
-
-          <div className="settings-info-panel rounded-lg p-4 text-sm text-[var(--brand-muted)]">
-            <strong className="block text-[var(--brand-ink)]">Dependencia con Kiosco web</strong>
-            <span className="mt-1 block">
-              Si self checkout o domiciliación están apagados aquí, sus toggles dependientes aparecerán deshabilitados en la configuración del kiosco.
-            </span>
-          </div>
         </article>
       </div>
 
