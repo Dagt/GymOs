@@ -41,7 +41,7 @@ del código, migraciones y pruebas.
 | [Coaches](modulos/14-coaching.md) | ESTABILIZADO | Perfiles, catálogo, rutinas versionadas, asignación, métricas, CSV y PDF | Cleanup durable de medios (`COA-018`) |
 | [Wellness](modulos/15-wellness.md) | ESTABILIZADO | Profesionales, servicios, disponibilidad, agenda y citas | E2E y hardening multi-tenant |
 | [Automatizaciones](modulos/16-automations.md) | FUNCIONAL / ACEPTACIÓN | Reglas, recetas, inbox durable, leases, reintentos, pausa, historial y telemetría | Mantener pruebas PostgreSQL/CI |
-| [Notificaciones](modulos/17-notifications.md) | FUNCIONAL ZEptomail/SMTP | Cola durable, remitentes autorizados, prueba inmediata, preferencias y recuperación | Credenciales/DNS y entregabilidad del ambiente (`NOT-001`) |
+| [Notificaciones](modulos/17-notifications.md) | FUNCIONAL ZEPTOMAIL/SMTP | Cola durable, remitentes autorizados, prueba inmediata, preferencias y recuperación | Credenciales/DNS y entregabilidad del ambiente (`NOT-001`) |
 | [Reportes](modulos/18-reporting.md) | PARCIAL | Reportes por dominio y métricas de coaches/operación | Definiciones KPI y filtros homogéneos (`REP-001`) |
 | [Auditoría](modulos/19-audit.md) | FUNCIONAL | Registro de mutaciones sensibles y motivos operativos | Matriz/retención/inmutabilidad (`AUD-001`) |
 | [Operación común](modulos/20-common-operations.md) | FUNCIONAL PARA LOCAL | Errores correlacionados, Flyway, métricas, Docker, CI y runbooks | Restore, staging y simulacros (`DB-001`, `OPS-001`) |
