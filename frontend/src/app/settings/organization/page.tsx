@@ -46,6 +46,7 @@ import {
   OrganizationOverviewCard,
   TeamAccessCard,
 } from "./OrganizationSettingsSections";
+import { PaymentConfigurationCard } from "./PaymentConfigurationCard";
 import { PaymentOperationsHistoryCard } from "./PaymentOperationsHistoryCard";
 import { KioskBranchSettingsCard } from "./KioskBranchSettingsCard";
 import { NotificationEmailSettingsCard } from "./NotificationEmailSettingsCard";
@@ -595,116 +596,6 @@ function operationalSectionHash(section: OperationalSection) {
     email: "#email-settings",
     history: "#payment-operations",
   } as Record<OperationalSection, string>)[section];
-}
-
-function PaymentConfigurationCard({
-  canManage,
-  canManageStripeAccount,
-  configuration,
-  mercadoPagoTerminals,
-  saving,
-  onChooseMercadoPagoTerminal,
-  onConnectMercadoPago,
-  onConnectStripe,
-  onLoadMercadoPagoTerminals,
-  onRefreshStripe,
-  onSave,
-}: {
-  canManage: boolean;
-  canManageStripeAccount: boolean;
-  configuration: PaymentConfiguration;
-  mercadoPagoTerminals: MercadoPagoTerminal[];
-  saving: boolean;
-  onChooseMercadoPagoTerminal: (terminalId: string) => Promise<void>;
-  onConnectMercadoPago: () => Promise<void>;
-  onConnectStripe: () => Promise<void>;
-  onLoadMercadoPagoTerminals: () => Promise<void>;
-  onRefreshStripe: () => Promise<void>;
-  onSave: (configuration: PaymentConfiguration) => Promise<void>;
-}) {
-  const [draft, setDraft] = useState(configuration);
-
-  return (
-    <section className="app-card settings-detail-panel grid scroll-mt-6 gap-5 p-5" id="payment-settings">
-      <h2 className="text-xl font-semibold">Recepción y pagos del kiosco</h2>
-      <label className="flex items-start gap-3 rounded-md border border-[var(--brand-line)] p-4">
-        <input
-          checked={draft.receptionManualTerminalEnabled}
-          disabled={!canManage}
-          onChange={(event) => setDraft({ ...draft, receptionManualTerminalEnabled: event.target.checked })}
-          type="checkbox"
-        />
-        <strong>Terminal independiente en recepción</strong>
-      </label>
-      <label className="flex items-start gap-3 rounded-md border border-[var(--brand-line)] p-4">
-        <input
-          checked={draft.receptionMercadoPagoEnabled}
-          disabled={!canManage || !draft.mercadoPagoConnected}
-          onChange={(event) => setDraft({ ...draft, receptionMercadoPagoEnabled: event.target.checked })}
-          type="checkbox"
-        />
-        <span><strong>Mercado Pago Point integrado</strong><small className="mt-1 block">{draft.mercadoPagoConnected ? `Vinculado · ${draft.mercadoPagoTerminalId ?? "sin terminal"}` : "No vinculado"}</small></span>
-      </label>
-      {canManage ? (
-        <div className="flex flex-wrap items-center gap-3">
-          <button className="app-button-secondary" disabled={saving} onClick={() => void onConnectMercadoPago()} type="button">
-            {draft.mercadoPagoConnected ? "Volver a vincular Mercado Pago" : "Vincular Mercado Pago"}
-          </button>
-          {draft.mercadoPagoConnected ? (
-            <button className="app-button-secondary" disabled={saving} onClick={() => void onLoadMercadoPagoTerminals()} type="button">
-              Consultar terminales Point
-            </button>
-          ) : null}
-          {mercadoPagoTerminals.length > 0 ? (
-            <select
-              className="app-input min-w-64"
-              disabled={saving}
-              onChange={(event) => void onChooseMercadoPagoTerminal(event.target.value)}
-              value={draft.mercadoPagoTerminalId ?? ""}
-            >
-              <option value="">Selecciona una terminal</option>
-              {mercadoPagoTerminals.map((terminal) => (
-                <option key={terminal.id} value={terminal.id}>
-                  {terminal.name ?? terminal.id}{terminal.status ? ` (${terminal.status})` : ""}
-                </option>
-              ))}
-            </select>
-          ) : null}
-        </div>
-      ) : null}
-      <label className="flex items-start gap-3 rounded-md border border-[var(--brand-line)] p-4">
-        <input
-          checked={draft.stripeSelfCheckoutEnabled}
-          disabled={!canManage || !draft.stripeConnected}
-          onChange={(event) => setDraft({ ...draft, stripeSelfCheckoutEnabled: event.target.checked, stripeRecurringEnabled: event.target.checked ? draft.stripeRecurringEnabled : false })}
-          type="checkbox"
-        />
-        <span><strong>Stripe para self checkout</strong><small className="mt-1 block">{draft.stripeConnected ? "Vinculado" : "No vinculado"}</small></span>
-      </label>
-      {canManageStripeAccount ? (
-        <div className="flex flex-wrap gap-3">
-          <button className="app-button-secondary" disabled={saving} onClick={() => void onConnectStripe()} type="button">
-            {draft.stripeAccountId ? "Continuar configuración de Stripe" : "Vincular Stripe"}
-          </button>
-          {draft.stripeAccountId ? (
-            <button className="app-button-secondary" disabled={saving} onClick={() => void onRefreshStripe()} type="button">
-              Verificar conexión de Stripe
-            </button>
-          ) : null}
-        </div>
-      ) : <p className="rounded-md border border-[var(--brand-line)] bg-[var(--brand-surface)] px-4 py-3 text-sm text-[var(--brand-muted)]">La cuenta de Stripe sólo puede vincularla o modificarla el dueño del gimnasio. Puedes activar o desactivar su uso en el kiosco cuando ya esté conectada.</p>}
-      <label className="flex items-start gap-3 rounded-md border border-[var(--brand-line)] p-4">
-        <input
-          checked={draft.stripeRecurringEnabled}
-          disabled={!canManage || !draft.stripeConnected || !draft.stripeSelfCheckoutEnabled}
-          onChange={(event) => setDraft({ ...draft, stripeRecurringEnabled: event.target.checked })}
-          type="checkbox"
-        />
-        <strong>Domiciliación con Stripe</strong>
-      </label>
-      {canManage ? <button className="app-button w-fit" disabled={saving} onClick={() => void onSave(draft)} type="button">{saving ? "Guardando..." : "Guardar configuración de cobro"}</button> : null}
-    </section>
-  );
 }
 
 function AuthRequired() {
