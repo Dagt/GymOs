@@ -75,7 +75,7 @@ public class SmtpEmailDeliveryAdapter implements EmailDeliveryPort {
 			return new DeliveryResult(stableMessageId);
 		} catch (MailAuthenticationException exception) {
 			throw new DeliveryException(
-					properties.displayName() + " rechazo las credenciales SMTP. Revisa el usuario y la contrasena de aplicacion.",
+					properties.displayName() + " rechazo las credenciales SMTP. Revisa el usuario y la contrasena del Agent.",
 					false, exception
 			);
 		} catch (MailParseException | MessagingException | UnsupportedEncodingException exception) {
