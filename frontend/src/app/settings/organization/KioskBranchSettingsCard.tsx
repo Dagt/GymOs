@@ -69,7 +69,7 @@ export function KioskBranchSettingsCard({ accessToken, activeBranchId }: { acces
         autopay: capabilities.recurringCardPaymentsReady && capabilities.autopayAllowed,
       });
       setItems((current) => current.map((entry) => entry.branchId === updated.branchId ? updated : entry));
-      setMessage(`Kiosco de ${updated.branchName} actualizado.`);
+      setMessage("Configuración del kiosco actualizada.");
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible guardar el kiosco.");
     } finally {
@@ -81,26 +81,24 @@ export function KioskBranchSettingsCard({ accessToken, activeBranchId }: { acces
     <section className="app-card settings-detail-panel grid scroll-mt-6 gap-5 p-5" id="kiosk-settings">
       <div>
         <h2 className="text-xl font-semibold">Kiosco web</h2>
-        <p className="mt-2 max-w-3xl text-sm text-[var(--brand-muted)]">Elige qué puede hacer el socio en la sucursal.</p>
+        <p className="mt-2 max-w-3xl text-sm text-[var(--brand-muted)]">Elige qué puede hacer el socio en la sucursal seleccionada.</p>
       </div>
       {error ? <AppNotice message={error} tone="error" /> : null}
       {message ? <AppNotice message={message} tone="success" /> : null}
       <div className="grid gap-4">
         {items.length === 0 && !error ? <p className="text-sm text-[var(--brand-muted)]">Selecciona una sucursal activa para configurar su kiosco.</p> : null}
         {items.map((item) => (
-          <article className="settings-branch-container rounded-xl border p-5" key={item.branchId}>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--brand-line)] pb-4">
-              <h3 className="text-lg font-semibold">{item.branchName}</h3>
-              <button className="app-button" disabled={saving === item.branchId} onClick={() => void save(item)} type="button">
-                {saving === item.branchId ? "Guardando..." : "Guardar sucursal"}
-              </button>
-            </div>
-
-            <div className="mt-5 grid gap-8 xl:grid-cols-2">
+          <div className="grid gap-5" key={item.branchId}>
+            <div className="grid gap-8 xl:grid-cols-2">
               <KioskOptionGroup item={item} options={paymentOptions} title="Pagos y membresías" onToggle={toggle} />
               <KioskOptionGroup item={item} options={serviceOptions} title="Servicios y perfil" onToggle={toggle} />
             </div>
-          </article>
+            <div className="flex justify-end pt-1">
+              <button className="app-button" disabled={saving === item.branchId} onClick={() => void save(item)} type="button">
+                {saving === item.branchId ? "Guardando..." : "Guardar configuración del kiosco"}
+              </button>
+            </div>
+          </div>
         ))}
       </div>
     </section>
@@ -115,12 +113,12 @@ function KioskOptionGroup({ item, options, title, onToggle }: {
 }) {
   return (
     <section className="grid content-start gap-3">
-      <h4 className="border-b border-[var(--brand-line)] pb-3 font-semibold">{title}</h4>
+      <h4 className="font-semibold">{title}</h4>
       {options.map((option) => {
         const disabled = !requirementReady(item, option.requirement);
         const checked = !disabled && item.capabilities[option.key];
         return (
-          <div className={`settings-option-row flex items-start justify-between gap-4 rounded-xl border p-4 ${disabled ? "is-disabled" : ""}`} key={option.key}>
+          <article className={`bg-white flex items-start justify-between gap-4 rounded-xl border p-4 ${disabled ? "opacity-60" : ""}`} key={option.key}>
             <div className="min-w-0">
               <strong className="block text-sm">{option.title}</strong>
               <span className="mt-1 block text-xs leading-5 text-[var(--brand-muted)]">
@@ -128,7 +126,7 @@ function KioskOptionGroup({ item, options, title, onToggle }: {
               </span>
             </div>
             <ToggleSwitch checked={checked} disabled={disabled} label={`${option.title} en ${item.branchName}`} onChange={(next) => onToggle(item.branchId, option.key, next)} />
-          </div>
+          </article>
         );
       })}
     </section>
