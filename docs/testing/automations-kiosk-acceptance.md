@@ -1,36 +1,36 @@
 # Aceptación de automatizaciones y kiosco
 
-Corte: 21 de agosto de 2026
+Corte: 22 de agosto de 2026
 
 ## 1. Roles y entradas
 
 | Perfil | Entrada | Alcance |
 |---|---|---|
 | Dueño | Configuración y Automatizaciones | Cuenta Stripe, modalidades, kiosco, correo y reglas |
-| Gerente | Configuración y Automatizaciones | Modalidades ya conectadas, capacidades, correo y operación permitida; no administra la cuenta Stripe ni abre kiosco |
+| Gerente | Configuración y Automatizaciones | Modalidades ya conectadas, capacidades, correo, creación/administración/prueba de automatizaciones; no administra la cuenta Stripe ni abre kiosco |
 | Recepción | `Inicio recepción` → `Abrir kiosco seguro` | Abre la pestaña aislada y conserva su consola |
 | Soporte | Modo soporte auditado | Mismo alcance técnico mediante `platform.admin` |
 | Socio | Pestaña `/kiosk/reception` | Sesión temporal sin credenciales administrativas |
 
+V80 concede a Gerencia `automation.read`, `automation.manage`, `automation.execute`, `notification.read` y `notification.manage`. Después de aplicar la migración debe renovarse la sesión/JWT.
+
 ## 2. Preparación
 
-1. Selecciona organización y sucursal.
-2. En Configuración habilita las modalidades de cobro. Stripe sólo puede
-   encenderse cuando dueño/soporte ya vinculó y verificó la cuenta.
-3. Configura las capacidades del kiosco para la sucursal activa.
-4. Crea planes/productos/recursos activos y socios con fecha de nacimiento.
-5. Para correo, configura SMTP del backend y después remitente/reply-to tenant.
-6. Para Stripe local, inicia el listener CLI y reinicia backend con el mismo
-   `whsec_...`; consulta `stripe-kiosk-test-mode.md`.
+1. Seleccionar organización y sucursal.
+2. En Configuración habilitar modalidades de cobro. Stripe sólo puede encenderse cuando dueño/soporte ya vinculó y verificó la cuenta.
+3. Configurar capacidades del kiosco para la sucursal activa.
+4. Crear planes/productos/recursos activos y socios con fecha de nacimiento.
+5. Para correo, configurar ZeptoMail SMTP en backend y después `From`/nombre/`Reply-To` tenant.
+6. Para Stripe local, iniciar listener CLI y reiniciar backend con el mismo `whsec_...`; consultar `stripe-kiosk-test-mode.md`.
 
 ## 3. Kiosco y privacidad
 
-1. Desde Recepción abre el kiosco. Verifica que Gerencia no tenga esa acción.
-2. Confirma que una URL directa sin handoff no crea sesión.
-3. Verifica al socio por contacto y fecha de nacimiento.
-4. Comprueba PII enmascarada, `no-store`, inactividad y cierre/borrado manual.
-5. Verifica que no existen rutas o credenciales de POS/CRM/configuración.
-6. Finaliza y confirma que la pantalla queda lista para otro socio.
+1. Desde Recepción abrir el kiosco. Confirmar que Dueño/Gerente no tienen esa acción.
+2. Confirmar que URL directa sin handoff no crea sesión.
+3. Verificar socio por contacto y fecha de nacimiento.
+4. Comprobar PII enmascarada, `no-store`, inactividad y cierre/borrado manual.
+5. Confirmar ausencia de rutas/credenciales POS/CRM/configuración.
+6. Finalizar y verificar pantalla limpia para el siguiente socio.
 
 ## 4. Membresías y Stripe Checkout
 
@@ -39,65 +39,96 @@ Recorrer por separado:
 - socio sin membresía: contratar plan;
 - membresía vigente/vencida: renovar;
 - membresía activa: cambiar plan;
-- recurso con costo: pagar reserva cuando corresponda;
 - doble clic, reintento y regreso repetido.
 
-En todos los casos debe mostrarse cotización final. Antes de webhook no cambia
-la membresía/reserva. Después del webhook confirmado debe existir una sola
-venta, un pago, un recibo cuando Stripe lo provee y un solo efecto de dominio.
-El retorno usa el sistema visual GymFort y explica la verificación; no afirma
-éxito por sí solo.
+Antes del webhook no cambia la membresía. Después del webhook confirmado debe existir una sola venta, pago, recibo cuando Stripe lo provee y un solo efecto de dominio. El retorno del navegador nunca confirma éxito por sí solo.
 
 ## 5. Planes multi-sucursal
 
-1. Asigna al socio un plan `multiBranchAccess=true` originado en sucursal A.
-2. Abre el kiosco desde Recepción en sucursal B del mismo tenant.
-3. Confirma que encuentra al socio, reconoce su membresía y muestra pagos
-   permitidos sin mezclar otro tenant.
-4. Reserva un recurso elegible de B y confirma que la reserva pertenece a B.
-5. Cotiza un plan local de B: la nueva operación debe usar B y no mutar la
-   membresía original antes del pago.
-6. Repite con plan no multi-sucursal y confirma rechazo/ocultamiento en B.
+1. Asignar plan `multiBranchAccess=true` originado en A.
+2. Abrir kiosco desde Recepción en B del mismo tenant.
+3. Confirmar reconocimiento del socio/membresía sin mezclar otro tenant.
+4. Reservar recurso elegible de B y confirmar sucursal B.
+5. Cotizar plan local de B sin mutar la membresía original antes del pago.
+6. Repetir con plan no multi-sucursal y confirmar rechazo/ocultamiento en B.
 
 ## 6. Domiciliación
 
-1. Obtén términos vigentes y acepta expresamente.
-2. Completa Setup alojado; confirma que GymFort sólo muestra marca y últimos cuatro.
-3. Reenvía el webhook y verifica que no duplica mandato.
-4. Ejecuta cargo exitoso y confirma una sola extensión.
-5. Prueba rechazo, reintentos, `PAST_DUE` y `requires_action`.
-6. Sustituye la tarjeta y recupera el mandato.
-7. Revoca y confirma que no se materializan nuevos cargos.
+1. Obtener términos vigentes y aceptar expresamente.
+2. Completar Setup alojado; confirmar que GymFort sólo muestra marca/últimos cuatro.
+3. Reenviar webhook y verificar idempotencia.
+4. Ejecutar cargo exitoso y confirmar una sola extensión.
+5. Probar rechazo, reintentos, `PAST_DUE` y `requires_action`.
+6. Sustituir tarjeta y recuperar mandato.
+7. Revocar y confirmar que no se materializan nuevos cargos.
 
-## 7. Historial de pagos
+Importante para Automatizaciones: activar una domiciliación y llegar a la fecha de cobro son eventos distintos. `RECURRING_CHARGE_DUE` se dispara cuando llega la fecha programada de una ocurrencia; no al vincular inicialmente el mandato.
 
-- Estados claros: pendiente, pagado, rechazado y comprobante.
-- Intentos pendientes repetidos no deben aparentar cargos completados.
-- `Continuar pago` sólo aparece con una URL todavía válida.
-- Los historiales técnicos de mandatos/cargos/webhooks están paginados y
-  aislados al tenant, sin PAN, CVV, secretos ni payloads sensibles.
+## 7. Automatizaciones - interfaz
 
-## 8. Automatizaciones
+1. Entrar como Dueño y Gerente; ambos deben ver y administrar reglas.
+2. Confirmar pestañas **Automatizaciones / Actividad / Problemas**.
+3. Crear una regla desde cero; no deben mostrarse plantillas/recetas recomendadas.
+4. Confirmar que la card de una regla contiene toggle y `Probar ahora` directamente, sin menú `Opciones` intermedio.
+5. Activar/desactivar y comprobar persistencia.
+6. Verificar que logs técnicos de scheduler/leases/intentos no saturan la vista normal.
 
-1. Crea una regla desde receta y revisa trigger, destinatario, contenido y
-   `retryLimit`.
-2. Ejecuta manualmente y confirma historial/entrega.
-3. Genera eventos de pago, membresía, domiciliación y reserva.
-4. Repite un evento y confirma una sola ocurrencia/efecto por identidad.
-5. Fuerza fallo, backoff y `DEAD_LETTER`; corrige la causa y reintenta con motivo.
-6. Pausa un tenant y confirma que otros continúan; reanuda con auditoría.
-7. Verifica backlog, leases, duración y resultado en métricas.
+## 8. Probar ahora - email
 
-## 9. Correo
+1. Pulsar `Probar ahora` en una regla `EMAIL`.
+2. Confirmar que aparece búsqueda por nombre/correo, no un selector con todos los socios.
+3. Escribir al menos dos caracteres y verificar resultados incrementales.
+4. Confirmar que sólo se muestran socios activos con correo.
+5. Seleccionar un socio y enviar.
+6. Confirmar aparición en **Actividad** y recepción en la bandeja.
+7. Confirmar que la prueba no crea ventas, pagos, reservas ni membresías falsas.
 
-1. Configura SMTP y remitente tenant; envía prueba.
-2. Confirma transición `QUEUED` → `PROCESSING` → `SENT`.
-3. Simula timeout hasta `DEAD_LETTER` y recupera manualmente.
-4. Confirma preferencia/supresión y destinatarios sanitizados.
-5. Para Zoho, además valida TLS, SPF, DKIM, DMARC y entrega real. Este último
-   recorrido permanece pendiente mientras no se implemente/conecte Zoho.
+La búsqueda debe ser usable sin scroll anidado en la lista; si el contenido excede el viewport, sólo el drawer completo debe desplazarse.
 
-## 10. Comandos
+## 9. Eventos reales de automatización
+
+Probar al menos:
+
+- `PAYMENT_COMPLETED`;
+- `MEMBERSHIP_EXPIRING`;
+- `MEMBERSHIP_EXPIRED`;
+- reserva creada/confirmada/cancelada;
+- `BOOKING_REMINDER`;
+- `RECURRING_CHARGE_DUE`;
+- `RECURRING_CHARGE_SUCCEEDED`;
+- `RECURRING_CHARGE_FAILED`.
+
+Repetir un evento y confirmar una sola ocurrencia/efecto por identidad idempotente.
+
+## 10. Fallos y recuperación
+
+1. Forzar un fallo recuperable y comprobar `RETRY_SCHEDULED`/backoff.
+2. Agotar intentos y comprobar `DEAD_LETTER`.
+3. En UI, confirmar que aparece en **Problemas** con lenguaje operativo.
+4. Corregir la causa y reintentar.
+5. Pausar un tenant mediante permiso avanzado y confirmar que otros continúan.
+6. Verificar backlog, leases y resultados en métricas/Actuator.
+
+## 11. ZeptoMail
+
+1. Verificar dominio `gymfort.mx` con DKIM y CNAME/return-path.
+2. En Cloudflare, dejar el CNAME de bounce como **DNS only**.
+3. Configurar `smtp.zeptomail.com:587`, STARTTLS y credenciales del Mail Agent.
+4. Autorizar `notificaciones@gymfort.mx`.
+5. Configurar un gimnasio con nombre visible y `Reply-To` real.
+6. Enviar prueba desde Configuración y confirmar recepción.
+7. Probar una regla con `Probar ahora` y confirmar entrega.
+8. Revisar Processed emails y headers SPF/DKIM/DMARC.
+9. Confirmar que `Responder` apunta al `Reply-To` tenant.
+10. Confirmar branding visual del gimnasio.
+
+Evidencia actual: al 22 de agosto de 2026 DKIM/CNAME de `gymfort.mx` quedaron verificados y se recibieron correos reales desde ZeptoMail.
+
+## 12. Logo del email
+
+En producción `GYMOS_FRONTEND_BASE_URL` debe ser público (`https://gymfort.mx`) para que Gmail/Outlook descarguen `/api/tenant-logo/...`. En local, una URL `localhost` no es accesible por el cliente de correo; el renderer omite el `<img>` en ese caso.
+
+## 13. Comandos
 
 ```powershell
 cd backend
@@ -112,6 +143,16 @@ npm.cmd run build
 npm.cmd run test:e2e
 ```
 
-`stripeTest` requiere `GYMOS_STRIPE_TEST_SECRET_KEY=sk_test_...`; rechaza llaves
-live y debe ejecutarse con una cuenta Connect test para reproducir la topología
-completa.
+`stripeTest` requiere `GYMOS_STRIPE_TEST_SECRET_KEY=sk_test_...`; rechaza llaves live y debe ejecutarse con cuenta Connect test para reproducir la topología completa.
+
+## 14. Criterio de cierre
+
+Automatizaciones/email se considera aceptado para el alcance V1 cuando:
+
+- Dueño y Gerente pueden crear/administrar/probar reglas;
+- eventos reales producen una sola notificación;
+- prueba manual usa socio real con email;
+- cola/reintentos/dead letter funcionan;
+- ZeptoMail entrega correo real con identidad tenant;
+- no se exponen secretos ni logs técnicos innecesarios al cliente;
+- documentación/runbook coincide con el comportamiento del código.
