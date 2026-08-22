@@ -7,16 +7,18 @@ import jakarta.mail.internet.MimeMessage;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 import java.util.Properties;
+import java.util.regex.Pattern;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.MailAuthenticationException;
 import org.springframework.mail.MailException;
 import org.springframework.mail.MailParseException;
 import org.springframework.mail.javamail.JavaMailSenderImpl;
 import org.springframework.mail.javamail.MimeMessageHelper;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 @Component
 public class SmtpEmailDeliveryAdapter implements EmailDeliveryPort {
+	private static final Pattern HEX_COLOR = Pattern.compile("^#[0-9A-Fa-f]{6}$");
 	private final NotificationProperties.Smtp properties;
 	private final JavaMailSenderImpl mailSender;
 
@@ -112,19 +114,59 @@ public class SmtpEmailDeliveryAdapter implements EmailDeliveryPort {
 	}
 
 	private String brandedHtml(EmailMessage message) {
-		String sender = message.fromName() == null ? "Tu gimnasio" : escape(message.fromName());
+		String brand = escape(firstNonBlank(message.brandName(), message.fromName(), "Tu gimnasio"));
+		String subject = escape(firstNonBlank(message.subject(), "Notificación"));
 		String content = escape(message.bodyText()).replace("\r\n", "\n").replace("\r", "\n").replace("\n", "<br>");
+		String primary = safeColor(message.primaryColor(), "#093d3a");
+		String accent = safeColor(message.accentColor(), "#18c8b2");
+		String surface = safeColor(message.surfaceColor(), "#f2f8f7");
+		String logo = safeLogo(message.logoUrl(), brand);
+		String replyHint = message.replyTo() == null
+				? "Este es un mensaje automático."
+				: "Puedes responder este correo para contactar al gimnasio.";
+
 		return """
 				<!doctype html>
-				<html lang="es"><body style="margin:0;background:#f2f6f4;font-family:Arial,sans-serif;color:#17342d">
-				<table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="padding:32px 16px;background:#f2f6f4"><tr><td align="center">
-				<table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="max-width:620px;background:#ffffff;border:1px solid #dbe7e2;border-radius:16px;overflow:hidden">
-				<tr><td style="height:6px;background:#d8f000"></td></tr>
-				<tr><td style="padding:30px 34px 12px"><div style="font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#477168">%s</div></td></tr>
-				<tr><td style="padding:10px 34px 34px;font-size:16px;line-height:1.7;color:#284b43">%s</td></tr>
-				<tr><td style="padding:18px 34px;background:#102d27;color:#d7e8e3;font-size:12px;line-height:1.5">Mensaje enviado de forma segura con GymFort.</td></tr>
-				</table></td></tr></table></body></html>
-				""".formatted(sender, content);
+				<html lang="es">
+				<body style="margin:0;padding:0;background:#f4f6f5;font-family:Arial,Helvetica,sans-serif;color:#17211f">
+				<table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="width:100%%;background:#f4f6f5;padding:32px 14px">
+				<tr><td align="center">
+				<table role="presentation" width="100%%" cellspacing="0" cellpadding="0" style="width:100%%;max-width:640px;background:#ffffff;border:1px solid #dfe7e4;border-radius:16px;overflow:hidden">
+				<tr><td style="height:6px;background:%s;font-size:0;line-height:0">&nbsp;</td></tr>
+				<tr><td style="padding:28px 32px 12px">
+				<table role="presentation" width="100%%" cellspacing="0" cellpadding="0"><tr>
+				<td style="vertical-align:middle">%s<div style="display:inline-block;vertical-align:middle;color:%s;font-size:15px;font-weight:800">%s</div></td>
+				</tr></table>
+				<h1 style="margin:26px 0 0;color:#17211f;font-size:25px;line-height:1.25;font-weight:800">%s</h1>
+				</td></tr>
+				<tr><td style="padding:8px 32px 34px;color:#40524e;font-size:16px;line-height:1.7">%s</td></tr>
+				<tr><td style="padding:18px 32px;background:%s;border-top:1px solid #dfe7e4">
+				<div style="color:%s;font-size:12px;font-weight:700;line-height:1.5">%s</div>
+				<div style="margin-top:4px;color:#6b7976;font-size:11px;line-height:1.5">%s&nbsp;&nbsp;·&nbsp;&nbsp;Enviado mediante GymFort</div>
+				</td></tr>
+				</table>
+				</td></tr></table>
+				</body></html>
+				""".formatted(accent, logo, primary, brand, subject, content, surface, primary, brand, replyHint);
+	}
+
+	private String safeLogo(String logoUrl, String brand) {
+		if (logoUrl == null || logoUrl.isBlank()) return "";
+		String normalized = logoUrl.trim();
+		if (!normalized.startsWith("https://") && !normalized.startsWith("http://")) return "";
+		return "<img src=\"" + escape(normalized) + "\" alt=\"" + brand
+				+ "\" width=\"44\" height=\"44\" style=\"display:inline-block;vertical-align:middle;width:44px;height:44px;object-fit:contain;margin-right:12px;border-radius:10px\">";
+	}
+
+	private String safeColor(String value, String fallback) {
+		return value != null && HEX_COLOR.matcher(value.trim()).matches() ? value.trim() : fallback;
+	}
+
+	private String firstNonBlank(String... values) {
+		for (String value : values) {
+			if (value != null && !value.isBlank()) return value.trim();
+		}
+		return "";
 	}
 
 	private String escape(String value) {
