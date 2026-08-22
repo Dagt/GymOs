@@ -37,7 +37,9 @@ export function AppDrawer({
             Cerrar
           </button>
         </header>
-        <div className="app-drawer-body min-h-0 overflow-y-auto overscroll-contain pr-1">{children}</div>
+        <div className="app-drawer-body min-h-0 overflow-y-auto overscroll-contain pr-1 [&_.max-h-64]:!static [&_.max-h-64]:!max-h-none [&_.max-h-64]:!overflow-visible">
+          {children}
+        </div>
       </section>
     </aside>
   );
