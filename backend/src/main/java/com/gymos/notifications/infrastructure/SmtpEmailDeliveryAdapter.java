@@ -31,9 +31,17 @@ public class SmtpEmailDeliveryAdapter implements EmailDeliveryPort {
 	}
 
 	SmtpEmailDeliveryAdapter(NotificationProperties.Smtp properties, JavaMailSenderImpl mailSender) {
+		this(properties, mailSender, "http://localhost:3000");
+	}
+
+	SmtpEmailDeliveryAdapter(
+			NotificationProperties.Smtp properties,
+			JavaMailSenderImpl mailSender,
+			String frontendBaseUrl
+	) {
 		this.properties = properties;
 		this.mailSender = mailSender;
-		this.frontendBaseUrl = "http://localhost:3000";
+		this.frontendBaseUrl = frontendBaseUrl == null ? "" : frontendBaseUrl.replaceAll("/+$", "");
 	}
 
 	@Override
@@ -195,9 +203,18 @@ public class SmtpEmailDeliveryAdapter implements EmailDeliveryPort {
 			normalized = frontendBaseUrl + normalized;
 		}
 		if (!normalized.startsWith("https://") && !normalized.startsWith("http://")) return "";
+		if (isLocalAddress(normalized)) return "";
 		return "<span style=\"display:inline-block;vertical-align:middle;margin-right:12px;padding:6px;background:#ffffff;border-radius:10px\"><img src=\""
 				+ escape(normalized) + "\" alt=\"" + brand
 				+ "\" width=\"40\" height=\"40\" style=\"display:block;width:40px;height:40px;object-fit:contain;border:0\"></span>";
+	}
+
+	private boolean isLocalAddress(String value) {
+		String normalized = value.toLowerCase();
+		return normalized.startsWith("http://localhost")
+				|| normalized.startsWith("https://localhost")
+				|| normalized.startsWith("http://127.0.0.1")
+				|| normalized.startsWith("https://127.0.0.1");
 	}
 
 	private String safeColor(String value, String fallback) {
