@@ -38,9 +38,28 @@ nombre técnico interno durante la transición de marca.
 - Split Stripe account management from operational payment switches: managers
   may enable or disable an existing connection, while owners/support connect
   and refresh it.
-- Add durable email delivery with SMTP, leases, retries, preferences,
-  suppression, tenant sender settings and operational metrics; use ZeptoMail as
-  the transactional SMTP profile while preserving the provider abstraction.
+- Complete durable transactional email delivery with ZeptoMail through the
+  existing `EmailDeliveryPort`: verified `gymfort.mx` DKIM/return-path DNS,
+  real SMTP delivery, tenant sender name/Reply-To, allowlisted From addresses,
+  retries/dead letters, preferences and operational metrics.
+- Add branded HTML email rendering from organization name, primary/accent/surface
+  colors and tenant logo; resolve relative logos with `GYMOS_FRONTEND_BASE_URL`
+  and avoid broken localhost images in external mail clients.
+- Simplify Automations to three customer-facing views: Automations, Activity and
+  Problems; hide scheduler/lease/internal execution detail from the normal gym
+  workflow while preserving it in backend observability.
+- Remove recommended automation templates; new rules are configured from scratch
+  through a guided flow.
+- Replace the Automations options menu with a direct `Probar ahora` action.
+- Make email-rule tests select a real active member through incremental
+  name/email search instead of executing without recipient context.
+- Grant managers the operational automation/notification permissions required to
+  create, enable, disable and test rules (V80) without granting scheduler control.
+- Clarify recurring-charge semantics: `RECURRING_CHARGE_DUE` represents a due
+  occurrence, not the initial activation of a recurring payment mandate.
+- Reconcile missing historical Coach operational profiles with V79 after a
+  real acceptance case showed role/branch access could drift from the `coach`
+  entity and break workout creation/metrics.
 - Add a pinned Stripe CLI `v1.50.3` Docker profile and CI verification.
 
 - Consolidate documentation into one canonical status file per module.
@@ -84,9 +103,6 @@ nombre técnico interno durante la transición de marca.
 - Start the safe self-service kiosk foundation with canonical terminal
   capabilities, audited contact updates and card-only financial contracts that
   remain closed until a real payment gateway is connected.
-- Make Automations expose only working manual/scheduled notification rules,
-  reject unsupported definitions and explain its operational purpose in the
-  administrative interface.
 
 ## 0.6.5
 
