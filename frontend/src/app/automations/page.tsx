@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { AppDrawer } from "@/components/AppDrawer";
 import { AppNotice } from "@/components/AppNotice";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
@@ -18,14 +18,17 @@ import {
   getStoredSession,
   recoverAutomationDeadLetter,
   retryNotificationEmail,
+  searchClients,
   setAutomationStatus,
   type AutomationDeadLetter,
   type AutomationOperations,
   type AutomationRule,
+  type ClientSummary,
   type EmailNotificationConfiguration,
   type NotificationLog,
   type StoredSession,
 } from "@/lib/api";
+import { testAutomationEmail } from "@/lib/api/automations";
 
 type ViewTab = "AUTOMATIONS" | "ACTIVITY" | "PROBLEMS";
 type RuleChannel = "IN_APP" | "EMAIL";
@@ -73,6 +76,10 @@ export default function AutomationsPage() {
   const [showRuleDrawer, setShowRuleDrawer] = useState(false);
   const [wizardStep, setWizardStep] = useState(1);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
+  const [testRule, setTestRule] = useState<AutomationRule | null>(null);
+  const [testClients, setTestClients] = useState<ClientSummary[]>([]);
+  const [testClientId, setTestClientId] = useState("");
+  const [testClientsLoading, setTestClientsLoading] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -119,7 +126,9 @@ export default function AutomationsPage() {
   }
 
   function openNewAutomation(template?: string) {
-    const next = template ? templateDraft(template) : { ...EMPTY_DRAFT, channel: emailConfiguration?.ready ? "EMAIL" : "IN_APP" as RuleChannel };
+    const next = template
+      ? templateDraft(template)
+      : { ...EMPTY_DRAFT, channel: (emailConfiguration?.ready ? "EMAIL" : "IN_APP") as RuleChannel };
     if (next.channel === "EMAIL" && !emailConfiguration?.ready) next.channel = "IN_APP";
     setDraft(next);
     setWizardStep(template ? 2 : 1);
@@ -133,7 +142,7 @@ export default function AutomationsPage() {
     setDraft((current) => ({
       ...current,
       triggerType,
-      name: current.name || defaults.name,
+      name: defaults.name,
       subject: defaults.subject,
       body: defaults.body,
       channel: supportsClientEmail(triggerType) && emailConfiguration?.ready ? "EMAIL" : "IN_APP",
@@ -191,6 +200,10 @@ export default function AutomationsPage() {
 
   async function runRule(rule: AutomationRule) {
     if (!session) return;
+    if (isEmailRule(rule)) {
+      await openEmailTest(rule);
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -200,6 +213,43 @@ export default function AutomationsPage() {
       setActiveTab("ACTIVITY");
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible probar la automatización.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function openEmailTest(rule: AutomationRule) {
+    if (!session) return;
+    setTestRule(rule);
+    setTestClients([]);
+    setTestClientId("");
+    setTestClientsLoading(true);
+    setError(null);
+    try {
+      const clients = await searchClients(session.accessToken, "", "ACTIVE");
+      const withEmail = clients.filter((client) => Boolean(client.email?.trim()));
+      setTestClients(withEmail);
+      setTestClientId(withEmail[0]?.id ?? "");
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible cargar los socios para la prueba.");
+      setTestRule(null);
+    } finally {
+      setTestClientsLoading(false);
+    }
+  }
+
+  async function sendEmailTest() {
+    if (!session || !testRule || !testClientId) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await testAutomationEmail(session.accessToken, testRule.id, testClientId);
+      setTestRule(null);
+      await refresh();
+      setMessage("Prueba enviada al socio seleccionado. Revisa Actividad para seguir la entrega.");
+      setActiveTab("ACTIVITY");
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible enviar la prueba.");
     } finally {
       setSaving(false);
     }
@@ -320,7 +370,14 @@ export default function AutomationsPage() {
                     <details className="relative">
                       <summary className="app-button-secondary list-none cursor-pointer">Opciones</summary>
                       <div className="app-card absolute right-0 z-20 mt-2 grid min-w-44 gap-1 p-2 shadow-xl">
-                        <button className="rounded-xl px-3 py-2 text-left text-sm font-bold text-[var(--brand-ink)] hover:bg-[var(--brand-primary-soft)] disabled:opacity-50" disabled={saving || rule.status !== "ENABLED"} onClick={() => void runRule(rule)} type="button">Probar ahora</button>
+                        <button
+                          className="rounded-xl px-3 py-2 text-left text-sm font-bold text-[var(--brand-ink)] hover:bg-[var(--brand-primary-soft)] disabled:opacity-50"
+                          disabled={saving || rule.status !== "ENABLED"}
+                          onClick={() => void runRule(rule)}
+                          type="button"
+                        >
+                          Probar ahora
+                        </button>
                       </div>
                     </details>
                   ) : null}
@@ -374,6 +431,37 @@ export default function AutomationsPage() {
           saving={saving}
           step={wizardStep}
         />
+      </AppDrawer>
+
+      <AppDrawer onClose={() => setTestRule(null)} open={testRule !== null} title="Probar automatización">
+        <section className="grid gap-4">
+          <div>
+            <p className="app-eyebrow">Prueba real de correo</p>
+            <h3 className="app-card-title mt-1">{testRule?.name}</h3>
+            <p className="app-card-copy mt-2">Selecciona un socio con correo registrado. La prueba usará el asunto, mensaje y diseño configurados en esta regla.</p>
+          </div>
+          {testClientsLoading ? <p className="text-sm text-[var(--brand-muted)]">Cargando socios...</p> : null}
+          {!testClientsLoading && testClients.length === 0 ? (
+            <section className="app-card p-4">
+              <p className="text-sm font-bold text-[var(--brand-ink)]">No hay socios activos con correo disponible.</p>
+              <p className="mt-1 text-sm text-[var(--brand-muted)]">Registra un correo en un socio para poder probar reglas que envían email.</p>
+            </section>
+          ) : null}
+          {testClients.length > 0 ? (
+            <label className="form-field">
+              <span>Socio destinatario</span>
+              <select className="app-input" onChange={(event) => setTestClientId(event.target.value)} value={testClientId}>
+                {testClients.map((client) => (
+                  <option key={client.id} value={client.id}>{clientDisplayName(client)} · {client.email}</option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <div className="flex justify-end gap-2">
+            <button className="app-button-secondary" onClick={() => setTestRule(null)} type="button">Cancelar</button>
+            <button className="app-button" disabled={saving || !testClientId} onClick={() => void sendEmailTest()} type="button">Enviar prueba</button>
+          </div>
+        </section>
       </AppDrawer>
     </AppShell>
   );
@@ -587,6 +675,9 @@ function TriggerConditionFields({ draft, onDraftChange }: { draft: Draft; onDraf
   if (draft.triggerType === "PAYMENT_PENDING_VALIDATION") {
     return <div className="mt-3 grid gap-3"><label className="form-field"><span>Método de pago</span><select className="app-input" onChange={(event) => onDraftChange({ ...draft, paymentMethod: event.target.value })} value={draft.paymentMethod}><option value="ALL">Cualquier método</option><option value="CARD_MANUAL">Terminal manual</option><option value="CARD_MERCADO_PAGO">Mercado Pago Point</option><option value="CARD_ONLINE">Stripe Checkout</option><option value="TRANSFER">Transferencia</option><option value="CASH">Efectivo</option></select></label><label className="form-field"><span>Monto mínimo (opcional)</span><input className="app-input" min={0} onChange={(event) => onDraftChange({ ...draft, minimumAmountPesos: event.target.value })} step="0.01" type="number" value={draft.minimumAmountPesos} /></label></div>;
   }
+  if (draft.triggerType === "RECURRING_CHARGE_DUE") {
+    return <p className="app-card-copy mt-3 rounded-xl border border-[var(--brand-line)] p-3">Se activa cuando llega la fecha programada del cobro recurrente y GymFort lo pone en proceso. No se activa al vincular por primera vez la tarjeta o crear la domiciliación.</p>;
+  }
   return null;
 }
 
@@ -594,7 +685,7 @@ function TemplateButton({ title, copy, onClick }: { title: string; copy: string;
   return <button className="app-card p-4 text-left transition hover:-translate-y-0.5" onClick={onClick} type="button"><strong className="block text-sm font-black text-[var(--brand-ink)]">{title}</strong><span className="mt-1 block text-xs text-[var(--brand-muted)]">{copy}</span></button>;
 }
 
-function TabButton({ active, children, onClick }: { active: boolean; children: React.ReactNode; onClick: () => void }) {
+function TabButton({ active, children, onClick }: { active: boolean; children: ReactNode; onClick: () => void }) {
   return <button aria-selected={active} className={active ? "app-button" : "app-button-secondary"} onClick={onClick} role="tab" type="button">{children}</button>;
 }
 
@@ -620,7 +711,7 @@ function triggerDefaults(triggerType: string) {
     MEMBERSHIP_EXPIRED: { name: "Membresía vencida", subject: "Tu membresía ha vencido", body: "Hola {{recipientName}},\n\nTu membresía ha vencido. Contáctanos para renovarla." },
     RECURRING_CHARGE_FAILED: { name: "Aviso de cobro rechazado", subject: "No pudimos procesar tu cobro", body: "Hola {{recipientName}},\n\nNo pudimos procesar el cobro de tu membresía. Actualiza tu método de pago o comunícate con recepción." },
     RECURRING_CHARGE_SUCCEEDED: { name: "Confirmación de domiciliación", subject: "Pago recibido", body: "Hola {{recipientName}},\n\nTu cobro recurrente se procesó correctamente. Gracias." },
-    RECURRING_CHARGE_DUE: { name: "Cobro domiciliado iniciado", subject: "Procesaremos tu cobro", body: "Hola {{recipientName}},\n\nTu cobro recurrente está programado y será procesado automáticamente." },
+    RECURRING_CHARGE_DUE: { name: "Cobro domiciliado por procesar", subject: "Procesaremos tu cobro recurrente", body: "Hola {{recipientName}},\n\nLlegó la fecha programada de tu cobro recurrente y lo procesaremos automáticamente." },
     BOOKING_REMINDER: { name: "Recordatorio de reserva", subject: "Recordatorio de tu reserva", body: "Hola {{recipientName}},\n\nTe recordamos que tienes una reserva próxima. Te esperamos." },
     BOOKING_CREATED: { name: "Reserva creada", subject: "Recibimos tu reserva", body: "Hola {{recipientName}},\n\nTu reserva fue registrada correctamente." },
     BOOKING_CONFIRMED: { name: "Reserva confirmada", subject: "Tu reserva está confirmada", body: "Hola {{recipientName}},\n\nTu reserva quedó confirmada. Te esperamos." },
@@ -678,6 +769,15 @@ function ruleDeliveryLabel(rule: AutomationRule) {
   }
 }
 
+function isEmailRule(rule: AutomationRule) {
+  try {
+    const configuration = JSON.parse(rule.actionConfigJson || "{}") as { channel?: string };
+    return configuration.channel === "EMAIL";
+  } catch {
+    return false;
+  }
+}
+
 function notificationChannelLabel(channel: string) {
   return ({ EMAIL: "Correo al socio", IN_APP: "Notificación interna" } as Record<string, string>)[channel] ?? channel;
 }
@@ -702,7 +802,7 @@ function triggerLabel(triggerType: string) {
     PAYMENT_PENDING_VALIDATION: "Pago pendiente de validar",
     MEMBERSHIP_EXPIRING: "Membresía por vencer",
     MEMBERSHIP_EXPIRED: "Membresía vencida",
-    RECURRING_CHARGE_DUE: "Cobro domiciliado iniciado",
+    RECURRING_CHARGE_DUE: "Cobro domiciliado por procesar",
     RECURRING_CHARGE_SUCCEEDED: "Domiciliación cobrada",
     RECURRING_CHARGE_FAILED: "Domiciliación fallida",
     BOOKING_CREATED: "Reserva creada",
@@ -733,6 +833,10 @@ function supportsClientEmail(triggerType: string) {
   ].includes(triggerType);
 }
 
+function clientDisplayName(client: ClientSummary) {
+  return [client.firstName, client.lastName, client.maternalLastName].filter(Boolean).join(" ") || "Socio";
+}
+
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
@@ -750,7 +854,7 @@ const TRIGGERS = [
   { value: "MEMBERSHIP_EXPIRED", label: "Una membresía venció" },
   { value: "PAYMENT_COMPLETED", label: "Se completa un pago" },
   { value: "PAYMENT_PENDING_VALIDATION", label: "Hay un pago pendiente de validar" },
-  { value: "RECURRING_CHARGE_DUE", label: "Inicia un cobro domiciliado" },
+  { value: "RECURRING_CHARGE_DUE", label: "Llega la fecha de un cobro domiciliado" },
   { value: "RECURRING_CHARGE_SUCCEEDED", label: "Una domiciliación se cobra" },
   { value: "RECURRING_CHARGE_FAILED", label: "Falla una domiciliación" },
   { value: "BOOKING_CREATED", label: "Se crea una reserva" },
