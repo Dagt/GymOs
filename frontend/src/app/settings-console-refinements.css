@@ -1,11 +1,9 @@
-/* Configuration workspace refinements.
-   Reuse the same tenant-card treatment already present in Datos y marca/Sedes,
-   and keep section grouping structural rather than card-within-card. */
+/* Configuration layout only.
+   Colors, cards and controls intentionally inherit the shared GymFort styles from globals.css. */
 .settings-console .settings-section-nav {
-  background: white;
-  border: 1px solid color-mix(in srgb, var(--brand-primary) 10%, var(--brand-line));
   border-bottom: 0;
   border-radius: .75rem .75rem 0 0;
+  border-top: 3px solid color-mix(in srgb, var(--brand-accent) 72%, var(--brand-primary));
   box-shadow: none;
   justify-content: flex-end;
   padding: .65rem .8rem;
@@ -18,33 +16,8 @@
 }
 
 .settings-console .settings-section-nav + .settings-detail-panel {
-  background: white !important;
   border-radius: 0 0 .75rem .75rem !important;
-  border-top: 1px solid color-mix(in srgb, var(--brand-primary) 10%, var(--brand-line)) !important;
-  box-shadow: 0 12px 35px rgba(9, 42, 37, .055) !important;
   margin-top: -1.25rem;
-}
-
-/* Same visual formula as the existing organization/branch summary cards. */
-.settings-console .settings-option-row {
-  background: color-mix(in srgb, var(--brand-surface) 56%, white) !important;
-  border-color: color-mix(in srgb, var(--brand-primary) 10%, var(--brand-line)) !important;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .78) !important;
-}
-
-.settings-console .settings-option-row.is-disabled {
-  background: color-mix(in srgb, var(--brand-surface) 34%, white) !important;
-}
-
-.settings-console .settings-branch-container {
-  background: white !important;
-  border-color: color-mix(in srgb, var(--brand-primary) 10%, var(--brand-line)) !important;
-  box-shadow: none !important;
-}
-
-.settings-console .settings-info-panel {
-  background: white !important;
-  border: 1px solid color-mix(in srgb, var(--brand-primary) 10%, var(--brand-line)) !important;
 }
 
 .settings-console .settings-section-tabs {
