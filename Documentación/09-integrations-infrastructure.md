@@ -4,224 +4,196 @@ Corte: 22 de agosto de 2026
 
 ## 9.1 Arquitectura de proveedores
 
-Los proveedores externos se aíslan detrás de puertos de aplicación. Los
-dominios no almacenan secretos ni confían en datos devueltos por el navegador.
+Los proveedores externos se aíslan detrás de puertos de aplicación. Los dominios no almacenan secretos ni confían en datos devueltos por navegador.
 
-- Pagos: terminal manual, Mercado Pago OAuth/Point y Stripe
-  Connect/Checkout/Setup/off-session.
-- Correo: `EmailDeliveryPort` con adaptador SMTP, cola durable y configuración
-  de remitente por tenant. El perfil Zoho/SMTP, remitentes autorizados, prueba
-  inmediata y evidencia de última verificación forman parte del trabajo vigente
-  de notificaciones.
+- Pagos: terminal manual, Mercado Pago OAuth/Point y Stripe Connect/Checkout/Setup/off-session.
+- Correo: `EmailDeliveryPort` con adaptador SMTP y ZeptoMail como proveedor operativo actual.
 - Almacenamiento: MinIO/S3 para logos, medios, comprobantes y documentos.
-- Acceso físico: modelo funcional de dispositivos/beneficios ya implementado;
-  integración productiva de hardware definida para iniciar con HikCentral
-  Professional en el primer gimnasio piloto.
-- WhatsApp, push y facturación: puertos previstos, adaptadores productivos fuera
-  del corte.
+- Acceso físico: modelo funcional de dispositivos/beneficios; integración productiva prevista con HikCentral Professional en el primer piloto.
+- WhatsApp, push y facturación: puertos previstos, adaptadores productivos fuera del corte.
 
 ## 9.2 Acceso físico y HikCentral Professional
 
 ### Fuente de verdad y ejecutor físico
 
-GymFort será la fuente de verdad para:
+GymFort será fuente de verdad para:
 
 ```text
 Client -> Membership -> MembershipPlan -> Benefit ACCESS
 ```
 
-El sistema físico existente será responsable de ejecutar localmente esos
-derechos. La lógica de membresías/elegibilidad no debe depender de una marca.
+El sistema físico ejecutará localmente esos derechos. La lógica de membresías/elegibilidad no depende de una marca.
 
-El primer gimnasio piloto utiliza terminal/torniquete Hikvision administrado por
-**HikCentral Professional** dentro de la red local. El objetivo es integrar con
-HikCentral, no saltarlo para hablar directamente con el torniquete mientras
-HikCentral siga siendo el administrador del dispositivo.
-
-Arquitectura objetivo del primer piloto:
+Primer piloto:
 
 ```text
 GymFort Cloud
-  -> puerto de integración Access
+  -> puerto Access
   -> GymFort Local Connector
   -> HikCentral Professional (LAN)
   -> terminal/controlador Hikvision
   -> torniquete/puerta
 ```
 
-### Modo de integración
+Se prefiere sincronización de autorizaciones frente a consulta cloud por cada paso. HikCentral conserva decisión local y biometría; GymFort no procesa plantillas biométricas.
 
-Para HikCentral se prefiere **sincronización de autorizaciones** frente a una
-consulta a GymFort Cloud en cada intento de paso.
-
-GymFort calcula el estado deseado de acceso y el conector sincroniza con
-HikCentral las personas/referencias y niveles de acceso necesarios. HikCentral y
-los terminales continúan tomando la decisión local con sus capacidades propias.
-Esto evita convertir la conexión a Internet de GymFort en requisito para abrir
-cada puerta.
-
-Ejemplo conceptual:
-
-```text
-GymFort benefit GYM_ACCESS
-  <-> mapping de integración
-  <-> HikCentral Access Level acceso general
-
-GymFort benefit SAUNA_ACCESS
-  <-> mapping de integración
-  <-> HikCentral Access Level sauna
-```
-
-Los identificadores concretos de `Person`, `Door`, `Access Level` o recurso del
-proveedor deben quedar en configuración de integración por tenant/sucursal, no
-en el dominio de Benefits ni en `EligibilityPolicy`.
-
-### Descubrimiento obligatorio antes de implementar
-
-La instalación real debe validarse antes de fijar contratos del adaptador:
-
-- versión de HikCentral Professional;
-- modelo/firmware de terminal y controlador;
-- disponibilidad y licencia de OpenAPI/Open Platform o SDK soportado por esa
-  instalación;
-- endpoints, puertos y autenticación oficiales;
-- operaciones soportadas para persona, fotografía/rostro, Access Levels,
-  apertura remota y eventos;
-- topología actual de red y relación de puertas.
-
-No se documenta como hecho un endpoint/puerto concreto de HikCentral hasta
-confirmarlo en el ambiente del gimnasio piloto.
-
-### GymFort Local Connector
-
-El conector será un proceso ligero dentro de la red del gimnasio, idealmente en
-la misma PC o LAN donde opera HikCentral.
-
-Responsabilidades:
-
-- establecer comunicación segura con GymFort;
-- invocar únicamente interfaces oficiales/soportadas de HikCentral;
-- aplicar sincronizaciones idempotentes;
-- reportar éxito, error y salud de integración;
-- permitir reconciliación del estado deseado contra el estado real;
-- posteriormente reenviar/consultar eventos físicos para `access_log`.
-
-No debe:
-
-- contener reglas de membresía;
-- calcular beneficios;
-- decidir qué plan corresponde al cliente;
-- almacenar secretos en frontend;
-- exigir exposición pública de HikCentral o de puertos del torniquete.
-
-Se prioriza un patrón de conexión saliente desde la red local cuando la
-tecnología elegida lo permita.
-
-### Biometría
-
-GymFort no debe implementar reconocimiento facial. HikCentral/Hikvision conserva
-el matching biométrico y la operación local. GymFort debe almacenar como máximo
-las referencias opacas indispensables para vincular un `Client` con la persona
-del proveedor.
-
-La automatización posterior del alta de persona/fotografía sólo se implementará
-si la interfaz oficial disponible en la instalación real lo soporta y después
-de revisar seguridad, privacidad y cumplimiento. No se copiarán plantillas
-biométricas a GymFort por defecto.
-
-### Fases
-
-1. **Descubrimiento:** inventario técnico y capacidades reales de HikCentral.
-2. **Sincronización mínima:** el enrolamiento facial puede seguir siendo manual
-   una vez; GymFort concede/revoca Access Levels según membresía y beneficios.
-3. **Enrolamiento asistido:** crear/actualizar persona/fotografía desde GymFort
-   si el API/licencia lo soporta.
-4. **Eventos:** conciliar eventos de HikCentral con la bitácora de GymFort.
-5. **Resiliencia:** heartbeat, cola, reintentos y reconciliación tras desconexión.
-6. **Segundo proveedor:** abstraer otra marca sólo cuando exista un caso real.
+Antes de implementar deben validarse versión/licencia/API/SDK, topología y operaciones oficiales de la instalación real.
 
 ## 9.3 Stripe y Mercado Pago
 
-- Las credenciales permanecen en secretos del backend; nunca en
-  `NEXT_PUBLIC_*`, imágenes o Git.
-- Stripe usa cuenta Express conectada por gimnasio, Account Links y captura
-  alojada. GymFort conserva sólo identificadores opacos y máscara.
-- Mercado Pago usa OAuth/PKCE, selección de Point y órdenes idempotentes.
-- Todo pago se persiste pendiente antes de invocar al proveedor.
-- Webhook firmado más consulta autoritativa concilian monto, moneda, tenant,
-  sucursal, venta, pago y método antes de publicar efectos.
-- Los workers recuperan operaciones no terminales y preservan idempotencia.
+- secretos sólo en backend;
+- Stripe usa Express conectado por gimnasio y captura alojada;
+- Mercado Pago usa OAuth/PKCE, terminal Point y órdenes idempotentes;
+- todo pago se persiste pendiente antes de invocar proveedor;
+- webhook firmado + consulta autoritativa concilian monto, moneda, tenant, sucursal y contexto;
+- workers recuperan operaciones no terminales e idempotentes.
 
-## 9.4 Correo
+## 9.4 Correo / ZeptoMail
 
-El backend recibe proveedor visible, host, puerto, usuario, contraseña,
-remitentes autorizados, TLS/SSL y timeouts SMTP por entorno. Cada gimnasio
-configura nombre, `From`, `Reply-To` y habilitación, no las credenciales. Los
-remitentes que no pertenezcan al dominio central de GymFort deben estar
-verificados y asociados al proveedor antes de autorizarse. La cola usa lease,
-backoff, dead letter, preferencias y destinatarios enmascarados/HMAC.
+### Diseño
 
-La prueba administrativa intenta la entrega inmediatamente, clasifica
-autenticación/configuración como fallo permanente y conserva la última entrega
-de prueba `SENT`. SPF/DKIM/DMARC, reputación y credenciales reales siguen siendo
-responsabilidades del ambiente.
+`notifications` posee la entrega; Automatizaciones sólo genera `CREATE_NOTIFICATION`.
 
-## 9.5 Despliegue local
+```text
+Automation / módulo productor
+        ↓
+notification_log
+        ↓
+NotificationDeliveryWorker
+        ↓
+EmailDeliveryPort
+        ↓
+SmtpEmailDeliveryAdapter
+        ↓
+ZeptoMail
+```
 
-Docker Compose levanta frontend, backend, PostgreSQL 18, Redis 8 y MinIO. El
-perfil opcional `stripe` usa `stripe/stripe-cli:v1.50.3` para reenviar eventos
-Connect. El primer arranque entrega un `whsec_...` que debe inyectarse al backend
-antes de validar firmas.
+No existe una segunda cola específica para Zoho/ZeptoMail.
 
-El futuro `GymFort Local Connector` de acceso físico es un componente distinto
-del stack local de desarrollo. Su empaquetado, actualización y observabilidad se
-definirán durante el piloto HikCentral; no debe requerir instalar el backend
-completo de GymFort dentro de cada gimnasio.
+### Credenciales
 
-## 9.6 CI/CD vigente
+El backend recibe por entorno:
 
-El pipeline ejecuta pruebas backend, pruebas/lint/typecheck/build frontend,
-validación y build de Compose. También descarga la imagen fijada de Stripe CLI
-y ejecuta su comando de versión. Permanecen pendientes despliegue automático a
-staging, escaneo formal de imágenes, simulacro restore y `stripeTest` con
-secretos sandbox protegidos.
+- proveedor visible;
+- host/puerto;
+- usuario/password;
+- remitentes autorizados;
+- TLS/SSL;
+- timeouts.
 
-Cuando inicie el conector HikCentral se debe añadir una suite contractual con un
-fake/simulador del proveedor; las pruebas de CI no deben depender del torniquete
-físico del gimnasio.
+Cada gimnasio configura sólo:
 
-## 9.7 Observabilidad y resiliencia
+- habilitación;
+- `fromName`;
+- `fromEmail`;
+- `replyTo`.
+
+Las credenciales nunca se guardan por tenant.
+
+### Patrón V1
+
+```text
+From: Nombre del gimnasio <notificaciones@gymfort.mx>
+Reply-To: correo real del gimnasio
+```
+
+La cuenta `notificaciones@gymfort.mx` no necesita buzón empresarial. ZeptoMail entrega desde el dominio autorizado y `Reply-To` dirige respuestas al gimnasio.
+
+Remitentes de dominio propio sólo se habilitan después de verificar dominio/dirección y agregarlos a `GYMOS_SMTP_ALLOWED_FROM_ADDRESSES`.
+
+### DNS y validación
+
+El 22 de agosto de 2026 se verificó `gymfort.mx` en ZeptoMail con:
+
+- DKIM TXT;
+- CNAME de return-path/bounce.
+
+En Cloudflare, el CNAME de bounce debe permanecer `DNS only`.
+
+Se confirmó entrega real desde ZeptoMail durante las pruebas del módulo.
+
+### Seguridad
+
+Configuración recomendada:
+
+- `smtp.zeptomail.com:587`;
+- STARTTLS requerido;
+- identidad del servidor verificada;
+- secretos fuera de Git/frontend;
+- allowlist de `From`;
+- mensajes del usuario escapados; no HTML arbitrario en reglas.
+
+### Branding
+
+El email consume marca tenant (`brandName`, `logoUrl`, `primaryColor`, `accentColor`, `surfaceColor`). Los logos relativos se convierten usando `GYMOS_FRONTEND_BASE_URL`.
+
+En producción debe ser público (`https://gymfort.mx`). `localhost`/`127.0.0.1` no son accesibles para Gmail/Outlook y se omiten del HTML para evitar imágenes rotas.
+
+### Durabilidad
+
+- cola PostgreSQL;
+- lease recuperable;
+- reparto justo entre tenants;
+- backoff;
+- dead letter;
+- preferencias;
+- HMAC para comparación de destinatarios;
+- `Message-ID` e idempotency headers estables.
+
+### Pruebas
+
+- prueba inmediata desde Configuración;
+- prueba de una regla desde Automatizaciones seleccionando un socio real por búsqueda incremental;
+- Processed emails en ZeptoMail para diagnóstico.
+
+Trabajo posterior no bloqueante: bounce/complaint webhooks, reputación productiva, política DMARC final, múltiples proveedores y nuevos canales.
+
+## 9.5 Automatizaciones como integración interna
+
+Los eventos de pagos, membresías, reservas y recurrencia se publican/consumen mediante inbox durable. El motor no llama directamente proveedores externos.
+
+`RECURRING_CHARGE_DUE` representa la llegada de la fecha programada de una ocurrencia, no la activación inicial del mandato. Si producto requiere avisar al activar domiciliación, debe añadirse un trigger específico.
+
+## 9.6 Despliegue local
+
+Docker Compose levanta frontend, backend, PostgreSQL 18, Redis 8 y MinIO. El perfil opcional `stripe` usa `stripe/stripe-cli:v1.50.3`.
+
+Para email local pueden realizarse entregas reales con ZeptoMail, pero los clientes de correo no pueden cargar imágenes servidas desde `localhost`. La validación visual completa del logo requiere despliegue público o túnel.
+
+El futuro GymFort Local Connector es un componente distinto del stack local de desarrollo.
+
+## 9.7 CI/CD vigente
+
+Pipeline:
+
+- pruebas backend;
+- pruebas/lint/typecheck/build frontend;
+- Compose build/config;
+- imagen Stripe CLI fijada.
+
+Pendiente transversal: staging automático, escaneo formal de imágenes, restore y `stripeTest` con secretos sandbox protegidos.
+
+## 9.8 Observabilidad y resiliencia
 
 - Correlation ID y errores sanitizados.
-- Métricas Prometheus de pagos, recurrencia, webhooks, automatizaciones y correo
-  con etiquetas acotadas por tenant/sucursal.
-- Idempotencia, timeouts, backoff, leasing recuperable y dead letters.
-- Alertas para backlog, lease vencido, fallos de proveedor y correo definitivo.
-- Auditoría separada de logs técnicos; nunca PAN, CVV, secretos o payloads
-  sensibles.
+- Métricas Prometheus de pagos, recurrencia, automatizaciones y correo.
+- Idempotencia, timeouts, backoff, leasing y dead letters.
+- Alertas de backlog/leases/fallos definitivos.
+- Auditoría separada de logs técnicos.
 
-Para acceso físico deberán añadirse métricas acotadas de sincronización,
-conector disponible/no disponible, último sync exitoso, backlog y errores del
-proveedor, sin incluir datos biométricos.
+## 9.9 Kiosco
 
-## 9.8 Kiosco
+El kiosco es perfil lógico por sucursal. Recepción crea el handoff; la pestaña usa sesión temporal con `no-store`, rate limit, inactividad, verificación del socio y capacidades cerradas por defecto.
 
-El kiosco es un perfil lógico por sucursal, no una computadora registrada.
-Recepción crea el handoff de navegador; la pestaña elimina tokens
-administrativos y usa una sesión temporal con `no-store`, rate limit,
-inactividad, verificación del socio y capacidades cerradas por defecto.
+Compra/renovación/cambio requieren Stripe self checkout listo; domiciliación exige además recurring.
 
-Las capacidades de compra/renovación/cambio de plan sólo pueden habilitarse
-cuando Stripe self checkout está listo. La domiciliación del kiosco exige además
-Stripe recurring listo; backend y frontend aplican la misma dependencia.
+## 9.10 Operación
 
-## 9.9 Operación
+Runbooks vigentes en `docs/operations/` cubren despliegue, rollback, backup, restore, incidentes, secretos, correo, kiosco, Stripe y mantenimiento.
 
-Runbooks vigentes: `docs/operations/` para despliegue, rollback, backup, restore,
-incidentes, secretos, correo, kiosco, Stripe y mantenimiento. RPO piloto: 24
-horas. RTO piloto: 4 horas. Ambos deben validarse mediante simulacro antes de
-producción.
+Runbooks de email:
 
-Antes de poner el control físico en producción se añadirá un runbook específico
-para pérdida de conectividad GymFort/HikCentral, reconciliación posterior,
-revocaciones pendientes, apertura manual y recuperación del conector local.
+- `docs/operations/email-delivery.md`
+- `docs/operations/zeptomail-email.md`
+
+RPO piloto: 24 h. RTO piloto: 4 h; ambos deben validarse mediante simulacro antes de producción.
