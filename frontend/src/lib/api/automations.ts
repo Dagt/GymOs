@@ -119,6 +119,17 @@ export async function executeAutomation(
   });
 }
 
+export async function testAutomationEmail(
+  accessToken: string,
+  ruleId: string,
+  clientId: string,
+): Promise<NotificationLog> {
+  return apiFetch<NotificationLog>(`/automations/${ruleId}/test-email`, accessToken, {
+    method: "POST",
+    body: JSON.stringify({ clientId }),
+  });
+}
+
 export async function getAutomationExecutions(
   accessToken: string,
   ruleId: string,

@@ -1,230 +1,128 @@
-# 11. Roadmap de Implementación
+# 11. Roadmap de implementación
 
-## Fase 0 — Cimientos
+Corte: 22 de agosto de 2026
 
-- Monorepo.
-- CI/CD.
-- Docker.
-- Docker Compose local con PostgreSQL, Redis y MinIO.
-- Estructura Spring Modulith.
-- Estructura Next.js.
-- Convenciones.
-- Manejo de errores.
-- Auditoría.
-- Autenticación completa inicial.
-- JWT de corta duración.
-- Refresh tokens revocables.
-- Roles y permisos.
-- Contexto de organización y sucursal.
-- Registro técnico de kioscos de autoservicio.
-- Flyway.
-- OpenAPI.
-- Observabilidad.
+Este documento expresa secuencia y estado, no sustituye el estado verificable del documento 13 ni la deuda del 28.
 
-## Fase 1 — Identidad y clientes
+## Entregado para piloto
 
-- Organization.
-- Branch.
-- Person.
-- User.
-- Roles.
-- Permisos.
-- Client.
-- Alta.
-- Búsqueda.
-- Ficha.
-- Frontend de login.
-- Frontend de recepción inicial.
-- Frontend de alta y ficha de cliente.
-- Base visual para modo kiosco.
+### Cimientos y SaaS multi-tenant
 
-## Fase 2 — Catálogo y ventas
+- Monorepo, Spring Modulith, Next.js, Flyway, PostgreSQL, Redis y MinIO.
+- JWT/refresh, RBAC granular, organización, sucursal, soporte y auditoría.
+- Consolas separadas para plataforma, dueño, gerente, recepción y coach.
+- Identidad GymFort permanente más personalización visual por gimnasio.
 
-- Product.
-- Plan.
-- Benefit.
-- Sale.
-- SaleItem.
-- Payment.
-- POS.
-- Pagos internos/manuales: efectivo, transferencia y registro manual de tarjeta.
+### Operación del gimnasio
 
-## Fase 3 — Membresías
+- CRM de socios, importación, catálogo, POS, caja y reportes operativos.
+- Membresías con periodos inclusivos, alta, renovación, cambio y beneficios.
+- Acceso lógico, dispositivos, bitácora, autorizaciones temporales y beneficios `ACCESS`; apertura física aún simulada.
+- Coaches, ejercicios, rutinas versionadas, asignaciones, métricas, CSV/PDF.
+- Profesionales wellness, servicios, disponibilidad, agenda y citas.
 
-- Alta.
-- Activación.
-- Renovación.
-- Expiración.
-- Beneficios de estudiante.
-- Recordatorios.
-- Renovación desde kiosco.
-- Solicitud de cambio de membresía desde kiosco.
+### Pagos y autoservicio
 
-## Fase 3.1 — Autoservicio en kiosco
+- Efectivo, transferencia y terminal externa con validación manual.
+- Mercado Pago OAuth/Point.
+- Stripe Connect, Checkout, Setup, webhook, conciliación y recibos.
+- Domiciliación con consentimiento, cargos por vigencia, reintentos, recuperación, cambio de tarjeta y revocación.
+- Kiosco lógico por sucursal, abierto sólo por Recepción, con sesión aislada, membresías, pagos, reservas, wellness y actualización de contacto.
+- Elegibilidad multi-sucursal en sedes secundarias.
 
-- Registro y configuración de terminales.
-- Sesiones temporales de cliente.
-- Resumen de membresía.
-- Pagos pendientes.
-- Inicio de pagos manuales.
-- Carga de comprobantes.
-- Renovación y cambio de plan con validación backend.
-- Cierre automático por inactividad.
-- Auditoría de acciones de autoservicio.
+### Automatizaciones
 
-## Fase 4 — Control de acceso
+- Reglas manuales, programadas y por eventos de pagos, membresías, reservas y recurrencia.
+- Inbox durable, idempotencia, leasing, reparto justo entre tenants, reintentos, dead letters, pausa y métricas.
+- UI simplificada en **Automatizaciones / Actividad / Problemas**.
+- Creación desde cero sin plantillas recomendadas.
+- Toggle + `Probar ahora` directo en cada regla.
+- Prueba de email usando búsqueda dinámica y un socio real.
+- Gerencia autorizada para crear/administrar/probar reglas mediante V80.
 
-- Puerto.
-- Adaptador inicial.
-- Accesos.
-- Excepciones.
-- Bitácora.
-- Acceso temporal.
+### Correo transaccional / ZeptoMail
 
-## Fase 5 — Inventario
+- `EmailDeliveryPort` y adaptador SMTP desacoplado.
+- ZeptoMail configurado como proveedor operativo mediante secretos de entorno.
+- `gymfort.mx` verificado con DKIM y CNAME/return-path.
+- Entrega real a bandeja confirmada el 22 de agosto de 2026.
+- `From` central recomendado `notificaciones@gymfort.mx` + nombre/`Reply-To` tenant.
+- Cola durable, preferencias, leasing, retry/dead letter y prueba inmediata.
+- Plantilla HTML con branding del gimnasio y logo público cuando está disponible.
 
-- Existencias.
-- Movimientos.
-- Ventas.
-- Mermas.
-- Alertas.
+### Calidad y operación local
 
-## Fase 6 — Reservas
+- Suites backend/frontend y E2E críticos.
+- PostgreSQL y Stripe sandbox como suites opt-in.
+- Docker Compose, Stripe CLI fijado, CI y runbooks.
+- Sistema visual unificado y feedback global.
 
-- Recursos.
-- Disponibilidad.
-- Booking.
-- Cancelaciones.
-- Sauna.
-- Tina.
-- Clases.
-- Consultorios.
+## En curso inmediato
 
-## Fase 7 — Coaches y bienestar
+### Aceptación conectada de pagos
 
-- Coaches vinculados con usuarios y alcance por sucursal.
-- Catálogo amplio, buscable y extensible de ejercicios.
-- Constructor de rutinas por sesiones, bloques y prescripciones flexibles.
-- Borradores, publicación y versionado inmutable.
-- Asignación idempotente a socios y PDF imprimible.
-- Métricas semanales por coach, socio y sucursal.
-- Profesionales.
-- Servicios.
-- Agenda.
+- Ejecutar `stripeTest` en CI protegido con cuenta Connect test.
+- Ampliar E2E de timeout, reintento, recuperación y webhook duplicado.
+- Validar cancelación/reembolso autoritativo por proveedor.
+- Mantener regresión de membresías/reservas multi-sucursal.
 
-Para Coaches y rutinas, quedan fuera de esta fase el cobro por plataforma, registro
-del efectivo del coach, comisiones y app remota del socio. El plan ejecutable es
-el que quedó cerrado en `84a5fd3` y ampliado con perfiles multi-sucursal,
-filtro directo por socio e histórico semanal en `8162814`; su estado y
-evidencia se mantienen en `modulos/14-coaching.md`.
+### Hardening transversal
 
-## Fase 8 — Automatizaciones y reportes
+- matriz completa de autorización por tenant/sucursal;
+- migración limpia + upgrade de base real;
+- backup/restore ensayado;
+- staging/HTTPS/secret management;
+- dashboards/alertas y respuesta a incidentes.
 
-- Motor de eventos.
-- Notificaciones.
-- Dashboards.
-- Reportes.
+## Mejoras posteriores de Automatizaciones/Notificaciones
 
-## Fase 9 - Hito 6: Productizacion por codigo
+Estas mejoras no bloquean el cierre V1:
 
-- Checklist vendible dentro de la aplicacion.
-- Onboarding piloto de organizacion y sucursal activa.
-- Creacion idempotente de catalogo base: planes, productos y kiosco.
-- Importacion inicial de clientes por CSV.
-- Dry-run y resultado por fila para importaciones.
-- Permisos `onboarding.manage` y `client.import`.
-- Pantallas `/onboarding` y `/clients/import`.
+- trigger específico de **domiciliación activada** distinto de `RECURRING_CHARGE_DUE`;
+- webhooks de rebote/queja de ZeptoMail;
+- seguimiento productivo de reputación y DMARC;
+- remitentes/dominios propios por gimnasio si producto lo requiere;
+- WhatsApp y push mediante adaptadores nuevos de `notifications`;
+- campañas promocionales únicamente con consentimiento.
 
-## Fase 10 - Hito 6.5: Rediseño frontend y experiencia comercial
+## Siguiente bloque: acceso físico en gimnasio piloto
 
-- Sistema visual frontend con tokens de marca.
-- Navegacion principal por areas: Operacion, Gestion y Direccion.
-- Portada como centro operativo del producto.
-- Login, recepcion, dashboard, reporte de ventas y configuracion alineados a una UI moderna.
-- Personalizacion local de nombre visible, colores y logo para demos y pilotos.
-- Sin cambios de contrato HTTP ni reglas de negocio en frontend.
+El primer caso real está definido: gimnasio con torniquete/terminal Hikvision administrado por HikCentral Professional en red local.
 
-## Fase 11 - Hito 7: Preparacion administrativa y piloto comercial
+Secuencia:
 
-- Capacitacion.
-- Scripts y politica de backups.
-- Checklist de venta e instalacion.
-- Checklist de produccion.
-- Entorno staging formal.
-- Manual operativo para el gimnasio piloto.
-- Ejecucion del piloto con datos reales.
-- Registro de feedback, pricing, soporte y procesos comerciales.
+1. ajustar UX de Access y permisos/pruebas;
+2. configurar `GYM_ACCESS`, `SAUNA_ACCESS` y planes de visita diaria;
+3. confirmar versión/licencia/API/SDK/topología de HikCentral;
+4. introducir puerto de integración física independiente;
+5. crear GymFort Local Connector y adaptador HikCentral;
+6. mantener enrolamiento facial manual inicialmente y sincronizar Access Levels;
+7. añadir reconciliación/estado/errores;
+8. importar eventos a `access_log`;
+9. automatizar persona/fotografía sólo si la interfaz oficial lo permite;
+10. abstraer segundo fabricante sólo con caso real.
 
-## Hito 7.1 - Calidad y regresion
+El modo inicial será de **sincronización de permisos**: HikCentral y terminales deciden localmente; GymFort Cloud no debe ser requisito en línea para abrir el torniquete.
 
-Estado: IN_PROGRESS
+## Antes de producción
 
-- Suite transversal multi-tenant.
-- Regresion de autenticacion, ventas, pagos, membresias, kiosco, inventario, reservas, acceso e importacion.
-- Pruebas de concurrencia e idempotencia.
-- Testcontainers como base para flujos criticos.
+- matriz completa de autorización;
+- migración limpia y upgrade de referencia;
+- staging, HTTPS, escaneo de imágenes y secretos gestionados;
+- simulacro backup/restore contra RPO/RTO;
+- dashboards/alertas ensayados;
+- volumen/concurrencia para comercio, inventario y reservas;
+- acceso físico con reconciliación/runbook/privacidad probados;
+- manuales por rol y piloto controlado.
 
-## Hito 7.2 - Refactorizacion tecnica
+## Fuera de V1
 
-Estado: IN_PROGRESS
-
-- Separacion gradual de servicios grandes por casos de uso.
-- Eliminacion de `JdbcClient` en `application`.
-- Division del cliente frontend API por dominio.
-- Extraccion de paginas frontend grandes en componentes y hooks.
-
-## Hito 7.3 - Operacion y produccion
-
-Estado: IN_PROGRESS
-
-- Perfiles `local`, `test`, `development`, `staging` y `production`.
-- Seed demo limitado a `local`.
-- Reverse proxy, HTTPS, backups, restore, observabilidad y runbooks.
-- CI ampliado con validacion Docker.
-
-## Hito 7.4 - Cierre funcional minimo
-
-Estado: PLANNED
-
-- Beneficios.
-- Expiracion y recordatorios de membresia.
-- Renovacion automatica con pasarela abstracta.
-- Visitas.
-- Cancelaciones y reembolsos.
-- Reservas pagadas.
-- Automatizaciones programadas y correo.
-
-## Hito 7.5 - Preparacion del piloto
-
-Estado: PLANNED
-
-- Checklist operativo del gimnasio piloto.
-- Plantillas de importacion.
-- Manuales por rol.
-- Operacion paralela.
-- Feedback, soporte y pricing.
-
-## Hito 8 - Integraciones reales
-
-- Torniquetes, reconocimiento facial, WhatsApp, SMS, pasarela de pagos, facturacion, webhooks y modo offline.
-
-## Hito 9 - Aplicacion de clientes
-
-- Login cliente, membresia, pagos, reservas, rutinas, notificaciones, perfil, QR e historial.
-
-## Hito 10 - SaaS avanzado
-
-- Provisionamiento, suscripciones B2B, licenciamiento, modulos contratados, facturacion GymOS y marketplace.
+- aplicación móvil/portal remoto completo del socio;
+- pagos/comisiones directos entre coach y socio;
+- múltiples fabricantes de acceso sin caso real;
+- procesamiento biométrico propio de GymFort;
+- WhatsApp, push, facturación y marketplace SaaS avanzados.
 
 ## Definición de terminado
 
-Una funcionalidad está terminada cuando:
-
-- Cumple criterios de aceptación.
-- Tiene pruebas.
-- Tiene migración.
-- Tiene documentación.
-- Tiene auditoría.
-- Tiene permisos.
-- Tiene manejo de errores.
-- Está desplegada en staging.
+Una capacidad está terminada cuando tiene contrato, permisos, reglas de tenant/sucursal, migración cuando aplica, auditoría, errores seguros, pruebas, documentación y validación en el entorno objetivo. Para proveedores externos se requiere además evidencia sandbox/productiva controlada y runbook de recuperación.

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AppDrawer } from "@/components/AppDrawer";
+import { AppNotice } from "@/components/AppNotice";
 import {
   assignClientBenefit,
   getBenefits,
@@ -204,9 +205,9 @@ export function ClientBenefitsSection({
         ) : null}
       </div>
 
-      {message ? <p className="form-message success mt-4">{message}</p> : null}
-      {error && !showDrawer ? <p className="form-message error mt-4">{error}</p> : null}
-      {loadWarning ? <p className="form-message error mt-4">{loadWarning}</p> : null}
+      {message ? <AppNotice message={message} tone="success" /> : null}
+      {error && !showDrawer ? <AppNotice message={error} tone="error" /> : null}
+      {loadWarning ? <AppNotice message={loadWarning} title="Información incompleta" tone="error" /> : null}
 
       {loading ? (
         <p className="mt-4 text-sm text-[#6f7a73]">Cargando beneficios del socio...</p>
@@ -307,7 +308,7 @@ export function ClientBenefitsSection({
         title="Asignar beneficio de descuento"
       >
         <form className="grid gap-4" onSubmit={handleAssignBenefit}>
-          {error ? <p className="form-message error">{error}</p> : null}
+          {error ? <AppNotice message={error} tone="error" /> : null}
 
           <label className="form-field" htmlFor="clientBenefit">
             <span>Convenio o beneficio</span>

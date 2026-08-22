@@ -29,10 +29,25 @@ class PaymentConfigurationServiceTests {
 
 		assertThatThrownBy(() -> service.update(
 				principal,
-				new UpdatePaymentConfigurationCommand(true, true, "POINT__123", false, false),
+				new UpdatePaymentConfigurationCommand(false, true, "POINT__123", false, false),
 				"correlation"
 		)).isInstanceOfSatisfying(BusinessException.class, exception ->
 				org.assertj.core.api.Assertions.assertThat(exception.code()).isEqualTo("MERCADO_PAGO_NOT_CONNECTED"));
+	}
+
+	@Test
+	void cannotEnableManualTerminalAndMercadoPagoAtTheSameTime() {
+		when(repository.configuration(organizationId)).thenReturn(configuration(false, true));
+		var principal = new GymOsPrincipal(
+				UUID.randomUUID(), organizationId, UUID.randomUUID(), "owner", "Owner", Set.of("payment.settings.manage")
+		);
+
+		assertThatThrownBy(() -> service.update(
+				principal,
+				new UpdatePaymentConfigurationCommand(true, true, "POINT__123", false, false),
+				"correlation"
+		)).isInstanceOfSatisfying(BusinessException.class, exception ->
+				org.assertj.core.api.Assertions.assertThat(exception.code()).isEqualTo("RECEPTION_CARD_METHOD_EXCLUSIVE"));
 	}
 
 	@Test

@@ -127,8 +127,9 @@ Criterios:
 6. Confirmar.
 7. Hacer check-in.
 8. Completar.
-9. Cobrar si aplica en una iteracion posterior.
-10. Notificar en una iteracion posterior.
+9. Si la reserva tiene importe, crear una operación de pago y abrir Stripe Checkout; confirmar el cobro sólo después del webhook firmado y la consulta autoritativa al proveedor.
+10. Reflejar el movimiento confirmado en la actividad de caja y habilitar el comprobante cuando Stripe lo proporcione.
+11. Generar la notificación durable aplicable; su entrega depende de la configuración SMTP activa.
 
 ## UC-008B Administrar recursos reservables
 
@@ -247,19 +248,19 @@ Debe mostrar:
 Actor: Cliente.
 
 Precondiciones:
-- Kiosco registrado y activo en una sucursal.
+- Recepción abrió una sesión de navegador para una sucursal con perfil lógico activo.
 - Cliente existente.
 - Acciones de autoservicio habilitadas por la organización.
 
 Flujo:
-1. Cliente inicia sesión temporal en el kiosco.
+1. Cliente recibe una sesión temporal en el kiosco abierto por Recepción.
 2. Sistema verifica identidad mediante mecanismo configurado.
 3. Sistema muestra resumen limitado: estado, membresía vigente, vencimiento y pagos pendientes.
-4. Cliente selecciona renovar, cambiar membresía, iniciar pago o actualizar datos permitidos.
+4. Cliente selecciona contratar, renovar, cambiar plan, domiciliar, reservar o actualizar datos permitidos.
 5. Backend valida elegibilidad, reglas de membresía, beneficios y montos.
 6. Si hay pago, se crea venta o pago según corresponda.
-7. Si el pago requiere validación manual, queda pendiente o en revisión.
-8. Si el pago queda completado, se ejecutan efectos de negocio.
+7. Si existe cobro, Stripe Checkout/Setup captura la tarjeta y el pago permanece pendiente.
+8. Sólo webhook firmado y conciliación autoritativa completan el pago y sus efectos.
 9. Sistema emite eventos correspondientes.
 10. Sistema audita acción con origen `SELF_SERVICE_KIOSK`.
 11. Sesión termina manualmente o por inactividad.
@@ -269,7 +270,7 @@ Errores:
 - Cliente no verificado.
 - Acción no permitida para autoservicio.
 - Membresía no elegible para cambio.
-- Pago pendiente de validación.
+- Proveedor no disponible, pago rechazado o todavía pendiente de webhook.
 
 Criterios:
 - El kiosco no muestra información administrativa.
@@ -284,7 +285,7 @@ Actor: Recepcionista, kiosco o sistema de pagos.
 
 Flujo:
 1. `memberships` solicita a `sales` una venta de renovacion mediante API interna.
-2. `sales` crea venta, partida y pago manual con `idempotencyKey`.
+2. `sales` crea venta, partida y pago manual o de proveedor con `idempotencyKey`.
 3. Si el pago queda pendiente, no se activa membresia.
 4. Al validar el pago, `sales` publica `PaymentCompletedV1`.
 5. `memberships` consume el evento, registra `processed_domain_event` y extiende desde la fecha final vigente.
@@ -301,23 +302,24 @@ Criterios:
 Flujo:
 1. `memberships` valida membresia activa y plan destino distinto.
 2. `memberships` solicita a `sales` venta de cambio de plan.
-3. Al completarse el pago, `memberships` cancela la membresia anterior y activa la nueva.
+3. Al completarse el pago, `memberships` conserva la membresía operativa,
+   actualiza el plan vigente y agrega un periodo histórico de cambio.
 4. El evento de pago es idempotente.
 
 Criterios:
 - No se permite cambiar al mismo plan.
-- La membresia anterior queda cancelada con auditoria.
-- La nueva membresia se activa solo con pago completado.
+- El plan/periodo anterior queda en el historial con auditoría.
+- El plan destino se vuelve operativo sólo con pago completado.
 
 ## UC-020 Seguridad de sesion de kiosco
 
 Flujo:
-1. El kiosco activo crea sesion temporal.
+1. Recepción con `selfservice.session.launch` crea el handoff de un solo uso.
 2. Backend devuelve `sessionId` y `sessionToken`.
 3. Cada operacion posterior envia `X-Self-Service-Session-Token`.
 4. Verificaciones fallidas incrementan intentos.
 5. Al superar el limite, la sesion queda bloqueada temporalmente.
-6. Rate limiting protege por IP, terminal y sesion.
+6. Rate limiting protege por IP efectiva, perfil lógico y sesión.
 7. Al cerrar sesion, no puede reutilizarse.
 
 ## UC-021 Setup piloto vendible
@@ -327,9 +329,9 @@ Actor: Administrador.
 Flujo:
 1. Administrador abre `/onboarding`.
 2. Sistema muestra checklist de organizacion, sucursal, planes, productos, kiosco y clientes.
-3. Administrador ajusta datos de organizacion, sucursal, plan base, producto base y codigo de kiosco.
+3. Administrador ajusta organización, sucursal, plan base, producto base y capacidades de kiosco.
 4. Sistema actualiza organizacion/sucursal activa.
-5. Sistema crea productos, planes y terminal de kiosco faltantes sin duplicar SKU ni terminal.
+5. Sistema crea productos, planes y perfil lógico de kiosco faltantes sin duplicar SKU ni perfil.
 6. Sistema devuelve checklist actualizado.
 
 Criterios:
@@ -469,7 +471,8 @@ Flujo:
 3. Scheduler interno revisa reglas vencidas de forma periodica.
 4. Sistema reclama la regla con `locked_until`.
 5. Sistema ejecuta la accion configurada.
-6. Si la accion es `CREATE_NOTIFICATION`, se crea una notificacion interna.
+6. Si la acción es notificación, se crea entrega interna o correo durable según
+   el destinatario/configuración.
 7. Sistema registra `automation_execution`.
 8. Sistema libera el bloqueo y reprograma `nextRunAt`.
 
@@ -477,7 +480,7 @@ Criterios:
 - Una regla reclamada no se ejecuta simultaneamente por otro ciclo.
 - El intervalo se limita entre 1 minuto y 10080 minutos.
 - Los errores quedan como ejecucion `FAILED`.
-- No se requiere proveedor externo para la V1.
+- La notificación interna no requiere proveedor; `EMAIL` requiere SMTP operativo.
 
 ## UC-027 Login y entrada por consola
 
@@ -533,6 +536,7 @@ Flujo:
 3. Frontend valida colores `#RRGGBB`.
 4. Backend guarda la marca en `organization`.
 5. Gerencia, recepcion, coaches y kiosco usan la marca del tenant.
+6. El shell mantiene atribución permanente GymFort junto a la marca tenant.
 
 Resultado esperado:
 - La marca no afecta el panel neutral de Admin GymOS fuera de soporte.
@@ -600,7 +604,7 @@ Resultado esperado:
 
 ## UC-032 Cambiar rol de usuario interno
 
-Actor: Admin GymOS en soporte, dueÃ±o del gimnasio o gerente con permiso `user.manage`.
+Actor: Admin GymOS en soporte, dueño del gimnasio o gerente con permiso `user.manage`.
 
 Precondiciones:
 - Usuario autenticado con permiso `user.manage`.

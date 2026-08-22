@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { isActive, resolveShellBrand, visibleSectionsForConsole } from "@/components/app-shell-model";
-import { FormError } from "@/components/FormFields";
+import { AppNotice } from "@/components/AppNotice";
 import { clearSession, getBranches, selectBranch, selectOrganization, storeSession, type StoredSession } from "@/lib/api";
 import { getConsoleProfile, isPlatformAdmin, isSupportMode, resolveUserConsole } from "@/lib/role-model";
 
@@ -23,6 +23,7 @@ export function AppShell({
   hideSidebar = false,
   organizationName,
   mode,
+  pageClassName,
   session,
   subtitle,
   title,
@@ -33,6 +34,7 @@ export function AppShell({
   eyebrow: string;
   hideSidebar?: boolean;
   mode?: "setup" | "operation";
+  pageClassName?: string;
   organizationName?: string | null;
   session: StoredSession;
   subtitle?: string;
@@ -169,7 +171,8 @@ export function AppShell({
   }
 
   return (
-    <main className={`admin-console ${hideSidebar ? "no-sidebar" : ""} ${supportMode ? "support-mode" : ""}`}>
+    <main className={`admin-console ${hideSidebar ? "no-sidebar" : ""} ${supportMode ? "support-mode" : ""} ${pageClassName ?? ""}`}>
+      <div className="app-notice-region" id="app-notice-region" />
       {!hideSidebar ? (
         <aside className="admin-sidebar">
           <div className="admin-sidebar-brand">
@@ -184,10 +187,12 @@ export function AppShell({
             </div>
           </div>
 
-          <section className="admin-user-card" aria-label="Perfil activo">
-            <p>Entraste como</p>
-            <strong>{role.label}</strong>
-            <span>{role.description}</span>
+          <section className="admin-session-card" aria-label="Sesión activa">
+            <div className="admin-session-identity">
+              <span>{session.user.fullName}</span>
+              <small>{session.user.username}</small>
+            </div>
+            <button onClick={logout} type="button">Salir</button>
           </section>
 
           {platformAdmin && !pathname.startsWith("/platform") ? (
@@ -233,9 +238,9 @@ export function AppShell({
           </nav>
 
           <div className="admin-sidebar-footer">
-            <span>{session.user.fullName}</span>
-            <small>{session.user.username}</small>
-            <button onClick={logout} type="button">Salir</button>
+            <Link aria-label="Ir al inicio de GymFort" className="admin-product-footer" href={role.homePath}>
+              <Image alt="GymFort" height={27} src="/gymfort_web_assets/gymfort-logo-horizontal-white.png" width={122} />
+            </Link>
           </div>
         </aside>
       ) : null}
@@ -314,5 +319,5 @@ export function LoadingScreen({ text = "Cargando..." }: { text?: string }) {
 }
 
 export function InlineError({ message }: { message: string }) {
-  return <FormError message={message} />;
+  return <AppNotice message={message} tone="error" />;
 }

@@ -1,5 +1,7 @@
 # Restore Runbook
 
+Last reviewed: 2026-08-21.
+
 ## Preconditions
 
 - Confirm the target environment.
@@ -19,6 +21,7 @@
 3. Check `/actuator/health`.
 4. Login with a non-demo user in staging or production.
 5. Validate clients, sales, payments, memberships and reports.
+6. Reconcile pending payment operations and notifications against their provider state before replaying work.
 
 ## Failure
 

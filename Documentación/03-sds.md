@@ -2,7 +2,7 @@
 
 ## 3.1 Estilo arquitectónico
 
-GymOS se implementará como monolito modular con Spring Modulith. Cada módulo representa un dominio delimitado y expone únicamente contratos públicos.
+GymFort se implementa como monolito modular con Spring Modulith. El repositorio conserva el nombre técnico GymOS. Cada módulo representa un dominio delimitado y expone únicamente contratos públicos.
 
 ## 3.2 Módulos
 
@@ -23,6 +23,7 @@ GymOS se implementará como monolito modular con Spring Modulith. Cada módulo r
 - wellness
 - notifications
 - automations
+- payments
 - reporting
 - onboarding
 - audit
@@ -95,7 +96,7 @@ Las acciones críticas deben registrar:
 
 ## 3.9 Configuración por organización
 
-GymOS debe soportar múltiples organizaciones cliente desde la base. Toda tabla de negocio debe incluir `organization_id` cuando pertenezca a datos de un cliente comercial.
+GymFort debe soportar múltiples organizaciones cliente desde la base. Toda tabla de negocio debe incluir `organization_id` cuando pertenezca a datos de un cliente comercial.
 
 El sistema también debe modelar sucursales mediante `branch_id` en las tablas donde la operación sea física o localizable: ventas, pagos, inventario, reservas, accesos, usuarios asignados, reportes operativos y configuración local.
 
@@ -145,8 +146,9 @@ Reglas:
 - No puede aplicar descuentos, beneficios o cambios de plan sin validación backend.
 - Debe cerrar sesión automáticamente por inactividad.
 - Toda acción debe auditarse con origen `SELF_SERVICE_KIOSK`.
-- Los pagos manuales iniciados desde kiosco quedan en estado pendiente o en revisión hasta que el flujo de pagos los complete según reglas.
-- Los pagos manuales iniciados desde kiosco quedan en estado pendiente o en revisión hasta que el flujo de pagos los complete según reglas.
+- El kiosco no captura pagos manuales: crea una operación pendiente y redirige
+  a Stripe Checkout/Setup. El webhook firmado y la consulta autoritativa son la
+  única fuente para completar venta, pago, recibo o membresía.
 
 ## 3.14 Estabilizacion arquitectonica Hito 3.5
 
@@ -188,8 +190,12 @@ Decisiones implementadas:
 - Las rutinas se modelan como `workout` con versiones publicadas en `workout_version`.
 - Las asignaciones a clientes quedan en `workout_assignment`, apuntando a una version concreta para preservar historial.
 - `wellness` gestiona profesionales, servicios, precios, duracion y disponibilidad base.
-- `notifications` funciona como cola/log interno auditable; el envio externo por correo, WhatsApp o push queda aislado para una integracion posterior.
-- `automations` gestiona reglas configurables, enable/disable y ejecucion manual; la accion inicial soportada crea notificaciones internas.
+- `notifications` mantiene cola durable, leasing, reintentos, preferencias,
+  configuración tenant y entrega SMTP. Zoho sigue siendo una integración de
+  proveedor pendiente; WhatsApp y push quedan para una fase posterior.
+- `automations` gestiona reglas manuales, programadas y de dominio, inbox
+  durable, idempotencia versionada, reintentos, dead letters, pausa por tenant
+  y telemetría.
 - `reporting` expone el dashboard del dueno con metricas agregadas de ventas, clientes, membresias, reservas, inventario, coaches, profesionales, notificaciones y automatizaciones.
 - Los endpoints internos de rutinas usan `workout.read.own|all` y
   `workout.manage.own|all`; asignación, PDF y métricas usan respectivamente
@@ -216,7 +222,7 @@ Diseño implementado para los cierres de `coaching` (`84a5fd3` y `8162814`):
   contratos remotos.
 
 `coaching` no depende de `sales`, `payments` ni POS. Los cobros privados entre coach
-y socio son externos y no se persisten en GymOS.
+y socio son externos y no se persisten en GymFort.
 
 ## 3.17 Productizacion Hito 6
 
@@ -250,7 +256,11 @@ Decisiones implementadas:
 - El ruteo post-login se resuelve por permisos en `role-model`, no por nombres de usuario.
 - `platform.admin` identifica al Administrador GymOS y le permite volver a administracion de gimnasios desde cualquier pantalla.
 - `AppShell` es la unica navegacion visible; `GlobalSessionNav` solo valida sesion y redirige.
-- La marca del gimnasio se aplica por tenant con `TenantThemeProvider`; la plataforma conserva marca neutral.
+- La marca del gimnasio se aplica por tenant con `TenantThemeProvider`; la
+  plataforma conserva tema neutral y todas las consolas muestran atribución
+  permanente de producto GymFort.
+- El feedback de éxito, advertencia y error usa notificaciones flotantes
+  globales, accesibles y visibles independientemente del scroll.
 - La administracion de muchos gimnasios y sucursales usa un patron maestro-detalle para evitar saturacion visual.
 - Los formularios comunes aplican validacion previa al envio y muestran errores de backend con codigo y `correlationId`.
 

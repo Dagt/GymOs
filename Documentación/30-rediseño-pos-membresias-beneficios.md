@@ -1,8 +1,8 @@
 # 30. Rediseño de POS, membresías y beneficios
 
 Estado: IMPLEMENTADO / VALIDADO
-Rama: `feature/reception-pos-init`
-Fecha: 30 de julio de 2026
+Base histórica: `feature/reception-pos-init`
+Última revisión en el árbol integrado: 21 de agosto de 2026
 
 ## Objetivo y decisiones
 
@@ -18,6 +18,17 @@ compartir comportamiento:
   `MEMBERSHIP_RENEWAL` o `MEMBERSHIP_PLAN_CHANGE`;
 - un plan seleccionado inicia una operación de membresía, no una línea minorista
   sin contexto.
+
+Evolución vigente:
+
+- recepción admite pagos manuales y proveedores integrados;
+- el kiosco usa Stripe Checkout para alta, renovación y cambio, sin aplicar
+  efectos por el redirect;
+- webhook firmado/conciliado completa la venta y crea exactamente un periodo;
+- `multiBranchAccess` permite operar en sedes secundarias conservando la
+  sucursal de origen de la membresía;
+- intentos pendientes y webhooks repetidos no duplican ventas, pagos,
+  beneficios ni periodos.
 
 ## Membresía e historial
 

@@ -1,10 +1,13 @@
 # Catálogo comercial
 
 Estado: `ESTABILIZADO`
+Última revisión: 21 de agosto de 2026
 
 ## Implementado
 
 - productos, planes de membresía, servicios y conceptos vendibles;
+- planes con asociación por sucursal y `multiBranchAccess` para elegibilidad
+  transversal dentro del mismo tenant;
 - categorías, etiquetas, búsqueda, filtros y paginación;
 - activación, archivado, imágenes y código de barras;
 - unidad de producto físico guiada por un selector cerrado de valores comunes,

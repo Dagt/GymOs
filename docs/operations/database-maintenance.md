@@ -1,5 +1,7 @@
 # Database Maintenance
 
+Last reviewed: 2026-08-21. The current Flyway schema version is V78.
+
 ## Routine Tasks
 
 - Monitor database size.
@@ -14,6 +16,7 @@
 - New migrations must start after the current latest version.
 - Every migration must be PostgreSQL-compatible.
 - Tenant-scoped business tables require `organization_id` and usually `branch_id`.
+- Payment, webhook, automation and notification records must retain their idempotency and audit identifiers during maintenance.
 
 ## Pre-Pilot Checklist
 

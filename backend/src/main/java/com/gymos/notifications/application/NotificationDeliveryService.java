@@ -4,6 +4,7 @@ import com.gymos.common.observability.TenantTelemetry;
 import com.gymos.notifications.api.EmailDeliveryPort;
 import com.gymos.notifications.api.EmailDeliveryPort.DeliveryException;
 import com.gymos.notifications.api.EmailDeliveryPort.EmailMessage;
+import com.gymos.notifications.infrastructure.NotificationBrandRepository;
 import com.gymos.notifications.infrastructure.NotificationRepository;
 import com.gymos.notifications.infrastructure.NotificationRepository.EmailDeliveryRecord;
 import java.time.OffsetDateTime;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 @Service
 public class NotificationDeliveryService {
 	private final NotificationRepository repository;
+	private final NotificationBrandRepository brandRepository;
 	private final NotificationProperties properties;
 	private final TenantTelemetry telemetry;
 	private final Map<String, EmailDeliveryPort> providers;
@@ -24,12 +26,14 @@ public class NotificationDeliveryService {
 
 	public NotificationDeliveryService(
 			NotificationRepository repository,
+			NotificationBrandRepository brandRepository,
 			NotificationProperties properties,
 			TenantTelemetry telemetry,
 			List<EmailDeliveryPort> providers,
 			NotificationRecipientHasher recipientHasher
 	) {
 		this.repository = repository;
+		this.brandRepository = brandRepository;
 		this.properties = properties;
 		this.telemetry = telemetry;
 		this.providers = providers.stream().collect(Collectors.toUnmodifiableMap(
@@ -57,6 +61,23 @@ public class NotificationDeliveryService {
 		return processed;
 	}
 
+	public boolean deliverNow(java.util.UUID organizationId, java.util.UUID notificationId) {
+		if (providers.values().stream().noneMatch(EmailDeliveryPort::available)) return false;
+		OffsetDateTime now = OffsetDateTime.now();
+		if (!repository.claimEmail(organizationId, notificationId, now, now.plusSeconds(properties.leaseSeconds()))) {
+			return false;
+		}
+		EmailDeliveryRecord delivery = repository.emailDelivery(notificationId).orElse(null);
+		if (delivery == null || !organizationId.equals(delivery.organizationId())) {
+			repository.markDeliveryFailure(
+					notificationId, false, now, "No fue posible cargar la entrega de prueba.", now
+			);
+			return false;
+		}
+		deliver(delivery);
+		return true;
+	}
+
 	private void deliver(EmailDeliveryRecord delivery) {
 		var sample = telemetry.start();
 		OffsetDateTime now = OffsetDateTime.now();
@@ -71,10 +92,12 @@ public class NotificationDeliveryService {
 			if (provider == null || !provider.available()) {
 				throw new DeliveryException("El proveedor de correo no esta disponible.", true, null);
 			}
+			var brand = brandRepository.emailBrand(delivery.organizationId());
 			var result = provider.deliver(new EmailMessage(
 					delivery.id(), delivery.organizationId(), delivery.fromEmail(), delivery.fromName(),
 					delivery.replyTo(), delivery.recipient(), delivery.subject(), delivery.body(),
-					delivery.bodyHtml(), delivery.idempotencyKey()
+					delivery.bodyHtml(), delivery.idempotencyKey(), brand.brandName(), brand.logoUrl(),
+					brand.primaryColor(), brand.accentColor(), brand.surfaceColor()
 			));
 			repository.markSent(delivery.id(), provider.providerKey(), result.providerMessageId(), now);
 		} catch (DeliveryException exception) {
@@ -107,5 +130,4 @@ public class NotificationDeliveryService {
 		String normalized = value == null || value.isBlank() ? "Fallo del proveedor de correo." : value.trim();
 		return normalized.substring(0, Math.min(500, normalized.length()));
 	}
-
 }

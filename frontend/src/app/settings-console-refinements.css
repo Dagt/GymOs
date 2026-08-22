@@ -1,0 +1,32 @@
+/* Configuration layout only.
+   Colors, cards and controls intentionally inherit the shared GymFort styles from globals.css. */
+.settings-console .settings-section-nav {
+  border-bottom: 0;
+  border-radius: .75rem .75rem 0 0;
+  border-top: 3px solid color-mix(in srgb, var(--brand-accent) 72%, var(--brand-primary));
+  box-shadow: none;
+  justify-content: flex-end;
+  padding: .65rem .8rem;
+  position: static;
+  top: auto;
+}
+
+.settings-console .settings-section-nav > div:first-child {
+  display: none;
+}
+
+.settings-console .settings-section-nav + .settings-detail-panel {
+  border-radius: 0 0 .75rem .75rem !important;
+  margin-top: -1.25rem;
+}
+
+.settings-console .settings-section-tabs {
+  align-items: center;
+}
+
+@media (max-width: 980px) {
+  .settings-console .settings-section-nav {
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+}

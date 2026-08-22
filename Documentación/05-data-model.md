@@ -618,6 +618,18 @@ Migraciones nuevas:
   administración de beneficios y recursos reservables; la fecha de nacimiento
   obligatoria se valida en los contratos de socio para no imponerla a otros
   tipos de persona.
+- `V75__repair_manager_configuration_access.sql`: repara en bases existentes los
+  permisos operativos de configuración de cobros, kiosco y correo del gerente.
+- `V76__restrict_kiosk_launch_to_reception.sql`: retira
+  `selfservice.session.launch` del gerente; sólo Recepción y soporte de
+  plataforma pueden abrir una sesión aislada para socios.
+- `V77__separate_stripe_account_management.sql`: crea
+  `payment.provider.stripe.manage`, lo concede a dueño/soporte y lo separa de
+  `payment.settings.manage`, que el gerente conserva para activar o desactivar
+  una conexión existente.
+- `V78__restrict_kiosk_launch_strictly_to_reception.sql`: conserva
+  `selfservice.session.launch` únicamente en los roles de Recepción y elimina
+  concesiones heredadas de dueño, administrador, gerente o soporte.
 - `V15__hito6_productization_onboarding_imports.sql`: agrega bitacora de importacion inicial de clientes y permisos `onboarding.manage` y `client.import`.
 - `V23__membership_plan_multi_branch_access.sql`: agrega `membership_plan.multi_branch_access` para planes con acceso a todas las sucursales del tenant.
 - `V24__resource_allowed_membership_plans.sql`: agrega planes permitidos por recurso para restringir reservas segun membresia vigente.
@@ -691,7 +703,7 @@ Notas de integridad:
 
 - Los colores deben validarse como `#RRGGBB` desde API/frontend.
 - La marca pertenece a la organizacion, no a la sesion local ni al navegador.
-- El panel de plataforma no toma la marca del tenant; usa identidad neutral de GymOS para evitar confusion entre administracion SaaS y operacion del gimnasio.
+- El panel de plataforma no toma la marca del tenant; usa identidad neutral de GymFort para evitar confusion entre administracion SaaS y operacion del gimnasio.
 
 ## Hito 7.8 - Separacion de roles plataforma/tenant
 

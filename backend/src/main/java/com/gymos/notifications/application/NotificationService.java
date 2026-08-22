@@ -31,12 +31,14 @@ public class NotificationService {
 	private final AuditService auditService;
 	private final Map<String, EmailDeliveryPort> emailProviders;
 	private final NotificationRecipientHasher recipientHasher;
+	private final NotificationProperties.Smtp smtpProperties;
 
 	public NotificationService(
 			NotificationRepository notificationRepository,
 			AuditService auditService,
 			List<EmailDeliveryPort> emailProviders,
-			NotificationRecipientHasher recipientHasher
+			NotificationRecipientHasher recipientHasher,
+			NotificationProperties notificationProperties
 	) {
 		this.notificationRepository = notificationRepository;
 		this.auditService = auditService;
@@ -44,6 +46,7 @@ public class NotificationService {
 				provider -> provider.providerKey().toUpperCase(Locale.ROOT), Function.identity()
 		));
 		this.recipientHasher = recipientHasher;
+		this.smtpProperties = notificationProperties.smtp();
 	}
 
 	@Transactional(readOnly = true)
@@ -151,6 +154,13 @@ public class NotificationService {
 					"Configura y conecta el proveedor " + providerKey + " antes de habilitar el correo."
 			);
 		}
+		if (command.enabled() && "SMTP".equals(providerKey) && !smtpProperties.allowsFromAddress(fromEmail)) {
+			throw new BusinessException(
+					"NOTIFICATION_FROM_EMAIL_NOT_AUTHORIZED",
+					"El correo remitente no esta autorizado en " + smtpProperties.displayName()
+							+ ". Usa un remitente verificado y asociado al Agent configurado."
+			);
+		}
 		EmailConfigurationRecord updated = notificationRepository.upsertEmailConfiguration(
 				principal.organizationId(), principal.userId(), command.enabled(), providerKey,
 				fromEmail, fromName, replyTo
@@ -169,12 +179,18 @@ public class NotificationService {
 		return create(
 				principal,
 				new CreateNotificationCommand(
-						"EMAIL", recipient, "DIRECT", null, "Prueba de correo de GymOS",
-						"La configuracion de correo de tu gimnasio funciona correctamente.", "TRANSACTIONAL",
+						"EMAIL", recipient, "DIRECT", null, "Prueba de correo de GymFort",
+						"Esta es una prueba real de entrega. Si recibiste este mensaje, el canal de correo de tu gimnasio esta listo para las automatizaciones.", "TRANSACTIONAL",
 						"MANUAL_TEST", "ORGANIZATION", principal.organizationId(), null
 				),
 				correlationId
 		);
+	}
+
+	@Transactional(readOnly = true)
+	public NotificationRecord notification(GymOsPrincipal principal, UUID notificationId) {
+		requirePrincipal(principal);
+		return notificationRepository.notification(principal.organizationId(), notificationId);
 	}
 
 	@Transactional
@@ -228,10 +244,17 @@ public class NotificationService {
 	private EmailConfigurationView view(EmailConfigurationRecord record) {
 		EmailDeliveryPort provider = emailProviders.get(record.emailProviderKey().toUpperCase(Locale.ROOT));
 		boolean available = provider != null && provider.available();
-		boolean ready = record.emailEnabled() && available && record.fromEmail() != null;
+		String preferredFromEmail = "SMTP".equalsIgnoreCase(record.emailProviderKey())
+				? smtpProperties.preferredFromAddress() : null;
+		String fromEmail = record.fromEmail() == null ? preferredFromEmail : record.fromEmail();
+		boolean ready = record.emailEnabled() && available && fromEmail != null
+				&& (!"SMTP".equalsIgnoreCase(record.emailProviderKey()) || smtpProperties.allowsFromAddress(fromEmail));
 		return new EmailConfigurationView(
 				record.organizationId(), record.emailEnabled(), record.emailProviderKey(),
-				record.fromEmail(), record.fromName(), record.replyTo(), available, ready, record.updatedAt()
+				fromEmail, record.fromName(), record.replyTo(), available, ready,
+				smtpProperties.displayName(), preferredFromEmail, smtpProperties.restrictsFromAddresses(),
+				smtpProperties.allowedFromAddresses(),
+				notificationRepository.lastSuccessfulEmailTestAt(record.organizationId()), record.updatedAt()
 		);
 	}
 
@@ -366,6 +389,9 @@ public class NotificationService {
 	public record EmailConfigurationView(
 			UUID organizationId, boolean emailEnabled, String providerKey, String fromEmail,
 			String fromName, String replyTo, boolean providerAvailable, boolean ready,
+			String providerName, String preferredFromEmail, boolean fromEmailRestricted,
+			List<String> allowedFromEmails,
+			OffsetDateTime lastVerifiedAt,
 			OffsetDateTime updatedAt
 	) {
 	}

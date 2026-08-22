@@ -1,5 +1,7 @@
 # 10. Desarrollo Asistido por IA
 
+**Corte documental:** 21 de agosto de 2026.
+
 ## 10.1 Modelo operativo
 
 El usuario actúa como Product Owner y Tech Lead. Las IAs actúan como especialistas:
@@ -20,19 +22,21 @@ El usuario actúa como Product Owner y Tech Lead. Las IAs actúan como especiali
 - Exigir pruebas.
 - Exigir resumen de cambios.
 - No aceptar cambios de arquitectura implícitos.
+- Consultar primero el código, las migraciones, los contratos y las pruebas vigentes; la documentación histórica no sustituye esas fuentes.
+- Mantener separados el nombre comercial `GymFort` y los identificadores técnicos históricos `GymOS`/`gymos` mientras no exista una migración explícita.
 
 ## 10.3 Prompt maestro
 
-Actúa como arquitecto y desarrollador senior de GymOS.
+Actúa como arquitecto y desarrollador senior de GymFort (repositorio técnico GymOS).
 
 Debes respetar:
 
 - Java 25.
-- Spring Boot.
-- Spring Modulith.
-- PostgreSQL.
-- Redis.
-- Next.js y TypeScript.
+- Spring Boot 4.1.
+- Spring Modulith 2.1.
+- PostgreSQL 18.
+- Redis 8.
+- Next.js 16, React 19 y TypeScript 5.
 - DDD.
 - Arquitectura hexagonal.
 - Monolito modular.
@@ -43,6 +47,8 @@ Debes respetar:
 - Idempotencia.
 - Flyway.
 - OpenAPI.
+- Integraciones de pago confirmadas por webhook firmado y consulta autoritativa al proveedor.
+- Separación entre administrar una conexión de pago y habilitarla para una sucursal o kiosco.
 
 Antes de escribir código:
 
@@ -73,6 +79,8 @@ No hagas:
 - Secretos en código.
 - Cambios silenciosos de contrato.
 - Omisión de pruebas.
+- Tratar el regreso del navegador desde Stripe como comprobante de pago.
+- Mostrar errores únicamente dentro del flujo o en banners que puedan quedar fuera del área visible; utiliza el sistema global de notificaciones flotantes.
 
 ## 10.4 Prompt backend
 
@@ -80,7 +88,7 @@ Implementa únicamente el módulo indicado. Usa puertos y adaptadores. Mantén e
 
 ## 10.5 Prompt frontend
 
-Implementa la pantalla indicada usando Next.js y TypeScript. Consume la API documentada. No dupliques reglas. Respeta permisos. Incluye estados de carga, vacío, error y éxito.
+Implementa la pantalla indicada usando Next.js, React y TypeScript. Consume la API documentada. No dupliques reglas. Respeta permisos. Incluye estados de carga, vacío, error y éxito, conserva la atribución de GymFort y utiliza el sistema global de notificaciones flotantes.
 
 ## 10.6 Prompt QA
 

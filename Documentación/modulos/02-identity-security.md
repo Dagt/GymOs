@@ -1,11 +1,14 @@
 # Identidad y seguridad
 
 Estado: `FUNCIONAL`
+Última revisión: 21 de agosto de 2026
 
 ## Implementado
 
 - login, refresh, selección de sucursal y contexto de sesión;
 - roles y permisos aplicados en backend;
+- V78 limita estrictamente el lanzamiento de kiosco a Recepción y V77 separa
+  administración de cuenta Stripe de su configuración operativa;
 - consolas y navegación condicionadas por rol;
 - rotación y gracia de refresh, suspensión y soporte de plataforma;
 - respuestas diferenciadas: `401 AUTHENTICATION_REQUIRED` sólo para ausencia o

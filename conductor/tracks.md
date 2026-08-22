@@ -1,6 +1,8 @@
 # Project Tracks
 
-This file tracks all major tracks for the project. Each track has its own detailed plan in its respective folder.
+Last reviewed: 2026-08-21.
+
+This file preserves the completed Conductor tracks that initialized reception and POS workflows. Each folder is historical delivery evidence, not a complete registry of current modules or the source of truth for current behavior. See [`../Documentación/13-estado-desarrollo.md`](../Documentación/13-estado-desarrollo.md) and [`../Documentación/modulos/README.md`](../Documentación/modulos/README.md) for the current system.
 
 ---
 
@@ -21,6 +23,5 @@ This file tracks all major tracks for the project. Each track has its own detail
 
 - [x] **Track: Reception Renewals Module, Initial Plan Onboarding, and Benefits Governance**
   *Link: [./tracks/reception_renewals_benefits_20260729/](./tracks/reception_renewals_benefits_20260729/)*
-
 
 

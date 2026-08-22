@@ -1,11 +1,16 @@
 # Autoservicio y kiosco
 
-Estado: `LISTO PARA ACEPTACIÓN` (la validación externa de Stripe sandbox se ejecuta por separado)
+Estado: `FUNCIONAL / LISTO PARA ACEPTACIÓN CONECTADA`
+Última revisión: 21 de agosto de 2026
 
 ## Implementado
 
 - sesión temporal con token aleatorio almacenado como hash;
+- apertura exclusiva desde Recepción; dueño, administrador, gerente y soporte
+  pueden configurar lo permitido por sus permisos, pero no lanzan sesiones;
 - verificación genérica de socio por contacto y fecha de nacimiento;
+- membresías, pagos, reservas y domiciliación disponibles también en una sede
+  secundaria cuando el plan vigente es multi-sucursal;
 - rate limiting, bloqueo por intentos y auditoría;
 - resumen de membresía y pagos pendientes;
 - reserva de recursos mediante la API pública del módulo propietario; el catálogo
@@ -14,9 +19,9 @@ Estado: `LISTO PARA ACEPTACIÓN` (la validación externa de Stripe sandbox se ej
 - capacidades canónicas por perfil lógico de sucursal, expuestas a la sesión y aplicadas en cada
   endpoint implementado;
 - actualización real y auditada de correo/teléfono desde sesión verificada;
-- contrato de renovación/cambio sin método manual ni `validateNow`, bloqueado
-  hasta disponer de pasarela;
-- marca tenant y superficie sin navegación administrativa.
+- contrato de alta/renovación/cambio sin método manual ni `validateNow`,
+  conectado a Stripe Checkout y confirmado sólo por webhook/conciliación;
+- marca tenant, atribución GymFort y superficie sin navegación administrativa;
 - lanzamiento desde recepción con permiso dedicado, sin registrar una
   computadora o navegador;
 - apertura en una pestaña aislada sin colocar la credencial de kiosco en la URL;
@@ -32,7 +37,7 @@ Estado: `LISTO PARA ACEPTACIÓN` (la validación externa de Stripe sandbox se ej
 - contratación de membresía inicial desde el kiosco, con selección de plan,
   venta/pago pendiente y activación exclusiva por webhook conciliado; sólo se
   muestran planes asociados a la sucursal activa;
-- venta y pago pendientes antes de abandonar GymOS, con idempotencia estable
+- venta y pago pendientes antes de abandonar GymFort, con idempotencia estable
   y persistida durante la sesión del navegador para recuperar un fallo de red
   o un regreso desde Stripe;
 - webhook Stripe firmado, consulta autoritativa, conciliación de monto/moneda y
@@ -59,7 +64,7 @@ Estado: `LISTO PARA ACEPTACIÓN` (la validación externa de Stripe sandbox se ej
   duplicados, timeouts, `requires_action`, rechazos y recuperación posterior a
   una caída.
 - cotización autoritativa final, incluidos beneficios y descuento, antes de
-  crear la venta o abandonar GymOS para abrir Stripe Checkout;
+  crear la venta o abandonar GymFort para abrir Stripe Checkout;
 - configuración administrativa de capacidades por sucursal, sin alta ni
   asignación de computadoras o terminales físicas; la pantalla muestra una sola
   configuración correspondiente a la sucursal elegida en el selector global;
@@ -80,16 +85,16 @@ Estado: `LISTO PARA ACEPTACIÓN` (la validación externa de Stripe sandbox se ej
 ## Pendiente
 
 - ejecutar `stripeTest` con credenciales Stripe exclusivamente test y cuenta
-  Connect sandbox. En este corte `postgresIntegrationTest` pasó 37 escenarios
-  reales y el E2E de kiosco pasó 7 recorridos; Stripe omitió sus 3 escenarios
-  porque el entorno no contiene `GYMOS_STRIPE_TEST_SECRET_KEY`;
+  Connect sandbox dentro de CI protegido; el corte actual validó backend,
+  frontend, ruteo por consola, Compose y la imagen real Stripe CLI, pero la
+  suite conectada continúa opt-in;
 - ejecutar los recorridos E2E y las suites conectadas en el ambiente de
   integración para publicar evidencia multi-tenant, expiración, concurrencia y
   recuperación real. No se contempla una consola de computadoras registradas.
 
-Decisión de producto: no se implementarán pagos para recursos reservables ni
-servicios de Wellness con costo. Las reservas de autoservicio permanecen
-incluidas/sin cobro; Stripe se limita a membresías y domiciliaciones.
+Los recursos incluidos en el plan no generan cobro. Las reservas con costo
+pueden abrir Stripe Checkout y sólo se confirman después del webhook; Wellness
+con costo permanece fuera del autoservicio del corte.
 
 Deuda rectora: `SELF-001`.
 

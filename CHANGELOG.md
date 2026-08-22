@@ -1,8 +1,66 @@
 # Changelog
 
-All notable changes to GymOS will be documented in this file.
+Los cambios relevantes de GymFort se documentan aquí. `GymOS` permanece como
+nombre técnico interno durante la transición de marca.
 
 ## 0.7.0-pilot-readiness - Unreleased
+
+- Adopt the visible GymFort product identity while preserving compatible
+  internal `gymos` packages, variables and data identifiers.
+- Put the tenant logo, gym name and active branch first in the sidebar; move the
+  signed-in user controls below it and keep GymFort attribution in the footer.
+- Clarify sidebar hierarchy with stronger section/child separation, tree cues
+  and a more visible current-page/section treatment without changing the GymFort
+  visual language.
+- Retire the redundant `Operación diaria` page and route; managers now land on
+  the first useful authorized workspace, prioritizing executive indicators.
+- Align Automations and Organization settings with the same light workspace
+  surfaces used by Catalog while retaining the shared dark command header, and
+  replace page-top feedback boxes with accessible floating notifications.
+- Join connected-service tabs to their active configuration panel and reserve
+  tenant gradient/tint for first-level groups while keeping nested controls
+  neutral and readable.
+- Replace payment and kiosk capability checkboxes with tenant-aware toggles whose
+  outline/knob use the primary color and whose active track uses the accent;
+  group reception and Stripe settings, make manual terminal/Mercado Pago mutually
+  exclusive and enforce Stripe readiness for dependent kiosk capabilities.
+- Add Stripe Connect, hosted Checkout, signed webhooks, reconciliation,
+  receipts, recurring card mandates, retries and tenant-scoped histories.
+- Support kiosk membership enrollment, renewal and plan changes only after
+  confirmed payment, with idempotent sales, payments and membership periods.
+- Support multi-branch plan access in secondary branches, including eligible
+  kiosk lookup and reservations while retaining membership origin ownership.
+- Restrict kiosk launch strictly to Reception in navigation, direct routes,
+  HTTP security and business authorization; owners, administrators, managers
+  and platform support cannot open a member session.
+- Simplify the Reception home by removing the non-actionable cash/payment/branch
+  signal strip and keeping the operational actions in focus.
+- Split Stripe account management from operational payment switches: managers
+  may enable or disable an existing connection, while owners/support connect
+  and refresh it.
+- Complete durable transactional email delivery with ZeptoMail through the
+  existing `EmailDeliveryPort`: verified `gymfort.mx` DKIM/return-path DNS,
+  real SMTP delivery, tenant sender name/Reply-To, allowlisted From addresses,
+  retries/dead letters, preferences and operational metrics.
+- Add branded HTML email rendering from organization name, primary/accent/surface
+  colors and tenant logo; resolve relative logos with `GYMOS_FRONTEND_BASE_URL`
+  and avoid broken localhost images in external mail clients.
+- Simplify Automations to three customer-facing views: Automations, Activity and
+  Problems; hide scheduler/lease/internal execution detail from the normal gym
+  workflow while preserving it in backend observability.
+- Remove recommended automation templates; new rules are configured from scratch
+  through a guided flow.
+- Replace the Automations options menu with a direct `Probar ahora` action.
+- Make email-rule tests select a real active member through incremental
+  name/email search instead of executing without recipient context.
+- Grant managers the operational automation/notification permissions required to
+  create, enable, disable and test rules (V80) without granting scheduler control.
+- Clarify recurring-charge semantics: `RECURRING_CHARGE_DUE` represents a due
+  occurrence, not the initial activation of a recurring payment mandate.
+- Reconcile missing historical Coach operational profiles with V79 after a
+  real acceptance case showed role/branch access could drift from the `coach`
+  entity and break workout creation/metrics.
+- Add a pinned Stripe CLI `v1.50.3` Docker profile and CI verification.
 
 - Consolidate documentation into one canonical status file per module.
 - Add the live technical-debt register and audited branch chronology.
@@ -45,9 +103,6 @@ All notable changes to GymOS will be documented in this file.
 - Start the safe self-service kiosk foundation with canonical terminal
   capabilities, audited contact updates and card-only financial contracts that
   remain closed until a real payment gateway is connected.
-- Make Automations expose only working manual/scheduled notification rules,
-  reject unsupported definitions and explain its operational purpose in the
-  administrative interface.
 
 ## 0.6.5
 

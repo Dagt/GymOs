@@ -3,6 +3,7 @@ package com.gymos.notifications.api;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.notifications.application.NotificationService;
+import com.gymos.notifications.application.NotificationDeliveryService;
 import com.gymos.notifications.application.NotificationService.CreateNotificationCommand;
 import com.gymos.notifications.application.NotificationService.EmailConfigurationView;
 import com.gymos.notifications.application.NotificationService.EmailPreferenceView;
@@ -30,9 +31,14 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/notifications")
 public class NotificationController {
 	private final NotificationService notificationService;
+	private final NotificationDeliveryService notificationDeliveryService;
 
-	public NotificationController(NotificationService notificationService) {
+	public NotificationController(
+			NotificationService notificationService,
+			NotificationDeliveryService notificationDeliveryService
+	) {
 		this.notificationService = notificationService;
+		this.notificationDeliveryService = notificationDeliveryService;
 	}
 
 	@GetMapping
@@ -74,7 +80,11 @@ public class NotificationController {
 			@Valid @RequestBody TestEmailRequest request,
 			HttpServletRequest servletRequest
 	) {
-		return notificationService.queueTestEmail(principal, request.recipient(), correlationId(servletRequest));
+		NotificationRecord queued = notificationService.queueTestEmail(
+				principal, request.recipient(), correlationId(servletRequest)
+		);
+		notificationDeliveryService.deliverNow(principal.organizationId(), queued.id());
+		return notificationService.notification(principal, queued.id());
 	}
 
 	@PutMapping("/email-preferences")

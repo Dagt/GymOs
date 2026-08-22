@@ -338,6 +338,13 @@ class SecurityAuthorizationTests {
 	}
 
 	@Test
+	@WithMockUser(authorities = "platform.admin")
+	void platformAdministratorCannotLaunchKioskSession() throws Exception {
+		mockMvc.perform(post("/api/v1/self-service/kiosk-sessions"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
 	void paymentProviderCallbacksAndWebhooksArePublicButStillValidateTheirPayload() throws Exception {
 		var oauth = mockMvc.perform(get("/api/v1/payment-settings/mercado-pago/oauth/callback")).andReturn();
 		var webhook = mockMvc.perform(post("/api/v1/payment-webhooks/stripe")

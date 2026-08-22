@@ -1,6 +1,7 @@
 # Wellness y profesionales
 
-Estado: `ESTABILIZADO EN feature/coaches-workouts`
+Estado: `ESTABILIZADO`
+Última revisión en el árbol integrado: 21 de agosto de 2026
 
 ## Alcance vigente
 

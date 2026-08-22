@@ -24,6 +24,11 @@ y enviar un correo de prueba desde Configuración del gimnasio. La contraseña
 nunca se captura ni persiste en la configuración tenant. Véase
 `email-delivery.md`.
 
+Para ZeptoMail, genera o rota la contraseña SMTP desde el Mail Agent, actualiza
+el gestor de secretos, reinicia backend, valida TLS y una entrega real y revoca
+la credencial anterior sólo después de completar la prueba. No documentar el
+valor ni copiarlo a configuración tenant. Véase `zeptomail-email.md`.
+
 `GYMOS_NOTIFICATION_PREFERENCE_KEY` no debe rotarse sin una migración que
 recalcule las preferencias existentes; cambiarla directamente haría que las
 bajas previas dejaran de coincidir con el HMAC del destinatario.

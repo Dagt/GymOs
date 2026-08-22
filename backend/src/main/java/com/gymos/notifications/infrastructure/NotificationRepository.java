@@ -143,6 +143,18 @@ public class NotificationRepository {
 				.query(this::mapEmailConfiguration).single();
 	}
 
+	public OffsetDateTime lastSuccessfulEmailTestAt(UUID organizationId) {
+		return jdbcClient.sql("""
+				SELECT MAX(sent_at)
+				FROM notification_log
+				WHERE organization_id = :organizationId
+				  AND channel = 'EMAIL'
+				  AND trigger_type = 'MANUAL_TEST'
+				  AND status = 'SENT'
+				""").param("organizationId", organizationId)
+				.query(OffsetDateTime.class).optional().orElse(null);
+	}
+
 	public EmailConfigurationRecord upsertEmailConfiguration(
 			UUID organizationId, UUID actorUserId, boolean enabled, String providerKey,
 			String fromEmail, String fromName, String replyTo
@@ -258,6 +270,20 @@ public class NotificationRepository {
 				  AND (locked_until IS NULL OR locked_until < :now)
 				""").param("notificationId", notificationId).param("now", now)
 				.param("lockedUntil", lockedUntil).update() == 1;
+	}
+
+	public boolean claimEmail(UUID organizationId, UUID notificationId, OffsetDateTime now, OffsetDateTime lockedUntil) {
+		return jdbcClient.sql("""
+				UPDATE notification_log SET
+				 status = 'PROCESSING', attempt_count = attempt_count + 1,
+				 locked_until = :lockedUntil, last_attempt_at = :now,
+				 updated_at = :now, version = version + 1
+				WHERE organization_id = :organizationId AND id = :notificationId AND channel = 'EMAIL'
+				  AND status IN ('QUEUED', 'RETRY_SCHEDULED', 'PROCESSING')
+				  AND available_at <= :now
+				  AND (locked_until IS NULL OR locked_until < :now)
+				""").param("organizationId", organizationId).param("notificationId", notificationId)
+				.param("now", now).param("lockedUntil", lockedUntil).update() == 1;
 	}
 
 	public Optional<EmailDeliveryRecord> emailDelivery(UUID notificationId) {

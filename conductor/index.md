@@ -1,5 +1,7 @@
 # Project Context
 
+Last reviewed: 2026-08-21. The Conductor track folders are historical records; current product and module status lives in [`../Documentación/`](../Documentación/README.md).
+
 ## Definition
 - [Product Definition](./product.md)
 - [Product Guidelines](./product-guidelines.md)

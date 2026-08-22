@@ -48,6 +48,11 @@ export type EmailNotificationConfiguration = {
   replyTo: string | null;
   providerAvailable: boolean;
   ready: boolean;
+  providerName: string;
+  preferredFromEmail: string | null;
+  fromEmailRestricted: boolean;
+  allowedFromEmails: string[];
+  lastVerifiedAt: string | null;
   updatedAt: string | null;
 };
 

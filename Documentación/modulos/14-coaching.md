@@ -1,13 +1,12 @@
 # Coaches, ejercicios y rutinas
 
 Estado: `ESTABILIZADO`
-Rama de cierre: `feature/coaches-workouts`
-Código verificado: `e718fdf`
-Corte: 30 de julio de 2026
+Base histórica de cierre: `feature/coaches-workouts` / `e718fdf`
+Última revisión en el árbol integrado: 21 de agosto de 2026
 
 ## Propósito y alcance V1
 
-GymOS permite que cada coach cree, publique, asigne e imprima rutinas, mientras
+GymFort permite que cada coach cree, publique, asigne e imprima rutinas, mientras
 dueño y gerencia miden el acompañamiento a socios. La plataforma no cobra estas
 rutinas, no registra comisiones y no genera ventas, pagos ni movimientos de caja.
 La consulta remota por el socio pertenece a una aplicación futura.

@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getStoredSession, launchKioskSession } from "@/lib/api";
 import { encodeKioskLaunch } from "@/lib/kiosk-launch";
+import { canLaunchKiosk, getPostLoginPath } from "@/lib/role-model";
 
 export default function KioskLaunchPage() {
   const router = useRouter();
@@ -13,14 +14,22 @@ export default function KioskLaunchPage() {
 
   useEffect(() => {
     const session = getStoredSession();
+    if (session && !canLaunchKiosk(session.user)) {
+      router.replace(getPostLoginPath(session.user));
+      return;
+    }
     if (!session?.user.organizationId || !session.user.branchId) {
       setError("Selecciona una sucursal activa en recepción antes de abrir el kiosco.");
     }
     setReady(true);
-  }, []);
+  }, [router]);
 
   async function launch() {
     const administrativeSession = getStoredSession();
+    if (!administrativeSession || !canLaunchKiosk(administrativeSession.user)) {
+      setError("Sólo el personal de recepción puede abrir el kiosco de autoservicio.");
+      return;
+    }
     if (!administrativeSession?.user.organizationId || !administrativeSession.user.branchId) {
       setError("La sesión de recepción no tiene una organización y sucursal activas.");
       return;

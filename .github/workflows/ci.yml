@@ -94,6 +94,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - name: Validate Docker Compose
-        run: docker compose -f infra/docker-compose.yml config
+        run: docker compose -f infra/docker-compose.yml --profile stripe config
+      - name: Verify Stripe CLI image
+        run: |
+          docker pull stripe/stripe-cli:v1.50.3
+          docker run --rm stripe/stripe-cli:v1.50.3 version
       - name: Build Docker images
         run: docker compose -f infra/docker-compose.yml build

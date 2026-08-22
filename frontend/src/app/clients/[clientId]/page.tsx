@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
+import { AppNotice } from "@/components/AppNotice";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import { FormError } from "@/components/FormFields";
 import {
@@ -63,7 +64,7 @@ export default function ClientDetailPage() {
       title={clientFullName(controller.data.client)}
     >
       {controller.error ? <FormError message={controller.error} /> : null}
-      {controller.message ? <p className="form-message success">{controller.message}</p> : null}
+      {controller.message ? <AppNotice message={controller.message} tone="success" /> : null}
 
       {controller.limitedCoachView ? (
         <section className="mb-5 rounded-xl border border-[#d8ddd2] bg-[#f7f9f6] px-4 py-3 text-sm text-[#5d6b63]">

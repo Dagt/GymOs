@@ -59,8 +59,8 @@ export function getConsoleProfile(user: CurrentUser): ConsoleProfile {
     return {
       console,
       label: "Gerente",
-      description: "Operacion diaria, pendientes, equipo y administracion autorizada.",
-      homePath: "/operations",
+      description: "Indicadores, socios, operación y administración autorizada.",
+      homePath: managerHomePath(user),
     };
   }
   if (console === "RECEPTION") {
@@ -96,6 +96,9 @@ export function isSupportMode(user: CurrentUser) {
 
 export function canAccessRoute(user: CurrentUser, pathname: string) {
   const console = resolveUserConsole(user);
+  if (matches(pathname, "/kiosk/launch")) {
+    return canLaunchKiosk(user);
+  }
   if (publicRoutes.some((route) => matches(pathname, route)) || pathname.startsWith("/kiosk")) {
     return true;
   }
@@ -115,6 +118,9 @@ export function canAccessRoute(user: CurrentUser, pathname: string) {
     return tenantOwnerRoutes.some((route) => matches(pathname, route));
   }
   if (console === "TENANT_MANAGER") {
+    if (matches(pathname, "/dashboard")) {
+      return user.permissions.includes("report.owner.read");
+    }
     if (matches(pathname, "/settings/organization")) {
       return hasAny(user, ["payment.settings.manage", "selfservice.settings.manage", "notification.settings.manage"]);
     }
@@ -126,8 +132,30 @@ export function canAccessRoute(user: CurrentUser, pathname: string) {
   return coachRoutes.some((route) => matches(pathname, route));
 }
 
+export function canLaunchKiosk(user: CurrentUser) {
+  return resolveUserConsole(user) === "RECEPTION"
+    && user.permissions.includes("selfservice.session.launch");
+}
+
 function hasAny(user: CurrentUser, permissions: string[]) {
   return permissions.some((permission) => user.permissions.includes(permission));
+}
+
+function managerHomePath(user: CurrentUser) {
+  if (user.permissions.includes("report.owner.read")) return "/dashboard";
+  if (user.permissions.includes("report.sales.read")) return "/reports/sales";
+  if (hasAny(user, ["client.read", "client.create", "client.update", "membership.read", "membership.renew", "membership.change-plan"])) return "/clients";
+  if (user.permissions.includes("booking.read")) return "/bookings";
+  if (user.permissions.includes("professional.read")) return "/wellness";
+  if (user.permissions.includes("coach.read")) return "/coaches";
+  if (user.permissions.includes("inventory.read")) return "/inventory";
+  if (user.permissions.includes("sale.create")) return "/pos";
+  if (hasAny(user, ["payment.settings.manage", "selfservice.settings.manage", "notification.settings.manage"])) return "/settings/organization";
+  if (user.permissions.includes("user.read")) return "/users";
+  if (user.permissions.includes("catalog.read")) return "/catalog";
+  if (user.permissions.includes("benefit.read")) return "/benefits";
+  if (user.permissions.includes("automation.read")) return "/automations";
+  return "/clients";
 }
 
 function isKnownConsole(value: string): value is UserConsole {
@@ -140,7 +168,6 @@ function matches(pathname: string, route: string) {
 
 const tenantOwnerRoutes = [
   "/dashboard",
-  "/operations",
   "/reports",
   "/settings/organization",
   "/users",
@@ -160,7 +187,6 @@ const tenantOwnerRoutes = [
 ];
 
 const managerRoutes = [
-  "/operations",
   "/reports",
   "/settings/organization",
   "/users",

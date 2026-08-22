@@ -161,22 +161,25 @@ test.describe("consolas por rol", () => {
 
     await expect(page.getByRole("heading", { name: /Panel ejecutivo|Dashboard|Metricas/i })).toBeVisible();
     await expect(page.getByLabel("Perfil activo").getByText("Dueño del gimnasio")).toBeVisible();
+    await expect(page.getByRole("img", { name: "GymFort" })).toBeVisible();
     await expect(page.locator("body")).toContainText("Gestión operativa");
     await expect(page.locator("body")).toContainText("Administración");
     await expect(page.locator("body")).toContainText("Configuración");
+    await expect(page.getByRole("link", { name: "Operación diaria" })).toHaveCount(0);
   });
 
-  test("gerente conserva menu operativo sin rutas de plataforma", async ({ page }) => {
+  test("gerente conserva menu operativo sin la pagina redundante de operacion diaria", async ({ page }) => {
     await bootAs(page, user({
       console: "TENANT_MANAGER",
       roles: ["Gerente"],
       permissions: managerPermissions(),
     }));
 
-    await page.goto("/operations");
+    await page.goto("/dashboard");
 
-    await expect(page.getByRole("heading", { name: /Operacion diaria/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Panel ejecutivo|Dashboard|Metricas/i })).toBeVisible();
     await expect(page.getByLabel("Perfil activo").getByText("Gerente")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Operación diaria" })).toHaveCount(0);
     await expect(page.locator("body")).toContainText("Gestión operativa");
     await expect(page.locator("body")).toContainText("Administración");
     await expect(page.locator("body")).toContainText("Mostrador");
@@ -187,6 +190,8 @@ test.describe("consolas por rol", () => {
     await page.locator('a[href="/settings/organization"]').click();
     await expect(page).toHaveURL(/\/settings\/organization/);
     await expect(page.getByRole("heading", { name: "Configuración del gimnasio" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Vincular Stripe|Continuar configuración de Stripe/i })).toHaveCount(0);
+    await expect(page.getByText(/cuenta de Stripe sólo puede vincularla o modificarla el dueño/i)).toBeVisible();
     await page.goto("/bookings");
     await expect(page.getByRole("button", { name: "Crear recurso" })).toBeVisible();
     await page.goto("/benefits");
@@ -275,7 +280,7 @@ test.describe("consolas por rol", () => {
   test("dueno configura el remitente SMTP y encola un correo de prueba", async ({ page }) => {
     let savedConfiguration: Record<string, unknown> | null = null;
     let testRecipient: string | null = null;
-    const emailConfiguration = {
+    let emailConfiguration = {
       organizationId: org.id,
       emailEnabled: false,
       providerKey: "SMTP",
@@ -284,6 +289,11 @@ test.describe("consolas por rol", () => {
       replyTo: null,
       providerAvailable: true,
       ready: false,
+      providerName: "ZeptoMail",
+      preferredFromEmail: "notificaciones@appex.com",
+      fromEmailRestricted: true,
+      allowedFromEmails: ["notificaciones@appex.com"],
+      lastVerifiedAt: null as string | null,
       updatedAt: null,
     };
     await bootAs(page, user({
@@ -297,24 +307,33 @@ test.describe("consolas por rol", () => {
       }
       if (path === "/notifications/email-configuration" && route.request().method() === "PUT") {
         savedConfiguration = route.request().postDataJSON() as Record<string, unknown>;
+        emailConfiguration = {
+          ...emailConfiguration,
+          emailEnabled: true,
+          fromEmail: String(savedConfiguration.fromEmail),
+          fromName: String(savedConfiguration.fromName),
+          replyTo: savedConfiguration.replyTo ? String(savedConfiguration.replyTo) : null,
+          ready: true,
+        };
         await route.fulfill({
           contentType: "application/json",
-          body: JSON.stringify({ ...emailConfiguration, ...savedConfiguration, emailEnabled: true, ready: true }),
+          body: JSON.stringify(emailConfiguration),
         });
         return true;
       }
       if (path === "/notifications/email-configuration/test" && route.request().method() === "POST") {
         testRecipient = (route.request().postDataJSON() as { recipient: string }).recipient;
+        emailConfiguration = { ...emailConfiguration, lastVerifiedAt: new Date().toISOString() };
         await route.fulfill({
           contentType: "application/json",
           body: JSON.stringify({
             id: "99999999-9999-4999-8999-999999999999",
             channel: "EMAIL",
             recipient: testRecipient,
-            subject: "Prueba de correo de GymOS",
+            subject: "Prueba de correo de GymFort",
             body: "Mensaje",
             bodyHtml: null,
-            status: "QUEUED",
+            status: "SENT",
             category: "TRANSACTIONAL",
             recipientType: "DIRECT",
             recipientId: null,
@@ -322,7 +341,7 @@ test.describe("consolas por rol", () => {
             referenceType: "ORGANIZATION",
             referenceId: org.id,
             scheduledAt: null,
-            sentAt: null,
+            sentAt: new Date().toISOString(),
             errorMessage: null,
             providerKey: null,
             providerMessageId: null,
@@ -341,7 +360,7 @@ test.describe("consolas por rol", () => {
 
     await page.goto("/settings/organization");
     await page.getByRole("button", { name: /Correo electrónico/ }).click();
-    await expect(page.getByRole("heading", { name: "Correo electrónico" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Correo real con ZeptoMail" })).toBeVisible();
     await page.getByLabel("Nombre del remitente").fill("Appex Fitness");
     await page.getByLabel("Correo remitente").fill("notificaciones@appex.com");
     await page.getByText("Habilitar entregas por correo").click();
@@ -355,8 +374,8 @@ test.describe("consolas por rol", () => {
     });
 
     await page.getByLabel("Destinatario de prueba").fill("qa@appex.com");
-    await page.getByRole("button", { name: "Enviar prueba" }).click();
-    await expect(page.getByText(/Correo de prueba en cola/)).toBeVisible();
+    await page.getByRole("button", { name: "Enviar y verificar" }).click();
+    await expect(page.getByText(/aceptó el correo de prueba/)).toBeVisible();
     expect(testRecipient).toBe("qa@appex.com");
   });
 });
@@ -395,6 +414,24 @@ function responseFor(path: string, currentUser: TestUser) {
   }
   if (path === "/organizations/current/branches" || path.endsWith("/branches")) {
     return branches;
+  }
+  if (path === "/notifications/email-configuration") {
+    return {
+      organizationId: org.id,
+      emailEnabled: false,
+      providerKey: "SMTP",
+      fromEmail: null,
+      fromName: null,
+      replyTo: null,
+      providerAvailable: false,
+      ready: false,
+      providerName: "ZeptoMail",
+      preferredFromEmail: null,
+      fromEmailRestricted: false,
+      allowedFromEmails: [],
+      lastVerifiedAt: null,
+      updatedAt: null,
+    };
   }
   if (path.startsWith("/reports/owner-dashboard")) {
     return {
@@ -449,7 +486,6 @@ function ownerPermissions() {
   return [
     "report.owner.read",
     "report.sales.read",
-    "operations.read",
     "inventory.read",
     "booking.read",
     "booking.manage",
@@ -476,7 +512,6 @@ function ownerPermissions() {
 
 function managerPermissions() {
   return [
-    "operations.read",
     "booking.read",
     "booking.manage",
     "inventory.read",

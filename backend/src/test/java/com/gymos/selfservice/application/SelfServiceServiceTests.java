@@ -45,6 +45,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.annotation.Transactional;
 
 class SelfServiceServiceTests {
@@ -145,7 +146,9 @@ class SelfServiceServiceTests {
 				branchId,
 				"recepcion@example.com",
 				"Recepcion",
-				Set.of("selfservice.session.launch")
+				Set.of("selfservice.session.launch"),
+				Set.of("Recepcion"),
+				false
 		);
 		when(repository.defaultTerminal(organizationId, branchId)).thenReturn(Optional.of(new TerminalRecord(
 				UUID.randomUUID(), organizationId, branchId, "Kiosco de sucursal", "KIOSK-MAIN", "ACTIVE",
@@ -157,6 +160,24 @@ class SelfServiceServiceTests {
 
 		verify(repository).ensureDefaultTerminal(organizationId, branchId, userId);
 		assertThat(Duration.between(before, result.expiresAt()).toHours()).isEqualTo(12);
+	}
+
+	@Test
+	void launchRejectsOwnerEvenWithInheritedLaunchPermission() {
+		GymOsPrincipal principal = new GymOsPrincipal(
+				UUID.randomUUID(),
+				organizationId,
+				branchId,
+				"owner@example.com",
+				"Owner",
+				Set.of("selfservice.session.launch"),
+				Set.of("Dueno del gimnasio"),
+				false
+		);
+
+		assertThatThrownBy(() -> service.launchSession(principal, "127.0.0.1", "correlation"))
+				.isInstanceOf(AccessDeniedException.class);
+		verifyNoInteractions(repository);
 	}
 
 	@Test

@@ -25,7 +25,7 @@ type OrganizationOverviewCardProps = {
 
 export function OrganizationOverviewCard({ form, onEdit }: OrganizationOverviewCardProps) {
   return (
-    <section className="app-card p-5">
+    <section className="app-card settings-overview-card p-5">
       <div className="admin-panel-header">
         <div>
           <p>Gimnasio</p>
@@ -64,7 +64,7 @@ type BranchesOverviewCardProps = {
 
 export function BranchesOverviewCard({ branches, onEditBranch, onNewBranch }: BranchesOverviewCardProps) {
   return (
-    <section className="app-card flex min-h-0 flex-col overflow-hidden p-5 xl:h-full">
+    <section className="app-card settings-overview-card flex min-h-0 flex-col overflow-hidden p-5 xl:h-full">
       <div className="admin-panel-header shrink-0">
         <div>
           <p>Sucursales</p>
@@ -96,7 +96,7 @@ export function BranchesOverviewCard({ branches, onEditBranch, onNewBranch }: Br
 
 export function TeamAccessCard() {
   return (
-    <section className="app-card p-5">
+    <section className="app-card settings-overview-card p-5">
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div className="min-w-0">
           <p className="app-eyebrow">Equipo</p>

@@ -1,6 +1,7 @@
 "use client";
 
 import { AppShell, LoadingScreen } from "@/components/AppShell";
+import { AppNotice } from "@/components/AppNotice";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import { FormError } from "@/components/FormFields";
 import {
@@ -10,6 +11,7 @@ import {
   CreateClientDrawer,
 } from "./ClientSections";
 import { useClientsController } from "./useClientsController";
+import "./clients-scroll.css";
 
 export default function ClientsPage() {
   const controller = useClientsController();
@@ -25,6 +27,7 @@ export default function ClientsPage() {
   return (
     <AppShell
       eyebrow="Socios"
+      pageClassName="clients-scroll-page"
       session={controller.session}
       subtitle="Registro de socios, membresía inicial opcional y búsqueda para recepción."
       title="Socios"
@@ -32,7 +35,7 @@ export default function ClientsPage() {
       <ClientSearchBar query={controller.query} onQueryChange={controller.setQuery} onSubmit={controller.submitSearch} />
 
       {controller.error ? <FormError message={controller.error} /> : null}
-      {controller.message ? <p className="form-message success">{controller.message}</p> : null}
+      {controller.message ? <AppNotice message={controller.message} tone="success" /> : null}
 
       <section className="grid gap-6">
         <ClientToolbar

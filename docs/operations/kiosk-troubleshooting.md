@@ -1,61 +1,61 @@
-# Kiosk Troubleshooting
+# Diagnóstico del kiosco
 
-## Common Symptoms
+## No abre la sesión
 
-- Terminal cannot start a session.
-- Verification always fails.
-- Session token rejected.
-- Session expired.
+1. Confirma que el usuario es Recepción y posee `selfservice.session.launch`.
+   Dueño/gerente configuran el kiosco, pero no deben abrirlo.
+2. Selecciona organización y sucursal activa.
+3. Abre desde Recepción y permite la nueva pestaña; una URL directa a
+   `/kiosk/reception` se rechaza sin el handoff de un solo uso.
+4. Verifica la capacidad habilitada en Configuración para esa sucursal.
+5. Revisa reloj local/backend, rate limit y estado `blocked-until`.
 
-## Checks
+## Verificación o sesión rechazada
 
-1. Confirm the branch kiosk profile and its capabilities are active in Organization settings.
-2. Confirm the reception account selected the expected organization and branch, opened `/kiosk/launch`, and allowed the new tab. No computer ID is registered.
-3. Confirm the kiosk arrived at `/kiosk/reception`. Opening that route directly is intentionally rejected because it lacks the one-time browser handoff.
-4. Confirm local clock and backend clock are aligned.
-5. Confirm `X-Self-Service-Session-Token` is sent after verification.
-6. Check rate limiting and blocked-until state.
+- Enviar `X-Self-Service-Session-Token` después de verificar.
+- La identidad expira tras tres minutos de inactividad; la ejecución del
+  navegador tiene máximo de doce horas.
+- No revelar si un correo/teléfono existe. Mantener respuestas genéricas.
+- Revisar `GYMOS_TRUSTED_PROXIES`; no confiar en cabeceras de clientes públicos.
 
-For wellness, only active services with `price_cents = 0` are returned. A paid
-service is rejected by the backend even if a client attempts to submit its ID.
+## Stripe se queda esperando
 
-## Data Safety
+1. Confirma backend y red antes de culpar al listener: Stripe CLI sólo recibe
+   webhooks después de que Checkout crea/termina una operación.
+2. Comprueba `sk_test_...`, cuenta conectada, modalidad habilitada y URLs de retorno.
+3. Confirma que el listener usa `--forward-connect-to` y que el backend arrancó
+   con el mismo `whsec_...`.
+4. Revisa historial técnico de operaciones/webhooks y el `correlationId`.
+5. No repitas manualmente efectos de membresía por una pantalla de retorno.
 
-Do not expose whether a specific email or phone exists. Kiosk responses must remain generic.
+## Plan multi-sucursal
 
-## Recurring Payments
+La membresía conserva sucursal de origen. Con `multiBranchAccess=true`, el socio
+debe ser reconocido y reservar recursos elegibles en otra sucursal activa del
+mismo tenant. Si no ocurre, revisar asociación del plan, estado/vigencia,
+tenant, capacidad de reservas y restricciones del recurso.
 
-Use the tenant-scoped histories in Organization settings before inspecting the
-database. They list mandates, recurring charges and webhook outcomes without
-provider payloads or full payment-method identifiers.
+## Pagos y domiciliación
 
-Operational metrics are available to authenticated monitoring clients through
-`/actuator/metrics` and `/actuator/prometheus`:
+Usa primero los historiales tenant-scoped de Configuración: operaciones,
+mandatos, cargos recurrentes y webhooks. No inspecciones ni copies payloads con
+datos sensibles.
 
-- `gymos.payments.recurring.worker`;
-- `gymos.payments.recurring.charges`;
-- `gymos.payments.webhooks`;
-- `gymos.payments.reconciliation`;
-- `gymos.automation.executions` and `gymos.automation.execution.duration`.
-- `gymos.automation.backlog`, `gymos.automation.expired_leases`,
-  `gymos.payment.operations` and `gymos.recurring.expired_leases`.
+Métricas principales:
 
-Every series includes `organization_id`. Provider, event type, trigger type and
-outcome are bounded tags; client, sale, charge, webhook and PaymentIntent IDs
-must never become metric tags.
+- `gymos.payments.recurring.worker`
+- `gymos.payments.recurring.charges`
+- `gymos.payments.webhooks`
+- `gymos.payments.reconciliation`
+- `gymos.payment.operations`
+- `gymos.recurring.expired_leases`
 
-## Infrastructure Verification
-
-Run PostgreSQL concurrency and lease recovery tests on a machine with Docker:
+## Pruebas
 
 ```powershell
 cd backend
 .\gradlew.bat postgresIntegrationTest
 ```
-
-Run the live sandbox contract only with a Stripe test key. A connected test
-account is optional for platform-account tests and required to reproduce the
-production Connect topology:
 
 ```powershell
 $env:GYMOS_STRIPE_TEST_SECRET_KEY = "sk_test_..."
@@ -64,11 +64,5 @@ cd backend
 .\gradlew.bat stripeTest
 ```
 
-The Stripe suite rejects live keys by construction and is skipped when the test
-secret is absent. It covers idempotent replay, an interruption between create
-and confirm, successful off-session confirmation, `requires_action` and an
-insufficient-funds decline. The regular unit suite separately verifies signed
-webhook deduplication and provider timeout mapping.
-
-For the full manual setup, Stripe CLI forwarding, sandbox cards and expected UI
-results, follow [`../testing/stripe-kiosk-test-mode.md`](../testing/stripe-kiosk-test-mode.md).
+La suite Stripe rechaza llaves live y se omite sin secreto. Guía completa:
+[`../testing/stripe-kiosk-test-mode.md`](../testing/stripe-kiosk-test-mode.md).

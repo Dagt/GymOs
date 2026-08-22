@@ -2,7 +2,7 @@
 
 ## 4.0 Organization
 
-Responsabilidad: cliente comercial de GymOS y límite principal de aislamiento de datos.
+Responsabilidad: cliente comercial de GymFort y límite principal de aislamiento de datos.
 
 Atributos:
 - id
@@ -363,7 +363,7 @@ Atributos:
 - schedule
 - reservableResourceId
 
-Implementado en Hito 5:
+Implementado:
 - `Professional` pertenece a organizacion y sucursal, tiene tipo profesional, contacto, biografia y estado.
 - `ProfessionalService` define nombre, tipo, duracion, precio, moneda y estado.
 - `ProfessionalAvailability` define disponibilidad semanal por dia y rango horario.
@@ -386,13 +386,15 @@ Atributos:
 Implementado en Hito 5:
 - `AutomationRule` guarda evento, condicion JSON, accion, configuracion JSON, estado y limite de reintentos.
 - `AutomationExecution` registra cada ejecucion y su resultado.
-- La accion inicial soportada es `CREATE_NOTIFICATION`.
-- `NotificationLog` registra canal, destinatario, asunto, cuerpo, estado, referencia y programacion.
+- Las acciones soportan notificación interna y correo al destinatario del evento.
+- `NotificationLog` y la cola durable registran canal, destinatario protegido,
+  contenido, estado, referencia, intento, lease y programación.
 
 Invariantes:
 - Solo reglas `ENABLED` pueden ejecutarse.
 - La configuracion de condicion y accion debe ser JSON valido.
-- Las notificaciones quedan auditadas aunque el envio externo aun no este conectado.
+- Las notificaciones quedan auditadas; SMTP usa reintentos/dead letter y Zoho
+  permanece como proveedor concreto pendiente de conexión.
 
 ## 4.17 OnboardingChecklist
 
@@ -445,6 +447,13 @@ Eventos de membresias:
 - `MembershipPlanChangedV1`: membresia anterior cancelada y nuevo plan activado.
 - Paquete propietario: `com.gymos.memberships.api.events`.
 
+Eventos/ocurrencias adicionales vigentes:
+
+- reservas creadas, confirmadas y canceladas;
+- membresías próximas a vencer y vencidas;
+- cobro domiciliado debido, completado o fallido;
+- inbox de automatización con versión de regla e identidad idempotente.
+
 Reglas reforzadas:
 - Una membresia solo se activa desde pago completado.
 - Reprocesar `PaymentCompletedV1` no duplica efectos porque se registra `processed_domain_event`.
@@ -488,6 +497,17 @@ Politica de anticipacion, cancelacion, penalizacion, buffers y pago requerido pa
 ### AutoRenewalAttempt
 
 Intento idempotente de renovacion automatica de membresia.
+
+### ProviderConnection / ProviderOperation / WebhookInbox
+
+Conexión tenant cifrada, operación financiera idempotente y recepción durable
+de eventos firmados para Stripe/Mercado Pago. El cuerpo del proveedor no es
+fuente única de verdad: se concilia contra su API.
+
+### RecurringPaymentMandate / RecurringChargeOccurrence
+
+Consentimiento versionado, método tokenizado enmascarado y un cargo por vigencia
+con reintentos/recuperación. No almacena PAN ni CVV.
 
 ### NotificationTemplate
 

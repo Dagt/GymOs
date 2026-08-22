@@ -73,13 +73,17 @@ services:
       GYMOS_STRIPE_REFRESH_URL: ${GYMOS_STRIPE_REFRESH_URL:-http://localhost:3000/settings/organization?payment=stripe-refresh}
       GYMOS_NOTIFICATION_PREFERENCE_KEY: ${GYMOS_NOTIFICATION_PREFERENCE_KEY:-local-notification-preference-key-change-outside-development}
       GYMOS_SMTP_ENABLED: ${GYMOS_SMTP_ENABLED:-false}
+      GYMOS_SMTP_PROVIDER_NAME: ${GYMOS_SMTP_PROVIDER_NAME:-Zoho Mail}
       GYMOS_SMTP_HOST: ${GYMOS_SMTP_HOST:-}
       GYMOS_SMTP_PORT: ${GYMOS_SMTP_PORT:-587}
       GYMOS_SMTP_USERNAME: ${GYMOS_SMTP_USERNAME:-}
       GYMOS_SMTP_PASSWORD: ${GYMOS_SMTP_PASSWORD:-}
+      GYMOS_SMTP_ALLOWED_FROM_ADDRESSES: ${GYMOS_SMTP_ALLOWED_FROM_ADDRESSES:-}
       GYMOS_SMTP_AUTH: ${GYMOS_SMTP_AUTH:-true}
       GYMOS_SMTP_STARTTLS: ${GYMOS_SMTP_STARTTLS:-true}
+      GYMOS_SMTP_STARTTLS_REQUIRED: ${GYMOS_SMTP_STARTTLS_REQUIRED:-true}
       GYMOS_SMTP_SSL: ${GYMOS_SMTP_SSL:-false}
+      GYMOS_SMTP_CHECK_SERVER_IDENTITY: ${GYMOS_SMTP_CHECK_SERVER_IDENTITY:-true}
       GYMOS_SMTP_CONNECTION_TIMEOUT_MS: ${GYMOS_SMTP_CONNECTION_TIMEOUT_MS:-10000}
       GYMOS_SMTP_READ_TIMEOUT_MS: ${GYMOS_SMTP_READ_TIMEOUT_MS:-10000}
       GYMOS_SMTP_WRITE_TIMEOUT_MS: ${GYMOS_SMTP_WRITE_TIMEOUT_MS:-10000}
@@ -108,6 +112,22 @@ services:
     mem_limit: 2048m
     depends_on:
       - backend
+
+  stripe-listener:
+    image: stripe/stripe-cli:v1.50.3
+    profiles: ["stripe"]
+    command:
+      - listen
+      - --api-key
+      - ${GYMOS_STRIPE_SECRET_KEY:-}
+      - --events
+      - checkout.session.completed,checkout.session.async_payment_succeeded,payment_intent.succeeded,payment_intent.payment_failed
+      - --forward-connect-to
+      - http://backend:8080/api/v1/payment-webhooks/stripe
+    depends_on:
+      backend:
+        condition: service_started
+    restart: unless-stopped
 
 volumes:
   postgres-data:

@@ -43,14 +43,13 @@ const ownerSections: NavigationSection[] = [
   {
     title: "Dirección",
     links: [
-      { label: "Métricas del negocio", href: "/dashboard", hint: "Ingresos, socios y salud", permissions: ["report.owner.read", "report.sales.read"] },
+      { label: "Métricas del negocio", href: "/dashboard", hint: "Ingresos, socios y salud", permissions: ["report.owner.read"] },
       { label: "Ventas y pagos", href: "/reports/sales", hint: "Reportes financieros", permissions: ["report.sales.read"] },
     ],
   },
   {
     title: "Gestión operativa",
     links: [
-      { label: "Operación diaria", href: "/operations", hint: "Pendientes y herramientas", permissions: ["operations.read", "inventory.read", "booking.read"] },
       { label: "Socios", href: "/clients", hint: "Altas, fichas y membresías", permissions: memberWorkflowPermissions },
       { label: "Reservas", href: "/bookings", hint: "Agenda y recursos", permissions: ["booking.read"] },
       { label: "Wellness", href: "/wellness", hint: "Bienestar", permissions: ["professional.read"] },
@@ -73,7 +72,6 @@ const ownerSections: NavigationSection[] = [
     links: [
       { label: "Caja / POS", href: "/pos", hint: "Ventas y pagos", permissions: ["sale.create"] },
       { label: "Accesos", href: "/access", hint: "Visitas y pases", permissions: ["access.read", "visit.read"] },
-      { label: "Pantalla para socios", href: "/kiosk/launch", hint: "Abrir kiosco seguro", permissions: ["selfservice.session.launch"] },
     ],
   },
 ];
@@ -82,8 +80,7 @@ const managerSections: NavigationSection[] = [
   {
     title: "Gerencia",
     links: [
-      { label: "Operación diaria", href: "/operations", hint: "Pendientes y herramientas", permissions: ["operations.read", "booking.read", "inventory.read"] },
-      { label: "Indicadores", href: "/dashboard", hint: "Resumen ejecutivo", permissions: ["report.owner.read", "report.sales.read"] },
+      { label: "Indicadores", href: "/dashboard", hint: "Resumen ejecutivo", permissions: ["report.owner.read"] },
       { label: "Ventas y pagos", href: "/reports/sales", hint: "Pagos y saldos", permissions: ["report.sales.read"] },
     ],
   },

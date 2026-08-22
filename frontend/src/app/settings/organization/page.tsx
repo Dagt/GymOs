@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
+import { AppNotice } from "@/components/AppNotice";
 import { type FieldErrorMap } from "@/components/FormFields";
 import {
   beginMercadoPagoOnboarding,
@@ -45,6 +46,7 @@ import {
   OrganizationOverviewCard,
   TeamAccessCard,
 } from "./OrganizationSettingsSections";
+import { PaymentConfigurationCard } from "./PaymentConfigurationCard";
 import { PaymentOperationsHistoryCard } from "./PaymentOperationsHistoryCard";
 import { KioskBranchSettingsCard } from "./KioskBranchSettingsCard";
 import { NotificationEmailSettingsCard } from "./NotificationEmailSettingsCard";
@@ -92,6 +94,8 @@ export default function OrganizationSettingsPage() {
         const canReadPaymentSettings = storedSession.user.permissions.includes("payment.settings.read")
           || storedSession.user.permissions.includes("payment.settings.manage")
           || storedSession.user.permissions.includes("platform.admin");
+        const canManageStripeProvider = storedSession.user.permissions.includes("payment.provider.stripe.manage")
+          || storedSession.user.permissions.includes("platform.admin");
         const [currentOrganization, availableBranches, currentPaymentConfiguration] = await Promise.all([
           canManageOrganizationProfile
             ? getCurrentOrganization(storedSession.accessToken)
@@ -105,11 +109,11 @@ export default function OrganizationSettingsPage() {
         setBranches(availableBranches);
         let resolvedPaymentConfiguration = currentPaymentConfiguration;
         const paymentReturn = new URLSearchParams(window.location.search).get("payment");
-        if (canReadPaymentSettings && paymentReturn === "stripe-return") {
+        if (canManageStripeProvider && paymentReturn === "stripe-return") {
           resolvedPaymentConfiguration = await refreshStripeConnection(storedSession.accessToken);
           window.history.replaceState({}, "", window.location.pathname);
         }
-        if (canReadPaymentSettings && paymentReturn === "stripe-refresh") {
+        if (canManageStripeProvider && paymentReturn === "stripe-refresh") {
           const link = await beginStripeOnboarding(storedSession.accessToken);
           window.location.assign(link.url);
           return;
@@ -173,6 +177,7 @@ export default function OrganizationSettingsPage() {
   const canManageBranches = Boolean(session?.user.permissions.includes("branch.update") || session?.user.permissions.includes("platform.admin"));
   const canManageKioskSettings = Boolean(session?.user.permissions.includes("selfservice.settings.manage") || session?.user.permissions.includes("platform.admin"));
   const canManageEmailSettings = Boolean(session?.user.permissions.includes("notification.settings.manage") || session?.user.permissions.includes("platform.admin"));
+  const canManageStripeAccount = Boolean(session?.user.permissions.includes("payment.provider.stripe.manage") || session?.user.permissions.includes("platform.admin"));
   const availableOperationalSections: OperationalSection[] = [
     ...(paymentConfiguration ? ["payments", "history"] as OperationalSection[] : []),
     ...(canManageKioskSettings ? ["kiosk"] as OperationalSection[] : []),
@@ -420,10 +425,11 @@ export default function OrganizationSettingsPage() {
         eyebrow="Administracion"
         mode={activeBranch ? "operation" : "setup"}
         organizationName={session.user.organizationName}
+        pageClassName="settings-console"
         session={session}
         title="Configuración del gimnasio"
       >
-        <p className="form-message error">{error ?? "No fue posible cargar los datos del gimnasio."}</p>
+        <AppNotice message={error ?? "No fue posible cargar los datos del gimnasio."} tone="error" />
       </AppShell>
     );
   }
@@ -434,14 +440,16 @@ export default function OrganizationSettingsPage() {
       eyebrow="Administracion"
       mode={activeBranch ? "operation" : "setup"}
       organizationName={organization?.tradeName ?? session.user.organizationName}
+      pageClassName="settings-console"
       session={session}
+      subtitle="Organiza identidad, sucursales y servicios conectados desde un solo centro de control."
       title="Configuración del gimnasio"
     >
-      {error ? <p className="form-message error">{error}</p> : null}
-      {message ? <p className="form-message success">{message}</p> : null}
+      {error ? <AppNotice message={error} tone="error" /> : null}
+      {message ? <AppNotice message={message} tone="success" /> : null}
 
       {canManageOrganization || canManageBranches ? (
-        <section className="grid items-start gap-5 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <section className="settings-overview-grid">
           {canManageOrganization && persistedOrganizationForm ? (
             <div className="grid min-w-0 gap-5" ref={settingsColumnRef}>
               <OrganizationOverviewCard form={persistedOrganizationForm} onEdit={openOrganizationDrawer} />
@@ -471,6 +479,7 @@ export default function OrganizationSettingsPage() {
         <PaymentConfigurationCard
           key={`${paymentConfiguration.receptionManualTerminalEnabled}-${paymentConfiguration.receptionMercadoPagoEnabled}-${paymentConfiguration.mercadoPagoConnected}-${paymentConfiguration.mercadoPagoTerminalId ?? "none"}-${paymentConfiguration.stripeSelfCheckoutEnabled}-${paymentConfiguration.stripeRecurringEnabled}-${paymentConfiguration.stripeConnected}-${paymentConfiguration.stripeAccountId ?? "none"}`}
           canManage={session.user.permissions.includes("payment.settings.manage") || session.user.permissions.includes("platform.admin")}
+          canManageStripeAccount={canManageStripeAccount}
           configuration={paymentConfiguration}
           mercadoPagoTerminals={mercadoPagoTerminals}
           saving={saving}
@@ -535,8 +544,12 @@ function OperationalSettingsNavigation({
 }) {
   if (!showEmail && !showKiosk && !showPayments) return null;
   return (
-    <nav aria-label="Configuración operativa" className="app-card p-4">
-      <div className="flex flex-wrap gap-2">
+    <nav aria-label="Configuración operativa" className="settings-section-nav">
+      <div>
+        <p>Servicios conectados</p>
+        <span>Selecciona el bloque que deseas configurar.</span>
+      </div>
+      <div className="settings-section-tabs">
         {showPayments ? <SettingsSectionButton active={activeSection === "payments"} label="Medios de cobro" onClick={() => onSelect("payments")} /> : null}
         {showKiosk ? <SettingsSectionButton active={activeSection === "kiosk"} label="Kiosco web" onClick={() => onSelect("kiosk")} /> : null}
         {showEmail ? <SettingsSectionButton active={activeSection === "email"} label="Correo electrónico" onClick={() => onSelect("email")} /> : null}
@@ -558,7 +571,7 @@ function SettingsSectionButton({
   return (
     <button
       aria-pressed={active}
-      className={`rounded-md border px-4 py-2 text-sm font-semibold transition ${active ? "border-[var(--brand-primary)] bg-[#edf5ef]" : "border-[var(--brand-line)] bg-white hover:border-[var(--brand-primary)]"}`}
+      className={`settings-section-tab ${active ? "active" : ""}`}
       onClick={onClick}
       type="button"
     >
@@ -583,114 +596,6 @@ function operationalSectionHash(section: OperationalSection) {
     email: "#email-settings",
     history: "#payment-operations",
   } as Record<OperationalSection, string>)[section];
-}
-
-function PaymentConfigurationCard({
-  canManage,
-  configuration,
-  mercadoPagoTerminals,
-  saving,
-  onChooseMercadoPagoTerminal,
-  onConnectMercadoPago,
-  onConnectStripe,
-  onLoadMercadoPagoTerminals,
-  onRefreshStripe,
-  onSave,
-}: {
-  canManage: boolean;
-  configuration: PaymentConfiguration;
-  mercadoPagoTerminals: MercadoPagoTerminal[];
-  saving: boolean;
-  onChooseMercadoPagoTerminal: (terminalId: string) => Promise<void>;
-  onConnectMercadoPago: () => Promise<void>;
-  onConnectStripe: () => Promise<void>;
-  onLoadMercadoPagoTerminals: () => Promise<void>;
-  onRefreshStripe: () => Promise<void>;
-  onSave: (configuration: PaymentConfiguration) => Promise<void>;
-}) {
-  const [draft, setDraft] = useState(configuration);
-
-  return (
-    <section className="app-card grid scroll-mt-6 gap-5 p-5" id="payment-settings">
-      <h2 className="text-xl font-semibold">Recepción y pagos del kiosco</h2>
-      <label className="flex items-start gap-3 rounded-md border border-[var(--brand-line)] p-4">
-        <input
-          checked={draft.receptionManualTerminalEnabled}
-          disabled={!canManage}
-          onChange={(event) => setDraft({ ...draft, receptionManualTerminalEnabled: event.target.checked })}
-          type="checkbox"
-        />
-        <strong>Terminal independiente en recepción</strong>
-      </label>
-      <label className="flex items-start gap-3 rounded-md border border-[var(--brand-line)] p-4">
-        <input
-          checked={draft.receptionMercadoPagoEnabled}
-          disabled={!canManage || !draft.mercadoPagoConnected}
-          onChange={(event) => setDraft({ ...draft, receptionMercadoPagoEnabled: event.target.checked })}
-          type="checkbox"
-        />
-        <span><strong>Mercado Pago Point integrado</strong><small className="mt-1 block">{draft.mercadoPagoConnected ? `Vinculado · ${draft.mercadoPagoTerminalId ?? "sin terminal"}` : "No vinculado"}</small></span>
-      </label>
-      {canManage ? (
-        <div className="flex flex-wrap items-center gap-3">
-          <button className="app-button-secondary" disabled={saving} onClick={() => void onConnectMercadoPago()} type="button">
-            {draft.mercadoPagoConnected ? "Volver a vincular Mercado Pago" : "Vincular Mercado Pago"}
-          </button>
-          {draft.mercadoPagoConnected ? (
-            <button className="app-button-secondary" disabled={saving} onClick={() => void onLoadMercadoPagoTerminals()} type="button">
-              Consultar terminales Point
-            </button>
-          ) : null}
-          {mercadoPagoTerminals.length > 0 ? (
-            <select
-              className="app-input min-w-64"
-              disabled={saving}
-              onChange={(event) => void onChooseMercadoPagoTerminal(event.target.value)}
-              value={draft.mercadoPagoTerminalId ?? ""}
-            >
-              <option value="">Selecciona una terminal</option>
-              {mercadoPagoTerminals.map((terminal) => (
-                <option key={terminal.id} value={terminal.id}>
-                  {terminal.name ?? terminal.id}{terminal.status ? ` (${terminal.status})` : ""}
-                </option>
-              ))}
-            </select>
-          ) : null}
-        </div>
-      ) : null}
-      <label className="flex items-start gap-3 rounded-md border border-[var(--brand-line)] p-4">
-        <input
-          checked={draft.stripeSelfCheckoutEnabled}
-          disabled={!canManage || !draft.stripeConnected}
-          onChange={(event) => setDraft({ ...draft, stripeSelfCheckoutEnabled: event.target.checked, stripeRecurringEnabled: event.target.checked ? draft.stripeRecurringEnabled : false })}
-          type="checkbox"
-        />
-        <span><strong>Stripe para self checkout</strong><small className="mt-1 block">{draft.stripeConnected ? "Vinculado" : "No vinculado"}</small></span>
-      </label>
-      {canManage ? (
-        <div className="flex flex-wrap gap-3">
-          <button className="app-button-secondary" disabled={saving} onClick={() => void onConnectStripe()} type="button">
-            {draft.stripeAccountId ? "Continuar configuración de Stripe" : "Vincular Stripe"}
-          </button>
-          {draft.stripeAccountId ? (
-            <button className="app-button-secondary" disabled={saving} onClick={() => void onRefreshStripe()} type="button">
-              Verificar conexión de Stripe
-            </button>
-          ) : null}
-        </div>
-      ) : null}
-      <label className="flex items-start gap-3 rounded-md border border-[var(--brand-line)] p-4">
-        <input
-          checked={draft.stripeRecurringEnabled}
-          disabled={!canManage || !draft.stripeConnected || !draft.stripeSelfCheckoutEnabled}
-          onChange={(event) => setDraft({ ...draft, stripeRecurringEnabled: event.target.checked })}
-          type="checkbox"
-        />
-        <strong>Domiciliación con Stripe</strong>
-      </label>
-      {canManage ? <button className="app-button w-fit" disabled={saving} onClick={() => void onSave(draft)} type="button">{saving ? "Guardando..." : "Guardar configuración de cobro"}</button> : null}
-    </section>
-  );
 }
 
 function AuthRequired() {

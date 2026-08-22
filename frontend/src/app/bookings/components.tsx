@@ -1,6 +1,7 @@
 "use client";
 
 import type { BookingSummary, ResourceSummary } from "@/lib/api";
+import { AppNotice } from "@/components/AppNotice";
 import { bookingDate, formatLongDate, formatMonthLabel } from "./booking-utils";
 
 export type BookingNotice = { title: string; message: string; tone: "error" | "success" };
@@ -27,21 +28,7 @@ type WeekdayLabel = {
 };
 
 export function BookingNoticeModal({ notice, onClose }: { notice: BookingNotice; onClose: () => void }) {
-  const isError = notice.tone === "error";
-  return (
-    <div aria-modal="true" className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-md animate-in fade-in duration-300" onClick={onClose} role="dialog">
-      <div className="w-full max-w-md rounded-3xl bg-white p-8 shadow-2xl scale-in-95 animate-in" onClick={(event) => event.stopPropagation()}>
-        <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-2xl text-2xl font-black shadow-lg ${isError ? "bg-red-50 text-red-600 shadow-red-100" : "bg-green-50 text-green-600 shadow-green-100"}`}>
-          {isError ? "!" : "✓"}
-        </div>
-        <h2 className="mt-6 text-center text-2xl font-black text-[color:var(--brand-primary)] tracking-tight">{notice.title}</h2>
-        <p className="mt-3 text-center text-sm font-medium leading-relaxed text-[color:var(--brand-muted)]">{notice.message}</p>
-        <button autoFocus className={`mt-8 h-14 w-full rounded-2xl px-4 text-sm font-black text-white shadow-xl transition-all hover:brightness-110 active:scale-95 ${isError ? "bg-red-600 shadow-red-200" : "bg-[var(--brand-primary)] shadow-[color:var(--brand-primary)]/20"}`} onClick={onClose} type="button">
-          ENTENDIDO
-        </button>
-      </div>
-    </div>
-  );
+  return <AppNotice message={notice.message} onClose={onClose} title={notice.title} tone={notice.tone} />;
 }
 
 export function BookingNoteModal({ dialog, onClose }: { dialog: BookingNoteDialog; onClose: () => void }) {
