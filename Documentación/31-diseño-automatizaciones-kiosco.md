@@ -1,20 +1,14 @@
 # 31. Diseño rector de Automatizaciones y Kiosco
 
-Estado: IMPLEMENTADO / ACEPTACIÓN CONECTADA PENDIENTE
-Corte: 21 de agosto de 2026
-Base integrada: PR #10; rama siguiente `feature/automations-zoho-email`
+Estado: IMPLEMENTADO / CIERRE FUNCIONAL DE AUTOMATIZACIONES Y EMAIL
+Corte: 22 de agosto de 2026
+Base integrada: PR #10; rama `feature/automations-zoho-email`
 
 ## 1. Decisión central
 
-Automatizaciones orquesta; Kiosco presenta y solicita; los módulos propietarios
-deciden y ejecutan. Automatizaciones no escribe directamente membresías, pagos
-o reservas. El kiosco no calcula precios, elegibilidad, vigencias ni aprueba
-pagos.
+Automatizaciones orquesta; Kiosco presenta y solicita; los módulos propietarios deciden y ejecutan. Automatizaciones no escribe directamente membresías, pagos o reservas. El kiosco no calcula precios, elegibilidad, vigencias ni aprueba pagos.
 
-El kiosco es un perfil lógico de capacidades por sucursal, no una computadora
-registrada. Sólo Recepción inicia el handoff desde una sesión autenticada. La
-pestaña aislada elimina credenciales administrativas y conserva únicamente un
-token temporal de autoservicio.
+El kiosco es un perfil lógico de capacidades por sucursal, no una computadora registrada. Sólo Recepción inicia el handoff desde una sesión autenticada. La pestaña aislada elimina credenciales administrativas y conserva únicamente un token temporal de autoservicio.
 
 ## 2. Fronteras
 
@@ -26,100 +20,122 @@ token temporal de autoservicio.
 - `automations`: reglas, eventos, ejecución y recuperación.
 - `notifications`: mensajes internos y entrega externa durable.
 
-La comunicación entre módulos usa contratos públicos/eventos; las capas de
-aplicación no consultan tablas ajenas directamente.
+La comunicación usa contratos públicos/eventos; las capas de aplicación no consultan tablas ajenas directamente.
 
 ## 3. Seguridad del kiosco
 
-- `selfservice.session.launch` pertenece exclusivamente a Recepción. V78 elimina
-  las concesiones heredadas de dueño, administrador, gerente y soporte; el
-  backend además valida que el principal tenga un rol puro de Recepción.
-- Handoff de navegador de un solo uso sin IDs ni secretos en la URL.
-- Verificación genérica por correo/teléfono y fecha de nacimiento.
-- PII enmascarada, respuestas `no-store` y acción para borrar la sesión.
-- Inactividad verificada de tres minutos; ejecución máxima de doce horas.
+- `selfservice.session.launch` pertenece exclusivamente a Recepción. V78 elimina concesiones heredadas de dueño, administrador, gerente y soporte y el backend exige rol puro de Recepción.
+- Handoff de navegador de un solo uso sin IDs ni secretos en URL.
+- Verificación por contacto + fecha de nacimiento.
+- PII enmascarada, respuestas `no-store` y reset de sesión.
+- Inactividad de tres minutos; ejecución máxima de doce horas.
 - Rate limit por perfil lógico, IP efectiva e identificador anonimizado.
 - `Forwarded`/`X-Forwarded-For` sólo se confían desde `GYMOS_TRUSTED_PROXIES`.
-- Ninguna ruta del kiosco concede acceso a POS, CRM, reportes o configuración.
 
 ## 4. Capacidades por sucursal
 
-Cada sucursal puede habilitar contratación, renovación, cambio de plan,
-domiciliación, reservas, wellness y actualización de contacto. Activar una
-capacidad no sustituye tener listo el proveedor requerido.
+Cada sucursal puede habilitar contratación, renovación, cambio de plan, domiciliación, reservas, wellness y actualización de contacto. Activar una capacidad no sustituye tener listo el proveedor requerido.
 
-Un plan `multiBranchAccess=true` conserva la sucursal de origen de la membresía,
-pero permite reconocer al socio, consultar su elegibilidad y reservar en otras
-sucursales activas del mismo tenant. Si en una sede secundaria se contrata un
-plan local, la nueva operación queda contextualizada allí y sólo se aplica tras
-el pago confirmado.
+Un plan `multiBranchAccess=true` conserva la sucursal de origen, pero permite reconocimiento/elegibilidad/reserva en otras sucursales activas del tenant.
 
 ## 5. Comercio y Stripe
 
-1. El kiosco solicita una cotización autoritativa.
-2. Muestra plan, lista, descuentos, total y operación propuesta.
+1. Kiosco solicita cotización autoritativa.
+2. Muestra plan/lista/descuentos/total.
 3. Con aceptación explícita crea venta/pago pendiente e idempotente.
-4. Stripe Checkout captura la tarjeta; GymFort no recibe PAN ni CVV.
-5. El redirect sólo muestra que el resultado está siendo verificado.
-6. Webhook firmado y consulta autoritativa concilian el contexto.
-7. Un éxito produce exactamente una venta completada, un pago y el efecto de
-   membresía/reserva; un fallo conserva un estado recuperable.
-
-Las llaves idempotentes se conservan durante reintentos y doble clic. Los
-historiales evitan presentar intentos redundantes como cargos completados.
+4. Stripe Checkout captura tarjeta; GymFort no recibe PAN/CVV.
+5. Redirect sólo indica verificación.
+6. Webhook firmado + consulta autoritativa concilian contexto.
+7. Éxito produce exactamente una venta, pago y efecto de dominio.
 
 ## 6. Domiciliación
 
-- Consentimiento versionado y aceptación expresa.
-- Checkout `mode=setup` y método tokenizado.
-- Sólo identificadores opacos, marca y últimos cuatro en GymFort.
-- Un cargo materializado por vigencia, no una suscripción ciega.
-- Cobro off-session con webhook/conciliación, reintentos y `PAST_DUE`.
-- `requires_action`, sustitución de tarjeta, recuperación y revocación.
-- Extensión idempotente únicamente después del pago confirmado.
+- consentimiento versionado;
+- Checkout `mode=setup`;
+- sólo referencias opacas, marca y últimos cuatro;
+- un cargo materializado por vigencia;
+- off-session con webhook/conciliación y reintentos;
+- `PAST_DUE`, `requires_action`, sustitución de tarjeta y revocación;
+- extensión idempotente sólo después del pago confirmado.
+
+Para Automatizaciones se distinguen claramente:
+
+- activación inicial del mandato;
+- fecha de una ocurrencia (`RECURRING_CHARGE_DUE`);
+- cobro exitoso (`RECURRING_CHARGE_SUCCEEDED`);
+- cobro fallido (`RECURRING_CHARGE_FAILED`).
+
+La activación inicial todavía no es un trigger configurable independiente.
 
 ## 7. Configuración y permisos de pagos
 
-`payment.settings.manage` permite activar/desactivar terminal manual, Mercado
-Pago, Stripe Checkout y recurrencia. Gerencia puede usar este permiso con una
-cuenta ya vinculada.
+`payment.settings.manage` permite activar/desactivar terminal manual, Mercado Pago, Stripe Checkout y recurrencia. Gerencia puede usarlo con cuenta ya vinculada.
 
-V77 crea `payment.provider.stripe.manage` para conectar/refrescar la cuenta
-Express. Ese permiso corresponde al dueño y soporte de plataforma; Gerencia no
-administra cuentas Stripe.
+`payment.provider.stripe.manage` corresponde a dueño/soporte para conectar/refrescar Stripe Express.
 
 ## 8. Automatizaciones
 
-Las reglas soportan ejecución manual, intervalo y eventos de pagos,
-membresías, domiciliación y reservas. Cada ocurrencia entra a un inbox durable
-con versión de regla e identidad idempotente.
+Las reglas soportan ejecución manual, intervalo y eventos de pagos, membresías, domiciliación y reservas. Cada ocurrencia entra a un inbox durable con versión de regla e identidad idempotente.
 
-El worker reclama con lease, reparte trabajo entre tenants, respeta pausa
-auditada, aplica backoff y termina en éxito o `DEAD_LETTER`. La consola ofrece
-recetas, vista previa, historial paginado, monitoreo, reintento y descarte con
-motivo.
+El worker reclama con lease, reparte trabajo entre tenants, respeta pausa auditada, aplica backoff y termina en éxito o `DEAD_LETTER`.
 
-Las acciones vigentes son notificación interna y correo al socio cuando el
-evento identifica un destinatario válido.
+### UX final
 
-## 9. Correo
+La consola del cliente no expone el motor técnico completo. La vista se divide en:
 
-`notifications` posee cola durable SMTP, preferencias, supresión, configuración
-tenant, prueba, leasing, reintentos y métricas. Zoho debe conectarse mediante el
-puerto existente; el diseño no permite introducir credenciales del proveedor
-en reglas, logs o tablas tenant.
+- **Automatizaciones**: reglas, estado, toggle, resumen y `Probar ahora`;
+- **Actividad**: resultados comprensibles;
+- **Problemas**: fallos accionables y reintentos.
 
-## 10. Evidencia y cierre pendiente
+Scheduler, leases, referencias técnicas, intentos y métricas permanecen en soporte/observabilidad, no como interfaz principal.
 
-El corte `88a6b58` pasó suite backend, 77 pruebas frontend, lint, typecheck,
-build, 8 E2E de ruteo, Compose y ejecución real de Stripe CLI `v1.50.3`.
-Recorridos manuales Stripe test confirmaron Checkout, webhook, recibo y
-domiciliación.
+La creación es guiada **desde cero**, sin recetas/plantillas recomendadas. El usuario define trigger, condiciones, canal y mensaje.
 
-Para cerrar aceptación financiera faltan:
+### Prueba manual
 
-- ejecutar `stripeTest` con `GYMOS_STRIPE_TEST_SECRET_KEY` y cuenta Connect test
-  dentro de CI protegido;
-- ampliar E2E de expiración, timeout, caída y recuperación multi-tenant;
-- verificar cancelación/reembolso autoritativo por proveedor;
-- completar integración y entregabilidad real de Zoho.
+Las reglas `EMAIL` exigen seleccionar un socio real mediante búsqueda incremental por nombre/correo. La prueba valida mensaje + destinatario + cola + proveedor sin crear operaciones falsas de dominio.
+
+## 9. Permisos de Automatizaciones
+
+- Dueño: lectura/gestión/ejecución.
+- Gerente: V80 concede lectura/gestión/ejecución y gestión operativa de notificaciones.
+- `automation.scheduler.manage`: permiso avanzado separado; no se concede por el simple hecho de administrar reglas.
+
+## 10. Notificaciones y ZeptoMail
+
+`notifications` posee la cola durable, preferencias, configuración tenant, branding, leasing, reintentos y métricas. ZeptoMail se conecta mediante `EmailDeliveryPort`; no existen credenciales del proveedor en reglas ni tablas tenant.
+
+Patrón V1 recomendado:
+
+```text
+From: Nombre del gimnasio <notificaciones@gymfort.mx>
+Reply-To: bandeja real del gimnasio
+```
+
+La dirección transaccional central no necesita buzón real. `gymfort.mx` quedó verificado en ZeptoMail mediante DKIM y CNAME/return-path y se confirmó entrega real el 22 de agosto de 2026.
+
+### Branding del mensaje
+
+El email toma `brandName`, `logoUrl`, `primaryColor`, `accentColor` y `surfaceColor` de la organización. El logo relativo se resuelve con `GYMOS_FRONTEND_BASE_URL`; clientes externos no pueden acceder a `localhost`, por lo que esa imagen se omite en desarrollo local.
+
+## 11. Estado y deuda posterior
+
+El alcance de Automatizaciones + email transaccional queda funcionalmente cerrado. Trabajo posterior no bloqueante:
+
+- trigger independiente de **domiciliación activada** si producto lo requiere;
+- webhooks de bounce/complaint de ZeptoMail;
+- seguimiento productivo de reputación/DMARC;
+- nuevos canales (WhatsApp/push) detrás de `notifications`;
+- mantener suites PostgreSQL/E2E/Prometheus en CI.
+
+La aceptación financiera conectada de Stripe continúa como deuda separada del cierre de Automatizaciones/email.
+
+## 12. Evidencia
+
+- ZeptoMail real: dominio verificado y entregas recibidas.
+- prueba de configuración y prueba de regla con socio real.
+- V80 corrige permisos de Gerencia.
+- V79 repara perfiles históricos de Coach y es deuda técnica adyacente, no parte del motor de Automatizaciones.
+- interfaz simplificada y alineada con estilos compartidos de GymFort.
+
+Runbooks: `docs/operations/zeptomail-email.md`, `docs/operations/email-delivery.md` y `docs/testing/automations-kiosk-acceptance.md`.
