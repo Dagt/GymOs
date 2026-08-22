@@ -21,7 +21,7 @@ class SmtpEmailDeliveryAdapterTests {
 				true, "SMTP de prueba", "smtp.test", 587, "user", "secret", List.of("envios@gymos.test"),
 				true, true, true, false, true, 10000, 10000, 10000
 		);
-		var adapter = new SmtpEmailDeliveryAdapter(smtp, sender);
+		var adapter = new SmtpEmailDeliveryAdapter(smtp, sender, "https://gymfort.mx");
 		UUID notificationId = UUID.randomUUID();
 
 		var result = adapter.deliver(new EmailMessage(
@@ -41,7 +41,28 @@ class SmtpEmailDeliveryAdapterTests {
 		String rawMessage = output.toString(StandardCharsets.UTF_8);
 		assertThat(rawMessage).contains("Appex Hub Deportivo");
 		assertThat(rawMessage).contains("Tu membresia");
-		assertThat(rawMessage).contains("http://localhost:3000/api/tenant-logo/abc?v=1");
+		assertThat(rawMessage).contains("https://gymfort.mx/api/tenant-logo/abc?v=1");
+	}
+
+	@Test
+	void smtpAdapterOmitsRelativeLogoWhenFrontendIsOnlyLocal() throws Exception {
+		CapturingMailSender sender = new CapturingMailSender();
+		var smtp = new NotificationProperties.Smtp(
+				true, "SMTP de prueba", "smtp.test", 587, "user", "secret", List.of("envios@gymos.test"),
+				true, true, true, false, true, 10000, 10000, 10000
+		);
+		var adapter = new SmtpEmailDeliveryAdapter(smtp, sender, "http://localhost:3000");
+
+		adapter.deliver(new EmailMessage(
+				UUID.randomUUID(), UUID.randomUUID(), "envios@gymos.test", "Mi gimnasio",
+				null, "socio@example.com", "Asunto", "Mensaje", null, "notification:key",
+				"Mi gimnasio", "/api/tenant-logo/abc?v=1", "#093d3a", "#18c8b2", "#f2f8f7"
+		));
+
+		ByteArrayOutputStream output = new ByteArrayOutputStream();
+		sender.message.writeTo(output);
+		String rawMessage = output.toString(StandardCharsets.UTF_8);
+		assertThat(rawMessage).doesNotContain("localhost:3000/api/tenant-logo/abc");
 	}
 
 	@Test
