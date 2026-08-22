@@ -19,7 +19,12 @@ public interface EmailDeliveryPort {
 			String subject,
 			String bodyText,
 			String bodyHtml,
-			String idempotencyKey
+			String idempotencyKey,
+			String brandName,
+			String logoUrl,
+			String primaryColor,
+			String accentColor,
+			String surfaceColor
 	) {
 	}
 
