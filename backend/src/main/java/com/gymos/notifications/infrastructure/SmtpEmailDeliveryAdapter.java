@@ -21,16 +21,19 @@ public class SmtpEmailDeliveryAdapter implements EmailDeliveryPort {
 	private static final Pattern HEX_COLOR = Pattern.compile("^#[0-9A-Fa-f]{6}$");
 	private final NotificationProperties.Smtp properties;
 	private final JavaMailSenderImpl mailSender;
+	private final String frontendBaseUrl;
 
 	@Autowired
 	public SmtpEmailDeliveryAdapter(NotificationProperties notificationProperties) {
 		this.properties = notificationProperties.smtp();
 		this.mailSender = sender(properties);
+		this.frontendBaseUrl = notificationProperties.frontendBaseUrl();
 	}
 
 	SmtpEmailDeliveryAdapter(NotificationProperties.Smtp properties, JavaMailSenderImpl mailSender) {
 		this.properties = properties;
 		this.mailSender = mailSender;
+		this.frontendBaseUrl = "http://localhost:3000";
 	}
 
 	@Override
@@ -188,10 +191,13 @@ public class SmtpEmailDeliveryAdapter implements EmailDeliveryPort {
 	private String safeLogo(String logoUrl, String brand) {
 		if (logoUrl == null || logoUrl.isBlank()) return "";
 		String normalized = logoUrl.trim();
+		if (normalized.startsWith("/")) {
+			normalized = frontendBaseUrl + normalized;
+		}
 		if (!normalized.startsWith("https://") && !normalized.startsWith("http://")) return "";
 		return "<span style=\"display:inline-block;vertical-align:middle;margin-right:12px;padding:6px;background:#ffffff;border-radius:10px\"><img src=\""
 				+ escape(normalized) + "\" alt=\"" + brand
-				+ "\" width=\"36\" height=\"36\" style=\"display:block;width:36px;height:36px;object-fit:contain;border:0\"></span>";
+				+ "\" width=\"40\" height=\"40\" style=\"display:block;width:40px;height:40px;object-fit:contain;border:0\"></span>";
 	}
 
 	private String safeColor(String value, String fallback) {
