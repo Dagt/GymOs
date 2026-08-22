@@ -1,7 +1,7 @@
 # 28. Registro vivo de hallazgos y deuda técnica
 
 Estado: VIGENTE / OBLIGATORIO
-Corte: 21 de agosto de 2026
+Corte: 22 de agosto de 2026
 
 ## 1. Propósito y regla de actualización
 
@@ -25,8 +25,9 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 | CLI-001 | P1 | Socios/CRM | ABIERTA | Falta auditoría completa de PII, duplicados e importaciones fallidas. | Política de exposición y pruebas CRUD/importación/multi-sucursal. |
 | CAT-001 | P2 | Catálogo | ABIERTA | Quedan compatibilidad legacy, alto volumen y ciclo de imágenes por validar. | Retirar contratos obsoletos y aprobar pruebas de volumen/archivos. |
 | SAL-001 | P0 | Ventas/pagos | ABIERTA | Concurrencia y conciliación financiera no tienen E2E integral. | Pruebas simultáneas e invariantes venta–pago–inventario–refund. |
-| ACC-001 | P0 | Accesos | ABIERTA | Doble consumo, reintentos y privacidad requieren pruebas. | Consumo atómico, respuestas mínimas y matriz dispositivo/tenant. |
-| ACC-002 | P3 | Acceso físico | ACEPTADA | Adaptadores de proveedor, modo offline y telemetría de hardware se posponen por decisión de producto. No bloquean renovaciones, POS ni beneficios. | Reactivar únicamente cuando el hardware físico entre en el roadmap. |
+| ACC-001 | P0 | Accesos | ABIERTA | Doble consumo de autorización temporal, reintentos, privacidad, permiso específico de apertura manual y aislamiento por dispositivo/tenant requieren endurecimiento antes de operación física. | Consumo atómico, `access.manual.open` aplicado al endpoint sensible, respuestas mínimas y matriz positiva/negativa por dispositivo, tenant y sucursal. |
+| ACC-002 | P1 | Acceso físico/HikCentral | ABIERTA | La apertura real sigue en `SIMULATED_OPEN`. El primer piloto ya está definido con HikCentral Professional en LAN: falta descubrimiento de versión/licencia/API, puerto de integración, GymFort Local Connector, sincronización idempotente de Access Levels, reconciliación, eventos y runbook de desconexión. GymFort no debe procesar biometría ni depender de Internet para cada paso. | Confirmar capacidades de la instalación real; implementar puerto + conector + adaptador HikCentral; demostrar concesión/revocación/reconciliación por membresía y `ACCESS`; importar eventos sin duplicados; probar caída/recuperación y documentar privacidad/operación. |
+| ACC-003 | P2 | Accesos/UX y visitas | ABIERTA | La pantalla y API conservan el flujo histórico de `VisitPass`/paquetes de visitas aunque la decisión de producto vigente modela la visita normal como plan de membresía de un día. Además la entrada sin beneficio requerido todavía acepta cualquier membresía. | Retirar paquetes de visitas del flujo principal, renombrar pase temporal a autorización temporal, configurar planes `Visita diaria`/`Visita diaria Premium` y exigir un beneficio explícito como `GYM_ACCESS` en la entrada del piloto; retirar infraestructura legacy sólo después de verificar que no tenga dependencias reales. |
 | SELF-001 | P0 | Autoservicio | VALIDACIÓN EXTERNA | Domiciliación revocable/recuperable, cotización, comprobantes, capacidades por sucursal, membresías, reservas y wellness están implementados. Los planes multi-sucursal permiten kiosco y reservas en sedes secundarias; sólo Recepción abre sesiones. La prueba manual Stripe test confirmó Checkout, webhook y mandato. | Ejecutar `stripeTest` con `sk_test_...` y cuenta Connect test; ampliar E2E multi-tenant, expiración y recuperación en CI. |
 | PAY-001 | P0 | Proveedores de pago | EN PROGRESO | Mercado Pago OAuth/Point y Stripe Connect/Checkout/recurrencia persisten operaciones idempotentes, verifican firmas, concilian contexto, recuperan recibos y publican métricas. La administración de cuenta Stripe ya está separada de los interruptores operativos. | Ejecutar contrato sandbox conectado en CI y completar cancelación/reembolso autoritativo por proveedor. |
 | BKG-001 | P1 | Reservas | ABIERTA | Falta E2E de colisiones, pagos, cancelación y otra sucursal. | Suite crítica de calendario y autorización en CI. |
