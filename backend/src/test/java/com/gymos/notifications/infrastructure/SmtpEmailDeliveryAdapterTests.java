@@ -27,7 +27,7 @@ class SmtpEmailDeliveryAdapterTests {
 		var result = adapter.deliver(new EmailMessage(
 				notificationId, UUID.randomUUID(), "envios@gymos.test", "Mi gimnasio",
 				"recepcion@gymos.test", "socio@example.com", "Tu membresia", "Mensaje", null,
-				"notification:key", "Appex Hub Deportivo", null, "#000000", "#e8ff00", "#ffffff"
+				"notification:key", "Appex Hub Deportivo", "/api/tenant-logo/abc?v=1", "#000000", "#e8ff00", "#ffffff"
 		));
 
 		assertThat(adapter.available()).isTrue();
@@ -41,6 +41,7 @@ class SmtpEmailDeliveryAdapterTests {
 		String rawMessage = output.toString(StandardCharsets.UTF_8);
 		assertThat(rawMessage).contains("Appex Hub Deportivo");
 		assertThat(rawMessage).contains("Tu membresia");
+		assertThat(rawMessage).contains("http://localhost:3000/api/tenant-logo/abc?v=1");
 	}
 
 	@Test
