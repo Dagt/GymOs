@@ -1,6 +1,6 @@
 # 11. Roadmap de implementación
 
-Corte: 21 de agosto de 2026
+Corte: 22 de agosto de 2026
 
 Este documento expresa secuencia y estado, no sustituye el estado verificable
 del documento 13 ni la deuda del 28.
@@ -18,7 +18,8 @@ del documento 13 ni la deuda del 28.
 
 - CRM de socios, importación, catálogo, POS, caja y reportes operativos.
 - Membresías con periodos inclusivos, alta, renovación, cambio y beneficios.
-- Acceso lógico, visitas, inventario, reservas y recursos.
+- Acceso lógico, dispositivos, bitácora, autorizaciones temporales y beneficios
+  `ACCESS`; la apertura física sigue simulada.
 - Coaches, ejercicios, rutinas versionadas, asignaciones, métricas, CSV y PDF.
 - Profesionales wellness, servicios, disponibilidad, agenda y citas.
 
@@ -67,6 +68,38 @@ del documento 13 ni la deuda del 28.
 - Validar cancelación/reembolso autoritativo por proveedor.
 - Mantener regresión de membresías/reservas multi-sucursal.
 
+## Siguiente bloque: acceso físico en gimnasio piloto
+
+La integración física deja de considerarse fuera de alcance indefinido. El
+primer caso real está definido: gimnasio con torniquete/terminal Hikvision
+administrado por HikCentral Professional en red local.
+
+La implementación seguirá esta secuencia:
+
+1. Ajustar UX de Access: retirar paquetes de visitas del flujo principal,
+   renombrar pase temporal a autorización temporal y reforzar permisos/pruebas.
+2. Configurar `GYM_ACCESS`, `SAUNA_ACCESS` y los planes de visita diaria mediante
+   el motor normal de membresías.
+3. Confirmar versión/licencia/API/SDK/topología de HikCentral y hardware real.
+4. Introducir un puerto de integración física independiente de Hikvision.
+5. Crear GymFort Local Connector y adaptador HikCentral.
+6. Primera entrega: mantener enrolamiento facial manual una sola vez y
+   sincronizar automáticamente concesión/revocación de Access Levels desde
+   GymFort.
+7. Añadir reconciliación, estado de sincronización y manejo de errores.
+8. Incorporar eventos físicos de HikCentral a `access_log`.
+9. Automatizar alta/fotografía sólo si la interfaz oficial instalada lo permite
+   y después de revisar privacidad/seguridad.
+10. Abstraer un segundo fabricante únicamente al existir un segundo caso real.
+
+El modo inicial será de **sincronización de permisos**: HikCentral y los
+terminales deciden localmente en cada paso. GymFort Cloud no debe ser requisito
+en línea para abrir el torniquete.
+
+Esta decisión reactiva funcionalmente el alcance descrito por `ACC-002`; el
+registro vivo de deuda debe reflejar que el acceso físico volvió al roadmap y ya
+no es una posposición indefinida.
+
 ## Antes de producción
 
 - Matriz completa de autorización por tenant/sucursal y mutaciones auditadas.
@@ -75,13 +108,17 @@ del documento 13 ni la deuda del 28.
 - Simulacro documentado de backup/restore contra RPO/RTO.
 - Dashboards/alertas operativos y respuesta a incidentes ensayada.
 - Pruebas de volumen y concurrencia para comercio, inventario y reservas.
+- Para acceso físico: reconciliación probada, runbook de caída del conector,
+  revocaciones pendientes, privacidad biométrica y operación local sin Internet.
 - Manuales por rol y piloto controlado con feedback.
 
 ## Fuera de V1
 
 - Aplicación móvil o portal remoto completo del socio.
 - Pagos, comisiones o efectivo acordados directamente entre coach y socio.
-- Integración productiva de torniquetes/biometría y modo offline.
+- Soporte simultáneo de múltiples fabricantes de acceso sin un caso real que lo
+  justifique.
+- Procesamiento biométrico propio de GymFort.
 - WhatsApp, push, facturación y marketplace SaaS avanzados.
 
 ## Definición de terminado
