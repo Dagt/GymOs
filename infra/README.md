@@ -34,10 +34,10 @@ docker compose --env-file infra/.env -f infra/docker-compose.yml --profile strip
 docker compose --env-file infra/.env -f infra/docker-compose.yml --profile stripe up stripe-listener
 ```
 
-El listener reenvía únicamente los eventos soportados de cuentas Connect a
+El listener reenvía únicamente eventos soportados de cuentas Connect a
 `http://backend:8080/api/v1/payment-webhooks/stripe`. En el primer arranque
 imprime `whsec_...`; cópialo a `GYMOS_STRIPE_WEBHOOK_SECRET` en `infra/.env` y
-recrea el backend:
+recrea backend:
 
 ```powershell
 docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --force-recreate backend
@@ -49,18 +49,69 @@ Para tarjetas sandbox y recorridos consulta
 
 ## Correo transaccional con ZeptoMail
 
-El backend ya incluye el cliente SMTP, la cola durable y el worker; ZeptoMail es
-un servicio externo y no requiere un contenedor adicional. Configura los valores
-`GYMOS_SMTP_*` de `infra/.env.example` con las credenciales de **Agent > SMTP/API**,
-recrea `backend` y ejecuta la prueba real desde **Configuración > Correo electrónico**.
+ZeptoMail es un servicio externo y no necesita contenedor. El backend ya incluye
+cola durable, worker, branding y adaptador SMTP.
 
-Los `From` admitidos deben estar verificados y asociados al Agent. El `Reply-To`
-permanece configurable por gimnasio para que las respuestas lleguen a su propia
-bandeja.
+Configuración mínima recomendada:
 
-La guía completa, incluyendo TLS, remitentes, SPF, DKIM, DMARC y diagnóstico,
-está en
+```dotenv
+GYMOS_SMTP_ENABLED=true
+GYMOS_SMTP_PROVIDER_NAME=ZeptoMail
+GYMOS_SMTP_HOST=smtp.zeptomail.com
+GYMOS_SMTP_PORT=587
+GYMOS_SMTP_USERNAME=emailapikey
+GYMOS_SMTP_PASSWORD=...
+GYMOS_SMTP_ALLOWED_FROM_ADDRESSES=notificaciones@gymfort.mx
+GYMOS_SMTP_AUTH=true
+GYMOS_SMTP_STARTTLS=true
+GYMOS_SMTP_STARTTLS_REQUIRED=true
+GYMOS_SMTP_SSL=false
+GYMOS_SMTP_CHECK_SERVER_IDENTITY=true
+GYMOS_FRONTEND_BASE_URL=http://localhost:3000
+```
+
+Después de modificar secretos:
+
+```powershell
+docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build --force-recreate backend
+```
+
+El 22 de agosto de 2026 `gymfort.mx` quedó verificado en ZeptoMail con DKIM y
+CNAME de return-path y se confirmaron entregas reales.
+
+Patrón V1:
+
+```text
+From: Nombre del gimnasio <notificaciones@gymfort.mx>
+Reply-To: correo real del gimnasio
+```
+
+Los `From` deben estar verificados/autorizados y en
+`GYMOS_SMTP_ALLOWED_FROM_ADDRESSES`. El `Reply-To` se configura por gimnasio.
+
+### Logo en desarrollo
+
+Los logos tenant se sirven mediante `/api/tenant-logo/...`. En producción usar:
+
+```dotenv
+GYMOS_FRONTEND_BASE_URL=https://gymfort.mx
+```
+
+Gmail/Outlook no pueden descargar imágenes desde `localhost`; el renderer omite
+el `<img>` si la URL resultante es localhost/127.0.0.1. Para probar el logo antes
+del despliegue se necesita una URL pública/túnel.
+
+La guía completa está en
 [`../docs/operations/zeptomail-email.md`](../docs/operations/zeptomail-email.md).
+
+## Automatizaciones en local
+
+La página `/automations` permite crear reglas desde cero y probar reglas email
+contra un socio real. `Probar ahora` busca socios activos por nombre/correo y no
+crea operaciones falsas de pago/reserva/membresía.
+
+Gerencia requiere V80 aplicada y una sesión/JWT renovada para recibir los nuevos
+permisos de automatización/notificaciones.
 
 ## Datos y observabilidad
 
