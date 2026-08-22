@@ -14,17 +14,29 @@ notificaciones, reportes, auditoría y kiosco de autoservicio.
 
 Los cobros soportan efectivo/transferencia/terminal manual en recepción,
 Mercado Pago Point y Stripe Checkout. El kiosco usa Stripe para contratación,
-renovación, cambio de plan, reservas pagadas y domiciliación con tarjeta. GymFort
-no almacena PAN ni CVV; los efectos financieros se confirman mediante webhook
-firmado y conciliación autoritativa.
+renovación, cambio de plan y domiciliación con tarjeta. GymFort no almacena PAN
+ni CVV; los efectos financieros se confirman mediante webhook firmado y
+conciliación autoritativa.
 
-El correo transaccional dispone de cola durable, leasing, reintentos,
-preferencias y un perfil SMTP seguro para ZeptoMail. La prueba desde Configuración
-realiza una entrega inmediata, conserva evidencia de la última verificación y
-las automatizaciones sólo habilitan el canal cuando el servidor y el remitente
-están listos. Las credenciales son del ambiente; cada gimnasio conserva su
-nombre, `From` autorizado y `Reply-To`. La activación requiere credenciales del
-Mail Agent y dominios/remitentes verificados; consulta la
+Automatizaciones está funcional para reglas manuales, programadas y por eventos,
+con inbox durable, leases, idempotencia, reintentos/dead letters y una interfaz
+simplificada en `Automatizaciones`, `Actividad` y `Problemas`. Dueño y Gerente
+pueden crear, administrar y probar reglas según permisos; las pruebas de email
+usan un socio real buscado por nombre o correo.
+
+El correo transaccional usa ZeptoMail mediante el `EmailDeliveryPort`/SMTP
+existente. `gymfort.mx` quedó verificado con DKIM y CNAME de return-path y se
+confirmaron entregas reales el 22 de agosto de 2026. Las credenciales pertenecen
+al ambiente; cada gimnasio conserva su nombre visible, `From` autorizado y
+`Reply-To`. El patrón V1 recomendado es:
+
+```text
+From: Nombre del gimnasio <notificaciones@gymfort.mx>
+Reply-To: bandeja real del gimnasio
+```
+
+Los mensajes usan branding del tenant y logo público cuando
+`GYMOS_FRONTEND_BASE_URL` es accesible desde el cliente de correo. Consulta la
 [guía de ZeptoMail](docs/operations/zeptomail-email.md).
 
 Consulta el [estado canónico](Documentación/13-estado-desarrollo.md), el
