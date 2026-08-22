@@ -22,6 +22,7 @@ WITH coach_users AS (
     JOIN user_branch_access uba ON uba.user_id = u.id
     JOIN branch b ON b.id = uba.branch_id
         AND b.organization_id = u.organization_id
+        AND b.status = 'ACTIVE'
         AND b.deleted_at IS NULL
     WHERE u.deleted_at IS NULL
       AND r.deleted_at IS NULL
@@ -61,6 +62,7 @@ WITH coach_users AS (
     JOIN user_branch_access uba ON uba.user_id = u.id
     JOIN branch b ON b.id = uba.branch_id
         AND b.organization_id = u.organization_id
+        AND b.status = 'ACTIVE'
         AND b.deleted_at IS NULL
     WHERE u.deleted_at IS NULL
       AND r.deleted_at IS NULL
