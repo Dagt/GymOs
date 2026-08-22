@@ -51,8 +51,8 @@ const EMPTY_DRAFT: Draft = {
   name: "",
   triggerType: "MEMBERSHIP_EXPIRING",
   channel: "EMAIL",
-  subject: "Tu membresía está por vencer",
-  body: "Hola {{recipientName}},\n\nTu membresía está próxima a vencer. Acércate a recepción para renovarla y seguir disfrutando de tu gimnasio.",
+  subject: "",
+  body: "",
   intervalMinutes: 1440,
   daysBefore: 3,
   bookingReminderMinutes: 1440,
@@ -77,8 +77,9 @@ export default function AutomationsPage() {
   const [wizardStep, setWizardStep] = useState(1);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [testRule, setTestRule] = useState<AutomationRule | null>(null);
+  const [testClientQuery, setTestClientQuery] = useState("");
   const [testClients, setTestClients] = useState<ClientSummary[]>([]);
-  const [testClientId, setTestClientId] = useState("");
+  const [selectedTestClient, setSelectedTestClient] = useState<ClientSummary | null>(null);
   const [testClientsLoading, setTestClientsLoading] = useState(false);
 
   useEffect(() => {
@@ -109,6 +110,35 @@ export default function AutomationsPage() {
     return () => { active = false; };
   }, []);
 
+  useEffect(() => {
+    if (!session || !testRule) return;
+    const query = testClientQuery.trim();
+    if (query.length < 2 || selectedTestClient) {
+      setTestClients([]);
+      setTestClientsLoading(false);
+      return;
+    }
+
+    let active = true;
+    const timer = window.setTimeout(async () => {
+      setTestClientsLoading(true);
+      try {
+        const clients = await searchClients(session.accessToken, query, "ACTIVE");
+        if (!active) return;
+        setTestClients(clients.filter((client) => Boolean(client.email?.trim())).slice(0, 10));
+      } catch (exception) {
+        if (active) setError(exception instanceof Error ? exception.message : "No fue posible buscar socios.");
+      } finally {
+        if (active) setTestClientsLoading(false);
+      }
+    }, 300);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [session, testRule, testClientQuery, selectedTestClient]);
+
   const enabledRules = useMemo(() => rules.filter((rule) => rule.status === "ENABLED").length, [rules]);
   const problemCount = useMemo(() => {
     const failedEmails = notifications.filter((item) => item.status === "DEAD_LETTER" || item.status === "FAILED").length;
@@ -125,27 +155,20 @@ export default function AutomationsPage() {
     setEmailConfiguration(data.emailConfiguration);
   }
 
-  function openNewAutomation(template?: string) {
-    const next = template
-      ? templateDraft(template)
-      : { ...EMPTY_DRAFT, channel: (emailConfiguration?.ready ? "EMAIL" : "IN_APP") as RuleChannel };
-    if (next.channel === "EMAIL" && !emailConfiguration?.ready) next.channel = "IN_APP";
-    setDraft(next);
-    setWizardStep(template ? 2 : 1);
+  function openNewAutomation() {
+    const channel: RuleChannel = emailConfiguration?.ready ? "EMAIL" : "IN_APP";
+    setDraft({ ...EMPTY_DRAFT, channel });
+    setWizardStep(1);
     setShowRuleDrawer(true);
     setError(null);
     setMessage(null);
   }
 
   function chooseTrigger(triggerType: string) {
-    const defaults = triggerDefaults(triggerType);
     setDraft((current) => ({
       ...current,
       triggerType,
-      name: defaults.name,
-      subject: defaults.subject,
-      body: defaults.body,
-      channel: supportsClientEmail(triggerType) && emailConfiguration?.ready ? "EMAIL" : "IN_APP",
+      channel: current.channel === "EMAIL" && !supportsClientEmail(triggerType) ? "IN_APP" : current.channel,
     }));
   }
 
@@ -201,7 +224,7 @@ export default function AutomationsPage() {
   async function runRule(rule: AutomationRule) {
     if (!session) return;
     if (isEmailRule(rule)) {
-      await openEmailTest(rule);
+      openEmailTest(rule);
       return;
     }
     setSaving(true);
@@ -218,33 +241,29 @@ export default function AutomationsPage() {
     }
   }
 
-  async function openEmailTest(rule: AutomationRule) {
-    if (!session) return;
+  function openEmailTest(rule: AutomationRule) {
     setTestRule(rule);
+    setTestClientQuery("");
     setTestClients([]);
-    setTestClientId("");
-    setTestClientsLoading(true);
+    setSelectedTestClient(null);
+    setTestClientsLoading(false);
     setError(null);
-    try {
-      const clients = await searchClients(session.accessToken, "", "ACTIVE");
-      const withEmail = clients.filter((client) => Boolean(client.email?.trim()));
-      setTestClients(withEmail);
-      setTestClientId(withEmail[0]?.id ?? "");
-    } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible cargar los socios para la prueba.");
-      setTestRule(null);
-    } finally {
-      setTestClientsLoading(false);
-    }
+  }
+
+  function closeEmailTest() {
+    setTestRule(null);
+    setTestClientQuery("");
+    setTestClients([]);
+    setSelectedTestClient(null);
   }
 
   async function sendEmailTest() {
-    if (!session || !testRule || !testClientId) return;
+    if (!session || !testRule || !selectedTestClient) return;
     setSaving(true);
     setError(null);
     try {
-      await testAutomationEmail(session.accessToken, testRule.id, testClientId);
-      setTestRule(null);
+      await testAutomationEmail(session.accessToken, testRule.id, selectedTestClient.id);
+      closeEmailTest();
       await refresh();
       setMessage("Prueba enviada al socio seleccionado. Revisa Actividad para seguir la entrega.");
       setActiveTab("ACTIVITY");
@@ -338,7 +357,7 @@ export default function AutomationsPage() {
           <TabButton active={activeTab === "PROBLEMS"} onClick={() => setActiveTab("PROBLEMS")}>Problemas{problemCount > 0 ? ` (${problemCount})` : ""}</TabButton>
         </div>
         {hasPermission(session, "automation.manage") ? (
-          <button className="app-button" onClick={() => openNewAutomation()} type="button">+ Nueva automatización</button>
+          <button className="app-button" onClick={openNewAutomation} type="button">+ Nueva automatización</button>
         ) : null}
       </section>
 
@@ -367,19 +386,14 @@ export default function AutomationsPage() {
                     />
                   ) : null}
                   {hasAnyPermission(session, "automation.execute", "automation.manage") ? (
-                    <details className="relative">
-                      <summary className="app-button-secondary list-none cursor-pointer">Opciones</summary>
-                      <div className="app-card absolute right-0 z-20 mt-2 grid min-w-44 gap-1 p-2 shadow-xl">
-                        <button
-                          className="rounded-xl px-3 py-2 text-left text-sm font-bold text-[var(--brand-ink)] hover:bg-[var(--brand-primary-soft)] disabled:opacity-50"
-                          disabled={saving || rule.status !== "ENABLED"}
-                          onClick={() => void runRule(rule)}
-                          type="button"
-                        >
-                          Probar ahora
-                        </button>
-                      </div>
-                    </details>
+                    <button
+                      className="app-button-secondary"
+                      disabled={saving || rule.status !== "ENABLED"}
+                      onClick={() => void runRule(rule)}
+                      type="button"
+                    >
+                      Probar ahora
+                    </button>
                   ) : null}
                 </div>
               </div>
@@ -423,7 +437,6 @@ export default function AutomationsPage() {
         <AutomationWizard
           draft={draft}
           emailReady={Boolean(emailConfiguration?.ready)}
-          onChooseTemplate={(template) => openNewAutomation(template)}
           onChooseTrigger={chooseTrigger}
           onDraftChange={setDraft}
           onFinish={() => void createRule()}
@@ -433,33 +446,69 @@ export default function AutomationsPage() {
         />
       </AppDrawer>
 
-      <AppDrawer onClose={() => setTestRule(null)} open={testRule !== null} title="Probar automatización">
+      <AppDrawer onClose={closeEmailTest} open={testRule !== null} title="Probar automatización">
         <section className="grid gap-4">
           <div>
             <p className="app-eyebrow">Prueba real de correo</p>
             <h3 className="app-card-title mt-1">{testRule?.name}</h3>
-            <p className="app-card-copy mt-2">Selecciona un socio con correo registrado. La prueba usará el asunto, mensaje y diseño configurados en esta regla.</p>
+            <p className="app-card-copy mt-2">Busca un socio por nombre o correo. La prueba usará exactamente el asunto, mensaje y diseño configurados en esta regla.</p>
           </div>
-          {testClientsLoading ? <p className="text-sm text-[var(--brand-muted)]">Cargando socios...</p> : null}
-          {!testClientsLoading && testClients.length === 0 ? (
-            <section className="app-card p-4">
-              <p className="text-sm font-bold text-[var(--brand-ink)]">No hay socios activos con correo disponible.</p>
-              <p className="mt-1 text-sm text-[var(--brand-muted)]">Registra un correo en un socio para poder probar reglas que envían email.</p>
-            </section>
-          ) : null}
-          {testClients.length > 0 ? (
+
+          <div className="relative">
             <label className="form-field">
               <span>Socio destinatario</span>
-              <select className="app-input" onChange={(event) => setTestClientId(event.target.value)} value={testClientId}>
-                {testClients.map((client) => (
-                  <option key={client.id} value={client.id}>{clientDisplayName(client)} · {client.email}</option>
-                ))}
-              </select>
+              <input
+                autoComplete="off"
+                className="app-input"
+                onChange={(event) => {
+                  setTestClientQuery(event.target.value);
+                  setSelectedTestClient(null);
+                }}
+                placeholder="Escribe nombre o correo..."
+                value={testClientQuery}
+              />
             </label>
+
+            {testClientsLoading ? <p className="mt-2 text-sm text-[var(--brand-muted)]">Buscando socios...</p> : null}
+            {!selectedTestClient && testClientQuery.trim().length > 0 && testClientQuery.trim().length < 2 ? (
+              <p className="mt-2 text-xs text-[var(--brand-muted)]">Escribe al menos 2 caracteres.</p>
+            ) : null}
+            {!selectedTestClient && testClientQuery.trim().length >= 2 && !testClientsLoading && testClients.length === 0 ? (
+              <p className="mt-2 text-sm text-[var(--brand-muted)]">No encontramos socios activos con correo que coincidan con la búsqueda.</p>
+            ) : null}
+
+            {!selectedTestClient && testClients.length > 0 ? (
+              <div className="app-card absolute left-0 right-0 z-30 mt-2 max-h-64 overflow-y-auto p-2 shadow-xl">
+                {testClients.map((client) => (
+                  <button
+                    className="block w-full rounded-xl px-3 py-3 text-left transition hover:bg-[var(--brand-primary-soft)]"
+                    key={client.id}
+                    onClick={() => {
+                      setSelectedTestClient(client);
+                      setTestClientQuery(`${clientDisplayName(client)} · ${client.email}`);
+                      setTestClients([]);
+                    }}
+                    type="button"
+                  >
+                    <strong className="block text-sm font-black text-[var(--brand-ink)]">{clientDisplayName(client)}</strong>
+                    <span className="mt-1 block text-xs text-[var(--brand-muted)]">{client.email}</span>
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+
+          {selectedTestClient ? (
+            <article className="app-card p-4">
+              <p className="app-eyebrow">Destinatario seleccionado</p>
+              <strong className="mt-1 block text-sm font-black text-[var(--brand-ink)]">{clientDisplayName(selectedTestClient)}</strong>
+              <span className="mt-1 block text-sm text-[var(--brand-muted)]">{selectedTestClient.email}</span>
+            </article>
           ) : null}
+
           <div className="flex justify-end gap-2">
-            <button className="app-button-secondary" onClick={() => setTestRule(null)} type="button">Cancelar</button>
-            <button className="app-button" disabled={saving || !testClientId} onClick={() => void sendEmailTest()} type="button">Enviar prueba</button>
+            <button className="app-button-secondary" onClick={closeEmailTest} type="button">Cancelar</button>
+            <button className="app-button" disabled={saving || !selectedTestClient} onClick={() => void sendEmailTest()} type="button">Enviar prueba</button>
           </div>
         </section>
       </AppDrawer>
@@ -549,7 +598,6 @@ function ProblemsView({
 function AutomationWizard({
   draft,
   emailReady,
-  onChooseTemplate,
   onChooseTrigger,
   onDraftChange,
   onFinish,
@@ -559,7 +607,6 @@ function AutomationWizard({
 }: {
   draft: Draft;
   emailReady: boolean;
-  onChooseTemplate: (template: string) => void;
   onChooseTrigger: (triggerType: string) => void;
   onDraftChange: (draft: Draft) => void;
   onFinish: () => void;
@@ -574,27 +621,33 @@ function AutomationWizard({
       </div>
 
       {step === 1 ? (
-        <>
-          <section>
-            <p className="app-eyebrow">Recomendadas</p>
-            <h3 className="app-card-title mt-1">Empieza con una plantilla</h3>
-            <div className="mt-3 grid gap-2">
-              <TemplateButton title="Membresía por vencer" copy="Avisar 3 días antes por correo." onClick={() => onChooseTemplate("MEMBERSHIP_EXPIRING")} />
-              <TemplateButton title="Pago rechazado" copy="Avisar cuando falle una domiciliación." onClick={() => onChooseTemplate("RECURRING_CHARGE_FAILED")} />
-              <TemplateButton title="Recordatorio de reserva" copy="Avisar 24 horas antes de la reserva." onClick={() => onChooseTemplate("BOOKING_REMINDER")} />
-            </div>
-          </section>
-          <section className="border-t border-[var(--brand-line)] pt-4">
-            <label className="form-field">
-              <span>Otro evento</span>
-              <select className="app-input" onChange={(event) => onChooseTrigger(event.target.value)} value={draft.triggerType}>
-                {TRIGGERS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
-              </select>
-            </label>
-            <TriggerConditionFields draft={draft} onDraftChange={onDraftChange} />
-            <button className="app-button mt-4" onClick={() => onStepChange(2)} type="button">Continuar</button>
-          </section>
-        </>
+        <section className="grid gap-4">
+          <div>
+            <p className="app-eyebrow">Disparador</p>
+            <h3 className="app-card-title mt-1">¿Cuándo debe ejecutarse?</h3>
+            <p className="app-card-copy mt-2">Define la regla desde cero. Elige el evento y ajusta únicamente las condiciones que necesites.</p>
+          </div>
+          <label className="form-field">
+            <span>Nombre de la automatización</span>
+            <input
+              className="app-input"
+              maxLength={160}
+              onChange={(event) => onDraftChange({ ...draft, name: event.target.value })}
+              placeholder="Ej. Aviso de renovación pendiente"
+              value={draft.name}
+            />
+          </label>
+          <label className="form-field">
+            <span>Evento</span>
+            <select className="app-input" onChange={(event) => onChooseTrigger(event.target.value)} value={draft.triggerType}>
+              {TRIGGERS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+            </select>
+          </label>
+          <TriggerConditionFields draft={draft} onDraftChange={onDraftChange} />
+          <div className="flex justify-end">
+            <button className="app-button" disabled={!draft.name.trim()} onClick={() => onStepChange(2)} type="button">Continuar</button>
+          </div>
+        </section>
       ) : null}
 
       {step === 2 ? (
@@ -617,11 +670,22 @@ function AutomationWizard({
           </label>
           <label className="form-field">
             <span>Asunto</span>
-            <input className="app-input" maxLength={180} onChange={(event) => onDraftChange({ ...draft, subject: event.target.value })} value={draft.subject} />
+            <input
+              className="app-input"
+              maxLength={180}
+              onChange={(event) => onDraftChange({ ...draft, subject: event.target.value })}
+              placeholder="Escribe el asunto que verá el destinatario"
+              value={draft.subject}
+            />
           </label>
           <label className="form-field">
             <span>{draft.channel === "EMAIL" ? "Mensaje del correo" : "Mensaje"}</span>
-            <textarea className="app-input min-h-40 py-3" onChange={(event) => onDraftChange({ ...draft, body: event.target.value })} value={draft.body} />
+            <textarea
+              className="app-input min-h-40 py-3"
+              onChange={(event) => onDraftChange({ ...draft, body: event.target.value })}
+              placeholder="Escribe el mensaje..."
+              value={draft.body}
+            />
             <small>Usa {"{{recipientName}}"} para insertar el nombre del socio.</small>
           </label>
           <div className="flex justify-between gap-2">
@@ -637,12 +701,9 @@ function AutomationWizard({
             <p className="app-eyebrow">Revisión</p>
             <h3 className="app-card-title mt-1">Confirma la automatización</h3>
           </div>
-          <label className="form-field">
-            <span>Nombre</span>
-            <input className="app-input" onChange={(event) => onDraftChange({ ...draft, name: event.target.value })} value={draft.name} />
-          </label>
           <article className="app-card p-4">
-            <p className="text-sm font-black text-[var(--brand-ink)]">Cuando</p>
+            <p className="text-sm font-black text-[var(--brand-ink)]">{draft.name}</p>
+            <p className="mt-4 text-sm font-black text-[var(--brand-ink)]">Cuando</p>
             <p className="mt-1 text-sm text-[var(--brand-muted)]">{triggerLabel(draft.triggerType)}{conditionSummary(draft)}</p>
             <p className="mt-4 text-sm font-black text-[var(--brand-ink)]">Entonces</p>
             <p className="mt-1 text-sm text-[var(--brand-muted)]">{draft.channel === "EMAIL" ? "Enviar un correo al socio relacionado" : "Crear una notificación interna"}</p>
@@ -661,28 +722,24 @@ function AutomationWizard({
 
 function TriggerConditionFields({ draft, onDraftChange }: { draft: Draft; onDraftChange: (draft: Draft) => void }) {
   if (draft.triggerType === "MEMBERSHIP_EXPIRING") {
-    return <label className="form-field mt-3"><span>Días antes del vencimiento</span><input className="app-input" max={90} min={1} onChange={(event) => onDraftChange({ ...draft, daysBefore: Number(event.target.value) })} type="number" value={draft.daysBefore} /></label>;
+    return <label className="form-field"><span>Días antes del vencimiento</span><input className="app-input" max={90} min={1} onChange={(event) => onDraftChange({ ...draft, daysBefore: Number(event.target.value) })} type="number" value={draft.daysBefore} /></label>;
   }
   if (draft.triggerType === "BOOKING_REMINDER") {
-    return <label className="form-field mt-3"><span>Anticipación</span><select className="app-input" onChange={(event) => onDraftChange({ ...draft, bookingReminderMinutes: Number(event.target.value) })} value={draft.bookingReminderMinutes}><option value={60}>1 hora antes</option><option value={180}>3 horas antes</option><option value={720}>12 horas antes</option><option value={1440}>1 día antes</option><option value={2880}>2 días antes</option><option value={10080}>7 días antes</option></select></label>;
+    return <label className="form-field"><span>Anticipación</span><select className="app-input" onChange={(event) => onDraftChange({ ...draft, bookingReminderMinutes: Number(event.target.value) })} value={draft.bookingReminderMinutes}><option value={60}>1 hora antes</option><option value={180}>3 horas antes</option><option value={720}>12 horas antes</option><option value={1440}>1 día antes</option><option value={2880}>2 días antes</option><option value={10080}>7 días antes</option></select></label>;
   }
   if (draft.triggerType === "SCHEDULED") {
-    return <label className="form-field mt-3"><span>Repetir cada cuántos minutos</span><input className="app-input" max={10080} min={1} onChange={(event) => onDraftChange({ ...draft, intervalMinutes: Number(event.target.value) })} type="number" value={draft.intervalMinutes} /></label>;
+    return <label className="form-field"><span>Repetir cada cuántos minutos</span><input className="app-input" max={10080} min={1} onChange={(event) => onDraftChange({ ...draft, intervalMinutes: Number(event.target.value) })} type="number" value={draft.intervalMinutes} /></label>;
   }
   if (draft.triggerType === "PAYMENT_COMPLETED") {
-    return <label className="form-field mt-3"><span>Contexto del pago</span><select className="app-input" onChange={(event) => onDraftChange({ ...draft, paymentContext: event.target.value })} value={draft.paymentContext}><option value="ALL">Cualquier pago</option><option value="RETAIL_SALE">Productos y servicios</option><option value="MEMBERSHIP_ENROLLMENT">Contratación de membresía</option><option value="MEMBERSHIP_RENEWAL">Renovación</option><option value="MEMBERSHIP_PLAN_CHANGE">Cambio de plan</option></select></label>;
+    return <label className="form-field"><span>Contexto del pago</span><select className="app-input" onChange={(event) => onDraftChange({ ...draft, paymentContext: event.target.value })} value={draft.paymentContext}><option value="ALL">Cualquier pago</option><option value="RETAIL_SALE">Productos y servicios</option><option value="MEMBERSHIP_ENROLLMENT">Contratación de membresía</option><option value="MEMBERSHIP_RENEWAL">Renovación</option><option value="MEMBERSHIP_PLAN_CHANGE">Cambio de plan</option></select></label>;
   }
   if (draft.triggerType === "PAYMENT_PENDING_VALIDATION") {
-    return <div className="mt-3 grid gap-3"><label className="form-field"><span>Método de pago</span><select className="app-input" onChange={(event) => onDraftChange({ ...draft, paymentMethod: event.target.value })} value={draft.paymentMethod}><option value="ALL">Cualquier método</option><option value="CARD_MANUAL">Terminal manual</option><option value="CARD_MERCADO_PAGO">Mercado Pago Point</option><option value="CARD_ONLINE">Stripe Checkout</option><option value="TRANSFER">Transferencia</option><option value="CASH">Efectivo</option></select></label><label className="form-field"><span>Monto mínimo (opcional)</span><input className="app-input" min={0} onChange={(event) => onDraftChange({ ...draft, minimumAmountPesos: event.target.value })} step="0.01" type="number" value={draft.minimumAmountPesos} /></label></div>;
+    return <div className="grid gap-3"><label className="form-field"><span>Método de pago</span><select className="app-input" onChange={(event) => onDraftChange({ ...draft, paymentMethod: event.target.value })} value={draft.paymentMethod}><option value="ALL">Cualquier método</option><option value="CARD_MANUAL">Terminal manual</option><option value="CARD_MERCADO_PAGO">Mercado Pago Point</option><option value="CARD_ONLINE">Stripe Checkout</option><option value="TRANSFER">Transferencia</option><option value="CASH">Efectivo</option></select></label><label className="form-field"><span>Monto mínimo (opcional)</span><input className="app-input" min={0} onChange={(event) => onDraftChange({ ...draft, minimumAmountPesos: event.target.value })} step="0.01" type="number" value={draft.minimumAmountPesos} /></label></div>;
   }
   if (draft.triggerType === "RECURRING_CHARGE_DUE") {
-    return <p className="app-card-copy mt-3 rounded-xl border border-[var(--brand-line)] p-3">Se activa cuando llega la fecha programada del cobro recurrente y GymFort lo pone en proceso. No se activa al vincular por primera vez la tarjeta o crear la domiciliación.</p>;
+    return <p className="app-card-copy rounded-xl border border-[var(--brand-line)] p-3">Se activa cuando llega la fecha programada del cobro recurrente y GymFort lo pone en proceso. No se activa al vincular por primera vez la tarjeta o crear la domiciliación.</p>;
   }
   return null;
-}
-
-function TemplateButton({ title, copy, onClick }: { title: string; copy: string; onClick: () => void }) {
-  return <button className="app-card p-4 text-left transition hover:-translate-y-0.5" onClick={onClick} type="button"><strong className="block text-sm font-black text-[var(--brand-ink)]">{title}</strong><span className="mt-1 block text-xs text-[var(--brand-muted)]">{copy}</span></button>;
 }
 
 function TabButton({ active, children, onClick }: { active: boolean; children: ReactNode; onClick: () => void }) {
@@ -691,36 +748,6 @@ function TabButton({ active, children, onClick }: { active: boolean; children: R
 
 function EmptyState({ title, copy }: { title: string; copy: string }) {
   return <section className="app-card p-7 text-center"><h2 className="app-card-title">{title}</h2><p className="app-card-copy mt-2">{copy}</p></section>;
-}
-
-function templateDraft(triggerType: string): Draft {
-  const defaults = triggerDefaults(triggerType);
-  return {
-    ...EMPTY_DRAFT,
-    triggerType,
-    name: defaults.name,
-    subject: defaults.subject,
-    body: defaults.body,
-    channel: supportsClientEmail(triggerType) ? "EMAIL" : "IN_APP",
-  };
-}
-
-function triggerDefaults(triggerType: string) {
-  return ({
-    MEMBERSHIP_EXPIRING: { name: "Recordatorio de membresía", subject: "Tu membresía está por vencer", body: "Hola {{recipientName}},\n\nTu membresía está próxima a vencer. Acércate a recepción para renovarla y seguir disfrutando de tu gimnasio." },
-    MEMBERSHIP_EXPIRED: { name: "Membresía vencida", subject: "Tu membresía ha vencido", body: "Hola {{recipientName}},\n\nTu membresía ha vencido. Contáctanos para renovarla." },
-    RECURRING_CHARGE_FAILED: { name: "Aviso de cobro rechazado", subject: "No pudimos procesar tu cobro", body: "Hola {{recipientName}},\n\nNo pudimos procesar el cobro de tu membresía. Actualiza tu método de pago o comunícate con recepción." },
-    RECURRING_CHARGE_SUCCEEDED: { name: "Confirmación de domiciliación", subject: "Pago recibido", body: "Hola {{recipientName}},\n\nTu cobro recurrente se procesó correctamente. Gracias." },
-    RECURRING_CHARGE_DUE: { name: "Cobro domiciliado por procesar", subject: "Procesaremos tu cobro recurrente", body: "Hola {{recipientName}},\n\nLlegó la fecha programada de tu cobro recurrente y lo procesaremos automáticamente." },
-    BOOKING_REMINDER: { name: "Recordatorio de reserva", subject: "Recordatorio de tu reserva", body: "Hola {{recipientName}},\n\nTe recordamos que tienes una reserva próxima. Te esperamos." },
-    BOOKING_CREATED: { name: "Reserva creada", subject: "Recibimos tu reserva", body: "Hola {{recipientName}},\n\nTu reserva fue registrada correctamente." },
-    BOOKING_CONFIRMED: { name: "Reserva confirmada", subject: "Tu reserva está confirmada", body: "Hola {{recipientName}},\n\nTu reserva quedó confirmada. Te esperamos." },
-    BOOKING_CANCELLED: { name: "Reserva cancelada", subject: "Tu reserva fue cancelada", body: "Hola {{recipientName}},\n\nTu reserva fue cancelada. Si necesitas ayuda, comunícate con recepción." },
-    PAYMENT_COMPLETED: { name: "Confirmación de pago", subject: "Pago recibido", body: "Hola {{recipientName}},\n\nHemos recibido tu pago correctamente. Gracias." },
-    PAYMENT_PENDING_VALIDATION: { name: "Pago pendiente de validar", subject: "Pago pendiente de revisión", body: "Hay un pago pendiente de validación que requiere atención." },
-    SCHEDULED: { name: "Aviso programado", subject: "Aviso programado", body: "Recordatorio programado de GymFort." },
-    MANUAL: { name: "Automatización manual", subject: "Aviso", body: "Mensaje de prueba." },
-  } as Record<string, { name: string; subject: string; body: string }>)[triggerType] ?? { name: triggerLabel(triggerType), subject: triggerLabel(triggerType), body: "" };
 }
 
 function buildCondition(draft: Draft): Record<string, number | string> {
