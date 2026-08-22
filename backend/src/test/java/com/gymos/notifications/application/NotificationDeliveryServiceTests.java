@@ -10,9 +10,9 @@ import static org.mockito.Mockito.when;
 
 import com.gymos.common.observability.TenantTelemetry;
 import com.gymos.notifications.api.EmailDeliveryPort;
+import com.gymos.notifications.infrastructure.NotificationBrandRepository;
 import com.gymos.notifications.infrastructure.NotificationRepository;
 import com.gymos.notifications.infrastructure.NotificationRepository.EmailDeliveryRecord;
-import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 
 class NotificationDeliveryServiceTests {
 	private final NotificationRepository repository = mock(NotificationRepository.class);
+	private final NotificationBrandRepository brandRepository = mock(NotificationBrandRepository.class);
 	private final EmailDeliveryPort provider = mock(EmailDeliveryPort.class);
 	private NotificationDeliveryService service;
 
@@ -28,9 +29,13 @@ class NotificationDeliveryServiceTests {
 	void setUp() {
 		when(provider.providerKey()).thenReturn("SMTP");
 		when(provider.available()).thenReturn(true);
+		when(brandRepository.emailBrand(any())).thenReturn(new NotificationBrandRepository.EmailBrand(
+				"Mi gimnasio", null, "#111111", "#ffee00", "#ffffff"
+		));
 		NotificationProperties properties = properties();
 		service = new NotificationDeliveryService(
-				repository, properties, TenantTelemetry.noOp(), List.of(provider), new NotificationRecipientHasher(properties)
+				repository, brandRepository, properties, TenantTelemetry.noOp(), List.of(provider),
+				new NotificationRecipientHasher(properties)
 		);
 	}
 
@@ -45,6 +50,7 @@ class NotificationDeliveryServiceTests {
 
 		service.runDueDeliveries();
 
+		verify(brandRepository).emailBrand(delivery.organizationId());
 		verify(repository).markSent(eq(delivery.id()), eq("SMTP"), eq("message-1"), any());
 	}
 
@@ -96,7 +102,7 @@ class NotificationDeliveryServiceTests {
 		return new NotificationProperties(
 				30000, 60000, 50, 120, 5, "http://localhost:3000", "preference-test-key",
 				new NotificationProperties.Smtp(
-						false, "Zoho Mail", null, 587, null, null, List.of(),
+						false, "ZeptoMail", null, 587, null, null, List.of(),
 						true, true, true, false, true, 10000, 10000, 10000
 				)
 		);
