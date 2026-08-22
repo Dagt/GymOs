@@ -2,11 +2,9 @@
 
 Estado: VIGENTE / COBERTURA PARCIAL
 Fuente primaria: `backend/src/main/java/com/gymos/common/security/SecurityConfig.java`  
-Última revisión: 21 de agosto de 2026
+Última revisión: 22 de agosto de 2026
 
-Esta matriz resume el permiso mínimo HTTP. Los servicios deben volver a validar
-organización, sucursal, propiedad y estado del recurso; una coincidencia de ruta
-no sustituye autorización de negocio.
+Esta matriz resume el permiso mínimo HTTP. Los servicios deben volver a validar organización, sucursal, propiedad y estado del recurso; una coincidencia de ruta no sustituye autorización de negocio.
 
 ## Rutas públicas endurecidas
 
@@ -14,7 +12,7 @@ no sustituye autorización de negocio.
 |---|---|
 | `/api/v1/auth/login`, `/api/v1/auth/refresh` | Credenciales/refresh válidos y rate limit aplicable |
 | `/api/v1/self-service/**` excepto alta de sesión | Token temporal, sesión activa, tenant/sucursal y capacidad |
-| `POST /api/v1/self-service/kiosk-sessions` | No es pública: exige `selfservice.session.launch` y un rol exclusivo de Recepción |
+| `POST /api/v1/self-service/kiosk-sessions` | No es pública: exige `selfservice.session.launch` y rol exclusivo de Recepción |
 | `/api/v1/payment-webhooks/**` | Firma del proveedor, inbox durable, deduplicación y conciliación |
 | Callback OAuth Mercado Pago | `state` de un solo uso y PKCE |
 | `GET /api/v1/organizations/*/logo` | Sólo marca pública por UUID; sin datos tenant adicionales |
@@ -40,8 +38,8 @@ no sustituye autorización de negocio.
 | Coaches | `coach.read`, `coach.metrics.read` | `coach.manage`, `coach.profile.manage` |
 | Ejercicios/rutinas | `exercise.read`, `workout.read.own/all` | `exercise.create/manage`, `workout.manage.own/all`, `workout.assign`, `workout.pdf.download` |
 | Wellness | `professional.read` o `booking.read` | `professional.manage` o `booking.manage` |
-| Notificaciones | `notification.read` | `notification.manage`; SMTP tenant: `notification.settings.manage` |
-| Automatizaciones | `automation.read` | `automation.manage`, `automation.execute`, `automation.scheduler.manage` |
+| Notificaciones | `notification.read` | `notification.manage`; configuración email: `notification.settings.manage` |
+| Automatizaciones | `automation.read` | `automation.manage`, `automation.execute`; operación avanzada: `automation.scheduler.manage` |
 | Reporte dueño | `report.owner.read` | No aplica |
 
 ## Separaciones críticas vigentes
@@ -54,26 +52,34 @@ no sustituye autorización de negocio.
 | Activar/desactivar modalidades | `payment.settings.manage` | Dueño, gerente autorizado, soporte |
 | Conectar/refrescar Stripe | `payment.provider.stripe.manage` | Dueño y soporte; no gerente |
 | Configurar correo tenant | `notification.settings.manage` | Dueño, gerente autorizado, soporte |
+| Crear/editar/activar reglas | `automation.manage` | Dueño, Gerente y soporte |
+| Probar regla manualmente | `automation.execute` o `automation.manage` | Dueño, Gerente y soporte |
+| Pausar/reanudar scheduler tenant | `automation.scheduler.manage` | Permiso avanzado; no se concede a Gerencia sólo por administrar reglas |
 
-V78 deja el lanzamiento del kiosco exclusivamente en Recepción y elimina la
-excepción histórica de `platform.admin`. V77 separa administrar la cuenta
-Stripe de sus interruptores operativos. El frontend oculta acciones por rol y
-permiso, pero el backend vuelve a validar ambos y es autoritativo.
+## Migraciones relevantes
+
+- **V77** separa administración de cuenta Stripe de los toggles operativos.
+- **V78** deja lanzamiento de kiosco exclusivamente en Recepción y elimina la excepción histórica de `platform.admin`.
+- **V80** repara el rol `Gerente` para Automatizaciones/Notificaciones y concede:
+  - `automation.read`
+  - `automation.manage`
+  - `automation.execute`
+  - `notification.read`
+  - `notification.manage`
+
+Después de aplicar una migración de permisos, una sesión ya emitida debe renovarse para que el JWT refleje las nuevas authorities.
 
 ## Reglas de rol relevantes
 
 - Gerencia no crea/modifica dueño, gerente ni administrador de plataforma.
-- Dueño y gerente sólo consultan métricas de coaches; no reciben por defecto las
-  operaciones `workout.*` del Coach.
-- Recepción puede operar POS, socios, reservas y kiosco según sus permisos, pero
-  no administrar tenant/proveedores.
-- Soporte usa `platform.admin`, contexto tenant explícito y auditoría
-  `PLATFORM_SUPPORT`, pero no puede iniciar kioscos de socios.
+- Gerencia sí puede administrar reglas de Automatizaciones y operación de notificaciones, pero no recibe control avanzado del scheduler.
+- Dueño y gerente sólo consultan métricas de coaches; no reciben por defecto operaciones `workout.*` del Coach.
+- Recepción puede operar POS, socios, reservas y kiosco según permisos, pero no administrar tenant/proveedores/automatizaciones administrativas.
+- Soporte usa `platform.admin`, contexto tenant explícito y auditoría `PLATFORM_SUPPORT`, pero no puede iniciar kioscos de socios.
 
 ## Brechas de cobertura
 
-1. Convertir cada familia en pruebas positivas y negativas por rol, tenant,
-   sucursal y UUID ajeno (`GEN-001`).
+1. Convertir cada familia en pruebas positivas/negativas por rol, tenant, sucursal y UUID ajeno (`GEN-001`).
 2. Deshabilitar docs/actuator públicos en producción mediante perfil.
 3. Verificar que cada mutación sensible escriba `audit_log` (`AUD-001`).
-4. Mantener regresión explícita de V77/V78 y de planes multi-sucursal.
+4. Mantener regresión explícita de V77/V78/V80 y de planes multi-sucursal.
