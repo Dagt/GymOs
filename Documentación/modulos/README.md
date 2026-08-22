@@ -1,14 +1,10 @@
 # Estado por módulos
 
-Corte: 21 de agosto de 2026
+Corte: 22 de agosto de 2026
 
-Esta carpeta documenta el comportamiento existente de cada módulo backend. Los
-estados permitidos son `PARCIAL`, `FUNCIONAL`, `ESTABILIZADO`, `PLANIFICADO` y
-`NO AUDITADO`.
+Esta carpeta documenta el comportamiento existente de cada módulo backend. Los estados permitidos son `PARCIAL`, `FUNCIONAL`, `ESTABILIZADO`, `PLANIFICADO` y `NO AUDITADO`.
 
-Cada ficha debe separar lo implementado, pendiente y fuera de alcance; enlazar
-la deuda por ID desde `../28-registro-vivo-deuda-tecnica.md`; y registrar la
-última validación reproducible.
+Cada ficha debe separar lo implementado, pendiente y fuera de alcance; enlazar la deuda por ID desde `../28-registro-vivo-deuda-tecnica.md`; y registrar la última validación reproducible.
 
 | Archivo | Módulo backend | Superficie principal |
 |---|---|---|
@@ -27,9 +23,16 @@ la deuda por ID desde `../28-registro-vivo-deuda-tecnica.md`; y registrar la
 | `13-inventory.md` | `inventory` | Existencias, movimientos y auditorías |
 | `14-coaching.md` | `coaching` | Coaches, ejercicios y rutinas |
 | `15-wellness.md` | `wellness` | Profesionales y servicios |
-| `16-automations.md` | `automations` | Reglas, inbox y ejecución programada |
-| `17-notifications.md` | `notifications` | Cola, plantillas y entrega SMTP |
+| `16-automations.md` | `automations` | Reglas, eventos, inbox durable, actividad/problemas y prueba manual |
+| `17-notifications.md` | `notifications` | Cola durable, preferencias, branding y entrega ZeptoMail/SMTP |
 | `18-reporting.md` | `reporting` | Reportes transversales |
 | `19-audit.md` | `audit` | Bitácora de acciones |
 | `20-common-operations.md` | `common` e infraestructura | API común, datos y operación |
 | `21-payments.md` | `payments` | Stripe, Mercado Pago, webhooks y recurrencia |
+
+Para el cierre de Automatizaciones/email consultar además:
+
+- `../31-diseño-automatizaciones-kiosco.md`;
+- `../../docs/operations/email-delivery.md`;
+- `../../docs/operations/zeptomail-email.md`;
+- `../../docs/testing/automations-kiosk-acceptance.md`.
