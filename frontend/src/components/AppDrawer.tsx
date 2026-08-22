@@ -24,7 +24,9 @@ export function AppDrawer({
   return (
     <aside className="app-drawer" aria-modal="true" role="dialog">
       <button className="app-drawer-backdrop" onClick={onClose} type="button" aria-label="Cerrar panel" />
-      <section className={`app-drawer-card${wide ? " wide" : ""}`}>
+      <section
+        className={`app-drawer-card${wide ? " wide" : ""} max-h-[calc(100dvh-1.5rem)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden`}
+      >
         <header>
           <div>
             <p>Panel de trabajo</p>
@@ -35,7 +37,7 @@ export function AppDrawer({
             Cerrar
           </button>
         </header>
-        <div className="app-drawer-body">{children}</div>
+        <div className="app-drawer-body min-h-0 overflow-y-auto overscroll-contain pr-1">{children}</div>
       </section>
     </aside>
   );
