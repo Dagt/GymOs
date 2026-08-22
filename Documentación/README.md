@@ -1,12 +1,10 @@
 # GymFort — documentación maestra
 
-Versión documental: 0.8
+Versión documental: 0.9
 Estado: FUENTE CANÓNICA
-Corte: 21 de agosto de 2026
+Corte: 22 de agosto de 2026
 
-GymFort es la identidad comercial vigente. `GymOS`/`gymos` permanece como nombre
-técnico histórico en paquetes Java, variables, base de datos y algunos artefactos;
-una migración de marca no debe romper contratos ni datos existentes.
+GymFort es la identidad comercial vigente. `GymOS`/`gymos` permanece como nombre técnico histórico en paquetes Java, variables, base de datos y algunos artefactos; una migración de marca no debe romper contratos ni datos existentes.
 
 ## Fuentes canónicas
 
@@ -27,7 +25,7 @@ una migración de marca no debe romper contratos ni datos existentes.
 15. `28-registro-vivo-deuda-tecnica.md`: único registro de deuda activa.
 16. `29-cronologia-ramas.md`: integración y situación Git.
 17. `30-rediseño-pos-membresias-beneficios.md`: diseño consolidado de comercio.
-18. `31-diseño-automatizaciones-kiosco.md`: diseño consolidado de autoservicio y automatización.
+18. `31-diseño-automatizaciones-kiosco.md`: diseño consolidado de autoservicio, automatizaciones y correo transaccional.
 
 Fuentes operativas complementarias:
 
@@ -38,32 +36,42 @@ Fuentes operativas complementarias:
 
 ## Alcance implementado
 
-La versión piloto cubre organizaciones y sucursales, identidad/RBAC, clientes,
-catálogo, ventas, pagos manuales y por proveedor, membresías, beneficios,
-acceso, reservas, inventario, coaches, wellness, automatizaciones,
-notificaciones, reportes, auditoría, configuración y kiosco web.
+La versión piloto cubre organizaciones y sucursales, identidad/RBAC, clientes, catálogo, ventas, pagos manuales y por proveedor, membresías, beneficios, acceso, reservas, inventario, coaches, wellness, automatizaciones, notificaciones, reportes, auditoría, configuración y kiosco web.
 
-Stripe Checkout y la domiciliación ya forman parte del producto. Los cambios de
-membresía y demás efectos financieros solo se aplican después del webhook
-firmado y conciliado. Los planes multi-sucursal conservan la sucursal de origen
-de la membresía, pero habilitan consulta, acceso, reservas y kiosco en las otras
-sucursales activas del mismo gimnasio.
+Stripe Checkout y la domiciliación ya forman parte del producto. Los cambios de membresía y demás efectos financieros sólo se aplican después del webhook firmado y conciliado. Los planes multi-sucursal conservan la sucursal de origen de la membresía, pero habilitan consulta, acceso, reservas y kiosco en otras sucursales activas del mismo gimnasio.
 
-El correo transaccional dispone de infraestructura SMTP durable. Zoho es el
-proveedor objetivo del siguiente bloque; conexión real, dominio y
-entregabilidad siguen pendientes de validación.
+### Automatizaciones
 
-Quedan fuera de V1: aplicación móvil/portal remoto completo del socio, cobros
-entre coach y socio, hardware de acceso offline y WhatsApp/push productivos.
+El alcance V1 está funcionalmente cerrado:
+
+- reglas manuales, programadas y por eventos;
+- inbox durable, leases, idempotencia, retries y dead letters;
+- interfaz simplificada en **Automatizaciones / Actividad / Problemas**;
+- creación desde cero sin plantillas recomendadas;
+- prueba manual directa con un socio real;
+- Gerencia autorizada para crear/administrar/probar reglas mediante V80.
+
+### Correo transaccional
+
+ZeptoMail es el proveedor operativo actual mediante `EmailDeliveryPort` + SMTP. `gymfort.mx` quedó verificado con DKIM y CNAME/return-path y se confirmaron entregas reales el 22 de agosto de 2026.
+
+Patrón V1 recomendado:
+
+```text
+From: Nombre del gimnasio <notificaciones@gymfort.mx>
+Reply-To: bandeja real del gimnasio
+```
+
+La plantilla toma nombre, colores y logo del tenant. La URL pública del logo depende de `GYMOS_FRONTEND_BASE_URL`; localhost no es accesible desde clientes externos de correo.
+
+Quedan como mejoras posteriores, no como bloqueo del módulo: feedback de rebotes/quejas, reputación productiva/DMARC final, trigger específico de domiciliación activada y canales WhatsApp/push.
+
+Quedan fuera de V1: aplicación móvil/portal remoto completo del socio, cobros entre coach y socio, integración productiva del hardware de acceso hasta completar el piloto HikCentral y WhatsApp/push productivos.
 
 ## Reglas de mantenimiento
 
-1. El código y las pruebas verificadas son la evidencia; la documentación debe
-   corregirse cuando discrepe.
-2. Todo cambio material actualiza la ficha de módulo, este índice si cambia el
-   mapa, el documento 13 y la deuda 28 cuando corresponda.
-3. Cambios de endpoint, permiso o migración actualizan 05, 06 y la matriz de
-   permisos.
+1. El código y las pruebas verificadas son la evidencia; la documentación debe corregirse cuando discrepe.
+2. Todo cambio material actualiza la ficha de módulo, este índice si cambia el mapa, el documento 13 y la deuda 28 cuando corresponda.
+3. Cambios de endpoint, permiso o migración actualizan 05, 06 y la matriz de permisos.
 4. Cambios operativos actualizan `docs/operations`, `docs/testing` o `infra`.
-5. No crear cierres, prompts o listas de pendientes paralelas; Git conserva el
-   historial y el documento 28 conserva la deuda activa.
+5. No crear cierres, prompts o listas de pendientes paralelas; Git conserva el historial y el documento 28 conserva la deuda activa.
