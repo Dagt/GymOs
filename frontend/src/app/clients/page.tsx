@@ -11,6 +11,7 @@ import {
   CreateClientDrawer,
 } from "./ClientSections";
 import { useClientsController } from "./useClientsController";
+import "./clients-scroll.css";
 
 export default function ClientsPage() {
   const controller = useClientsController();
@@ -26,6 +27,7 @@ export default function ClientsPage() {
   return (
     <AppShell
       eyebrow="Socios"
+      pageClassName="clients-scroll-page"
       session={controller.session}
       subtitle="Registro de socios, membresía inicial opcional y búsqueda para recepción."
       title="Socios"
