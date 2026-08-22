@@ -89,6 +89,7 @@ export function KioskBranchSettingsCard({ accessToken, activeBranchId }: { acces
         {items.length === 0 && !error ? <p className="text-sm text-[var(--brand-muted)]">Selecciona una sucursal activa para configurar su kiosco.</p> : null}
         {items.map((item) => (
           <div className="grid gap-5" key={item.branchId}>
+            <h3 className="sr-only">{item.branchName}</h3>
             <div className="grid gap-8 xl:grid-cols-2">
               <KioskOptionGroup item={item} options={paymentOptions} title="Pagos y membresías" onToggle={toggle} />
               <KioskOptionGroup item={item} options={serviceOptions} title="Servicios y perfil" onToggle={toggle} />
