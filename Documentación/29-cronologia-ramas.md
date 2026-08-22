@@ -1,60 +1,88 @@
 # 29. Cronología y situación de ramas
 
 Estado: AUDITADO
-Corte: 21 de agosto de 2026
+Corte: 22 de agosto de 2026
 Rama de trabajo: `feature/automations-zoho-email`
 Base integrada: PR #10, merge `52a72bc`
 
 ## 1. Situación vigente
 
-`fix/kiosk-memberships-stripe` se integró a `main` mediante el PR #10. A partir
-de ese merge se creó `feature/automations-zoho-email`, que contiene el
-endurecimiento menor previo a Zoho: identidad GymFort, estilo administrativo,
-feedback global, permisos Stripe y verificación del contenedor Stripe CLI.
+`fix/kiosk-memberships-stripe` se integró a `main` mediante PR #10. A partir de ese merge se creó `feature/automations-zoho-email`.
 
-El corte funcional auditado es `88a6b58` y está publicado en
-`origin/feature/automations-zoho-email`; la sincronización documental posterior
-no cambia ese comportamiento. La implementación específica de Zoho todavía no
-comenzó y esta rama es el lugar de trabajo previsto.
+La rama ya no es sólo preparación para Zoho: contiene el cierre funcional de **Automatizaciones + correo transaccional con ZeptoMail**, además de ajustes de configuración/kiosco, permisos y deuda técnica detectada durante aceptación.
+
+El alcance de Automatizaciones/ZeptoMail quedó implementado y validado manualmente el 22 de agosto de 2026. Falta abrir/integrar el PR correspondiente cuando el usuario decida cerrar la rama contra `main`.
 
 | Rama | Estado | Acción |
 |---|---|---|
 | `main` | Base estable con PR #10 integrado | Recibir cambios sólo por PR verde |
 | `fix/kiosk-memberships-stripe` | Integrada | Histórica; no fusionar otra vez |
-| `feature/automations-zoho-email` | Activa, publicada | Continuar Zoho y abrir PR al cerrar aceptación |
-| `feature/automations-self-service-kiosk` | Ancestro funcional integrado por la línea de fix/PR | Referencia histórica |
-| `feature/coaches-workouts` | Trabajo de coaches ya incorporado en la evolución del árbol | No fusionar lateralmente sin auditoría |
-| `feature/wellness-services` | Funcionalidad reaplicada en la historia vigente | Referencia; no fusionar de nuevo |
-
-Las ramas antiguas `feature/hito-*`, backups y ramas de estabilización ya
-contenidas en `main` son únicamente historia. Una rama divergente nunca se
-considera pendiente sólo por conservar commits: se compara por ancestros y se
-extraen cambios útiles mediante PR/cherry-pick controlado.
+| `feature/automations-zoho-email` | Activa, publicada, alcance funcional cerrado | Completar validación/PR y fusionar a `main` cuando corresponda |
+| `feature/automations-self-service-kiosk` | Ancestro funcional integrado | Referencia histórica |
+| `feature/coaches-workouts` | Coaches ya incorporado en la evolución del árbol | Referencia histórica; no merge lateral |
+| `feature/wellness-services` | Funcionalidad reaplicada en historia vigente | Referencia; no fusionar de nuevo |
 
 ## 2. Hitos integrados
 
 | Periodo | Hito |
 |---|---|
 | 13–25 jul 2026 | Fundación, multi-tenant, identidad, CRM, catálogo, POS, membresías, reservas, inventario, consolas y operación por sucursal |
-| 26–27 jul | Coaches/rutinas, perfiles, catálogo de ejercicios, métricas, PDF y restauración de Wellness |
+| 26–27 jul | Coaches/rutinas, perfiles, catálogo de ejercicios, métricas, PDF y Wellness |
 | 30 jul–3 ago | Automatizaciones durables, kiosco lógico, proveedores, Stripe Checkout/recurrencia, correo durable y observabilidad |
-| agosto | Integración y corrección de membresías Stripe, idempotencia, beneficios, retornos, pagos y planes multi-sucursal |
+| agosto | Integración/corrección de membresías Stripe, idempotencia, beneficios, retornos, pagos y multi-sucursal |
 | 20 ago | PR #10 integra `fix/kiosk-memberships-stripe` en `main` |
-| 21 ago | `88a6b58`: estilo administrativo, atribución GymFort, feedback global, permisos Stripe y Stripe CLI en Docker/CI |
+| 21 ago | Inicio de `feature/automations-zoho-email`: estilo administrativo, GymFort, feedback, permisos Stripe y Stripe CLI |
+| 21–22 ago | Configuración unificada de pagos/kiosco, restricción de apertura sólo a Recepción, UI administrativa refinada y eliminación de Operación diaria |
+| 22 ago | ZeptoMail sustituye el planteamiento previo de Zoho Mail: SMTP real, allowlist de remitentes, DKIM/CNAME de `gymfort.mx`, entrega real y runbooks |
+| 22 ago | Automatizaciones simplificadas a **Automatizaciones / Actividad / Problemas**, creación desde cero, prueba con socio real y búsqueda incremental |
+| 22 ago | V80 concede administración/ejecución de Automatizaciones a Gerencia |
+| 22 ago | V79 reconcilia perfiles Coach históricos faltantes después de detectar drift durante pruebas |
+| 22 ago | Cierre documental de Automatizaciones + ZeptoMail |
 
-## 3. Evidencia del corte
+## 3. Cambios materiales del cierre
 
-- backend Gradle exitoso;
-- 77 pruebas frontend, lint, typecheck y build exitosos;
-- 8 E2E de ruteo por consola exitosos;
-- Docker Compose válido;
-- `stripe/stripe-cli:v1.50.3` descargado y ejecutado realmente.
+### Automatizaciones
 
-## 4. Regla futura
+- motor durable existente conservado;
+- UI del cliente simplificada;
+- recetas/plantillas recomendadas eliminadas;
+- toggle + `Probar ahora` directo;
+- prueba email con socio real;
+- búsqueda por nombre/correo;
+- Gerencia con permisos de gestión;
+- distinción documentada entre activación de mandato y `RECURRING_CHARGE_DUE`.
+
+### ZeptoMail
+
+- integración mediante `EmailDeliveryPort` + SMTP existente;
+- credenciales globales por ambiente;
+- `From` central recomendado `notificaciones@gymfort.mx`;
+- nombre y `Reply-To` por tenant;
+- branding HTML con colores/logo del gimnasio;
+- resolución pública del logo mediante `GYMOS_FRONTEND_BASE_URL`;
+- validación DKIM + CNAME/return-path;
+- entregas reales confirmadas.
+
+### Deuda técnica adyacente
+
+- V79 evita perfiles Coach históricos sin fila operativa correspondiente cuando existe rol/acceso válido;
+- la modificación de kiosco V78 quedó confirmada como independiente del problema de Coaches.
+
+## 4. Evidencia del corte
+
+- dominio `gymfort.mx` verificado en ZeptoMail;
+- correo de prueba recibido en bandeja;
+- prueba de regla EMAIL usando socio real;
+- V80 aplicada como reparación de permisos;
+- documentación operativa/funcional actualizada;
+- la rama se mantiene sin commits por detrás de `main` al momento del cierre documental.
+
+Los checks CI deben revisarse sobre el commit final antes de abrir/fusionar PR; ausencia de un status publicado no se interpreta como pipeline verde.
+
+## 5. Regla futura
 
 1. Una rama representa un objetivo claro.
-2. Antes de integrar: `fetch`, comparación contra `origin/main`, pruebas,
-   revisión documental y PR.
+2. Antes de integrar: fetch/comparación contra `origin/main`, pruebas, revisión documental y PR.
 3. No hacer merges laterales de ramas históricas.
 4. Todo cierre material actualiza documentos 13, 28, 29 y fichas afectadas.
 5. Las ramas remotas sólo se eliminan por decisión explícita.
