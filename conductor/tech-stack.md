@@ -11,6 +11,7 @@ Last reviewed: 2026-08-21.
 - **Language:** TypeScript
 - **Framework:** Next.js 16.2.11 and React 19.2.4.
 - **Styling:** Tailwind CSS (v4) for utility-first styling.
+- **Icons & Data Viz:** Lucide-React for iconography and Recharts for responsive, composable data visualization.
 - **Testing:** Vitest/unit tooling and Playwright 1.61.1 for browser acceptance tests.
 
 ## Infrastructure & Data
