@@ -198,12 +198,12 @@ function PaymentToggleRow({
   onChange: (checked: boolean) => void;
 }) {
   return (
-    <div className={`settings-option-row flex items-start justify-between gap-4 rounded-xl border p-4 ${disabled ? "is-disabled" : ""}`}>
+    <article className={`bg-white flex items-start justify-between gap-4 rounded-xl border p-4 ${disabled ? "opacity-60" : ""}`}>
       <div className="min-w-0">
         <strong className="block text-sm">{label}</strong>
         <span className="mt-1 block text-xs leading-5 text-[var(--brand-muted)]">{description}</span>
       </div>
       <ToggleSwitch checked={checked} disabled={disabled} label={label} onChange={onChange} />
-    </div>
+    </article>
   );
 }
