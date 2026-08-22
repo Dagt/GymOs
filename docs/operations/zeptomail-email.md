@@ -1,30 +1,58 @@
 # Activar correo transaccional con ZeptoMail
 
-Esta guía conecta el canal transaccional de GymFort con ZeptoMail mediante el adaptador SMTP existente. La arquitectura de notificaciones no cambia: las credenciales viven únicamente en el backend y cada gimnasio conserva su configuración visible de nombre, `From` y `Reply-To`.
+Corte: 22 de agosto de 2026
+Estado: VALIDADO CON ENTREGA REAL
+
+Esta guía conecta GymFort con ZeptoMail mediante el adaptador SMTP existente. La arquitectura de notificaciones no cambia: las credenciales viven únicamente en el backend y cada gimnasio conserva su identidad visible (`fromName`, `From`, `Reply-To`) dentro de los remitentes autorizados del ambiente.
+
+## Arquitectura operativa recomendada
+
+```text
+Automatización / notificación
+        ↓
+notification_log
+        ↓
+NotificationDeliveryWorker
+        ↓
+EmailDeliveryPort (SMTP)
+        ↓
+ZeptoMail Mail Agent
+        ↓
+Destinatario
+```
+
+Patrón recomendado para V1:
+
+```text
+From: Nombre del gimnasio <notificaciones@gymfort.mx>
+Reply-To: correo real del gimnasio
+```
+
+`notificaciones@gymfort.mx` no necesita ser un buzón real. ZeptoMail puede enviar desde una dirección autorizada del dominio verificado; las respuestas se dirigen al `Reply-To`.
 
 ## 1. Preparar ZeptoMail
 
-1. Crea o selecciona un **Mail Agent** para GymFort.
-2. Agrega al Agent los dominios remitentes que vayas a utilizar y completa su verificación DNS.
-3. Configura SPF, DKIM y DMARC antes de enviar a clientes reales.
-4. En **Agent > SMTP/API > SMTP**, copia las credenciales exactas que muestra ZeptoMail.
-5. Mantén en GymFort únicamente direcciones remitentes verificadas y asociadas a ese Agent.
+1. Crear o seleccionar el **Mail Agent** de GymFort.
+2. Agregar `gymfort.mx` al Agent.
+3. Publicar en DNS los registros que entregue ZeptoMail:
+   - DKIM (`TXT`, selector `..._domainkey`);
+   - return-path/bounce (`CNAME`).
+4. Si el DNS está en Cloudflare, el CNAME de bounce debe quedar **DNS only**, no proxied.
+5. Esperar a que ZeptoMail marque ambos registros como verificados.
+6. Autorizar el sender `notificaciones@gymfort.mx` (o cualquier otro `From` que vaya a usarse).
+7. En **Agent > SMTP/API > SMTP**, copiar usuario y contraseña del Agent.
 
-Configuración SMTP oficial de ZeptoMail:
+Configuración usada por GymFort:
 
 - servidor: `smtp.zeptomail.com`;
-- puerto recomendado para GymFort: `587` con TLS/STARTTLS;
-- alternativa: `465` con SSL;
+- puerto: `587`;
+- seguridad: TLS/STARTTLS;
 - usuario: el mostrado por el Agent (normalmente `emailapikey`);
-- contraseña: la contraseña SMTP generada para el Agent.
+- contraseña: secreto SMTP del Agent.
 
-ZeptoMail soporta TLS 1.2 para SMTP. GymFort exige STARTTLS y validación de identidad del servidor en la configuración recomendada.
-
-Referencias oficiales: [SMTP de ZeptoMail](https://www.zoho.com/zeptomail/help/smtp-home.html), [SMTP/API](https://www.zoho.com/zeptomail/help/smtp-and-api.html) y [Mail Agents](https://www.zoho.com/zeptomail/help/agents.html).
+Referencias oficiales: [SMTP](https://www.zoho.com/zeptomail/help/smtp-home.html), [SMTP/API](https://www.zoho.com/zeptomail/help/smtp-and-api.html) y [Mail Agents](https://www.zoho.com/zeptomail/help/agents.html).
 
 ## 2. Configurar el backend
-
-Copia `infra/.env.example` como `infra/.env` y reemplaza los valores sensibles con los del Agent:
 
 ```dotenv
 GYMOS_SMTP_ENABLED=true
@@ -39,55 +67,122 @@ GYMOS_SMTP_STARTTLS=true
 GYMOS_SMTP_STARTTLS_REQUIRED=true
 GYMOS_SMTP_SSL=false
 GYMOS_SMTP_CHECK_SERVER_IDENTITY=true
+GYMOS_FRONTEND_BASE_URL=https://gymfort.mx
 ```
 
-`GYMOS_SMTP_ALLOWED_FROM_ADDRESSES` admite varias direcciones separadas por coma. Si GymFort envía con identidad propia de un gimnasio, su dominio y dirección deben estar verificados/asociados al Agent antes de agregarlos a esta lista.
+`GYMOS_SMTP_PASSWORD` es un secreto. No debe vivir en Git, frontend, capturas ni documentación versionada.
 
-Ejemplo:
+`GYMOS_SMTP_ALLOWED_FROM_ADDRESSES` admite varias direcciones separadas por coma. Cada una debe estar previamente autorizada/verificada en el Mail Agent.
+
+Las credenciales SMTP son globales para el ambiente. No se guardan en PostgreSQL por tenant.
+
+## 3. URL pública y logo
+
+Los correos usan el logo del gimnasio almacenado en GymFort. Si `logoUrl` es relativa (`/api/tenant-logo/...`), el backend la convierte usando `GYMOS_FRONTEND_BASE_URL`.
+
+En producción:
 
 ```dotenv
-GYMOS_SMTP_ALLOWED_FROM_ADDRESSES=notificaciones@gymfort.mx,avisos@powergym.mx,notificaciones@ironhouse.mx
+GYMOS_FRONTEND_BASE_URL=https://gymfort.mx
 ```
 
-Las credenciales SMTP son globales para el ambiente; no se guardan en PostgreSQL ni se envían al frontend.
+En local normalmente apunta a `http://localhost:3000`. Gmail/Outlook no pueden acceder al localhost de la computadora del desarrollador; por eso el renderer omite imágenes que resolverían a localhost/127.0.0.1 para evitar un placeholder roto. Para probar el logo antes del despliegue se necesita una URL pública/túnel; no es requisito del funcionamiento productivo.
 
-Recrea el backend para inyectar los secretos:
+## 4. Reiniciar/redeployar backend
+
+Local con Compose:
 
 ```powershell
 docker compose --env-file infra/.env -f infra/docker-compose.yml up -d --build --force-recreate backend
 docker compose --env-file infra/.env -f infra/docker-compose.yml logs -f backend
 ```
 
-## 3. Configurar cada gimnasio
+En un ambiente hospedado, cargar las mismas variables como secrets/environment variables y redeployar Spring Boot.
 
-1. Entra como dueño o usuario con `notification.settings.manage`.
-2. Abre **Configuración > Correo electrónico**.
-3. Confirma que **Servidor** muestre `ZeptoMail configurado`.
-4. Define el nombre visible del gimnasio.
-5. Selecciona un `From` autorizado.
-6. Define el `Reply-To` del gimnasio si las respuestas deben llegar a su propia bandeja.
-7. Activa **Habilitar entregas por correo** y guarda.
-8. Envía una prueba real.
+## 5. Configurar cada gimnasio
 
-Ejemplo de identidad visible:
+En **Administración > Configuración > Correo electrónico**:
+
+1. confirmar que el servidor muestre ZeptoMail disponible;
+2. definir nombre visible del gimnasio;
+3. usar un `From` autorizado (para V1: `notificaciones@gymfort.mx`);
+4. definir `Reply-To` con la bandeja real del gimnasio;
+5. habilitar entregas;
+6. guardar;
+7. enviar una prueba real.
+
+Ejemplo:
 
 ```text
-From: Power Gym <avisos@powergym.mx>
-Reply-To: contacto@powergym.mx
+From: Appex Hub Deportivo <notificaciones@gymfort.mx>
+Reply-To: contacto@appex.com
 ```
 
-También es válido usar un `From` central de GymFort y mantener el nombre/`Reply-To` propios del gimnasio.
+## 6. Validación de entrega
 
-## 4. Automatizaciones
+Después de enviar una prueba:
 
-Cuando el canal esté listo, las automatizaciones pueden utilizar `EMAIL`. Los eventos de membresías, pagos, domiciliaciones y reservas resuelven el correo del socio relacionado. Los mensajes se persisten antes de enviarse y conservan idempotencia, preferencias, leasing, reintentos y dead letter.
+1. confirmar recepción en Gmail/Outlook;
+2. verificar en ZeptoMail **Processed emails** que el mensaje fue aceptado/procesado;
+3. revisar headers/original del correo para SPF/DKIM/DMARC cuando corresponda;
+4. pulsar `Responder` y confirmar que el destinatario es el `Reply-To` del gimnasio;
+5. verificar que nombre, colores y logo se correspondan con la organización.
 
-## 5. Diagnóstico
+En el corte del 22 de agosto de 2026 ya se verificaron DKIM + CNAME para `gymfort.mx` y se recibieron correos reales desde ZeptoMail durante pruebas locales.
 
-- `Servidor sin configurar`: faltan variables `GYMOS_SMTP_*` o el backend no fue recreado.
-- `Remitente no autorizado`: la dirección no está en `GYMOS_SMTP_ALLOWED_FROM_ADDRESSES` o no está verificada/asociada al Agent.
-- `ZeptoMail rechazó las credenciales`: copia nuevamente usuario y contraseña desde **Agent > SMTP/API**.
-- Timeout: verifica DNS, firewall y salida TCP al puerto `587` desde el backend.
-- Mensaje aceptado pero no visible en inbox: revisa SPF, DKIM, DMARC y los logs de **Processed emails** del Agent.
+## 7. Probar una automatización
 
-Para revisar la cola y reintentar fallos definitivos usa **Automatizaciones > Entregas recientes / Fallos definitivos**.
+En **Automatizaciones**:
+
+1. crear/configurar una regla `EMAIL`;
+2. pulsar `Probar ahora`;
+3. buscar al socio por nombre o correo;
+4. seleccionar un socio activo con email;
+5. enviar la prueba;
+6. revisar **Actividad** y la bandeja del socio.
+
+La prueba usa el asunto/mensaje real de la regla y un destinatario real; no fabrica un pago, una reserva ni una domiciliación en el dominio.
+
+## 8. Estados y reintentos
+
+La cola conserva:
+
+```text
+QUEUED → PROCESSING → SENT
+           ↓
+    RETRY_SCHEDULED
+           ↓
+      DEAD_LETTER
+```
+
+`SUPPRESSED` significa que una preferencia impidió la entrega.
+
+Los fallos recuperables usan backoff y los definitivos pueden reintentarse desde **Automatizaciones > Problemas** después de corregir la causa.
+
+## 9. Diagnóstico
+
+- **Servidor sin configurar**: faltan `GYMOS_SMTP_*` o backend no fue reiniciado.
+- **Remitente no autorizado**: el `From` no está en `GYMOS_SMTP_ALLOWED_FROM_ADDRESSES` o no fue autorizado en ZeptoMail.
+- **Credenciales rechazadas**: regenerar/copiar usuario/password desde Agent > SMTP/API.
+- **Timeout**: revisar DNS, firewall y salida TCP 587.
+- **Aceptado pero no llega**: revisar Processed emails, spam, DKIM/SPF/DMARC y reputación.
+- **Logo ausente en local**: comportamiento esperado si `GYMOS_FRONTEND_BASE_URL` apunta a localhost.
+- **Respuesta llega al lugar equivocado**: revisar `Reply-To` del tenant.
+
+## 10. Seguridad
+
+- secretos sólo en backend;
+- TLS/STARTTLS requerido;
+- validación de identidad del servidor;
+- lista cerrada de remitentes permitidos;
+- no incluir secretos en reglas/JSON/logs;
+- no permitir HTML arbitrario del usuario en las reglas;
+- marketing sigue bloqueado por defecto sin consentimiento.
+
+## 11. Trabajo posterior no bloqueante
+
+- webhooks de rebote/queja de ZeptoMail;
+- dashboards de reputación/entregabilidad productiva;
+- política DMARC final del dominio productivo;
+- remitentes/dominios propios por gimnasio si producto lo exige;
+- proveedores adicionales, WhatsApp y push.
