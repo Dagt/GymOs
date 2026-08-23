@@ -7,9 +7,6 @@ import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
 import {
   getSalesReport,
   getStoredSession,
-  type PaymentMethodBreakdown,
-  type SaleBusinessContextBreakdown,
-  type SaleStatusBreakdown,
   type SalesReportResponse,
   type StoredSession,
 } from "@/lib/api";
@@ -32,12 +29,8 @@ import {
   ArrowRight,
   TrendingUp,
   Receipt,
-  CreditCard,
   AlertCircle,
-  Banknote,
-  Smartphone,
   Wallet,
-  Landmark,
   CheckCircle2,
   Clock,
   XCircle,
@@ -206,7 +199,7 @@ export default function SalesReportPage() {
                             <Cell key={"cell-" + index} fill={COLORS_PAYMENTS[index % COLORS_PAYMENTS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip formatter={(val: any) => formatMoney(Number(val), currency)} labelFormatter={(l: any) => paymentMethodLabel(String(l))} />
+                        <Tooltip formatter={(val: unknown) => formatMoney(Number(val), currency)} labelFormatter={(l: unknown) => paymentMethodLabel(String(l))} />
                       </PieChart>
                     </ResponsiveContainer>
                   ) : (
@@ -241,7 +234,7 @@ export default function SalesReportPage() {
                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
                         <XAxis dataKey="status" tickFormatter={saleStatusLabel} axisLine={false} tickLine={false} />
                         <YAxis tickFormatter={(val) => `$${val/100}`} axisLine={false} tickLine={false} />
-                        <Tooltip formatter={(val: any) => formatMoney(Number(val), currency)} labelFormatter={(l: any) => saleStatusLabel(String(l))} cursor={{fill: 'transparent'}} />
+                        <Tooltip formatter={(val: unknown) => formatMoney(Number(val), currency)} labelFormatter={(l: unknown) => saleStatusLabel(String(l))} cursor={{fill: 'transparent'}} />
                         <Legend />
                         <Bar dataKey="paidCents" name="Cobrado" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={40} />
                         <Bar dataKey="balanceCents" name="Pendiente (Saldo)" fill="#f43f5e" radius={[4, 4, 0, 0]} maxBarSize={40} />
@@ -468,10 +461,6 @@ function ShoppingBagIcon() {
 
 function RefreshCcwIcon() {
   return <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M16 21v-5h5"/></svg>
-}
-
-function periodLabel(report: SalesReportResponse) {
-  return `${report.fromDate} a ${report.toDate}`;
 }
 
 function todayIso() {

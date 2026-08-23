@@ -7,13 +7,8 @@ import { AuthRequired } from "@/components/AuthRequired";
 import {
   AreaChart,
   Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar
+  ResponsiveContainer
 } from "recharts";
 import {
   addExerciseAlias,
@@ -50,6 +45,7 @@ import {
   type CreateExercisePayload,
   type Exercise,
   type StoredSession,
+  type WeeklyTrendPoint,
   type WeeklyTrendReport,
   type WorkoutBlockDraft,
   type WorkoutExerciseDraft,
@@ -1473,19 +1469,19 @@ export default function CoachesPage() {
                   color="#1b6b45"
                   label="Rutinas asignadas"
                   points={trend?.points ?? []}
-                  value={(point: any) => point.assignments}
+                  value={(point) => point.assignments}
                 />
                 <WeeklyTrendChart
                   color="#276f91"
                   label="Socios únicos"
                   points={trend?.points ?? []}
-                  value={(point: any) => point.uniqueClients}
+                  value={(point) => point.uniqueClients}
                 />
                 <WeeklyTrendChart
                   color="#b26a1b"
                   label="Primeras rutinas"
                   points={trend?.points ?? []}
-                  value={(point: any) => point.firstWorkouts}
+                  value={(point) => point.firstWorkouts}
                 />
               </div>
             </section>
@@ -2450,7 +2446,7 @@ function Field({ label, help, children }: { label: string; help?: string; childr
   );
 }
 
-function WeeklyTrendChart({ color, label, points, value }: { color: string; label: string; points: any[]; value: (p: any) => number }) {
+function WeeklyTrendChart({ color, label, points, value }: { color: string; label: string; points: WeeklyTrendPoint[]; value: (point: WeeklyTrendPoint) => number }) {
   const data = points.map(p => ({
     date: p.weekFrom,
     val: value(p)
@@ -2536,11 +2532,6 @@ function startOfWeek() {
   return date.toISOString().slice(0, 10);
 }
 
-function formatShortDate(value: string) {
-  return new Intl.DateTimeFormat("es-MX", { day: "2-digit", month: "short", timeZone: "UTC" })
-    .format(new Date(`${value}T00:00:00Z`));
-}
-
 function availableTabs(session: StoredSession | null): Tab[] {
   if (!session) return [];
   if (isMetricsOnlySupervisor(session)) {
@@ -2578,8 +2569,6 @@ function normalizeRole(role: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 }
-
-
 
 
 

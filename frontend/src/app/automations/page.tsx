@@ -114,8 +114,6 @@ export default function AutomationsPage() {
     if (!session || !testRule) return;
     const query = testClientQuery.trim();
     if (query.length < 2 || selectedTestClient) {
-      setTestClients([]);
-      setTestClientsLoading(false);
       return;
     }
 
