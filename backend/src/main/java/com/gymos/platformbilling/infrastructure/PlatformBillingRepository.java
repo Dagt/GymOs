@@ -146,7 +146,8 @@ public class PlatformBillingRepository {
     }
 
     private BranchBillingRecord mapRecord(ResultSet resultSet, int rowNumber) throws SQLException {
-        Integer billingAnchorDay = (Integer) resultSet.getObject("billing_anchor_day");
+        Number billingAnchorValue = (Number) resultSet.getObject("billing_anchor_day");
+        Integer billingAnchorDay = billingAnchorValue == null ? null : billingAnchorValue.intValue();
         BigDecimal implementationFee = resultSet.getBigDecimal("implementation_fee");
         return new BranchBillingRecord(
                 resultSet.getObject("organization_id", UUID.class),
