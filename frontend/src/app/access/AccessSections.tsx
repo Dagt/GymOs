@@ -7,12 +7,15 @@ import type {
   ClientSummary,
   PhysicalAccessBenefit,
   PhysicalClientState,
+  PhysicalConnectorActivationCode,
   PhysicalIntegration,
+  PhysicalPersonCandidate,
 } from "@/lib/api";
 
 export function AccessOperationSection({
   availableBenefits,
   busy,
+  canManualOpen,
   clients,
   deviceCode,
   deviceRequiredBenefitIds,
@@ -41,6 +44,7 @@ export function AccessOperationSection({
 }: {
   availableBenefits: PhysicalAccessBenefit[];
   busy: boolean;
+  canManualOpen: boolean;
   clients: ClientSummary[];
   deviceCode: string;
   deviceRequiredBenefitIds: string[];
@@ -299,12 +303,15 @@ export function AccessOperationSection({
               </span>
             </summary>
             <div className="grid gap-4 border-t border-[var(--brand-line)] p-4 lg:grid-cols-2">
-              <ManualAccessSection
-                busy={busy}
-                manualReason={manualReason}
-                onManualReasonChange={onManualReasonChange}
-                onOpenManually={onOpenManually}
-              />
+              {canManualOpen ? (
+                <ManualAccessSection
+                  busy={busy}
+                  deviceCode={deviceCode}
+                  manualReason={manualReason}
+                  onManualReasonChange={onManualReasonChange}
+                  onOpenManually={onOpenManually}
+                />
+              ) : null}
               <TemporaryPassSection
                 busy={busy}
                 maxUses={maxUses}
@@ -327,49 +334,74 @@ export function AccessOperationSection({
 export function PhysicalAccessIntegrationSection({
   availableDeviceBenefits,
   busy,
+  candidates,
   connectionName,
+  connectorActivation,
   connectorKey,
   device,
   deviceCode,
   deviceRequiredBenefitIds,
   devices,
+  externalDeviceName,
+  externalDeviceRef,
   externalPersonRef,
   integration,
   mappingDrafts,
   physicalClientState,
+  providerKey,
   selectedClient,
   syncEnabled,
   onConnectionNameChange,
+  onActivationIssue,
+  onCandidateMatch,
+  onCandidateReject,
   onConnectorKeyChange,
   onCreateDevice,
   onDeviceCodeChange,
   onExternalPersonRefChange,
+  onExternalDeviceNameChange,
+  onExternalDeviceRefChange,
   onLinkClient,
   onMappingChange,
   onQueueSynchronization,
+  onReconcileAll,
+  onRemoveDeviceLink,
+  onRevokeConnector,
   onSaveDeviceRequiredBenefits,
   onSaveIntegration,
+  onSaveDeviceLink,
   onSyncEnabledChange,
+  onProviderKeyChange,
 }: {
   availableDeviceBenefits: PhysicalAccessBenefit[];
   busy: boolean;
+  candidates: PhysicalPersonCandidate[];
   connectionName: string;
+  connectorActivation: PhysicalConnectorActivationCode | null;
   connectorKey: string;
   device: AccessDevice | null;
   deviceCode: string;
   deviceRequiredBenefitIds: string[];
   devices: AccessDevice[];
+  externalDeviceName: string;
+  externalDeviceRef: string;
   externalPersonRef: string;
   integration: PhysicalIntegration | null;
   mappingDrafts: Record<string, { reference: string; name: string }>;
   physicalClientState: PhysicalClientState | null;
+  providerKey: string;
   selectedClient: ClientSummary | null;
   syncEnabled: boolean;
   onConnectionNameChange: (value: string) => void;
+  onActivationIssue: () => void;
+  onCandidateMatch: (candidateId: string) => void;
+  onCandidateReject: (candidateId: string) => void;
   onConnectorKeyChange: (value: string) => void;
   onCreateDevice: (payload: AccessDevicePayload) => Promise<void>;
   onDeviceCodeChange: (value: string) => void;
   onExternalPersonRefChange: (value: string) => void;
+  onExternalDeviceNameChange: (value: string) => void;
+  onExternalDeviceRefChange: (value: string) => void;
   onLinkClient: () => void;
   onMappingChange: (
     benefitId: string,
@@ -377,9 +409,14 @@ export function PhysicalAccessIntegrationSection({
     value: string,
   ) => void;
   onQueueSynchronization: () => void;
+  onReconcileAll: () => void;
+  onRemoveDeviceLink: () => void;
+  onRevokeConnector: () => void;
   onSaveDeviceRequiredBenefits: (benefitIds: string[]) => void;
   onSaveIntegration: () => void;
+  onSaveDeviceLink: () => void;
   onSyncEnabledChange: (value: boolean) => void;
+  onProviderKeyChange: (value: string) => void;
 }) {
   if (!integration) return null;
 
@@ -388,6 +425,12 @@ export function PhysicalAccessIntegrationSection({
     mappingDrafts[benefit.id]?.reference.trim(),
   ).length;
   const syncState = physicalClientState?.syncState;
+  const selectedProvider = integration.providers.find(
+    (provider) => provider.providerKey === providerKey,
+  );
+  const selectedDeviceLink = integration.deviceLinks.find(
+    (link) => link.accessDeviceId === device?.id,
+  );
 
   return (
     <section className="grid gap-6">
@@ -398,12 +441,12 @@ export function PhysicalAccessIntegrationSection({
               Configuración física por sucursal
             </p>
             <h2 className="mt-2 text-2xl font-black tracking-tight">
-              HikCentral y puntos de acceso
+              Proveedor y puntos de acceso físico
             </h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-white/75">
               GymFort calcula quién puede entrar. El conector local aplica esos
-              derechos en HikCentral sin guardar contraseñas, URL internas ni
-              biometría en la nube.
+              derechos en el proveedor seleccionado sin guardar contraseñas,
+              URL internas ni biometría en la nube.
             </p>
           </div>
           <ConnectionStatus connection={connection} />
@@ -416,11 +459,15 @@ export function PhysicalAccessIntegrationSection({
             text={connection.id ? "Guardada" : "Pendiente"}
           />
           <SetupStep
-            complete={Boolean(device && deviceRequiredBenefitIds.length)}
+            complete={Boolean(
+              device &&
+                deviceRequiredBenefitIds.length === 1 &&
+                (device.provider === "SIMULATED" || selectedDeviceLink),
+            )}
             label="2. Puntos"
             text={
               device
-                ? `${deviceRequiredBenefitIds.length} derecho(s)`
+                ? `${deviceRequiredBenefitIds.length}/1 derecho · ${selectedDeviceLink ? "vinculado" : "sin recurso"}`
                 : "Elige un punto"
             }
           />
@@ -453,28 +500,47 @@ export function PhysicalAccessIntegrationSection({
           />
         </summary>
         <div className="border-t border-[var(--brand-line)] p-5">
-          <div className="grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
+          <div className="grid gap-4 md:grid-cols-2">
+            <label className="grid gap-2 text-sm font-semibold text-[var(--brand-muted)]">
+              Proveedor
+              <select
+                className="h-11 rounded-lg border border-[var(--brand-line)] bg-white px-3 text-sm"
+                disabled={Boolean(connection.id)}
+                onChange={(event) => onProviderKeyChange(event.target.value)}
+                value={providerKey}
+              >
+                {integration.providers.map((provider) => (
+                  <option
+                    disabled={provider.availability !== "AVAILABLE" || provider.providerKey === "SIMULATED"}
+                    key={provider.providerKey}
+                    value={provider.providerKey}
+                  >
+                    {provider.displayName} · {provider.availability === "AVAILABLE" ? "disponible" : "planificado"}
+                  </option>
+                ))}
+              </select>
+            </label>
             <label className="grid gap-2 text-sm font-semibold text-[var(--brand-muted)]">
               Nombre para reconocer la conexión
               <input
                 className="h-11 rounded-lg border border-[var(--brand-line)] px-3 text-sm"
                 maxLength={160}
                 onChange={(event) => onConnectionNameChange(event.target.value)}
-                placeholder="Ej. HikCentral · Centro"
+                placeholder="Ej. Control físico · Centro"
                 value={connectionName}
               />
             </label>
             <label className="grid gap-2 text-sm font-semibold text-[var(--brand-muted)]">
-              ID del conector local
+              ID público del Connector
               <input
                 className="h-11 rounded-lg border border-[var(--brand-line)] px-3 text-sm"
                 maxLength={120}
                 onChange={(event) => onConnectorKeyChange(event.target.value)}
-                placeholder="Ej. hikcentral-centro-01"
+                placeholder="Ej. acceso-centro-01"
                 value={connectorKey}
               />
             </label>
-            <label className="flex h-11 items-center gap-2 rounded-lg border border-[var(--brand-line)] bg-[var(--brand-surface)] px-3 text-sm font-bold text-[var(--brand-ink)]">
+            <label className="flex h-11 items-center gap-2 self-end rounded-lg border border-[var(--brand-line)] bg-[var(--brand-surface)] px-3 text-sm font-bold text-[var(--brand-ink)]">
               <input
                 checked={syncEnabled}
                 onChange={(event) => onSyncEnabledChange(event.target.checked)}
@@ -484,9 +550,9 @@ export function PhysicalAccessIntegrationSection({
             </label>
           </div>
           <p className="mt-4 rounded-xl border border-[var(--brand-line)] bg-[var(--brand-surface)] px-4 py-3 text-sm text-[var(--brand-muted)]">
-            El conector se instalará dentro de la red del gimnasio. Aquí sólo se
-            registra su ID, no la dirección, credenciales ni información
-            biométrica de HikCentral.
+            {selectedProvider?.implementationNote ?? "Selecciona un proveedor disponible."}
+            {" "}El Connector se instala dentro de la red del gimnasio. GymFort
+            Cloud no recibe la URL, credenciales ni biometría del proveedor.
           </p>
           <button
             className="mt-4 h-11 rounded-lg bg-[var(--brand-primary)] px-5 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-60"
@@ -500,6 +566,59 @@ export function PhysicalAccessIntegrationSection({
           >
             Guardar conexión
           </button>
+
+          {connection.id ? (
+            <div className="mt-5 rounded-xl border border-[var(--brand-line)] bg-[var(--brand-surface)] p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <p className="font-black text-[var(--brand-ink)]">GymFort Local Connector</p>
+                  <p className="mt-1 text-sm text-[var(--brand-muted)]">
+                    {connection.credentialActive
+                      ? "Credencial activa. Puedes rotarla sin exponer el secreto actual."
+                      : "Genera un código de un solo uso después de guardar y activar la conexión."}
+                  </p>
+                </div>
+                <ConnectionStatus connection={connection} />
+              </div>
+              <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                <DecisionDetail label="Último heartbeat" value={connection.lastHeartbeatAt ? formatDateTime(connection.lastHeartbeatAt) : "Nunca"} />
+                <DecisionDetail label="Versión" value={connection.connectorVersion ?? "Sin reportar"} />
+                <DecisionDetail label="Jobs pendientes" value={String(connection.pendingJobs)} />
+                <DecisionDetail label="Jobs fallidos" value={String(connection.failedJobs)} />
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  className="h-10 rounded-lg bg-[var(--brand-primary)] px-4 text-sm font-bold text-white disabled:opacity-60"
+                  disabled={busy || !connection.enabled || !connection.connectorKey}
+                  onClick={onActivationIssue}
+                  type="button"
+                >
+                  {connection.credentialActive ? "Rotar credencial" : "Generar activación"}
+                </button>
+                {connection.credentialActive ? (
+                  <button
+                    className="h-10 rounded-lg border border-[#c87676] bg-white px-4 text-sm font-bold text-[#8d3030] disabled:opacity-60"
+                    disabled={busy}
+                    onClick={onRevokeConnector}
+                    type="button"
+                  >
+                    Revocar Connector
+                  </button>
+                ) : null}
+              </div>
+              {connectorActivation ? (
+                <div className="mt-4 rounded-xl border border-[#e7c06f] bg-[#fff8e7] p-4">
+                  <p className="text-xs font-black uppercase tracking-wide text-[#805500]">Se muestra una sola vez</p>
+                  <code className="mt-2 block break-all rounded-lg bg-white px-3 py-3 text-sm font-bold text-[var(--brand-ink)]">
+                    {connectorActivation.activationCode}
+                  </code>
+                  <p className="mt-2 text-xs text-[#805500]">
+                    Expira {formatDateTime(connectorActivation.expiresAt)}. {connectorActivation.warning}
+                  </p>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
       </details>
 
@@ -545,9 +664,64 @@ export function PhysicalAccessIntegrationSection({
                 requiredBenefitIds={deviceRequiredBenefitIds}
                 onSave={onSaveDeviceRequiredBenefits}
               />
+              {device.provider !== "SIMULATED" ? (
+                <div className="mt-5 rounded-xl border border-[var(--brand-line)] bg-[var(--brand-surface)] p-4">
+                  <p className="font-bold text-[var(--brand-ink)]">Recurso físico externo</p>
+                  <p className="mt-1 text-sm text-[var(--brand-muted)]">
+                    Vincula explícitamente este punto GymFort con la puerta o torniquete que reportará el Connector.
+                  </p>
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <label className="grid gap-2 text-sm font-semibold text-[var(--brand-muted)]">
+                      Referencia externa
+                      <input
+                        className="h-10 rounded-lg border border-[var(--brand-line)] bg-white px-3 text-sm"
+                        maxLength={180}
+                        onChange={(event) => onExternalDeviceRefChange(event.target.value)}
+                        placeholder="Ej. door-main-01"
+                        value={externalDeviceRef}
+                      />
+                    </label>
+                    <label className="grid gap-2 text-sm font-semibold text-[var(--brand-muted)]">
+                      Nombre reportado (opcional)
+                      <input
+                        className="h-10 rounded-lg border border-[var(--brand-line)] bg-white px-3 text-sm"
+                        maxLength={180}
+                        onChange={(event) => onExternalDeviceNameChange(event.target.value)}
+                        placeholder="Ej. Torniquete entrada"
+                        value={externalDeviceName}
+                      />
+                    </label>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      className="h-10 rounded-lg bg-[var(--brand-primary)] px-4 text-sm font-bold text-white disabled:opacity-60"
+                      disabled={busy || !connection.id || !externalDeviceRef.trim()}
+                      onClick={onSaveDeviceLink}
+                      type="button"
+                    >
+                      Guardar vínculo de dispositivo
+                    </button>
+                    {selectedDeviceLink ? (
+                      <button
+                        className="h-10 rounded-lg border border-[#c87676] bg-white px-4 text-sm font-bold text-[#8d3030] disabled:opacity-60"
+                        disabled={busy}
+                        onClick={onRemoveDeviceLink}
+                        type="button"
+                      >
+                        Quitar vínculo
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
             </div>
           )}
-          <AccessPointRegistration busy={busy} onCreate={onCreateDevice} />
+          <AccessPointRegistration
+            availableBenefits={availableDeviceBenefits}
+            busy={busy}
+            onCreate={onCreateDevice}
+            providers={integration.providers}
+          />
         </div>
       </details>
 
@@ -555,7 +729,7 @@ export function PhysicalAccessIntegrationSection({
         <summary className="cursor-pointer list-none px-5 py-5">
           <SummaryHeading
             detail="Relaciona derechos GymFort con Access Levels existentes"
-            title="3. Mapea niveles de HikCentral"
+            title={`3. Mapea niveles de ${selectedProvider?.displayName ?? "tu proveedor"}`}
             status={
               integration.availableBenefits.length === 0
                 ? "Sin beneficios"
@@ -583,13 +757,70 @@ export function PhysicalAccessIntegrationSection({
 
       <section className="rounded-2xl border border-[var(--brand-line)] bg-white p-5 shadow-sm">
         <SummaryHeading
-          detail="Vincula una persona de HikCentral y prepara su estado deseado"
-          title="4. Sincroniza un socio"
+          detail="Coincidencias exactas sugeridas; GymFort nunca adivina por similitud"
+          title="4. Revisa personas externas"
+          status={candidates.some((candidate) => !["MATCHED", "REJECTED"].includes(candidate.matchStatus)) ? "Pendiente" : "Revisado"}
+        />
+        <p className="mt-3 text-sm leading-6 text-[var(--brand-muted)]">
+          El Connector puede enviar nombre y contacto para conciliación. La vinculación requiere una referencia opaca; rostros, huellas y plantillas biométricas permanecen fuera de GymFort Cloud.
+        </p>
+        {candidates.length === 0 ? (
+          <div className="mt-4">
+            <EmptyState text="El Connector todavía no reporta personas pendientes de conciliación." />
+          </div>
+        ) : (
+          <div className="mt-4 grid gap-3">
+            {candidates.map((candidate) => (
+              <div className="rounded-xl border border-[var(--brand-line)] p-4" key={candidate.id}>
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <p className="font-bold text-[var(--brand-ink)]">
+                      {candidate.externalDisplayName ?? candidate.externalPersonRef}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--brand-muted)]">
+                      {candidate.externalPersonRef} · {candidate.email ?? candidate.phone ?? "Sin contacto"}
+                    </p>
+                    {candidate.matchReason ? (
+                      <p className="mt-2 text-xs text-[var(--brand-muted)]">Motivo: {humanize(candidate.matchReason)}</p>
+                    ) : null}
+                  </div>
+                  <SyncBadge status={candidate.matchStatus} />
+                </div>
+                {!['MATCHED', 'REJECTED'].includes(candidate.matchStatus) ? (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      className="h-9 rounded-lg bg-[var(--brand-primary)] px-3 text-xs font-bold text-white disabled:opacity-60"
+                      disabled={busy || !selectedClient}
+                      onClick={() => onCandidateMatch(candidate.id)}
+                      type="button"
+                    >
+                      {selectedClient ? `Vincular con ${selectedClient.firstName}` : "Selecciona un socio en Operar"}
+                    </button>
+                    <button
+                      className="h-9 rounded-lg border border-[var(--brand-line)] bg-white px-3 text-xs font-bold text-[var(--brand-muted)] disabled:opacity-60"
+                      disabled={busy}
+                      onClick={() => onCandidateReject(candidate.id)}
+                      type="button"
+                    >
+                      Descartar
+                    </button>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-2xl border border-[var(--brand-line)] bg-white p-5 shadow-sm">
+        <SummaryHeading
+          detail={`Vincula una persona de ${selectedProvider?.displayName ?? "tu proveedor"} y revisa su estado deseado`}
+          title="5. Revisa el estado deseado de un socio"
           status={syncState?.status ?? "Sin preparar"}
         />
         {!selectedClient ? (
           <div className="mt-4">
-            <EmptyState text="Selecciona un socio desde Operar acceso para revisar sus derechos efectivos y vincular su referencia opaca de HikCentral." />
+            <EmptyState text="Selecciona un socio desde Operar acceso para revisar sus derechos efectivos y vincular su referencia opaca del proveedor." />
           </div>
         ) : (
           <div className="mt-5 grid gap-5">
@@ -603,7 +834,7 @@ export function PhysicalAccessIntegrationSection({
               </p>
               <div className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
                 <label className="grid gap-2 text-sm font-semibold text-[var(--brand-muted)]">
-                  Referencia de persona en HikCentral
+                  Referencia de persona en el proveedor
                   <input
                     className="h-11 rounded-lg border border-[var(--brand-line)] bg-white px-3 text-sm"
                     maxLength={180}
@@ -635,6 +866,34 @@ export function PhysicalAccessIntegrationSection({
             ) : null}
           </div>
         )}
+      </section>
+
+      <section className="rounded-2xl border border-[var(--brand-line)] bg-white p-5 shadow-sm">
+        <SummaryHeading
+          detail="La membresía, el estado del socio y los beneficios disparan la sincronización automáticamente"
+          title="6. Salud y reconciliación"
+          status={connection.syncStatus}
+        />
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <LogMetric label="Jobs pendientes" value={String(connection.pendingJobs)} />
+          <LogMetric label="Jobs fallidos" tone={connection.failedJobs > 0 ? "danger" : "neutral"} value={String(connection.failedJobs)} />
+          <LogMetric label="Última entrega" value={connection.lastSynchronizedAt ? formatDateTime(connection.lastSynchronizedAt) : "Nunca"} />
+          <LogMetric label="Heartbeat" value={connection.lastHeartbeatAt ? formatDateTime(connection.lastHeartbeatAt) : "Nunca"} />
+        </div>
+        {connection.lastError ? (
+          <p className="mt-4 rounded-lg bg-[#fff0f0] px-3 py-3 text-sm text-[#922f2f]">{connection.lastError}</p>
+        ) : null}
+        <button
+          className="mt-4 h-10 rounded-lg border border-[var(--brand-primary-border)] bg-white px-4 text-sm font-bold text-[var(--brand-primary)] disabled:opacity-60"
+          disabled={busy || !connection.id}
+          onClick={onReconcileAll}
+          type="button"
+        >
+          Forzar reconciliación completa
+        </button>
+        <p className="mt-2 text-xs text-[var(--brand-muted)]">
+          Esta acción es de recuperación operativa. El flujo normal no depende de un botón manual.
+        </p>
       </section>
     </section>
   );
@@ -766,7 +1025,7 @@ function BenefitMappings({
   return (
     <>
       <p className="text-sm text-[var(--brand-muted)]">
-        Usa la referencia del Access Level que ya existe en HikCentral. Un
+        Usa la referencia del nivel de acceso que ya existe en el proveedor. Un
         beneficio sin referencia impedirá preparar sincronizaciones para socios
         que lo requieran.
       </p>
@@ -878,19 +1137,28 @@ function PhysicalClientSyncState({
           {syncState.lastError}
         </p>
       ) : null}
+      {syncState ? (
+        <p className="mt-3 text-xs text-[var(--brand-muted)]">
+          Versión deseada {syncState.desiredVersion} · último intento {syncState.lastAttemptAt ? formatDateTime(syncState.lastAttemptAt) : "sin intentar"}
+          {syncState.blockedReasonCode ? ` · ${humanize(syncState.blockedReasonCode)}` : ""}
+        </p>
+      ) : null}
       <button
         className="mt-4 h-11 rounded-lg bg-[var(--brand-accent)] px-5 text-sm font-black text-[#04231f] transition hover:brightness-105 disabled:opacity-60"
         disabled={busy || !connectionEnabled || !state.externalPersonRef}
         onClick={onQueueSynchronization}
         type="button"
       >
-        Preparar sincronización local
+        Forzar reconciliación de este socio
       </button>
       {!connectionEnabled ? (
         <p className="mt-2 text-xs text-[var(--brand-muted)]">
           Activa y guarda la conexión para preparar cambios de acceso.
         </p>
       ) : null}
+      <p className="mt-2 text-xs text-[var(--brand-muted)]">
+        Las altas, renovaciones, cambios de plan, expiraciones y suspensiones ya recalculan este estado automáticamente.
+      </p>
     </div>
   );
 }
@@ -908,15 +1176,9 @@ function AccessPointRequirements({
   requiredBenefitIds: string[];
   onSave: (benefitIds: string[]) => void;
 }) {
-  const [draft, setDraft] = useState<string[]>(requiredBenefitIds);
-  const hasChanges = !sameSet(draft, requiredBenefitIds);
-  function toggle(benefitId: string) {
-    setDraft((current) =>
-      current.includes(benefitId)
-        ? current.filter((id) => id !== benefitId)
-        : [...current, benefitId],
-    );
-  }
+  const [draft, setDraft] = useState(requiredBenefitIds[0] ?? "");
+  const hasChanges = draft !== (requiredBenefitIds[0] ?? "");
+  const productive = device.provider !== "SIMULATED";
   if (availableBenefits.length === 0)
     return (
       <EmptyState text="Crea primero beneficios activos de tipo ACCESS. Por ejemplo: GYM_ACCESS, SAUNA_ACCESS o CLASES_ACCESS." />
@@ -925,12 +1187,12 @@ function AccessPointRequirements({
     <div>
       <p className="font-bold text-[var(--brand-ink)]">{device.name}</p>
       <p className="mt-1 text-sm text-[var(--brand-muted)]">
-        Selecciona todos los derechos que un socio debe tener para utilizar este
-        punto. No dejes un torniquete real sin requisitos.
+        Selecciona el único beneficio ACCESS principal que habilita este punto.
+        En V1 no se combinan múltiples derechos ni se permite dejar vacío un punto productivo.
       </p>
       <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {availableBenefits.map((benefit) => {
-          const checked = draft.includes(benefit.id);
+          const checked = draft === benefit.id;
           return (
             <label
               className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${checked ? "border-[var(--brand-accent)] bg-[var(--brand-accent-soft)]" : "border-[var(--brand-line)] bg-white hover:border-[var(--brand-primary-border)]"}`}
@@ -939,8 +1201,9 @@ function AccessPointRequirements({
               <input
                 checked={checked}
                 className="mt-1"
-                onChange={() => toggle(benefit.id)}
-                type="checkbox"
+                name={`benefit-${device.id}`}
+                onChange={() => setDraft(benefit.id)}
+                type="radio"
               />
               <span>
                 <BenefitBadge benefit={benefit} />
@@ -952,16 +1215,15 @@ function AccessPointRequirements({
           );
         })}
       </div>
-      {draft.length === 0 ? (
+      {!draft && productive ? (
         <p className="mt-4 text-sm text-[#925b21]">
-          Este punto no exigirá ningún derecho y sólo debe mantenerse así si es
-          intencional para pruebas.
+          Selecciona un beneficio antes de guardar este punto productivo.
         </p>
       ) : null}
       <button
         className="mt-4 h-11 rounded-lg bg-[var(--brand-primary)] px-5 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-60"
-        disabled={busy || !hasChanges}
-        onClick={() => onSave(draft)}
+        disabled={busy || !hasChanges || (productive && !draft)}
+        onClick={() => onSave(draft ? [draft] : [])}
         type="button"
       >
         Guardar requisitos de {device.name}
@@ -971,11 +1233,15 @@ function AccessPointRequirements({
 }
 
 function AccessPointRegistration({
+  availableBenefits,
   busy,
   onCreate,
+  providers,
 }: {
+  availableBenefits: PhysicalAccessBenefit[];
   busy: boolean;
   onCreate: (payload: AccessDevicePayload) => Promise<void>;
+  providers: PhysicalIntegration["providers"];
 }) {
   const [name, setName] = useState("");
   const [deviceCode, setDeviceCode] = useState("");
@@ -983,10 +1249,12 @@ function AccessPointRegistration({
     useState<AccessDevicePayload["deviceType"]>("TURNSTILE");
   const [provider, setProvider] =
     useState<NonNullable<AccessDevicePayload["provider"]>>("HIKCENTRAL");
+  const [requiredBenefitId, setRequiredBenefitId] = useState("");
+  const productive = provider !== "SIMULATED";
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!name.trim() || !deviceCode.trim()) {
+    if (!name.trim() || !deviceCode.trim() || (productive && !requiredBenefitId)) {
       return;
     }
     await onCreate({
@@ -994,6 +1262,7 @@ function AccessPointRegistration({
       deviceCode: deviceCode.trim().toUpperCase(),
       deviceType,
       provider,
+      requiredBenefitId: requiredBenefitId || null,
     });
     setName("");
     setDeviceCode("");
@@ -1059,19 +1328,40 @@ function AccessPointRegistration({
             }
             value={provider}
           >
-            <option value="HIKCENTRAL">HikCentral (conector local)</option>
-            <option value="SIMULATED">Simulado (sin apertura física)</option>
+            {providers.map((candidate) => (
+              <option
+                disabled={candidate.availability !== "AVAILABLE"}
+                key={candidate.providerKey}
+                value={candidate.providerKey}
+              >
+                {candidate.displayName} · {candidate.availability === "AVAILABLE" ? "disponible" : "planificado"}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-2 text-sm font-semibold text-[var(--brand-muted)]">
+          Beneficio ACCESS principal
+          <select
+            className="h-10 rounded-lg border border-[var(--brand-line)] bg-white px-3 text-sm"
+            disabled={!productive}
+            onChange={(event) => setRequiredBenefitId(event.target.value)}
+            value={productive ? requiredBenefitId : ""}
+          >
+            <option value="">{productive ? "Selecciona un beneficio" : "No aplica en simulación"}</option>
+            {availableBenefits.map((benefit) => (
+              <option key={benefit.id} value={benefit.id}>{benefit.code} · {benefit.name}</option>
+            ))}
           </select>
         </label>
         <div className="md:col-span-2">
           <p className="text-xs leading-5 text-[var(--brand-muted)]">
             El punto se crea activo para poder configurar sus derechos ahora. La
-            apertura física seguirá pendiente hasta que el conector local se
-            conecte a HikCentral.
+            apertura física seguirá pendiente hasta que el Connector local se
+            autentique y valide el proveedor en sitio.
           </p>
           <button
             className="mt-3 h-10 rounded-lg bg-[var(--brand-primary)] px-4 text-sm font-bold text-white disabled:opacity-60"
-            disabled={busy || !name.trim() || !deviceCode.trim()}
+            disabled={busy || !name.trim() || !deviceCode.trim() || (productive && !requiredBenefitId)}
             type="submit"
           >
             Registrar punto
@@ -1123,11 +1413,13 @@ function AccessDecisionResult({ decision }: { decision: AccessDecision }) {
 
 function ManualAccessSection({
   busy,
+  deviceCode,
   manualReason,
   onManualReasonChange,
   onOpenManually,
 }: {
   busy: boolean;
+  deviceCode: string;
   manualReason: string;
   onManualReasonChange: (value: string) => void;
   onOpenManually: () => void;
@@ -1142,7 +1434,7 @@ function ManualAccessSection({
       </h4>
       <p className="mt-1 text-sm text-[var(--brand-muted)]">
         Sólo para incidencias, emergencia o autorización explícita. Queda
-        auditada.
+        auditada y siempre apunta al dispositivo seleccionado: {deviceCode || "ninguno"}.
       </p>
       <label className="mt-3 grid gap-2 text-sm font-semibold text-[var(--brand-muted)]">
         Motivo
@@ -1154,7 +1446,7 @@ function ManualAccessSection({
       </label>
       <button
         className="mt-3 h-10 rounded-lg border border-[#b16a1e] bg-white px-4 text-sm font-bold text-[#805111] disabled:opacity-60"
-        disabled={busy || !manualReason.trim()}
+        disabled={busy || !deviceCode || !manualReason.trim()}
         onClick={onOpenManually}
         type="button"
       >
@@ -1239,6 +1531,10 @@ function ConnectionStatus({
   const copy =
     connection.syncStatus === "HEALTHY"
       ? { tone: "success" as const, text: "Conector activo" }
+      : connection.syncStatus === "DEGRADED"
+        ? { tone: "danger" as const, text: "Conector degradado" }
+        : connection.syncStatus === "OFFLINE"
+          ? { tone: "danger" as const, text: "Conector sin heartbeat" }
       : connection.enabled
         ? { tone: "warning" as const, text: "Esperando conector" }
         : { tone: "neutral" as const, text: "Sincronización desactivada" };
@@ -1354,10 +1650,12 @@ function LogMetric({
 }
 function SyncBadge({ status }: { status: string }) {
   const tone =
-    status === "SYNCED"
+    status === "SYNCED" || status === "MATCHED"
       ? "success"
-      : status === "BLOCKED" || status === "FAILED"
+      : status === "BLOCKED" || status === "FAILED" || status === "CONFLICT"
         ? "danger"
+        : status === "REJECTED"
+          ? "neutral"
         : "warning";
   return <StatusBadge tone={tone}>{humanize(status)}</StatusBadge>;
 }
@@ -1420,11 +1718,6 @@ function NumberInput({
         value={value}
       />
     </label>
-  );
-}
-function sameSet(left: string[], right: string[]) {
-  return (
-    left.length === right.length && left.every((value) => right.includes(value))
   );
 }
 function humanize(value: string) {

@@ -10,8 +10,11 @@ import type {
   EffectiveAccessBenefit,
   ManualOpenPayload,
   PhysicalClientState,
+  PhysicalConnectorActivationCode,
+  PhysicalDeviceLink,
   PhysicalIntegration,
   PhysicalIntegrationPayload,
+  PhysicalPersonCandidate,
   TemporaryPass,
   TemporaryPassPayload,
   VisitPass,
@@ -163,6 +166,104 @@ export async function queuePhysicalClientSynchronization(
     {
       method: "POST",
     },
+  );
+}
+
+export async function reconcilePhysicalIntegration(
+  accessToken: string,
+): Promise<{ queuedClients: number }> {
+  return apiFetch<{ queuedClients: number }>(
+    "/access/physical-integration/reconcile",
+    accessToken,
+    { method: "POST" },
+  );
+}
+
+export async function linkPhysicalDevice(
+  accessToken: string,
+  deviceId: string,
+  externalDeviceRef: string,
+  externalDeviceName?: string | null,
+): Promise<PhysicalDeviceLink> {
+  return apiFetch<PhysicalDeviceLink>(
+    `/access/physical-integration/devices/${deviceId}/link`,
+    accessToken,
+    {
+      method: "PUT",
+      body: JSON.stringify(
+        normalizePayload({ externalDeviceRef, externalDeviceName }),
+      ),
+    },
+  );
+}
+
+export async function unlinkPhysicalDevice(
+  accessToken: string,
+  deviceId: string,
+): Promise<void> {
+  return apiFetch<void>(
+    `/access/physical-integration/devices/${deviceId}/link`,
+    accessToken,
+    { method: "DELETE" },
+  );
+}
+
+export async function issuePhysicalConnectorActivation(
+  accessToken: string,
+  purpose: "ACTIVATION" | "ROTATION",
+): Promise<PhysicalConnectorActivationCode> {
+  return apiFetch<PhysicalConnectorActivationCode>(
+    "/access/physical-integration/connector/activation",
+    accessToken,
+    {
+      method: "POST",
+      body: JSON.stringify({ purpose }),
+    },
+  );
+}
+
+export async function revokePhysicalConnector(
+  accessToken: string,
+): Promise<void> {
+  return apiFetch<void>(
+    "/access/physical-integration/connector/revoke",
+    accessToken,
+    { method: "POST" },
+  );
+}
+
+export async function getPhysicalPersonCandidates(
+  accessToken: string,
+): Promise<PhysicalPersonCandidate[]> {
+  return apiFetch<PhysicalPersonCandidate[]>(
+    "/access/physical-integration/candidates?limit=100",
+    accessToken,
+  );
+}
+
+export async function matchPhysicalPersonCandidate(
+  accessToken: string,
+  candidateId: string,
+  clientId: string,
+): Promise<PhysicalPersonCandidate> {
+  return apiFetch<PhysicalPersonCandidate>(
+    `/access/physical-integration/candidates/${candidateId}/match`,
+    accessToken,
+    {
+      method: "PUT",
+      body: JSON.stringify({ clientId }),
+    },
+  );
+}
+
+export async function rejectPhysicalPersonCandidate(
+  accessToken: string,
+  candidateId: string,
+): Promise<PhysicalPersonCandidate> {
+  return apiFetch<PhysicalPersonCandidate>(
+    `/access/physical-integration/candidates/${candidateId}/reject`,
+    accessToken,
+    { method: "POST" },
   );
 }
 

@@ -7,13 +7,21 @@ import {
   getDeviceRequiredBenefits,
   getPhysicalClientState,
   getPhysicalIntegration,
+  getPhysicalPersonCandidates,
   getStoredSession,
+  issuePhysicalConnectorActivation,
   linkPhysicalClient,
+  linkPhysicalDevice,
   manualOpenAccess,
+  matchPhysicalPersonCandidate,
   queuePhysicalClientSynchronization,
+  reconcilePhysicalIntegration,
+  rejectPhysicalPersonCandidate,
   replaceDeviceRequiredBenefits,
   requestAccess,
+  revokePhysicalConnector,
   searchClients,
+  unlinkPhysicalDevice,
   updatePhysicalIntegration,
   type AccessDecision,
   type AccessDevice,
@@ -21,7 +29,9 @@ import {
   type AccessLog,
   type ClientSummary,
   type PhysicalClientState,
+  type PhysicalConnectorActivationCode,
   type PhysicalIntegration,
+  type PhysicalPersonCandidate,
   type StoredSession,
 } from "@/lib/api";
 
@@ -47,11 +57,19 @@ export function useAccessController() {
     useState<PhysicalClientState | null>(null);
   const [physicalConnectionName, setPhysicalConnectionName] = useState("");
   const [physicalConnectorKey, setPhysicalConnectorKey] = useState("");
+  const [physicalProviderKey, setPhysicalProviderKey] = useState("HIKCENTRAL");
   const [physicalSyncEnabled, setPhysicalSyncEnabled] = useState(false);
   const [physicalMappingDrafts, setPhysicalMappingDrafts] = useState<
     Record<string, { reference: string; name: string }>
   >({});
   const [externalPersonRef, setExternalPersonRef] = useState("");
+  const [externalDeviceRef, setExternalDeviceRef] = useState("");
+  const [externalDeviceName, setExternalDeviceName] = useState("");
+  const [connectorActivation, setConnectorActivation] =
+    useState<PhysicalConnectorActivationCode | null>(null);
+  const [physicalCandidates, setPhysicalCandidates] = useState<
+    PhysicalPersonCandidate[]
+  >([]);
   const [lastDecision, setLastDecision] = useState<AccessDecision | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -89,11 +107,24 @@ export function useAccessController() {
         setDevices(loadedDevices);
         setLogs(loadedLogs);
         setClients(loadedClients);
-        setDeviceCode(
-          loadedDevices.find((device) => device.status === "ACTIVE")
-            ?.deviceCode ?? "",
+        const initialDevice = loadedDevices.find(
+          (device) => device.status === "ACTIVE",
         );
+        setDeviceCode(initialDevice?.deviceCode ?? "");
+        const initialDeviceLink = loadedPhysicalIntegration.deviceLinks.find(
+          (candidate) => candidate.accessDeviceId === initialDevice?.id,
+        );
+        setExternalDeviceRef(initialDeviceLink?.externalDeviceRef ?? "");
+        setExternalDeviceName(initialDeviceLink?.externalDeviceName ?? "");
         hydratePhysicalIntegration(loadedPhysicalIntegration);
+        if (
+          hasPermission(stored, "access.physical.manage") &&
+          loadedPhysicalIntegration.connection.id
+        ) {
+          setPhysicalCandidates(
+            await getPhysicalPersonCandidates(stored.accessToken),
+          );
+        }
       } catch (exception) {
         if (active) {
           setError(
@@ -209,6 +240,16 @@ export function useAccessController() {
     setExternalPersonRef("");
   }
 
+  function selectDeviceCode(value: string) {
+    setDeviceCode(value);
+    const selected = devices.find((device) => device.deviceCode === value);
+    const link = physicalIntegration?.deviceLinks.find(
+      (candidate) => candidate.accessDeviceId === selected?.id,
+    );
+    setExternalDeviceRef(link?.externalDeviceRef ?? "");
+    setExternalDeviceName(link?.externalDeviceName ?? "");
+  }
+
   async function evaluateAccess() {
     if (!session) {
       return;
@@ -305,6 +346,7 @@ export function useAccessController() {
     setPhysicalIntegration(integration);
     setPhysicalConnectionName(integration.connection.displayName);
     setPhysicalConnectorKey(integration.connection.connectorKey ?? "");
+    setPhysicalProviderKey(integration.connection.providerKey);
     setPhysicalSyncEnabled(integration.connection.enabled);
     setPhysicalMappingDrafts(
       Object.fromEntries(
@@ -347,7 +389,7 @@ export function useAccessController() {
     try {
       const integration = await updatePhysicalIntegration(session.accessToken, {
         enabled: physicalSyncEnabled,
-        providerKey: "HIKCENTRAL",
+        providerKey: physicalProviderKey,
         displayName: physicalConnectionName,
         connectorKey: physicalConnectorKey || null,
         benefitMappings: physicalIntegration.availableBenefits.flatMap(
@@ -426,7 +468,11 @@ export function useAccessController() {
         ),
       );
       setDeviceCode(device.deviceCode);
-      setDeviceRequiredBenefitIds([]);
+      setExternalDeviceRef("");
+      setExternalDeviceName("");
+      setDeviceRequiredBenefitIds(
+        payload.requiredBenefitId ? [payload.requiredBenefitId] : [],
+      );
       setMessage(
         `${device.name} quedó registrado como punto de acceso activo.`,
       );
@@ -497,6 +543,190 @@ export function useAccessController() {
     }
   }
 
+  async function refreshPhysicalCandidates() {
+    if (!session || !hasPermission(session, "access.physical.manage")) return;
+    setPhysicalCandidates(
+      await getPhysicalPersonCandidates(session.accessToken),
+    );
+  }
+
+  async function issueConnectorActivation() {
+    if (!session || !physicalIntegration?.connection.id) return;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const purpose = physicalIntegration.connection.credentialActive
+        ? "ROTATION"
+        : "ACTIVATION";
+      const activation = await issuePhysicalConnectorActivation(
+        session.accessToken,
+        purpose,
+      );
+      setConnectorActivation(activation);
+      setMessage(
+        "Código de activación generado. Cópialo ahora al GymFort Local Connector.",
+      );
+    } catch (exception) {
+      setError(
+        exception instanceof Error
+          ? exception.message
+          : "No fue posible generar la activación del Connector.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revokeConnector() {
+    if (!session || !physicalIntegration?.connection.id) return;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await revokePhysicalConnector(session.accessToken);
+      setConnectorActivation(null);
+      hydratePhysicalIntegration(
+        await getPhysicalIntegration(session.accessToken),
+      );
+      setMessage("Credencial del GymFort Local Connector revocada.");
+    } catch (exception) {
+      setError(
+        exception instanceof Error
+          ? exception.message
+          : "No fue posible revocar el Connector.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function reconcileAllPhysicalClients() {
+    if (!session) return;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await reconcilePhysicalIntegration(session.accessToken);
+      const integration = await getPhysicalIntegration(session.accessToken);
+      hydratePhysicalIntegration(integration);
+      if (selectedClientId) {
+        setPhysicalClientState(
+          await getPhysicalClientState(session.accessToken, selectedClientId),
+        );
+      }
+      setMessage(
+        `Reconciliación solicitada para ${result.queuedClients} socio(s).`,
+      );
+    } catch (exception) {
+      setError(
+        exception instanceof Error
+          ? exception.message
+          : "No fue posible reconciliar el estado físico.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function savePhysicalDeviceLink() {
+    if (!session || !selectedDevice || !externalDeviceRef.trim()) return;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await linkPhysicalDevice(
+        session.accessToken,
+        selectedDevice.id,
+        externalDeviceRef.trim(),
+        externalDeviceName.trim() || null,
+      );
+      hydratePhysicalIntegration(
+        await getPhysicalIntegration(session.accessToken),
+      );
+      setMessage(`${selectedDevice.name} quedó vinculado al recurso externo.`);
+    } catch (exception) {
+      setError(
+        exception instanceof Error
+          ? exception.message
+          : "No fue posible vincular el recurso físico.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function removePhysicalDeviceLink() {
+    if (!session || !selectedDevice) return;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await unlinkPhysicalDevice(session.accessToken, selectedDevice.id);
+      setExternalDeviceRef("");
+      setExternalDeviceName("");
+      hydratePhysicalIntegration(
+        await getPhysicalIntegration(session.accessToken),
+      );
+      setMessage(`${selectedDevice.name} quedó sin recurso externo.`);
+    } catch (exception) {
+      setError(
+        exception instanceof Error
+          ? exception.message
+          : "No fue posible quitar el vínculo físico.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function matchCandidate(candidateId: string) {
+    if (!session || !selectedClientId) return;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await matchPhysicalPersonCandidate(
+        session.accessToken,
+        candidateId,
+        selectedClientId,
+      );
+      await refreshPhysicalCandidates();
+      setPhysicalClientState(
+        await getPhysicalClientState(session.accessToken, selectedClientId),
+      );
+      setMessage("Persona externa vinculada al socio seleccionado.");
+    } catch (exception) {
+      setError(
+        exception instanceof Error
+          ? exception.message
+          : "No fue posible aceptar la coincidencia.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function rejectCandidate(candidateId: string) {
+    if (!session) return;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      await rejectPhysicalPersonCandidate(session.accessToken, candidateId);
+      await refreshPhysicalCandidates();
+      setMessage("Candidato externo descartado.");
+    } catch (exception) {
+      setError(
+        exception instanceof Error
+          ? exception.message
+          : "No fue posible descartar el candidato.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return {
     busy,
     clients,
@@ -505,6 +735,8 @@ export function useAccessController() {
     deviceRequiredBenefitIds,
     devices,
     error,
+    externalDeviceName,
+    externalDeviceRef,
     identifier,
     lastDecision,
     loading,
@@ -512,8 +744,10 @@ export function useAccessController() {
     manualReason,
     message,
     physicalClientState,
+    physicalCandidates,
     physicalConnectionName,
     physicalConnectorKey,
+    physicalProviderKey,
     physicalIntegration,
     physicalMappingDrafts,
     physicalSyncEnabled,
@@ -522,6 +756,9 @@ export function useAccessController() {
     selectedClientId,
     selectedDevice,
     session,
+    canManagePhysical: hasPermission(session, "access.physical.manage"),
+    canManualOpen: hasPermission(session, "access.manual.open"),
+    connectorActivation,
     externalPersonRef,
     temporaryHours,
     temporaryMaxUses,
@@ -529,19 +766,29 @@ export function useAccessController() {
     createPass,
     evaluateAccess,
     linkSelectedPhysicalClient,
+    issueConnectorActivation,
+    matchCandidate,
     openManually,
     queueSelectedPhysicalSynchronization,
+    reconcileAllPhysicalClients,
+    rejectCandidate,
+    removePhysicalDeviceLink,
+    revokeConnector,
     refreshLogs,
     savePhysicalIntegration,
+    savePhysicalDeviceLink,
     saveDeviceRequiredBenefits,
     search,
     selectClient,
-    setDeviceCode,
+    setDeviceCode: selectDeviceCode,
     setIdentifier,
     setManualReason,
     setExternalPersonRef,
+    setExternalDeviceName,
+    setExternalDeviceRef,
     setPhysicalConnectionName,
     setPhysicalConnectorKey,
+    setPhysicalProviderKey,
     setPhysicalMapping,
     setPhysicalSyncEnabled,
     setQuery,
@@ -549,4 +796,13 @@ export function useAccessController() {
     setTemporaryMaxUses,
     setTemporaryReason,
   };
+}
+
+function hasPermission(session: StoredSession | null, permission: string) {
+  return Boolean(
+    session &&
+      (session.user.platformAdmin ||
+        session.user.permissions.includes("platform.admin") ||
+        session.user.permissions.includes(permission)),
+  );
 }

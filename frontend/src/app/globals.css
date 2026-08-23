@@ -5522,6 +5522,12 @@ button.admin-secondary-link:disabled {
   grid-template-columns: 17.5rem minmax(0, 1fr);
 }
 
+@media (max-width: 980px) {
+  .admin-console {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .admin-sidebar {
   background: linear-gradient(180deg, var(--shell-dark), color-mix(in srgb, var(--shell-dark) 88%, black));
   border-right: 1px solid color-mix(in srgb, var(--brand-accent) 22%, transparent);

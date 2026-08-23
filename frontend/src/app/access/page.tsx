@@ -45,7 +45,7 @@ export default function AccessPage() {
 
         <nav
           aria-label="Secciones de control de acceso"
-          className="grid gap-2 rounded-2xl border border-[var(--brand-line)] bg-white p-2 shadow-sm sm:grid-cols-3"
+          className={`grid gap-2 rounded-2xl border border-[var(--brand-line)] bg-white p-2 shadow-sm ${access.canManagePhysical ? "sm:grid-cols-3" : "sm:grid-cols-2"}`}
         >
           <TabButton
             active={activeTab === "OPERATE"}
@@ -53,12 +53,14 @@ export default function AccessPage() {
             label="Operar acceso"
             onClick={() => setActiveTab("OPERATE")}
           />
-          <TabButton
-            active={activeTab === "PHYSICAL"}
-            description="Puntos, derechos y HikCentral"
-            label="Configuración física"
-            onClick={() => setActiveTab("PHYSICAL")}
-          />
+          {access.canManagePhysical ? (
+            <TabButton
+              active={activeTab === "PHYSICAL"}
+              description="Proveedor, Connector y derechos"
+              label="Configuración física"
+              onClick={() => setActiveTab("PHYSICAL")}
+            />
+          ) : null}
           <TabButton
             active={activeTab === "LOGS"}
             description="Resultados y evidencia reciente"
@@ -73,6 +75,7 @@ export default function AccessPage() {
               access.physicalIntegration?.availableBenefits ?? []
             }
             busy={access.busy}
+            canManualOpen={access.canManualOpen}
             clients={access.clients}
             deviceCode={access.deviceCode}
             deviceRequiredBenefitIds={access.deviceRequiredBenefitIds}
@@ -107,29 +110,44 @@ export default function AccessPage() {
               access.physicalIntegration?.availableBenefits ?? []
             }
             busy={access.busy}
+            candidates={access.physicalCandidates}
             connectionName={access.physicalConnectionName}
+            connectorActivation={access.connectorActivation}
             connectorKey={access.physicalConnectorKey}
             device={access.selectedDevice}
             deviceCode={access.deviceCode}
             deviceRequiredBenefitIds={access.deviceRequiredBenefitIds}
             devices={access.devices}
             externalPersonRef={access.externalPersonRef}
+            externalDeviceName={access.externalDeviceName}
+            externalDeviceRef={access.externalDeviceRef}
             integration={access.physicalIntegration}
             mappingDrafts={access.physicalMappingDrafts}
+            onActivationIssue={access.issueConnectorActivation}
+            onCandidateMatch={access.matchCandidate}
+            onCandidateReject={access.rejectCandidate}
             onConnectionNameChange={access.setPhysicalConnectionName}
             onConnectorKeyChange={access.setPhysicalConnectorKey}
             onCreateDevice={access.createDevice}
             onDeviceCodeChange={access.setDeviceCode}
             onExternalPersonRefChange={access.setExternalPersonRef}
+            onExternalDeviceNameChange={access.setExternalDeviceName}
+            onExternalDeviceRefChange={access.setExternalDeviceRef}
             onLinkClient={access.linkSelectedPhysicalClient}
             onMappingChange={access.setPhysicalMapping}
             onQueueSynchronization={access.queueSelectedPhysicalSynchronization}
+            onReconcileAll={access.reconcileAllPhysicalClients}
+            onRemoveDeviceLink={access.removePhysicalDeviceLink}
+            onRevokeConnector={access.revokeConnector}
             onSaveDeviceRequiredBenefits={access.saveDeviceRequiredBenefits}
             onSaveIntegration={access.savePhysicalIntegration}
+            onSaveDeviceLink={access.savePhysicalDeviceLink}
             onSyncEnabledChange={access.setPhysicalSyncEnabled}
             physicalClientState={access.physicalClientState}
+            providerKey={access.physicalProviderKey}
             selectedClient={access.selectedClient}
             syncEnabled={access.physicalSyncEnabled}
+            onProviderKeyChange={access.setPhysicalProviderKey}
           />
         ) : null}
 
