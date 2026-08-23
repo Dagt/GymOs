@@ -48,6 +48,11 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(AuthenticationException.class)
 	ResponseEntity<ApiError> handleAuthentication(AuthenticationException exception, HttpServletRequest request) {
+		if (exception instanceof ApiAuthenticationException apiException) {
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+					.body(ApiError.of(
+							apiException.code(), apiException.publicMessage(), Map.of(), correlationId(request)));
+		}
 		return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
 				.body(ApiError.of("BAD_CREDENTIALS", "Usuario o contrasena incorrectos.", Map.of(), correlationId(request)));
 	}

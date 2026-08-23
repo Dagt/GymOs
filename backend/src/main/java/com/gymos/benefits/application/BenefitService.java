@@ -1,6 +1,7 @@
 package com.gymos.benefits.application;
 
 import com.gymos.audit.api.AuditService;
+import com.gymos.benefits.api.events.AccessBenefitConfigurationChangedV1;
 import com.gymos.benefits.application.command.AssignClientBenefitCommand;
 import com.gymos.benefits.application.command.CreateBenefitCommand;
 import com.gymos.benefits.infrastructure.BenefitRepository;
@@ -10,6 +11,8 @@ import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import java.util.List;
 import java.util.UUID;
+import java.time.OffsetDateTime;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -17,10 +20,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class BenefitService {
 	private final BenefitRepository benefitRepository;
 	private final AuditService auditService;
+	private final ApplicationEventPublisher eventPublisher;
 
-	public BenefitService(BenefitRepository benefitRepository, AuditService auditService) {
+	public BenefitService(
+			BenefitRepository benefitRepository,
+			AuditService auditService,
+			ApplicationEventPublisher eventPublisher
+	) {
 		this.benefitRepository = benefitRepository;
 		this.auditService = auditService;
+		this.eventPublisher = eventPublisher;
 	}
 
 	@Transactional(readOnly = true)
@@ -52,6 +61,11 @@ public class BenefitService {
 		UUID benefitId = benefitRepository.createBenefit(principal, benefitBranchId, command);
 		benefitRepository.replaceMembershipPlans(principal, benefitId, command.planIds());
 		auditService.record(principal, "BENEFIT_CREATED", "BENEFIT", benefitId, "BACKOFFICE", null, correlationId);
+		if ("ACCESS".equalsIgnoreCase(command.benefitType())) {
+			eventPublisher.publishEvent(new AccessBenefitConfigurationChangedV1(
+					"access-benefit-created:" + benefitId,
+					principal.organizationId(), benefitBranchId, benefitId, command.planIds(), OffsetDateTime.now()));
+		}
 		return benefitRepository.benefit(principal.organizationId(), benefitId)
 				.orElseThrow(() -> new BusinessException("BENEFIT_NOT_FOUND", "El beneficio no esta disponible."));
 	}

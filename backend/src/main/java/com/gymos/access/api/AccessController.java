@@ -3,6 +3,10 @@ package com.gymos.access.api;
 import com.gymos.access.application.AccessService;
 import com.gymos.access.application.AccessService.PhysicalClientStateView;
 import com.gymos.access.application.AccessService.PhysicalIntegrationView;
+import com.gymos.access.application.AccessService.PhysicalDeviceLinkView;
+import com.gymos.access.application.PhysicalConnectorService;
+import com.gymos.access.application.PhysicalConnectorService.ActivationCodeView;
+import com.gymos.access.infrastructure.PhysicalAccessRepository.PersonCandidateRecord;
 import com.gymos.access.application.command.AccessRequestCommand;
 import com.gymos.access.application.command.ConfigurePhysicalIntegrationCommand;
 import com.gymos.access.application.command.ConsumeVisitPassCommand;
@@ -31,6 +35,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -43,9 +48,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/access")
 public class AccessController {
 	private final AccessService accessService;
+	private final PhysicalConnectorService connectorService;
 
-	public AccessController(AccessService accessService) {
+	public AccessController(AccessService accessService, PhysicalConnectorService connectorService) {
 		this.accessService = accessService;
+		this.connectorService = connectorService;
 	}
 
 	@GetMapping("/devices")
@@ -60,7 +67,8 @@ public class AccessController {
 			HttpServletRequest servletRequest
 	) {
 		return accessService.createDevice(
-				principal, request.name(), request.deviceCode(), request.deviceType(), request.provider(), correlationId(servletRequest));
+				principal, request.name(), request.deviceCode(), request.deviceType(), request.provider(),
+				request.requiredBenefitId(), correlationId(servletRequest));
 	}
 
 	@GetMapping("/devices/{deviceId}/benefits")
@@ -138,6 +146,82 @@ public class AccessController {
 		return accessService.queuePhysicalSynchronization(principal, clientId, correlationId(servletRequest));
 	}
 
+	@PostMapping("/physical-integration/reconcile")
+	ReconcileResult reconcileAll(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			HttpServletRequest servletRequest
+	) {
+		return new ReconcileResult(accessService.reconcileAllPhysicalClients(
+				principal, correlationId(servletRequest)));
+	}
+
+	@PutMapping("/physical-integration/devices/{deviceId}/link")
+	PhysicalDeviceLinkView linkPhysicalDevice(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID deviceId,
+			@Valid @RequestBody PhysicalDeviceLinkRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return accessService.linkPhysicalDevice(
+				principal, deviceId, request.externalDeviceRef(), request.externalDeviceName(),
+				correlationId(servletRequest));
+	}
+
+	@DeleteMapping("/physical-integration/devices/{deviceId}/link")
+	void unlinkPhysicalDevice(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID deviceId,
+			HttpServletRequest servletRequest
+	) {
+		accessService.unlinkPhysicalDevice(principal, deviceId, correlationId(servletRequest));
+	}
+
+	@PostMapping("/physical-integration/connector/activation")
+	ActivationCodeView issueConnectorActivation(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@Valid @RequestBody(required = false) ConnectorActivationIssueRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return connectorService.issueActivation(
+				principal, request == null ? "ACTIVATION" : request.purpose(), correlationId(servletRequest));
+	}
+
+	@PostMapping("/physical-integration/connector/revoke")
+	void revokeConnector(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			HttpServletRequest servletRequest
+	) {
+		connectorService.revoke(principal, correlationId(servletRequest));
+	}
+
+	@GetMapping("/physical-integration/candidates")
+	List<PersonCandidateRecord> candidates(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@RequestParam(defaultValue = "100") int limit
+	) {
+		return connectorService.candidates(principal, limit);
+	}
+
+	@PutMapping("/physical-integration/candidates/{candidateId}/match")
+	PersonCandidateRecord matchCandidate(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID candidateId,
+			@Valid @RequestBody CandidateMatchRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return connectorService.acceptCandidate(
+				principal, candidateId, request.clientId(), correlationId(servletRequest));
+	}
+
+	@PostMapping("/physical-integration/candidates/{candidateId}/reject")
+	PersonCandidateRecord rejectCandidate(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID candidateId,
+			HttpServletRequest servletRequest
+	) {
+		return connectorService.rejectCandidate(principal, candidateId, correlationId(servletRequest));
+	}
+
 	@PutMapping("/devices/{deviceId}/benefits")
 	List<UUID> replaceDeviceBenefits(
 			@AuthenticationPrincipal GymOsPrincipal principal,
@@ -212,7 +296,7 @@ public class AccessController {
 
 	public record ManualOpenRequest(
 			UUID clientId,
-			@Size(max = 80) String deviceCode,
+			@NotBlank @Size(max = 80) String deviceCode,
 			@NotBlank @Size(max = 500) String reason
 	) {
 		private ManualOpenCommand toCommand() {
@@ -260,13 +344,14 @@ public class AccessController {
 			@NotBlank @Size(max = 120) String name,
 			@NotBlank @Size(max = 80) String deviceCode,
 			@NotBlank @Pattern(regexp = "TURNSTILE|DOOR|GATE|ZONE|BIOMETRIC") String deviceType,
-			@Pattern(regexp = "HIKCENTRAL|SIMULATED") String provider
+			@Size(max = 60) String provider,
+			UUID requiredBenefitId
 	) {
 	}
 
 	public record PhysicalIntegrationRequest(
 			boolean enabled,
-			@Pattern(regexp = "HIKCENTRAL") String providerKey,
+			@NotBlank @Size(max = 60) String providerKey,
 			@NotBlank @Size(max = 160) String displayName,
 			@Size(max = 120) String connectorKey,
 			@Size(max = 100) List<@Valid PhysicalBenefitMappingRequest> benefitMappings
@@ -295,5 +380,22 @@ public class AccessController {
 		private LinkPhysicalClientCommand toCommand() {
 			return new LinkPhysicalClientCommand(externalPersonRef);
 		}
+	}
+
+	public record PhysicalDeviceLinkRequest(
+			@NotBlank @Size(max = 180) String externalDeviceRef,
+			@Size(max = 180) String externalDeviceName
+	) {
+	}
+
+	public record ConnectorActivationIssueRequest(
+			@Pattern(regexp = "ACTIVATION|ROTATION") String purpose
+	) {
+	}
+
+	public record CandidateMatchRequest(@NotNull UUID clientId) {
+	}
+
+	public record ReconcileResult(int queuedClients) {
 	}
 }

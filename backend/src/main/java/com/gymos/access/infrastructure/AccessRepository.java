@@ -123,6 +123,22 @@ public class AccessRepository {
 				.optional();
 	}
 
+	public Optional<AccessDeviceRecord> deviceById(UUID organizationId, UUID branchId, UUID deviceId) {
+		return jdbcClient.sql("""
+				SELECT id, name, device_code, device_type, status, provider, last_seen_at
+				FROM access_device
+				WHERE organization_id = :organizationId
+				  AND branch_id = :branchId
+				  AND id = :deviceId
+				  AND deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("deviceId", deviceId)
+				.query(this::mapDevice)
+				.optional();
+	}
+
 	public Optional<ClientAccessRecord> clientById(UUID organizationId, UUID clientId) {
 		return jdbcClient.sql("""
 				SELECT c.id, p.first_name || ' ' || p.last_name AS full_name,
@@ -135,6 +151,38 @@ public class AccessRepository {
 				  AND p.deleted_at IS NULL
 				""")
 				.param("organizationId", organizationId)
+				.param("clientId", clientId)
+				.query(this::mapClient)
+				.optional();
+	}
+
+	public Optional<ClientAccessRecord> clientById(UUID organizationId, UUID branchId, UUID clientId) {
+		return jdbcClient.sql("""
+				SELECT c.id, p.first_name || ' ' || p.last_name AS full_name,
+				       p.phone, p.email, c.status
+				FROM client c
+				JOIN person p ON p.id = c.person_id
+				WHERE c.organization_id = :organizationId
+				  AND c.id = :clientId
+				  AND c.deleted_at IS NULL
+				  AND p.deleted_at IS NULL
+				  AND (
+				      c.home_branch_id IS NULL
+				      OR c.home_branch_id = :branchId
+				      OR EXISTS (
+				          SELECT 1
+				          FROM membership m
+				          JOIN membership_plan mp ON mp.id = m.plan_id
+				          WHERE m.organization_id = c.organization_id
+				            AND m.client_id = c.id
+				            AND m.status = 'ACTIVE'
+				            AND m.deleted_at IS NULL
+				            AND (m.branch_id = :branchId OR mp.multi_branch_access = TRUE)
+				      )
+				  )
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
 				.param("clientId", clientId)
 				.query(this::mapClient)
 				.optional();
@@ -263,8 +311,9 @@ public class AccessRepository {
 				    :id, :organizationId, :branchId, :providerKey, :displayName, :connectorKey,
 				    :enabled, :syncStatus, :now, :now, :actorUserId, :actorUserId, 0
 				)
-				ON CONFLICT (organization_id, branch_id, provider_key)
+				ON CONFLICT (organization_id, branch_id)
 				DO UPDATE SET
+				    provider_key = EXCLUDED.provider_key,
 				    display_name = EXCLUDED.display_name,
 				    connector_key = EXCLUDED.connector_key,
 				    enabled = EXCLUDED.enabled,

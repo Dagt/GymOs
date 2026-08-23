@@ -96,6 +96,25 @@ class DatabaseMigrationTests {
 			assertThat(tableExists(connection, "access_provider_client_link")).isTrue();
 			assertThat(tableExists(connection, "access_provider_sync_state")).isTrue();
 			assertThat(indexExists(connection, "ix_access_provider_sync_state_pending")).isTrue();
+			assertThat(tableExists(connection, "access_provider_device_link")).isTrue();
+			assertThat(tableExists(connection, "access_connector_activation")).isTrue();
+			assertThat(tableExists(connection, "access_connector_credential")).isTrue();
+			assertThat(tableExists(connection, "access_provider_sync_job")).isTrue();
+			assertThat(tableExists(connection, "access_provider_person_candidate")).isTrue();
+			assertThat(columnExists(connection, "access_provider_sync_job", "claim_token")).isTrue();
+			assertThat(columnExists(connection, "access_provider_sync_state", "desired_version")).isTrue();
+			assertThat(columnExists(connection, "access_provider_sync_state", "latest_job_id")).isTrue();
+			assertThat(columnExists(connection, "access_log", "external_event_id")).isTrue();
+			assertThat(indexExists(connection, "ux_access_provider_connector_key")).isTrue();
+			assertThat(indexExists(connection, "ux_access_provider_connection_branch")).isTrue();
+			assertThat(indexExists(connection, "ux_access_connector_credential_tenant_identity")).isTrue();
+			assertThat(indexExists(connection, "ux_access_provider_sync_job_idempotency")).isTrue();
+			assertThat(indexExists(connection, "ux_access_log_external_event")).isTrue();
+			assertThat(roleHasPermission(connection, "Dueno del gimnasio", "access.physical.manage")).isTrue();
+			assertThat(roleHasPermission(connection, "Gerente", "access.physical.manage")).isTrue();
+			assertThat(roleHasPermission(connection, "Recepcion", "access.physical.manage")).isFalse();
+			assertThat(roleHasPermission(connection, "Dueno del gimnasio", "access.manual.open")).isTrue();
+			assertThat(roleHasPermission(connection, "Gerente", "access.manual.open")).isTrue();
 			assertThat(tableExists(connection, "client_import_batch")).isTrue();
 			assertThat(tableExists(connection, "client_import_row")).isTrue();
 			assertThat(tableExists(connection, "benefit")).isTrue();
@@ -152,6 +171,138 @@ class DatabaseMigrationTests {
 			assertThat(columnExists(connection, "branch", "surface_color")).isFalse();
 			assertThat(roleHasPermission(connection, "Recepcion", "resource.manage")).isFalse();
 			assertThat(roleHasPermission(connection, "Recepcion", "booking.manage")).isTrue();
+		}
+	}
+
+	@Test
+	void physicalAccessMigrationUpgradesAnExistingV83Schema() throws Exception {
+		String schema = "upgrade_" + UUID.randomUUID().toString().replace("-", "");
+		Flyway.configure()
+				.dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+				.locations("classpath:db/migration")
+				.schemas(schema)
+				.defaultSchema(schema)
+				.target("83")
+				.load()
+				.migrate();
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		UUID personId = UUID.randomUUID();
+		UUID clientId = UUID.randomUUID();
+		UUID connectionId = UUID.randomUUID();
+		UUID linkId = UUID.randomUUID();
+		UUID syncStateId = UUID.randomUUID();
+		try (var connection = DriverManager.getConnection(
+				postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())) {
+			try (var statement = connection.createStatement()) {
+				statement.execute("SET search_path TO " + schema);
+			}
+			insertOrganization(connection, organizationId);
+			insertBranch(connection, organizationId, branchId);
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO person (
+					    id, organization_id, first_name, last_name, email, phone, status,
+					    created_at, updated_at, version
+					)
+					VALUES (?, ?, 'Pending', 'Member', ?, ?, 'ACTIVE', now(), now(), 0)
+					""")) {
+				statement.setObject(1, personId);
+				statement.setObject(2, organizationId);
+				statement.setString(3, "pending-" + personId + "@example.com");
+				statement.setString(4, "+52" + Math.abs(personId.hashCode()));
+				statement.executeUpdate();
+			}
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO client (
+					    id, organization_id, person_id, status, joined_at,
+					    created_at, updated_at, version, home_branch_id
+					)
+					VALUES (?, ?, ?, 'ACTIVE', now(), now(), now(), 0, ?)
+					""")) {
+				statement.setObject(1, clientId);
+				statement.setObject(2, organizationId);
+				statement.setObject(3, personId);
+				statement.setObject(4, branchId);
+				statement.executeUpdate();
+			}
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO access_provider_connection (
+					    id, organization_id, branch_id, provider_key, display_name, connector_key,
+					    enabled, sync_status, created_at, updated_at, version
+					)
+					VALUES (?, ?, ?, 'HIKCENTRAL', 'HikCentral', ?, TRUE,
+					        'AWAITING_CONNECTOR', now(), now(), 0)
+					""")) {
+				statement.setObject(1, connectionId);
+				statement.setObject(2, organizationId);
+				statement.setObject(3, branchId);
+				statement.setString(4, "upgrade-connector-" + connectionId);
+				statement.executeUpdate();
+			}
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO access_provider_client_link (
+					    id, organization_id, branch_id, connection_id, client_id,
+					    external_person_ref, linked_at, updated_at, version
+					)
+					VALUES (?, ?, ?, ?, ?, 'person-upgrade', now(), now(), 0)
+					""")) {
+				statement.setObject(1, linkId);
+				statement.setObject(2, organizationId);
+				statement.setObject(3, branchId);
+				statement.setObject(4, connectionId);
+				statement.setObject(5, clientId);
+				statement.executeUpdate();
+			}
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO access_provider_sync_state (
+					    id, organization_id, branch_id, connection_id, client_id,
+					    desired_access_level_refs, action, status, requested_at,
+					    created_at, updated_at, version
+					)
+					VALUES (?, ?, ?, ?, ?, '["LEVEL-UPGRADE"]'::jsonb,
+					        'UPSERT', 'PENDING', now(), now(), now(), 0)
+					""")) {
+				statement.setObject(1, syncStateId);
+				statement.setObject(2, organizationId);
+				statement.setObject(3, branchId);
+				statement.setObject(4, connectionId);
+				statement.setObject(5, clientId);
+				statement.executeUpdate();
+			}
+		}
+
+		Flyway.configure()
+				.dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+				.locations("classpath:db/migration")
+				.schemas(schema)
+				.defaultSchema(schema)
+				.load()
+				.migrate();
+
+		try (var connection = DriverManager.getConnection(
+				postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())) {
+			assertThat(tableExists(connection, schema, "access_provider_sync_job")).isTrue();
+			assertThat(tableExists(connection, schema, "access_connector_credential")).isTrue();
+			try (var statement = connection.createStatement()) {
+				statement.execute("SET search_path TO " + schema);
+			}
+			try (var statement = connection.prepareStatement("""
+					SELECT job.status, job.external_person_ref, state.latest_job_id,
+					       job.id AS job_id
+					FROM access_provider_sync_job job
+					JOIN access_provider_sync_state state ON state.id = job.sync_state_id
+					WHERE state.id = ?
+					""")) {
+				statement.setObject(1, syncStateId);
+				try (var resultSet = statement.executeQuery()) {
+					assertThat(resultSet.next()).isTrue();
+					assertThat(resultSet.getString("status")).isEqualTo("PENDING");
+					assertThat(resultSet.getString("external_person_ref")).isEqualTo("person-upgrade");
+					assertThat(resultSet.getObject("latest_job_id", UUID.class))
+							.isEqualTo(resultSet.getObject("job_id", UUID.class));
+					assertThat(resultSet.next()).isFalse();
+				}
+			}
 		}
 	}
 
@@ -250,13 +401,18 @@ class DatabaseMigrationTests {
 	}
 
 	private boolean tableExists(java.sql.Connection connection, String table) throws Exception {
+		return tableExists(connection, "public", table);
+	}
+
+	private boolean tableExists(java.sql.Connection connection, String schema, String table) throws Exception {
 		try (var statement = connection.prepareStatement("""
 				SELECT 1
 				FROM information_schema.tables
-				WHERE table_schema = 'public'
+				WHERE table_schema = ?
 				  AND table_name = ?
 				""")) {
-			statement.setString(1, table);
+			statement.setString(1, schema);
+			statement.setString(2, table);
 			try (var resultSet = statement.executeQuery()) {
 				return resultSet.next();
 			}

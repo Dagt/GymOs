@@ -20,11 +20,13 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 class BenefitPlanLinkPolicyTests {
 	private final BenefitRepository repository = mock(BenefitRepository.class);
 	private final AuditService auditService = mock(AuditService.class);
-	private final BenefitService service = new BenefitService(repository, auditService);
+	private final BenefitService service = new BenefitService(
+			repository, auditService, mock(ApplicationEventPublisher.class));
 	private final UUID organizationId = UUID.randomUUID();
 	private final GymOsPrincipal principal = new GymOsPrincipal(
 			UUID.randomUUID(), organizationId, UUID.randomUUID(), "owner@gymos.local", "Owner", Set.of("benefit.manage"));

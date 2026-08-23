@@ -2,6 +2,7 @@ package com.gymos.clients.application;
 
 import com.gymos.audit.api.AuditService;
 import com.gymos.clients.api.operations.ClientLookupOperations;
+import com.gymos.clients.api.events.ClientAccessStatusChangedV1;
 import com.gymos.clients.api.operations.ClientVerificationResult;
 import com.gymos.clients.api.operations.SelfServiceClientProfile;
 import com.gymos.clients.api.operations.UpdateSelfServiceContactCommand;
@@ -24,6 +25,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -31,11 +33,18 @@ public class ClientService implements ClientLookupOperations {
 	private final ClientRepository clientRepository;
 	private final ClientCommandRepository commandRepository;
 	private final AuditService auditService;
+	private final ApplicationEventPublisher eventPublisher;
 
-	public ClientService(ClientRepository clientRepository, ClientCommandRepository commandRepository, AuditService auditService) {
+	public ClientService(
+			ClientRepository clientRepository,
+			ClientCommandRepository commandRepository,
+			AuditService auditService,
+			ApplicationEventPublisher eventPublisher
+	) {
 		this.clientRepository = clientRepository;
 		this.commandRepository = commandRepository;
 		this.auditService = auditService;
+		this.eventPublisher = eventPublisher;
 	}
 
 	@Transactional
@@ -123,6 +132,12 @@ public class ClientService implements ClientLookupOperations {
 				now
 		));
 		auditService.record(principal, "CLIENT_UPDATED", "CLIENT", clientId, "RECEPTION", null, correlationId);
+		String currentStatus = request.status().trim().toUpperCase();
+		if (!existing.status().equals(currentStatus)) {
+			eventPublisher.publishEvent(new ClientAccessStatusChangedV1(
+					"client-status-changed:" + clientId + ":" + correlationId,
+					principal.organizationId(), clientId, existing.status(), currentStatus, OffsetDateTime.now()));
+		}
 		return detail(principal, clientId);
 	}
 
