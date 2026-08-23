@@ -6584,3 +6584,135 @@ button.admin-secondary-link:disabled {
   .automation-email-channel { grid-template-columns: auto minmax(0, 1fr); }
   .automation-email-channel a { grid-column: 1 / -1; text-align: center; }
 }
+
+/* ==========================================================================
+   MODERN POLISH OVERRIDES (Global UI Uplift)
+   Applies the "smooth" aesthetics from the new dashboard app-wide.
+   ========================================================================== */
+
+/* 1. Base Cards & Panels - Softer shadows, smoother borders, consistent rounding */
+.app-card, 
+.admin-panel, 
+.admin-action-card, 
+.settings-overview-card, 
+.settings-detail-panel,
+.automation-panel,
+.automation-health-panel,
+.automation-control-bar,
+.settings-section-nav {
+  border-radius: 0.75rem !important;
+  border-color: color-mix(in srgb, var(--brand-line) 60%, transparent) !important;
+  box-shadow: 0 4px 20px rgba(9, 42, 37, 0.03), 0 1px 3px rgba(9, 42, 37, 0.02) !important;
+  transition: box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out;
+}
+
+/* 2. Hover states for interactive cards */
+a.app-card:hover, 
+a.admin-panel:hover, 
+button.admin-action-card:hover,
+a.admin-action-card:hover {
+  box-shadow: 0 12px 30px rgba(9, 42, 37, 0.06), 0 4px 6px rgba(9, 42, 37, 0.03) !important;
+  border-color: color-mix(in srgb, var(--brand-primary) 20%, var(--brand-line)) !important;
+}
+
+/* 3. Buttons - Smoother radius and active states */
+.app-button,
+.admin-primary-cta,
+button[type="submit"] {
+  border-radius: 0.5rem !important;
+  transition: all 0.2s ease-in-out !important;
+  font-weight: 600 !important;
+}
+
+.app-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 15px color-mix(in srgb, var(--brand-action) 25%, transparent) !important;
+}
+
+.app-button:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: 0 2px 5px color-mix(in srgb, var(--brand-action) 15%, transparent) !important;
+}
+
+/* 4. Inputs & Forms - Softer borders, better focus rings */
+input:not([type="checkbox"]):not([type="radio"]), 
+select, 
+textarea {
+  border-radius: 0.5rem !important;
+  border: 1px solid color-mix(in srgb, var(--brand-line) 80%, transparent) !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.01) inset !important;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):focus, 
+select:focus, 
+textarea:focus {
+  border-color: var(--brand-action) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-action) 15%, transparent) !important;
+  outline: none !important;
+}
+
+/* 5. Tables - Cleaner lines and hover states */
+.admin-workspace table, 
+.settings-detail-panel table, 
+.automation-panel table {
+  border-collapse: separate !important;
+  border-spacing: 0 !important;
+}
+
+.admin-workspace table th, 
+.settings-detail-panel table th, 
+.automation-panel table th {
+  background: color-mix(in srgb, var(--brand-surface) 50%, white) !important;
+  color: var(--brand-muted) !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+  font-size: 0.75rem !important;
+  letter-spacing: 0.05em;
+  padding-top: 0.85rem !important;
+  padding-bottom: 0.85rem !important;
+  border-bottom: 1px solid var(--brand-line) !important;
+}
+
+.admin-workspace table th:first-child { border-top-left-radius: 0.5rem; }
+.admin-workspace table th:last-child { border-top-right-radius: 0.5rem; }
+
+.admin-workspace table tbody tr {
+  transition: background-color 0.15s ease;
+}
+
+.admin-workspace table tbody tr:hover {
+  background-color: color-mix(in srgb, var(--brand-surface) 30%, transparent) !important;
+}
+
+.admin-workspace table td {
+  border-bottom: 1px solid color-mix(in srgb, var(--brand-line) 40%, transparent) !important;
+  padding-top: 0.85rem !important;
+  padding-bottom: 0.85rem !important;
+}
+
+/* 6. Typography refinements */
+.app-eyebrow, 
+.admin-panel-header p,
+.settings-section-nav p {
+  font-weight: 700 !important;
+  color: color-mix(in srgb, var(--brand-muted) 80%, var(--brand-primary)) !important;
+}
+
+.admin-panel-header h2, 
+.settings-overview-card h2,
+.automation-panel h2 {
+  font-weight: 800 !important;
+  color: var(--brand-ink) !important;
+  letter-spacing: -0.015em;
+}
+
+/* 7. Badges and Tags */
+.app-badge, 
+[class*="bg-"][class*="-100"][class*="text-"] {
+  border-radius: 9999px !important;
+  font-weight: 600 !important;
+  padding: 0.25rem 0.75rem !important;
+  border: 1px solid currentColor !important;
+  opacity: 0.9;
+}
