@@ -169,7 +169,11 @@ export default function PlatformBillingPage() {
             <div className="platform-table-row" key={customer.organizationId}>
               <div><strong>{customer.organizationName}</strong><small className="block text-[var(--brand-muted)]">{customer.branchCount} sucursales</small></div>
               <div><strong>{formatNumber(customer.activeMembers)} activos</strong><small className="block text-[var(--brand-muted)]">{customer.unconfiguredCount ? `${customer.unconfiguredCount} por configurar` : customer.nextBillingLabel}</small></div>
-              <div><strong>{formatCurrency(customer.monthlyAmount)}</strong><small className="block text-[var(--brand-muted)]">+ IVA</small></div>
+              <div>
+                <strong>{formatCurrency(customer.monthlyAmount)}</strong>
+                <small className="block text-[var(--brand-muted)]">+ IVA</small>
+                {customer.implementationOutstanding > 0 ? <small className="block text-[var(--brand-muted)]">{formatCurrency(customer.implementationOutstanding)} de implementacion pendiente</small> : null}
+              </div>
               <button onClick={() => { setQuery(customer.organizationName); setPaymentFilter("ALL"); }} type="button">{customer.overdueCount ? `${customer.overdueCount} vencida${customer.overdueCount === 1 ? "" : "s"}` : "Ver sedes"}</button>
             </div>
           ))}
@@ -253,12 +257,33 @@ function toForm(branch: PlatformBranchBilling): PlatformBillingUpdatePayload {
 }
 
 function groupByCustomer(branches: PlatformBranchBilling[]) {
-  const groups = new Map<string, { organizationId: string; organizationName: string; branchCount: number; activeMembers: number; monthlyAmount: number; unconfiguredCount: number; overdueCount: number; dates: Set<string> }>();
+  const groups = new Map<string, {
+    organizationId: string;
+    organizationName: string;
+    branchCount: number;
+    activeMembers: number;
+    monthlyAmount: number;
+    implementationOutstanding: number;
+    unconfiguredCount: number;
+    overdueCount: number;
+    dates: Set<string>;
+  }>();
   for (const branch of branches) {
-    const group = groups.get(branch.organizationId) ?? { organizationId: branch.organizationId, organizationName: branch.organizationName, branchCount: 0, activeMembers: 0, monthlyAmount: 0, unconfiguredCount: 0, overdueCount: 0, dates: new Set<string>() };
+    const group = groups.get(branch.organizationId) ?? {
+      organizationId: branch.organizationId,
+      organizationName: branch.organizationName,
+      branchCount: 0,
+      activeMembers: 0,
+      monthlyAmount: 0,
+      implementationOutstanding: 0,
+      unconfiguredCount: 0,
+      overdueCount: 0,
+      dates: new Set<string>(),
+    };
     group.branchCount += 1;
     group.activeMembers += branch.activeMembers;
     if (branch.subscriptionStatus === "ACTIVE" && branch.monthlyAmount != null) group.monthlyAmount += branch.monthlyAmount;
+    if (branch.subscriptionStatus !== "UNCONFIGURED" && !branch.implementationPaid) group.implementationOutstanding += branch.implementationFee;
     if (branch.subscriptionStatus === "UNCONFIGURED") group.unconfiguredCount += 1;
     if (branch.paymentStatus === "OVERDUE") group.overdueCount += 1;
     if (branch.subscriptionStatus === "ACTIVE" && branch.nextBillingDate) group.dates.add(branch.nextBillingDate);
