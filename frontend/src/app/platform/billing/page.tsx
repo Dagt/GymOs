@@ -8,11 +8,7 @@ import { AuthRequired } from "@/components/AuthRequired";
 import { DateField, FormError, NumberField, SelectField, TextAreaField } from "@/components/FormFields";
 import { getStoredSession, type StoredSession } from "@/lib/api";
 import { getPlatformBillingOverview, updatePlatformBranchBilling } from "@/lib/api/platform-billing";
-import type {
-  PlatformBillingOverview,
-  PlatformBillingUpdatePayload,
-  PlatformBranchBilling,
-} from "@/lib/api/platform-billing-types";
+import type { PlatformBillingOverview, PlatformBillingUpdatePayload, PlatformBranchBilling } from "@/lib/api/platform-billing-types";
 
 const planOptions = [
   { value: "GYMFORT_150", label: "GymFort 150 · $1,190" },
@@ -60,9 +56,7 @@ export default function PlatformBillingPage() {
       }
     }
     void load();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   const filteredBranches = useMemo(() => {
@@ -70,18 +64,12 @@ export default function PlatformBillingPage() {
     return (overview?.branches ?? []).filter((branch) => {
       const matchesQuery = !normalizedQuery || [branch.organizationName, branch.branchName, branch.branchCode]
         .some((value) => value.toLowerCase().includes(normalizedQuery));
-      const matchesPayment = paymentFilter === "ALL" || branch.paymentStatus === paymentFilter;
-      return matchesQuery && matchesPayment;
+      return matchesQuery && (paymentFilter === "ALL" || branch.paymentStatus === paymentFilter);
     });
   }, [overview, paymentFilter, query]);
 
-  if (loading) {
-    return <LoadingScreen text="Cargando cobros y suscripciones..." />;
-  }
-
-  if (!session) {
-    return <AuthRequired message="Este panel es exclusivo de la administracion comercial de GymFort." title="Inicia sesion como administrador de plataforma" />;
-  }
+  if (loading) return <LoadingScreen text="Cargando cobros y suscripciones..." />;
+  if (!session) return <AuthRequired message="Este panel es exclusivo de la administracion comercial de GymFort." title="Inicia sesion como administrador de plataforma" />;
 
   const summary = overview?.summary;
 
@@ -96,11 +84,17 @@ export default function PlatformBillingPage() {
     if (saving) return;
     setSelected(null);
     setForm(null);
+    setError("");
+    setMessage("");
   }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!form || !selected || !session) return;
+    if (form.billingAnchorDay < 1 || form.billingAnchorDay > 31) {
+      setError("El dia de corte debe estar entre 1 y 31.");
+      return;
+    }
     setSaving(true);
     setError("");
     setMessage("");
@@ -117,7 +111,7 @@ export default function PlatformBillingPage() {
     }
   }
 
-  function registerPaymentToday() {
+  function preparePaymentToday() {
     if (!form || !selected) return;
     const today = isoToday();
     setForm({
@@ -165,14 +159,9 @@ export default function PlatformBillingPage() {
           <label className="form-field">
             <span>Estado de cobro</span>
             <select className="app-input" onChange={(event) => setPaymentFilter(event.target.value)} value={paymentFilter}>
-              <option value="ALL">Todos</option>
-              <option value="CURRENT">Al corriente</option>
-              <option value="DUE_TODAY">Vence hoy</option>
-              <option value="OVERDUE">Vencido</option>
-              <option value="UNCONFIGURED">Sin configurar</option>
-              <option value="PENDING">Pendiente</option>
-              <option value="PAUSED">Pausada</option>
-              <option value="CANCELLED">Cancelada</option>
+              <option value="ALL">Todos</option><option value="CURRENT">Al corriente</option><option value="DUE_TODAY">Vence hoy</option>
+              <option value="OVERDUE">Vencido</option><option value="UNCONFIGURED">Sin configurar</option><option value="PENDING">Pendiente</option>
+              <option value="PAUSED">Pausada</option><option value="CANCELLED">Cancelada</option>
             </select>
           </label>
         </div>
@@ -180,11 +169,11 @@ export default function PlatformBillingPage() {
         <div className="platform-table">
           <div className="platform-table-row header"><span>Cliente / sucursal</span><span>Uso y plan</span><span>Cobro</span><span>Estado</span></div>
           {filteredBranches.map((branch) => {
-            const planMismatch = branch.subscriptionStatus !== "UNCONFIGURED" && branch.contractedPlanCode !== branch.suggestedPlanCode;
+            const mismatch = branch.subscriptionStatus !== "UNCONFIGURED" && branch.contractedPlanCode !== branch.suggestedPlanCode;
             return (
               <div className="platform-table-row" key={branch.branchId}>
                 <div><strong>{branch.organizationName}</strong><small className="block text-[var(--brand-muted)]">{branch.branchName} · {branch.branchCode}</small></div>
-                <div><strong>{formatNumber(branch.activeMembers)} activos</strong><small className="block text-[var(--brand-muted)]">{branch.contractedPlanName}{planMismatch ? ` · sugerido: ${branch.suggestedPlanName}` : ""}</small></div>
+                <div><strong>{formatNumber(branch.activeMembers)} activos</strong><small className="block text-[var(--brand-muted)]">{branch.contractedPlanName}{mismatch ? ` · sugerido: ${branch.suggestedPlanName}` : ""}</small></div>
                 <div><strong>{branch.monthlyAmount == null ? "Cotizar" : formatCurrency(branch.monthlyAmount)}</strong><small className="block text-[var(--brand-muted)]">{branch.nextBillingDate ? `Proximo: ${formatDate(branch.nextBillingDate)}` : "Fecha pendiente"}</small></div>
                 <button onClick={() => openBilling(branch)} type="button">{branch.subscriptionStatus === "UNCONFIGURED" ? "Configurar" : paymentLabel(branch.paymentStatus)}</button>
               </div>
@@ -194,13 +183,7 @@ export default function PlatformBillingPage() {
         </div>
       </section>
 
-      <AppDrawer
-        description={selected ? `${selected.organizationName} · ${selected.branchName} · ${selected.activeMembers} socios activos.` : undefined}
-        onClose={closeBilling}
-        open={Boolean(selected && form)}
-        title="Configuracion comercial"
-        wide
-      >
+      <AppDrawer description={selected ? `${selected.organizationName} · ${selected.branchName} · ${selected.activeMembers} socios activos.` : undefined} onClose={closeBilling} open={Boolean(selected && form)} title="Configuracion comercial" wide>
         {selected && form ? (
           <form className="grid gap-4" onSubmit={submit}>
             {error ? <FormError message={error} /> : null}
@@ -216,7 +199,7 @@ export default function PlatformBillingPage() {
             <div className="grid gap-4 md:grid-cols-2">
               <SelectField label="Estado de suscripcion" name="subscriptionStatus" onChange={(value) => setForm({ ...form, subscriptionStatus: value as PlatformBillingUpdatePayload["subscriptionStatus"] })} options={subscriptionOptions} value={form.subscriptionStatus} />
               <SelectField label="Plan contratado" name="contractedPlanCode" onChange={(value) => setForm({ ...form, contractedPlanCode: value as PlatformBillingUpdatePayload["contractedPlanCode"] })} options={planOptions} value={form.contractedPlanCode} />
-              <NumberField help="Dia habitual de corte/cobro." label="Dia de corte" max="31" min="1" name="billingAnchorDay" onChange={(value) => setForm({ ...form, billingAnchorDay: numberValue(value, 1) })} value={String(form.billingAnchorDay)} />
+              <NumberField help="Dia habitual de corte/cobro. Debe estar entre 1 y 31." label="Dia de corte" min="1" name="billingAnchorDay" onChange={(value) => setForm({ ...form, billingAnchorDay: numberValue(value, 1) })} value={String(form.billingAnchorDay)} />
               <DateField label="Proximo cobro" name="nextBillingDate" onChange={(value) => setForm({ ...form, nextBillingDate: value })} required value={form.nextBillingDate} />
               <NumberField help="Dejalo vacio para usar el precio de lista del plan contratado." label="Precio mensual manual" min="0" name="monthlyPriceOverride" onChange={(value) => setForm({ ...form, monthlyPriceOverride: nullableNumber(value) })} required={false} step="0.01" value={form.monthlyPriceOverride == null ? "" : String(form.monthlyPriceOverride)} />
               <NumberField label="Costo de implementacion" min="0" name="implementationFee" onChange={(value) => setForm({ ...form, implementationFee: numberValue(value, 0) })} step="0.01" value={String(form.implementationFee)} />
@@ -228,11 +211,10 @@ export default function PlatformBillingPage() {
               <input checked={form.implementationPaid} onChange={(event) => setForm({ ...form, implementationPaid: event.target.checked })} type="checkbox" />
               Implementacion pagada
             </label>
-
             <TextAreaField label="Notas comerciales" name="notes" onChange={(value) => setForm({ ...form, notes: value || null })} placeholder="Acuerdos, condiciones, observaciones de cobro..." required={false} rows={4} value={form.notes ?? ""} />
 
             <div className="platform-actions">
-              <button className="form-secondary-button" onClick={registerPaymentToday} type="button">Preparar pago de hoy</button>
+              <button className="app-button-secondary" onClick={preparePaymentToday} type="button">Preparar pago de hoy</button>
               <button className="form-primary-button" disabled={saving} type="submit">{saving ? "Guardando..." : "Guardar configuracion"}</button>
             </div>
           </form>
@@ -244,10 +226,11 @@ export default function PlatformBillingPage() {
 
 function toForm(branch: PlatformBranchBilling): PlatformBillingUpdatePayload {
   const today = isoToday();
+  const anchor = branch.billingAnchorDay ?? new Date().getDate();
   return {
     subscriptionStatus: branch.subscriptionStatus === "UNCONFIGURED" ? "ACTIVE" : branch.subscriptionStatus as PlatformBillingUpdatePayload["subscriptionStatus"],
-    billingAnchorDay: branch.billingAnchorDay ?? new Date().getDate(),
-    nextBillingDate: branch.nextBillingDate ?? nextMonthlyDate(today, new Date().getDate()),
+    billingAnchorDay: anchor,
+    nextBillingDate: branch.nextBillingDate ?? nextMonthlyDate(today, anchor),
     lastPaymentDate: branch.lastPaymentDate,
     lastPaymentAmount: branch.lastPaymentAmount,
     contractedPlanCode: branch.contractedPlanCode as PlatformBillingUpdatePayload["contractedPlanCode"],
@@ -260,11 +243,10 @@ function toForm(branch: PlatformBranchBilling): PlatformBillingUpdatePayload {
 
 function recalculateOverview(current: PlatformBillingOverview, updated: PlatformBranchBilling): PlatformBillingOverview {
   const branches = current.branches.map((branch) => branch.branchId === updated.branchId ? updated : branch);
-  const organizations = new Set(branches.map((branch) => branch.organizationId));
   return {
     branches,
     summary: {
-      customerCount: organizations.size,
+      customerCount: new Set(branches.map((branch) => branch.organizationId)).size,
       branchCount: branches.length,
       activeMemberCount: branches.reduce((total, branch) => total + branch.activeMembers, 0),
       monthlyRecurringRevenue: branches.reduce((total, branch) => total + (branch.subscriptionStatus === "ACTIVE" ? branch.monthlyAmount ?? 0 : 0), 0),
@@ -283,59 +265,15 @@ function implementationForPlan(planCode: string) {
 }
 
 function paymentLabel(status: string) {
-  const labels: Record<string, string> = {
-    CURRENT: "Al corriente",
-    DUE_TODAY: "Vence hoy",
-    OVERDUE: "Vencido",
-    UNCONFIGURED: "Configurar",
-    PENDING: "Pendiente",
-    PAUSED: "Pausada",
-    CANCELLED: "Cancelada",
-    ACTIVE: "Activa",
-  };
+  const labels: Record<string, string> = { CURRENT: "Al corriente", DUE_TODAY: "Vence hoy", OVERDUE: "Vencido", UNCONFIGURED: "Configurar", PENDING: "Pendiente", PAUSED: "Pausada", CANCELLED: "Cancelada", ACTIVE: "Activa" };
   return labels[status] ?? status;
 }
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 }).format(value);
-}
-
-function formatNumber(value: number) {
-  return new Intl.NumberFormat("es-MX").format(value);
-}
-
-function formatDate(value: string) {
-  const [year, month, day] = value.split("-");
-  return year && month && day ? `${day}/${month}/${year}` : value;
-}
-
-function isoToday() {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, "0");
-  const day = String(now.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
-function nextMonthlyDate(from: string, anchorDay: number) {
-  const [year, month] = from.split("-").map(Number);
-  const target = new Date(year, month, 1);
-  const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate();
-  const day = Math.min(Math.max(anchorDay, 1), lastDay);
-  return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-}
-
-function nullableNumber(value: string) {
-  if (!value.trim()) return null;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-}
-
-function numberValue(value: string, fallback: number) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function messageFromError(error: unknown) {
-  return error instanceof Error ? error.message : "No se pudo completar la operacion.";
-}
+function formatCurrency(value: number) { return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 }).format(value); }
+function formatNumber(value: number) { return new Intl.NumberFormat("es-MX").format(value); }
+function formatDate(value: string) { const [year, month, day] = value.split("-"); return year && month && day ? `${day}/${month}/${year}` : value; }
+function isoToday() { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`; }
+function nextMonthlyDate(from: string, anchorDay: number) { const [year, month] = from.split("-").map(Number); const target = new Date(year, month, 1); const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate(); const day = Math.min(Math.max(anchorDay, 1), lastDay); return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`; }
+function nullableNumber(value: string) { if (!value.trim()) return null; const parsed = Number(value); return Number.isFinite(parsed) ? parsed : null; }
+function numberValue(value: string, fallback: number) { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : fallback; }
+function messageFromError(error: unknown) { return error instanceof Error ? error.message : "No se pudo completar la operacion."; }
