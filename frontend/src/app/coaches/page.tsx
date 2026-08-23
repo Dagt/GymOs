@@ -5,6 +5,17 @@ import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AppDrawer } from "@/components/AppDrawer";
 import { AuthRequired } from "@/components/AuthRequired";
 import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar
+} from "recharts";
+import {
   addExerciseAlias,
   assignWorkout,
   createExercise,
@@ -1462,19 +1473,19 @@ export default function CoachesPage() {
                   color="#1b6b45"
                   label="Rutinas asignadas"
                   points={trend?.points ?? []}
-                  value={(point) => point.assignments}
+                  value={(point: any) => point.assignments}
                 />
                 <WeeklyTrendChart
                   color="#276f91"
                   label="Socios únicos"
                   points={trend?.points ?? []}
-                  value={(point) => point.uniqueClients}
+                  value={(point: any) => point.uniqueClients}
                 />
                 <WeeklyTrendChart
                   color="#b26a1b"
                   label="Primeras rutinas"
                   points={trend?.points ?? []}
-                  value={(point) => point.firstWorkouts}
+                  value={(point: any) => point.firstWorkouts}
                 />
               </div>
             </section>
@@ -2439,86 +2450,42 @@ function Field({ label, help, children }: { label: string; help?: string; childr
   );
 }
 
-function WeeklyTrendChart({
-  color,
-  label,
-  points,
-  value,
-}: {
-  color: string;
-  label: string;
-  points: WeeklyTrendReport["points"];
-  value: (point: WeeklyTrendReport["points"][number]) => number;
-}) {
-  const width = 640;
-  const height = 220;
-  const paddingX = 28;
-  const paddingTop = 20;
-  const paddingBottom = 34;
-  const values = points.map(value);
-  const maximum = Math.max(1, ...values);
-  const chartHeight = height - paddingTop - paddingBottom;
-  const chartWidth = width - (paddingX * 2);
-  const coordinates = points.map((point, index) => {
-    const x = paddingX + (points.length === 1 ? chartWidth / 2 : (index / (points.length - 1)) * chartWidth);
-    const y = paddingTop + chartHeight - ((value(point) / maximum) * chartHeight);
-    return { point, x, y };
-  });
-  const total = values.reduce((sum, current) => sum + current, 0);
+function WeeklyTrendChart({ color, label, points, value }: { color: string; label: string; points: any[]; value: (p: any) => number }) {
+  const data = points.map(p => ({
+    date: p.weekFrom,
+    val: value(p)
+  }));
+  const total = data.reduce((acc, curr) => acc + curr.val, 0);
 
   return (
-    <article className="rounded-lg border border-[#e0e7e2] p-4">
-      <div className="flex items-end justify-between gap-3">
-        <h3 className="text-sm font-semibold">{label}</h3>
-        <p className="text-2xl font-semibold">{total}</p>
+    <article className="rounded-xl border border-[var(--brand-line)] bg-white p-5 shadow-sm">
+      <div className="flex items-end justify-between gap-3 mb-4">
+        <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">{label}</h3>
+        <p className="text-3xl font-bold text-gray-900">{total}</p>
       </div>
-      {points.length ? (
-        <>
-          <svg
-            aria-label={`${label} por semana`}
-            className="mt-3 h-auto w-full"
-            role="img"
-            viewBox={`0 0 ${width} ${height}`}
-          >
-            {[0, 0.5, 1].map((ratio) => {
-              const y = paddingTop + (chartHeight * ratio);
-              return (
-                <line
-                  key={ratio}
-                  stroke="#dce5df"
-                  strokeDasharray={ratio === 1 ? undefined : "4 5"}
-                  strokeWidth="1"
-                  x1={paddingX}
-                  x2={width - paddingX}
-                  y1={y}
-                  y2={y}
-                />
-              );
-            })}
-            <polyline
-              fill="none"
-              points={coordinates.map(({ x, y }) => `${x},${y}`).join(" ")}
-              stroke={color}
-              strokeLinejoin="round"
-              strokeWidth="4"
-            />
-            {coordinates.map(({ point, x, y }) => (
-              <circle cx={x} cy={y} fill="white" key={point.weekFrom} r="5" stroke={color} strokeWidth="3">
-                <title>{formatShortDate(point.weekFrom)}: {value(point)}</title>
-              </circle>
-            ))}
-            <text fill="#637268" fontSize="18" x={paddingX} y={height - 7}>
-              {formatShortDate(points[0].weekFrom)}
-            </text>
-            <text fill="#637268" fontSize="18" textAnchor="end" x={width - paddingX} y={height - 7}>
-              {formatShortDate(points[points.length - 1].weekFrom)}
-            </text>
-          </svg>
-          <p className="mt-1 text-xs text-[#637268]">Máximo semanal: {maximum}</p>
-        </>
-      ) : (
-        <p className="mt-3 rounded-md border border-dashed p-4 text-sm text-[#637268]">Sin datos para graficar.</p>
-      )}
+      <div className="h-[100px] w-full">
+        {data.length > 0 ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={data} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id={`gradient-${label.replace(/\s+/g, '')}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={color} stopOpacity={0.3}/>
+                  <stop offset="95%" stopColor={color} stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+              <Tooltip 
+                contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)', fontSize: '12px' }}
+                labelFormatter={(date) => new Date(String(date)).toLocaleDateString('es-MX', { day: '2-digit', month: 'short'})}
+              />
+              <Area type="monotone" dataKey="val" stroke={color} strokeWidth={2} fillOpacity={1} fill={`url(#gradient-${label.replace(/\s+/g, '')})`} />
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="flex h-full items-center justify-center border-2 border-dashed border-gray-100 rounded-lg">
+            <span className="text-xs text-gray-400">Sin datos suficientes</span>
+          </div>
+        )}
+      </div>
     </article>
   );
 }
@@ -2526,19 +2493,19 @@ function WeeklyTrendChart({
 function Metric({ change, label, value }: { change?: number; label: string; value: number }) {
   const direction = change === undefined ? null : change > 0 ? "increase" : change < 0 ? "decrease" : "same";
   return (
-    <article className="rounded-xl border border-[#d9e2dc] bg-white p-5">
-      <p className="text-sm text-[#637268]">{label}</p>
-      <div className="mt-1 flex items-end justify-between gap-2">
-        <p className="text-3xl font-semibold">{value}</p>
+    <article className="rounded-xl border border-[var(--brand-line)] bg-white p-5 shadow-sm transition-all hover:shadow-md">
+      <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">{label}</p>
+      <div className="mt-2 flex items-end justify-between gap-2">
+        <p className="text-3xl font-bold text-gray-900">{value}</p>
         {direction ? (
-          <span className={`rounded-full px-2 py-1 text-xs font-semibold ${
+          <span className={"rounded-full px-2.5 py-1 text-xs font-semibold " + (
             direction === "increase"
-              ? "bg-emerald-50 text-emerald-800"
+              ? "bg-emerald-100 text-emerald-800"
               : direction === "decrease"
-                ? "bg-red-50 text-red-700"
+                ? "bg-rose-100 text-rose-800"
                 : "bg-slate-100 text-slate-700"
-          }`}>
-            {change && change > 0 ? "+" : ""}{change} vs. anterior
+          )}>
+            {change && change > 0 ? "+" : ""}{change} vs. ant.
           </span>
         ) : null}
       </div>
@@ -2611,3 +2578,17 @@ function normalizeRole(role: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+

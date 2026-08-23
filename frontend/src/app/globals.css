@@ -6716,3 +6716,64 @@ textarea:focus {
   border: 1px solid currentColor !important;
   opacity: 0.9;
 }
+
+/* --- WORKOUT BUILDER POLISH OVERRIDES --- */
+.workout-block-card {
+  background: white !important;
+  border: 1px solid var(--brand-line) !important;
+  border-radius: 1rem !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03) !important;
+  padding: 1.5rem !important;
+  margin-bottom: 1.5rem !important;
+}
+
+.workout-block-header {
+  margin-bottom: 1.5rem !important;
+  padding-bottom: 1.25rem !important;
+  border-bottom: 1px dashed var(--brand-line) !important;
+}
+
+.workout-exercise-card {
+  background: color-mix(in srgb, var(--brand-surface) 30%, white) !important;
+  border: 1px solid color-mix(in srgb, var(--brand-line) 80%, transparent) !important;
+  border-radius: 0.75rem !important;
+  margin-bottom: 0.75rem !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02) !important;
+  transition: all 0.2s ease !important;
+}
+
+.workout-exercise-card:hover {
+  border-color: color-mix(in srgb, var(--brand-primary) 30%, var(--brand-line)) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04) !important;
+}
+
+.workout-exercise-card[open] {
+  background: white !important;
+  border-color: var(--brand-primary) !important;
+  box-shadow: 0 8px 24px rgba(9, 42, 37, 0.06) !important;
+}
+
+.workout-exercise-card > summary {
+  padding: 1rem 1.25rem !important;
+}
+
+.workout-exercise-body {
+  padding: 1.25rem !important;
+  background: color-mix(in srgb, var(--brand-surface) 10%, white) !important;
+}
+
+.workout-optional-panel.compact > summary {
+  color: var(--brand-action) !important;
+  font-weight: 600 !important;
+  font-size: 0.8rem !important;
+}
+
+/* Make sets inside detailed sets look like real distinct rows */
+.workout-exercise-detailed-sets article {
+  background: white !important;
+  border: 1px solid var(--brand-line) !important;
+  border-radius: 0.5rem !important;
+  padding: 0.75rem !important;
+  margin-bottom: 0.5rem !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02) !important;
+}
