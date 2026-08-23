@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { clearSession, getStoredSession, type StoredSession } from "@/lib/api";
 import { getPostLoginPath } from "@/lib/session-routing";
-import styles from "./pricing.module.css";
 
 const features = [
   ["01", "Miembros y membresías", "Expedientes, planes, renovaciones y seguimiento en un solo lugar."],
@@ -29,27 +28,20 @@ const plans = [
   { name: "GymFort 2000", capacity: "Hasta 2,000 socios activos", price: "2,990", tag: "Operación de alto volumen" },
 ];
 
-const includedFeatures = [
-  "Todas las funcionalidades actuales de GymFort",
-  "Usuarios de personal sin costo adicional",
-  "Soporte técnico estándar y actualizaciones",
-  "Registros históricos sin consumir capacidad",
-];
-
-const implementation = [
-  ["GymFort 150", "$2,500"],
-  ["GymFort 500", "$3,500"],
-  ["GymFort 1000", "$5,000"],
-  ["GymFort 2000", "$7,500"],
+const pricingRules = [
+  ["Socios activos", "El plan se determina por clientes con una membresía vigente en la sucursal. Históricos, prospectos, empleados y clientes inactivos no elevan la tarifa."],
+  ["Una licencia por sucursal", "Una misma cuenta puede administrar múltiples gimnasios. Cada ubicación se factura de forma independiente según sus propios socios activos."],
+  ["Crecimiento sin bloqueos", "Superar ocasionalmente el límite no detiene la operación. Cuando el crecimiento es sostenido, la sucursal pasa al siguiente nivel de servicio."],
+  ["Costos variables separados", "Hardware, instalaciones, desarrollos específicos y consumos de proveedores externos como SMS o WhatsApp se cotizan por separado cuando apliquen."],
 ];
 
 const pricingFaq = [
-  ["¿Qué se considera un socio activo?", "Un cliente con una membresía vigente en la sucursal. Prospectos, empleados, históricos y clientes sin membresía vigente no cuentan para determinar el plan."],
-  ["¿Cómo se cobra si tengo varias sucursales?", "Cada sucursal se licencia según sus propios socios activos. El propietario puede administrar todas sus sedes desde la misma cuenta, pero cada ubicación se factura de forma independiente."],
-  ["¿Los planes bloquean funcionalidades?", "No. Los planes cambian por capacidad, no por módulos. Las funcionalidades actuales de GymFort están disponibles en todos los niveles."],
-  ["¿Qué pasa si supero el límite de mi plan?", "GymFort no busca frenar el crecimiento de tu gimnasio. Revisamos la capacidad y, cuando el crecimiento es sostenido, la sucursal pasa al siguiente nivel de servicio."],
-  ["¿La implementación se cobra una sola vez?", "Sí. Cubre la puesta en marcha estándar, configuración inicial, migración base y capacitación. Migraciones extraordinarias o desarrollos específicos se cotizan por separado."],
-  ["¿Cobran comisión sobre mis ventas?", "No. GymFort no cobra una comisión adicional sobre las ventas registradas por tu gimnasio. Los costos de proveedores de pago externos, cuando se utilicen, son independientes."],
+  ["¿Todos los planes tienen las mismas funciones?", "Sí. Los planes cambian por capacidad, no por módulos. Las funcionalidades actuales de GymFort están disponibles en todos los niveles."],
+  ["¿Cobran por empleados o administradores?", "No. Puedes dar acceso al personal que necesites de acuerdo con los roles y permisos disponibles en la plataforma."],
+  ["¿Cobran comisión sobre las ventas?", "No. GymFort no cobra una comisión adicional sobre las ventas registradas por tu gimnasio. Los costos de proveedores de pago externos son independientes."],
+  ["¿Qué pasa si tengo varias marcas?", "El propietario puede administrar sus gimnasios desde una misma cuenta. Comercialmente, cada ubicación física se licencia según su número de socios activos."],
+  ["¿La implementación se cobra una sola vez?", "Sí. Cubre la puesta en marcha estándar, configuración inicial, migración base y capacitación. Trabajos extraordinarios se cotizan por separado."],
+  ["¿Cuándo aplica Enterprise?", "Para sucursales con más de 2,000 socios activos o grupos con requerimientos especiales de integración, soporte, infraestructura o despliegue."],
 ];
 
 export default function Home() {
@@ -88,76 +80,42 @@ export default function Home() {
     <section className="landing-section" id="funciones"><div className="landing-section-heading"><p>Una operación conectada</p><h2>Lo que necesitas para administrar mejor</h2><span>GymFort reúne las áreas críticas de tu gimnasio y ayuda a tu equipo a trabajar con una sola fuente de información.</span></div><div className="feature-grid">{features.map(([icon,title,text]) => <article key={title}><span>{icon}</span><h3>{title}</h3><p>{text}</p></article>)}</div></section>
     <section className="landing-steps" id="como-funciona"><div><p>Simple desde el primer día</p><h2>De la configuración a una operación más fuerte.</h2><span>La plataforma acompaña el flujo real de tu negocio sin agregar complejidad innecesaria.</span></div><ol>{steps.map(([title,text], index) => <li key={title}><b>0{index + 1}</b><section><h3>{title}</h3><p>{text}</p></section></li>)}</ol></section>
 
-    <section className={styles.pricingSection} id="precios">
-      <div className={styles.sectionHeader}>
-        <p className={styles.sectionEyebrow}>Precios simples y transparentes</p>
-        <h2>El mismo GymFort.<br />Elige sólo el tamaño de tu gimnasio.</h2>
-        <span>Sin módulos esenciales bloqueados ni cobros por cada miembro de tu equipo. El precio de cada sucursal depende únicamente de su número de socios activos.</span>
-      </div>
-      <div className={styles.pricingNotice}>
-        <span>✓ Todas las funcionalidades actuales</span>
-        <span>✓ Staff sin costo adicional</span>
-        <span>✓ Sin comisión GymFort sobre ventas</span>
-        <span>✓ Soporte y actualizaciones incluidos</span>
-      </div>
-      <div className={styles.pricingGrid}>
-        {plans.map((plan) => <article className={styles.pricingCard} key={plan.name}>
-          <span className={styles.planTag}>{plan.tag}</span>
-          <h3 className={styles.planName}>{plan.name}</h3>
-          <p className={styles.planCapacity}>{plan.capacity}</p>
-          <div className={styles.priceRow}><span className={styles.priceCurrency}>$</span><strong className={styles.priceAmount}>{plan.price}</strong><span className={styles.pricePeriod}>MXN / mes</span></div>
-          <p className={styles.taxNote}>+ IVA · precio por sucursal</p>
-          <hr className={styles.planDivider} />
-          <ul className={styles.planFeatures}>{includedFeatures.map((feature) => <li key={feature}>{feature}</li>)}</ul>
-          <a className={styles.pricingCta} href={`mailto:contacto@gymfort.mx?subject=Quiero%20contratar%20${encodeURIComponent(plan.name)}`}>Solicitar información <span>→</span></a>
+    <section className="landing-section" id="precios">
+      <div className="landing-section-heading"><p>Precios simples y transparentes</p><h2>El mismo GymFort. Elige sólo el tamaño de tu gimnasio.</h2><span>Sin módulos esenciales bloqueados ni cobros por cada miembro de tu equipo. Cada sucursal utiliza el plan que corresponde a su número de socios activos.</span></div>
+      <div className="feature-grid">
+        {plans.map((plan, index) => <article key={plan.name}>
+          <span>{String(index + 1).padStart(2, "0")}</span>
+          <h3>{plan.name}</h3>
+          <p>{plan.tag}<br />{plan.capacity}</p>
+          <h3>${plan.price} MXN / mes</h3>
+          <p>+ IVA · precio por sucursal</p>
         </article>)}
-      </div>
-
-      <article className={styles.enterpriseCard}>
-        <div>
-          <span className={styles.enterpriseBadge}>GymFort Enterprise</span>
-          <h3>Para operaciones que necesitan ir más allá.</h3>
-          <p>Diseñado para sucursales con más de 2,000 socios activos o grupos con requerimientos especiales de integración, soporte, infraestructura o despliegue.</p>
-        </div>
-        <div className={styles.enterpriseSide}>
-          <strong>Cotización personalizada</strong>
-          <span>La operación multi-sucursal no obliga a contratar Enterprise: cada sede puede usar el plan que corresponda a su tamaño.</span>
-          <a className={styles.pricingCta} href="mailto:contacto@gymfort.mx?subject=GymFort%20Enterprise">Hablar con GymFort <span>→</span></a>
-        </div>
-      </article>
-    </section>
-
-    <section className={styles.pricingDetails} aria-label="Cómo funciona el precio de GymFort">
-      <div className={styles.sectionHeader}>
-        <p className={styles.sectionEyebrow}>Una regla fácil de entender</p>
-        <h2>Crece sin complicar tu facturación.</h2>
-        <span>Una cuenta puede administrar múltiples gimnasios. Cada sucursal conserva su operación independiente y se licencia de acuerdo con su propia capacidad.</span>
-      </div>
-      <div className={styles.detailsGrid}>
-        <article className={styles.detailCard}><h3>Socios activos, no registros históricos</h3><p>Para determinar el plan contamos a los clientes con <strong>membresía vigente</strong> en la sucursal. Tus registros históricos, prospectos y clientes inactivos permanecen en GymFort sin elevar artificialmente tu tarifa.</p></article>
-        <article className={styles.detailCard}><h3>Una licencia por sucursal</h3><p>Si administras dos, tres o más ubicaciones, cada una utiliza el plan correspondiente a sus socios activos. <strong>El propietario mantiene una sola cuenta de administración</strong> para operar sus sucursales.</p></article>
-        <article className={styles.detailCard}><h3>Sin castigar el crecimiento</h3><p>Superar ocasionalmente un límite no detiene tu operación. Cuando el crecimiento se vuelve sostenido, ajustamos la sucursal al siguiente nivel para que el sistema siga acompañando su escala.</p></article>
-        <article className={styles.detailCard}><h3>Costos variables separados</h3><p>Hardware, instalaciones físicas, desarrollos específicos y consumos de proveedores externos como SMS o WhatsApp se cotizan por separado cuando apliquen. <strong>GymFort no cobra comisión adicional sobre tus ventas.</strong></p></article>
-      </div>
-
-      <div className={styles.implementation}>
-        <div className={styles.implementationHeader}>
-          <div><p>Puesta en marcha</p><h3>Implementación inicial por sucursal</h3></div>
-          <span>Pago único que cubre configuración estándar, migración base, preparación operativa y capacitación inicial. Proyectos especiales se cotizan según alcance.</span>
-        </div>
-        <div className={styles.implementationGrid}>
-          {implementation.map(([plan, price]) => <div className={styles.implementationItem} key={plan}><b>{plan}</b><strong>{price}</strong><small>MXN + IVA · una sola vez</small></div>)}
-        </div>
+        <article>
+          <span>05</span>
+          <h3>GymFort Enterprise</h3>
+          <p>Para sucursales con más de 2,000 socios activos o grupos con necesidades especiales de integración, soporte, infraestructura o despliegue.</p>
+          <h3>Cotización personalizada</h3>
+          <p>La operación multi-sucursal no obliga a contratar Enterprise.</p>
+        </article>
+        <article>
+          <span>06</span>
+          <h3>Implementación inicial</h3>
+          <p>Pago único por sucursal que incluye configuración estándar, migración base, preparación operativa y capacitación inicial.</p>
+          <p><strong>GymFort 150:</strong> $2,500 + IVA<br /><strong>GymFort 500:</strong> $3,500 + IVA<br /><strong>GymFort 1000:</strong> $5,000 + IVA<br /><strong>GymFort 2000:</strong> $7,500 + IVA</p>
+        </article>
       </div>
     </section>
 
-    <section className={styles.faqSection} aria-label="Preguntas frecuentes sobre precios">
-      <div className={styles.sectionHeader}>
-        <p className={styles.sectionEyebrow}>Preguntas frecuentes</p>
-        <h2>Sin letras pequeñas en la forma de cobrar.</h2>
-        <span>La estructura está diseñada para que sepas qué pagas hoy y cómo cambia tu costo conforme crece tu operación.</span>
-      </div>
-      <div className={styles.faqGrid}>{pricingFaq.map(([question, answer]) => <article className={styles.faqItem} key={question}><h3>{question}</h3><p>{answer}</p></article>)}</div>
+    <section className="landing-proof" aria-label="Lo que incluyen los planes de GymFort"><div><strong>GymFort completo</strong><span>Todas las funcionalidades actuales en todos los planes.</span></div><div><strong>Staff incluido</strong><span>Sin cobro adicional por empleados o administradores.</span></div><div><strong>0% comisión</strong><span>GymFort no agrega comisión sobre tus ventas.</span></div><div><strong>Soporte incluido</strong><span>Soporte técnico estándar y actualizaciones.</span></div></section>
+
+    <section className="landing-steps" aria-label="Cómo se calcula el plan de GymFort">
+      <div><p>Una regla fácil de entender</p><h2>Crece sin complicar tu facturación.</h2><span>Una cuenta puede administrar múltiples gimnasios. Cada sucursal conserva su operación y se licencia de acuerdo con su propia capacidad.</span></div>
+      <ol>{pricingRules.map(([title,text], index) => <li key={title}><b>0{index + 1}</b><section><h3>{title}</h3><p>{text}</p></section></li>)}</ol>
+    </section>
+
+    <section className="landing-section" aria-label="Preguntas frecuentes sobre precios">
+      <div className="landing-section-heading"><p>Preguntas frecuentes</p><h2>Sin letras pequeñas en la forma de cobrar.</h2><span>La estructura está diseñada para que sepas qué pagas hoy y cómo cambia tu costo conforme crece tu operación.</span></div>
+      <div className="feature-grid">{pricingFaq.map(([question,answer], index) => <article key={question}><span>{String(index + 1).padStart(2, "0")}</span><h3>{question}</h3><p>{answer}</p></article>)}</div>
     </section>
 
     <section className="landing-contact" id="contacto"><div><p>¿Quieres conocer GymFort?</p><h2>Conversemos sobre la operación de tu gimnasio.</h2><span>Cuéntanos cuántos socios activos y sucursales tienes y te ayudaremos a identificar el plan adecuado para cada ubicación.</span></div><a href="mailto:contacto@gymfort.mx?subject=Quiero%20conocer%20GymFort">contacto@gymfort.mx <span>→</span></a></section>
