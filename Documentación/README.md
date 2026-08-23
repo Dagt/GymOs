@@ -2,7 +2,7 @@
 
 Versión documental: 0.9
 Estado: FUENTE CANÓNICA
-Corte: 22 de agosto de 2026
+Corte: 23 de agosto de 2026
 
 GymFort es la identidad comercial vigente. `GymOS`/`gymos` permanece como nombre técnico histórico en paquetes Java, variables, base de datos y algunos artefactos; una migración de marca no debe romper contratos ni datos existentes.
 
@@ -32,7 +32,8 @@ Para **Automatizaciones y Notificaciones**, las fichas `modulos/16-automations.m
 
 Fuentes operativas complementarias:
 
-- `../docs/operations/`: despliegue, respaldo, incidentes, correo, kiosco y Stripe.
+- `../docs/operations/`: despliegue, respaldo, incidentes, correo, kiosco,
+  Stripe y contrato/diagnóstico del Connector de acceso físico.
 - `../docs/security/`: permisos y verificación multi-tenant.
 - `../docs/testing/`: aceptación funcional y Stripe sandbox.
 - `../infra/README.md`: ejecución local y perfil Docker de Stripe CLI.

@@ -1,6 +1,6 @@
 # Estado por módulos
 
-Corte: 22 de agosto de 2026
+Corte: 23 de agosto de 2026
 
 Esta carpeta documenta el comportamiento existente de cada módulo backend. Los estados permitidos son `PARCIAL`, `FUNCIONAL`, `ESTABILIZADO`, `PLANIFICADO` y `NO AUDITADO`.
 
@@ -17,7 +17,7 @@ Cada ficha debe separar lo implementado, pendiente y fuera de alcance; enlazar l
 | `07-sales.md` | `sales` | Ventas, pagos y devoluciones |
 | `08-memberships.md` | `memberships` | Membresías, periodos, renovaciones y cambios |
 | `09-benefits.md` | `benefits`, `eligibility` | Beneficios y elegibilidad transversal |
-| `10-access.md` | `access` | Visitas y control de acceso |
+| `10-access.md` | `access` | Elegibilidad, control plane físico y Connector API |
 | `11-selfservice.md` | `selfservice` | Kiosco y autoservicio |
 | `12-bookings.md` | `bookings` | Recursos, disponibilidad y reservas |
 | `13-inventory.md` | `inventory` | Existencias, movimientos y auditorías |
@@ -36,3 +36,8 @@ Para el cierre de Automatizaciones/email consultar además:
 - `../../docs/operations/email-delivery.md`;
 - `../../docs/operations/zeptomail-email.md`;
 - `../../docs/testing/automations-kiosk-acceptance.md`.
+
+Para el control físico consultar además:
+
+- `../../docs/operations/physical-access-connector.md`;
+- `../../docs/operations/access-device-troubleshooting.md`.

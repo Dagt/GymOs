@@ -1,595 +1,347 @@
 # Accesos y control físico
 
-Estado: `FASE 1 INICIADA / CONECTOR LOCAL PENDIENTE`
+Estado: `CONTROL PLANE CLOUD IMPLEMENTADO / CONNECTOR LOCAL Y ADAPTER HIKCENTRAL PENDIENTES`
+
 Última revisión: 23 de agosto de 2026
 
-## 1. Propósito del módulo
+## 1. Alcance y fuente de verdad
 
-El módulo `access` es responsable del **control operativo y físico de acceso** a una
-sucursal y a sus zonas restringidas. Su pregunta principal es:
-
-> ¿Esta persona puede utilizar este punto de acceso, en esta sucursal, en este momento?
-
-No es responsable de autenticación de usuarios administrativos, RBAC ni permisos
-para usar pantallas de GymFort. Tampoco debe convertirse en un segundo módulo de
-ventas. La identidad administrativa pertenece a `identity/security`; la venta y
-el cobro pertenecen a `sales/payments`; la vigencia comercial pertenece a
-`memberships`; y la interpretación común de elegibilidad pertenece a
-`eligibility`.
-
-La frontera deseada es:
+El módulo `access` decide y distribuye derechos de acceso físico por organización
+y sucursal. GymFort es la fuente de verdad comercial:
 
 ```text
-Client
-  -> Membership vigente
+Client activo
+  -> Membership vigente o en gracia
   -> MembershipPlan
-  -> Benefit tipo ACCESS heredado
-  -> EligibilityPolicy
-  -> Access
-  -> punto físico / proveedor de control de acceso
+  -> Benefit tipo ACCESS
+  -> estado deseado por proveedor
+  -> GymFort Local Connector
+  -> sistema local de control físico
 ```
 
-## 2. Decisión de producto vigente
+`EligibilityPolicy` sigue siendo la única interpretación de cliente, fecha
+operativa, membresía, gracia, plan, multi-sucursal y beneficios. `access` no
+duplica esas reglas. Tampoco administra usuarios internos, cobros ni biometría.
 
-### 2.1 Los derechos físicos se expresan con beneficios `ACCESS`
+Una visita comercial normal se representa mediante una membresía de un día. La
+infraestructura histórica `visit_pass` permanece por compatibilidad, pero ya no
+forma parte del flujo principal de la consola.
 
-Los beneficios `ACCESS` son la abstracción canónica para representar derechos
-físicos. Un plan no concede acceso por su nombre ni por ser "Premium"; concede
-los beneficios `ACCESS` vinculados mediante `benefit_membership_plan`.
+## 2. Estado real de la entrega
 
-Ejemplos:
+| Pieza | Estado | Alcance comprobado |
+|---|---|---|
+| Decisión lógica y bitácora | IMPLEMENTADO | Elegibilidad por membresía/beneficio, autorización temporal y apertura manual simulada |
+| Modelo físico provider-neutral | IMPLEMENTADO | Conexión, puntos, recursos externos, niveles, personas, estado deseado y salud por sucursal |
+| Control plane del Connector | IMPLEMENTADO | Activación, secreto rotatorio, heartbeat, jobs con lease, resultados, eventos y candidatos |
+| Sincronización automática | IMPLEMENTADO | Eventos de membresía, estado del socio y configuración de beneficios; reconciliación manual de recuperación |
+| Consola administrativa | IMPLEMENTADO | Secuencia proveedor → puntos → derechos → recursos → personas → salud |
+| GymFort Local Connector ejecutable | PENDIENTE CONNECTOR | Debe instalarse dentro de la LAN del primer cliente |
+| Adapter contra HikCentral Professional | PENDIENTE HIKCENTRAL REAL | Requiere descubrimiento de versión, licencia, API/SDK, topología y pruebas físicas |
+| Apertura real del torniquete | PENDIENTE HARDWARE | `commands/open` conserva `SIMULATED_OPEN`; no se afirma operación física |
+
+Configurar `HIKCENTRAL` en la consola significa que el contrato cloud está listo
+para un Connector. No significa que GymFort esté llamando hoy a HikCentral.
+
+## 3. Proveedores y puntos físicos
+
+`PhysicalAccessProviderCatalog` evita condicionales de marca en el dominio:
+
+- `HIKCENTRAL`: primer contrato cloud configurable; necesita Connector y
+  validación contra la instalación real;
+- `SIMULATED`: diagnóstico sin hardware y nunca productivo;
+- `ZKTECO`, `SUPREMA`, `GENERIC_RELAY` y `CLOUD_PROVIDER`: visibles como
+  planificados y no seleccionables.
+
+La conexión V1 es única por organización/sucursal y su proveedor es inmutable.
+Una migración de proveedor exige revocación y procedimiento asistido; no se
+sobrescribe de forma silenciosa.
+
+Cada punto productivo debe cumplir estas invariantes:
+
+1. pertenece a la organización y sucursal activas;
+2. tiene exactamente un beneficio `ACCESS` requerido, nunca cero ni varios;
+3. se vincula explícitamente con una referencia de puerta, torniquete o recurso
+   externo del mismo proveedor;
+4. utiliza un código de dispositivo único y normalizado.
+
+La relación conceptual es:
 
 ```text
-Plan Mensual Básico
-  -> GYM_ACCESS
-
-Plan Mensual Premium
-  -> GYM_ACCESS
-  -> SAUNA_ACCESS
-
-Plan Visita Diaria
-  -> GYM_ACCESS
-
-Plan Visita Diaria Premium
-  -> GYM_ACCESS
-  -> SAUNA_ACCESS
+MAIN_TURNSTILE -> GYM_ACCESS -> external access level ref
+SAUNA_DOOR     -> SAUNA_ACCESS -> external access level ref
 ```
 
-El socio no recibe copias en `client_benefit`. El derecho se resuelve de forma
-dinámica a partir de la membresía operativa y su plan actual. Cambiar de plan,
-vencer, suspender o revocar la membresía debe cambiar inmediatamente la
-eligibilidad calculada.
+No existe el fallback productivo “sin requisito = cualquier membresía”. El modo
+`SIMULATED` conserva flexibilidad sólo para diagnóstico local.
 
-### 2.2 Una visita diaria se modela como una membresía de un día
+## 4. Estado deseado y sincronización automática
 
-Para el alcance real previsto de GymFort no se desarrollará un segundo sistema
-comercial de paquetes de N visitas. La visita normal al gimnasio se modelará
-como un `membership_plan` con duración de un día.
+GymFort persiste estado deseado por conexión y socio. No confunde activación de
+membresía con entrega exitosa al hardware.
 
-Ejemplos:
+Estados expuestos:
 
-- `Visita diaria`: un día, `GYM_ACCESS`.
-- `Visita diaria Premium`: un día, `GYM_ACCESS` + `SAUNA_ACCESS`.
+- `PENDING`: existe un job durable por entregar;
+- `SYNCED`: el Connector confirmó el job vigente;
+- `FAILED`: el último intento falló; el job indica si todavía es reintentable;
+- `BLOCKED`: falta un prerrequisito cloud.
 
-El flujo de un visitante nuevo será:
+`NOT_LINKED` no es un estado persistido: es la condición que presenta la vista
+cuando todavía no existe vínculo de persona ni estado deseado para ese socio.
+
+Bloqueos comunes:
+
+- `EXTERNAL_PERSON_LINK_REQUIRED`;
+- `ACCESS_LEVEL_MAPPING_REQUIRED`;
+- `CONNECTION_DISABLED`;
+- `CLIENT_NOT_FOUND`.
+
+Acciones del contrato:
+
+- `UPSERT`: crear o actualizar los niveles deseados;
+- `REVOKE`: retirar todos los niveles de GymFort;
+- `RECONCILE`: comparar y reparar el estado externo.
+
+Los siguientes cambios recalculan automáticamente a las personas ya vinculadas:
+
+- membresía activada;
+- renovación;
+- cambio de plan;
+- vencimiento;
+- cambio de estado del socio;
+- alta/configuración de un beneficio `ACCESS`;
+- cambio de mapeos físicos.
+
+Vincular una persona también genera su estado inicial. Los botones “Forzar
+reconciliación” existen para recuperación operativa; no son el flujo normal.
+
+En el dominio vigente, la suspensión y reactivación operativas se expresan como
+cambios de estado del socio; el cambio de plan cancela la membresía anterior y
+publica `MembershipPlanChangedV1`. No existe todavía un comando independiente
+para cancelar, suspender o reactivar una membresía. Si ese caso de uso se agrega,
+deberá publicar un evento de cambio de derechos consumido por esta misma
+reconciliación antes de exponerse en producción.
+
+## 5. Entrega durable al Connector
+
+`access_provider_sync_job` es la bandeja durable. Un job contiene únicamente:
+
+- acción;
+- referencia opaca de persona;
+- referencias de niveles de acceso;
+- versión deseada;
+- clave de idempotencia;
+- estado, intentos, lease, token efímero del claim y error sanitizado.
+
+El Connector reclama lotes con `FOR UPDATE SKIP LOCKED`. El lease y un
+`claimToken` nuevo por intento evitan que un worker anterior complete, falle o
+extienda un job recuperado. Los jobs de un mismo socio se serializan; una versión
+deseada nueva sustituye pendientes/reintentos anteriores y espera a que termine
+o venza cualquier intento ya reclamado. Completar actualiza a `SYNCED` sólo si
+todavía corresponde a la versión deseada. Un fallo reintentable vuelve a estar
+disponible después del retraso indicado; uno terminal queda `FAILED`. Repetir el
+mismo evento no crea jobs duplicados.
+
+La cola reside en PostgreSQL y sobrevive a reinicios de GymFort Cloud o del
+Connector. Una caída de Internet no cambia la membresía comercial y el sistema
+local debe seguir decidiendo con su último estado distribuido.
+
+## 6. API administrativa
+
+Todas las rutas viven bajo `/api/v1/access` y usan JWT, organización y sucursal
+del actor:
+
+- `GET|PUT /physical-integration`;
+- `GET /physical-integration/clients/{clientId}`;
+- `PUT /physical-integration/clients/{clientId}/link`;
+- `POST /physical-integration/clients/{clientId}/synchronize`;
+- `POST /physical-integration/reconcile`;
+- `PUT|DELETE /physical-integration/devices/{deviceId}/link`;
+- `POST /physical-integration/connector/activation`;
+- `POST /physical-integration/connector/revoke`;
+- `GET /physical-integration/candidates`;
+- `PUT /physical-integration/candidates/{candidateId}/match`;
+- `POST /physical-integration/candidates/{candidateId}/reject`;
+- `POST /devices` y `GET|PUT /devices/{deviceId}/benefits`.
+
+Las mutaciones físicas y la revisión de candidatos exigen
+`access.physical.manage`, asignado en V84 a Dueño y Gerente. Recepción no lo
+recibe. Soporte de plataforma opera mediante su autoridad global y queda
+auditado. La lectura operativa sigue usando `access.read`.
+
+`POST /api/v1/access/commands/open` conserva su contrato excepcional:
+
+- permiso separado `access.manual.open`;
+- dispositivo explícito;
+- motivo obligatorio;
+- auditoría;
+- resultado `SIMULATED_OPEN` mientras no exista adapter real.
+
+## 7. API propia del GymFort Local Connector
+
+El Connector no usa JWT de empleados. Sus rutas están separadas bajo
+`/api/v1/physical-connectors`:
+
+- `POST /activate`;
+- `POST /heartbeat`;
+- `POST /jobs/claim`;
+- `POST /jobs/{jobId}/complete`;
+- `POST /jobs/{jobId}/fail`;
+- `POST /jobs/{jobId}/lease`;
+- `POST /events`;
+- `POST /person-candidates`.
+
+Después de activarse, autentica cada llamada con:
 
 ```text
-Recepción
-  -> buscar cliente
-  -> si no existe, alta rápida de Client
-  -> contratar plan Visita diaria / Visita diaria Premium
-  -> cobrar mediante el flujo normal de membresía
-  -> pago confirmado
-  -> Membership activa durante la fecha operativa
-  -> beneficios ACCESS heredados
-  -> acceso físico
+X-GymFort-Connector-Key
+X-GymFort-Connector-Secret
 ```
 
-No se crea una entidad especial `Visitor`: una persona puede existir como
-`Client` sin una membresía permanente y contratar posteriormente cualquier plan.
-
-La visita de un día usa los extremos inclusivos ya definidos por Membresías. Un
-plan de duración 1 genera `startsOn == endsOn` para la fecha operativa de la
-contratación; no significa 24 horas móviles desde la hora del pago.
-
-### 2.3 Los paquetes de visitas dejan de ser flujo objetivo
-
-El código actual contiene `visit_pass`, creación manual, consulta y consumo de
-paquetes. Esta funcionalidad fue útil para el piloto inicial, pero **no forma
-parte del flujo comercial objetivo** después de esta decisión.
-
-Por tanto:
-
-- no se ampliará `VisitPass` con integración a Catálogo ni nuevos beneficios;
-- no se creará una relación general producto -> beneficio de acceso;
-- la sección "Paquetes de visitas" ya fue retirada de la pantalla principal de
-  Access; los endpoints y tablas se mantienen temporalmente por compatibilidad;
-- los endpoints/tablas existentes pueden mantenerse temporalmente por
-  compatibilidad hasta comprobar que ninguna operación real depende de ellos;
-- su eliminación física debe hacerse en una migración posterior y explícita, no
-  dentro de un cambio no relacionado.
-
-`UC-002 Registrar visita` y `UC-023 Paquetes de visitas` representan el enfoque
-histórico previo a esta decisión. Para la evolución del módulo, este documento
-es la fuente vigente: una visita comercial normal se resuelve mediante un plan
-diario de membresía.
-
-## 3. Qué está implementado y sí se conserva
-
-### 3.1 Dispositivos de acceso
-
-`access_device` ya modela puntos físicos por organización y sucursal con datos
-útiles para la evolución posterior:
-
-- `device_code`;
-- `device_type`;
-- `status`;
-- `provider`;
-- `adapter_config_json`;
-- `last_seen_at`.
-
-Este modelo se conserva. Un dispositivo representa una puerta, torniquete,
-controlador o filtro lógico de acceso, no necesariamente un lector específico.
-
-### 3.2 Relación dispositivo -> beneficio requerido
-
-`access_device_benefit` permite declarar qué beneficios `ACCESS` exige un punto.
-Esta es la base correcta para zonas como entrada general, sauna o áreas Premium.
-
-El modelo objetivo es explícito:
-
-```text
-MAIN_DOOR
-  -> GYM_ACCESS
-
-SAUNA_DOOR
-  -> SAUNA_ACCESS
-```
-
-El comportamiento actual por el cual una puerta sin beneficios configurados
-acepta cualquier membresía vigente se considera **compatibilidad provisional**.
-Para una operación física real la entrada principal también debe tener un
-beneficio explícito, normalmente `GYM_ACCESS`. De esta manera una membresía que
-no conceda entrada física no obtiene acceso por accidente.
-
-### 3.3 `EligibilityPolicy`
-
-`com.gymos.eligibility` se conserva como fuente única de verdad para:
-
-- cliente existente y activo;
-- sucursal efectiva;
-- fecha operativa;
-- membresía vigente y gracia;
-- multi-sucursal;
-- plan vigente;
-- herencia dinámica `plan -> ACCESS`;
-- comparación contra beneficios requeridos por el dispositivo.
-
-Access no debe duplicar estas consultas ni interpretar por su cuenta los planes.
-
-### 3.4 Evaluación y bitácora
-
-Se conserva el flujo `requestAccess()` y `access_log` como registro auditable de
-intentos y decisiones. La bitácora debe seguir permitiendo distinguir:
-
-- cliente;
-- dispositivo;
-- decisión `GRANTED` / `DENIED`;
-- fuente/tipo de acceso;
-- motivo normalizado;
-- fecha/hora;
-- correlación;
-- estado del comando físico cuando exista integración real.
-
-La bitácora deberá aceptar en el futuro tanto decisiones originadas por GymFort
-como eventos importados desde un proveedor local, evitando duplicados mediante
-identificadores externos/idempotencia.
-
-### 3.5 Apertura manual
-
-La apertura manual se conserva como **override excepcional y auditado**, no como
-flujo normal de una visita pagada.
-
-Casos esperados:
-
-- técnico o proveedor;
-- emergencia;
-- incidencia con credencial;
-- discrepancia administrativa;
-- autorización expresa de un responsable.
-
-Debe existir una autoridad dedicada `access.manual.open`; el matcher genérico
-`access.manage` no debe ser suficiente para este comando sensible.
-
-### 3.6 Autorización temporal
-
-La infraestructura `access_temporary_pass` se conserva, pero su nombre de UX
-debe evolucionar de "Pase temporal" a **"Autorización temporal"** para no
-confundirla con una visita comercial.
-
-Representa una excepción administrativa limitada por tiempo y/o usos. No es un
-producto vendible y no sustituye los beneficios especiales de zonas
-restringidas. Si un plan no concede `SAUNA_ACCESS`, una autorización temporal
-genérica no debe convertirse en acceso al sauna; para una excepción puntual se
-usa apertura manual auditada o una futura autorización explícita por derecho.
-
-## 4. Qué existe hoy pero no está listo para producción física
-
-### 4.1 La apertura es simulada
-
-Actualmente una decisión concedida registra `command_status = SIMULATED_OPEN`.
-No existe un adaptador productivo que abra el torniquete o una puerta real. Esto
-es correcto para el estado actual, pero debe sustituirse por un puerto de
-integración antes del piloto físico.
-
-### 4.2 Identificación provisional
-
-`requestAccess()` puede resolver cliente por `clientId` o por identificador de
-recepción basado en datos del cliente. No existe todavía un modelo estable de
-credencial física propio de GymFort.
-
-Para el primer piloto Hikvision **no es obligatorio crear inmediatamente un
-`AccessCredential` universal**: se puede conservar la biometría y la identidad
-física dentro de HikCentral y relacionar el `Client` de GymFort con el
-identificador opaco de persona del proveedor. Si más adelante se integran QR,
-RFID/NFC u otros fabricantes, se evaluará una abstracción de credenciales común.
-
-### 4.3 Dispositivo por defecto
-
-Si no llega `deviceCode`, el repositorio puede seleccionar un dispositivo activo
-por defecto. Esto sólo es aceptable para recepción/piloto con una puerta. En una
-sucursal con múltiples zonas, toda evaluación física debe identificar de forma
-inequívoca el dispositivo/punto de acceso.
-
-### 4.4 Consumo de autorización temporal
-
-El consumo de `TemporaryPass` se realiza mediante actualización condicional y
-atómica por organización, sucursal, vigencia, estado y usos disponibles. Un
-segundo consumo concurrente se registra como denegado y no abre el acceso.
-
-### 4.5 Mensaje de periodo de gracia
-
-La política permite acceso durante `graceEndsOn`, pero la respuesta actual puede
-mostrar únicamente `membership.endsOn`. El motivo visible debe diferenciar
-membresía vigente normal y periodo de gracia.
-
-### 4.6 Seguridad y aislamiento
-
-Faltan pruebas negativas completas de tenant/sucursal/dispositivo, respuestas
-mínimas para no filtrar información sensible y pruebas específicas del permiso
-de apertura manual.
-
-## 5. Pantalla `/access`: objetivo de UX
-
-La pantalla debe convertirse en una **consola de control de acceso**, no en una
-segunda caja.
-
-Debe conservar/mostrar:
-
-- cliente seleccionado;
-- dispositivo/punto de acceso;
-- evaluación de acceso y motivo;
-- beneficios `ACCESS` efectivos del cliente;
-- apertura manual excepcional;
-- autorización temporal;
-- bitácora reciente;
-- en el futuro, salud/sincronización del proveedor físico.
-
-### 5.1 Consola por intención
-
-La pantalla no debe mezclar todas las tareas en una columna interminable. La
-consola se divide en tres vistas dentro de la misma sucursal:
-
-1. **Operar acceso**: elegir el punto físico, encontrar al socio, revisar los
-   derechos requeridos y registrar la decisión. La apertura manual y la
-   autorización temporal quedan agrupadas como excepciones controladas, no como
-   acciones principales.
-2. **Configuración física**: registrar el identificador del conector local,
-   registrar cada puerta/torniquete, asignarle sus beneficios `ACCESS` requeridos,
-   mapear esos beneficios a Access Levels del proveedor y preparar la
-   sincronización de un socio seleccionado.
-3. **Bitácora**: consultar los eventos recientes sin alargar toda la página.
-   El API entrega un conjunto acotado de resultados y la tabla usa un panel con
-   desplazamiento propio y encabezado fijo. Para investigación histórica se
-   incorporarán filtros y paginación, no una lista sin límite en la consola.
-
-El punto físico seleccionado debe mostrar siempre sus requisitos efectivos. Si
-no tiene ningún beneficio `ACCESS` asignado, la pantalla debe advertirlo
-claramente antes de una operación real; la configuración se guarda mediante
-`POST /api/v1/access/devices` y
-`GET`/`PUT /api/v1/access/devices/{deviceId}/benefits`; permanece aislada por
-organización y sucursal. Registrar un punto no abre hardware: el estado de
-apertura física sólo cambia cuando exista un conector local sano.
-
-La primera base de esa integración ya está disponible en la misma consola:
-
-- configuración por sucursal de una conexión `HIKCENTRAL`;
-- identificador público del GymFort Local Connector, sin URL, contraseña ni
-  secreto del proveedor;
-- mapeo `Benefit ACCESS -> Access Level` externo;
-- vínculo `Client -> external_person_ref` opaco;
-- estado deseado de sincronización `PENDING`, `BLOCKED`, `SYNCED` o `FAILED`.
-
-La configuración no llama todavía a HikCentral ni manipula biometría. Su único
-efecto es persistir el estado deseado que consumirá el conector local.
-
-Debe retirarse del flujo principal:
-
-- creación manual de paquetes de visitas;
-- consumo comercial manual de paquetes.
-
-La contratación de una visita diaria se hará desde el mismo flujo de
-membresías/recepción que contrata cualquier otro plan, con alta rápida de cliente
-cuando la persona todavía no exista.
-
-## 6. Estrategia de control físico
-
-### 6.1 Principio de arquitectura
-
-GymFort debe ser la **fuente de verdad comercial y de derechos**:
-
-```text
-Client -> Membership -> Plan -> ACCESS Benefits
-```
-
-El proveedor físico debe ser el **ejecutor local** de esos derechos. No se debe
-acoplar `AccessService` a marcas concretas.
-
-Arquitectura objetivo:
-
-```text
-GymFort Cloud
-  -> Access integration port
-  -> conector/adaptador de proveedor
-  -> sistema local de control de acceso
-  -> terminal/torniquete/puerta
-```
-
-Las integraciones posteriores deben reutilizar el mismo puerto en lugar de
-introducir `if provider == ...` dentro de la lógica de elegibilidad.
-
-### 6.2 Primer proveedor objetivo: HikCentral Professional
-
-El primer gimnasio piloto ya utiliza un torniquete y terminal biométrico
-Hikvision administrados por **HikCentral Professional** dentro de la red local.
-Actualmente recepción mantiene por separado:
-
-1. el sistema de membresías;
-2. las personas/fotografías/reconocimiento facial y permisos en HikCentral.
-
-El objetivo del piloto es eliminar esa doble administración. GymFort controlará
-membresías y derechos; HikCentral seguirá administrando el reconocimiento local,
-la comunicación con el terminal y la apertura física.
-
-No se integrará inicialmente GymFort directamente contra el torniquete si
-HikCentral ya es el sistema que lo administra.
-
-### 6.3 Modo recomendado para HikCentral: sincronización, no decisión cloud por paso
-
-El primer piloto debe usar **sincronización de autorizaciones**:
-
-```text
-GymFort calcula derechos
-  -> sincroniza persona / Access Levels necesarios en HikCentral
-  -> HikCentral distribuye y decide localmente
-  -> terminal reconoce rostro/tarjeta
-  -> puerta abre o rechaza sin depender de Internet en cada paso
-```
-
-Esto evita que una caída de Internet impida entrar al gimnasio y aprovecha el
-controlador local que ya existe.
-
-La relación conceptual será:
-
-```text
-GymFort GYM_ACCESS   <-> HikCentral Access Level: acceso general
-GymFort SAUNA_ACCESS <-> HikCentral Access Level: sauna
-```
-
-El nombre exacto y los identificadores se configurarán por sucursal/proveedor;
-no se codificarán en el dominio.
-
-### 6.4 Conector local
-
-Como HikCentral vive en la LAN y GymFort en la nube, se prevé un **GymFort Local
-Connector** ligero, preferentemente instalado en la misma PC o red donde opera
-HikCentral.
-
-El conector debe:
-
-- iniciar comunicaciones salientes seguras hacia GymFort cuando sea posible;
-- evitar exponer directamente HikCentral o puertos del torniquete a Internet;
-- ejecutar llamadas al API/SDK local del proveedor;
-- aplicar comandos/sincronizaciones idempotentes;
-- reportar resultado y estado de salud;
-- en fases posteriores, reenviar eventos de acceso a GymFort.
-
-No debe contener reglas de membresía ni decidir si un cliente merece acceso; esa
-lógica permanece en GymFort.
-
-#### Base de datos y puerto ya preparados
-
-La migración `V83__physical_access_integration_foundation.sql` crea los
-registros de conexión, mapeos de beneficios, vínculos opacos de persona y estado
-de sincronización. El puerto de aplicación
-`PhysicalAccessSynchronizationPort` define el límite que implementará el
-conector/adaptador. No existe todavía una implementación remota o embebida en
-GymFort Cloud: esa separación evita acoplar la elegibilidad comercial a una
-marca, LAN, token o puerto de Hikvision.
-
-### 6.5 Biometría
-
-GymFort no debe convertirse en motor de reconocimiento facial. Para el primer
-piloto:
-
-- HikCentral/Hikvision conserva y procesa la biometría;
-- GymFort debe guardar como máximo referencias opacas necesarias para relacionar
-  un `Client` con la persona del proveedor;
-- no se copiarán plantillas biométricas al backend de GymFort salvo una decisión
-  posterior, necesidad técnica demostrada y revisión específica de seguridad,
-  privacidad y cumplimiento.
-
-La fotografía de perfil de GymFort y la fotografía/plantilla biométrica del
-proveedor son conceptos distintos aunque en una etapa futura pueda automatizarse
-el enrolamiento utilizando capacidades oficiales de HikCentral.
-
-## 7. Fases del piloto HikCentral
-
-### Fase 0 - Descubrimiento técnico
-
-Antes de escribir el adaptador se debe confirmar en el gimnasio:
-
-- versión exacta de HikCentral Professional;
+Flujo de credenciales:
+
+1. un Dueño o Gerente genera un código de activación válido por 15 minutos;
+2. el código se muestra una vez y en base sólo se almacena su hash BCrypt;
+3. `/activate` consume el código de forma atómica y devuelve un secreto una sola
+   vez;
+4. GymFort almacena únicamente el hash BCrypt del secreto;
+5. una rotación revoca la credencial anterior; una revocación corta heartbeat,
+   jobs y eventos inmediatamente;
+6. autenticación inválida responde `401 CONNECTOR_AUTH_INVALID` y se audita sin
+   registrar el secreto.
+
+Las credenciales del proveedor, URL/puerto de LAN y cualquier material
+biométrico deben residir sólo en el almacén seguro del Connector local.
+
+## 8. Eventos físicos y conciliación de personas
+
+El Connector puede publicar eventos reales una vez que el adapter exista. Cloud
+acepta únicamente eventos cuyo proveedor y recurso externo coinciden con la
+conexión autenticada. `externalEventId` es único por conexión, por lo que un
+reintento devuelve el registro existente sin duplicar `access_log`.
+
+Los metadatos están limitados en cantidad y tamaño. Se rechazan nombres de campo
+sensibles como rostro, imagen, huella, plantilla, contraseña, secreto, token o
+credencial.
+
+Para importar personas, el Connector envía referencia opaca y, opcionalmente,
+nombre/contacto. GymFort sólo sugiere una coincidencia cuando correo o teléfono
+normalizados producen un único resultado exacto visible en esa sucursal. Las
+coincidencias ambiguas quedan `CONFLICT`; nunca se enlaza automáticamente por
+similitud de nombre. Dueño o Gerente confirma o descarta desde la consola.
+
+GymFort Cloud no recibe fotografías de enrolamiento, plantillas faciales,
+huellas ni resultados de matching biométrico.
+
+## 9. Salud y operación
+
+La salud derivada de una conexión puede ser:
+
+- `DISABLED`;
+- `AWAITING_CONNECTOR`;
+- `HEALTHY`;
+- `DEGRADED`;
+- `OFFLINE` después de cinco minutos sin heartbeat.
+
+La consola muestra último heartbeat, versión del Connector, última entrega,
+jobs pendientes/fallidos y último error. Para un incidente:
+
+1. verificar que la membresía y el estado deseado sean correctos;
+2. revisar heartbeat y credencial activa;
+3. revisar jobs fallidos sin copiar secretos a tickets o logs;
+4. recuperar/reiniciar el Connector dentro de la LAN;
+5. forzar reconciliación completa;
+6. comprobar que pendientes bajen y que el proveedor conserve los niveles
+   esperados;
+7. usar apertura manual sólo con autorización y motivo mientras el adapter real
+   siga pendiente.
+
+Contratos y procedimientos detallados:
+
+- [GymFort Local Connector](../../docs/operations/physical-access-connector.md);
+- [diagnóstico de acceso físico](../../docs/operations/access-device-troubleshooting.md).
+
+## 10. Secuencia de alta para el primer cliente
+
+La consola guía este orden:
+
+1. seleccionar `HIKCENTRAL` y guardar una conexión de la sucursal;
+2. registrar cada punto físico con exactamente un beneficio `ACCESS`;
+3. vincular cada punto con la referencia real de puerta/torniquete;
+4. mapear cada beneficio a un Access Level existente;
+5. generar el código y activar el GymFort Local Connector;
+6. importar/revisar personas y confirmar vínculos;
+7. observar heartbeat, jobs y reconciliación.
+
+Antes de ejecutar los pasos 3–7 contra hardware debe completarse descubrimiento
+en sitio:
+
+- nombre y versión exacta de HikCentral Professional;
 - modelo y firmware del terminal/controlador Hikvision;
-- disponibilidad, versión y licencia de OpenAPI/Open Platform o SDK aplicable;
-- endpoint/puerto y autenticación permitidos;
+- licencia y disponibilidad de OpenAPI/Open Platform o SDK oficial;
+- autenticación, endpoint y puerto permitidos dentro de la LAN;
 - estructura actual de Persons, Doors y Access Levels;
-- posibilidad oficial de alta/actualización de persona, rostro, asignación de
-  Access Level, apertura remota y consulta/suscripción de eventos.
+- operaciones oficiales disponibles para personas, niveles, apertura y eventos;
+- política de disponibilidad cuando Internet o Cloud no responden.
 
-Ningún endpoint o puerto de proveedor debe quedar codificado hasta confirmar
-estas capacidades contra la instalación real.
+No se codifica ningún endpoint, puerto ni payload de HikCentral hasta validar esa
+instalación concreta.
 
-### Fase 1 - Sincronización mínima de permisos
+## 11. Datos y migraciones
 
-Objetivo: eliminar la duplicidad diaria de altas/bajas de autorización.
+V83 creó la base provider-neutral. V84 agrega y endurece:
 
-El enrolamiento facial puede seguir siendo manual una sola vez en HikCentral.
-GymFort almacena el identificador externo de la persona y sincroniza derechos:
+- identidades y claves foráneas compuestas de tenant/sucursal;
+- una conexión por sucursal y `connector_key` global único sin distinguir
+  mayúsculas;
+- vínculo `access_device -> external_device_ref`;
+- activaciones y credenciales hasheadas;
+- versión del estado deseado;
+- jobs durables, índices de claim, lease y reintentos;
+- conversión de estados V83 pendientes/fallidos en jobs V84 cuando conservan
+  conexión activa y vínculo de persona; los demás quedan `BLOCKED` explícitos;
+- candidatos de personas;
+- referencias externas e idempotencia en `access_log`;
+- `access.physical.manage` y reparación de `access.manual.open` para Dueño y
+  Gerente.
 
-- membresía activada/pagada -> conceder Access Levels correspondientes;
-- renovación -> mantener/actualizar vigencia;
-- cambio de plan -> recalcular derechos y retirar/agregar niveles;
-- vencimiento/cancelación/suspensión -> revocar niveles;
-- reconciliación periódica -> reparar diferencias entre estado deseado y estado
-  real del proveedor.
+No se almacenan contraseñas del proveedor ni secretos del Connector en texto
+plano.
 
-### Fase 2 - Alta de persona/enrolamiento asistido
+## 12. Evidencia automatizada
 
-Si la versión/licencia lo permite de forma oficial y segura:
+La cobertura dedicada demuestra, entre otros casos:
 
-- crear persona desde GymFort;
-- enviar/actualizar fotografía apta para enrolamiento;
-- conservar el identificador externo;
-- seguir dejando el matching biométrico dentro de Hikvision.
+- catálogo de proveedores y rechazo de proveedores planificados;
+- punto productivo con cero o múltiples beneficios rechazado;
+- aislamiento por organización, sucursal, dispositivo, recurso y candidato;
+- UPSERT, REVOKE y BLOCKED según elegibilidad/mapeo;
+- triggers de activación, renovación, cambio, vencimiento, estado de socio y
+  beneficios;
+- código de activación de un uso y secretos hasheados/revocables;
+- claim exclusivo concurrente, rotación del token al recuperar un lease,
+  serialización de versiones deseadas y reintentos;
+- idempotencia de jobs y eventos físicos;
+- upgrade V83 → V84 y migración limpia en PostgreSQL;
+- permisos separados para configuración física y apertura manual.
 
-### Fase 3 - Eventos y bitácora
+## 13. Pendiente antes de producción física
 
-Recibir o consultar eventos de HikCentral y conciliarlos con `access_log` para
-mostrar en GymFort accesos reales, rechazos, dispositivo y hora, con idempotencia
-y aislamiento por organización/sucursal.
+La entrega deja GymFort Cloud listo para iniciar la integración, no listo para
+abrir el torniquete. Faltan obligatoriamente:
 
-### Fase 4 - Resiliencia y otros proveedores
-
-Sólo después del piloto:
-
-- telemetría y heartbeat;
-- cola/reintentos del conector;
-- reconciliación después de desconexión;
-- adaptación a un segundo fabricante;
-- abstracción común de credenciales si aparece una necesidad real.
-
-No se diseñarán desde ahora múltiples adapters hipotéticos sin un segundo caso
-real.
-
-## 8. Sincronización de derechos: comportamiento objetivo
-
-La integración física debe trabajar con **estado deseado**, no con comandos
-frágiles enviados una sola vez.
-
-Ejemplo:
-
-```text
-Client Pedro
-Membership Premium ACTIVE
-Benefits deseados: [GYM_ACCESS, SAUNA_ACCESS]
-
-HikCentral actual:
-[GYM_ACCESS]
-
-Reconciliación:
-+ SAUNA_ACCESS
-```
-
-Si la llamada falla, GymFort conserva que el estado físico está pendiente y
-reintenta/reconcilia. Un pago confirmado no debe considerarse "sincronización de
-hardware exitosa" sólo porque la membresía quedó activa.
-
-Debe poder distinguirse al menos:
-
-- estado comercial de membresía;
-- derechos calculados por GymFort;
-- estado de sincronización del proveedor;
-- último error/última sincronización exitosa.
-
-## 9. Permisos y auditoría objetivo
-
-Permisos existentes/recomendados:
-
-- `access.read`: dispositivos, decisiones, bitácora y estado de sincronización;
-- `access.manage`: configuración funcional de dispositivos y beneficios;
-- `access.manual.open`: apertura excepcional inmediata;
-- los permisos de visita históricos se mantendrán sólo mientras sobreviva el
-  flujo legacy de `visit_pass`.
-
-Toda mutación física relevante debe auditar actor, organización, sucursal,
-dispositivo, motivo, correlación y resultado. Nunca se deben registrar secretos,
-plantillas biométricas ni payloads sensibles completos del proveedor.
-
-## 10. Matriz mínima de pruebas antes de producción física
-
-- membresía vigente con `GYM_ACCESS` -> permitido;
-- membresía vigente sin beneficio requerido -> denegado;
-- plan de visita diaria básico -> entrada general y no sauna;
-- plan de visita diaria Premium -> entrada general y sauna;
-- vencida fuera de gracia -> denegado/revocado en proveedor;
-- gracia -> comportamiento y mensaje correctos;
-- cliente suspendido/inactivo -> denegado/revocado;
-- cambio de plan -> revocación y concesión correctas;
-- multi-sucursal según alcance real del beneficio;
-- dispositivo de otra sucursal/tenant -> rechazo;
-- apertura manual requiere permiso dedicado y deja auditoría;
-- consumo concurrente de autorización temporal;
-- reintento de sincronización idempotente;
-- reconciliación de diferencia GymFort/HikCentral;
-- evento duplicado del proveedor no duplica `access_log`;
-- desconexión del conector no altera incorrectamente la membresía comercial.
-
-## 11. Prioridad de cambios
-
-Orden recomendado para la siguiente evolución del módulo:
-
-1. Retirar de la UX principal "Paquetes de visitas" y renombrar "Pase temporal"
-   a "Autorización temporal".
-2. Crear/configurar planes `Visita diaria` y `Visita diaria Premium` usando el
-   flujo normal de membresías y beneficios `ACCESS`.
-3. Exigir `GYM_ACCESS` explícito en la entrada principal del piloto en vez de
-   depender de "sin requisitos = cualquier membresía".
-4. Corregir `access.manual.open` para que proteja realmente la apertura manual.
-5. Hacer atómico el consumo de autorización temporal y ampliar matriz de
-   seguridad/concurrencia (`ACC-001`).
-6. Introducir el puerto de integración física sin acoplar `AccessService` a
-   Hikvision.
-7. Ejecutar Fase 0 de descubrimiento contra la instalación real de HikCentral.
-8. Implementar conector local + sincronización mínima de derechos para el primer
-   gimnasio piloto.
-9. Incorporar eventos reales a la bitácora.
-10. Automatizar enrolamiento sólo si el API/licencia instalados lo permiten y
-    después de validar privacidad/seguridad.
-11. Abstraer otros fabricantes únicamente cuando exista un segundo caso real.
-
-## 12. Criterio de éxito del módulo
-
-Access se considerará listo para el primer gimnasio real cuando:
-
-- una membresía pagada y vigente determine sus derechos exclusivamente mediante
-  `ACCESS`;
-- una visita diaria use el mismo motor de membresías, sin `VisitPass` comercial;
-- la puerta principal y las zonas restringidas tengan requisitos explícitos;
-- GymFort pueda sincronizar concesión y revocación con HikCentral sin que
-  recepción mantenga manualmente permisos en ambos sistemas;
-- el reconocimiento y la decisión local puedan seguir funcionando aunque
-  GymFort Cloud no sea alcanzable momentáneamente;
-- los eventos relevantes puedan auditarse/reconciliarse;
-- apertura manual y autorizaciones temporales permanezcan como excepciones
-  controladas, no como camino comercial normal.
+1. descubrimiento técnico de la instalación del cliente;
+2. implementar, empaquetar y actualizar de forma segura GymFort Local Connector;
+3. implementar el adapter HikCentral contra API/SDK oficial confirmado;
+4. comprobar alta/actualización, concesión, revocación y reconciliación reales;
+5. comprobar eventos reales, reloj, duplicados y mapeo de dispositivos;
+6. probar caída/recuperación de Internet, Cloud, Connector y HikCentral;
+7. definir instalación como servicio, logs sanitizados, métricas, alertas,
+   backup de configuración y rotación de secretos;
+8. ejecutar pruebas de aceptación con el torniquete y obtener aprobación del
+   cliente;
+9. revisar privacidad y contratos aplicables al tratamiento biométrico que
+   seguirá realizando Hikvision/HikCentral;
+10. reemplazar `SIMULATED_OPEN` sólo cuando el puerto productivo tenga resultado
+    confirmado y runbook probado.

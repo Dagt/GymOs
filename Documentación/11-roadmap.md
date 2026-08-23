@@ -1,6 +1,6 @@
 # 11. Roadmap de implementación
 
-Corte: 22 de agosto de 2026
+Corte: 23 de agosto de 2026
 
 Este documento expresa secuencia y estado, no sustituye el estado verificable del documento 13 ni la deuda del 28.
 
@@ -17,7 +17,9 @@ Este documento expresa secuencia y estado, no sustituye el estado verificable de
 
 - CRM de socios, importación, catálogo, POS, caja y reportes operativos.
 - Membresías con periodos inclusivos, alta, renovación, cambio y beneficios.
-- Acceso lógico, dispositivos, bitácora, autorizaciones temporales y beneficios `ACCESS`; apertura física aún simulada.
+- Acceso lógico, dispositivos, bitácora, autorizaciones temporales y beneficios
+  `ACCESS`; control plane/Connector API durables implementados y apertura física
+  aún simulada.
 - Coaches, ejercicios, rutinas versionadas, asignaciones, métricas, CSV/PDF.
 - Profesionales wellness, servicios, disponibilidad, agenda y citas.
 
@@ -96,22 +98,34 @@ Estas mejoras no bloquean el cierre V1:
 - WhatsApp y push mediante adaptadores nuevos de `notifications`;
 - campañas promocionales únicamente con consentimiento.
 
-## Siguiente bloque: acceso físico en gimnasio piloto
+## En curso: acceso físico en gimnasio piloto
 
 El primer caso real está definido: gimnasio con torniquete/terminal Hikvision administrado por HikCentral Professional en red local.
 
-Secuencia:
+Entregado en `feature/physical-access-control`:
 
-1. ajustar UX de Access y permisos/pruebas;
-2. configurar `GYM_ACCESS`, `SAUNA_ACCESS` y planes de visita diaria;
-3. confirmar versión/licencia/API/SDK/topología de HikCentral;
-4. introducir puerto de integración física independiente;
-5. crear GymFort Local Connector y adaptador HikCentral;
-6. mantener enrolamiento facial manual inicialmente y sincronizar Access Levels;
-7. añadir reconciliación/estado/errores;
-8. importar eventos a `access_log`;
-9. automatizar persona/fotografía sólo si la interfaz oficial lo permite;
-10. abstraer segundo fabricante sólo con caso real.
+- UX y permiso `access.physical.manage` separados;
+- catálogo provider-neutral con HikCentral como primer contrato configurable;
+- punto productivo con exactamente un beneficio `ACCESS`;
+- vínculos explícitos de recursos y personas externas;
+- estado deseado automático por eventos de membresía/socio/beneficio;
+- jobs PostgreSQL con idempotencia, lease, reintentos y reconciliación;
+- activación/rotación/revocación segura y heartbeat del Connector;
+- contratos para eventos idempotentes y candidatos de persona;
+- aislamiento tenant/sucursal y pruebas PostgreSQL/migración.
+
+Secuencia restante:
+
+1. configurar `GYM_ACCESS`, niveles, puntos y planes de visita diaria del cliente;
+2. confirmar versión/licencia/API/SDK/topología de HikCentral en sitio;
+3. implementar y empaquetar GymFort Local Connector;
+4. implementar el adapter HikCentral sobre la interfaz oficial confirmada;
+5. mantener enrolamiento facial manual inicialmente y sincronizar Access Levels;
+6. validar concesión, revocación, reconciliación y eventos contra hardware real;
+7. probar caída/recuperación y cerrar runbook/observabilidad/rotación;
+8. automatizar persona/fotografía sólo si la interfaz oficial lo permite y pasa
+   revisión de privacidad;
+9. abstraer un segundo fabricante únicamente con un caso real.
 
 El modo inicial será de **sincronización de permisos**: HikCentral y terminales deciden localmente; GymFort Cloud no debe ser requisito en línea para abrir el torniquete.
 
