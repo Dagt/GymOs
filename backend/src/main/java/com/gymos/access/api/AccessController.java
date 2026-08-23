@@ -53,6 +53,24 @@ public class AccessController {
 		return accessService.devices(principal);
 	}
 
+	@PostMapping("/devices")
+	AccessDeviceRecord createDevice(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@Valid @RequestBody AccessDeviceRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return accessService.createDevice(
+				principal, request.name(), request.deviceCode(), request.deviceType(), request.provider(), correlationId(servletRequest));
+	}
+
+	@GetMapping("/devices/{deviceId}/benefits")
+	List<UUID> deviceRequiredBenefits(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID deviceId
+	) {
+		return accessService.deviceRequiredBenefits(principal, deviceId);
+	}
+
 	@GetMapping("/logs")
 	List<AccessLogRecord> logs(
 			@AuthenticationPrincipal GymOsPrincipal principal,
@@ -235,6 +253,14 @@ public class AccessController {
 
 	public record DeviceBenefitsRequest(
 			@Size(max = 100) List<@NotNull UUID> benefitIds
+	) {
+	}
+
+	public record AccessDeviceRequest(
+			@NotBlank @Size(max = 120) String name,
+			@NotBlank @Size(max = 80) String deviceCode,
+			@NotBlank @Pattern(regexp = "TURNSTILE|DOOR|GATE|ZONE|BIOMETRIC") String deviceType,
+			@Pattern(regexp = "HIKCENTRAL|SIMULATED") String provider
 	) {
 	}
 

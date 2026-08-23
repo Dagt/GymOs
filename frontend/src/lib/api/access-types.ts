@@ -8,6 +8,13 @@ export type AccessDevice = {
   lastSeenAt: string | null;
 };
 
+export type AccessDevicePayload = {
+  name: string;
+  deviceCode: string;
+  deviceType: "TURNSTILE" | "DOOR" | "GATE" | "ZONE" | "BIOMETRIC";
+  provider?: "HIKCENTRAL" | "SIMULATED" | null;
+};
+
 export type AccessDecision = {
   logId: string;
   decision: "GRANTED" | "DENIED";
@@ -127,7 +134,8 @@ export type PhysicalIntegrationConnection = {
   displayName: string;
   connectorKey: string | null;
   enabled: boolean;
-  syncStatus: "DISABLED" | "AWAITING_CONNECTOR" | "HEALTHY" | "DEGRADED" | string;
+  syncStatus:
+    "DISABLED" | "AWAITING_CONNECTOR" | "HEALTHY" | "DEGRADED" | string;
   lastHeartbeatAt: string | null;
   lastSynchronizedAt: string | null;
   lastError: string | null;

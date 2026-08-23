@@ -39,6 +39,56 @@ public class AccessRepository {
 				.list();
 	}
 
+	public boolean deviceCodeExists(UUID organizationId, String deviceCode) {
+		return Boolean.TRUE.equals(jdbcClient.sql("""
+				SELECT EXISTS (
+				    SELECT 1
+				    FROM access_device
+				    WHERE organization_id = :organizationId
+				      AND device_code = :deviceCode
+				      AND deleted_at IS NULL
+				)
+				""")
+				.param("organizationId", organizationId)
+				.param("deviceCode", deviceCode)
+				.query(Boolean.class)
+				.single());
+	}
+
+	public AccessDeviceRecord createDevice(
+			UUID organizationId,
+			UUID branchId,
+			String name,
+			String deviceCode,
+			String deviceType,
+			String provider,
+			UUID actorUserId
+	) {
+		OffsetDateTime now = OffsetDateTime.now();
+		return jdbcClient.sql("""
+				INSERT INTO access_device (
+				    id, organization_id, branch_id, name, device_code, device_type,
+				    status, provider, created_at, updated_at, created_by, updated_by, version
+				)
+				VALUES (
+				    :id, :organizationId, :branchId, :name, :deviceCode, :deviceType,
+				    'ACTIVE', :provider, :now, :now, :actorUserId, :actorUserId, 0
+				)
+				RETURNING id, name, device_code, device_type, status, provider, last_seen_at
+				""")
+				.param("id", UUID.randomUUID())
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("name", name)
+				.param("deviceCode", deviceCode)
+				.param("deviceType", deviceType)
+				.param("provider", provider)
+				.param("now", now)
+				.param("actorUserId", actorUserId)
+				.query(this::mapDevice)
+				.single();
+	}
+
 	public Optional<AccessDeviceRecord> defaultDevice(UUID organizationId, UUID branchId) {
 		return jdbcClient.sql("""
 				SELECT id, name, device_code, device_type, status, provider, last_seen_at

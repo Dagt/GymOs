@@ -36,6 +36,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -65,6 +66,37 @@ public class AccessService {
 	public List<AccessDeviceRecord> devices(GymOsPrincipal principal) {
 		requireBranch(principal);
 		return accessRepository.devices(principal.organizationId(), principal.branchId());
+	}
+
+	@Transactional
+	public AccessDeviceRecord createDevice(
+			GymOsPrincipal principal,
+			String name,
+			String deviceCode,
+			String deviceType,
+			String provider,
+			String correlationId
+	) {
+		requireBranch(principal);
+		String normalizedCode = normalizeDeviceCode(deviceCode);
+		if (accessRepository.deviceCodeExists(principal.organizationId(), normalizedCode)) {
+			throw new BusinessException("ACCESS_DEVICE_CODE_IN_USE", "El código del punto de acceso ya está registrado.");
+		}
+		String normalizedDeviceType = normalizeDeviceType(deviceType);
+		AccessDeviceRecord device = accessRepository.createDevice(
+				principal.organizationId(), principal.branchId(), normalizeRequiredText(name), normalizedCode,
+				normalizedDeviceType, normalizeProvider(normalizedDeviceType, provider), principal.userId());
+		auditService.record(principal, "ACCESS_DEVICE_CREATED", "ACCESS_DEVICE", device.id(),
+				"BACKOFFICE", "code=" + device.deviceCode(), correlationId);
+		return device;
+	}
+
+	@Transactional(readOnly = true)
+	public List<UUID> deviceRequiredBenefits(GymOsPrincipal principal, UUID deviceId) {
+		requireBranch(principal);
+		accessDevice(principal, deviceId);
+		return accessRepository.deviceRequiredBenefitIds(
+				principal.organizationId(), principal.branchId(), deviceId);
 	}
 
 	@Transactional(readOnly = true)
@@ -275,10 +307,7 @@ public class AccessService {
 	@Transactional
 	public List<UUID> replaceDeviceBenefits(GymOsPrincipal principal, UUID deviceId, List<UUID> benefitIds, String correlationId) {
 		requireBranch(principal);
-		AccessDeviceRecord device = accessRepository.devices(principal.organizationId(), principal.branchId()).stream()
-				.filter(candidate -> candidate.id().equals(deviceId))
-				.findFirst()
-				.orElseThrow(() -> new BusinessException("ACCESS_DEVICE_NOT_FOUND", "El dispositivo no existe en la sucursal."));
+		AccessDeviceRecord device = accessDevice(principal, deviceId);
 		List<UUID> normalizedIds = benefitIds == null ? List.of() : benefitIds.stream().distinct().toList();
 		if (!accessRepository.accessBenefitsExist(principal.organizationId(), principal.branchId(), normalizedIds)) {
 			throw new BusinessException("ACCESS_BENEFIT_NOT_AVAILABLE", "Uno o mas beneficios de acceso no estan disponibles.");
@@ -289,6 +318,46 @@ public class AccessService {
 				"BACKOFFICE", "benefits=" + normalizedIds.size(), correlationId);
 		return accessRepository.deviceRequiredBenefitIds(
 				principal.organizationId(), principal.branchId(), device.id());
+	}
+
+	private AccessDeviceRecord accessDevice(GymOsPrincipal principal, UUID deviceId) {
+		return accessRepository.devices(principal.organizationId(), principal.branchId()).stream()
+				.filter(candidate -> candidate.id().equals(deviceId))
+				.findFirst()
+				.orElseThrow(() -> new BusinessException("ACCESS_DEVICE_NOT_FOUND", "El dispositivo no existe en la sucursal."));
+	}
+
+	private String normalizeDeviceCode(String deviceCode) {
+		String normalized = normalizeRequiredText(deviceCode).toUpperCase(Locale.ROOT);
+		if (!normalized.matches("[A-Z0-9][A-Z0-9_-]{1,79}")) {
+			throw new BusinessException("ACCESS_DEVICE_CODE_INVALID", "El código sólo puede usar letras, números, guiones y guiones bajos.");
+		}
+		return normalized;
+	}
+
+	private String normalizeDeviceType(String deviceType) {
+		String normalized = normalizeRequiredText(deviceType).toUpperCase(Locale.ROOT);
+		if (!Set.of("TURNSTILE", "DOOR", "GATE", "ZONE", "BIOMETRIC").contains(normalized)) {
+			throw new BusinessException("ACCESS_DEVICE_TYPE_INVALID", "El tipo de punto de acceso no es válido.");
+		}
+		return normalized;
+	}
+
+	private String normalizeProvider(String deviceType, String provider) {
+		String normalized = provider == null || provider.isBlank()
+				? ("TURNSTILE".equals(deviceType) || "BIOMETRIC".equals(deviceType) ? "HIKCENTRAL" : "SIMULATED")
+				: provider.trim().toUpperCase(Locale.ROOT);
+		if (!Set.of("HIKCENTRAL", "SIMULATED").contains(normalized)) {
+			throw new BusinessException("ACCESS_PROVIDER_INVALID", "El proveedor de acceso no es válido.");
+		}
+		return normalized;
+	}
+
+	private String normalizeRequiredText(String value) {
+		if (value == null || value.isBlank()) {
+			throw new BusinessException("ACCESS_DEVICE_DATA_INVALID", "Completa los datos requeridos del punto de acceso.");
+		}
+		return value.trim();
 	}
 
 	@Transactional

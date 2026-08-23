@@ -275,6 +275,32 @@ Debe conservar/mostrar:
 - bitácora reciente;
 - en el futuro, salud/sincronización del proveedor físico.
 
+### 5.1 Consola por intención
+
+La pantalla no debe mezclar todas las tareas en una columna interminable. La
+consola se divide en tres vistas dentro de la misma sucursal:
+
+1. **Operar acceso**: elegir el punto físico, encontrar al socio, revisar los
+   derechos requeridos y registrar la decisión. La apertura manual y la
+   autorización temporal quedan agrupadas como excepciones controladas, no como
+   acciones principales.
+2. **Configuración física**: registrar el identificador del conector local,
+   registrar cada puerta/torniquete, asignarle sus beneficios `ACCESS` requeridos,
+   mapear esos beneficios a Access Levels del proveedor y preparar la
+   sincronización de un socio seleccionado.
+3. **Bitácora**: consultar los eventos recientes sin alargar toda la página.
+   El API entrega un conjunto acotado de resultados y la tabla usa un panel con
+   desplazamiento propio y encabezado fijo. Para investigación histórica se
+   incorporarán filtros y paginación, no una lista sin límite en la consola.
+
+El punto físico seleccionado debe mostrar siempre sus requisitos efectivos. Si
+no tiene ningún beneficio `ACCESS` asignado, la pantalla debe advertirlo
+claramente antes de una operación real; la configuración se guarda mediante
+`POST /api/v1/access/devices` y
+`GET`/`PUT /api/v1/access/devices/{deviceId}/benefits`; permanece aislada por
+organización y sucursal. Registrar un punto no abre hardware: el estado de
+apertura física sólo cambia cuando exista un conector local sano.
+
 La primera base de esa integración ya está disponible en la misma consola:
 
 - configuración por sucursal de una conexión `HIKCENTRAL`;

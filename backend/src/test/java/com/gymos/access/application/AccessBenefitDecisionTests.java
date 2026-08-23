@@ -91,4 +91,57 @@ class AccessBenefitDecisionTests {
 				.isInstanceOf(com.gymos.common.api.BusinessException.class)
 				.hasMessageContaining("permiso");
 	}
+
+	@Test
+	void returnsRequirementsOnlyForAnAccessPointInTheActiveBranch() {
+		AccessRepository repository = mock(AccessRepository.class);
+		AccessService service = new AccessService(
+				repository, mock(AuditService.class), mock(EligibilityPolicy.class), new ObjectMapper());
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		UUID deviceId = UUID.randomUUID();
+		UUID requiredBenefitId = UUID.randomUUID();
+		GymOsPrincipal principal = new GymOsPrincipal(
+				UUID.randomUUID(), organizationId, branchId, "reception@gymos.local", "Recepcion",
+				Set.of("access.read"));
+		AccessDeviceRecord device = new AccessDeviceRecord(
+				deviceId, "Entrada principal", "MAIN-DOOR", "TURNSTILE", "ACTIVE", "HIKCENTRAL", null);
+
+		when(repository.devices(organizationId, branchId)).thenReturn(List.of(device));
+		when(repository.deviceRequiredBenefitIds(organizationId, branchId, deviceId))
+				.thenReturn(List.of(requiredBenefitId));
+
+		assertThat(service.deviceRequiredBenefits(principal, deviceId)).containsExactly(requiredBenefitId);
+		verify(repository).devices(organizationId, branchId);
+		verify(repository).deviceRequiredBenefitIds(organizationId, branchId, deviceId);
+	}
+
+	@Test
+	void createsAnActiveAccessPointWithANormalizedCode() {
+		AccessRepository repository = mock(AccessRepository.class);
+		AccessService service = new AccessService(
+				repository, mock(AuditService.class), mock(EligibilityPolicy.class), new ObjectMapper());
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		UUID userId = UUID.randomUUID();
+		UUID deviceId = UUID.randomUUID();
+		GymOsPrincipal principal = new GymOsPrincipal(
+				userId, organizationId, branchId, "admin@gymos.local", "Administrador", Set.of("access.manage"));
+		AccessDeviceRecord created = new AccessDeviceRecord(
+				deviceId, "Torniquete recepción", "FRONT-01", "TURNSTILE", "ACTIVE", "HIKCENTRAL", null);
+
+		when(repository.deviceCodeExists(organizationId, "FRONT-01")).thenReturn(false);
+		when(repository.createDevice(
+				eq(organizationId), eq(branchId), eq("Torniquete recepción"), eq("FRONT-01"),
+				eq("TURNSTILE"), eq("HIKCENTRAL"), eq(userId)))
+				.thenReturn(created);
+
+		AccessDeviceRecord result = service.createDevice(
+				principal, "Torniquete recepción", "front-01", "turnstile", null, UUID.randomUUID().toString());
+
+		assertThat(result).isEqualTo(created);
+		verify(repository).createDevice(
+				eq(organizationId), eq(branchId), eq("Torniquete recepción"), eq("FRONT-01"),
+				eq("TURNSTILE"), eq("HIKCENTRAL"), eq(userId));
+	}
 }

@@ -2,6 +2,7 @@ import { apiFetch, normalizePayload } from "./client";
 import type {
   AccessDecision,
   AccessDevice,
+  AccessDevicePayload,
   AccessLog,
   AccessRequestPayload,
   ConsumeVisitPassPayload,
@@ -16,11 +17,51 @@ import type {
   VisitPass,
 } from "./access-types";
 
-export async function getAccessDevices(accessToken: string): Promise<AccessDevice[]> {
+export async function getAccessDevices(
+  accessToken: string,
+): Promise<AccessDevice[]> {
   return apiFetch<AccessDevice[]>("/access/devices", accessToken);
 }
 
-export async function getAccessLogs(accessToken: string, limit = 30): Promise<AccessLog[]> {
+export async function createAccessDevice(
+  accessToken: string,
+  payload: AccessDevicePayload,
+): Promise<AccessDevice> {
+  return apiFetch<AccessDevice>("/access/devices", accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function getDeviceRequiredBenefits(
+  accessToken: string,
+  deviceId: string,
+): Promise<string[]> {
+  return apiFetch<string[]>(
+    `/access/devices/${deviceId}/benefits`,
+    accessToken,
+  );
+}
+
+export async function replaceDeviceRequiredBenefits(
+  accessToken: string,
+  deviceId: string,
+  benefitIds: string[],
+): Promise<string[]> {
+  return apiFetch<string[]>(
+    `/access/devices/${deviceId}/benefits`,
+    accessToken,
+    {
+      method: "PUT",
+      body: JSON.stringify(normalizePayload({ benefitIds })),
+    },
+  );
+}
+
+export async function getAccessLogs(
+  accessToken: string,
+  limit = 30,
+): Promise<AccessLog[]> {
   return apiFetch<AccessLog[]>(`/access/logs?limit=${limit}`, accessToken);
 }
 
@@ -64,25 +105,37 @@ export async function createTemporaryPass(
   });
 }
 
-export async function getPhysicalIntegration(accessToken: string): Promise<PhysicalIntegration> {
-  return apiFetch<PhysicalIntegration>("/access/physical-integration", accessToken);
+export async function getPhysicalIntegration(
+  accessToken: string,
+): Promise<PhysicalIntegration> {
+  return apiFetch<PhysicalIntegration>(
+    "/access/physical-integration",
+    accessToken,
+  );
 }
 
 export async function updatePhysicalIntegration(
   accessToken: string,
   payload: PhysicalIntegrationPayload,
 ): Promise<PhysicalIntegration> {
-  return apiFetch<PhysicalIntegration>("/access/physical-integration", accessToken, {
-    method: "PUT",
-    body: JSON.stringify(normalizePayload(payload)),
-  });
+  return apiFetch<PhysicalIntegration>(
+    "/access/physical-integration",
+    accessToken,
+    {
+      method: "PUT",
+      body: JSON.stringify(normalizePayload(payload)),
+    },
+  );
 }
 
 export async function getPhysicalClientState(
   accessToken: string,
   clientId: string,
 ): Promise<PhysicalClientState> {
-  return apiFetch<PhysicalClientState>(`/access/physical-integration/clients/${clientId}`, accessToken);
+  return apiFetch<PhysicalClientState>(
+    `/access/physical-integration/clients/${clientId}`,
+    accessToken,
+  );
 }
 
 export async function linkPhysicalClient(
@@ -90,22 +143,33 @@ export async function linkPhysicalClient(
   clientId: string,
   externalPersonRef: string,
 ): Promise<PhysicalClientState> {
-  return apiFetch<PhysicalClientState>(`/access/physical-integration/clients/${clientId}/link`, accessToken, {
-    method: "PUT",
-    body: JSON.stringify(normalizePayload({ externalPersonRef })),
-  });
+  return apiFetch<PhysicalClientState>(
+    `/access/physical-integration/clients/${clientId}/link`,
+    accessToken,
+    {
+      method: "PUT",
+      body: JSON.stringify(normalizePayload({ externalPersonRef })),
+    },
+  );
 }
 
 export async function queuePhysicalClientSynchronization(
   accessToken: string,
   clientId: string,
 ): Promise<PhysicalClientState> {
-  return apiFetch<PhysicalClientState>(`/access/physical-integration/clients/${clientId}/synchronize`, accessToken, {
-    method: "POST",
-  });
+  return apiFetch<PhysicalClientState>(
+    `/access/physical-integration/clients/${clientId}/synchronize`,
+    accessToken,
+    {
+      method: "POST",
+    },
+  );
 }
 
-export async function getVisitPasses(accessToken: string, clientId?: string): Promise<VisitPass[]> {
+export async function getVisitPasses(
+  accessToken: string,
+  clientId?: string,
+): Promise<VisitPass[]> {
   const params = new URLSearchParams();
   if (clientId) params.set("clientId", clientId);
   const suffix = params.toString() ? `?${params.toString()}` : "";
@@ -127,8 +191,12 @@ export async function consumeVisitPass(
   visitPassId: string,
   payload: ConsumeVisitPassPayload = {},
 ): Promise<VisitPass> {
-  return apiFetch<VisitPass>(`/access/visit-passes/${visitPassId}/consume`, accessToken, {
-    method: "POST",
-    body: JSON.stringify(normalizePayload(payload)),
-  });
+  return apiFetch<VisitPass>(
+    `/access/visit-passes/${visitPassId}/consume`,
+    accessToken,
+    {
+      method: "POST",
+      body: JSON.stringify(normalizePayload(payload)),
+    },
+  );
 }

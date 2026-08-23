@@ -162,9 +162,11 @@ export type {
 } from "./api/selfservice-types";
 export {
   consumeVisitPass,
+  createAccessDevice,
   createTemporaryPass,
   createVisitPass,
   getAccessDevices,
+  getDeviceRequiredBenefits,
   getEffectiveAccessBenefits,
   getAccessLogs,
   getPhysicalClientState,
@@ -172,6 +174,7 @@ export {
   getVisitPasses,
   linkPhysicalClient,
   manualOpenAccess,
+  replaceDeviceRequiredBenefits,
   queuePhysicalClientSynchronization,
   requestAccess,
   updatePhysicalIntegration,
@@ -179,6 +182,7 @@ export {
 export type {
   AccessDecision,
   AccessDevice,
+  AccessDevicePayload,
   AccessLog,
   AccessRequestPayload,
   ConsumeVisitPassPayload,
