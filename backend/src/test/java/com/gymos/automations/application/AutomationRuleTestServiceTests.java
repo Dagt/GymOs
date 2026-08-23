@@ -13,7 +13,6 @@ import com.gymos.automations.infrastructure.AutomationRepository.AutomationRuleR
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.notifications.application.NotificationService;
 import com.gymos.notifications.application.NotificationService.CreateNotificationCommand;
-import com.gymos.notifications.infrastructure.NotificationRepository.NotificationRecord;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.Set;
@@ -42,12 +41,15 @@ class AutomationRuleTestServiceTests {
 				"ENABLED", 3, null, null, null, null, OffsetDateTime.now(), OffsetDateTime.now(), 1
 		);
 		when(repository.rule(organizationId, branchId, ruleId)).thenReturn(Optional.of(rule));
-		when(notifications.create(eq(principal), any(), eq("corr-1"))).thenReturn(mock(NotificationRecord.class));
+		when(notifications.queue(eq(principal), any(), eq("corr-1"))).thenReturn(new NotificationService.NotificationView(
+				UUID.randomUUID(), "EMAIL", "socio@example.com", "Aviso", "Hola", "QUEUED",
+				"TRANSACTIONAL", "MANUAL_TEST", "AUTOMATION_RULE", ruleId, OffsetDateTime.now()
+		));
 
 		service.testEmail(principal, ruleId, clientId, "corr-1");
 
 		ArgumentCaptor<CreateNotificationCommand> command = ArgumentCaptor.forClass(CreateNotificationCommand.class);
-		verify(notifications).create(eq(principal), command.capture(), eq("corr-1"));
+		verify(notifications).queue(eq(principal), command.capture(), eq("corr-1"));
 		assertThat(command.getValue().channel()).isEqualTo("EMAIL");
 		assertThat(command.getValue().recipientType()).isEqualTo("CLIENT");
 		assertThat(command.getValue().recipientId()).isEqualTo(clientId);

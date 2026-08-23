@@ -9,7 +9,6 @@ import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.notifications.application.NotificationService;
 import com.gymos.notifications.application.NotificationService.CreateNotificationCommand;
-import com.gymos.notifications.infrastructure.NotificationRepository.NotificationRecord;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
@@ -29,7 +28,7 @@ public class AutomationRuleTestService {
 		this.objectMapper = objectMapper;
 	}
 
-	public NotificationRecord testEmail(
+	public AutomationEmailTestResult testEmail(
 			GymOsPrincipal principal,
 			UUID ruleId,
 			UUID clientId,
@@ -57,13 +56,17 @@ public class AutomationRuleTestService {
 		String body = text(config, "body", "Prueba de automatizacion: " + rule.name());
 		String category = text(config, "category", "TRANSACTIONAL").toUpperCase();
 
-		return notificationService.create(
+		NotificationService.NotificationView notification = notificationService.queue(
 				principal,
 				new CreateNotificationCommand(
 						"EMAIL", null, "CLIENT", clientId, subject, body, category,
 						"MANUAL_TEST", "AUTOMATION_RULE", rule.id(), null
 				),
 				correlationId
+		);
+		return new AutomationEmailTestResult(
+				notification.id(), notification.channel(), notification.recipient(), notification.subject(),
+				notification.status(), notification.createdAt()
 		);
 	}
 
@@ -79,5 +82,15 @@ public class AutomationRuleTestService {
 		JsonNode value = node.get(field);
 		if (value == null || value.isNull() || !value.isValueNode() || value.asText().isBlank()) return fallback;
 		return value.asText();
+	}
+
+	public record AutomationEmailTestResult(
+			UUID notificationId,
+			String channel,
+			String recipient,
+			String subject,
+			String status,
+			java.time.OffsetDateTime createdAt
+	) {
 	}
 }

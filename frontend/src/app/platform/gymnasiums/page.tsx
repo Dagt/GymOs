@@ -5,6 +5,7 @@ import { AppNotice } from "@/components/AppNotice";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired } from "@/components/AuthRequired";
 import { FormError } from "@/components/FormFields";
+import Link from "next/link";
 import { BranchForm, OrganizationForm } from "./PlatformGymnasiumForms";
 import { PlatformGymnasiumDetail, PlatformGymnasiumList } from "./PlatformGymnasiumPanels";
 import { usePlatformGymnasiumsController } from "./usePlatformGymnasiumsController";
@@ -38,6 +39,15 @@ export default function PlatformGymnasiumsPage() {
     >
       {platform.error ? <FormError message={platform.error} /> : null}
       {platform.message ? <AppNotice message={platform.message} tone="success" /> : null}
+
+      <section className="platform-billing-entry">
+        <div>
+          <p className="app-eyebrow">Administración GymFort</p>
+          <h2>Cobros y suscripciones</h2>
+          <span>Consulta el plan contratado, socios activos, MRR, fechas de corte e historial de pagos de cada gimnasio.</span>
+        </div>
+        <Link className="app-button" href="/platform/billing">Abrir cobros y suscripciones</Link>
+      </section>
 
       <section className="platform-layout">
         <PlatformGymnasiumList
