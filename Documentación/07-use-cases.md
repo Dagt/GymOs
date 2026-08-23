@@ -624,6 +624,29 @@ Reglas:
 - No se permite asignar `Administrador GymOS` desde contexto de gimnasio.
 - El gerente no puede ver ni administrar usuarios con rol `Dueno del gimnasio` o `Gerente`; solo usuarios operativos dentro de su alcance.
 
+## UC-033 Administrar y cobrar suscripciones GymFort
+
+Actor: Administrador GymOS.
+
+Precondiciones:
+- Usuario con permiso `platform.admin`.
+- Organización cliente y al menos una sucursal disponibles.
+
+Flujo:
+1. Administrador abre `/platform/billing`.
+2. Sistema muestra el total comercial por cliente y el detalle facturable por sucursal: socios con membresía activa, usuarios internos, planes de membresía, plan sugerido, plan contratado, importe, implementación, próxima fecha y estado de cobro.
+3. Administrador configura el plan contratado, la fecha de corte y las condiciones comerciales de una sucursal.
+4. Administrador registra un pago recibido indicando concepto, medio, monto, fecha, referencia y nota.
+5. Sistema guarda un renglón inmutable en el historial, audita la acción y, si es mensualidad, calcula el siguiente corte; si completa implementación, la marca como liquidada.
+6. La pantalla actualiza el MRR, el expediente de la sucursal y el total del cliente.
+
+Reglas:
+- El total del cliente suma únicamente las sucursales con suscripción comercial activa; cada sede conserva su contrato y pago por separado.
+- La recomendación de plan se basa en membresías activas de la sede; personal y planes internos son indicadores, no reglas de precio.
+- No se generan CFDI ni cargos automáticos de GymFort en este flujo.
+- El historial no permite edición ni eliminación; correcciones futuras deben ser movimientos explícitos y auditables.
+- Perfiles tenant nunca pueden acceder a estos endpoints ni a la ruta.
+
 ## Anexo Hito 3.5 final
 
 La verificación segura de kiosco, la idempotencia por hash y los eventos por

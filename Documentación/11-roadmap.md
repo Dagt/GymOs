@@ -59,6 +59,17 @@ Este documento expresa secuencia y estado, no sustituye el estado verificable de
 
 ## En curso inmediato
 
+### Administración comercial de GymFort
+
+- Panel de plataforma por cliente y sucursal: socios activos, personal interno,
+  planes operativos, recomendación comercial, plan contratado, MRR, corte y
+  estado de cobranza.
+- Registro auditable e inmutable de mensualidad, implementación y otros cobros
+  recibidos; el siguiente corte y la liquidación de implementación se actualizan
+  sin manipular los pagos de los socios del gimnasio.
+- Completar catálogo de precios/descuentos/impuestos, historial exportable,
+  facturación fiscal, ajustes y cobro recurrente de la suscripción SaaS.
+
 ### Aceptación conectada de pagos
 
 - Ejecutar `stripeTest` en CI protegido con cuenta Connect test.

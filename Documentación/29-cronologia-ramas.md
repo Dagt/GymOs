@@ -1,23 +1,22 @@
 # 29. Cronología y situación de ramas
 
 Estado: AUDITADO
-Corte: 22 de agosto de 2026
-Rama de trabajo: `feature/automations-zoho-email`
-Base integrada: PR #10, merge `52a72bc`
+Corte: 23 de agosto de 2026
+Rama de trabajo: `feature/pricing-and-billing`
+Base integrada: `main` con Automatizaciones/ZeptoMail y visualización de métricas cerradas
 
 ## 1. Situación vigente
 
-`fix/kiosk-memberships-stripe` se integró a `main` mediante PR #10. A partir de ese merge se creó `feature/automations-zoho-email`.
+`fix/kiosk-memberships-stripe`, Automatizaciones/ZeptoMail y la visualización de métricas ya fueron cerradas e integradas a `main`. La rama actual parte de esa base para administrar la relación comercial de GymFort con sus gimnasios clientes.
 
-La rama ya no es sólo preparación para Zoho: contiene el cierre funcional de **Automatizaciones + correo transaccional con ZeptoMail**, además de ajustes de configuración/kiosco, permisos y deuda técnica detectada durante aceptación.
-
-El alcance de Automatizaciones/ZeptoMail quedó implementado y validado manualmente el 22 de agosto de 2026. Falta abrir/integrar el PR correspondiente cuando el usuario decida cerrar la rama contra `main`.
+El alcance actual inicia con la configuración de planes por sucursal, la agregación por cliente y un registro manual controlado de cobros. No representa todavía facturación fiscal ni cobro automático de la suscripción SaaS.
 
 | Rama | Estado | Acción |
 |---|---|---|
-| `main` | Base estable con PR #10 integrado | Recibir cambios sólo por PR verde |
+| `main` | Base estable con cierres de kiosco, Automatizaciones/ZeptoMail y métricas integrados | Recibir cambios sólo por PR verde |
 | `fix/kiosk-memberships-stripe` | Integrada | Histórica; no fusionar otra vez |
-| `feature/automations-zoho-email` | Activa, publicada, alcance funcional cerrado | Completar validación/PR y fusionar a `main` cuando corresponda |
+| `feature/automations-zoho-email` | Integrada | Histórica; no fusionar otra vez |
+| `feature/pricing-and-billing` | Activa | Completar cobranza comercial, validación, PR y merge a `main` |
 | `feature/automations-self-service-kiosk` | Ancestro funcional integrado | Referencia histórica |
 | `feature/coaches-workouts` | Coaches ya incorporado en la evolución del árbol | Referencia histórica; no merge lateral |
 | `feature/wellness-services` | Funcionalidad reaplicada en historia vigente | Referencia; no fusionar de nuevo |
@@ -38,6 +37,7 @@ El alcance de Automatizaciones/ZeptoMail quedó implementado y validado manualme
 | 22 ago | V80 concede administración/ejecución de Automatizaciones a Gerencia |
 | 22 ago | V79 reconcilia perfiles Coach históricos faltantes después de detectar drift durante pruebas |
 | 22 ago | Cierre documental de Automatizaciones + ZeptoMail |
+| 23 ago | Inicio de `feature/pricing-and-billing`: V81 configura contratos por sucursal y V82 agrega historial inmutable de cobros comerciales |
 
 ## 3. Cambios materiales del cierre
 

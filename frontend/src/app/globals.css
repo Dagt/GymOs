@@ -2482,6 +2482,37 @@ th {
   grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
 }
 
+.platform-billing-entry {
+  align-items: center;
+  background: linear-gradient(120deg, color-mix(in srgb, var(--brand-primary) 92%, #000), color-mix(in srgb, var(--brand-primary) 65%, var(--brand-accent)));
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 45%, transparent);
+  border-radius: 1.25rem;
+  color: white;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding: 1.1rem 1.25rem;
+}
+
+.platform-billing-entry h2 {
+  font-size: 1.1rem;
+  font-weight: 900;
+  margin: 0.1rem 0 0.25rem;
+}
+
+.platform-billing-entry > div > span {
+  color: rgba(255, 255, 255, 0.76);
+  display: block;
+  font-size: 0.86rem;
+  max-width: 48rem;
+}
+
+.platform-billing-entry .app-button {
+  flex: 0 0 auto;
+  text-align: center;
+}
+
 .platform-list-panel,
 .platform-detail-panel {
   background: rgba(255, 255, 255, 0.92);

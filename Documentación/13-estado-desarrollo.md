@@ -1,12 +1,12 @@
 # 13. Estado actual de desarrollo
 
 Estado: FUENTE CANÓNICA / EN PROGRESO
-Corte: 22 de agosto de 2026
-Código auditado: `feature/automations-zoho-email`, incluyendo V80 y cierre funcional de Automatizaciones/ZeptoMail.
+Corte: 23 de agosto de 2026
+Código auditado: `feature/pricing-and-billing`, incluyendo V81/V82 sobre la base integrada de Automatizaciones/ZeptoMail y métricas.
 
 ## 1. Resumen ejecutivo
 
-GymFort opera como monolito modular multi-tenant y multi-sucursal. El piloto incluye consolas SaaS y de gimnasio, recepción/POS, kiosco aislado, comercio y membresías, reservas, inventario, coaches, wellness, automatizaciones y correo transaccional durable.
+GymFort opera como monolito modular multi-tenant y multi-sucursal. El piloto incluye consolas SaaS y de gimnasio, recepción/POS, kiosco aislado, comercio y membresías, reservas, inventario, coaches, wellness, automatizaciones, correo transaccional durable y cobranza comercial controlada de GymFort.
 
 La identidad comercial visible es GymFort. `GymOS`/`gymos` continúa en nombres técnicos por compatibilidad.
 
@@ -39,6 +39,7 @@ Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún 
 | [Auditoría](modulos/19-audit.md) | FUNCIONAL | Registro de mutaciones sensibles y motivos operativos | Matriz/retención/inmutabilidad (`AUD-001`) |
 | [Operación común](modulos/20-common-operations.md) | FUNCIONAL PARA LOCAL | Errores correlacionados, Flyway, métricas, Docker, CI y runbooks | Restore, staging y simulacros (`DB-001`, `OPS-001`) |
 | [Pagos](modulos/21-payments.md) | FUNCIONAL / ACEPTACIÓN | Terminal manual/MP excluyentes, Stripe Connect/Checkout, webhooks, recibos y recurrencia | Sandbox CI y reembolso/cancelación por proveedor (`PAY-001`) |
+| [Cobranza comercial GymFort](modulos/22-platform-billing.md) | FUNCIONAL / COBRO MANUAL CONTROLADO | Plan e importe por sucursal, agregado por cliente, indicadores de operación, MRR y bitácora inmutable de cobros | Cargo SaaS automático, CFDI, ajustes y reportes financieros (`BIL-001`) |
 
 ## 3. Decisiones operativas vigentes
 
@@ -68,6 +69,8 @@ Evidencia disponible:
 - prueba de regla email con selección de socio real;
 - V80 corrige permisos de Gerencia para gestionar Automatizaciones;
 - V79 repara perfiles Coach históricos desincronizados;
+- pruebas unitarias de cobranza comercial, autorización de plataforma y
+  migración PostgreSQL V82 ejecutadas correctamente;
 - suites backend/frontend y CI de rama continúan siendo la red de regresión.
 
 La carga real del logo en correo debe verificarse después del despliegue con `GYMOS_FRONTEND_BASE_URL=https://gymfort.mx`; localhost no es accesible desde Gmail/Outlook.
@@ -76,9 +79,10 @@ La carga real del logo en correo debe verificarse después del despliegue con `G
 
 Automatizaciones/ZeptoMail ya no forman parte del bloque inmediato de implementación. Los siguientes frentes son:
 
-1. ejecutar Stripe sandbox automatizado y escenarios de recuperación conectados;
-2. cerrar autorización multi-tenant, migración limpia/upgrade, backup/restore y observabilidad de piloto;
-3. iniciar el bloque de acceso físico/HikCentral definido en roadmap;
-4. como mejoras posteriores de notificaciones: bounce/complaint webhooks, reputación productiva y canales adicionales.
+1. cerrar la evolución de cobranza comercial: catálogo/precio, impuestos, cobro SaaS automático, CFDI, ajustes y reportes;
+2. ejecutar Stripe sandbox automatizado y escenarios de recuperación conectados;
+3. cerrar autorización multi-tenant, migración limpia/upgrade, backup/restore y observabilidad de piloto;
+4. iniciar el bloque de acceso físico/HikCentral definido en roadmap;
+5. como mejoras posteriores de notificaciones: bounce/complaint webhooks, reputación productiva y canales adicionales.
 
 El detalle vive en `modulos/`, la deuda única en el documento 28 y la situación Git en el documento 29.

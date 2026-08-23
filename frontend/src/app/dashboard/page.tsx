@@ -39,7 +39,6 @@ import {
 import {
   TrendingUp,
   Users,
-  CreditCard,
   AlertTriangle,
   Package,
   Calendar,
@@ -48,7 +47,6 @@ import {
   CheckCircle2,
   XCircle,
   Clock,
-  ArrowUpRight,
   Database,
   BarChart3
 } from "lucide-react";
@@ -299,7 +297,7 @@ export default function DashboardPage() {
                               fontSize={12} 
                             />
                             <Tooltip 
-                              formatter={(val: any) => formatMoney(Number(val) * 100, "MXN")} 
+                              formatter={(val: unknown) => formatMoney(Number(val) * 100, "MXN")}
                               labelFormatter={(date) => new Date(String(date)).toLocaleDateString('es-MX', { weekday: 'long', day: '2-digit', month: 'long'})} 
                               contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                             />
@@ -333,7 +331,7 @@ export default function DashboardPage() {
                                 <Cell key={"cell-" + index} fill={COLORS_CONTEXT[index % COLORS_CONTEXT.length]} />
                               ))}
                             </Pie>
-                            <Tooltip formatter={(val: any) => formatMoney(Number(val), "MXN")} labelFormatter={(l: any) => businessContextLabel(String(l))} />
+                            <Tooltip formatter={(val: unknown) => formatMoney(Number(val), "MXN")} labelFormatter={(l: unknown) => businessContextLabel(String(l))} />
                           </PieChart>
                         </ResponsiveContainer>
                       ) : (
@@ -446,7 +444,7 @@ export default function DashboardPage() {
                               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                               <XAxis dataKey="status" tickFormatter={saleStatusLabel} axisLine={false} tickLine={false} fontSize={12} />
                               <YAxis axisLine={false} tickLine={false} fontSize={12} />
-                              <Tooltip formatter={(val: any) => Number(val)} labelFormatter={(l: any) => saleStatusLabel(String(l))} cursor={{fill: '#f9fafb'}} />
+                              <Tooltip formatter={(val: unknown) => Number(val)} labelFormatter={(l: unknown) => saleStatusLabel(String(l))} cursor={{fill: '#f9fafb'}} />
                               <Bar dataKey="saleCount" name="Operaciones" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={60} />
                             </BarChart>
                           </ResponsiveContainer>
@@ -466,7 +464,7 @@ export default function DashboardPage() {
                               <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f3f4f6" />
                               <XAxis type="number" tickFormatter={(val) => formatMoney(val, "MXN")} axisLine={false} tickLine={false} fontSize={12} />
                               <YAxis dataKey="method" type="category" tickFormatter={paymentMethodLabel} axisLine={false} tickLine={false} fontSize={12} width={80} />
-                              <Tooltip formatter={(val: any) => formatMoney(Number(val), "MXN")} labelFormatter={(l: any) => paymentMethodLabel(String(l))} cursor={{fill: '#f9fafb'}} />
+                              <Tooltip formatter={(val: unknown) => formatMoney(Number(val), "MXN")} labelFormatter={(l: unknown) => paymentMethodLabel(String(l))} cursor={{fill: '#f9fafb'}} />
                               <Bar dataKey="completedCents" name="Cobrado" fill="#10b981" radius={[0, 4, 4, 0]} maxBarSize={30} />
                             </BarChart>
                           </ResponsiveContainer>
@@ -525,7 +523,7 @@ export default function DashboardPage() {
                             />
                             <YAxis stroke="#9ca3af" fontSize={12} />
                             <Tooltip 
-                              formatter={(val: any) => Number(val)}
+                              formatter={(val: unknown) => Number(val)}
                               labelFormatter={(date) => "Semana del " + new Date(String(date)).toLocaleDateString('es-MX', { day: '2-digit', month: 'short'})}
                             />
                             <Legend />
@@ -559,7 +557,7 @@ export default function DashboardPage() {
                             />
                             <YAxis stroke="#9ca3af" fontSize={12} />
                             <Tooltip 
-                              formatter={(val: any) => Number(val)}
+                              formatter={(val: unknown) => Number(val)}
                               labelFormatter={(date) => "Semana del " + new Date(String(date)).toLocaleDateString('es-MX', { day: '2-digit', month: 'short'})}
                             />
                             <Legend />
@@ -712,5 +710,3 @@ function businessContextLabel(context: string) {
   };
   return labels[context] ?? context;
 }
-
-

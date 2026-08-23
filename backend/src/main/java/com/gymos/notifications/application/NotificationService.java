@@ -66,6 +66,16 @@ public class NotificationService {
 		return notificationRepository.notification(principal.organizationId(), notificationId);
 	}
 
+	/**
+	 * Queues a notification for another module without exposing notification persistence types
+	 * across the module boundary.
+	 */
+	@Transactional
+	public NotificationView queue(GymOsPrincipal principal, CreateNotificationCommand command, String correlationId) {
+		NotificationRecord notification = create(principal, command, correlationId);
+		return notificationView(notification);
+	}
+
 	@Transactional
 	public UUID createSystem(
 			UUID organizationId, UUID branchId, UUID actorUserId,
@@ -241,6 +251,14 @@ public class NotificationService {
 		return view(notificationRepository.emailConfiguration(organizationId));
 	}
 
+	private NotificationView notificationView(NotificationRecord notification) {
+		return new NotificationView(
+				notification.id(), notification.channel(), notification.recipient(), notification.subject(), notification.body(),
+				notification.status(), notification.category(), notification.triggerType(), notification.referenceType(),
+				notification.referenceId(), notification.createdAt()
+		);
+	}
+
 	private EmailConfigurationView view(EmailConfigurationRecord record) {
 		EmailDeliveryPort provider = emailProviders.get(record.emailProviderKey().toUpperCase(Locale.ROOT));
 		boolean available = provider != null && provider.available();
@@ -383,6 +401,21 @@ public class NotificationService {
 
 	public record UpdateEmailConfigurationCommand(
 			boolean enabled, String providerKey, String fromEmail, String fromName, String replyTo
+	) {
+	}
+
+	public record NotificationView(
+			UUID id,
+			String channel,
+			String recipient,
+			String subject,
+			String body,
+			String status,
+			String category,
+			String triggerType,
+			String referenceType,
+			UUID referenceId,
+			OffsetDateTime createdAt
 	) {
 	}
 

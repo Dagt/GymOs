@@ -15,6 +15,14 @@ GymFort debe construirse como producto vendible desde la primera versión operat
 - `Branch` representa una sucursal física u operativa.
 - Los usuarios, permisos, ventas, accesos, reservas, inventario y reportes deben considerar contexto de organización y sucursal cuando aplique.
 
+### 12.2.1 Cobranza comercial de GymFort
+
+- `Organization` es el cliente comercial de GymFort; no se asume que dos gimnasios con los mismos dueños sean necesariamente el mismo cliente.
+- Cada `Branch` contratada es una línea de servicio facturable. El total del cliente es la suma de sus sucursales con suscripción comercial activa, pero el plan, fecha de corte, importe y evidencia de cobro se conservan por sucursal para poder añadir, pausar o cotizar una sede de forma independiente.
+- La sugerencia de plan se calcula por socios con membresía activa en la sede. Los usuarios internos activos y los planes de membresía activos se muestran como contexto comercial; no incrementan automáticamente el precio.
+- V1 registra cobros recibidos por transferencia, efectivo, tarjeta, Stripe u otro medio. La bitácora es inmutable y auditable; un pago de mensualidad mueve la siguiente fecha de corte y los pagos de implementación completan automáticamente ese cargo al cubrir su importe.
+- Facturación CFDI, cobro automático de la suscripción SaaS, conciliación bancaria y ajustes/reversiones contables requieren un bloque posterior; no deben simularse como pagos confirmados.
+
 ## 12.3 Primer hito
 
 El primer hito debe incluir:

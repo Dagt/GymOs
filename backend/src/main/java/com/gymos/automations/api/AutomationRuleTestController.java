@@ -1,9 +1,9 @@
 package com.gymos.automations.api;
 
 import com.gymos.automations.application.AutomationRuleTestService;
+import com.gymos.automations.application.AutomationRuleTestService.AutomationEmailTestResult;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
-import com.gymos.notifications.infrastructure.NotificationRepository.NotificationRecord;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
@@ -25,7 +25,7 @@ public class AutomationRuleTestController {
 	}
 
 	@PostMapping("/{ruleId}/test-email")
-	NotificationRecord testEmail(
+	AutomationEmailTestResult testEmail(
 			@AuthenticationPrincipal GymOsPrincipal principal,
 			@PathVariable UUID ruleId,
 			@Valid @RequestBody TestEmailRequest request,

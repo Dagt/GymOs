@@ -218,6 +218,14 @@ class SecurityAuthorizationTests {
 	}
 
 	@Test
+	@WithMockUser(authorities = "organization.read")
+	void platformBillingRequiresPlatformAdministrator() throws Exception {
+		mockMvc.perform(get("/api/v1/platform/billing/overview"))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
+	}
+
+	@Test
 	@WithMockUser(authorities = "notification.manage")
 	void emailConfigurationRequiresDedicatedSettingsPermission() throws Exception {
 		mockMvc.perform(put("/api/v1/notifications/email-configuration")
