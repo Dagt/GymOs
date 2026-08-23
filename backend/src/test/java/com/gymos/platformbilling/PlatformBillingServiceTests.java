@@ -9,6 +9,7 @@ import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.platformbilling.application.PlatformBillingService;
+import com.gymos.platformbilling.application.PlatformBillingService.UpdateBillingCommand;
 import com.gymos.platformbilling.infrastructure.PlatformBillingRepository;
 import com.gymos.platformbilling.infrastructure.PlatformBillingRepository.BranchBillingRecord;
 import java.math.BigDecimal;
@@ -57,6 +58,46 @@ class PlatformBillingServiceTests {
         assertThat(branch.suggestedPlanName()).isEqualTo("GymFort Enterprise");
         assertThat(branch.suggestedMonthlyPrice()).isNull();
         assertThat(branch.monthlyAmount()).isNull();
+    }
+
+    @Test
+    void rejectsManualPriceOnStandardPlans() {
+        UpdateBillingCommand command = new UpdateBillingCommand(
+                "ACTIVE",
+                15,
+                LocalDate.now().plusMonths(1),
+                null,
+                null,
+                "GYMFORT_500",
+                new BigDecimal("999.00"),
+                new BigDecimal("3500.00"),
+                false,
+                null
+        );
+
+        assertThrows(BusinessException.class, () -> service.update(
+                platformAdmin(), UUID.randomUUID(), command, "test-correlation"
+        ));
+    }
+
+    @Test
+    void requiresAQuotedMonthlyPriceForEnterprise() {
+        UpdateBillingCommand command = new UpdateBillingCommand(
+                "ACTIVE",
+                15,
+                LocalDate.now().plusMonths(1),
+                null,
+                null,
+                "ENTERPRISE",
+                null,
+                BigDecimal.ZERO,
+                false,
+                null
+        );
+
+        assertThrows(BusinessException.class, () -> service.update(
+                platformAdmin(), UUID.randomUUID(), command, "test-correlation"
+        ));
     }
 
     @Test
