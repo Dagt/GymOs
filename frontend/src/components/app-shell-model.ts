@@ -35,6 +35,7 @@ const platformSections: NavigationSection[] = [
     title: "Negocio GymFort",
     links: [
       { label: "Gimnasios cliente", href: "/platform/gymnasiums", hint: "CRM, tenants y soporte", permissions: ["platform.admin"] },
+      { label: "Cobros y suscripciones", href: "/platform/billing", hint: "Planes, fechas y MRR", permissions: ["platform.admin"] },
     ],
   },
 ];
