@@ -1,9 +1,13 @@
 package com.gymos.access.api;
 
 import com.gymos.access.application.AccessService;
+import com.gymos.access.application.AccessService.PhysicalClientStateView;
+import com.gymos.access.application.AccessService.PhysicalIntegrationView;
 import com.gymos.access.application.command.AccessRequestCommand;
+import com.gymos.access.application.command.ConfigurePhysicalIntegrationCommand;
 import com.gymos.access.application.command.ConsumeVisitPassCommand;
 import com.gymos.access.application.command.CreateVisitPassCommand;
+import com.gymos.access.application.command.LinkPhysicalClientCommand;
 import com.gymos.access.application.command.ManualOpenCommand;
 import com.gymos.access.application.command.TemporaryPassCommand;
 import com.gymos.access.infrastructure.AccessRepository.AccessDecisionResponse;
@@ -71,6 +75,49 @@ public class AccessController {
 			@PathVariable UUID clientId
 	) {
 		return accessService.effectiveBenefits(principal, clientId);
+	}
+
+	@GetMapping("/physical-integration")
+	PhysicalIntegrationView physicalIntegration(@AuthenticationPrincipal GymOsPrincipal principal) {
+		return accessService.physicalIntegration(principal);
+	}
+
+	@PutMapping("/physical-integration")
+	PhysicalIntegrationView configurePhysicalIntegration(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@Valid @RequestBody PhysicalIntegrationRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return accessService.configurePhysicalIntegration(
+				principal, request.toCommand(), correlationId(servletRequest));
+	}
+
+	@GetMapping("/physical-integration/clients/{clientId}")
+	PhysicalClientStateView physicalClientState(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID clientId
+	) {
+		return accessService.physicalClientState(principal, clientId);
+	}
+
+	@PutMapping("/physical-integration/clients/{clientId}/link")
+	PhysicalClientStateView linkPhysicalClient(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID clientId,
+			@Valid @RequestBody PhysicalClientLinkRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return accessService.linkPhysicalClient(
+				principal, clientId, request.toCommand(), correlationId(servletRequest));
+	}
+
+	@PostMapping("/physical-integration/clients/{clientId}/synchronize")
+	PhysicalClientStateView queuePhysicalSynchronization(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID clientId,
+			HttpServletRequest servletRequest
+	) {
+		return accessService.queuePhysicalSynchronization(principal, clientId, correlationId(servletRequest));
 	}
 
 	@PutMapping("/devices/{deviceId}/benefits")
@@ -189,5 +236,38 @@ public class AccessController {
 	public record DeviceBenefitsRequest(
 			@Size(max = 100) List<@NotNull UUID> benefitIds
 	) {
+	}
+
+	public record PhysicalIntegrationRequest(
+			boolean enabled,
+			@Pattern(regexp = "HIKCENTRAL") String providerKey,
+			@NotBlank @Size(max = 160) String displayName,
+			@Size(max = 120) String connectorKey,
+			@Size(max = 100) List<@Valid PhysicalBenefitMappingRequest> benefitMappings
+	) {
+		private ConfigurePhysicalIntegrationCommand toCommand() {
+			return new ConfigurePhysicalIntegrationCommand(
+					enabled, providerKey, displayName, connectorKey,
+					benefitMappings == null ? List.of() : benefitMappings.stream()
+							.map(PhysicalBenefitMappingRequest::toCommand)
+							.toList());
+		}
+	}
+
+	public record PhysicalBenefitMappingRequest(
+			@NotNull UUID benefitId,
+			@NotBlank @Size(max = 180) String externalAccessLevelRef,
+			@Size(max = 180) String externalAccessLevelName
+	) {
+		private ConfigurePhysicalIntegrationCommand.BenefitMapping toCommand() {
+			return new ConfigurePhysicalIntegrationCommand.BenefitMapping(
+					benefitId, externalAccessLevelRef, externalAccessLevelName);
+		}
+	}
+
+	public record PhysicalClientLinkRequest(@NotBlank @Size(max = 180) String externalPersonRef) {
+		private LinkPhysicalClientCommand toCommand() {
+			return new LinkPhysicalClientCommand(externalPersonRef);
+		}
 	}
 }

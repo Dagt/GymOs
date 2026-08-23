@@ -9,8 +9,8 @@ import {
   AccessDeviceSection,
   AccessLogsSection,
   ManualAccessSection,
+  PhysicalAccessIntegrationSection,
   TemporaryPassSection,
-  VisitPassesSection,
 } from "./AccessSections";
 import { useAccessController } from "./useAccessController";
 
@@ -34,7 +34,7 @@ export default function AccessPage() {
     <AppShell
       eyebrow="Operacion"
       session={access.session}
-      subtitle="Pases, visitas, apertura manual y bitacora de accesos."
+      subtitle="Consola operativa, autorizaciones excepcionales y sincronización de derechos físicos."
       title="Control de acceso"
     >
       <section className="grid gap-6 lg:grid-cols-[0.95fr_1.4fr]">
@@ -90,19 +90,24 @@ export default function AccessPage() {
             />
           </section>
 
-          <VisitPassesSection
+          <PhysicalAccessIntegrationSection
             busy={access.busy}
-            onConsumeVisit={access.consumeVisit}
-            onCreateVisitPack={access.createVisitPack}
-            onRefresh={access.refreshVisitPasses}
-            onValidDaysChange={access.setVisitPassValidDays}
-            onVisitPassTotalChange={access.setVisitPassTotal}
-            onVisitPassTypeChange={access.setVisitPassType}
-            selectedClientId={access.selectedClientId}
-            validDays={access.visitPassValidDays}
-            visitPasses={access.visitPasses}
-            visitPassTotal={access.visitPassTotal}
-            visitPassType={access.visitPassType}
+            connectionName={access.physicalConnectionName}
+            connectorKey={access.physicalConnectorKey}
+            externalPersonRef={access.externalPersonRef}
+            integration={access.physicalIntegration}
+            mappingDrafts={access.physicalMappingDrafts}
+            onConnectionNameChange={access.setPhysicalConnectionName}
+            onConnectorKeyChange={access.setPhysicalConnectorKey}
+            onExternalPersonRefChange={access.setExternalPersonRef}
+            onLinkClient={access.linkSelectedPhysicalClient}
+            onMappingChange={access.setPhysicalMapping}
+            onQueueSynchronization={access.queueSelectedPhysicalSynchronization}
+            onSaveIntegration={access.savePhysicalIntegration}
+            onSyncEnabledChange={access.setPhysicalSyncEnabled}
+            physicalClientState={access.physicalClientState}
+            selectedClient={access.selectedClient}
+            syncEnabled={access.physicalSyncEnabled}
           />
 
           <AccessLogsSection logs={access.logs} onRefreshLogs={() => void access.refreshLogs()} />
@@ -111,4 +116,3 @@ export default function AccessPage() {
     </AppShell>
   );
 }
-

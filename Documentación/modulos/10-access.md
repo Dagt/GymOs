@@ -1,7 +1,7 @@
 # Accesos y control físico
 
-Estado: `FUNCIONAL PARCIAL / MODELO OBJETIVO DEFINIDO`
-Última revisión: 22 de agosto de 2026
+Estado: `FASE 1 INICIADA / CONECTOR LOCAL PENDIENTE`
+Última revisión: 23 de agosto de 2026
 
 ## 1. Propósito del módulo
 
@@ -102,8 +102,8 @@ Por tanto:
 
 - no se ampliará `VisitPass` con integración a Catálogo ni nuevos beneficios;
 - no se creará una relación general producto -> beneficio de acceso;
-- la sección "Paquetes de visitas" debe retirarse de la pantalla principal de
-  Access cuando se ejecute el siguiente ajuste de frontend;
+- la sección "Paquetes de visitas" ya fue retirada de la pantalla principal de
+  Access; los endpoints y tablas se mantienen temporalmente por compatibilidad;
 - los endpoints/tablas existentes pueden mantenerse temporalmente por
   compatibilidad hasta comprobar que ninguna operación real depende de ellos;
 - su eliminación física debe hacerse en una migración posterior y explícita, no
@@ -243,9 +243,9 @@ inequívoca el dispositivo/punto de acceso.
 
 ### 4.4 Consumo de autorización temporal
 
-El consumo de `TemporaryPass` requiere endurecimiento de concurrencia: debe
-hacerse mediante actualización condicional y atómica, rechazando un segundo
-consumo concurrente cuando el último uso ya fue tomado.
+El consumo de `TemporaryPass` se realiza mediante actualización condicional y
+atómica por organización, sucursal, vigencia, estado y usos disponibles. Un
+segundo consumo concurrente se registra como denegado y no abre el acceso.
 
 ### 4.5 Mensaje de periodo de gracia
 
@@ -274,6 +274,18 @@ Debe conservar/mostrar:
 - autorización temporal;
 - bitácora reciente;
 - en el futuro, salud/sincronización del proveedor físico.
+
+La primera base de esa integración ya está disponible en la misma consola:
+
+- configuración por sucursal de una conexión `HIKCENTRAL`;
+- identificador público del GymFort Local Connector, sin URL, contraseña ni
+  secreto del proveedor;
+- mapeo `Benefit ACCESS -> Access Level` externo;
+- vínculo `Client -> external_person_ref` opaco;
+- estado deseado de sincronización `PENDING`, `BLOCKED`, `SYNCED` o `FAILED`.
+
+La configuración no llama todavía a HikCentral ni manipula biometría. Su único
+efecto es persistir el estado deseado que consumirá el conector local.
 
 Debe retirarse del flujo principal:
 
@@ -368,6 +380,16 @@ El conector debe:
 
 No debe contener reglas de membresía ni decidir si un cliente merece acceso; esa
 lógica permanece en GymFort.
+
+#### Base de datos y puerto ya preparados
+
+La migración `V83__physical_access_integration_foundation.sql` crea los
+registros de conexión, mapeos de beneficios, vínculos opacos de persona y estado
+de sincronización. El puerto de aplicación
+`PhysicalAccessSynchronizationPort` define el límite que implementará el
+conector/adaptador. No existe todavía una implementación remota o embebida en
+GymFort Cloud: esa separación evita acoplar la elegibilidad comercial a una
+marca, LAN, token o puerto de Hikvision.
 
 ### 6.5 Biometría
 

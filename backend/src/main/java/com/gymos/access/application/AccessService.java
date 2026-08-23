@@ -1,8 +1,10 @@
 package com.gymos.access.application;
 
 import com.gymos.access.application.command.AccessRequestCommand;
+import com.gymos.access.application.command.ConfigurePhysicalIntegrationCommand;
 import com.gymos.access.application.command.ConsumeVisitPassCommand;
 import com.gymos.access.application.command.CreateVisitPassCommand;
+import com.gymos.access.application.command.LinkPhysicalClientCommand;
 import com.gymos.access.application.command.ManualOpenCommand;
 import com.gymos.access.application.command.TemporaryPassCommand;
 import com.gymos.access.infrastructure.AccessRepository;
@@ -11,9 +13,17 @@ import com.gymos.access.infrastructure.AccessRepository.AccessDeviceRecord;
 import com.gymos.access.infrastructure.AccessRepository.AccessLogRecord;
 import com.gymos.access.infrastructure.AccessRepository.ClientAccessRecord;
 import com.gymos.access.infrastructure.AccessRepository.EffectiveAccessBenefitRecord;
+import com.gymos.access.infrastructure.AccessRepository.PhysicalAccessBenefitRecord;
+import com.gymos.access.infrastructure.AccessRepository.PhysicalBenefitMappingRecord;
+import com.gymos.access.infrastructure.AccessRepository.PhysicalClientLinkRecord;
+import com.gymos.access.infrastructure.AccessRepository.PhysicalProviderConnectionRecord;
+import com.gymos.access.infrastructure.AccessRepository.PhysicalSyncStateRecord;
 import com.gymos.access.infrastructure.AccessRepository.TemporaryPassRecord;
 import com.gymos.access.infrastructure.AccessRepository.VisitPassRecord;
 import com.gymos.audit.api.AuditService;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.time.BusinessTime;
@@ -24,7 +34,9 @@ import com.gymos.eligibility.api.EligibilityPolicy.EligibilityRequest;
 import com.gymos.eligibility.api.EligibilityPolicy.Reason;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -35,15 +47,18 @@ public class AccessService {
 	private final AccessRepository accessRepository;
 	private final AuditService auditService;
 	private final EligibilityPolicy eligibilityPolicy;
+	private final ObjectMapper objectMapper;
 
 	public AccessService(
 			AccessRepository accessRepository,
 			AuditService auditService,
-			EligibilityPolicy eligibilityPolicy
+			EligibilityPolicy eligibilityPolicy,
+			ObjectMapper objectMapper
 	) {
 		this.accessRepository = accessRepository;
 		this.auditService = auditService;
 		this.eligibilityPolicy = eligibilityPolicy;
+		this.objectMapper = objectMapper;
 	}
 
 	@Transactional(readOnly = true)
@@ -81,6 +96,180 @@ public class AccessService {
 						benefit.id(), benefit.code(), benefit.name(),
 						benefit.membershipId(), benefit.planId(), benefit.planName()))
 				.toList();
+	}
+
+	@Transactional(readOnly = true)
+	public PhysicalIntegrationView physicalIntegration(GymOsPrincipal principal) {
+		requireBranch(principal);
+		PhysicalProviderConnectionRecord connection = accessRepository
+				.physicalProviderConnection(principal.organizationId(), principal.branchId())
+				.orElse(null);
+		List<PhysicalAccessBenefitView> benefits = accessRepository
+				.physicalAccessBenefits(principal.organizationId(), principal.branchId())
+				.stream()
+				.map(this::physicalAccessBenefitView)
+				.toList();
+		List<PhysicalBenefitMappingView> mappings = connection == null
+				? List.of()
+				: accessRepository.physicalBenefitMappings(
+						principal.organizationId(), principal.branchId(), connection.id())
+						.stream()
+						.map(this::physicalBenefitMappingView)
+						.toList();
+		return new PhysicalIntegrationView(
+				connection == null ? defaultPhysicalConnection() : physicalConnectionView(connection),
+				benefits,
+				mappings
+		);
+	}
+
+	@Transactional
+	public PhysicalIntegrationView configurePhysicalIntegration(
+			GymOsPrincipal principal,
+			ConfigurePhysicalIntegrationCommand request,
+			String correlationId
+	) {
+		requireBranch(principal);
+		String providerKey = normalizeProviderKey(request.providerKey());
+		String displayName = requiredText(request.displayName(), "PHYSICAL_ACCESS_PROVIDER_NAME_REQUIRED",
+				"Indica un nombre para la conexion de acceso fisico.");
+		String connectorKey = trimToNull(request.connectorKey());
+		if (request.enabled() && connectorKey == null) {
+			throw new BusinessException(
+					"PHYSICAL_ACCESS_CONNECTOR_REQUIRED",
+					"Indica el identificador del conector local antes de activar la integracion."
+			);
+		}
+		List<PhysicalBenefitMappingRecord> mappings = normalizedPhysicalMappings(principal, request.benefitMappings());
+		PhysicalProviderConnectionRecord connection = accessRepository.upsertPhysicalProviderConnection(
+				principal.organizationId(), principal.branchId(), providerKey, displayName, connectorKey,
+				request.enabled(), principal.userId());
+		accessRepository.replacePhysicalBenefitMappings(
+				principal.organizationId(), principal.branchId(), connection.id(), mappings, principal.userId());
+		auditService.record(principal, "PHYSICAL_ACCESS_INTEGRATION_CONFIGURED", "ACCESS_PROVIDER_CONNECTION",
+				connection.id(), "BACKOFFICE", "provider=" + providerKey + "; mappings=" + mappings.size(), correlationId);
+		return physicalIntegration(principal);
+	}
+
+	@Transactional(readOnly = true)
+	public PhysicalClientStateView physicalClientState(GymOsPrincipal principal, UUID clientId) {
+		requireBranch(principal);
+		ClientAccessRecord client = accessRepository.clientById(principal.organizationId(), clientId)
+				.orElseThrow(() -> new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible."));
+		PhysicalProviderConnectionRecord connection = accessRepository
+				.physicalProviderConnection(principal.organizationId(), principal.branchId())
+				.orElse(null);
+		List<PhysicalAccessBenefitView> effectiveBenefits = effectivePhysicalBenefits(principal, client.id());
+		if (connection == null) {
+			return new PhysicalClientStateView(
+					client.id(), client.fullName(), null, effectiveBenefits, List.of(), null);
+		}
+		Map<UUID, PhysicalBenefitMappingRecord> mappingsByBenefit = accessRepository
+				.physicalBenefitMappings(principal.organizationId(), principal.branchId(), connection.id())
+				.stream()
+				.collect(java.util.stream.Collectors.toMap(
+						PhysicalBenefitMappingRecord::benefitId,
+						mapping -> mapping,
+						(first, ignored) -> first,
+						LinkedHashMap::new));
+		List<PhysicalBenefitMappingView> effectiveMappings = effectiveBenefits.stream()
+				.map(benefit -> {
+					PhysicalBenefitMappingRecord mapping = mappingsByBenefit.get(benefit.id());
+					return new PhysicalBenefitMappingView(
+							benefit.id(), benefit.code(), benefit.name(),
+							mapping == null ? null : mapping.externalAccessLevelRef(),
+							mapping == null ? null : mapping.externalAccessLevelName());
+				})
+				.toList();
+		PhysicalClientLinkRecord link = accessRepository.physicalClientLink(
+				principal.organizationId(), principal.branchId(), connection.id(), client.id()).orElse(null);
+		PhysicalSyncStateRecord syncState = accessRepository.physicalSyncState(
+				principal.organizationId(), principal.branchId(), connection.id(), client.id()).orElse(null);
+		return new PhysicalClientStateView(
+				client.id(), client.fullName(),
+				link == null ? null : link.externalPersonRef(),
+				effectiveBenefits, effectiveMappings, syncState == null ? null : physicalSyncStateView(syncState));
+	}
+
+	@Transactional
+	public PhysicalClientStateView linkPhysicalClient(
+			GymOsPrincipal principal,
+			UUID clientId,
+			LinkPhysicalClientCommand request,
+			String correlationId
+	) {
+		requireBranch(principal);
+		ClientAccessRecord client = accessRepository.clientById(principal.organizationId(), clientId)
+				.orElseThrow(() -> new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible."));
+		PhysicalProviderConnectionRecord connection = requiredPhysicalConnection(principal);
+		String externalPersonRef = requiredText(request.externalPersonRef(), "PHYSICAL_ACCESS_PERSON_REQUIRED",
+				"Indica la referencia de persona asignada por el proveedor fisico.");
+		accessRepository.upsertPhysicalClientLink(
+				principal.organizationId(), principal.branchId(), connection.id(), client.id(), externalPersonRef, principal.userId());
+		auditService.record(principal, "PHYSICAL_ACCESS_CLIENT_LINKED", "ACCESS_PROVIDER_CLIENT_LINK",
+				client.id(), "BACKOFFICE", "provider=" + connection.providerKey(), correlationId);
+		return physicalClientState(principal, client.id());
+	}
+
+	@Transactional
+	public PhysicalClientStateView queuePhysicalSynchronization(
+			GymOsPrincipal principal,
+			UUID clientId,
+			String correlationId
+	) {
+		requireBranch(principal);
+		ClientAccessRecord client = accessRepository.clientById(principal.organizationId(), clientId)
+				.orElseThrow(() -> new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible."));
+		PhysicalProviderConnectionRecord connection = requiredPhysicalConnection(principal);
+		if (!connection.enabled()) {
+			throw new BusinessException("PHYSICAL_ACCESS_INTEGRATION_DISABLED",
+					"Activa la integracion de acceso fisico antes de preparar sincronizaciones.");
+		}
+		if (trimToNull(connection.connectorKey()) == null) {
+			throw new BusinessException("PHYSICAL_ACCESS_CONNECTOR_REQUIRED",
+					"La integracion activa requiere un identificador de conector local.");
+		}
+		if (accessRepository.physicalClientLink(
+				principal.organizationId(), principal.branchId(), connection.id(), client.id()).isEmpty()) {
+			throw new BusinessException("PHYSICAL_ACCESS_CLIENT_LINK_REQUIRED",
+					"Vincula primero al socio con su referencia de persona en el proveedor fisico.");
+		}
+
+		List<PhysicalAccessBenefitView> effectiveBenefits = effectivePhysicalBenefits(principal, client.id());
+		Map<UUID, PhysicalBenefitMappingRecord> mappingsByBenefit = accessRepository
+				.physicalBenefitMappings(principal.organizationId(), principal.branchId(), connection.id())
+				.stream()
+				.collect(java.util.stream.Collectors.toMap(
+						PhysicalBenefitMappingRecord::benefitId,
+						mapping -> mapping,
+						(first, ignored) -> first,
+						LinkedHashMap::new));
+		List<PhysicalAccessBenefitView> unmappedBenefits = effectiveBenefits.stream()
+				.filter(benefit -> mappingsByBenefit.get(benefit.id()) == null)
+				.toList();
+		if (!unmappedBenefits.isEmpty()) {
+			String error = "Falta mapear el nivel externo para: " + unmappedBenefits.stream()
+					.map(PhysicalAccessBenefitView::name)
+					.collect(java.util.stream.Collectors.joining(", ")) + ".";
+			accessRepository.upsertPhysicalSyncState(
+					principal.organizationId(), principal.branchId(), connection.id(), client.id(), "[]",
+					"RECONCILE", "BLOCKED", error, principal.userId());
+			auditService.record(principal, "PHYSICAL_ACCESS_SYNC_BLOCKED", "ACCESS_PROVIDER_SYNC_STATE",
+					client.id(), "BACKOFFICE", error, correlationId);
+			return physicalClientState(principal, client.id());
+		}
+
+		List<String> externalAccessLevelRefs = effectiveBenefits.stream()
+				.map(benefit -> mappingsByBenefit.get(benefit.id()).externalAccessLevelRef())
+				.distinct()
+				.toList();
+		String action = externalAccessLevelRefs.isEmpty() ? "REVOKE" : "UPSERT";
+		accessRepository.upsertPhysicalSyncState(
+				principal.organizationId(), principal.branchId(), connection.id(), client.id(),
+				toJson(externalAccessLevelRefs), action, "PENDING", null, principal.userId());
+		auditService.record(principal, "PHYSICAL_ACCESS_SYNC_QUEUED", "ACCESS_PROVIDER_SYNC_STATE",
+				client.id(), "BACKOFFICE", "action=" + action + "; levels=" + externalAccessLevelRefs.size(), correlationId);
+		return physicalClientState(principal, client.id());
 	}
 
 	@Transactional
@@ -131,8 +320,13 @@ public class AccessService {
 		TemporaryPassRecord pass = accessRepository.validTemporaryPass(principal.organizationId(), principal.branchId(), client.id(), now)
 				.orElse(null);
 		if (pass != null) {
-			accessRepository.consumeTemporaryPass(pass.id(), now);
-			return recordDecision(principal, device, client, null, pass.id(), "TEMPORARY_PASS", "GRANTED", "RECEPTION", "Pase temporal vigente.", now, correlationId);
+			boolean consumed = accessRepository.consumeTemporaryPass(
+					principal.organizationId(), principal.branchId(), pass.id(), now);
+			if (!consumed) {
+				return recordDecision(principal, device, client, null, pass.id(), "TEMPORARY_PASS", "DENIED",
+						"RECEPTION", "La autorizacion temporal ya fue consumida o vencio.", now, correlationId);
+			}
+			return recordDecision(principal, device, client, null, pass.id(), "TEMPORARY_PASS", "GRANTED", "RECEPTION", "Autorizacion temporal vigente.", now, correlationId);
 		}
 
 		return recordDecision(principal, device, client, null, null, "MEMBERSHIP_CHECK", "DENIED", "RECEPTION", "Sin membresia activa ni pase temporal vigente.", now, correlationId);
@@ -141,6 +335,7 @@ public class AccessService {
 	@Transactional
 	public AccessDecisionResponse manualOpen(GymOsPrincipal principal, ManualOpenCommand request, String correlationId) {
 		requireBranch(principal);
+		requireManualOpenPermission(principal);
 		AccessDeviceRecord device = resolveDevice(principal, request.deviceCode());
 		ClientAccessRecord client = request.clientId() == null ? null : accessRepository.clientById(principal.organizationId(), request.clientId())
 				.orElseThrow(() -> new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible."));
@@ -226,6 +421,135 @@ public class AccessService {
 				.orElseThrow(() -> new BusinessException("VISIT_PASS_NOT_FOUND", "El paquete de visitas no esta disponible."));
 	}
 
+	private List<PhysicalAccessBenefitView> effectivePhysicalBenefits(GymOsPrincipal principal, UUID clientId) {
+		EligibilityDecision eligibility = eligibilityPolicy.evaluate(EligibilityRequest.access(
+				principal.organizationId(), principal.branchId(), clientId, BusinessTime.today(), Set.of()));
+		if (eligibility.reason() == Reason.CLIENT_NOT_FOUND) {
+			throw new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible.");
+		}
+		if (!eligibility.eligible()) {
+			return List.of();
+		}
+		return eligibility.benefits().stream()
+				.filter(benefit -> benefit.benefitType() == EligibilityPolicy.BenefitType.ACCESS)
+				.map(benefit -> new PhysicalAccessBenefitView(benefit.id(), benefit.code(), benefit.name()))
+				.toList();
+	}
+
+	private List<PhysicalBenefitMappingRecord> normalizedPhysicalMappings(
+			GymOsPrincipal principal,
+			List<ConfigurePhysicalIntegrationCommand.BenefitMapping> requestedMappings
+	) {
+		Map<UUID, PhysicalBenefitMappingRecord> byBenefit = new LinkedHashMap<>();
+		Set<String> externalRefs = new java.util.HashSet<>();
+		for (ConfigurePhysicalIntegrationCommand.BenefitMapping mapping : requestedMappings) {
+			if (mapping == null || mapping.benefitId() == null) {
+				throw new BusinessException("PHYSICAL_ACCESS_MAPPING_INVALID", "Cada mapeo debe incluir un beneficio de acceso.");
+			}
+			String externalAccessLevelRef = requiredText(mapping.externalAccessLevelRef(),
+					"PHYSICAL_ACCESS_MAPPING_INVALID", "Cada mapeo debe incluir la referencia del nivel externo.");
+			if (byBenefit.containsKey(mapping.benefitId()) || !externalRefs.add(externalAccessLevelRef)) {
+				throw new BusinessException("PHYSICAL_ACCESS_MAPPING_DUPLICATE",
+						"No repitas beneficios ni niveles externos dentro de la misma configuracion.");
+			}
+			byBenefit.put(mapping.benefitId(), new PhysicalBenefitMappingRecord(
+					mapping.benefitId(), null, null, externalAccessLevelRef, trimToNull(mapping.externalAccessLevelName())));
+		}
+		List<UUID> benefitIds = List.copyOf(byBenefit.keySet());
+		if (!accessRepository.accessBenefitsExist(principal.organizationId(), principal.branchId(), benefitIds)) {
+			throw new BusinessException("ACCESS_BENEFIT_NOT_AVAILABLE",
+					"Uno o mas beneficios de acceso no estan disponibles en esta sucursal.");
+		}
+		return List.copyOf(byBenefit.values());
+	}
+
+	private PhysicalProviderConnectionRecord requiredPhysicalConnection(GymOsPrincipal principal) {
+		return accessRepository.physicalProviderConnection(principal.organizationId(), principal.branchId())
+				.orElseThrow(() -> new BusinessException("PHYSICAL_ACCESS_INTEGRATION_REQUIRED",
+						"Configura primero la integracion de acceso fisico para esta sucursal."));
+	}
+
+	private PhysicalIntegrationConnectionView defaultPhysicalConnection() {
+		return new PhysicalIntegrationConnectionView(
+				null, "HIKCENTRAL", "HikCentral Professional", null, false, "DISABLED", null, null, null);
+	}
+
+	private PhysicalIntegrationConnectionView physicalConnectionView(PhysicalProviderConnectionRecord connection) {
+		return new PhysicalIntegrationConnectionView(
+				connection.id(), connection.providerKey(), connection.displayName(), connection.connectorKey(),
+				connection.enabled(), connection.syncStatus(), connection.lastHeartbeatAt(),
+				connection.lastSynchronizedAt(), connection.lastError());
+	}
+
+	private PhysicalAccessBenefitView physicalAccessBenefitView(PhysicalAccessBenefitRecord benefit) {
+		return new PhysicalAccessBenefitView(benefit.id(), benefit.code(), benefit.name());
+	}
+
+	private PhysicalBenefitMappingView physicalBenefitMappingView(PhysicalBenefitMappingRecord mapping) {
+		return new PhysicalBenefitMappingView(
+				mapping.benefitId(), mapping.benefitCode(), mapping.benefitName(),
+				mapping.externalAccessLevelRef(), mapping.externalAccessLevelName());
+	}
+
+	private PhysicalSyncStateView physicalSyncStateView(PhysicalSyncStateRecord state) {
+		return new PhysicalSyncStateView(
+				fromJson(state.desiredAccessLevelRefsJson()), state.action(), state.status(),
+				state.requestedAt(), state.lastSynchronizedAt(), state.lastError());
+	}
+
+	private String toJson(List<String> values) {
+		try {
+			return objectMapper.writeValueAsString(values);
+		} catch (JsonProcessingException exception) {
+			throw new IllegalStateException("No fue posible serializar el estado de sincronizacion de acceso.", exception);
+		}
+	}
+
+	private List<String> fromJson(String value) {
+		if (value == null || value.isBlank()) {
+			return List.of();
+		}
+		try {
+			return objectMapper.readValue(value, new TypeReference<List<String>>() { });
+		} catch (JsonProcessingException exception) {
+			throw new IllegalStateException("El estado de sincronizacion de acceso almacenado es invalido.", exception);
+		}
+	}
+
+	private String normalizeProviderKey(String providerKey) {
+		String normalized = providerKey == null || providerKey.isBlank()
+				? "HIKCENTRAL"
+				: providerKey.trim().toUpperCase();
+		if (!"HIKCENTRAL".equals(normalized)) {
+			throw new BusinessException("PHYSICAL_ACCESS_PROVIDER_UNSUPPORTED",
+					"El primer piloto solo admite configuracion de HikCentral Professional.");
+		}
+		return normalized;
+	}
+
+	private String requiredText(String value, String code, String message) {
+		String normalized = trimToNull(value);
+		if (normalized == null) {
+			throw new BusinessException(code, message);
+		}
+		return normalized;
+	}
+
+	private String trimToNull(String value) {
+		if (value == null) {
+			return null;
+		}
+		String normalized = value.trim();
+		return normalized.isEmpty() ? null : normalized;
+	}
+
+	private void requireManualOpenPermission(GymOsPrincipal principal) {
+		if (!principal.platformAdmin() && !principal.permissions().contains("access.manual.open")) {
+			throw new BusinessException("ACCESS_MANUAL_OPEN_FORBIDDEN",
+					"No tienes permiso para realizar una apertura manual.");
+		}
+	}
+
 	private AccessDecisionResponse recordDecision(
 			GymOsPrincipal principal,
 			AccessDeviceRecord device,
@@ -279,6 +603,58 @@ public class AccessService {
 					.orElseThrow(() -> new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible."));
 		}
 		throw new BusinessException("ACCESS_CLIENT_REQUIRED", "Selecciona un cliente o captura un identificador.");
+	}
+
+	public record PhysicalIntegrationView(
+			PhysicalIntegrationConnectionView connection,
+			List<PhysicalAccessBenefitView> availableBenefits,
+			List<PhysicalBenefitMappingView> mappings
+	) {
+	}
+
+	public record PhysicalIntegrationConnectionView(
+			UUID id,
+			String providerKey,
+			String displayName,
+			String connectorKey,
+			boolean enabled,
+			String syncStatus,
+			OffsetDateTime lastHeartbeatAt,
+			OffsetDateTime lastSynchronizedAt,
+			String lastError
+	) {
+	}
+
+	public record PhysicalAccessBenefitView(UUID id, String code, String name) {
+	}
+
+	public record PhysicalBenefitMappingView(
+			UUID benefitId,
+			String benefitCode,
+			String benefitName,
+			String externalAccessLevelRef,
+			String externalAccessLevelName
+	) {
+	}
+
+	public record PhysicalClientStateView(
+			UUID clientId,
+			String clientName,
+			String externalPersonRef,
+			List<PhysicalAccessBenefitView> effectiveBenefits,
+			List<PhysicalBenefitMappingView> effectiveMappings,
+			PhysicalSyncStateView syncState
+	) {
+	}
+
+	public record PhysicalSyncStateView(
+			List<String> desiredAccessLevelRefs,
+			String action,
+			String status,
+			OffsetDateTime requestedAt,
+			OffsetDateTime lastSynchronizedAt,
+			String lastError
+	) {
 	}
 
 	private void requireBranch(GymOsPrincipal principal) {

@@ -8,6 +8,9 @@ import type {
   CreateVisitPassPayload,
   EffectiveAccessBenefit,
   ManualOpenPayload,
+  PhysicalClientState,
+  PhysicalIntegration,
+  PhysicalIntegrationPayload,
   TemporaryPass,
   TemporaryPassPayload,
   VisitPass,
@@ -58,6 +61,47 @@ export async function createTemporaryPass(
   return apiFetch<TemporaryPass>("/access/commands/temporary", accessToken, {
     method: "POST",
     body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function getPhysicalIntegration(accessToken: string): Promise<PhysicalIntegration> {
+  return apiFetch<PhysicalIntegration>("/access/physical-integration", accessToken);
+}
+
+export async function updatePhysicalIntegration(
+  accessToken: string,
+  payload: PhysicalIntegrationPayload,
+): Promise<PhysicalIntegration> {
+  return apiFetch<PhysicalIntegration>("/access/physical-integration", accessToken, {
+    method: "PUT",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
+}
+
+export async function getPhysicalClientState(
+  accessToken: string,
+  clientId: string,
+): Promise<PhysicalClientState> {
+  return apiFetch<PhysicalClientState>(`/access/physical-integration/clients/${clientId}`, accessToken);
+}
+
+export async function linkPhysicalClient(
+  accessToken: string,
+  clientId: string,
+  externalPersonRef: string,
+): Promise<PhysicalClientState> {
+  return apiFetch<PhysicalClientState>(`/access/physical-integration/clients/${clientId}/link`, accessToken, {
+    method: "PUT",
+    body: JSON.stringify(normalizePayload({ externalPersonRef })),
+  });
+}
+
+export async function queuePhysicalClientSynchronization(
+  accessToken: string,
+  clientId: string,
+): Promise<PhysicalClientState> {
+  return apiFetch<PhysicalClientState>(`/access/physical-integration/clients/${clientId}/synchronize`, accessToken, {
+    method: "POST",
   });
 }
 

@@ -1,13 +1,16 @@
 package com.gymos.access.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.access.application.command.AccessRequestCommand;
+import com.gymos.access.application.command.ManualOpenCommand;
 import com.gymos.access.infrastructure.AccessRepository;
 import com.gymos.access.infrastructure.AccessRepository.AccessDecisionResponse;
 import com.gymos.access.infrastructure.AccessRepository.AccessDeviceRecord;
@@ -32,7 +35,7 @@ class AccessBenefitDecisionTests {
 		AccessRepository repository = mock(AccessRepository.class);
 		AuditService auditService = mock(AuditService.class);
 		EligibilityPolicy eligibilityPolicy = mock(EligibilityPolicy.class);
-		AccessService service = new AccessService(repository, auditService, eligibilityPolicy);
+		AccessService service = new AccessService(repository, auditService, eligibilityPolicy, new ObjectMapper());
 		UUID organizationId = UUID.randomUUID();
 		UUID branchId = UUID.randomUUID();
 		UUID userId = UUID.randomUUID();
@@ -73,5 +76,19 @@ class AccessBenefitDecisionTests {
 
 		assertThat(result.decision()).isEqualTo("DENIED");
 		verify(eligibilityPolicy).evaluate(any());
+	}
+
+	@Test
+	void requiresDedicatedPermissionForManualOpening() {
+		AccessService service = new AccessService(
+				mock(AccessRepository.class), mock(AuditService.class), mock(EligibilityPolicy.class), new ObjectMapper());
+		GymOsPrincipal principal = new GymOsPrincipal(
+				UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "reception@gymos.local", "Recepcion",
+				Set.of("access.manage"));
+
+		assertThatThrownBy(() -> service.manualOpen(
+				principal, new ManualOpenCommand(null, null, "Prueba de seguridad"), UUID.randomUUID().toString()))
+				.isInstanceOf(com.gymos.common.api.BusinessException.class)
+				.hasMessageContaining("permiso");
 	}
 }

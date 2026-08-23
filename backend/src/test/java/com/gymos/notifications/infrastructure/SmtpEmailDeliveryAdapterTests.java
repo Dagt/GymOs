@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.gymos.notifications.api.EmailDeliveryPort.EmailMessage;
 import com.gymos.notifications.application.NotificationProperties;
 import jakarta.mail.MessagingException;
+import jakarta.mail.Multipart;
+import jakarta.mail.Part;
 import jakarta.mail.internet.MimeMessage;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
@@ -36,12 +38,10 @@ class SmtpEmailDeliveryAdapterTests {
 		assertThat(sender.message.getSubject()).isEqualTo("Tu membresia");
 		assertThat(sender.message.getHeader("X-GymOS-Notification-Id", null)).isEqualTo(notificationId.toString());
 		assertThat(sender.message.getHeader("X-GymOS-Idempotency-Key", null)).isEqualTo("notification:key");
-		ByteArrayOutputStream output = new ByteArrayOutputStream();
-		sender.message.writeTo(output);
-		String rawMessage = output.toString(StandardCharsets.UTF_8);
-		assertThat(rawMessage).contains("Appex Hub Deportivo");
-		assertThat(rawMessage).contains("Tu membresia");
-		assertThat(rawMessage).contains("https://gymfort.mx/api/tenant-logo/abc?v=1");
+		String html = htmlContent(sender.message);
+		assertThat(html).contains("Appex Hub Deportivo");
+		assertThat(html).contains("Tu membresia");
+		assertThat(html).contains("https://gymfort.mx/api/tenant-logo/abc?v=1");
 	}
 
 	@Test
@@ -96,5 +96,21 @@ class SmtpEmailDeliveryAdapterTests {
 			}
 			this.message = mimeMessage;
 		}
+	}
+
+	private String htmlContent(Part part) throws Exception {
+		if (part.isMimeType("text/html")) {
+			return part.getContent().toString();
+		}
+		if (part.isMimeType("multipart/*")) {
+			Multipart multipart = (Multipart) part.getContent();
+			for (int index = 0; index < multipart.getCount(); index++) {
+				String content = htmlContent(multipart.getBodyPart(index));
+				if (!content.isBlank()) {
+					return content;
+				}
+			}
+		}
+		return "";
 	}
 }

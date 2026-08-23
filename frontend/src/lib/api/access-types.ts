@@ -106,3 +106,65 @@ export type CreateVisitPassPayload = {
 export type ConsumeVisitPassPayload = {
   reason?: string | null;
 };
+
+export type PhysicalAccessBenefit = {
+  id: string;
+  code: string;
+  name: string;
+};
+
+export type PhysicalBenefitMapping = {
+  benefitId: string;
+  benefitCode: string | null;
+  benefitName: string | null;
+  externalAccessLevelRef: string | null;
+  externalAccessLevelName: string | null;
+};
+
+export type PhysicalIntegrationConnection = {
+  id: string | null;
+  providerKey: "HIKCENTRAL" | string;
+  displayName: string;
+  connectorKey: string | null;
+  enabled: boolean;
+  syncStatus: "DISABLED" | "AWAITING_CONNECTOR" | "HEALTHY" | "DEGRADED" | string;
+  lastHeartbeatAt: string | null;
+  lastSynchronizedAt: string | null;
+  lastError: string | null;
+};
+
+export type PhysicalIntegration = {
+  connection: PhysicalIntegrationConnection;
+  availableBenefits: PhysicalAccessBenefit[];
+  mappings: PhysicalBenefitMapping[];
+};
+
+export type PhysicalIntegrationPayload = {
+  enabled: boolean;
+  providerKey: "HIKCENTRAL";
+  displayName: string;
+  connectorKey?: string | null;
+  benefitMappings: Array<{
+    benefitId: string;
+    externalAccessLevelRef: string;
+    externalAccessLevelName?: string | null;
+  }>;
+};
+
+export type PhysicalAccessSyncState = {
+  desiredAccessLevelRefs: string[];
+  action: "UPSERT" | "REVOKE" | "RECONCILE" | string;
+  status: "PENDING" | "BLOCKED" | "SYNCED" | "FAILED" | string;
+  requestedAt: string;
+  lastSynchronizedAt: string | null;
+  lastError: string | null;
+};
+
+export type PhysicalClientState = {
+  clientId: string;
+  clientName: string;
+  externalPersonRef: string | null;
+  effectiveBenefits: PhysicalAccessBenefit[];
+  effectiveMappings: PhysicalBenefitMapping[];
+  syncState: PhysicalAccessSyncState | null;
+};

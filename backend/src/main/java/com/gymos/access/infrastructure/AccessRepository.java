@@ -157,6 +157,289 @@ public class AccessRepository {
 		return count == distinctIds.size();
 	}
 
+	public List<PhysicalAccessBenefitRecord> physicalAccessBenefits(UUID organizationId, UUID branchId) {
+		return jdbcClient.sql("""
+				SELECT id, code, name
+				FROM benefit
+				WHERE organization_id = :organizationId
+				  AND benefit_type = 'ACCESS'
+				  AND status = 'ACTIVE'
+				  AND deleted_at IS NULL
+				  AND (branch_id IS NULL OR branch_id = :branchId)
+				ORDER BY name, code
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.query((resultSet, rowNumber) -> new PhysicalAccessBenefitRecord(
+						resultSet.getObject("id", UUID.class),
+						resultSet.getString("code"),
+						resultSet.getString("name")
+				))
+				.list();
+	}
+
+	public Optional<PhysicalProviderConnectionRecord> physicalProviderConnection(UUID organizationId, UUID branchId) {
+		return jdbcClient.sql("""
+				SELECT id, provider_key, display_name, connector_key, enabled, sync_status,
+				       last_heartbeat_at, last_synchronized_at, last_error
+				FROM access_provider_connection
+				WHERE organization_id = :organizationId
+				  AND branch_id = :branchId
+				ORDER BY created_at
+				LIMIT 1
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.query(this::mapPhysicalProviderConnection)
+				.optional();
+	}
+
+	public PhysicalProviderConnectionRecord upsertPhysicalProviderConnection(
+			UUID organizationId,
+			UUID branchId,
+			String providerKey,
+			String displayName,
+			String connectorKey,
+			boolean enabled,
+			UUID actorUserId
+	) {
+		OffsetDateTime now = OffsetDateTime.now();
+		return jdbcClient.sql("""
+				INSERT INTO access_provider_connection (
+				    id, organization_id, branch_id, provider_key, display_name, connector_key,
+				    enabled, sync_status, created_at, updated_at, created_by, updated_by, version
+				)
+				VALUES (
+				    :id, :organizationId, :branchId, :providerKey, :displayName, :connectorKey,
+				    :enabled, :syncStatus, :now, :now, :actorUserId, :actorUserId, 0
+				)
+				ON CONFLICT (organization_id, branch_id, provider_key)
+				DO UPDATE SET
+				    display_name = EXCLUDED.display_name,
+				    connector_key = EXCLUDED.connector_key,
+				    enabled = EXCLUDED.enabled,
+				    sync_status = EXCLUDED.sync_status,
+				    last_error = CASE WHEN EXCLUDED.enabled THEN access_provider_connection.last_error ELSE NULL END,
+				    updated_at = EXCLUDED.updated_at,
+				    updated_by = EXCLUDED.updated_by,
+				    version = access_provider_connection.version + 1
+				RETURNING id, provider_key, display_name, connector_key, enabled, sync_status,
+				          last_heartbeat_at, last_synchronized_at, last_error
+				""")
+				.param("id", UUID.randomUUID())
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("providerKey", providerKey)
+				.param("displayName", displayName)
+				.param("connectorKey", connectorKey)
+				.param("enabled", enabled)
+				.param("syncStatus", enabled ? "AWAITING_CONNECTOR" : "DISABLED")
+				.param("now", now)
+				.param("actorUserId", actorUserId)
+				.query(this::mapPhysicalProviderConnection)
+				.single();
+	}
+
+	public List<PhysicalBenefitMappingRecord> physicalBenefitMappings(UUID organizationId, UUID branchId, UUID connectionId) {
+		return jdbcClient.sql("""
+				SELECT m.benefit_id, b.code AS benefit_code, b.name AS benefit_name,
+				       m.external_access_level_ref, m.external_access_level_name
+				FROM access_provider_benefit_mapping m
+				JOIN benefit b ON b.id = m.benefit_id
+				WHERE m.organization_id = :organizationId
+				  AND m.branch_id = :branchId
+				  AND m.connection_id = :connectionId
+				ORDER BY b.name, b.code
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("connectionId", connectionId)
+				.query((resultSet, rowNumber) -> new PhysicalBenefitMappingRecord(
+						resultSet.getObject("benefit_id", UUID.class),
+						resultSet.getString("benefit_code"),
+						resultSet.getString("benefit_name"),
+						resultSet.getString("external_access_level_ref"),
+						resultSet.getString("external_access_level_name")
+				))
+				.list();
+	}
+
+	public void replacePhysicalBenefitMappings(
+			UUID organizationId,
+			UUID branchId,
+			UUID connectionId,
+			List<PhysicalBenefitMappingRecord> mappings,
+			UUID actorUserId
+	) {
+		jdbcClient.sql("""
+				DELETE FROM access_provider_benefit_mapping
+				WHERE organization_id = :organizationId
+				  AND branch_id = :branchId
+				  AND connection_id = :connectionId
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("connectionId", connectionId)
+				.update();
+		OffsetDateTime now = OffsetDateTime.now();
+		for (PhysicalBenefitMappingRecord mapping : mappings) {
+			jdbcClient.sql("""
+					INSERT INTO access_provider_benefit_mapping (
+					    id, organization_id, branch_id, connection_id, benefit_id,
+					    external_access_level_ref, external_access_level_name,
+					    created_at, updated_at, created_by, updated_by, version
+					)
+					VALUES (
+					    :id, :organizationId, :branchId, :connectionId, :benefitId,
+					    :externalAccessLevelRef, :externalAccessLevelName,
+					    :now, :now, :actorUserId, :actorUserId, 0
+					)
+					""")
+					.param("id", UUID.randomUUID())
+					.param("organizationId", organizationId)
+					.param("branchId", branchId)
+					.param("connectionId", connectionId)
+					.param("benefitId", mapping.benefitId())
+					.param("externalAccessLevelRef", mapping.externalAccessLevelRef())
+					.param("externalAccessLevelName", mapping.externalAccessLevelName())
+					.param("now", now)
+					.param("actorUserId", actorUserId)
+					.update();
+		}
+	}
+
+	public Optional<PhysicalClientLinkRecord> physicalClientLink(UUID organizationId, UUID branchId, UUID connectionId, UUID clientId) {
+		return jdbcClient.sql("""
+				SELECT client_id, external_person_ref, linked_at
+				FROM access_provider_client_link
+				WHERE organization_id = :organizationId
+				  AND branch_id = :branchId
+				  AND connection_id = :connectionId
+				  AND client_id = :clientId
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("connectionId", connectionId)
+				.param("clientId", clientId)
+				.query((resultSet, rowNumber) -> new PhysicalClientLinkRecord(
+						resultSet.getObject("client_id", UUID.class),
+						resultSet.getString("external_person_ref"),
+						resultSet.getObject("linked_at", OffsetDateTime.class)
+				))
+				.optional();
+	}
+
+	public PhysicalClientLinkRecord upsertPhysicalClientLink(
+			UUID organizationId,
+			UUID branchId,
+			UUID connectionId,
+			UUID clientId,
+			String externalPersonRef,
+			UUID actorUserId
+	) {
+		OffsetDateTime now = OffsetDateTime.now();
+		return jdbcClient.sql("""
+				INSERT INTO access_provider_client_link (
+				    id, organization_id, branch_id, connection_id, client_id, external_person_ref,
+				    linked_at, linked_by, updated_at, updated_by, version
+				)
+				VALUES (
+				    :id, :organizationId, :branchId, :connectionId, :clientId, :externalPersonRef,
+				    :now, :actorUserId, :now, :actorUserId, 0
+				)
+				ON CONFLICT (connection_id, client_id)
+				DO UPDATE SET
+				    external_person_ref = EXCLUDED.external_person_ref,
+				    updated_at = EXCLUDED.updated_at,
+				    updated_by = EXCLUDED.updated_by,
+				    version = access_provider_client_link.version + 1
+				RETURNING client_id, external_person_ref, linked_at
+				""")
+				.param("id", UUID.randomUUID())
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("connectionId", connectionId)
+				.param("clientId", clientId)
+				.param("externalPersonRef", externalPersonRef)
+				.param("now", now)
+				.param("actorUserId", actorUserId)
+				.query((resultSet, rowNumber) -> new PhysicalClientLinkRecord(
+						resultSet.getObject("client_id", UUID.class),
+						resultSet.getString("external_person_ref"),
+						resultSet.getObject("linked_at", OffsetDateTime.class)
+				))
+				.single();
+	}
+
+	public Optional<PhysicalSyncStateRecord> physicalSyncState(UUID organizationId, UUID branchId, UUID connectionId, UUID clientId) {
+		return jdbcClient.sql("""
+				SELECT desired_access_level_refs::text AS desired_access_level_refs, action, status,
+				       requested_at, last_synchronized_at, last_error
+				FROM access_provider_sync_state
+				WHERE organization_id = :organizationId
+				  AND branch_id = :branchId
+				  AND connection_id = :connectionId
+				  AND client_id = :clientId
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("connectionId", connectionId)
+				.param("clientId", clientId)
+				.query(this::mapPhysicalSyncState)
+				.optional();
+	}
+
+	public PhysicalSyncStateRecord upsertPhysicalSyncState(
+			UUID organizationId,
+			UUID branchId,
+			UUID connectionId,
+			UUID clientId,
+			String desiredAccessLevelRefsJson,
+			String action,
+			String status,
+			String lastError,
+			UUID actorUserId
+	) {
+		OffsetDateTime now = OffsetDateTime.now();
+		return jdbcClient.sql("""
+				INSERT INTO access_provider_sync_state (
+				    id, organization_id, branch_id, connection_id, client_id,
+				    desired_access_level_refs, action, status, requested_at, last_error,
+				    created_at, updated_at, created_by, updated_by, version
+				)
+				VALUES (
+				    :id, :organizationId, :branchId, :connectionId, :clientId,
+				    CAST(:desiredAccessLevelRefsJson AS jsonb), :action, :status, :now, :lastError,
+				    :now, :now, :actorUserId, :actorUserId, 0
+				)
+				ON CONFLICT (connection_id, client_id)
+				DO UPDATE SET
+				    desired_access_level_refs = EXCLUDED.desired_access_level_refs,
+				    action = EXCLUDED.action,
+				    status = EXCLUDED.status,
+				    requested_at = EXCLUDED.requested_at,
+				    last_error = EXCLUDED.last_error,
+				    updated_at = EXCLUDED.updated_at,
+				    updated_by = EXCLUDED.updated_by,
+				    version = access_provider_sync_state.version + 1
+				RETURNING desired_access_level_refs::text AS desired_access_level_refs, action, status,
+				          requested_at, last_synchronized_at, last_error
+				""")
+				.param("id", UUID.randomUUID())
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("connectionId", connectionId)
+				.param("clientId", clientId)
+				.param("desiredAccessLevelRefsJson", desiredAccessLevelRefsJson)
+				.param("action", action)
+				.param("status", status)
+				.param("now", now)
+				.param("lastError", lastError)
+				.param("actorUserId", actorUserId)
+				.query(this::mapPhysicalSyncState)
+				.single();
+	}
+
 	public void replaceDeviceBenefits(
 			UUID organizationId,
 			UUID branchId,
@@ -327,18 +610,33 @@ public class AccessRepository {
 		return logId;
 	}
 
-	public void consumeTemporaryPass(UUID passId, OffsetDateTime now) {
-		jdbcClient.sql("""
+	public boolean consumeTemporaryPass(
+			UUID organizationId,
+			UUID branchId,
+			UUID passId,
+			OffsetDateTime now
+	) {
+		int updated = jdbcClient.sql("""
 				UPDATE access_temporary_pass
 				SET uses_count = uses_count + 1,
 				    status = CASE WHEN uses_count + 1 >= max_uses THEN 'CONSUMED' ELSE status END,
 				    updated_at = :updatedAt,
 				    version = version + 1
-				WHERE id = :passId
+				WHERE organization_id = :organizationId
+				  AND branch_id = :branchId
+				  AND id = :passId
+				  AND status = 'ACTIVE'
+				  AND starts_at <= :updatedAt
+				  AND expires_at >= :updatedAt
+				  AND uses_count < max_uses
+				  AND deleted_at IS NULL
 				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
 				.param("updatedAt", now)
 				.param("passId", passId)
 				.update();
+		return updated == 1;
 	}
 
 	public Optional<AccessDecisionResponse> decision(UUID logId) {
@@ -561,6 +859,37 @@ public class AccessRepository {
 		);
 	}
 
+	private PhysicalProviderConnectionRecord mapPhysicalProviderConnection(
+			java.sql.ResultSet resultSet,
+			int rowNumber
+	) throws java.sql.SQLException {
+		return new PhysicalProviderConnectionRecord(
+				resultSet.getObject("id", UUID.class),
+				resultSet.getString("provider_key"),
+				resultSet.getString("display_name"),
+				resultSet.getString("connector_key"),
+				resultSet.getBoolean("enabled"),
+				resultSet.getString("sync_status"),
+				resultSet.getObject("last_heartbeat_at", OffsetDateTime.class),
+				resultSet.getObject("last_synchronized_at", OffsetDateTime.class),
+				resultSet.getString("last_error")
+		);
+	}
+
+	private PhysicalSyncStateRecord mapPhysicalSyncState(
+			java.sql.ResultSet resultSet,
+			int rowNumber
+	) throws java.sql.SQLException {
+		return new PhysicalSyncStateRecord(
+				resultSet.getString("desired_access_level_refs"),
+				resultSet.getString("action"),
+				resultSet.getString("status"),
+				resultSet.getObject("requested_at", OffsetDateTime.class),
+				resultSet.getObject("last_synchronized_at", OffsetDateTime.class),
+				resultSet.getString("last_error")
+		);
+	}
+
 	public record AccessDeviceRecord(
 			UUID id,
 			String name,
@@ -582,6 +911,48 @@ public class AccessRepository {
 			UUID membershipId,
 			UUID planId,
 			String planName
+	) {
+	}
+
+	public record PhysicalAccessBenefitRecord(UUID id, String code, String name) {
+	}
+
+	public record PhysicalProviderConnectionRecord(
+			UUID id,
+			String providerKey,
+			String displayName,
+			String connectorKey,
+			boolean enabled,
+			String syncStatus,
+			OffsetDateTime lastHeartbeatAt,
+			OffsetDateTime lastSynchronizedAt,
+			String lastError
+	) {
+	}
+
+	public record PhysicalBenefitMappingRecord(
+			UUID benefitId,
+			String benefitCode,
+			String benefitName,
+			String externalAccessLevelRef,
+			String externalAccessLevelName
+	) {
+	}
+
+	public record PhysicalClientLinkRecord(
+			UUID clientId,
+			String externalPersonRef,
+			OffsetDateTime linkedAt
+	) {
+	}
+
+	public record PhysicalSyncStateRecord(
+			String desiredAccessLevelRefsJson,
+			String action,
+			String status,
+			OffsetDateTime requestedAt,
+			OffsetDateTime lastSynchronizedAt,
+			String lastError
 	) {
 	}
 

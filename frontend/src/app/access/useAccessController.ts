@@ -1,23 +1,25 @@
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import {
-  consumeVisitPass,
   createTemporaryPass,
-  createVisitPass,
   getAccessDevices,
   getAccessLogs,
+  getPhysicalClientState,
+  getPhysicalIntegration,
   getStoredSession,
-  getVisitPasses,
+  linkPhysicalClient,
   manualOpenAccess,
+  queuePhysicalClientSynchronization,
   requestAccess,
   searchClients,
+  updatePhysicalIntegration,
   type AccessDecision,
   type AccessDevice,
   type AccessLog,
   type ClientSummary,
+  type PhysicalClientState,
+  type PhysicalIntegration,
   type StoredSession,
-  type VisitPass,
 } from "@/lib/api";
-import { type VisitPassType } from "./AccessSections";
 
 export function useAccessController() {
   const [session, setSession] = useState<StoredSession | null>(null);
@@ -32,10 +34,13 @@ export function useAccessController() {
   const [temporaryReason, setTemporaryReason] = useState("");
   const [temporaryHours, setTemporaryHours] = useState(4);
   const [temporaryMaxUses, setTemporaryMaxUses] = useState(1);
-  const [visitPasses, setVisitPasses] = useState<VisitPass[]>([]);
-  const [visitPassType, setVisitPassType] = useState<VisitPassType>("VISIT_PACK");
-  const [visitPassTotal, setVisitPassTotal] = useState(5);
-  const [visitPassValidDays, setVisitPassValidDays] = useState(30);
+  const [physicalIntegration, setPhysicalIntegration] = useState<PhysicalIntegration | null>(null);
+  const [physicalClientState, setPhysicalClientState] = useState<PhysicalClientState | null>(null);
+  const [physicalConnectionName, setPhysicalConnectionName] = useState("");
+  const [physicalConnectorKey, setPhysicalConnectorKey] = useState("");
+  const [physicalSyncEnabled, setPhysicalSyncEnabled] = useState(false);
+  const [physicalMappingDrafts, setPhysicalMappingDrafts] = useState<Record<string, { reference: string; name: string }>>({});
+  const [externalPersonRef, setExternalPersonRef] = useState("");
   const [lastDecision, setLastDecision] = useState<AccessDecision | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,10 +61,11 @@ export function useAccessController() {
       }
       setSession(stored);
       try {
-        const [loadedDevices, loadedLogs, loadedClients] = await Promise.all([
+        const [loadedDevices, loadedLogs, loadedClients, loadedPhysicalIntegration] = await Promise.all([
           getAccessDevices(stored.accessToken),
           getAccessLogs(stored.accessToken),
           searchClients(stored.accessToken, "", "ACTIVE"),
+          getPhysicalIntegration(stored.accessToken),
         ]);
         if (!active) {
           return;
@@ -68,6 +74,7 @@ export function useAccessController() {
         setLogs(loadedLogs);
         setClients(loadedClients);
         setDeviceCode(loadedDevices.find((device) => device.status === "ACTIVE")?.deviceCode ?? "");
+        hydratePhysicalIntegration(loadedPhysicalIntegration);
       } catch (exception) {
         if (active) {
           setError(exception instanceof Error ? exception.message : "No fue posible cargar accesos.");
@@ -95,21 +102,22 @@ export function useAccessController() {
     if (!session || !selectedClientId) {
       return;
     }
-    const accessToken = session.accessToken;
     let active = true;
-    async function loadVisitPasses() {
+    const accessToken = session.accessToken;
+    async function loadPhysicalClient() {
       try {
-        const passes = await getVisitPasses(accessToken, selectedClientId);
+        const state = await getPhysicalClientState(accessToken, selectedClientId);
         if (active) {
-          setVisitPasses(passes);
+          setPhysicalClientState(state);
+          setExternalPersonRef(state.externalPersonRef ?? "");
         }
       } catch {
         if (active) {
-          setVisitPasses([]);
+          setPhysicalClientState(null);
         }
       }
     }
-    void loadVisitPasses();
+    void loadPhysicalClient();
     return () => {
       active = false;
     };
@@ -145,7 +153,8 @@ export function useAccessController() {
   function selectClient(client: ClientSummary) {
     setSelectedClientId(client.id);
     setIdentifier(client.email ?? client.phone ?? "");
-    setVisitPasses([]);
+    setPhysicalClientState(null);
+    setExternalPersonRef("");
   }
 
   async function evaluateAccess() {
@@ -211,15 +220,94 @@ export function useAccessController() {
         reason: temporaryReason,
       });
       setTemporaryReason("");
-      setMessage(`Pase temporal creado para ${pass.clientName}.`);
+      setMessage(`Autorización temporal creada para ${pass.clientName}.`);
     } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible crear pase temporal.");
+      setError(exception instanceof Error ? exception.message : "No fue posible crear la autorización temporal.");
     } finally {
       setBusy(false);
     }
   }
 
-  async function createVisitPack() {
+  function hydratePhysicalIntegration(integration: PhysicalIntegration) {
+    const mappedByBenefit = new Map(integration.mappings.map((mapping) => [mapping.benefitId, mapping]));
+    setPhysicalIntegration(integration);
+    setPhysicalConnectionName(integration.connection.displayName);
+    setPhysicalConnectorKey(integration.connection.connectorKey ?? "");
+    setPhysicalSyncEnabled(integration.connection.enabled);
+    setPhysicalMappingDrafts(Object.fromEntries(integration.availableBenefits.map((benefit) => {
+      const mapping = mappedByBenefit.get(benefit.id);
+      return [benefit.id, {
+        reference: mapping?.externalAccessLevelRef ?? "",
+        name: mapping?.externalAccessLevelName ?? "",
+      }];
+    })));
+  }
+
+  function setPhysicalMapping(benefitId: string, field: "reference" | "name", value: string) {
+    setPhysicalMappingDrafts((current) => ({
+      ...current,
+      [benefitId]: {
+        reference: current[benefitId]?.reference ?? "",
+        name: current[benefitId]?.name ?? "",
+        [field]: value,
+      },
+    }));
+  }
+
+  async function savePhysicalIntegration() {
+    if (!session || !physicalIntegration) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const integration = await updatePhysicalIntegration(session.accessToken, {
+        enabled: physicalSyncEnabled,
+        providerKey: "HIKCENTRAL",
+        displayName: physicalConnectionName,
+        connectorKey: physicalConnectorKey || null,
+        benefitMappings: physicalIntegration.availableBenefits.flatMap((benefit) => {
+          const draft = physicalMappingDrafts[benefit.id];
+          if (!draft?.reference.trim()) {
+            return [];
+          }
+          return [{
+            benefitId: benefit.id,
+            externalAccessLevelRef: draft.reference.trim(),
+            externalAccessLevelName: draft.name.trim() || null,
+          }];
+        }),
+      });
+      hydratePhysicalIntegration(integration);
+      setMessage("Configuración de acceso físico guardada. No se almacenaron secretos del proveedor.");
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible guardar la configuración física.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function linkSelectedPhysicalClient() {
+    if (!session || !selectedClientId || !externalPersonRef.trim()) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const state = await linkPhysicalClient(session.accessToken, selectedClientId, externalPersonRef.trim());
+      setPhysicalClientState(state);
+      setExternalPersonRef(state.externalPersonRef ?? "");
+      setMessage("Vínculo con la persona del proveedor guardado.");
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible vincular al socio con el proveedor físico.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function queueSelectedPhysicalSynchronization() {
     if (!session || !selectedClientId) {
       return;
     }
@@ -227,49 +315,16 @@ export function useAccessController() {
     setError(null);
     setMessage(null);
     try {
-      const validFrom = new Date();
-      const validUntil = new Date(Date.now() + visitPassValidDays * 24 * 60 * 60 * 1000);
-      const pass = await createVisitPass(session.accessToken, {
-        clientId: selectedClientId,
-        passType: visitPassType,
-        totalVisits: visitPassTotal,
-        validFrom: toDateOnly(validFrom),
-        validUntil: toDateOnly(validUntil),
-      });
-      setVisitPasses((current) => [pass, ...current.filter((item) => item.id !== pass.id)]);
-      setMessage(`Paquete creado para ${pass.clientName}.`);
+      const state = await queuePhysicalClientSynchronization(session.accessToken, selectedClientId);
+      setPhysicalClientState(state);
+      setMessage(state.syncState?.status === "BLOCKED"
+        ? "La sincronización quedó bloqueada hasta completar el mapeo de beneficios."
+        : "Sincronización preparada para el conector local.");
     } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible crear paquete de visitas.");
+      setError(exception instanceof Error ? exception.message : "No fue posible preparar la sincronización.");
     } finally {
       setBusy(false);
     }
-  }
-
-  async function consumeVisit(visitPassId: string) {
-    if (!session) {
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const pass = await consumeVisitPass(session.accessToken, visitPassId, {
-        reason: "Consumo registrado en recepcion",
-      });
-      setVisitPasses((current) => current.map((item) => (item.id === pass.id ? pass : item)));
-      setMessage(`Visita consumida. Quedan ${pass.remainingVisits}.`);
-    } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible consumir la visita.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function refreshVisitPasses() {
-    if (!session || !selectedClientId) {
-      return;
-    }
-    setVisitPasses(await getVisitPasses(session.accessToken, selectedClientId));
   }
 
   return {
@@ -284,39 +339,40 @@ export function useAccessController() {
     logs,
     manualReason,
     message,
+    physicalClientState,
+    physicalConnectionName,
+    physicalConnectorKey,
+    physicalIntegration,
+    physicalMappingDrafts,
+    physicalSyncEnabled,
     query,
     selectedClient,
     selectedClientId,
     session,
+    externalPersonRef,
     temporaryHours,
     temporaryMaxUses,
     temporaryReason,
-    visitPasses,
-    visitPassTotal,
-    visitPassType,
-    visitPassValidDays,
-    consumeVisit,
     createPass,
-    createVisitPack,
     evaluateAccess,
+    linkSelectedPhysicalClient,
     openManually,
+    queueSelectedPhysicalSynchronization,
     refreshLogs,
-    refreshVisitPasses,
+    savePhysicalIntegration,
     search,
     selectClient,
     setDeviceCode,
     setIdentifier,
     setManualReason,
+    setExternalPersonRef,
+    setPhysicalConnectionName,
+    setPhysicalConnectorKey,
+    setPhysicalMapping,
+    setPhysicalSyncEnabled,
     setQuery,
     setTemporaryHours,
     setTemporaryMaxUses,
     setTemporaryReason,
-    setVisitPassTotal,
-    setVisitPassType,
-    setVisitPassValidDays,
   };
-}
-
-function toDateOnly(value: Date) {
-  return value.toISOString().slice(0, 10);
 }
