@@ -5,10 +5,10 @@ import { AppDrawer } from "@/components/AppDrawer";
 import { AppNotice } from "@/components/AppNotice";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired } from "@/components/AuthRequired";
-import { DateField, FormError, NumberField, SelectField, TextAreaField } from "@/components/FormFields";
+import { DateField, FormError, NumberField, SelectField, TextAreaField, TextField } from "@/components/FormFields";
 import { getStoredSession, type StoredSession } from "@/lib/api";
-import { getPlatformBillingOverview, updatePlatformBranchBilling } from "@/lib/api/platform-billing";
-import type { PlatformBillingOverview, PlatformBillingUpdatePayload, PlatformBranchBilling } from "@/lib/api/platform-billing-types";
+import { getPlatformBillingOverview, getPlatformBillingPayments, recordPlatformBillingPayment, updatePlatformBranchBilling } from "@/lib/api/platform-billing";
+import type { PlatformBillingOverview, PlatformBillingPayment, PlatformBillingPaymentPayload, PlatformBillingUpdatePayload, PlatformBranchBilling } from "@/lib/api/platform-billing-types";
 
 const planOptions = [
   { value: "GYMFORT_150", label: "GymFort 150 · $1,190" },
@@ -25,6 +25,20 @@ const subscriptionOptions = [
   { value: "CANCELLED", label: "Cancelada" },
 ];
 
+const paymentTypeOptions = [
+  { value: "SUBSCRIPTION", label: "Mensualidad GymFort" },
+  { value: "IMPLEMENTATION", label: "Implementación" },
+  { value: "OTHER", label: "Otro concepto" },
+];
+
+const paymentMethodOptions = [
+  { value: "TRANSFER", label: "Transferencia" },
+  { value: "CASH", label: "Efectivo" },
+  { value: "CARD", label: "Tarjeta" },
+  { value: "STRIPE", label: "Stripe" },
+  { value: "OTHER", label: "Otro" },
+];
+
 export default function PlatformBillingPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
   const [overview, setOverview] = useState<PlatformBillingOverview | null>(null);
@@ -36,6 +50,10 @@ export default function PlatformBillingPage() {
   const [paymentFilter, setPaymentFilter] = useState("ALL");
   const [selected, setSelected] = useState<PlatformBranchBilling | null>(null);
   const [form, setForm] = useState<PlatformBillingUpdatePayload | null>(null);
+  const [payments, setPayments] = useState<PlatformBillingPayment[]>([]);
+  const [paymentForm, setPaymentForm] = useState<PlatformBillingPaymentPayload | null>(null);
+  const [paymentError, setPaymentError] = useState("");
+  const [recordingPayment, setRecordingPayment] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,17 +94,29 @@ export default function PlatformBillingPage() {
 
   const summary = overview?.summary;
 
-  function openBilling(branch: PlatformBranchBilling) {
+  async function openBilling(branch: PlatformBranchBilling) {
     setSelected(branch);
     setError("");
     setMessage("");
     setForm(toForm(branch));
+    setPaymentError("");
+    setPayments([]);
+    setPaymentForm(toPaymentForm(branch));
+    if (!session) return;
+    try {
+      setPayments(await getPlatformBillingPayments(session.accessToken, branch.branchId));
+    } catch (historyError) {
+      setPaymentError(messageFromError(historyError));
+    }
   }
 
   function closeBilling() {
-    if (saving) return;
+    if (saving || recordingPayment) return;
     setSelected(null);
     setForm(null);
+    setPayments([]);
+    setPaymentForm(null);
+    setPaymentError("");
     setError("");
     setMessage("");
   }
@@ -118,15 +148,28 @@ export default function PlatformBillingPage() {
     }
   }
 
-  function preparePaymentToday() {
-    if (!form) return;
-    const today = isoToday();
-    setForm({
-      ...form,
-      lastPaymentDate: today,
-      lastPaymentAmount: priceForForm(form),
-      nextBillingDate: nextMonthlyDate(today, form.billingAnchorDay),
-    });
+  async function recordPayment(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session || !selected || !paymentForm) return;
+    if (paymentForm.amount <= 0) {
+      setPaymentError("El monto recibido debe ser mayor a cero.");
+      return;
+    }
+    setRecordingPayment(true);
+    setPaymentError("");
+    try {
+      const registered = await recordPlatformBillingPayment(session.accessToken, selected.branchId, paymentForm);
+      setOverview((current) => current ? recalculateOverview(current, registered.branch) : current);
+      setSelected(registered.branch);
+      setForm(toForm(registered.branch));
+      setPayments((current) => [registered.payment, ...current]);
+      setPaymentForm(toPaymentForm(registered.branch));
+      setMessage(`Cobro de ${formatCurrency(registered.payment.amount)} registrado.`);
+    } catch (recordError) {
+      setPaymentError(messageFromError(recordError));
+    } finally {
+      setRecordingPayment(false);
+    }
   }
 
   function changeContractedPlan(value: string) {
@@ -157,6 +200,7 @@ export default function PlatformBillingPage() {
         <div><span>Gimnasios cliente</span><strong>{summary?.customerCount ?? 0}</strong></div>
         <div><span>Sucursales</span><strong>{summary?.branchCount ?? 0}</strong></div>
         <div><span>Socios activos</span><strong>{formatNumber(summary?.activeMemberCount ?? 0)}</strong></div>
+        <div><span>Usuarios internos</span><strong>{formatNumber(summary?.activeTeamUserCount ?? 0)}</strong></div>
       </section>
 
       <section className="admin-panel">
@@ -214,6 +258,8 @@ export default function PlatformBillingPage() {
           {message ? <AppNotice message={message} tone="success" /> : null}
           <section className="platform-facts">
             <div><span>Socios activos</span><strong>{formatNumber(selected.activeMembers)}</strong></div>
+            <div><span>Equipo activo</span><strong>{formatNumber(selected.activeTeamUserCount)}</strong></div>
+            <div><span>Planes del gimnasio</span><strong>{formatNumber(selected.activeMembershipPlanCount)}</strong></div>
             <div><span>Plan sugerido</span><strong>{selected.suggestedPlanName}</strong></div>
             <div><span>Precio de lista</span><strong>{selected.suggestedMonthlyPrice == null ? "Cotizar" : formatCurrency(selected.suggestedMonthlyPrice)}</strong></div>
             <div><span>Estado de cobro</span><strong>{paymentLabel(selected.paymentStatus)}</strong></div>
@@ -226,14 +272,38 @@ export default function PlatformBillingPage() {
             <DateField label="Proximo cobro" name="nextBillingDate" onChange={(value) => setForm({ ...form, nextBillingDate: value })} required value={form.nextBillingDate} />
             {form.contractedPlanCode === "ENTERPRISE" ? <NumberField help="Precio mensual acordado para esta sucursal Enterprise." label="Precio mensual Enterprise" min="0" name="monthlyPriceOverride" onChange={(value) => setForm({ ...form, monthlyPriceOverride: nullableNumber(value) })} step="0.01" value={form.monthlyPriceOverride == null ? "" : String(form.monthlyPriceOverride)} /> : null}
             <NumberField label="Costo de implementacion" min="0" name="implementationFee" onChange={(value) => setForm({ ...form, implementationFee: numberValue(value, 0) })} step="0.01" value={String(form.implementationFee)} />
-            <DateField label="Ultimo pago" name="lastPaymentDate" onChange={(value) => setForm({ ...form, lastPaymentDate: value || null })} required={false} value={form.lastPaymentDate ?? ""} />
-            <NumberField label="Monto del ultimo pago" min="0" name="lastPaymentAmount" onChange={(value) => setForm({ ...form, lastPaymentAmount: nullableNumber(value) })} required={false} step="0.01" value={form.lastPaymentAmount == null ? "" : String(form.lastPaymentAmount)} />
           </div>
 
           <label className="flex items-center gap-3 rounded-lg border border-[var(--brand-line)] bg-white p-4 text-sm font-semibold"><input checked={form.implementationPaid} onChange={(event) => setForm({ ...form, implementationPaid: event.target.checked })} type="checkbox" />Implementacion pagada</label>
           <TextAreaField label="Notas comerciales" name="notes" onChange={(value) => setForm({ ...form, notes: value || null })} placeholder="Acuerdos, condiciones, observaciones de cobro..." required={false} rows={4} value={form.notes ?? ""} />
-          <div className="platform-actions"><button className="app-button-secondary" onClick={preparePaymentToday} type="button">Preparar pago de hoy</button><button className="form-primary-button" disabled={saving} type="submit">{saving ? "Guardando..." : "Guardar configuracion"}</button></div>
+          <div className="platform-actions"><button className="form-primary-button" disabled={saving} type="submit">{saving ? "Guardando..." : "Guardar configuracion"}</button></div>
         </form> : null}
+
+        {selected && paymentForm ? <section className="mt-5 grid gap-4 border-t border-[var(--brand-line)] pt-5">
+          <header><p className="section-eyebrow">Registro de cobro</p><h3 className="text-lg font-bold">Registrar pago recibido</h3><p className="text-sm text-[var(--brand-muted)]">Este registro es permanente y deja trazabilidad del cobro recibido por GymFort.</p></header>
+          <form className="grid gap-4" onSubmit={recordPayment}>
+            {paymentError ? <FormError message={paymentError} /> : null}
+            <div className="grid gap-4 md:grid-cols-2">
+              <SelectField label="Concepto" name="paymentType" onChange={(value) => setPaymentForm({ ...paymentForm, paymentType: value as PlatformBillingPaymentPayload["paymentType"], amount: defaultPaymentAmount(value, selected) })} options={paymentTypeOptions} value={paymentForm.paymentType} />
+              <SelectField label="Método recibido" name="paymentMethod" onChange={(value) => setPaymentForm({ ...paymentForm, paymentMethod: value as PlatformBillingPaymentPayload["paymentMethod"] })} options={paymentMethodOptions} value={paymentForm.paymentMethod} />
+              <NumberField label="Monto recibido" min="0.01" name="paymentAmount" onChange={(value) => setPaymentForm({ ...paymentForm, amount: numberValue(value, 0) })} step="0.01" value={String(paymentForm.amount)} />
+              <DateField label="Fecha del pago" name="paidOn" onChange={(value) => setPaymentForm({ ...paymentForm, paidOn: value })} value={paymentForm.paidOn} />
+              <TextField label="Referencia o folio" name="paymentReference" onChange={(value) => setPaymentForm({ ...paymentForm, reference: value || null })} placeholder="Transferencia, recibo o folio" required={false} value={paymentForm.reference ?? ""} />
+            </div>
+            <TextAreaField label="Nota del cobro" name="paymentNotes" onChange={(value) => setPaymentForm({ ...paymentForm, notes: value || null })} placeholder="Ej. pago recibido de Juan Pérez, contrato 2026..." required={false} rows={3} value={paymentForm.notes ?? ""} />
+            <div className="platform-actions"><button className="form-primary-button" disabled={recordingPayment} type="submit">{recordingPayment ? "Registrando..." : "Registrar pago"}</button></div>
+          </form>
+
+          <div className="grid gap-2">
+            <h4 className="text-base font-bold">Historial de pagos</h4>
+            {payments.map((payment) => <article className="rounded-lg border border-[var(--brand-line)] bg-white p-3" key={payment.id}>
+              <div className="flex flex-wrap items-start justify-between gap-2"><div><strong>{formatCurrency(payment.amount)}</strong><span className="ml-2 text-sm text-[var(--brand-muted)]">{paymentTypeLabel(payment.paymentType)} · {paymentMethodLabel(payment.paymentMethod)}</span></div><time className="text-sm font-semibold">{formatDate(payment.paidOn)}</time></div>
+              {payment.reference ? <small className="block text-[var(--brand-muted)]">Referencia: {payment.reference}</small> : null}
+              {payment.notes ? <small className="block text-[var(--brand-muted)]">{payment.notes}</small> : null}
+            </article>)}
+            {!paymentError && payments.length === 0 ? <div className="admin-empty-card">Aún no hay cobros registrados para esta sucursal.</div> : null}
+          </div>
+        </section> : null}
       </AppDrawer>
     </AppShell>
   );
@@ -308,16 +378,11 @@ function recalculateOverview(current: PlatformBillingOverview, updated: Platform
     customerCount: new Set(branches.map((branch) => branch.organizationId)).size,
     branchCount: branches.length,
     activeMemberCount: branches.reduce((total, branch) => total + branch.activeMembers, 0),
+    activeTeamUserCount: [...new Map(branches.map((branch) => [branch.organizationId, branch.activeTeamUserCount])).values()].reduce((total, count) => total + count, 0),
     monthlyRecurringRevenue: branches.reduce((total, branch) => total + (branch.subscriptionStatus === "ACTIVE" ? branch.monthlyAmount ?? 0 : 0), 0),
     overdueBranchCount: branches.filter((branch) => branch.paymentStatus === "OVERDUE").length,
     unconfiguredBranchCount: branches.filter((branch) => branch.subscriptionStatus === "UNCONFIGURED").length,
   } };
-}
-
-function priceForForm(form: PlatformBillingUpdatePayload) {
-  if (form.contractedPlanCode === "ENTERPRISE") return form.monthlyPriceOverride;
-  const prices: Record<string, number> = { GYMFORT_150: 1190, GYMFORT_500: 1590, GYMFORT_1000: 2190, GYMFORT_2000: 2990 };
-  return prices[form.contractedPlanCode] ?? null;
 }
 
 function implementationForPlan(planCode: string) { const fees: Record<string, number> = { GYMFORT_150: 2500, GYMFORT_500: 3500, GYMFORT_1000: 5000, GYMFORT_2000: 7500 }; return fees[planCode] ?? 0; }
@@ -326,7 +391,10 @@ function formatCurrency(value: number) { return new Intl.NumberFormat("es-MX", {
 function formatNumber(value: number) { return new Intl.NumberFormat("es-MX").format(value); }
 function formatDate(value: string) { const [year, month, day] = value.split("-"); return year && month && day ? `${day}/${month}/${year}` : value; }
 function isoToday() { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`; }
-function nextMonthlyDate(from: string, anchorDay: number) { const [year, month] = from.split("-").map(Number); const target = new Date(year, month, 1); const lastDay = new Date(target.getFullYear(), target.getMonth() + 1, 0).getDate(); const day = Math.min(Math.max(anchorDay, 1), lastDay); return `${target.getFullYear()}-${String(target.getMonth() + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`; }
-function nullableNumber(value: string) { if (!value.trim()) return null; const parsed = Number(value); return Number.isFinite(parsed) ? parsed : null; }
 function numberValue(value: string, fallback: number) { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : fallback; }
+function nullableNumber(value: string) { if (!value.trim()) return null; const parsed = Number(value); return Number.isFinite(parsed) ? parsed : null; }
+function toPaymentForm(branch: PlatformBranchBilling): PlatformBillingPaymentPayload { return { paymentType: "SUBSCRIPTION", paymentMethod: "TRANSFER", amount: branch.monthlyAmount ?? 0, paidOn: isoToday(), reference: null, notes: null }; }
+function defaultPaymentAmount(paymentType: string, branch: PlatformBranchBilling) { return paymentType === "IMPLEMENTATION" ? branch.implementationFee : paymentType === "SUBSCRIPTION" ? branch.monthlyAmount ?? 0 : 0; }
+function paymentTypeLabel(type: string) { const labels: Record<string, string> = { SUBSCRIPTION: "Mensualidad", IMPLEMENTATION: "Implementación", OTHER: "Otro concepto" }; return labels[type] ?? type; }
+function paymentMethodLabel(method: string) { const labels: Record<string, string> = { TRANSFER: "Transferencia", CASH: "Efectivo", CARD: "Tarjeta", STRIPE: "Stripe", OTHER: "Otro" }; return labels[method] ?? method; }
 function messageFromError(error: unknown) { return error instanceof Error ? error.message : "No se pudo completar la operacion."; }

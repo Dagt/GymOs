@@ -4,7 +4,10 @@ import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.platformbilling.application.PlatformBillingService;
 import com.gymos.platformbilling.application.PlatformBillingService.BillingOverview;
+import com.gymos.platformbilling.application.PlatformBillingService.BillingPaymentView;
 import com.gymos.platformbilling.application.PlatformBillingService.BranchBillingView;
+import com.gymos.platformbilling.application.PlatformBillingService.PaymentRegistration;
+import com.gymos.platformbilling.application.PlatformBillingService.RecordPaymentCommand;
 import com.gymos.platformbilling.application.PlatformBillingService.UpdateBillingCommand;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -16,10 +19,12 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -47,6 +52,24 @@ public class PlatformBillingController {
             HttpServletRequest servletRequest
     ) {
         return service.update(principal, branchId, request.toCommand(), correlationId(servletRequest));
+    }
+
+    @GetMapping("/branches/{branchId}/payments")
+    List<BillingPaymentView> payments(
+            @AuthenticationPrincipal GymOsPrincipal principal,
+            @PathVariable UUID branchId
+    ) {
+        return service.payments(principal, branchId);
+    }
+
+    @PostMapping("/branches/{branchId}/payments")
+    PaymentRegistration recordPayment(
+            @AuthenticationPrincipal GymOsPrincipal principal,
+            @PathVariable UUID branchId,
+            @Valid @RequestBody RecordBillingPaymentRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        return service.recordPayment(principal, branchId, request.toCommand(), correlationId(servletRequest));
     }
 
     private String correlationId(HttpServletRequest request) {
@@ -79,6 +102,19 @@ public class PlatformBillingController {
                     implementationPaid,
                     notes
             );
+        }
+    }
+
+    public record RecordBillingPaymentRequest(
+            @NotBlank String paymentType,
+            @NotBlank String paymentMethod,
+            @NotNull @DecimalMin(value = "0.01") BigDecimal amount,
+            @NotNull LocalDate paidOn,
+            @Size(max = 160) String reference,
+            @Size(max = 1000) String notes
+    ) {
+        private RecordPaymentCommand toCommand() {
+            return new RecordPaymentCommand(paymentType, paymentMethod, amount, paidOn, reference, notes);
         }
     }
 }

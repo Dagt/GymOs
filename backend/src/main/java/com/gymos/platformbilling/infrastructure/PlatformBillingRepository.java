@@ -115,6 +115,19 @@ public class PlatformBillingRepository {
                     b.code AS branch_code,
                     b.status AS branch_status,
                     (
+                        SELECT COUNT(*)
+                        FROM user_account u
+                        WHERE u.organization_id = o.id
+                          AND u.status = 'ACTIVE'
+                    ) AS active_team_user_count,
+                    (
+                        SELECT COUNT(*)
+                        FROM membership_plan mp
+                        WHERE mp.organization_id = o.id
+                          AND mp.status = 'ACTIVE'
+                          AND mp.deleted_at IS NULL
+                    ) AS active_membership_plan_count,
+                    (
                         SELECT COUNT(DISTINCT m.client_id)
                         FROM membership m
                         WHERE m.organization_id = o.id
@@ -157,6 +170,8 @@ public class PlatformBillingRepository {
                 resultSet.getString("branch_name"),
                 resultSet.getString("branch_code"),
                 resultSet.getString("branch_status"),
+                resultSet.getInt("active_team_user_count"),
+                resultSet.getInt("active_membership_plan_count"),
                 resultSet.getInt("active_members"),
                 resultSet.getString("subscription_status"),
                 billingAnchorDay,
@@ -171,6 +186,106 @@ public class PlatformBillingRepository {
         );
     }
 
+    public List<BillingPaymentRecord> findPayments(UUID branchId) {
+        return jdbcClient.sql("""
+                SELECT id, branch_id, organization_id, payment_type, payment_method, amount,
+                       paid_on, reference, notes, recorded_by, created_at
+                FROM platform_billing_payment
+                WHERE branch_id = :branchId
+                ORDER BY paid_on DESC, created_at DESC
+                LIMIT 50
+                """)
+                .param("branchId", branchId)
+                .query(this::mapPayment)
+                .list();
+    }
+
+    public void insertPayment(BillingPaymentWrite record) {
+        jdbcClient.sql("""
+                INSERT INTO platform_billing_payment (
+                    id, branch_id, organization_id, payment_type, payment_method, amount,
+                    paid_on, reference, notes, recorded_by, created_at
+                ) VALUES (
+                    :id, :branchId, :organizationId, :paymentType, :paymentMethod, :amount,
+                    :paidOn, :reference, :notes, :recordedBy, :createdAt
+                )
+                """)
+                .param("id", record.id())
+                .param("branchId", record.branchId())
+                .param("organizationId", record.organizationId())
+                .param("paymentType", record.paymentType())
+                .param("paymentMethod", record.paymentMethod())
+                .param("amount", record.amount())
+                .param("paidOn", record.paidOn())
+                .param("reference", record.reference())
+                .param("notes", record.notes())
+                .param("recordedBy", record.recordedBy())
+                .param("createdAt", record.createdAt())
+                .update();
+    }
+
+    public void registerSubscriptionPayment(UUID branchId, LocalDate paidOn, BigDecimal amount, LocalDate nextBillingDate, UUID updatedBy, OffsetDateTime now) {
+        jdbcClient.sql("""
+                UPDATE platform_branch_billing
+                SET last_payment_date = :paidOn,
+                    last_payment_amount = :amount,
+                    next_billing_date = :nextBillingDate,
+                    updated_by = :updatedBy,
+                    updated_at = :now
+                WHERE branch_id = :branchId
+                """)
+                .param("branchId", branchId)
+                .param("paidOn", paidOn)
+                .param("amount", amount)
+                .param("nextBillingDate", nextBillingDate)
+                .param("updatedBy", updatedBy)
+                .param("now", now)
+                .update();
+    }
+
+    public BigDecimal paymentTotal(UUID branchId, String paymentType) {
+        return jdbcClient.sql("""
+                SELECT COALESCE(SUM(amount), 0)
+                FROM platform_billing_payment
+                WHERE branch_id = :branchId
+                  AND payment_type = :paymentType
+                """)
+                .param("branchId", branchId)
+                .param("paymentType", paymentType)
+                .query(BigDecimal.class)
+                .single();
+    }
+
+    public void markImplementationPaid(UUID branchId, UUID updatedBy, OffsetDateTime now) {
+        jdbcClient.sql("""
+                UPDATE platform_branch_billing
+                SET implementation_paid = TRUE,
+                    updated_by = :updatedBy,
+                    updated_at = :now
+                WHERE branch_id = :branchId
+                """)
+                .param("branchId", branchId)
+                .param("updatedBy", updatedBy)
+                .param("now", now)
+                .update();
+    }
+
+    private BillingPaymentRecord mapPayment(ResultSet resultSet, int rowNumber) throws SQLException {
+        return new BillingPaymentRecord(
+                resultSet.getObject("id", UUID.class),
+                resultSet.getObject("branch_id", UUID.class),
+                resultSet.getObject("organization_id", UUID.class),
+                resultSet.getString("payment_type"),
+                resultSet.getString("payment_method"),
+                resultSet.getBigDecimal("amount"),
+                resultSet.getObject("paid_on", LocalDate.class),
+                resultSet.getString("reference"),
+                resultSet.getString("notes"),
+                resultSet.getObject("recorded_by", UUID.class),
+                resultSet.getObject("created_at", OffsetDateTime.class)
+        );
+    }
+
     public record BranchBillingRecord(
             UUID organizationId,
             String organizationName,
@@ -179,6 +294,8 @@ public class PlatformBillingRepository {
             String branchName,
             String branchCode,
             String branchStatus,
+            int activeTeamUserCount,
+            int activeMembershipPlanCount,
             int activeMembers,
             String subscriptionStatus,
             Integer billingAnchorDay,
@@ -190,6 +307,36 @@ public class PlatformBillingRepository {
             BigDecimal implementationFee,
             boolean implementationPaid,
             String notes
+    ) {
+    }
+
+    public record BillingPaymentRecord(
+            UUID id,
+            UUID branchId,
+            UUID organizationId,
+            String paymentType,
+            String paymentMethod,
+            BigDecimal amount,
+            LocalDate paidOn,
+            String reference,
+            String notes,
+            UUID recordedBy,
+            OffsetDateTime createdAt
+    ) {
+    }
+
+    public record BillingPaymentWrite(
+            UUID id,
+            UUID branchId,
+            UUID organizationId,
+            String paymentType,
+            String paymentMethod,
+            BigDecimal amount,
+            LocalDate paidOn,
+            String reference,
+            String notes,
+            UUID recordedBy,
+            OffsetDateTime createdAt
     ) {
     }
 

@@ -1280,3 +1280,50 @@ Webhooks públicos con verificación criptográfica:
 El retorno del navegador y el cuerpo del webhook no son fuente suficiente para
 completar el pago. El backend consulta la sesión/Order al proveedor y concilia
 monto, moneda y contexto antes de actualizar ventas o membresías.
+
+## Cobranza comercial de plataforma
+
+Estos endpoints pertenecen a la consola neutral de GymFort y requieren
+exclusivamente `platform.admin`; ningún dueño, administrador o gerente de un
+gimnasio puede consultar o mutar esta información.
+
+`GET /api/v1/platform/billing/overview`
+
+- devuelve el resumen de MRR configurado, clientes, sucursales, socios activos,
+  usuarios internos activos, vencimientos y sucursales sin configurar;
+- devuelve una fila por sucursal con cliente, socios activos, planes de
+  membresía activos, plan sugerido/contratado, importe, corte y estado de cobro.
+
+`PUT /api/v1/platform/billing/branches/{branchId}`
+
+- configura estado de suscripción, día de corte, próximo cobro, plan comercial,
+  cotización Enterprise, implementación y notas;
+- los planes estándar no aceptan importe manual; `ENTERPRISE` sí lo requiere.
+
+`GET /api/v1/platform/billing/branches/{branchId}/payments`
+
+- devuelve hasta los 50 cobros comerciales más recientes de la sucursal,
+  ordenados por fecha efectiva y registro.
+
+`POST /api/v1/platform/billing/branches/{branchId}/payments`
+
+```json
+{
+  "paymentType": "SUBSCRIPTION",
+  "paymentMethod": "TRANSFER",
+  "amount": 1590.00,
+  "paidOn": "2026-08-23",
+  "reference": "SPEI-001",
+  "notes": "Mensualidad de agosto"
+}
+```
+
+- acepta `SUBSCRIPTION`, `IMPLEMENTATION` u `OTHER` y medios previamente
+  definidos por el contrato;
+- rechaza importe no positivo, fecha futura, referencia mayor a 160 caracteres
+  y notas mayores a 1000;
+- una mensualidad exige suscripción `ACTIVE` o `PENDING`, registra la evidencia
+  y mueve el siguiente corte al siguiente día ancla; un pago de implementación
+  completo la marca liquidada;
+- responde el pago creado y la configuración comercial actualizada. Los pagos
+  no se editan ni eliminan por esta API.

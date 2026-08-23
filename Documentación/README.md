@@ -26,6 +26,7 @@ GymFort es la identidad comercial vigente. `GymOS`/`gymos` permanece como nombre
 16. `29-cronologia-ramas.md`: integración y situación Git.
 17. `30-rediseño-pos-membresias-beneficios.md`: diseño consolidado de comercio.
 18. `31-diseño-automatizaciones-kiosco.md`: diseño consolidado de autoservicio, automatizaciones y correo transaccional.
+19. `modulos/22-platform-billing.md`: operación comercial de GymFort por cliente y sucursal.
 
 Para **Automatizaciones y Notificaciones**, las fichas `modulos/16-automations.md`, `modulos/17-notifications.md` y el diseño rector `31-diseño-automatizaciones-kiosco.md` representan el corte funcional vigente. Las notas etiquetadas como hitos históricos dentro de documentos generales como `06-api-contracts.md` u `08-frontend-spec.md` describen etapas de evolución y no deben prevalecer sobre esas fichas cuando exista una diferencia de detalle.
 

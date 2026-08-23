@@ -748,3 +748,37 @@ intentos, disponibilidad y lease. Agrega:
 La cola conserva `organization_id`; tanto la selección justa como el claim y
 las consultas de preferencia incluyen el tenant. Los secretos SMTP permanecen
 fuera del modelo relacional.
+
+## Hito 8 - Cobranza comercial de GymFort
+
+Migraciones:
+
+- `V81__platform_branch_billing.sql`
+- `V82__platform_billing_payment_history.sql`
+
+### platform_branch_billing
+
+Configura la relación comercial de GymFort por sucursal contratada. Conserva
+`branch_id` como clave primaria, `organization_id` para agregación por cliente,
+estado de suscripción, día de corte, siguiente cobro, plan contratado, importe
+Enterprise pactado, cargo de implementación, notas y la última mensualidad
+registrada como dato de consulta rápida.
+
+Los planes estándar permitidos son `GYMFORT_150`, `GYMFORT_500`,
+`GYMFORT_1000` y `GYMFORT_2000`; `ENTERPRISE` requiere precio mensual pactado.
+El estado comercial se limita a `ACTIVE`, `PENDING`, `PAUSED` y `CANCELLED`.
+
+### platform_billing_payment
+
+Es el historial inmutable de los cobros que recibe GymFort, no los pagos que
+procesa un gimnasio a sus propios socios. Guarda sucursal, organización, tipo
+(`SUBSCRIPTION`, `IMPLEMENTATION`, `OTHER`), medio
+(`TRANSFER`, `CASH`, `CARD`, `STRIPE`, `OTHER`), monto positivo, fecha efectiva,
+referencia, nota, usuario que lo registró y creación.
+
+Índices por sucursal/fecha y organización/fecha permiten consultar el
+expediente comercial sin recorrer la operación tenant. Al registrar una
+mensualidad se actualiza el resumen de `platform_branch_billing` y el siguiente
+corte; al acumular pagos de implementación por el importe acordado, la
+implementación queda liquidada. No hay borrado ni actualización operativa del
+historial de pagos.

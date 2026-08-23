@@ -88,6 +88,9 @@ class DatabaseMigrationTests {
 			assertThat(tableExists(connection, "notification_log")).isTrue();
 			assertThat(tableExists(connection, "automation_rule")).isTrue();
 			assertThat(tableExists(connection, "automation_execution")).isTrue();
+			assertThat(tableExists(connection, "platform_branch_billing")).isTrue();
+			assertThat(tableExists(connection, "platform_billing_payment")).isTrue();
+			assertThat(indexExists(connection, "ix_platform_billing_payment_branch_paid_on")).isTrue();
 			assertThat(tableExists(connection, "client_import_batch")).isTrue();
 			assertThat(tableExists(connection, "client_import_row")).isTrue();
 			assertThat(tableExists(connection, "benefit")).isTrue();
