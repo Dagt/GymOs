@@ -297,7 +297,7 @@ export default function DashboardPage() {
                               fontSize={12} 
                             />
                             <Tooltip 
-                              formatter={(val: unknown) => formatMoney(Number(val) * 100, "MXN")} 
+                              formatter={(val: unknown) => formatMoney(Number(val) * 100, "MXN")}
                               labelFormatter={(date) => new Date(String(date)).toLocaleDateString('es-MX', { weekday: 'long', day: '2-digit', month: 'long'})} 
                               contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
                             />
@@ -710,4 +710,3 @@ function businessContextLabel(context: string) {
   };
   return labels[context] ?? context;
 }
-
