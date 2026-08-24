@@ -20,6 +20,8 @@ spring:
     redis:
       host: ${GYMOS_REDIS_HOST:localhost}
       port: ${GYMOS_REDIS_PORT:6379}
+      username: ${GYMOS_REDIS_USERNAME:}
+      password: ${GYMOS_REDIS_PASSWORD:}
 
 server:
   port: ${PORT:8080}
