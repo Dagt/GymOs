@@ -5519,12 +5519,12 @@ button.admin-secondary-link:disabled {
   background:
     radial-gradient(circle at 90% 0%, color-mix(in srgb, var(--brand-accent) 9%, transparent), transparent 32rem),
     var(--brand-surface);
-  grid-template-columns: 17.5rem minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
-@media (max-width: 980px) {
+@media (min-width: 981px) {
   .admin-console {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: 17.5rem minmax(0, 1fr);
   }
 }
 
@@ -5619,7 +5619,12 @@ button.admin-secondary-link:disabled {
   color: rgba(240,252,249,.8);
 }
 
-.admin-workspace { gap: 1rem; padding: clamp(1rem, 2.4vw, 2rem); }
+.admin-workspace {
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+  padding: clamp(1rem, 2.4vw, 2rem);
+}
 
 .admin-command-bar {
   background:

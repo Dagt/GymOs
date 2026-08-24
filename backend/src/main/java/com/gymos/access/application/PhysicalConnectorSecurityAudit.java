@@ -20,12 +20,11 @@ public class PhysicalConnectorSecurityAudit {
 			UUID organizationId,
 			UUID branchId,
 			UUID entityId,
-			String connectorKey,
 			String correlationId
 	) {
 		auditService.recordSystem(
 				organizationId, branchId, null,
 				"PHYSICAL_CONNECTOR_AUTH_FAILED", "ACCESS_PROVIDER_CONNECTION", entityId,
-				"CONNECTOR", "connectorKey=" + connectorKey, correlationId);
+				"CONNECTOR", "Autenticación M2M rechazada", correlationId);
 	}
 }

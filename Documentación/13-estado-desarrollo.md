@@ -13,12 +13,16 @@ La identidad comercial visible es GymFort. `GymOS`/`gymos` continúa en nombres 
 
 **Automatizaciones + correo transaccional mediante ZeptoMail quedan funcionalmente cerrados para el alcance V1**: reglas, eventos, prueba manual con socio real, permisos de Gerencia, cola durable, retries/dead letters, branding tenant y envío SMTP real están operativos. El 22 de agosto de 2026 se verificó `gymfort.mx` en ZeptoMail con DKIM y CNAME/return-path y se recibieron correos reales de prueba.
 
-**El control plane cloud de acceso físico queda implementado**: modelo
+**El control plane cloud de acceso físico queda estabilizado para iniciar el
+Connector**: modelo
 provider-neutral, puntos con un derecho obligatorio, mapeos y vínculos externos,
 estado deseado automático, jobs PostgreSQL con lease/reintento/idempotencia,
 activación/rotación del Connector, heartbeat, eventos, candidatos y consola por
-sucursal. El GymFort Local Connector, adapter HikCentral y apertura del
-torniquete real siguen pendientes de trabajo y validación en sitio.
+sucursal. El cierre añade protección distribuida de fallos en producción,
+timestamp de autenticación con escritura acotada, proveedor explícito y
+diagnóstico visible de puntos legacy inválidos. El GymFort Local Connector,
+adapter HikCentral y apertura del torniquete real siguen pendientes de trabajo y
+validación en sitio.
 
 Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún módulo se considera completo por el nombre de una rama: la evidencia proviene de código, migraciones, pruebas y validación del entorno.
 
@@ -35,7 +39,7 @@ Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún 
 | [Ventas](modulos/07-sales.md) | FUNCIONAL | POS, ventas contextualizadas, pagos, reembolsos, recibos e inventario | Concurrencia/conciliación E2E (`SAL-001`) |
 | [Membresías](modulos/08-memberships.md) | ESTABILIZADO | Periodos inclusivos, activa única, alta, renovación, cambio y cotización | E2E financiero completo |
 | [Beneficios/elegibilidad](modulos/09-benefits.md) | ESTABILIZADO | Descuentos y acceso heredado mediante política transversal | Concurrencia y negativos de permisos |
-| [Acceso](modulos/10-access.md) | CONTROL PLANE FUNCIONAL | Elegibilidad, puntos, bitácora, permisos físicos, estado deseado, Connector API durable, salud, eventos/candidatos y consola | Connector local, adapter HikCentral, aceptación del torniquete y resiliencia en sitio (`ACC-002`) |
+| [Acceso](modulos/10-access.md) | ESTABILIZADO PARA INICIAR CONNECTOR | Elegibilidad, provider explícito, puntos, bitácora, permisos físicos, estado deseado, Connector API durable y protegida, salud, eventos/candidatos y consola con diagnóstico legacy | Connector local, adapter HikCentral, aceptación del torniquete y resiliencia en sitio (`ACC-002`) |
 | [Kiosco](modulos/11-selfservice.md) | FUNCIONAL / ACEPTACIÓN | Apertura sólo por Recepción, sesión aislada, membresías, pagos, domiciliación, reservas, wellness y datos | Publicar ejecución automatizada de Stripe sandbox (`SELF-001`) |
 | [Reservas](modulos/12-bookings.md) | FUNCIONAL | Recursos, disponibilidad, pago y acceso multi-sucursal | Colisiones/cancelación/E2E (`BKG-001`) |
 | [Inventario](modulos/13-inventory.md) | ESTABILIZADO | Existencias, movimientos, transferencias, conteos y valuación | Paginación y feedback (`INV-001`, `INV-002`) |
@@ -68,12 +72,18 @@ Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún 
 - Una conexión física V1 es única por sucursal y conserva su proveedor; un punto
   productivo requiere exactamente un beneficio `ACCESS` y un recurso externo
   explícito.
+- Ninguna configuración nueva infiere `HIKCENTRAL`: proveedor y modo
+  `SIMULATED` se eligen explícitamente.
 - La sincronización física normal parte de eventos de membresía, socio y
   beneficio; los botones de reconciliación son recuperación, no operación diaria.
 - `access.physical.manage` corresponde a Dueño/Gerente y
   `access.manual.open` protege por separado la apertura excepcional simulada.
 - GymFort Cloud nunca recibe credenciales LAN ni material biométrico; el
   Connector usa activación/secretos hasheados y rutas máquina-a-máquina propias.
+- Los fallos de autenticación/activación del Connector se limitan mediante Redis
+  compartido en producción y memoria por proceso en local/tests, sin claves ni
+  credenciales crudas; `last_authenticated_at` se escribe como máximo una vez
+  por ventana configurable.
 
 ## 4. Validación del corte
 
@@ -89,7 +99,7 @@ Evidencia disponible:
 - pruebas unitarias de cobranza comercial, autorización de plataforma y
   migración PostgreSQL V82 ejecutadas correctamente;
 - suite backend completa, pruebas PostgreSQL V84, upgrade V83 → V84, seguridad
-  HTTP, suite frontend (84/84), build de producción y build Docker ejecutados
+  HTTP, suite frontend (87/87), build de producción y build Docker ejecutados
   correctamente en la rama física;
 - recorrido visual de Access en escritorio y móvil, incluidos los formularios de
   proveedor/puntos sin desbordamiento horizontal ni errores de consola;

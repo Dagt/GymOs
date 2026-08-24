@@ -300,6 +300,47 @@ class PhysicalAccessRepositoryIntegrationTests {
 				.update()).hasRootCauseInstanceOf(SQLException.class);
 	}
 
+	@Test
+	void credentialAuthenticationTimestampOnlyWritesAfterTheConfiguredWindow() {
+		Fixture fixture = fixture();
+		UUID credentialId = fixture.connector().credentialId();
+		OffsetDateTime firstAuthentication = OffsetDateTime.now().withNano(0);
+
+		assertThat(fixture.repository().touchCredentialIfStale(
+				credentialId, firstAuthentication, firstAuthentication.minusMinutes(5))).isTrue();
+		assertThat(credentialVersion(fixture.jdbc(), credentialId)).isEqualTo(1);
+		assertThat(credentialLastAuthenticatedAt(fixture.jdbc(), credentialId))
+				.isEqualTo(firstAuthentication);
+
+		OffsetDateTime insideWindow = firstAuthentication.plusMinutes(1);
+		assertThat(fixture.repository().touchCredentialIfStale(
+				credentialId, insideWindow, insideWindow.minusMinutes(5))).isFalse();
+		assertThat(credentialVersion(fixture.jdbc(), credentialId)).isEqualTo(1);
+		assertThat(credentialLastAuthenticatedAt(fixture.jdbc(), credentialId))
+				.isEqualTo(firstAuthentication);
+
+		OffsetDateTime afterWindow = firstAuthentication.plusMinutes(6);
+		assertThat(fixture.repository().touchCredentialIfStale(
+				credentialId, afterWindow, afterWindow.minusMinutes(5))).isTrue();
+		assertThat(credentialVersion(fixture.jdbc(), credentialId)).isEqualTo(2);
+		assertThat(credentialLastAuthenticatedAt(fixture.jdbc(), credentialId))
+				.isEqualTo(afterWindow);
+	}
+
+	private int credentialVersion(JdbcClient jdbc, UUID credentialId) {
+		return jdbc.sql("SELECT version FROM access_connector_credential WHERE id = :id")
+				.param("id", credentialId)
+				.query(Integer.class)
+				.single();
+	}
+
+	private OffsetDateTime credentialLastAuthenticatedAt(JdbcClient jdbc, UUID credentialId) {
+		return jdbc.sql("SELECT last_authenticated_at FROM access_connector_credential WHERE id = :id")
+				.param("id", credentialId)
+				.query(OffsetDateTime.class)
+				.single();
+	}
+
 	private Fixture fixture() {
 		JdbcClient jdbc = JdbcClient.create(dataSource());
 		UUID organizationId = UUID.randomUUID();

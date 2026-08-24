@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -20,12 +21,15 @@ import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.ApiAuthenticationException;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.common.security.InMemoryRateLimiter;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Assertions;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -35,6 +39,8 @@ class PhysicalConnectorServiceTests {
 	private final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder(4);
 	private final AuditService auditService = mock(AuditService.class);
 	private final PhysicalConnectorSecurityAudit securityAudit = mock(PhysicalConnectorSecurityAudit.class);
+	private final PhysicalConnectorProperties properties = new PhysicalConnectorProperties(
+			2, Duration.ofMinutes(5), 2, Duration.ofMinutes(2), Duration.ofMinutes(5));
 	private final PhysicalConnectorService service = new PhysicalConnectorService(
 			repository,
 			mock(AccessRepository.class),
@@ -43,7 +49,9 @@ class PhysicalConnectorServiceTests {
 			passwordEncoder,
 			new ObjectMapper(),
 			auditService,
-			securityAudit
+			securityAudit,
+			new InMemoryRateLimiter(),
+			properties
 	);
 	private final UUID organizationId = UUID.randomUUID();
 	private final UUID branchId = UUID.randomUUID();
@@ -94,14 +102,16 @@ class PhysicalConnectorServiceTests {
 						UUID.randomUUID(), organizationId, branchId, connectionId,
 						invocation.getArgument(1), "ACTIVE", OffsetDateTime.now(), null, null));
 
-		var result = service.activate("connector-main", activationCode, "correlation");
+		var result = service.activate(
+				"connector-main", activationCode, "198.51.100.10", "correlation");
 
 		ArgumentCaptor<String> secretHash = ArgumentCaptor.forClass(String.class);
 		verify(repository).createCredential(eq(connection), secretHash.capture(), eq(null), any());
 		assertThat(result.connectorSecret()).startsWith("gfs_");
 		assertThat(secretHash.getValue()).isNotEqualTo(result.connectorSecret());
 		assertThat(passwordEncoder.matches(result.connectorSecret(), secretHash.getValue())).isTrue();
-		assertThatThrownBy(() -> service.activate("connector-main", activationCode, "second"))
+		assertThatThrownBy(() -> service.activate(
+				"connector-main", activationCode, "198.51.100.10", "second"))
 				.isInstanceOf(ApiAuthenticationException.class);
 	}
 
@@ -109,10 +119,11 @@ class PhysicalConnectorServiceTests {
 	void revokedOrMissingCredentialIsRejectedAndAuditedWithoutJwt() {
 		when(repository.activeCredential(connectionId)).thenReturn(Optional.empty());
 
-		assertThatThrownBy(() -> service.authenticate("connector-main", "gfs_revoked", "correlation"))
+		assertThatThrownBy(() -> service.authenticate(
+				"connector-main", "gfs_revoked", "198.51.100.11", "correlation"))
 				.isInstanceOf(ApiAuthenticationException.class);
 		verify(securityAudit).authenticationRejected(
-				organizationId, branchId, connectionId, "connector-main", "correlation");
+				organizationId, branchId, connectionId, "correlation");
 	}
 
 	@Test
@@ -125,7 +136,7 @@ class PhysicalConnectorServiceTests {
 		when(repository.jobCounts(organizationId, branchId, connectionId)).thenReturn(new JobCounts(2, 1));
 
 		ConnectorContext context = service.authenticate(
-				"connector-main", connectorSecret, "auth-correlation");
+				"connector-main", connectorSecret, "198.51.100.12", "auth-correlation");
 		var health = service.heartbeat(
 				context, "HEALTHY", "1.2.3", "instance-main", "stale local error");
 
@@ -133,7 +144,12 @@ class PhysicalConnectorServiceTests {
 		assertThat(health.status()).isEqualTo("HEALTHY");
 		assertThat(health.pendingJobs()).isEqualTo(2);
 		assertThat(health.failedJobs()).isEqualTo(1);
-		verify(repository).touchCredential(eq(credential.id()), any());
+		ArgumentCaptor<OffsetDateTime> authenticatedAt = ArgumentCaptor.forClass(OffsetDateTime.class);
+		ArgumentCaptor<OffsetDateTime> staleBefore = ArgumentCaptor.forClass(OffsetDateTime.class);
+		verify(repository).touchCredentialIfStale(
+				eq(credential.id()), authenticatedAt.capture(), staleBefore.capture());
+		assertThat(Duration.between(staleBefore.getValue(), authenticatedAt.getValue()))
+				.isEqualTo(properties.lastAuthenticatedWriteInterval());
 		verify(repository).updateHeartbeat(
 				eq(context), eq("HEALTHY"), eq("1.2.3"), eq("instance-main"), eq(null), any());
 	}
@@ -163,10 +179,10 @@ class PhysicalConnectorServiceTests {
 		when(repository.activeCredential(connectionId)).thenReturn(Optional.of(credential));
 
 		assertThatThrownBy(() -> service.authenticate(
-				"connector-main", "test-wrong-connector-secret", "invalid-secret"))
+				"connector-main", "test-wrong-connector-secret", "198.51.100.13", "invalid-secret"))
 				.isInstanceOf(ApiAuthenticationException.class);
 		verify(securityAudit).authenticationRejected(
-				organizationId, branchId, connectionId, "connector-main", "invalid-secret");
+				organizationId, branchId, connectionId, "invalid-secret");
 	}
 
 	@Test
@@ -182,8 +198,84 @@ class PhysicalConnectorServiceTests {
 		verify(repository).markConnectionRevoked(eq(connectionId), any());
 		when(repository.activeCredential(connectionId)).thenReturn(Optional.empty());
 		assertThatThrownBy(() -> service.authenticate(
-				"connector-main", "test-old-connector-secret", "after-revoke"))
+				"connector-main", "test-old-connector-secret", "198.51.100.14", "after-revoke"))
 				.isInstanceOf(ApiAuthenticationException.class);
+	}
+
+	@Test
+	void repeatedInvalidAuthenticationIsLimitedButAValidConnectorFromItsOwnOriginStillAuthenticates() {
+		String validSecret = "test-valid-secret";
+		CredentialRecord credential = new CredentialRecord(
+				UUID.randomUUID(), organizationId, branchId, connectionId,
+				passwordEncoder.encode(validSecret), "ACTIVE", OffsetDateTime.now(), null, null);
+		when(repository.activeCredential(connectionId)).thenReturn(Optional.of(credential));
+
+		for (int attempt = 0; attempt < properties.authenticationMaxFailures(); attempt++) {
+			assertThatThrownBy(() -> service.authenticate(
+					"connector-main", "wrong-secret", "203.0.113.50", "invalid"))
+					.isInstanceOf(ApiAuthenticationException.class);
+		}
+		assertThatThrownBy(() -> service.authenticate(
+				"connector-main", "wrong-secret", "203.0.113.50", "limited"))
+				.isInstanceOfSatisfying(ApiAuthenticationException.class,
+					exception -> assertThat(exception.code()).isEqualTo("CONNECTOR_AUTH_INVALID"));
+		verify(repository, times(properties.authenticationMaxFailures()))
+				.connectionByConnectorKey("connector-main");
+
+		ConnectorContext authenticated = service.authenticate(
+				"connector-main", validSecret, "203.0.113.51", "valid");
+		assertThat(authenticated.connectionId()).isEqualTo(connectionId);
+	}
+
+	@Test
+	void repeatedInvalidActivationCodesAreLimitedBeforeAnotherCredentialLookup() {
+		ActivationRecord activation = new ActivationRecord(
+				UUID.randomUUID(), organizationId, branchId, connectionId,
+				passwordEncoder.encode("correct-code"), "ACTIVATION",
+				OffsetDateTime.now().plusMinutes(10), null, null);
+		when(repository.openActivationForUpdate(connectionId)).thenReturn(Optional.of(activation));
+
+		for (int attempt = 0; attempt < properties.activationMaxFailures(); attempt++) {
+			assertThatThrownBy(() -> service.activate(
+					"connector-main", "wrong-code", "203.0.113.60", "invalid-activation"))
+					.isInstanceOf(ApiAuthenticationException.class);
+		}
+		assertThatThrownBy(() -> service.activate(
+				"connector-main", "wrong-code", "203.0.113.60", "limited-activation"))
+				.isInstanceOfSatisfying(ApiAuthenticationException.class,
+					exception -> assertThat(exception.code()).isEqualTo("CONNECTOR_AUTH_INVALID"));
+		verify(repository, times(properties.activationMaxFailures()))
+				.openActivationForUpdate(connectionId);
+	}
+
+	@Test
+	void missingWrongAndRevokedCredentialsShareTheSamePublicFailureWithoutSecretMaterial() {
+		String submittedSecret = "gfs_must-never-leak";
+		CredentialRecord credential = new CredentialRecord(
+				UUID.randomUUID(), organizationId, branchId, connectionId,
+				passwordEncoder.encode("different-secret"), "ACTIVE", OffsetDateTime.now(), null, null);
+		when(repository.activeCredential(connectionId)).thenReturn(Optional.of(credential));
+		ApiAuthenticationException wrong = Assertions.assertThrows(
+				ApiAuthenticationException.class,
+				() -> service.authenticate(
+						"connector-main", submittedSecret, "203.0.113.70", "wrong"));
+		ApiAuthenticationException missing = Assertions.assertThrows(
+				ApiAuthenticationException.class,
+				() -> service.authenticate(
+						"connector-unknown", submittedSecret, "203.0.113.71", "missing"));
+		when(repository.activeCredential(connectionId)).thenReturn(Optional.empty());
+		ApiAuthenticationException revoked = Assertions.assertThrows(
+				ApiAuthenticationException.class,
+				() -> service.authenticate(
+						"connector-main", submittedSecret, "203.0.113.72", "revoked"));
+
+		assertThat(java.util.List.of(wrong.code(), missing.code(), revoked.code()))
+				.containsOnly("CONNECTOR_AUTH_INVALID");
+		assertThat(java.util.List.of(
+				wrong.publicMessage(), missing.publicMessage(), revoked.publicMessage()))
+				.containsOnly(wrong.publicMessage())
+				.allSatisfy(message -> assertThat(message)
+						.doesNotContain(submittedSecret, "connector-main", "connector-unknown"));
 	}
 
 	@Test

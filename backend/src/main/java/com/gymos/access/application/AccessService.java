@@ -107,7 +107,7 @@ public class AccessService {
 					"Un punto físico productivo debe exigir exactamente un beneficio ACCESS."
 			);
 		}
-		if (!accessRepository.accessBenefitsExist(
+		if (!requiredBenefitIds.isEmpty() && !accessRepository.accessBenefitsExist(
 				principal.organizationId(), principal.branchId(), requiredBenefitIds)) {
 			throw new BusinessException(
 					"ACCESS_BENEFIT_NOT_AVAILABLE",
@@ -669,7 +669,7 @@ public class AccessService {
 
 	private PhysicalIntegrationConnectionView defaultPhysicalConnection() {
 		return new PhysicalIntegrationConnectionView(
-				null, "HIKCENTRAL", "HikCentral Professional", null, false, "DISABLED", false,
+				null, "", "", null, false, "DISABLED", false,
 				null, null, null, 0, 0, null, null);
 	}
 

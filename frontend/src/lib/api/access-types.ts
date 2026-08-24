@@ -12,7 +12,7 @@ export type AccessDevicePayload = {
   name: string;
   deviceCode: string;
   deviceType: "TURNSTILE" | "DOOR" | "GATE" | "ZONE" | "BIOMETRIC";
-  provider?: string | null;
+  provider: string;
   requiredBenefitId?: string | null;
 };
 

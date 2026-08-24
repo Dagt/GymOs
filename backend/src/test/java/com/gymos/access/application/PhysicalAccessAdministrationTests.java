@@ -115,6 +115,28 @@ class PhysicalAccessAdministrationTests {
 	}
 
 	@Test
+	void physicalConnectionRequiresAnExplicitProductiveProvider() {
+		var command = new ConfigurePhysicalIntegrationCommand(
+				false, " ", "Acceso centro", null, List.of());
+
+		assertThatThrownBy(() -> service.configurePhysicalIntegration(manager, command, "test"))
+				.isInstanceOfSatisfying(BusinessException.class,
+						exception -> assertThat(exception.code())
+								.isEqualTo("PHYSICAL_ACCESS_PROVIDER_REQUIRED"));
+	}
+
+	@Test
+	void unconfiguredIntegrationDoesNotPreselectAHardwareBrand() {
+		when(physicalRepository.connection(organizationId, branchId)).thenReturn(Optional.empty());
+
+		var result = service.physicalIntegration(manager);
+
+		assertThat(result.connection().id()).isNull();
+		assertThat(result.connection().providerKey()).isEmpty();
+		assertThat(result.connection().displayName()).isEmpty();
+	}
+
+	@Test
 	void physicalConfigurationRequiresItsDedicatedPermission() {
 		GymOsPrincipal reception = new GymOsPrincipal(
 				UUID.randomUUID(), organizationId, branchId, "reception@gymfort.local", "Recepcion",

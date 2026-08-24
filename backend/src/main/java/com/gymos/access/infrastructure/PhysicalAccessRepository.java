@@ -282,15 +282,23 @@ public class PhysicalAccessRepository {
 				.optional();
 	}
 
-	public void touchCredential(UUID credentialId, OffsetDateTime now) {
-		jdbcClient.sql("""
+	public boolean touchCredentialIfStale(
+			UUID credentialId, OffsetDateTime now, OffsetDateTime staleBefore
+	) {
+		return jdbcClient.sql("""
 				UPDATE access_connector_credential
 				SET last_authenticated_at = :now, version = version + 1
-				WHERE id = :credentialId AND status = 'ACTIVE'
+				WHERE id = :credentialId
+				  AND status = 'ACTIVE'
+				  AND (
+				      last_authenticated_at IS NULL
+				      OR last_authenticated_at < :staleBefore
+				  )
 				""")
 				.param("credentialId", credentialId)
 				.param("now", now)
-				.update();
+				.param("staleBefore", staleBefore)
+				.update() == 1;
 	}
 
 	public List<DeviceLinkRecord> deviceLinks(UUID organizationId, UUID branchId, UUID connectionId) {

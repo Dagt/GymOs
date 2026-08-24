@@ -32,4 +32,18 @@ class PhysicalAccessProviderCatalogTests {
 				.isInstanceOfSatisfying(BusinessException.class,
 						exception -> assertThat(exception.code()).isEqualTo("PHYSICAL_ACCESS_PROVIDER_NOT_PRODUCTIVE"));
 	}
+
+	@Test
+	void requiresAnExplicitProviderWithoutFallingBackToHikCentral() {
+		assertThatThrownBy(() -> catalog.requireAvailable("  "))
+				.isInstanceOfSatisfying(BusinessException.class,
+						exception -> assertThat(exception.code())
+								.isEqualTo("PHYSICAL_ACCESS_PROVIDER_REQUIRED"));
+		assertThatThrownBy(() -> catalog.normalize(null))
+				.isInstanceOfSatisfying(BusinessException.class,
+						exception -> assertThat(exception.code())
+								.isEqualTo("PHYSICAL_ACCESS_PROVIDER_REQUIRED"));
+		assertThat(catalog.requireAvailable("HIKCENTRAL").providerKey()).isEqualTo("HIKCENTRAL");
+		assertThat(catalog.requireAvailable("SIMULATED").providerKey()).isEqualTo("SIMULATED");
+	}
 }

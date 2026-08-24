@@ -69,13 +69,17 @@ public class PhysicalAccessProviderCatalog {
 	}
 
 	public boolean isProductive(String providerKey) {
-		return providerKey != null && !"SIMULATED".equals(normalize(providerKey));
+		return !"SIMULATED".equals(normalize(providerKey));
 	}
 
 	public String normalize(String providerKey) {
-		return providerKey == null || providerKey.isBlank()
-				? "HIKCENTRAL"
-				: providerKey.trim().toUpperCase(Locale.ROOT);
+		if (providerKey == null || providerKey.isBlank()) {
+			throw new BusinessException(
+					"PHYSICAL_ACCESS_PROVIDER_REQUIRED",
+					"Selecciona explícitamente el proveedor de acceso físico."
+			);
+		}
+		return providerKey.trim().toUpperCase(Locale.ROOT);
 	}
 
 	private ProviderDescriptor planned(String key, String displayName) {

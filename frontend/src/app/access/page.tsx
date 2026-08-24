@@ -115,6 +115,7 @@ export default function AccessPage() {
             connectorActivation={access.connectorActivation}
             connectorKey={access.physicalConnectorKey}
             device={access.selectedDevice}
+            deviceBenefitIdsByDevice={access.deviceBenefitIdsByDevice}
             deviceCode={access.deviceCode}
             deviceRequiredBenefitIds={access.deviceRequiredBenefitIds}
             devices={access.devices}

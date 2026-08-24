@@ -14,10 +14,15 @@ import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.api.ApiAuthenticationException;
 import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.common.security.RateLimiter;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Base64;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -54,6 +59,9 @@ public class PhysicalConnectorService {
 	private final ObjectMapper objectMapper;
 	private final AuditService auditService;
 	private final PhysicalConnectorSecurityAudit securityAudit;
+	private final RateLimiter rateLimiter;
+	private final PhysicalConnectorProperties properties;
+	private final String dummyCredentialHash;
 	private final SecureRandom secureRandom = new SecureRandom();
 
 	public PhysicalConnectorService(
@@ -64,7 +72,9 @@ public class PhysicalConnectorService {
 			PasswordEncoder passwordEncoder,
 			ObjectMapper objectMapper,
 			AuditService auditService,
-			PhysicalConnectorSecurityAudit securityAudit
+			PhysicalConnectorSecurityAudit securityAudit,
+			RateLimiter rateLimiter,
+			PhysicalConnectorProperties properties
 	) {
 		this.repository = repository;
 		this.accessRepository = accessRepository;
@@ -74,6 +84,9 @@ public class PhysicalConnectorService {
 		this.objectMapper = objectMapper;
 		this.auditService = auditService;
 		this.securityAudit = securityAudit;
+		this.rateLimiter = rateLimiter;
+		this.properties = properties;
+		this.dummyCredentialHash = passwordEncoder.encode("physical-connector-dummy-" + UUID.randomUUID());
 	}
 
 	@Transactional
@@ -113,23 +126,29 @@ public class PhysicalConnectorService {
 
 	@Transactional
 	public ConnectorActivationView activate(
-			String connectorKey, String activationCode, String correlationId
+			String connectorKey, String activationCode, String originIp, String correlationId
 	) {
 		String safeKey = requiredText(connectorKey, "CONNECTOR_KEY_REQUIRED", "Indica el identificador del Connector.", 120);
 		String safeCode = requiredText(activationCode, "CONNECTOR_ACTIVATION_CODE_REQUIRED", "Indica el código de activación.", 200);
-		ConnectionRecord connection = repository.connectionByConnectorKey(safeKey)
-				.orElseThrow(() -> authenticationFailure(null, safeKey, correlationId));
-		if (!connection.enabled()) {
-			throw authenticationFailure(connection, safeKey, correlationId);
+		AbuseKeys abuseKeys = abuseKeys("activate", safeKey, originIp);
+		enforceNotLimited(
+				abuseKeys, properties.activationMaxFailures(),
+				properties.activationFailureWindow(), correlationId);
+		ConnectionRecord connection = repository.connectionByConnectorKey(safeKey).orElse(null);
+		if (connection != null && connection.enabled()) {
+			providerCatalog.requireProductive(connection.providerKey());
 		}
-		providerCatalog.requireProductive(connection.providerKey());
 		OffsetDateTime now = OffsetDateTime.now();
-		var activation = repository.openActivationForUpdate(connection.id())
-				.orElseThrow(() -> authenticationFailure(connection, safeKey, correlationId));
-		if (activation.expiresAt().isBefore(now)
-				|| !passwordEncoder.matches(safeCode, activation.activationCodeHash())
-				|| !repository.consumeActivation(activation.id(), now)) {
-			throw authenticationFailure(connection, safeKey, correlationId);
+		var activation = connection == null || !connection.enabled()
+				? null : repository.openActivationForUpdate(connection.id()).orElse(null);
+		boolean codeMatches = passwordEncoder.matches(
+				safeCode, activation == null ? dummyCredentialHash : activation.activationCodeHash());
+		boolean valid = connection != null && connection.enabled() && activation != null
+				&& !activation.expiresAt().isBefore(now) && codeMatches;
+		if (!valid || !repository.consumeActivation(activation.id(), now)) {
+			throw authenticationFailure(
+					connection, safeKey, correlationId, abuseKeys,
+					properties.activationMaxFailures(), properties.activationFailureWindow());
 		}
 
 		String connectorSecret = randomToken("gfs_", 32);
@@ -162,21 +181,29 @@ public class PhysicalConnectorService {
 
 	@Transactional
 	public ConnectorContext authenticate(
-			String connectorKey, String connectorSecret, String correlationId
+			String connectorKey, String connectorSecret, String originIp, String correlationId
 	) {
 		String safeKey = trim(connectorKey, 120);
 		String safeSecret = trim(connectorSecret, 200);
-		if (safeKey == null || safeSecret == null) {
-			throw authenticationFailure(null, safeKey, correlationId);
+		AbuseKeys abuseKeys = abuseKeys("authenticate", safeKey, originIp);
+		enforceNotLimited(
+				abuseKeys, properties.authenticationMaxFailures(),
+				properties.authenticationFailureWindow(), correlationId);
+		ConnectionRecord connection = safeKey == null
+				? null : repository.connectionByConnectorKey(safeKey).orElse(null);
+		var credential = connection == null ? null : repository.activeCredential(connection.id()).orElse(null);
+		boolean secretMatches = passwordEncoder.matches(
+				safeSecret == null ? "" : safeSecret,
+				credential == null ? dummyCredentialHash : credential.secretHash());
+		if (safeKey == null || safeSecret == null || connection == null || !connection.enabled()
+				|| credential == null || !secretMatches) {
+			throw authenticationFailure(
+					connection, safeKey, correlationId, abuseKeys,
+					properties.authenticationMaxFailures(), properties.authenticationFailureWindow());
 		}
-		ConnectionRecord connection = repository.connectionByConnectorKey(safeKey)
-				.orElseThrow(() -> authenticationFailure(null, safeKey, correlationId));
-		var credential = repository.activeCredential(connection.id()).orElse(null);
-		if (!connection.enabled() || credential == null
-				|| !passwordEncoder.matches(safeSecret, credential.secretHash())) {
-			throw authenticationFailure(connection, safeKey, correlationId);
-		}
-		repository.touchCredential(credential.id(), OffsetDateTime.now());
+		OffsetDateTime now = OffsetDateTime.now();
+		repository.touchCredentialIfStale(
+				credential.id(), now, now.minus(properties.lastAuthenticatedWriteInterval()));
 		return new ConnectorContext(
 				credential.id(), connection.organizationId(), connection.branchId(), connection.id(),
 				connection.providerKey(), connection.connectorKey());
@@ -449,17 +476,76 @@ public class PhysicalConnectorService {
 	}
 
 	private ApiAuthenticationException authenticationFailure(
-			ConnectionRecord connection, String connectorKey, String correlationId
+			ConnectionRecord connection,
+			String connectorKey,
+			String correlationId,
+			AbuseKeys abuseKeys,
+			int maxFailures,
+			Duration failureWindow
 	) {
+		recordFailedAttempt(abuseKeys, maxFailures, failureWindow, correlationId);
 		UUID entityId = connection == null ? safeUuid("connector:" + connectorKey) : connection.id();
 		try {
 			securityAudit.authenticationRejected(
 					connection == null ? null : connection.organizationId(),
-					connection == null ? null : connection.branchId(), entityId,
-					trim(connectorKey, 120), correlationId);
+					connection == null ? null : connection.branchId(), entityId, correlationId);
 		} catch (RuntimeException auditFailure) {
 			LOGGER.warn("Could not persist rejected Connector authentication. correlationId={}", correlationId);
 		}
+		return invalidAuthentication();
+	}
+
+	private void enforceNotLimited(
+			AbuseKeys keys, int maxFailures, Duration window, String correlationId
+	) {
+		try {
+			if (rateLimiter.isLimited(keys.origin(), maxFailures, window)
+					|| rateLimiter.isLimited(keys.connectorKey(), maxFailures, window)) {
+				throw invalidAuthentication();
+			}
+		} catch (ApiAuthenticationException exception) {
+			throw exception;
+		} catch (RuntimeException limiterFailure) {
+			LOGGER.warn("Connector abuse protection unavailable. correlationId={}", correlationId);
+		}
+	}
+
+	private void recordFailedAttempt(
+			AbuseKeys keys, int maxFailures, Duration window, String correlationId
+	) {
+		for (String key : List.of(keys.origin(), keys.connectorKey())) {
+			try {
+				rateLimiter.check(key, maxFailures, window);
+			} catch (BusinessException limited) {
+				// The public response intentionally remains CONNECTOR_AUTH_INVALID.
+			} catch (RuntimeException limiterFailure) {
+				LOGGER.warn("Could not record Connector authentication failure. correlationId={}", correlationId);
+			}
+		}
+	}
+
+	private AbuseKeys abuseKeys(String operation, String connectorKey, String originIp) {
+		String normalizedOrigin = originIp == null ? "<missing>" : originIp;
+		String normalizedConnectorKey = connectorKey == null ? "<missing>" : connectorKey;
+		return new AbuseKeys(
+				"physical-connector:" + operation + ":origin:" + fingerprint(normalizedOrigin),
+				"physical-connector:" + operation + ":origin-key:"
+						+ fingerprint(normalizedOrigin + "\n" + normalizedConnectorKey));
+	}
+
+	private String fingerprint(String value) {
+		String normalized = value == null || value.isBlank()
+				? "<missing>" : value.trim().toLowerCase(Locale.ROOT);
+		try {
+			byte[] digest = MessageDigest.getInstance("SHA-256")
+					.digest(normalized.getBytes(StandardCharsets.UTF_8));
+			return HexFormat.of().formatHex(digest, 0, 16);
+		} catch (NoSuchAlgorithmException exception) {
+			throw new IllegalStateException("SHA-256 is required for Connector abuse protection.", exception);
+		}
+	}
+
+	private ApiAuthenticationException invalidAuthentication() {
 		return new ApiAuthenticationException(
 				"CONNECTOR_AUTH_INVALID", "La autenticación del Connector no es válida o fue revocada.");
 	}
@@ -638,5 +724,8 @@ public class PhysicalConnectorService {
 			String externalPersonRef, String externalDisplayName, String email, String phone,
 			String externalEmployeeNumber
 	) {
+	}
+
+	private record AbuseKeys(String origin, String connectorKey) {
 	}
 }

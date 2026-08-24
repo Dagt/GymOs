@@ -11,6 +11,10 @@ import type {
   PhysicalIntegration,
   PhysicalPersonCandidate,
 } from "@/lib/api";
+import {
+  accessDeviceReadiness,
+  initialAccessBenefitSelection,
+} from "./access-device-readiness";
 
 export function AccessOperationSection({
   availableBenefits,
@@ -339,6 +343,7 @@ export function PhysicalAccessIntegrationSection({
   connectorActivation,
   connectorKey,
   device,
+  deviceBenefitIdsByDevice,
   deviceCode,
   deviceRequiredBenefitIds,
   devices,
@@ -380,6 +385,7 @@ export function PhysicalAccessIntegrationSection({
   connectorActivation: PhysicalConnectorActivationCode | null;
   connectorKey: string;
   device: AccessDevice | null;
+  deviceBenefitIdsByDevice: Record<string, string[]>;
   deviceCode: string;
   deviceRequiredBenefitIds: string[];
   devices: AccessDevice[];
@@ -431,6 +437,19 @@ export function PhysicalAccessIntegrationSection({
   const selectedDeviceLink = integration.deviceLinks.find(
     (link) => link.accessDeviceId === device?.id,
   );
+  const selectedDeviceReadiness = device
+    ? accessDeviceReadiness(
+        device,
+        deviceBenefitIdsByDevice[device.id] ?? [],
+      )
+    : null;
+  const productiveIssues = devices.filter((candidate) => {
+    const readiness = accessDeviceReadiness(
+      candidate,
+      deviceBenefitIdsByDevice[candidate.id] ?? [],
+    );
+    return readiness.state === "INCOMPLETE" || readiness.state === "INVALID";
+  });
 
   return (
     <section className="grid gap-6">
@@ -461,13 +480,14 @@ export function PhysicalAccessIntegrationSection({
           <SetupStep
             complete={Boolean(
               device &&
-                deviceRequiredBenefitIds.length === 1 &&
+                (selectedDeviceReadiness?.state === "READY" ||
+                  selectedDeviceReadiness?.state === "DIAGNOSTIC") &&
                 (device.provider === "SIMULATED" || selectedDeviceLink),
             )}
             label="2. Puntos"
             text={
               device
-                ? `${deviceRequiredBenefitIds.length}/1 derecho · ${selectedDeviceLink ? "vinculado" : "sin recurso"}`
+                ? `${selectedDeviceReadiness?.countLabel ?? "Sin revisar"} · ${selectedDeviceLink ? "vinculado" : "sin recurso"}`
                 : "Elige un punto"
             }
           />
@@ -509,6 +529,7 @@ export function PhysicalAccessIntegrationSection({
                 onChange={(event) => onProviderKeyChange(event.target.value)}
                 value={providerKey}
               >
+                <option value="">Selecciona un proveedor</option>
                 {integration.providers.map((provider) => (
                   <option
                     disabled={provider.availability !== "AVAILABLE" || provider.providerKey === "SIMULATED"}
@@ -558,6 +579,7 @@ export function PhysicalAccessIntegrationSection({
             className="mt-4 h-11 rounded-lg bg-[var(--brand-primary)] px-5 text-sm font-bold text-white transition hover:brightness-110 disabled:opacity-60"
             disabled={
               busy ||
+              !providerKey ||
               !connectionName.trim() ||
               (syncEnabled && !connectorKey.trim())
             }
@@ -628,11 +650,59 @@ export function PhysicalAccessIntegrationSection({
             detail="Define qué derecho comercial exige cada punto"
             title="2. Configura los puntos de acceso"
             status={
-              deviceRequiredBenefitIds.length > 0 ? "Revisado" : "Pendiente"
+              devices.length === 0
+                ? "Sin puntos"
+                : productiveIssues.length > 0
+                  ? `${productiveIssues.length} por corregir`
+                  : "Todos revisados"
             }
           />
         </summary>
         <div className="border-t border-[var(--brand-line)] p-5">
+          {devices.length > 0 ? (
+            <div className="mb-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {devices.map((candidate) => {
+                const readiness = accessDeviceReadiness(
+                  candidate,
+                  deviceBenefitIdsByDevice[candidate.id] ?? [],
+                );
+                const selected = candidate.id === device?.id;
+                return (
+                  <button
+                    aria-pressed={selected}
+                    className={`rounded-xl border p-4 text-left transition ${
+                      selected
+                        ? "border-[var(--brand-primary)] bg-[var(--brand-primary-soft)]"
+                        : "border-[var(--brand-line)] bg-white hover:border-[var(--brand-primary-border)]"
+                    }`}
+                    key={candidate.id}
+                    onClick={() => onDeviceCodeChange(candidate.deviceCode)}
+                    type="button"
+                  >
+                    <span className="flex items-start justify-between gap-3">
+                      <span>
+                        <span className="block font-bold text-[var(--brand-ink)]">
+                          {candidate.name}
+                        </span>
+                        <span className="mt-1 block text-xs text-[var(--brand-muted)]">
+                          {candidate.deviceCode} · {candidate.provider}
+                        </span>
+                      </span>
+                      <StatusBadge tone={readiness.tone}>
+                        {readiness.label}
+                      </StatusBadge>
+                    </span>
+                    <span className="mt-3 block text-sm font-black text-[var(--brand-ink)]">
+                      {readiness.countLabel}
+                    </span>
+                    <span className="mt-1 block text-xs leading-5 text-[var(--brand-muted)]">
+                      {readiness.detail}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          ) : null}
           <label className="grid max-w-xl gap-2 text-sm font-semibold text-[var(--brand-muted)]">
             Punto físico a configurar
             <select
@@ -645,7 +715,13 @@ export function PhysicalAccessIntegrationSection({
               ) : null}
               {devices.map((candidate) => (
                 <option key={candidate.id} value={candidate.deviceCode}>
-                  {candidate.name} · {candidate.deviceCode}
+                  {candidate.name} · {candidate.deviceCode} ·{" "}
+                  {
+                    accessDeviceReadiness(
+                      candidate,
+                      deviceBenefitIdsByDevice[candidate.id] ?? [],
+                    ).countLabel
+                  }
                 </option>
               ))}
             </select>
@@ -1176,16 +1252,27 @@ function AccessPointRequirements({
   requiredBenefitIds: string[];
   onSave: (benefitIds: string[]) => void;
 }) {
-  const [draft, setDraft] = useState(requiredBenefitIds[0] ?? "");
-  const hasChanges = draft !== (requiredBenefitIds[0] ?? "");
+  const initialSelection = initialAccessBenefitSelection(requiredBenefitIds);
+  const [draft, setDraft] = useState(initialSelection);
+  const hasChanges = draft !== initialSelection;
   const productive = device.provider !== "SIMULATED";
+  const readiness = accessDeviceReadiness(device, requiredBenefitIds);
   if (availableBenefits.length === 0)
     return (
       <EmptyState text="Crea primero beneficios activos de tipo ACCESS. Por ejemplo: GYM_ACCESS, SAUNA_ACCESS o CLASES_ACCESS." />
     );
   return (
     <div>
-      <p className="font-bold text-[var(--brand-ink)]">{device.name}</p>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="font-bold text-[var(--brand-ink)]">{device.name}</p>
+        <StatusBadge tone={readiness.tone}>{readiness.label}</StatusBadge>
+      </div>
+      <p className="mt-2 text-sm font-black text-[var(--brand-ink)]">
+        {readiness.countLabel}
+      </p>
+      <p className="mt-1 text-sm text-[var(--brand-muted)]">
+        {readiness.detail}
+      </p>
       <p className="mt-1 text-sm text-[var(--brand-muted)]">
         Selecciona el único beneficio ACCESS principal que habilita este punto.
         En V1 no se combinan múltiples derechos ni se permite dejar vacío un punto productivo.
@@ -1247,14 +1334,13 @@ function AccessPointRegistration({
   const [deviceCode, setDeviceCode] = useState("");
   const [deviceType, setDeviceType] =
     useState<AccessDevicePayload["deviceType"]>("TURNSTILE");
-  const [provider, setProvider] =
-    useState<NonNullable<AccessDevicePayload["provider"]>>("HIKCENTRAL");
+  const [provider, setProvider] = useState<AccessDevicePayload["provider"]>("");
   const [requiredBenefitId, setRequiredBenefitId] = useState("");
   const productive = provider !== "SIMULATED";
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!name.trim() || !deviceCode.trim() || (productive && !requiredBenefitId)) {
+    if (!name.trim() || !deviceCode.trim() || !provider || (productive && !requiredBenefitId)) {
       return;
     }
     await onCreate({
@@ -1328,6 +1414,7 @@ function AccessPointRegistration({
             }
             value={provider}
           >
+            <option value="">Selecciona un proveedor</option>
             {providers.map((candidate) => (
               <option
                 disabled={candidate.availability !== "AVAILABLE"}
@@ -1361,7 +1448,7 @@ function AccessPointRegistration({
           </p>
           <button
             className="mt-3 h-10 rounded-lg bg-[var(--brand-primary)] px-4 text-sm font-bold text-white disabled:opacity-60"
-            disabled={busy || !name.trim() || !deviceCode.trim() || (productive && !requiredBenefitId)}
+            disabled={busy || !name.trim() || !deviceCode.trim() || !provider || (productive && !requiredBenefitId)}
             type="submit"
           >
             Registrar punto

@@ -9,6 +9,7 @@ import com.gymos.access.application.PhysicalConnectorService.PhysicalEventInput;
 import com.gymos.access.application.PhysicalConnectorService.PhysicalEventView;
 import com.gymos.access.infrastructure.PhysicalAccessRepository.PersonCandidateRecord;
 import com.gymos.common.api.Correlation;
+import com.gymos.common.security.ClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
@@ -35,9 +36,13 @@ public class PhysicalConnectorController {
 	public static final String CONNECTOR_SECRET_HEADER = "X-GymFort-Connector-Secret";
 
 	private final PhysicalConnectorService connectorService;
+	private final ClientIpResolver clientIpResolver;
 
-	public PhysicalConnectorController(PhysicalConnectorService connectorService) {
+	public PhysicalConnectorController(
+			PhysicalConnectorService connectorService, ClientIpResolver clientIpResolver
+	) {
 		this.connectorService = connectorService;
+		this.clientIpResolver = clientIpResolver;
 	}
 
 	@PostMapping("/activate")
@@ -46,7 +51,8 @@ public class PhysicalConnectorController {
 			HttpServletRequest servletRequest
 	) {
 		return connectorService.activate(
-				request.connectorKey(), request.activationCode(), correlationId(servletRequest));
+				request.connectorKey(), request.activationCode(),
+				clientIpResolver.resolve(servletRequest), correlationId(servletRequest));
 	}
 
 	@PostMapping("/heartbeat")
@@ -57,7 +63,8 @@ public class PhysicalConnectorController {
 			HttpServletRequest servletRequest
 	) {
 		String correlationId = correlationId(servletRequest);
-		var connector = connectorService.authenticate(connectorKey, connectorSecret, correlationId);
+		var connector = connectorService.authenticate(
+				connectorKey, connectorSecret, clientIpResolver.resolve(servletRequest), correlationId);
 		return connectorService.heartbeat(
 				connector, request.status(), request.connectorVersion(), request.instanceId(), request.lastError());
 	}
@@ -70,7 +77,8 @@ public class PhysicalConnectorController {
 			HttpServletRequest servletRequest
 	) {
 		String correlationId = correlationId(servletRequest);
-		var connector = connectorService.authenticate(connectorKey, connectorSecret, correlationId);
+		var connector = connectorService.authenticate(
+				connectorKey, connectorSecret, clientIpResolver.resolve(servletRequest), correlationId);
 		ConnectorClaimRequest safeRequest = request == null ? new ConnectorClaimRequest(20, 90) : request;
 		return connectorService.claimJobs(connector, safeRequest.limit(), safeRequest.leaseSeconds());
 	}
@@ -84,7 +92,8 @@ public class PhysicalConnectorController {
 			HttpServletRequest servletRequest
 	) {
 		String correlationId = correlationId(servletRequest);
-		var connector = connectorService.authenticate(connectorKey, connectorSecret, correlationId);
+		var connector = connectorService.authenticate(
+				connectorKey, connectorSecret, clientIpResolver.resolve(servletRequest), correlationId);
 		return connectorService.completeJob(
 				connector, jobId, request.claimToken(), request.externalOperationRef());
 	}
@@ -98,7 +107,8 @@ public class PhysicalConnectorController {
 			HttpServletRequest servletRequest
 	) {
 		String correlationId = correlationId(servletRequest);
-		var connector = connectorService.authenticate(connectorKey, connectorSecret, correlationId);
+		var connector = connectorService.authenticate(
+				connectorKey, connectorSecret, clientIpResolver.resolve(servletRequest), correlationId);
 		return connectorService.failJob(
 				connector, jobId, request.claimToken(), request.error(),
 				request.retryable() == null || request.retryable(),
@@ -114,7 +124,8 @@ public class PhysicalConnectorController {
 			HttpServletRequest servletRequest
 	) {
 		String correlationId = correlationId(servletRequest);
-		var connector = connectorService.authenticate(connectorKey, connectorSecret, correlationId);
+		var connector = connectorService.authenticate(
+				connectorKey, connectorSecret, clientIpResolver.resolve(servletRequest), correlationId);
 		return connectorService.extendLease(
 				connector, jobId, request.claimToken(), request.leaseSeconds());
 	}
@@ -127,7 +138,8 @@ public class PhysicalConnectorController {
 			HttpServletRequest servletRequest
 	) {
 		String correlationId = correlationId(servletRequest);
-		var connector = connectorService.authenticate(connectorKey, connectorSecret, correlationId);
+		var connector = connectorService.authenticate(
+				connectorKey, connectorSecret, clientIpResolver.resolve(servletRequest), correlationId);
 		return connectorService.ingestEvent(connector, request.toInput(), correlationId);
 	}
 
@@ -139,7 +151,8 @@ public class PhysicalConnectorController {
 			HttpServletRequest servletRequest
 	) {
 		String correlationId = correlationId(servletRequest);
-		var connector = connectorService.authenticate(connectorKey, connectorSecret, correlationId);
+		var connector = connectorService.authenticate(
+				connectorKey, connectorSecret, clientIpResolver.resolve(servletRequest), correlationId);
 		return connectorService.ingestPersonCandidate(connector, request.toInput());
 	}
 

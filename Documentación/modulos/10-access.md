@@ -1,8 +1,8 @@
 # Accesos y control físico
 
-Estado: `CONTROL PLANE CLOUD IMPLEMENTADO / CONNECTOR LOCAL Y ADAPTER HIKCENTRAL PENDIENTES`
+Estado: `CONTROL PLANE CLOUD ESTABILIZADO PARA INICIAR CONNECTOR / CONNECTOR LOCAL Y ADAPTER HIKCENTRAL PENDIENTES`
 
-Última revisión: 23 de agosto de 2026
+Última revisión: 24 de agosto de 2026
 
 ## 1. Alcance y fuente de verdad
 
@@ -33,9 +33,9 @@ forma parte del flujo principal de la consola.
 |---|---|---|
 | Decisión lógica y bitácora | IMPLEMENTADO | Elegibilidad por membresía/beneficio, autorización temporal y apertura manual simulada |
 | Modelo físico provider-neutral | IMPLEMENTADO | Conexión, puntos, recursos externos, niveles, personas, estado deseado y salud por sucursal |
-| Control plane del Connector | IMPLEMENTADO | Activación, secreto rotatorio, heartbeat, jobs con lease, resultados, eventos y candidatos |
+| Control plane del Connector | ESTABILIZADO | Activación, secreto rotatorio, protección de fallos, heartbeat, jobs con lease, resultados, eventos y candidatos |
 | Sincronización automática | IMPLEMENTADO | Eventos de membresía, estado del socio y configuración de beneficios; reconciliación manual de recuperación |
-| Consola administrativa | IMPLEMENTADO | Secuencia proveedor → puntos → derechos → recursos → personas → salud |
+| Consola administrativa | ESTABILIZADA | Secuencia proveedor → puntos → derechos → recursos → personas → salud; alerta de puntos legacy con 0 o múltiples derechos |
 | GymFort Local Connector ejecutable | PENDIENTE CONNECTOR | Debe instalarse dentro de la LAN del primer cliente |
 | Adapter contra HikCentral Professional | PENDIENTE HIKCENTRAL REAL | Requiere descubrimiento de versión, licencia, API/SDK, topología y pruebas físicas |
 | Apertura real del torniquete | PENDIENTE HARDWARE | `commands/open` conserva `SIMULATED_OPEN`; no se afirma operación física |
@@ -52,6 +52,11 @@ para un Connector. No significa que GymFort esté llamando hoy a HikCentral.
 - `SIMULATED`: diagnóstico sin hardware y nunca productivo;
 - `ZKTECO`, `SUPREMA`, `GENERIC_RELAY` y `CLOUD_PROVIDER`: visibles como
   planificados y no seleccionables.
+
+El proveedor siempre se selecciona explícitamente al crear un punto o una
+conexión. Un valor nulo o vacío produce
+`PHYSICAL_ACCESS_PROVIDER_REQUIRED`; nunca se interpreta como `HIKCENTRAL`.
+Los registros históricos que ya conservan `HIKCENTRAL` siguen siendo válidos.
 
 La conexión V1 es única por organización/sucursal y su proveedor es inmutable.
 Una migración de proveedor exige revocación y procedimiento asistido; no se
@@ -74,6 +79,11 @@ SAUNA_DOOR     -> SAUNA_ACCESS -> external access level ref
 
 No existe el fallback productivo “sin requisito = cualquier membresía”. El modo
 `SIMULATED` conserva flexibilidad sólo para diagnóstico local.
+
+La consola calcula la preparación de todos los puntos y muestra `Correcto 1/1`,
+`Configuración incompleta 0/1` o `Configuración inválida N/1`. Ante varios
+beneficios legacy no preselecciona ninguno: Dueño o Gerente debe elegir cuál
+conservar y el punto continúa no listo para producción hasta guardarlo.
 
 ## 4. Estado deseado y sincronización automática
 
@@ -211,6 +221,21 @@ Flujo de credenciales:
 6. autenticación inválida responde `401 CONNECTOR_AUTH_INVALID` y se audita sin
    registrar el secreto.
 
+Los fallos repetidos de activación y autenticación se limitan por origen y por
+la combinación origen/connector key. Las claves del limitador sólo contienen
+huellas SHA-256; nunca incluyen el secret ni el código de activación. Producción
+usa el limitador Redis ya compartido por las instancias; perfiles `local` y
+`test` usan memoria y su alcance es deliberadamente por proceso. Una petición
+limitada conserva la misma respuesta genérica para no revelar si la key existe.
+Los límites y ventanas se configuran bajo
+`gymos.access.physical-connector.*`.
+
+`last_authenticated_at` representa actividad autenticada reciente, no la hora
+exacta de cada request. La validación del secret ocurre siempre, pero PostgreSQL
+sólo actualiza ese timestamp de forma atómica si es nulo o más antiguo que
+`last-authenticated-write-interval` (cinco minutos por defecto); una petición
+dentro de la ventana no incrementa `version`.
+
 Las credenciales del proveedor, URL/puerto de LAN y cualquier material
 biométrico deben residir sólo en el almacén seguro del Connector local.
 
@@ -314,12 +339,17 @@ plano.
 La cobertura dedicada demuestra, entre otros casos:
 
 - catálogo de proveedores y rechazo de proveedores planificados;
+- proveedor obligatorio sin fallback implícito a `HIKCENTRAL`;
 - punto productivo con cero o múltiples beneficios rechazado;
+- estados de preparación de puntos productivos y ausencia de selección
+  automática ante múltiples beneficios legacy;
 - aislamiento por organización, sucursal, dispositivo, recurso y candidato;
 - UPSERT, REVOKE y BLOCKED según elegibilidad/mapeo;
 - triggers de activación, renovación, cambio, vencimiento, estado de socio y
   beneficios;
 - código de activación de un uso y secretos hasheados/revocables;
+- limitación configurable de fallos sin enumeración de key y escritura
+  condicional de `last_authenticated_at`;
 - claim exclusivo concurrente, rotación del token al recuperar un lease,
   serialización de versiones deseadas y reintentos;
 - idempotencia de jobs y eventos físicos;

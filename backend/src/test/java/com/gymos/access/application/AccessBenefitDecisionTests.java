@@ -142,7 +142,7 @@ class AccessBenefitDecisionTests {
 				.thenReturn(created);
 
 		AccessDeviceRecord result = service.createDevice(
-				principal, "Torniquete recepción", "front-01", "turnstile", null,
+				principal, "Torniquete recepción", "front-01", "turnstile", "HIKCENTRAL",
 				requiredBenefitId, UUID.randomUUID().toString());
 
 		assertThat(result).isEqualTo(created);
@@ -151,6 +151,46 @@ class AccessBenefitDecisionTests {
 				eq("TURNSTILE"), eq("HIKCENTRAL"), eq(userId));
 		verify(repository).replaceDeviceBenefits(
 				organizationId, branchId, deviceId, userId, List.of(requiredBenefitId));
+	}
+
+	@Test
+	void accessPointCannotInferHikCentralFromAnEmptyProvider() {
+		AccessRepository repository = mock(AccessRepository.class);
+		AccessService service = service(
+				repository, mock(AuditService.class), mock(EligibilityPolicy.class));
+		GymOsPrincipal principal = new GymOsPrincipal(
+				UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "manager@gymos.local", "Gerente",
+				Set.of("access.physical.manage"));
+
+		assertThatThrownBy(() -> service.createDevice(
+				principal, "Torniquete", "TURN-EXPLICIT", "TURNSTILE", "  ",
+				UUID.randomUUID(), "test"))
+				.isInstanceOfSatisfying(
+						com.gymos.common.api.BusinessException.class,
+						exception -> assertThat(exception.code())
+								.isEqualTo("PHYSICAL_ACCESS_PROVIDER_REQUIRED"));
+	}
+
+	@Test
+	void explicitlySimulatedAccessPointCanRemainDiagnosticWithoutABenefit() {
+		AccessRepository repository = mock(AccessRepository.class);
+		AccessService service = service(
+				repository, mock(AuditService.class), mock(EligibilityPolicy.class));
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		UUID userId = UUID.randomUUID();
+		GymOsPrincipal principal = new GymOsPrincipal(
+				userId, organizationId, branchId, "manager@gymos.local", "Gerente",
+				Set.of("access.physical.manage"));
+		AccessDeviceRecord created = new AccessDeviceRecord(
+				UUID.randomUUID(), "Simulador", "SIM-01", "DOOR", "ACTIVE", "SIMULATED", null);
+		when(repository.createDevice(
+				eq(organizationId), eq(branchId), eq("Simulador"), eq("SIM-01"),
+				eq("DOOR"), eq("SIMULATED"), eq(userId))).thenReturn(created);
+
+		assertThat(service.createDevice(
+				principal, "Simulador", "SIM-01", "DOOR", "SIMULATED", null, "test"))
+				.isEqualTo(created);
 	}
 
 	@Test

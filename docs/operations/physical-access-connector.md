@@ -50,6 +50,29 @@ Invalid, expired or revoked credentials return HTTP 401 with
 `CONNECTOR_AUTH_INVALID`. Do not retry an invalid credential indefinitely; stop
 provider mutation, surface a local alert and wait for operator rotation.
 
+Cloud throttles repeated activation and authentication failures by source and
+by source/connector-key pair. Limited attempts intentionally return the same
+`CONNECTOR_AUTH_INVALID`, so the response cannot be used to discover whether a
+key exists. Apply exponential backoff with jitter after any 401; a correct
+Connector running from a different source is not locked by another source's
+failures, and every bucket expires automatically.
+
+Production counters use GymFort's shared Redis rate limiter. `local` and `test`
+profiles use an in-process limiter and must not be described as distributed.
+Only SHA-256 fingerprints enter limiter keys; the Connector secret and
+activation code never do. Operators can tune:
+
+- `GYMOS_CONNECTOR_ACTIVATION_MAX_FAILURES` and
+  `GYMOS_CONNECTOR_ACTIVATION_FAILURE_WINDOW`;
+- `GYMOS_CONNECTOR_AUTH_MAX_FAILURES` and
+  `GYMOS_CONNECTOR_AUTH_FAILURE_WINDOW`.
+
+Cloud validates the secret on every call. `last_authenticated_at` is an
+operational "recently authenticated" marker rather than a per-request ledger:
+its PostgreSQL row is updated only after
+`GYMOS_CONNECTOR_LAST_AUTH_WRITE_INTERVAL` (five minutes by default), preventing
+heartbeat/job polling from incrementing the credential version on every call.
+
 ## 3. Heartbeat
 
 Send at least once per minute:

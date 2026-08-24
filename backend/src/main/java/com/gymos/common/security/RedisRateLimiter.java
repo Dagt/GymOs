@@ -33,4 +33,17 @@ public class RedisRateLimiter implements RateLimiter {
 			throw new BusinessException("RATE_LIMIT_EXCEEDED", "Demasiados intentos. Espera un momento y vuelve a intentar.");
 		}
 	}
+
+	@Override
+	public boolean isLimited(String key, int maxRequests, Duration windowDuration) {
+		String current = redisTemplate.opsForValue().get("gymos:rate-limit:" + key);
+		if (current == null) {
+			return false;
+		}
+		try {
+			return Long.parseLong(current) >= maxRequests;
+		} catch (NumberFormatException exception) {
+			return false;
+		}
+	}
 }

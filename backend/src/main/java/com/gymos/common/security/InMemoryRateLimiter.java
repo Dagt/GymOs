@@ -30,6 +30,20 @@ public class InMemoryRateLimiter implements RateLimiter {
 		}
 	}
 
+	@Override
+	public boolean isLimited(String key, int maxRequests, Duration windowDuration) {
+		Instant now = Instant.now();
+		Window window = windows.get(key);
+		if (window == null) {
+			return false;
+		}
+		if (now.isAfter(window.startedAt().plus(windowDuration))) {
+			windows.remove(key, window);
+			return false;
+		}
+		return window.count() >= maxRequests;
+	}
+
 	private record Window(Instant startedAt, int count) {
 	}
 }

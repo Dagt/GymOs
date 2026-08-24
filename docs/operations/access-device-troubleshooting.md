@@ -19,6 +19,18 @@ HikCentral adapter and real turnstile acceptance are not implemented yet.
    uses. Consumption is conditional and atomic.
 7. Review `access_log` and the correlated audit event.
 
+The Physical configuration view lists every point with one of these explicit
+states:
+
+- `Correcto — 1/1 beneficio ACCESS`;
+- `Configuración incompleta — 0/1 beneficios ACCESS`;
+- `Configuración inválida — N/1 beneficios ACCESS`.
+
+For an invalid legacy point, select the affected point and choose the single
+benefit that should remain. GymFort does not auto-fix or choose the first legacy
+benefit. `SIMULATED` is shown separately as diagnostic and is never evidence of
+physical production readiness.
+
 ## Connector and synchronization checks
 
 Use the Physical configuration view as Owner or Manager:
@@ -50,6 +62,12 @@ truth and physical delivery are intentionally separate.
 3. Generate a rotation code. It expires after 15 minutes and is shown once.
 4. Activate the new credential locally and verify heartbeat.
 5. Run reconciliation and review authentication-rejection audit events.
+
+Repeated invalid attempts are temporarily throttled. They continue returning
+`CONNECTOR_AUTH_INVALID` whether the key is unknown, wrong or revoked. Stop
+automatic retries, correct/rotate the credential and wait for the configured
+failure window; do not try multiple connector keys. Production throttling is
+shared through Redis, while local/test counters are only per process.
 
 ## Privacy boundary
 

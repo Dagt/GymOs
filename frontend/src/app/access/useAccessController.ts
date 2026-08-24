@@ -44,9 +44,9 @@ export function useAccessController() {
   const [query, setQuery] = useState("");
   const [identifier, setIdentifier] = useState("");
   const [deviceCode, setDeviceCode] = useState("");
-  const [deviceRequiredBenefitIds, setDeviceRequiredBenefitIds] = useState<
-    string[]
-  >([]);
+  const [deviceBenefitIdsByDevice, setDeviceBenefitIdsByDevice] = useState<
+    Record<string, string[]>
+  >({});
   const [manualReason, setManualReason] = useState("");
   const [temporaryReason, setTemporaryReason] = useState("");
   const [temporaryHours, setTemporaryHours] = useState(4);
@@ -57,7 +57,7 @@ export function useAccessController() {
     useState<PhysicalClientState | null>(null);
   const [physicalConnectionName, setPhysicalConnectionName] = useState("");
   const [physicalConnectorKey, setPhysicalConnectorKey] = useState("");
-  const [physicalProviderKey, setPhysicalProviderKey] = useState("HIKCENTRAL");
+  const [physicalProviderKey, setPhysicalProviderKey] = useState("");
   const [physicalSyncEnabled, setPhysicalSyncEnabled] = useState(false);
   const [physicalMappingDrafts, setPhysicalMappingDrafts] = useState<
     Record<string, { reference: string; name: string }>
@@ -101,10 +101,17 @@ export function useAccessController() {
           searchClients(stored.accessToken, "", "ACTIVE"),
           getPhysicalIntegration(stored.accessToken),
         ]);
+        const loadedBenefitEntries = await Promise.all(
+          loadedDevices.map(async (device) => [
+            device.id,
+            await getDeviceRequiredBenefits(stored.accessToken, device.id),
+          ] as const),
+        );
         if (!active) {
           return;
         }
         setDevices(loadedDevices);
+        setDeviceBenefitIdsByDevice(Object.fromEntries(loadedBenefitEntries));
         setLogs(loadedLogs);
         setClients(loadedClients);
         const initialDevice = loadedDevices.find(
@@ -157,22 +164,11 @@ export function useAccessController() {
     [deviceCode, devices],
   );
 
-  useEffect(() => {
-    if (!session || !selectedDevice) {
-      return;
-    }
-    let active = true;
-    void getDeviceRequiredBenefits(session.accessToken, selectedDevice.id)
-      .then((benefitIds) => {
-        if (active) setDeviceRequiredBenefitIds(benefitIds);
-      })
-      .catch(() => {
-        if (active) setDeviceRequiredBenefitIds([]);
-      });
-    return () => {
-      active = false;
-    };
-  }, [selectedDevice, session]);
+  const deviceRequiredBenefitIds = useMemo(
+    () =>
+      selectedDevice ? (deviceBenefitIdsByDevice[selectedDevice.id] ?? []) : [],
+    [deviceBenefitIdsByDevice, selectedDevice],
+  );
 
   useEffect(() => {
     if (!session || !selectedClientId) {
@@ -346,7 +342,7 @@ export function useAccessController() {
     setPhysicalIntegration(integration);
     setPhysicalConnectionName(integration.connection.displayName);
     setPhysicalConnectorKey(integration.connection.connectorKey ?? "");
-    setPhysicalProviderKey(integration.connection.providerKey);
+    setPhysicalProviderKey(integration.connection.providerKey || "");
     setPhysicalSyncEnabled(integration.connection.enabled);
     setPhysicalMappingDrafts(
       Object.fromEntries(
@@ -436,7 +432,10 @@ export function useAccessController() {
         selectedDevice.id,
         benefitIds,
       );
-      setDeviceRequiredBenefitIds(savedBenefitIds);
+      setDeviceBenefitIdsByDevice((current) => ({
+        ...current,
+        [selectedDevice.id]: savedBenefitIds,
+      }));
       setMessage(
         savedBenefitIds.length > 0
           ? `Requisitos de ${selectedDevice.name} actualizados.`
@@ -470,9 +469,12 @@ export function useAccessController() {
       setDeviceCode(device.deviceCode);
       setExternalDeviceRef("");
       setExternalDeviceName("");
-      setDeviceRequiredBenefitIds(
-        payload.requiredBenefitId ? [payload.requiredBenefitId] : [],
-      );
+      setDeviceBenefitIdsByDevice((current) => ({
+        ...current,
+        [device.id]: payload.requiredBenefitId
+          ? [payload.requiredBenefitId]
+          : [],
+      }));
       setMessage(
         `${device.name} quedó registrado como punto de acceso activo.`,
       );
@@ -732,6 +734,7 @@ export function useAccessController() {
     clients,
     createDevice,
     deviceCode,
+    deviceBenefitIdsByDevice,
     deviceRequiredBenefitIds,
     devices,
     error,
