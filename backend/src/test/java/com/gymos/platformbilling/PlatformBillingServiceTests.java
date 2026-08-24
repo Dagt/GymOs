@@ -10,6 +10,7 @@ import static org.mockito.ArgumentMatchers.any;
 
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
+import com.gymos.common.security.AccountScope;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.platformbilling.application.PlatformBillingService;
 import com.gymos.platformbilling.application.PlatformBillingService.UpdateBillingCommand;
@@ -346,7 +347,8 @@ class PlatformBillingServiceTests {
 
     private GymOsPrincipal platformAdmin() {
         return new GymOsPrincipal(
-                UUID.randomUUID(), null, null, "platform", "Platform Admin", Set.of("platform.admin")
+                UUID.randomUUID(), AccountScope.PLATFORM, null, null, "platform", "Platform Admin",
+                Set.of("platform.admin"), Set.of("Administrador GymOS"), false, null
         );
     }
 }

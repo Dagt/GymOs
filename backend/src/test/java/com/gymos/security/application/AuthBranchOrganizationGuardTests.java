@@ -42,8 +42,8 @@ class AuthBranchOrganizationGuardTests {
 		UUID organizationId = UUID.randomUUID();
 		UUID branchId = UUID.randomUUID();
 		String refreshToken = "refresh-test";
-		when(values.get("gymos:refresh:" + refreshToken))
-				.thenReturn(userId + "|" + organizationId + "|" + branchId + "|false");
+		when(values.get("gymos:refresh:v2:" + refreshToken))
+				.thenReturn("v2|" + userId + "|TENANT|" + organizationId + "|" + branchId + "|false|");
 		when(repository.branchBelongsToOrganization(branchId, organizationId)).thenReturn(false);
 
 		assertThatThrownBy(() -> guard.guardRefreshSession(refreshToken))

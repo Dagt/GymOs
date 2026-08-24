@@ -66,7 +66,18 @@ public class AuthController {
 			@Valid @RequestBody SelectOrganizationRequest request,
 			HttpServletRequest servletRequest
 	) {
-		return toResponse(authService.selectOrganization(principal, request.organizationId(), correlationId(servletRequest)));
+		return toResponse(authService.selectOrganization(
+				principal, request.organizationId(), request.reason(), correlationId(servletRequest)));
+	}
+
+	@PostMapping("/exit-support")
+	AuthResponse exitSupport(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@Valid @RequestBody ExitSupportRequest request,
+			HttpServletRequest servletRequest
+	) {
+		return toResponse(authService.exitSupport(
+				principal, request.refreshToken(), correlationId(servletRequest)));
 	}
 
 	private AuthResponse toResponse(AuthResult result) {
@@ -82,6 +93,7 @@ public class AuthController {
 	private CurrentUserResponse toResponse(CurrentUserResult result) {
 		return new CurrentUserResponse(
 				result.userId(),
+				result.accountScope(),
 				result.organizationId(),
 				result.branchId(),
 				result.username(),
@@ -90,6 +102,7 @@ public class AuthController {
 				result.roles(),
 				result.platformAdmin(),
 				result.supportMode(),
+				result.supportExpiresAt(),
 				result.console(),
 				result.organizationName(),
 				result.brandName(),
@@ -117,7 +130,13 @@ public class AuthController {
 	public record SelectBranchRequest(@NotNull UUID branchId) {
 	}
 
-	public record SelectOrganizationRequest(@NotNull UUID organizationId) {
+	public record SelectOrganizationRequest(
+			@NotNull UUID organizationId,
+			@NotBlank @jakarta.validation.constraints.Size(max = 500) String reason
+	) {
+	}
+
+	public record ExitSupportRequest(@NotBlank String refreshToken) {
 	}
 
 	public record AuthResponse(
@@ -131,6 +150,7 @@ public class AuthController {
 
 	public record CurrentUserResponse(
 			UUID userId,
+			com.gymos.common.security.AccountScope accountScope,
 			UUID organizationId,
 			UUID branchId,
 			String username,
@@ -139,6 +159,7 @@ public class AuthController {
 			Set<String> roles,
 			boolean platformAdmin,
 			boolean supportMode,
+			java.time.Instant supportExpiresAt,
 			String console,
 			String organizationName,
 			String brandName,

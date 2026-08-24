@@ -45,6 +45,9 @@ public class OrganizationService {
 		if (principal.platformAdmin()) {
 			return organizationQueryRepository.findAllOrganizations();
 		}
+		if (principal.platformIdentity()) {
+			throw new BusinessException("PLATFORM_SUPPORT_SCOPE_ACTIVE", "Vuelve al panel de plataforma para consultar la cartera.");
+		}
 		return organizationQueryRepository.findOrganizationsForUser(principal.userId());
 	}
 
@@ -61,7 +64,7 @@ public class OrganizationService {
 	@Transactional(readOnly = true)
 	public List<BranchSummary> branches(GymOsPrincipal principal) {
 		requirePrincipal(principal);
-		if (principal.platformAdmin() && principal.supportMode()) {
+		if (principal.platformSupport()) {
 			return organizationQueryRepository.findBranchesForOrganization(principal.organizationId());
 		}
 		return organizationQueryRepository.findBranchesForUser(principal.userId(), principal.organizationId());
@@ -76,7 +79,8 @@ public class OrganizationService {
 	@Transactional(readOnly = true)
 	public List<BranchSummary> branchesForOrganization(GymOsPrincipal principal, UUID organizationId) {
 		requirePrincipal(principal);
-		if (!principal.platformAdmin()) {
+		if (!principal.platformIdentity()
+				|| (principal.supportMode() && !organizationId.equals(principal.organizationId()))) {
 			throw new BusinessException("PLATFORM_ACCESS_REQUIRED", "Solo Admin GymOS puede consultar sucursales por gimnasio.");
 		}
 		return organizationQueryRepository.findBranchesForOrganization(organizationId);
@@ -89,6 +93,11 @@ public class OrganizationService {
 			String correlationId
 	) {
 		requirePrincipal(principal);
+		if (principal.platformIdentity()) {
+			throw new BusinessException(
+					"PLATFORM_CUSTOMER_PROVISIONING_REQUIRED",
+					"Crea el gimnasio y su dueño desde la operacion de clientes de plataforma.");
+		}
 		OffsetDateTime now = OffsetDateTime.now();
 		UUID organizationId = UUID.randomUUID();
 		if (hasPartialBranchRequest(request)) {
@@ -186,9 +195,11 @@ public class OrganizationService {
 		} catch (DuplicateKeyException exception) {
 			throw new BusinessException("BRANCH_CODE_ALREADY_EXISTS", "Ya existe una sucursal con ese codigo.");
 		}
-		commandRepository.grantUserBranchAccess(principal.userId(), branchId, "ADMIN");
+		if (principal.tenantIdentity()) {
+			commandRepository.grantUserBranchAccess(principal.userId(), branchId, "ADMIN");
+		}
 		auditService.record(principal, "BRANCH_CREATED", "BRANCH", branchId, "ADMIN", null, correlationId);
-		if (principal.platformAdmin() && principal.supportMode()) {
+		if (principal.platformSupport()) {
 			return organizationQueryRepository.findBranch(principal.organizationId(), branchId)
 					.orElseThrow(() -> new BusinessException("BRANCH_NOT_FOUND", "La sucursal no esta disponible."));
 		}
@@ -204,7 +215,8 @@ public class OrganizationService {
 			String correlationId
 	) {
 		requirePrincipal(principal);
-		if (!principal.platformAdmin() && !organizationQueryRepository.userHasBranchAccess(principal.userId(), principal.organizationId(), branchId)) {
+		if (!principal.platformSupport()
+				&& !organizationQueryRepository.userHasBranchAccess(principal.userId(), principal.organizationId(), branchId)) {
 			throw new BusinessException("BRANCH_ACCESS_DENIED", "No tienes acceso a la sucursal solicitada.");
 		}
 		OffsetDateTime now = OffsetDateTime.now();
@@ -219,7 +231,7 @@ public class OrganizationService {
 				now
 		));
 		auditService.record(principal, "BRANCH_UPDATED", "BRANCH", branchId, "RECEPTION", null, correlationId);
-		if (principal.platformAdmin() && principal.supportMode()) {
+		if (principal.platformSupport()) {
 			return organizationQueryRepository.findBranch(principal.organizationId(), branchId)
 					.orElseThrow(() -> new BusinessException("BRANCH_NOT_FOUND", "La sucursal no esta disponible."));
 		}
@@ -238,7 +250,7 @@ public class OrganizationService {
 		if (!principal.platformAdmin()) {
 			throw new BusinessException("PLATFORM_ACCESS_REQUIRED", "Solo Admin GymOS puede cambiar el estado de un gimnasio cliente.");
 		}
-		if (organizationId.equals(UUID.fromString("11111111-1111-1111-1111-111111111111"))) {
+		if (organizationQueryRepository.isDemoOrganization(organizationId)) {
 			throw new BusinessException("PLATFORM_ORGANIZATION_LOCKED", "La organizacion tecnica de plataforma no se puede suspender.");
 		}
 		String normalizedStatus = normalizeOrganizationStatus(status);

@@ -11,10 +11,14 @@ import static org.mockito.Mockito.when;
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.common.security.AccountScope;
 import com.gymos.organizations.api.operations.PlatformOrganizationOperations;
+import com.gymos.identity.api.operations.TenantOwnerProvisioning;
+import com.gymos.identity.api.operations.TenantOwnerProvisioning.OwnerInvitation;
 import com.gymos.organizations.api.operations.PlatformOrganizationOperations.ManagedOrganization;
 import com.gymos.platformadmin.application.PlatformCustomerService;
 import com.gymos.platformadmin.application.PlatformCustomerService.UpdateCustomerAccountCommand;
+import com.gymos.platformadmin.application.PlatformCustomerService.CreateCustomerCommand;
 import com.gymos.platformadmin.infrastructure.PlatformCustomerAccountRepository;
 import com.gymos.platformadmin.infrastructure.PlatformCustomerAccountRepository.CustomerAccountRecord;
 import com.gymos.platformbilling.api.operations.PlatformBillingOperations;
@@ -33,8 +37,9 @@ class PlatformCustomerServiceTests {
     private final PlatformCustomerAccountRepository accountRepository = mock(PlatformCustomerAccountRepository.class);
     private final PlatformBillingOperations billingOperations = mock(PlatformBillingOperations.class);
     private final AuditService auditService = mock(AuditService.class);
+    private final TenantOwnerProvisioning ownerProvisioning = mock(TenantOwnerProvisioning.class);
     private final PlatformCustomerService service = new PlatformCustomerService(
-            organizationOperations, accountRepository, billingOperations, auditService);
+            organizationOperations, accountRepository, billingOperations, auditService, ownerProvisioning);
 
     @Test
     void buildsACommercialPortfolioAndPrioritizesOverdueCustomers() {
@@ -88,6 +93,31 @@ class PlatformCustomerServiceTests {
         assertThat(exception.code()).isEqualTo("PLATFORM_ACCESS_REQUIRED");
     }
 
+	@Test
+	void provisionsOrganizationBranchAndInvitedOwnerAsOneUseCase() {
+		PlatformCustomerService provisioningService = new PlatformCustomerService(
+				organizationOperations, accountRepository, billingOperations, auditService, ownerProvisioning);
+		GymOsPrincipal admin = platformAdmin();
+		UUID ownerUserId = UUID.randomUUID();
+		when(ownerProvisioning.provisionOwner(any())).thenReturn(new OwnerInvitation(
+				ownerUserId, "https://gymfort.mx/accept-invitation?token=secret",
+				OffsetDateTime.now().plusHours(72)));
+		when(organizationOperations.organization(any())).thenAnswer(invocation -> Optional.of(
+				organization(invocation.getArgument(0), "Gym Nuevo", "ACTIVE", 1, 1)));
+
+		var result = provisioningService.create(admin, new CreateCustomerCommand(
+				"Gym Nuevo SA de CV", "Gym Nuevo", "GNUE260101AA1", "America/Mexico_City", "MXN",
+				"contacto@gymnuevo.mx", "+525512345678", "Gym Nuevo", null,
+				"#093D3A", "#18C8B2", "#F2F8F7", "Sucursal Principal", "MAIN", "+525512345678",
+				"Ana", "Propietaria", "ana@gymnuevo.mx", "+525587654321"), "correlation");
+
+		assertThat(result.customer().branchCount()).isEqualTo(1);
+		assertThat(result.ownerEmail()).isEqualTo("ana@gymnuevo.mx");
+		assertThat(result.invitationUrl()).contains("/accept-invitation?token=");
+		verify(organizationOperations).create(any());
+		verify(ownerProvisioning).provisionOwner(any());
+	}
+
     private ManagedOrganization organization(
             UUID id, String tradeName, String status, int branchCount, int activeBranchCount) {
         return new ManagedOrganization(
@@ -111,7 +141,8 @@ class PlatformCustomerServiceTests {
     }
 
     private GymOsPrincipal platformAdmin() {
-        return new GymOsPrincipal(
-                UUID.randomUUID(), null, null, "platform", "Platform Admin", Set.of("platform.admin"));
+		return new GymOsPrincipal(
+				UUID.randomUUID(), AccountScope.PLATFORM, null, null, "platform", "Platform Admin",
+				Set.of("platform.admin"), Set.of("Administrador GymOS"), false, null);
     }
 }

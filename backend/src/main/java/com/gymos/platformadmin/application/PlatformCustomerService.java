@@ -3,8 +3,11 @@ package com.gymos.platformadmin.application;
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.identity.api.operations.TenantOwnerProvisioning;
+import com.gymos.identity.api.operations.TenantOwnerProvisioning.ProvisionOwner;
 import com.gymos.organizations.api.operations.PlatformOrganizationOperations;
 import com.gymos.organizations.api.operations.PlatformOrganizationOperations.ManagedOrganization;
+import com.gymos.organizations.api.operations.PlatformOrganizationOperations.CreateManagedOrganization;
 import com.gymos.platformadmin.infrastructure.PlatformCustomerAccountRepository;
 import com.gymos.platformadmin.infrastructure.PlatformCustomerAccountRepository.CustomerAccountRecord;
 import com.gymos.platformadmin.infrastructure.PlatformCustomerAccountRepository.CustomerAccountWrite;
@@ -22,11 +25,10 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DuplicateKeyException;
 
 @Service
 public class PlatformCustomerService {
-	private static final UUID PLATFORM_ORGANIZATION_ID =
-			UUID.fromString("11111111-1111-1111-1111-111111111111");
 	private static final Set<String> LIFECYCLE_STATUSES = Set.of(
 			"ONBOARDING", "ACTIVE", "AT_RISK", "OFFBOARDING", "FORMER");
 	private static final ZoneId BUSINESS_ZONE = ZoneId.of("America/Mexico_City");
@@ -35,17 +37,59 @@ public class PlatformCustomerService {
 	private final PlatformCustomerAccountRepository accountRepository;
 	private final PlatformBillingOperations billingOperations;
 	private final AuditService auditService;
+	private final TenantOwnerProvisioning ownerProvisioning;
 
 	public PlatformCustomerService(
 			PlatformOrganizationOperations organizationOperations,
 			PlatformCustomerAccountRepository accountRepository,
 			PlatformBillingOperations billingOperations,
-			AuditService auditService
+			AuditService auditService,
+			TenantOwnerProvisioning ownerProvisioning
 	) {
 		this.organizationOperations = organizationOperations;
 		this.accountRepository = accountRepository;
 		this.billingOperations = billingOperations;
 		this.auditService = auditService;
+		this.ownerProvisioning = ownerProvisioning;
+	}
+
+	@Transactional
+	public ProvisionedCustomer create(
+			GymOsPrincipal principal,
+			CreateCustomerCommand command,
+			String correlationId
+	) {
+		requirePlatformAdmin(principal);
+		OffsetDateTime now = OffsetDateTime.now();
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		String normalizedEmail = command.ownerEmail().trim().toLowerCase(java.util.Locale.ROOT);
+		try {
+			organizationOperations.create(new CreateManagedOrganization(
+					organizationId, branchId, principal.userId(), command.legalName().trim(),
+					command.tradeName().trim(), blankToNull(command.taxId()), command.timezone().trim(),
+					command.defaultCurrency().trim().toUpperCase(), command.contactEmail().trim().toLowerCase(),
+					command.contactPhone().trim(), defaultText(command.brandName(), command.tradeName()),
+					blankToNull(command.logoUrl()), defaultText(command.primaryColor(), "#093D3A"),
+					defaultText(command.accentColor(), "#18C8B2"),
+					defaultText(command.surfaceColor(), "#F2F8F7"), command.branchName().trim(),
+					command.branchCode().trim().toUpperCase(), command.branchPhone().trim(), now));
+			var invitation = ownerProvisioning.provisionOwner(new ProvisionOwner(
+					organizationId, branchId, principal.userId(), command.ownerFirstName().trim(),
+					command.ownerLastName().trim(), normalizedEmail, command.ownerPhone().trim(), now));
+			auditService.recordSystem(
+					organizationId, branchId, principal.userId(), "PLATFORM_CUSTOMER_PROVISIONED", "ORGANIZATION",
+					organizationId, "PLATFORM_ADMIN", "ownerUserId=" + invitation.userId(), correlationId);
+			ManagedOrganization organization = organizationOperations.organization(organizationId)
+					.orElseThrow(() -> new BusinessException("ORGANIZATION_NOT_FOUND", "El gimnasio creado no esta disponible."));
+			return new ProvisionedCustomer(
+					toView(organization, null, BillingAggregate.empty()), normalizedEmail,
+					invitation.invitationUrl(), invitation.expiresAt());
+		} catch (DuplicateKeyException exception) {
+			throw new BusinessException(
+					"PLATFORM_CUSTOMER_ALREADY_EXISTS",
+					"Ya existe un gimnasio, RFC, codigo de sucursal o correo de acceso con esos datos.");
+		}
 	}
 
 	@Transactional(readOnly = true)
@@ -76,7 +120,6 @@ public class PlatformCustomerService {
 	) {
 		requirePlatformAdmin(principal);
 		ManagedOrganization organization = organizationOperations.organization(organizationId)
-				.filter(candidate -> !PLATFORM_ORGANIZATION_ID.equals(candidate.id()))
 				.orElseThrow(() -> new BusinessException(
 						"ORGANIZATION_NOT_FOUND", "El gimnasio cliente no esta disponible."));
 		String lifecycleStatus = normalizeLifecycle(command.lifecycleStatus());
@@ -241,6 +284,15 @@ public class PlatformCustomerService {
 		return normalized;
 	}
 
+	private String blankToNull(String value) {
+		return value == null || value.isBlank() ? null : value.trim();
+	}
+
+	private String defaultText(String value, String fallback) {
+		String normalized = blankToNull(value);
+		return normalized == null ? fallback.trim() : normalized;
+	}
+
 	private void requirePlatformAdmin(GymOsPrincipal principal) {
 		if (principal == null) {
 			throw new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesion para continuar.");
@@ -290,6 +342,37 @@ public class PlatformCustomerService {
 			LocalDate nextFollowUpOn,
 			String notes,
 			long expectedVersion
+	) {
+	}
+
+	public record CreateCustomerCommand(
+			String legalName,
+			String tradeName,
+			String taxId,
+			String timezone,
+			String defaultCurrency,
+			String contactEmail,
+			String contactPhone,
+			String brandName,
+			String logoUrl,
+			String primaryColor,
+			String accentColor,
+			String surfaceColor,
+			String branchName,
+			String branchCode,
+			String branchPhone,
+			String ownerFirstName,
+			String ownerLastName,
+			String ownerEmail,
+			String ownerPhone
+	) {
+	}
+
+	public record ProvisionedCustomer(
+			PlatformCustomerView customer,
+			String ownerEmail,
+			String invitationUrl,
+			OffsetDateTime invitationExpiresAt
 	) {
 	}
 

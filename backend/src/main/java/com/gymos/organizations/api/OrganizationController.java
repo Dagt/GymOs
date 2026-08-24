@@ -33,7 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class OrganizationController {
 	private final OrganizationService organizationService;
 	private static final String HEX_COLOR = "^#[0-9A-Fa-f]{6}$";
-	private static final String MX_RFC = "^[A-ZÑ&]{4}\\d{6}[A-Z0-9]{3}$";
+	private static final String MX_RFC = "^[A-ZÑ&]{3,4}\\d{6}[A-Z0-9]{3}$";
 	private static final String MX_PHONE = "^\\+52\\d{10}$";
 
 	public OrganizationController(OrganizationService organizationService) {

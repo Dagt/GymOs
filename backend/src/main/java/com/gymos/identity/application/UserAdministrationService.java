@@ -250,7 +250,7 @@ public class UserAdministrationService {
 		if (target.contains("admin") && target.contains("gymos")) {
 			return false;
 		}
-		if (principal.platformAdmin()) {
+		if (principal.platformSupport()) {
 			return true;
 		}
 		boolean targetIsOwner = isOwnerRole(target);
@@ -266,7 +266,7 @@ public class UserAdministrationService {
 	}
 
 	private boolean canViewUser(GymOsPrincipal principal, InternalUserSummary targetUser) {
-		if (principal.platformAdmin() || isPrincipalOwner(principal)) {
+		if (principal.platformSupport() || isPrincipalOwner(principal)) {
 			return true;
 		}
 		if (isPrincipalManager(principal)) {
@@ -278,7 +278,7 @@ public class UserAdministrationService {
 	}
 
 	private boolean canManageUser(GymOsPrincipal principal, List<String> targetRoles) {
-		if (principal.platformAdmin()) {
+		if (principal.platformSupport()) {
 			return true;
 		}
 		boolean targetIsOwner = targetRoles.stream()

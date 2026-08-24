@@ -733,14 +733,14 @@ public class AccessService {
 	}
 
 	private void requireManualOpenPermission(GymOsPrincipal principal) {
-		if (!principal.platformAdmin() && !principal.permissions().contains("access.manual.open")) {
+		if (!principal.permissions().contains("access.manual.open")) {
 			throw new BusinessException("ACCESS_MANUAL_OPEN_FORBIDDEN",
 					"No tienes permiso para realizar una apertura manual.");
 		}
 	}
 
 	private void requirePhysicalManagement(GymOsPrincipal principal) {
-		if (!principal.platformAdmin() && !principal.permissions().contains("access.physical.manage")) {
+		if (!principal.permissions().contains("access.physical.manage")) {
 			throw new BusinessException(
 					"ACCESS_PHYSICAL_MANAGE_FORBIDDEN",
 					"No tienes permiso para administrar la integración física."

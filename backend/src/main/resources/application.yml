@@ -52,6 +52,16 @@ gymos:
       last-authenticated-write-interval: ${GYMOS_CONNECTOR_LAST_AUTH_WRITE_INTERVAL:5m}
   seed:
     enabled: ${GYMOS_SEED_ENABLED:false}
+    owner-email: ${GYMOS_DEMO_OWNER_EMAIL:}
+    owner-password: ${GYMOS_DEMO_OWNER_PASSWORD:}
+  identity:
+    invitation-hours: ${GYMOS_USER_INVITATION_HOURS:72}
+    frontend-base-url: ${GYMOS_FRONTEND_BASE_URL:http://localhost:3000}
+  platform-bootstrap:
+    enabled: ${GYMOS_PLATFORM_BOOTSTRAP_ENABLED:false}
+    email: ${GYMOS_PLATFORM_ADMIN_EMAIL:}
+    password: ${GYMOS_PLATFORM_ADMIN_PASSWORD:}
+    name: ${GYMOS_PLATFORM_ADMIN_NAME:}
   memberships:
     expiration-delay-ms: ${GYMOS_MEMBERSHIP_EXPIRATION_DELAY_MS:60000}
     expiring-horizon-days: ${GYMOS_MEMBERSHIP_EXPIRING_HORIZON_DAYS:90}
@@ -61,6 +71,7 @@ gymos:
     access-token-seconds: ${GYMOS_ACCESS_TOKEN_SECONDS:900}
     reception-access-token-seconds: ${GYMOS_RECEPTION_ACCESS_TOKEN_SECONDS:86400}
     refresh-token-days: ${GYMOS_REFRESH_TOKEN_DAYS:7}
+    platform-support-minutes: ${GYMOS_PLATFORM_SUPPORT_MINUTES:30}
     # Comma-separated CIDRs. Forwarded/X-Forwarded-For are ignored unless the direct peer is trusted.
     trusted-proxies: ${GYMOS_TRUSTED_PROXIES:}
   storage:

@@ -372,13 +372,11 @@ class SecurityAuthorizationTests {
 
 	@Test
 	@WithMockUser(authorities = "platform.admin")
-	void platformSupportCanReachTheAuditedManualOpenCommand() throws Exception {
-		var result = mockMvc.perform(post("/api/v1/access/commands/open")
+	void platformHomeCannotReachTenantManualOpenCommandWithoutSupportScope() throws Exception {
+		mockMvc.perform(post("/api/v1/access/commands/open")
 				.contentType("application/json")
 				.content("{\"deviceCode\":\"MAIN\",\"reason\":\"Soporte autorizado\"}"))
-				.andReturn();
-
-		assertThat(result.getResponse().getStatus()).isNotIn(401, 403);
+				.andExpect(status().isForbidden());
 	}
 
 	@Test

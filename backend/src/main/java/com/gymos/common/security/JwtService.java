@@ -45,13 +45,15 @@ public class JwtService {
 		Map<String, Object> payload = new LinkedHashMap<>();
 		payload.put("type", "access");
 		payload.put("sub", principal.userId().toString());
+		payload.put("scope", principal.accountScope().name());
 		payload.put("username", principal.username());
-		payload.put("organizationId", principal.organizationId().toString());
+		payload.put("organizationId", principal.organizationId() == null ? null : principal.organizationId().toString());
 		payload.put("branchId", principal.branchId() == null ? null : principal.branchId().toString());
 		payload.put("fullName", principal.fullName());
 		payload.put("permissions", principal.permissions().stream().sorted().toList());
 		payload.put("roles", principal.roles().stream().sorted().toList());
 		payload.put("supportMode", principal.supportMode());
+		payload.put("supportExpiresAt", principal.supportExpiresAt() == null ? null : principal.supportExpiresAt().getEpochSecond());
 		payload.put("iat", now.getEpochSecond());
 		payload.put("exp", now.plusSeconds(lifetimeSeconds).getEpochSecond());
 		return sign(payload);
@@ -71,20 +73,48 @@ public class JwtService {
 			List<String> permissions = (List<String>) payload.get("permissions");
 			@SuppressWarnings("unchecked")
 			List<String> roles = (List<String>) payload.get("roles");
+			AccountScope accountScope = AccountScope.valueOf((String) payload.get("scope"));
+			String organizationId = (String) payload.get("organizationId");
 			String branchId = (String) payload.get("branchId");
+			boolean supportMode = Boolean.TRUE.equals(payload.get("supportMode"));
+			Number supportExpiry = (Number) payload.get("supportExpiresAt");
+			Instant supportExpiresAt = supportExpiry == null ? null : Instant.ofEpochSecond(supportExpiry.longValue());
+			if (!validContext(accountScope, organizationId, branchId, supportMode, supportExpiresAt)) {
+				return Optional.empty();
+			}
 			return Optional.of(new GymOsPrincipal(
 					UUID.fromString((String) payload.get("sub")),
-					UUID.fromString((String) payload.get("organizationId")),
+					accountScope,
+					organizationId == null ? null : UUID.fromString(organizationId),
 					branchId == null ? null : UUID.fromString(branchId),
 					(String) payload.get("username"),
 					(String) payload.get("fullName"),
 					permissions == null ? Set.of() : Set.copyOf(permissions),
 					roles == null ? Set.of() : Set.copyOf(roles),
-					Boolean.TRUE.equals(payload.get("supportMode"))
+					supportMode,
+					supportExpiresAt
 			));
 		} catch (Exception exception) {
 			return Optional.empty();
 		}
+	}
+
+	private boolean validContext(
+			AccountScope accountScope,
+			String organizationId,
+			String branchId,
+			boolean supportMode,
+			Instant supportExpiresAt
+	) {
+		if (accountScope == AccountScope.TENANT) {
+			return organizationId != null && !supportMode && supportExpiresAt == null;
+		}
+		if (!supportMode) {
+			return organizationId == null && branchId == null && supportExpiresAt == null;
+		}
+		return organizationId != null
+				&& supportExpiresAt != null
+				&& Instant.now().isBefore(supportExpiresAt);
 	}
 
 	private long accessTokenLifetime(GymOsPrincipal principal) {

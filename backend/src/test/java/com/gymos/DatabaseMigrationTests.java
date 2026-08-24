@@ -101,6 +101,11 @@ class DatabaseMigrationTests {
 			assertThat(tableExists(connection, "platform_customer_account")).isTrue();
 			assertThat(columnExists(connection, "platform_branch_billing", "version")).isTrue();
 			assertThat(columnExists(connection, "platform_billing_payment", "idempotency_key")).isTrue();
+			assertThat(columnExists(connection, "user_account", "account_scope")).isTrue();
+			assertThat(columnExists(connection, "person", "account_scope")).isTrue();
+			assertThat(columnExists(connection, "role", "account_scope")).isTrue();
+			assertThat(columnExists(connection, "organization", "data_origin")).isTrue();
+			assertThat(tableExists(connection, "user_invitation")).isTrue();
 			assertThat(indexExists(connection, "ux_platform_billing_payment_idempotency")).isTrue();
 			assertThat(tableExists(connection, "access_provider_connection")).isTrue();
 			assertThat(tableExists(connection, "access_provider_benefit_mapping")).isTrue();
@@ -182,6 +187,53 @@ class DatabaseMigrationTests {
 			assertThat(columnExists(connection, "branch", "surface_color")).isFalse();
 			assertThat(roleHasPermission(connection, "Recepcion", "resource.manage")).isFalse();
 			assertThat(roleHasPermission(connection, "Recepcion", "booking.manage")).isTrue();
+		}
+	}
+
+	@Test
+	void databaseEnforcesPlatformAndTenantIdentityBoundaries() throws Exception {
+		try (var connection = DriverManager.getConnection(
+				postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())) {
+			UUID personId = UUID.randomUUID();
+			UUID userId = UUID.randomUUID();
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO person (
+					    id, account_scope, organization_id, first_name, last_name, email, status,
+					    created_at, updated_at, version
+					) VALUES (?, 'PLATFORM', NULL, 'Platform', 'Admin', ?, 'ACTIVE', now(), now(), 0)
+					""")) {
+				statement.setObject(1, personId);
+				statement.setString(2, "platform-" + userId + "@gymfort.mx");
+				statement.executeUpdate();
+			}
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO user_account (
+					    id, account_scope, organization_id, person_id, username, password_hash, status,
+					    failed_attempts, created_at, updated_at, version
+					) VALUES (?, 'PLATFORM', NULL, ?, ?, 'encoded', 'ACTIVE', 0, now(), now(), 0)
+					""")) {
+				statement.setObject(1, userId);
+				statement.setObject(2, personId);
+				statement.setString(3, "platform-" + userId + "@gymfort.mx");
+				statement.executeUpdate();
+			}
+
+			UUID platformRoleId = roleId(connection, "Administrador GymOS");
+			UUID tenantRoleId = roleId(connection, "Dueno del gimnasio");
+			try (var statement = connection.prepareStatement(
+					"INSERT INTO user_role (user_id, role_id) VALUES (?, ?)")) {
+				statement.setObject(1, userId);
+				statement.setObject(2, platformRoleId);
+				statement.executeUpdate();
+			}
+			assertThatThrownBy(() -> insertUserRole(connection, userId, tenantRoleId))
+					.isInstanceOf(SQLException.class);
+			assertThatThrownBy(() -> insertUserBranchAccess(
+					connection, userId, UUID.fromString("22222222-2222-2222-2222-222222222222")))
+					.isInstanceOf(SQLException.class);
+
+			assertThatThrownBy(() -> insertPlatformPersonWithOrganization(connection, UUID.randomUUID()))
+					.isInstanceOf(SQLException.class);
 		}
 	}
 
@@ -581,6 +633,56 @@ class DatabaseMigrationTests {
 			statement.setObject(3, branchId);
 			statement.setString(4, saleNumber);
 			statement.setString(5, idempotencyKey);
+			statement.executeUpdate();
+		}
+	}
+
+	private UUID roleId(java.sql.Connection connection, String roleName) throws Exception {
+		try (var statement = connection.prepareStatement("SELECT id FROM role WHERE name = ? LIMIT 1")) {
+			statement.setString(1, roleName);
+			try (var resultSet = statement.executeQuery()) {
+				assertThat(resultSet.next()).isTrue();
+				return resultSet.getObject("id", UUID.class);
+			}
+		}
+	}
+
+	private void insertUserRole(java.sql.Connection connection, UUID userId, UUID roleId) throws SQLException {
+		try (var statement = connection.prepareStatement(
+				"INSERT INTO user_role (user_id, role_id) VALUES (?, ?)")) {
+			statement.setObject(1, userId);
+			statement.setObject(2, roleId);
+			statement.executeUpdate();
+		}
+	}
+
+	private void insertUserBranchAccess(
+			java.sql.Connection connection,
+			UUID userId,
+			UUID branchId
+	) throws SQLException {
+		try (var statement = connection.prepareStatement("""
+				INSERT INTO user_branch_access (user_id, branch_id, access_scope)
+				VALUES (?, ?, 'ADMIN')
+				""")) {
+			statement.setObject(1, userId);
+			statement.setObject(2, branchId);
+			statement.executeUpdate();
+		}
+	}
+
+	private void insertPlatformPersonWithOrganization(
+			java.sql.Connection connection,
+			UUID personId
+	) throws SQLException {
+		try (var statement = connection.prepareStatement("""
+				INSERT INTO person (
+				    id, account_scope, organization_id, first_name, last_name, status,
+				    created_at, updated_at, version
+				) VALUES (?, 'PLATFORM', '11111111-1111-1111-1111-111111111111',
+				          'Invalid', 'Platform', 'ACTIVE', now(), now(), 0)
+				""")) {
+			statement.setObject(1, personId);
 			statement.executeUpdate();
 		}
 	}

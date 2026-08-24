@@ -13,8 +13,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class PlatformBillingRepository {
-    private static final UUID PLATFORM_ORGANIZATION_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
-
     private final JdbcClient jdbcClient;
 
     public PlatformBillingRepository(JdbcClient jdbcClient) {
@@ -23,14 +21,12 @@ public class PlatformBillingRepository {
 
     public List<BranchBillingRecord> findAll() {
         return jdbcClient.sql(baseSelect() + "\nORDER BY LOWER(o.trade_name), LOWER(b.name)")
-                .param("platformOrganizationId", PLATFORM_ORGANIZATION_ID)
                 .query(this::mapRecord)
                 .list();
     }
 
     public Optional<BranchBillingRecord> findByBranchId(UUID branchId) {
         return jdbcClient.sql(baseSelect() + "\nAND b.id = :branchId")
-                .param("platformOrganizationId", PLATFORM_ORGANIZATION_ID)
                 .param("branchId", branchId)
                 .query(this::mapRecord)
                 .optional();
@@ -152,7 +148,7 @@ public class PlatformBillingRepository {
                 LEFT JOIN platform_branch_billing pbb
                   ON pbb.branch_id = b.id
                 WHERE o.deleted_at IS NULL
-                  AND o.id <> :platformOrganizationId
+                  AND o.data_origin = 'PRODUCTIVE'
                 """;
     }
 

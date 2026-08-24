@@ -3,6 +3,8 @@ package com.gymos.configuration;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
+import com.gymos.common.security.StrongPasswordPolicy;
+import com.gymos.common.api.BusinessException;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -24,34 +26,47 @@ public class DevelopmentSeedConfig {
 	static final UUID ROLE_ID = UUID.fromString("55555555-5555-5555-5555-555555555555");
 
 	@Bean
-	@ConditionalOnProperty(prefix = "gymos.seed", name = "enabled", havingValue = "true", matchIfMissing = true)
-	ApplicationRunner developmentSeedRunner(DevelopmentSeedService service) {
-		return arguments -> service.seed();
+	@ConditionalOnProperty(prefix = "gymos.seed", name = "enabled", havingValue = "true")
+	ApplicationRunner developmentSeedRunner(DevelopmentSeedService service, SeedProperties properties) {
+		return arguments -> service.seed(properties);
 	}
 
 	@Bean
-	DevelopmentSeedService developmentSeedService(JdbcClient jdbcClient, PasswordEncoder passwordEncoder) {
-		return new DevelopmentSeedService(jdbcClient, passwordEncoder);
+	DevelopmentSeedService developmentSeedService(
+			JdbcClient jdbcClient,
+			PasswordEncoder passwordEncoder,
+			StrongPasswordPolicy passwordPolicy
+	) {
+		return new DevelopmentSeedService(jdbcClient, passwordEncoder, passwordPolicy);
 	}
 
 	static class DevelopmentSeedService {
 		private final JdbcClient jdbcClient;
 		private final PasswordEncoder passwordEncoder;
+		private final StrongPasswordPolicy passwordPolicy;
 
-		DevelopmentSeedService(JdbcClient jdbcClient, PasswordEncoder passwordEncoder) {
+		DevelopmentSeedService(
+				JdbcClient jdbcClient,
+				PasswordEncoder passwordEncoder,
+				StrongPasswordPolicy passwordPolicy
+		) {
 			this.jdbcClient = jdbcClient;
 			this.passwordEncoder = passwordEncoder;
+			this.passwordPolicy = passwordPolicy;
 		}
 
 		@Transactional
-		void seed() {
+		void seed(SeedProperties properties) {
+			String ownerEmail = required(properties.ownerEmail(), "GYMOS_DEMO_OWNER_EMAIL").toLowerCase();
+			passwordPolicy.validate(properties.ownerPassword());
 			OffsetDateTime now = OffsetDateTime.now();
 			jdbcClient.sql("""
-					INSERT INTO organization (id, legal_name, trade_name, tax_id, status, timezone, default_currency, contact_email, contact_phone, created_at, updated_at, version)
-					VALUES (:id, 'GymOS Demo S.A. de C.V.', 'GymOS Demo', 'GYMOS-DEMO', 'ACTIVE', 'America/Mexico_City', 'MXN', 'admin@gymos.local', '+520000000000', :now, :now, 0)
-					ON CONFLICT (id) DO NOTHING
+					INSERT INTO organization (id, legal_name, trade_name, tax_id, status, timezone, default_currency, contact_email, contact_phone, data_origin, created_at, updated_at, version)
+					VALUES (:id, 'GymOS Demo S.A. de C.V.', 'GymOS Demo', 'GYMOS-DEMO', 'ACTIVE', 'America/Mexico_City', 'MXN', :ownerEmail, '+520000000000', 'DEMO', :now, :now, 0)
+					ON CONFLICT (id) DO UPDATE SET status = 'ACTIVE', deleted_at = NULL, data_origin = 'DEMO'
 					""")
 					.param("id", ORGANIZATION_ID)
+					.param("ownerEmail", ownerEmail)
 					.param("now", now)
 					.update();
 			jdbcClient.sql("""
@@ -64,48 +79,53 @@ public class DevelopmentSeedConfig {
 					.param("now", now)
 					.update();
 			jdbcClient.sql("""
-					INSERT INTO person (id, organization_id, first_name, last_name, email, phone, status, created_at, updated_at, version)
-					VALUES (:id, :organizationId, 'Admin', 'GymOS', 'admin@gymos.local', '+520000000001', 'ACTIVE', :now, :now, 0)
+					INSERT INTO person (id, account_scope, organization_id, first_name, last_name, email, phone, status, created_at, updated_at, version)
+					VALUES (:id, 'TENANT', :organizationId, 'Owner', 'Demo', :ownerEmail, '+520000000001', 'ACTIVE', :now, :now, 0)
 					ON CONFLICT (id) DO NOTHING
 					""")
 					.param("id", PERSON_ID)
 					.param("organizationId", ORGANIZATION_ID)
+					.param("ownerEmail", ownerEmail)
 					.param("now", now)
 					.update();
 			jdbcClient.sql("""
-					INSERT INTO user_account (id, organization_id, person_id, username, password_hash, status, failed_attempts, created_at, updated_at, version)
-					VALUES (:id, :organizationId, :personId, 'admin@gymos.local', :passwordHash, 'ACTIVE', 0, :now, :now, 0)
+					INSERT INTO user_account (id, account_scope, organization_id, person_id, username, password_hash, status, failed_attempts, created_at, updated_at, version)
+					VALUES (:id, 'TENANT', :organizationId, :personId, :ownerEmail, :passwordHash, 'ACTIVE', 0, :now, :now, 0)
 					ON CONFLICT (id) DO NOTHING
 					""")
 					.param("id", USER_ID)
 					.param("organizationId", ORGANIZATION_ID)
 					.param("personId", PERSON_ID)
-					.param("passwordHash", passwordEncoder.encode("Admin123!"))
+					.param("ownerEmail", ownerEmail)
+					.param("passwordHash", passwordEncoder.encode(properties.ownerPassword()))
 					.param("now", now)
 					.update();
 			jdbcClient.sql("""
-					INSERT INTO role (id, organization_id, name, description, system_role, created_at, updated_at, version)
-					VALUES (:id, :organizationId, 'Dueno del gimnasio', 'Administrador principal del gimnasio demo', true, :now, :now, 0)
+					INSERT INTO role (id, account_scope, organization_id, name, description, system_role, created_at, updated_at, version)
+					VALUES (:id, 'TENANT', :organizationId, 'Dueno del gimnasio', 'Administrador principal del gimnasio demo', true, :now, :now, 0)
 					ON CONFLICT (id) DO NOTHING
 					""")
 					.param("id", ROLE_ID)
 					.param("organizationId", ORGANIZATION_ID)
 					.param("now", now)
 					.update();
-			jdbcClient.sql("INSERT INTO user_role (user_id, role_id) VALUES (:userId, :roleId) ON CONFLICT DO NOTHING")
+			jdbcClient.sql("""
+					INSERT INTO user_role (user_id, role_id)
+					SELECT :userId, :roleId
+					FROM user_account
+					WHERE id = :userId AND account_scope = 'TENANT'
+					ON CONFLICT DO NOTHING
+					""")
 					.param("userId", USER_ID)
 					.param("roleId", ROLE_ID)
 					.update();
 			jdbcClient.sql("""
-					INSERT INTO user_role (user_id, role_id)
-					SELECT :userId, r.id
-					FROM role r
-					WHERE r.name = 'Administrador GymOS'
+					INSERT INTO user_branch_access (user_id, branch_id, access_scope)
+					SELECT :userId, :branchId, 'BRANCH'
+					FROM user_account
+					WHERE id = :userId AND account_scope = 'TENANT'
 					ON CONFLICT DO NOTHING
 					""")
-					.param("userId", USER_ID)
-					.update();
-			jdbcClient.sql("INSERT INTO user_branch_access (user_id, branch_id, access_scope) VALUES (:userId, :branchId, 'BRANCH') ON CONFLICT DO NOTHING")
 					.param("userId", USER_ID)
 					.param("branchId", BRANCH_ID)
 					.update();
@@ -201,6 +221,15 @@ public class DevelopmentSeedConfig {
 						.param("code", permissions.get(index))
 						.update();
 			}
+		}
+
+		private String required(String value, String variable) {
+			if (value == null || value.isBlank()) {
+				throw new BusinessException(
+						"DEVELOPMENT_SEED_CONFIGURATION_REQUIRED",
+						"El seed local esta habilitado pero falta configurar " + variable + ".");
+			}
+			return value.trim();
 		}
 	}
 }

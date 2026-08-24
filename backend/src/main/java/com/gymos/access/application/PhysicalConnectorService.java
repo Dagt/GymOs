@@ -665,8 +665,7 @@ public class PhysicalConnectorService {
 	}
 
 	private void requirePhysicalManagement(GymOsPrincipal principal) {
-		if (principal == null || (!principal.platformAdmin()
-				&& !principal.permissions().contains("access.physical.manage"))) {
+		if (principal == null || !principal.permissions().contains("access.physical.manage")) {
 			throw new BusinessException(
 					"ACCESS_PHYSICAL_MANAGE_FORBIDDEN",
 					"No tienes permiso para administrar la integración física."
