@@ -8,9 +8,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.coaching.api.operations.CoachProfileProvisioningAdapter;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository;
 import com.gymos.coaching.infrastructure.CoachingRepository;
+import com.gymos.platformadmin.infrastructure.PlatformCustomerAccountRepository;
+import com.gymos.platformadmin.infrastructure.PlatformCustomerAccountRepository.CustomerAccountWrite;
+import com.gymos.platformbilling.infrastructure.PlatformBillingRepository;
+import com.gymos.platformbilling.infrastructure.PlatformBillingRepository.BillingPaymentWrite;
+import com.gymos.platformbilling.infrastructure.PlatformBillingRepository.BillingUpdateRecord;
+import java.math.BigDecimal;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
@@ -91,6 +98,10 @@ class DatabaseMigrationTests {
 			assertThat(tableExists(connection, "platform_branch_billing")).isTrue();
 			assertThat(tableExists(connection, "platform_billing_payment")).isTrue();
 			assertThat(indexExists(connection, "ix_platform_billing_payment_branch_paid_on")).isTrue();
+			assertThat(tableExists(connection, "platform_customer_account")).isTrue();
+			assertThat(columnExists(connection, "platform_branch_billing", "version")).isTrue();
+			assertThat(columnExists(connection, "platform_billing_payment", "idempotency_key")).isTrue();
+			assertThat(indexExists(connection, "ux_platform_billing_payment_idempotency")).isTrue();
 			assertThat(tableExists(connection, "access_provider_connection")).isTrue();
 			assertThat(tableExists(connection, "access_provider_benefit_mapping")).isTrue();
 			assertThat(tableExists(connection, "access_provider_client_link")).isTrue();
@@ -283,6 +294,7 @@ class DatabaseMigrationTests {
 				postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())) {
 			assertThat(tableExists(connection, schema, "access_provider_sync_job")).isTrue();
 			assertThat(tableExists(connection, schema, "access_connector_credential")).isTrue();
+			assertThat(tableExists(connection, schema, "platform_customer_account")).isTrue();
 			try (var statement = connection.createStatement()) {
 				statement.execute("SET search_path TO " + schema);
 			}
@@ -318,6 +330,47 @@ class DatabaseMigrationTests {
 			assertThatThrownBy(() -> insertSale(connection, UUID.randomUUID(), organizationId, branchId, "S-2", "repeat-key"))
 					.isInstanceOf(SQLException.class);
 		}
+	}
+
+	@Test
+	void platformCommercialWritesAreIdempotentAndVersionedOnPostgresql() throws Exception {
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		UUID actorId = UUID.randomUUID();
+		OffsetDateTime now = OffsetDateTime.parse("2026-08-24T10:00:00-06:00");
+		var dataSource = new DriverManagerDataSource(
+				postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
+		var billingRepository = new PlatformBillingRepository(JdbcClient.create(dataSource));
+		var customerRepository = new PlatformCustomerAccountRepository(JdbcClient.create(dataSource));
+
+		try (var connection = DriverManager.getConnection(
+				postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())) {
+			insertOrganization(connection, organizationId);
+			insertBranch(connection, organizationId, branchId);
+			insertUser(connection, organizationId, actorId);
+		}
+
+		BillingUpdateRecord billing = new BillingUpdateRecord(
+				branchId, "ACTIVE", 15, LocalDate.of(2026, 9, 15), "GYMFORT_500", null,
+				new BigDecimal("3500.00"), false, "Contrato inicial", 0, actorId, now);
+		assertThat(billingRepository.upsert(billing)).isEqualTo(1);
+		assertThat(billingRepository.upsert(billing)).isZero();
+		assertThat(billingRepository.findByBranchId(branchId).orElseThrow().version()).isEqualTo(1);
+
+		BillingPaymentWrite payment = new BillingPaymentWrite(
+				UUID.randomUUID(), branchId, organizationId, "SUBSCRIPTION", "TRANSFER",
+				new BigDecimal("1590.00"), LocalDate.of(2026, 8, 24), "SPEI-01", null,
+				"payment-2026-08", actorId, now);
+		assertThat(billingRepository.insertPayment(payment)).isEqualTo(1);
+		assertThat(billingRepository.insertPayment(payment)).isZero();
+
+		CustomerAccountWrite account = new CustomerAccountWrite(
+				organizationId, "ACTIVE", "Daniela", "cobranza@gym.mx", "+52 55 1000 1000",
+				LocalDate.of(2026, 1, 1), LocalDate.of(2027, 1, 1), 15,
+				LocalDate.of(2026, 8, 31), "Seguimiento mensual", 0, actorId, now);
+		assertThat(customerRepository.upsert(account)).isEqualTo(1);
+		assertThat(customerRepository.upsert(account)).isZero();
+		assertThat(customerRepository.find(organizationId).orElseThrow().version()).isEqualTo(1);
 	}
 
 	@Test

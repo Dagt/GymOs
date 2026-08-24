@@ -81,26 +81,24 @@ public class PlatformBillingController {
             @NotBlank String subscriptionStatus,
             @Min(1) @Max(31) int billingAnchorDay,
             @NotNull LocalDate nextBillingDate,
-            LocalDate lastPaymentDate,
-            @DecimalMin("0.0") BigDecimal lastPaymentAmount,
             @NotBlank String contractedPlanCode,
             @DecimalMin("0.0") BigDecimal monthlyPriceOverride,
             @NotNull @DecimalMin("0.0") BigDecimal implementationFee,
             boolean implementationPaid,
-            @Size(max = 1000) String notes
+            @Size(max = 1000) String notes,
+            @Min(0) long expectedVersion
     ) {
         private UpdateBillingCommand toCommand() {
             return new UpdateBillingCommand(
                     subscriptionStatus,
                     billingAnchorDay,
                     nextBillingDate,
-                    lastPaymentDate,
-                    lastPaymentAmount,
                     contractedPlanCode,
                     monthlyPriceOverride,
                     implementationFee,
                     implementationPaid,
-                    notes
+                    notes,
+                    expectedVersion
             );
         }
     }
@@ -111,10 +109,12 @@ public class PlatformBillingController {
             @NotNull @DecimalMin(value = "0.01") BigDecimal amount,
             @NotNull LocalDate paidOn,
             @Size(max = 160) String reference,
-            @Size(max = 1000) String notes
+            @Size(max = 1000) String notes,
+            @NotBlank @Size(max = 120) String idempotencyKey
     ) {
         private RecordPaymentCommand toCommand() {
-            return new RecordPaymentCommand(paymentType, paymentMethod, amount, paidOn, reference, notes);
+            return new RecordPaymentCommand(
+                    paymentType, paymentMethod, amount, paidOn, reference, notes, idempotencyKey);
         }
     }
 }

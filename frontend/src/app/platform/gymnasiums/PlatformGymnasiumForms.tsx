@@ -1,8 +1,12 @@
 import type { FormEvent } from "react";
 import {
   EmailField,
+  DateField,
   type FieldErrorMap,
   PhoneField,
+  NumberField,
+  SelectField,
+  TextAreaField,
   TextField,
   normalizeRfc,
   validateBranchCode,
@@ -14,6 +18,15 @@ import {
 } from "@/components/FormFields";
 import { LogoUploadField } from "@/components/LogoUploadField";
 import type { CreateBranchPayload, CreateOrganizationPayload } from "@/lib/api";
+import type { PlatformCustomerUpdatePayload } from "@/lib/api/platform-customer-types";
+
+const lifecycleOptions = [
+  { value: "ONBOARDING", label: "Implementación" },
+  { value: "ACTIVE", label: "Cliente activo" },
+  { value: "AT_RISK", label: "En riesgo" },
+  { value: "OFFBOARDING", label: "En proceso de salida" },
+  { value: "FORMER", label: "Cliente anterior" },
+];
 
 export const emptyOrganizationForm: CreateOrganizationPayload = {
   legalName: "",
@@ -97,6 +110,100 @@ export function BranchForm({
       <PhoneField error={errors.phone} label="Telefono sucursal" name="branchPhone" value={form.phone ?? ""} onChange={(value) => onChange({ ...form, phone: value })} />
       <TextField error={errors.timezone} label="Zona horaria" name="branchTimezone" value={form.timezone} onChange={(value) => onChange({ ...form, timezone: value })} />
       <button className="form-primary-button" disabled={saving} type="submit">Crear sucursal</button>
+    </form>
+  );
+}
+
+export function CustomerAccountForm({
+  form,
+  saving,
+  onChange,
+  onSubmit,
+}: {
+  form: PlatformCustomerUpdatePayload;
+  saving: boolean;
+  onChange: (next: PlatformCustomerUpdatePayload) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <form className="grid gap-4" onSubmit={onSubmit}>
+      <section className="platform-form-intro">
+        <strong>Relación con el cliente</strong>
+        <span>Estos datos son internos de GymFort y no cambian la operación del gimnasio.</span>
+      </section>
+      <div className="grid gap-4 md:grid-cols-2">
+        <SelectField
+          label="Etapa comercial"
+          name="customerLifecycle"
+          onChange={(value) => onChange({ ...form, lifecycleStatus: value as PlatformCustomerUpdatePayload["lifecycleStatus"] })}
+          options={lifecycleOptions}
+          value={form.lifecycleStatus}
+        />
+        <TextField
+          label="Responsable en GymFort"
+          name="accountOwner"
+          onChange={(value) => onChange({ ...form, accountOwner: value || null })}
+          placeholder="Ej. Daniela · Customer Success"
+          required={false}
+          value={form.accountOwner ?? ""}
+        />
+        <EmailField
+          label="Correo de cobranza"
+          name="billingEmail"
+          onChange={(value) => onChange({ ...form, billingEmail: value || null })}
+          required={false}
+          value={form.billingEmail ?? ""}
+        />
+        <PhoneField
+          label="Teléfono de cobranza"
+          name="billingPhone"
+          onChange={(value) => onChange({ ...form, billingPhone: value || null })}
+          required={false}
+          value={form.billingPhone ?? ""}
+        />
+        <DateField
+          label="Inicio de contrato"
+          name="contractStartedOn"
+          onChange={(value) => onChange({ ...form, contractStartedOn: value || null })}
+          required={false}
+          value={form.contractStartedOn ?? ""}
+        />
+        <DateField
+          label="Renovación prevista"
+          name="renewalOn"
+          onChange={(value) => onChange({ ...form, renewalOn: value || null })}
+          required={false}
+          value={form.renewalOn ?? ""}
+        />
+        <NumberField
+          help="Días acordados después de la fecha de cobro; máximo 90."
+          label="Días de crédito"
+          max="90"
+          min="0"
+          name="paymentTermsDays"
+          onChange={(value) => onChange({ ...form, paymentTermsDays: Number(value) || 0 })}
+          value={String(form.paymentTermsDays)}
+        />
+        <DateField
+          label="Próximo seguimiento"
+          name="nextFollowUpOn"
+          onChange={(value) => onChange({ ...form, nextFollowUpOn: value || null })}
+          required={false}
+          value={form.nextFollowUpOn ?? ""}
+        />
+      </div>
+      <TextAreaField
+        label="Notas del expediente"
+        name="customerNotes"
+        onChange={(value) => onChange({ ...form, notes: value || null })}
+        placeholder="Acuerdos, riesgos, responsables del cliente y siguiente paso..."
+        required={false}
+        rows={5}
+        value={form.notes ?? ""}
+      />
+      <button className="form-primary-button" disabled={saving} type="submit">
+        {saving ? "Guardando..." : "Guardar expediente"}
+      </button>
     </form>
   );
 }

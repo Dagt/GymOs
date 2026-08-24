@@ -697,7 +697,7 @@ Columnas agregadas a `organization`:
 
 Permisos:
 
-- `platform.admin`: identifica al Administrador GymOS de plataforma. Permite administrar gimnasios/tenants y regresar a `/platform/gymnasiums` desde cualquier pantalla.
+- `platform.admin`: identifica al Administrador GymOS de plataforma. Permite administrar gimnasios/tenants y regresar a `/platform` desde cualquier pantalla.
 
 Notas de integridad:
 
@@ -755,6 +755,15 @@ Migraciones:
 
 - `V81__platform_branch_billing.sql`
 - `V82__platform_billing_payment_history.sql`
+- `V85__platform_customer_management_and_billing_hardening.sql`
+
+### platform_customer_account
+
+Expediente interno de la relación de GymFort con cada `Organization` cliente.
+Conserva etapa (`ONBOARDING`, `ACTIVE`, `AT_RISK`, `OFFBOARDING`, `FORMER`),
+responsable, contacto de cobranza, inicio/renovación, plazo de pago, siguiente
+seguimiento y notas. `version` implementa concurrencia optimista; las fechas y
+datos no sustituyen los estados operativos del tenant ni su historial de cobros.
 
 ### platform_branch_billing
 
@@ -763,6 +772,10 @@ Configura la relación comercial de GymFort por sucursal contratada. Conserva
 estado de suscripción, día de corte, siguiente cobro, plan contratado, importe
 Enterprise pactado, cargo de implementación, notas y la última mensualidad
 registrada como dato de consulta rápida.
+
+V85 agrega `version`: toda edición debe enviar la versión leída y la actualización
+la incrementa de forma atómica. Los resúmenes de último pago no son editables por
+este contrato; sólo cambian al registrar una mensualidad real.
 
 Los planes estándar permitidos son `GYMFORT_150`, `GYMFORT_500`,
 `GYMFORT_1000` y `GYMFORT_2000`; `ENTERPRISE` requiere precio mensual pactado.
@@ -775,6 +788,10 @@ procesa un gimnasio a sus propios socios. Guarda sucursal, organización, tipo
 (`SUBSCRIPTION`, `IMPLEMENTATION`, `OTHER`), medio
 (`TRANSFER`, `CASH`, `CARD`, `STRIPE`, `OTHER`), monto positivo, fecha efectiva,
 referencia, nota, usuario que lo registró y creación.
+
+V85 agrega `idempotency_key`, obligatorio y único por sucursal. Repetir una clave
+con el mismo contenido devuelve el registro original; usarla con datos distintos
+se rechaza. El backfill `legacy-{id}` mantiene compatible el historial V82.
 
 Índices por sucursal/fecha y organización/fecha permiten consultar el
 expediente comercial sin recorrer la operación tenant. Al registrar una

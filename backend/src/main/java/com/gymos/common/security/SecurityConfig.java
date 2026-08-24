@@ -44,6 +44,7 @@ public class SecurityConfig {
 						.requestMatchers("/actuator/health/**", "/api/v1/system/**", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/self-service/**", "/api/v1/openapi/**", "/api/v1/docs/**", "/swagger-ui/**").permitAll()
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/organizations/*/logo").permitAll()
 						.requestMatchers("/api/v1/platform/billing/**").hasAuthority("platform.admin")
+						.requestMatchers("/api/v1/platform/customers/**").hasAuthority("platform.admin")
 						.requestMatchers("/api/v1/auth/select-branch").hasAuthority("branch.read")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/roles", "/api/v1/users/internal").hasAuthority("user.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/users/internal").hasAuthority("user.manage")

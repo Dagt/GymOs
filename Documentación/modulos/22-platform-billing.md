@@ -1,8 +1,9 @@
 # Cobranza comercial de GymFort
 
-Estado: `FUNCIONAL / COBRO MANUAL CONTROLADO`
-Última revisión: 23 de agosto de 2026
-Código: `backend/.../platformbilling`, `/platform/billing`, migraciones V81 y V82.
+Estado: `ESTABILIZADO / ADMINISTRACIÓN COMERCIAL MANUAL`
+Última revisión: 24 de agosto de 2026
+Código: `backend/.../platformadmin`, `backend/.../platformbilling`, `/platform`,
+`/platform/gymnasiums`, `/platform/billing`, migraciones V81, V82 y V85.
 
 ## Propósito
 
@@ -16,7 +17,13 @@ el total mensual del cliente.
 
 ## Implementado
 
-- consola exclusiva de `Administrador GymOS` en `/platform/billing`;
+- inicio ejecutivo exclusivo de `Administrador GymOS` en `/platform`, accesible
+  desde el menú lateral y sin depender de banners dentro de Configuración;
+- cartera por gimnasio con salud derivada, etapa comercial, responsable GymFort,
+  contacto de cobranza, contrato/renovación, términos, seguimiento y notas;
+- centro de acción que prioriza vencidos, clientes en riesgo, altas incompletas y
+  seguimientos; exportación CSV de la cartera visible;
+- navegación explícita `Resumen de cartera` / `Gimnasios cliente` / `Cobros y contratos`;
 - resumen de MRR configurado, clientes, sucursales, socios activos y usuarios
   internos activos;
 - vista por cliente con total mensual e implementación pendiente;
@@ -28,6 +35,12 @@ el total mensual del cliente.
 - estados comerciales `ACTIVE`, `PENDING`, `PAUSED` y `CANCELLED`;
 - historial inmutable de cobros recibidos por transferencia, efectivo, tarjeta,
   Stripe u otro medio, con referencia y notas;
+- clave idempotente única por sucursal para que el reintento de un mismo registro
+  devuelva el cobro original sin duplicar historial ni avanzar dos veces el corte;
+- control de versión optimista en expediente y configuración comercial para
+  evitar que dos pestañas sobrescriban cambios silenciosamente;
+- `last_payment_date` y `last_payment_amount` sólo se derivan del historial de
+  cobros; la edición de configuración ya no puede alterarlos;
 - la mensualidad avanza automáticamente el corte al siguiente día ancla;
 - la implementación queda liquidada cuando el acumulado de sus pagos cubre el
   importe acordado;
@@ -48,11 +61,14 @@ el total mensual del cliente.
 
 - `/api/v1/platform/billing/**` exige `platform.admin` en la cadena de
   seguridad y en el servicio.
+- `/api/v1/platform/customers/**` usa la misma doble barrera y registra
+  `PLATFORM_CUSTOMER_ACCOUNT_UPDATED`.
 - El selector excluye la organización técnica de GymFort.
 - Las cantidades de operación se consultan con contexto de organización y
   sucursal; no exponen información personal de socios.
 - El historial limita inicialmente la consulta a los 50 pagos más recientes por
-  sucursal; un reporte/exportación paginada es mejora posterior.
+  sucursal; el CSV actual es operativo por cliente y no sustituye un reporte
+  financiero paginado por periodo.
 
 ## Siguiente evolución
 
@@ -61,4 +77,4 @@ el total mensual del cliente.
 - cargos automáticos de suscripción SaaS y conciliación bancaria/Stripe;
 - CFDI e integración contable;
 - notas de crédito, ajustes, vencimiento y recordatorios de cobranza;
-- reporte/exportación por rango y tablero de MRR, churn y cohortes.
+- reporte financiero por rango y tableros históricos de churn y cohortes.

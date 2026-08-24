@@ -1,7 +1,7 @@
 # 28. Registro vivo de hallazgos y deuda técnica
 
 Estado: VIGENTE / OBLIGATORIO
-Corte: 23 de agosto de 2026
+Corte: 24 de agosto de 2026
 
 ## 1. Propósito y regla de actualización
 
@@ -29,7 +29,7 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 | ACC-004 | P1 | Acceso físico/membresías | ABIERTA | El dominio actual emite alta, renovación, cambio de plan y vencimiento; suspensión/reactivación se expresa mediante estado del socio. Aún no existe un comando independiente de cancelación, suspensión o reactivación de membresía. Si se incorpora sin publicar un cambio de derechos, el estado físico podría quedar obsoleto. | Antes de exponer esos comandos, publicar un evento idempotente de cambio de derechos y demostrar `REVOKE`/`UPSERT` automático en Access. |
 | SELF-001 | P0 | Autoservicio | VALIDACIÓN EXTERNA | Domiciliación revocable/recuperable, cotización, comprobantes, capacidades por sucursal, membresías, reservas y wellness están implementados. Los planes multi-sucursal permiten kiosco y reservas en sedes secundarias; sólo Recepción abre sesiones. La prueba manual Stripe test confirmó Checkout, webhook y mandato. | Ejecutar `stripeTest` con `sk_test_...` y cuenta Connect test; ampliar E2E multi-tenant, expiración y recuperación en CI. |
 | PAY-001 | P0 | Proveedores de pago | EN PROGRESO | Mercado Pago OAuth/Point y Stripe Connect/Checkout/recurrencia persisten operaciones idempotentes, verifican firmas, concilian contexto, recuperan recibos y publican métricas. La administración de cuenta Stripe ya está separada de los interruptores operativos. | Ejecutar contrato sandbox conectado en CI y completar cancelación/reembolso autoritativo por proveedor. |
-| BIL-001 | P1 | Cobranza comercial GymFort | EN CURSO | V81/V82 permiten configurar contrato por sucursal, agrupar MRR por cliente y conservar pagos comerciales inmutables; todavía no existen cobro SaaS automático, impuestos/CFDI, ajustes o reportes/exportación financiera. | Definir catálogo comercial/impuestos, integrar cobranza recurrente y conciliación, emitir o integrar CFDI según modelo fiscal, añadir ajustes auditables y reportes paginados de MRR/churn/cobranza. |
+| BIL-001 | P1 | Cobranza comercial GymFort | EN CURSO | V81/V82/V85 permiten gestionar cartera y expediente comercial, configurar contrato por sucursal, agrupar MRR, exportar el portafolio y conservar pagos inmutables/idempotentes con concurrencia optimista; todavía no existen cobro SaaS automático, impuestos/CFDI, ajustes ni reportes financieros históricos por periodo. | Definir catálogo comercial/impuestos, integrar cobranza recurrente y conciliación, emitir o integrar CFDI según modelo fiscal, añadir ajustes auditables y reportes paginados de MRR/churn/cobranza. |
 | BKG-001 | P1 | Reservas | ABIERTA | Falta E2E de colisiones, pagos, cancelación y otra sucursal. | Suite crítica de calendario y autorización en CI. |
 | INV-001 | P1 | Inventarios | ABIERTA | Transferencias y conteos no tienen paginación parametrizada completa. | Contratos paginados, UI y pruebas de volumen. |
 | INV-002 | P2 | Inventarios | ABIERTA | Falta indicador inequívoco de guardado por renglón en conteos. | Estado guardando/guardado/error accesible por partida. |

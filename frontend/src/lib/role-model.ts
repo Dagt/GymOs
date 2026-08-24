@@ -42,7 +42,7 @@ export function getConsoleProfile(user: CurrentUser): ConsoleProfile {
       console,
       label: "Admin GymFort",
       description: "Vende, crea, configura y da soporte a gimnasios cliente.",
-      homePath: "/platform/gymnasiums",
+      homePath: "/platform",
     };
   }
   if (console === "TENANT_OWNER") {
@@ -81,7 +81,7 @@ export function getConsoleProfile(user: CurrentUser): ConsoleProfile {
 
 export function getPostLoginPath(user: CurrentUser) {
   if (isPlatformAdmin(user) && !user.supportMode) {
-    return "/platform/gymnasiums";
+    return "/platform";
   }
   return getConsoleProfile(user).homePath;
 }

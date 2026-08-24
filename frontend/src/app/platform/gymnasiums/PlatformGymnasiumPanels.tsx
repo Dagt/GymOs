@@ -1,12 +1,17 @@
 import type { BranchSummary, ManagedOrganizationSummary } from "@/lib/api";
+import type { PlatformCustomer } from "@/lib/api/platform-customer-types";
+import { customerHealthPresentation, lifecycleLabel } from "../platform-portfolio";
 
 type PlatformGymnasiumListProps = {
   filteredOrganizations: ManagedOrganizationSummary[];
   organizationsCount: number;
   query: string;
   selectedOrganizationId: string;
+  customers: PlatformCustomer[];
+  lifecycleFilter: string;
   onCreateOrganization: () => void;
   onQueryChange: (value: string) => void;
+  onLifecycleFilterChange: (value: string) => void;
   onSelectOrganization: (organizationId: string) => void;
 };
 
@@ -18,20 +23,25 @@ type PlatformGymnasiumDetailProps = {
   selectedIsActive: boolean;
   selectedOrganization: ManagedOrganizationSummary | null;
   selectingId: string | null;
+  selectedCustomer: PlatformCustomer | null;
   onActivateBranch: (branchId: string) => void;
   onActivateOrganization: (organizationId: string) => void;
   onCreateBranch: () => void;
+  onEditCustomerAccount: () => void;
   onGoToTenantSection: (path: string) => void;
   onToggleOrganizationStatus: () => void;
 };
 
 export function PlatformGymnasiumList({
   filteredOrganizations,
+  customers,
+  lifecycleFilter,
   organizationsCount,
   query,
   selectedOrganizationId,
   onCreateOrganization,
   onQueryChange,
+  onLifecycleFilterChange,
   onSelectOrganization,
 }: PlatformGymnasiumListProps) {
   return (
@@ -45,29 +55,46 @@ export function PlatformGymnasiumList({
           Nuevo gimnasio
         </button>
       </div>
-      <input
-        className="app-input"
-        onChange={(event) => onQueryChange(event.target.value)}
-        placeholder="Buscar por nombre o RFC"
-        value={query}
-      />
+      <div className="platform-list-filters">
+        <input
+          className="app-input"
+          onChange={(event) => onQueryChange(event.target.value)}
+          placeholder="Nombre, RFC, responsable o cobranza"
+          value={query}
+        />
+        <select className="app-input" onChange={(event) => onLifecycleFilterChange(event.target.value)} value={lifecycleFilter}>
+          <option value="ALL">Todas las etapas</option>
+          <option value="ONBOARDING">Implementación</option>
+          <option value="ACTIVE">Clientes activos</option>
+          <option value="AT_RISK">En riesgo</option>
+          <option value="OFFBOARDING">En salida</option>
+          <option value="FORMER">Clientes anteriores</option>
+        </select>
+      </div>
       <div className="platform-tenant-list">
-        {filteredOrganizations.map((item) => (
-          <button
+        {filteredOrganizations.map((item) => {
+          const customer = customers.find((candidate) => candidate.organizationId === item.id);
+          const health = customer ? customerHealthPresentation(customer.healthStatus) : null;
+          return <button
             className={item.id === selectedOrganizationId ? "active" : undefined}
             key={item.id}
             onClick={() => onSelectOrganization(item.id)}
             type="button"
           >
-            <span>{item.status}</span>
+            <span>{health?.label ?? item.status}</span>
             <strong>{item.tradeName}</strong>
             <small>
-              {item.activeBranchCount === 0
-                ? "Sin sucursales activas"
-                : `${item.activeBranchCount} sucursales activas`}
+              {customer
+                ? `${lifecycleLabel(customer.lifecycleStatus)} · ${item.activeBranchCount} ${item.activeBranchCount === 1 ? "sede activa" : "sedes activas"}`
+                : item.activeBranchCount === 0
+                  ? "Sin sucursales activas"
+                  : `${item.activeBranchCount} sucursales activas`}
             </small>
-          </button>
-        ))}
+          </button>;
+        })}
+        {filteredOrganizations.length === 0 ? (
+          <div className="admin-empty-card">No hay clientes que coincidan con los filtros.</div>
+        ) : null}
       </div>
     </section>
   );
@@ -81,9 +108,11 @@ export function PlatformGymnasiumDetail({
   selectedIsActive,
   selectedOrganization,
   selectingId,
+  selectedCustomer,
   onActivateBranch,
   onActivateOrganization,
   onCreateBranch,
+  onEditCustomerAccount,
   onGoToTenantSection,
   onToggleOrganizationStatus,
 }: PlatformGymnasiumDetailProps) {
@@ -97,9 +126,12 @@ export function PlatformGymnasiumDetail({
               <h2>{selectedOrganization.tradeName}</h2>
               <span>{selectedOrganization.legalName}</span>
             </div>
-            <button className="app-button" disabled={selectingId !== null} onClick={() => onActivateOrganization(selectedOrganization.id)} type="button">
-              {selectedIsActive ? "Actualizar soporte" : "Entrar en soporte"}
-            </button>
+            <div className="platform-header-actions">
+              <button className="app-button-secondary" onClick={onEditCustomerAccount} type="button">Editar expediente</button>
+              <button className="app-button" disabled={selectingId !== null} onClick={() => onActivateOrganization(selectedOrganization.id)} type="button">
+                {selectedIsActive ? "Actualizar soporte" : "Entrar en soporte"}
+              </button>
+            </div>
           </header>
 
           <div className="platform-facts">
@@ -109,10 +141,33 @@ export function PlatformGymnasiumDetail({
             <article><span>Marca</span><strong>{selectedOrganization.brandName || selectedOrganization.tradeName}</strong></article>
           </div>
 
+          {selectedCustomer ? (
+            <section className="platform-customer-account">
+              <header>
+                <div>
+                  <span>Expediente comercial</span>
+                  <h3>{lifecycleLabel(selectedCustomer.lifecycleStatus)}</h3>
+                </div>
+                <span className={`platform-status-badge ${customerHealthPresentation(selectedCustomer.healthStatus).tone}`}>
+                  {customerHealthPresentation(selectedCustomer.healthStatus).label}
+                </span>
+              </header>
+              <dl>
+                <div><dt>Responsable GymFort</dt><dd>{selectedCustomer.accountOwner || "Por asignar"}</dd></div>
+                <div><dt>Contacto de cobranza</dt><dd>{selectedCustomer.billingEmail || "Sin correo"}</dd></div>
+                <div><dt>Renovación</dt><dd>{selectedCustomer.renewalOn ? formatDate(selectedCustomer.renewalOn) : "Sin fecha"}</dd></div>
+                <div><dt>Próximo seguimiento</dt><dd>{selectedCustomer.nextFollowUpOn ? formatDate(selectedCustomer.nextFollowUpOn) : "Sin seguimiento"}</dd></div>
+                <div><dt>MRR</dt><dd>{formatCurrency(selectedCustomer.monthlyRecurringRevenue)}</dd></div>
+                <div><dt>Cobranza</dt><dd>{selectedCustomer.overdueBranchCount ? `${selectedCustomer.overdueBranchCount} ${selectedCustomer.overdueBranchCount === 1 ? "sucursal vencida" : "sucursales vencidas"}` : "Al corriente"}</dd></div>
+              </dl>
+              {selectedCustomer.notes ? <p>{selectedCustomer.notes}</p> : null}
+            </section>
+          ) : null}
+
           <section className="platform-status-panel">
             <div>
               <span>Estado comercial</span>
-              <strong>{selectedOrganization.status}</strong>
+              <strong>{selectedOrganization.status === "ACTIVE" ? "Activo" : selectedOrganization.status === "SUSPENDED" ? "Suspendido" : "Inactivo"}</strong>
               <p>{selectedOrganization.status === "ACTIVE" ? "El gimnasio puede operar normalmente." : "El acceso de usuarios tenant queda bloqueado mientras este suspendido o inactivo."}</p>
             </div>
             <button className="app-button-secondary" disabled={saving} onClick={onToggleOrganizationStatus} type="button">
@@ -132,7 +187,7 @@ export function PlatformGymnasiumDetail({
 
           <div className="platform-actions">
             <div className="platform-action-group">
-              <span>Administracion del cliente</span>
+              <span>Administración del cliente</span>
               <button className="admin-secondary-link" disabled={selectingId !== null} onClick={() => onGoToTenantSection("/settings/organization")} type="button">
                 Datos, marca y sucursales
               </button>
@@ -150,6 +205,15 @@ export function PlatformGymnasiumDetail({
       )}
     </section>
   );
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("es-MX", { style: "currency", currency: "MXN", maximumFractionDigits: 0 }).format(value);
+}
+
+function formatDate(value: string) {
+  const [year, month, day] = value.split("-");
+  return year && month && day ? `${day}/${month}/${year}` : value;
 }
 
 function PlatformBranchPanel({
@@ -185,10 +249,10 @@ function PlatformBranchPanel({
       ) : branches.length > 0 ? (
         <div className="platform-table">
           <div className="platform-table-row header">
-            <span>Codigo</span>
+            <span>Código</span>
             <span>Sucursal</span>
-            <span>Telefono</span>
-            <span>Accion</span>
+            <span>Teléfono</span>
+            <span>Acción</span>
           </div>
           {branches.map((branch) => (
             <div className="platform-table-row" key={branch.id}>
@@ -210,4 +274,3 @@ function PlatformBranchPanel({
     </section>
   );
 }
-

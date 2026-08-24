@@ -32,10 +32,21 @@ const memberWorkflowPermissions = [
 
 const platformSections: NavigationSection[] = [
   {
-    title: "Negocio GymFort",
+    title: "Dirección GymFort",
     links: [
-      { label: "Gimnasios cliente", href: "/platform/gymnasiums", hint: "CRM, tenants y soporte", permissions: ["platform.admin"], requiresBranch: false },
-      { label: "Cobros y suscripciones", href: "/platform/billing", hint: "Planes, fechas y MRR", permissions: ["platform.admin"], requiresBranch: false },
+      { label: "Resumen de cartera", href: "/platform", hint: "Prioridades, salud y MRR", permissions: ["platform.admin"], requiresBranch: false },
+    ],
+  },
+  {
+    title: "Clientes",
+    links: [
+      { label: "Gimnasios cliente", href: "/platform/gymnasiums", hint: "Expedientes, tenants y soporte", permissions: ["platform.admin"], requiresBranch: false },
+    ],
+  },
+  {
+    title: "Ingresos",
+    links: [
+      { label: "Cobros y contratos", href: "/platform/billing", hint: "Planes, vencidos y pagos", permissions: ["platform.admin"], requiresBranch: false },
     ],
   },
 ];
@@ -198,6 +209,9 @@ export function canUseWithoutBranch(hasBranch: boolean, link: NavigationLink) {
 }
 
 export function isActive(pathname: string, href: string) {
+  if (href === "/platform") {
+    return pathname === href;
+  }
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 

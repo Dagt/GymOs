@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { canAccessRoute, getConsoleProfile } from "./role-model.ts";
+import { canAccessRoute, getConsoleProfile, getPostLoginPath } from "./role-model.ts";
 import type { CurrentUser } from "./api/types.ts";
 
 test("manager with executive reporting access starts in dashboard and cannot open removed operations route", () => {
@@ -22,6 +22,18 @@ test("manager without reporting access starts in first useful authorized workflo
   const user = manager(["client.read", "booking.read"]);
 
   assert.equal(getConsoleProfile(user).homePath, "/clients");
+});
+
+test("platform administrator enters through the customer portfolio home", () => {
+  const user: CurrentUser = {
+    ...manager(["platform.admin"]),
+    platformAdmin: true,
+    console: "PLATFORM_OWNER",
+    roles: ["Administrador GymOS"],
+  };
+
+  assert.equal(getConsoleProfile(user).homePath, "/platform");
+  assert.equal(getPostLoginPath(user), "/platform");
 });
 
 function manager(permissions: string[]): CurrentUser {

@@ -196,8 +196,8 @@ export function AppShell({
           </section>
 
           {platformAdmin && !pathname.startsWith("/platform") ? (
-            <Link className="admin-platform-return" href="/platform/gymnasiums">
-              Volver a administracion de gimnasios
+            <Link className="admin-platform-return" href="/platform">
+              Volver a administración GymFort
             </Link>
           ) : null}
 
@@ -293,7 +293,7 @@ export function AppShell({
                 Caja, recepcion, membresias, reservas y kiosco necesitan una sucursal activa para operar sin mezclar sedes.
               </span>
             </div>
-            <Link href={platformAdmin ? "/platform/gymnasiums" : "/settings/organization"}>
+            <Link href={platformAdmin ? "/platform" : "/settings/organization"}>
               {platformAdmin ? "Ir a gimnasios" : "Ir a sucursales"}
             </Link>
           </section>

@@ -18,6 +18,12 @@ import {
   type ManagedOrganizationSummary,
   type StoredSession,
 } from "@/lib/api";
+import { getPlatformCustomers, updatePlatformCustomer } from "@/lib/api/platform-customers";
+import type {
+  PlatformCustomer,
+  PlatformCustomerPortfolio,
+  PlatformCustomerUpdatePayload,
+} from "@/lib/api/platform-customer-types";
 import {
   emptyBranchForm,
   emptyOrganizationForm,
@@ -29,15 +35,19 @@ export function usePlatformGymnasiumsController() {
   const router = useRouter();
   const [session, setSession] = useState<StoredSession | null>(null);
   const [organizations, setOrganizations] = useState<ManagedOrganizationSummary[]>([]);
+  const [portfolio, setPortfolio] = useState<PlatformCustomerPortfolio | null>(null);
   const [branches, setBranches] = useState<BranchSummary[]>([]);
   const [branchesLoading, setBranchesLoading] = useState(false);
   const [selectedOrganizationId, setSelectedOrganizationId] = useState("");
   const [query, setQuery] = useState("");
+  const [lifecycleFilter, setLifecycleFilter] = useState("ALL");
   const [showCreate, setShowCreate] = useState(false);
   const [showCreateBranch, setShowCreateBranch] = useState(false);
+  const [showCustomerAccount, setShowCustomerAccount] = useState(false);
   const [form, setForm] = useState<CreateOrganizationPayload>(emptyOrganizationForm);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [branchForm, setBranchForm] = useState<CreateBranchPayload>(emptyBranchForm);
+  const [customerForm, setCustomerForm] = useState<PlatformCustomerUpdatePayload | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrorMap>({});
   const [branchFieldErrors, setBranchFieldErrors] = useState<FieldErrorMap>({});
   const [loading, setLoading] = useState(true);
@@ -58,13 +68,18 @@ export function usePlatformGymnasiumsController() {
       }
       setSession(stored);
       try {
-        const availableOrganizations = await getOrganizations(stored.accessToken);
+        const [availableOrganizations, customerPortfolio] = await Promise.all([
+          getOrganizations(stored.accessToken),
+          getPlatformCustomers(stored.accessToken),
+        ]);
         if (!active) {
           return;
         }
         setOrganizations(availableOrganizations);
+        setPortfolio(customerPortfolio);
         setSelectedOrganizationId((current) => {
-          const preferredId = current || stored.user.organizationId;
+          const requestedId = new URLSearchParams(window.location.search).get("organization") ?? "";
+          const preferredId = current || requestedId || stored.user.organizationId;
           return availableOrganizations.some((organization) => organization.id === preferredId)
             ? preferredId
             : availableOrganizations[0]?.id || "";
@@ -127,18 +142,28 @@ export function usePlatformGymnasiumsController() {
 
   const filteredOrganizations = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) {
-      return organizations;
-    }
-    return organizations.filter((item) =>
-      [item.tradeName, item.legalName, item.taxId ?? ""].some((value) =>
-        value.toLowerCase().includes(normalized),
-      ),
+    const customers = new Map(
+      (portfolio?.customers ?? []).map((customer) => [customer.organizationId, customer]),
     );
-  }, [organizations, query]);
+    return organizations.filter((item) => {
+      const customer = customers.get(item.id);
+      const matchesQuery = !normalized || [
+        item.tradeName,
+        item.legalName,
+        item.taxId ?? "",
+        customer?.accountOwner ?? "",
+        customer?.billingEmail ?? "",
+      ].some((value) => value.toLowerCase().includes(normalized));
+      return matchesQuery
+        && (lifecycleFilter === "ALL" || customer?.lifecycleStatus === lifecycleFilter);
+    });
+  }, [lifecycleFilter, organizations, portfolio, query]);
 
   const selectedOrganization =
     organizations.find((item) => item.id === selectedOrganizationId) ?? null;
+  const selectedCustomer = portfolio?.customers.find(
+    (customer) => customer.organizationId === selectedOrganizationId,
+  ) ?? null;
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
   const selectedIsActive = Boolean(
     session && selectedOrganization?.id === session.user.organizationId && session.user.supportMode,
@@ -148,6 +173,12 @@ export function usePlatformGymnasiumsController() {
     const availableBranches = await getOrganizationBranches(activeToken, organizationId);
     setBranches(availableBranches);
     return availableBranches;
+  }
+
+  async function refreshPortfolio(activeToken: string) {
+    const customerPortfolio = await getPlatformCustomers(activeToken);
+    setPortfolio(customerPortfolio);
+    return customerPortfolio;
   }
 
   async function ensureSupport(organizationId: string): Promise<StoredSession | null> {
@@ -291,6 +322,7 @@ export function usePlatformGymnasiumsController() {
       setShowCreate(false);
       setSelectedOrganizationId(created.id);
       setBranches([]);
+      await refreshPortfolio(session.accessToken);
       if (logoUploadError) {
         setError(`El gimnasio se creo correctamente, pero el logo no pudo guardarse. ${logoUploadError}`);
         setMessage("Gimnasio creado. Puedes volver a cargar el logo desde su detalle.");
@@ -343,6 +375,7 @@ export function usePlatformGymnasiumsController() {
             : organization,
         ),
       );
+      await refreshPortfolio(nextSession.accessToken);
       setBranchForm(emptyBranchForm);
       setShowCreateBranch(false);
       setMessage("Sucursal creada. Ya puedes seleccionarla o asignar usuarios.");
@@ -368,6 +401,53 @@ export function usePlatformGymnasiumsController() {
     setShowCreate(false);
   }
 
+  function openCustomerAccount() {
+    if (!selectedCustomer) return;
+    setCustomerForm(toCustomerForm(selectedCustomer));
+    setError(null);
+    setMessage(null);
+    setShowCustomerAccount(true);
+  }
+
+  function closeCustomerAccount() {
+    if (saving) return;
+    setShowCustomerAccount(false);
+    setCustomerForm(null);
+  }
+
+  async function submitCustomerAccount(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session || !selectedCustomer || !customerForm) return;
+    if (customerForm.renewalOn && customerForm.contractStartedOn
+        && customerForm.renewalOn < customerForm.contractStartedOn) {
+      setError("La renovación no puede ser anterior al inicio del contrato.");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const updated = await updatePlatformCustomer(
+        session.accessToken,
+        selectedCustomer.organizationId,
+        customerForm,
+      );
+      setPortfolio((current) => current ? {
+        ...current,
+        customers: current.customers.map((customer) =>
+          customer.organizationId === updated.organizationId ? updated : customer),
+      } : current);
+      await refreshPortfolio(session.accessToken);
+      setCustomerForm(toCustomerForm(updated));
+      setShowCustomerAccount(false);
+      setMessage("Expediente comercial actualizado.");
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible actualizar el expediente comercial.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function toggleOrganizationStatus() {
     if (!session || !selectedOrganization) {
       return;
@@ -389,6 +469,7 @@ export function usePlatformGymnasiumsController() {
       setOrganizations((current) =>
         current.map((organization) => (organization.id === updated.id ? updated : organization)),
       );
+      await refreshPortfolio(session.accessToken);
       setMessage(
         nextStatus === "ACTIVE"
           ? "Gimnasio reactivado."
@@ -413,30 +494,55 @@ export function usePlatformGymnasiumsController() {
     form,
     logoFile,
     loading,
+    lifecycleFilter,
     message,
     organizations,
+    portfolio,
     query,
     saving,
     selectedIsActive,
+    selectedCustomer,
     selectedOrganization,
     selectingId,
     session,
     showCreate,
     showCreateBranch,
+    showCustomerAccount,
+    customerForm,
     activateBranch,
     activateOrganization,
     goToTenantSection,
     openBranchDrawer,
+    openCustomerAccount,
     openCreateOrganization,
     closeCreateOrganization,
+    closeCustomerAccount,
     setBranchForm,
     setForm,
     setLogoFile,
+    setCustomerForm,
+    setLifecycleFilter,
     setQuery,
     setSelectedOrganizationId,
     setShowCreateBranch,
     submitBranch,
+    submitCustomerAccount,
     submitOrganization,
     toggleOrganizationStatus,
+  };
+}
+
+function toCustomerForm(customer: PlatformCustomer): PlatformCustomerUpdatePayload {
+  return {
+    lifecycleStatus: customer.lifecycleStatus,
+    accountOwner: customer.accountOwner,
+    billingEmail: customer.billingEmail,
+    billingPhone: customer.billingPhone,
+    contractStartedOn: customer.contractStartedOn,
+    renewalOn: customer.renewalOn,
+    paymentTermsDays: customer.paymentTermsDays,
+    nextFollowUpOn: customer.nextFollowUpOn,
+    notes: customer.notes,
+    expectedVersion: customer.version,
   };
 }

@@ -66,7 +66,12 @@ export default function PlatformBillingPage() {
       if (!cancelled) setSession(stored);
       try {
         const next = await getPlatformBillingOverview(stored.accessToken);
-        if (!cancelled) setOverview(next);
+        if (!cancelled) {
+          setOverview(next);
+          const requestedOrganizationId = new URLSearchParams(window.location.search).get("organization");
+          const requested = next.branches.find((branch) => branch.organizationId === requestedOrganizationId);
+          if (requested) setQuery(requested.organizationName);
+        }
       } catch (loadError) {
         if (!cancelled) setError(messageFromError(loadError));
       } finally {
@@ -89,8 +94,8 @@ export default function PlatformBillingPage() {
       .sort(compareBillingUrgency);
   }, [overview, paymentFilter, query]);
 
-  if (loading) return <LoadingScreen text="Cargando cobros y suscripciones..." />;
-  if (!session) return <AuthRequired message="Este panel es exclusivo de la administracion comercial de GymFort." title="Inicia sesion como administrador de plataforma" />;
+  if (loading) return <LoadingScreen text="Cargando cobros y contratos..." />;
+  if (!session) return <AuthRequired message="Este panel es exclusivo de la administración comercial de GymFort." title="Inicia sesión como administrador de plataforma" />;
 
   const summary = overview?.summary;
 
@@ -190,7 +195,7 @@ export default function PlatformBillingPage() {
       organizationName="GymFort"
       session={session}
       subtitle="Control comercial por cliente y sucursal: socios activos, plan contratado, importe, fechas y estado de cobro."
-      title="Cobros y suscripciones"
+      title="Cobros y contratos"
       variant="platform"
     >
       {error && !selected ? <FormError message={error} /> : null}
@@ -205,18 +210,18 @@ export default function PlatformBillingPage() {
 
       <section className="admin-panel">
         <header className="admin-panel-header">
-          <div><p>Cobro por cliente</p><h2>Cuanto debes cobrar a cada gimnasio</h2><span>El total suma las sucursales con suscripcion activa dentro de cada Organization.</span></div>
+          <div><p>Cobro por cliente</p><h2>Cuánto debes cobrar a cada gimnasio</h2><span>El total suma las sucursales con suscripción activa dentro de cada Organization.</span></div>
         </header>
         <div className="platform-table">
-          <div className="platform-table-row header"><span>Cliente</span><span>Operacion</span><span>Total mensual</span><span>Estado</span></div>
+          <div className="platform-table-row header"><span>Cliente</span><span>Operación</span><span>Total mensual</span><span>Estado</span></div>
           {customerRows.map((customer) => (
             <div className="platform-table-row" key={customer.organizationId}>
-              <div><strong>{customer.organizationName}</strong><small className="block text-[var(--brand-muted)]">{customer.branchCount} sucursales</small></div>
+              <div><strong>{customer.organizationName}</strong><small className="block text-[var(--brand-muted)]">{customer.branchCount} {customer.branchCount === 1 ? "sucursal" : "sucursales"}</small></div>
               <div><strong>{formatNumber(customer.activeMembers)} activos</strong><small className="block text-[var(--brand-muted)]">{customer.unconfiguredCount ? `${customer.unconfiguredCount} por configurar` : customer.nextBillingLabel}</small></div>
               <div>
                 <strong>{formatCurrency(customer.monthlyAmount)}</strong>
-                <small className="block text-[var(--brand-muted)]">+ IVA</small>
-                {customer.implementationOutstanding > 0 ? <small className="block text-[var(--brand-muted)]">{formatCurrency(customer.implementationOutstanding)} de implementacion pendiente</small> : null}
+                <small className="block text-[var(--brand-muted)]">Importe mensual configurado</small>
+                {customer.implementationOutstanding > 0 ? <small className="block text-[var(--brand-muted)]">{formatCurrency(customer.implementationOutstanding)} de implementación pendiente</small> : null}
               </div>
               <button onClick={() => { setQuery(customer.organizationName); setPaymentFilter("ALL"); }} type="button">{customer.overdueCount ? `${customer.overdueCount} vencida${customer.overdueCount === 1 ? "" : "s"}` : "Ver sedes"}</button>
             </div>
@@ -227,11 +232,11 @@ export default function PlatformBillingPage() {
 
       <section className="admin-panel">
         <header className="admin-panel-header">
-          <div><p>Seguimiento por sucursal</p><h2>Planes, fechas y pagos</h2><span>{summary?.overdueBranchCount ?? 0} vencidas · {summary?.unconfiguredBranchCount ?? 0} por configurar.</span></div>
+          <div><p>Seguimiento por sucursal</p><h2>Planes, fechas y pagos</h2><span>{summary?.overdueBranchCount ?? 0} {(summary?.overdueBranchCount ?? 0) === 1 ? "vencida" : "vencidas"} · {summary?.unconfiguredBranchCount ?? 0} por configurar.</span></div>
         </header>
 
         <div className="grid gap-3 md:grid-cols-2">
-          <label className="form-field"><span>Buscar gimnasio o sucursal</span><input className="app-input" onChange={(event) => setQuery(event.target.value)} placeholder="Nombre, sucursal o codigo" value={query} /></label>
+          <label className="form-field"><span>Buscar gimnasio o sucursal</span><input className="app-input" onChange={(event) => setQuery(event.target.value)} placeholder="Nombre, sucursal o código" value={query} /></label>
           <label className="form-field"><span>Estado de cobro</span><select className="app-input" onChange={(event) => setPaymentFilter(event.target.value)} value={paymentFilter}>
             <option value="ALL">Todos</option><option value="CURRENT">Al corriente</option><option value="DUE_TODAY">Vence hoy</option><option value="OVERDUE">Vencido</option><option value="UNCONFIGURED">Sin configurar</option><option value="PENDING">Pendiente</option><option value="PAUSED">Pausada</option><option value="CANCELLED">Cancelada</option>
           </select></label>
@@ -252,7 +257,7 @@ export default function PlatformBillingPage() {
         </div>
       </section>
 
-      <AppDrawer description={selected ? `${selected.organizationName} · ${selected.branchName} · ${selected.activeMembers} socios activos.` : undefined} onClose={closeBilling} open={Boolean(selected && form)} title="Configuracion comercial" wide>
+      <AppDrawer description={selected ? `${selected.organizationName} · ${selected.branchName} · ${selected.activeMembers} socios activos.` : undefined} onClose={closeBilling} open={Boolean(selected && form)} title="Configuración comercial" wide>
         {selected && form ? <form className="grid gap-4" onSubmit={submit}>
           {error ? <FormError message={error} /> : null}
           {message ? <AppNotice message={message} tone="success" /> : null}
@@ -276,7 +281,7 @@ export default function PlatformBillingPage() {
 
           <label className="flex items-center gap-3 rounded-lg border border-[var(--brand-line)] bg-white p-4 text-sm font-semibold"><input checked={form.implementationPaid} onChange={(event) => setForm({ ...form, implementationPaid: event.target.checked })} type="checkbox" />Implementacion pagada</label>
           <TextAreaField label="Notas comerciales" name="notes" onChange={(value) => setForm({ ...form, notes: value || null })} placeholder="Acuerdos, condiciones, observaciones de cobro..." required={false} rows={4} value={form.notes ?? ""} />
-          <div className="platform-actions"><button className="form-primary-button" disabled={saving} type="submit">{saving ? "Guardando..." : "Guardar configuracion"}</button></div>
+          <div className="platform-actions"><button className="form-primary-button" disabled={saving} type="submit">{saving ? "Guardando..." : "Guardar configuración"}</button></div>
         </form> : null}
 
         {selected && paymentForm ? <section className="mt-5 grid gap-4 border-t border-[var(--brand-line)] pt-5">
@@ -316,13 +321,12 @@ function toForm(branch: PlatformBranchBilling): PlatformBillingUpdatePayload {
     subscriptionStatus: branch.subscriptionStatus === "UNCONFIGURED" ? "ACTIVE" : branch.subscriptionStatus as PlatformBillingUpdatePayload["subscriptionStatus"],
     billingAnchorDay: anchor,
     nextBillingDate: branch.nextBillingDate ?? today,
-    lastPaymentDate: branch.lastPaymentDate,
-    lastPaymentAmount: branch.lastPaymentAmount,
     contractedPlanCode: branch.contractedPlanCode as PlatformBillingUpdatePayload["contractedPlanCode"],
     monthlyPriceOverride: branch.monthlyPriceOverride,
     implementationFee: branch.subscriptionStatus === "UNCONFIGURED" ? implementationForPlan(branch.suggestedPlanCode) : branch.implementationFee,
     implementationPaid: branch.implementationPaid,
     notes: branch.notes,
+    expectedVersion: branch.version,
   };
 }
 
@@ -393,7 +397,8 @@ function formatDate(value: string) { const [year, month, day] = value.split("-")
 function isoToday() { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`; }
 function numberValue(value: string, fallback: number) { const parsed = Number(value); return Number.isFinite(parsed) ? parsed : fallback; }
 function nullableNumber(value: string) { if (!value.trim()) return null; const parsed = Number(value); return Number.isFinite(parsed) ? parsed : null; }
-function toPaymentForm(branch: PlatformBranchBilling): PlatformBillingPaymentPayload { return { paymentType: "SUBSCRIPTION", paymentMethod: "TRANSFER", amount: branch.monthlyAmount ?? 0, paidOn: isoToday(), reference: null, notes: null }; }
+function toPaymentForm(branch: PlatformBranchBilling): PlatformBillingPaymentPayload { return { paymentType: "SUBSCRIPTION", paymentMethod: "TRANSFER", amount: branch.monthlyAmount ?? 0, paidOn: isoToday(), reference: null, notes: null, idempotencyKey: newIdempotencyKey() }; }
+function newIdempotencyKey() { return typeof crypto !== "undefined" && typeof crypto.randomUUID === "function" ? crypto.randomUUID() : `payment-${Date.now()}-${Math.random().toString(36).slice(2)}`; }
 function defaultPaymentAmount(paymentType: string, branch: PlatformBranchBilling) { return paymentType === "IMPLEMENTATION" ? branch.implementationFee : paymentType === "SUBSCRIPTION" ? branch.monthlyAmount ?? 0 : 0; }
 function paymentTypeLabel(type: string) { const labels: Record<string, string> = { SUBSCRIPTION: "Mensualidad", IMPLEMENTATION: "Implementación", OTHER: "Otro concepto" }; return labels[type] ?? type; }
 function paymentMethodLabel(method: string) { const labels: Record<string, string> = { TRANSFER: "Transferencia", CASH: "Efectivo", CARD: "Tarjeta", STRIPE: "Stripe", OTHER: "Otro" }; return labels[method] ?? method; }

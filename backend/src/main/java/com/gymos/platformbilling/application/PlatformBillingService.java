@@ -47,13 +47,15 @@ public class PlatformBillingService {
         requirePlatformAdmin(principal);
         String subscriptionStatus = normalizeSubscriptionStatus(command.subscriptionStatus());
         String contractedPlanCode = normalizePlanCode(command.contractedPlanCode());
+        if (command.expectedVersion() < 0) {
+            throw new BusinessException("BILLING_VERSION_INVALID", "La version de la configuracion comercial no es valida.");
+        }
         if (command.billingAnchorDay() < 1 || command.billingAnchorDay() > 31) {
             throw new BusinessException("BILLING_ANCHOR_DAY_INVALID", "El dia de corte debe estar entre 1 y 31.");
         }
         if (command.nextBillingDate() == null) {
             throw new BusinessException("NEXT_BILLING_DATE_REQUIRED", "Captura la proxima fecha de cobro.");
         }
-        requireNonNegative(command.lastPaymentAmount(), "LAST_PAYMENT_AMOUNT_INVALID", "El ultimo pago no puede ser negativo.");
         requireNonNegative(command.monthlyPriceOverride(), "MONTHLY_PRICE_INVALID", "El precio mensual no puede ser negativo.");
         requireNonNegative(command.implementationFee(), "IMPLEMENTATION_FEE_INVALID", "La implementacion no puede ser negativa.");
         validateManualPrice(contractedPlanCode, command.monthlyPriceOverride());
@@ -68,17 +70,24 @@ public class PlatformBillingService {
                 subscriptionStatus,
                 command.billingAnchorDay(),
                 command.nextBillingDate(),
-                command.lastPaymentDate(),
-                command.lastPaymentAmount(),
                 contractedPlanCode,
                 "ENTERPRISE".equals(contractedPlanCode) ? command.monthlyPriceOverride() : null,
                 command.implementationFee() == null ? BigDecimal.ZERO : command.implementationFee(),
                 command.implementationPaid(),
                 notes,
+                command.expectedVersion(),
                 principal.userId(),
                 now
         ));
         if (updated == 0) {
+            BranchBillingRecord current = repository.findByBranchId(branchId)
+                    .orElseThrow(() -> new BusinessException("BRANCH_NOT_FOUND", "La sucursal no esta disponible."));
+            if (current.version() != command.expectedVersion() || current.subscriptionStatus() != null) {
+                throw new BusinessException(
+                        "BILLING_VERSION_CONFLICT",
+                        "La configuracion comercial cambio mientras la editabas. Recarga antes de guardar."
+                );
+            }
             throw new BusinessException("BRANCH_NOT_FOUND", "La sucursal no esta disponible.");
         }
 
@@ -105,6 +114,10 @@ public class PlatformBillingService {
         BranchBillingRecord branch = requireBranch(branchId);
         String paymentType = normalizePaymentType(command.paymentType());
         String paymentMethod = normalizePaymentMethod(command.paymentMethod());
+        String idempotencyKey = requiredText(
+                command.idempotencyKey(), 120, "BILLING_PAYMENT_IDEMPOTENCY_REQUIRED",
+                "No fue posible identificar de forma segura este registro de cobro."
+        );
         if (command.amount() == null || command.amount().signum() <= 0) {
             throw new BusinessException("BILLING_PAYMENT_AMOUNT_INVALID", "El monto del cobro debe ser mayor a cero.");
         }
@@ -123,6 +136,12 @@ public class PlatformBillingService {
             throw new BusinessException("BILLING_PAYMENT_NOTES_TOO_LONG", "Las notas no pueden exceder 1000 caracteres.");
         }
 
+        BillingPaymentRecord existing = repository.findPaymentByIdempotencyKey(branchId, idempotencyKey).orElse(null);
+        if (existing != null) {
+            requireSamePayment(existing, paymentType, paymentMethod, command.amount(), command.paidOn(), reference, notes);
+            return new PaymentRegistration(toView(branch), toPaymentView(existing));
+        }
+
         BranchBillingView billing = toView(branch);
         if ("SUBSCRIPTION".equals(paymentType)
                 && (!Set.of("ACTIVE", "PENDING").contains(billing.subscriptionStatus()) || branch.billingAnchorDay() == null)) {
@@ -131,9 +150,16 @@ public class PlatformBillingService {
         OffsetDateTime now = OffsetDateTime.now();
         BillingPaymentWrite payment = new BillingPaymentWrite(
                 UUID.randomUUID(), branch.branchId(), branch.organizationId(), paymentType, paymentMethod,
-                command.amount(), command.paidOn(), reference, notes, principal.userId(), now
+                command.amount(), command.paidOn(), reference, notes, idempotencyKey, principal.userId(), now
         );
-        repository.insertPayment(payment);
+        if (repository.insertPayment(payment) == 0) {
+            BillingPaymentRecord concurrent = repository.findPaymentByIdempotencyKey(branchId, idempotencyKey)
+                    .orElseThrow(() -> new BusinessException(
+                            "BILLING_PAYMENT_CONFLICT", "El cobro ya fue procesado. Recarga el historial."));
+            requireSamePayment(
+                    concurrent, paymentType, paymentMethod, command.amount(), command.paidOn(), reference, notes);
+            return new PaymentRegistration(toView(requireBranch(branchId)), toPaymentView(concurrent));
+        }
 
         if ("SUBSCRIPTION".equals(paymentType)) {
             repository.registerSubscriptionPayment(
@@ -156,7 +182,8 @@ public class PlatformBillingService {
         );
         return new PaymentRegistration(toView(persisted), toPaymentView(new BillingPaymentRecord(
                 payment.id(), payment.branchId(), payment.organizationId(), payment.paymentType(), payment.paymentMethod(),
-                payment.amount(), payment.paidOn(), payment.reference(), payment.notes(), payment.recordedBy(), payment.createdAt()
+                payment.amount(), payment.paidOn(), payment.reference(), payment.notes(), payment.idempotencyKey(),
+                payment.recordedBy(), payment.createdAt()
         )));
     }
 
@@ -197,7 +224,8 @@ public class PlatformBillingService {
                 contracted.code(), contracted.name(), effectivePrice,
                 subscriptionStatus, paymentStatus(subscriptionStatus, record.nextBillingDate()),
                 record.billingAnchorDay(), record.nextBillingDate(), record.lastPaymentDate(), record.lastPaymentAmount(),
-                record.monthlyPriceOverride(), record.implementationFee(), record.implementationPaid(), record.notes()
+                record.monthlyPriceOverride(), record.implementationFee(), record.implementationPaid(),
+                record.notes(), record.version()
         );
     }
 
@@ -303,6 +331,37 @@ public class PlatformBillingService {
         if (value != null && value.signum() < 0) throw new BusinessException(code, message);
     }
 
+    private void requireSamePayment(
+            BillingPaymentRecord existing,
+            String paymentType,
+            String paymentMethod,
+            BigDecimal amount,
+            LocalDate paidOn,
+            String reference,
+            String notes
+    ) {
+        boolean same = existing.paymentType().equals(paymentType)
+                && existing.paymentMethod().equals(paymentMethod)
+                && existing.amount().compareTo(amount) == 0
+                && existing.paidOn().equals(paidOn)
+                && java.util.Objects.equals(existing.reference(), reference)
+                && java.util.Objects.equals(existing.notes(), notes);
+        if (!same) {
+            throw new BusinessException(
+                    "BILLING_PAYMENT_IDEMPOTENCY_CONFLICT",
+                    "El identificador de este cobro ya fue usado con datos diferentes."
+            );
+        }
+    }
+
+    private String requiredText(String value, int maxLength, String code, String message) {
+        String normalized = blankToNull(value);
+        if (normalized == null || normalized.length() > maxLength) {
+            throw new BusinessException(code, message);
+        }
+        return normalized;
+    }
+
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
     }
@@ -320,13 +379,12 @@ public class PlatformBillingService {
             String subscriptionStatus,
             int billingAnchorDay,
             LocalDate nextBillingDate,
-            LocalDate lastPaymentDate,
-            BigDecimal lastPaymentAmount,
             String contractedPlanCode,
             BigDecimal monthlyPriceOverride,
             BigDecimal implementationFee,
             boolean implementationPaid,
-            String notes
+            String notes,
+            long expectedVersion
     ) {}
 
     public record BillingOverview(BillingSummary summary, List<BranchBillingView> branches) {}
@@ -367,7 +425,8 @@ public class PlatformBillingService {
             BigDecimal monthlyPriceOverride,
             BigDecimal implementationFee,
             boolean implementationPaid,
-            String notes
+            String notes,
+            long version
     ) {}
 
     public record RecordPaymentCommand(
@@ -376,7 +435,8 @@ public class PlatformBillingService {
             BigDecimal amount,
             LocalDate paidOn,
             String reference,
-            String notes
+            String notes,
+            String idempotencyKey
     ) {}
 
     public record BillingPaymentView(
