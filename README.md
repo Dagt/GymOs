@@ -89,13 +89,11 @@ Servicios locales:
 - Health: http://localhost:8080/actuator/health
 - MinIO: http://localhost:9001
 
-Credenciales demo del perfil `local`:
-
-- Usuario: `admin@gymos.local`
-- Contraseña: `Admin123!`
-
-El seed demo está restringido a `local`. En staging y producción se debe usar
-un perfil no local y `GYMOS_SEED_ENABLED=false`.
+El arranque no crea usuarios demo automáticamente. Para habilitar un tenant de
+prueba exclusivamente en el perfil `local`, define explícitamente
+`GYMOS_SEED_ENABLED=true`, `GYMOS_DEMO_OWNER_EMAIL` y una contraseña fuerte en
+`GYMOS_DEMO_OWNER_PASSWORD`; el acceso será con esos valores. En staging y
+producción se debe usar un perfil no local y `GYMOS_SEED_ENABLED=false`.
 
 ## Stripe local
 

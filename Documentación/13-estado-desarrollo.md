@@ -2,12 +2,21 @@
 
 Estado: FUENTE CANÓNICA / EN PROGRESO
 Corte: 24 de agosto de 2026
-Código auditado: `feature/platform-client-billing-management`, incluyendo V85
-sobre la base integrada de acceso físico, cobranza, Automatizaciones/ZeptoMail y métricas.
+Código auditado: `feature/platform-identity-separation`, incluyendo V86/V87
+sobre la administración comercial V85 y la base integrada de acceso físico,
+cobranza, Automatizaciones/ZeptoMail y métricas.
 
 ## 1. Resumen ejecutivo
 
 GymFort opera como monolito modular multi-tenant y multi-sucursal. El piloto incluye consolas SaaS y de gimnasio, recepción/POS, kiosco aislado, comercio y membresías, reservas, inventario, coaches, wellness, automatizaciones, correo transaccional durable y cobranza comercial controlada de GymFort.
+
+**La identidad SaaS y la identidad de los gimnasios ya están separadas**:
+`PLATFORM` inicia sin organización/sucursal, `TENANT` exige organización y las
+restricciones viven tanto en JWT/refresh como en PostgreSQL. El primer
+administrador se crea mediante bootstrap efímero de entorno, mientras el alta
+de un cliente crea transaccionalmente gimnasio, primera sucursal y dueño por
+invitación de un solo uso. El acceso excepcional de soporte requiere motivo,
+expira y queda auditado.
 
 **La administración de clientes de GymFort queda estabilizada para operación
 comercial manual**: el administrador entra desde el menú lateral a una cartera
@@ -38,7 +47,7 @@ Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún 
 | Módulo | Estado | Implementado | Pendiente principal |
 |---|---|---|---|
 | [Organizaciones](modulos/01-organizations.md) | FUNCIONAL | Plataforma, tenants, sucursales, equipo, soporte y marca persistente | Matriz negativa transversal (`ORG-001`) |
-| [Identidad y seguridad](modulos/02-identity-security.md) | FUNCIONAL | JWT, refresh revocable, selección de sucursal, RBAC y separación 401/403 | Endurecer almacenamiento/rotación de refresh (`AUTH-001`) |
+| [Identidad y seguridad](modulos/02-identity-security.md) | ESTABILIZADO PARA PRODUCCIÓN PILOTO | Ámbitos PLATFORM/TENANT, bootstrap sin tenant ficticio, JWT/refresh v2, soporte temporal auditable, invitación de dueño y restricciones DB | Endurecer almacenamiento cliente del refresh (`AUTH-001`) |
 | [Configuración](modulos/03-configuration.md) | FUNCIONAL | Marca tenant, cobros, kiosco y correo por permisos; UI unificada | Completar ciclo eliminación/reemplazo de logo (`CFG-001`) |
 | [Onboarding](modulos/04-onboarding.md) | FUNCIONAL | Checklist, setup piloto idempotente e importación inicial | Recuperación probada de altas parciales (`ONB-001`) |
 | [Socios](modulos/05-clients.md) | FUNCIONAL | Alta, búsqueda, detalle, importación y visibilidad multi-sucursal | PII, duplicados y pruebas CRUD (`CLI-001`) |
@@ -91,6 +100,15 @@ Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún 
   compartido en producción y memoria por proceso en local/tests, sin claves ni
   credenciales crudas; `last_authenticated_at` se escribe como máximo una vez
   por ventana configurable.
+- `PLATFORM` nunca obtiene organización/sucursal persistente ni acceso implícito
+  a endpoints tenant; el soporte se inicia para un tenant concreto, con motivo y
+  vencimiento, y puede finalizarse explícitamente desde el shell.
+- La creación de un gimnasio cliente es una sola transacción que incluye su
+  primera sucursal y un dueño `TENANT` en estado `INVITED`; no se comparte una
+  contraseña inicial y el token de activación sólo se devuelve una vez.
+- Producción usa `GYMOS_SEED_ENABLED=false`; datos históricos con la firma exacta
+  del fixture se clasifican `DEMO`, quedan fuera de cartera/cobranza y no se
+  eliminan sin revisar actividad.
 
 ## 4. Validación del corte
 
@@ -111,6 +129,12 @@ Evidencia disponible:
 - frontend pasó 92/92 pruebas, typecheck, lint, build Next.js y bundle OpenNext
   para Cloudflare; el recorrido visual confirmó menú lateral, cartera, filtros,
   expediente y deep links de cobranza con datos representativos;
+- V86/V87 pasaron migración PostgreSQL limpia y upgrade; las pruebas cubren
+  ámbitos DB, JWT/refresh, bootstrap idempotente, invitación de dueño,
+  autorización plataforma/tenant y límites del monolito modular;
+- frontend pasó 94/94 pruebas, typecheck, lint, build Next 16.3.2 y bundle
+  OpenNext 1.20.2; `npm audit` quedó en 0 vulnerabilidades después de actualizar
+  Next y transitivas parcheadas sin usar `--force`;
 - suite backend completa, pruebas PostgreSQL V84, upgrade V83 → V84, seguridad
   HTTP, suite frontend (87/87), build de producción y build Docker ejecutados
   correctamente en la rama física;
