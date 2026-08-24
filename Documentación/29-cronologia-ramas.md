@@ -6,26 +6,24 @@ Corte: 24 de agosto de 2026
 
 Rama de trabajo: `feature/platform-identity-separation`
 
-Base integrada: `main` en `71810b3` (`fix: support authenticated Redis connections`)
+Base integrada: `main` en `88981b4` (`Merge pull request #15`)
 
 ## 1. Situación vigente
 
-El control plane de acceso físico cloud ya está integrado en `main`. La rama
-`feature/platform-client-billing-management` agrega la administración comercial
-de gimnasios clientes y permanece publicada en `8ba97a6`; la rama actual parte de
-ese commit y añade la separación definitiva entre identidades `PLATFORM` y
-`TENANT`, el bootstrap seguro del primer administrador y el aprovisionamiento
-transaccional de cada gimnasio con su primer propietario invitado.
+El PR #15 ya integró en `main` la administración comercial, la separación
+`PLATFORM`/`TENANT`, el bootstrap inicial y el aprovisionamiento transaccional de
+gimnasios. La rama actual fue adelantada a ese merge y contiene exclusivamente
+el cierre posterior: concurrencia PostgreSQL del bootstrap, detección por
+permiso efectivo, retiro seguro del fixture histórico, Compose, CI y runbook.
 
-El PR de la rama actual hacia `main` incluye ambos bloques porque la remediación
-de identidad es necesaria para operar de forma segura la consola comercial. No
-debe fusionarse hasta que CI y la revisión de seguridad estén verdes.
+Este cierre debe publicarse en un PR nuevo; el PR #15 fusionado es inmutable. No
+debe fusionarse hasta que el nuevo CI y la revisión de seguridad estén verdes.
 
 | Rama | Estado | Acción |
 |---|---|---|
-| `main` | Base estable con acceso físico cloud | Recibir cambios sólo por PR verde |
-| `feature/platform-identity-separation` | Activa y validada localmente | Publicar PR; revisar CI/seguridad; no fusionar automáticamente |
-| `feature/platform-client-billing-management` | Publicada en `8ba97a6`; base de la rama actual | No abrir un merge paralelo; queda incluida en el PR actual |
+| `main` | Incluye PR #15 en `88981b4` | Recibir el hardening sólo por un PR nuevo y verde |
+| `feature/platform-identity-separation` | Activa sobre el `main` fusionado | Publicar PR de cierre; revisar CI/seguridad; no fusionar automáticamente |
+| `feature/platform-client-billing-management` | Integrada mediante PR #15 | Histórica; no fusionar otra vez |
 | `feature/physical-access-control` | Integrada mediante PR #14 | Histórica; no fusionar otra vez |
 | `feature/pricing-and-billing` | Integrada en `main` | Histórica; no fusionar otra vez |
 | `feature/automations-zoho-email` | Integrada | Histórica; no fusionar otra vez |
@@ -42,6 +40,8 @@ debe fusionarse hasta que CI y la revisión de seguridad estén verdes.
 | 24 ago 2026 | `8ba97a6` completa cartera, cobranza y gestión profesional de gimnasios clientes |
 | 24 ago 2026 | V86/V87 separan cuentas de plataforma/tenant y agregan invitaciones de propietario de un uso |
 | 24 ago 2026 | JWT/refresh, soporte temporal, bootstrap y rutas frontend adoptan `accountScope` explícito |
+| 24 ago 2026 | PR #15 integra administración comercial e identidad en `main` (`88981b4`) |
+| 24 ago 2026 | V88 y el hardening posterior coordinan bootstrap, retiran fixture vacío y amplían CI |
 
 ## 3. Alcance material de la rama activa
 
@@ -54,17 +54,18 @@ debe fusionarse hasta que CI y la revisión de seguridad estén verdes.
 - JWT y refresh con scope explícito, sin promoción implícita entre contextos;
 - soporte temporal por gimnasio con motivo, expiración, auditoría y salida
   explícita;
-- bootstrap idempotente del primer administrador usando sólo variables de
-  entorno, sin conservar el secreto;
+- bootstrap concurrente coordinado por PostgreSQL, con detección por permiso
+  efectivo y variables temporales sin conservar el secreto;
 - alta transaccional de organización, primera sucursal y propietario tenant;
 - invitación de un solo uso almacenada únicamente como hash;
-- clasificación `PRODUCTIVE`/`DEMO` y exclusión de fixtures demo del portafolio;
+- retiro V88 del fixture histórico exacto cuando está vacío y conservación
+  diagnóstica ante actividad o ambigüedad;
 - guards y rutas frontend que separan la consola SaaS del gimnasio cliente;
 - actualización segura de dependencias frontend y auditoría sin advisories.
 
 ### No incluido
 
-- borrado automático de datos demo o de datos productivos existentes;
+- borrado de cualquier dato demo ambiguo, modificado o con actividad;
 - fusión automática a `main`;
 - GymFort Local Connector, adapter HikCentral o integración con hardware;
 - cobro SaaS recurrente automático, CFDI o conciliación bancaria completa;
@@ -72,12 +73,13 @@ debe fusionarse hasta que CI y la revisión de seguridad estén verdes.
 
 ## 4. Evidencia de validación local
 
-- suite backend completa y pruebas focalizadas de identidad/plataforma;
-- suite PostgreSQL/Testcontainers completa y migraciones limpias/upgrade;
+- 413 pruebas backend unitarias;
+- 59 pruebas PostgreSQL/Testcontainers, incluidas migraciones limpias/upgrade;
 - `build` backend y construcción de imagen Docker;
 - 94/94 pruebas frontend, typecheck, lint y build Next;
 - bundle OpenNext para Cloudflare;
 - `npm audit` con cero vulnerabilidades;
+- construcción completa de imágenes backend/frontend mediante Compose;
 - `git diff --check` y revisión de que no se versionen secretos.
 
 La evidencia local no sustituye los checks del PR. Ausencia de un status
