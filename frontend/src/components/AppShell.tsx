@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { isActive, resolveShellBrand, visibleSectionsForConsole } from "@/components/app-shell-model";
 import { AppNotice } from "@/components/AppNotice";
-import { clearSession, getBranches, selectBranch, selectOrganization, storeSession, type StoredSession } from "@/lib/api";
+import { clearSession, exitSupport, getBranches, selectBranch, storeSession, type StoredSession } from "@/lib/api";
 import { getConsoleProfile, isPlatformAdmin, isSupportMode, resolveUserConsole } from "@/lib/role-model";
 
 type BranchOption = {
@@ -47,6 +47,7 @@ export function AppShell({
   const [availableBranches, setAvailableBranches] = useState<BranchOption[]>([]);
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [switchingBranch, setSwitchingBranch] = useState(false);
+	const [leavingSupport, setLeavingSupport] = useState(false);
   const [failedBrandLogoUrl, setFailedBrandLogoUrl] = useState<string | null>(null);
 
   const consoleType = resolveUserConsole(session.user);
@@ -126,7 +127,12 @@ export function AppShell({
 
     async function recoverBranchContext() {
       try {
-        const nextSession = await selectOrganization(session.accessToken, session.user.organizationId!);
+		const branches = await getBranches(session.accessToken);
+		if (branches.length !== 1) {
+			window.sessionStorage.removeItem(BRANCH_RECOVERY_KEY);
+			return;
+		}
+		const nextSession = await selectBranch(session.accessToken, branches[0].id);
         if (cancelled) return;
 
         if (nextSession.user.branchId && nextSession.user.branchId !== session.user.branchId) {
@@ -170,6 +176,22 @@ export function AppShell({
     }
   }
 
+	async function leaveSupport() {
+		if (leavingSupport) return;
+		setLeavingSupport(true);
+		try {
+			const platformSession = await exitSupport(session.accessToken, session.refreshToken);
+			storeSession(platformSession);
+			router.replace("/platform");
+			router.refresh();
+		} catch {
+			clearSession();
+			router.push("/login");
+		} finally {
+			setLeavingSupport(false);
+		}
+	}
+
   return (
     <main className={`admin-console ${hideSidebar ? "no-sidebar" : ""} ${supportMode ? "support-mode" : ""} ${pageClassName ?? ""}`}>
       <div className="app-notice-region" id="app-notice-region" />
@@ -195,10 +217,10 @@ export function AppShell({
             <button onClick={logout} type="button">Salir</button>
           </section>
 
-          {platformAdmin && !pathname.startsWith("/platform") ? (
-            <Link className="admin-platform-return" href="/platform">
-              Volver a administración GymFort
-            </Link>
+		  {supportMode ? (
+			<button className="admin-platform-return" disabled={leavingSupport} onClick={leaveSupport} type="button">
+			  {leavingSupport ? "Cerrando soporte..." : "Volver a administración GymFort"}
+			</button>
           ) : null}
 
           <button
@@ -248,8 +270,11 @@ export function AppShell({
       <section className="admin-workspace">
         {supportMode ? (
           <section className="support-banner" role="status">
-            <strong>Modo soporte GymFort</strong>
-            <span>Estas operando dentro de este gimnasio para apoyar al cliente. Las acciones quedan auditadas.</span>
+			<div>
+			  <strong>Modo soporte GymFort</strong>
+			  <span>Acceso temporal y auditado{session.user.supportExpiresAt ? ` hasta ${formatSupportExpiry(session.user.supportExpiresAt)}` : ""}.</span>
+			</div>
+			<button disabled={leavingSupport} onClick={leaveSupport} type="button">Terminar soporte</button>
           </section>
         ) : null}
 
@@ -303,6 +328,10 @@ export function AppShell({
       </section>
     </main>
   );
+}
+
+function formatSupportExpiry(value: string) {
+	return new Intl.DateTimeFormat("es-MX", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 }
 
 export function LoadingScreen({ text = "Cargando..." }: { text?: string }) {

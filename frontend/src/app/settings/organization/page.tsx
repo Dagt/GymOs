@@ -511,7 +511,7 @@ export default function OrganizationSettingsPage() {
           errors={fieldErrors}
           form={organizationForm}
           open={showOrganizationDrawer}
-          organizationId={organization?.id ?? session.user.organizationId}
+		  organizationId={organization?.id ?? session.user.organizationId ?? ""}
           saving={saving}
           onChange={setOrganizationForm}
           onClose={closeOrganizationDrawer}

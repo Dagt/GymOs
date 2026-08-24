@@ -3101,6 +3101,65 @@ th {
   font-weight: 700;
 }
 
+.support-banner .admin-platform-return {
+  border: 1px solid #fed7aa;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.support-banner .admin-platform-return:hover {
+  background: #ffedd5;
+}
+
+.platform-invitation-card {
+  align-items: center;
+  background: linear-gradient(135deg, #ecfdf5, #f0fdfa);
+  border-color: #6ee7b7;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 1.15fr);
+}
+
+.platform-invitation-card h2 {
+  color: var(--brand-ink);
+  margin: 0.25rem 0;
+}
+
+.platform-invitation-card span {
+  color: var(--brand-muted);
+  display: block;
+}
+
+.platform-invitation-actions {
+  align-items: center;
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.platform-invitation-actions input {
+  background: white;
+  border: 1px solid var(--brand-line);
+  border-radius: 0.65rem;
+  min-width: 0;
+  padding: 0.7rem 0.8rem;
+}
+
+.invitation-accept-card {
+  max-width: 62rem;
+}
+
+@media (max-width: 800px) {
+  .platform-invitation-card,
+  .platform-invitation-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-invitation-actions button {
+    width: 100%;
+  }
+}
+
 .admin-console.support-mode .admin-sidebar {
   background: linear-gradient(180deg, #111827, #292524);
 }

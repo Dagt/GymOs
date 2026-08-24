@@ -17,8 +17,8 @@ import {
   validateRequired,
 } from "@/components/FormFields";
 import { LogoUploadField } from "@/components/LogoUploadField";
-import type { CreateBranchPayload, CreateOrganizationPayload } from "@/lib/api";
-import type { PlatformCustomerUpdatePayload } from "@/lib/api/platform-customer-types";
+import type { CreateBranchPayload } from "@/lib/api";
+import type { PlatformCustomerCreatePayload, PlatformCustomerUpdatePayload } from "@/lib/api/platform-customer-types";
 
 const lifecycleOptions = [
   { value: "ONBOARDING", label: "Implementación" },
@@ -28,7 +28,7 @@ const lifecycleOptions = [
   { value: "FORMER", label: "Cliente anterior" },
 ];
 
-export const emptyOrganizationForm: CreateOrganizationPayload = {
+export const emptyOrganizationForm: PlatformCustomerCreatePayload = {
   legalName: "",
   tradeName: "",
   taxId: "",
@@ -41,6 +41,13 @@ export const emptyOrganizationForm: CreateOrganizationPayload = {
   primaryColor: "#093D3A",
   accentColor: "#18C8B2",
   surfaceColor: "#F2F8F7",
+	branchName: "Sucursal Principal",
+	branchCode: "MAIN",
+	branchPhone: "",
+	ownerFirstName: "",
+	ownerLastName: "",
+	ownerEmail: "",
+	ownerPhone: "",
 };
 
 export const emptyBranchForm: CreateBranchPayload = {
@@ -59,10 +66,10 @@ export function OrganizationForm({
   onSubmit,
 }: {
   errors: FieldErrorMap;
-  form: CreateOrganizationPayload;
+  form: PlatformCustomerCreatePayload;
   saving: boolean;
   onLogoFileChange: (file: File | null) => void;
-  onChange: (next: CreateOrganizationPayload) => void;
+  onChange: (next: PlatformCustomerCreatePayload) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
@@ -72,6 +79,23 @@ export function OrganizationForm({
       <TextField error={errors.taxId} label="RFC" name="taxId" value={form.taxId ?? ""} onChange={(value) => onChange({ ...form, taxId: normalizeRfc(value) })} />
       <EmailField error={errors.contactEmail} label="Email contacto" name="contactEmail" required value={form.contactEmail ?? ""} onChange={(value) => onChange({ ...form, contactEmail: value })} />
       <PhoneField error={errors.contactPhone} label="Telefono contacto" name="contactPhone" required value={form.contactPhone ?? ""} onChange={(value) => onChange({ ...form, contactPhone: value })} />
+	  <section className="platform-form-intro">
+		<strong>Primera sucursal</strong>
+		<span>Se crea junto con el gimnasio para que el dueño pueda comenzar a operar.</span>
+	  </section>
+	  <TextField error={errors.branchName} label="Nombre de sucursal" name="branchName" value={form.branchName} onChange={(value) => onChange({ ...form, branchName: value })} />
+	  <TextField error={errors.branchCode} label="Codigo corto" name="branchCode" value={form.branchCode} onChange={(value) => onChange({ ...form, branchCode: value.toUpperCase() })} />
+	  <PhoneField error={errors.branchPhone} label="Telefono de sucursal" name="branchPhone" required value={form.branchPhone} onChange={(value) => onChange({ ...form, branchPhone: value })} />
+	  <section className="platform-form-intro">
+		<strong>Dueño del gimnasio</strong>
+		<span>Recibirá una invitación de un solo uso; no se envían contraseñas permanentes.</span>
+	  </section>
+	  <div className="grid gap-4 md:grid-cols-2">
+		<TextField error={errors.ownerFirstName} label="Nombre" name="ownerFirstName" value={form.ownerFirstName} onChange={(value) => onChange({ ...form, ownerFirstName: value })} />
+		<TextField error={errors.ownerLastName} label="Apellidos" name="ownerLastName" value={form.ownerLastName} onChange={(value) => onChange({ ...form, ownerLastName: value })} />
+		<EmailField error={errors.ownerEmail} label="Correo de acceso" name="ownerEmail" required value={form.ownerEmail} onChange={(value) => onChange({ ...form, ownerEmail: value })} />
+		<PhoneField error={errors.ownerPhone} label="Telefono del dueño" name="ownerPhone" required value={form.ownerPhone} onChange={(value) => onChange({ ...form, ownerPhone: value })} />
+	  </div>
       <hr className="border-[#dbe4ee]" />
       <TextField error={errors.brandName} label="Nombre visible de marca" name="brandName" required={false} value={form.brandName ?? ""} onChange={(value) => onChange({ ...form, brandName: value })} />
       <LogoUploadField
@@ -208,13 +232,20 @@ export function CustomerAccountForm({
   );
 }
 
-export function validateOrganization(form: CreateOrganizationPayload) {
+export function validateOrganization(form: PlatformCustomerCreatePayload) {
   const errors: FieldErrorMap = {};
   addError(errors, "tradeName", validateRequired(form.tradeName, "Nombre comercial"));
   addError(errors, "legalName", validateRequired(form.legalName, "Nombre legal"));
   addError(errors, "taxId", validateRfc(form.taxId ?? "", true));
   addError(errors, "contactEmail", validateEmail(form.contactEmail ?? "", true));
   addError(errors, "contactPhone", validatePhone(form.contactPhone ?? "", true));
+	addError(errors, "branchName", validateRequired(form.branchName, "Nombre de sucursal"));
+	addError(errors, "branchCode", validateBranchCode(form.branchCode));
+	addError(errors, "branchPhone", validatePhone(form.branchPhone, true));
+	addError(errors, "ownerFirstName", validateRequired(form.ownerFirstName, "Nombre del dueño"));
+	addError(errors, "ownerLastName", validateRequired(form.ownerLastName, "Apellidos del dueño"));
+	addError(errors, "ownerEmail", validateEmail(form.ownerEmail, true));
+	addError(errors, "ownerPhone", validatePhone(form.ownerPhone, true));
   addError(errors, "primaryColor", validateHexColor(form.primaryColor ?? "", "Color principal", true));
   addError(errors, "accentColor", validateHexColor(form.accentColor ?? "", "Color acento", true));
   addError(errors, "surfaceColor", validateHexColor(form.surfaceColor ?? "", "Color fondo", true));

@@ -38,11 +38,35 @@ export async function selectBranch(accessToken: string, branchId: string): Promi
   }));
 }
 
-export async function selectOrganization(accessToken: string, organizationId: string): Promise<AuthResponse> {
+export async function selectOrganization(accessToken: string, organizationId: string, reason: string): Promise<AuthResponse> {
   return normalizeAuthResponse(await apiFetch<AuthResponse>("/auth/select-organization", accessToken, {
     method: "POST",
-    body: JSON.stringify({ organizationId }),
+    body: JSON.stringify({ organizationId, reason }),
   }));
+}
+
+export async function exitSupport(accessToken: string, refreshToken: string): Promise<AuthResponse> {
+  return normalizeAuthResponse(await apiFetch<AuthResponse>("/auth/exit-support", accessToken, {
+    method: "POST",
+    body: JSON.stringify({ refreshToken }),
+  }));
+}
+
+export async function acceptUserInvitation(token: string, password: string): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/auth/invitations/accept`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token, password }),
+    });
+  } catch {
+    throw new Error("No se pudo conectar con GymFort. Intenta de nuevo.");
+  }
+  if (!response.ok) {
+    const error = await response.json().catch(() => null);
+    throw new Error(formatLoginError(response, error));
+  }
 }
 
 export async function getCurrentUser(accessToken: string): Promise<CurrentUser> {
@@ -129,9 +153,25 @@ function clearLegacySharedSession() {
 }
 
 function normalizeCurrentUser(user: CurrentUser): CurrentUser {
+	if (user.accountScope !== "PLATFORM" && user.accountScope !== "TENANT") {
+		throw new Error("La sesion no incluye un ambito de identidad valido.");
+	}
+	if (user.accountScope === "TENANT" && !user.organizationId) {
+		throw new Error("La sesion tenant no incluye un gimnasio valido.");
+	}
+	if (user.accountScope === "TENANT" && user.supportMode) {
+		throw new Error("Una sesion tenant no puede declararse como soporte de plataforma.");
+	}
+	if (user.accountScope === "PLATFORM" && !user.supportMode && (user.organizationId || user.branchId)) {
+		throw new Error("La sesion de plataforma contiene un contexto tenant inesperado.");
+	}
+	if (user.accountScope === "PLATFORM" && user.supportMode
+			&& (!user.organizationId || !user.supportExpiresAt)) {
+		throw new Error("La sesion de soporte no incluye un contexto temporal valido.");
+	}
   const permissions = user.permissions ?? [];
   const roles = user.roles ?? [];
-  const platformAdmin = Boolean(user.platformAdmin || permissions.includes("platform.admin"));
+  const platformAdmin = user.accountScope === "PLATFORM";
   const supportMode = Boolean(user.supportMode);
   return {
     ...user,
@@ -139,6 +179,7 @@ function normalizeCurrentUser(user: CurrentUser): CurrentUser {
     roles,
     platformAdmin,
     supportMode,
+		supportExpiresAt: user.supportExpiresAt ?? null,
     console: inferConsole(permissions, roles, platformAdmin, supportMode, user.console),
   };
 }

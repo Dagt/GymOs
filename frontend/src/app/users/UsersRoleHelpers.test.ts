@@ -48,7 +48,8 @@ test("platform administrator keeps full support visibility", () => {
 
 test("receptionist role cannot access /benefits route", () => {
   const receptionUser: CurrentUser = {
-    userId: "user-1",
+	userId: "user-1",
+	accountScope: "TENANT",
     organizationId: "organization-1",
     branchId: "branch-1",
     username: "reception@gymos.local",
@@ -57,7 +58,8 @@ test("receptionist role cannot access /benefits route", () => {
     permissions: ["sale.create", "client.create"],
     console: "RECEPTION",
     platformAdmin: false,
-    supportMode: false,
+	supportMode: false,
+	supportExpiresAt: null,
     organizationName: "GymOS Test",
   };
 
@@ -67,7 +69,8 @@ test("receptionist role cannot access /benefits route", () => {
 
 test("public policy and support routes stay available for authenticated users", () => {
   const receptionUser: CurrentUser = {
-    userId: "user-1",
+	userId: "user-1",
+	accountScope: "TENANT",
     organizationId: "organization-1",
     branchId: "branch-1",
     username: "reception@gymfort.mx",
@@ -76,7 +79,8 @@ test("public policy and support routes stay available for authenticated users", 
     permissions: ["sale.create", "client.create"],
     console: "RECEPTION",
     platformAdmin: false,
-    supportMode: false,
+	supportMode: false,
+	supportExpiresAt: null,
     organizationName: "GymFort Test",
   };
 
@@ -101,8 +105,8 @@ test("only reception can open the kiosk even when another role inherits the perm
 
 function kioskUser(overrides: Partial<CurrentUser>): CurrentUser {
   return {
-    userId: "user-kiosk",
-    organizationId: "organization-1",
+	userId: "user-kiosk",
+	organizationId: "organization-1",
     branchId: "branch-1",
     username: "user@gymfort.mx",
     fullName: "Usuario Kiosco",
@@ -110,8 +114,10 @@ function kioskUser(overrides: Partial<CurrentUser>): CurrentUser {
     permissions: ["selfservice.session.launch"],
     console: "RECEPTION",
     platformAdmin: false,
-    supportMode: false,
+	supportMode: false,
+	supportExpiresAt: null,
     organizationName: "GymFort Test",
-    ...overrides,
+	...overrides,
+	accountScope: overrides.accountScope ?? "TENANT",
   };
 }

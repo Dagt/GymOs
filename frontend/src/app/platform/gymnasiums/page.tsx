@@ -38,6 +38,22 @@ export default function PlatformGymnasiumsPage() {
     >
       {platform.error ? <FormError message={platform.error} /> : null}
       {platform.message ? <AppNotice message={platform.message} tone="success" /> : null}
+	  {platform.provisionedInvitation ? (
+		<section className="app-card platform-invitation-card" role="status">
+		  <div>
+			<p className="app-eyebrow">Invitación del dueño</p>
+			<h2>Cuenta creada sin contraseña compartida</h2>
+			<span>
+			  Envía este enlace de un solo uso a {platform.provisionedInvitation.ownerEmail}. Vence el {formatDateTime(platform.provisionedInvitation.invitationExpiresAt)}.
+			</span>
+		  </div>
+		  <div className="platform-invitation-actions">
+			<input aria-label="Enlace de invitación" readOnly value={platform.provisionedInvitation.invitationUrl} />
+			<button className="app-button" onClick={() => navigator.clipboard.writeText(platform.provisionedInvitation!.invitationUrl)} type="button">Copiar enlace</button>
+			<button className="app-button-secondary" onClick={() => platform.setProvisionedInvitation(null)} type="button">Ocultar</button>
+		  </div>
+		</section>
+	  ) : null}
 
       <section className="platform-kpi-grid" aria-label="Resumen de clientes">
         <article className="platform-kpi"><span>Clientes</span><strong>{platform.portfolio?.summary.customerCount ?? 0}</strong></article>
@@ -80,7 +96,32 @@ export default function PlatformGymnasiumsPage() {
       </section>
 
       <AppDrawer
-        description="Registra el tenant y su marca. Las sucursales se crean despues desde el detalle del gimnasio."
+		description="El acceso al tenant será temporal, quedará asociado a tu usuario y se registrará en auditoría."
+		onClose={platform.closeSupportReason}
+		open={platform.showSupportReason}
+		title="Motivo de soporte"
+	  >
+		<form className="grid gap-4" onSubmit={platform.submitSupportReason}>
+		  <label className="grid gap-2 font-semibold">
+			Motivo del acceso
+			<textarea
+			  autoFocus
+			  maxLength={500}
+			  onChange={(event) => platform.setSupportReason(event.target.value)}
+			  rows={4}
+			  value={platform.supportReason}
+			/>
+		  </label>
+		  {platform.supportReasonError ? <FormError message={platform.supportReasonError} /> : null}
+		  <div className="app-form-actions">
+			<button className="app-button-secondary" onClick={platform.closeSupportReason} type="button">Cancelar</button>
+			<button className="app-button" type="submit">Iniciar soporte temporal</button>
+		  </div>
+		</form>
+	  </AppDrawer>
+
+      <AppDrawer
+		description="Crea de una vez el tenant, su primera sucursal y la cuenta invitada del dueño. Si algo falla, no queda un gimnasio huérfano."
         onClose={platform.closeCreateOrganization}
         open={platform.showCreate}
         title="Alta de gimnasio"
@@ -141,4 +182,8 @@ function formatCurrency(value: number) {
     currency: "MXN",
     maximumFractionDigits: 0,
   }).format(value);
+}
+
+function formatDateTime(value: string) {
+	return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }

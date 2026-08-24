@@ -73,3 +73,32 @@ export type PlatformCustomerUpdatePayload = {
   notes: string | null;
   expectedVersion: number;
 };
+
+export type PlatformCustomerCreatePayload = {
+	legalName: string;
+	tradeName: string;
+	taxId: string;
+	timezone: string;
+	defaultCurrency: string;
+	contactEmail: string;
+	contactPhone: string;
+	brandName: string;
+	logoUrl: string;
+	primaryColor: string;
+	accentColor: string;
+	surfaceColor: string;
+	branchName: string;
+	branchCode: string;
+	branchPhone: string;
+	ownerFirstName: string;
+	ownerLastName: string;
+	ownerEmail: string;
+	ownerPhone: string;
+};
+
+export type ProvisionedPlatformCustomer = {
+	customer: PlatformCustomer;
+	ownerEmail: string;
+	invitationUrl: string;
+	invitationExpiresAt: string;
+};

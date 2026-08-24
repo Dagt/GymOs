@@ -10,7 +10,7 @@ export type ConsoleProfile = {
 };
 
 export function resolveUserConsole(user: CurrentUser): UserConsole {
-  if (user.platformAdmin && !user.supportMode) {
+	if (user.accountScope === "PLATFORM" && !user.supportMode) {
     return "PLATFORM_OWNER";
   }
   if (isPlatformAdmin(user) && !user.supportMode) {
@@ -87,7 +87,7 @@ export function getPostLoginPath(user: CurrentUser) {
 }
 
 export function isPlatformAdmin(user: CurrentUser) {
-  return user.platformAdmin || user.permissions.includes("platform.admin");
+	return user.accountScope === "PLATFORM";
 }
 
 export function isSupportMode(user: CurrentUser) {
@@ -103,7 +103,7 @@ export function canAccessRoute(user: CurrentUser, pathname: string) {
     return true;
   }
   if (pathname.startsWith("/platform")) {
-    return isPlatformAdmin(user);
+		return user.accountScope === "PLATFORM" && !user.supportMode;
   }
   if (isPlatformAdmin(user) && !user.supportMode) {
     return false;
@@ -207,4 +207,4 @@ const managerRoutes = [
 
 const receptionRoutes = ["/reception", "/pos", "/clients", "/sales", "/reports/sales", "/bookings", "/wellness"];
 const coachRoutes = ["/coaches", "/clients"];
-const publicRoutes = ["/", "/login", "/privacy-policy", "/terms-of-service", "/support", "/privacidad", "/terminos"];
+const publicRoutes = ["/", "/login", "/accept-invitation", "/privacy-policy", "/terms-of-service", "/support", "/privacidad", "/terminos"];

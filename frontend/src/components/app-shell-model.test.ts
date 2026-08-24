@@ -122,7 +122,8 @@ test("platform shell uses neutral GymFort brand outside support mode", () => {
     refreshToken: "refresh",
     user: user({
       brandName: "Tenant Brand",
-      logoUrl: "/tenants/tenant/logo.png",
+	  logoUrl: "/tenants/tenant/logo.png",
+	  accountScope: "PLATFORM",
       platformAdmin: true,
       supportMode: false,
     }),
@@ -145,7 +146,8 @@ test("support mode uses tenant brand even for platform administrator", () => {
     refreshToken: "refresh",
     user: user({
       brandName: "Tenant Brand",
-      logoUrl: "/tenants/tenant/logo.png",
+	  logoUrl: "/tenants/tenant/logo.png",
+	  accountScope: "PLATFORM",
       platformAdmin: true,
       supportMode: true,
     }),
@@ -183,15 +185,16 @@ function sectionLinks(sections: ReturnType<typeof visibleSectionsForConsole>, ti
 
 function user(overrides: Partial<CurrentUser> = {}): CurrentUser {
   return {
-    userId: "user-id",
-    organizationId: "org-id",
+	userId: "user-id",
+	organizationId: "org-id",
     branchId: "branch-id",
     username: "usuario",
     fullName: "Usuario Prueba",
     permissions: [],
     roles: [],
     platformAdmin: false,
-    supportMode: false,
+	supportMode: false,
+	supportExpiresAt: null,
     console: "TENANT_OWNER",
     organizationName: "Gym Prueba",
     brandName: "Gym Prueba",
@@ -199,6 +202,7 @@ function user(overrides: Partial<CurrentUser> = {}): CurrentUser {
     primaryColor: null,
     accentColor: null,
     surfaceColor: null,
-    ...overrides,
+	...overrides,
+	accountScope: overrides.accountScope ?? "TENANT",
   };
 }
