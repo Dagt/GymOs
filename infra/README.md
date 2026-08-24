@@ -19,6 +19,23 @@ Credenciales locales no productivas:
 - PostgreSQL: `gymos` / `gymos`
 - MinIO: `gymos` / `gymos-secret`
 
+El Compose no crea usuarios demo por defecto. Si necesitas datos de prueba,
+copia `infra/.env.example` a `infra/.env`, configura valores propios y fuertes,
+y arranca pasando el archivo explícitamente:
+
+```dotenv
+GYMOS_SEED_ENABLED=true
+GYMOS_DEMO_OWNER_EMAIL=tu-correo-local
+GYMOS_DEMO_OWNER_PASSWORD=tu-contraseña-local-fuerte
+```
+
+```powershell
+docker compose --env-file infra/.env -f infra/docker-compose.yml up --build
+```
+
+El seed sólo existe con el perfil `local`; nunca habilitarlo en staging o
+producción.
+
 ## Stripe CLI en Docker
 
 El archivo Compose incluye el servicio opcional `stripe-listener` con la imagen

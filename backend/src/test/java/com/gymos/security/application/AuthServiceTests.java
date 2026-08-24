@@ -10,10 +10,12 @@ import static org.mockito.Mockito.when;
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.common.security.AccountScope;
 import com.gymos.common.security.JwtService;
 import com.gymos.security.infrastructure.AuthQueryRepository;
 import java.util.Set;
 import java.util.UUID;
+import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -41,6 +43,10 @@ class AuthServiceTests {
 				Set.of("branch.read")
 		);
 		when(authQueryRepository.branchBelongsToOrganization(foreignBranchId, organizationId)).thenReturn(false);
+		when(authQueryRepository.findActiveUserById(userId)).thenReturn(java.util.Optional.of(
+				new AuthQueryRepository.AuthenticatedUser(
+						userId, AccountScope.TENANT, organizationId, "admin@gymos.local", "hash",
+						"Admin GymOS", Set.of("branch.read"), Set.of("Gerente"))));
 
 		assertThatThrownBy(() -> authService.selectBranch(principal, foreignBranchId, "test-correlation"))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
@@ -61,13 +67,15 @@ class AuthServiceTests {
 		);
 		GymOsPrincipal principal = new GymOsPrincipal(
 				UUID.randomUUID(),
-				UUID.randomUUID(),
+				AccountScope.PLATFORM,
+				null,
 				null,
 				"admin@gymos.local",
 				"Admin GymOS",
 				Set.of("platform.admin", "organization.read"),
 				Set.of("Administrador GymOS"),
-				false
+				false,
+				null
 		);
 
 		var currentUser = authService.currentUser(principal);
@@ -88,13 +96,15 @@ class AuthServiceTests {
 		);
 		GymOsPrincipal principal = new GymOsPrincipal(
 				UUID.randomUUID(),
+				AccountScope.PLATFORM,
 				UUID.randomUUID(),
 				UUID.randomUUID(),
 				"admin@gymos.local",
 				"Admin GymOS",
-				Set.of("platform.admin", "organization.read", "user.manage"),
+				Set.of("organization.read", "user.manage"),
 				Set.of("Administrador GymOS"),
-				true
+				true,
+				Instant.now().plusSeconds(600)
 		);
 
 		var currentUser = authService.currentUser(principal);
@@ -120,19 +130,22 @@ class AuthServiceTests {
 		UUID branchId = UUID.randomUUID();
 		GymOsPrincipal principal = new GymOsPrincipal(
 				userId,
+				AccountScope.PLATFORM,
 				organizationId,
 				null,
 				"admin@gymos.local",
 				"Admin GymOS",
-				Set.of("platform.admin", "branch.read"),
+				Set.of("branch.read"),
 				Set.of("Administrador GymOS"),
-				true
+				true,
+				Instant.now().plusSeconds(600)
 		);
 		when(authQueryRepository.branchBelongsToOrganization(branchId, organizationId)).thenReturn(true);
 		when(authQueryRepository.userHasBranchAccess(userId, branchId)).thenReturn(false);
 		when(authQueryRepository.findActiveUserById(userId)).thenReturn(java.util.Optional.of(new AuthQueryRepository.AuthenticatedUser(
 				userId,
-				organizationId,
+				AccountScope.PLATFORM,
+				null,
 				"admin@gymos.local",
 				"hash",
 				"Admin GymOS",

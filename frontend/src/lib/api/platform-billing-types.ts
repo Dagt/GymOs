@@ -35,6 +35,7 @@ export type PlatformBranchBilling = {
   implementationFee: number;
   implementationPaid: boolean;
   notes: string | null;
+  version: number;
 };
 
 export type PlatformBillingOverview = {
@@ -46,13 +47,12 @@ export type PlatformBillingUpdatePayload = {
   subscriptionStatus: "ACTIVE" | "PENDING" | "PAUSED" | "CANCELLED";
   billingAnchorDay: number;
   nextBillingDate: string;
-  lastPaymentDate: string | null;
-  lastPaymentAmount: number | null;
   contractedPlanCode: "GYMFORT_150" | "GYMFORT_500" | "GYMFORT_1000" | "GYMFORT_2000" | "ENTERPRISE";
   monthlyPriceOverride: number | null;
   implementationFee: number;
   implementationPaid: boolean;
   notes: string | null;
+  expectedVersion: number;
 };
 
 export type PlatformBillingPayment = {
@@ -75,6 +75,7 @@ export type PlatformBillingPaymentPayload = {
   paidOn: string;
   reference: string | null;
   notes: string | null;
+  idempotencyKey: string;
 };
 
 export type PlatformBillingPaymentRegistration = {

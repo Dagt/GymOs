@@ -1,8 +1,12 @@
 import type { FormEvent } from "react";
 import {
   EmailField,
+  DateField,
   type FieldErrorMap,
   PhoneField,
+  NumberField,
+  SelectField,
+  TextAreaField,
   TextField,
   normalizeRfc,
   validateBranchCode,
@@ -13,9 +17,18 @@ import {
   validateRequired,
 } from "@/components/FormFields";
 import { LogoUploadField } from "@/components/LogoUploadField";
-import type { CreateBranchPayload, CreateOrganizationPayload } from "@/lib/api";
+import type { CreateBranchPayload } from "@/lib/api";
+import type { PlatformCustomerCreatePayload, PlatformCustomerUpdatePayload } from "@/lib/api/platform-customer-types";
 
-export const emptyOrganizationForm: CreateOrganizationPayload = {
+const lifecycleOptions = [
+  { value: "ONBOARDING", label: "Implementación" },
+  { value: "ACTIVE", label: "Cliente activo" },
+  { value: "AT_RISK", label: "En riesgo" },
+  { value: "OFFBOARDING", label: "En proceso de salida" },
+  { value: "FORMER", label: "Cliente anterior" },
+];
+
+export const emptyOrganizationForm: PlatformCustomerCreatePayload = {
   legalName: "",
   tradeName: "",
   taxId: "",
@@ -28,6 +41,13 @@ export const emptyOrganizationForm: CreateOrganizationPayload = {
   primaryColor: "#093D3A",
   accentColor: "#18C8B2",
   surfaceColor: "#F2F8F7",
+	branchName: "Sucursal Principal",
+	branchCode: "MAIN",
+	branchPhone: "",
+	ownerFirstName: "",
+	ownerLastName: "",
+	ownerEmail: "",
+	ownerPhone: "",
 };
 
 export const emptyBranchForm: CreateBranchPayload = {
@@ -46,10 +66,10 @@ export function OrganizationForm({
   onSubmit,
 }: {
   errors: FieldErrorMap;
-  form: CreateOrganizationPayload;
+  form: PlatformCustomerCreatePayload;
   saving: boolean;
   onLogoFileChange: (file: File | null) => void;
-  onChange: (next: CreateOrganizationPayload) => void;
+  onChange: (next: PlatformCustomerCreatePayload) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }) {
   return (
@@ -59,6 +79,23 @@ export function OrganizationForm({
       <TextField error={errors.taxId} label="RFC" name="taxId" value={form.taxId ?? ""} onChange={(value) => onChange({ ...form, taxId: normalizeRfc(value) })} />
       <EmailField error={errors.contactEmail} label="Email contacto" name="contactEmail" required value={form.contactEmail ?? ""} onChange={(value) => onChange({ ...form, contactEmail: value })} />
       <PhoneField error={errors.contactPhone} label="Telefono contacto" name="contactPhone" required value={form.contactPhone ?? ""} onChange={(value) => onChange({ ...form, contactPhone: value })} />
+	  <section className="platform-form-intro">
+		<strong>Primera sucursal</strong>
+		<span>Se crea junto con el gimnasio para que el dueño pueda comenzar a operar.</span>
+	  </section>
+	  <TextField error={errors.branchName} label="Nombre de sucursal" name="branchName" value={form.branchName} onChange={(value) => onChange({ ...form, branchName: value })} />
+	  <TextField error={errors.branchCode} label="Codigo corto" name="branchCode" value={form.branchCode} onChange={(value) => onChange({ ...form, branchCode: value.toUpperCase() })} />
+	  <PhoneField error={errors.branchPhone} label="Telefono de sucursal" name="branchPhone" required value={form.branchPhone} onChange={(value) => onChange({ ...form, branchPhone: value })} />
+	  <section className="platform-form-intro">
+		<strong>Dueño del gimnasio</strong>
+		<span>Recibirá una invitación de un solo uso; no se envían contraseñas permanentes.</span>
+	  </section>
+	  <div className="grid gap-4 md:grid-cols-2">
+		<TextField error={errors.ownerFirstName} label="Nombre" name="ownerFirstName" value={form.ownerFirstName} onChange={(value) => onChange({ ...form, ownerFirstName: value })} />
+		<TextField error={errors.ownerLastName} label="Apellidos" name="ownerLastName" value={form.ownerLastName} onChange={(value) => onChange({ ...form, ownerLastName: value })} />
+		<EmailField error={errors.ownerEmail} label="Correo de acceso" name="ownerEmail" required value={form.ownerEmail} onChange={(value) => onChange({ ...form, ownerEmail: value })} />
+		<PhoneField error={errors.ownerPhone} label="Telefono del dueño" name="ownerPhone" required value={form.ownerPhone} onChange={(value) => onChange({ ...form, ownerPhone: value })} />
+	  </div>
       <hr className="border-[#dbe4ee]" />
       <TextField error={errors.brandName} label="Nombre visible de marca" name="brandName" required={false} value={form.brandName ?? ""} onChange={(value) => onChange({ ...form, brandName: value })} />
       <LogoUploadField
@@ -101,13 +138,114 @@ export function BranchForm({
   );
 }
 
-export function validateOrganization(form: CreateOrganizationPayload) {
+export function CustomerAccountForm({
+  form,
+  saving,
+  onChange,
+  onSubmit,
+}: {
+  form: PlatformCustomerUpdatePayload;
+  saving: boolean;
+  onChange: (next: PlatformCustomerUpdatePayload) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  return (
+    <form className="grid gap-4" onSubmit={onSubmit}>
+      <section className="platform-form-intro">
+        <strong>Relación con el cliente</strong>
+        <span>Estos datos son internos de GymFort y no cambian la operación del gimnasio.</span>
+      </section>
+      <div className="grid gap-4 md:grid-cols-2">
+        <SelectField
+          label="Etapa comercial"
+          name="customerLifecycle"
+          onChange={(value) => onChange({ ...form, lifecycleStatus: value as PlatformCustomerUpdatePayload["lifecycleStatus"] })}
+          options={lifecycleOptions}
+          value={form.lifecycleStatus}
+        />
+        <TextField
+          label="Responsable en GymFort"
+          name="accountOwner"
+          onChange={(value) => onChange({ ...form, accountOwner: value || null })}
+          placeholder="Ej. Daniela · Customer Success"
+          required={false}
+          value={form.accountOwner ?? ""}
+        />
+        <EmailField
+          label="Correo de cobranza"
+          name="billingEmail"
+          onChange={(value) => onChange({ ...form, billingEmail: value || null })}
+          required={false}
+          value={form.billingEmail ?? ""}
+        />
+        <PhoneField
+          label="Teléfono de cobranza"
+          name="billingPhone"
+          onChange={(value) => onChange({ ...form, billingPhone: value || null })}
+          required={false}
+          value={form.billingPhone ?? ""}
+        />
+        <DateField
+          label="Inicio de contrato"
+          name="contractStartedOn"
+          onChange={(value) => onChange({ ...form, contractStartedOn: value || null })}
+          required={false}
+          value={form.contractStartedOn ?? ""}
+        />
+        <DateField
+          label="Renovación prevista"
+          name="renewalOn"
+          onChange={(value) => onChange({ ...form, renewalOn: value || null })}
+          required={false}
+          value={form.renewalOn ?? ""}
+        />
+        <NumberField
+          help="Días acordados después de la fecha de cobro; máximo 90."
+          label="Días de crédito"
+          max="90"
+          min="0"
+          name="paymentTermsDays"
+          onChange={(value) => onChange({ ...form, paymentTermsDays: Number(value) || 0 })}
+          value={String(form.paymentTermsDays)}
+        />
+        <DateField
+          label="Próximo seguimiento"
+          name="nextFollowUpOn"
+          onChange={(value) => onChange({ ...form, nextFollowUpOn: value || null })}
+          required={false}
+          value={form.nextFollowUpOn ?? ""}
+        />
+      </div>
+      <TextAreaField
+        label="Notas del expediente"
+        name="customerNotes"
+        onChange={(value) => onChange({ ...form, notes: value || null })}
+        placeholder="Acuerdos, riesgos, responsables del cliente y siguiente paso..."
+        required={false}
+        rows={5}
+        value={form.notes ?? ""}
+      />
+      <button className="form-primary-button" disabled={saving} type="submit">
+        {saving ? "Guardando..." : "Guardar expediente"}
+      </button>
+    </form>
+  );
+}
+
+export function validateOrganization(form: PlatformCustomerCreatePayload) {
   const errors: FieldErrorMap = {};
   addError(errors, "tradeName", validateRequired(form.tradeName, "Nombre comercial"));
   addError(errors, "legalName", validateRequired(form.legalName, "Nombre legal"));
   addError(errors, "taxId", validateRfc(form.taxId ?? "", true));
   addError(errors, "contactEmail", validateEmail(form.contactEmail ?? "", true));
   addError(errors, "contactPhone", validatePhone(form.contactPhone ?? "", true));
+	addError(errors, "branchName", validateRequired(form.branchName, "Nombre de sucursal"));
+	addError(errors, "branchCode", validateBranchCode(form.branchCode));
+	addError(errors, "branchPhone", validatePhone(form.branchPhone, true));
+	addError(errors, "ownerFirstName", validateRequired(form.ownerFirstName, "Nombre del dueño"));
+	addError(errors, "ownerLastName", validateRequired(form.ownerLastName, "Apellidos del dueño"));
+	addError(errors, "ownerEmail", validateEmail(form.ownerEmail, true));
+	addError(errors, "ownerPhone", validatePhone(form.ownerPhone, true));
   addError(errors, "primaryColor", validateHexColor(form.primaryColor ?? "", "Color principal", true));
   addError(errors, "accentColor", validateHexColor(form.accentColor ?? "", "Color acento", true));
   addError(errors, "surfaceColor", validateHexColor(form.surfaceColor ?? "", "Color fondo", true));

@@ -2,92 +2,92 @@
 
 Estado: AUDITADO
 
-Corte: 23 de agosto de 2026
+Corte: 24 de agosto de 2026
 
-Rama de trabajo: `feature/physical-access-control`
+Rama de trabajo: `feature/platform-identity-separation`
 
-Base integrada: `main` en `a9ca485` (`Merge pricing and billing`)
+Base integrada: `main` en `71810b3` (`fix: support authenticated Redis connections`)
 
 ## 1. Situación vigente
 
-Cobranza comercial, Automatizaciones/ZeptoMail y métricas ya forman parte de la
-base integrada. La rama actual concentra exclusivamente el control de acceso
-físico cloud y la preparación del primer piloto Hikvision/HikCentral.
+El control plane de acceso físico cloud ya está integrado en `main`. La rama
+`feature/platform-client-billing-management` agrega la administración comercial
+de gimnasios clientes y permanece publicada en `8ba97a6`; la rama actual parte de
+ese commit y añade la separación definitiva entre identidades `PLATFORM` y
+`TENANT`, el bootstrap seguro del primer administrador y el aprovisionamiento
+transaccional de cada gimnasio con su primer propietario invitado.
 
-La rama inició con la fundación de sincronización `f0b375c` y la consola
-`bbf7ea8`. El corte actual agrega V84, el contrato seguro del GymFort Local
-Connector, jobs durables, automatización de estado deseado, eventos/candidatos,
-hardening tenant/sucursal, UX operativa, pruebas y documentación. No incluye un
-adapter HikCentral funcional ni afirma apertura del torniquete real.
+El PR de la rama actual hacia `main` incluye ambos bloques porque la remediación
+de identidad es necesaria para operar de forma segura la consola comercial. No
+debe fusionarse hasta que CI y la revisión de seguridad estén verdes.
 
 | Rama | Estado | Acción |
 |---|---|---|
-| `main` | Base estable hasta cobranza comercial | Recibir cambios sólo por PR verde |
-| `feature/physical-access-control` | Activa | Validar, revisar, publicar PR; no fusionar desde esta tarea |
+| `main` | Base estable con acceso físico cloud | Recibir cambios sólo por PR verde |
+| `feature/platform-identity-separation` | Activa y validada localmente | Publicar PR; revisar CI/seguridad; no fusionar automáticamente |
+| `feature/platform-client-billing-management` | Publicada en `8ba97a6`; base de la rama actual | No abrir un merge paralelo; queda incluida en el PR actual |
+| `feature/physical-access-control` | Integrada mediante PR #14 | Histórica; no fusionar otra vez |
 | `feature/pricing-and-billing` | Integrada en `main` | Histórica; no fusionar otra vez |
 | `feature/automations-zoho-email` | Integrada | Histórica; no fusionar otra vez |
 | `fix/kiosk-memberships-stripe` | Integrada | Histórica; no fusionar otra vez |
-| `feature/coaches-workouts` | Integrada en la evolución del árbol | Referencia histórica; no merge lateral |
-| `feature/wellness-services` | Funcionalidad reaplicada en historia vigente | Referencia; no fusionar de nuevo |
 
-## 2. Hitos integrados y de rama
+## 2. Hitos recientes
 
-| Periodo | Hito |
+| Fecha | Hito |
 |---|---|
-| 13–25 jul 2026 | Fundación, multi-tenant, identidad, CRM, catálogo, POS, membresías, reservas, inventario, consolas y operación por sucursal |
-| 26–27 jul | Coaches/rutinas, perfiles, catálogo de ejercicios, métricas, PDF y Wellness |
-| 30 jul–3 ago | Automatizaciones durables, kiosco lógico, proveedores, Stripe Checkout/recurrencia, correo durable y observabilidad |
-| agosto | Membresías Stripe, idempotencia, beneficios, retornos, pagos y multi-sucursal |
-| 20 ago | PR #10 integra `fix/kiosk-memberships-stripe` en `main` |
-| 21–22 ago | Configuración unificada de pagos/kiosco, ZeptoMail real, automatizaciones simplificadas y permisos de Gerencia |
-| 23 ago | `feature/pricing-and-billing` se integra a `main` en `a9ca485` |
-| 23 ago | `f0b375c` agrega V83, puerto provider-neutral, vínculos/mapeos y estado de sincronización |
-| 23 ago | `bbf7ea8` reorganiza `/access` en operación, configuración física y bitácora |
-| 23 ago | V84 completa control plane, Connector API, cola durable, seguridad, pruebas y documentación del piloto físico |
+| 23 ago 2026 | `feature/pricing-and-billing` se integra en `main` en `a9ca485` |
+| 23 ago 2026 | V83/V84 completan el control plane, Connector API, hardening y consola de acceso físico |
+| 24 ago 2026 | PR #14 integra `feature/physical-access-control` en `main` (`f95abfa`) |
+| 24 ago 2026 | `71810b3` agrega soporte de autenticación Redis y se incorpora a la rama activa |
+| 24 ago 2026 | `8ba97a6` completa cartera, cobranza y gestión profesional de gimnasios clientes |
+| 24 ago 2026 | V86/V87 separan cuentas de plataforma/tenant y agregan invitaciones de propietario de un uso |
+| 24 ago 2026 | JWT/refresh, soporte temporal, bootstrap y rutas frontend adoptan `accountScope` explícito |
 
 ## 3. Alcance material de la rama activa
 
-### Cloud implementado
+### Implementado
 
-- catálogo provider-neutral con proveedores planificados no seleccionables;
-- conexión única por sucursal;
-- puntos productivos con exactamente un beneficio `ACCESS`;
-- vínculos de dispositivo/persona y mapeos de niveles externos;
-- estado deseado automático por eventos de membresía, socio y beneficio;
-- jobs PostgreSQL idempotentes con claim exclusivo, lease, retry y resultado;
-- activación de un uso, secretos hasheados, rotación/revocación y heartbeat;
-- eventos físicos idempotentes y candidatos con matching exacto/manual;
-- permiso `access.physical.manage`, aislamiento compuesto tenant/sucursal y
-  auditoría;
-- consola de configuración/salud sin biometría ni credenciales LAN.
+- administración comercial de gimnasios desde la navegación lateral de
+  plataforma;
+- identidades `PLATFORM` sin organización/sucursal e identidades `TENANT` con
+  organización obligatoria, protegidas también por restricciones PostgreSQL;
+- JWT y refresh con scope explícito, sin promoción implícita entre contextos;
+- soporte temporal por gimnasio con motivo, expiración, auditoría y salida
+  explícita;
+- bootstrap idempotente del primer administrador usando sólo variables de
+  entorno, sin conservar el secreto;
+- alta transaccional de organización, primera sucursal y propietario tenant;
+- invitación de un solo uso almacenada únicamente como hash;
+- clasificación `PRODUCTIVE`/`DEMO` y exclusión de fixtures demo del portafolio;
+- guards y rutas frontend que separan la consola SaaS del gimnasio cliente;
+- actualización segura de dependencias frontend y auditoría sin advisories.
 
-### Fuera de esta rama
+### No incluido
 
-- ejecutable instalable GymFort Local Connector;
-- adapter contra una versión/licencia confirmada de HikCentral Professional;
-- endpoints, puertos o credenciales HikCentral;
-- enrolamiento biométrico en GymFort Cloud;
-- apertura física distinta de `SIMULATED_OPEN`;
-- aceptación con hardware y runbook de caída/recuperación en sitio.
+- borrado automático de datos demo o de datos productivos existentes;
+- fusión automática a `main`;
+- GymFort Local Connector, adapter HikCentral o integración con hardware;
+- cobro SaaS recurrente automático, CFDI o conciliación bancaria completa;
+- una suite E2E homogénea para todos los recorridos críticos.
 
-## 4. Evidencia requerida para cierre
+## 4. Evidencia de validación local
 
-- suites backend unitarias y de arquitectura;
-- migración limpia y upgrade V83 → V84 en PostgreSQL;
-- integración PostgreSQL de claim/lease/retry/idempotencia/aislamiento;
-- typecheck, lint, pruebas y build frontend;
-- smoke visual local de `/access` con permisos reales;
-- `git diff --check`, revisión de secretos y comparación contra `origin/main`;
-- commits claros sólo en `feature/physical-access-control`.
+- suite backend completa y pruebas focalizadas de identidad/plataforma;
+- suite PostgreSQL/Testcontainers completa y migraciones limpias/upgrade;
+- `build` backend y construcción de imagen Docker;
+- 94/94 pruebas frontend, typecheck, lint y build Next;
+- bundle OpenNext para Cloudflare;
+- `npm audit` con cero vulnerabilidades;
+- `git diff --check` y revisión de que no se versionen secretos.
 
-Los checks CI deben revisarse sobre el commit final antes de abrir o fusionar un
-PR. Ausencia de un status publicado no se interpreta como pipeline verde.
+La evidencia local no sustituye los checks del PR. Ausencia de un status
+publicado no se interpreta como pipeline verde.
 
-## 5. Regla futura
+## 5. Regla de integración
 
-1. Una rama representa un objetivo claro.
-2. Antes de integrar: fetch/comparación contra `origin/main`, pruebas, revisión
-   documental y PR.
-3. No hacer merges laterales de ramas históricas.
-4. Todo cierre material actualiza documentos 13, 28, 29 y fichas afectadas.
+1. La rama actual se publica y abre contra `main` como PR revisable.
+2. CI, migraciones y revisión de seguridad deben terminar correctamente.
+3. El bootstrap se habilita sólo durante la creación inicial y sus variables se
+   eliminan después, conforme al runbook.
+4. No se fusiona ni despliega automáticamente desde esta tarea.
 5. Las ramas remotas sólo se eliminan por decisión explícita.

@@ -5,8 +5,7 @@ import { AppNotice } from "@/components/AppNotice";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired } from "@/components/AuthRequired";
 import { FormError } from "@/components/FormFields";
-import Link from "next/link";
-import { BranchForm, OrganizationForm } from "./PlatformGymnasiumForms";
+import { BranchForm, CustomerAccountForm, OrganizationForm } from "./PlatformGymnasiumForms";
 import { PlatformGymnasiumDetail, PlatformGymnasiumList } from "./PlatformGymnasiumPanels";
 import { usePlatformGymnasiumsController } from "./usePlatformGymnasiumsController";
 
@@ -39,20 +38,38 @@ export default function PlatformGymnasiumsPage() {
     >
       {platform.error ? <FormError message={platform.error} /> : null}
       {platform.message ? <AppNotice message={platform.message} tone="success" /> : null}
+	  {platform.provisionedInvitation ? (
+		<section className="app-card platform-invitation-card" role="status">
+		  <div>
+			<p className="app-eyebrow">Invitación del dueño</p>
+			<h2>Cuenta creada sin contraseña compartida</h2>
+			<span>
+			  Envía este enlace de un solo uso a {platform.provisionedInvitation.ownerEmail}. Vence el {formatDateTime(platform.provisionedInvitation.invitationExpiresAt)}.
+			</span>
+		  </div>
+		  <div className="platform-invitation-actions">
+			<input aria-label="Enlace de invitación" readOnly value={platform.provisionedInvitation.invitationUrl} />
+			<button className="app-button" onClick={() => navigator.clipboard.writeText(platform.provisionedInvitation!.invitationUrl)} type="button">Copiar enlace</button>
+			<button className="app-button-secondary" onClick={() => platform.setProvisionedInvitation(null)} type="button">Ocultar</button>
+		  </div>
+		</section>
+	  ) : null}
 
-      <section className="platform-billing-entry">
-        <div>
-          <p className="app-eyebrow">Administración GymFort</p>
-          <h2>Cobros y suscripciones</h2>
-          <span>Consulta el plan contratado, socios activos, MRR, fechas de corte e historial de pagos de cada gimnasio.</span>
-        </div>
-        <Link className="app-button" href="/platform/billing">Abrir cobros y suscripciones</Link>
+      <section className="platform-kpi-grid" aria-label="Resumen de clientes">
+        <article className="platform-kpi"><span>Clientes</span><strong>{platform.portfolio?.summary.customerCount ?? 0}</strong></article>
+        <article className="platform-kpi"><span>Activos</span><strong>{platform.portfolio?.summary.activeCustomerCount ?? 0}</strong></article>
+        <article className="platform-kpi"><span>En implementación</span><strong>{platform.portfolio?.summary.onboardingCustomerCount ?? 0}</strong></article>
+        <article className={`platform-kpi ${(platform.portfolio?.summary.atRiskCustomerCount ?? 0) > 0 ? "danger" : "neutral"}`}><span>En riesgo</span><strong>{platform.portfolio?.summary.atRiskCustomerCount ?? 0}</strong></article>
+        <article className="platform-kpi"><span>MRR configurado</span><strong>{formatCurrency(platform.portfolio?.summary.monthlyRecurringRevenue ?? 0)}</strong></article>
       </section>
 
       <section className="platform-layout">
         <PlatformGymnasiumList
+          customers={platform.portfolio?.customers ?? []}
           filteredOrganizations={platform.filteredOrganizations}
+          lifecycleFilter={platform.lifecycleFilter}
           onCreateOrganization={platform.openCreateOrganization}
+          onLifecycleFilterChange={platform.setLifecycleFilter}
           onQueryChange={platform.setQuery}
           onSelectOrganization={platform.setSelectedOrganizationId}
           organizationsCount={platform.organizations.length}
@@ -67,17 +84,44 @@ export default function PlatformGymnasiumsPage() {
           onActivateBranch={platform.activateBranch}
           onActivateOrganization={platform.activateOrganization}
           onCreateBranch={platform.openBranchDrawer}
+          onEditCustomerAccount={platform.openCustomerAccount}
           onGoToTenantSection={platform.goToTenantSection}
           onToggleOrganizationStatus={platform.toggleOrganizationStatus}
           saving={platform.saving}
           selectedIsActive={platform.selectedIsActive}
+          selectedCustomer={platform.selectedCustomer}
           selectedOrganization={platform.selectedOrganization}
           selectingId={platform.selectingId}
         />
       </section>
 
       <AppDrawer
-        description="Registra el tenant y su marca. Las sucursales se crean despues desde el detalle del gimnasio."
+		description="El acceso al tenant será temporal, quedará asociado a tu usuario y se registrará en auditoría."
+		onClose={platform.closeSupportReason}
+		open={platform.showSupportReason}
+		title="Motivo de soporte"
+	  >
+		<form className="grid gap-4" onSubmit={platform.submitSupportReason}>
+		  <label className="grid gap-2 font-semibold">
+			Motivo del acceso
+			<textarea
+			  autoFocus
+			  maxLength={500}
+			  onChange={(event) => platform.setSupportReason(event.target.value)}
+			  rows={4}
+			  value={platform.supportReason}
+			/>
+		  </label>
+		  {platform.supportReasonError ? <FormError message={platform.supportReasonError} /> : null}
+		  <div className="app-form-actions">
+			<button className="app-button-secondary" onClick={platform.closeSupportReason} type="button">Cancelar</button>
+			<button className="app-button" type="submit">Iniciar soporte temporal</button>
+		  </div>
+		</form>
+	  </AppDrawer>
+
+      <AppDrawer
+		description="Crea de una vez el tenant, su primera sucursal y la cuenta invitada del dueño. Si algo falla, no queda un gimnasio huérfano."
         onClose={platform.closeCreateOrganization}
         open={platform.showCreate}
         title="Alta de gimnasio"
@@ -110,6 +154,36 @@ export default function PlatformGymnasiumsPage() {
           saving={platform.saving}
         />
       </AppDrawer>
+
+      <AppDrawer
+        description={platform.selectedOrganization ? `Relacion comercial interna con ${platform.selectedOrganization.tradeName}.` : undefined}
+        onClose={platform.closeCustomerAccount}
+        open={platform.showCustomerAccount}
+        title="Expediente comercial"
+        wide
+      >
+        {platform.error ? <FormError message={platform.error} /> : null}
+        {platform.customerForm ? (
+          <CustomerAccountForm
+            form={platform.customerForm}
+            onChange={platform.setCustomerForm}
+            onSubmit={platform.submitCustomerAccount}
+            saving={platform.saving}
+          />
+        ) : null}
+      </AppDrawer>
     </AppShell>
   );
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("es-MX", {
+    style: "currency",
+    currency: "MXN",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+function formatDateTime(value: string) {
+	return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }

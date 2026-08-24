@@ -5,10 +5,32 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.time.Instant;
 import org.junit.jupiter.api.Test;
 
 class JwtServiceTests {
 	private static final String TEST_SECRET = "test-secret-with-enough-entropy-for-jwt-signing";
+
+	@Test
+	void platformTokenPreservesExplicitScopeWithoutTenantContext() {
+		JwtService jwtService = service();
+		GymOsPrincipal principal = new GymOsPrincipal(
+				UUID.randomUUID(), AccountScope.PLATFORM, null, null, "platform@gymfort.mx", "Admin GymFort",
+				Set.of("platform.admin"), Set.of("Administrador GymOS"), false, null);
+
+		assertThat(jwtService.parseAccessToken(jwtService.accessToken(principal))).contains(principal);
+	}
+
+	@Test
+	void expiredSupportContextIsRejectedEvenWhenJwtExpirationIsStillValid() {
+		JwtService jwtService = service();
+		GymOsPrincipal principal = new GymOsPrincipal(
+				UUID.randomUUID(), AccountScope.PLATFORM, UUID.randomUUID(), null,
+				"platform@gymfort.mx", "Admin GymFort", Set.of("branch.read"),
+				Set.of("Administrador GymOS"), true, Instant.now().minusSeconds(1));
+
+		assertThat(jwtService.parseAccessToken(jwtService.accessToken(principal))).isEmpty();
+	}
 
 	@Test
 	void accessTokenPreservesAuthenticatedTenantAndAuthorities() {

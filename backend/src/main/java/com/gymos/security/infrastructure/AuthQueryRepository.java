@@ -1,6 +1,8 @@
 package com.gymos.security.infrastructure;
 
+import com.gymos.common.security.AccountScope;
 import com.gymos.common.security.GymOsPrincipal;
+import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -18,11 +20,11 @@ public class AuthQueryRepository {
 
 	public Optional<AuthenticatedUser> findActiveUserByUsername(String username) {
 		return findUser("""
-				SELECT ua.id, ua.organization_id, ua.username, ua.password_hash,
+				SELECT ua.id, ua.account_scope, ua.organization_id, ua.username, ua.password_hash,
 				       TRIM(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) AS full_name
 				FROM user_account ua
 				JOIN person p ON p.id = ua.person_id
-				WHERE (LOWER(ua.username) = LOWER(:username) OR LOWER(p.email) = LOWER(:username))
+				WHERE LOWER(ua.username) = LOWER(:username)
 				  AND ua.status = 'ACTIVE'
 				  AND ua.deleted_at IS NULL
 				""", "username", username);
@@ -30,7 +32,7 @@ public class AuthQueryRepository {
 
 	public Optional<AuthenticatedUser> findActiveUserById(UUID userId) {
 		return findUser("""
-				SELECT ua.id, ua.organization_id, ua.username, ua.password_hash,
+				SELECT ua.id, ua.account_scope, ua.organization_id, ua.username, ua.password_hash,
 				       TRIM(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) AS full_name
 				FROM user_account ua
 				JOIN person p ON p.id = ua.person_id
@@ -138,6 +140,9 @@ public class AuthQueryRepository {
 	}
 
 	public Optional<OrganizationTheme> organizationTheme(UUID organizationId) {
+		if (organizationId == null) {
+			return Optional.empty();
+		}
 		return jdbcClient.sql("""
 				SELECT trade_name, brand_name, logo_url, primary_color, accent_color, surface_color
 				FROM organization
@@ -161,6 +166,7 @@ public class AuthQueryRepository {
 				.param(parameterName, parameterValue)
 				.query((resultSet, rowNumber) -> new AuthenticatedUser(
 						resultSet.getObject("id", UUID.class),
+						AccountScope.valueOf(resultSet.getString("account_scope")),
 						resultSet.getObject("organization_id", UUID.class),
 						resultSet.getString("username"),
 						resultSet.getString("password_hash"),
@@ -201,6 +207,7 @@ public class AuthQueryRepository {
 
 	public record AuthenticatedUser(
 			UUID userId,
+			AccountScope accountScope,
 			UUID organizationId,
 			String username,
 			String passwordHash,
@@ -208,8 +215,52 @@ public class AuthQueryRepository {
 			Set<String> permissions,
 			Set<String> roles
 	) {
+		public AuthenticatedUser(
+				UUID userId,
+				UUID organizationId,
+				String username,
+				String passwordHash,
+				String fullName,
+				Set<String> permissions,
+				Set<String> roles
+		) {
+			this(userId, AccountScope.TENANT, organizationId, username, passwordHash, fullName, permissions, roles);
+		}
+
 		public GymOsPrincipal toPrincipal(UUID branchId) {
-			return new GymOsPrincipal(userId, organizationId, branchId, username, fullName, permissions, roles, false);
+			if (accountScope == AccountScope.PLATFORM) {
+				return new GymOsPrincipal(
+						userId, accountScope, null, null, username, fullName,
+						platformPermissions(), roles, false, null);
+			}
+			return new GymOsPrincipal(
+					userId, accountScope, organizationId, branchId, username, fullName,
+					permissions, roles, false, null);
+		}
+
+		public GymOsPrincipal toSupportPrincipal(UUID activeOrganizationId, UUID branchId, Instant expiresAt) {
+			if (accountScope != AccountScope.PLATFORM) {
+				throw new IllegalStateException("Only platform identities can enter support mode");
+			}
+			return new GymOsPrincipal(
+					userId, accountScope, activeOrganizationId, branchId, username, fullName,
+					tenantSupportPermissions(), roles, true, expiresAt);
+		}
+
+		public boolean platformAdmin() {
+			return accountScope == AccountScope.PLATFORM && permissions.contains("platform.admin");
+		}
+
+		private Set<String> platformPermissions() {
+			return permissions.stream()
+					.filter(permission -> permission.startsWith("platform."))
+					.collect(java.util.stream.Collectors.toUnmodifiableSet());
+		}
+
+		private Set<String> tenantSupportPermissions() {
+			return permissions.stream()
+					.filter(permission -> !permission.startsWith("platform."))
+					.collect(java.util.stream.Collectors.toUnmodifiableSet());
 		}
 	}
 

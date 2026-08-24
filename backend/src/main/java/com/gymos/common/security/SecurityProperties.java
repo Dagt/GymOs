@@ -10,10 +10,21 @@ public record SecurityProperties(
 		String jwtSecret,
 		long accessTokenSeconds,
 		long receptionAccessTokenSeconds,
-		long refreshTokenDays
+		long refreshTokenDays,
+		long platformSupportMinutes
 ) {
 	public SecurityProperties(List<String> corsAllowedOrigins, String jwtSecret, long accessTokenSeconds, long refreshTokenDays) {
-		this(corsAllowedOrigins, jwtSecret, accessTokenSeconds, 86_400, refreshTokenDays);
+		this(corsAllowedOrigins, jwtSecret, accessTokenSeconds, 86_400, refreshTokenDays, 30);
+	}
+
+	public SecurityProperties(
+			List<String> corsAllowedOrigins,
+			String jwtSecret,
+			long accessTokenSeconds,
+			long receptionAccessTokenSeconds,
+			long refreshTokenDays
+	) {
+		this(corsAllowedOrigins, jwtSecret, accessTokenSeconds, receptionAccessTokenSeconds, refreshTokenDays, 30);
 	}
 
 	@ConstructorBinding
@@ -32,6 +43,9 @@ public record SecurityProperties(
 		}
 		if (refreshTokenDays <= 0) {
 			refreshTokenDays = 7;
+		}
+		if (platformSupportMinutes <= 0) {
+			platformSupportMinutes = 30;
 		}
 	}
 }

@@ -1,10 +1,10 @@
 # Despliegue piloto
 
-Corte: 21 de agosto de 2026
+Corte: 24 de agosto de 2026
 
 ## Entornos
 
-- `local`: seed demo permitido.
+- `local`: seed demo permitido sólo con opt-in y credenciales explícitas.
 - `test`: pruebas automatizadas, seed deshabilitado.
 - `development`: validación compartida.
 - `staging`: ensayo similar a producción.
@@ -22,6 +22,10 @@ Inyectar por entorno/gestor de secretos:
 - correo: `GYMOS_SMTP_*` y `GYMOS_NOTIFICATION_PREFERENCE_KEY`;
 - proxy: `GYMOS_TRUSTED_PROXIES` sólo para balanceadores directos.
 
+El primer administrador SaaS se crea una sola vez con el procedimiento
+`platform-identity-bootstrap.md`. No dejes `GYMOS_PLATFORM_BOOTSTRAP_ENABLED`
+activo ni la contraseña de bootstrap en Railway después de verificar la cuenta.
+
 Nunca usar credenciales demo fuera de `local`, secretos en imágenes/Git ni
 llaves de backend en `NEXT_PUBLIC_*`.
 
@@ -36,7 +40,10 @@ llaves de backend en `NEXT_PUBLIC_*`.
 7. Si se habilita correo, probar SMTP/remitente y entregabilidad.
 8. Ejecutar smoke de login, sucursal, socio, venta, pago, membresía, reserva,
    kiosco y reporte.
-9. Confirmar seed deshabilitado, backup programado, métricas y alertas.
+9. Confirmar `GYMOS_SEED_ENABLED=false`, que el perfil `local` no está activo,
+   bootstrap deshabilitado, backup programado, métricas y alertas.
+10. Validar por separado login `PLATFORM`, login `TENANT`, entrada/salida de
+    soporte y que un tenant no alcance `/api/v1/platform/**`.
 
 El perfil Docker `stripe` es para desarrollo/test local; producción debe usar un
 endpoint público HTTPS registrado en Stripe, no un listener CLI permanente.

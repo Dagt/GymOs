@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 @Aspect
 @Component
 class AuthBranchOrganizationGuard {
-	private static final String REFRESH_PREFIX = "gymos:refresh:";
+	private static final String REFRESH_PREFIX = "gymos:refresh:v2:";
 
 	private final AuthQueryRepository authQueryRepository;
 	private final StringRedisTemplate redisTemplate;
@@ -38,11 +38,11 @@ class AuthBranchOrganizationGuard {
 		}
 		try {
 			String[] parts = storedSession.split("\\|", -1);
-			if (parts.length != 4 || parts[2].isBlank()) {
+			if (parts.length != 7 || !"v2".equals(parts[0]) || parts[4].isBlank()) {
 				return;
 			}
-			UUID organizationId = UUID.fromString(parts[1]);
-			UUID branchId = UUID.fromString(parts[2]);
+			UUID organizationId = UUID.fromString(parts[3]);
+			UUID branchId = UUID.fromString(parts[4]);
 			ensureBranchBelongsToOrganization(branchId, organizationId, "REFRESH_TOKEN_INVALID");
 		} catch (IllegalArgumentException exception) {
 			throw new BusinessException("REFRESH_TOKEN_INVALID", "La sesion ya no es valida.");

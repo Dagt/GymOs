@@ -97,13 +97,14 @@ export function PasswordField(props: BaseProps) {
   );
 }
 
-export function NumberField(props: BaseProps & { min?: string; step?: string }) {
+export function NumberField(props: BaseProps & { max?: string; min?: string; step?: string }) {
   return (
     <FieldFrame error={props.error} help={props.help} label={props.label} name={props.name} required={props.required ?? true}>
       <input
         aria-invalid={Boolean(props.error)}
         className="app-input"
         id={props.name}
+        max={props.max}
         min={props.min ?? "0"}
         name={props.name}
         onChange={(event) => props.onChange(event.target.value)}

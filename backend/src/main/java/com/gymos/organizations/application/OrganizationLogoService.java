@@ -48,6 +48,9 @@ public class OrganizationLogoService {
 			String correlationId
 	) {
 		requirePrincipal(principal);
+		if (principal.organizationId() == null) {
+			throw new BusinessException("ORGANIZATION_REQUIRED", "Selecciona un gimnasio para continuar.");
+		}
 		return uploadForOrganization(principal, principal.organizationId(), command, correlationId);
 	}
 
@@ -165,7 +168,7 @@ public class OrganizationLogoService {
 	}
 
 	private void requirePrincipal(GymOsPrincipal principal) {
-		if (principal == null || principal.organizationId() == null) {
+		if (principal == null) {
 			throw new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesion para continuar.");
 		}
 	}

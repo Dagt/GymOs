@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 
 export default function AdminRedirectPage() {
-  redirect("/platform/gymnasiums");
+  redirect("/platform");
 }
-

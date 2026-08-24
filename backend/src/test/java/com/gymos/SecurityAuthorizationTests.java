@@ -226,6 +226,19 @@ class SecurityAuthorizationTests {
 	}
 
 	@Test
+	@WithMockUser(authorities = "organization.read")
+	void platformCustomerManagementRequiresPlatformAdministrator() throws Exception {
+		mockMvc.perform(get("/api/v1/platform/customers"))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
+		mockMvc.perform(put("/api/v1/platform/customers/99999999-9999-9999-9999-999999999951")
+						.contentType("application/json")
+						.content("{}"))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
+	}
+
+	@Test
 	@WithMockUser(authorities = "notification.manage")
 	void emailConfigurationRequiresDedicatedSettingsPermission() throws Exception {
 		mockMvc.perform(put("/api/v1/notifications/email-configuration")
@@ -359,13 +372,11 @@ class SecurityAuthorizationTests {
 
 	@Test
 	@WithMockUser(authorities = "platform.admin")
-	void platformSupportCanReachTheAuditedManualOpenCommand() throws Exception {
-		var result = mockMvc.perform(post("/api/v1/access/commands/open")
+	void platformHomeCannotReachTenantManualOpenCommandWithoutSupportScope() throws Exception {
+		mockMvc.perform(post("/api/v1/access/commands/open")
 				.contentType("application/json")
 				.content("{\"deviceCode\":\"MAIN\",\"reason\":\"Soporte autorizado\"}"))
-				.andReturn();
-
-		assertThat(result.getResponse().getStatus()).isNotIn(401, 403);
+				.andExpect(status().isForbidden());
 	}
 
 	@Test

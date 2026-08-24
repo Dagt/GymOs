@@ -6,16 +6,20 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
 
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
+import com.gymos.common.security.AccountScope;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.platformbilling.application.PlatformBillingService;
 import com.gymos.platformbilling.application.PlatformBillingService.UpdateBillingCommand;
 import com.gymos.platformbilling.infrastructure.PlatformBillingRepository;
+import com.gymos.platformbilling.infrastructure.PlatformBillingRepository.BillingPaymentRecord;
 import com.gymos.platformbilling.infrastructure.PlatformBillingRepository.BranchBillingRecord;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -70,13 +74,12 @@ class PlatformBillingServiceTests {
                 "ACTIVE",
                 15,
                 LocalDate.now().plusMonths(1),
-                null,
-                null,
                 "GYMFORT_500",
                 new BigDecimal("999.00"),
                 new BigDecimal("3500.00"),
                 false,
-                null
+                null,
+                0
         );
 
         assertThrows(BusinessException.class, () -> service.update(
@@ -90,13 +93,12 @@ class PlatformBillingServiceTests {
                 "ACTIVE",
                 15,
                 LocalDate.now().plusMonths(1),
-                null,
-                null,
                 "ENTERPRISE",
                 null,
                 BigDecimal.ZERO,
                 false,
-                null
+                null,
+                0
         );
 
         assertThrows(BusinessException.class, () -> service.update(
@@ -121,12 +123,13 @@ class PlatformBillingServiceTests {
         );
         UUID branchId = branch.branchId();
         when(repository.findByBranchId(branchId)).thenReturn(java.util.Optional.of(branch));
+        when(repository.insertPayment(any())).thenReturn(1);
 
         var result = service.recordPayment(
                 platformAdmin(), branchId,
                 new PlatformBillingService.RecordPaymentCommand(
                         "SUBSCRIPTION", "TRANSFER", new BigDecimal("1590.00"),
-                        LocalDate.of(2026, 8, 15), "SPEI-123", "Agosto"
+                        LocalDate.of(2026, 8, 15), "SPEI-123", "Agosto", "payment-august"
                 ),
                 "test-correlation"
         );
@@ -150,12 +153,13 @@ class PlatformBillingServiceTests {
                 LocalDate.of(2026, 8, 15)
         );
         when(repository.findByBranchId(branch.branchId())).thenReturn(java.util.Optional.of(branch));
+        when(repository.insertPayment(any())).thenReturn(1);
 
         service.recordPayment(
                 platformAdmin(), branch.branchId(),
                 new PlatformBillingService.RecordPaymentCommand(
                         "SUBSCRIPTION", "TRANSFER", new BigDecimal("1590.00"),
-                        LocalDate.of(2026, 8, 10), "SPEI-early", null
+                        LocalDate.of(2026, 8, 10), "SPEI-early", null, "payment-early"
                 ),
                 "test-correlation"
         );
@@ -178,12 +182,13 @@ class PlatformBillingServiceTests {
         );
         when(repository.findByBranchId(branch.branchId())).thenReturn(java.util.Optional.of(branch));
         when(repository.paymentTotal(branch.branchId(), "IMPLEMENTATION")).thenReturn(new BigDecimal("3500.00"));
+        when(repository.insertPayment(any())).thenReturn(1);
 
         service.recordPayment(
                 platformAdmin(), branch.branchId(),
                 new PlatformBillingService.RecordPaymentCommand(
                         "IMPLEMENTATION", "TRANSFER", new BigDecimal("3500.00"),
-                        LocalDate.of(2026, 8, 15), "SPEI-124", null
+                        LocalDate.of(2026, 8, 15), "SPEI-124", null, "implementation-payment"
                 ),
                 "test-correlation"
         );
@@ -204,12 +209,77 @@ class PlatformBillingServiceTests {
                 platformAdmin(), branch.branchId(),
                 new PlatformBillingService.RecordPaymentCommand(
                         "SUBSCRIPTION", "TRANSFER", new BigDecimal("1590.00"),
-                        LocalDate.of(2026, 8, 15), null, null
+                        LocalDate.of(2026, 8, 15), null, null, "paused-payment"
                 ),
                 "test-correlation"
         ));
 
         verify(repository, never()).insertPayment(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void returnsTheOriginalPaymentWhenTheSameIdempotencyKeyIsRetried() {
+        BranchBillingRecord branch = withNextBillingDate(
+                row(UUID.randomUUID(), "Centro", 180, "ACTIVE", "GYMFORT_500", null),
+                LocalDate.of(2026, 8, 15)
+        );
+        BillingPaymentRecord existing = payment(branch, "payment-retry", new BigDecimal("1590.00"));
+        when(repository.findByBranchId(branch.branchId())).thenReturn(java.util.Optional.of(branch));
+        when(repository.findPaymentByIdempotencyKey(branch.branchId(), "payment-retry"))
+                .thenReturn(java.util.Optional.of(existing));
+
+        var result = service.recordPayment(
+                platformAdmin(), branch.branchId(),
+                new PlatformBillingService.RecordPaymentCommand(
+                        "SUBSCRIPTION", "TRANSFER", new BigDecimal("1590.00"),
+                        LocalDate.of(2026, 8, 15), "SPEI-RETRY", "Agosto", "payment-retry"
+                ),
+                "test-correlation"
+        );
+
+        assertThat(result.payment().id()).isEqualTo(existing.id());
+        verify(repository, never()).insertPayment(any());
+        verify(repository, never()).registerSubscriptionPayment(
+                any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void rejectsReusingAnIdempotencyKeyWithDifferentPaymentData() {
+        BranchBillingRecord branch = row(UUID.randomUUID(), "Centro", 180, "ACTIVE", "GYMFORT_500", null);
+        BillingPaymentRecord existing = payment(branch, "payment-conflict", new BigDecimal("1590.00"));
+        when(repository.findByBranchId(branch.branchId())).thenReturn(java.util.Optional.of(branch));
+        when(repository.findPaymentByIdempotencyKey(branch.branchId(), "payment-conflict"))
+                .thenReturn(java.util.Optional.of(existing));
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> service.recordPayment(
+                platformAdmin(), branch.branchId(),
+                new PlatformBillingService.RecordPaymentCommand(
+                        "SUBSCRIPTION", "TRANSFER", new BigDecimal("1.00"),
+                        LocalDate.of(2026, 8, 15), "SPEI-RETRY", "Agosto", "payment-conflict"
+                ),
+                "test-correlation"
+        ));
+
+        assertThat(exception.code()).isEqualTo("BILLING_PAYMENT_IDEMPOTENCY_CONFLICT");
+        verify(repository, never()).insertPayment(any());
+    }
+
+    @Test
+    void rejectsAnUpdateWhenTheCommercialVersionChanged() {
+        BranchBillingRecord branch = row(UUID.randomUUID(), "Centro", 180, "ACTIVE", "GYMFORT_500", null);
+        when(repository.upsert(any())).thenReturn(0);
+        when(repository.findByBranchId(branch.branchId())).thenReturn(java.util.Optional.of(branch));
+
+        BusinessException exception = assertThrows(BusinessException.class, () -> service.update(
+                platformAdmin(), branch.branchId(),
+                new UpdateBillingCommand(
+                        "ACTIVE", 15, LocalDate.now().plusMonths(1), "GYMFORT_500", null,
+                        BigDecimal.ZERO, false, null, branch.version() - 1
+                ),
+                "test-correlation"
+        ));
+
+        assertThat(exception.code()).isEqualTo("BILLING_VERSION_CONFLICT");
     }
 
     private BranchBillingRecord row(
@@ -240,7 +310,8 @@ class PlatformBillingServiceTests {
                 monthlyOverride,
                 BigDecimal.ZERO,
                 false,
-                null
+                null,
+                1
         );
     }
 
@@ -251,7 +322,7 @@ class PlatformBillingServiceTests {
                 branch.activeTeamUserCount(), branch.activeMembershipPlanCount(), branch.activeMembers(),
                 branch.subscriptionStatus(), branch.billingAnchorDay(), branch.nextBillingDate(),
                 branch.lastPaymentDate(), branch.lastPaymentAmount(), branch.planOverride(), branch.monthlyPriceOverride(),
-                implementationFee, false, branch.notes()
+                implementationFee, false, branch.notes(), branch.version()
         );
     }
 
@@ -262,13 +333,22 @@ class PlatformBillingServiceTests {
                 branch.activeTeamUserCount(), branch.activeMembershipPlanCount(), branch.activeMembers(),
                 branch.subscriptionStatus(), branch.billingAnchorDay(), nextBillingDate,
                 branch.lastPaymentDate(), branch.lastPaymentAmount(), branch.planOverride(), branch.monthlyPriceOverride(),
-                branch.implementationFee(), branch.implementationPaid(), branch.notes()
+                branch.implementationFee(), branch.implementationPaid(), branch.notes(), branch.version()
+        );
+    }
+
+    private BillingPaymentRecord payment(BranchBillingRecord branch, String key, BigDecimal amount) {
+        return new BillingPaymentRecord(
+                UUID.randomUUID(), branch.branchId(), branch.organizationId(), "SUBSCRIPTION", "TRANSFER",
+                amount, LocalDate.of(2026, 8, 15), "SPEI-RETRY", "Agosto", key,
+                UUID.randomUUID(), OffsetDateTime.parse("2026-08-15T12:00:00-06:00")
         );
     }
 
     private GymOsPrincipal platformAdmin() {
         return new GymOsPrincipal(
-                UUID.randomUUID(), null, null, "platform", "Platform Admin", Set.of("platform.admin")
+                UUID.randomUUID(), AccountScope.PLATFORM, null, null, "platform", "Platform Admin",
+                Set.of("platform.admin"), Set.of("Administrador GymOS"), false, null
         );
     }
 }

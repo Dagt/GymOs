@@ -23,7 +23,7 @@ export function validateRfc(value: string, required = false) {
   if (!value.trim()) {
     return required ? "RFC es obligatorio." : "";
   }
-  return /^[A-ZÑ&]{4}\d{6}[A-Z0-9]{3}$/.test(normalizeRfc(value))
+  return /^[A-ZÑ&]{3,4}\d{6}[A-Z0-9]{3}$/.test(normalizeRfc(value))
     ? ""
     : "El RFC debe tener 4 letras, 6 numeros y 3 caracteres alfanumericos.";
 }

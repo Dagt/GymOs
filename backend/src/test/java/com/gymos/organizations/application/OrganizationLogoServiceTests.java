@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
+import com.gymos.common.security.AccountScope;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.storage.ObjectStorageService;
 import com.gymos.organizations.application.OrganizationLogoService.UploadOrganizationLogo;
@@ -136,12 +137,9 @@ class OrganizationLogoServiceTests {
 		UUID targetOrganizationId = UUID.randomUUID();
 		UUID userId = UUID.randomUUID();
 		GymOsPrincipal principal = new GymOsPrincipal(
-				userId,
-				platformOrganizationId,
-				null,
-				"admin@gymos.local",
-				"Admin GymOS",
-				Set.of("platform.admin")
+				userId, AccountScope.PLATFORM, null, null,
+				"admin@gymos.local", "Admin GymOS", Set.of("platform.admin"),
+				Set.of("Administrador GymOS"), false, null
 		);
 		var summary = new OrganizationQueryRepository.OrganizationSummary(
 				targetOrganizationId,

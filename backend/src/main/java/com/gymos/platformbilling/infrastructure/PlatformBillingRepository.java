@@ -13,8 +13,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class PlatformBillingRepository {
-    private static final UUID PLATFORM_ORGANIZATION_ID = UUID.fromString("11111111-1111-1111-1111-111111111111");
-
     private final JdbcClient jdbcClient;
 
     public PlatformBillingRepository(JdbcClient jdbcClient) {
@@ -23,14 +21,12 @@ public class PlatformBillingRepository {
 
     public List<BranchBillingRecord> findAll() {
         return jdbcClient.sql(baseSelect() + "\nORDER BY LOWER(o.trade_name), LOWER(b.name)")
-                .param("platformOrganizationId", PLATFORM_ORGANIZATION_ID)
                 .query(this::mapRecord)
                 .list();
     }
 
     public Optional<BranchBillingRecord> findByBranchId(UUID branchId) {
         return jdbcClient.sql(baseSelect() + "\nAND b.id = :branchId")
-                .param("platformOrganizationId", PLATFORM_ORGANIZATION_ID)
                 .param("branchId", branchId)
                 .query(this::mapRecord)
                 .optional();
@@ -44,13 +40,12 @@ public class PlatformBillingRepository {
                     subscription_status,
                     billing_anchor_day,
                     next_billing_date,
-                    last_payment_date,
-                    last_payment_amount,
                     plan_override,
                     monthly_price_override,
                     implementation_fee,
                     implementation_paid,
                     notes,
+                    version,
                     created_at,
                     updated_at,
                     updated_by
@@ -61,13 +56,12 @@ public class PlatformBillingRepository {
                     :subscriptionStatus,
                     :billingAnchorDay,
                     :nextBillingDate,
-                    :lastPaymentDate,
-                    :lastPaymentAmount,
                     :planOverride,
                     :monthlyPriceOverride,
                     :implementationFee,
                     :implementationPaid,
                     :notes,
+                    1,
                     :now,
                     :now,
                     :updatedBy
@@ -78,27 +72,26 @@ public class PlatformBillingRepository {
                     subscription_status = EXCLUDED.subscription_status,
                     billing_anchor_day = EXCLUDED.billing_anchor_day,
                     next_billing_date = EXCLUDED.next_billing_date,
-                    last_payment_date = EXCLUDED.last_payment_date,
-                    last_payment_amount = EXCLUDED.last_payment_amount,
                     plan_override = EXCLUDED.plan_override,
                     monthly_price_override = EXCLUDED.monthly_price_override,
                     implementation_fee = EXCLUDED.implementation_fee,
                     implementation_paid = EXCLUDED.implementation_paid,
                     notes = EXCLUDED.notes,
+                    version = platform_branch_billing.version + 1,
                     updated_at = EXCLUDED.updated_at,
                     updated_by = EXCLUDED.updated_by
+                WHERE platform_branch_billing.version = :expectedVersion
                 """)
                 .param("branchId", record.branchId())
                 .param("subscriptionStatus", record.subscriptionStatus())
                 .param("billingAnchorDay", record.billingAnchorDay())
                 .param("nextBillingDate", record.nextBillingDate())
-                .param("lastPaymentDate", record.lastPaymentDate())
-                .param("lastPaymentAmount", record.lastPaymentAmount())
                 .param("planOverride", record.planOverride())
                 .param("monthlyPriceOverride", record.monthlyPriceOverride())
                 .param("implementationFee", record.implementationFee())
                 .param("implementationPaid", record.implementationPaid())
                 .param("notes", record.notes())
+                .param("expectedVersion", record.expectedVersion())
                 .param("now", record.now())
                 .param("updatedBy", record.updatedBy())
                 .update();
@@ -146,7 +139,8 @@ public class PlatformBillingRepository {
                     pbb.monthly_price_override,
                     pbb.implementation_fee,
                     pbb.implementation_paid,
-                    pbb.notes
+                    pbb.notes,
+                    COALESCE(pbb.version, 0) AS version
                 FROM organization o
                 JOIN branch b
                   ON b.organization_id = o.id
@@ -154,7 +148,7 @@ public class PlatformBillingRepository {
                 LEFT JOIN platform_branch_billing pbb
                   ON pbb.branch_id = b.id
                 WHERE o.deleted_at IS NULL
-                  AND o.id <> :platformOrganizationId
+                  AND o.data_origin = 'PRODUCTIVE'
                 """;
     }
 
@@ -182,14 +176,15 @@ public class PlatformBillingRepository {
                 resultSet.getBigDecimal("monthly_price_override"),
                 implementationFee == null ? BigDecimal.ZERO : implementationFee,
                 resultSet.getBoolean("implementation_paid"),
-                resultSet.getString("notes")
+                resultSet.getString("notes"),
+                resultSet.getLong("version")
         );
     }
 
     public List<BillingPaymentRecord> findPayments(UUID branchId) {
         return jdbcClient.sql("""
                 SELECT id, branch_id, organization_id, payment_type, payment_method, amount,
-                       paid_on, reference, notes, recorded_by, created_at
+                       paid_on, reference, notes, idempotency_key, recorded_by, created_at
                 FROM platform_billing_payment
                 WHERE branch_id = :branchId
                 ORDER BY paid_on DESC, created_at DESC
@@ -200,15 +195,16 @@ public class PlatformBillingRepository {
                 .list();
     }
 
-    public void insertPayment(BillingPaymentWrite record) {
-        jdbcClient.sql("""
+    public int insertPayment(BillingPaymentWrite record) {
+        return jdbcClient.sql("""
                 INSERT INTO platform_billing_payment (
                     id, branch_id, organization_id, payment_type, payment_method, amount,
-                    paid_on, reference, notes, recorded_by, created_at
+                    paid_on, reference, notes, idempotency_key, recorded_by, created_at
                 ) VALUES (
                     :id, :branchId, :organizationId, :paymentType, :paymentMethod, :amount,
-                    :paidOn, :reference, :notes, :recordedBy, :createdAt
+                    :paidOn, :reference, :notes, :idempotencyKey, :recordedBy, :createdAt
                 )
+                ON CONFLICT (branch_id, idempotency_key) DO NOTHING
                 """)
                 .param("id", record.id())
                 .param("branchId", record.branchId())
@@ -219,9 +215,24 @@ public class PlatformBillingRepository {
                 .param("paidOn", record.paidOn())
                 .param("reference", record.reference())
                 .param("notes", record.notes())
+                .param("idempotencyKey", record.idempotencyKey())
                 .param("recordedBy", record.recordedBy())
                 .param("createdAt", record.createdAt())
                 .update();
+    }
+
+    public Optional<BillingPaymentRecord> findPaymentByIdempotencyKey(UUID branchId, String idempotencyKey) {
+        return jdbcClient.sql("""
+                SELECT id, branch_id, organization_id, payment_type, payment_method, amount,
+                       paid_on, reference, notes, idempotency_key, recorded_by, created_at
+                FROM platform_billing_payment
+                WHERE branch_id = :branchId
+                  AND idempotency_key = :idempotencyKey
+                """)
+                .param("branchId", branchId)
+                .param("idempotencyKey", idempotencyKey)
+                .query(this::mapPayment)
+                .optional();
     }
 
     public void registerSubscriptionPayment(UUID branchId, LocalDate paidOn, BigDecimal amount, LocalDate nextBillingDate, UUID updatedBy, OffsetDateTime now) {
@@ -230,6 +241,7 @@ public class PlatformBillingRepository {
                 SET last_payment_date = :paidOn,
                     last_payment_amount = :amount,
                     next_billing_date = :nextBillingDate,
+                    version = version + 1,
                     updated_by = :updatedBy,
                     updated_at = :now
                 WHERE branch_id = :branchId
@@ -260,6 +272,7 @@ public class PlatformBillingRepository {
         jdbcClient.sql("""
                 UPDATE platform_branch_billing
                 SET implementation_paid = TRUE,
+                    version = version + 1,
                     updated_by = :updatedBy,
                     updated_at = :now
                 WHERE branch_id = :branchId
@@ -281,6 +294,7 @@ public class PlatformBillingRepository {
                 resultSet.getObject("paid_on", LocalDate.class),
                 resultSet.getString("reference"),
                 resultSet.getString("notes"),
+                resultSet.getString("idempotency_key"),
                 resultSet.getObject("recorded_by", UUID.class),
                 resultSet.getObject("created_at", OffsetDateTime.class)
         );
@@ -306,7 +320,8 @@ public class PlatformBillingRepository {
             BigDecimal monthlyPriceOverride,
             BigDecimal implementationFee,
             boolean implementationPaid,
-            String notes
+            String notes,
+            long version
     ) {
     }
 
@@ -320,6 +335,7 @@ public class PlatformBillingRepository {
             LocalDate paidOn,
             String reference,
             String notes,
+            String idempotencyKey,
             UUID recordedBy,
             OffsetDateTime createdAt
     ) {
@@ -335,6 +351,7 @@ public class PlatformBillingRepository {
             LocalDate paidOn,
             String reference,
             String notes,
+            String idempotencyKey,
             UUID recordedBy,
             OffsetDateTime createdAt
     ) {
@@ -345,13 +362,12 @@ public class PlatformBillingRepository {
             String subscriptionStatus,
             int billingAnchorDay,
             LocalDate nextBillingDate,
-            LocalDate lastPaymentDate,
-            BigDecimal lastPaymentAmount,
             String planOverride,
             BigDecimal monthlyPriceOverride,
             BigDecimal implementationFee,
             boolean implementationPaid,
             String notes,
+            long expectedVersion,
             UUID updatedBy,
             OffsetDateTime now
     ) {

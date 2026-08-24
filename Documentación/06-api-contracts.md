@@ -1323,6 +1323,20 @@ Estos endpoints pertenecen a la consola neutral de GymFort y requieren
 exclusivamente `platform.admin`; ningún dueño, administrador o gerente de un
 gimnasio puede consultar o mutar esta información.
 
+`GET /api/v1/platform/customers`
+
+- devuelve el resumen ejecutivo y una fila por `Organization` cliente con etapa,
+  salud derivada, responsable, contacto de cobranza, contrato, seguimiento, MRR,
+  vencidos y configuración pendiente;
+- excluye la organización técnica GymFort y no expone datos personales de socios.
+
+`PUT /api/v1/platform/customers/{organizationId}`
+
+- actualiza el expediente comercial interno: etapa, responsable, contacto de
+  cobranza, fechas, días de crédito, seguimiento y notas;
+- exige `expectedVersion`; un expediente modificado en otra sesión responde
+  `CUSTOMER_ACCOUNT_VERSION_CONFLICT` en lugar de sobrescribirlo.
+
 `GET /api/v1/platform/billing/overview`
 
 - devuelve el resumen de MRR configurado, clientes, sucursales, socios activos,
@@ -1335,6 +1349,8 @@ gimnasio puede consultar o mutar esta información.
 - configura estado de suscripción, día de corte, próximo cobro, plan comercial,
   cotización Enterprise, implementación y notas;
 - los planes estándar no aceptan importe manual; `ENTERPRISE` sí lo requiere.
+- exige `expectedVersion`; `lastPaymentDate` y `lastPaymentAmount` son de sólo
+  lectura y se actualizan únicamente desde el ledger de pagos.
 
 `GET /api/v1/platform/billing/branches/{branchId}/payments`
 
@@ -1350,7 +1366,8 @@ gimnasio puede consultar o mutar esta información.
   "amount": 1590.00,
   "paidOn": "2026-08-23",
   "reference": "SPEI-001",
-  "notes": "Mensualidad de agosto"
+  "notes": "Mensualidad de agosto",
+  "idempotencyKey": "payment-2026-08-gym-centro"
 }
 ```
 
@@ -1362,4 +1379,6 @@ gimnasio puede consultar o mutar esta información.
   y mueve el siguiente corte al siguiente día ancla; un pago de implementación
   completo la marca liquidada;
 - responde el pago creado y la configuración comercial actualizada. Los pagos
-  no se editan ni eliminan por esta API.
+  no se editan ni eliminan por esta API;
+- repetir la misma `idempotencyKey` y los mismos datos devuelve el cobro original
+  sin avanzar nuevamente el corte; reutilizarla con datos distintos se rechaza.

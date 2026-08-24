@@ -11,11 +11,13 @@ import static org.mockito.Mockito.when;
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.common.security.AccountScope;
 import com.gymos.common.security.JwtService;
 import com.gymos.security.infrastructure.AuthQueryRepository;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.time.Instant;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
@@ -32,17 +34,18 @@ class AuthOrganizationSecurityTests {
 				mock(AuthenticationManager.class), repository, jwtService, redisTemplate, auditService
 		);
 		UUID userId = UUID.randomUUID();
-		UUID currentOrganizationId = UUID.randomUUID();
 		UUID requestedOrganizationId = UUID.randomUUID();
 		GymOsPrincipal principal = new GymOsPrincipal(
 				userId,
-				currentOrganizationId,
+				AccountScope.PLATFORM,
+				null,
 				null,
 				"platform@gymos.local",
 				"Platform Admin",
 				Set.of("platform.admin", "organization.read"),
 				Set.of("Administrador GymOS"),
-				false
+				false,
+				null
 		);
 		when(repository.organizationIsActive(requestedOrganizationId)).thenReturn(false);
 
@@ -70,12 +73,14 @@ class AuthOrganizationSecurityTests {
 		UUID organizationId = UUID.randomUUID();
 		UUID branchId = UUID.randomUUID();
 		String refreshToken = "support-refresh";
-		String storedSession = userId + "|" + organizationId + "|" + branchId + "|true";
+		Instant expiresAt = Instant.now().plusSeconds(600);
+		String storedSession = "v2|" + userId + "|PLATFORM|" + organizationId + "|" + branchId + "|true|" + expiresAt.getEpochSecond();
 		when(redisTemplate.opsForValue()).thenReturn(values);
-		when(values.get("gymos:refresh:" + refreshToken)).thenReturn(storedSession);
+		when(values.get("gymos:refresh:v2:" + refreshToken)).thenReturn(storedSession);
 		when(repository.findActiveUserById(userId)).thenReturn(Optional.of(new AuthQueryRepository.AuthenticatedUser(
 				userId,
-				UUID.randomUUID(),
+				AccountScope.PLATFORM,
+				null,
 				"platform@gymos.local",
 				"hash",
 				"Platform Admin",
@@ -86,7 +91,7 @@ class AuthOrganizationSecurityTests {
 
 		assertThatThrownBy(() -> service.refresh(refreshToken))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
-						assertThat(exception.code()).isEqualTo("ORGANIZATION_SUSPENDED"));
+						assertThat(exception.code()).isEqualTo("REFRESH_TOKEN_INVALID"));
 
 		verify(repository).organizationIsActive(organizationId);
 		verify(repository, never()).branchBelongsToOrganization(branchId, organizationId);
