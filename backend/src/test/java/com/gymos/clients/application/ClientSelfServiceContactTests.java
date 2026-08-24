@@ -15,11 +15,13 @@ import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.ApplicationEventPublisher;
 
 class ClientSelfServiceContactTests {
 	private final ClientRepository queryRepository = mock(ClientRepository.class);
 	private final ClientCommandRepository commandRepository = mock(ClientCommandRepository.class);
-	private final ClientService service = new ClientService(queryRepository, commandRepository, mock(AuditService.class));
+	private final ClientService service = new ClientService(
+			queryRepository, commandRepository, mock(AuditService.class), mock(ApplicationEventPublisher.class));
 	private final UUID organizationId = UUID.randomUUID();
 	private final UUID clientId = UUID.randomUUID();
 	private final UUID personId = UUID.randomUUID();

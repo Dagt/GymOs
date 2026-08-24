@@ -2,7 +2,8 @@
 
 Estado: FUENTE CANÓNICA / EN PROGRESO
 Corte: 23 de agosto de 2026
-Código auditado: `feature/pricing-and-billing`, incluyendo V81/V82 sobre la base integrada de Automatizaciones/ZeptoMail y métricas.
+Código auditado: `feature/physical-access-control`, incluyendo V83/V84 sobre la
+base integrada de cobranza comercial, Automatizaciones/ZeptoMail y métricas.
 
 ## 1. Resumen ejecutivo
 
@@ -11,6 +12,17 @@ GymFort opera como monolito modular multi-tenant y multi-sucursal. El piloto inc
 La identidad comercial visible es GymFort. `GymOS`/`gymos` continúa en nombres técnicos por compatibilidad.
 
 **Automatizaciones + correo transaccional mediante ZeptoMail quedan funcionalmente cerrados para el alcance V1**: reglas, eventos, prueba manual con socio real, permisos de Gerencia, cola durable, retries/dead letters, branding tenant y envío SMTP real están operativos. El 22 de agosto de 2026 se verificó `gymfort.mx` en ZeptoMail con DKIM y CNAME/return-path y se recibieron correos reales de prueba.
+
+**El control plane cloud de acceso físico queda estabilizado para iniciar el
+Connector**: modelo
+provider-neutral, puntos con un derecho obligatorio, mapeos y vínculos externos,
+estado deseado automático, jobs PostgreSQL con lease/reintento/idempotencia,
+activación/rotación del Connector, heartbeat, eventos, candidatos y consola por
+sucursal. El cierre añade protección distribuida de fallos en producción,
+timestamp de autenticación con escritura acotada, proveedor explícito y
+diagnóstico visible de puntos legacy inválidos. El GymFort Local Connector,
+adapter HikCentral y apertura del torniquete real siguen pendientes de trabajo y
+validación en sitio.
 
 Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún módulo se considera completo por el nombre de una rama: la evidencia proviene de código, migraciones, pruebas y validación del entorno.
 
@@ -27,7 +39,7 @@ Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún 
 | [Ventas](modulos/07-sales.md) | FUNCIONAL | POS, ventas contextualizadas, pagos, reembolsos, recibos e inventario | Concurrencia/conciliación E2E (`SAL-001`) |
 | [Membresías](modulos/08-memberships.md) | ESTABILIZADO | Periodos inclusivos, activa única, alta, renovación, cambio y cotización | E2E financiero completo |
 | [Beneficios/elegibilidad](modulos/09-benefits.md) | ESTABILIZADO | Descuentos y acceso heredado mediante política transversal | Concurrencia y negativos de permisos |
-| [Acceso](modulos/10-access.md) | FUNCIONAL | Visitas, decisión por membresía/beneficio y bitácora | Doble consumo/privacidad (`ACC-001`); hardware real pendiente |
+| [Acceso](modulos/10-access.md) | ESTABILIZADO PARA INICIAR CONNECTOR | Elegibilidad, provider explícito, puntos, bitácora, permisos físicos, estado deseado, Connector API durable y protegida, salud, eventos/candidatos y consola con diagnóstico legacy | Connector local, adapter HikCentral, aceptación del torniquete y resiliencia en sitio (`ACC-002`) |
 | [Kiosco](modulos/11-selfservice.md) | FUNCIONAL / ACEPTACIÓN | Apertura sólo por Recepción, sesión aislada, membresías, pagos, domiciliación, reservas, wellness y datos | Publicar ejecución automatizada de Stripe sandbox (`SELF-001`) |
 | [Reservas](modulos/12-bookings.md) | FUNCIONAL | Recursos, disponibilidad, pago y acceso multi-sucursal | Colisiones/cancelación/E2E (`BKG-001`) |
 | [Inventario](modulos/13-inventory.md) | ESTABILIZADO | Existencias, movimientos, transferencias, conteos y valuación | Paginación y feedback (`INV-001`, `INV-002`) |
@@ -57,6 +69,21 @@ Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún 
 - `Probar ahora` para EMAIL usa búsqueda dinámica y un socio real con correo.
 - Correo V1 usa preferentemente `Nombre del gimnasio <notificaciones@gymfort.mx>` + `Reply-To` propio del tenant.
 - Branding del correo usa nombre, colores y logo de la organización; logos locales no pueden cargarse desde clientes externos.
+- Una conexión física V1 es única por sucursal y conserva su proveedor; un punto
+  productivo requiere exactamente un beneficio `ACCESS` y un recurso externo
+  explícito.
+- Ninguna configuración nueva infiere `HIKCENTRAL`: proveedor y modo
+  `SIMULATED` se eligen explícitamente.
+- La sincronización física normal parte de eventos de membresía, socio y
+  beneficio; los botones de reconciliación son recuperación, no operación diaria.
+- `access.physical.manage` corresponde a Dueño/Gerente y
+  `access.manual.open` protege por separado la apertura excepcional simulada.
+- GymFort Cloud nunca recibe credenciales LAN ni material biométrico; el
+  Connector usa activación/secretos hasheados y rutas máquina-a-máquina propias.
+- Los fallos de autenticación/activación del Connector se limitan mediante Redis
+  compartido en producción y memoria por proceso en local/tests, sin claves ni
+  credenciales crudas; `last_authenticated_at` se escribe como máximo una vez
+  por ventana configurable.
 
 ## 4. Validación del corte
 
@@ -71,6 +98,11 @@ Evidencia disponible:
 - V79 repara perfiles Coach históricos desincronizados;
 - pruebas unitarias de cobranza comercial, autorización de plataforma y
   migración PostgreSQL V82 ejecutadas correctamente;
+- suite backend completa, pruebas PostgreSQL V84, upgrade V83 → V84, seguridad
+  HTTP, suite frontend (87/87), build de producción y build Docker ejecutados
+  correctamente en la rama física;
+- recorrido visual de Access en escritorio y móvil, incluidos los formularios de
+  proveedor/puntos sin desbordamiento horizontal ni errores de consola;
 - suites backend/frontend y CI de rama continúan siendo la red de regresión.
 
 La carga real del logo en correo debe verificarse después del despliegue con `GYMOS_FRONTEND_BASE_URL=https://gymfort.mx`; localhost no es accesible desde Gmail/Outlook.
@@ -79,10 +111,14 @@ La carga real del logo en correo debe verificarse después del despliegue con `G
 
 Automatizaciones/ZeptoMail ya no forman parte del bloque inmediato de implementación. Los siguientes frentes son:
 
-1. cerrar la evolución de cobranza comercial: catálogo/precio, impuestos, cobro SaaS automático, CFDI, ajustes y reportes;
-2. ejecutar Stripe sandbox automatizado y escenarios de recuperación conectados;
-3. cerrar autorización multi-tenant, migración limpia/upgrade, backup/restore y observabilidad de piloto;
-4. iniciar el bloque de acceso físico/HikCentral definido en roadmap;
-5. como mejoras posteriores de notificaciones: bounce/complaint webhooks, reputación productiva y canales adicionales.
+1. ejecutar descubrimiento del HikCentral/terminal del primer cliente y confirmar
+   licencia, API/SDK y topología;
+2. implementar, empaquetar y operar GymFort Local Connector + adapter HikCentral;
+3. demostrar concesión, revocación, reconciliación, eventos y recuperación con el
+   torniquete real sin mover biometría a GymFort Cloud;
+4. cerrar la evolución de cobranza comercial: impuestos, cobro SaaS automático,
+   CFDI, ajustes y reportes;
+5. ejecutar Stripe sandbox automatizado y cerrar autorización multi-tenant,
+   backup/restore y observabilidad de piloto.
 
 El detalle vive en `modulos/`, la deuda única en el documento 28 y la situación Git en el documento 29.

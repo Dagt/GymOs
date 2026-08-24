@@ -1,6 +1,6 @@
 # 9. Integraciones e infraestructura
 
-Corte: 22 de agosto de 2026
+Corte: 23 de agosto de 2026
 
 ## 9.1 Arquitectura de proveedores
 
@@ -9,35 +9,53 @@ Los proveedores externos se aíslan detrás de puertos de aplicación. Los domin
 - Pagos: terminal manual, Mercado Pago OAuth/Point y Stripe Connect/Checkout/Setup/off-session.
 - Correo: `EmailDeliveryPort` con adaptador SMTP y ZeptoMail como proveedor operativo actual.
 - Almacenamiento: MinIO/S3 para logos, medios, comprobantes y documentos.
-- Acceso físico: modelo funcional de dispositivos/beneficios; integración productiva prevista con HikCentral Professional en el primer piloto.
+- Acceso físico: control plane provider-neutral, Connector API y entrega durable
+  implementados; Connector local y adapter productivo HikCentral pendientes.
 - WhatsApp, push y facturación: puertos previstos, adaptadores productivos fuera del corte.
 
 ## 9.2 Acceso físico y HikCentral Professional
 
-### Fuente de verdad y ejecutor físico
-
-GymFort será fuente de verdad para:
+GymFort es fuente de verdad para:
 
 ```text
 Client -> Membership -> MembershipPlan -> Benefit ACCESS
 ```
 
-El sistema físico ejecutará localmente esos derechos. La lógica de membresías/elegibilidad no depende de una marca.
+El sistema físico ejecutará localmente esos derechos. La lógica de membresías y
+elegibilidad no depende de una marca.
 
 Primer piloto:
 
 ```text
 GymFort Cloud
-  -> puerto Access
+  -> estado deseado + jobs PostgreSQL
+  -> Connector API saliente/autenticada
   -> GymFort Local Connector
   -> HikCentral Professional (LAN)
   -> terminal/controlador Hikvision
   -> torniquete/puerta
 ```
 
-Se prefiere sincronización de autorizaciones frente a consulta cloud por cada paso. HikCentral conserva decisión local y biometría; GymFort no procesa plantillas biométricas.
+La parte cloud ya está implementada: catálogo de proveedor/capacidades,
+conexión y mapeos por sucursal, vínculos opacos, estado deseado, jobs durables con
+lease/reintento/idempotencia, activación y rotación hasheadas, heartbeat, eventos
+físicos idempotentes y candidatos de persona. No contiene URL, puerto,
+credenciales ni llamadas HikCentral.
 
-Antes de implementar deben validarse versión/licencia/API/SDK, topología y operaciones oficiales de la instalación real.
+El Connector usa únicamente comunicaciones salientes a GymFort Cloud. Se activa
+con un código de 15 minutos y después autentica con clave pública + secreto de
+un solo despliegue; Cloud conserva sólo hashes BCrypt. Los detalles de LAN y del
+proveedor permanecen en el almacén seguro local.
+
+Se sincronizan autorizaciones en vez de consultar Cloud por cada paso.
+HikCentral conserva decisión local y biometría; GymFort no procesa plantillas
+biométricas. Un corte de Internet no debe impedir la decisión con el último
+estado distribuido.
+
+Antes de implementar el Connector y adapter deben validarse versión, licencia,
+API/SDK, topología y operaciones oficiales de la instalación real. Hasta tener
+esa evidencia, `HIKCENTRAL` significa “contrato cloud configurable”, no
+“integración física operativa”.
 
 ## 9.3 Stripe y Mercado Pago
 

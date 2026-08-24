@@ -313,6 +313,70 @@ class SecurityAuthorizationTests {
 	}
 
 	@Test
+	@WithMockUser(authorities = "access.manage")
+	void generalAccessManagementCannotConfigurePhysicalInfrastructure() throws Exception {
+		mockMvc.perform(put("/api/v1/access/physical-integration")
+						.contentType("application/json").content("{}"))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(post("/api/v1/access/devices")
+						.contentType("application/json").content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(authorities = "access.physical.manage")
+	void physicalAccessManagersCanReachConfigurationEndpoints() throws Exception {
+		var integration = mockMvc.perform(put("/api/v1/access/physical-integration")
+				.contentType("application/json").content("{}"))
+				.andReturn();
+		var device = mockMvc.perform(post("/api/v1/access/devices")
+				.contentType("application/json").content("{}"))
+				.andReturn();
+
+		assertThat(integration.getResponse().getStatus()).isNotIn(401, 403);
+		assertThat(device.getResponse().getStatus()).isNotIn(401, 403);
+	}
+
+	@Test
+	@WithMockUser(authorities = "access.manage")
+	void generalAccessManagementCannotOpenAManualDevice() throws Exception {
+		mockMvc.perform(post("/api/v1/access/commands/open")
+						.contentType("application/json")
+						.content("{\"deviceCode\":\"MAIN\",\"reason\":\"Test\"}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(authorities = "access.manual.open")
+	void dedicatedManualOpenPermissionCanReachTheCommand() throws Exception {
+		var result = mockMvc.perform(post("/api/v1/access/commands/open")
+				.contentType("application/json")
+				.content("{\"deviceCode\":\"MAIN\",\"reason\":\"Test\"}"))
+				.andReturn();
+
+		assertThat(result.getResponse().getStatus()).isNotIn(401, 403);
+	}
+
+	@Test
+	@WithMockUser(authorities = "platform.admin")
+	void platformSupportCanReachTheAuditedManualOpenCommand() throws Exception {
+		var result = mockMvc.perform(post("/api/v1/access/commands/open")
+				.contentType("application/json")
+				.content("{\"deviceCode\":\"MAIN\",\"reason\":\"Soporte autorizado\"}"))
+				.andReturn();
+
+		assertThat(result.getResponse().getStatus()).isNotIn(401, 403);
+	}
+
+	@Test
+	void physicalConnectorApiUsesItsOwnAuthenticationInsteadOfJwt() throws Exception {
+		mockMvc.perform(post("/api/v1/physical-connectors/heartbeat")
+						.contentType("application/json").content("{}"))
+				.andExpect(status().isUnauthorized())
+				.andExpect(jsonPath("$.code").value("CONNECTOR_AUTH_INVALID"));
+	}
+
+	@Test
 	@WithMockUser(authorities = "client.read")
 	void clientReadersCanInspectEffectiveAccessBenefitsWithoutAccessAdministrationPermission() throws Exception {
 		var result = mockMvc.perform(get(

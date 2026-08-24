@@ -2,7 +2,7 @@
 
 Estado: VIGENTE / COBERTURA PARCIAL
 Fuente primaria: `backend/src/main/java/com/gymos/common/security/SecurityConfig.java`  
-Última revisión: 22 de agosto de 2026
+Última revisión: 23 de agosto de 2026
 
 Esta matriz resume el permiso mínimo HTTP. Los servicios deben volver a validar organización, sucursal, propiedad y estado del recurso; una coincidencia de ruta no sustituye autorización de negocio.
 
@@ -14,6 +14,7 @@ Esta matriz resume el permiso mínimo HTTP. Los servicios deben volver a validar
 | `/api/v1/self-service/**` excepto alta de sesión | Token temporal, sesión activa, tenant/sucursal y capacidad |
 | `POST /api/v1/self-service/kiosk-sessions` | No es pública: exige `selfservice.session.launch` y rol exclusivo de Recepción |
 | `/api/v1/payment-webhooks/**` | Firma del proveedor, inbox durable, deduplicación y conciliación |
+| `/api/v1/physical-connectors/**` | Autenticación propia por conexión; sólo `/activate` usa código temporal, el resto exige clave + secreto activo y limita tenant/sucursal/conexión |
 | Callback OAuth Mercado Pago | `state` de un solo uso y PKCE |
 | `GET /api/v1/organizations/*/logo` | Sólo marca pública por UUID; sin datos tenant adicionales |
 | Health/system/docs | Deben restringirse por perfil antes de producción |
@@ -32,7 +33,7 @@ Esta matriz resume el permiso mínimo HTTP. Los servicios deben volver a validar
 | Membresías | `membership.read` | `membership.create/update/renew/change-plan` o `sale.create` según flujo |
 | Ventas | `sale.read`, `report.sales.read` | `sale.create`, `sale.refund` |
 | Pagos manuales | lectura por venta | `payment.manual.create/validate/reject`, `payment.receipt.upload` |
-| Acceso/visitas | `access.read`, `visit.read` | `access.manage`, `visit.create`, `visit.consume` |
+| Acceso/visitas | `access.read`, `visit.read` | Operación lógica: `access.manage`, `visit.create`, `visit.consume`; configuración física/candidatos: `access.physical.manage`; apertura excepcional: `access.manual.open` |
 | Inventario | `inventory.read` | `inventory.manage` |
 | Recursos/reservas | `resource.read`, `booking.read` | `resource.manage`, `booking.manage`, `booking.payment.manage` |
 | Coaches | `coach.read`, `coach.metrics.read` | `coach.manage`, `coach.profile.manage` |
@@ -55,6 +56,8 @@ Esta matriz resume el permiso mínimo HTTP. Los servicios deben volver a validar
 | Crear/editar/activar reglas | `automation.manage` | Dueño, Gerente y soporte |
 | Probar regla manualmente | `automation.execute` o `automation.manage` | Dueño, Gerente y soporte |
 | Pausar/reanudar scheduler tenant | `automation.scheduler.manage` | Permiso avanzado; no se concede a Gerencia sólo por administrar reglas |
+| Configurar proveedor, Connector, puntos/mapeos y personas físicas | `access.physical.manage` | Dueño, Gerente y soporte de plataforma; no Recepción |
+| Abrir manualmente un punto explícito con motivo | `access.manual.open` | Dueño, Gerente y soporte de plataforma auditado; no deriva de `access.manage` |
 
 ## Migraciones relevantes
 
@@ -66,6 +69,9 @@ Esta matriz resume el permiso mínimo HTTP. Los servicios deben volver a validar
   - `automation.execute`
   - `notification.read`
   - `notification.manage`
+- **V84** crea `access.physical.manage` para Dueño/Gerente, repara
+  `access.manual.open` para esos mismos roles y agrega aislamiento compuesto para
+  conexiones, dispositivos, personas, jobs y eventos físicos.
 
 Después de aplicar una migración de permisos, una sesión ya emitida debe renovarse para que el JWT refleje las nuevas authorities.
 
@@ -75,6 +81,8 @@ Después de aplicar una migración de permisos, una sesión ya emitida debe reno
 - Gerencia sí puede administrar reglas de Automatizaciones y operación de notificaciones, pero no recibe control avanzado del scheduler.
 - Dueño y gerente sólo consultan métricas de coaches; no reciben por defecto operaciones `workout.*` del Coach.
 - Recepción puede operar POS, socios, reservas y kiosco según permisos, pero no administrar tenant/proveedores/automatizaciones administrativas.
+- Recepción no administra proveedores físicos, credenciales, candidatos ni
+  apertura manual; conserva sólo las operaciones lógicas otorgadas por su rol.
 - Soporte usa `platform.admin`, contexto tenant explícito y auditoría `PLATFORM_SUPPORT`, pero no puede iniciar kioscos de socios.
 
 ## Brechas de cobertura
@@ -82,4 +90,4 @@ Después de aplicar una migración de permisos, una sesión ya emitida debe reno
 1. Convertir cada familia en pruebas positivas/negativas por rol, tenant, sucursal y UUID ajeno (`GEN-001`).
 2. Deshabilitar docs/actuator públicos en producción mediante perfil.
 3. Verificar que cada mutación sensible escriba `audit_log` (`AUD-001`).
-4. Mantener regresión explícita de V77/V78/V80 y de planes multi-sucursal.
+4. Mantener regresión explícita de V77/V78/V80/V84 y de planes multi-sucursal.

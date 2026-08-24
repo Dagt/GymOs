@@ -173,11 +173,12 @@ Criterios:
 
 ## UC-011 Apertura manual
 
-1. Recepcionista selecciona cliente o motivo.
-2. Sistema exige permiso.
-3. Registrar motivo.
-4. Enviar comando al proveedor.
-5. Auditar.
+1. Dueño o Gerente con `access.manual.open` selecciona un punto explícito y,
+   opcionalmente, un socio.
+2. Sistema exige motivo y permiso dedicado.
+3. Registrar decisión, actor, sucursal, punto, motivo y correlación.
+4. Mantener `SIMULATED_OPEN` hasta que exista un adapter físico validado.
+5. Auditar sin registrar secretos ni datos biométricos.
 
 ## UC-012 Acceso temporal
 
@@ -646,6 +647,55 @@ Reglas:
 - No se generan CFDI ni cargos automáticos de GymFort en este flujo.
 - El historial no permite edición ni eliminación; correcciones futuras deben ser movimientos explícitos y auditables.
 - Perfiles tenant nunca pueden acceder a estos endpoints ni a la ruta.
+
+## UC-034 Preparar y operar una conexión de acceso físico
+
+Actor administrativo: Dueño o Gerente con `access.physical.manage`.
+
+Precondiciones:
+
+- sucursal activa;
+- planes y beneficios `ACCESS` configurados;
+- inventario real de puertas/torniquetes y niveles externos;
+- descubrimiento técnico del proveedor antes de conectar hardware.
+
+Flujo administrativo:
+
+1. Actor selecciona un proveedor configurable y guarda una conexión única para
+   la sucursal.
+2. Registra cada punto productivo con exactamente un beneficio `ACCESS`.
+3. Vincula el punto con una referencia externa inequívoca.
+4. Mapea cada beneficio con el nivel de acceso existente en el proveedor.
+5. Genera un código de activación que se muestra una vez.
+6. Instala el Connector en la LAN, intercambia el código y guarda localmente el
+   secreto recibido una vez.
+7. El Connector reporta heartbeat e importa candidatos de persona; el actor
+   confirma o descarta vínculos sin usar similitud de nombre.
+8. GymFort recalcula estado deseado ante altas, renovaciones, cambios,
+   vencimientos, estado del socio y configuración de derechos.
+9. El Connector reclama jobs con lease, aplica cambios idempotentes y confirma o
+   reporta fallos sanitizados.
+10. La consola muestra salud, pendientes, fallos y última sincronización.
+
+Flujo de recuperación:
+
+1. Actor verifica membresía, vínculo, mapeo, heartbeat y último error.
+2. Recupera el Connector o la conectividad local.
+3. Fuerza reconciliación completa.
+4. Comprueba que los jobs concluyan y que el estado externo coincida.
+5. Rota o revoca la credencial si existe sospecha de exposición.
+
+Reglas:
+
+- Recepción puede operar la evaluación normal si tiene `access.read/manage`,
+  pero no configura el proveedor ni ve candidatos físicos.
+- El Connector no usa JWT de empleado y queda limitado a su organización,
+  sucursal y conexión por su propia credencial.
+- Eventos repetidos no duplican `access_log`.
+- GymFort Cloud no recibe credenciales LAN, fotos, rostros, huellas ni plantillas
+  biométricas.
+- `HIKCENTRAL` identifica el primer contrato cloud; la operación contra un
+  torniquete real sigue pendiente del Connector y adapter validados en sitio.
 
 ## Anexo Hito 3.5 final
 

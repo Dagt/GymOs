@@ -39,6 +39,12 @@ Los mensajes usan branding del tenant y logo público cuando
 `GYMOS_FRONTEND_BASE_URL` es accesible desde el cliente de correo. Consulta la
 [guía de ZeptoMail](docs/operations/zeptomail-email.md).
 
+El control plane de acceso físico ya incluye estado deseado automático, jobs
+durables y una API segura para el GymFort Local Connector. El Connector local,
+adapter HikCentral y apertura del torniquete real siguen pendientes de validación
+en la instalación del primer cliente; consulta el
+[contrato del Connector](docs/operations/physical-access-connector.md).
+
 Consulta el [estado canónico](Documentación/13-estado-desarrollo.md), el
 [índice por módulos](Documentación/modulos/README.md) y la
 [deuda técnica vigente](Documentación/28-registro-vivo-deuda-tecnica.md).
@@ -50,7 +56,8 @@ Consulta el [estado canónico](Documentación/13-estado-desarrollo.md), el
 - `frontend/`: Next.js 16, React 19, TypeScript, Tailwind CSS y Playwright.
 - `infra/`: Docker Compose local, Stripe CLI opcional, proxy y observabilidad.
 - `Documentación/`: producto, arquitectura, contratos, estado y módulos.
-- `docs/operations/`: runbooks de despliegue, correo, Stripe, kiosco y recuperación.
+- `docs/operations/`: runbooks de despliegue, correo, Stripe, kiosco, acceso
+  físico y recuperación.
 - `docs/security/`: matrices de permisos y aislamiento multi-tenant.
 - `docs/testing/`: aceptación manual y pruebas Stripe sandbox.
 - `scripts/`: utilidades operativas locales.

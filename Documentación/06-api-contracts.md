@@ -475,20 +475,54 @@ Nota implementada Hito 4:
 
 ## 6.12 Accesos
 
-- `POST /access/requests`
-- `POST /access/commands/open`
-- `POST /access/commands/temporary`
-- `POST /access/commands/block`
-- `GET /access/logs`
-- `GET /access/devices`
+Operación lógica:
 
-Nota implementada Hito 4:
-- `GET /access/devices` lista dispositivos de acceso por sucursal activa.
-- `GET /access/logs` lista la bitacora reciente de accesos por sucursal activa.
-- `POST /access/requests` evalua acceso por cliente o identificador contra membresia activa o pase temporal vigente.
-- `POST /access/commands/open` registra apertura manual con motivo y comando simulado.
-- `POST /access/commands/temporary` crea pase temporal limitado por expiracion y numero de usos.
-- `POST /access/commands/block` queda pendiente para integracion futura con hardware real.
+- `GET /access/devices` lista puntos por sucursal;
+- `POST /access/devices` crea un punto y, si es productivo, exige exactamente un
+  `requiredBenefitId` de tipo `ACCESS`;
+- `GET|PUT /access/devices/{deviceId}/benefits` consulta o reemplaza el único
+  derecho requerido de un punto productivo;
+- `GET /access/logs` lista hasta 100 eventos recientes de la sucursal;
+- `POST /access/requests` evalúa socio/identificador mediante
+  `EligibilityPolicy` y registra la decisión;
+- `POST /access/commands/open` exige `access.manual.open`, `deviceCode` y motivo;
+  registra `SIMULATED_OPEN` mientras no exista adapter físico;
+- `POST /access/commands/temporary` crea una autorización limitada por tiempo y
+  usos.
+
+Control plane de acceso físico, bajo `/access/physical-integration`:
+
+- `GET|PUT /` consulta/configura proveedor, conexión y mapeos por sucursal;
+- `GET /clients/{clientId}` muestra derechos y estado deseado;
+- `PUT /clients/{clientId}/link` guarda una referencia opaca de persona;
+- `POST /clients/{clientId}/synchronize` y `POST /reconcile` encolan recuperación
+  manual; el flujo normal reacciona a eventos de dominio;
+- `PUT|DELETE /devices/{deviceId}/link` administra el recurso externo;
+- `POST /connector/activation` genera un código de un solo uso y
+  `POST /connector/revoke` revoca su credencial;
+- `GET /candidates`, `PUT /candidates/{id}/match` y
+  `POST /candidates/{id}/reject` permiten conciliación humana segura.
+
+Las mutaciones anteriores y los candidatos requieren
+`access.physical.manage`. Recepción no recibe ese permiso.
+
+Contrato máquina-a-máquina independiente, bajo `/api/v1/physical-connectors`:
+
+- `POST /activate` intercambia `connectorKey + activationCode` por un secreto
+  mostrado una sola vez;
+- `POST /heartbeat` reporta salud/versión;
+- `POST /jobs/claim`, `/jobs/{id}/complete`, `/jobs/{id}/fail` y
+  `/jobs/{id}/lease` implementan entrega durable con lease; `claim` devuelve un
+  `claimToken` nuevo que es obligatorio para completar, fallar o extender ese
+  intento y deja inválido al worker anterior después de un reclaim;
+- `POST /events` ingresa eventos idempotentes por `externalEventId`;
+- `POST /person-candidates` ingresa referencias externas para revisión.
+
+Excepto `/activate`, estas rutas autentican con
+`X-GymFort-Connector-Key` y `X-GymFort-Connector-Secret`. Una credencial ausente,
+inválida o revocada devuelve `401 CONNECTOR_AUTH_INVALID`. Los códigos y secretos
+se almacenan únicamente como hash y nunca forman parte de logs o respuestas de
+lectura.
 
 ## 6.13 Coaches y rutinas
 
@@ -1215,7 +1249,9 @@ Deriva los beneficios desde la membresía vigente y el plan actual.
 { "benefitIds": ["uuid"] }
 ```
 
-Reemplaza de forma auditable los accesos requeridos por el dispositivo.
+Reemplaza de forma auditable el derecho requerido. Para un punto productivo la
+lista debe contener exactamente un beneficio `ACCESS`; cero o más de uno se
+rechazan.
 
 ## Organización y marca persistente
 

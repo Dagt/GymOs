@@ -43,6 +43,13 @@ springdoc:
     path: /api/v1/docs
 
 gymos:
+  access:
+    physical-connector:
+      activation-max-failures: ${GYMOS_CONNECTOR_ACTIVATION_MAX_FAILURES:8}
+      activation-failure-window: ${GYMOS_CONNECTOR_ACTIVATION_FAILURE_WINDOW:5m}
+      authentication-max-failures: ${GYMOS_CONNECTOR_AUTH_MAX_FAILURES:12}
+      authentication-failure-window: ${GYMOS_CONNECTOR_AUTH_FAILURE_WINDOW:2m}
+      last-authenticated-write-interval: ${GYMOS_CONNECTOR_LAST_AUTH_WRITE_INTERVAL:5m}
   seed:
     enabled: ${GYMOS_SEED_ENABLED:false}
   memberships:
