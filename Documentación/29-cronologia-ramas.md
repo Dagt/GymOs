@@ -6,7 +6,7 @@ Corte: 24 de agosto de 2026
 
 Rama de trabajo: `feature/platform-identity-separation`
 
-Base integrada: `main` en `f95abfa` (`feat: stabilize physical access cloud control plane (#14)`)
+Base integrada: `main` en `71810b3` (`fix: support authenticated Redis connections`)
 
 ## 1. Situación vigente
 
@@ -38,6 +38,7 @@ debe fusionarse hasta que CI y la revisión de seguridad estén verdes.
 | 23 ago 2026 | `feature/pricing-and-billing` se integra en `main` en `a9ca485` |
 | 23 ago 2026 | V83/V84 completan el control plane, Connector API, hardening y consola de acceso físico |
 | 24 ago 2026 | PR #14 integra `feature/physical-access-control` en `main` (`f95abfa`) |
+| 24 ago 2026 | `71810b3` agrega soporte de autenticación Redis y se incorpora a la rama activa |
 | 24 ago 2026 | `8ba97a6` completa cartera, cobranza y gestión profesional de gimnasios clientes |
 | 24 ago 2026 | V86/V87 separan cuentas de plataforma/tenant y agregan invitaciones de propietario de un uso |
 | 24 ago 2026 | JWT/refresh, soporte temporal, bootstrap y rutas frontend adoptan `accountScope` explícito |
