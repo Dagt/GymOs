@@ -130,6 +130,27 @@ Después de enviar una prueba:
 
 En el corte del 22 de agosto de 2026 ya se verificaron DKIM + CNAME para `gymfort.mx` y se recibieron correos reales desde ZeptoMail durante pruebas locales.
 
+### Invitaciones de dueños
+
+Al crear un gimnasio desde **Plataforma → Gimnasios**, GymFort intenta enviar la
+invitación después de confirmar la transacción. Usa el mismo adapter SMTP y el
+remitente autorizado del ambiente, con el contacto del gimnasio como
+`Reply-To`. El enlace no entra a `notification_log`: contiene un token de un
+solo uso y sólo su SHA-256 se conserva en `user_invitation`.
+
+La ficha del gimnasio permite regenerar una invitación vencida o reenviar una
+pendiente. Cada acción rota el token y revoca el enlace anterior. Variables:
+
+```dotenv
+GYMOS_USER_INVITATION_HOURS=72
+GYMOS_USER_INVITATION_RESEND_COOLDOWN_SECONDS=60
+```
+
+`SENT` significa que ZeptoMail aceptó el mensaje SMTP; la confirmación posterior
+de entrega/rebote sigue dependiendo de **Processed emails** y de los webhooks
+futuros. `NOT_CONFIGURED` o `FAILED` no revierten el gimnasio creado: configura
+SMTP y usa **Reenviar invitación**.
+
 ## 7. Probar una automatización
 
 En **Automatizaciones**:

@@ -17,7 +17,7 @@ public class GymOsUserDetailsService implements UserDetailsService {
 
 	@Override
 	public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-		return authQueryRepository.findActiveUserByUsername(username)
+		return authQueryRepository.findActiveUserByLoginIdentifier(username)
 				.map(user -> User.withUsername(user.username())
 						.password(user.passwordHash())
 						.authorities(user.permissions().toArray(String[]::new))

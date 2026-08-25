@@ -14,7 +14,7 @@ export async function login(username: string, password: string): Promise<AuthRes
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username: username.trim(), password }),
     });
   } catch {
     throw new Error(`No se pudo conectar con el servidor (${API_BASE_URL}). Revisa que el backend este encendido.`);

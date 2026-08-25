@@ -3,10 +3,12 @@ package com.gymos.platformadmin.api;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.platformadmin.application.PlatformCustomerService;
+import com.gymos.platformadmin.application.PlatformCustomerProvisioningService;
 import com.gymos.platformadmin.application.PlatformCustomerService.CustomerPortfolioView;
 import com.gymos.platformadmin.application.PlatformCustomerService.CreateCustomerCommand;
 import com.gymos.platformadmin.application.PlatformCustomerService.PlatformCustomerView;
 import com.gymos.platformadmin.application.PlatformCustomerService.ProvisionedCustomer;
+import com.gymos.platformadmin.application.PlatformCustomerService.ProvisionedOwnerInvitation;
 import com.gymos.platformadmin.application.PlatformCustomerService.UpdateCustomerAccountCommand;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -34,9 +36,14 @@ public class PlatformCustomerController {
 	private static final String MX_RFC = "^[A-ZÑ&]{3,4}\\d{6}[A-Z0-9]{3}$";
 	private static final String MX_PHONE = "^\\+52\\d{10}$";
 	private final PlatformCustomerService service;
+	private final PlatformCustomerProvisioningService provisioningService;
 
-	public PlatformCustomerController(PlatformCustomerService service) {
+	public PlatformCustomerController(
+			PlatformCustomerService service,
+			PlatformCustomerProvisioningService provisioningService
+	) {
 		this.service = service;
+		this.provisioningService = provisioningService;
 	}
 
 	@GetMapping
@@ -50,7 +57,17 @@ public class PlatformCustomerController {
 			@Valid @RequestBody CreateCustomerRequest request,
 			HttpServletRequest servletRequest
 	) {
-		return service.create(principal, request.toCommand(), correlationId(servletRequest));
+		return provisioningService.create(principal, request.toCommand(), correlationId(servletRequest));
+	}
+
+	@PostMapping("/{organizationId}/owner-invitation")
+	ProvisionedOwnerInvitation reissueOwnerInvitation(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID organizationId,
+			HttpServletRequest servletRequest
+	) {
+		return provisioningService.reissueOwnerInvitation(
+				principal, organizationId, correlationId(servletRequest));
 	}
 
 	@PutMapping("/{organizationId}")

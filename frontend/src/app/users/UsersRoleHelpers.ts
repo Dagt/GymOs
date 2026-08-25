@@ -108,6 +108,19 @@ export function validateUserForm(form: CreateInternalUserPayload) {
   return errors;
 }
 
+export function withSynchronizedLoginEmail(
+  form: CreateInternalUserPayload,
+  nextEmail: string,
+): CreateInternalUserPayload {
+  const previousEmail = form.email ?? "";
+  const usernameTracksEmail = !form.username.trim() || form.username === previousEmail;
+  return {
+    ...form,
+    email: nextEmail,
+    username: usernameTracksEmail ? nextEmail : form.username,
+  };
+}
+
 export function roleIdForUser(user: InternalUserSummary, roles: RoleOption[]) {
   const currentRoleLabel = displayRoleName(user.roles[0] ?? "");
   return roles.find((role) => displayRoleName(role.name) === currentRoleLabel)?.id ?? "";

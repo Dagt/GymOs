@@ -1,9 +1,18 @@
-import type { BranchSummary, ManagedOrganizationSummary } from "@/lib/api";
-import type { PlatformCustomer } from "@/lib/api/platform-customer-types";
+import type { BranchSummary } from "@/lib/api";
+import type {
+  PlatformCustomer,
+  PlatformOrganizationSummary,
+  PlatformOwnerAccess,
+} from "@/lib/api/platform-customer-types";
 import { customerHealthPresentation, lifecycleLabel } from "../platform-portfolio";
+import {
+  deliveryStatusLabel,
+  invitationActionLabel,
+  invitationStatusLabel,
+} from "./owner-invitation";
 
 type PlatformGymnasiumListProps = {
-  filteredOrganizations: ManagedOrganizationSummary[];
+  filteredOrganizations: PlatformOrganizationSummary[];
   organizationsCount: number;
   query: string;
   selectedOrganizationId: string;
@@ -21,7 +30,7 @@ type PlatformGymnasiumDetailProps = {
   branchesLoading: boolean;
   saving: boolean;
   selectedIsActive: boolean;
-  selectedOrganization: ManagedOrganizationSummary | null;
+  selectedOrganization: PlatformOrganizationSummary | null;
   selectingId: string | null;
   selectedCustomer: PlatformCustomer | null;
   onActivateBranch: (branchId: string) => void;
@@ -29,6 +38,7 @@ type PlatformGymnasiumDetailProps = {
   onCreateBranch: () => void;
   onEditCustomerAccount: () => void;
   onGoToTenantSection: (path: string) => void;
+  onReissueOwnerInvitation: () => void;
   onToggleOrganizationStatus: () => void;
 };
 
@@ -114,6 +124,7 @@ export function PlatformGymnasiumDetail({
   onCreateBranch,
   onEditCustomerAccount,
   onGoToTenantSection,
+  onReissueOwnerInvitation,
   onToggleOrganizationStatus,
 }: PlatformGymnasiumDetailProps) {
   return (
@@ -164,6 +175,14 @@ export function PlatformGymnasiumDetail({
             </section>
           ) : null}
 
+          {selectedCustomer?.ownerAccess ? (
+            <OwnerInvitationPanel
+              ownerAccess={selectedCustomer.ownerAccess}
+              onReissue={onReissueOwnerInvitation}
+              saving={saving}
+            />
+          ) : null}
+
           <section className="platform-status-panel">
             <div>
               <span>Estado comercial</span>
@@ -205,6 +224,60 @@ export function PlatformGymnasiumDetail({
       )}
     </section>
   );
+}
+
+function OwnerInvitationPanel({
+  ownerAccess,
+  saving,
+  onReissue,
+}: {
+  ownerAccess: PlatformOwnerAccess;
+  saving: boolean;
+  onReissue: () => void;
+}) {
+  const accountActive = ownerAccess.accountStatus === "ACTIVE";
+  const canReissue = ownerAccess.accountStatus === "INVITED";
+  return (
+    <section className="platform-owner-access-panel">
+      <header>
+        <div>
+          <span>Acceso del dueño</span>
+          <h3>{ownerAccess.ownerName}</h3>
+          <p>{ownerAccess.ownerEmail}</p>
+        </div>
+        <span className={`platform-status-badge ${accountActive ? "success" : "warning"}`}>
+          {accountActive ? "Cuenta activada" : invitationStatusLabel(ownerAccess.invitationStatus)}
+        </span>
+      </header>
+      <div className="platform-owner-access-details">
+        <div>
+          <span>Correo de invitación</span>
+          <strong>{deliveryStatusLabel(ownerAccess.emailDeliveryStatus)}</strong>
+        </div>
+        <div>
+          <span>Vigencia del enlace</span>
+          <strong>{ownerAccess.invitationExpiresAt
+            ? formatDateTime(ownerAccess.invitationExpiresAt)
+            : "Sin invitación vigente"}</strong>
+        </div>
+      </div>
+      {canReissue ? (
+        <div className="platform-owner-access-actions">
+          <p>Al generar una nueva invitación, cualquier enlace anterior deja de funcionar.</p>
+          <button className="app-button-secondary" disabled={saving} onClick={onReissue} type="button">
+            {invitationActionLabel(ownerAccess.invitationStatus)}
+          </button>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat("es-MX", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 function formatCurrency(value: number) {

@@ -58,6 +58,7 @@ gymos:
     owner-password: ${GYMOS_DEMO_OWNER_PASSWORD:}
   identity:
     invitation-hours: ${GYMOS_USER_INVITATION_HOURS:72}
+    invitation-resend-cooldown-seconds: ${GYMOS_USER_INVITATION_RESEND_COOLDOWN_SECONDS:60}
     frontend-base-url: ${GYMOS_FRONTEND_BASE_URL:http://localhost:3000}
   platform-bootstrap:
     enabled: ${GYMOS_PLATFORM_BOOTSTRAP_ENABLED:false}

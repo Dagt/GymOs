@@ -2556,12 +2556,6 @@ th {
   border-color: #f2b2ad;
 }
 
-.platform-overview-grid {
-  display: grid;
-  gap: 1.25rem;
-  grid-template-columns: minmax(0, 1.45fr) minmax(18rem, 0.75fr);
-}
-
 .platform-action-list {
   display: grid;
   gap: 0.55rem;
@@ -2623,37 +2617,6 @@ th {
 .platform-action-priority.priority-2 {
   background: #fef3c7;
   color: #92400e;
-}
-
-.platform-shortcut-grid {
-  display: grid;
-  gap: 0.7rem;
-}
-
-.platform-shortcut-grid a {
-  background: white;
-  border: 1px solid var(--brand-line);
-  border-radius: 0.8rem;
-  display: grid;
-  gap: 0.25rem;
-  padding: 1rem;
-}
-
-.platform-shortcut-grid span,
-.platform-shortcut-grid small {
-  color: var(--brand-muted);
-  font-size: 0.78rem;
-}
-
-.platform-shortcut-grid span {
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.platform-shortcut-grid strong {
-  color: var(--brand-ink);
-  font-size: 1rem;
-  font-weight: 950;
 }
 
 .platform-customer-cards {
@@ -3145,6 +3108,61 @@ th {
   padding: 0.7rem 0.8rem;
 }
 
+.platform-owner-access-panel {
+  background: linear-gradient(135deg, #f8fafc, #f0fdfa);
+  border: 1px solid var(--brand-line);
+  border-radius: 1rem;
+  display: grid;
+  gap: 1rem;
+  padding: 1.1rem;
+}
+
+.platform-owner-access-panel > header {
+  align-items: flex-start;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.platform-owner-access-panel h3,
+.platform-owner-access-panel p {
+  margin: 0.15rem 0 0;
+}
+
+.platform-owner-access-panel header span,
+.platform-owner-access-details span {
+  color: var(--brand-muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.platform-owner-access-details {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.platform-owner-access-details > div {
+  background: white;
+  border: 1px solid var(--brand-line);
+  border-radius: 0.75rem;
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.75rem;
+}
+
+.platform-owner-access-actions {
+  align-items: center;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.platform-owner-access-actions p {
+  color: var(--brand-muted);
+  font-size: 0.82rem;
+}
+
 .invitation-accept-card {
   max-width: 62rem;
 }
@@ -3157,6 +3175,16 @@ th {
 
   .platform-invitation-actions button {
     width: 100%;
+  }
+
+  .platform-owner-access-details {
+    grid-template-columns: 1fr;
+  }
+
+  .platform-owner-access-actions,
+  .platform-owner-access-panel > header {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
 
@@ -4653,7 +4681,6 @@ button.admin-secondary-link:disabled {
   .admin-status-board,
   .admin-report-strip,
   .platform-layout,
-  .platform-overview-grid,
   .operations-grid,
   .operations-hero,
   .operations-card-grid,

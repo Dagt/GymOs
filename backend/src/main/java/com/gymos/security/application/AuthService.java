@@ -66,7 +66,7 @@ public class AuthService {
 	@Transactional
 	public AuthResult login(String username, String password, String correlationId) {
 		authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(username, password));
-		AuthenticatedUser user = authQueryRepository.findActiveUserByUsername(username)
+		AuthenticatedUser user = authQueryRepository.findActiveUserByLoginIdentifier(username)
 				.orElseThrow(() -> new BusinessException("INVALID_CREDENTIALS", "Usuario o password invalidos."));
 		if (user.accountScope() == AccountScope.TENANT
 				&& !authQueryRepository.organizationIsActive(user.organizationId())) {

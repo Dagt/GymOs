@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -31,6 +32,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DuplicateKeyException;
 
 class PlatformCustomerServiceTests {
     private final PlatformOrganizationOperations organizationOperations = mock(PlatformOrganizationOperations.class);
@@ -100,8 +102,9 @@ class PlatformCustomerServiceTests {
 		GymOsPrincipal admin = platformAdmin();
 		UUID ownerUserId = UUID.randomUUID();
 		when(ownerProvisioning.provisionOwner(any())).thenReturn(new OwnerInvitation(
-				ownerUserId, "https://gymfort.mx/accept-invitation?token=secret",
-				OffsetDateTime.now().plusHours(72)));
+				UUID.randomUUID(), ownerUserId, "Ana Propietaria", "ana@gymnuevo.mx",
+				"https://gymfort.mx/accept-invitation?token=secret",
+				OffsetDateTime.now().plusHours(72), "PENDING"));
 		when(organizationOperations.organization(any())).thenAnswer(invocation -> Optional.of(
 				organization(invocation.getArgument(0), "Gym Nuevo", "ACTIVE", 1, 1)));
 
@@ -116,6 +119,24 @@ class PlatformCustomerServiceTests {
 		assertThat(result.invitationUrl()).contains("/accept-invitation?token=");
 		verify(organizationOperations).create(any());
 		verify(ownerProvisioning).provisionOwner(any());
+	}
+
+	@Test
+	void reportsTheConflictingRfcInsteadOfAnAmbiguousDuplicateMessage() {
+		GymOsPrincipal admin = platformAdmin();
+		doThrow(new DuplicateKeyException("duplicate constraint ux_organization_tax_id"))
+				.when(organizationOperations).create(any());
+
+		BusinessException exception = assertThrows(BusinessException.class, () -> service.create(
+				admin, new CreateCustomerCommand(
+						"Gym Duplicado SA", "Gym Duplicado", "GDUP260101AA1",
+						"America/Mexico_City", "MXN", "contacto@gym.mx", "+525512345678",
+						"Gym Duplicado", null, "#093D3A", "#18C8B2", "#F2F8F7",
+						"Principal", "MAIN", "+525512345678", "Ana", "Dueña",
+						"ana@gym.mx", "+525587654321"), "correlation"));
+
+		assertThat(exception.code()).isEqualTo("PLATFORM_CUSTOMER_TAX_ID_ALREADY_EXISTS");
+		assertThat(exception.details()).containsEntry("field", "taxId");
 	}
 
     private ManagedOrganization organization(

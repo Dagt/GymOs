@@ -1,7 +1,7 @@
 # Identidad y seguridad
 
 Estado: `ESTABILIZADO PARA PRODUCCIÓN PILOTO`
-Última revisión: 24 de agosto de 2026
+Última revisión: 25 de agosto de 2026
 
 ## Implementado
 
@@ -26,7 +26,14 @@ Estado: `ESTABILIZADO PARA PRODUCCIÓN PILOTO`
   la contraseña;
 - alta transaccional de gimnasio + primera sucursal + dueño `TENANT` invitado;
   V87 almacena únicamente el hash SHA-256 del token de invitación y la
-  contraseña sólo se persiste codificada al aceptar el enlace de un uso;
+  contraseña sólo se persiste codificada al aceptar el enlace de un uso; V89
+  registra únicamente estado/fechas del intento de correo, permite rotar una
+  invitación pendiente o vencida y revoca el enlace anterior;
+- la invitación del dueño se envía después del commit mediante el mismo adapter
+  SMTP/ZeptoMail del backend; el token completo existe sólo en memoria y en la
+  respuesta de un solo uso al administrador, nunca en `notification_log`,
+  auditoría ni logs; si el proveedor no está configurado o falla, el gimnasio
+  continúa creado y la consola ofrece enlace de respaldo y reenvío;
 - el seed demo está limitado al perfil `local`, deshabilitado por defecto y
   requiere correo/contraseña explícitos; V88 elimina únicamente el fixture
   histórico exacto cuando no tiene actividad y lo conserva como `DEMO` ante
@@ -50,8 +57,8 @@ Estado: `ESTABILIZADO PARA PRODUCCIÓN PILOTO`
 - GymFort Cloud rechaza metadatos físicos con biometría, imágenes, plantillas,
   contraseñas, tokens o secretos;
 - pruebas de autorización, JWT/refresh, bootstrap concurrente real,
-  invitaciones, límites de módulo, migración limpia/upgrade y restricciones
-  PostgreSQL.
+  invitaciones, rotación/expiración, entrega SMTP, límites de módulo, migración
+  limpia/upgrade y restricciones PostgreSQL.
 
 ## Pendiente
 

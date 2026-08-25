@@ -5,7 +5,9 @@ import {
   canSeeUserForSession,
   canShowRoleForSession,
   displayRoleName,
+  withSynchronizedLoginEmail,
 } from "./UsersRoleHelpers.ts";
+import type { CreateInternalUserPayload } from "../../lib/api/user-types.ts";
 import { canAccessRoute, canLaunchKiosk } from "../../lib/role-model.ts";
 import type { CurrentUser } from "../../lib/api/auth-types.ts";
 
@@ -44,6 +46,31 @@ test("platform administrator keeps full support visibility", () => {
   assert.equal(canShowRoleForSession(["Administrador GymOS"], "Administrador", true), true);
   assert.equal(canSeeUserForSession(["Administrador GymOS"], ["Administrador"], true), true);
   assert.equal(canManageUserForSession(["Administrador GymOS"], ["Administrador"], true), true);
+});
+
+test("email typing keeps the login identifier synchronized character by character", () => {
+  let form = emptyUserForm();
+  const email = "ana.gerencia@example.com";
+
+  for (let index = 1; index <= email.length; index += 1) {
+    form = withSynchronizedLoginEmail(form, email.slice(0, index));
+  }
+
+  assert.equal(form.email, email);
+  assert.equal(form.username, email);
+});
+
+test("a deliberately customized login identifier is preserved when email changes", () => {
+  const form = {
+    ...emptyUserForm(),
+    email: "ana@example.com",
+    username: "ana.gerencia",
+  };
+
+  const updated = withSynchronizedLoginEmail(form, "ana.nueva@example.com");
+
+  assert.equal(updated.email, "ana.nueva@example.com");
+  assert.equal(updated.username, "ana.gerencia");
 });
 
 test("receptionist role cannot access /benefits route", () => {
@@ -119,5 +146,18 @@ function kioskUser(overrides: Partial<CurrentUser>): CurrentUser {
     organizationName: "GymFort Test",
 	...overrides,
 	accountScope: overrides.accountScope ?? "TENANT",
+  };
+}
+
+function emptyUserForm(): CreateInternalUserPayload {
+  return {
+    firstName: "Ana",
+    lastName: "Gerencia",
+    email: "",
+    phone: "+525512345678",
+    username: "",
+    temporaryPassword: "Temporal123!",
+    roleId: "role-id",
+    branchIds: ["branch-id"],
   };
 }

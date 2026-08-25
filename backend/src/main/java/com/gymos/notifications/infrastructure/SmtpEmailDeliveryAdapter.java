@@ -131,6 +131,7 @@ public class SmtpEmailDeliveryAdapter implements EmailDeliveryPort {
 		String primary = safeColor(message.primaryColor(), "#093d3a");
 		String accent = safeColor(message.accentColor(), "#18c8b2");
 		String surface = safeColor(message.surfaceColor(), "#f2f8f7");
+		content += actionBlock(message.actionUrl(), message.actionLabel(), accent);
 		String primaryText = contrastText(primary);
 		String logo = safeLogo(message.logoUrl(), brand);
 		String assistance = message.replyTo() == null
@@ -194,6 +195,27 @@ public class SmtpEmailDeliveryAdapter implements EmailDeliveryPort {
 				brand,
 				brand
 		);
+	}
+
+	private String actionBlock(String actionUrl, String actionLabel, String accent) {
+		String safeUrl = safeActionUrl(actionUrl);
+		if (safeUrl == null) return "";
+		String label = escape(firstNonBlank(actionLabel, "Continuar"));
+		String textColor = contrastText(accent);
+		return """
+				<div style="margin:26px 0 12px;text-align:center">
+				<a href="%s" style="display:inline-block;padding:14px 24px;border-radius:10px;background:%s;color:%s;text-decoration:none;font-size:15px;font-weight:800">%s</a>
+				</div>
+				<div style="margin-top:13px;color:#687773;font-size:11px;line-height:1.55;word-break:break-all">Si el botón no funciona, copia este enlace:<br><a href="%s" style="color:#315c57">%s</a></div>
+				""".formatted(
+				escape(safeUrl), accent, textColor, label,
+				escape(safeUrl), escape(safeUrl));
+	}
+
+	private String safeActionUrl(String value) {
+		if (value == null || value.isBlank()) return null;
+		String normalized = value.trim();
+		return normalized.startsWith("https://") || normalized.startsWith("http://") ? normalized : null;
 	}
 
 	private String safeLogo(String logoUrl, String brand) {

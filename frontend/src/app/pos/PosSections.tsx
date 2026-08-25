@@ -52,7 +52,7 @@ export function ProductGrid({
         </div>
 
         <div className="mt-6 overflow-y-auto pr-2 max-h-[520px] custom-scrollbar">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-4" data-testid="pos-product-grid">
             {loading && (
               <div className="col-span-full py-12 flex flex-col items-center gap-4">
                  <div className="w-10 h-10 border-4 border-[color:var(--brand-primary)]/20 border-t-[color:var(--brand-primary)] rounded-full animate-spin"></div>
@@ -66,24 +66,37 @@ export function ProductGrid({
             )}
             {products.map((product) => (
               <button
-                className="group relative flex flex-col p-3.5 rounded-xl border border-gray-200 bg-white text-left transition-all duration-200 hover:bg-[color:var(--brand-surface)] hover:border-[color:var(--brand-primary)] hover:shadow-md hover:-translate-y-0.5"
+                className="group relative flex min-h-40 min-w-0 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-[color:var(--brand-primary)] hover:bg-[color:var(--brand-surface)] hover:shadow-md"
+                data-testid="pos-product-card"
                 key={product.id}
                 onClick={() => onAddProduct(product)}
                 type="button"
               >
-                <div className="flex justify-between items-start mb-2 gap-2">
-                  <span className="block text-sm font-bold text-gray-900 leading-tight group-hover:text-[color:var(--brand-primary)] transition-colors line-clamp-2">{product.name}</span>
-                  <span className="shrink-0 text-[0.6rem] font-bold uppercase tracking-wider px-1.5 py-0.5 bg-gray-100 text-gray-400 border border-gray-100 rounded-md">{product.sku}</span>
+                <div className="grid min-w-0 gap-2">
+                  <span
+                    className="line-clamp-3 min-h-15 min-w-0 break-words text-sm font-bold leading-5 text-gray-900 transition-colors [overflow-wrap:anywhere] group-hover:text-[color:var(--brand-primary)]"
+                    data-testid="pos-product-name"
+                    title={product.name}
+                  >
+                    {product.name}
+                  </span>
+                  <span
+                    className="block w-fit max-w-full truncate rounded-md border border-gray-100 bg-gray-100 px-2 py-1 text-[0.65rem] font-bold uppercase tracking-wider text-gray-500"
+                    data-testid="pos-product-sku"
+                    title={product.sku}
+                  >
+                    SKU · {product.sku}
+                  </span>
                 </div>
                 
-                <div className="mt-auto flex items-center justify-between pt-2">
-                  <div className="flex flex-col">
+                <div className="mt-auto flex min-w-0 items-end justify-between gap-3 pt-4">
+                  <div className="flex min-w-0 flex-col">
                     <span className="text-[0.6rem] font-bold uppercase tracking-wider text-gray-400">Precio</span>
-                    <span className="text-base font-black text-[color:var(--brand-primary)]">
+                    <span className="truncate text-base font-black text-[color:var(--brand-primary)]">
                       {formatMoney(product.priceCents, product.currency)}
                     </span>
                   </div>
-                  <div className="w-8 h-8 rounded-lg bg-white border border-gray-200 shadow-xs flex items-center justify-center text-[color:var(--brand-primary)] text-lg font-bold group-hover:bg-[color:var(--brand-primary)] group-hover:text-white group-hover:border-[color:var(--brand-primary)] transition-all duration-200">
+                  <div aria-hidden="true" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-gray-200 bg-white text-lg font-bold text-[color:var(--brand-primary)] shadow-xs transition-all duration-200 group-hover:border-[color:var(--brand-primary)] group-hover:bg-[color:var(--brand-primary)] group-hover:text-white">
                     +
                   </div>
                 </div>

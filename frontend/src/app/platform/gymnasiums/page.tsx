@@ -8,6 +8,7 @@ import { FormError } from "@/components/FormFields";
 import { BranchForm, CustomerAccountForm, OrganizationForm } from "./PlatformGymnasiumForms";
 import { PlatformGymnasiumDetail, PlatformGymnasiumList } from "./PlatformGymnasiumPanels";
 import { usePlatformGymnasiumsController } from "./usePlatformGymnasiumsController";
+import { invitationDeliveryDescription, invitationDeliveryTitle } from "./owner-invitation";
 
 export default function PlatformGymnasiumsPage() {
   const platform = usePlatformGymnasiumsController();
@@ -42,14 +43,17 @@ export default function PlatformGymnasiumsPage() {
 		<section className="app-card platform-invitation-card" role="status">
 		  <div>
 			<p className="app-eyebrow">Invitación del dueño</p>
-			<h2>Cuenta creada sin contraseña compartida</h2>
+			<h2>{invitationDeliveryTitle(platform.provisionedInvitation.emailDeliveryStatus)}</h2>
 			<span>
-			  Envía este enlace de un solo uso a {platform.provisionedInvitation.ownerEmail}. Vence el {formatDateTime(platform.provisionedInvitation.invitationExpiresAt)}.
+			  {invitationDeliveryDescription(
+				platform.provisionedInvitation.emailDeliveryStatus,
+				platform.provisionedInvitation.ownerEmail,
+			  )} Vence el {formatDateTime(platform.provisionedInvitation.invitationExpiresAt)}.
 			</span>
 		  </div>
 		  <div className="platform-invitation-actions">
-			<input aria-label="Enlace de invitación" readOnly value={platform.provisionedInvitation.invitationUrl} />
-			<button className="app-button" onClick={() => navigator.clipboard.writeText(platform.provisionedInvitation!.invitationUrl)} type="button">Copiar enlace</button>
+			<input aria-label="Enlace de respaldo de la invitación" readOnly value={platform.provisionedInvitation.invitationUrl} />
+			<button className="app-button" onClick={() => navigator.clipboard.writeText(platform.provisionedInvitation!.invitationUrl)} type="button">Copiar enlace de respaldo</button>
 			<button className="app-button-secondary" onClick={() => platform.setProvisionedInvitation(null)} type="button">Ocultar</button>
 		  </div>
 		</section>
@@ -86,6 +90,7 @@ export default function PlatformGymnasiumsPage() {
           onCreateBranch={platform.openBranchDrawer}
           onEditCustomerAccount={platform.openCustomerAccount}
           onGoToTenantSection={platform.goToTenantSection}
+          onReissueOwnerInvitation={platform.reissueOwnerInvitation}
           onToggleOrganizationStatus={platform.toggleOrganizationStatus}
           saving={platform.saving}
           selectedIsActive={platform.selectedIsActive}

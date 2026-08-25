@@ -236,6 +236,9 @@ class SecurityAuthorizationTests {
 						.content("{}"))
 				.andExpect(status().isForbidden())
 				.andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
+		mockMvc.perform(post("/api/v1/platform/customers/99999999-9999-9999-9999-999999999951/owner-invitation"))
+				.andExpect(status().isForbidden())
+				.andExpect(jsonPath("$.code").value("PERMISSION_DENIED"));
 	}
 
 	@Test

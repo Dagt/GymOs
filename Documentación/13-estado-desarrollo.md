@@ -1,8 +1,8 @@
 # 13. Estado actual de desarrollo
 
 Estado: FUENTE CANÓNICA / EN PROGRESO
-Corte: 24 de agosto de 2026
-Código auditado: `feature/platform-identity-separation`, incluyendo V86–V88
+Corte: 25 de agosto de 2026
+Código auditado: `feature/platform-identity-separation`, incluyendo V86–V89
 sobre la administración comercial V85 y la base integrada de acceso físico,
 cobranza, Automatizaciones/ZeptoMail y métricas.
 
@@ -18,6 +18,14 @@ PostgreSQL, mientras el alta
 de un cliente crea transaccionalmente gimnasio, primera sucursal y dueño por
 invitación de un solo uso. El acceso excepcional de soporte requiere motivo,
 expira y queda auditado.
+
+El alta desde la consola de plataforma ya no consulta la colección tenant
+`/organizations`: usa exclusivamente `/platform/customers`, por lo que un alta
+confirmada no se presenta falsamente como fallida ni se reintenta creando una
+colisión. Después del commit, el enlace del dueño se entrega por ZeptoMail sin
+persistir el token en claro. La ficha muestra aceptación del proveedor,
+expiración y acciones para rotar/reemitir invitaciones; una falla de correo no
+revierte ni oculta el gimnasio ya creado.
 
 **La administración de clientes de GymFort queda estabilizada para operación
 comercial manual**: el administrador entra desde el menú lateral a una cartera

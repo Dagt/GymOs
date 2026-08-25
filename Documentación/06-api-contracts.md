@@ -1328,7 +1328,28 @@ gimnasio puede consultar o mutar esta información.
 - devuelve el resumen ejecutivo y una fila por `Organization` cliente con etapa,
   salud derivada, responsable, contacto de cobranza, contrato, seguimiento, MRR,
   vencidos y configuración pendiente;
+- incluye `ownerAccess` con estado de la cuenta, vigencia de la invitación y
+  estado operativo del último intento de correo, pero nunca devuelve el token
+  histórico;
 - excluye la organización técnica GymFort y no expone datos personales de socios.
+
+`POST /api/v1/platform/customers`
+
+- crea en una transacción organización, primera sucursal, cuenta invitada,
+  rol/acceso del dueño e invitación;
+- después del commit intenta entregar el enlace por el adapter SMTP/ZeptoMail;
+  una falla posterior no convierte el alta confirmada en error ni deja al
+  frontend repitiendo la creación;
+- devuelve el enlace de respaldo sólo en esa respuesta y
+  `emailDeliveryStatus` (`SENT`, `FAILED`, `NOT_CONFIGURED` o `PENDING`).
+
+`POST /api/v1/platform/customers/{organizationId}/owner-invitation`
+
+- sólo `platform.admin`; exige que la cuenta continúe `INVITED`;
+- invalida cualquier invitación pendiente anterior, genera un token distinto,
+  conserva únicamente SHA-256 y vuelve a intentar ZeptoMail;
+- aplica cooldown configurable para evitar envíos repetitivos y rechaza la
+  operación si el dueño ya activó su cuenta.
 
 `PUT /api/v1/platform/customers/{organizationId}`
 

@@ -6,11 +6,13 @@ import org.springframework.boot.context.properties.bind.ConstructorBinding;
 @ConfigurationProperties(prefix = "gymos.identity")
 public record IdentityProperties(
 		long invitationHours,
+		long invitationResendCooldownSeconds,
 		String frontendBaseUrl
 ) {
 	@ConstructorBinding
 	public IdentityProperties {
 		if (invitationHours <= 0) invitationHours = 72;
+		if (invitationResendCooldownSeconds < 0) invitationResendCooldownSeconds = 60;
 		if (frontendBaseUrl == null || frontendBaseUrl.isBlank()) frontendBaseUrl = "http://localhost:3000";
 		frontendBaseUrl = frontendBaseUrl.replaceAll("/+$", "");
 	}

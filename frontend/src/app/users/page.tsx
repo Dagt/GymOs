@@ -191,8 +191,8 @@ export default function UsersPage() {
       setNewCoachBio("");
       setShowCreateUser(false);
       setMessage(coachRoleSelected
-        ? "Usuario y perfil de Coach creados. Ya puede iniciar sesion con su contrasena temporal."
-        : "Usuario creado. Ya puede iniciar sesion con su usuario y contrasena temporal.");
+        ? `Usuario y perfil de Coach creados. Su acceso es ${created.username}; ya puede iniciar sesión con la contraseña temporal.`
+        : `Usuario creado. Su acceso es ${created.username}; ya puede iniciar sesión con la contraseña temporal.`);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible crear el usuario.");
     } finally {

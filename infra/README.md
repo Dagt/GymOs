@@ -92,6 +92,8 @@ GYMOS_SMTP_STARTTLS_REQUIRED=true
 GYMOS_SMTP_SSL=false
 GYMOS_SMTP_CHECK_SERVER_IDENTITY=true
 GYMOS_FRONTEND_BASE_URL=http://localhost:3000
+GYMOS_USER_INVITATION_HOURS=72
+GYMOS_USER_INVITATION_RESEND_COOLDOWN_SECONDS=60
 ```
 
 Después de modificar secretos:
@@ -112,6 +114,11 @@ Reply-To: correo real del gimnasio
 
 Los `From` deben estar verificados/autorizados y en
 `GYMOS_SMTP_ALLOWED_FROM_ADDRESSES`. El `Reply-To` se configura por gimnasio.
+
+Las invitaciones iniciales de dueños usan este mismo adapter después de que la
+creación del gimnasio confirma su transacción. El enlace no se persiste en la
+cola de notificaciones; la consola conserva un enlace de respaldo y permite
+rotarlo/reintentarlo si ZeptoMail no está configurado o la invitación vence.
 
 ### Logo en desarrollo
 

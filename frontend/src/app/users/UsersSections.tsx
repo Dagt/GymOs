@@ -17,7 +17,13 @@ import type {
   RoleOption,
   StoredSession,
 } from "@/lib/api";
-import { canManageUserForSession, displayRoleName, roleDescription, roleIdForUser } from "./UsersRoleHelpers";
+import {
+  canManageUserForSession,
+  displayRoleName,
+  roleDescription,
+  roleIdForUser,
+  withSynchronizedLoginEmail,
+} from "./UsersRoleHelpers";
 
 export function TeamOverview({ branches, roles, onCreateUser }: { branches: BranchSummary[]; roles: RoleOption[]; onCreateUser: () => void }) {
   return (
@@ -244,8 +250,8 @@ export function CreateUserDrawer({ branches, branchSelectionLocked, coachBio, co
     <AppDrawer description="Crea la cuenta y define desde que sucursales podra operar. Cada usuario entrara a su consola segun su rol." onClose={onClose} open={open} title="Crear usuario del gimnasio">
       <form className="grid gap-4" onSubmit={onSubmit}>
         <div className="grid gap-4 sm:grid-cols-2"><TextField error={errors.firstName} label="Nombre" name="firstName" value={form.firstName} onChange={(value) => onFormChange({ ...form, firstName: value })} /><TextField error={errors.lastName} label="Apellido paterno" name="lastName" value={form.lastName} onChange={(value) => onFormChange({ ...form, lastName: value })} /><TextField error={errors.maternalLastName} label="Apellido materno" name="maternalLastName" required={false} value={form.maternalLastName ?? ""} onChange={(value) => onFormChange({ ...form, maternalLastName: value })} /></div>
-        <div className="grid gap-4 sm:grid-cols-2"><EmailField error={errors.email} label="Email" name="email" required value={form.email ?? ""} onChange={(value) => onFormChange({ ...form, email: value, username: form.username || value })} /><PhoneField error={errors.phone} label="Telefono" name="phone" required value={form.phone ?? ""} onChange={(value) => onFormChange({ ...form, phone: value })} /></div>
-        <TextField error={errors.username} label="Usuario de inicio de sesion" name="username" value={form.username} onChange={(value) => onFormChange({ ...form, username: value })} />
+        <div className="grid gap-4 sm:grid-cols-2"><EmailField error={errors.email} label="Email" name="email" required value={form.email ?? ""} onChange={(value) => onFormChange(withSynchronizedLoginEmail(form, value))} /><PhoneField error={errors.phone} label="Teléfono" name="phone" required value={form.phone ?? ""} onChange={(value) => onFormChange({ ...form, phone: value })} /></div>
+        <TextField error={errors.username} help="Se completa con el correo. Puedes personalizarlo antes de crear la cuenta." label="Usuario de inicio de sesión" name="username" value={form.username} onChange={(value) => onFormChange({ ...form, username: value })} />
         <PasswordField error={errors.temporaryPassword} label="Contrasena temporal" name="temporaryPassword" value={form.temporaryPassword} onChange={(value) => onFormChange({ ...form, temporaryPassword: value })} />
         <SelectField error={errors.roleId} label="Rol" name="roleId" options={roles.map((role) => ({ label: displayRoleName(role.name), value: role.id }))} value={form.roleId} onChange={(nextRoleId) => { const nextLabel = displayRoleName(roles.find((role) => role.id === nextRoleId)?.name ?? ""); onFormChange({ ...form, roleId: nextRoleId, branchIds: nextLabel === "Dueno del gimnasio" ? branches.map((branch) => branch.id) : branches.length === 1 ? [branches[0].id] : form.branchIds }); }} />
         {coachRoleSelected ? (

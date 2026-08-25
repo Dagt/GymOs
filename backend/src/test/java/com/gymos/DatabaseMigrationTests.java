@@ -111,6 +111,12 @@ class DatabaseMigrationTests {
 			assertThat(columnExists(connection, "role", "account_scope")).isTrue();
 			assertThat(columnExists(connection, "organization", "data_origin")).isTrue();
 			assertThat(tableExists(connection, "user_invitation")).isTrue();
+			assertThat(columnExists(connection, "user_invitation", "email_delivery_status")).isTrue();
+			assertThat(columnExists(connection, "user_invitation", "email_attempt_count")).isTrue();
+			assertThat(columnExists(connection, "user_invitation", "last_email_attempt_at")).isTrue();
+			assertThat(columnExists(connection, "user_invitation", "last_email_sent_at")).isTrue();
+			assertThat(indexExists(connection, "ix_user_invitation_user_created")).isTrue();
+			assertThat(indexExists(connection, "ix_person_login_email_active")).isTrue();
 			assertThat(indexExists(connection, "ux_platform_billing_payment_idempotency")).isTrue();
 			assertThat(tableExists(connection, "access_provider_connection")).isTrue();
 			assertThat(tableExists(connection, "access_provider_benefit_mapping")).isTrue();
