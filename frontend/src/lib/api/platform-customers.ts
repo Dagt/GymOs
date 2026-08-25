@@ -5,6 +5,7 @@ import type {
   PlatformCustomerPortfolio,
   PlatformCustomerUpdatePayload,
 	ProvisionedPlatformCustomer,
+	ProvisionedOwnerInvitation,
 } from "./platform-customer-types";
 
 export async function getPlatformCustomers(
@@ -32,4 +33,15 @@ export async function updatePlatformCustomer(
     method: "PUT",
     body: JSON.stringify(normalizePayload(payload)),
   });
+}
+
+export async function reissuePlatformOwnerInvitation(
+  accessToken: string,
+  organizationId: string,
+): Promise<ProvisionedOwnerInvitation> {
+  return apiFetch<ProvisionedOwnerInvitation>(
+    `/platform/customers/${organizationId}/owner-invitation`,
+    accessToken,
+    { method: "POST" },
+  );
 }

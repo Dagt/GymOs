@@ -4,7 +4,6 @@ import { type FieldErrorMap, normalizePhone, normalizeRfc } from "@/components/F
 import {
   createBranch,
   getOrganizationBranches,
-  getOrganizations,
   getStoredSession,
   selectBranch,
   selectOrganization,
@@ -13,13 +12,18 @@ import {
   updateOrganizationStatus,
   type BranchSummary,
   type CreateBranchPayload,
-  type ManagedOrganizationSummary,
   type StoredSession,
 } from "@/lib/api";
-import { createPlatformCustomer, getPlatformCustomers, updatePlatformCustomer } from "@/lib/api/platform-customers";
+import {
+  createPlatformCustomer,
+  getPlatformCustomers,
+  reissuePlatformOwnerInvitation,
+  updatePlatformCustomer,
+} from "@/lib/api/platform-customers";
 import type {
   PlatformCustomer,
 	PlatformCustomerCreatePayload,
+  PlatformOrganizationSummary,
   PlatformCustomerPortfolio,
   PlatformCustomerUpdatePayload,
 	ProvisionedPlatformCustomer,
@@ -30,11 +34,11 @@ import {
   validateBranch,
   validateOrganization,
 } from "./PlatformGymnasiumForms";
+import { invitationSuccessMessage } from "./owner-invitation";
 
 export function usePlatformGymnasiumsController() {
   const router = useRouter();
   const [session, setSession] = useState<StoredSession | null>(null);
-  const [organizations, setOrganizations] = useState<ManagedOrganizationSummary[]>([]);
   const [portfolio, setPortfolio] = useState<PlatformCustomerPortfolio | null>(null);
   const [branches, setBranches] = useState<BranchSummary[]>([]);
   const [branchesLoading, setBranchesLoading] = useState(false);
@@ -73,21 +77,19 @@ export function usePlatformGymnasiumsController() {
       }
       setSession(stored);
       try {
-        const [availableOrganizations, customerPortfolio] = await Promise.all([
-          getOrganizations(stored.accessToken),
-          getPlatformCustomers(stored.accessToken),
-        ]);
+        const customerPortfolio = await getPlatformCustomers(stored.accessToken);
         if (!active) {
           return;
         }
-        setOrganizations(availableOrganizations);
         setPortfolio(customerPortfolio);
         setSelectedOrganizationId((current) => {
           const requestedId = new URLSearchParams(window.location.search).get("organization") ?? "";
 		  const preferredId = current || requestedId || stored.user.organizationId || "";
-          return availableOrganizations.some((organization) => organization.id === preferredId)
+          return customerPortfolio.customers.some(
+            (customer) => customer.organizationId === preferredId,
+          )
             ? preferredId
-            : availableOrganizations[0]?.id || "";
+            : customerPortfolio.customers[0]?.organizationId || "";
         });
       } catch (exception) {
         if (active) {
@@ -145,6 +147,11 @@ export function usePlatformGymnasiumsController() {
     };
   }, [accessToken, selectedOrganizationId]);
 
+  const organizations = useMemo<PlatformOrganizationSummary[]>(
+    () => (portfolio?.customers ?? []).map(toPlatformOrganization),
+    [portfolio],
+  );
+
   const filteredOrganizations = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     const customers = new Map(
@@ -184,6 +191,17 @@ export function usePlatformGymnasiumsController() {
     const customerPortfolio = await getPlatformCustomers(activeToken);
     setPortfolio(customerPortfolio);
     return customerPortfolio;
+  }
+
+  async function refreshPortfolioAfterCommittedAction(activeToken: string) {
+    try {
+      await refreshPortfolio(activeToken);
+      return null;
+    } catch (exception) {
+      return exception instanceof Error
+        ? exception.message
+        : "No fue posible actualizar el portafolio.";
+    }
   }
 
 	function requestSupportReason(): Promise<string | null> {
@@ -364,23 +382,72 @@ export function usePlatformGymnasiumsController() {
             : "No fue posible guardar el logo seleccionado.";
         }
       }
-	  const availableOrganizations = await getOrganizations(session.accessToken);
-	  setOrganizations(availableOrganizations);
       setForm(emptyOrganizationForm);
       setLogoFile(null);
       setShowCreate(false);
 	  setProvisionedInvitation(provisioned);
 	  setSelectedOrganizationId(provisioned.customer.organizationId);
       setBranches([]);
-      await refreshPortfolio(session.accessToken);
-      if (logoUploadError) {
-        setError(`El gimnasio se creo correctamente, pero el logo no pudo guardarse. ${logoUploadError}`);
-		setMessage("Gimnasio, sucursal y dueño creados. Comparte la invitación por un canal seguro.");
-      } else {
-		setMessage("Gimnasio, sucursal y dueño creados de forma transaccional.");
+      const portfolioRefreshError = await refreshPortfolioAfterCommittedAction(session.accessToken);
+      const completedWithWarnings = Boolean(logoUploadError || portfolioRefreshError);
+      if (completedWithWarnings) {
+        const warnings = [
+          logoUploadError ? `El logo no pudo guardarse: ${logoUploadError}` : null,
+          portfolioRefreshError
+            ? `El portafolio no pudo actualizarse todavía: ${portfolioRefreshError}`
+            : null,
+        ].filter(Boolean).join(" ");
+        setError(`El gimnasio se creó correctamente. ${warnings}`);
       }
+	  setMessage(invitationSuccessMessage(
+		provisioned.emailDeliveryStatus,
+		Boolean(logoUploadError),
+	  ));
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible crear el gimnasio.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function reissueOwnerInvitation() {
+    if (!session || !selectedCustomer?.ownerAccess) return;
+    const ownerAccess = selectedCustomer.ownerAccess;
+    if (ownerAccess.invitationStatus === "PENDING") {
+      const confirmed = window.confirm(
+        "Se invalidará el enlace anterior y se enviará uno nuevo. ¿Quieres continuar?",
+      );
+      if (!confirmed) return;
+    }
+
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const invitation = await reissuePlatformOwnerInvitation(
+        session.accessToken,
+        selectedCustomer.organizationId,
+      );
+      setProvisionedInvitation({
+        customer: selectedCustomer,
+        invitationId: invitation.invitationId,
+        ownerName: invitation.ownerName,
+        ownerEmail: invitation.ownerEmail,
+        invitationUrl: invitation.invitationUrl,
+        invitationExpiresAt: invitation.invitationExpiresAt,
+        emailDeliveryStatus: invitation.emailDeliveryStatus,
+      });
+      setMessage(invitationSuccessMessage(invitation.emailDeliveryStatus, false, true));
+      const portfolioRefreshError = await refreshPortfolioAfterCommittedAction(session.accessToken);
+      if (portfolioRefreshError) {
+        setError(
+          `La nueva invitación se generó correctamente, pero el portafolio no pudo actualizarse todavía: ${portfolioRefreshError}`,
+        );
+      }
+    } catch (exception) {
+      setError(exception instanceof Error
+        ? exception.message
+        : "No fue posible generar una nueva invitación.");
     } finally {
       setSaving(false);
     }
@@ -501,10 +568,7 @@ export function usePlatformGymnasiumsController() {
     setError(null);
     setMessage(null);
     try {
-      const updated = await updateOrganizationStatus(session.accessToken, selectedOrganization.id, nextStatus);
-      setOrganizations((current) =>
-        current.map((organization) => (organization.id === updated.id ? updated : organization)),
-      );
+      await updateOrganizationStatus(session.accessToken, selectedOrganization.id, nextStatus);
       await refreshPortfolio(session.accessToken);
       setMessage(
         nextStatus === "ACTIVE"
@@ -555,6 +619,7 @@ export function usePlatformGymnasiumsController() {
     openBranchDrawer,
     openCustomerAccount,
     openCreateOrganization,
+	reissueOwnerInvitation,
     closeCreateOrganization,
     closeCustomerAccount,
 	closeSupportReason,
@@ -573,6 +638,22 @@ export function usePlatformGymnasiumsController() {
     submitOrganization,
 	submitSupportReason,
     toggleOrganizationStatus,
+  };
+}
+
+function toPlatformOrganization(customer: PlatformCustomer): PlatformOrganizationSummary {
+  return {
+    id: customer.organizationId,
+    legalName: customer.legalName,
+    tradeName: customer.tradeName,
+    taxId: customer.taxId,
+    status: customer.organizationStatus,
+    contactEmail: customer.contactEmail,
+    contactPhone: customer.contactPhone,
+    brandName: customer.brandName,
+    logoUrl: customer.logoUrl,
+    branchCount: customer.branchCount,
+    activeBranchCount: customer.activeBranchCount,
   };
 }
 

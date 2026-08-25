@@ -199,10 +199,27 @@ sucursal, cuenta `TENANT`, rol, acceso e invitación. El enlace se entrega una
 sola vez y PostgreSQL conserva únicamente SHA-256 del token. Si falla cualquier
 paso, no debe quedar una identidad huérfana.
 
+Una vez confirmado el commit, el backend intenta el correo del dueño mediante
+el adapter SMTP/ZeptoMail. Este envío inicial es directo deliberadamente: poner
+el enlace en la cola durable persistiría el token de un solo uso dentro del
+cuerpo. V89 guarda sólo `email_delivery_status`, contador y fechas. Si SMTP no
+está listo o rechaza el mensaje, el alta sigue siendo exitosa, la consola muestra
+el enlace de respaldo y permite **Reenviar invitación**. Reenviar rota el token,
+revoca el enlace anterior y aplica el cooldown
+`GYMOS_USER_INVITATION_RESEND_COOLDOWN_SECONDS` (60 segundos por defecto).
+
+La cartera del administrador se refresca con `GET /api/v1/platform/customers`;
+no debe usar `GET /api/v1/organizations`, reservado a capacidades tenant. Para
+smoke, confirmar en la ficha del cliente:
+
+- cuenta `INVITED` e invitación pendiente/vencida;
+- `Aceptado por ZeptoMail`, `Falló la entrega` o `ZeptoMail no configurado`;
+- después de aceptar, cuenta activada y acción de reenvío oculta.
+
 ## 7. Rollback y recuperación
 
 - No editar, borrar ni fabricar filas en `flyway_schema_history`.
-- No deshacer V86, V87, V88 ni migraciones posteriores manualmente.
+- No deshacer V86, V87, V88, V89 ni migraciones posteriores manualmente.
 - Preferir roll forward mediante una migración compensatoria y una imagen nueva.
 - Para restaurar el backup, detener escrituras y aceptar explícitamente la
   pérdida de operaciones posteriores al punto restaurado.
@@ -219,6 +236,7 @@ paso, no debe quedar una identidad huérfana.
 - soporte exige motivo, expira y permite volver al panel;
 - tenant suspendido no inicia ni renueva sesión;
 - invitación sólo se consume una vez y la base no contiene el token en claro;
+- una invitación vencida puede rotarse y el enlace anterior queda inválido;
 - `GYMOS_SEED_ENABLED=false` y bootstrap deshabilitado;
 - reiniciar backend no crea ni restablece administradores;
 - no existen secretos de bootstrap en logs, auditoría, respuestas o frontend.

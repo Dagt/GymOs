@@ -54,6 +54,34 @@ export type PlatformCustomer = {
   implementationOutstanding: number;
   nextBillingDate: string | null;
   healthStatus: PlatformCustomerHealth;
+  ownerAccess: PlatformOwnerAccess | null;
+};
+
+export type PlatformOwnerAccess = {
+  userId: string;
+  ownerName: string;
+  ownerEmail: string;
+  accountStatus: string;
+  invitationId: string | null;
+  invitationStatus: "PENDING" | "ACCEPTED" | "EXPIRED" | "REVOKED" | "MISSING";
+  invitationExpiresAt: string | null;
+  emailDeliveryStatus: "UNKNOWN" | "PENDING" | "SENT" | "FAILED" | "NOT_CONFIGURED";
+  lastEmailAttemptAt: string | null;
+  lastEmailSentAt: string | null;
+};
+
+export type PlatformOrganizationSummary = {
+  id: string;
+  legalName: string;
+  tradeName: string;
+  taxId: string | null;
+  status: string;
+  contactEmail: string | null;
+  contactPhone: string | null;
+  brandName: string | null;
+  logoUrl: string | null;
+  branchCount: number;
+  activeBranchCount: number;
 };
 
 export type PlatformCustomerPortfolio = {
@@ -98,7 +126,23 @@ export type PlatformCustomerCreatePayload = {
 
 export type ProvisionedPlatformCustomer = {
 	customer: PlatformCustomer;
+	invitationId: string;
+	ownerName: string;
 	ownerEmail: string;
 	invitationUrl: string;
 	invitationExpiresAt: string;
+	emailDeliveryStatus: PlatformOwnerAccess["emailDeliveryStatus"];
+};
+
+export type ProvisionedOwnerInvitation = {
+  organizationId: string;
+  organizationName: string;
+  organizationContactEmail: string | null;
+  invitationId: string;
+  ownerUserId: string;
+  ownerName: string;
+  ownerEmail: string;
+  invitationUrl: string;
+  invitationExpiresAt: string;
+  emailDeliveryStatus: PlatformOwnerAccess["emailDeliveryStatus"];
 };

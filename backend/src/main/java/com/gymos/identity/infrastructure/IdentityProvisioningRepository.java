@@ -2,7 +2,9 @@ package com.gymos.identity.infrastructure;
 
 import com.gymos.common.security.AccountScope;
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
@@ -192,9 +194,13 @@ public class IdentityProvisioningRepository {
 	) {
 		jdbcClient.sql("""
 				INSERT INTO user_invitation (
-				    id, user_id, token_hash, status, expires_at, created_at, created_by
+				    id, user_id, token_hash, status, expires_at, email_delivery_status,
+				    created_at, created_by
 				)
-				VALUES (:id, :userId, :tokenHash, 'PENDING', :expiresAt, :now, :actorUserId)
+				VALUES (
+				    :id, :userId, :tokenHash, 'PENDING', :expiresAt, 'PENDING',
+				    :now, :actorUserId
+				)
 				""")
 				.param("id", invitationId)
 				.param("userId", userId)
@@ -202,6 +208,153 @@ public class IdentityProvisioningRepository {
 				.param("expiresAt", expiresAt)
 				.param("now", now)
 				.param("actorUserId", actorUserId)
+				.update();
+	}
+
+	public Optional<OwnerAccountRecord> lockOwnerAccount(UUID organizationId) {
+		return jdbcClient.sql("""
+				SELECT ua.id AS user_id, ua.organization_id, ua.status AS account_status,
+				       p.email, TRIM(p.first_name || ' ' || p.last_name) AS owner_name
+				FROM user_account ua
+				JOIN person p ON p.id = ua.person_id
+				WHERE ua.organization_id = :organizationId
+				  AND ua.account_scope = 'TENANT'
+				  AND ua.deleted_at IS NULL
+				  AND p.deleted_at IS NULL
+				  AND EXISTS (
+				      SELECT 1
+				      FROM user_role ur
+				      JOIN role r ON r.id = ur.role_id
+				      WHERE ur.user_id = ua.id
+				        AND r.account_scope = 'TENANT'
+				        AND r.name = 'Dueno del gimnasio'
+				        AND r.deleted_at IS NULL
+				  )
+				ORDER BY CASE WHEN ua.status = 'INVITED' THEN 0 ELSE 1 END, ua.created_at
+				LIMIT 1
+				FOR UPDATE OF ua
+				""")
+				.param("organizationId", organizationId)
+				.query((rs, row) -> new OwnerAccountRecord(
+						rs.getObject("user_id", UUID.class),
+						rs.getObject("organization_id", UUID.class),
+						rs.getString("account_status"),
+						rs.getString("email"),
+						rs.getString("owner_name")))
+				.optional();
+	}
+
+	public Optional<LatestInvitationRecord> latestInvitation(UUID userId) {
+		return jdbcClient.sql("""
+				SELECT id, status, expires_at, email_delivery_status, created_at
+				FROM user_invitation
+				WHERE user_id = :userId
+				ORDER BY created_at DESC, id DESC
+				LIMIT 1
+				""")
+				.param("userId", userId)
+				.query((rs, row) -> new LatestInvitationRecord(
+						rs.getObject("id", UUID.class), rs.getString("status"),
+						rs.getObject("expires_at", OffsetDateTime.class),
+						rs.getString("email_delivery_status"),
+						rs.getObject("created_at", OffsetDateTime.class)))
+				.optional();
+	}
+
+	public void revokePendingInvitations(UUID userId, OffsetDateTime now) {
+		jdbcClient.sql("""
+				UPDATE user_invitation
+				SET status = CASE WHEN expires_at <= :now THEN 'EXPIRED' ELSE 'REVOKED' END
+				WHERE user_id = :userId
+				  AND status = 'PENDING'
+				""")
+				.param("userId", userId)
+				.param("now", now)
+				.update();
+	}
+
+	public List<OwnerInvitationStateRecord> ownerInvitationStates(
+			Set<UUID> organizationIds,
+			OffsetDateTime now
+	) {
+		if (organizationIds == null || organizationIds.isEmpty()) return List.of();
+		return jdbcClient.sql("""
+				SELECT DISTINCT ON (ua.organization_id)
+				       ua.organization_id, ua.id AS user_id,
+				       TRIM(p.first_name || ' ' || p.last_name) AS owner_name,
+				       p.email, ua.status AS account_status,
+				       invitation.id AS invitation_id,
+				       CASE
+				         WHEN invitation.id IS NULL THEN 'MISSING'
+				         WHEN invitation.status = 'PENDING' AND invitation.expires_at <= :now THEN 'EXPIRED'
+				         ELSE invitation.status
+				       END AS invitation_status,
+				       invitation.expires_at,
+				       COALESCE(invitation.email_delivery_status, 'UNKNOWN') AS email_delivery_status,
+				       invitation.last_email_attempt_at,
+				       invitation.last_email_sent_at
+				FROM user_account ua
+				JOIN person p ON p.id = ua.person_id
+				LEFT JOIN LATERAL (
+				    SELECT i.id, i.status, i.expires_at, i.email_delivery_status,
+				           i.last_email_attempt_at, i.last_email_sent_at
+				    FROM user_invitation i
+				    WHERE i.user_id = ua.id
+				    ORDER BY i.created_at DESC, i.id DESC
+				    LIMIT 1
+				) invitation ON true
+				WHERE ua.organization_id IN (:organizationIds)
+				  AND ua.account_scope = 'TENANT'
+				  AND ua.deleted_at IS NULL
+				  AND p.deleted_at IS NULL
+				  AND EXISTS (
+				      SELECT 1
+				      FROM user_role ur
+				      JOIN role r ON r.id = ur.role_id
+				      WHERE ur.user_id = ua.id
+				        AND r.account_scope = 'TENANT'
+				        AND r.name = 'Dueno del gimnasio'
+				        AND r.deleted_at IS NULL
+				  )
+				ORDER BY ua.organization_id,
+				         CASE WHEN ua.status = 'INVITED' THEN 0 WHEN ua.status = 'ACTIVE' THEN 1 ELSE 2 END,
+				         ua.created_at
+				""")
+				.param("organizationIds", organizationIds)
+				.param("now", now)
+				.query((rs, row) -> new OwnerInvitationStateRecord(
+						rs.getObject("organization_id", UUID.class),
+						rs.getObject("user_id", UUID.class),
+						rs.getString("owner_name"), rs.getString("email"),
+						rs.getString("account_status"),
+						rs.getObject("invitation_id", UUID.class),
+						rs.getString("invitation_status"),
+						rs.getObject("expires_at", OffsetDateTime.class),
+						rs.getString("email_delivery_status"),
+						rs.getObject("last_email_attempt_at", OffsetDateTime.class),
+						rs.getObject("last_email_sent_at", OffsetDateTime.class)))
+				.list();
+	}
+
+	public void recordInvitationEmailDelivery(
+			UUID invitationId,
+			String deliveryStatus,
+			OffsetDateTime attemptedAt
+	) {
+		jdbcClient.sql("""
+				UPDATE user_invitation
+				SET email_delivery_status = :deliveryStatus,
+				    email_attempt_count = email_attempt_count + 1,
+				    last_email_attempt_at = :attemptedAt,
+				    last_email_sent_at = CASE
+				        WHEN :deliveryStatus = 'SENT' THEN :attemptedAt
+				        ELSE last_email_sent_at
+				    END
+				WHERE id = :invitationId
+				""")
+				.param("deliveryStatus", deliveryStatus)
+				.param("attemptedAt", attemptedAt)
+				.param("invitationId", invitationId)
 				.update();
 	}
 
@@ -263,6 +416,39 @@ public class IdentityProvisioningRepository {
 			OffsetDateTime expiresAt,
 			AccountScope accountScope,
 			UUID organizationId
+	) {
+	}
+
+	public record OwnerAccountRecord(
+			UUID userId,
+			UUID organizationId,
+			String accountStatus,
+			String email,
+			String ownerName
+	) {
+	}
+
+	public record LatestInvitationRecord(
+			UUID invitationId,
+			String status,
+			OffsetDateTime expiresAt,
+			String emailDeliveryStatus,
+			OffsetDateTime createdAt
+	) {
+	}
+
+	public record OwnerInvitationStateRecord(
+			UUID organizationId,
+			UUID userId,
+			String ownerName,
+			String email,
+			String accountStatus,
+			UUID invitationId,
+			String invitationStatus,
+			OffsetDateTime invitationExpiresAt,
+			String emailDeliveryStatus,
+			OffsetDateTime lastEmailAttemptAt,
+			OffsetDateTime lastEmailSentAt
 	) {
 	}
 

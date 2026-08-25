@@ -24,8 +24,21 @@ public interface EmailDeliveryPort {
 			String logoUrl,
 			String primaryColor,
 			String accentColor,
-			String surfaceColor
+			String surfaceColor,
+			String actionUrl,
+			String actionLabel
 	) {
+		public EmailMessage(
+				UUID notificationId, UUID organizationId, String fromEmail, String fromName,
+				String replyTo, String recipient, String subject, String bodyText,
+				String bodyHtml, String idempotencyKey, String brandName, String logoUrl,
+				String primaryColor, String accentColor, String surfaceColor
+		) {
+			this(
+					notificationId, organizationId, fromEmail, fromName, replyTo, recipient,
+					subject, bodyText, bodyHtml, idempotencyKey, brandName, logoUrl,
+					primaryColor, accentColor, surfaceColor, null, null);
+		}
 	}
 
 	record DeliveryResult(String providerMessageId) {

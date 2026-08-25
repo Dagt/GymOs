@@ -33,6 +33,7 @@ const customer: PlatformCustomer = {
   implementationOutstanding: 0,
   nextBillingDate: "2026-08-15",
   healthStatus: "AT_RISK",
+  ownerAccess: null,
 };
 
 test("portfolio action center prioritizes overdue billing and account risk", () => {

@@ -5,6 +5,7 @@ import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.identity.api.operations.TenantOwnerProvisioning;
 import com.gymos.identity.api.operations.TenantOwnerProvisioning.ProvisionOwner;
+import com.gymos.identity.api.operations.TenantOwnerProvisioning.ReissueOwnerInvitation;
 import com.gymos.organizations.api.operations.PlatformOrganizationOperations;
 import com.gymos.organizations.api.operations.PlatformOrganizationOperations.ManagedOrganization;
 import com.gymos.organizations.api.operations.PlatformOrganizationOperations.CreateManagedOrganization;
@@ -83,12 +84,11 @@ public class PlatformCustomerService {
 			ManagedOrganization organization = organizationOperations.organization(organizationId)
 					.orElseThrow(() -> new BusinessException("ORGANIZATION_NOT_FOUND", "El gimnasio creado no esta disponible."));
 			return new ProvisionedCustomer(
-					toView(organization, null, BillingAggregate.empty()), normalizedEmail,
-					invitation.invitationUrl(), invitation.expiresAt());
+					toView(organization, null, BillingAggregate.empty(), ownerAccess(invitation)),
+					invitation.invitationId(), invitation.ownerName(), normalizedEmail,
+					invitation.invitationUrl(), invitation.expiresAt(), invitation.emailDeliveryStatus());
 		} catch (DuplicateKeyException exception) {
-			throw new BusinessException(
-					"PLATFORM_CUSTOMER_ALREADY_EXISTS",
-					"Ya existe un gimnasio, RFC, codigo de sucursal o correo de acceso con esos datos.");
+			throw duplicateCustomer(exception);
 		}
 	}
 
@@ -100,12 +100,18 @@ public class PlatformCustomerService {
 		accountRepository.findAll().forEach(account -> accounts.put(account.organizationId(), account));
 		Map<UUID, BillingAggregate> billingByOrganization = aggregateBilling(
 				billingOperations.branches(principal));
+		Map<UUID, OwnerAccessView> ownerAccessByOrganization = ownerProvisioning.invitationStates(
+				organizations.stream().map(ManagedOrganization::id)
+						.collect(java.util.stream.Collectors.toSet()),
+				OffsetDateTime.now()).stream().collect(java.util.stream.Collectors.toMap(
+						state -> state.organizationId(), this::ownerAccess));
 
 		List<PlatformCustomerView> customers = organizations.stream()
 				.map(organization -> toView(
 						organization,
 						accounts.get(organization.id()),
-						billingByOrganization.getOrDefault(organization.id(), BillingAggregate.empty())))
+						billingByOrganization.getOrDefault(organization.id(), BillingAggregate.empty()),
+						ownerAccessByOrganization.get(organization.id())))
 				.sorted(Comparator.comparing(PlatformCustomerView::tradeName, String.CASE_INSENSITIVE_ORDER))
 				.toList();
 		return new CustomerPortfolioView(summary(customers), customers);
@@ -171,7 +177,32 @@ public class PlatformCustomerService {
 						"CUSTOMER_ACCOUNT_NOT_FOUND", "El expediente comercial no esta disponible."));
 		BillingAggregate billing = aggregateBilling(
 				billingOperations.branches(principal)).getOrDefault(organizationId, BillingAggregate.empty());
-		return toView(organization, persisted, billing);
+		OwnerAccessView ownerAccess = ownerProvisioning.invitationStates(Set.of(organizationId), now).stream()
+				.findFirst().map(this::ownerAccess).orElse(null);
+		return toView(organization, persisted, billing, ownerAccess);
+	}
+
+	@Transactional
+	public ProvisionedOwnerInvitation reissueOwnerInvitation(
+			GymOsPrincipal principal,
+			UUID organizationId,
+			String correlationId
+	) {
+		requirePlatformAdmin(principal);
+		ManagedOrganization organization = organizationOperations.organization(organizationId)
+				.orElseThrow(() -> new BusinessException(
+						"ORGANIZATION_NOT_FOUND", "El gimnasio cliente no esta disponible."));
+		var invitation = ownerProvisioning.reissueOwnerInvitation(new ReissueOwnerInvitation(
+				organizationId, principal.userId(), OffsetDateTime.now()));
+		auditService.recordSystem(
+				organizationId, null, principal.userId(), "TENANT_OWNER_INVITATION_REISSUED",
+				"USER_INVITATION", invitation.invitationId(), "PLATFORM_ADMIN",
+				"Invitacion rotada por administrador de plataforma", correlationId);
+		return new ProvisionedOwnerInvitation(
+				organizationId, organization.tradeName(), organization.contactEmail(),
+				invitation.invitationId(), invitation.userId(), invitation.ownerName(),
+				invitation.ownerEmail(), invitation.invitationUrl(), invitation.expiresAt(),
+				invitation.emailDeliveryStatus());
 	}
 
 	private Map<UUID, BillingAggregate> aggregateBilling(List<BranchCommercialStatus> branches) {
@@ -201,7 +232,8 @@ public class PlatformCustomerService {
 	private PlatformCustomerView toView(
 			ManagedOrganization organization,
 			CustomerAccountRecord account,
-			BillingAggregate billing
+			BillingAggregate billing,
+			OwnerAccessView ownerAccess
 	) {
 		String lifecycleStatus = account == null ? "ONBOARDING" : account.lifecycleStatus();
 		String billingEmail = account == null || account.billingEmail() == null
@@ -224,7 +256,49 @@ public class PlatformCustomerService {
 				account == null ? null : account.updatedAt(),
 				billing.activeMembers(), billing.monthlyRecurringRevenue(), billing.overdueBranchCount(),
 				billing.unconfiguredBranchCount(), billing.implementationOutstanding(),
-				billing.nextBillingDate(), healthStatus);
+				billing.nextBillingDate(), healthStatus, ownerAccess);
+	}
+
+	private OwnerAccessView ownerAccess(TenantOwnerProvisioning.OwnerInvitation invitation) {
+		return new OwnerAccessView(
+				invitation.userId(), invitation.ownerName(), invitation.ownerEmail(), "INVITED",
+				invitation.invitationId(), "PENDING", invitation.expiresAt(),
+				invitation.emailDeliveryStatus(), null, null);
+	}
+
+	private OwnerAccessView ownerAccess(TenantOwnerProvisioning.OwnerInvitationState state) {
+		return new OwnerAccessView(
+				state.userId(), state.ownerName(), state.ownerEmail(), state.accountStatus(),
+				state.invitationId(), state.invitationStatus(), state.invitationExpiresAt(),
+				state.emailDeliveryStatus(), state.lastEmailAttemptAt(), state.lastEmailSentAt());
+	}
+
+	private BusinessException duplicateCustomer(DuplicateKeyException exception) {
+		String diagnostic = exceptionChain(exception).toLowerCase(java.util.Locale.ROOT);
+		if (diagnostic.contains("ux_organization_tax_id")) {
+			return new BusinessException(
+					"PLATFORM_CUSTOMER_TAX_ID_ALREADY_EXISTS",
+					"Ya existe un gimnasio con ese RFC.", Map.of("field", "taxId"));
+		}
+		if (diagnostic.contains("ux_user_username_active")) {
+			return new BusinessException(
+					"TENANT_OWNER_EMAIL_ALREADY_EXISTS",
+					"Ese correo ya tiene una cuenta de acceso. Usa otro correo o gestiona la cuenta existente.",
+					Map.of("field", "ownerEmail"));
+		}
+		return new BusinessException(
+				"PLATFORM_CUSTOMER_ALREADY_EXISTS",
+				"No fue posible crear el gimnasio porque uno de sus identificadores ya está registrado.");
+	}
+
+	private String exceptionChain(Throwable throwable) {
+		StringBuilder result = new StringBuilder();
+		Throwable current = throwable;
+		while (current != null) {
+			if (current.getMessage() != null) result.append(' ').append(current.getMessage());
+			current = current.getCause();
+		}
+		return result.toString();
 	}
 
 	private CustomerPortfolioSummary summary(List<PlatformCustomerView> customers) {
@@ -370,10 +444,38 @@ public class PlatformCustomerService {
 
 	public record ProvisionedCustomer(
 			PlatformCustomerView customer,
+			UUID invitationId,
+			String ownerName,
 			String ownerEmail,
 			String invitationUrl,
-			OffsetDateTime invitationExpiresAt
+			OffsetDateTime invitationExpiresAt,
+			String emailDeliveryStatus
 	) {
+		public ProvisionedCustomer withEmailDeliveryStatus(String status) {
+			return new ProvisionedCustomer(
+					customer.withOwnerEmailDeliveryStatus(status), invitationId, ownerName, ownerEmail,
+					invitationUrl, invitationExpiresAt, status);
+		}
+	}
+
+	public record ProvisionedOwnerInvitation(
+			UUID organizationId,
+			String organizationName,
+			String organizationContactEmail,
+			UUID invitationId,
+			UUID ownerUserId,
+			String ownerName,
+			String ownerEmail,
+			String invitationUrl,
+			OffsetDateTime invitationExpiresAt,
+			String emailDeliveryStatus
+	) {
+		public ProvisionedOwnerInvitation withEmailDeliveryStatus(String status) {
+			return new ProvisionedOwnerInvitation(
+					organizationId, organizationName, organizationContactEmail,
+					invitationId, ownerUserId, ownerName, ownerEmail,
+					invitationUrl, invitationExpiresAt, status);
+		}
 	}
 
 	public record CustomerPortfolioView(
@@ -423,7 +525,38 @@ public class PlatformCustomerService {
 			int unconfiguredBranchCount,
 			BigDecimal implementationOutstanding,
 			LocalDate nextBillingDate,
-			String healthStatus
+			String healthStatus,
+			OwnerAccessView ownerAccess
 	) {
+		public PlatformCustomerView withOwnerEmailDeliveryStatus(String status) {
+			return new PlatformCustomerView(
+					organizationId, tradeName, legalName, taxId, organizationStatus,
+					contactEmail, contactPhone, brandName, logoUrl, branchCount, activeBranchCount,
+					lifecycleStatus, accountOwner, billingEmail, billingPhone, contractStartedOn,
+					renewalOn, paymentTermsDays, nextFollowUpOn, notes, version, updatedAt,
+					activeMembers, monthlyRecurringRevenue, overdueBranchCount, unconfiguredBranchCount,
+					implementationOutstanding, nextBillingDate, healthStatus,
+					ownerAccess == null ? null : ownerAccess.withEmailDeliveryStatus(status));
+		}
+	}
+
+	public record OwnerAccessView(
+			UUID userId,
+			String ownerName,
+			String ownerEmail,
+			String accountStatus,
+			UUID invitationId,
+			String invitationStatus,
+			OffsetDateTime invitationExpiresAt,
+			String emailDeliveryStatus,
+			OffsetDateTime lastEmailAttemptAt,
+			OffsetDateTime lastEmailSentAt
+	) {
+		public OwnerAccessView withEmailDeliveryStatus(String status) {
+			return new OwnerAccessView(
+					userId, ownerName, ownerEmail, accountStatus, invitationId,
+					invitationStatus, invitationExpiresAt, status,
+					lastEmailAttemptAt, lastEmailSentAt);
+		}
 	}
 }
