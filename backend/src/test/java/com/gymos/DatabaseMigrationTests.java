@@ -34,6 +34,11 @@ import org.springframework.jdbc.datasource.SingleConnectionDataSource;
 @Tag("postgres-integration")
 @Testcontainers(disabledWithoutDocker = true)
 class DatabaseMigrationTests {
+	private static final UUID HISTORICAL_DEMO_ORGANIZATION_ID =
+			UUID.fromString("11111111-1111-1111-1111-111111111111");
+	private static final UUID HISTORICAL_DEMO_BRANCH_ID =
+			UUID.fromString("22222222-2222-2222-2222-222222222222");
+
 	@Container
 	static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18-alpine");
 
@@ -191,6 +196,84 @@ class DatabaseMigrationTests {
 	}
 
 	@Test
+	void cleanInstallationEndsWithoutHistoricalDemoFixture() throws Exception {
+		try (var connection = DriverManager.getConnection(
+				postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())) {
+			assertThat(rowExists(connection, "organization", HISTORICAL_DEMO_ORGANIZATION_ID)).isFalse();
+			assertThat(rowExists(connection, "branch", HISTORICAL_DEMO_BRANCH_ID)).isFalse();
+		}
+	}
+
+	@Test
+	void upgradeRemovesAnExactEmptyHistoricalDemoFixture() throws Exception {
+		String schema = migrationSchema("empty_demo");
+		migrateSchema(schema, "87");
+		try (var connection = schemaConnection(schema)) {
+			assertThat(rowExists(connection, "organization", HISTORICAL_DEMO_ORGANIZATION_ID)).isTrue();
+			assertThat(rowExists(connection, "branch", HISTORICAL_DEMO_BRANCH_ID)).isTrue();
+		}
+
+		migrateSchema(schema, null);
+
+		try (var connection = schemaConnection(schema)) {
+			assertThat(rowExists(connection, "organization", HISTORICAL_DEMO_ORGANIZATION_ID)).isFalse();
+			assertThat(rowExists(connection, "branch", HISTORICAL_DEMO_BRANCH_ID)).isFalse();
+		}
+	}
+
+	@Test
+	void upgradeKeepsHistoricalDemoFixtureWhenItContainsActivity() throws Exception {
+		String schema = migrationSchema("active_demo");
+		migrateSchema(schema, "87");
+		UUID personId = UUID.randomUUID();
+		try (var connection = schemaConnection(schema);
+			 var statement = connection.prepareStatement("""
+					INSERT INTO person (
+					    id, account_scope, organization_id, first_name, last_name, email, status,
+					    created_at, updated_at, version
+					) VALUES (?, 'TENANT', ?, 'Real', 'Activity', ?, 'ACTIVE', now(), now(), 0)
+					""")) {
+			statement.setObject(1, personId);
+			statement.setObject(2, HISTORICAL_DEMO_ORGANIZATION_ID);
+			statement.setString(3, "activity-" + personId + "@example.mx");
+			statement.executeUpdate();
+		}
+
+		migrateSchema(schema, null);
+
+		try (var connection = schemaConnection(schema)) {
+			assertThat(rowExists(connection, "organization", HISTORICAL_DEMO_ORGANIZATION_ID)).isTrue();
+			assertThat(rowExists(connection, "branch", HISTORICAL_DEMO_BRANCH_ID)).isTrue();
+			assertThat(rowExists(connection, "person", personId)).isTrue();
+		}
+	}
+
+	@Test
+	void migrationNeverDeletesAnotherOrganizationWithSimilarNames() throws Exception {
+		String schema = migrationSchema("similar_demo");
+		migrateSchema(schema, "87");
+		UUID similarOrganizationId = UUID.randomUUID();
+		try (var connection = schemaConnection(schema);
+			 var statement = connection.prepareStatement("""
+					INSERT INTO organization (
+					    id, legal_name, trade_name, tax_id, status, timezone, default_currency,
+					    data_origin, created_at, updated_at, version
+					) VALUES (?, 'GymOS Demo S.A. de C.V.', 'GymOS Demo', ?, 'ACTIVE',
+					          'America/Mexico_City', 'MXN', 'PRODUCTIVE', now(), now(), 0)
+					""")) {
+			statement.setObject(1, similarOrganizationId);
+			statement.setString(2, "SIMILAR-" + similarOrganizationId);
+			statement.executeUpdate();
+		}
+
+		migrateSchema(schema, null);
+
+		try (var connection = schemaConnection(schema)) {
+			assertThat(rowExists(connection, "organization", similarOrganizationId)).isTrue();
+		}
+	}
+
+	@Test
 	void databaseEnforcesPlatformAndTenantIdentityBoundaries() throws Exception {
 		try (var connection = DriverManager.getConnection(
 				postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())) {
@@ -220,6 +303,7 @@ class DatabaseMigrationTests {
 
 			UUID platformRoleId = roleId(connection, "Administrador GymOS");
 			UUID tenantRoleId = roleId(connection, "Dueno del gimnasio");
+			UUID platformAdminPermissionId = permissionId(connection, "platform.admin");
 			try (var statement = connection.prepareStatement(
 					"INSERT INTO user_role (user_id, role_id) VALUES (?, ?)")) {
 				statement.setObject(1, userId);
@@ -227,6 +311,8 @@ class DatabaseMigrationTests {
 				statement.executeUpdate();
 			}
 			assertThatThrownBy(() -> insertUserRole(connection, userId, tenantRoleId))
+					.isInstanceOf(SQLException.class);
+			assertThatThrownBy(() -> insertRolePermission(connection, tenantRoleId, platformAdminPermissionId))
 					.isInstanceOf(SQLException.class);
 			assertThatThrownBy(() -> insertUserBranchAccess(
 					connection, userId, UUID.fromString("22222222-2222-2222-2222-222222222222")))
@@ -505,6 +591,38 @@ class DatabaseMigrationTests {
 		}
 	}
 
+	private String migrationSchema(String prefix) {
+		return prefix + "_" + UUID.randomUUID().toString().replace("-", "");
+	}
+
+	private void migrateSchema(String schema, String target) {
+		var configuration = Flyway.configure()
+				.dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+				.locations("classpath:db/migration")
+				.schemas(schema)
+				.defaultSchema(schema);
+		if (target != null) configuration.target(target);
+		configuration.load().migrate();
+	}
+
+	private java.sql.Connection schemaConnection(String schema) throws Exception {
+		var connection = DriverManager.getConnection(
+				postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword());
+		try (var statement = connection.createStatement()) {
+			statement.execute("SET search_path TO " + schema);
+		}
+		return connection;
+	}
+
+	private boolean rowExists(java.sql.Connection connection, String table, UUID id) throws Exception {
+		try (var statement = connection.prepareStatement("SELECT 1 FROM " + table + " WHERE id = ?")) {
+			statement.setObject(1, id);
+			try (var resultSet = statement.executeQuery()) {
+				return resultSet.next();
+			}
+		}
+	}
+
 	private boolean tableExists(java.sql.Connection connection, String table) throws Exception {
 		return tableExists(connection, "public", table);
 	}
@@ -644,6 +762,29 @@ class DatabaseMigrationTests {
 				assertThat(resultSet.next()).isTrue();
 				return resultSet.getObject("id", UUID.class);
 			}
+		}
+	}
+
+	private UUID permissionId(java.sql.Connection connection, String permissionCode) throws Exception {
+		try (var statement = connection.prepareStatement("SELECT id FROM permission WHERE code = ? LIMIT 1")) {
+			statement.setString(1, permissionCode);
+			try (var resultSet = statement.executeQuery()) {
+				assertThat(resultSet.next()).isTrue();
+				return resultSet.getObject("id", UUID.class);
+			}
+		}
+	}
+
+	private void insertRolePermission(
+			java.sql.Connection connection,
+			UUID roleId,
+			UUID permissionId
+	) throws SQLException {
+		try (var statement = connection.prepareStatement(
+				"INSERT INTO role_permission (role_id, permission_id) VALUES (?, ?)")) {
+			statement.setObject(1, roleId);
+			statement.setObject(2, permissionId);
+			statement.executeUpdate();
 		}
 	}
 

@@ -36,6 +36,13 @@ docker compose --env-file infra/.env -f infra/docker-compose.yml up --build
 El seed sólo existe con el perfil `local`; nunca habilitarlo en staging o
 producción.
 
+El primer administrador `PLATFORM` usa variables distintas y temporales:
+`GYMOS_PLATFORM_BOOTSTRAP_ENABLED`, `GYMOS_PLATFORM_ADMIN_EMAIL`,
+`GYMOS_PLATFORM_ADMIN_NAME` y `GYMOS_PLATFORM_ADMIN_PASSWORD`. Permanecen vacías
+y deshabilitadas en `.env.example`; después de crear la cuenta se elimina la
+contraseña y se vuelve a deshabilitar el bootstrap. El procedimiento completo
+está en `docs/operations/platform-identity-bootstrap.md`.
+
 ## Stripe CLI en Docker
 
 El archivo Compose incluye el servicio opcional `stripe-listener` con la imagen

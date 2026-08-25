@@ -20,14 +20,17 @@ Estado: `ESTABILIZADO PARA PRODUCCIÓN PILOTO`
   entrar a un tenant exige motivo, genera auditoría, tiene expiración
   configurable y salir revoca el refresh de soporte;
 - bootstrap opcional e idempotente del primer administrador `PLATFORM` mediante
-  variables de entorno; no crea organización ficticia, no restablece una cuenta
-  existente y nunca registra la contraseña;
+  variables de entorno y lock transaccional PostgreSQL; exige el permiso
+  efectivo `platform.admin`, no confunde soporte con administración, no crea
+  organización ficticia, no restablece una cuenta existente y nunca registra
+  la contraseña;
 - alta transaccional de gimnasio + primera sucursal + dueño `TENANT` invitado;
   V87 almacena únicamente el hash SHA-256 del token de invitación y la
   contraseña sólo se persiste codificada al aceptar el enlace de un uso;
 - el seed demo está limitado al perfil `local`, deshabilitado por defecto y
-  requiere correo/contraseña explícitos; la cartera productiva excluye datos
-  marcados `DEMO` sin borrarlos automáticamente;
+  requiere correo/contraseña explícitos; V88 elimina únicamente el fixture
+  histórico exacto cuando no tiene actividad y lo conserva como `DEMO` ante
+  cualquier dependencia ambigua;
 - respuestas diferenciadas: `401 AUTHENTICATION_REQUIRED` sólo para ausencia o
   invalidez de autenticación y `403 PERMISSION_DENIED` para un JWT válido sin
   la autoridad requerida;
@@ -46,8 +49,9 @@ Estado: `ESTABILIZADO PARA PRODUCCIÓN PILOTO`
   dispositivos, personas y eventos a organización y sucursal;
 - GymFort Cloud rechaza metadatos físicos con biometría, imágenes, plantillas,
   contraseñas, tokens o secretos;
-- pruebas de autorización, JWT/refresh, bootstrap, invitaciones, límites de
-  módulo y restricciones PostgreSQL.
+- pruebas de autorización, JWT/refresh, bootstrap concurrente real,
+  invitaciones, límites de módulo, migración limpia/upgrade y restricciones
+  PostgreSQL.
 
 ## Pendiente
 

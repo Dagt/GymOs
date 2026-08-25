@@ -9,22 +9,48 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class IdentityProvisioningRepository {
+	private static final long PLATFORM_ADMINISTRATOR_BOOTSTRAP_LOCK_KEY = 0x47594D464F525441L;
+
 	private final JdbcClient jdbcClient;
 
 	public IdentityProvisioningRepository(JdbcClient jdbcClient) {
 		this.jdbcClient = jdbcClient;
 	}
 
-	public boolean platformAdministratorExists() {
-		return jdbcClient.sql("""
-				SELECT COUNT(*)
+	public void acquirePlatformAdministratorBootstrapLock() {
+		jdbcClient.sql("SELECT pg_advisory_xact_lock(:lockKey)")
+				.param("lockKey", PLATFORM_ADMINISTRATOR_BOOTSTRAP_LOCK_KEY)
+				.query((resultSet, rowNumber) -> true)
+				.single();
+	}
+
+	public PlatformAdministratorState platformAdministratorState() {
+		String state = jdbcClient.sql("""
+				WITH effective_platform_administrators AS (
+				    SELECT DISTINCT ua.id, ua.status, ua.locked_until
 				FROM user_account ua
 				JOIN user_role ur ON ur.user_id = ua.id
 				JOIN role r ON r.id = ur.role_id
+				JOIN role_permission rp ON rp.role_id = r.id
+				JOIN permission p ON p.id = rp.permission_id
 				WHERE ua.account_scope = 'PLATFORM'
 				  AND r.account_scope = 'PLATFORM'
 				  AND ua.deleted_at IS NULL
-				""").query(Integer.class).single() > 0;
+				  AND r.deleted_at IS NULL
+				  AND p.deleted_at IS NULL
+				  AND p.code = 'platform.admin'
+				)
+				SELECT CASE
+				    WHEN COUNT(*) FILTER (
+				        WHERE status = 'ACTIVE'
+				          AND (locked_until IS NULL OR locked_until <= now())
+				    ) > 0 THEN 'ACTIVE'
+				    WHEN COUNT(*) > 0 THEN 'INACTIVE'
+				    ELSE 'NONE'
+				END
+				FROM effective_platform_administrators
+				""").query(String.class).single();
+		return PlatformAdministratorState.valueOf(state);
 	}
 
 	public Optional<AccountScope> accountScopeForUsername(String username) {
@@ -49,6 +75,7 @@ public class IdentityProvisioningRepository {
 				WHERE r.account_scope = 'PLATFORM'
 				  AND p.code = 'platform.admin'
 				  AND r.deleted_at IS NULL
+				  AND p.deleted_at IS NULL
 				ORDER BY CASE WHEN r.name = 'Administrador GymOS' THEN 0 ELSE 1 END, r.name
 				LIMIT 1
 				""").query(UUID.class).single();
@@ -237,5 +264,11 @@ public class IdentityProvisioningRepository {
 			AccountScope accountScope,
 			UUID organizationId
 	) {
+	}
+
+	public enum PlatformAdministratorState {
+		NONE,
+		ACTIVE,
+		INACTIVE
 	}
 }

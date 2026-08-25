@@ -2,7 +2,7 @@
 
 Estado: FUENTE CANÓNICA / EN PROGRESO
 Corte: 24 de agosto de 2026
-Código auditado: `feature/platform-identity-separation`, incluyendo V86/V87
+Código auditado: `feature/platform-identity-separation`, incluyendo V86–V88
 sobre la administración comercial V85 y la base integrada de acceso físico,
 cobranza, Automatizaciones/ZeptoMail y métricas.
 
@@ -13,7 +13,8 @@ GymFort opera como monolito modular multi-tenant y multi-sucursal. El piloto inc
 **La identidad SaaS y la identidad de los gimnasios ya están separadas**:
 `PLATFORM` inicia sin organización/sucursal, `TENANT` exige organización y las
 restricciones viven tanto en JWT/refresh como en PostgreSQL. El primer
-administrador se crea mediante bootstrap efímero de entorno, mientras el alta
+administrador se crea mediante bootstrap efímero de entorno coordinado por
+PostgreSQL, mientras el alta
 de un cliente crea transaccionalmente gimnasio, primera sucursal y dueño por
 invitación de un solo uso. El acceso excepcional de soporte requiere motivo,
 expira y queda auditado.
@@ -132,6 +133,12 @@ Evidencia disponible:
 - V86/V87 pasaron migración PostgreSQL limpia y upgrade; las pruebas cubren
   ámbitos DB, JWT/refresh, bootstrap idempotente, invitación de dueño,
   autorización plataforma/tenant y límites del monolito modular;
+- V88 retira sólo el fixture demo histórico exacto y vacío; 413 pruebas
+  unitarias y 59 pruebas PostgreSQL cubren concurrencia/rollback del bootstrap,
+  permiso efectivo `platform.admin`, instalación limpia, upgrade, conservación
+  ante actividad y seed local explícito;
+- CI incorpora `postgresIntegrationTest`, `cf:build` y bloqueo por advisories
+  npm altos/críticos; build backend, imágenes Docker y Compose pasaron;
 - frontend pasó 94/94 pruebas, typecheck, lint, build Next 16.3.2 y bundle
   OpenNext 1.20.2; `npm audit` quedó en 0 vulnerabilidades después de actualizar
   Next y transitivas parcheadas sin usar `--force`;

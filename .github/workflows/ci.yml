@@ -25,8 +25,16 @@ jobs:
         shell: bash
         run: |
           chmod +x gradlew
-          if ! ./gradlew test --no-daemon --console=plain > /tmp/backend.log 2>&1; then
-            tail -n 160 /tmp/backend.log
+          if ! ./gradlew test --no-daemon --console=plain > /tmp/backend-unit.log 2>&1; then
+            tail -n 160 /tmp/backend-unit.log
+            exit 1
+          fi
+      - name: Test PostgreSQL integration
+        id: backend-postgres-test
+        shell: bash
+        run: |
+          if ! ./gradlew postgresIntegrationTest --no-daemon --console=plain > /tmp/backend-postgres.log 2>&1; then
+            tail -n 200 /tmp/backend-postgres.log
             exit 1
           fi
       - name: Upload backend diagnostics
@@ -35,9 +43,12 @@ jobs:
         with:
           name: backend-diagnostics
           path: |
-            /tmp/backend.log
+            /tmp/backend-unit.log
+            /tmp/backend-postgres.log
             backend/build/test-results/test
             backend/build/reports/tests/test
+            backend/build/test-results/postgresIntegrationTest
+            backend/build/reports/tests/postgresIntegrationTest
           if-no-files-found: ignore
 
   frontend:
@@ -54,6 +65,13 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install dependencies
         run: npm ci
+      - name: Audit high severity dependencies
+        shell: bash
+        run: |
+          if ! npm audit --audit-level=high > /tmp/frontend-audit.log 2>&1; then
+            tail -n 160 /tmp/frontend-audit.log
+            exit 1
+          fi
       - name: Test
         run: npm test
       - name: Lint
@@ -77,6 +95,13 @@ jobs:
             tail -n 120 /tmp/frontend-build.log
             exit 1
           fi
+      - name: Build Cloudflare bundle
+        shell: bash
+        run: |
+          if ! npm run cf:build > /tmp/frontend-cloudflare-build.log 2>&1; then
+            tail -n 160 /tmp/frontend-cloudflare-build.log
+            exit 1
+          fi
       - name: Upload frontend diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
@@ -86,6 +111,8 @@ jobs:
             /tmp/frontend-lint.log
             /tmp/frontend-typecheck.log
             /tmp/frontend-build.log
+            /tmp/frontend-cloudflare-build.log
+            /tmp/frontend-audit.log
           if-no-files-found: ignore
 
   docker:

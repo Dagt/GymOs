@@ -16,6 +16,7 @@ import com.gymos.common.security.AccountScope;
 import com.gymos.common.security.StrongPasswordPolicy;
 import com.gymos.identity.api.operations.PlatformAdministratorBootstrap.BootstrapCommand;
 import com.gymos.identity.infrastructure.IdentityProvisioningRepository;
+import com.gymos.identity.infrastructure.IdentityProvisioningRepository.PlatformAdministratorState;
 import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -38,12 +39,28 @@ class PlatformAdministratorBootstrapTests {
 
 	@Test
 	void existingPlatformAdministratorIsNeverModifiedOrReset() {
-		when(repository.platformAdministratorExists()).thenReturn(true);
+		when(repository.platformAdministratorState()).thenReturn(PlatformAdministratorState.ACTIVE);
 
 		assertThat(service.bootstrap(new BootstrapCommand(
 				true, "platform@gymfort.mx", "DifferentSecret1!", "Admin GymFort"))).isFalse();
 
-		verify(repository).platformAdministratorExists();
+		verify(repository).acquirePlatformAdministratorBootstrapLock();
+		verify(repository).platformAdministratorState();
+		verifyNoInteractions(passwordEncoder, auditService);
+	}
+
+	@Test
+	void inactivePlatformAdministratorRequiresOperationalRecovery() {
+		when(repository.platformAdministratorState()).thenReturn(PlatformAdministratorState.INACTIVE);
+
+		assertThatThrownBy(() -> service.bootstrap(new BootstrapCommand(
+				true, "platform@gymfort.mx", "DifferentSecret1!", "Admin GymFort")))
+				.isInstanceOfSatisfying(BusinessException.class,
+						exception -> assertThat(exception.code())
+								.isEqualTo("PLATFORM_BOOTSTRAP_ADMIN_INACTIVE"));
+
+		verify(repository).acquirePlatformAdministratorBootstrapLock();
+		verify(repository, never()).createPerson(any(), any(), any(), any(), any(), any(), any(), any());
 		verifyNoInteractions(passwordEncoder, auditService);
 	}
 
@@ -53,7 +70,7 @@ class PlatformAdministratorBootstrapTests {
 		UUID userId = UUID.randomUUID();
 		UUID roleId = UUID.randomUUID();
 		String secret = "VeryStrongSecret1!";
-		when(repository.platformAdministratorExists()).thenReturn(false);
+		when(repository.platformAdministratorState()).thenReturn(PlatformAdministratorState.NONE);
 		when(repository.accountScopeForUsername("platform@gymfort.mx")).thenReturn(Optional.empty());
 		when(passwordEncoder.encode(secret)).thenReturn("bcrypt-hash");
 		when(repository.createPerson(
@@ -79,7 +96,7 @@ class PlatformAdministratorBootstrapTests {
 
 	@Test
 	void weakBootstrapPasswordFailsBeforeWritingIdentity() {
-		when(repository.platformAdministratorExists()).thenReturn(false);
+		when(repository.platformAdministratorState()).thenReturn(PlatformAdministratorState.NONE);
 
 		assertThatThrownBy(() -> service.bootstrap(new BootstrapCommand(
 				true, "platform@gymfort.mx", "weak", "Admin GymFort")))

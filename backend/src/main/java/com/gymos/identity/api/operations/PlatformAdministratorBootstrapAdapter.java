@@ -5,6 +5,7 @@ import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.AccountScope;
 import com.gymos.common.security.StrongPasswordPolicy;
 import com.gymos.identity.infrastructure.IdentityProvisioningRepository;
+import com.gymos.identity.infrastructure.IdentityProvisioningRepository.PlatformAdministratorState;
 import java.time.OffsetDateTime;
 import java.util.Locale;
 import java.util.regex.Pattern;
@@ -37,7 +38,14 @@ class PlatformAdministratorBootstrapAdapter implements PlatformAdministratorBoot
 	@Transactional
 	public boolean bootstrap(BootstrapCommand command) {
 		if (!command.enabled()) return false;
-		if (repository.platformAdministratorExists()) return false;
+		repository.acquirePlatformAdministratorBootstrapLock();
+		PlatformAdministratorState administratorState = repository.platformAdministratorState();
+		if (administratorState == PlatformAdministratorState.ACTIVE) return false;
+		if (administratorState == PlatformAdministratorState.INACTIVE) {
+			throw new BusinessException(
+					"PLATFORM_BOOTSTRAP_ADMIN_INACTIVE",
+					"Existe una cuenta administradora de plataforma que requiere recuperacion operativa.");
+		}
 
 		String email = required(command.email(), "PLATFORM_BOOTSTRAP_EMAIL_REQUIRED", "Falta el correo del administrador de plataforma.")
 				.toLowerCase(Locale.ROOT);
