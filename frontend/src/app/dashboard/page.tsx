@@ -167,20 +167,20 @@ export default function DashboardPage() {
     return Object.values(grouped).sort((a, b) => a.date.localeCompare(b.date));
   }, [report]);
 
-  if (loading) return <LoadingScreen text="Cargando anÃ¡lisis mÃ©trico..." />;
+  if (loading) return <LoadingScreen text="Cargando análisis métrico..." />;
   if (!session) return <AuthRequired />;
 
   return (
     <AppShell
       eyebrow="Panel de Control Avanzado"
       session={session}
-      subtitle="Inteligencia de negocios y mÃ©tricas operativas de la sucursal activa."
+      subtitle="Inteligencia de negocios y métricas operativas de la sucursal activa."
       title="Dashboard"
     >
       <section className="grid gap-6">
         <section className="admin-panel flex flex-col md:flex-row md:items-end md:justify-between">
           <div>
-            <p className="app-eyebrow">Periodo de AnÃ¡lisis</p>
+            <p className="app-eyebrow">Periodo de análisis</p>
             <h2 className="text-xl font-bold">Filtro de Datos</h2>
           </div>
           <div className="admin-command-actions mt-4 justify-start md:mt-0">
@@ -205,7 +205,7 @@ export default function DashboardPage() {
                       : "border-transparent text-[#6f7a73] hover:border-[var(--brand-line)] hover:text-gray-700"
                   } whitespace-nowrap border-b-2 px-1 py-4 text-sm font-semibold flex items-center gap-2 transition-colors`}
                 >
-                  <BarChart3 className="h-4 w-4" /> Inteligencia EstratÃ©gica
+                  <BarChart3 className="h-4 w-4" /> Inteligencia estratégica
                 </button>
                 <button
                   onClick={() => setActiveTab("manager")}
@@ -249,7 +249,7 @@ export default function DashboardPage() {
                   />
                   <MetricCard
                     icon={<Users className="h-5 w-5 text-blue-600" />}
-                    title="MembresÃ­as Vigentes"
+                    title="Membresías vigentes"
                     value={dashboard.activeMemberships.toString()}
                     subtitle={`+${dashboard.newClients} nuevos socios`}
                   />
@@ -257,7 +257,7 @@ export default function DashboardPage() {
                     icon={<Database className="h-5 w-5 text-purple-600" />}
                     title="Capital en Inventario"
                     value={inventorySummary ? formatMoney(inventorySummary.totalValuationCents, "MXN") : "$---"}
-                    subtitle={`ArtÃ­culos disponibles: ${inventorySummary?.totalTrackedProducts ?? '-'}`}
+                    subtitle={`Artículos disponibles: ${inventorySummary?.totalTrackedProducts ?? '-'}`}
                   />
                 </section>
 
@@ -266,7 +266,7 @@ export default function DashboardPage() {
                   <div className="lg:col-span-2 rounded-xl border border-[var(--brand-line)] bg-white p-5 shadow-sm">
                     <div className="flex items-center justify-between mb-6">
                       <div>
-                        <h3 className="text-lg font-semibold text-[#2b3a32]">EvoluciÃ³n de Ingresos Diarios</h3>
+                        <h3 className="text-lg font-semibold text-[#2b3a32]">Evolución de ingresos diarios</h3>
                         <p className="text-sm text-gray-500">Tendencia de caja en el periodo seleccionado</p>
                       </div>
                       <div className="px-3 py-1 bg-emerald-50 text-emerald-700 font-medium text-xs rounded-full">
@@ -305,14 +305,14 @@ export default function DashboardPage() {
                           </AreaChart>
                         </ResponsiveContainer>
                       ) : (
-                        <EmptyState message="No hay suficientes datos histÃ³ricos en este periodo" />
+                        <EmptyState message="No hay suficientes datos históricos en este periodo" />
                       )}
                     </div>
                   </div>
 
                   <div className="rounded-xl border border-[var(--brand-line)] bg-white p-5 shadow-sm">
                     <h3 className="text-lg font-semibold mb-1 text-[#2b3a32]">Fuentes de Ingreso</h3>
-                    <p className="text-sm text-gray-500 mb-6">DistribuciÃ³n por concepto</p>
+                    <p className="text-sm text-gray-500 mb-6">Distribución por concepto</p>
                     <div className="h-[250px] w-full">
                       {report.salesByBusinessContext.length > 0 ? (
                         <ResponsiveContainer width="100%" height="100%">
@@ -393,7 +393,7 @@ export default function DashboardPage() {
                   {/* Recent Operations Timeline */}
                   <div className="lg:col-span-1 rounded-xl border border-[var(--brand-line)] bg-white p-5 shadow-sm flex flex-col">
                     <div className="flex items-center justify-between mb-4 pb-4 border-b border-gray-100">
-                      <h3 className="text-lg font-semibold text-[#2b3a32]">Ãšltimos Movimientos</h3>
+                      <h3 className="text-lg font-semibold text-[#2b3a32]">Últimos movimientos</h3>
                       <span className="text-xs font-medium bg-[#f1f4ec] text-[#51735f] px-2 py-1 rounded-full">
                         Recientes
                       </span>
@@ -418,7 +418,7 @@ export default function DashboardPage() {
                                   <p className="text-sm font-bold text-gray-900 leading-tight">{formatMoney(sale.totalCents, sale.currency)}</p>
                                 </div>
                                 <div className="flex justify-between items-center mt-1">
-                                  <p className="text-xs text-gray-500">{businessContextLabel(sale.businessContext)} â€¢ {sale.saleNumber}</p>
+                                  <p className="text-xs text-gray-500">{businessContextLabel(sale.businessContext)} · {sale.saleNumber}</p>
                                   <p className={`text-[10px] font-bold uppercase tracking-wider ${sale.status === 'PAID' ? 'text-emerald-600' : 'text-amber-600'}`}>
                                     {saleStatusLabel(sale.status)}
                                   </p>
@@ -456,7 +456,7 @@ export default function DashboardPage() {
 
                     {/* Payment Methods Chart */}
                     <div className="rounded-xl border border-[var(--brand-line)] bg-white p-5 shadow-sm">
-                      <h3 className="text-sm font-semibold text-gray-500 mb-4 uppercase tracking-wider">VÃ­as de Ingreso (MÃ©todos de Pago)</h3>
+                      <h3 className="text-sm font-semibold text-gray-500 mb-4 uppercase tracking-wider">Vías de ingreso (métodos de pago)</h3>
                       <div className="h-[160px] w-full">
                         {report.paymentsByMethod.length > 0 ? (
                           <ResponsiveContainer width="100%" height="100%">
@@ -498,11 +498,11 @@ export default function DashboardPage() {
                     icon={<TrendingUp className="h-5 w-5 text-blue-600" />}
                     title="Nuevas Asignaciones"
                     value={coachReport.assignmentsLast30Days.toString()}
-                    subtitle="Ãšltimos 30 dÃ­as"
+                    subtitle="Últimos 30 días"
                   />
                   <MetricCard
                     icon={<Database className="h-5 w-5 text-purple-600" />}
-                    title="CatÃ¡logo de Rutinas"
+                    title="Catálogo de rutinas"
                     value={coachReport.workoutCount.toString()}
                     subtitle="Plantillas disponibles"
                   />
@@ -528,11 +528,11 @@ export default function DashboardPage() {
                             />
                             <Legend />
                             <Bar dataKey="assignments" name="Nuevas Rutinas" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={50} />
-                            <Bar dataKey="uniqueClients" name="Socios Ãšnicos" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={50} />
+                            <Bar dataKey="uniqueClients" name="Socios únicos" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={50} />
                           </BarChart>
                         </ResponsiveContainer>
                       ) : (
-                        <EmptyState message="No hay suficientes datos histÃ³ricos" />
+                        <EmptyState message="No hay suficientes datos históricos" />
                       )}
                     </div>
                   </div>
@@ -565,7 +565,7 @@ export default function DashboardPage() {
                           </AreaChart>
                         </ResponsiveContainer>
                       ) : (
-                        <EmptyState message="No hay suficientes datos histÃ³ricos" />
+                        <EmptyState message="No hay suficientes datos históricos" />
                       )}
                     </div>
                   </div>
@@ -667,8 +667,8 @@ function EmptyState({ message }: { message: string }) {
 function AuthRequired() {
   return (
     <AuthRequiredCard
-      message="El panel de control requiere permisos administrativos o de direcciÃ³n."
-      title="Inicia sesiÃ³n para ver indicadores"
+      message="El panel de control requiere permisos administrativos o de dirección."
+      title="Inicia sesión para ver indicadores"
     />
   );
 }
@@ -704,7 +704,7 @@ function paymentMethodLabel(method: string) {
 function businessContextLabel(context: string) {
   const labels: Record<string, string> = {
     RETAIL_SALE: "Mostrador",
-    MEMBERSHIP_ENROLLMENT: "Nuevas MembresÃ­as",
+    MEMBERSHIP_ENROLLMENT: "Nuevas membresías",
     MEMBERSHIP_RENEWAL: "Renovaciones",
     MEMBERSHIP_PLAN_CHANGE: "Upgrades",
   };

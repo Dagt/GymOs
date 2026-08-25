@@ -2,6 +2,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 
 type TestUser = {
   userId: string;
+  accountScope: "TENANT";
   organizationId: string;
   branchId: string;
   username: string;
@@ -10,6 +11,7 @@ type TestUser = {
   roles: string[];
   platformAdmin: boolean;
   supportMode: boolean;
+  supportExpiresAt: null;
   console: "TENANT_OWNER";
   organizationName: string;
   brandName: string;
@@ -130,6 +132,51 @@ test.describe("catalogo e inventario", () => {
     expect(completeCatalogRequests).toBe(0);
   });
 
+  test("las tarjetas del POS contienen nombres y SKU extensos sin solaparse", async ({ page }) => {
+    const longProduct = {
+      ...product,
+      id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+      name: "Proteína aislada sabor chocolate con fórmula de recuperación muscular avanzada",
+      sku: "PROTEINA-AISLADA-CHOCOLATE-RECUPERACION-2KG-EDICION-ESPECIAL",
+    };
+    await page.setViewportSize({ width: 1180, height: 820 });
+    await bootCatalog(page, owner(), async (route, path) => {
+      if (path === "/catalog/products/search") {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({ items: [longProduct], page: 0, size: 25, totalElements: 1, totalPages: 1 }),
+        });
+        return true;
+      }
+      return false;
+    });
+
+    await page.goto("/pos");
+    const card = page.getByTestId("pos-product-card").filter({ hasText: "Proteína aislada" });
+    const name = card.getByTestId("pos-product-name");
+    const sku = card.getByTestId("pos-product-sku");
+    await expect(card).toBeVisible();
+    await expect(name).toHaveAttribute("title", longProduct.name);
+    await expect(sku).toHaveAttribute("title", longProduct.sku);
+
+    const [cardBox, nameBox, skuBox] = await Promise.all([
+      card.boundingBox(),
+      name.boundingBox(),
+      sku.boundingBox(),
+    ]);
+    expect(cardBox).not.toBeNull();
+    expect(nameBox).not.toBeNull();
+    expect(skuBox).not.toBeNull();
+    expect((nameBox?.x ?? 0) + (nameBox?.width ?? 0)).toBeLessThanOrEqual((cardBox?.x ?? 0) + (cardBox?.width ?? 0) + 1);
+    expect((skuBox?.x ?? 0) + (skuBox?.width ?? 0)).toBeLessThanOrEqual((cardBox?.x ?? 0) + (cardBox?.width ?? 0) + 1);
+    expect((nameBox?.y ?? 0) + (nameBox?.height ?? 0)).toBeLessThanOrEqual((skuBox?.y ?? 0) + 1);
+    const cardOverflow = await card.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+    }));
+    expect(cardOverflow.scrollWidth).toBeLessThanOrEqual(cardOverflow.clientWidth + 1);
+  });
+
   test("lector HID agrega por codigo de barras y acumula cantidad", async ({ page }) => {
     await bootCatalog(page, owner());
     await page.goto("/pos");
@@ -199,6 +246,7 @@ function editorWithoutCosts(): TestUser {
 function user(permissions: string[]): TestUser {
   return {
     userId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    accountScope: "TENANT",
     organizationId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
     branchId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
     username: "owner@gymos.test",
@@ -207,6 +255,7 @@ function user(permissions: string[]): TestUser {
     roles: ["Dueno del gimnasio"],
     platformAdmin: false,
     supportMode: false,
+    supportExpiresAt: null,
     console: "TENANT_OWNER",
     organizationName: "GymOS Test",
     brandName: "GymOS Test",

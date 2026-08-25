@@ -3,6 +3,7 @@ package com.gymos.security.infrastructure;
 import com.gymos.common.security.AccountScope;
 import com.gymos.common.security.GymOsPrincipal;
 import java.time.Instant;
+import java.util.List;
 import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.Set;
@@ -18,16 +19,37 @@ public class AuthQueryRepository {
 		this.jdbcClient = jdbcClient;
 	}
 
-	public Optional<AuthenticatedUser> findActiveUserByUsername(String username) {
-		return findUser("""
+	public Optional<AuthenticatedUser> findActiveUserByLoginIdentifier(String loginIdentifier) {
+		String normalizedIdentifier = loginIdentifier == null ? "" : loginIdentifier.trim();
+		Optional<AuthenticatedUser> usernameMatch = findUser("""
 				SELECT ua.id, ua.account_scope, ua.organization_id, ua.username, ua.password_hash,
 				       TRIM(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) AS full_name
 				FROM user_account ua
 				JOIN person p ON p.id = ua.person_id
-				WHERE LOWER(ua.username) = LOWER(:username)
+				WHERE LOWER(ua.username) = LOWER(:loginIdentifier)
 				  AND ua.status = 'ACTIVE'
 				  AND ua.deleted_at IS NULL
-				""", "username", username);
+				  AND p.deleted_at IS NULL
+				""", "loginIdentifier", normalizedIdentifier);
+		if (usernameMatch.isPresent()) {
+			return usernameMatch;
+		}
+
+		List<AuthenticatedUser> emailMatches = findUsers("""
+				SELECT ua.id, ua.account_scope, ua.organization_id, ua.username, ua.password_hash,
+				       TRIM(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) AS full_name
+				FROM user_account ua
+				JOIN person p ON p.id = ua.person_id
+				WHERE LOWER(p.email) = LOWER(:loginIdentifier)
+				  AND ua.status = 'ACTIVE'
+				  AND ua.deleted_at IS NULL
+				  AND p.deleted_at IS NULL
+				ORDER BY ua.created_at, ua.id
+				LIMIT 2
+				""", "loginIdentifier", normalizedIdentifier);
+		// Person emails are unique only inside a tenant. Never guess a tenant when
+		// the same email identifies more than one active account.
+		return emailMatches.size() == 1 ? Optional.of(emailMatches.getFirst()) : Optional.empty();
 	}
 
 	public Optional<AuthenticatedUser> findActiveUserById(UUID userId) {
@@ -162,6 +184,10 @@ public class AuthQueryRepository {
 	}
 
 	private Optional<AuthenticatedUser> findUser(String sql, String parameterName, Object parameterValue) {
+		return findUsers(sql, parameterName, parameterValue).stream().findFirst();
+	}
+
+	private List<AuthenticatedUser> findUsers(String sql, String parameterName, Object parameterValue) {
 		return jdbcClient.sql(sql)
 				.param(parameterName, parameterValue)
 				.query((resultSet, rowNumber) -> new AuthenticatedUser(
@@ -174,7 +200,7 @@ public class AuthQueryRepository {
 						findPermissions(resultSet.getObject("id", UUID.class)),
 						findRoles(resultSet.getObject("id", UUID.class))
 				))
-				.optional();
+				.list();
 	}
 
 	private Set<String> findPermissions(UUID userId) {

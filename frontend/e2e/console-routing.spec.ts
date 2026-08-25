@@ -78,6 +78,24 @@ test.describe("consolas por rol", () => {
     await expect(page.locator("body")).toContainText("Nuevo gimnasio");
   });
 
+  test("el resumen de cartera evita accesos duplicados al menu lateral", async ({ page }) => {
+    await bootAs(page, user({
+      console: "PLATFORM_OWNER",
+      platformAdmin: true,
+      roles: ["Administrador GymOS"],
+      permissions: ["platform.admin"],
+      branchId: null,
+    }));
+
+    await page.goto("/platform");
+
+    await expect(page.getByRole("heading", { name: "Cartera de gimnasios" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Exportar cartera CSV" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Gestionar clientes" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "Administración diaria" })).toHaveCount(0);
+    await expect(page.getByText("Atajos", { exact: true })).toHaveCount(0);
+  });
+
   test("alta de gimnasio confirma el tenant, envía la invitación y no consulta la colección tenant", async ({ page }) => {
     let legacyLogoRequests = 0;
     let legacyOrganizationReads = 0;
@@ -287,6 +305,8 @@ test.describe("consolas por rol", () => {
     await expect(page.locator("body")).toContainText("Gestión operativa");
     await expect(page.locator("body")).toContainText("Administración");
     await expect(page.locator("body")).toContainText("Configuración");
+    await expect(page.getByText("Inteligencia estratégica", { exact: true })).toBeVisible();
+    await expect(page.locator("body")).not.toContainText(String.fromCharCode(0xc3));
     await expect(page.getByRole("link", { name: "Operación diaria" })).toHaveCount(0);
   });
 

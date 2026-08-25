@@ -2454,7 +2454,10 @@ function WeeklyTrendChart({ color, label, points, value }: { color: string; labe
   const total = data.reduce((acc, curr) => acc + curr.val, 0);
 
   return (
-    <article className="rounded-xl border border-[var(--brand-line)] bg-white p-5 shadow-sm">
+    <article
+      aria-label={`${label} por semana`}
+      className="rounded-xl border border-[var(--brand-line)] bg-white p-5 shadow-sm"
+    >
       <div className="flex items-end justify-between gap-3 mb-4">
         <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide">{label}</h3>
         <p className="text-3xl font-bold text-gray-900">{total}</p>
@@ -2501,7 +2504,7 @@ function Metric({ change, label, value }: { change?: number; label: string; valu
                 ? "bg-rose-100 text-rose-800"
                 : "bg-slate-100 text-slate-700"
           )}>
-            {change && change > 0 ? "+" : ""}{change} vs. ant.
+            {change && change > 0 ? "+" : ""}{change} vs. anterior
           </span>
         ) : null}
       </div>
@@ -2569,8 +2572,6 @@ function normalizeRole(role: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 }
-
-
 
 
 

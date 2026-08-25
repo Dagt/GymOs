@@ -2556,12 +2556,6 @@ th {
   border-color: #f2b2ad;
 }
 
-.platform-overview-grid {
-  display: grid;
-  gap: 1.25rem;
-  grid-template-columns: minmax(0, 1.45fr) minmax(18rem, 0.75fr);
-}
-
 .platform-action-list {
   display: grid;
   gap: 0.55rem;
@@ -2623,37 +2617,6 @@ th {
 .platform-action-priority.priority-2 {
   background: #fef3c7;
   color: #92400e;
-}
-
-.platform-shortcut-grid {
-  display: grid;
-  gap: 0.7rem;
-}
-
-.platform-shortcut-grid a {
-  background: white;
-  border: 1px solid var(--brand-line);
-  border-radius: 0.8rem;
-  display: grid;
-  gap: 0.25rem;
-  padding: 1rem;
-}
-
-.platform-shortcut-grid span,
-.platform-shortcut-grid small {
-  color: var(--brand-muted);
-  font-size: 0.78rem;
-}
-
-.platform-shortcut-grid span {
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.platform-shortcut-grid strong {
-  color: var(--brand-ink);
-  font-size: 1rem;
-  font-weight: 950;
 }
 
 .platform-customer-cards {
@@ -4718,7 +4681,6 @@ button.admin-secondary-link:disabled {
   .admin-status-board,
   .admin-report-strip,
   .platform-layout,
-  .platform-overview-grid,
   .operations-grid,
   .operations-hero,
   .operations-card-grid,

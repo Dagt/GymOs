@@ -509,7 +509,7 @@ test.describe("coaches y rutinas", () => {
             ...internalCoach(),
             id: "abababab-abab-4bab-8bab-abababababab",
             fullName: "Ana Coach",
-            username: "ana.coach",
+            username: "ana@example.com",
             email: "ana@example.com",
             branches: ["Norte"],
             branchIds: [secondBranchId],
@@ -524,9 +524,9 @@ test.describe("coaches y rutinas", () => {
     await page.getByRole("button", { name: "Crear usuario" }).first().click();
     await page.getByLabel("Nombre").fill("Ana");
     await page.getByLabel("Apellido paterno").fill("Coach");
-    await page.getByLabel("Email").fill("ana@example.com");
-    await page.getByLabel("Telefono").fill("5512345678");
-    await page.getByLabel("Usuario de inicio de sesion").fill("ana.coach");
+    await page.getByLabel("Email").pressSequentially("ana@example.com");
+    await page.getByLabel("Teléfono").fill("5512345678");
+    await expect(page.getByLabel("Usuario de inicio de sesión")).toHaveValue("ana@example.com");
     await page.getByLabel("Contrasena temporal").fill("Temporal123!");
     await expect(page.getByText("Información del Coach")).toBeVisible();
     await page.getByLabel("Especialidades").fill("Fuerza, Movilidad");
@@ -537,7 +537,7 @@ test.describe("coaches y rutinas", () => {
     await expect.poll(() => createPayload).toMatchObject({
       firstName: "Ana",
       lastName: "Coach",
-      username: "ana.coach",
+      username: "ana@example.com",
       roleId: "13131313-1313-4313-8313-131313131313",
       branchIds: [secondBranchId],
       coachSpecialties: ["Fuerza", "Movilidad"],
@@ -764,6 +764,7 @@ function report() {
 function coachUser() {
   return {
     userId,
+    accountScope: "TENANT",
     organizationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
     branchId,
     username: "coach@gymos.test",
@@ -776,6 +777,7 @@ function coachUser() {
     roles: ["Coach"],
     platformAdmin: false,
     supportMode: false,
+    supportExpiresAt: null,
     console: "COACH",
     organizationName: "GymOS Test",
     brandName: "GymOS Test",

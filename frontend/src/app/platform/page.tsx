@@ -95,7 +95,6 @@ export default function PlatformOverviewPage() {
           <button className="app-button-secondary" disabled={customers.length === 0} onClick={downloadPortfolio} type="button">
             Exportar cartera CSV
           </button>
-          <Link className="app-button" href="/platform/gymnasiums">Gestionar clientes</Link>
         </div>
       </section>
 
@@ -108,57 +107,33 @@ export default function PlatformOverviewPage() {
         <Metric label="Seguimientos próximos" value={formatNumber(summary?.followUpsDueCount ?? 0)} tone={(summary?.followUpsDueCount ?? 0) > 0 ? "warning" : "neutral"} />
       </section>
 
-      <section className="platform-overview-grid">
-        <article className="admin-panel platform-action-center">
-          <header className="admin-panel-header">
-            <div>
-              <p>Centro de acción</p>
-              <h2>{actions.length ? `${actions.length} asuntos priorizados` : "Cartera sin pendientes críticos"}</h2>
-              <span>Las alertas se derivan del expediente, la configuración y el estado real de cobro.</span>
-            </div>
-          </header>
-          <div className="platform-action-list">
-            {actions.slice(0, 8).map((action, index) => (
-              <Link href={action.destination} key={`${action.organizationId}:${action.title}`}>
-                <span className={`platform-action-priority priority-${action.priority}`}>{index + 1}</span>
-                <span>
-                  <small>{action.customerName}</small>
-                  <strong>{action.title}</strong>
-                  <em>{action.detail}</em>
-                </span>
-                <b aria-hidden="true">→</b>
-              </Link>
-            ))}
-            {!error && actions.length === 0 ? (
-              <div className="admin-empty-card">
-                <strong>Todo bajo control</strong>
-                <span>No hay vencidos, seguimientos atrasados ni altas comerciales incompletas.</span>
-              </div>
-            ) : null}
+      <section className="admin-panel platform-action-center">
+        <header className="admin-panel-header">
+          <div>
+            <p>Centro de acción</p>
+            <h2>{actions.length ? `${actions.length} asuntos priorizados` : "Cartera sin pendientes críticos"}</h2>
+            <span>Las alertas se derivan del expediente, la configuración y el estado real de cobro.</span>
           </div>
-        </article>
-
-        <article className="admin-panel">
-          <header className="admin-panel-header">
-            <div>
-              <p>Atajos</p>
-              <h2>Administración diaria</h2>
-              <span>Cada flujo tiene un propósito claro y permanece disponible en el menú lateral.</span>
+        </header>
+        <div className="platform-action-list">
+          {actions.slice(0, 8).map((action, index) => (
+            <Link href={action.destination} key={`${action.organizationId}:${action.title}`}>
+              <span className={`platform-action-priority priority-${action.priority}`}>{index + 1}</span>
+              <span>
+                <small>{action.customerName}</small>
+                <strong>{action.title}</strong>
+                <em>{action.detail}</em>
+              </span>
+              <b aria-hidden="true">→</b>
+            </Link>
+          ))}
+          {!error && actions.length === 0 ? (
+            <div className="admin-empty-card">
+              <strong>Todo bajo control</strong>
+              <span>No hay vencidos, seguimientos atrasados ni altas comerciales incompletas.</span>
             </div>
-          </header>
-          <div className="platform-shortcut-grid">
-            <Link href="/platform/gymnasiums">
-              <span>Clientes</span>
-              <strong>Expedientes y sucursales</strong>
-              <small>Contacto, etapa, responsable, soporte y estado del tenant.</small>
-            </Link>
-            <Link href="/platform/billing">
-              <span>Ingresos</span>
-              <strong>Cobros y contratos</strong>
-              <small>Planes, fechas, implementación, pagos y MRR por sucursal.</small>
-            </Link>
-          </div>
-        </article>
+          ) : null}
+        </div>
       </section>
 
       <section className="admin-panel">
