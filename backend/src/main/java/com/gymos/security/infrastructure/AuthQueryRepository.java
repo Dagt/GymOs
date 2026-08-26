@@ -22,7 +22,7 @@ public class AuthQueryRepository {
 	public Optional<AuthenticatedUser> findActiveUserByLoginIdentifier(String loginIdentifier) {
 		String normalizedIdentifier = loginIdentifier == null ? "" : loginIdentifier.trim();
 		Optional<AuthenticatedUser> usernameMatch = findUser("""
-				SELECT ua.id, ua.account_scope, ua.organization_id, ua.username, ua.password_hash,
+				SELECT ua.id, ua.account_scope, ua.organization_id, ua.username, ua.password_hash, ua.credential_version,
 				       TRIM(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) AS full_name
 				FROM user_account ua
 				JOIN person p ON p.id = ua.person_id
@@ -36,7 +36,7 @@ public class AuthQueryRepository {
 		}
 
 		List<AuthenticatedUser> emailMatches = findUsers("""
-				SELECT ua.id, ua.account_scope, ua.organization_id, ua.username, ua.password_hash,
+				SELECT ua.id, ua.account_scope, ua.organization_id, ua.username, ua.password_hash, ua.credential_version,
 				       TRIM(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) AS full_name
 				FROM user_account ua
 				JOIN person p ON p.id = ua.person_id
@@ -54,7 +54,7 @@ public class AuthQueryRepository {
 
 	public Optional<AuthenticatedUser> findActiveUserById(UUID userId) {
 		return findUser("""
-				SELECT ua.id, ua.account_scope, ua.organization_id, ua.username, ua.password_hash,
+				SELECT ua.id, ua.account_scope, ua.organization_id, ua.username, ua.password_hash, ua.credential_version,
 				       TRIM(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) AS full_name
 				FROM user_account ua
 				JOIN person p ON p.id = ua.person_id
@@ -198,7 +198,8 @@ public class AuthQueryRepository {
 						resultSet.getString("password_hash"),
 						resultSet.getString("full_name"),
 						findPermissions(resultSet.getObject("id", UUID.class)),
-						findRoles(resultSet.getObject("id", UUID.class))
+						findRoles(resultSet.getObject("id", UUID.class)),
+						resultSet.getLong("credential_version")
 				))
 				.list();
 	}
@@ -239,8 +240,13 @@ public class AuthQueryRepository {
 			String passwordHash,
 			String fullName,
 			Set<String> permissions,
-			Set<String> roles
+			Set<String> roles,
+			long credentialVersion
 	) {
+		public AuthenticatedUser(UUID userId, AccountScope accountScope, UUID organizationId, String username,
+				String passwordHash, String fullName, Set<String> permissions, Set<String> roles) {
+			this(userId, accountScope, organizationId, username, passwordHash, fullName, permissions, roles, 0);
+		}
 		public AuthenticatedUser(
 				UUID userId,
 				UUID organizationId,
@@ -257,11 +263,11 @@ public class AuthQueryRepository {
 			if (accountScope == AccountScope.PLATFORM) {
 				return new GymOsPrincipal(
 						userId, accountScope, null, null, username, fullName,
-						platformPermissions(), roles, false, null);
+						platformPermissions(), roles, false, null, credentialVersion);
 			}
 			return new GymOsPrincipal(
 					userId, accountScope, organizationId, branchId, username, fullName,
-					permissions, roles, false, null);
+					permissions, roles, false, null, credentialVersion);
 		}
 
 		public GymOsPrincipal toSupportPrincipal(UUID activeOrganizationId, UUID branchId, Instant expiresAt) {
@@ -270,7 +276,7 @@ public class AuthQueryRepository {
 			}
 			return new GymOsPrincipal(
 					userId, accountScope, activeOrganizationId, branchId, username, fullName,
-					tenantSupportPermissions(), roles, true, expiresAt);
+					tenantSupportPermissions(), roles, true, expiresAt, credentialVersion);
 		}
 
 		public boolean platformAdmin() {

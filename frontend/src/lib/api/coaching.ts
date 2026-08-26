@@ -1,4 +1,6 @@
 import { apiFetch, normalizePayload } from "./client";
+import type { PageResult } from "../pagination";
+import type { AssignmentDetail } from "./coaching-types";
 import type {
   AssignWorkoutPayload,
   CoachReport,
@@ -249,10 +251,17 @@ export async function getAssignmentReport(
   );
 }
 
+export function getAssignmentHistory(accessToken: string, params: { clientId?: string; page?: number; size?: number } = {}): Promise<PageResult<AssignmentDetail>> {
+  const search = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => { if (value !== undefined && value !== "") search.set(key, String(value)); });
+  return apiFetch<PageResult<AssignmentDetail>>(`/workout-assignments/history?${search}`, accessToken);
+}
+
 export async function getAssignmentTrend(
   accessToken: string,
   params: {
     weeks?: number;
+    from?: string;
     to?: string;
     coachId?: string;
     clientId?: string;

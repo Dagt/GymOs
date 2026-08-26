@@ -65,6 +65,7 @@ export function UsersTable({
   onChangeRole,
   onEditCoach,
   onToggleStatus,
+  onRecoverPassword,
 }: {
   roles: RoleOption[];
   saving: boolean;
@@ -73,11 +74,12 @@ export function UsersTable({
   onChangeRole: (user: InternalUserSummary, roleId: string) => void;
   onEditCoach: (user: InternalUserSummary) => void;
   onToggleStatus: (user: InternalUserSummary) => void;
+  onRecoverPassword: (user: InternalUserSummary) => void;
 }) {
   return (
     <section className="app-card p-5">
       <div className="admin-panel-header"><div><p>Usuarios actuales</p><h2>Equipo del gimnasio</h2></div></div>
-      <div className="team-user-table">
+      <div className="team-user-table app-scroll-list" role="region" aria-label="Usuarios del gimnasio" tabIndex={0}>
         {users.length === 0 ? <section className="admin-empty-card"><strong>No hay usuarios internos creados</strong><span>Crea cuentas para duenos, gerentes, recepcion y coaches.</span></section> : null}
         {users.length ? (
           <div aria-hidden="true" className="team-user-table-header">
@@ -131,6 +133,11 @@ export function UsersTable({
                 {canManage && isCoach && session.user.permissions.includes("coach.profile.manage") ? (
                   <button className="safe-action" disabled={saving} onClick={() => onEditCoach(user)} type="button">
                     Datos de Coach
+                  </button>
+                ) : null}
+                {canManage && user.status === "ACTIVE" && session.user.accountScope !== "PLATFORM" && !session.user.supportMode && session.user.permissions.includes("user.manage") && (session.user.roles.some((role) => displayRoleName(role) === "Dueno del gimnasio") || user.branchIds.includes(session.user.branchId ?? "")) ? (
+                  <button className="safe-action" disabled={saving} onClick={() => onRecoverPassword(user)} type="button">
+                    Recuperar contraseña
                   </button>
                 ) : null}
                 {canManage ? (

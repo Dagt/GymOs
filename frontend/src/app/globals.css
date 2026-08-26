@@ -4414,6 +4414,33 @@ button.admin-secondary-link:disabled {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-top: 1rem;
   padding: 0.1rem 0.45rem 0.1rem 0.1rem;
+  max-height: min(56dvh, 38rem);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+/* Compact operational lists. Pagination and filters stay outside this region. */
+.app-scroll-list {
+  max-height: min(56dvh, 38rem);
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: none;
+  scroll-padding-block: 0.5rem;
+}
+
+.app-scroll-list--short {
+  max-height: min(32dvh, 22rem);
+}
+
+.app-scroll-list::-webkit-scrollbar,
+.exercise-catalog-list::-webkit-scrollbar {
+  display: none;
+}
+
+.app-scroll-list:focus-visible,
+.exercise-catalog-list:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 3px;
 }
 
 .exercise-catalog-card {

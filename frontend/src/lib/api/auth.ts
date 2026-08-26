@@ -1,4 +1,4 @@
-import { apiFetch } from "./client";
+import { apiFetch, publicApiFetch } from "./client";
 import type { AuthResponse, CurrentUser, StoredSession, UserConsole } from "./auth-types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api/v1";
@@ -67,6 +67,12 @@ export async function acceptUserInvitation(token: string, password: string): Pro
     const error = await response.json().catch(() => null);
     throw new Error(formatLoginError(response, error));
   }
+}
+
+export async function acceptPasswordRecovery(token: string, password: string): Promise<void> {
+  await publicApiFetch("/auth/password-recovery/accept", {
+    method: "POST", cache: "no-store", body: JSON.stringify({ token, password }),
+  });
 }
 
 export async function getCurrentUser(accessToken: string): Promise<CurrentUser> {

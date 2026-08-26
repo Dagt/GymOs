@@ -1,6 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { lastPage, pageNumber, pageRange, pageSize } from "./pagination.ts";
+import { isPageResult, lastPage, pageNumber, pageRange, pageSize } from "./pagination.ts";
+
+test("legacy arrays and malformed totals are not treated as an empty page", () => {
+  assert.equal(isPageResult([]), false);
+  assert.equal(isPageResult({ items: [], page: 0, size: 25 }), false);
+  assert.equal(isPageResult({ items: [], page: 0, size: 25, totalElements: 127, totalPages: 1 }), false);
+  assert.equal(isPageResult({ items: [], page: 0, size: 25, totalElements: 0, totalPages: 0 }), true);
+});
 
 test("pagination reports the complete total and the partial final page", () => {
   assert.deepEqual(pageRange(0, 25, 127), { from: 1, to: 25, pages: 6 });

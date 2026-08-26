@@ -26,7 +26,7 @@ export function CatalogProductTable({ loading, products, saving, canArchive, can
       {loading ? <TableSkeleton /> : null}
       {!loading && products.length === 0 ? <div className="p-6 text-center text-xs text-[#5d6b63]">No hay resultados para estos filtros.</div> : null}
       {!loading && products.length ? (
-        <div className="overflow-x-auto">
+        <div key={products[0]?.id} className="app-scroll-list" aria-label="Listado del catálogo" role="region" tabIndex={0}>
           <table className="min-w-full text-left text-[12px]">
             <thead className="sticky top-0 z-10 bg-[#f6f8f4] text-[10px] uppercase tracking-wide text-[#5d6b63]"><tr>
               <th className="px-3 py-2">Registro</th><th className="px-3 py-2">Categoría</th><th className="px-3 py-2">Tipo</th>

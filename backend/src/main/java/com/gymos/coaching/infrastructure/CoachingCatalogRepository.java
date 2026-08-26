@@ -1,5 +1,7 @@
 package com.gymos.coaching.infrastructure;
 
+import com.gymos.coaching.domain.AssignmentLifecycle;
+import com.gymos.common.time.BusinessTime;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -269,7 +271,7 @@ public class CoachingCatalogRepository {
 
 	public List<AssignmentDetail> assignments(
 			UUID organizationId, UUID branchId, LocalDate from, LocalDate to,
-			UUID coachId, UUID clientId, UUID ownerUserId, int size, int offset
+			UUID coachId, UUID clientId, UUID ownerUserId, int size, long offset
 	) {
 		return jdbc.sql("""
 				SELECT a.id, a.assigned_on, a.status, a.status_reason, a.replaced_assignment_id,
@@ -290,7 +292,7 @@ public class CoachingCatalogRepository {
 				  AND (CAST(:coachId AS UUID) IS NULL OR a.coach_id = CAST(:coachId AS UUID))
 				  AND (CAST(:clientId AS UUID) IS NULL OR a.client_id = CAST(:clientId AS UUID))
 				  AND (CAST(:ownerUserId AS UUID) IS NULL OR c.user_account_id = CAST(:ownerUserId AS UUID))
-				ORDER BY a.assigned_on DESC, a.created_at DESC
+				ORDER BY a.assigned_on DESC, a.created_at DESC, a.id DESC
 				LIMIT :size OFFSET :offset
 				""")
 				.param("organizationId", organizationId)
@@ -359,12 +361,12 @@ public class CoachingCatalogRepository {
 				           SELECT 1 FROM workout_assignment previous
 				           WHERE previous.organization_id = a.organization_id
 				             AND previous.client_id = a.client_id
-				             AND previous.assigned_on < a.assigned_on
+				             AND (previous.assigned_on, previous.created_at, previous.id) < (a.assigned_on, a.created_at, a.id)
 				             AND previous.status <> 'CANCELLED'
 				             AND previous.deleted_at IS NULL
 				       )) AS first_workouts
 				FROM coach c
-				LEFT JOIN workout_assignment a ON a.coach_id = c.id
+				LEFT JOIN workout_assignment a ON a.coach_id = c.id AND a.organization_id = c.organization_id AND a.branch_id = c.branch_id
 				  AND a.assigned_on BETWEEN :fromDate AND :toDate AND a.deleted_at IS NULL
 				  AND (CAST(:clientId AS UUID) IS NULL OR a.client_id = CAST(:clientId AS UUID))
 				WHERE c.organization_id = :organizationId AND c.branch_id = :branchId
@@ -401,7 +403,7 @@ public class CoachingCatalogRepository {
 				           FROM workout_assignment previous
 				           WHERE previous.organization_id = a.organization_id
 				             AND previous.client_id = a.client_id
-				             AND previous.assigned_on < a.assigned_on
+				             AND (previous.assigned_on, previous.created_at, previous.id) < (a.assigned_on, a.created_at, a.id)
 				             AND previous.status <> 'CANCELLED'
 				             AND previous.deleted_at IS NULL
 				       )) AS first_workouts
@@ -432,6 +434,34 @@ public class CoachingCatalogRepository {
 				))
 				.list();
 	}
+
+	public List<CoachActivityPoint> coachActivity(UUID organizationId, UUID branchId, LocalDate from, LocalDate to,
+			UUID coachId, UUID clientId, UUID ownerUserId) {
+		return jdbc.sql("""
+				SELECT a.assigned_on, a.coach_id, COALESCE(c.display_name, 'Sin coach') AS coach_name,
+				       COUNT(*) AS assignments, COUNT(DISTINCT a.client_id) AS unique_clients,
+				       COUNT(*) FILTER (WHERE NOT EXISTS (
+				           SELECT 1 FROM workout_assignment previous
+				           WHERE previous.organization_id = a.organization_id AND previous.client_id = a.client_id
+				             AND (previous.assigned_on, previous.created_at, previous.id) < (a.assigned_on, a.created_at, a.id)
+				             AND previous.status <> 'CANCELLED' AND previous.deleted_at IS NULL)) AS first_workouts
+				FROM workout_assignment a LEFT JOIN coach c ON c.id = a.coach_id AND c.organization_id = a.organization_id
+				WHERE a.organization_id = :organizationId AND a.branch_id = :branchId
+				  AND a.deleted_at IS NULL AND a.status <> 'CANCELLED'
+				  AND a.assigned_on BETWEEN :fromDate AND :toDate
+				  AND (CAST(:coachId AS UUID) IS NULL OR a.coach_id = CAST(:coachId AS UUID))
+				  AND (CAST(:clientId AS UUID) IS NULL OR a.client_id = CAST(:clientId AS UUID))
+				  AND (CAST(:ownerUserId AS UUID) IS NULL OR c.user_account_id = CAST(:ownerUserId AS UUID))
+				GROUP BY a.assigned_on, a.coach_id, c.display_name ORDER BY a.assigned_on, a.coach_id
+				""").param("organizationId", organizationId).param("branchId", branchId)
+				.param("fromDate", from).param("toDate", to).param("coachId", coachId).param("clientId", clientId)
+				.param("ownerUserId", ownerUserId)
+				.query((rs, row) -> new CoachActivityPoint(rs.getObject("assigned_on", LocalDate.class),
+						rs.getObject("coach_id", UUID.class), rs.getString("coach_name"), rs.getLong("assignments"),
+						rs.getLong("unique_clients"), rs.getLong("first_workouts"))).list();
+	}
+
+	public record CoachActivityPoint(LocalDate date, UUID coachId, String coachName, long assignments, long uniqueClients, long firstWorkouts) {}
 
 	public Optional<AssignmentPdfData> assignmentPdf(
 			UUID organizationId, UUID branchId, UUID assignmentId, UUID ownerUserId
@@ -509,7 +539,13 @@ public class CoachingCatalogRepository {
 			LocalDate startsOn, LocalDate endsOn,
 			UUID workoutId, String workoutTitle, int versionNumber, UUID clientId,
 			String clientName, UUID coachId, String coachName, String printableNotes, String privateNotes
-	) {}
+	) {
+		public AssignmentDetail {
+			String effective = AssignmentLifecycle.effectiveStatus(status, startsOn, endsOn, BusinessTime.today());
+			if ("ACTIVE".equals(status) && "COMPLETED".equals(effective)) statusReason = AssignmentLifecycle.PERIOD_ENDED;
+			status = effective;
+		}
+	}
 	public record CoachMetric(UUID coachId, String coachName, long assignments, long uniqueClients, long firstWorkouts) {}
 	public record AssignmentStats(long totalRows, long assignments, long uniqueClients) {}
 	public record WeeklyTrendMetric(

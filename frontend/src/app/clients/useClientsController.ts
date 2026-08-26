@@ -215,6 +215,7 @@ export function useClientsController() {
     clients,
     createdClientId,
     error: error ?? listError,
+    listError,
     fieldErrors,
     form,
     loading,

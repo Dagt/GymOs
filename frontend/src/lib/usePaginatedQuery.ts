@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { lastPage, type PageResult } from "./pagination";
+import { isPageResult, lastPage, type PageResult } from "./pagination";
 
 /** Server-side paging with atomic filter resets and stale-response protection. */
 export function usePaginatedQuery<T, F extends object>(
@@ -20,6 +20,7 @@ export function usePaginatedQuery<T, F extends object>(
     let active = true;
     void load(accessToken, { ...request.filters, page: request.page, size: request.size }).then((data) => {
       if (!active) return;
+      if (!isPageResult(data)) throw new Error("El servidor devolvió un listado sin paginación válida. Actualiza el backend y vuelve a intentar; no es un listado vacío.");
       const validPage = lastPage(data.totalElements, data.size);
       if (request.page > validPage) {
         setRequest((current) => current === request ? { ...current, page: validPage } : current);

@@ -59,7 +59,7 @@ export default function InventoryPage() {
         {view === "stock" && (
           <section className="grid gap-4 lg:grid-cols-12 lg:items-start">
             <div className="lg:col-span-7 flex flex-col">
-              <InventoryStockPanel
+              {controller.stockList.error ? <InventoryListFailure title="Existencias" onRetry={controller.stockList.refresh} /> : <InventoryStockPanel
                 loading={controller.stockList.loading}
                 onExportCsv={controller.exportStockCsv}
                 onPageChange={controller.stockList.setPage}
@@ -75,7 +75,7 @@ export default function InventoryPage() {
                 sort={controller.stockList.filters.sort ?? "name,asc"}
                 stock={controller.stockList.items}
                 total={controller.stockList.total}
-              />
+              />}
             </div>
             <div className="lg:col-span-5 flex flex-col space-y-4">
               <InventoryMovementSummary
@@ -84,7 +84,7 @@ export default function InventoryPage() {
                 onOpenPhysicalCountDrawer={() => controller.setShowPhysicalCountDrawer(true)}
                 onOpenTransferDrawer={() => controller.setShowTransferDrawer(true)}
               />
-              <InventoryAlertsPanel
+              {controller.lowStockList.error ? <InventoryListFailure title="Alertas de stock" onRetry={controller.lowStockList.refresh} /> : <InventoryAlertsPanel
                 lowStock={controller.lowStockList.items}
                 page={controller.lowStockList.page}
                 pageSize={controller.lowStockList.size}
@@ -94,14 +94,14 @@ export default function InventoryPage() {
                 onSelectProduct={(product) => {
                   controller.selectProduct(product);
                 }}
-              />
+              />}
             </div>
           </section>
         )}
 
         {view === "movements" && (
           <section className="space-y-4">
-            <InventoryMovementsTable
+            {controller.movementList.error ? <InventoryListFailure title="Historial de movimientos" onRetry={controller.movementList.refresh} /> : <InventoryMovementsTable
               accessToken={controller.session.accessToken}
               loading={controller.movementList.loading}
               movements={controller.movementList.items}
@@ -118,13 +118,13 @@ export default function InventoryPage() {
               query={controller.movementQuery}
               total={controller.movementList.total}
               typeFilter={controller.movementList.filters.type ?? ""}
-            />
+            />}
           </section>
         )}
 
         {view === "transfers" && (
           <section className="space-y-4">
-            <InventoryTransfersCard
+            {controller.transferList.error ? <InventoryListFailure title="Historial de transferencias" onRetry={controller.transferList.refresh} /> : <InventoryTransfersCard
               transfers={controller.transferList.items}
               activeTransfersCount={controller.activeTransfersCount}
               page={controller.transferList.page}
@@ -138,13 +138,13 @@ export default function InventoryPage() {
               onReceiveTransfer={controller.handleReceiveTransfer}
               onShipTransfer={controller.handleShipTransfer}
               saving={controller.saving}
-            />
+            />}
           </section>
         )}
 
         {view === "audits" && (
           <section className="space-y-4">
-            <InventoryAuditsCard
+            {controller.countList.error ? <InventoryListFailure title="Historial de conteos" onRetry={controller.countList.refresh} /> : <InventoryAuditsCard
               counts={controller.countList.items}
               activeCount={controller.activeCount}
               page={controller.countList.page}
@@ -154,7 +154,7 @@ export default function InventoryPage() {
               onPageChange={controller.countList.setPage}
               onPageSizeChange={controller.countList.setPageSize}
               onOpenDrawer={() => controller.setShowPhysicalCountDrawer(true)}
-            />
+            />}
           </section>
         )}
       </div>
@@ -202,4 +202,12 @@ export default function InventoryPage() {
       />
     </AppShell>
   );
+}
+
+function InventoryListFailure({ title, onRetry }: { title: string; onRetry: () => void }) {
+  return <section className="app-card p-5" aria-label={title}>
+    <h2 className="app-card-title">{title}</h2>
+    <p className="mt-2 text-sm text-[var(--brand-muted)]">No fue posible cargar este listado. El total no está disponible; esto no significa que no existan registros.</p>
+    <button className="app-button-secondary mt-3" type="button" onClick={onRetry}>Reintentar listado</button>
+  </section>;
 }

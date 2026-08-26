@@ -34,6 +34,22 @@ Estado: `ESTABILIZADO PARA PRODUCCIÓN PILOTO`
   respuesta de un solo uso al administrador, nunca en `notification_log`,
   auditoría ni logs; si el proveedor no está configurado o falla, el gimnasio
   continúa creado y la consola ofrece enlace de respaldo y reenvío;
+- recuperación del equipo desde **Equipo y accesos → Recuperar contraseña**: el
+  dueño puede emitir enlaces para gerente, coach y recepción; un gerente sólo
+  para subordinados de su sucursal. No recupera dueños, cuentas PLATFORM ni
+  al propio actor por este flujo;
+- V92 guarda sólo el hash de un enlace de un uso y su estado de entrega;
+  ZeptoMail usa el SMTP existente después del commit. Regenerar revoca el
+  anterior, exige una espera configurable y ofrece copia privada si el correo
+  falla/no está configurado. Una aceptación del proveedor no garantiza bandeja;
+- la aceptación valida contraseña fuerte, token vigente, usuario activo y
+  consumo atómico. Incrementa `credential_version`, invalida JWT y refresh
+  anteriores y elimina el bloqueo temporal de intentos de login. Cambiar rol o
+  suspender también invalida sesiones y enlaces pendientes;
+- el enlace usa fragmento `#token=`, se retira de la dirección al abrir y no se
+  guarda en local/sessionStorage. La ruta pública limita intentos sin consultar
+  ni revelar cuentas por correo; **Olvidé mi contraseña** explica cómo pedir el
+  enlace al administrador del gimnasio;
 - el seed demo está limitado al perfil `local`, deshabilitado por defecto y
   requiere correo/contraseña explícitos; V88 elimina únicamente el fixture
   histórico exacto cuando no tiene actividad y lo conserva como `DEMO` ante
@@ -68,3 +84,5 @@ Estado: `ESTABILIZADO PARA PRODUCCIÓN PILOTO`
 
 Referencias vigentes: `../../docs/security/permissions-matrix.md` y
 `../../docs/operations/platform-identity-bootstrap.md`.
+Recuperación del equipo, propiedades y límites:
+[cierre operativo](../../docs/operations/operational-hardening.md).

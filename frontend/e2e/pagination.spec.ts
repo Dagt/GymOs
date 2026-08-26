@@ -1,6 +1,54 @@
 import { expect, test } from "@playwright/test";
 import { bootPagination, clients, exercises, id, json, paged, products } from "./pagination-fixtures";
 
+test("un backend antiguo se explica y no convierte un listado fallido en cero socios", async ({ page }) => {
+  let searches = 0;
+  await bootPagination(page, async (route, path) => {
+    if (path === "/system/info") return json(route, { name: "GymOS", status: "BOOTSTRAPPED" });
+    if (path === "/clients/search") searches++;
+    return false;
+  });
+  await page.goto("/clients");
+  await expect(page.getByText("Total no disponible", { exact: true })).toBeVisible();
+  await expect(page.getByText(/frontend y el backend no están actualizados/).first()).toBeVisible();
+  await expect(page.getByText("0 socios", { exact: true })).toHaveCount(0);
+  expect(searches).toBe(0);
+});
+
+test("el listado se desplaza con teclado dentro de una altura limitada y reinicia al cambiar página", async ({ page }, testInfo) => {
+  await bootPagination(page); await page.goto("/inventory");
+  const list = page.getByRole("region", { name: "Listado de existencias", exact: true });
+  const pager = page.getByRole("navigation", { name: "Paginación de existencias" });
+  await expect(pager).toContainText("1–25 de 127 existencias");
+  await expect(list).toHaveCSS("overflow-y", "auto"); await expect(list).toHaveCSS("scrollbar-width", "none");
+  expect(await list.evaluate((node) => node.clientHeight < innerHeight * .6 && node.scrollHeight > node.clientHeight)).toBe(true);
+  await list.focus(); await page.keyboard.press("End");
+  await expect.poll(() => list.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+  await pager.getByRole("button", { name: "Siguiente" }).click();
+  await expect(pager).toContainText("26–50 de 127 existencias");
+  expect(await list.evaluate((node) => node.scrollTop)).toBe(0);
+  await page.screenshot({ path: testInfo.outputPath("inventario-scroll-oculto.png") });
+});
+
+test("una consulta de conteos fallida no se presenta como historial vacío y permite reintentar", async ({ page }) => {
+  let fail = true;
+  await bootPagination(page, async (route, path) => {
+    if (path === "/inventory/physical-counts/search" && fail) {
+      await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ code: "INTERNAL_ERROR", message: "No fue posible consultar conteos." }) });
+      return true;
+    }
+    return false;
+  });
+  await page.goto("/inventory");
+  await page.getByRole("button", { name: "Auditorías", exact: true }).click();
+  const failure = page.getByRole("region", { name: "Historial de conteos", exact: true });
+  await expect(failure).toContainText("El total no está disponible");
+  await expect(page.getByRole("navigation", { name: "Paginación de conteos" })).toHaveCount(0);
+  fail = false;
+  await failure.getByRole("button", { name: "Reintentar listado" }).click();
+  await expect(page.getByRole("navigation", { name: "Paginación de conteos" })).toContainText("1–25 de 127 conteos");
+});
+
 test("socios muestra el total real, permite recorrer 127 y busca fuera de los primeros 50", async ({ page }) => {
   await bootPagination(page);
   await page.goto("/clients");

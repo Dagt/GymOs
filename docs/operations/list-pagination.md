@@ -10,8 +10,8 @@ Implementación: `cab3e28`. Cierre de deuda: `INV-001`.
 - Inventario tenía consultas paginadas, pero la UI no recorría todas las
   páginas; filtraba movimientos después de descargarlos y recortaba el
   historial de conteos. Transferencias/conteos conservaban listas limitadas.
-- Catálogo ya tenía paginación, pero la búsqueda no reiniciaba la página y la
-  tabla añadía un scroll interno con barra oculta.
+- Catálogo ya tenía paginación, pero la búsqueda no reiniciaba la página. El
+  scroll interno no sustituía la necesidad de navegar por todas las páginas.
 - POS pedía sólo la primera página de 50; ejercicios, hasta 100 con filtrado
   local. Los selectores reutilizaban esas listas parciales.
 
@@ -22,10 +22,13 @@ Implementación: `cab3e28`. Cierre de deuda: `INV-001`.
   si fuera el total de la colección.
 - Los controles están antes del listado: rango visible, anterior/siguiente y
   25/50/100 registros por página. Las alertas de inventario usan 10 por página.
-- El scroll de la página sólo recorre los registros de esa página; no carga
-  páginas siguientes ni existe un scroll vertical oculto dentro del listado.
-  Se conserva el desplazamiento horizontal de tablas anchas y el scroll de
-  formularios laterales cuando es necesario.
+- Los listados tienen una altura máxima y scroll interno con barra oculta,
+  según la preferencia operativa del piloto. Admiten rueda, touch y teclado;
+  reciben foco y tienen nombre accesible. No alargan la página con 100 filas.
+- La paginación permanece fuera del área desplazable. El scroll recorre sólo
+  la página actual; **Siguiente** consulta la siguiente página del servidor.
+  Al cambiar de página se reinicia el desplazamiento del listado. Se conserva
+  el desplazamiento horizontal de tablas anchas y de formularios laterales.
 - Cambiar búsqueda, filtros o tamaño vuelve a la primera página. Si al
   actualizar/archivar desaparece la última página, se consulta la última válida.
   Las respuestas de una búsqueda anterior no reemplazan la búsqueda vigente.
@@ -74,6 +77,26 @@ selectores existentes. Su límite no representa el total de socios. Las
 pantallas principales usan el contrato paginado; no se descarga la colección
 completa para simular paginación en el navegador.
 
+## Compatibilidad entre frontend y backend
+
+`GET /system/info` anuncia `capabilities: ["operational-pagination-v1"]`.
+Socios y las consultas nuevas de inventario verifican esta capacidad antes de
+usarlas; un backend anterior produce una instrucción explícita de actualización,
+no un total parcial ni una falsa lista vacía. El hook paginado también rechaza
+respuestas legacy o totales incoherentes. Un error de socios/inventario muestra
+que el total no está disponible y permite reintentar.
+
+Las capturas del piloto muestran `500` en `/clients/search` y en
+`/inventory/physical-counts/search`. Un backend anterior puede interpretar
+`search` como un UUID o ignorar el filtro `lowStockOnly`; esto es compatible con
+los síntomas, pero no se dispone del log de esa instancia para atribuirles una
+causa definitiva. Las rutas actuales y sus consultas PostgreSQL pasan pruebas.
+Los parámetros y cuerpos mal formados ahora devuelven `400 VALIDATION_ERROR`
+sin exponer los valores rechazados.
+
+Para probar, reiniciar/desplegar **backend y frontend del mismo corte** y
+comprobar `NEXT_PUBLIC_API_BASE_URL`; no basta con actualizar sólo el navegador.
+
 ## Alcance y límites
 
 - Sin migraciones, cambios de permisos ni cambios al ciclo de inventario,
@@ -118,7 +141,7 @@ de orden, vacíos, archivado, CSV acotado, carrito, selectores y vista móvil.
 PostgreSQL comprueba el recorrido sin duplicados sobre datos estáticos, totales,
 filtros, aislamiento por tenant/sucursal y límites del contrato.
 
-Resultado local del 25/08/2026:
+Resultado histórico del cierre inicial de paginación (`cab3e28`, 25/08/2026):
 
 | Validación | Resultado |
 |---|---|
@@ -138,3 +161,7 @@ cobros reales. `stripeTest` no forma parte de esta ejecución.
 
 OpenNext emitió su advertencia de compatibilidad con Windows, pero terminó el
 bundle sin errores. Generar los builds no despliega estos cambios a producción.
+
+La validación del endurecimiento posterior, scroll oculto y compatibilidad está
+en [cierre operativo](operational-hardening.md). No confundir la evidencia del
+corte inicial anterior con el código posterior.

@@ -214,6 +214,23 @@ public class UserAdministrationService {
 		return user;
 	}
 
+	@Transactional(readOnly = true)
+	public InternalUserSummary passwordRecoveryTarget(GymOsPrincipal principal, UUID userId) {
+		requirePrincipal(principal);
+		if (!principal.tenantIdentity() || !principal.permissions().contains("user.manage") || principal.userId().equals(userId)) {
+			throw new org.springframework.security.access.AccessDeniedException("Staff password recovery is restricted");
+		}
+		InternalUserSummary user = requireManageableUser(principal, userId);
+		if (isPrincipalManager(principal) && !isPrincipalOwner(principal)
+				&& (principal.branchId() == null || !user.branchIds().contains(principal.branchId()))) {
+			throw new org.springframework.security.access.AccessDeniedException("Staff recovery is restricted to the selected branch");
+		}
+		if (!"ACTIVE".equals(user.status())) {
+			throw new BusinessException("PASSWORD_RESET_USER_INACTIVE", "Reactiva explícitamente al usuario antes de recuperar su acceso.");
+		}
+		return user;
+	}
+
 	private void requirePrincipal(GymOsPrincipal principal) {
 		if (principal == null) {
 			throw new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesion para continuar.");

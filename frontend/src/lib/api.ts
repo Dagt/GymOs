@@ -301,6 +301,7 @@ export {
   removeExerciseMedia,
   replaceWorkoutAssignment,
   getAssignmentReport,
+  getAssignmentHistory,
   getAssignmentTrend,
   downloadWorkoutPdf,
   downloadAssignmentCsv,
@@ -421,7 +422,9 @@ export {
   getUserRoles,
   updateInternalUserRole,
   updateInternalUserStatus,
+  requestPasswordRecovery,
 } from "./api/users";
+export type { PasswordRecoveryIssued } from "./api/users";
 export type {
   CreateInternalUserPayload,
   InternalUserSummary,

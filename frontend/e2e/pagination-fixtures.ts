@@ -72,6 +72,8 @@ export async function bootPagination(page: Page, override?: (route: Route, path:
     const url = new URL(route.request().url());
     const path = url.pathname.replace(/^\/api\/v1/, "");
     if (override && await override(route, path, url)) return;
+    if (path === "/system/info") return void await json(route, { capabilities: ["operational-pagination-v1"] });
+    if (path === "/workout-assignments/history") return void await json(route, paged([], url));
     const query = (url.searchParams.get("q") ?? url.searchParams.get("query") ?? "").toLocaleLowerCase("es");
     const matches = (...values: (string | null)[]) => values.some((value) => value?.toLocaleLowerCase("es").includes(query));
     if (path === "/clients/search") return void await json(route, paged(clients.filter((client) => matches(client.firstName, client.email, client.phone)), url));

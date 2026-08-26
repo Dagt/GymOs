@@ -6,6 +6,14 @@ export type PageResult<T> = {
   totalPages: number;
 };
 
+export function isPageResult(value: unknown): value is PageResult<unknown> {
+  if (!value || typeof value !== "object" || !("items" in value) || !Array.isArray(value.items)) return false;
+  const page = value as PageResult<unknown>;
+  return Number.isSafeInteger(page.page) && page.page >= 0 && Number.isSafeInteger(page.size) && page.size > 0
+    && Number.isSafeInteger(page.totalElements) && page.totalElements >= 0
+    && Number.isSafeInteger(page.totalPages) && page.totalPages === Math.ceil(page.totalElements / page.size);
+}
+
 export function pageNumber(value: string | null, fallback = 0) {
   const parsed = Number(value ?? fallback);
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : fallback;

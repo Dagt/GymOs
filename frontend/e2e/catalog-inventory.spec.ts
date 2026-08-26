@@ -222,6 +222,7 @@ async function bootCatalog(
 }
 
 function responseFor(path: string) {
+  if (path === "/system/info") return { capabilities: ["operational-pagination-v1"] };
   if (path === "/catalog/products/search") {
     return { items: [product], page: 0, size: 25, totalElements: 1, totalPages: 1 };
   }

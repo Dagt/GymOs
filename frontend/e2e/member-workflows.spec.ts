@@ -309,6 +309,7 @@ async function bootMemberWorkflow(
   await page.route("**/api/v1/**", async (route) => {
     const path = new URL(route.request().url()).pathname.replace(/^\/api\/v1/, "");
     if (override && await override(route, path)) return;
+    if (path === "/system/info") return void await fulfill(route, { capabilities: ["operational-pagination-v1"] });
     if (path === "/organizations/current") {
       await fulfill(route, {
         id: user.organizationId,

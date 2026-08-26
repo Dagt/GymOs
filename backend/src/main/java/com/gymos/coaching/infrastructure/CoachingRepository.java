@@ -1,5 +1,7 @@
 package com.gymos.coaching.infrastructure;
 
+import com.gymos.coaching.domain.AssignmentLifecycle;
+import com.gymos.common.time.BusinessTime;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -668,7 +670,7 @@ public class CoachingRepository {
 				    cancelled_at = CASE WHEN :status = 'CANCELLED' THEN now() ELSE cancelled_at END,
 				    version = version + 1
 				WHERE id = :assignmentId AND organization_id = :organizationId
-				  AND branch_id = :branchId AND deleted_at IS NULL
+				  AND branch_id = :branchId AND deleted_at IS NULL AND status = 'ACTIVE'
 				""")
 				.param("status", status)
 				.param("reason", reason)
@@ -677,7 +679,7 @@ public class CoachingRepository {
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
 				.update();
-		if (updated == 0) throw new IllegalStateException("Assignment not found");
+		if (updated == 0) throw new com.gymos.common.api.BusinessException("WORKOUT_ASSIGNMENT_CONFLICT", "La asignación cambió. Actualiza el historial antes de continuar.");
 	}
 
 	public List<WorkoutVersionRecord> workoutVersions(UUID organizationId, UUID workoutId) {
@@ -750,17 +752,18 @@ public class CoachingRepository {
 	}
 
 	public void replaceAssignment(UUID organizationId, UUID branchId, UUID oldAssignmentId, UUID newAssignmentId) {
-		jdbcClient.sql("""
+		int updated = jdbcClient.sql("""
 				UPDATE workout_assignment
-				SET status = 'REPLACED', replaced_assignment_id = :newAssignmentId, updated_at = now()
+				SET status = 'REPLACED', replaced_assignment_id = :newAssignmentId, updated_at = now(), version = version + 1
 				WHERE id = :oldAssignmentId AND organization_id = :organizationId
-				  AND branch_id = :branchId AND deleted_at IS NULL
+				  AND branch_id = :branchId AND deleted_at IS NULL AND status = 'ACTIVE'
 				""")
 				.param("newAssignmentId", newAssignmentId)
 				.param("oldAssignmentId", oldAssignmentId)
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
 				.update();
+		if (updated == 0) throw new com.gymos.common.api.BusinessException("WORKOUT_ASSIGNMENT_CONFLICT", "La asignación cambió. Actualiza el historial antes de continuar.");
 	}
 
 	public boolean clientExists(UUID organizationId, UUID clientId) {
@@ -778,6 +781,62 @@ public class CoachingRepository {
 				.single();
 		return count > 0;
 	}
+
+	/** Serializes existing assignment mutations even when the member is inactive. */
+	public boolean lockAssignmentClient(UUID organizationId, UUID clientId) {
+		return jdbcClient.sql("SELECT id FROM client WHERE organization_id = :organizationId AND id = :clientId FOR UPDATE")
+				.param("organizationId", organizationId).param("clientId", clientId).query(UUID.class).optional().isPresent();
+	}
+
+	/** New assignments additionally require an active member available in the branch. */
+	public boolean lockAssignableClient(UUID organizationId, UUID branchId, UUID clientId) {
+		return jdbcClient.sql("""
+				SELECT c.id FROM client c JOIN person p ON p.id = c.person_id AND p.organization_id = c.organization_id
+				WHERE c.organization_id = :organizationId AND c.id = :clientId
+				  AND c.status = 'ACTIVE' AND c.deleted_at IS NULL AND p.deleted_at IS NULL
+				  AND (c.home_branch_id IS NULL OR c.home_branch_id = :branchId OR EXISTS (
+				      SELECT 1 FROM membership m JOIN membership_plan mp ON mp.id = m.plan_id
+				      WHERE m.organization_id = c.organization_id AND m.client_id = c.id
+				        AND m.status = 'ACTIVE' AND m.deleted_at IS NULL
+				        AND (m.branch_id = :branchId OR mp.multi_branch_access = true)))
+				FOR UPDATE OF c
+				""").param("organizationId", organizationId).param("branchId", branchId).param("clientId", clientId)
+				.query(UUID.class).optional().isPresent();
+	}
+
+	public boolean hasOverlappingAssignment(UUID organizationId, UUID branchId, UUID clientId,
+			LocalDate startsOn, LocalDate endsOn, UUID excludedAssignmentId) {
+		return jdbcClient.sql("""
+				SELECT EXISTS (SELECT 1 FROM workout_assignment a
+				WHERE a.organization_id = :organizationId AND a.branch_id = :branchId AND a.client_id = :clientId
+				  AND a.deleted_at IS NULL AND a.status = 'ACTIVE'
+				  AND (CAST(:excludedId AS UUID) IS NULL OR a.id <> CAST(:excludedId AS UUID))
+				  AND COALESCE(a.starts_on, a.assigned_on) <= :endsOn
+				  AND (a.ends_on IS NULL OR a.ends_on >= :startsOn))
+				""").param("organizationId", organizationId).param("branchId", branchId).param("clientId", clientId)
+				.param("startsOn", startsOn).param("endsOn", endsOn).param("excludedId", excludedAssignmentId)
+				.query(Boolean.class).single();
+	}
+
+	public List<ExpiredAssignment> completeDueAssignments(LocalDate today, int batchSize) {
+		return jdbcClient.sql("""
+				WITH due AS (
+				    SELECT id FROM workout_assignment
+				    WHERE status = 'ACTIVE' AND ends_on < :today AND deleted_at IS NULL
+				    ORDER BY ends_on, id LIMIT :batchSize FOR UPDATE SKIP LOCKED
+				)
+				UPDATE workout_assignment a
+				SET status = 'COMPLETED', status_reason = 'PERIOD_ENDED',
+				    completed_at = ((a.ends_on + 1)::timestamp AT TIME ZONE 'America/Mexico_City'),
+				    updated_at = now(), updated_by = NULL, version = version + 1
+				FROM due WHERE a.id = due.id AND a.status = 'ACTIVE'
+				RETURNING a.id, a.organization_id, a.branch_id
+				""").param("today", today).param("batchSize", batchSize)
+				.query((rs, row) -> new ExpiredAssignment(rs.getObject("id", UUID.class),
+						rs.getObject("organization_id", UUID.class), rs.getObject("branch_id", UUID.class))).list();
+	}
+
+	public record ExpiredAssignment(UUID id, UUID organizationId, UUID branchId) {}
 
 	public UUID assignWorkout(UUID organizationId, UUID branchId, UUID actorUserId, AssignWorkoutData data) {
 		OffsetDateTime now = OffsetDateTime.now();
@@ -893,19 +952,19 @@ public class CoachingRepository {
 	public CoachReportRecord coachReport(UUID organizationId, UUID branchId) {
 		return jdbcClient.sql("""
 				SELECT
-				    COUNT(DISTINCT c.id) AS coach_count,
-				    COUNT(DISTINCT w.id) AS workout_count,
-				    COUNT(a.id) AS active_assignments,
-				    COALESCE(SUM(CASE WHEN a.assigned_on >= CURRENT_DATE - INTERVAL '30 days' THEN 1 ELSE 0 END), 0) AS assignments_last_30_days
-				FROM coach c
-				LEFT JOIN workout w ON w.coach_id = c.id AND w.deleted_at IS NULL
-				LEFT JOIN workout_assignment a ON a.coach_id = c.id AND a.status = 'ACTIVE' AND a.deleted_at IS NULL
-				WHERE c.organization_id = :organizationId
-				  AND c.branch_id = :branchId
-				  AND c.deleted_at IS NULL
+				    (SELECT COUNT(*) FROM coach WHERE organization_id = :organizationId AND branch_id = :branchId
+				      AND status = 'ACTIVE' AND deleted_at IS NULL) AS coach_count,
+				    (SELECT COUNT(*) FROM workout WHERE organization_id = :organizationId AND branch_id = :branchId
+				      AND status <> 'ARCHIVED' AND deleted_at IS NULL) AS workout_count,
+				    COUNT(*) FILTER (WHERE a.status = 'ACTIVE' AND COALESCE(a.starts_on, a.assigned_on) <= :today
+				      AND (a.ends_on IS NULL OR a.ends_on >= :today)) AS active_assignments,
+				    COUNT(*) FILTER (WHERE a.status <> 'CANCELLED' AND a.assigned_on BETWEEN :fromDate AND :today) AS assignments_last_30_days
+				FROM workout_assignment a
+				WHERE a.organization_id = :organizationId AND a.branch_id = :branchId AND a.deleted_at IS NULL
 				""")
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
+				.param("today", BusinessTime.today()).param("fromDate", BusinessTime.today().minusDays(29))
 				.query((resultSet, rowNumber) -> new CoachReportRecord(
 						resultSet.getLong("coach_count"),
 						resultSet.getLong("workout_count"),
@@ -1037,6 +1096,9 @@ public class CoachingRepository {
 	}
 
 	public record WorkoutAssignmentRecord(UUID id, UUID workoutId, UUID workoutVersionId, UUID clientId, String clientName, UUID coachId, String coachName, String workoutTitle, String level, int versionNumber, String status, LocalDate assignedOn, LocalDate startsOn, LocalDate endsOn, String notes) {
+		public WorkoutAssignmentRecord {
+			status = AssignmentLifecycle.effectiveStatus(status, startsOn, endsOn, BusinessTime.today());
+		}
 	}
 
 	public record WorkoutDetailRecord(WorkoutRecord workout, List<WorkoutVersionRecord> versions) {

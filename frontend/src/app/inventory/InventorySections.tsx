@@ -288,7 +288,7 @@ export function InventoryStockPanel({
         ) : null}
 
         {!loading && stock.length > 0 ? (
-          <div className="mt-4 grid gap-2">
+          <div key={page} className="app-scroll-list mt-4 grid gap-2" aria-label="Listado de existencias" role="region" tabIndex={0}>
             {stock.map((item) => {
               const isSelected = item.productId === selectedProductId;
               return (
@@ -425,7 +425,7 @@ export function InventoryAlertsPanel({
           Sin productos bajo el nivel mínimo de reorden.
         </p>
       ) : (
-        <div className="flex-1 min-h-0 flex flex-col justify-start gap-2">
+        <div key={page} className="app-scroll-list app-scroll-list--short flex flex-col justify-start gap-2" aria-label="Listado de alertas de inventario" role="region" tabIndex={0}>
           {lowStock.map((item) => (
             <button type="button"
               key={item.productId}
@@ -555,7 +555,7 @@ export function InventoryMovementsTable({
       ) : null}
 
       {!loading && movements.length > 0 ? (
-        <div className="overflow-x-auto">
+        <div key={page} className="app-scroll-list" aria-label="Historial de movimientos" role="region" tabIndex={0}>
           <table className="w-full border-collapse text-xs">
             <thead>
               <tr className="border-b border-[#e4e8df] text-left uppercase tracking-wider text-[#6f7a73] font-semibold">
@@ -650,7 +650,7 @@ export function InventoryAuditsCard({
             Sin historial de auditorías de conteo físico registradas.
           </p>
         ) : (
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div key={page} className="app-scroll-list mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3" aria-label="Historial de conteos" role="region" tabIndex={0}>
             {counts.map((c) => (
               <div className="rounded-lg border border-[#eef0eb] bg-[var(--brand-surface)] p-3 text-xs flex flex-col justify-between gap-2" key={c.id}>
                 <div>
@@ -717,7 +717,7 @@ export function InventoryTransfersCard({
           No hay registros de transferencias de inventario en esta sucursal.
         </p>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-2">
+        <div key={page} className="app-scroll-list grid gap-3 sm:grid-cols-2 lg:grid-cols-2" aria-label="Historial de transferencias" role="region" tabIndex={0}>
           {transfers.map((t) => (
             <div className="rounded-lg border border-[#e4e8df] bg-[var(--brand-surface)] p-4 text-xs flex flex-col justify-between gap-3" key={t.id}>
               <div className="space-y-2">

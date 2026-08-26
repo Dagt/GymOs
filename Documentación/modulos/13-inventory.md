@@ -14,6 +14,12 @@ Estado: `ESTABILIZADO`
 - frontend separado en existencias, movimientos, transferencias y auditorías.
 - existencias, movimientos, alertas, transferencias y conteos paginados en
   servidor, con totales filtrados y navegación explícita;
+- listados de altura acotada, scroll interno con barra oculta y controles de
+  página siempre fuera del scroll; no se confunde una consulta fallida con
+  cero existencias o un historial vacío, y se ofrece reintento;
+- verificación de capacidad del backend para los nuevos endpoints/filtros,
+  evitando que un servidor anterior ignore `lowStockOnly` y muestre todos los
+  productos como alertas;
 - búsqueda global de movimientos por nombre, SKU y motivo, combinada con
   producto/tipo antes de paginar;
 - selectores de producto independientes de la página de existencias y señales

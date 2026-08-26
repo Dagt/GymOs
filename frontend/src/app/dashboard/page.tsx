@@ -3,20 +3,15 @@
 import { useEffect, useState, useMemo } from "react";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
+import { CoachingDashboard } from "@/features/coaching/CoachingDashboard";
 import {
   getOwnerDashboard,
   getSalesReport,
   getInventorySummary,
-  getCoachReport,
-  getAssignmentTrend,
-  getAssignmentReport,
   getStoredSession,
   type OwnerDashboard,
   type SalesReportResponse,
   type InventorySummary,
-  type CoachReport,
-  type WeeklyTrendReport,
-  type AssignmentReport,
   type StoredSession,
 } from "@/lib/api";
 import {
@@ -27,13 +22,10 @@ import {
   Bar,
   AreaChart,
   Area,
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
 } from "recharts";
 import {
@@ -42,12 +34,12 @@ import {
   AlertTriangle,
   Package,
   Calendar,
+  Database,
   Wallet,
   Activity,
   CheckCircle2,
   XCircle,
   Clock,
-  Database,
   BarChart3
 } from "lucide-react";
 
@@ -56,13 +48,11 @@ export default function DashboardPage() {
   const [dashboard, setDashboard] = useState<OwnerDashboard | null>(null);
   const [report, setReport] = useState<SalesReportResponse | null>(null);
   const [inventorySummary, setInventorySummary] = useState<InventorySummary | null>(null);
-  const [coachReport, setCoachReport] = useState<CoachReport | null>(null);
-  const [trendReport, setTrendReport] = useState<WeeklyTrendReport | null>(null);
-  const [assignmentReport, setAssignmentReport] = useState<AssignmentReport | null>(null);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [coachingRevision, setCoachingRevision] = useState(0);
   const [activeTab, setActiveTab] = useState<"owner" | "manager" | "coaching">("owner");
 
   useEffect(() => {
@@ -84,20 +74,14 @@ export default function DashboardPage() {
         setFromDate(initialDashboard.fromDate);
         setToDate(initialDashboard.toDate);
 
-        const [initialReport, invSummary, initCoach, initTrend, initAssign] = await Promise.all([
+        const [initialReport, invSummary] = await Promise.all([
           getSalesReport(stored.accessToken, initialDashboard.fromDate, initialDashboard.toDate),
           getInventorySummary(stored.accessToken).catch(() => null), // Failsafe if not implemented
-          getCoachReport(stored.accessToken).catch(() => null),
-          getAssignmentTrend(stored.accessToken, { weeks: 4 }).catch(() => null),
-          getAssignmentReport(stored.accessToken, { from: initialDashboard.fromDate, to: initialDashboard.toDate }).catch(() => null)
         ]);
         
         if (active) {
           setReport(initialReport);
           setInventorySummary(invSummary);
-          setCoachReport(initCoach);
-          setTrendReport(initTrend);
-          setAssignmentReport(initAssign);
         }
       } catch (exception) {
         if (active) {
@@ -118,20 +102,15 @@ export default function DashboardPage() {
     if (!session) return;
     setError(null);
     try {
-      const [newDashboard, newReport, invSummary, newCoach, newTrend, newAssign] = await Promise.all([
+      const [newDashboard, newReport, invSummary] = await Promise.all([
         getOwnerDashboard(session.accessToken, fromDate, toDate),
         getSalesReport(session.accessToken, fromDate, toDate),
         getInventorySummary(session.accessToken).catch(() => null),
-        getCoachReport(session.accessToken).catch(() => null),
-        getAssignmentTrend(session.accessToken, { weeks: 4 }).catch(() => null),
-        getAssignmentReport(session.accessToken, { from: fromDate, to: toDate }).catch(() => null)
       ]);
       setDashboard(newDashboard);
       setReport(newReport);
       setInventorySummary(invSummary);
-      setCoachReport(newCoach);
-      setTrendReport(newTrend);
-      setAssignmentReport(newAssign);
+      setCoachingRevision((value) => value + 1);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible actualizar dashboard.");
     }
@@ -177,15 +156,15 @@ export default function DashboardPage() {
       subtitle="Inteligencia de negocios y métricas operativas de la sucursal activa."
       title="Dashboard"
     >
-      <section className="grid gap-6">
+      <section className="grid min-w-0 gap-6">
         <section className="admin-panel flex flex-col md:flex-row md:items-end md:justify-between">
           <div>
             <p className="app-eyebrow">Periodo de análisis</p>
             <h2 className="text-xl font-bold">Filtro de Datos</h2>
           </div>
           <div className="admin-command-actions mt-4 justify-start md:mt-0">
-            <input className="h-10 rounded-md border border-[var(--brand-line)] px-3 text-sm" onChange={(e) => setFromDate(e.target.value)} type="date" value={fromDate} />
-            <input className="h-10 rounded-md border border-[var(--brand-line)] px-3 text-sm" onChange={(e) => setToDate(e.target.value)} type="date" value={toDate} />
+            <input aria-label="Inicio del periodo" className="h-10 min-w-0 rounded-md border border-[var(--brand-line)] px-3 text-sm" onChange={(e) => setFromDate(e.target.value)} type="date" value={fromDate} />
+            <input aria-label="Fin del periodo" className="h-10 min-w-0 rounded-md border border-[var(--brand-line)] px-3 text-sm" onChange={(e) => setToDate(e.target.value)} type="date" value={toDate} />
             <button className="app-button" onClick={refresh} type="button">Consultar</button>
           </div>
         </section>
@@ -195,7 +174,7 @@ export default function DashboardPage() {
         {dashboard && report ? (
           <>
             {/* TABS */}
-            <div className="border-b border-[var(--brand-line)] mb-2">
+            <div className="min-w-0 border-b border-[var(--brand-line)] mb-2">
               <nav className="-mb-px flex space-x-8 overflow-x-auto" aria-label="Tabs">
                 <button
                   onClick={() => setActiveTab("owner")}
@@ -477,145 +456,7 @@ export default function DashboardPage() {
                 </section>
               </div>
             )}
-            {/* TAB CONTENT: COACHING (Sports Performance) */}
-            {activeTab === "coaching" && coachReport && trendReport && (
-              <div className="animate-in fade-in duration-300 grid gap-6">
-                {/* Top KPIs */}
-                <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                  <MetricCard
-                    icon={<Users className="h-5 w-5 text-indigo-600" />}
-                    title="Entrenadores Activos"
-                    value={coachReport.coachCount.toString()}
-                    subtitle="Registrados en la plataforma"
-                  />
-                  <MetricCard
-                    icon={<Activity className="h-5 w-5 text-emerald-600" />}
-                    title="Rutinas Asignadas"
-                    value={coachReport.activeAssignments.toString()}
-                    subtitle="Socios con plan vigente"
-                  />
-                  <MetricCard
-                    icon={<TrendingUp className="h-5 w-5 text-blue-600" />}
-                    title="Nuevas Asignaciones"
-                    value={coachReport.assignmentsLast30Days.toString()}
-                    subtitle="Últimos 30 días"
-                  />
-                  <MetricCard
-                    icon={<Database className="h-5 w-5 text-purple-600" />}
-                    title="Catálogo de rutinas"
-                    value={coachReport.workoutCount.toString()}
-                    subtitle="Plantillas disponibles"
-                  />
-                </section>
-
-                <section className="grid gap-6 lg:grid-cols-2">
-                  <div className="rounded-xl border border-[var(--brand-line)] bg-white p-5 shadow-sm">
-                    <h3 className="text-lg font-semibold mb-4 text-[#2b3a32]">Tendencia Semanal (Asignaciones)</h3>
-                    <div className="h-[300px] w-full">
-                      {trendReport.points.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={trendReport.points} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                            <XAxis 
-                              dataKey="weekFrom" 
-                              tickFormatter={(date) => new Date(date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short'})}
-                              stroke="#9ca3af" fontSize={12} 
-                            />
-                            <YAxis stroke="#9ca3af" fontSize={12} />
-                            <Tooltip 
-                              formatter={(val: unknown) => Number(val)}
-                              labelFormatter={(date) => "Semana del " + new Date(String(date)).toLocaleDateString('es-MX', { day: '2-digit', month: 'short'})}
-                            />
-                            <Legend />
-                            <Bar dataKey="assignments" name="Nuevas Rutinas" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={50} />
-                            <Bar dataKey="uniqueClients" name="Socios únicos" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={50} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <EmptyState message="No hay suficientes datos históricos" />
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="rounded-xl border border-[var(--brand-line)] bg-white p-5 shadow-sm">
-                    <h3 className="text-lg font-semibold mb-4 text-[#2b3a32]">Primerizas vs Renovaciones</h3>
-                    <div className="h-[300px] w-full">
-                      {trendReport.points.length > 0 ? (
-                        <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={trendReport.points} margin={{ top: 20, right: 30, left: 0, bottom: 5 }}>
-                            <defs>
-                              <linearGradient id="colorFirst" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3}/>
-                                <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
-                              </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                            <XAxis 
-                              dataKey="weekFrom" 
-                              tickFormatter={(date) => new Date(date).toLocaleDateString('es-MX', { day: '2-digit', month: 'short'})}
-                              stroke="#9ca3af" fontSize={12} 
-                            />
-                            <YAxis stroke="#9ca3af" fontSize={12} />
-                            <Tooltip 
-                              formatter={(val: unknown) => Number(val)}
-                              labelFormatter={(date) => "Semana del " + new Date(String(date)).toLocaleDateString('es-MX', { day: '2-digit', month: 'short'})}
-                            />
-                            <Legend />
-                            <Area type="monotone" dataKey="firstWorkouts" name="Rutinas de 1ra vez" stroke="#8b5cf6" strokeWidth={3} fillOpacity={1} fill="url(#colorFirst)" />
-                          </AreaChart>
-                        </ResponsiveContainer>
-                      ) : (
-                        <EmptyState message="No hay suficientes datos históricos" />
-                      )}
-                    </div>
-                  </div>
-                </section>
-              
-                {/* Individual Coach Performance */}
-                {assignmentReport && assignmentReport.coaches && assignmentReport.coaches.length > 0 && (
-                  <section className="rounded-xl border border-[var(--brand-line)] bg-white p-5 shadow-sm">
-                    <h3 className="text-lg font-semibold mb-4 text-[#2b3a32]">Desempeño Individual por Coach</h3>
-                    <div className="grid gap-6 lg:grid-cols-2">
-                      <div className="h-[300px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={assignmentReport.coaches} margin={{ top: 20, right: 30, left: 10, bottom: 5 }}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                            <XAxis dataKey="coachName" stroke="#9ca3af" fontSize={11} tick={{fill: '#4b5563'}} />
-                            <YAxis stroke="#9ca3af" fontSize={12} />
-                            <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
-                            <Legend />
-                            <Line type="monotone" dataKey="assignments" name="Asignaciones Activas" stroke="#6366f1" strokeWidth={3} activeDot={{ r: 6 }} />
-                            <Line type="monotone" dataKey="uniqueClients" name="Socios Atendidos" stroke="#14b8a6" strokeWidth={3} />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left">
-                          <thead className="bg-gray-50/80 text-xs uppercase text-gray-500">
-                            <tr>
-                              <th className="px-4 py-3 rounded-tl-lg font-medium">Coach</th>
-                              <th className="px-4 py-3 font-medium text-center">Rutinas</th>
-                              <th className="px-4 py-3 font-medium text-center">Socios</th>
-                              <th className="px-4 py-3 rounded-tr-lg font-medium text-center">1ra Vez</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100">
-                            {assignmentReport.coaches.map(coach => (
-                              <tr key={coach.coachId} className="hover:bg-gray-50/50">
-                                <td className="px-4 py-3 font-medium text-gray-900">{coach.coachName}</td>
-                                <td className="px-4 py-3 text-center text-indigo-600 font-semibold">{coach.assignments}</td>
-                                <td className="px-4 py-3 text-center text-teal-600 font-semibold">{coach.uniqueClients}</td>
-                                <td className="px-4 py-3 text-center text-gray-600 font-semibold">{coach.firstWorkouts}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  </section>
-                )}
-              </div>
-            )}
+            {activeTab === "coaching" && <CoachingDashboard key={coachingRevision} accessToken={session.accessToken} from={dashboard.fromDate} to={dashboard.toDate} />}
           </>
         ) : null}
       </section>

@@ -14,11 +14,13 @@ import com.gymos.coaching.infrastructure.CoachingCatalogRepository.AssignmentDet
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.AssignmentPdfData;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.AssignmentStats;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.CoachMetric;
+import com.gymos.coaching.infrastructure.CoachingCatalogRepository.CoachActivityPoint;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.ExerciseData;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.ExercisePage;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.ExerciseRecord;
 import com.gymos.coaching.infrastructure.CoachingCatalogRepository.WeeklyTrendMetric;
 import com.gymos.common.api.BusinessException;
+import com.gymos.common.api.PageResponse;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.security.SecurityProperties;
 import com.gymos.common.time.BusinessTime;
@@ -219,6 +221,20 @@ public class CoachingCatalogService {
 	}
 
 	@Transactional(readOnly = true)
+	public PageResponse<AssignmentDetail> assignmentHistory(GymOsPrincipal principal, UUID clientId, int page, int size) {
+		requireBranch(principal);
+		UUID ownerUserId = workoutReadScope(principal);
+		int safePage = Math.max(0, page);
+		int safeSize = Math.max(1, Math.min(MAX_PAGE_SIZE, size));
+		LocalDate from = LocalDate.of(1, 1, 1);
+		LocalDate to = LocalDate.of(9999, 12, 31);
+		var stats = repository.assignmentStats(principal.organizationId(), principal.branchId(), from, to, null, clientId, ownerUserId);
+		var items = repository.assignments(principal.organizationId(), principal.branchId(), from, to, null, clientId,
+				ownerUserId, safeSize, (long) safePage * safeSize);
+		return PageResponse.of(items, safePage, safeSize, stats.totalRows());
+	}
+
+	@Transactional(readOnly = true)
 	public AssignmentReport assignmentReport(
 			GymOsPrincipal principal, LocalDate from, LocalDate to, UUID coachId, UUID clientId,
 			int page, int size
@@ -260,7 +276,7 @@ public class CoachingCatalogService {
 		);
 		List<AssignmentDetail> details = repository.assignments(
 				principal.organizationId(), principal.branchId(), safeFrom, safeTo,
-				coachId, clientId, ownerUserId, safeSize, safePage * safeSize
+				coachId, clientId, ownerUserId, safeSize, (long) safePage * safeSize
 		);
 		long activeCoaches = metrics.size();
 		long coachesWithoutAssignments = metrics.stream().filter(metric -> metric.assignments() == 0).count();
@@ -287,6 +303,13 @@ public class CoachingCatalogService {
 	public WeeklyTrendReport weeklyTrend(
 			GymOsPrincipal principal, int weeks, LocalDate to, UUID coachId, UUID clientId
 	) {
+		return weeklyTrend(principal, weeks, null, to, coachId, clientId);
+	}
+
+	@Transactional(readOnly = true)
+	public WeeklyTrendReport weeklyTrend(
+			GymOsPrincipal principal, int weeks, LocalDate from, LocalDate to, UUID coachId, UUID clientId
+	) {
 		requireBranch(principal);
 		if (weeks < 4 || weeks > 52) {
 			throw new BusinessException(
@@ -296,15 +319,20 @@ public class CoachingCatalogService {
 		}
 		LocalDate safeTo = to == null ? BusinessTime.today() : to;
 		LocalDate currentWeek = safeTo.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
-		LocalDate safeFrom = currentWeek.minusWeeks(weeks - 1L);
+		LocalDate safeFrom = from == null ? currentWeek.minusWeeks(weeks - 1L) : from;
+		if (safeTo.isBefore(safeFrom) || safeFrom.plusYears(1).isBefore(safeTo)) {
+			throw new BusinessException("REPORT_RANGE_INVALID", "El rango del reporte es inválido o excede un año.");
+		}
+		LocalDate firstWeek = safeFrom.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+		int pointCount = Math.toIntExact(ChronoUnit.WEEKS.between(firstWeek, currentWeek) + 1);
 		UUID ownerUserId = metricsReadScope(principal);
 		Map<LocalDate, WeeklyTrendMetric> values = repository.weeklyTrend(
 				principal.organizationId(), principal.branchId(), safeFrom, safeTo,
 				coachId, clientId, ownerUserId
 		).stream().collect(Collectors.toMap(WeeklyTrendMetric::weekStart, Function.identity()));
 		List<WeeklyTrendPoint> points = new ArrayList<>();
-		for (int index = 0; index < weeks; index++) {
-			LocalDate weekFrom = safeFrom.plusWeeks(index);
+		for (int index = 0; index < pointCount; index++) {
+			LocalDate weekFrom = firstWeek.plusWeeks(index);
 			LocalDate weekTo = weekFrom.plusDays(6).isAfter(safeTo)
 					? safeTo : weekFrom.plusDays(6);
 			WeeklyTrendMetric metric = values.get(weekFrom);
@@ -315,7 +343,8 @@ public class CoachingCatalogService {
 					metric == null ? 0 : metric.firstWorkouts()
 			));
 		}
-		return new WeeklyTrendReport(safeFrom, safeTo, weeks, points);
+		return new WeeklyTrendReport(safeFrom, safeTo, pointCount, points,
+				repository.coachActivity(principal.organizationId(), principal.branchId(), safeFrom, safeTo, coachId, clientId, ownerUserId));
 	}
 
 	@Transactional(readOnly = true)
@@ -450,11 +479,13 @@ public class CoachingCatalogService {
 	) {}
 
 	public record WeeklyTrendReport(
-			LocalDate from, LocalDate to, int weeks, List<WeeklyTrendPoint> points
+			LocalDate from, LocalDate to, int weeks, List<WeeklyTrendPoint> points, List<CoachActivityPoint> coachActivity
 	) {}
 
 	public record WeeklyTrendPoint(
 			LocalDate weekFrom, LocalDate weekTo,
 			long assignments, long uniqueClients, long firstWorkouts
-	) {}
+	) {
+		public long getRenewals() { return Math.max(0, assignments - firstWorkouts); }
+	}
 }

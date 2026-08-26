@@ -30,6 +30,7 @@ import {
 } from "@/lib/api";
 import { CoachProfileDrawer, CreateUserDrawer, TeamContextCard, TeamOverview, UsersTable } from "./UsersSections";
 import { canSeeUserForSession, canShowRoleForSession, displayRoleName, validateUserForm } from "./UsersRoleHelpers";
+import { PasswordRecoveryDrawer } from "./PasswordRecoveryDrawer";
 
 const emptyUserForm: CreateInternalUserPayload = {
   firstName: "",
@@ -63,6 +64,7 @@ export default function UsersPage() {
   const [coachSpecialties, setCoachSpecialties] = useState("");
   const [coachBio, setCoachBio] = useState("");
   const [coachBranchIds, setCoachBranchIds] = useState<string[]>([]);
+  const [recoveringUser, setRecoveringUser] = useState<InternalUserSummary | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -375,7 +377,10 @@ export default function UsersPage() {
         onChangeRole={changeUserRole}
         onEditCoach={openCoachProfile}
         onToggleStatus={toggleUserStatus}
+        onRecoverPassword={setRecoveringUser}
       />
+
+      {recoveringUser ? <PasswordRecoveryDrawer key={recoveringUser.id} user={recoveringUser} accessToken={session.accessToken} onClose={() => setRecoveringUser(null)} /> : null}
 
       <CoachProfileDrawer
         bio={coachBio}

@@ -72,6 +72,7 @@ export function ClientToolbar({ canCreate, onCreateClient }: ClientToolbarProps)
 
 type ClientListProps = {
   clients: ClientSummary[];
+  error?: string | null;
   loading: boolean;
   page: number;
   pageSize: number;
@@ -80,7 +81,7 @@ type ClientListProps = {
   onPageSizeChange: (size: number) => void;
 };
 
-export function ClientList({ clients, loading, page, pageSize, total, onPageChange, onPageSizeChange }: ClientListProps) {
+export function ClientList({ clients, error, loading, page, pageSize, total, onPageChange, onPageSizeChange }: ClientListProps) {
   return (
     <section className="app-card p-6">
       <div className="flex items-center justify-between gap-3 mb-6">
@@ -88,17 +89,17 @@ export function ClientList({ clients, loading, page, pageSize, total, onPageChan
           <p className="text-[0.65rem] font-black uppercase tracking-widest text-[color:var(--brand-primary)] opacity-60">Base de Datos</p>
           <h2 className="text-xl font-black text-[color:var(--brand-primary)] mt-1">Socios registrados</h2>
         </div>
-        <span className="px-3 py-1 bg-[color:var(--brand-surface)] text-[color:var(--brand-primary)] text-xs font-black rounded-full border border-[color:var(--brand-line)]">{total} socios</span>
+        <span className="px-3 py-1 bg-[color:var(--brand-surface)] text-[color:var(--brand-primary)] text-xs font-black rounded-full border border-[color:var(--brand-line)]">{error ? "Total no disponible" : `${total} socios`}</span>
       </div>
-      <Pagination label="socios" loading={loading} page={page} size={pageSize} totalElements={total} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
-      <div className="mt-4 grid gap-1.5" aria-busy={loading}>
+      {!error ? <Pagination label="socios" loading={loading} page={page} size={pageSize} totalElements={total} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} /> : <p role="status" className="text-sm text-[var(--brand-muted)]">No se pudo consultar el listado. Revisa el error y vuelve a buscar.</p>}
+      <div className="app-scroll-list mt-4 grid gap-1.5" aria-busy={loading} aria-label="Listado de socios" role="region" tabIndex={0} key={page}>
         {loading ? (
           <div className="py-6 flex flex-col items-center gap-2">
             <div className="w-6 h-6 border-3 border-[color:var(--brand-primary)]/10 border-t-[color:var(--brand-primary)] rounded-full animate-spin"></div>
             <p className="text-[0.65rem] font-bold text-gray-400 uppercase tracking-widest">Sincronizando socios...</p>
           </div>
         ) : null}
-        {!loading && clients.length === 0 ? (
+        {!loading && !error && clients.length === 0 ? (
           <p className="py-6 text-center text-xs text-gray-400 font-bold italic bg-gray-50 rounded-xl border-2 border-dashed border-gray-100">No hay socios para mostrar.</p>
         ) : null}
         {!loading && clients.map((client) => {

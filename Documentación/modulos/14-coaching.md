@@ -56,7 +56,8 @@ La consulta remota por el socio pertenece a una aplicación futura.
 - identificación y ejecución visibles primero; detalles técnicos, medios y
   nombres alternativos se administran de forma progresiva;
 - catálogo con paginación visible de 25/50/100 ejercicios, total del servidor,
-  scroll natural de la página, cuadrícula responsiva y tarjetas de 88 px;
+  scroll interno de altura acotada con barra oculta, cuadrícula responsiva y
+  tarjetas de 88 px; el teclado también permite recorrer el listado;
 - el constructor consulta sus propias sugerencias en servidor: ni la página
   ni los filtros del catálogo visible restringen la selección del ejercicio;
 - la descripción e instrucciones no se imprimen dentro de la tarjeta: `Ver
@@ -129,9 +130,28 @@ La consulta remota por el socio pertenece a una aplicación futura.
 - para rutinas con un borrador posterior, el listado selecciona la versión
   publicada más reciente y nunca propone el borrador para una asignación;
 - `Idempotency-Key` evita duplicados y detecta reutilización con otro payload;
-- estados activa, completada, cancelada y reemplazada;
+- inicio y fin obligatorios, fin inclusivo e inicio no anterior al día de
+  operación en `America/Mexico_City`; socio y coach deben estar activos;
+- una sola asignación por socio/sucursal para periodos que se solapen, incluso
+  entre rutinas o coaches distintos; lock transaccional del socio evita dos
+  altas simultáneas. La siguiente rutina puede programarse desde el día
+  siguiente al fin de la anterior;
+- estados activa, programada, completada, cancelada y reemplazada. Programada
+  es la proyección de una asignación cuyo inicio aún no llega; no cuenta como
+  vigente. Al pasar el fin se muestra completada aunque el worker no haya
+  corrido; éste persiste el cierre por lotes con motivo `PERIOD_ENDED` y auditoría;
+- completar por vencimiento indica **fin del periodo**, no demuestra que el
+  socio realizó los ejercicios; no se reabren estados finales ni se completa
+  manualmente una asignación que todavía no inicia;
 - cancelación con motivo obligatorio y auditoría;
-- reemplazo idempotente que conserva y muestra el vínculo histórico;
+- reemplazo idempotente que conserva y muestra el vínculo histórico; una
+  sustitución de la rutina vigente empieza hoy y exige nueva fecha de fin.
+  Programar la siguiente sin solape usa una nueva asignación, no reemplazo;
+- historial independiente de los filtros de métricas, paginado en servidor y
+  con scroll interno oculto; el socio seleccionado permite acotar su historial;
+- duplicados legacy no se eliminan ni se elige arbitrariamente cuál conservar:
+  el coach debe cancelar los sobrantes con motivo. Registros antiguos sin fin
+  requieren cancelación/reemplazo explícitos;
 - notas privadas separadas de indicaciones imprimibles;
 - descarga PDF mediante un enlace temporal insertado en el documento, con
   validación de respuesta vacía, estado visible y mensaje de éxito/error;
@@ -165,7 +185,8 @@ La consulta remota por el socio pertenece a una aplicación futura.
 - comparación automática contra un periodo anterior de igual duración;
 - detalle paginado y filtros visibles por fechas, coach y socio;
 - búsqueda directa y selección explícita de socio en la pantalla de métricas;
-- serie histórica continua de 4 a 52 semanas, incluyendo semanas sin actividad;
+- serie histórica continua por rango (hasta un año), semanas de lunes a domingo
+  y días sin actividad incluidos; se mantiene el parámetro legacy de 4–52 semanas;
 - gráficas separadas de rutinas asignadas, socios únicos y primeras rutinas;
 - CSV completo y acotado a 10,000 filas para evitar exportaciones accidentales
   sin filtro, respetando también el socio seleccionado;
@@ -177,6 +198,21 @@ La consulta remota por el socio pertenece a una aplicación futura.
   redundante y sin cargar rutinas, catálogo de ejercicios ni acciones sobre
   asignaciones; la detección por rol también protege la interfaz mientras se
   renueva un token anterior.
+
+En **Indicadores → Coaches y Rutinas**, las gráficas semanal y primerizas vs.
+renovaciones comparten el periodo seleccionado. La primera asignación del socio
+en la organización se cuenta una sola vez, incluso con varias altas el mismo
+día; las posteriores son renovaciones. Las canceladas se excluyen y las
+reemplazadas permanecen en el historial. `assigned_on` usa la fecha de México,
+no el día UTC del servidor; V91 repara únicamente el defecto histórico que
+coincide con el día UTC de creación, sin modificar los periodos elegidos.
+
+El desempeño individual tiene eje de fechas y una línea por coach (hasta cinco
+visibles), vista acumulada **dentro del periodo** o por día, colores/trazos
+distintos, semanas/tablas consultables y errores diferenciados de cero actividad.
+No suma socios únicos semanales como si fueran personas distintas del periodo.
+Los indicadores actuales excluyen asignaciones futuras/finalizadas y no
+multiplican registros por joins con la biblioteca de rutinas.
 
 ## Seguridad e invariantes
 
@@ -200,6 +236,13 @@ La consulta remota por el socio pertenece a una aplicación futura.
 - `REPLACED` sólo surge del flujo de reemplazo, no de un cambio manual de estado.
 
 ## Evidencia de cierre
+
+La regresión de fechas, solapes concurrentes, estados, métricas y cierre
+automático se valida en `OperationalHardeningPostgresIntegrationTests`; el
+dashboard y los flujos visibles en `operational-hardening.spec.ts` y
+`coaches-workouts.spec.ts`. Configuración, migraciones y resultados del corte
+actual: [cierre operativo](../../docs/operations/operational-hardening.md).
+Los resultados siguientes se conservan como evidencia histórica de cortes previos.
 
 - paginación: `ExercisePaginationIntegrationTests` y `e2e/pagination.spec.ts`
   comprueban navegación y búsqueda con 127 ejercicios y selección independiente

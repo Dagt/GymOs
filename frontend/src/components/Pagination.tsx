@@ -12,7 +12,7 @@ type PaginationProps = {
   onPageSizeChange?: (size: number) => void;
 };
 
-/** Lists scroll with the page; navigation is explicit, never inferred from scrolling. */
+/** Keep navigation outside the bounded list: scrolling never changes the page. */
 export function Pagination({ label, page, size, totalElements, loading = false, onPageChange, onPageSizeChange }: PaginationProps) {
   const { from, to, pages } = pageRange(page, size, totalElements);
   const sizes = [...new Set([25, 50, 100, size])].sort((a, b) => a - b);

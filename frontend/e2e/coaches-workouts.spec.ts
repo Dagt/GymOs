@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { businessToday } from "../src/lib/business-date";
 
 const coachId = "11111111-1111-4111-8111-111111111111";
 const workoutId = "22222222-2222-4222-8222-222222222222";
@@ -178,7 +179,7 @@ test.describe("coaches y rutinas", () => {
     await expect.poll(() => mediaUploaded).toBe(true);
   });
 
-  test("crea un equipo reutilizable y mantiene el catálogo paginado sin scroll interno", async ({ page }) => {
+  test("crea un equipo reutilizable y mantiene el catálogo compacto con scroll oculto", async ({ page }) => {
     let createPayload: Record<string, unknown> | null = null;
     await bootCoaching(page, async (route, path) => {
       if (route.request().method() === "POST" && path === "/exercises") {
@@ -208,7 +209,8 @@ test.describe("coaches y rutinas", () => {
     await page.goto("/coaches");
     await page.getByRole("button", { name: "Ejercicios", exact: true }).click();
     const catalog = page.locator(".exercise-catalog-list");
-    await expect(catalog).toHaveCSS("overflow-y", "visible");
+    await expect(catalog).toHaveCSS("overflow-y", "auto");
+    await expect(catalog).toHaveCSS("scrollbar-width", "none");
     await expect(page.getByRole("navigation", { name: "Paginación de ejercicios" })).toBeVisible();
     await page.getByRole("button", { name: "+ Nuevo ejercicio" }).click();
     await page.getByLabel("Nombre", { exact: true }).fill("Empuje de trineo");
@@ -280,6 +282,7 @@ test.describe("coaches y rutinas", () => {
     await expect(page.getByRole("button", { name: "Diego García" })).toBeVisible();
     expect(searchedQuery).toBe("Diego");
     await page.getByRole("button", { name: "Diego García" }).click();
+    await page.getByLabel("Fin", { exact: true }).fill("2099-12-31");
     await page.getByRole("button", { name: "Asignar rutina" }).click();
 
     await expect.poll(() => assignmentPayload).toMatchObject({
@@ -357,6 +360,7 @@ test.describe("coaches y rutinas", () => {
 
     await page.getByRole("button", { name: "Reemplazar", exact: true }).click();
     await page.getByLabel("Selecciona la nueva rutina").selectOption(replacementWorkoutId);
+    await page.getByLabel("Fin de la rutina de reemplazo").fill("2099-12-31");
     await page.getByRole("button", { name: "Confirmar reemplazo" }).click();
     await expect.poll(() => replacementPayload).toMatchObject({
       clientId,
@@ -574,6 +578,8 @@ async function bootCoaching(
 }
 
 function responseFor(path: string) {
+  if (path === "/system/info") return { capabilities: ["operational-pagination-v1"] };
+  if (path === "/workout-assignments/history") return { items: report().details, page: 0, size: 25, totalElements: 1, totalPages: 1 };
   if (path === "/branches" || path === "/organizations/current/branches") {
     return [
       { id: branchId, name: "Centro" },
@@ -754,7 +760,7 @@ function report() {
       status: "ACTIVE",
       statusReason: null,
       replacedAssignmentId: null,
-      startsOn: "2026-07-28",
+      startsOn: businessToday(),
       endsOn: null,
       workoutId,
       workoutTitle: "Fuerza base",

@@ -14,6 +14,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -61,6 +63,14 @@ public class GlobalExceptionHandler {
 	ResponseEntity<ApiError> handleNotFound(NoResourceFoundException exception, HttpServletRequest request) {
 		return ResponseEntity.status(HttpStatus.NOT_FOUND)
 				.body(ApiError.of("RESOURCE_NOT_FOUND", "El recurso solicitado no existe.", Map.of(), correlationId(request)));
+	}
+
+	@ExceptionHandler({MethodArgumentTypeMismatchException.class, HttpMessageNotReadableException.class})
+	ResponseEntity<ApiError> handleMalformedRequest(Exception exception, HttpServletRequest request) {
+		// Never echo rejected values: request bodies may contain passwords or tokens.
+		return ResponseEntity.badRequest().body(ApiError.of(
+				"VALIDATION_ERROR", "La solicitud contiene un identificador, fecha o dato inválido.",
+				Map.of(), correlationId(request)));
 	}
 
 	@ExceptionHandler(Exception.class)

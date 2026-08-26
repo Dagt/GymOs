@@ -23,6 +23,7 @@ import com.gymos.coaching.infrastructure.CoachingRepository.WorkoutSummaryRecord
 import com.gymos.coaching.infrastructure.CoachingRepository.WorkoutVersionRecord;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.common.time.BusinessTime;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.nio.charset.StandardCharsets;
@@ -316,6 +317,11 @@ public class CoachingService {
 
 	@Transactional
 	public WorkoutAssignmentRecord assignWorkout(GymOsPrincipal principal, UUID workoutId, AssignWorkoutCommand command, String correlationId) {
+		return assignWorkout(principal, workoutId, command, correlationId, null);
+	}
+
+	private WorkoutAssignmentRecord assignWorkout(GymOsPrincipal principal, UUID workoutId, AssignWorkoutCommand command,
+			String correlationId, UUID excludedAssignmentId) {
 		requireBranch(principal);
 		UUID ownerUserId = manageScope(principal);
 		WorkoutRecord workout = coachingRepository.workout(
@@ -328,12 +334,12 @@ public class CoachingService {
 		if (!coachingRepository.clientExists(principal.organizationId(), command.clientId())) {
 			throw new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta activo.");
 		}
+		if (!coachingRepository.lockAssignableClient(principal.organizationId(), principal.branchId(), command.clientId())) {
+			throw new BusinessException("CLIENT_NOT_FOUND", "El socio no está activo o no está disponible en esta sucursal.");
+		}
 		WorkoutVersionRecord version = resolveVersion(principal.organizationId(), workoutId, command.workoutVersionId());
 		if (!"PUBLISHED".equals(version.status())) {
 			throw new BusinessException("WORKOUT_VERSION_NOT_PUBLISHED", "Solo se pueden asignar versiones publicadas.");
-		}
-		if (command.startsOn() != null && command.endsOn() != null && command.endsOn().isBefore(command.startsOn())) {
-			throw new BusinessException("WORKOUT_ASSIGNMENT_RANGE_INVALID", "La fecha final no puede ser anterior al inicio.");
 		}
 		String idempotencyKey = blankToNull(command.idempotencyKey());
 		String requestHash = assignmentHash(workoutId, version.id(), command);
@@ -349,6 +355,25 @@ public class CoachingService {
 						.orElseThrow();
 			}
 		}
+		LocalDate today = BusinessTime.today();
+		if (command.startsOn() == null || command.endsOn() == null) {
+			throw new BusinessException("WORKOUT_ASSIGNMENT_DATES_REQUIRED", "Indica el inicio y el fin de la rutina.");
+		}
+		if (command.startsOn().isBefore(today)) {
+			throw new BusinessException("WORKOUT_ASSIGNMENT_START_IN_PAST", "La rutina debe comenzar hoy o en una fecha futura.");
+		}
+		if (command.endsOn().isBefore(command.startsOn())) {
+			throw new BusinessException("WORKOUT_ASSIGNMENT_RANGE_INVALID", "La fecha final no puede ser anterior al inicio.");
+		}
+		if (workout.coachId() != null && coachingRepository.coach(principal.organizationId(), principal.branchId(), workout.coachId())
+				.filter(coach -> "ACTIVE".equals(coach.status())).isEmpty()) {
+			throw new BusinessException("COACH_NOT_ACTIVE", "El coach de la rutina no está activo en esta sucursal.");
+		}
+		if (coachingRepository.hasOverlappingAssignment(principal.organizationId(), principal.branchId(), command.clientId(),
+				command.startsOn(), command.endsOn(), excludedAssignmentId)) {
+			throw new BusinessException("WORKOUT_ASSIGNMENT_OVERLAP",
+					"El socio ya tiene una rutina en ese periodo. Reemplázala explícitamente o programa la siguiente después de su fecha de fin.");
+		}
 		UUID assignmentId = coachingRepository.assignWorkout(
 				principal.organizationId(),
 				principal.branchId(),
@@ -358,7 +383,7 @@ public class CoachingService {
 						version.id(),
 						command.clientId(),
 						workout.coachId(),
-						LocalDate.now(),
+						today,
 						command.startsOn(),
 						command.endsOn(),
 						blankToNull(command.notes()),
@@ -403,7 +428,7 @@ public class CoachingService {
 	) {
 		requireBranch(principal);
 		String normalized = required(status, "WORKOUT_ASSIGNMENT_STATUS_REQUIRED", "El estado es obligatorio.").toUpperCase();
-		if (!List.of("ACTIVE", "COMPLETED", "CANCELLED").contains(normalized)) {
+		if (!List.of("COMPLETED", "CANCELLED").contains(normalized)) {
 			throw new BusinessException("WORKOUT_ASSIGNMENT_STATUS_INVALID", "Estado de asignación inválido.");
 		}
 		String normalizedReason = blankToNull(reason);
@@ -414,8 +439,16 @@ public class CoachingService {
 			);
 		}
 		UUID ownerUserId = manageScope(principal);
-		coachingRepository.assignment(principal.organizationId(), principal.branchId(), assignmentId, ownerUserId)
+		WorkoutAssignmentRecord current = coachingRepository.assignment(principal.organizationId(), principal.branchId(), assignmentId, ownerUserId)
 				.orElseThrow(() -> new BusinessException("WORKOUT_ASSIGNMENT_NOT_FOUND", "La asignación no existe."));
+		coachingRepository.lockAssignmentClient(principal.organizationId(), current.clientId());
+		current = coachingRepository.assignment(principal.organizationId(), principal.branchId(), assignmentId, ownerUserId).orElseThrow();
+		if (normalized.equals(current.status())) return current;
+		if (!List.of("ACTIVE", "SCHEDULED").contains(current.status())
+				|| ("SCHEDULED".equals(current.status()) && "COMPLETED".equals(normalized))) {
+			throw new BusinessException("WORKOUT_ASSIGNMENT_TRANSITION_INVALID",
+					"No puedes reabrir una asignación finalizada ni completar una rutina antes de su inicio.");
+		}
 		coachingRepository.updateAssignmentStatus(
 				principal.organizationId(), principal.branchId(), assignmentId,
 				normalized, normalizedReason, principal.userId()
@@ -440,6 +473,8 @@ public class CoachingService {
 		WorkoutAssignmentRecord replaced = coachingRepository.assignment(
 				principal.organizationId(), principal.branchId(), replacedAssignmentId, ownerUserId
 		).orElseThrow(() -> new BusinessException("WORKOUT_ASSIGNMENT_NOT_FOUND", "La asignacion a reemplazar no existe."));
+		coachingRepository.lockAssignmentClient(principal.organizationId(), replaced.clientId());
+		replaced = coachingRepository.assignment(principal.organizationId(), principal.branchId(), replacedAssignmentId, ownerUserId).orElseThrow();
 		String replacementKey = blankToNull(command.idempotencyKey());
 		if ("REPLACED".equals(replaced.status()) && replacementKey != null
 				&& coachingRepository.assignmentByIdempotencyKey(
@@ -447,13 +482,16 @@ public class CoachingService {
 				).isPresent()) {
 			return assignWorkout(principal, workoutId, command, correlationId);
 		}
-		if (!"ACTIVE".equals(replaced.status())) {
-			throw new BusinessException("WORKOUT_ASSIGNMENT_NOT_ACTIVE", "Solo se puede reemplazar una asignacion activa.");
+		if (!List.of("ACTIVE", "SCHEDULED").contains(replaced.status())) {
+			throw new BusinessException("WORKOUT_ASSIGNMENT_NOT_ACTIVE", "Solo se puede reemplazar una asignación vigente o programada.");
 		}
 		if (!replaced.clientId().equals(command.clientId())) {
 			throw new BusinessException("WORKOUT_ASSIGNMENT_CLIENT_MISMATCH", "El reemplazo debe conservar al mismo socio.");
 		}
-		WorkoutAssignmentRecord replacement = assignWorkout(principal, workoutId, command, correlationId);
+		if ("ACTIVE".equals(replaced.status()) && !BusinessTime.today().equals(command.startsOn())) {
+			throw new BusinessException("WORKOUT_REPLACEMENT_START_INVALID", "El reemplazo de una rutina vigente debe empezar hoy.");
+		}
+		WorkoutAssignmentRecord replacement = assignWorkout(principal, workoutId, command, correlationId, replacedAssignmentId);
 		coachingRepository.replaceAssignment(
 				principal.organizationId(), principal.branchId(), replacedAssignmentId, replacement.id()
 		);

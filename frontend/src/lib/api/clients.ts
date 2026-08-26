@@ -1,4 +1,5 @@
 import { apiFetch, normalizePayload } from "./client";
+import { requireOperationalPagination } from "./capabilities";
 import type { PageResult } from "../pagination";
 import type {
   ClientDetailResponse,
@@ -20,10 +21,11 @@ export async function searchClients(
   return apiFetch<ClientSummary[]>(`/clients${suffix}`, accessToken);
 }
 
-export function searchClientsPage(
+export async function searchClientsPage(
   accessToken: string,
   { query = "", status = "", page = 0, size = 25 }: { query?: string; status?: string; page?: number; size?: number } = {},
 ): Promise<PageResult<ClientSummary>> {
+  await requireOperationalPagination();
   const params = new URLSearchParams({ page: String(page), size: String(size) });
   if (query.trim()) params.set("query", query.trim());
   if (status.trim()) params.set("status", status.trim());

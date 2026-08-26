@@ -28,6 +28,21 @@ class ClientPaginationControllerTests {
 
 	@Test
 	@WithMockUser(authorities = "client.read")
+	void invalidIdentifiersAndPageNumbersAreValidationErrorsNotServerErrors() throws Exception {
+		mockMvc.perform(get("/api/v1/clients/not-a-uuid")).andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+		mockMvc.perform(get("/api/v1/clients/search").param("page", "not-a-number")).andExpect(status().isBadRequest())
+				.andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+	}
+
+	@Test
+	void capabilityEndpointIsPublicAndAnnouncesThePagingContract() throws Exception {
+		mockMvc.perform(get("/api/v1/system/info")).andExpect(status().isOk())
+				.andExpect(jsonPath("$.capabilities[0]").value("operational-pagination-v1"));
+	}
+
+	@Test
+	@WithMockUser(authorities = "client.read")
 	void directoryReturnsMetadataWhileQuickSearchKeepsArrayContract() throws Exception {
 		when(service.searchPage(any(), eq("Ana"), eq("ACTIVE"), eq(2), eq(25)))
 				.thenReturn(PageResponse.of(List.of(), 2, 25, 127));

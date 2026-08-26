@@ -61,7 +61,7 @@ export function ProductGrid({
 
         <div className="mt-4"><Pagination label="productos" page={page} size={pageSize} totalElements={total} loading={loading} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} /></div>
         {error ? <p className="mt-3 text-sm text-red-700" role="alert">{error}</p> : null}
-        <div className="mt-6">
+        <div className="app-scroll-list mt-6 p-1" aria-label="Listado de productos del POS" role="region" tabIndex={0} key={page}>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-4" data-testid="pos-product-grid">
             {loading && (
               <div className="col-span-full py-12 flex flex-col items-center gap-4">

@@ -5,6 +5,7 @@ import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AppDrawer } from "@/components/AppDrawer";
 import { Pagination } from "@/components/Pagination";
 import { usePaginatedQuery } from "@/lib/usePaginatedQuery";
+import { businessToday, businessWeekStart, assignmentDateError } from "@/lib/business-date";
 import { AuthRequired } from "@/components/AuthRequired";
 import {
   AreaChart,
@@ -22,6 +23,7 @@ import {
   downloadWorkoutPdf,
   duplicateWorkout,
   getAssignmentReport,
+  getAssignmentHistory,
   getAssignmentTrend,
   getBranches,
   getCoaches,
@@ -41,6 +43,7 @@ import {
   updateWorkoutAssignmentStatus,
   uploadExerciseMedia,
   type AssignmentReport,
+  type AssignmentDetail,
   type BranchSummary,
   type ClientSummary,
   type CoachSummary,
@@ -177,7 +180,7 @@ export default function CoachesPage() {
   const [clientSearchBusy, setClientSearchBusy] = useState(false);
   const [selectedClient, setSelectedClient] = useState<ClientSummary | null>(null);
   const [selectedWorkoutId, setSelectedWorkoutId] = useState("");
-  const [startsOn, setStartsOn] = useState("");
+  const [startsOn, setStartsOn] = useState(today());
   const [endsOn, setEndsOn] = useState("");
   const [printableNotes, setPrintableNotes] = useState("");
   const [privateNotes, setPrivateNotes] = useState("");
@@ -189,6 +192,8 @@ export default function CoachesPage() {
   const [metricClientQuery, setMetricClientQuery] = useState("");
   const [metricClients, setMetricClients] = useState<ClientSummary[]>([]);
   const [reportClient, setReportClient] = useState<ClientSummary | null>(null);
+  const assignmentList = usePaginatedQuery<AssignmentDetail, { clientId?: string }>(session?.accessToken, getAssignmentHistory, {}, 25,
+    Boolean(session && !isMetricsOnlySupervisor(session) && hasAnyPermission(session, "workout.read.own", "workout.read.all")));
 
   useEffect(() => {
     let active = true;
@@ -340,6 +345,7 @@ export default function CoachesPage() {
       && session.user.permissions.includes("exercise.read");
     const canReadMetrics = session.user.permissions.includes("coach.metrics.read");
     exerciseList.refresh();
+    assignmentList.refresh();
     const [nextWorkouts, nextEquipmentOptions, nextReport, nextTrend] = await Promise.all([
       canReadWorkouts ? getWorkouts(session.accessToken) : Promise.resolve(workouts),
       canReadExercises
@@ -526,6 +532,8 @@ export default function CoachesPage() {
   async function saveAssignment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session || !selectedClient || !selectedWorkoutId) return;
+    const dateError = assignmentDateError(startsOn, endsOn);
+    if (dateError) { setError(dateError); return; }
     setSaving(true);
     clearFeedback();
     try {
@@ -542,6 +550,7 @@ export default function CoachesPage() {
       setMessage(`Rutina asignada a ${assignment.clientName}. El PDF ya está disponible.`);
       setPrintableNotes("");
       setPrivateNotes("");
+      assignmentList.setPage(0);
       await refresh();
       setTab("assignments");
     } catch (exception) {
@@ -1248,9 +1257,10 @@ export default function CoachesPage() {
         ) : null}
 
         {tab === "assignments" ? (
-          <section className="grid gap-5 lg:grid-cols-[0.8fr_1.2fr]">
+          <section className="grid items-start gap-5 xl:grid-cols-[0.8fr_1.2fr]">
             <form className="rounded-xl border border-[#d9e2dc] bg-white p-5" onSubmit={saveAssignment}>
               <h2 className="text-xl font-semibold">Asignar a un socio</h2>
+              <p className="mt-2 text-sm text-[#637268]">Una rutina por periodo y socio en esta sucursal. Para cambiarla usa Reemplazar; para renovarla, comienza después de la fecha de fin.</p>
               <input
                 className="app-input mt-4"
                 onChange={(event) => {
@@ -1284,7 +1294,7 @@ export default function CoachesPage() {
                       selectedClient?.id === client.id ? "border-emerald-700 bg-emerald-50" : ""
                     }`}
                     key={client.id}
-                    onClick={() => setSelectedClient(client)}
+                    onClick={() => { setSelectedClient(client); assignmentList.setFilters({ clientId: client.id }); }}
                     type="button"
                   >
                     {client.firstName} {client.lastName}
@@ -1301,27 +1311,33 @@ export default function CoachesPage() {
                   </select>
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
-                  <Field label="Inicio"><input className="app-input" onChange={(event) => setStartsOn(event.target.value)} type="date" value={startsOn} /></Field>
-                  <Field label="Fin"><input className="app-input" onChange={(event) => setEndsOn(event.target.value)} type="date" value={endsOn} /></Field>
+                  <Field label="Inicio"><input className="app-input" required min={today()} onChange={(event) => setStartsOn(event.target.value)} type="date" value={startsOn} /></Field>
+                  <Field label="Fin"><input className="app-input" required min={startsOn || today()} onChange={(event) => setEndsOn(event.target.value)} type="date" value={endsOn} /></Field>
                 </div>
+                <p className="text-xs text-[#637268]">La fecha de fin incluye todo ese día (Ciudad de México). Después se finaliza por vigencia, sin certificar que el socio completó los ejercicios.</p>
                 <Field label="Indicaciones imprimibles"><textarea className="app-input min-h-20" onChange={(event) => setPrintableNotes(event.target.value)} value={printableNotes} /></Field>
                 <Field label="Notas privadas"><textarea className="app-input min-h-16" onChange={(event) => setPrivateNotes(event.target.value)} value={privateNotes} /></Field>
-                <button className="rounded-lg bg-[#173c2a] px-4 py-2 font-semibold text-white disabled:opacity-60" disabled={saving || !selectedClient || !selectedWorkoutId} type="submit">
-                  Asignar rutina
+                <button className="rounded-lg bg-[#173c2a] px-4 py-2 font-semibold text-white disabled:opacity-60" disabled={saving || !selectedClient || !selectedWorkoutId || !startsOn || !endsOn} type="submit">
+                  {saving ? "Asignando…" : "Asignar rutina"}
                 </button>
               </div>
             </form>
+            <div className="min-w-0 space-y-3">
+            {assignmentList.error ? <p role="alert" className="text-sm text-red-700">{assignmentList.error}</p> : null}
+            {assignmentList.filters.clientId ? <button type="button" className="app-button-secondary" onClick={() => assignmentList.setFilters({})}>Ver historial de todos los socios</button> : null}
             <AssignmentTable
               canDownloadPdf={canDownloadAssignmentPdf}
               canManage={canManageAssignments}
               onChanged={refresh}
               onError={(value) => setError(value)}
               onMessage={(value) => setMessage(value)}
-              onPageChange={loadReportPage}
-              report={report}
+              onPageChange={async (page) => { assignmentList.setPage(page); }}
+              report={{ details: assignmentList.items, page: assignmentList.page, size: assignmentList.size, totalDetails: assignmentList.total, totalPages: assignmentList.totalPages }}
+              loading={assignmentList.loading}
               session={session}
               workouts={publishedWorkouts}
             />
+            </div>
           </section>
         ) : null}
 
@@ -2228,6 +2244,7 @@ function AssignmentTable({
   report,
   session,
   workouts,
+  loading = false,
 }: {
   canDownloadPdf: boolean;
   canManage: boolean;
@@ -2235,7 +2252,8 @@ function AssignmentTable({
   onError: (message: string) => void;
   onMessage: (message: string) => void;
   onPageChange: (page: number) => Promise<void>;
-  report: AssignmentReport | null;
+  report: Pick<AssignmentReport, "details" | "page" | "size" | "totalDetails" | "totalPages"> | null;
+  loading?: boolean;
   session: StoredSession;
   workouts: WorkoutSummary[];
 }) {
@@ -2245,6 +2263,7 @@ function AssignmentTable({
   const [cancelReason, setCancelReason] = useState("");
   const [replacing, setReplacing] = useState<string | null>(null);
   const [replacementWorkoutId, setReplacementWorkoutId] = useState("");
+  const [replacementEnd, setReplacementEnd] = useState("");
 
   async function downloadPdf(assignment: AssignmentReport["details"][number]) {
     setDownloading(assignment.id);
@@ -2290,6 +2309,9 @@ function AssignmentTable({
       onError("Selecciona la rutina de reemplazo.");
       return;
     }
+    const replacementStart = assignment.status === "SCHEDULED" ? assignment.startsOn ?? today() : today();
+    const dateError = assignmentDateError(replacementStart, replacementEnd);
+    if (dateError) { onError(dateError); return; }
     setChanging(assignment.id);
     onError("");
     try {
@@ -2297,8 +2319,8 @@ function AssignmentTable({
         clientId: assignment.clientId,
         workoutId: workout.id,
         workoutVersionId: workout.latestVersionId,
-        startsOn: assignment.startsOn,
-        endsOn: assignment.endsOn,
+        startsOn: replacementStart,
+        endsOn: replacementEnd,
         printableNotes: assignment.printableNotes,
         notes: assignment.privateNotes,
         idempotencyKey: `replace:${assignment.id}:${workout.id}:${crypto.randomUUID()}`,
@@ -2317,19 +2339,22 @@ function AssignmentTable({
   return (
     <section className="rounded-xl border border-[#d9e2dc] bg-white p-5">
       <h2 className="text-xl font-semibold">Historial de asignaciones</h2>
-      <div className="mt-4 grid gap-2">
+      <p className="mt-1 text-xs text-[#637268]">Consulta la vigencia y el estado de cada rutina. Completar por fecha no acredita que el socio haya realizado los ejercicios.</p>
+      {report ? <div className="mt-3"><Pagination label="asignaciones" page={report.page} size={report.size} totalElements={report.totalDetails} loading={loading} onPageChange={(page) => void onPageChange(page)} /></div> : null}
+      <div className="app-scroll-list mt-4 grid gap-2" role="region" aria-label="Listado de asignaciones" tabIndex={0} aria-busy={loading} key={report?.page}>
         {report?.details.length ? report.details.map((assignment) => (
           <article className="grid gap-2 rounded-lg border border-[#e0e7e2] p-3" key={assignment.id}>
-            <div className="grid gap-2 md:grid-cols-[1fr_1fr_auto]">
+            <div className="grid min-w-0 gap-3 sm:grid-cols-2">
               <div>
                 <strong>{assignment.clientName}</strong>
                 <p className="text-xs text-[#637268]">{assignment.assignedOn} · {assignment.coachName || "Sin coach"}</p>
               </div>
               <div>
                 <p>{assignment.workoutTitle}</p>
-                <p className="text-xs text-[#637268]">Versión {assignment.versionNumber} · {assignment.status}</p>
+                <p className="text-xs font-semibold text-[#637268]">Versión {assignment.versionNumber} · {({ ACTIVE: "Vigente", SCHEDULED: "Programada", COMPLETED: "Finalizada", CANCELLED: "Cancelada", REPLACED: "Reemplazada" } as Record<string, string>)[assignment.status] ?? assignment.status}</p>
+                <p className="mt-1 text-xs text-[#637268]">Inicio: {assignment.startsOn ?? "No registrado"} · Fin: {assignment.endsOn ?? "Sin fecha (histórica)"}</p>
                 {assignment.statusReason ? (
-                  <p className="text-xs text-[#637268]">Motivo: {assignment.statusReason}</p>
+                  <p className="text-xs text-[#637268]">{assignment.statusReason === "PERIOD_ENDED" ? "Finalizada automáticamente por fecha." : `Motivo: ${assignment.statusReason}`}</p>
                 ) : null}
                 {assignment.replacedAssignmentId ? (
                   <p className="text-xs text-[#637268]">
@@ -2337,7 +2362,7 @@ function AssignmentTable({
                   </p>
                 ) : null}
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 sm:col-span-2">
                 {canDownloadPdf ? (
                   <button
                     className="rounded-lg border border-[#9eb2a5] bg-white px-3 py-2 text-sm font-bold text-[#1e382b] transition-all hover:bg-emerald-50 disabled:opacity-60"
@@ -2349,11 +2374,11 @@ function AssignmentTable({
                     {downloading === assignment.id ? "Descargando…" : "Descargar PDF"}
                   </button>
                 ) : null}
-                {canManage && assignment.status === "ACTIVE" ? (
+                {canManage && (assignment.status === "ACTIVE" || assignment.status === "SCHEDULED") ? (
                   <>
-                    <button className="rounded-md border px-3 py-2 text-sm font-semibold" disabled={changing === assignment.id} onClick={() => changeStatus(assignment.id, "COMPLETED")} type="button">
+                    {assignment.status === "ACTIVE" ? <button className="rounded-md border px-3 py-2 text-sm font-semibold" disabled={changing === assignment.id} onClick={() => changeStatus(assignment.id, "COMPLETED")} type="button">
                       Completar
-                    </button>
+                    </button> : null}
                     <button className="rounded-md border px-3 py-2 text-sm font-semibold" disabled={changing === assignment.id} onClick={() => {
                       setCancelling(assignment.id);
                       setReplacing(null);
@@ -2362,6 +2387,7 @@ function AssignmentTable({
                     </button>
                     <button className="rounded-md border px-3 py-2 text-sm font-semibold" disabled={changing === assignment.id} onClick={() => {
                       setReplacing(assignment.id);
+                      setReplacementEnd(assignment.endsOn ?? "");
                       setCancelling(null);
                     }} type="button">
                       Reemplazar
@@ -2387,10 +2413,11 @@ function AssignmentTable({
                   value={replacementWorkoutId}
                 >
                   <option value="">Selecciona la nueva rutina</option>
-                  {workouts.filter((workout) => workout.id !== assignment.workoutId).map((workout) => (
+                  {workouts.map((workout) => (
                     <option key={workout.id} value={workout.id}>{workout.title} · v{workout.latestVersionNumber}</option>
                   ))}
                 </select>
+                <label className="grid gap-1 text-xs">Fin de la rutina de reemplazo<input type="date" className="app-input" min={assignment.status === "SCHEDULED" ? assignment.startsOn ?? today() : today()} value={replacementEnd} onChange={(event) => setReplacementEnd(event.target.value)} /></label>
                 <button className="rounded-md bg-[#173c2a] px-3 py-2 text-sm font-semibold text-white" disabled={changing === assignment.id || !replacementWorkoutId} onClick={() => replaceAssignment(assignment)} type="button">
                   Confirmar reemplazo
                 </button>
@@ -2403,29 +2430,6 @@ function AssignmentTable({
           </p>
         )}
       </div>
-      {report && report.totalPages > 1 ? (
-        <div className="mt-4 flex items-center justify-between gap-3">
-          <button
-            className="rounded-md border px-3 py-2 text-sm font-semibold disabled:opacity-50"
-            disabled={report.page === 0}
-            onClick={() => onPageChange(report.page - 1)}
-            type="button"
-          >
-            Anterior
-          </button>
-          <span className="text-sm text-[#637268]">
-            Página {report.page + 1} de {report.totalPages} · {report.totalDetails} asignaciones
-          </span>
-          <button
-            className="rounded-md border px-3 py-2 text-sm font-semibold disabled:opacity-50"
-            disabled={report.page + 1 >= report.totalPages}
-            onClick={() => onPageChange(report.page + 1)}
-            type="button"
-          >
-            Siguiente
-          </button>
-        </div>
-      ) : null}
     </section>
   );
 }
@@ -2544,14 +2548,11 @@ function errorMessage(error: unknown) {
 }
 
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  return businessToday();
 }
 
 function startOfWeek() {
-  const date = new Date();
-  const day = date.getDay() || 7;
-  date.setDate(date.getDate() - day + 1);
-  return date.toISOString().slice(0, 10);
+  return businessWeekStart();
 }
 
 function availableTabs(session: StoredSession | null): Tab[] {
@@ -2591,9 +2592,6 @@ function normalizeRole(role: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 }
-
-
-
 
 
 

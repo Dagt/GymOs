@@ -1,4 +1,5 @@
 import { apiFetch, normalizePayload } from "./client";
+import { requireOperationalPagination } from "./capabilities";
 import type { PageResult } from "../pagination";
 import type {
   InventoryBranchSettings,
@@ -31,6 +32,7 @@ export async function searchInventoryStock(
   accessToken: string,
   params: InventoryStockSearchParams = {},
 ): Promise<InventoryStockPage> {
+  if (params.lowStockOnly) await requireOperationalPagination();
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== "") search.set(key, String(value));
@@ -74,6 +76,7 @@ export async function searchInventoryMovements(
   accessToken: string,
   params: InventoryMovementSearchParams = {},
 ): Promise<InventoryMovementPage> {
+  await requireOperationalPagination();
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== "") search.set(key, String(value));
@@ -107,7 +110,8 @@ export async function getInventoryPhysicalCounts(accessToken: string): Promise<I
   return apiFetch<InventoryPhysicalCount[]>("/inventory/physical-counts", accessToken);
 }
 
-export function searchInventoryPhysicalCounts(accessToken: string, params: InventoryHistorySearchParams = {}): Promise<PageResult<InventoryPhysicalCount>> {
+export async function searchInventoryPhysicalCounts(accessToken: string, params: InventoryHistorySearchParams = {}): Promise<PageResult<InventoryPhysicalCount>> {
+  await requireOperationalPagination();
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => { if (value !== undefined) query.set(key, String(value)); });
   return apiFetch<PageResult<InventoryPhysicalCount>>(`/inventory/physical-counts/search?${query}`, accessToken);
@@ -153,7 +157,8 @@ export async function getInventoryTransfers(accessToken: string): Promise<Invent
   return apiFetch<InventoryTransfer[]>("/inventory/transfers", accessToken);
 }
 
-export function searchInventoryTransfers(accessToken: string, params: InventoryHistorySearchParams = {}): Promise<PageResult<InventoryTransfer>> {
+export async function searchInventoryTransfers(accessToken: string, params: InventoryHistorySearchParams = {}): Promise<PageResult<InventoryTransfer>> {
+  await requireOperationalPagination();
   const query = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => { if (value !== undefined) query.set(key, String(value)); });
   return apiFetch<PageResult<InventoryTransfer>>(`/inventory/transfers/search?${query}`, accessToken);

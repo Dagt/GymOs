@@ -4,8 +4,10 @@ import { FormEvent, useEffect, useState } from "react";
 import { AppDrawer } from "@/components/AppDrawer";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
+import { AppNotice } from "@/components/AppNotice";
 import {
   createBenefit,
+  updateBenefit,
   getBenefits,
   getPlans,
   getStoredSession,
@@ -38,6 +40,8 @@ export default function BenefitsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showBenefitDrawer, setShowBenefitDrawer] = useState(false);
+  const [editing, setEditing] = useState<BenefitSummary | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   const canManageBenefits = Boolean(
     session?.user.permissions.includes("benefit.manage")
@@ -58,8 +62,8 @@ export default function BenefitsPage() {
       setSession(stored);
       try {
         const [loadedBenefits, loadedPlans] = await Promise.all([
-          getBenefits(stored.accessToken).catch(() => []),
-          getPlans(stored.accessToken).catch(() => []),
+          getBenefits(stored.accessToken),
+          getPlans(stored.accessToken),
         ]);
         if (active) {
           setBenefits(loadedBenefits);
@@ -81,6 +85,35 @@ export default function BenefitsPage() {
     };
   }, []);
 
+  async function openEditor(benefit: BenefitSummary | null) {
+    if (!session) return;
+    setError(null);
+    setMessage(null);
+    try {
+      // Refresh both the plan options and optimistic version when reopening an editor.
+      const [loadedPlans, loadedBenefits] = await Promise.all([getPlans(session.accessToken), getBenefits(session.accessToken)]);
+      setPlans(loadedPlans);
+      setBenefits(loadedBenefits);
+      if (benefit) {
+        benefit = loadedBenefits.find((item) => item.id === benefit?.id) ?? null;
+        if (!benefit) throw new Error("El beneficio ya no está disponible. Revisa la lista actualizada.");
+      }
+      setEditing(benefit);
+      setForm(benefit ? {
+        code: benefit.code, name: benefit.name,
+        benefitType: benefit.benefitType as BenefitPayload["benefitType"],
+        discountType: benefit.discountType as BenefitPayload["discountType"],
+        discountPercent: benefit.discountPercent, discountValueCents: benefit.discountValueCents,
+        requiresEvidence: benefit.requiresEvidence, combinable: benefit.combinable, priority: benefit.priority,
+        status: benefit.status, validFrom: benefit.validFrom, validUntil: benefit.validUntil,
+      } : { ...defaultForm });
+      setSelectedPlanIds(benefit?.planIds ?? []);
+      setShowBenefitDrawer(true);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible cargar los planes.");
+    }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session) {
@@ -92,20 +125,25 @@ export default function BenefitsPage() {
       if (!session.user.branchId) {
         throw new Error("Selecciona una sucursal antes de crear el beneficio.");
       }
-      const created = await createBenefit(session.accessToken, {
+      const payload: BenefitPayload = {
         ...form,
         branchId: session.user.branchId,
         discountType: form.benefitType === "ACCESS" ? "NONE" : form.discountType,
         discountPercent: form.benefitType === "ACCESS" ? null : form.discountPercent,
         discountValueCents: form.benefitType === "ACCESS" ? null : form.discountValueCents,
         planIds: form.benefitType === "ACCESS" ? selectedPlanIds : [],
-      });
-      setBenefits((current) => [created, ...current]);
+      };
+      const saved = editing
+        ? await updateBenefit(session.accessToken, editing.id, payload, editing.version ?? 0)
+        : await createBenefit(session.accessToken, payload);
+      setBenefits((current) => editing ? current.map((item) => item.id === saved.id ? saved : item) : [saved, ...current]);
+      setMessage(editing ? "Beneficio actualizado. Los planes vinculados comparten el mismo beneficio." : "Beneficio creado.");
       setForm(defaultForm);
       setSelectedPlanIds([]);
       setShowBenefitDrawer(false);
+      setEditing(null);
     } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible crear el beneficio.");
+      setError(exception instanceof Error ? exception.message : "No fue posible guardar el beneficio.");
     } finally {
       setSaving(false);
     }
@@ -128,22 +166,23 @@ export default function BenefitsPage() {
     <AppShell
       eyebrow="Administracion"
       session={session}
-      subtitle="Configura descuentos y elegibilidad para estudiantes, convenios o promociones."
+      subtitle="Administra descuentos y beneficios de acceso compartidos por tus planes."
       title="Beneficios"
     >
       {error ? <InlineError message={error} /> : null}
+      {message ? <AppNotice message={message} tone="success" /> : null}
 
       <section className="grid gap-5">
         <section className="catalog-toolbar app-card p-5">
           <div>
             <p className="app-eyebrow">Beneficios</p>
-            <h2 className="app-card-title">Promociones y descuentos</h2>
+            <h2 className="app-card-title">Accesos, promociones y descuentos</h2>
             <p className="app-card-copy">
-              Consulta convenios y descuentos vigentes aplicables a ventas de socios.
+              Un mismo acceso, como Sauna, puede incluirse en varios planes sin duplicar el beneficio.
             </p>
           </div>
           {canManageBenefits ? (
-            <button className="app-button" onClick={() => setShowBenefitDrawer(true)} type="button">
+            <button className="app-button" onClick={() => void openEditor(null)} type="button">
               Crear beneficio
             </button>
           ) : null}
@@ -157,7 +196,7 @@ export default function BenefitsPage() {
             </div>
             <span className="app-pill">{benefits.length}</span>
           </div>
-          <div className="mt-4 grid gap-3">
+          <div className="app-scroll-list mt-4 grid gap-3" aria-label="Beneficios registrados" role="region" tabIndex={0}>
             {benefits.length === 0 ? (
               <section className="admin-empty-card">
                 <strong>No hay beneficios registrados</strong>
@@ -178,14 +217,15 @@ export default function BenefitsPage() {
                         : "Todas las sucursales"}
                     </span>
                     <span className="app-pill">{benefit.status}</span>
+                    {canManageBenefits ? <button className="app-button-secondary !px-3 !py-1" onClick={() => void openEditor(benefit)} type="button" aria-label={`Editar ${benefit.name}`}>Editar</button> : null}
                   </div>
                 </div>
                 <p className="mt-3 text-sm text-[var(--brand-muted)]">
-                  {benefit.discountType === "PERCENT" ? `${benefit.discountPercent ?? 0}% de descuento` : benefit.discountType}
+                  {benefit.benefitType === "ACCESS" ? "Acceso heredado del plan" : benefit.discountType === "PERCENT" ? `${benefit.discountPercent ?? 0}% de descuento` : benefit.discountType}
                 </p>
                 {benefit.benefitType === "ACCESS" ? (
                   <p className="mt-2 text-xs font-bold text-[var(--brand-primary)]">
-                    {benefit.planIds.length} {benefit.planIds.length === 1 ? "plan vinculado" : "planes vinculados"}
+                    Planes: {benefit.planIds.map((id) => plans.find((plan) => plan.id === id)?.name ?? "Plan histórico vinculado").join(", ") || "Sin planes vinculados"}
                   </p>
                 ) : null}
               </article>
@@ -196,18 +236,21 @@ export default function BenefitsPage() {
 
       <AppDrawer
         description="Define descuentos o accesos para la sucursal seleccionada actualmente."
-        onClose={() => setShowBenefitDrawer(false)}
+        onClose={() => { if (!saving) { setShowBenefitDrawer(false); setEditing(null); } }}
         open={showBenefitDrawer}
-        title="Crear beneficio"
+        title={editing ? "Editar beneficio" : "Crear beneficio"}
       >
         <form className="grid gap-4" onSubmit={submit}>
-          <Field label="Codigo" value={form.code} onChange={(value) => setForm({ ...form, code: value })} />
+          {error ? <p role="alert" className="text-sm text-red-700">{error}</p> : null}
+          {editing ? <p className="text-sm text-[var(--brand-muted)]">El código, tipo y sucursal se conservan para mantener el historial y los puntos de acceso vinculados.</p> : null}
+          <Field label="Código" value={form.code} disabled={Boolean(editing)} onChange={(value) => setForm({ ...form, code: value })} />
           <Field label="Nombre" value={form.name} onChange={(value) => setForm({ ...form, name: value })} />
           <label className="grid gap-2 text-sm font-bold text-[#42514a]">
             Tipo
             <select
               className="h-11 rounded-md border border-[var(--brand-line)] px-3"
               value={form.benefitType}
+              disabled={Boolean(editing)}
               onChange={(event) => {
                 const benefitType = event.target.value as BenefitPayload["benefitType"];
                 setForm({
@@ -229,10 +272,10 @@ export default function BenefitsPage() {
           </label>
           {form.benefitType === "ACCESS" ? (
             <div className="grid gap-2">
-              <label className="text-sm font-bold text-[#42514a]">
+              <p className="text-sm font-bold text-[#42514a]">
                 Vincular a Planes de Membresía (Selección Múltiple)
-              </label>
-              <div className="grid gap-2 max-h-40 overflow-y-auto p-3 rounded-md border border-[var(--brand-line)] bg-gray-50">
+              </p>
+              <div className="app-scroll-list app-scroll-list--short grid gap-2 p-3 rounded-md border border-[var(--brand-line)] bg-gray-50">
                 {plans.map((p) => {
                   const isChecked = selectedPlanIds.includes(p.id);
                   return (
@@ -261,22 +304,42 @@ export default function BenefitsPage() {
                     </label>
                   );
                 })}
+                {(editing?.planIds ?? []).filter((id) => !plans.some((plan) => plan.id === id)).map((id) => (
+                  <label key={id} className="flex items-center gap-2 text-xs text-[#637268]">
+                    <input type="checkbox" checked={selectedPlanIds.includes(id)} onChange={(event) => setSelectedPlanIds((current) => event.target.checked ? [...new Set([...current, id])] : current.filter((value) => value !== id))} />
+                    Plan histórico ({id.slice(0, 8)}). Conserva el vínculo para sus membresías existentes.
+                  </label>
+                ))}
               </div>
+              {plans.length === 0 ? <p className="text-sm text-amber-800">Crea primero un plan de membresía para poder vincular este acceso.</p> : null}
+              {editing ? <p className="text-xs text-amber-800">Puedes vincular varios planes al mismo acceso. Quitar un plan retira este beneficio de los derechos de sus socios.</p> : null}
               <p className="text-xs font-medium text-gray-500 italic bg-blue-50 p-2.5 rounded-lg border border-blue-100">
                 🔒 Los pases/accesos especiales se heredan automáticamente a los socios que tengan contratado cualquiera de los planes vinculados.
               </p>
             </div>
           ) : (
             <div className="grid gap-4">
+              <label className="grid gap-2 text-sm font-bold text-[#42514a]">Regla de precio
+                <select className="app-input" value={form.discountType} onChange={(event) => setForm({ ...form, discountType: event.target.value as BenefitPayload["discountType"] })}>
+                  <option value="PERCENT">Porcentaje</option><option value="FIXED">Descuento fijo</option><option value="SPECIAL_PRICE">Precio especial</option>
+                </select>
+              </label>
               <label className="grid gap-2 text-sm font-bold text-[#42514a]">
-                Descuento %
-                <input className="h-11 rounded-md border border-[var(--brand-line)] px-3" type="number" min="0" max="100" value={form.discountPercent ?? 0} onChange={(event) => setForm({ ...form, discountPercent: Number(event.target.value), discountType: "PERCENT" })} />
+                {form.discountType === "PERCENT" ? "Descuento %" : "Importe (MXN)"}
+                <input className="app-input" required type="number" min="0.01" step="0.01" max={form.discountType === "PERCENT" ? 100 : undefined} value={form.discountType === "PERCENT" ? form.discountPercent ?? 0 : (form.discountValueCents ?? 0) / 100} onChange={(event) => setForm(form.discountType === "PERCENT" ? { ...form, discountPercent: Number(event.target.value), discountValueCents: null } : { ...form, discountValueCents: Math.round(Number(event.target.value) * 100), discountPercent: null })} />
               </label>
               <p className="text-xs font-medium text-gray-500 italic bg-gray-50 p-2.5 rounded-lg border border-gray-100">
                 💡 Este convenio/descuento podrá asignarse a perfiles de socios y aplicarse sobre la suscripción de su plan.
               </p>
             </div>
           )}
+          <label className="grid gap-2 text-sm font-bold text-[#42514a]">Estado
+            <select className="app-input" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as BenefitPayload["status"] })}><option value="ACTIVE">Activo</option><option value="INACTIVE">Inactivo</option></select>
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <label className="grid gap-2 text-sm font-bold">Vigente desde<input className="app-input" type="date" value={form.validFrom ?? ""} onChange={(event) => setForm({ ...form, validFrom: event.target.value })} /></label>
+            <label className="grid gap-2 text-sm font-bold">Vigente hasta<input className="app-input" type="date" min={form.validFrom || undefined} value={form.validUntil ?? ""} onChange={(event) => setForm({ ...form, validUntil: event.target.value })} /></label>
+          </div>
           <label className="flex items-center gap-2 text-sm font-bold text-[#42514a]">
             <input type="checkbox" checked={form.requiresEvidence} onChange={(event) => setForm({ ...form, requiresEvidence: event.target.checked })} />
             Requiere evidencia
@@ -286,7 +349,7 @@ export default function BenefitsPage() {
             disabled={saving || (form.benefitType === "ACCESS" && selectedPlanIds.length === 0)}
             type="submit"
           >
-            {saving ? "Guardando..." : "Crear beneficio"}
+            {saving ? "Guardando..." : editing ? "Guardar cambios" : "Crear beneficio"}
           </button>
         </form>
       </AppDrawer>
@@ -294,11 +357,11 @@ export default function BenefitsPage() {
   );
 }
 
-function Field({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function Field({ label, value, onChange, disabled = false }: { label: string; value: string; onChange: (value: string) => void; disabled?: boolean }) {
   return (
     <label className="grid gap-2 text-sm font-bold text-[#42514a]">
       {label}
-      <input className="h-11 rounded-md border border-[var(--brand-line)] px-3" value={value} onChange={(event) => onChange(event.target.value)} />
+      <input className="h-11 rounded-md border border-[var(--brand-line)] px-3" required disabled={disabled} maxLength={label === "Código" ? 80 : 160} value={value} onChange={(event) => onChange(event.target.value)} />
     </label>
   );
 }

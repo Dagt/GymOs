@@ -1,13 +1,15 @@
 # Beneficios y elegibilidad
 
 Estado: `ESTABILIZADO`
-Última revisión: 22 de agosto de 2026
+Última revisión: 25 de agosto de 2026
 
 ## Implementado
 
 - definición y asignación de beneficios económicos;
 - verificación de beneficios de socios;
 - beneficios especiales de tipo `ACCESS` vinculados a planes;
+- edición de nombre, vigencia, estado, reglas económicas y planes vinculados
+  desde el mismo beneficio; código, tipo, sucursal e ID se conservan;
 - integración con membresías, acceso y reservas mediante `EligibilityPolicy`.
 
 ## Pendiente
@@ -46,9 +48,27 @@ Sauna             -> SAUNA_ACCESS
 ```
 
 Access compara los derechos efectivos del plan vigente contra lo requerido por
-el punto físico. El comportamiento histórico "dispositivo sin beneficios =
-cualquier membresía vigente" se mantiene sólo por compatibilidad; para el
-piloto físico los puntos relevantes deben tener un beneficio explícito.
+el punto físico. Un punto productivo exige **exactamente un beneficio ACCESS**;
+cero o varios deniegan por configuración inválida. Las reglas diagnósticas de
+`SIMULATED` no se trasladan a producción.
+
+Para agregar el pase diario VIP al Sauna existente: **Beneficios → Sauna →
+Editar → seleccionar VIP y VIP diario → Guardar cambios**. No se crea otro
+beneficio ni se cambian los vínculos del punto de acceso. El editor vuelve a
+consultar planes y versión al abrirse. Los vínculos existentes a planes retirados
+pueden conservarse; sólo los nuevos vínculos exigen planes activos de la misma
+organización. Retirar un vínculo retira ese derecho heredado de sus socios.
+
+`PUT /benefits/{id}` exige `benefit.manage`, tenant/sucursal correctos y
+`expectedVersion`. Un conflicto no sobrescribe cambios ajenos y mantiene el
+formulario para revisión; cerrarlo y reabrirlo consulta la versión actual. El
+cambio se audita y publica reconciliación física para la unión de planes
+anteriores y nuevos, incluyendo aquellos que perdieron el beneficio. No añade
+una llamada al hardware ni modifica la arquitectura provider-neutral.
+
+Pruebas de identidad estable, control optimista, permisos, aislamiento y planes
+retirados: `OperationalHardeningPostgresIntegrationTests`. Recorrido del ejemplo
+Sauna/VIP diario: `frontend/e2e/operational-hardening.spec.ts`.
 
 Los beneficios de precio se resuelven en backend según vigencia, evidencia,
 combinación y prioridad; el helper frontend dejó de ser la fuente de verdad

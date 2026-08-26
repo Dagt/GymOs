@@ -1,6 +1,16 @@
 import { apiFetch, normalizePayload } from "./client";
 import type { CreateInternalUserPayload, InternalUserSummary, RoleOption } from "./user-types";
 
+export type PasswordRecoveryIssued = {
+  resetUrl: string;
+  expiresAt: string;
+  emailDeliveryStatus: "SENT" | "FAILED" | "NOT_CONFIGURED" | "NO_EMAIL";
+};
+
+export function requestPasswordRecovery(accessToken: string, userId: string): Promise<PasswordRecoveryIssued> {
+  return apiFetch(`/users/internal/${userId}/password-recovery`, accessToken, { method: "POST", cache: "no-store" });
+}
+
 export async function getUserRoles(accessToken: string): Promise<RoleOption[]> {
   return apiFetch<RoleOption[]>("/users/roles", accessToken);
 }

@@ -3,6 +3,7 @@ package com.gymos.benefits.api;
 import com.gymos.benefits.application.BenefitService;
 import com.gymos.benefits.application.command.AssignClientBenefitCommand;
 import com.gymos.benefits.application.command.CreateBenefitCommand;
+import com.gymos.benefits.application.command.UpdateBenefitCommand;
 import com.gymos.benefits.infrastructure.BenefitRepository.BenefitSummary;
 import com.gymos.benefits.infrastructure.BenefitRepository.ClientBenefitSummary;
 import com.gymos.common.api.Correlation;
@@ -22,6 +23,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -66,6 +68,27 @@ public class BenefitController {
 	) {
 		return benefitService.assignToClient(principal, request.toCommand(clientId), correlationId(servletRequest));
 	}
+
+	@PutMapping("/benefits/{benefitId}")
+	BenefitSummary updateBenefit(
+			@AuthenticationPrincipal GymOsPrincipal principal, @PathVariable UUID benefitId,
+			@Valid @RequestBody UpdateBenefitRequest request, HttpServletRequest servletRequest
+	) {
+		return benefitService.updateBenefit(principal, benefitId, new UpdateBenefitCommand(
+				request.name(), request.discountType(), request.discountValueCents(), request.discountPercent(),
+				request.requiresEvidence(), request.combinable(), request.priority(), request.validFrom(),
+				request.validUntil(), request.status(), request.planIds(), request.expectedVersion()), correlationId(servletRequest));
+	}
+
+	public record UpdateBenefitRequest(
+			@NotBlank @Size(max = 160) String name,
+			@NotBlank @Pattern(regexp = "PERCENT|FIXED|SPECIAL_PRICE|NONE") String discountType,
+			@Min(0) Integer discountValueCents, @Min(0) @Max(100) Double discountPercent,
+			boolean requiresEvidence, boolean combinable, @Min(0) int priority,
+			LocalDate validFrom, LocalDate validUntil,
+			@NotBlank @Pattern(regexp = "ACTIVE|INACTIVE") String status,
+			@Size(max = 100) List<@NotNull UUID> planIds, @NotNull @Min(0) Long expectedVersion
+	) {}
 
 	@PostMapping("/client-benefits/{clientBenefitId}/verify")
 	ClientBenefitSummary verifyClientBenefit(

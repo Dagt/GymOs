@@ -106,6 +106,7 @@ export default function LoginPage() {
             <button disabled={loading} type="submit">
               {loading ? "Validando acceso..." : "Entrar a GymFort"}
             </button>
+            <Link className="text-center text-sm underline underline-offset-4" href="/reset-password">Olvidé mi contraseña</Link>
           </form>
         </section>
       </section>
