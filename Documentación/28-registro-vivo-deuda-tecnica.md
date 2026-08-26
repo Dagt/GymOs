@@ -1,7 +1,7 @@
 # 28. Registro vivo de hallazgos y deuda técnica
 
 Estado: VIGENTE / OBLIGATORIO
-Corte: 24 de agosto de 2026
+Corte: 25 de agosto de 2026
 
 ## 1. Propósito y regla de actualización
 
@@ -31,7 +31,6 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 | PAY-001 | P0 | Proveedores de pago | EN PROGRESO | Mercado Pago OAuth/Point y Stripe Connect/Checkout/recurrencia persisten operaciones idempotentes, verifican firmas, concilian contexto, recuperan recibos y publican métricas. La administración de cuenta Stripe ya está separada de los interruptores operativos. | Ejecutar contrato sandbox conectado en CI y completar cancelación/reembolso autoritativo por proveedor. |
 | BIL-001 | P1 | Cobranza comercial GymFort | EN CURSO | V81/V82/V85 permiten gestionar cartera y expediente comercial, configurar contrato por sucursal, agrupar MRR, exportar el portafolio y conservar pagos inmutables/idempotentes con concurrencia optimista; todavía no existen cobro SaaS automático, impuestos/CFDI, ajustes ni reportes financieros históricos por periodo. | Definir catálogo comercial/impuestos, integrar cobranza recurrente y conciliación, emitir o integrar CFDI según modelo fiscal, añadir ajustes auditables y reportes paginados de MRR/churn/cobranza. |
 | BKG-001 | P1 | Reservas | ABIERTA | Falta E2E de colisiones, pagos, cancelación y otra sucursal. | Suite crítica de calendario y autorización en CI. |
-| INV-001 | P1 | Inventarios | ABIERTA | Transferencias y conteos no tienen paginación parametrizada completa. | Contratos paginados, UI y pruebas de volumen. |
 | INV-002 | P2 | Inventarios | ABIERTA | Falta indicador inequívoco de guardado por renglón en conteos. | Estado guardando/guardado/error accesible por partida. |
 | COA-018 | P2 | Coaches/multimedia | ABIERTA | El contrato heredado permite recibir `mediaUrl` aunque la UI usa carga real; si falla el borrado en MinIO al reemplazar/eliminar, el objeto anterior puede quedar huérfano sin cola de reintento. | Retirar `mediaUrl` de altas/ediciones, usar una referencia interna inequívoca y añadir cleanup durable con prueba de fallo/reintento. |
 | NOT-002 | P2 | Notificaciones/entregabilidad | ABIERTA | GymFort confirma aceptación/entrega SMTP y conserva retries/dead letters, pero todavía no ingiere webhooks de rebote/queja de ZeptoMail ni mantiene una señal productiva de reputación posterior a `SENT`. | Implementar feedback de bounce/complaint cuando el proveedor/plan lo permita, mapearlo a estado operativo sin PII sensible y documentar alertas/reputación. |
@@ -44,6 +43,7 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 
 | ID | Módulo | Resolución | Evidencia |
 |---|---|---|---|
+| INV-001 | Inventarios/paginación | RESUELTA el 25/08/2026 en `cab3e28`: transferencias y conteos tienen contratos `/search`, total filtrado, páginas y tamaño parametrizados. La UI permite recorrer el historial completo; los indicadores activos y selectores son independientes de la página. Existencias, movimientos y alertas usan la misma navegación. | `InventoryPaginationIntegrationTests` con 127 registros, `InventoryControllerTests`, `SecurityAuthorizationTests` y `e2e/pagination.spec.ts`; sin migraciones. Alcance y límites en `docs/operations/list-pagination.md`. |
 | SEC-001 | Frontend/dependencias | Resuelta el 24/08/2026 en `feature/platform-identity-separation`: la instalación limpia reveló seis advisories altos en Next/transitivas. Se actualizó Next y `eslint-config-next` de 16.2.11 a 16.3.2, se aplicaron únicamente parches no disruptivos a transitivas y se evitó `audit fix --force`. | `npm audit` final con 0 vulnerabilidades; 94/94 pruebas, typecheck, lint, build Next y bundle OpenNext 1.20.2 para Cloudflare exitosos. |
 | AUTH-004 | Identidad/plataforma | Resuelta el 24/08/2026 en `feature/platform-identity-separation`: las cuentas SaaS dejaron de depender de la organización demo. V86 separa ámbitos `PLATFORM`/`TENANT`; JWT/refresh llevan scope explícito; soporte es temporal/auditable; el bootstrap usa lock transaccional PostgreSQL y exige `platform.admin` efectivo; el alta incluye dueño invitado. V87 conserva sólo el hash de invitación y V88 retira el fixture histórico sólo si coincide y está vacío. | `PlatformAdministratorBootstrapTests`, `PlatformAdministratorBootstrapPostgresIntegrationTests`, `DatabaseMigrationTests`, `DevelopmentSeedPostgresIntegrationTests`, suites de JWT/refresh/autorización y runbook `platform-identity-bootstrap.md`. |
 | ACC-001 | Accesos/seguridad | Resuelta el 23/08/2026 en `feature/physical-access-control`: el consumo temporal usa actualización condicional atómica; la apertura manual exige `access.manual.open`, dispositivo y motivo; V84 agrega claves compuestas y el Connector restringe toda operación a su tenant/sucursal. | `AccessBenefitDecisionTests`, `SecurityAuthorizationTests`, `PhysicalAccessRepositoryIntegrationTests` y V84. |

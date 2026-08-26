@@ -2,7 +2,7 @@
 
 Estado: `ESTABILIZADO`
 Base histórica de cierre: `feature/coaches-workouts` / `e718fdf`
-Última revisión en el árbol integrado: 21 de agosto de 2026
+Última revisión en el árbol integrado: 25 de agosto de 2026
 
 ## Propósito y alcance V1
 
@@ -55,7 +55,10 @@ La consulta remota por el socio pertenece a una aplicación futura.
   identificación para no desplazar el selector de grupo muscular;
 - identificación y ejecución visibles primero; detalles técnicos, medios y
   nombres alternativos se administran de forma progresiva;
-- catálogo con scroll interno, cuadrícula responsiva y tarjetas de 88 px;
+- catálogo con paginación visible de 25/50/100 ejercicios, total del servidor,
+  scroll natural de la página, cuadrícula responsiva y tarjetas de 88 px;
+- el constructor consulta sus propias sugerencias en servidor: ni la página
+  ni los filtros del catálogo visible restringen la selección del ejercicio;
 - la descripción e instrucciones no se imprimen dentro de la tarjeta: `Ver
   descripción` abre un panel de consulta que no altera la cuadrícula;
 - carga, lectura, reemplazo y eliminación de JPG, PNG, WebP, GIF o MP4 de hasta
@@ -198,6 +201,10 @@ La consulta remota por el socio pertenece a una aplicación futura.
 
 ## Evidencia de cierre
 
+- paginación: `ExercisePaginationIntegrationTests` y `e2e/pagination.spec.ts`
+  comprueban navegación y búsqueda con 127 ejercicios y selección independiente
+  desde el constructor; contrato y límites en
+  [paginación de listados](../../docs/operations/list-pagination.md);
 - backend: `gradlew clean test --no-daemon`, exitoso;
 - frontend: 33 pruebas, typecheck, lint y build de producción, exitosos;
 - E2E Playwright: 13 recorridos exitosos para constructor/publicación,
