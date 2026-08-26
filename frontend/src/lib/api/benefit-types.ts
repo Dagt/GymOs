@@ -14,6 +14,7 @@ export type BenefitSummary = {
   validUntil: string | null;
   status: "ACTIVE" | "INACTIVE";
   planIds: string[];
+  version?: number;
 };
 
 export type BenefitPayload = {

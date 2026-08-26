@@ -142,6 +142,8 @@ class CoachingServiceSecurityTests {
 		when(repository.workout(organizationId, branchId, workoutId, userId))
 				.thenReturn(Optional.of(workout));
 		when(repository.clientExists(organizationId, clientId)).thenReturn(true);
+		when(repository.lockAssignableClient(organizationId, branchId, clientId)).thenReturn(true);
+		when(repository.coach(organizationId, branchId, coachId)).thenReturn(Optional.of(coach(coachId)));
 		when(repository.workoutVersion(organizationId, workoutId, versionId))
 				.thenReturn(Optional.of(version));
 		when(repository.assignWorkout(eq(organizationId), eq(branchId), eq(userId), any()))
@@ -151,7 +153,7 @@ class CoachingServiceSecurityTests {
 
 		WorkoutAssignmentRecord result = service.assignWorkout(
 				principal, workoutId,
-				new AssignWorkoutCommand(clientId, versionId, null, null, null, null, null),
+				new AssignWorkoutCommand(clientId, versionId, com.gymos.common.time.BusinessTime.today(), com.gymos.common.time.BusinessTime.today().plusDays(28), null, null, null),
 				"test"
 		);
 

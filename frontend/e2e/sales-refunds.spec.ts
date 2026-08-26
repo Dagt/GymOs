@@ -2,6 +2,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 
 const user = {
   userId: "77777777-7777-4777-8777-777777777777",
+  accountScope: "TENANT",
   organizationId: "88888888-8888-4888-8888-888888888888",
   branchId: "22222222-2222-4222-8222-222222222222",
   username: "owner@gymos.test",

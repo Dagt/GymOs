@@ -11,6 +11,7 @@ import com.gymos.clients.infrastructure.ClientRepository.ClientDetail;
 import com.gymos.clients.infrastructure.ClientRepository.ClientSummary;
 import com.gymos.clients.infrastructure.ClientRepository.ClientTimelineEntry;
 import com.gymos.common.api.Correlation;
+import com.gymos.common.api.PageResponse;
 import com.gymos.common.security.GymOsPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -60,6 +61,17 @@ public class ClientController {
 			HttpServletRequest servletRequest
 	) {
 		return toResponse(clientService.create(principal, request.toCommand(), correlationId(servletRequest)));
+	}
+
+	@GetMapping("/search")
+	PageResponse<ClientSummary> searchPage(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@RequestParam(required = false) String query,
+			@RequestParam(required = false) String status,
+			@RequestParam(defaultValue = "0") int page,
+			@RequestParam(defaultValue = "25") int size
+	) {
+		return clientService.searchPage(principal, query, status, page, size);
 	}
 
 	@GetMapping("/{clientId}")

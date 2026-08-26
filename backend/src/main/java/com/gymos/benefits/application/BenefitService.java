@@ -4,6 +4,7 @@ import com.gymos.audit.api.AuditService;
 import com.gymos.benefits.api.events.AccessBenefitConfigurationChangedV1;
 import com.gymos.benefits.application.command.AssignClientBenefitCommand;
 import com.gymos.benefits.application.command.CreateBenefitCommand;
+import com.gymos.benefits.application.command.UpdateBenefitCommand;
 import com.gymos.benefits.infrastructure.BenefitRepository;
 import com.gymos.benefits.infrastructure.BenefitRepository.BenefitSummary;
 import com.gymos.benefits.infrastructure.BenefitRepository.ClientBenefitSummary;
@@ -75,6 +76,11 @@ public class BenefitService {
 			CreateBenefitCommand command,
 			UUID benefitBranchId
 	) {
+		validatePlanLinks(principal, command, benefitBranchId, List.of());
+	}
+
+	private void validatePlanLinks(GymOsPrincipal principal, CreateBenefitCommand command,
+			UUID benefitBranchId, List<UUID> existingPlanIds) {
 		boolean accessBenefit = "ACCESS".equalsIgnoreCase(command.benefitType());
 		if (!accessBenefit && !command.planIds().isEmpty()) {
 			throw new BusinessException("BENEFIT_PLAN_LINK_NOT_ALLOWED", "Solo los beneficios de acceso pueden vincularse con planes.");
@@ -82,7 +88,10 @@ public class BenefitService {
 		if (accessBenefit && command.planIds().isEmpty()) {
 			throw new BusinessException("BENEFIT_PLAN_REQUIRED", "Selecciona al menos un plan para el beneficio de acceso.");
 		}
-		if (!benefitRepository.membershipPlansExist(principal.organizationId(), command.planIds())) {
+		// Existing links can remain for historical memberships after a plan is retired.
+		// Only newly linked plans must be currently available; no silent removal of rights.
+		List<UUID> newPlans = command.planIds().stream().filter(id -> !existingPlanIds.contains(id)).toList();
+		if (!benefitRepository.membershipPlansExist(principal.organizationId(), newPlans)) {
 			throw new BusinessException("MEMBERSHIP_PLAN_NOT_AVAILABLE", "Uno o mas planes no existen o no pertenecen a la organizacion.");
 		}
 		validateDiscountDefinition(command, accessBenefit);
@@ -93,6 +102,40 @@ public class BenefitService {
 		if (!benefitRepository.branchExists(principal.organizationId(), benefitBranchId)) {
 			throw new BusinessException("BRANCH_NOT_AVAILABLE", "La sucursal del beneficio no pertenece a la organizacion.");
 		}
+	}
+
+	@Transactional
+	public BenefitSummary updateBenefit(
+			GymOsPrincipal principal, UUID benefitId, UpdateBenefitCommand command, String correlationId
+	) {
+		requirePrincipal(principal);
+		if (!principal.permissions().contains("benefit.manage")) {
+			throw new org.springframework.security.access.AccessDeniedException("benefit.manage required");
+		}
+		BenefitSummary current = benefitRepository.benefit(principal.organizationId(), benefitId)
+				.orElseThrow(() -> new BusinessException("BENEFIT_NOT_FOUND", "El beneficio no está disponible."));
+		if (principal.branchId() == null || (current.branchId() != null && !current.branchId().equals(principal.branchId()))) {
+			throw new BusinessException("BENEFIT_BRANCH_MISMATCH", "Selecciona la sucursal del beneficio para editarlo.");
+		}
+		CreateBenefitCommand definition = new CreateBenefitCommand(
+				current.branchId(), current.code(), command.name(), current.benefitType(), command.discountType(),
+				command.discountValueCents(), command.discountPercent(), command.requiresEvidence(), command.combinable(),
+				command.priority(), command.validFrom(), command.validUntil(), command.status(), command.planIds());
+		validatePlanLinks(principal, definition, current.branchId() == null ? principal.branchId() : current.branchId(), current.planIds());
+		if (!benefitRepository.updateBenefit(principal.organizationId(), benefitId, definition, command.expectedVersion())) {
+			throw new BusinessException("BENEFIT_VERSION_CONFLICT", "Otro usuario modificó este beneficio. Actualiza la lista y vuelve a intentarlo.");
+		}
+		benefitRepository.replaceMembershipPlans(principal, benefitId, command.planIds());
+		auditService.record(principal, "BENEFIT_UPDATED", "BENEFIT", benefitId, "BACKOFFICE", null, correlationId);
+		if ("ACCESS".equals(current.benefitType())) {
+			// Include removed plans too: their members must lose rights on reconciliation.
+			List<UUID> affectedPlans = java.util.stream.Stream.concat(current.planIds().stream(), command.planIds().stream())
+					.distinct().toList();
+			eventPublisher.publishEvent(new AccessBenefitConfigurationChangedV1(
+					"access-benefit-updated:" + benefitId + ":" + (command.expectedVersion() + 1),
+					principal.organizationId(), current.branchId(), benefitId, affectedPlans, OffsetDateTime.now()));
+		}
+		return benefitRepository.benefit(principal.organizationId(), benefitId).orElseThrow();
 	}
 
 	private void validateDiscountDefinition(CreateBenefitCommand command, boolean accessBenefit) {

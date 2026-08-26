@@ -28,8 +28,9 @@ import {
   type RoleOption,
   type StoredSession,
 } from "@/lib/api";
-import { CoachProfileDrawer, CreateUserDrawer, TeamContextCard, TeamOverview, UsersTable } from "./UsersSections";
+import { CoachProfileDrawer, CreateUserDrawer, TeamOverview, UsersTable } from "./UsersSections";
 import { canSeeUserForSession, canShowRoleForSession, displayRoleName, validateUserForm } from "./UsersRoleHelpers";
+import { PasswordRecoveryDrawer } from "./PasswordRecoveryDrawer";
 
 const emptyUserForm: CreateInternalUserPayload = {
   firstName: "",
@@ -63,6 +64,7 @@ export default function UsersPage() {
   const [coachSpecialties, setCoachSpecialties] = useState("");
   const [coachBio, setCoachBio] = useState("");
   const [coachBranchIds, setCoachBranchIds] = useState<string[]>([]);
+  const [recoveringUser, setRecoveringUser] = useState<InternalUserSummary | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -362,10 +364,7 @@ export default function UsersPage() {
       {error ? <FormError message={error} /> : null}
       {message ? <AppNotice message={message} tone="success" /> : null}
 
-      <section className="team-layout">
-        <TeamOverview branches={branches} roles={selectableRoles} onCreateUser={openCreateUser} />
-        <TeamContextCard branches={branches} organization={organization} roles={selectableRoles} session={session} users={visibleUsers} />
-      </section>
+      <TeamOverview branches={branches} roles={selectableRoles} onCreateUser={openCreateUser} />
 
       <UsersTable
         roles={selectableRoles}
@@ -375,7 +374,10 @@ export default function UsersPage() {
         onChangeRole={changeUserRole}
         onEditCoach={openCoachProfile}
         onToggleStatus={toggleUserStatus}
+        onRecoverPassword={setRecoveringUser}
       />
+
+      {recoveringUser ? <PasswordRecoveryDrawer key={recoveringUser.id} user={recoveringUser} accessToken={session.accessToken} onClose={() => setRecoveringUser(null)} /> : null}
 
       <CoachProfileDrawer
         bio={coachBio}

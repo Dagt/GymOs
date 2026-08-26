@@ -1,4 +1,5 @@
 import { apiFetch, normalizePayload } from "./client";
+import { DEFAULT_PAGE_SIZE } from "../pagination";
 import type {
   MembershipPlanPayload,
   CatalogCategory,
@@ -31,7 +32,7 @@ export async function getProductByBarcode(accessToken: string, barcode: string):
 }
 
 export async function searchProducts(accessToken: string, params: ProductSearchParams = {}): Promise<ProductPage> {
-  const search = new URLSearchParams();
+  const search = new URLSearchParams({ size: String(DEFAULT_PAGE_SIZE) });
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== "") search.set(key, String(value));
   });

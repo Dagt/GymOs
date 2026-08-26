@@ -12,6 +12,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.common.api.PageResponse;
+import com.gymos.inventory.application.query.InventoryHistorySearchCriteria;
+import com.gymos.inventory.application.query.InventoryMovementPageView;
+import com.gymos.inventory.application.query.InventoryMovementSearchCriteria;
 import com.gymos.common.security.JwtService;
 import com.gymos.inventory.application.InventoryService;
 import com.gymos.inventory.application.query.InventoryBranchSettingsView;
@@ -70,6 +74,33 @@ class InventoryControllerTests {
 				.andExpect(jsonPath("$.totalTrackedProducts").value(25))
 				.andExpect(jsonPath("$.lowStockCount").value(3))
 				.andExpect(jsonPath("$.allowNegativeStock").value(true));
+	}
+
+	@Test
+	void movementSearchPassesGlobalFiltersAndReturnsTheFilteredTotal() throws Exception {
+		UUID product = UUID.randomUUID();
+		var criteria = new InventoryMovementSearchCriteria(product, 1, 25, "especial", "WASTE");
+		when(inventoryService.searchMovements(any(), eq(criteria)))
+				.thenReturn(InventoryMovementPageView.of(List.of(), 1, 25, 60));
+		mockMvc.perform(get("/api/v1/inventory/movements/search").param("productId", product.toString())
+						.param("page", "1").param("size", "25").param("q", "especial").param("type", "WASTE"))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.totalElements").value(60))
+				.andExpect(jsonPath("$.totalPages").value(3));
+		verify(inventoryService).searchMovements(any(), eq(criteria));
+		mockMvc.perform(get("/api/v1/inventory/movements/search").param("type", "INVALID"))
+				.andExpect(status().isBadRequest());
+	}
+
+	@Test
+	void historySearchPathsAreNotMistakenForDetailIdentifiers() throws Exception {
+		var criteria = new InventoryHistorySearchCriteria(2, 25, true);
+		when(inventoryService.searchPhysicalCounts(any(), eq(criteria))).thenReturn(PageResponse.of(List.of(), 2, 25, 127));
+		when(inventoryService.searchTransfers(any(), eq(criteria))).thenReturn(PageResponse.of(List.of(), 2, 25, 127));
+		for (String path : List.of("physical-counts", "transfers")) {
+			mockMvc.perform(get("/api/v1/inventory/" + path + "/search").param("page", "2").param("size", "25").param("activeOnly", "true"))
+					.andExpect(status().isOk()).andExpect(jsonPath("$.page").value(2))
+					.andExpect(jsonPath("$.totalElements").value(127)).andExpect(jsonPath("$.totalPages").value(6));
+		}
 	}
 
 	@Test

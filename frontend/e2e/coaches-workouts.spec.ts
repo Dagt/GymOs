@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
+import { businessToday } from "../src/lib/business-date";
 
 const coachId = "11111111-1111-4111-8111-111111111111";
 const workoutId = "22222222-2222-4222-8222-222222222222";
@@ -178,7 +179,7 @@ test.describe("coaches y rutinas", () => {
     await expect.poll(() => mediaUploaded).toBe(true);
   });
 
-  test("crea un equipo reutilizable y mantiene el catálogo contenido", async ({ page }) => {
+  test("crea un equipo reutilizable y mantiene el catálogo compacto con scroll oculto", async ({ page }) => {
     let createPayload: Record<string, unknown> | null = null;
     await bootCoaching(page, async (route, path) => {
       if (route.request().method() === "POST" && path === "/exercises") {
@@ -195,6 +196,13 @@ test.describe("coaches y rutinas", () => {
         });
         return true;
       }
+      if (route.request().method() === "GET" && path === "/exercises" && createPayload) {
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify({
+          items: [exercise(), { ...exercise(), ...createPayload, id: customExerciseId, origin: "COACH", createdBy: userId }],
+          page: 0, size: 25, totalElements: 2, totalPages: 1,
+        }) });
+        return true;
+      }
       return false;
     });
 
@@ -202,6 +210,8 @@ test.describe("coaches y rutinas", () => {
     await page.getByRole("button", { name: "Ejercicios", exact: true }).click();
     const catalog = page.locator(".exercise-catalog-list");
     await expect(catalog).toHaveCSS("overflow-y", "auto");
+    await expect(catalog).toHaveCSS("scrollbar-width", "none");
+    await expect(page.getByRole("navigation", { name: "Paginación de ejercicios" })).toBeVisible();
     await page.getByRole("button", { name: "+ Nuevo ejercicio" }).click();
     await page.getByLabel("Nombre", { exact: true }).fill("Empuje de trineo");
     await page.getByLabel("Grupo muscular principal").selectOption("Cuerpo completo");
@@ -272,6 +282,7 @@ test.describe("coaches y rutinas", () => {
     await expect(page.getByRole("button", { name: "Diego García" })).toBeVisible();
     expect(searchedQuery).toBe("Diego");
     await page.getByRole("button", { name: "Diego García" }).click();
+    await page.getByLabel("Fin", { exact: true }).fill("2099-12-31");
     await page.getByRole("button", { name: "Asignar rutina" }).click();
 
     await expect.poll(() => assignmentPayload).toMatchObject({
@@ -349,6 +360,7 @@ test.describe("coaches y rutinas", () => {
 
     await page.getByRole("button", { name: "Reemplazar", exact: true }).click();
     await page.getByLabel("Selecciona la nueva rutina").selectOption(replacementWorkoutId);
+    await page.getByLabel("Fin de la rutina de reemplazo").fill("2099-12-31");
     await page.getByRole("button", { name: "Confirmar reemplazo" }).click();
     await expect.poll(() => replacementPayload).toMatchObject({
       clientId,
@@ -547,6 +559,34 @@ test.describe("coaches y rutinas", () => {
   });
 });
 
+test("asignaciones y métricas comienzan con 100 registros, incluida la consulta inicial", async ({ page }) => {
+  const queries: URL[] = [];
+  const details = Array.from({ length: 127 }, (_, index) => ({ ...report().details[0], id: `assignment-${index}`, clientName: `Socio de prueba ${index + 1}` }));
+  await bootCoaching(page, async (route, path, url) => {
+    if (path === "/workout-assignments/history" || path === "/reports/coaches/workout-assignments/summary") {
+      queries.push(url);
+      const page = Number(url.searchParams.get("page")), size = Number(url.searchParams.get("size"));
+      const items = details.slice(page * size, (page + 1) * size);
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify(path.endsWith("/history")
+        ? { items, page, size, totalElements: details.length, totalPages: Math.ceil(details.length / size) }
+        : { ...report(), details: items, page, size, totalDetails: details.length, totalPages: Math.ceil(details.length / size) }) });
+      return true;
+    }
+    return false;
+  });
+  await page.goto("/coaches");
+  for (const tab of ["Asignaciones", "Métricas"]) {
+    await page.getByRole("button", { name: tab, exact: true }).click();
+    const pager = page.getByRole("navigation", { name: "Paginación de asignaciones" });
+    await expect(pager).toContainText("1–100 de 127 asignaciones");
+    await pager.getByRole("button", { name: "Siguiente" }).click();
+    await expect(pager).toContainText("101–127 de 127 asignaciones");
+    await expect(pager.getByRole("button", { name: "Siguiente" })).toBeDisabled();
+  }
+  expect(queries.length).toBeGreaterThanOrEqual(4);
+  expect(queries.every((url) => url.searchParams.get("size") === "100")).toBe(true);
+});
+
 async function bootCoaching(
   page: Page,
   override?: (route: Route, path: string, url: URL) => Promise<boolean>,
@@ -566,6 +606,8 @@ async function bootCoaching(
 }
 
 function responseFor(path: string) {
+  if (path === "/system/info") return { capabilities: ["operational-pagination-v1"] };
+  if (path === "/workout-assignments/history") return { items: report().details, page: 0, size: 25, totalElements: 1, totalPages: 1 };
   if (path === "/branches" || path === "/organizations/current/branches") {
     return [
       { id: branchId, name: "Centro" },
@@ -746,7 +788,7 @@ function report() {
       status: "ACTIVE",
       statusReason: null,
       replacedAssignmentId: null,
-      startsOn: "2026-07-28",
+      startsOn: businessToday(),
       endsOn: null,
       workoutId,
       workoutTitle: "Fuerza base",

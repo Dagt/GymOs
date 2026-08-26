@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { FormEvent } from "react";
 import { AppDrawer } from "@/components/AppDrawer";
+import { Pagination } from "@/components/Pagination";
 import {
   DateField,
   EmailField,
@@ -26,7 +27,7 @@ type SearchBarProps = {
 export function ClientSearchBar({ query, onQueryChange, onSubmit }: SearchBarProps) {
   return (
     <form className="bg-white rounded-2xl border border-gray-100 p-2 shadow-sm flex w-full gap-2 items-center" onSubmit={onSubmit}>
-      <div className="flex-1 relative">
+      <div className="min-w-0 flex-1 relative">
         <input
           className="h-12 w-full rounded-xl border-2 border-transparent bg-gray-50 px-5 text-base font-bold focus:border-[color:var(--brand-primary)] focus:bg-white focus:ring-4 focus:ring-[color:var(--brand-primary)]/5 transition-all outline-none"
           onChange={(event) => onQueryChange(event.target.value)}
@@ -34,7 +35,7 @@ export function ClientSearchBar({ query, onQueryChange, onSubmit }: SearchBarPro
           value={query}
         />
       </div>
-      <button className="h-12 px-8 rounded-xl bg-[color:var(--brand-primary)] text-white font-black text-sm hover:brightness-110 active:scale-95 transition-all shadow-md" type="submit">
+      <button className="h-12 px-4 sm:px-8 rounded-xl bg-[color:var(--brand-primary)] text-white font-black text-sm hover:brightness-110 active:scale-95 transition-all shadow-md" type="submit">
         Buscar Socio
       </button>
     </form>
@@ -71,30 +72,41 @@ export function ClientToolbar({ canCreate, onCreateClient }: ClientToolbarProps)
 
 type ClientListProps = {
   clients: ClientSummary[];
+  error?: string | null;
   loading: boolean;
+  page: number;
+  pageSize: number;
+  total: number;
+  registeredTotal: number | null;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
 };
 
-export function ClientList({ clients, loading }: ClientListProps) {
+export function ClientList({ clients, error, loading, page, pageSize, total, registeredTotal, onPageChange, onPageSizeChange }: ClientListProps) {
   return (
     <section className="app-card p-6">
-      <div className="flex items-center justify-between gap-3 mb-6">
+      <div className="flex items-center justify-between gap-3 mb-3">
         <div>
           <p className="text-[0.65rem] font-black uppercase tracking-widest text-[color:var(--brand-primary)] opacity-60">Base de Datos</p>
           <h2 className="text-xl font-black text-[color:var(--brand-primary)] mt-1">Socios registrados</h2>
         </div>
-        <span className="px-3 py-1 bg-[color:var(--brand-surface)] text-[color:var(--brand-primary)] text-xs font-black rounded-full border border-[color:var(--brand-line)]">{clients.length} socios</span>
+        <div className="text-right text-xs" aria-live="polite">
+          <strong className="block text-[var(--brand-primary)]" data-testid="registered-client-total">{error ? "Total no disponible" : registeredTotal === null ? "Consultando total…" : `${registeredTotal} socios`}</strong>
+          <span className="text-[var(--brand-muted)]">Total en esta sucursal</span>
+        </div>
       </div>
-      <div className="grid gap-1.5">
+      {!error ? <Pagination label="socios" loading={loading} page={page} size={pageSize} totalElements={total} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} /> : <p role="status" className="text-sm text-[var(--brand-muted)]">No se pudo consultar el listado. Revisa el error y vuelve a buscar.</p>}
+      <div className="app-scroll-list mt-4 grid gap-1.5" aria-busy={loading} aria-label="Listado de socios" role="region" tabIndex={0} key={page}>
         {loading ? (
           <div className="py-6 flex flex-col items-center gap-2">
             <div className="w-6 h-6 border-3 border-[color:var(--brand-primary)]/10 border-t-[color:var(--brand-primary)] rounded-full animate-spin"></div>
             <p className="text-[0.65rem] font-bold text-gray-400 uppercase tracking-widest">Sincronizando socios...</p>
           </div>
         ) : null}
-        {!loading && clients.length === 0 ? (
+        {!loading && !error && clients.length === 0 ? (
           <p className="py-6 text-center text-xs text-gray-400 font-bold italic bg-gray-50 rounded-xl border-2 border-dashed border-gray-100">No hay socios para mostrar.</p>
         ) : null}
-        {clients.map((client) => {
+        {!loading && clients.map((client) => {
           const membershipStatus = clientMembershipStatus(client);
           return (
             <Link
@@ -102,9 +114,9 @@ export function ClientList({ clients, loading }: ClientListProps) {
               href={`/clients/${client.id}`}
               key={client.id}
             >
-              <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-center gap-3">
                 <span className="w-2 h-2 rounded-full bg-[color:var(--brand-primary)] opacity-40 group-hover:opacity-100 transition-opacity"></span>
-                <div className="flex flex-col">
+                <div className="flex min-w-0 flex-col break-words">
                   <span className="font-bold text-gray-900 group-hover:text-[color:var(--brand-primary)] transition-colors text-sm leading-tight">{clientFullName(client)}</span>
                   <span className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[0.65rem] font-bold uppercase tracking-wider text-gray-400">
                     <span>{client.phone || "Sin teléfono"}</span>

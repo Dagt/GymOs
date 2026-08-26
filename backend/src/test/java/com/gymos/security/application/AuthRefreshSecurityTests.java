@@ -27,6 +27,39 @@ import org.springframework.security.authentication.AuthenticationManager;
 
 class AuthRefreshSecurityTests {
 	@Test
+	void changingPasswordInvalidatesLegacyAndCurrentRefreshTokens() {
+		AuthQueryRepository repository = mock(AuthQueryRepository.class);
+		StringRedisTemplate redis = mock(StringRedisTemplate.class);
+		@SuppressWarnings("unchecked") ValueOperations<String, String> values = mock(ValueOperations.class);
+		JwtService jwt = mock(JwtService.class);
+		AuthService service = new AuthService(mock(AuthenticationManager.class), repository, jwt, redis, mock(AuditService.class));
+		UUID userId = UUID.randomUUID(), org = UUID.randomUUID();
+		when(redis.opsForValue()).thenReturn(values);
+		when(repository.findActiveUserById(userId)).thenReturn(Optional.of(new AuthQueryRepository.AuthenticatedUser(
+				userId, AccountScope.TENANT, org, "coach", "hash", "Coach", Set.of("workout.read.own"), Set.of("Coach"), 1)));
+		for (String stored : java.util.List.of(tenantSession(userId, org, null), tenantSession(userId, org, null) + "|0")) {
+			when(values.get("gymos:refresh:v2:old-session")).thenReturn(stored);
+			assertThatThrownBy(() -> service.refresh("old-session")).isInstanceOfSatisfying(BusinessException.class,
+					error -> assertThat(error.code()).isEqualTo("REFRESH_TOKEN_INVALID"));
+		}
+		verify(jwt, never()).issueTokens(any(), anyString());
+	}
+
+	@Test
+	void passwordRecoveryDuringLoginCannotIssueANewGenerationTokenUsingOldPassword() {
+		AuthQueryRepository repository = mock(AuthQueryRepository.class);
+		JwtService jwt = mock(JwtService.class);
+		AuthenticationManager manager = mock(AuthenticationManager.class);
+		AuthService service = new AuthService(manager, repository, jwt, mock(StringRedisTemplate.class), mock(AuditService.class));
+		UUID id = UUID.randomUUID(), org = UUID.randomUUID();
+		var old = new AuthQueryRepository.AuthenticatedUser(id, AccountScope.TENANT, org, "coach", "oldhash", "Coach", Set.of(), Set.of("Coach"), 0);
+		var reset = new AuthQueryRepository.AuthenticatedUser(id, AccountScope.TENANT, org, "coach", "newhash", "Coach", Set.of(), Set.of("Coach"), 1);
+		when(repository.findActiveUserByLoginIdentifier("coach")).thenReturn(Optional.of(old), Optional.of(reset));
+		assertThatThrownBy(() -> service.login("coach", "OldPassword123!", "test"))
+				.isInstanceOf(org.springframework.security.authentication.BadCredentialsException.class);
+		verify(jwt, never()).issueTokens(any(), anyString());
+	}
+	@Test
 	void refreshRotatesTokenAndPreservesTenantContext() {
 		AuthQueryRepository repository = mock(AuthQueryRepository.class);
 		JwtService jwtService = mock(JwtService.class);
@@ -57,7 +90,7 @@ class AuthRefreshSecurityTests {
 		assertThat(result.user().organizationId()).isEqualTo(organizationId);
 		assertThat(result.user().branchId()).isEqualTo(branchId);
 		assertThat(result.refreshToken()).isNotEqualTo(previousToken);
-		verify(values).set("gymos:refresh:v2:" + result.refreshToken(), storedSession, Duration.ofDays(7));
+		verify(values).set("gymos:refresh:v2:" + result.refreshToken(), storedSession + "|0", Duration.ofDays(7));
 		verify(values).set(
 				"gymos:refresh:v2:" + previousToken,
 				"rotated:" + result.refreshToken(),

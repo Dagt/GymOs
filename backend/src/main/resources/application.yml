@@ -60,6 +60,15 @@ gymos:
     invitation-hours: ${GYMOS_USER_INVITATION_HOURS:72}
     invitation-resend-cooldown-seconds: ${GYMOS_USER_INVITATION_RESEND_COOLDOWN_SECONDS:60}
     frontend-base-url: ${GYMOS_FRONTEND_BASE_URL:http://localhost:3000}
+    password-recovery:
+      expiry-minutes: ${GYMOS_PASSWORD_RECOVERY_EXPIRY_MINUTES:60}
+      resend-cooldown-seconds: ${GYMOS_PASSWORD_RECOVERY_COOLDOWN_SECONDS:60}
+      max-attempts-per-minute: ${GYMOS_PASSWORD_RECOVERY_MAX_ATTEMPTS_PER_MINUTE:10}
+  coaching:
+    expiration:
+      enabled: ${GYMOS_COACHING_EXPIRATION_ENABLED:true}
+      delay-ms: ${GYMOS_COACHING_EXPIRATION_DELAY_MS:60000}
+      batch-size: ${GYMOS_COACHING_EXPIRATION_BATCH_SIZE:250}
   platform-bootstrap:
     enabled: ${GYMOS_PLATFORM_BOOTSTRAP_ENABLED:false}
     email: ${GYMOS_PLATFORM_ADMIN_EMAIL:}

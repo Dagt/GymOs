@@ -207,4 +207,4 @@ const managerRoutes = [
 
 const receptionRoutes = ["/reception", "/pos", "/clients", "/sales", "/reports/sales", "/bookings", "/wellness"];
 const coachRoutes = ["/coaches", "/clients"];
-const publicRoutes = ["/", "/login", "/accept-invitation", "/privacy-policy", "/terms-of-service", "/support", "/privacidad", "/terminos"];
+const publicRoutes = ["/", "/login", "/accept-invitation", "/reset-password", "/privacy-policy", "/terms-of-service", "/support", "/privacidad", "/terminos"];

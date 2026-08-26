@@ -181,6 +181,7 @@ public class UserAdministrationRepository {
 		jdbcClient.sql("""
 				UPDATE user_account
 				SET status = :status,
+				    credential_version = credential_version + 1,
 				    updated_at = :updatedAt,
 				    updated_by = :updatedBy,
 				    version = version + 1
@@ -194,6 +195,7 @@ public class UserAdministrationRepository {
 				.param("userId", userId)
 				.param("organizationId", organizationId)
 				.update();
+		revokePasswordRecovery(userId);
 	}
 
 	public UUID createPerson(
@@ -272,10 +274,19 @@ public class UserAdministrationRepository {
 	}
 
 	public void replaceRoles(UUID userId, UUID roleId) {
+		// Lock the account before changing roles, in the same order as recovery.
+		jdbcClient.sql("UPDATE user_account SET credential_version = credential_version + 1, version = version + 1 WHERE id = :userId")
+				.param("userId", userId).update();
 		jdbcClient.sql("DELETE FROM user_role WHERE user_id = :userId")
 				.param("userId", userId)
 				.update();
 		assignRole(userId, roleId);
+		revokePasswordRecovery(userId);
+	}
+
+	private void revokePasswordRecovery(UUID userId) {
+		jdbcClient.sql("UPDATE user_password_reset SET status = 'REVOKED' WHERE user_id = :userId AND status = 'PENDING'")
+				.param("userId", userId).update();
 	}
 
 	public void assignBranch(UUID userId, UUID branchId, String accessScope) {

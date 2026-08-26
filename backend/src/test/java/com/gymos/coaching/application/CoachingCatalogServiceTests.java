@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -155,7 +156,7 @@ class CoachingCatalogServiceTests {
 				.thenReturn(List.of(new CoachingCatalogRepository.CoachMetric(coachId, "Coach Uno", 0, 0, 0)));
 		when(repository.assignments(
 				eq(principal.organizationId()), eq(principal.branchId()), any(), any(),
-				any(), any(), any(), anyInt(), anyInt()
+				any(), any(), any(), anyInt(), anyLong()
 		))
 				.thenReturn(List.of());
 		when(repository.assignmentStats(
@@ -181,7 +182,7 @@ class CoachingCatalogServiceTests {
 		)).thenReturn(List.of(new CoachingCatalogRepository.CoachMetric(coachId, "Coach Uno", 1, 1, 1)));
 		when(repository.assignments(
 				eq(principal.organizationId()), eq(principal.branchId()), any(), any(),
-				any(), any(), any(), anyInt(), anyInt()
+				any(), any(), any(), anyInt(), anyLong()
 		)).thenReturn(
 				List.of(
 						assignment(clientOne, coachId, "ACTIVE", from),
@@ -217,7 +218,7 @@ class CoachingCatalogServiceTests {
 		)).thenReturn(List.of());
 		when(repository.assignments(
 				eq(coach.organizationId()), eq(coach.branchId()), any(), any(),
-				any(), any(), eq(coach.userId()), anyInt(), anyInt()
+				any(), any(), eq(coach.userId()), anyInt(), anyLong()
 		)).thenReturn(List.of());
 		when(repository.assignmentStats(
 				eq(coach.organizationId()), eq(coach.branchId()), any(), any(),
@@ -244,7 +245,7 @@ class CoachingCatalogServiceTests {
 		)).thenReturn(List.of());
 		when(repository.assignments(
 				eq(owner.organizationId()), eq(owner.branchId()), any(), any(),
-				any(), any(), eq((UUID) null), anyInt(), anyInt()
+				any(), any(), eq((UUID) null), anyInt(), anyLong()
 		)).thenReturn(List.of());
 		when(repository.assignmentStats(
 				eq(owner.organizationId()), eq(owner.branchId()), any(), any(),
@@ -274,7 +275,7 @@ class CoachingCatalogServiceTests {
 		)).thenReturn(List.of());
 		when(repository.assignments(
 				eq(coach.organizationId()), eq(coach.branchId()), any(), any(),
-				any(), any(), eq(coach.userId()), anyInt(), anyInt()
+				any(), any(), eq(coach.userId()), anyInt(), anyLong()
 		)).thenReturn(List.of());
 		when(repository.assignmentStats(
 				eq(coach.organizationId()), eq(coach.branchId()), any(), any(),

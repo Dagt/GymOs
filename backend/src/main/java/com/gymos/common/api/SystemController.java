@@ -14,6 +14,7 @@ public class SystemController {
 		return Map.of(
 				"name", "GymOS",
 				"status", "BOOTSTRAPPED",
+				"capabilities", java.util.List.of("operational-pagination-v1"),
 				"timestamp", Instant.now().toString()
 		);
 	}

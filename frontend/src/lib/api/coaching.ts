@@ -1,4 +1,6 @@
 import { apiFetch, normalizePayload } from "./client";
+import { DEFAULT_PAGE_SIZE, type PageResult } from "../pagination";
+import type { AssignmentDetail } from "./coaching-types";
 import type {
   AssignWorkoutPayload,
   CoachReport,
@@ -9,6 +11,7 @@ import type {
   CreateExercisePayload,
   Exercise,
   ExercisePage,
+  ExerciseSearchParams,
   AssignmentReport,
   WorkoutAssignment,
   WorkoutDetail,
@@ -208,9 +211,9 @@ export async function getCoachReport(accessToken: string): Promise<CoachReport> 
 
 export async function getExercises(
   accessToken: string,
-  params: { query?: string; muscleGroup?: string; equipment?: string; type?: string; page?: number; size?: number } = {},
+  params: ExerciseSearchParams = {},
 ): Promise<ExercisePage> {
-  const search = new URLSearchParams();
+  const search = new URLSearchParams({ size: String(DEFAULT_PAGE_SIZE) });
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== "") search.set(key, String(value));
   });
@@ -238,7 +241,7 @@ export async function getAssignmentReport(
     size?: number;
   } = {},
 ): Promise<AssignmentReport> {
-  const search = new URLSearchParams();
+  const search = new URLSearchParams({ size: String(DEFAULT_PAGE_SIZE) });
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== "") search.set(key, String(value));
   });
@@ -248,10 +251,17 @@ export async function getAssignmentReport(
   );
 }
 
+export function getAssignmentHistory(accessToken: string, params: { clientId?: string; page?: number; size?: number } = {}): Promise<PageResult<AssignmentDetail>> {
+  const search = new URLSearchParams({ size: String(DEFAULT_PAGE_SIZE) });
+  Object.entries(params).forEach(([key, value]) => { if (value !== undefined && value !== "") search.set(key, String(value)); });
+  return apiFetch<PageResult<AssignmentDetail>>(`/workout-assignments/history?${search}`, accessToken);
+}
+
 export async function getAssignmentTrend(
   accessToken: string,
   params: {
     weeks?: number;
+    from?: string;
     to?: string;
     coachId?: string;
     clientId?: string;

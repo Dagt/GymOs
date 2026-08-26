@@ -23,6 +23,7 @@ export type InventoryStockPage = {
 
 export type InventoryStockSearchParams = {
   q?: string;
+  lowStockOnly?: boolean;
   page?: number;
   size?: number;
   sort?: "name,asc" | "name,desc" | "quantity,asc" | "quantity,desc" | "updatedAt,desc";
@@ -66,8 +67,16 @@ export type InventoryMovementPage = {
 
 export type InventoryMovementSearchParams = {
   productId?: string;
+  q?: string;
+  type?: InventoryMovementType | "";
   page?: number;
   size?: number;
+};
+
+export type InventoryHistorySearchParams = {
+  page?: number;
+  size?: number;
+  activeOnly?: boolean;
 };
 
 export type InventoryMovementPayload = {

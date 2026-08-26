@@ -22,7 +22,7 @@ public class BenefitRepository {
 	public List<BenefitSummary> benefits(UUID organizationId) {
 		List<BenefitSummary> summaries = jdbcClient.sql("""
 				SELECT id, branch_id, code, name, benefit_type, discount_type, discount_value_cents,
-				       discount_percent, requires_evidence, combinable, priority, valid_from, valid_until, status
+				       discount_percent, requires_evidence, combinable, priority, valid_from, valid_until, status, version
 				FROM benefit
 				WHERE organization_id = :organizationId
 				  AND deleted_at IS NULL
@@ -44,7 +44,7 @@ public class BenefitRepository {
 						rs.getObject("valid_from", LocalDate.class),
 						rs.getObject("valid_until", LocalDate.class),
 						rs.getString("status"),
-						List.of()
+						List.of(), rs.getLong("version")
 				))
 				.list();
 		return summaries.stream()
@@ -170,6 +170,25 @@ public class BenefitRepository {
 				.query(Integer.class)
 				.single();
 		return count == distinctPlanIds.size();
+	}
+
+	public boolean updateBenefit(UUID organizationId, UUID benefitId, CreateBenefitCommand command, long expectedVersion) {
+		return jdbcClient.sql("""
+				UPDATE benefit SET name = :name, discount_type = :discountType,
+				    discount_value_cents = :discountValueCents, discount_percent = :discountPercent,
+				    requires_evidence = :requiresEvidence, combinable = :combinable, priority = :priority,
+				    valid_from = :validFrom, valid_until = :validUntil, status = :status,
+				    updated_at = :now, version = version + 1
+				WHERE organization_id = :organizationId AND id = :benefitId
+				  AND deleted_at IS NULL AND version = :expectedVersion
+				""")
+				.param("organizationId", organizationId).param("benefitId", benefitId)
+				.param("name", command.name().trim()).param("discountType", command.discountType())
+				.param("discountValueCents", command.discountValueCents()).param("discountPercent", command.discountPercent())
+				.param("requiresEvidence", command.requiresEvidence()).param("combinable", command.combinable())
+				.param("priority", command.priority()).param("validFrom", command.validFrom()).param("validUntil", command.validUntil())
+				.param("status", command.status()).param("now", OffsetDateTime.now()).param("expectedVersion", expectedVersion)
+				.update() == 1;
 	}
 
 	public void replaceMembershipPlans(GymOsPrincipal principal, UUID benefitId, List<UUID> planIds) {
@@ -361,12 +380,19 @@ public class BenefitRepository {
 			LocalDate validFrom,
 			LocalDate validUntil,
 			String status,
-			List<UUID> planIds
+			List<UUID> planIds,
+			long version
 	) {
+		public BenefitSummary(UUID id, UUID branchId, String code, String name, String benefitType,
+				String discountType, Integer discountValueCents, Double discountPercent, boolean requiresEvidence,
+				boolean combinable, int priority, LocalDate validFrom, LocalDate validUntil, String status, List<UUID> planIds) {
+			this(id, branchId, code, name, benefitType, discountType, discountValueCents, discountPercent,
+					requiresEvidence, combinable, priority, validFrom, validUntil, status, planIds, 0);
+		}
 		BenefitSummary withPlanIds(List<UUID> resolvedPlanIds) {
 			return new BenefitSummary(id, branchId, code, name, benefitType, discountType,
 					discountValueCents, discountPercent, requiresEvidence, combinable, priority,
-					validFrom, validUntil, status, resolvedPlanIds);
+					validFrom, validUntil, status, resolvedPlanIds, version);
 		}
 	}
 

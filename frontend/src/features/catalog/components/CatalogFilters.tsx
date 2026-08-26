@@ -29,7 +29,6 @@ export function CatalogFilters({ categories, filters, searchInput, total, onClea
           <Select label="Estado" value={filters.status ?? ""} onChange={(value) => onUpdate("status", value || null)} options={[["", "Todos"], ["ACTIVE", "Activo"], ["INACTIVE", "Inactivo"]]} />
           <Select label="Inventario" value={filters.inventoryTracked === undefined ? "" : String(filters.inventoryTracked)} onChange={(value) => onUpdate("inventoryTracked", value || null)} options={[["", "Todos"], ["true", "Controlado"], ["false", "Sin control"]]} />
           <Select label="Orden" value={filters.sort ?? "displayOrder,asc"} onChange={(value) => onUpdate("sort", value)} options={[["displayOrder,asc", "Predeterminado"], ["name,asc", "Nombre A-Z"], ["name,desc", "Nombre Z-A"], ["createdAt,desc", "Más recientes"], ["price,asc", "Menor precio"], ["price,desc", "Mayor precio"]]} />
-          <Select label="Por página" value={String(filters.size ?? 25)} onChange={(value) => onUpdate("size", value)} options={[["10", "10"], ["25", "25"], ["50", "50"], ["100", "100"]]} />
           <label className="flex h-8 items-center gap-1.5 whitespace-nowrap text-[10px]"><input checked={Boolean(filters.includeArchived)} className="h-3.5 w-3.5 accent-[var(--brand-primary)]" onChange={(event) => onUpdate("includeArchived", event.target.checked ? "true" : null)} type="checkbox" />Archivados</label>
         </div>
       </details>

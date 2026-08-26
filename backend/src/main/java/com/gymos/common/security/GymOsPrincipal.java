@@ -14,8 +14,14 @@ public record GymOsPrincipal(
 		Set<String> permissions,
 		Set<String> roles,
 		boolean supportMode,
-		Instant supportExpiresAt
+		Instant supportExpiresAt,
+		long credentialVersion
 ) {
+	public GymOsPrincipal(UUID userId, AccountScope accountScope, UUID organizationId, UUID branchId,
+			String username, String fullName, Set<String> permissions, Set<String> roles,
+			boolean supportMode, Instant supportExpiresAt) {
+		this(userId, accountScope, organizationId, branchId, username, fullName, permissions, roles, supportMode, supportExpiresAt, 0);
+	}
 	public GymOsPrincipal(
 			UUID userId,
 			UUID organizationId,

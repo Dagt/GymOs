@@ -1,6 +1,9 @@
 import { apiFetch, normalizePayload } from "./client";
+import { requireOperationalPagination } from "./capabilities";
+import { DEFAULT_PAGE_SIZE, type PageResult } from "../pagination";
 import type {
   InventoryBranchSettings,
+  InventoryHistorySearchParams,
   InventoryMovement,
   InventoryMovementPage,
   InventoryMovementPayload,
@@ -29,7 +32,8 @@ export async function searchInventoryStock(
   accessToken: string,
   params: InventoryStockSearchParams = {},
 ): Promise<InventoryStockPage> {
-  const search = new URLSearchParams();
+  if (params.lowStockOnly) await requireOperationalPagination();
+  const search = new URLSearchParams({ size: String(DEFAULT_PAGE_SIZE) });
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== "") search.set(key, String(value));
   });
@@ -72,7 +76,8 @@ export async function searchInventoryMovements(
   accessToken: string,
   params: InventoryMovementSearchParams = {},
 ): Promise<InventoryMovementPage> {
-  const search = new URLSearchParams();
+  await requireOperationalPagination();
+  const search = new URLSearchParams({ size: String(DEFAULT_PAGE_SIZE) });
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== "") search.set(key, String(value));
   });
@@ -103,6 +108,13 @@ export async function updateInventorySettings(
 // Physical Counts (Conteos Físicos)
 export async function getInventoryPhysicalCounts(accessToken: string): Promise<InventoryPhysicalCount[]> {
   return apiFetch<InventoryPhysicalCount[]>("/inventory/physical-counts", accessToken);
+}
+
+export async function searchInventoryPhysicalCounts(accessToken: string, params: InventoryHistorySearchParams = {}): Promise<PageResult<InventoryPhysicalCount>> {
+  await requireOperationalPagination();
+  const query = new URLSearchParams({ size: String(DEFAULT_PAGE_SIZE) });
+  Object.entries(params).forEach(([key, value]) => { if (value !== undefined) query.set(key, String(value)); });
+  return apiFetch<PageResult<InventoryPhysicalCount>>(`/inventory/physical-counts/search?${query}`, accessToken);
 }
 
 export async function getInventoryPhysicalCount(accessToken: string, countId: string): Promise<InventoryPhysicalCount> {
@@ -143,6 +155,13 @@ export async function cancelInventoryPhysicalCount(accessToken: string, countId:
 // Branch Transfers (Transferencias)
 export async function getInventoryTransfers(accessToken: string): Promise<InventoryTransfer[]> {
   return apiFetch<InventoryTransfer[]>("/inventory/transfers", accessToken);
+}
+
+export async function searchInventoryTransfers(accessToken: string, params: InventoryHistorySearchParams = {}): Promise<PageResult<InventoryTransfer>> {
+  await requireOperationalPagination();
+  const query = new URLSearchParams({ size: String(DEFAULT_PAGE_SIZE) });
+  Object.entries(params).forEach(([key, value]) => { if (value !== undefined) query.set(key, String(value)); });
+  return apiFetch<PageResult<InventoryTransfer>>(`/inventory/transfers/search?${query}`, accessToken);
 }
 
 export async function getInventoryTransfer(accessToken: string, transferId: string): Promise<InventoryTransfer> {

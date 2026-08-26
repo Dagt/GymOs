@@ -54,6 +54,9 @@ class DatabaseMigrationTests {
 	@Test
 	void flywayAddsArchitecturalStabilizationColumns() throws Exception {
 		try (var connection = DriverManager.getConnection(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())) {
+			assertThat(columnExists(connection, "user_account", "credential_version")).isTrue();
+			assertThat(tableExists(connection, "user_password_reset")).isTrue();
+			assertThat(indexExists(connection, "ix_workout_assignment_due_completion")).isTrue();
 			assertThat(columnExists(connection, "sale", "idempotency_key")).isTrue();
 			assertThat(columnExists(connection, "sale", "payment_completed_at")).isTrue();
 			assertThat(columnExists(connection, "payment", "idempotency_key")).isTrue();
@@ -198,6 +201,42 @@ class DatabaseMigrationTests {
 			assertThat(columnExists(connection, "branch", "surface_color")).isFalse();
 			assertThat(roleHasPermission(connection, "Recepcion", "resource.manage")).isFalse();
 			assertThat(roleHasPermission(connection, "Recepcion", "booking.manage")).isTrue();
+		}
+	}
+
+	@Test
+	void upgradeFromV90CorrectsUtcAssignmentDateWithoutChangingPeriodOrRemovingHistory() throws Exception {
+		String schema = migrationSchema("operational_hardening");
+		migrateSchema(schema, "90");
+		UUID assignment = UUID.randomUUID(), intentionallyHistorical = UUID.randomUUID();
+		UUID user;
+		try (var connection = schemaConnection(schema)) {
+			JdbcClient jdbc = JdbcClient.create(new SingleConnectionDataSource(connection, true));
+			var data = new com.gymos.support.OperationalTestData(jdbc);
+			user = data.ownerId;
+			var workout = data.workout(data.coach());
+			UUID client = data.client();
+			for (UUID id : List.of(assignment, intentionallyHistorical)) {
+				jdbc.sql("""
+						INSERT INTO workout_assignment(id, organization_id, branch_id, workout_id, workout_version_id, client_id,
+						status, assigned_on, starts_on, ends_on, created_at, updated_at)
+						VALUES (:id, :org, :branch, :workout, :version, :client, 'ACTIVE', :assigned,
+						'2026-08-26', '2026-09-20', '2026-08-26T02:00:00Z', '2026-08-26T02:00:00Z')
+						""").param("id", id).param("org", data.organizationId).param("branch", data.branchId)
+						.param("workout", workout.id()).param("version", workout.versionId()).param("client", client)
+						.param("assigned", id.equals(assignment) ? LocalDate.parse("2026-08-26") : LocalDate.parse("2026-08-20")).update();
+			}
+		}
+		migrateSchema(schema, null);
+		try (var connection = schemaConnection(schema)) {
+			JdbcClient jdbc = JdbcClient.create(new SingleConnectionDataSource(connection, true));
+			assertThat(jdbc.sql("SELECT assigned_on FROM workout_assignment WHERE id = :id").param("id", assignment).query(LocalDate.class).single()).isEqualTo("2026-08-25");
+			assertThat(jdbc.sql("SELECT assigned_on FROM workout_assignment WHERE id = :id").param("id", intentionallyHistorical).query(LocalDate.class).single()).isEqualTo("2026-08-20");
+			assertThat(jdbc.sql("SELECT starts_on FROM workout_assignment WHERE id = :id").param("id", assignment).query(LocalDate.class).single()).isEqualTo("2026-08-26");
+			assertThat(jdbc.sql("SELECT ends_on FROM workout_assignment WHERE id = :id").param("id", assignment).query(LocalDate.class).single()).isEqualTo("2026-09-20");
+			assertThat(jdbc.sql("SELECT status FROM workout_assignment WHERE id = :id").param("id", assignment).query(String.class).single()).isEqualTo("ACTIVE");
+			assertThat(jdbc.sql("SELECT credential_version FROM user_account WHERE id = :id").param("id", user).query(Long.class).single()).isZero();
+			assertThat(jdbc.sql("SELECT count(*) FROM user_password_reset").query(Long.class).single()).isZero();
 		}
 	}
 

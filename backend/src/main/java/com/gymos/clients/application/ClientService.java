@@ -18,6 +18,7 @@ import com.gymos.clients.infrastructure.ClientRepository.ClientDetail;
 import com.gymos.clients.infrastructure.ClientRepository.ClientSummary;
 import com.gymos.clients.infrastructure.ClientRepository.ClientTimelineEntry;
 import com.gymos.common.api.BusinessException;
+import com.gymos.common.api.PageResponse;
 import com.gymos.common.security.GymOsPrincipal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -85,6 +86,13 @@ public class ClientService implements ClientLookupOperations {
 		requirePrincipal(principal);
 		requireBranch(principal);
 		return clientRepository.search(principal.organizationId(), principal.branchId(), query, status, 50);
+	}
+
+	@Transactional(readOnly = true)
+	public PageResponse<ClientSummary> searchPage(GymOsPrincipal principal, String query, String status, int page, int size) {
+		requirePrincipal(principal);
+		requireBranch(principal);
+		return clientRepository.searchPage(principal.organizationId(), principal.branchId(), query, status, page, size);
 	}
 
 	@Transactional(readOnly = true)

@@ -28,6 +28,7 @@ export {
   getClient,
   importClientsCsv,
   searchClients,
+  searchClientsPage,
   updateClient,
 } from "./api/clients";
 export type {
@@ -231,6 +232,8 @@ export {
   getLowInventoryStock,
   receiveInventoryTransfer,
   searchInventoryMovements,
+  searchInventoryPhysicalCounts,
+  searchInventoryTransfers,
   searchInventoryStock,
   shipInventoryTransfer,
   updateInventoryBranchSettings,
@@ -298,6 +301,7 @@ export {
   removeExerciseMedia,
   replaceWorkoutAssignment,
   getAssignmentReport,
+  getAssignmentHistory,
   getAssignmentTrend,
   downloadWorkoutPdf,
   downloadAssignmentCsv,
@@ -418,7 +422,9 @@ export {
   getUserRoles,
   updateInternalUserRole,
   updateInternalUserStatus,
+  requestPasswordRecovery,
 } from "./api/users";
+export type { PasswordRecoveryIssued } from "./api/users";
 export type {
   CreateInternalUserPayload,
   InternalUserSummary,

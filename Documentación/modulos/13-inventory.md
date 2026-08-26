@@ -1,7 +1,7 @@
 # Inventarios
 
 Estado: `ESTABILIZADO`
-Última revisión: 21 de agosto de 2026
+Última revisión: 25 de agosto de 2026
 
 ## Implementado
 
@@ -12,12 +12,28 @@ Estado: `ESTABILIZADO`
 - costos, valuación y alertas de reabastecimiento;
 - integración con ventas, devoluciones y catálogo;
 - frontend separado en existencias, movimientos, transferencias y auditorías.
+- existencias, movimientos, alertas, transferencias y conteos paginados en
+  servidor, con totales filtrados y navegación explícita;
+- listados de altura acotada, scroll interno con barra oculta y controles de
+  página siempre fuera del scroll; no se confunde una consulta fallida con
+  cero existencias o un historial vacío, y se ofrece reintento;
+- verificación de capacidad del backend para los nuevos endpoints/filtros,
+  evitando que un servidor anterior ignore `lowStockOnly` y muestre todos los
+  productos como alertas;
+- búsqueda global de movimientos por nombre, SKU y motivo, combinada con
+  producto/tipo antes de paginar;
+- selectores de producto independientes de la página de existencias y señales
+  de conteo/transferencia activos independientes de la página del historial;
+- exportaciones identificadas como **Exportar página CSV**: sólo incluyen las
+  filas de la página seleccionada, no el inventario completo.
 
 ## Pendiente
 
-- paginación parametrizada en transferencias y conteos (`INV-001`);
 - indicador de guardado por renglón (`INV-002`);
 - pruebas de concurrencia y alto volumen.
 
 Base histórica: PR #6. Última revisión dentro del árbol integrado actual:
-21-ago-2026.
+25-ago-2026. `INV-001` queda resuelta con los contratos `/search`,
+`InventoryPaginationIntegrationTests` sobre 127 registros y la suite E2E de
+paginación. No se modifica el esquema ni el ciclo de aprobación de conteos.
+Contrato y límites: [paginación de listados](../../docs/operations/list-pagination.md).

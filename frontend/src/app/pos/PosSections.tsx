@@ -6,6 +6,7 @@ import {
   type SaleSummary,
 } from "@/lib/api";
 import { formatMoney } from "./pos-model";
+import { Pagination } from "@/components/Pagination";
 
 export type CartItem = {
   product: ProductSummary;
@@ -16,12 +17,19 @@ export type PaymentMethod = "CASH" | "TRANSFER" | "CARD_MANUAL" | "CARD_MERCADO_
 
 export function ProductGrid({
   loading,
+  error, page, pageSize, total, onPageChange, onPageSizeChange,
   productQuery,
   products,
   onAddProduct,
   onProductQueryChange,
 }: {
   loading: boolean;
+  error: string | null;
+  page: number;
+  pageSize: number;
+  total: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
   productQuery: string;
   products: ProductSummary[];
   onAddProduct: (product: ProductSummary) => void;
@@ -51,7 +59,9 @@ export function ProductGrid({
           </div>
         </div>
 
-        <div className="mt-6 overflow-y-auto pr-2 max-h-[520px] custom-scrollbar">
+        <div className="mt-4"><Pagination label="productos" page={page} size={pageSize} totalElements={total} loading={loading} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} /></div>
+        {error ? <p className="mt-3 text-sm text-red-700" role="alert">{error}</p> : null}
+        <div className="app-scroll-list mt-6 p-1" aria-label="Listado de productos del POS" role="region" tabIndex={0} key={page}>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,13.5rem),1fr))] gap-4" data-testid="pos-product-grid">
             {loading && (
               <div className="col-span-full py-12 flex flex-col items-center gap-4">
@@ -59,7 +69,7 @@ export function ProductGrid({
                  <p className="text-sm font-black text-[color:var(--brand-primary)] opacity-40 uppercase tracking-widest">Sincronizando catálogo...</p>
               </div>
             )}
-            {!loading && products.length === 0 && (
+            {!loading && !error && products.length === 0 && (
               <div className="col-span-full py-16 text-center bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
                  <p className="text-gray-400 font-bold italic">No se encontraron coincidencias en el inventario.</p>
               </div>

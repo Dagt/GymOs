@@ -184,6 +184,14 @@ public class CoachingCatalogController {
 		return service.assignmentReport(principal, from, to, coachId, clientId, page, size);
 	}
 
+	@GetMapping("/workout-assignments/history")
+	com.gymos.common.api.PageResponse<com.gymos.coaching.infrastructure.CoachingCatalogRepository.AssignmentDetail> assignmentHistory(
+			@AuthenticationPrincipal GymOsPrincipal principal, @RequestParam(required = false) UUID clientId,
+			@RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "25") int size
+	) {
+		return service.assignmentHistory(principal, clientId, page, size);
+	}
+
 	@GetMapping("/reports/coaches/workout-assignments/summary")
 	AssignmentReport metrics(
 			@AuthenticationPrincipal GymOsPrincipal principal,
@@ -216,11 +224,12 @@ public class CoachingCatalogController {
 	WeeklyTrendReport trend(
 			@AuthenticationPrincipal GymOsPrincipal principal,
 			@RequestParam(defaultValue = "12") int weeks,
+			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
 			@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
 			@RequestParam(required = false) UUID coachId,
 			@RequestParam(required = false) UUID clientId
 	) {
-		return service.weeklyTrend(principal, weeks, to, coachId, clientId);
+		return service.weeklyTrend(principal, weeks, from, to, coachId, clientId);
 	}
 
 	@GetMapping("/workout-assignments/{assignmentId}/pdf")

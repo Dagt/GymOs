@@ -262,4 +262,22 @@ export type WeeklyTrendReport = {
   to: string;
   weeks: number;
   points: WeeklyTrendPoint[];
+  coachActivity?: CoachActivityPoint[];
+};
+
+export type CoachActivityPoint = {
+  date: string;
+  coachId: string | null;
+  coachName: string;
+  assignments: number;
+  uniqueClients: number;
+  firstWorkouts: number;
+};
+export type ExerciseSearchParams = {
+  query?: string;
+  muscleGroup?: string;
+  equipment?: string;
+  type?: string;
+  page?: number;
+  size?: number;
 };

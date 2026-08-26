@@ -15,6 +15,9 @@ import com.gymos.common.security.JwtService;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import com.gymos.common.security.UserCredentialVersionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -31,6 +34,44 @@ class SecurityAuthorizationTests {
 
 	@Autowired
 	private JwtService jwtService;
+	@MockitoBean private UserCredentialVersionRepository credentialVersions;
+
+	@BeforeEach
+	void activeFixtureCredentials() {
+		org.mockito.Mockito.when(credentialVersions.isCurrent(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyLong())).thenReturn(true);
+	}
+
+	@Test
+	void revokedJwtIsRejectedBeforeController() throws Exception {
+		org.mockito.Mockito.when(credentialVersions.isCurrent(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyLong())).thenReturn(false);
+		String token = jwtService.accessToken(new GymOsPrincipal(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "coach", "Coach", Set.of("client.read")));
+		mockMvc.perform(get("/api/v1/clients/search").header("Authorization", "Bearer " + token))
+				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	@WithMockUser(authorities = "client.read")
+	void passwordRecoveryAndBenefitEditionRequireManagementPermissions() throws Exception {
+		mockMvc.perform(post("/api/v1/users/internal/99999999-9999-9999-9999-999999999951/password-recovery"))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(put("/api/v1/benefits/99999999-9999-9999-9999-999999999951").contentType("application/json").content("{}"))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void passwordRecoveryAcceptanceIsPublicButValidatesBodyWithoutEchoingIt() throws Exception {
+		mockMvc.perform(post("/api/v1/auth/password-recovery/accept").contentType("application/json").content("{\"token\":\"test-sensitive\",\"password\":"))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+				.andExpect(result -> assertThat(result.getResponse().getContentAsString()).doesNotContain("test-sensitive"));
+	}
+
+	@Test
+	@WithMockUser(authorities = "client.read")
+	void inventoryPagedHistoriesStillRequireInventoryRead() throws Exception {
+		for (String path : java.util.List.of("search", "movements/search", "physical-counts/search", "transfers/search")) {
+			mockMvc.perform(get("/api/v1/inventory/" + path)).andExpect(status().isForbidden());
+		}
+	}
 
 	@Test
 	void validJwtWithoutOrganizationPermissionReturnsForbiddenInsteadOfInvalidSession() throws Exception {

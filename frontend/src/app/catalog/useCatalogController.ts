@@ -26,6 +26,7 @@ import type { CatalogSummary } from "@/lib/api/catalog-types";
 import { emptyProduct, productDraftToPayload, productToDraft } from "./CatalogHelpers";
 import { useCatalogFilters } from "@/features/catalog/hooks/useCatalogFilters";
 import { useCatalogPlanEditor } from "@/features/catalog/hooks/useCatalogPlanEditor";
+import { lastPage } from "@/lib/pagination";
 
 export function useCatalogController() {
   const [session, setSession] = useState<StoredSession | null>(null);
@@ -75,6 +76,10 @@ export function useCatalogController() {
           catalogFilters.filters,
         );
         if (!active) return;
+        if (page.page > lastPage(page.totalElements, page.size)) {
+          catalogFilters.update("page", String(lastPage(page.totalElements, page.size)));
+          return;
+        }
         setProducts(page.items);
         setTotalProducts(page.totalElements);
         setTotalPages(page.totalPages);
@@ -105,6 +110,10 @@ export function useCatalogController() {
       catalogFilters.filters,
     );
     setSession(activeSession);
+    if (page.page > lastPage(page.totalElements, page.size)) {
+      catalogFilters.update("page", String(lastPage(page.totalElements, page.size)));
+      return;
+    }
     setProducts(page.items);
     setTotalProducts(page.totalElements);
     setTotalPages(page.totalPages);

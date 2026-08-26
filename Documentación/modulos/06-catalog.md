@@ -1,7 +1,7 @@
 # Catálogo comercial
 
 Estado: `ESTABILIZADO`
-Última revisión: 21 de agosto de 2026
+Última revisión: 25 de agosto de 2026
 
 ## Implementado
 
@@ -9,6 +9,9 @@ Estado: `ESTABILIZADO`
 - planes con asociación por sucursal y `multiBranchAccess` para elegibilidad
   transversal dentro del mismo tenant;
 - categorías, etiquetas, búsqueda, filtros y paginación;
+- filtros de URL que reinician la página al cambiar, navegación visible antes
+  de la tabla y recuperación de la última página válida después de archivar;
+- POS paginado con búsquedas globales, sin perder el carrito al cambiar de página;
 - activación, archivado, imágenes y código de barras;
 - unidad de producto físico guiada por un selector cerrado de valores comunes,
   normalización de etiquetas heredadas y validación canónica en backend;
@@ -30,3 +33,8 @@ Estado: `ESTABILIZADO`
 
 Última validación: `CatalogProductServiceTests`, pruebas frontend de unidades y
 E2E del selector cerrado, 30-jul-2026.
+
+`e2e/pagination.spec.ts` cubre 127 productos, filtros, archivado del último
+registro de una página y carrito entre páginas. Esto no equivale a una prueba
+de carga productiva ni cierra el ciclo de imágenes de `CAT-001`.
+Contrato y límites: [paginación de listados](../../docs/operations/list-pagination.md).

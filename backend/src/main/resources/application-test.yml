@@ -10,5 +10,8 @@ spring:
       ddl-auto: create
 
 gymos:
+  coaching:
+    expiration:
+      enabled: false
   seed:
     enabled: false

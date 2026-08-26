@@ -65,9 +65,16 @@ public class AuthService {
 
 	@Transactional
 	public AuthResult login(String username, String password, String correlationId) {
+		// Bind authentication to the password generation observed before checking it.
+		// A concurrent recovery must not turn an old-password login into a new-generation session.
+		var beforeAuthentication = authQueryRepository.findActiveUserByLoginIdentifier(username);
 		authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(username, password));
 		AuthenticatedUser user = authQueryRepository.findActiveUserByLoginIdentifier(username)
 				.orElseThrow(() -> new BusinessException("INVALID_CREDENTIALS", "Usuario o password invalidos."));
+		if (beforeAuthentication.filter(before -> before.userId().equals(user.userId())
+				&& before.credentialVersion() == user.credentialVersion()).isEmpty()) {
+			throw new org.springframework.security.authentication.BadCredentialsException("Invalid credentials");
+		}
 		if (user.accountScope() == AccountScope.TENANT
 				&& !authQueryRepository.organizationIsActive(user.organizationId())) {
 			throw new BusinessException("ORGANIZATION_SUSPENDED", "El gimnasio no tiene acceso activo a la plataforma.");
@@ -116,6 +123,7 @@ public class AuthService {
 		requirePrincipal(principal);
 		AuthenticatedUser user = activeUser(principal.userId());
 		GymOsPrincipal selectedPrincipal;
+		if (principal.credentialVersion() != user.credentialVersion()) throw invalidRefresh();
 		if (principal.tenantIdentity()) {
 			if (user.accountScope() != AccountScope.TENANT
 					|| !user.organizationId().equals(principal.organizationId())
@@ -222,6 +230,7 @@ public class AuthService {
 	private GymOsPrincipal restorePrincipalFor(String storedSession) {
 		RefreshSession session = parseRefreshSession(storedSession);
 		AuthenticatedUser user = activeUser(session.userId());
+		if (session.credentialVersion() != user.credentialVersion()) throw invalidRefresh();
 		if (user.accountScope() != session.accountScope()) {
 			throw invalidRefresh();
 		}
@@ -264,7 +273,7 @@ public class AuthService {
 	private RefreshSession parseRefreshSession(String storedSession) {
 		try {
 			String[] parts = storedSession.split("\\|", -1);
-			if (parts.length != 7 || !SESSION_VERSION.equals(parts[0])) {
+			if ((parts.length != 7 && parts.length != 8) || !SESSION_VERSION.equals(parts[0])) {
 				throw new IllegalArgumentException("Invalid refresh session version");
 			}
 			return new RefreshSession(
@@ -272,7 +281,8 @@ public class AuthService {
 					parts[3].isBlank() ? null : UUID.fromString(parts[3]),
 					parts[4].isBlank() ? null : UUID.fromString(parts[4]),
 					Boolean.parseBoolean(parts[5]),
-					parts[6].isBlank() ? null : Instant.ofEpochSecond(Long.parseLong(parts[6])));
+					parts[6].isBlank() ? null : Instant.ofEpochSecond(Long.parseLong(parts[6])),
+					parts.length == 8 ? Long.parseLong(parts[7]) : 0);
 		} catch (RuntimeException exception) {
 			throw invalidRefresh();
 		}
@@ -380,12 +390,13 @@ public class AuthService {
 			UUID organizationId,
 			UUID branchId,
 			boolean supportMode,
-			Instant supportExpiresAt
+			Instant supportExpiresAt,
+			long credentialVersion
 	) {
 		private static RefreshSession from(GymOsPrincipal principal) {
 			return new RefreshSession(
 					principal.userId(), principal.accountScope(), principal.organizationId(), principal.branchId(),
-					principal.supportMode(), principal.supportExpiresAt());
+					principal.supportMode(), principal.supportExpiresAt(), principal.credentialVersion());
 		}
 
 		private String serialize() {
@@ -394,7 +405,7 @@ public class AuthService {
 					+ (organizationId == null ? "" : organizationId) + SESSION_SEPARATOR
 					+ (branchId == null ? "" : branchId) + SESSION_SEPARATOR
 					+ supportMode + SESSION_SEPARATOR
-					+ (supportExpiresAt == null ? "" : supportExpiresAt.getEpochSecond());
+					+ (supportExpiresAt == null ? "" : supportExpiresAt.getEpochSecond()) + SESSION_SEPARATOR + credentialVersion;
 		}
 	}
 }

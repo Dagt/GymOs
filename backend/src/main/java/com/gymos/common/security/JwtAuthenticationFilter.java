@@ -14,9 +14,11 @@ import org.springframework.web.filter.OncePerRequestFilter;
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 	private final JwtService jwtService;
+	private final UserCredentialVersionRepository credentials;
 
-	public JwtAuthenticationFilter(JwtService jwtService) {
+	public JwtAuthenticationFilter(JwtService jwtService, UserCredentialVersionRepository credentials) {
 		this.jwtService = jwtService;
+		this.credentials = credentials;
 	}
 
 	@Override
@@ -25,6 +27,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 		String authorization = request.getHeader("Authorization");
 		if (authorization != null && authorization.startsWith("Bearer ")) {
 			jwtService.parseAccessToken(authorization.substring(7)).ifPresent(principal -> {
+				if (!credentials.isCurrent(principal.userId(), principal.credentialVersion())) return;
 				var authorities = principal.permissions().stream()
 						.map(SimpleGrantedAuthority::new)
 						.toList();

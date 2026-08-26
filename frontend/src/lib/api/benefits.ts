@@ -27,6 +27,14 @@ export async function createBenefit(
   });
 }
 
+export async function updateBenefit(accessToken: string, benefitId: string, payload: BenefitPayload, expectedVersion: number): Promise<BenefitSummary> {
+  const { name, discountType, discountValueCents, discountPercent, requiresEvidence, combinable, priority, validFrom, validUntil, status, planIds } = payload;
+  return apiFetch<BenefitSummary>(`/benefits/${benefitId}`, accessToken, {
+    method: "PUT",
+    body: JSON.stringify(normalizePayload({ name, discountType, discountValueCents, discountPercent, requiresEvidence, combinable, priority, validFrom, validUntil, status, planIds, expectedVersion })),
+  });
+}
+
 export async function assignClientBenefit(
   accessToken: string,
   clientId: string,

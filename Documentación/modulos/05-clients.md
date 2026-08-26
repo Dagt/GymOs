@@ -1,11 +1,13 @@
 # Socios y CRM
 
 Estado: `FUNCIONAL`
-Última revisión: 21 de agosto de 2026
+Última revisión: 25 de agosto de 2026
 
 ## Implementado
 
 - alta, búsqueda, consulta y actualización de socios;
+- listado paginado en servidor con total real, selección de 25/50/100 socios
+  por página y búsqueda en todos los registros visibles de la sucursal;
 - información personal y contacto;
 - visibilidad en sedes secundarias cuando la membresía activa permite acceso
   multi-sucursal;
@@ -41,3 +43,9 @@ Estado: `FUNCIONAL`
 de plan vigente validada sobre PostgreSQL y E2E de botón de alta visible para
 gerencia y recepción; `member-workflows.spec.ts` valida el listado, beneficios,
 accesos y cambio de plan desde la ficha, 30-jul-2026.
+
+Paginación: `ClientPaginationIntegrationTests` recorre 127 socios y comprueba
+aislamiento por organización/sucursal; `ClientPaginationControllerTests` y
+`ClientPaginationServiceTests` cubren contrato y autorización. La navegación,
+respuestas fuera de orden y vista móvil están en `e2e/pagination.spec.ts`.
+Contrato y límites: [paginación de listados](../../docs/operations/list-pagination.md).

@@ -28,10 +28,6 @@ export default function InventoryPage() {
   if (controller.loading) return <LoadingScreen text="Cargando inventario..." />;
   if (!controller.session) return <AuthRequiredCard message="Necesitas iniciar sesión para administrar inventario." title="Inicia sesión" />;
 
-  const activeTransfersCount = controller.transfers.filter(
-    (t) => t.status === "REQUESTED" || t.status === "SHIPPED"
-  ).length;
-
   return (
     <AppShell
       branchName={controller.activeBranch?.name}
@@ -52,7 +48,7 @@ export default function InventoryPage() {
         <InventorySummaryHeader summary={controller.summary} />
 
         <InventoryNavigation
-          activeTransfersCount={activeTransfersCount}
+          activeTransfersCount={controller.activeTransfersCount}
           lowStockCount={controller.summary?.lowStockCount ?? 0}
           onChange={setView}
           view={view}
@@ -61,24 +57,25 @@ export default function InventoryPage() {
         <InventoryStatusMessages error={controller.error} message={controller.message} />
 
         {view === "stock" && (
-          <section className="grid gap-4 lg:grid-cols-12 lg:items-stretch">
+          <section className="grid gap-4 lg:grid-cols-12 lg:items-start">
             <div className="lg:col-span-7 flex flex-col">
-              <InventoryStockPanel
-                loading={controller.stockLoading}
+              {controller.stockList.error ? <InventoryListFailure title="Existencias" onRetry={controller.stockList.refresh} /> : <InventoryStockPanel
+                loading={controller.stockList.loading}
                 onExportCsv={controller.exportStockCsv}
-                onPageChange={controller.setStockPage}
+                onPageChange={controller.stockList.setPage}
+                onPageSizeChange={controller.stockList.setPageSize}
                 onQueryChange={controller.setStockQuery}
                 onRefresh={() => controller.refresh()}
                 onSelectProduct={controller.selectProduct}
                 onSortChange={controller.setStockSort}
-                page={controller.stockPage}
+                page={controller.stockList.page}
+                pageSize={controller.stockList.size}
                 query={controller.stockQuery}
                 selectedProductId={controller.selectedProductId}
-                sort={controller.stockSort}
-                stock={controller.stock}
-                total={controller.stockTotal}
-                totalPages={controller.stockTotalPages}
-              />
+                sort={controller.stockList.filters.sort ?? "name,asc"}
+                stock={controller.stockList.items}
+                total={controller.stockList.total}
+              />}
             </div>
             <div className="lg:col-span-5 flex flex-col space-y-4">
               <InventoryMovementSummary
@@ -87,65 +84,87 @@ export default function InventoryPage() {
                 onOpenPhysicalCountDrawer={() => controller.setShowPhysicalCountDrawer(true)}
                 onOpenTransferDrawer={() => controller.setShowTransferDrawer(true)}
               />
-              <InventoryAlertsPanel
-                lowStock={controller.lowStock}
+              {controller.lowStockList.error ? <InventoryListFailure title="Alertas de stock" onRetry={controller.lowStockList.refresh} /> : <InventoryAlertsPanel
+                lowStock={controller.lowStockList.items}
+                page={controller.lowStockList.page}
+                pageSize={controller.lowStockList.size}
+                total={controller.lowStockList.total}
+                loading={controller.lowStockList.loading}
+                onPageChange={controller.lowStockList.setPage}
                 onSelectProduct={(product) => {
                   controller.selectProduct(product);
                 }}
-              />
+              />}
             </div>
           </section>
         )}
 
         {view === "movements" && (
           <section className="space-y-4">
-            <InventoryMovementsTable
-              loading={controller.movementLoading}
-              movements={controller.filteredMovements}
+            {controller.movementList.error ? <InventoryListFailure title="Historial de movimientos" onRetry={controller.movementList.refresh} /> : <InventoryMovementsTable
+              accessToken={controller.session.accessToken}
+              loading={controller.movementList.loading}
+              movements={controller.movementList.items}
               onClearFilters={controller.clearMovementFilters}
               onExportCsv={controller.exportMovementsCsv}
-              onPageChange={controller.setMovementPage}
-              onProductIdFilterChange={controller.setMovementProductIdFilter}
+              onPageChange={controller.movementList.setPage}
+              onPageSizeChange={controller.movementList.setPageSize}
+              onProductChange={controller.selectMovementFilter}
               onQueryChange={controller.setMovementQuery}
               onTypeFilterChange={controller.setMovementTypeFilter}
-              page={controller.movementPage}
-              productIdFilter={controller.movementProductIdFilter}
-              products={controller.stock}
+              page={controller.movementList.page}
+              pageSize={controller.movementList.size}
+              product={controller.movementProduct}
               query={controller.movementQuery}
-              totalPages={controller.movementTotalPages}
-              typeFilter={controller.movementTypeFilter}
-            />
+              total={controller.movementList.total}
+              typeFilter={controller.movementList.filters.type ?? ""}
+            />}
           </section>
         )}
 
         {view === "transfers" && (
           <section className="space-y-4">
-            <InventoryTransfersCard
-              transfers={controller.transfers}
+            {controller.transferList.error ? <InventoryListFailure title="Historial de transferencias" onRetry={controller.transferList.refresh} /> : <InventoryTransfersCard
+              transfers={controller.transferList.items}
+              activeTransfersCount={controller.activeTransfersCount}
+              page={controller.transferList.page}
+              pageSize={controller.transferList.size}
+              total={controller.transferList.total}
+              loading={controller.transferList.loading}
+              onPageChange={controller.transferList.setPage}
+              onPageSizeChange={controller.transferList.setPageSize}
               onCancelTransfer={controller.handleCancelTransfer}
               onOpenDrawer={() => controller.setShowTransferDrawer(true)}
               onReceiveTransfer={controller.handleReceiveTransfer}
               onShipTransfer={controller.handleShipTransfer}
               saving={controller.saving}
-            />
+            />}
           </section>
         )}
 
         {view === "audits" && (
           <section className="space-y-4">
-            <InventoryAuditsCard
-              counts={controller.physicalCounts}
+            {controller.countList.error ? <InventoryListFailure title="Historial de conteos" onRetry={controller.countList.refresh} /> : <InventoryAuditsCard
+              counts={controller.countList.items}
+              activeCount={controller.activeCount}
+              page={controller.countList.page}
+              pageSize={controller.countList.size}
+              total={controller.countList.total}
+              loading={controller.countList.loading}
+              onPageChange={controller.countList.setPage}
+              onPageSizeChange={controller.countList.setPageSize}
               onOpenDrawer={() => controller.setShowPhysicalCountDrawer(true)}
-            />
+            />}
           </section>
         )}
       </div>
 
       <InventoryMovementDrawer
+        accessToken={controller.session.accessToken}
         movementType={controller.movementType}
         onClose={() => controller.setShowMovementDrawer(false)}
         onMovementTypeChange={controller.setMovementType}
-        onProductChange={controller.selectDrawerProduct}
+        onProductChange={controller.selectProduct}
         onQuantityChange={controller.setQuantity}
         onReasonChange={controller.setReason}
         onReorderPointChange={controller.setReorderPoint}
@@ -156,13 +175,13 @@ export default function InventoryPage() {
         reason={controller.reason}
         reorderPoint={controller.reorderPoint}
         saving={controller.saving}
-        selectedProductId={controller.selectedProductId}
-        stock={controller.stock}
+        selectedProduct={controller.selectedStock}
         unitCostCents={controller.unitCostCents}
       />
 
       <InventoryPhysicalCountDrawer
-        counts={controller.physicalCounts}
+        activeCount={controller.activeCount}
+        loading={controller.activeCountLoading}
         onApproveCount={controller.approveCount}
         onCancelCount={controller.cancelCount}
         onClose={() => controller.setShowPhysicalCountDrawer(false)}
@@ -173,15 +192,22 @@ export default function InventoryPage() {
       />
 
       <InventoryTransferDrawer
+        accessToken={controller.session.accessToken}
         activeBranchId={controller.activeBranch?.id}
         branches={controller.branches}
         onClose={() => controller.setShowTransferDrawer(false)}
         onCreateTransfer={controller.handleCreateTransfer}
         open={controller.showTransferDrawer}
         saving={controller.saving}
-        stock={controller.stock}
       />
     </AppShell>
   );
 }
 
+function InventoryListFailure({ title, onRetry }: { title: string; onRetry: () => void }) {
+  return <section className="app-card p-5" aria-label={title}>
+    <h2 className="app-card-title">{title}</h2>
+    <p className="mt-2 text-sm text-[var(--brand-muted)]">No fue posible cargar este listado. El total no está disponible; esto no significa que no existan registros.</p>
+    <button className="app-button-secondary mt-3" type="button" onClick={onRetry}>Reintentar listado</button>
+  </section>;
+}

@@ -55,6 +55,7 @@ public class JwtService {
 		payload.put("supportMode", principal.supportMode());
 		payload.put("supportExpiresAt", principal.supportExpiresAt() == null ? null : principal.supportExpiresAt().getEpochSecond());
 		payload.put("iat", now.getEpochSecond());
+		payload.put("credentialVersion", principal.credentialVersion());
 		payload.put("exp", now.plusSeconds(lifetimeSeconds).getEpochSecond());
 		return sign(payload);
 	}
@@ -92,7 +93,8 @@ public class JwtService {
 					permissions == null ? Set.of() : Set.copyOf(permissions),
 					roles == null ? Set.of() : Set.copyOf(roles),
 					supportMode,
-					supportExpiresAt
+					supportExpiresAt,
+					((Number) payload.getOrDefault("credentialVersion", 0)).longValue()
 			));
 		} catch (Exception exception) {
 			return Optional.empty();
