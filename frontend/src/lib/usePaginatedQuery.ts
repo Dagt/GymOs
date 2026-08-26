@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { isPageResult, lastPage, type PageResult } from "./pagination";
+import { DEFAULT_PAGE_SIZE, isPageResult, lastPage, type PageResult } from "./pagination";
 
 /** Server-side paging with atomic filter resets and stale-response protection. */
 export function usePaginatedQuery<T, F extends object>(
   accessToken: string | undefined,
   load: (token: string, params: F & { page: number; size: number }) => Promise<PageResult<T>>,
   initialFilters: F,
-  initialSize = 25,
+  initialSize = DEFAULT_PAGE_SIZE,
   enabled = true,
 ) {
   const [request, setRequest] = useState({ filters: initialFilters, page: 0, size: initialSize, revision: 0 });

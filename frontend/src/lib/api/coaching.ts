@@ -1,5 +1,5 @@
 import { apiFetch, normalizePayload } from "./client";
-import type { PageResult } from "../pagination";
+import { DEFAULT_PAGE_SIZE, type PageResult } from "../pagination";
 import type { AssignmentDetail } from "./coaching-types";
 import type {
   AssignWorkoutPayload,
@@ -213,7 +213,7 @@ export async function getExercises(
   accessToken: string,
   params: ExerciseSearchParams = {},
 ): Promise<ExercisePage> {
-  const search = new URLSearchParams();
+  const search = new URLSearchParams({ size: String(DEFAULT_PAGE_SIZE) });
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== "") search.set(key, String(value));
   });
@@ -241,7 +241,7 @@ export async function getAssignmentReport(
     size?: number;
   } = {},
 ): Promise<AssignmentReport> {
-  const search = new URLSearchParams();
+  const search = new URLSearchParams({ size: String(DEFAULT_PAGE_SIZE) });
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== "") search.set(key, String(value));
   });
@@ -252,7 +252,7 @@ export async function getAssignmentReport(
 }
 
 export function getAssignmentHistory(accessToken: string, params: { clientId?: string; page?: number; size?: number } = {}): Promise<PageResult<AssignmentDetail>> {
-  const search = new URLSearchParams();
+  const search = new URLSearchParams({ size: String(DEFAULT_PAGE_SIZE) });
   Object.entries(params).forEach(([key, value]) => { if (value !== undefined && value !== "") search.set(key, String(value)); });
   return apiFetch<PageResult<AssignmentDetail>>(`/workout-assignments/history?${search}`, accessToken);
 }

@@ -1,5 +1,7 @@
 "use client";
 
+import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
+
 import { Suspense, useState } from "react";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
@@ -51,7 +53,7 @@ function CatalogContent() {
                 onUpdate={controller.catalogFilters.update} />
             </div>
             <Pagination label="artículos" page={controller.catalogFilters.filters.page ?? 0}
-              size={controller.catalogFilters.filters.size ?? 25} totalElements={controller.totalProducts}
+              size={controller.catalogFilters.filters.size ?? DEFAULT_PAGE_SIZE} totalElements={controller.totalProducts}
               loading={controller.loading || controller.saving}
               onPageChange={(page) => controller.catalogFilters.update("page", String(page))}
               onPageSizeChange={(size) => controller.catalogFilters.update("size", String(size))} />

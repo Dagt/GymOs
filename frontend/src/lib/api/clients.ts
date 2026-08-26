@@ -1,6 +1,6 @@
 import { apiFetch, normalizePayload } from "./client";
 import { requireOperationalPagination } from "./capabilities";
-import type { PageResult } from "../pagination";
+import { DEFAULT_PAGE_SIZE, type PageResult } from "../pagination";
 import type {
   ClientDetailResponse,
   ClientImportResult,
@@ -23,7 +23,7 @@ export async function searchClients(
 
 export async function searchClientsPage(
   accessToken: string,
-  { query = "", status = "", page = 0, size = 25 }: { query?: string; status?: string; page?: number; size?: number } = {},
+  { query = "", status = "", page = 0, size = DEFAULT_PAGE_SIZE }: { query?: string; status?: string; page?: number; size?: number } = {},
 ): Promise<PageResult<ClientSummary>> {
   await requireOperationalPagination();
   const params = new URLSearchParams({ page: String(page), size: String(size) });

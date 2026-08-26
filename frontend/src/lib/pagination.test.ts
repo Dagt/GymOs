@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { isPageResult, lastPage, pageNumber, pageRange, pageSize } from "./pagination.ts";
+import { DEFAULT_PAGE_SIZE, isPageResult, lastPage, pageNumber, pageRange, pageSize } from "./pagination.ts";
 
 test("legacy arrays and malformed totals are not treated as an empty page", () => {
   assert.equal(isPageResult([]), false);
@@ -25,7 +25,18 @@ test("a filtered or deleted final page can be brought back into range", () => {
 test("URL pagination uses bounded integer values", () => {
   for (const value of ["-1", "1.5", "NaN", "Infinity", "1e20"]) assert.equal(pageNumber(value), 0);
   assert.equal(pageNumber("2"), 2);
-  assert.equal(pageSize(null), 25);
+  assert.equal(pageSize(null), 100);
+  assert.equal(pageSize(""), 100);
+  assert.equal(pageSize("  "), 100);
+  assert.equal(pageSize("invalid"), 100);
+  assert.equal(pageSize("25"), 25);
+  assert.equal(pageSize("50"), 50);
   assert.equal(pageSize("0"), 1);
   assert.equal(pageSize("10000"), 100);
+});
+
+test("visible lists begin with 100 and preserve a partial last page", () => {
+  assert.equal(DEFAULT_PAGE_SIZE, 100);
+  assert.deepEqual(pageRange(0, DEFAULT_PAGE_SIZE, 127), { from: 1, to: 100, pages: 2 });
+  assert.deepEqual(pageRange(1, DEFAULT_PAGE_SIZE, 127), { from: 101, to: 127, pages: 2 });
 });

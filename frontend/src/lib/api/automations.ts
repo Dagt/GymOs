@@ -1,4 +1,5 @@
 import { apiFetch, normalizePayload } from "./client";
+import { DEFAULT_PAGE_SIZE } from "../pagination";
 import type {
   AutomationDeadLetter,
   AutomationDeadLetterPage,
@@ -134,7 +135,7 @@ export async function getAutomationExecutions(
   accessToken: string,
   ruleId: string,
   page = 0,
-  size = 25,
+  size = DEFAULT_PAGE_SIZE,
 ): Promise<AutomationExecutionPage> {
   return apiFetch<AutomationExecutionPage>(
     `/automations/${ruleId}/executions?page=${page}&size=${size}`,
@@ -144,8 +145,8 @@ export async function getAutomationExecutions(
 
 export async function getAutomationDeadLetters(
   accessToken: string,
-	page = 0,
-	size = 25,
+  page = 0,
+  size = DEFAULT_PAGE_SIZE,
 ): Promise<AutomationDeadLetterPage> {
   return apiFetch<AutomationDeadLetterPage>(`/automations/dead-letters?page=${page}&size=${size}`, accessToken);
 }

@@ -1,6 +1,6 @@
 import { apiFetch, normalizePayload } from "./client";
 import { requireOperationalPagination } from "./capabilities";
-import type { PageResult } from "../pagination";
+import { DEFAULT_PAGE_SIZE, type PageResult } from "../pagination";
 import type {
   InventoryBranchSettings,
   InventoryHistorySearchParams,
@@ -33,7 +33,7 @@ export async function searchInventoryStock(
   params: InventoryStockSearchParams = {},
 ): Promise<InventoryStockPage> {
   if (params.lowStockOnly) await requireOperationalPagination();
-  const search = new URLSearchParams();
+  const search = new URLSearchParams({ size: String(DEFAULT_PAGE_SIZE) });
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== "") search.set(key, String(value));
   });
@@ -77,7 +77,7 @@ export async function searchInventoryMovements(
   params: InventoryMovementSearchParams = {},
 ): Promise<InventoryMovementPage> {
   await requireOperationalPagination();
-  const search = new URLSearchParams();
+  const search = new URLSearchParams({ size: String(DEFAULT_PAGE_SIZE) });
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== "") search.set(key, String(value));
   });
@@ -112,7 +112,7 @@ export async function getInventoryPhysicalCounts(accessToken: string): Promise<I
 
 export async function searchInventoryPhysicalCounts(accessToken: string, params: InventoryHistorySearchParams = {}): Promise<PageResult<InventoryPhysicalCount>> {
   await requireOperationalPagination();
-  const query = new URLSearchParams();
+  const query = new URLSearchParams({ size: String(DEFAULT_PAGE_SIZE) });
   Object.entries(params).forEach(([key, value]) => { if (value !== undefined) query.set(key, String(value)); });
   return apiFetch<PageResult<InventoryPhysicalCount>>(`/inventory/physical-counts/search?${query}`, accessToken);
 }
@@ -159,7 +159,7 @@ export async function getInventoryTransfers(accessToken: string): Promise<Invent
 
 export async function searchInventoryTransfers(accessToken: string, params: InventoryHistorySearchParams = {}): Promise<PageResult<InventoryTransfer>> {
   await requireOperationalPagination();
-  const query = new URLSearchParams();
+  const query = new URLSearchParams({ size: String(DEFAULT_PAGE_SIZE) });
   Object.entries(params).forEach(([key, value]) => { if (value !== undefined) query.set(key, String(value)); });
   return apiFetch<PageResult<InventoryTransfer>>(`/inventory/transfers/search?${query}`, accessToken);
 }

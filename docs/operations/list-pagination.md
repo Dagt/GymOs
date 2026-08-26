@@ -1,6 +1,6 @@
 # Paginación de listados operativos
 
-Revisión: 25 de agosto de 2026. Rama: `codex/fix-list-pagination`.
+Revisión: 26 de agosto de 2026. Rama: `codex/fix-list-pagination`.
 Implementación: `cab3e28`. Cierre de deuda: `INV-001`.
 
 ## Hallazgos del corte inicial
@@ -21,7 +21,9 @@ Implementación: `cab3e28`. Cierre de deuda: `INV-001`.
   ejercicios muestran el total filtrado del servidor, no `items.length` como
   si fuera el total de la colección.
 - Los controles están antes del listado: rango visible, anterior/siguiente y
-  25/50/100 registros por página. Las alertas de inventario usan 10 por página.
+  25/50/100 registros por página, comenzando con **100**. Las alertas también
+  comienzan con 100. El valor inicial se centraliza en `DEFAULT_PAGE_SIZE`;
+  una selección explícita de otro tamaño, incluida la URL de catálogo, se respeta.
   Son compactos y no heredan las alturas de los formularios; sin recuadro exterior.
 - «Socios registrados» conserva el total sin filtros de la sucursal. El rango
   del paginador corresponde a los resultados de búsqueda, no al total del padrón.
@@ -41,11 +43,19 @@ Implementación: `cab3e28`. Cierre de deuda: `INV-001`.
 - Cambiar de página en POS no vacía el carrito. El lector de código de barras
   conserva la consulta exacta fuera de la página visible.
 - Los selectores de inventario buscan en servidor y tienen sus propias páginas
-  de 10 opciones. El constructor de rutinas busca ejercicios independientemente
-  del catálogo visible; ofrece hasta 25 sugerencias y pide afinar la búsqueda
+  de 100 opciones con scroll interno. El constructor de rutinas busca ejercicios
+  independientemente del catálogo visible; ofrece hasta 25 sugerencias y pide afinar la búsqueda
   cuando existen más coincidencias.
 - Los indicadores de conteos/transferencias activos consultan su propio filtro
   `activeOnly`; no se calculan a partir de una página del historial.
+- El historial de asignaciones, su reporte y los historiales paginados de pagos
+  y automatizaciones también solicitan 100 por defecto. Las consultas de sólo
+  totales conservan `size=1`; no son páginas visibles. No se modifican los límites
+  de los autocompletados ni los contratos por defecto del backend.
+- Los historiales de pagos conservan altura limitada; pulsar su pestaña ya
+  seleccionada no borra los registros ni deja la vista cargando indefinidamente.
+- La lista de problemas de automatizaciones también mantiene scroll interno
+  con barra oculta al cargar 100 registros.
 - **Exportar página CSV** en inventario incluye únicamente las filas visibles.
   El nombre del archivo incluye el número de página. No es una exportación
   masiva de todos los registros.
@@ -169,3 +179,23 @@ bundle sin errores. Generar los builds no despliega estos cambios a producción.
 La validación del endurecimiento posterior, scroll oculto y compatibilidad está
 en [cierre operativo](operational-hardening.md). No confundir la evidencia del
 corte inicial anterior con el código posterior.
+
+## Validación del ajuste de 100 registros y equipo (26/08/2026)
+
+- `npm test`: 113 pruebas aprobadas.
+- `npm run test:e2e -- --workers=2`: suite completa de 81 recorridos aprobados.
+  Después del último ajuste de scroll en automatizaciones se ejecutó
+  `npm run test:e2e -- e2e/notifications.spec.ts --workers=2`: 2 aprobados,
+  incluido el nuevo caso con 100 problemas visibles en un panel acotado.
+- `npm run typecheck`, `npm run lint` y lint focalizado de los últimos cambios:
+  correctos.
+- `npm run build` y `npm run cf:build`: correctos. El último build de Cloudflare
+  incluye también una compilación Next.js/TypeScript del ajuste final.
+- Revisión visual de equipo y recuperación en escritorio/móvil; layout probado
+  en anchos de 390, 768, 1024 y 1440 px. Se conservan permisos y entrega manual
+  de recuperación ante fallos de correo.
+
+Este ajuste es de frontend: sin migraciones ni cambios de backend. No se
+repitieron suites PostgreSQL en este corte ni se enviaron correos o cobros reales.
+OpenNext conserva la advertencia de soporte parcial de Windows; los builds
+no constituyen un despliegue ni una prueba del runtime productivo.

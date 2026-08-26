@@ -174,6 +174,164 @@ test("recuperación pública usa token en fragmento y valida confirmación antes
   expect(await page.evaluate(() => sessionStorage.getItem("gymos.accessToken"))).toBeNull();
 });
 
+test("el equipo organiza nombres largos, sucursales y acciones sin desbordarse", async ({ page }, testInfo) => {
+  const longName = "María Fernanda Hernández del Castillo";
+  await boot(page, async (route, path) => path === "/users/roles" ? json(route, [{ id: "role-coach", name: "Coach", permissionCount: 7 }, { id: "role-reception", name: "Recepcion", permissionCount: 5 }]) : path === "/users/internal" ? json(route, [
+    staff[0], { ...staff[1], fullName: longName, username: "maria.fernanda.hernandez.del.castillo@example.test", branches: ["Centro", "Sucursal Tecnológica Norte"] },
+    { ...staff[1], id: "reception", fullName: "Luis Recepción", roles: ["Recepcion"], username: "luis@example.test" },
+    { ...staff[1], id: "suspended", fullName: "Ana Suspendida", status: "SUSPENDED" },
+  ]) : false);
+  await page.goto("/users");
+  const users = page.getByRole("region", { name: "Usuarios del gimnasio" });
+  await expect(users.getByRole("article")).toHaveCount(4);
+  await expect(page.getByText("4 usuarios · 3 activos", { exact: true })).toBeVisible();
+  await expect(users.getByRole("article").filter({ hasText: "Dueño Prueba" }).getByRole("button")).toHaveCount(0);
+  const suspended = users.getByRole("article").filter({ hasText: "Ana Suspendida" });
+  await expect(suspended.getByRole("button", { name: "Recuperar contraseña" })).toHaveCount(0);
+  await expect(suspended.getByRole("button", { name: "Reactivar" })).toBeVisible();
+  for (const width of [1440, 1024, 768, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+    expect(await users.evaluate((node) => node.scrollWidth <= node.clientWidth + 1)).toBe(true);
+    const coach = users.getByRole("article").filter({ hasText: longName });
+    await coach.scrollIntoViewIfNeeded();
+    const row = (await coach.boundingBox())!;
+    for (const button of await coach.getByRole("button").all()) {
+      const box = (await button.boundingBox())!;
+      expect(box.width).toBeGreaterThanOrEqual(39);
+      expect(box.x).toBeGreaterThanOrEqual(row.x);
+      expect(box.x + box.width).toBeLessThanOrEqual(row.x + row.width);
+    }
+    if (width === 1440 || width === 390) await page.screenshot({ path: testInfo.outputPath(`equipo-${width}.png`) });
+  }
+});
+
+test("recuperación enviada muestra un resultado breve y permite regenerar sin conservar el enlace anterior", async ({ page }, testInfo) => {
+  let issued = 0;
+  await boot(page, async (route, path) => path === `/users/internal/${coachId}/password-recovery`
+    ? json(route, { resetUrl: `https://example.invalid/reset-password#token=private-link-${++issued}`, expiresAt: "2099-01-01T15:00:00Z", emailDeliveryStatus: "SENT" }) : false);
+  await page.goto("/users");
+  await page.getByRole("button", { name: "Recuperar contraseña" }).click();
+  const drawer = page.getByRole("dialog");
+  await expect(drawer.getByRole("heading", { name: "Restablecer contraseña" })).toBeVisible();
+  await expect(drawer.locator(".app-drawer-card")).toHaveCSS("background-color", "rgb(255, 255, 255)");
+  await expect(drawer.getByText("ana@example.test", { exact: true })).toHaveCount(1);
+  await expect(drawer.locator("details")).not.toHaveAttribute("open", "");
+  await page.screenshot({ path: testInfo.outputPath("recuperacion-inicial.png") });
+  await drawer.getByRole("button", { name: "Generar y enviar enlace" }).click();
+  await expect(drawer.getByRole("status")).toContainText("Enlace enviado");
+  await expect(drawer.getByLabel("Enlace privado de recuperación")).toHaveCount(0);
+  await drawer.getByRole("button", { name: "Ver enlace", exact: true }).click();
+  await expect(drawer.getByLabel("Enlace privado de recuperación")).toHaveValue(/private-link-1$/);
+  await expect(drawer.getByText("Invalida el anterior.", { exact: true })).toBeVisible();
+  await drawer.getByRole("button", { name: "Generar otro enlace", exact: true }).click();
+  await expect.poll(() => issued).toBe(2);
+  await expect(drawer.getByLabel("Enlace privado de recuperación")).toHaveCount(0);
+  await drawer.getByRole("button", { name: "Ver enlace", exact: true }).click();
+  await expect(drawer.getByLabel("Enlace privado de recuperación")).toHaveValue(/private-link-2$/);
+  await drawer.getByRole("button", { name: "Ocultar enlace", exact: true }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("recuperacion-enviada-mobile.png") });
+  await drawer.getByRole("button", { name: "Cerrar", exact: true }).click();
+  await page.getByRole("button", { name: "Recuperar contraseña" }).click();
+  await expect(drawer.getByRole("button", { name: "Generar y enviar enlace" })).toBeVisible();
+  await expect(drawer.getByLabel("Enlace privado de recuperación")).toHaveCount(0);
+  expect(await page.evaluate(() => JSON.stringify({ session: { ...sessionStorage }, local: { ...localStorage } }))).not.toContain("private-link-");
+});
+
+test("cancelar un cambio de rol conserva el rol vigente en la fila", async ({ page }) => {
+  let mutations = 0;
+  await boot(page, async (route, path) => {
+    if (route.request().method() !== "GET") mutations++;
+    if (path === "/users/roles") return json(route, [{ id: "role-coach", name: "Coach" }, { id: "role-reception", name: "Recepcion" }]);
+    return false;
+  });
+  await page.goto("/users");
+  const role = page.getByRole("combobox", { name: "Rol de Coach Ana" });
+  await expect(role).toHaveValue("role-coach");
+  page.once("dialog", (dialog) => dialog.dismiss());
+  await role.selectOption("role-reception");
+  await expect(role).toHaveValue("role-coach");
+  expect(mutations).toBe(0);
+});
+
+test("gerencia no ofrece recuperación para empleados ajenos a su sucursal", async ({ page }) => {
+  await boot(page, async (route, path) => path === "/users/internal" ? json(route, [staff[0], staff[1], { ...staff[1], id: "other-branch", fullName: "Coach Norte", branchIds: ["other-branch"], branches: ["Norte"] }]) : false,
+    { ...owner, roles: ["Gerente"], console: "TENANT_MANAGER" });
+  await page.goto("/users");
+  const rows = page.getByRole("region", { name: "Usuarios del gimnasio" }).getByRole("article");
+  await expect(rows.filter({ hasText: "Coach Ana" }).getByRole("button", { name: "Recuperar contraseña" })).toBeVisible();
+  await expect(rows.filter({ hasText: "Coach Norte" }).getByRole("button", { name: "Recuperar contraseña" })).toHaveCount(0);
+  await expect(rows.filter({ hasText: "Dueño Prueba" })).toHaveCount(0);
+});
+
+test("los tres historiales de pagos solicitan 100 y mantienen scroll interno", async ({ page }) => {
+  const queries: URL[] = [];
+  const entries = Array.from({ length: 127 }, (_, index) => ({ id: `history-${index}`, dueOn: "2026-08-26", status: "ACTIVE", amountCents: 10000, currency: "MXN", attemptNumber: 1, lastError: null, consentedAt: "2026-08-26T12:00:00Z", nextChargeOn: "2026-09-26", consecutiveFailures: 0, termsVersion: "v1", receivedAt: "2026-08-26T12:00:00Z", provider: "STRIPE", externalEventId: `test-event-${index}`, eventType: "test", errorMessage: null }));
+  await boot(page, async (route, path, url) => {
+    if (path === "/payment-settings") return json(route, { branchId, receptionManualTerminalEnabled: false, receptionMercadoPagoEnabled: false, stripeSelfCheckoutEnabled: false, stripeRecurringEnabled: false, stripeConnected: false, mercadoPagoConnected: false });
+    if (path === "/payment-settings/operations") return json(route, { pastDueMandates: 0, retryCharges: 0, failedCharges: 0, failedWebhooks: 0, staleOperations: 0, alertLevel: "HEALTHY" });
+    if (path.startsWith("/payment-settings/history/")) {
+      queries.push(url);
+      const page = Number(url.searchParams.get("page")), size = Number(url.searchParams.get("size"));
+      return json(route, { items: entries.slice(page * size, (page + 1) * size), page, size, totalElements: entries.length, totalPages: Math.ceil(entries.length / size) });
+    }
+    return false;
+  }, { ...owner, permissions: [...owner.permissions, "payment.settings.read"] });
+  await page.goto("/settings/organization#payment-operations");
+  const history = page.locator("#payment-operations");
+  for (const label of ["Cargos", "Consentimientos", "Webhooks"]) {
+    await history.getByRole("button", { name: label, exact: true }).click();
+    const list = history.getByRole("region", { name: "Registros del historial de pagos" });
+    await expect(list.getByRole("row")).toHaveCount(101);
+    await expect(list).toHaveCSS("scrollbar-width", "none");
+    await expect(history).toContainText("127 registros · Página 1 de 2");
+    await history.getByRole("button", { name: "Siguiente", exact: true }).click();
+    await expect(list.getByRole("row")).toHaveCount(28);
+    await expect(history.getByRole("button", { name: "Siguiente" })).toBeDisabled();
+  }
+  expect(queries.length).toBeGreaterThanOrEqual(6);
+  expect(queries.every((url) => url.searchParams.get("size") === "100")).toBe(true);
+});
+
+for (const delivery of ["NO_EMAIL", "NOT_CONFIGURED"]) {
+  test(`recuperación ${delivery} ofrece entrega privada sin afirmar que se envió correo`, async ({ page }) => {
+    await boot(page, async (route, path) => {
+      if (path === "/users/internal" && delivery === "NO_EMAIL") return json(route, [staff[0], { ...staff[1], email: null }]);
+      if (path === `/users/internal/${coachId}/password-recovery`) return json(route, { resetUrl: "https://example.invalid/reset-password#token=private-manual", expiresAt: "2099-01-01T15:00:00Z", emailDeliveryStatus: delivery });
+      return false;
+    });
+    await page.goto("/users"); await page.getByRole("button", { name: "Recuperar contraseña" }).click();
+    const drawer = page.getByRole("dialog");
+    await drawer.getByRole("button", { name: delivery === "NO_EMAIL" ? "Generar enlace privado" : "Generar y enviar enlace" }).click();
+    await expect(drawer.getByRole("status")).toContainText(delivery === "NO_EMAIL" ? "no tiene correo" : "no está configurado");
+    await expect(drawer.getByLabel("Enlace privado de recuperación")).toHaveValue(/private-manual$/);
+    await expect(drawer.getByText("Verifica su identidad antes de compartir el enlace.")).toBeVisible();
+    await drawer.getByText("Cómo funciona la recuperación", { exact: true }).click();
+    await expect(drawer.getByText(/entonces se cierran sus sesiones anteriores/)).toBeVisible();
+  });
+}
+
+test("fallo al copiar revela el enlace y un fallo al generar no simula un envío", async ({ page }) => {
+  let fail = true;
+  await boot(page, async (route, path) => path === `/users/internal/${coachId}/password-recovery`
+    ? fail ? json(route, { message: "Espera antes de generar otro enlace." }, 429)
+      : json(route, { resetUrl: "https://example.invalid/reset-password#token=copy-fallback", expiresAt: "2099-01-01T15:00:00Z", emailDeliveryStatus: "SENT" }) : false);
+  await page.addInitScript(() => Object.defineProperty(navigator, "clipboard", { value: { writeText: () => Promise.reject(new Error("Clipboard unavailable")) } }));
+  await page.goto("/users"); await page.getByRole("button", { name: "Recuperar contraseña" }).click();
+  const drawer = page.getByRole("dialog");
+  await drawer.getByRole("button", { name: "Generar y enviar enlace" }).click();
+  await expect(drawer.getByRole("alert")).toContainText("Espera antes de generar");
+  await expect(drawer.getByRole("status")).toHaveCount(0);
+  fail = false;
+  await drawer.getByRole("button", { name: "Generar y enviar enlace" }).click();
+  await expect(drawer.getByRole("status")).toContainText("Enlace enviado");
+  await drawer.getByRole("button", { name: "Copiar enlace privado" }).click();
+  await expect(drawer.getByRole("alert")).toContainText("No se pudo copiar");
+  await expect(drawer.getByLabel("Enlace privado de recuperación")).toHaveValue(/copy-fallback$/);
+});
+
 test("el enlace vencido explica cómo generar otro", async ({ page }) => {
   await boot(page, async (route, path) => path === "/auth/password-recovery/accept" ? json(route, { code: "PASSWORD_RESET_INVALID", message: "El enlace no es válido, ya se utilizó o venció. Solicita uno nuevo al administrador del gimnasio." }, 400) : false);
   await page.goto("/reset-password#token=expired-test-token");

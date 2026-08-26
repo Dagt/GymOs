@@ -559,6 +559,34 @@ test.describe("coaches y rutinas", () => {
   });
 });
 
+test("asignaciones y métricas comienzan con 100 registros, incluida la consulta inicial", async ({ page }) => {
+  const queries: URL[] = [];
+  const details = Array.from({ length: 127 }, (_, index) => ({ ...report().details[0], id: `assignment-${index}`, clientName: `Socio de prueba ${index + 1}` }));
+  await bootCoaching(page, async (route, path, url) => {
+    if (path === "/workout-assignments/history" || path === "/reports/coaches/workout-assignments/summary") {
+      queries.push(url);
+      const page = Number(url.searchParams.get("page")), size = Number(url.searchParams.get("size"));
+      const items = details.slice(page * size, (page + 1) * size);
+      await route.fulfill({ contentType: "application/json", body: JSON.stringify(path.endsWith("/history")
+        ? { items, page, size, totalElements: details.length, totalPages: Math.ceil(details.length / size) }
+        : { ...report(), details: items, page, size, totalDetails: details.length, totalPages: Math.ceil(details.length / size) }) });
+      return true;
+    }
+    return false;
+  });
+  await page.goto("/coaches");
+  for (const tab of ["Asignaciones", "Métricas"]) {
+    await page.getByRole("button", { name: tab, exact: true }).click();
+    const pager = page.getByRole("navigation", { name: "Paginación de asignaciones" });
+    await expect(pager).toContainText("1–100 de 127 asignaciones");
+    await pager.getByRole("button", { name: "Siguiente" }).click();
+    await expect(pager).toContainText("101–127 de 127 asignaciones");
+    await expect(pager.getByRole("button", { name: "Siguiente" })).toBeDisabled();
+  }
+  expect(queries.length).toBeGreaterThanOrEqual(4);
+  expect(queries.every((url) => url.searchParams.get("size") === "100")).toBe(true);
+});
+
 async function bootCoaching(
   page: Page,
   override?: (route: Route, path: string, url: URL) => Promise<boolean>,

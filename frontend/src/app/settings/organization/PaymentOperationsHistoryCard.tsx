@@ -72,6 +72,7 @@ export function PaymentOperationsHistoryCard({ accessToken }: { accessToken: str
   }, [accessToken, kind]);
 
   function select(nextKind: HistoryKind) {
+    if (nextKind === kind) return;
     setKind(nextKind);
     setHistory(null);
     setLoading(true);
@@ -102,7 +103,7 @@ export function PaymentOperationsHistoryCard({ accessToken }: { accessToken: str
         </p>
       ) : null}
       {!loading && history && history.items.length > 0 ? (
-        <div className="overflow-x-auto">
+        <div className="app-scroll-list" role="region" aria-label="Registros del historial de pagos" tabIndex={0} key={`${kind}-${history.page}`}>
           {kind === "charges" ? <ChargeTable items={history.items as RecurringChargeHistory[]} /> : null}
           {kind === "mandates" ? <MandateTable items={history.items as RecurringMandateHistory[]} /> : null}
           {kind === "webhooks" ? <WebhookTable items={history.items as PaymentWebhookHistory[]} /> : null}

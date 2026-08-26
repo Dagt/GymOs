@@ -29,7 +29,8 @@ test("una automatizacion de membresia puede enviar correo al socio del evento", 
       return fulfill(route, { ...createdRule, ...createdPayload });
     }
     if (path.startsWith("/automations/dead-letters")) {
-      return fulfill(route, { items: [], page: 0, size: 25, totalElements: 0, totalPages: 0 });
+      expect(new URL(route.request().url()).searchParams.get("size")).toBe("100");
+      return fulfill(route, { items: [], page: 0, size: 100, totalElements: 0, totalPages: 0 });
     }
     if (path === "/automations/operations") {
       return fulfill(route, {
@@ -81,6 +82,25 @@ test("una automatizacion de membresia puede enviar correo al socio del evento", 
     subject: "Tu membresia vence pronto",
     body: "Hola {{recipientName}}, tu membresia vence el {{endsOn}}.",
   });
+});
+
+test("los 100 problemas iniciales conservan scroll oculto y altura limitada", async ({ page }) => {
+  const items = Array.from({ length: 100 }, (_, index) => ({ id: `problem-${index}`, source: "EXECUTION", ruleName: `Aviso ${index + 1}`, triggerType: "MEMBERSHIP_EXPIRING", errorMessage: "Fallo de prueba", occurredAt: "2026-08-26T12:00:00Z" }));
+  await boot(page, async (route, path) => {
+    if (path === "/automations" || path === "/notifications") return fulfill(route, []);
+    if (path === "/automations/dead-letters") {
+      expect(new URL(route.request().url()).searchParams.get("size")).toBe("100");
+      return fulfill(route, { items, page: 0, size: 100, totalElements: 100, totalPages: 1 });
+    }
+    if (path === "/automations/operations") return fulfill(route, { schedulerPaused: false, alertLevel: "WARNING" });
+    return false;
+  });
+  await page.goto("/automations");
+  await page.getByRole("tab", { name: "Problemas (100)" }).click();
+  const list = page.getByRole("region", { name: "Problemas de automatizaciones" });
+  await expect(list.getByRole("article")).toHaveCount(100);
+  await expect(list).toHaveCSS("scrollbar-width", "none");
+  expect(await list.evaluate((node) => node.clientHeight < innerHeight * .6 && node.scrollHeight > node.clientHeight)).toBe(true);
 });
 
 async function boot(

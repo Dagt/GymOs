@@ -1,4 +1,5 @@
 import { apiFetch } from "./client";
+import { DEFAULT_PAGE_SIZE } from "../pagination";
 import type {
   MercadoPagoTerminal,
   PaymentConfiguration,
@@ -54,7 +55,7 @@ export function selectMercadoPagoTerminal(
 export function getRecurringMandateHistory(
   accessToken: string,
   page = 0,
-  size = 25,
+  size = DEFAULT_PAGE_SIZE,
 ): Promise<PaymentHistoryPage<RecurringMandateHistory>> {
   return apiFetch(`/payment-settings/history/mandates?page=${page}&size=${size}`, accessToken);
 }
@@ -62,7 +63,7 @@ export function getRecurringMandateHistory(
 export function getRecurringChargeHistory(
   accessToken: string,
   page = 0,
-  size = 25,
+  size = DEFAULT_PAGE_SIZE,
 ): Promise<PaymentHistoryPage<RecurringChargeHistory>> {
   return apiFetch(`/payment-settings/history/recurring-charges?page=${page}&size=${size}`, accessToken);
 }
@@ -70,7 +71,7 @@ export function getRecurringChargeHistory(
 export function getPaymentWebhookHistory(
   accessToken: string,
   page = 0,
-  size = 25,
+  size = DEFAULT_PAGE_SIZE,
 ): Promise<PaymentHistoryPage<PaymentWebhookHistory>> {
   return apiFetch(`/payment-settings/history/webhooks?page=${page}&size=${size}`, accessToken);
 }

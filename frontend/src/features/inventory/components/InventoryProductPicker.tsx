@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useState } from "react";
 import { Pagination } from "@/components/Pagination";
+import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import { searchInventoryStock, type InventoryStock, type InventoryStockSearchParams } from "@/lib/api";
 import { usePaginatedQuery } from "@/lib/usePaginatedQuery";
 
@@ -16,7 +17,7 @@ export function InventoryProductPicker({ accessToken, selected, onChange, allowC
   const id = useId();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const list = usePaginatedQuery<InventoryStock, InventoryStockSearchParams>(accessToken, searchInventoryStock, { sort: "name,asc" }, 10, open);
+  const list = usePaginatedQuery<InventoryStock, InventoryStockSearchParams>(accessToken, searchInventoryStock, { sort: "name,asc" }, DEFAULT_PAGE_SIZE, open);
   const setFilters = list.setFilters;
   useEffect(() => {
     const timer = window.setTimeout(() => setFilters({ q: query.trim(), sort: "name,asc" }), 250);
@@ -36,7 +37,7 @@ export function InventoryProductPicker({ accessToken, selected, onChange, allowC
           {list.error ? <p className="text-xs text-red-700" role="alert">{list.error}</p> : null}
           <Pagination label="opciones de producto" page={list.page} size={list.size} totalElements={list.total} loading={list.loading} onPageChange={list.setPage} />
           {!list.loading && list.items.length === 0 && !list.error ? <p className="text-xs text-[var(--brand-muted)]">No hay coincidencias.</p> : null}
-          <ul className="grid gap-1">
+          <ul className="app-scroll-list grid gap-1" aria-label="Opciones de producto" tabIndex={0} key={`${list.page}-${list.filters.q ?? ""}`}>
             {list.items.map((product) => (
               <li key={product.productId}>
                 <button className="grid w-full min-w-0 gap-1 rounded-lg p-2 text-left text-xs break-words hover:bg-[var(--brand-surface)] focus-visible:outline-2" onClick={() => { onChange(product); setOpen(false); }} type="button">

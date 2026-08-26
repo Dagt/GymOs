@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AppDrawer } from "@/components/AppDrawer";
 import { Pagination } from "@/components/Pagination";
+import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import { usePaginatedQuery } from "@/lib/usePaginatedQuery";
 import { businessToday, businessWeekStart, assignmentDateError } from "@/lib/business-date";
 import { AuthRequired } from "@/components/AuthRequired";
@@ -147,7 +148,7 @@ export default function CoachesPage() {
   const [coaches, setCoaches] = useState<CoachSummary[]>([]);
   const [workouts, setWorkouts] = useState<WorkoutSummary[]>([]);
   const canReadExercises = Boolean(session && !isMetricsOnlySupervisor(session) && session.user.permissions.includes("exercise.read"));
-  const exerciseList = usePaginatedQuery<Exercise, ExerciseSearchParams>(session?.accessToken, getExercises, {}, 25, canReadExercises);
+  const exerciseList = usePaginatedQuery<Exercise, ExerciseSearchParams>(session?.accessToken, getExercises, {}, DEFAULT_PAGE_SIZE, canReadExercises);
   const exercisePage = exerciseList.items;
   const [equipmentCatalogOptions, setEquipmentCatalogOptions] = useState<string[]>([]);
   const [report, setReport] = useState<AssignmentReport | null>(null);
@@ -192,7 +193,7 @@ export default function CoachesPage() {
   const [metricClientQuery, setMetricClientQuery] = useState("");
   const [metricClients, setMetricClients] = useState<ClientSummary[]>([]);
   const [reportClient, setReportClient] = useState<ClientSummary | null>(null);
-  const assignmentList = usePaginatedQuery<AssignmentDetail, { clientId?: string }>(session?.accessToken, getAssignmentHistory, {}, 25,
+  const assignmentList = usePaginatedQuery<AssignmentDetail, { clientId?: string }>(session?.accessToken, getAssignmentHistory, {}, DEFAULT_PAGE_SIZE,
     Boolean(session && !isMetricsOnlySupervisor(session) && hasAnyPermission(session, "workout.read.own", "workout.read.all")));
 
   useEffect(() => {
@@ -335,7 +336,7 @@ export default function CoachesPage() {
       coachId: reportCoachId || undefined,
       clientId: reportClient?.id,
       page: reportPage,
-      size: 25,
+      size: DEFAULT_PAGE_SIZE,
     };
     const supervisorMetricsOnly = isMetricsOnlySupervisor(session);
     const canReadWorkouts = !supervisorMetricsOnly && hasAnyPermission(
@@ -576,7 +577,7 @@ export default function CoachesPage() {
           to: reportTo,
           ...filters,
           page: 0,
-          size: 25,
+          size: DEFAULT_PAGE_SIZE,
         }),
         getAssignmentTrend(session.accessToken, {
           weeks: trendWeeks,
@@ -604,7 +605,7 @@ export default function CoachesPage() {
         coachId: reportCoachId || undefined,
         clientId: reportClient?.id,
         page,
-        size: 25,
+        size: DEFAULT_PAGE_SIZE,
       }));
       setReportPage(page);
     } catch (exception) {
@@ -2592,6 +2593,5 @@ function normalizeRole(role: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 }
-
 
 

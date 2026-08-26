@@ -3489,17 +3489,6 @@ button.admin-secondary-link:disabled {
   grid-column: 1 / -1;
 }
 
-.team-layout {
-  display: grid;
-  gap: 1.25rem;
-  grid-template-columns: minmax(0, 1fr) minmax(18rem, 25rem);
-}
-
-.team-side {
-  display: grid;
-  gap: 1.25rem;
-}
-
 .team-warning {
   background: #fff7ed;
   border: 1px solid #fed7aa;
@@ -3620,33 +3609,9 @@ button.admin-secondary-link:disabled {
   padding: 0.9rem;
 }
 
-.team-context-list {
-  display: grid;
-  gap: 0.75rem;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: 1rem;
-}
-
-.team-context-list article {
-  background: color-mix(in srgb, var(--brand-primary-soft) 45%, white);
-  border: 1px solid var(--brand-primary-border);
-  border-radius: 0.75rem;
-  display: grid;
-  gap: 0.3rem;
-  padding: 0.9rem;
-}
-
-.team-context-list span {
+.team-user-count {
   color: var(--brand-muted);
-  font-size: 0.74rem;
-  font-weight: 900;
-  text-transform: uppercase;
-}
-
-.team-context-list strong {
-  color: var(--brand-ink);
-  font-size: 1.1rem;
-  font-weight: 950;
+  font-size: 0.8rem;
 }
 
 .team-user-table article {
@@ -3654,10 +3619,20 @@ button.admin-secondary-link:disabled {
   background: white;
   border-bottom: 1px solid var(--brand-line);
   display: grid;
-  gap: 0.85rem;
-  grid-template-columns: minmax(13rem, 1.4fr) minmax(9rem, 0.85fr) minmax(10rem, 0.85fr) minmax(17rem, auto);
-  min-height: 4.75rem;
-  padding: 0.75rem 1rem;
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 0.9fr) 132px;
+  min-height: 6rem;
+  padding: 0.9rem 1rem;
+  font-size: 0.82rem;
+}
+
+.team-user-table article[data-status="SUSPENDED"] {
+  background: color-mix(in srgb, var(--brand-surface) 60%, white);
+}
+
+.team-user-table strong {
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
 
 .team-user-table {
@@ -3680,8 +3655,8 @@ button.admin-secondary-link:disabled {
   display: grid;
   font-size: 0.68rem;
   font-weight: 950;
-  gap: 0.85rem;
-  grid-template-columns: minmax(13rem, 1.4fr) minmax(9rem, 0.85fr) minmax(10rem, 0.85fr) minmax(17rem, auto);
+  gap: 1rem;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 0.9fr) 132px;
   letter-spacing: 0.055em;
   padding: 0.65rem 1rem;
   text-transform: uppercase;
@@ -3700,11 +3675,47 @@ button.admin-secondary-link:disabled {
   min-width: 0;
 }
 
+.team-user-identity > div > span {
+  font-size: 0.75rem;
+}
+
+.team-user-state {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.65rem;
+  margin-top: 0.25rem;
+}
+
+.team-user-state small {
+  font-size: 0.7rem;
+}
+
+.team-user-state .team-status {
+  align-items: center;
+  color: #64748b;
+  display: inline-flex;
+  font-size: 0.7rem;
+  gap: 0.3rem;
+}
+
+.team-user-state .team-status.active {
+  color: #166534;
+}
+
+.team-status::before {
+  background: currentColor;
+  border-radius: 50%;
+  content: "";
+  height: 0.35rem;
+  width: 0.35rem;
+}
+
 .team-user-avatar {
   align-items: center;
   background: var(--brand-primary-soft);
   border: 1px solid var(--brand-primary-border);
-  border-radius: 0.65rem;
+  border-radius: 50%;
   color: var(--brand-primary) !important;
   display: flex;
   flex: 0 0 2.35rem;
@@ -3720,22 +3731,20 @@ button.admin-secondary-link:disabled {
 }
 
 .team-user-branches > span:last-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  overflow-wrap: anywhere;
 }
 
 .team-user-action-buttons {
   align-items: center;
   display: flex;
   flex-wrap: nowrap;
-  gap: 0.5rem;
+  gap: 6px;
   justify-content: flex-end;
-  min-width: max-content;
+  min-width: 0;
 }
 
-.team-user-action-buttons > small {
-  white-space: nowrap;
+.team-actions-heading {
+  text-align: right;
 }
 
 .team-role-control {
@@ -3756,6 +3765,7 @@ button.admin-secondary-link:disabled {
   border: 1px solid var(--brand-line);
   border-radius: 0.5rem;
   min-height: 2.25rem;
+  font-size: 0.8rem;
   padding: 0 0.65rem;
   width: 100%;
 }
@@ -3775,22 +3785,36 @@ button.admin-secondary-link:disabled {
 }
 
 .team-user-action-buttons button {
-  background: color-mix(in srgb, var(--brand-primary) 92%, black);
-  border-radius: 0.5rem;
-  color: white;
-  font-size: 0.8rem;
-  font-weight: 900;
-  min-height: 2.1rem;
-  padding: 0 0.75rem;
+  align-items: center;
+  background: white;
+  border: 1px solid var(--brand-line);
+  border-radius: 0.65rem;
+  color: var(--brand-primary);
+  display: inline-flex;
+  flex: 0 0 40px;
+  height: 40px;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+
+.team-user-action-buttons button:hover:not(:disabled) {
+  background: var(--brand-primary-soft);
+  border-color: var(--brand-primary-border);
 }
 
 .team-user-action-buttons button.danger-action {
-  background: #7f1d1d;
+  color: #9f3535;
 }
 
 .team-user-action-buttons button.safe-action {
-  background: #166534;
-  border-bottom: 0.2rem solid var(--brand-accent);
+  color: #166534;
+}
+
+.team-user-action-buttons button:focus-visible,
+.password-recovery-text-button:focus-visible {
+  outline: 2px solid var(--brand-primary);
+  outline-offset: 3px;
 }
 
 .team-user-action-buttons button:disabled {
@@ -3805,6 +3829,151 @@ button.admin-secondary-link:disabled {
 .team-role-control select:focus {
   border-color: var(--brand-accent) !important;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-accent) 18%, transparent);
+}
+
+.app-drawer-card:has(.password-recovery) {
+  background: #fff;
+}
+
+.password-recovery {
+  display: grid;
+  gap: 1.25rem;
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.password-recovery-person {
+  align-items: center;
+  border-bottom: 1px solid var(--brand-line);
+  display: flex;
+  gap: 0.85rem;
+  padding-bottom: 1.25rem;
+}
+
+.password-recovery-avatar {
+  align-items: center;
+  background: var(--brand-primary-soft);
+  border-radius: 50%;
+  color: var(--brand-primary);
+  display: flex;
+  flex: 0 0 3rem;
+  height: 3rem;
+  justify-content: center;
+}
+
+.password-recovery-person > div {
+  display: grid;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.password-recovery-person strong {
+  font-size: 1rem;
+}
+
+.password-recovery-person span:not(.password-recovery-avatar),
+.password-recovery-person small,
+.password-recovery-expiry,
+.password-recovery-reissue small {
+  color: var(--brand-muted);
+}
+
+.password-recovery-result {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.password-recovery-status {
+  align-items: start;
+  border-radius: 0.85rem;
+  display: flex;
+  gap: 0.75rem;
+  padding: 1rem;
+}
+
+.password-recovery-status > svg,
+.password-recovery-safety > svg {
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+.password-recovery-status.sent {
+  background: #f0fdf4;
+  color: #166534;
+}
+
+.password-recovery-status.attention {
+  background: #fffbeb;
+  color: #854d0e;
+}
+
+.password-recovery-status p {
+  font-size: 0.8rem;
+  margin-top: 0.2rem;
+}
+
+.password-recovery-expiry {
+  font-size: 0.75rem;
+}
+
+.password-recovery-share,
+.password-recovery-reissue {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  justify-content: space-between;
+}
+
+.password-recovery .app-button,
+.password-recovery .app-button-secondary {
+  align-items: center;
+  display: inline-flex;
+  gap: 0.5rem;
+  justify-content: center;
+}
+
+.password-recovery-text-button {
+  border-radius: 0.35rem;
+  color: var(--brand-primary);
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 650;
+  min-height: 2.5rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.password-recovery-text-button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.password-recovery-safety {
+  color: var(--brand-muted);
+  display: flex;
+  font-size: 0.78rem;
+  gap: 0.5rem;
+}
+
+.password-recovery-help {
+  border-top: 1px solid var(--brand-line);
+  color: var(--brand-muted);
+  font-size: 0.8rem;
+  padding-top: 1rem;
+}
+
+.password-recovery-help summary {
+  color: var(--brand-ink);
+  cursor: pointer;
+}
+
+.password-recovery-help ul {
+  display: grid;
+  gap: 0.65rem;
+  list-style: disc;
+  margin-top: 0.85rem;
+  padding-left: 1.15rem;
 }
 
 .workout-builder {
@@ -4755,8 +4924,7 @@ button.admin-secondary-link:disabled {
   .reception-identity-panel,
   .reception-command-layout,
   .reception-action-grid,
-  .reception-secondary-commands,
-  .team-layout {
+  .reception-secondary-commands {
     grid-template-columns: 1fr;
   }
 
@@ -5723,10 +5891,6 @@ button.admin-secondary-link:disabled {
 }
 
 @media (max-width: 980px) {
-  .team-layout {
-    grid-template-columns: 1fr;
-  }
-
   .team-user-table-header {
     display: none;
   }
@@ -5778,15 +5942,23 @@ button.admin-secondary-link:disabled {
 
 @media (max-width: 640px) {
   .team-user-table article {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .team-user-identity,
-  .team-user-branches,
-  .team-role-control,
   .team-user-action-buttons {
-    grid-column: 1;
+    grid-column: 1 / -1;
     grid-row: auto;
+  }
+
+  .team-user-branches {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .team-role-control {
+    grid-column: 2;
+    grid-row: 2;
   }
 
   .team-user-action-buttons {

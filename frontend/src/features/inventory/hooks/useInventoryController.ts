@@ -54,7 +54,7 @@ export function useInventoryController() {
   const token = session?.accessToken;
   const stockList = usePaginatedQuery<InventoryStock, InventoryStockSearchParams>(token, searchInventoryStock, { sort: "name,asc" });
   const movementList = usePaginatedQuery<InventoryMovement, InventoryMovementSearchParams>(token, searchInventoryMovements, {});
-  const lowStockList = usePaginatedQuery<InventoryStock, InventoryStockSearchParams>(token, searchInventoryStock, { lowStockOnly: true, sort: "quantity,asc" }, 10);
+  const lowStockList = usePaginatedQuery<InventoryStock, InventoryStockSearchParams>(token, searchInventoryStock, { lowStockOnly: true, sort: "quantity,asc" });
   const countList = usePaginatedQuery<InventoryPhysicalCount, InventoryHistorySearchParams>(token, searchInventoryPhysicalCounts, {});
   const transferList = usePaginatedQuery<InventoryTransfer, InventoryHistorySearchParams>(token, searchInventoryTransfers, {});
   // Operational indicators must not depend on whichever history page is open.

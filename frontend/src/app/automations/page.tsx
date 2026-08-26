@@ -518,7 +518,7 @@ async function loadConsole(session: StoredSession) {
   const [rules, notifications, deadLetters, operations, emailConfiguration] = await Promise.all([
     getAutomations(session.accessToken),
     hasPermission(session, "notification.read") ? getNotifications(session.accessToken, 50) : Promise.resolve([]),
-    getAutomationDeadLetters(session.accessToken, 0, 25),
+    getAutomationDeadLetters(session.accessToken),
     getAutomationOperations(session.accessToken),
     hasAnyPermission(session, "notification.read", "notification.settings.manage", "platform.admin")
       ? getEmailNotificationConfiguration(session.accessToken)
@@ -556,7 +556,7 @@ function ProblemsView({
     );
   }
   return (
-    <section className="mt-4 grid gap-3">
+    <section className="app-scroll-list mt-4 grid gap-3" role="region" aria-label="Problemas de automatizaciones" tabIndex={0}>
       {deadLetters.map((item) => (
         <article className="app-card p-5" key={`${item.source}:${item.id}`}>
           <div className="flex flex-wrap items-start justify-between gap-4">

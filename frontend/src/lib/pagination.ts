@@ -1,3 +1,6 @@
+/** Initial size for visible paginated lists; explicit user choices take precedence. */
+export const DEFAULT_PAGE_SIZE = 100;
+
 export type PageResult<T> = {
   items: T[];
   page: number;
@@ -19,8 +22,8 @@ export function pageNumber(value: string | null, fallback = 0) {
   return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
-export function pageSize(value: string | null, fallback = 25) {
-  return Math.min(100, Math.max(1, pageNumber(value, fallback)));
+export function pageSize(value: string | null, fallback = DEFAULT_PAGE_SIZE) {
+  return Math.min(100, Math.max(1, pageNumber(value?.trim() || null, fallback)));
 }
 
 export function lastPage(total: number, size: number) {

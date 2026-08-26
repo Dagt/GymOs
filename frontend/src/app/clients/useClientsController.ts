@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import { type FieldErrorMap, normalizePhone } from "@/components/FormFields";
 import {
   createClient,
@@ -28,7 +29,7 @@ export function useClientsController() {
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [query, setQuery] = useState("");
-  const [listParams, setListParams] = useState({ query: "", page: 0, size: 25, revision: 0 });
+  const [listParams, setListParams] = useState({ query: "", page: 0, size: DEFAULT_PAGE_SIZE, revision: 0 });
   const [totalClients, setTotalClients] = useState(0);
   const [registeredClients, setRegisteredClients] = useState<number | null>(null);
   const [listError, setListError] = useState<string | null>(null);

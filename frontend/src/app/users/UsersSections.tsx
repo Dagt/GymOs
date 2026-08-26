@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { FormEvent } from "react";
+import { KeyRound, SquarePen, UserRoundCheck, UserRoundX } from "lucide-react";
 import { AppDrawer } from "@/components/AppDrawer";
 import {
   EmailField,
@@ -13,7 +14,6 @@ import type {
   BranchSummary,
   CreateInternalUserPayload,
   InternalUserSummary,
-  OrganizationSummary,
   RoleOption,
   StoredSession,
 } from "@/lib/api";
@@ -29,12 +29,11 @@ export function TeamOverview({ branches, roles, onCreateUser }: { branches: Bran
   return (
     <section className="app-card p-5">
       <div className="admin-panel-header">
-        <div><p>Equipo</p><h2>Usuarios por rol</h2></div>
+        <div><p>Equipo</p><h2>Gestiona a tus colaboradores</h2></div>
         <button className="app-button" disabled={roles.length === 0 || branches.length === 0} onClick={onCreateUser} type="button">Crear usuario</button>
       </div>
-      <p className="mt-2 text-sm leading-6 text-[var(--brand-muted)]">Administra accesos internos sin mezclar gimnasios ni sucursales. Los formularios de alta se abren en panel lateral para mantener esta vista limpia.</p>
       {branches.length === 0 ? (
-        <section className="team-warning"><strong>Primero crea una sucursal</strong><span>Sin sucursales no podras asignar acceso operativo a recepcion, coaches o gerencia.</span><Link href="/settings/organization">Crear sucursal</Link></section>
+        <section className="team-warning"><strong>Primero crea una sucursal</strong><span>Sin sucursales no podrás asignar acceso operativo a recepción, coaches o gerencia.</span><Link href="/settings/organization">Crear sucursal</Link></section>
       ) : null}
       <details className="team-role-disclosure">
         <summary>Consultar roles disponibles ({roles.length})</summary>
@@ -43,17 +42,6 @@ export function TeamOverview({ branches, roles, onCreateUser }: { branches: Bran
         </div>
       </details>
     </section>
-  );
-}
-
-export function TeamContextCard({ branches, organization, session, roles, users }: { branches: BranchSummary[]; organization: OrganizationSummary | null; session: StoredSession; roles: RoleOption[]; users: InternalUserSummary[] }) {
-  return (
-    <section className="team-side"><section className="app-card p-5"><p className="app-eyebrow">Contexto</p><h2 className="mt-2 text-xl font-semibold">Alcance operativo</h2><div className="team-context-list">
-      <article><span>Gimnasio</span><strong>{organization?.tradeName ?? session.user.organizationName ?? "GymFort"}</strong></article>
-      <article><span>Sucursales</span><strong>{branches.length}</strong></article>
-      <article><span>Usuarios activos</span><strong>{users.filter((user) => user.status === "ACTIVE").length}</strong></article>
-      <article><span>Roles disponibles</span><strong>{roles.length}</strong></article>
-    </div></section></section>
   );
 }
 
@@ -78,15 +66,18 @@ export function UsersTable({
 }) {
   return (
     <section className="app-card p-5">
-      <div className="admin-panel-header"><div><p>Usuarios actuales</p><h2>Equipo del gimnasio</h2></div></div>
+      <div className="admin-panel-header">
+        <div><p>Usuarios actuales</p><h2>Equipo del gimnasio</h2></div>
+        <p className="team-user-count">{users.length} usuarios · {users.filter((user) => user.status === "ACTIVE").length} activos</p>
+      </div>
       <div className="team-user-table app-scroll-list" role="region" aria-label="Usuarios del gimnasio" tabIndex={0}>
-        {users.length === 0 ? <section className="admin-empty-card"><strong>No hay usuarios internos creados</strong><span>Crea cuentas para duenos, gerentes, recepcion y coaches.</span></section> : null}
+        {users.length === 0 ? <section className="admin-empty-card"><strong>No hay usuarios internos creados</strong><span>Crea cuentas para dueños, gerentes, recepción y coaches.</span></section> : null}
         {users.length ? (
           <div aria-hidden="true" className="team-user-table-header">
             <span>Usuario</span>
             <span>Sucursales</span>
             <span>Rol</span>
-            <span>Estado y acciones</span>
+            <span className="team-actions-heading">Acciones</span>
           </div>
         ) : null}
         {users.map((user) => {
@@ -95,12 +86,16 @@ export function UsersTable({
           const isCoach = user.roles.some((role) => displayRoleName(role) === "Coach");
           const canManage = !isCurrentUser && canManageUserForSession(session.user.roles, user.roles, Boolean(session.user.platformAdmin));
           return (
-            <article key={user.id}>
+            <article key={user.id} data-status={user.status}>
               <div className="team-user-identity">
-                <span className="team-user-avatar">{userInitials(user.fullName)}</span>
+                <span className="team-user-avatar" aria-hidden="true">{userInitials(user.fullName)}</span>
                 <div>
                   <strong>{user.fullName}</strong>
                   <span className="break-all">{user.username}</span>
+                  <div className="team-user-state">
+                    <span className={user.status === "ACTIVE" ? "team-status active" : "team-status"}>{user.status === "ACTIVE" ? "Activo" : "Suspendido"}</span>
+                    {!canManage ? <small>{isCurrentUser ? "Tu cuenta" : isOwner ? "Dueño protegido" : "Solo lectura"}</small> : null}
+                  </div>
                 </div>
               </div>
               <div className="team-user-branches">
@@ -112,7 +107,7 @@ export function UsersTable({
                   <span className="team-mobile-label">Rol</span>
                   <select
                     aria-label={`Rol de ${user.fullName}`}
-                    defaultValue={roleIdForUser(user, roles)}
+                    value={roleIdForUser(user, roles)}
                     disabled={saving}
                     onChange={(event) => onChangeRole(user, event.target.value)}
                   >
@@ -127,31 +122,28 @@ export function UsersTable({
                 </div>
               )}
               <div className="team-user-action-buttons">
-                <p className={user.status === "ACTIVE" ? "status-pill active" : "status-pill"}>
-                  {user.status === "ACTIVE" ? "Activo" : "Suspendido"}
-                </p>
                 {canManage && isCoach && session.user.permissions.includes("coach.profile.manage") ? (
-                  <button className="safe-action" disabled={saving} onClick={() => onEditCoach(user)} type="button">
-                    Datos de Coach
+                  <button aria-label="Datos de Coach" title="Datos de Coach" disabled={saving} onClick={() => onEditCoach(user)} type="button">
+                    <SquarePen size={17} aria-hidden="true" />
                   </button>
                 ) : null}
                 {canManage && user.status === "ACTIVE" && session.user.accountScope !== "PLATFORM" && !session.user.supportMode && session.user.permissions.includes("user.manage") && (session.user.roles.some((role) => displayRoleName(role) === "Dueno del gimnasio") || user.branchIds.includes(session.user.branchId ?? "")) ? (
-                  <button className="safe-action" disabled={saving} onClick={() => onRecoverPassword(user)} type="button">
-                    Recuperar contraseña
+                  <button aria-label="Recuperar contraseña" title="Recuperar contraseña" disabled={saving} onClick={() => onRecoverPassword(user)} type="button">
+                    <KeyRound size={17} aria-hidden="true" />
                   </button>
                 ) : null}
                 {canManage ? (
                   <button
                     className={user.status === "ACTIVE" ? "danger-action" : "safe-action"}
+                    aria-label={user.status === "ACTIVE" ? "Suspender" : "Reactivar"}
+                    title={user.status === "ACTIVE" ? "Suspender usuario" : "Reactivar usuario"}
                     disabled={saving}
                     onClick={() => onToggleStatus(user)}
                     type="button"
                   >
-                    {user.status === "ACTIVE" ? "Suspender" : "Reactivar"}
+                    {user.status === "ACTIVE" ? <UserRoundX size={17} aria-hidden="true" /> : <UserRoundCheck size={17} aria-hidden="true" />}
                   </button>
-                ) : (
-                  <small>{isCurrentUser ? "Tu cuenta" : isOwner ? "Dueno protegido" : "Solo lectura"}</small>
-                )}
+                ) : null}
               </div>
             </article>
           );

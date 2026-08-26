@@ -123,6 +123,21 @@ incluidos. No se duplica el beneficio ni se llama al hardware.
 5. Si venció o se perdió, volver a **Recuperar contraseña** genera otro y revoca el
    anterior, tras la espera configurada. No se recupera un enlace anterior.
 
+La vista de equipo presenta identidad/estado, sucursales y rol en columnas,
+con acciones compactas de perfil, recuperación (llave) y suspensión. Cada acción
+conserva su nombre accesible y los permisos previos; en móvil se reorganizan las
+filas sin desbordamiento. El selector de rol vuelve a su valor vigente si se
+cancela la confirmación. Los conteos de usuarios se muestran sobre el listado;
+se retira la tarjeta redundante de contexto.
+
+El drawer de recuperación muestra primero el destinatario y una sola acción
+principal. La explicación del uso único, invalidación y cierre de sesiones está
+en **Cómo funciona la recuperación**. La advertencia de verificar la identidad
+permanece visible. Tras enviar, el enlace manual queda oculto hasta elegir
+**Ver enlace**; si falta correo/configuración o falla el envío, aparece de
+inmediato. **Generar otro enlace** avisa que invalida el anterior. Al cerrar el
+panel se descarta el enlace en memoria; no se guarda en storage del navegador.
+
 El login tiene **Olvidé mi contraseña** con estas instrucciones. No se introduce
 un endpoint público para enumerar usuarios por correo, ni recuperación de dueños,
 cuentas de plataforma o del propio administrador por este flujo.

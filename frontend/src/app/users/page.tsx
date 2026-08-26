@@ -28,7 +28,7 @@ import {
   type RoleOption,
   type StoredSession,
 } from "@/lib/api";
-import { CoachProfileDrawer, CreateUserDrawer, TeamContextCard, TeamOverview, UsersTable } from "./UsersSections";
+import { CoachProfileDrawer, CreateUserDrawer, TeamOverview, UsersTable } from "./UsersSections";
 import { canSeeUserForSession, canShowRoleForSession, displayRoleName, validateUserForm } from "./UsersRoleHelpers";
 import { PasswordRecoveryDrawer } from "./PasswordRecoveryDrawer";
 
@@ -364,10 +364,7 @@ export default function UsersPage() {
       {error ? <FormError message={error} /> : null}
       {message ? <AppNotice message={message} tone="success" /> : null}
 
-      <section className="team-layout">
-        <TeamOverview branches={branches} roles={selectableRoles} onCreateUser={openCreateUser} />
-        <TeamContextCard branches={branches} organization={organization} roles={selectableRoles} session={session} users={visibleUsers} />
-      </section>
+      <TeamOverview branches={branches} roles={selectableRoles} onCreateUser={openCreateUser} />
 
       <UsersTable
         roles={selectableRoles}
