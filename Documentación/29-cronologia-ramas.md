@@ -2,27 +2,24 @@
 
 Estado: AUDITADO
 
-Corte: 24 de agosto de 2026
+Corte: 26 de agosto de 2026
 
-Rama de trabajo: `feature/platform-identity-separation`
+Rama de trabajo: `feature/client-onboarding-lifecycle`
 
-Base integrada: `main` en `88981b4` (`Merge pull request #15`)
+Base integrada: `main` en `a5ea75f` (`Merge pull request #18`)
 
 ## 1. Situación vigente
 
-El PR #15 ya integró en `main` la administración comercial, la separación
-`PLATFORM`/`TENANT`, el bootstrap inicial y el aprovisionamiento transaccional de
-gimnasios. La rama actual fue adelantada a ese merge y contiene exclusivamente
-el cierre posterior: concurrencia PostgreSQL del bootstrap, detección por
-permiso efectivo, retiro seguro del fixture histórico, Compose, CI y runbook.
-
-Este cierre debe publicarse en un PR nuevo; el PR #15 fusionado es inmutable. No
-debe fusionarse hasta que el nuevo CI y la revisión de seguridad estén verdes.
+`main` ya contiene los cierres de identidad, administración comercial,
+paginación y endurecimiento hasta V92. La rama actual parte directamente de ese
+corte e implementa V93: inscripción, baja automática reversible, autenticación
+de socios sin plan y alta desde kiosco.
 
 | Rama | Estado | Acción |
 |---|---|---|
-| `main` | Incluye PR #15 en `88981b4` | Recibir el hardening sólo por un PR nuevo y verde |
-| `feature/platform-identity-separation` | Activa sobre el `main` fusionado | Publicar PR de cierre; revisar CI/seguridad; no fusionar automáticamente |
+| `main` | Incluye PR #18 en `a5ea75f` | Base estable de esta rama |
+| `feature/client-onboarding-lifecycle` | Activa sobre `main` | Revisar V93 y publicar por PR con CI verde |
+| `feature/platform-identity-separation` | Integrada antes del corte actual | Histórica; no fusionar otra vez |
 | `feature/platform-client-billing-management` | Integrada mediante PR #15 | Histórica; no fusionar otra vez |
 | `feature/physical-access-control` | Integrada mediante PR #14 | Histórica; no fusionar otra vez |
 | `feature/pricing-and-billing` | Integrada en `main` | Histórica; no fusionar otra vez |
@@ -42,11 +39,20 @@ debe fusionarse hasta que el nuevo CI y la revisión de seguridad estén verdes.
 | 24 ago 2026 | JWT/refresh, soporte temporal, bootstrap y rutas frontend adoptan `accountScope` explícito |
 | 24 ago 2026 | PR #15 integra administración comercial e identidad en `main` (`88981b4`) |
 | 24 ago 2026 | V88 y el hardening posterior coordinan bootstrap, retiran fixture vacío y amplían CI |
+| 26 ago 2026 | PR #18 integra paginación y hardening V91–V92 en `main` (`a5ea75f`) |
+| 26 ago 2026 | Se crea `feature/client-onboarding-lifecycle` y V93 agrupa el primer lote de retroalimentación del cliente real |
 
 ## 3. Alcance material de la rama activa
 
 ### Implementado
 
+- cargo de inscripción configurable, cotizado y persistido como partida
+  financiera independiente;
+- baja automática reversible de socios sin vigencia, con fecha, motivo,
+  auditoría y evento de cambio de estado;
+- verificación de socios sin plan y reactivación segura de bajas automáticas;
+- capacidad opt-in por sucursal para alta desde kiosco y continuación inmediata
+  al primer plan;
 - administración comercial de gimnasios desde la navegación lateral de
   plataforma;
 - identidades `PLATFORM` sin organización/sucursal e identidades `TENANT` con
@@ -65,6 +71,9 @@ debe fusionarse hasta que el nuevo CI y la revisión de seguridad estén verdes.
 
 ### No incluido
 
+- variantes de catálogo/códigos múltiples, paquetes de visitas entre tenants,
+  alcance multi-sucursal de beneficios ni branding por sucursal; quedan en los
+  lotes 2–5 del análisis del primer cliente;
 - borrado de cualquier dato demo ambiguo, modificado o con actividad;
 - fusión automática a `main`;
 - GymFort Local Connector, adapter HikCentral o integración con hardware;
@@ -73,13 +82,12 @@ debe fusionarse hasta que el nuevo CI y la revisión de seguridad estén verdes.
 
 ## 4. Evidencia de validación local
 
-- 413 pruebas backend unitarias;
-- 59 pruebas PostgreSQL/Testcontainers, incluidas migraciones limpias/upgrade;
-- `build` backend y construcción de imagen Docker;
-- 94/94 pruebas frontend, typecheck, lint y build Next;
-- bundle OpenNext para Cloudflare;
-- `npm audit` con cero vulnerabilidades;
-- construcción completa de imágenes backend/frontend mediante Compose;
+- 452 pruebas backend unitarias;
+- 88 pruebas PostgreSQL/Testcontainers, incluidas V93 sobre base limpia,
+  inactividad y persistencia financiera de la inscripción;
+- 113/113 pruebas frontend, typecheck, lint y build Next de producción;
+- 10/10 recorridos E2E de kiosco en Chromium, incluido registro nuevo y alta
+  sin membresía previa;
 - `git diff --check` y revisión de que no se versionen secretos.
 
 La evidencia local no sustituye los checks del PR. Ausencia de un status
@@ -89,7 +97,7 @@ publicado no se interpreta como pipeline verde.
 
 1. La rama actual se publica y abre contra `main` como PR revisable.
 2. CI, migraciones y revisión de seguridad deben terminar correctamente.
-3. El bootstrap se habilita sólo durante la creación inicial y sus variables se
-   eliminan después, conforme al runbook.
+3. La capacidad `clientRegistration` permanece deshabilitada en perfiles
+   existentes hasta que el gimnasio la active por sucursal.
 4. No se fusiona ni despliega automáticamente desde esta tarea.
 5. Las ramas remotas sólo se eliminan por decisión explícita.

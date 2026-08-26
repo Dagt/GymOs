@@ -1,6 +1,8 @@
 package com.gymos.memberships.application;
 
 import com.gymos.common.api.BusinessException;
+import com.gymos.clients.api.operations.ClientLifecycleOperations;
+import com.gymos.clients.api.operations.ClientLifecycleOperations.RegistrationFee;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.time.BusinessTime;
 import com.gymos.eligibility.api.EligibilityPolicy;
@@ -26,13 +28,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class MembershipPricingService implements MembershipPricingOperations {
 	private final MembershipRepository membershipRepository;
 	private final EligibilityPolicy eligibilityPolicy;
+	private final ClientLifecycleOperations clientLifecycleOperations;
 
 	public MembershipPricingService(
 			MembershipRepository membershipRepository,
-			EligibilityPolicy eligibilityPolicy
+			EligibilityPolicy eligibilityPolicy,
+			ClientLifecycleOperations clientLifecycleOperations
 	) {
 		this.membershipRepository = membershipRepository;
 		this.eligibilityPolicy = eligibilityPolicy;
+		this.clientLifecycleOperations = clientLifecycleOperations;
 	}
 
 	@Transactional(readOnly = true)
@@ -51,7 +56,8 @@ public class MembershipPricingService implements MembershipPricingOperations {
 	public MembershipQuoteView quoteForCheckout(GymOsPrincipal principal, UUID clientId, UUID planId) {
 		MembershipQuoteResult quote = quote(principal, clientId, planId);
 		return new MembershipQuoteView(
-				quote.clientId(), quote.planId(), quote.planName(), quote.listPriceCents(),
+				quote.clientId(), quote.planId(), quote.planName(), quote.planPriceCents(),
+				quote.registrationFeeCents(), quote.registrationFeeLabel(), quote.listPriceCents(),
 				quote.discountCents(), quote.totalCents(), quote.currency(),
 				quote.appliedBenefits().stream()
 						.map(item -> new AppliedBenefitView(item.benefitId(), item.code(), item.name(), item.discountCents()))
@@ -74,13 +80,25 @@ public class MembershipPricingService implements MembershipPricingOperations {
 		QuoteCandidate combinable = applyCombinable(plan.priceCents(), eligible);
 		QuoteCandidate exclusive = bestExclusive(plan.priceCents(), eligible);
 		QuoteCandidate selected = exclusive.totalCents() < combinable.totalCents() ? exclusive : combinable;
+		RegistrationFee registrationFee = clientLifecycleOperations.registrationFee(
+				organizationId, clientId, BusinessTime.today());
+		if (registrationFee.due() && !plan.currency().equalsIgnoreCase(registrationFee.currency())) {
+			throw new BusinessException(
+					"REGISTRATION_FEE_CURRENCY_MISMATCH",
+					"La moneda de la inscripción debe coincidir con la moneda del plan."
+			);
+		}
+		long registrationFeeCents = registrationFee.due() ? registrationFee.amountCents() : 0;
 		return new MembershipQuoteResult(
 				clientId,
 				plan.planId(),
 				plan.planName(),
 				plan.priceCents(),
+				registrationFeeCents,
+				registrationFee.due() ? registrationFee.label() : null,
+				plan.priceCents() + registrationFeeCents,
 				plan.priceCents() - selected.totalCents(),
-				selected.totalCents(),
+				selected.totalCents() + registrationFeeCents,
 				plan.currency(),
 				selected.applied()
 		);

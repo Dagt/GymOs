@@ -1,6 +1,7 @@
 import type { RenewMembershipResponse } from "./membership-types";
 
 export type KioskCapabilities = {
+  clientRegistrationAllowed: boolean;
   membershipEnrollmentAllowed: boolean;
   membershipRenewalAllowed: boolean;
   membershipPlanChangeAllowed: boolean;
@@ -55,6 +56,9 @@ export type KioskMembershipQuote = {
   clientId: string;
   planId: string;
   planName: string;
+  planPriceCents: number;
+  registrationFeeCents: number;
+  registrationFeeLabel: string | null;
   listPriceCents: number;
   discountCents: number;
   totalCents: number;
@@ -163,6 +167,16 @@ export type KioskAutopaySetupResult = {
 export type KioskContactUpdatePayload = {
   email?: string | null;
   phone?: string | null;
+};
+
+export type KioskRegistrationPayload = {
+  firstName: string;
+  lastName: string;
+  maternalLastName?: string | null;
+  birthDate: string;
+  gender?: "MALE" | "FEMALE" | null;
+  phone?: string | null;
+  email?: string | null;
 };
 
 export type { RenewMembershipResponse };

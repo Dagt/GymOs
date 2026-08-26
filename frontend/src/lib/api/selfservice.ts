@@ -11,6 +11,7 @@ import type {
   KioskMembershipQuote,
   KioskPlanChangeCheckoutPayload,
   KioskProfile,
+  KioskRegistrationPayload,
   KioskSessionResponse,
   KioskSummaryResponse,
   RenewMembershipResponse,
@@ -30,6 +31,18 @@ export async function verifyKioskSession(
     method: "POST",
     headers: kioskSessionHeaders(sessionToken),
     body: JSON.stringify({ identifier: normalizeKioskIdentifier(identifier), birthDate }),
+  });
+}
+
+export async function registerKioskClient(
+  sessionId: string,
+  sessionToken: string,
+  payload: KioskRegistrationPayload,
+): Promise<KioskSummaryResponse> {
+  return publicApiFetch<KioskSummaryResponse>(`/self-service/sessions/${sessionId}/registrations`, {
+    method: "POST",
+    headers: kioskSessionHeaders(sessionToken),
+    body: JSON.stringify(normalizePayload(payload)),
   });
 }
 

@@ -38,6 +38,8 @@ class MembershipSaleIdempotencyHashTests {
 				membershipId,
 				planId,
 				productId,
+				0,
+				null,
 				10_000,
 				1_000,
 				9_000,

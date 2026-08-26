@@ -50,6 +50,7 @@ import { PaymentConfigurationCard } from "./PaymentConfigurationCard";
 import { PaymentOperationsHistoryCard } from "./PaymentOperationsHistoryCard";
 import { KioskBranchSettingsCard } from "./KioskBranchSettingsCard";
 import { NotificationEmailSettingsCard } from "./NotificationEmailSettingsCard";
+import { ClientLifecycleSettingsCard } from "./ClientLifecycleSettingsCard";
 
 type OperationalSection = "payments" | "kiosk" | "email" | "history";
 
@@ -466,6 +467,8 @@ export default function OrganizationSettingsPage() {
           ) : null}
         </section>
       ) : null}
+
+      {canManageOrganization ? <ClientLifecycleSettingsCard accessToken={session.accessToken} /> : null}
 
       <OperationalSettingsNavigation
         activeSection={activeOperationalSection}

@@ -22,6 +22,9 @@ export type MembershipQuote = {
   clientId: string;
   planId: string;
   planName: string;
+  planPriceCents: number;
+  registrationFeeCents: number;
+  registrationFeeLabel: string | null;
   listPriceCents: number;
   discountCents: number;
   totalCents: number;

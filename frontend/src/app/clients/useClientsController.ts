@@ -9,11 +9,13 @@ import {
   enrollMembership,
   getCurrentUser,
   getPaymentConfiguration,
+  getClientLifecycleSettings,
   getPlans,
   getStoredSession,
   searchClientsPage,
   type ClientPayload,
   type ClientSummary,
+  type ClientLifecycleSettings,
   type PlanSummary,
   type StoredSession,
 } from "@/lib/api";
@@ -43,6 +45,7 @@ export function useClientsController() {
   const [showCreateClient, setShowCreateClient] = useState(false);
   const [manualCardEnabled, setManualCardEnabled] = useState(false);
   const [mercadoPagoEnabled, setMercadoPagoEnabled] = useState(false);
+  const [clientLifecycleSettings, setClientLifecycleSettings] = useState<ClientLifecycleSettings | null>(null);
 
   const canCreateClient = useMemo(() => canRegisterClients(session), [session]);
   const canCreateMembershipSale = useMemo(
@@ -66,17 +69,21 @@ export function useClientsController() {
         const refreshedSession = getStoredSession() ?? storedSession;
         const canLoadPlans = hasPermission(refreshedSession, "sale.create")
           && hasPermission(refreshedSession, "catalog.read");
-        const activePlans = canLoadPlans
-          ? await getPlans(refreshedSession.accessToken).then((loaded) => loaded.filter((plan) => plan.status === "ACTIVE"))
-          : [];
-        const paymentConfiguration = canLoadPlans && hasPermission(refreshedSession, "payment.settings.read")
-          ? await getPaymentConfiguration(refreshedSession.accessToken)
-          : null;
+        const [activePlans, paymentConfiguration, lifecycleSettings] = await Promise.all([
+          canLoadPlans
+            ? getPlans(refreshedSession.accessToken).then((loaded) => loaded.filter((plan) => plan.status === "ACTIVE"))
+            : Promise.resolve([]),
+          canLoadPlans && hasPermission(refreshedSession, "payment.settings.read")
+            ? getPaymentConfiguration(refreshedSession.accessToken)
+            : Promise.resolve(null),
+          canLoadPlans ? getClientLifecycleSettings(refreshedSession.accessToken) : Promise.resolve(null),
+        ]);
         if (!active) return;
         setSession(getStoredSession() ?? refreshedSession);
         setPlans(activePlans);
         setManualCardEnabled(Boolean(paymentConfiguration?.receptionManualTerminalEnabled));
         setMercadoPagoEnabled(Boolean(paymentConfiguration?.mercadoPagoReady));
+        setClientLifecycleSettings(lifecycleSettings);
       } catch (exception) {
         if (active) {
           setError(exception instanceof Error ? exception.message : "No fue posible cargar socios.");
@@ -237,6 +244,7 @@ export function useClientsController() {
     setPageSize: (size: number) => setListParams((current) => ({ ...current, size, page: 0 })),
     manualCardEnabled,
     mercadoPagoEnabled,
+    clientLifecycleSettings,
     message,
     plans,
     query,

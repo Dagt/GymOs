@@ -13,6 +13,7 @@ import {
   getKioskMembershipOptions,
   getKioskSummary,
   renewMembershipFromKiosk,
+  registerKioskClient,
   resetKioskSession,
   revokeKioskAutopay,
   setupKioskAutopay,
@@ -26,6 +27,7 @@ import {
   type KioskSessionResponse,
   type KioskSummaryResponse,
 } from "@/lib/api";
+import { normalizePhone } from "@/components/FormFields";
 import {
   createKioskBooking,
   getKioskBookingAvailability,
@@ -58,6 +60,7 @@ type MembershipCheckoutReview = {
   membership: KioskMembership | null;
   quote: KioskMembershipQuote;
 };
+type KioskEntryMode = "verify" | "register";
 
 export default function KioskPage() {
   const [session, setSession] = useState<KioskSessionResponse | null>(null);
@@ -65,6 +68,17 @@ export default function KioskPage() {
   const [plans, setPlans] = useState<KioskPlanOption[]>([]);
   const [identifier, setIdentifier] = useState("");
   const [birthDateDisplay, setBirthDateDisplay] = useState("");
+  const [entryMode, setEntryMode] = useState<KioskEntryMode>("verify");
+  const [registrationBusy, setRegistrationBusy] = useState(false);
+  const [registrationBirthDateDisplay, setRegistrationBirthDateDisplay] = useState("");
+  const [registration, setRegistration] = useState({
+    firstName: "",
+    lastName: "",
+    maternalLastName: "",
+    gender: "",
+    phone: "",
+    email: "",
+  });
   const [targetPlanId, setTargetPlanId] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
@@ -102,6 +116,10 @@ export default function KioskPage() {
   const membershipCheckoutInFlight = useRef(false);
 
   const birthDate = useMemo(() => parseMexicanDate(birthDateDisplay) ?? "", [birthDateDisplay]);
+  const registrationBirthDate = useMemo(
+    () => parseMexicanDate(registrationBirthDateDisplay) ?? "",
+    [registrationBirthDateDisplay],
+  );
   const activeMembership = useMemo(
     () => summary?.memberships.find((membership) => membership.status === "ACTIVE") ?? null,
     [summary],
@@ -174,34 +192,73 @@ export default function KioskPage() {
         identifier,
         birthDate,
       );
-      const [options, bookingResources, professionals] = await Promise.all([
-        nextSummary.capabilities.membershipPlanChangeAllowed
-          || nextSummary.capabilities.membershipEnrollmentAllowed
-          ? getKioskMembershipOptions(session.sessionId, session.sessionToken)
-          : Promise.resolve([]),
-        nextSummary.capabilities.resourceBookingAllowed
-          ? getKioskBookingResources(session.sessionId, session.sessionToken, bookingDate)
-          : Promise.resolve([]),
-        nextSummary.capabilities.wellnessBookingAllowed
-          ? getKioskWellnessProfessionals(session.sessionId, session.sessionToken)
-          : Promise.resolve([]),
-      ]);
-      setSummary(nextSummary);
-      setActivePanel("memberships");
-      setMembershipReview(null);
-      setMembershipError(null);
-      setContactEmail("");
-      setContactPhone("");
-      setPlans(options);
-      const currentPlanId = nextSummary.memberships.find((membership) => membership.status === "ACTIVE")?.planId;
-      setTargetPlanId(options.find((plan) => plan.id !== currentPlanId)?.id ?? options[0]?.id ?? "");
-      setResources(bookingResources);
-      setResourceId(bookingResources[0]?.id ?? "");
-      setWellnessProfessionals(professionals);
-      setWellnessProfessionalId(professionals[0]?.id ?? "");
+      await openMemberDashboard(nextSummary);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible verificar.");
     }
+  }
+
+  async function register(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session || !registrationBirthDate) {
+      setError("Captura una fecha de nacimiento válida en formato día/mes/año.");
+      return;
+    }
+    if (!registration.email.trim() && !registration.phone.trim()) {
+      setError("Captura al menos un correo o teléfono.");
+      return;
+    }
+    setRegistrationBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const nextSummary = await registerKioskClient(session.sessionId, session.sessionToken, {
+        firstName: registration.firstName.trim(),
+        lastName: registration.lastName.trim(),
+        maternalLastName: registration.maternalLastName.trim() || null,
+        birthDate: registrationBirthDate,
+        gender: registration.gender ? registration.gender as "MALE" | "FEMALE" : null,
+        phone: normalizePhone(registration.phone),
+        email: registration.email.trim() || null,
+      });
+      await openMemberDashboard(nextSummary);
+      setMessage(nextSummary.memberships.length === 0
+        ? "Tu registro quedó listo. Ahora puedes elegir tu primera membresía."
+        : "Tu expediente fue reactivado correctamente.");
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible completar el registro.");
+    } finally {
+      setRegistrationBusy(false);
+    }
+  }
+
+  async function openMemberDashboard(nextSummary: KioskSummaryResponse) {
+    if (!session) return;
+    const [options, bookingResources, professionals] = await Promise.all([
+      nextSummary.capabilities.membershipPlanChangeAllowed
+        || nextSummary.capabilities.membershipEnrollmentAllowed
+        ? getKioskMembershipOptions(session.sessionId, session.sessionToken)
+        : Promise.resolve([]),
+      nextSummary.capabilities.resourceBookingAllowed
+        ? getKioskBookingResources(session.sessionId, session.sessionToken, bookingDate)
+        : Promise.resolve([]),
+      nextSummary.capabilities.wellnessBookingAllowed
+        ? getKioskWellnessProfessionals(session.sessionId, session.sessionToken)
+        : Promise.resolve([]),
+    ]);
+    setSummary(nextSummary);
+    setActivePanel("memberships");
+    setMembershipReview(null);
+    setMembershipError(null);
+    setContactEmail("");
+    setContactPhone("");
+    setPlans(options);
+    const currentPlanId = nextSummary.memberships.find((membership) => membership.status === "ACTIVE")?.planId;
+    setTargetPlanId(options.find((plan) => plan.id !== currentPlanId)?.id ?? options[0]?.id ?? "");
+    setResources(bookingResources);
+    setResourceId(bookingResources[0]?.id ?? "");
+    setWellnessProfessionals(professionals);
+    setWellnessProfessionalId(professionals[0]?.id ?? "");
   }
 
   useEffect(() => {
@@ -645,27 +702,40 @@ export default function KioskPage() {
             <Link className="kiosk-primary-action inline-flex items-center justify-center" href="/login">Ir a iniciar sesión</Link>
           </section>
         ) : !summary ? (
-          <form className="kiosk-card kiosk-verify" onSubmit={verify}>
-            <div className="kiosk-step"><span>1</span><div><h2>Verifica tu identidad</h2><p>Usa los datos registrados en recepción.</p></div></div>
-            <input autoComplete="username" className="kiosk-input" onChange={(event) => setIdentifier(event.target.value)} placeholder="Correo o teléfono (10 dígitos)" required value={identifier} />
-            <label className="kiosk-field">
-              Fecha de nacimiento
-              <input
-                aria-label="Fecha de nacimiento en formato día mes año"
-                autoComplete="bday"
-                className="kiosk-input compact"
-                inputMode="numeric"
-                maxLength={10}
-                onChange={(event) => setBirthDateDisplay(formatMexicanDateInput(event.target.value))}
-                placeholder="DD/MM/AAAA"
-                required
-                type="text"
-                value={birthDateDisplay}
-              />
-              <small>Formato: día/mes/año, por ejemplo 25/08/1990.</small>
-            </label>
-            <button className="kiosk-primary-action" type="submit">Continuar de forma segura</button>
-          </form>
+          <section className="kiosk-card kiosk-verify">
+            {session.capabilities.clientRegistrationAllowed ? (
+              <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="Acceso al kiosco">
+                <button aria-selected={entryMode === "verify"} className={entryMode === "verify" ? "kiosk-primary-action small" : "kiosk-secondary-action"} onClick={() => { setEntryMode("verify"); setError(null); }} role="tab" type="button">Ya soy socio</button>
+                <button aria-selected={entryMode === "register"} className={entryMode === "register" ? "kiosk-primary-action small" : "kiosk-secondary-action"} onClick={() => { setEntryMode("register"); setError(null); }} role="tab" type="button">Quiero registrarme</button>
+              </div>
+            ) : null}
+            {entryMode === "verify" ? (
+              <form className="grid gap-4" onSubmit={verify}>
+                <div className="kiosk-step"><span>1</span><div><h2>Verifica tu identidad</h2><p>No necesitas tener una membresía activa para entrar.</p></div></div>
+                <input autoComplete="username" className="kiosk-input" onChange={(event) => setIdentifier(event.target.value)} placeholder="Correo o teléfono (10 dígitos)" required value={identifier} />
+                <label className="kiosk-field">
+                  Fecha de nacimiento
+                  <input aria-label="Fecha de nacimiento en formato día mes año" autoComplete="bday" className="kiosk-input compact" inputMode="numeric" maxLength={10} onChange={(event) => setBirthDateDisplay(formatMexicanDateInput(event.target.value))} placeholder="DD/MM/AAAA" required type="text" value={birthDateDisplay} />
+                  <small>Formato: día/mes/año, por ejemplo 25/08/1990.</small>
+                </label>
+                <button className="kiosk-primary-action" type="submit">Continuar de forma segura</button>
+              </form>
+            ) : (
+              <form className="grid gap-4" onSubmit={register}>
+                <div className="kiosk-step"><span>N</span><div><h2>Crea tu expediente</h2><p>Después podrás revisar y contratar tu primera membresía.</p></div></div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="kiosk-field">Nombre<input autoComplete="given-name" className="kiosk-input compact" maxLength={120} onChange={(event) => setRegistration({ ...registration, firstName: event.target.value })} required value={registration.firstName} /></label>
+                  <label className="kiosk-field">Apellido paterno<input autoComplete="family-name" className="kiosk-input compact" maxLength={120} onChange={(event) => setRegistration({ ...registration, lastName: event.target.value })} required value={registration.lastName} /></label>
+                  <label className="kiosk-field">Apellido materno<input className="kiosk-input compact" maxLength={120} onChange={(event) => setRegistration({ ...registration, maternalLastName: event.target.value })} value={registration.maternalLastName} /></label>
+                  <label className="kiosk-field">Género<select className="kiosk-input compact" onChange={(event) => setRegistration({ ...registration, gender: event.target.value })} value={registration.gender}><option value="">Prefiero no indicar</option><option value="FEMALE">Mujer</option><option value="MALE">Hombre</option></select></label>
+                  <label className="kiosk-field">Teléfono<input autoComplete="tel" className="kiosk-input compact" inputMode="tel" maxLength={20} onChange={(event) => setRegistration({ ...registration, phone: event.target.value })} placeholder="10 dígitos" value={registration.phone} /></label>
+                  <label className="kiosk-field">Correo<input autoComplete="email" className="kiosk-input compact" maxLength={180} onChange={(event) => setRegistration({ ...registration, email: event.target.value })} type="email" value={registration.email} /></label>
+                </div>
+                <label className="kiosk-field">Fecha de nacimiento<input autoComplete="bday" className="kiosk-input compact" inputMode="numeric" maxLength={10} onChange={(event) => setRegistrationBirthDateDisplay(formatMexicanDateInput(event.target.value))} placeholder="DD/MM/AAAA" required value={registrationBirthDateDisplay} /><small>Necesitarás esta fecha junto con tu correo o teléfono para volver a entrar.</small></label>
+                <button className="kiosk-primary-action" disabled={registrationBusy} type="submit">{registrationBusy ? "Registrando..." : "Crear expediente y continuar"}</button>
+              </form>
+            )}
+          </section>
         ) : (
           <section className="grid gap-5">
             <section className="kiosk-dashboard-hero">
@@ -861,7 +931,8 @@ export default function KioskPage() {
                     </div>
                     <dl className="kiosk-quote-breakdown">
                       <div><dt>Plan</dt><dd>{membershipReview.quote.planName}</dd></div>
-                      <div><dt>Precio de lista</dt><dd>{formatMoney(membershipReview.quote.listPriceCents, membershipReview.quote.currency)}</dd></div>
+                      <div><dt>Precio del plan</dt><dd>{formatMoney(membershipReview.quote.planPriceCents, membershipReview.quote.currency)}</dd></div>
+                      {membershipReview.quote.registrationFeeCents > 0 ? <div><dt>{membershipReview.quote.registrationFeeLabel ?? "Inscripción"}</dt><dd>{formatMoney(membershipReview.quote.registrationFeeCents, membershipReview.quote.currency)}</dd></div> : null}
                       {membershipReview.quote.discountCents > 0 ? <div><dt>Descuentos</dt><dd>-{formatMoney(membershipReview.quote.discountCents, membershipReview.quote.currency)}</dd></div> : null}
                       <div className="total"><dt>Total a pagar</dt><dd>{formatMoney(membershipReview.quote.totalCents, membershipReview.quote.currency)}</dd></div>
                     </dl>

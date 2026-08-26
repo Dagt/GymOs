@@ -52,6 +52,7 @@ export default function ClientsPage() {
         form={controller.form}
         manualCardEnabled={controller.manualCardEnabled}
         mercadoPagoEnabled={controller.mercadoPagoEnabled}
+        clientLifecycleSettings={controller.clientLifecycleSettings}
         open={controller.showCreateClient}
         plans={controller.plans}
         saving={controller.saving}

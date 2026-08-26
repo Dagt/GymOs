@@ -1,16 +1,10 @@
 # 13. Estado actual de desarrollo
 
 Estado: FUENTE CANÓNICA / EN PROGRESO
-Corte: 25 de agosto de 2026
-Código auditado: `feature/platform-identity-separation`, incluyendo V86–V89
-sobre la administración comercial V85 y la base integrada de acceso físico,
-cobranza, Automatizaciones/ZeptoMail y métricas.
-
-Cierre de paginación: `codex/fix-list-pagination`, sobre `main` (`710b41b`),
-sin nuevas migraciones.
-Endurecimiento posterior en esa rama: scroll interno oculto, ciclo de
-asignaciones, gráficas temporales, edición de beneficios y recuperación del
-equipo; incorpora V91–V92. No implica despliegue productivo de la rama.
+Corte: 26 de agosto de 2026
+Código auditado: `feature/client-onboarding-lifecycle`, basada en `main`
+`a5ea75f` e incluyendo V93 sobre el cierre integrado de paginación y
+endurecimiento operativo V91–V92. No implica despliegue productivo de la rama.
 
 ## 1. Resumen ejecutivo
 
@@ -48,6 +42,13 @@ paginar; los selectores no dependen de los primeros 50 registros. Los CSV de
 inventario se identifican explícitamente como exportaciones de la página.
 Detalles: [paginación de listados](../docs/operations/list-pagination.md).
 
+El primer lote derivado de la validación con un cliente real cierra el alta y
+ciclo de vida del socio: inscripción configurable y registrada como partida
+financiera, baja automática reversible, autenticación en kiosco sin plan y
+registro inicial desde el kiosco. El borrado físico se descarta para conservar
+ventas, pagos, membresías y auditoría. El análisis y los lotes restantes están
+en [retroalimentación del primer cliente](32-retroalimentacion-primer-cliente.md).
+
 El corte posterior mantiene los listados compactos con scroll interno oculto y
 controles de página visibles. Detecta backend/frontend incompatibles y separa
 errores de listas vacías. Coaches exige periodos sin solape por socio/sucursal,
@@ -80,13 +81,13 @@ Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún 
 | [Identidad y seguridad](modulos/02-identity-security.md) | ESTABILIZADO PARA PRODUCCIÓN PILOTO | Ámbitos PLATFORM/TENANT, bootstrap, JWT/refresh v2, soporte temporal, invitación de dueño, recuperación de staff y revocación de sesiones | Endurecer almacenamiento cliente del refresh (`AUTH-001`) |
 | [Configuración](modulos/03-configuration.md) | FUNCIONAL | Marca tenant, cobros, kiosco y correo por permisos; UI unificada | Completar ciclo eliminación/reemplazo de logo (`CFG-001`) |
 | [Onboarding](modulos/04-onboarding.md) | FUNCIONAL | Checklist, setup piloto idempotente e importación inicial | Recuperación probada de altas parciales (`ONB-001`) |
-| [Socios](modulos/05-clients.md) | FUNCIONAL | Alta, búsqueda, detalle, importación y visibilidad multi-sucursal | PII, duplicados y pruebas CRUD (`CLI-001`) |
+| [Socios](modulos/05-clients.md) | FUNCIONAL | Alta, búsqueda, detalle, importación, inscripción, baja automática reversible y visibilidad multi-sucursal | PII, duplicados y pruebas CRUD (`CLI-001`) |
 | [Catálogo](modulos/06-catalog.md) | ESTABILIZADO | Productos, planes, categorías, unidades y asociación por sucursal | Volumen, legacy y archivos (`CAT-001`) |
-| [Ventas](modulos/07-sales.md) | FUNCIONAL | POS, ventas contextualizadas, pagos, reembolsos, recibos e inventario | Concurrencia/conciliación E2E (`SAL-001`) |
-| [Membresías](modulos/08-memberships.md) | ESTABILIZADO | Periodos inclusivos, activa única, alta, renovación, cambio y cotización | E2E financiero completo |
+| [Ventas](modulos/07-sales.md) | FUNCIONAL | POS, ventas contextualizadas, inscripción separada, pagos, reembolsos, recibos e inventario | Concurrencia/conciliación E2E (`SAL-001`) |
+| [Membresías](modulos/08-memberships.md) | ESTABILIZADO | Periodos inclusivos, activa única, alta con inscripción, renovación, cambio y cotización | E2E financiero completo |
 | [Beneficios/elegibilidad](modulos/09-benefits.md) | ESTABILIZADO | Descuentos y acceso heredado; edición de planes vinculados con control de versión | Ampliar matriz negativa transversal |
 | [Acceso](modulos/10-access.md) | ESTABILIZADO PARA INICIAR CONNECTOR | Elegibilidad, provider explícito, puntos, bitácora, permisos físicos, estado deseado, Connector API durable y protegida, salud, eventos/candidatos y consola con diagnóstico legacy | Connector local, adapter HikCentral, aceptación del torniquete y resiliencia en sitio (`ACC-002`) |
-| [Kiosco](modulos/11-selfservice.md) | FUNCIONAL / ACEPTACIÓN | Apertura sólo por Recepción, sesión aislada, membresías, pagos, domiciliación, reservas, wellness y datos | Publicar ejecución automatizada de Stripe sandbox (`SELF-001`) |
+| [Kiosco](modulos/11-selfservice.md) | FUNCIONAL / ACEPTACIÓN | Apertura sólo por Recepción, sesión aislada, registro/verificación sin plan, membresías, pagos, domiciliación, reservas, wellness y datos | Publicar ejecución automatizada de Stripe sandbox (`SELF-001`) |
 | [Reservas](modulos/12-bookings.md) | FUNCIONAL | Recursos, disponibilidad, pago y acceso multi-sucursal | Colisiones/cancelación/E2E (`BKG-001`) |
 | [Inventario](modulos/13-inventory.md) | ESTABILIZADO | Existencias, movimientos, alertas, transferencias y conteos paginados; valuación | Feedback por partida (`INV-002`) |
 | [Coaches](modulos/14-coaching.md) | ESTABILIZADO | Perfiles, rutinas versionadas, asignación sin solapes, cierre por vencimiento, métricas temporales, CSV/PDF | Cleanup durable de medios (`COA-018`) |

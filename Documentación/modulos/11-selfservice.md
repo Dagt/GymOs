@@ -1,14 +1,18 @@
 # Autoservicio y kiosco
 
 Estado: `FUNCIONAL / LISTO PARA ACEPTACIÓN CONECTADA`
-Última revisión: 21 de agosto de 2026
+Última revisión: 26 de agosto de 2026
 
 ## Implementado
 
 - sesión temporal con token aleatorio almacenado como hash;
 - apertura exclusiva desde Recepción; dueño, administrador, gerente y soporte
   pueden configurar lo permitido por sus permisos, pero no lanzan sesiones;
-- verificación genérica de socio por contacto y fecha de nacimiento;
+- verificación genérica de socio por contacto y fecha de nacimiento, incluso
+  cuando todavía no tiene ninguna membresía;
+- alta de un socio nuevo desde el propio kiosco cuando Recepción habilita la
+  capacidad `clientRegistration` para la sucursal; el alta deja la sesión
+  verificada y abre la contratación del primer plan;
 - membresías, pagos, reservas y domiciliación disponibles también en una sede
   secundaria cuando el plan vigente es multi-sucursal;
 - rate limiting, bloqueo por intentos y auditoría;
@@ -65,6 +69,8 @@ Estado: `FUNCIONAL / LISTO PARA ACEPTACIÓN CONECTADA`
   una caída.
 - cotización autoritativa final, incluidos beneficios y descuento, antes de
   crear la venta o abandonar GymFort para abrir Stripe Checkout;
+- desglose de inscripción en la contratación inicial y conciliación del total
+  completo por Stripe;
 - configuración administrativa de capacidades por sucursal, sin alta ni
   asignación de computadoras o terminales físicas; la pantalla muestra una sola
   configuración correspondiente a la sucursal elegida en el selector global;

@@ -9,7 +9,7 @@ import {
   type KioskBranchSettings,
 } from "@/lib/api";
 
-type EditableKey = "membershipEnrollmentAllowed" | "membershipRenewalAllowed" |
+type EditableKey = "clientRegistrationAllowed" | "membershipEnrollmentAllowed" | "membershipRenewalAllowed" |
   "membershipPlanChangeAllowed" | "resourceBookingAllowed" | "wellnessBookingAllowed" |
   "profileUpdateAllowed" | "autopayAllowed";
 type Requirement = "ONLINE_CARD" | "RECURRING_CARD" | null;
@@ -28,6 +28,7 @@ const paymentOptions: KioskOption[] = [
 ];
 
 const serviceOptions: KioskOption[] = [
+  { key: "clientRegistrationAllowed", title: "Registrar nuevos socios", description: "Permite el alta o reactivación con datos personales desde el kiosco.", requirement: null },
   { key: "resourceBookingAllowed", title: "Reservas gratuitas", description: "Reserva recursos o clases disponibles.", requirement: null },
   { key: "wellnessBookingAllowed", title: "Citas wellness gratuitas", description: "Gestiona citas wellness sin pago en línea.", requirement: null },
   { key: "profileUpdateAllowed", title: "Actualizar contacto", description: "Permite corregir correo y teléfono.", requirement: null },
@@ -60,7 +61,8 @@ export function KioskBranchSettingsCard({ accessToken, activeBranchId }: { acces
     try {
       const capabilities = item.capabilities;
       const updated = await updateKioskBranchSettings(accessToken, item.branchId, {
-        membershipEnrollment: capabilities.onlineCardPaymentsReady && capabilities.membershipEnrollmentAllowed,
+        clientRegistration: capabilities.clientRegistrationAllowed,
+	        membershipEnrollment: capabilities.onlineCardPaymentsReady && capabilities.membershipEnrollmentAllowed,
         membershipRenewal: capabilities.onlineCardPaymentsReady && capabilities.membershipRenewalAllowed,
         membershipPlanChange: capabilities.onlineCardPaymentsReady && capabilities.membershipPlanChangeAllowed,
         resourceBooking: capabilities.resourceBookingAllowed,

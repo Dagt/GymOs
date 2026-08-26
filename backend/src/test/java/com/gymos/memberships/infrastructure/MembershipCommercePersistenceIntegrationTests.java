@@ -272,6 +272,41 @@ class MembershipCommercePersistenceIntegrationTests {
 	}
 
 	@Test
+	void membershipEnrollmentPersistsRegistrationFeeAsItsOwnSaleItem() {
+		OffsetDateTime now = OffsetDateTime.now();
+		UUID benefitId = insertBenefit(
+				"STUDENT-FEE", "Descuento estudiante", "STUDENT", "PERCENT", null, 10.0,
+				false, true, null, null, null);
+		UUID saleId = UUID.randomUUID();
+
+		assertThat(new MembershipSaleCommandRepository(jdbcClient).create(
+				membershipSaleRecord(
+						saleId, UUID.randomUUID(), "S-REGISTRATION-FEE", "registration-fee-sale",
+						benefitId, 1_500, now)))
+				.isTrue();
+
+		assertThat(jdbcClient.sql("""
+				SELECT item_type
+				FROM sale_item
+				WHERE sale_id=:saleId
+				ORDER BY item_type
+				""").param("saleId", saleId).query(String.class).list())
+				.containsExactly("MEMBERSHIP_PLAN", "REGISTRATION_FEE");
+		assertThat(jdbcClient.sql("""
+				SELECT unit_price_cents
+				FROM sale_item
+				WHERE sale_id=:saleId AND item_type='REGISTRATION_FEE'
+				""").param("saleId", saleId).query(Long.class).single())
+				.isEqualTo(1_500);
+		assertThat(jdbcClient.sql("SELECT subtotal_cents FROM sale WHERE id=:saleId")
+				.param("saleId", saleId).query(Long.class).single())
+				.isEqualTo(11_500);
+		assertThat(jdbcClient.sql("SELECT amount_cents FROM payment WHERE sale_id=:saleId")
+				.param("saleId", saleId).query(Long.class).single())
+				.isEqualTo(10_500);
+	}
+
+	@Test
 	void concurrentRequestsWithSameIdempotencyKeyPersistExactlyOneMembershipSale() throws Exception {
 		OffsetDateTime now = OffsetDateTime.now();
 		UUID benefitId = insertBenefit(
@@ -376,6 +411,19 @@ class MembershipCommercePersistenceIntegrationTests {
 			UUID benefitId,
 			OffsetDateTime now
 	) {
+		return membershipSaleRecord(
+				saleId, paymentId, saleNumber, idempotencyKey, benefitId, 0, now);
+	}
+
+	private MembershipSaleRecord membershipSaleRecord(
+			UUID saleId,
+			UUID paymentId,
+			String saleNumber,
+			String idempotencyKey,
+			UUID benefitId,
+			long registrationFeeCents,
+			OffsetDateTime now
+	) {
 		return new MembershipSaleRecord(
 				saleId,
 				paymentId,
@@ -392,9 +440,12 @@ class MembershipCommercePersistenceIntegrationTests {
 				"CASH",
 				"COMPLETED",
 				10_000,
+				registrationFeeCents,
+				registrationFeeCents > 0 ? "Inscripción" : null,
+				10_000 + registrationFeeCents,
 				1_000,
-				9_000,
-				9_000,
+				9_000 + registrationFeeCents,
+				9_000 + registrationFeeCents,
 				0,
 				"MXN",
 				List.of(new MembershipBenefitSnapshot(

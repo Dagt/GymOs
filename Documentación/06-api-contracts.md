@@ -161,6 +161,7 @@ Estado comercial de gimnasio cliente:
 - `POST /self-service/kiosk-sessions` — requiere JWT y
   `selfservice.session.launch`; selecciona el perfil lógico de la sucursal.
 - `POST /self-service/sessions/{sessionId}/verify`
+- `POST /self-service/sessions/{sessionId}/registrations`
 - `GET /self-service/sessions/{sessionId}/summary`
 - `GET /self-service/sessions/{sessionId}/membership-options`
 - `POST /self-service/sessions/{sessionId}/membership-enrollments`
@@ -181,6 +182,12 @@ Estado comercial de gimnasio cliente:
   acepta servicios activos con costo cero.
 
 Los endpoints de autoservicio sólo exponen acciones permitidas para clientes en una sesión temporal de kiosco. Las reglas de pagos, membresías, beneficios y permisos se validan en backend.
+
+`POST /self-service/sessions/{sessionId}/registrations` requiere la capacidad
+`clientRegistration`, nombre, apellido y fecha de nacimiento, además de al menos
+un correo o teléfono. Crea el expediente en la sucursal de la sesión, lo deja
+verificado y permite continuar a la contratación inicial. Un socio sin plan
+también puede usar `/verify`; la ausencia de membresía no oculta su expediente.
 
 La creación inicial ya no es pública. Recepción abre el modo kiosco desde su
 sesión y el frontend elimina inmediatamente sus tokens operativos. El código
@@ -252,6 +259,8 @@ Cambio Hito 3.5 final:
 - `PATCH /clients/{id}/status`
 - `GET /clients/{id}/timeline`
 - `GET /clients/{id}/summary`
+- `GET /client-lifecycle-settings`
+- `PUT /client-lifecycle-settings`
 
 Contrato implementado para alta/edicion de socio:
 
@@ -273,6 +282,13 @@ La respuesta resumida de `GET /clients` incluye `currentPlanName` y
 `ACTIVE` dentro de `grace_ends_on` se expone como `ACTIVE`; si su gracia ya
 terminó se expone como `EXPIRED` aunque el job de expiración aún no haya
 actualizado la fila. Las membresías canceladas no se presentan como plan actual.
+
+`GET /client-lifecycle-settings` acepta `organization.update` o `sale.create` y
+devuelve la política efectiva, incluyendo valores predeterminados aunque todavía
+no exista una fila. `PUT /client-lifecycle-settings` requiere
+`organization.update` y configura cargo de inscripción, meses para volver a
+cobrarlo y baja automática por inactividad. El importe se expresa en centavos y
+la moneda proviene de la organización.
 
 Autorización de alta:
 

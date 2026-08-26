@@ -1,7 +1,7 @@
 # Socios y CRM
 
 Estado: `FUNCIONAL`
-Última revisión: 25 de agosto de 2026
+Última revisión: 26 de agosto de 2026
 
 ## Implementado
 
@@ -23,6 +23,12 @@ Estado: `FUNCIONAL`
 - V57 crea de forma canónica los permisos `client.*` y garantiza que dueño,
   gerencia y recepción puedan consultar, registrar y actualizar socios también
   en instalaciones iniciadas desde una base vacía.
+- V93 agrega reglas por organización para inscripción y baja automática. La
+  baja es `INACTIVE`, conserva el historial financiero/auditable y registra
+  fecha y motivo; los expedientes dados de baja automáticamente pueden volver a
+  activarse al identificarse o registrarse en el kiosco.
+- un socio sin plan puede verificarse desde el kiosco de su sucursal de alta;
+  ya no se exige una membresía histórica para encontrarlo.
 
 ## Matriz operativa
 
@@ -49,3 +55,6 @@ aislamiento por organización/sucursal; `ClientPaginationControllerTests` y
 `ClientPaginationServiceTests` cubren contrato y autorización. La navegación,
 respuestas fuera de orden y vista móvil están en `e2e/pagination.spec.ts`.
 Contrato y límites: [paginación de listados](../../docs/operations/list-pagination.md).
+
+V93 se cubre con `ClientLifecycleServiceTests`,
+`ClientPaginationIntegrationTests` y la suite de migraciones PostgreSQL.

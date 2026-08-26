@@ -39,7 +39,7 @@ class KioskSettingsServiceTests {
 		assertThatThrownBy(() -> service.configure(
 				principal,
 				branchId,
-				new KioskSettingsService.UpdateKioskSettings(true, false, false, false, false, false, false),
+				new KioskSettingsService.UpdateKioskSettings(false, true, false, false, false, false, false, false),
 				"correlation"
 		)).isInstanceOfSatisfying(BusinessException.class, exception ->
 				assertThat(exception.code()).isEqualTo("KIOSK_STRIPE_CHECKOUT_REQUIRED"));
@@ -54,7 +54,7 @@ class KioskSettingsServiceTests {
 		assertThatThrownBy(() -> service.configure(
 				principal,
 				branchId,
-				new KioskSettingsService.UpdateKioskSettings(false, false, false, false, false, false, true),
+				new KioskSettingsService.UpdateKioskSettings(false, false, false, false, false, false, false, true),
 				"correlation"
 		)).isInstanceOfSatisfying(BusinessException.class, exception ->
 				assertThat(exception.code()).isEqualTo("KIOSK_STRIPE_RECURRING_REQUIRED"));

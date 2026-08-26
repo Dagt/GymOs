@@ -99,6 +99,16 @@ public class ClientCommandRepository {
 		jdbcClient.sql("""
 				UPDATE client
 				SET status = :status,
+				    inactivated_at = CASE
+				        WHEN :status = 'ACTIVE' THEN NULL
+				        WHEN status <> :status THEN :updatedAt
+				        ELSE inactivated_at
+				    END,
+				    inactivation_reason = CASE
+				        WHEN :status = 'ACTIVE' THEN NULL
+				        WHEN status <> :status THEN 'MANUAL'
+				        ELSE inactivation_reason
+				    END,
 				    notes = :notes,
 				    updated_at = :updatedAt,
 				    updated_by = :updatedBy,
@@ -114,6 +124,28 @@ public class ClientCommandRepository {
 				.param("clientId", record.clientId())
 				.param("organizationId", record.organizationId())
 				.update();
+	}
+
+	public boolean reactivateClient(UUID organizationId, UUID clientId, UUID branchId, OffsetDateTime now) {
+		return jdbcClient.sql("""
+				UPDATE client
+				SET status = 'ACTIVE',
+				    home_branch_id = COALESCE(home_branch_id, :branchId),
+				    inactivated_at = NULL,
+				    inactivation_reason = NULL,
+				    updated_at = :now,
+				    version = version + 1
+				WHERE organization_id = :organizationId
+				  AND id = :clientId
+				  AND status = 'INACTIVE'
+				  AND inactivation_reason = 'MEMBERSHIP_INACTIVITY'
+				  AND deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("clientId", clientId)
+				.param("branchId", branchId)
+				.param("now", now)
+				.update() == 1;
 	}
 
 	public void updateSelfServiceContact(

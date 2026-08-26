@@ -70,6 +70,7 @@ public class KioskSettingsService {
 		if (!repository.configureBranch(
 				principal.organizationId(), branchId, principal.userId(),
 				new BranchKioskConfigurationData(
+						command.clientRegistration(),
 						command.membershipEnrollment(), command.membershipRenewal(),
 						command.membershipPlanChange(), command.resourceBooking(),
 						command.wellnessBooking(), command.profileUpdate(), command.autopay()
@@ -94,6 +95,7 @@ public class KioskSettingsService {
 	}
 
 	public record UpdateKioskSettings(
+			boolean clientRegistration,
 			boolean membershipEnrollment, boolean membershipRenewal,
 			boolean membershipPlanChange, boolean resourceBooking,
 			boolean wellnessBooking, boolean profileUpdate, boolean autopay

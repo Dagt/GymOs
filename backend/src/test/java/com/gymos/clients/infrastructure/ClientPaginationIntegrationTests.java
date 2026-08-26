@@ -28,6 +28,7 @@ class ClientPaginationIntegrationTests {
 	private static JdbcClient jdbc;
 	private ClientRepository repository;
 	private ClientCommandRepository commands;
+	private ClientLifecycleRepository lifecycle;
 	private UUID organizationId;
 	private UUID branchId;
 	private UUID otherBranchId;
@@ -44,6 +45,7 @@ class ClientPaginationIntegrationTests {
 	void setUp() {
 		repository = new ClientRepository(jdbc);
 		commands = new ClientCommandRepository(jdbc);
+		lifecycle = new ClientLifecycleRepository(jdbc);
 		organizationId = organization();
 		branchId = branch(organizationId, "CENTRO");
 		otherBranchId = branch(organizationId, "NORTE");
@@ -116,6 +118,39 @@ class ClientPaginationIntegrationTests {
 		var distant = repository.searchPage(organizationId, branchId, null, null, Integer.MAX_VALUE, 100);
 		assertThat(distant.items()).isEmpty();
 		assertThat(distant.totalElements()).isEqualTo(1);
+	}
+
+	@Test
+	void selfServiceVerificationDoesNotRequireMembershipAndKeepsBranchScope() {
+		UUID clientId = client(organizationId, branchId, "Socio sin plan", now);
+
+		assertThat(repository.verifyForSelfService(
+				organizationId, branchId, clientId + "@example.test", LocalDate.of(1990, 1, 1)))
+				.map(ClientRepository.SelfServiceClientRecord::id)
+				.contains(clientId);
+		assertThat(repository.verifyForSelfService(
+				organizationId, otherBranchId, clientId + "@example.test", LocalDate.of(1990, 1, 1)))
+				.isEmpty();
+	}
+
+	@Test
+	void automaticInactivityUsesJoinDateWhenClientNeverHadMembership() {
+		UUID oldClient = client(organizationId, branchId, "Socio antiguo", now.minusMonths(7));
+		jdbc.sql("""
+				INSERT INTO client_lifecycle_configuration (
+				    organization_id, auto_inactivation_enabled, inactivity_months
+				) VALUES (:organizationId, true, 6)
+				""").param("organizationId", organizationId).update();
+
+		var candidates = lifecycle.automaticInactivityCandidates(LocalDate.of(2026, 8, 25), 100);
+
+		assertThat(candidates).extracting(ClientLifecycleRepository.ClientInactivityCandidate::clientId)
+				.contains(oldClient);
+		assertThat(lifecycle.markAutomaticallyInactive(organizationId, oldClient, now)).isTrue();
+		assertThat(jdbc.sql("SELECT status FROM client WHERE id=:id").param("id", oldClient)
+				.query(String.class).single()).isEqualTo("INACTIVE");
+		assertThat(jdbc.sql("SELECT inactivation_reason FROM client WHERE id=:id").param("id", oldClient)
+				.query(String.class).single()).isEqualTo("MEMBERSHIP_INACTIVITY");
 	}
 
 	private UUID client(UUID org, UUID branch, String name, OffsetDateTime timestamp) {

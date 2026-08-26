@@ -1,7 +1,7 @@
 # Membresías
 
 Estado: `ESTABILIZADO`
-Última revisión: 22 de agosto de 2026
+Última revisión: 26 de agosto de 2026
 
 ## Implementado
 
@@ -15,6 +15,9 @@ Estado: `ESTABILIZADO`
 - planes multi-sucursal y restricciones de reservas;
 - herencia dinámica de beneficios `ACCESS` desde el plan vigente mediante la
   política transversal de elegibilidad.
+- cotización de alta con desglose autoritativo entre plan, inscripción,
+  descuentos y total; la inscripción sólo aplica cuando la política de ciclo de
+  vida del socio determina que corresponde.
 
 ## Pendiente
 

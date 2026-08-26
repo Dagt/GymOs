@@ -1,7 +1,7 @@
 # Ventas, pagos y devoluciones
 
 Estado: `FUNCIONAL`
-Última revisión: 21 de agosto de 2026
+Última revisión: 26 de agosto de 2026
 
 ## Implementado
 
@@ -35,3 +35,8 @@ beneficios aplicados aunque cambie su definición. Los listados y el reporte
 exponen `businessContext` y un desglose separado para venta minorista, alta,
 renovación y cambio de plan. La creación específica usa inserción idempotente
 atómica, probada con dos solicitudes PostgreSQL concurrentes.
+
+V93 incorpora el cargo de inscripción a la cotización y al total conciliado de
+la primera alta. Se persiste como una partida `REGISTRATION_FEE` separada de
+`MEMBERSHIP_PLAN`; los beneficios descuentan el plan, no la inscripción. Importe
+y concepto participan en el hash de idempotencia.

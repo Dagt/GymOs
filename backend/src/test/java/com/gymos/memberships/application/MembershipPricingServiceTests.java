@@ -5,6 +5,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import com.gymos.clients.api.operations.ClientLifecycleOperations;
+import com.gymos.clients.api.operations.ClientLifecycleOperations.RegistrationFee;
 import com.gymos.eligibility.api.EligibilityPolicy;
 import com.gymos.eligibility.api.EligibilityPolicy.BenefitType;
 import com.gymos.eligibility.api.EligibilityPolicy.EligibleBenefit;
@@ -20,7 +22,10 @@ import org.junit.jupiter.api.Test;
 class MembershipPricingServiceTests {
 	private final MembershipRepository membershipRepository = mock(MembershipRepository.class);
 	private final EligibilityPolicy eligibilityPolicy = mock(EligibilityPolicy.class);
-	private final MembershipPricingService service = new MembershipPricingService(membershipRepository, eligibilityPolicy);
+	private final ClientLifecycleOperations clientLifecycle = (organizationId, clientId, effectiveOn) ->
+			RegistrationFee.none("MXN", 6);
+	private final MembershipPricingService service = new MembershipPricingService(
+			membershipRepository, eligibilityPolicy, clientLifecycle);
 	private final UUID organizationId = UUID.randomUUID();
 	private final UUID branchId = UUID.randomUUID();
 	private final UUID clientId = UUID.randomUUID();
@@ -55,6 +60,27 @@ class MembershipPricingServiceTests {
 		assertThat(quote.discountCents()).isEqualTo(6_000);
 		assertThat(quote.appliedBenefits()).singleElement()
 				.satisfies(applied -> assertThat(applied.code()).isEqualTo("PROMO"));
+	}
+
+	@Test
+	void addsRegistrationFeeAfterDiscountsWhenClientIsDue() {
+		when(eligibilityPolicy.evaluate(any())).thenReturn(eligible(List.of(
+				benefit("STUDENT", "PERCENT", null, 10.0, true, 10)
+		)));
+		MembershipPricingService feeService = new MembershipPricingService(
+				membershipRepository,
+				eligibilityPolicy,
+				(organizationId, clientId, effectiveOn) ->
+						new RegistrationFee(true, 500, "Inscripción", "MXN", 6)
+		);
+
+		MembershipQuoteResult quote = feeService.quote(organizationId, branchId, clientId, plan);
+
+		assertThat(quote.planPriceCents()).isEqualTo(10_000);
+		assertThat(quote.registrationFeeCents()).isEqualTo(500);
+		assertThat(quote.listPriceCents()).isEqualTo(10_500);
+		assertThat(quote.discountCents()).isEqualTo(1_000);
+		assertThat(quote.totalCents()).isEqualTo(9_500);
 	}
 
 	private EligibilityDecision eligible(List<EligibleBenefit> benefits) {

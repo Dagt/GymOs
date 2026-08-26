@@ -42,6 +42,14 @@ export type {
   ClientUpdatePayload,
 } from "./api/client-types";
 export {
+  getClientLifecycleSettings,
+  updateClientLifecycleSettings,
+} from "./api/client-lifecycle-settings";
+export type {
+  ClientLifecycleSettings,
+  UpdateClientLifecycleSettings,
+} from "./api/client-lifecycle-settings";
+export {
   createMembershipPlan,
   archiveProduct,
   restoreProduct,
@@ -137,6 +145,7 @@ export {
   getKioskSummary,
   renewMembershipFromKiosk,
   resetKioskSession,
+  registerKioskClient,
   revokeKioskAutopay,
   setupKioskAutopay,
   updateKioskContactData,
@@ -157,6 +166,7 @@ export type {
   KioskPlanOption,
   KioskPlanChangeCheckoutPayload,
   KioskProfile,
+  KioskRegistrationPayload,
   KioskSessionContext,
   KioskSessionResponse,
   KioskSummaryResponse,

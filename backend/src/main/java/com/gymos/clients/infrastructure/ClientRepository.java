@@ -151,11 +151,14 @@ public class ClientRepository {
 		return jdbcClient.sql("""
 				SELECT c.id AS client_id, p.id AS person_id,
 				       TRIM(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) AS full_name,
-				       p.email, p.phone
+				       p.email, p.phone, c.status, c.inactivation_reason
 				FROM client c
 				JOIN person p ON p.id = c.person_id
 				WHERE c.organization_id = :organizationId
-				  AND c.status = 'ACTIVE'
+				  AND (
+				      c.status = 'ACTIVE'
+				      OR (c.status = 'INACTIVE' AND c.inactivation_reason = 'MEMBERSHIP_INACTIVITY')
+				  )
 				  AND c.deleted_at IS NULL
 				  AND p.deleted_at IS NULL
 				  AND p.birth_date = :birthDate
@@ -168,21 +171,18 @@ public class ClientRepository {
 				          )
 				      )
 				  )
-				  AND EXISTS (
-				      SELECT 1
-				      FROM membership m
-				      WHERE m.organization_id = c.organization_id
-				        AND (
-				            m.branch_id = :branchId
-				            OR EXISTS (
-				                SELECT 1
-				                FROM membership_plan mp
-				                WHERE mp.id = m.plan_id
-				                  AND mp.multi_branch_access = true
-				            )
-				        )
-				        AND m.client_id = c.id
-				        AND m.deleted_at IS NULL
+				  AND (
+				      c.home_branch_id IS NULL
+				      OR c.home_branch_id = :branchId
+				      OR EXISTS (
+				          SELECT 1
+				          FROM membership m
+				          JOIN membership_plan mp ON mp.id = m.plan_id
+				          WHERE m.organization_id = c.organization_id
+				            AND m.client_id = c.id
+				            AND mp.multi_branch_access = true
+				            AND m.deleted_at IS NULL
+				      )
 				  )
 				ORDER BY c.joined_at DESC
 				LIMIT 1
@@ -199,9 +199,28 @@ public class ClientRepository {
 						resultSet.getObject("person_id", UUID.class),
 						resultSet.getString("full_name"),
 						resultSet.getString("email"),
-						resultSet.getString("phone")
+						resultSet.getString("phone"),
+						resultSet.getString("status"),
+						resultSet.getString("inactivation_reason")
 				))
 				.optional();
+	}
+
+	public boolean branchExists(UUID organizationId, UUID branchId) {
+		return jdbcClient.sql("""
+				SELECT EXISTS (
+				    SELECT 1
+				    FROM branch
+				    WHERE organization_id = :organizationId
+				      AND id = :branchId
+				      AND status = 'ACTIVE'
+				      AND deleted_at IS NULL
+				)
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.query(Boolean.class)
+				.single();
 	}
 
 	static SelfServiceIdentifiers selfServiceIdentifiers(String identifier) {
@@ -429,7 +448,18 @@ public class ClientRepository {
 	) {
 	}
 
-	public record SelfServiceClientRecord(UUID id, UUID personId, String fullName, String email, String phone) {
+	public record SelfServiceClientRecord(
+			UUID id,
+			UUID personId,
+			String fullName,
+			String email,
+			String phone,
+			String status,
+			String inactivationReason
+	) {
+		public SelfServiceClientRecord(UUID id, UUID personId, String fullName, String email, String phone) {
+			this(id, personId, fullName, email, phone, "ACTIVE", null);
+		}
 	}
 
 	record SelfServiceIdentifiers(String email, String phone, String localPhone, String legacyPhone) {

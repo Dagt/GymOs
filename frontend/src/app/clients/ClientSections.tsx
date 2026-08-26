@@ -10,7 +10,7 @@ import {
   PhoneField,
   TextField,
 } from "@/components/FormFields";
-import type { ClientSummary, PlanSummary } from "@/lib/api";
+import type { ClientLifecycleSettings, ClientSummary, PlanSummary } from "@/lib/api";
 import { clientMembershipStatus } from "./client-list-model";
 import {
   clientFullName,
@@ -147,6 +147,7 @@ type CreateClientDrawerProps = {
   form: ClientRegistrationForm;
   manualCardEnabled: boolean;
   mercadoPagoEnabled: boolean;
+  clientLifecycleSettings: ClientLifecycleSettings | null;
   open: boolean;
   plans: PlanSummary[];
   saving: boolean;
@@ -162,6 +163,7 @@ export function CreateClientDrawer({
   form,
   manualCardEnabled,
   mercadoPagoEnabled,
+  clientLifecycleSettings,
   open,
   plans,
   saving,
@@ -224,6 +226,12 @@ export function CreateClientDrawer({
                 ))}
               </select>
             </label>
+
+            {hasSelectedPlan && clientLifecycleSettings?.registrationFeeEnabled ? (
+              <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                Se agregará {clientLifecycleSettings.registrationFeeLabel}: {formatMoney(clientLifecycleSettings.registrationFeeCents, clientLifecycleSettings.currency)} al cobro inicial.
+              </p>
+            ) : null}
 
             {hasSelectedPlan ? (
               <div className="mt-4 pt-4 border-t border-[var(--brand-line)] grid gap-5">

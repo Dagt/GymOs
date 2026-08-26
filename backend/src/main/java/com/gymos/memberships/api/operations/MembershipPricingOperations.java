@@ -8,7 +8,8 @@ public interface MembershipPricingOperations {
 	MembershipQuoteView quoteForCheckout(GymOsPrincipal principal, UUID clientId, UUID planId);
 
 	record MembershipQuoteView(
-			UUID clientId, UUID planId, String planName, long listPriceCents,
+			UUID clientId, UUID planId, String planName, long planPriceCents,
+			long registrationFeeCents, String registrationFeeLabel, long listPriceCents,
 			long discountCents, long totalCents, String currency,
 			List<AppliedBenefitView> appliedBenefits
 	) {}

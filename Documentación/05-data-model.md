@@ -126,10 +126,33 @@ Regla:
 - person_id
 - status
 - joined_at
+- inactivated_at
+- inactivation_reason
 - notes
 
 Regla:
 - El socio pertenece a la organizacion/tenant, no se duplica por sucursal. Las ventas, membresias, accesos, reservas y pases conservan `branch_id` cuando la operacion es local a una sucursal.
+- La baja automática usa `status=INACTIVE` e
+  `inactivation_reason=MEMBERSHIP_INACTIVITY`; no elimina el expediente ni sus
+  relaciones financieras.
+
+### client_lifecycle_configuration
+- organization_id
+- registration_fee_enabled
+- registration_fee_cents
+- registration_fee_label
+- registration_recharge_months
+- auto_inactivation_enabled
+- inactivity_months
+- updated_at
+- updated_by
+- version
+
+Regla:
+- La inscripción corresponde en la primera membresía o cuando la última vigencia
+  terminó al menos los meses configurados antes de la fecha operativa.
+- La inactividad se mide desde el fin de la última gracia de membresía o, si el
+  socio nunca tuvo una, desde `joined_at`.
 
 ### product
 - sku
@@ -230,11 +253,17 @@ Regla:
 ### sale_item
 - sale_id
 - product_id
+- item_type
 - quantity
 - unit_price
 - discount_amount
 - total_amount
 - behavior_snapshot_json
+
+Regla:
+- Una alta con inscripción genera una partida `MEMBERSHIP_PLAN` con producto y
+  una partida `REGISTRATION_FEE` sin producto. Ambas integran subtotal, total y
+  pago, pero los beneficios de membresía sólo descuentan el plan.
 
 ### payment
 - sale_id
@@ -799,3 +828,15 @@ mensualidad se actualiza el resumen de `platform_branch_billing` y el siguiente
 corte; al acumular pagos de implementación por el importe acordado, la
 implementación queda liquidada. No hay borrado ni actualización operativa del
 historial de pagos.
+
+## Extensión V93 — Alta y ciclo de vida del socio
+
+`V93__client_onboarding_lifecycle.sql` agrega `client.inactivated_at`,
+`client.inactivation_reason`, la configuración por organización
+`client_lifecycle_configuration` y el índice parcial
+`ix_client_automatic_inactivation`. También incorpora la capacidad opt-in
+`clientRegistration=false` a los perfiles de kiosco existentes.
+
+La baja automática es lógica y reversible. Una inscripción cobrada se conserva
+como partida `sale_item` de tipo `REGISTRATION_FEE`; no requiere convertir el
+cargo en un producto físico ni provoca movimientos de inventario.

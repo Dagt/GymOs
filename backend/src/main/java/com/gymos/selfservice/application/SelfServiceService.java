@@ -6,6 +6,7 @@ import com.gymos.bookings.api.operations.BookingOperations.BookingAvailability;
 import com.gymos.bookings.api.operations.BookingOperations.BookingResource;
 import com.gymos.bookings.api.operations.BookingOperations.BookingResult;
 import com.gymos.clients.api.operations.ClientLookupOperations;
+import com.gymos.clients.api.operations.RegisterSelfServiceClientCommand;
 import com.gymos.clients.api.operations.SelfServiceClientProfile;
 import com.gymos.clients.api.operations.UpdateSelfServiceContactCommand;
 import com.gymos.clients.api.operations.VerifyClientIdentityCommand;
@@ -177,8 +178,42 @@ public class SelfServiceService {
 			throw new BusinessException("SELF_SERVICE_VERIFICATION_FAILED", "No fue posible verificar la sesion con los datos proporcionados.");
 		}
 		OffsetDateTime now = OffsetDateTime.now();
-		repository.markVerified(sessionId, client.clientId(), session.startedAt().plus(BROWSER_MODE_MAX_DURATION));
+		repository.markVerified(
+				sessionId, client.clientId(), session.startedAt().plus(BROWSER_MODE_MAX_DURATION),
+				"CONTACT_BIRTH_DATE"
+		);
 		auditService.recordSystem(session.organizationId(), session.branchId(), null, "SELF_SERVICE_CLIENT_VERIFIED", "CLIENT", client.clientId(), "SELF_SERVICE_KIOSK", null, correlationId);
+		return summary(sessionId, sessionToken);
+	}
+
+	@Transactional
+	public SelfServiceSummaryResult register(
+			UUID sessionId,
+			String sessionToken,
+			RegisterSelfServiceClientCommand command,
+			String correlationId,
+			String originIp
+	) {
+		rateLimiter.check("kiosk:register:ip:" + originIp, 20, Duration.ofMinutes(10));
+		rateLimiter.check("kiosk:register:session:" + sessionId, 5, Duration.ofMinutes(10));
+		SessionRecord session = activeSession(sessionId, sessionToken);
+		capabilityPolicy.require(capabilities(session), SelfServiceCapability.CLIENT_REGISTRATION);
+		if (session.clientId() != null) {
+			throw new BusinessException("SELF_SERVICE_SESSION_ALREADY_VERIFIED", "La sesión ya pertenece a un socio.");
+		}
+		var client = clientLookupOperations.registerForSelfService(new RegisterSelfServiceClientCommand(
+				session.organizationId(), session.branchId(), command.firstName(), command.lastName(),
+				command.maternalLastName(), command.birthDate(), command.gender(), command.phone(), command.email()
+		));
+		repository.markVerified(
+				sessionId, client.clientId(), session.startedAt().plus(BROWSER_MODE_MAX_DURATION),
+				"SELF_REGISTRATION"
+		);
+		auditService.recordSystem(
+				session.organizationId(), session.branchId(), null,
+				"SELF_SERVICE_CLIENT_REGISTERED", "CLIENT", client.clientId(),
+				"SELF_SERVICE_KIOSK", null, correlationId
+		);
 		return summary(sessionId, sessionToken);
 	}
 

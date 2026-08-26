@@ -4,6 +4,7 @@ import com.gymos.bookings.api.operations.BookingOperations.BookingAvailability;
 import com.gymos.bookings.api.operations.BookingOperations.BookingResource;
 import com.gymos.bookings.api.operations.BookingOperations.BookingResult;
 import com.gymos.clients.api.operations.SelfServiceClientProfile;
+import com.gymos.clients.api.operations.RegisterSelfServiceClientCommand;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.security.ClientIpResolver;
@@ -74,6 +75,19 @@ public class SelfServiceController {
 	@PostMapping("/sessions/{sessionId}/verify")
 	SelfServiceSummaryResponse verify(@PathVariable UUID sessionId, @Valid @RequestBody VerifySessionRequest request, @RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken, HttpServletRequest servletRequest) {
 		return toResponse(selfServiceService.verify(sessionId, sessionToken, request.toCommand(), correlationId(servletRequest), clientIpResolver.resolve(servletRequest)));
+	}
+
+	@PostMapping("/sessions/{sessionId}/registrations")
+	SelfServiceSummaryResponse register(
+			@PathVariable UUID sessionId,
+			@Valid @RequestBody RegisterClientRequest request,
+			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken,
+			HttpServletRequest servletRequest
+	) {
+		return toResponse(selfServiceService.register(
+				sessionId, sessionToken, request.toCommand(), correlationId(servletRequest),
+				clientIpResolver.resolve(servletRequest)
+		));
 	}
 
 	@GetMapping("/sessions/{sessionId}/summary")
@@ -220,6 +234,22 @@ public class SelfServiceController {
 	private SelfServiceMembershipSaleResponse toResponse(SelfServiceMembershipSaleResult result) { return new SelfServiceMembershipSaleResponse(result.saleId(), result.saleNumber(), result.saleStatus(), result.totalCents(), result.paidCents(), result.balanceCents(), result.currency(), result.membership(), result.paymentId(), result.providerOperationId(), result.checkoutUrl(), result.checkoutStatus()); }
 
 	public record VerifySessionRequest(@NotBlank String identifier, @NotNull LocalDate birthDate) { private VerifySessionCommand toCommand() { return new VerifySessionCommand(identifier, birthDate); } }
+	public record RegisterClientRequest(
+			@NotBlank @Size(max = 120) String firstName,
+			@NotBlank @Size(max = 120) String lastName,
+			@Size(max = 120) String maternalLastName,
+			@NotNull LocalDate birthDate,
+			@Pattern(regexp = "^$|MALE|FEMALE$") String gender,
+			@Pattern(regexp = "^$|^\\+52\\d{10}$") String phone,
+			@Email @Size(max = 180) String email
+	) {
+		private RegisterSelfServiceClientCommand toCommand() {
+			return new RegisterSelfServiceClientCommand(
+					null, null, firstName, lastName, maternalLastName, birthDate,
+					gender, phone, email
+			);
+		}
+	}
 	public record CreateBookingRequest(@NotNull UUID resourceId, @NotNull OffsetDateTime startsAt, @NotNull OffsetDateTime endsAt, @Size(max = 2000) String notes) {}
 	public record RenewMembershipRequest(@NotBlank @Size(max = 160) String idempotencyKey) { private RenewMembershipOperationCommand toCommand() { return new RenewMembershipOperationCommand("CARD_ONLINE", null, false, "Renovacion con tarjeta desde kiosco", idempotencyKey); } }
 	public record EnrollMembershipRequest(@NotNull UUID planId, @NotBlank @Size(max = 160) String idempotencyKey) {}
