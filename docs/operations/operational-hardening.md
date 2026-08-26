@@ -33,6 +33,11 @@ ocultas. La paginación de listados que ya la tienen permanece visible fuera del
 scroll; un desplazamiento no sustituye **Anterior/Siguiente**. Se conserva acceso
 por teclado y touch, filtros de servidor y totales completos.
 
+El paginador usa controles compactos propios (2 rem en escritorio, 2.5 rem con
+puntero táctil) sin el recuadro de formulario. En socios, el encabezado mantiene
+el total de la sucursal consultado sin filtros; el paginador muestra las
+coincidencias de la búsqueda. Cambiar 25/50/100 no cambia el total.
+
 `/api/v1/system/info` anuncia `operational-pagination-v1`; se rechaza un backend
 incompatible en vez de interpretar una respuesta parcial como completa. Una
 consulta fallida muestra total no disponible y reintento. Parámetros UUID,
@@ -63,9 +68,14 @@ Guía completa: [paginación de listados](list-pagination.md).
   organización; renovación: posteriores. Un reemplazo conserva la anterior.
 - Serie semanal por lunes y rango exacto; días/semanas sin actividad valen cero
   sólo tras una consulta correcta. Los socios únicos semanales no son sumables.
-- Indicadores permite hasta cinco líneas de coach con fecha diaria, vista
-  acumulada desde el inicio del periodo o por día, colores/trazos y tabla semanal.
-  Coaches activos sin actividad también pueden seleccionarse.
+- Indicadores superpone todas las líneas de coaches con fecha diaria, sin
+  selección ni límite de cinco. Conserva vista acumulada desde el inicio del
+  periodo o por día y recupera el resumen por coach a la derecha (debajo en móvil).
+  Los socios únicos de ese resumen proceden del agregado del periodo, no de
+  sumar días. La leyenda y el resumen tienen scroll acotado.
+- Se recupera el estilo del dashboard: barras semanales redondeadas azul/verde,
+  áreas violeta/turquesa para primerizas/renovaciones y líneas suaves por coach,
+  con etiquetas y trazos distintos al reutilizar colores. No cambian las métricas.
 
 Configuración del backend (valores predeterminados):
 
@@ -78,8 +88,15 @@ GYMOS_COACHING_EXPIRATION_BATCH_SIZE=250
 ## Edición de Sauna y otros beneficios
 
 **Beneficios → Editar → marcar los planes → Guardar cambios.** Código, tipo,
-sucursal e ID permanecen fijos. Se pueden editar nombre, vigencia, estado,
-reglas económicas y planes según el tipo. ACCESS exige al menos un plan.
+sucursal e ID permanecen fijos. Se pueden editar nombre, estado, reglas
+económicas y planes según el tipo. ACCESS exige al menos un plan.
+
+La consola no muestra fechas de vigencia ni permite alternar evidencia para
+ACCESS. Al editar conserva los valores históricos ocultos; los accesos nuevos
+se crean sin fechas propias ni evidencia. La API y la elegibilidad histórica
+no cambian. Los descuentos conservan su control de evidencia. En el listado se
+retiran las etiquetas «Sucursal actual» y «ACTIVE» y se utiliza un lápiz con
+nombre accesible para editar; inactivos/alcance global se indican sólo si aplican.
 
 Los nuevos vínculos deben ser planes activos del tenant; se pueden conservar
 vínculos a planes retirados para no quitar derechos históricos silenciosamente.
@@ -182,7 +199,7 @@ contrato paginado y recorridos Playwright de edición, recuperación, gráficas,
 errores y scroll. Datos sintéticos, correo simulado y revisión visual en
 escritorio/móvil; no se han enviado correos reales ni efectuado cobros en este corte.
 
-Resultados locales finales:
+Resultados locales del cierre funcional (`ac8866c`):
 
 | Validación | Resultado |
 |---|---|
@@ -206,6 +223,30 @@ advierte que Windows no tiene compatibilidad completa; no es una prueba de
 ejecución del worker en Cloudflare ni un despliegue. La guía `visualize-data`
 se aplicó al eje temporal, comparación de series, distinción entre cero/error y
 QA de las gráficas en escritorio y móvil.
+
+### Revalidación del ajuste visual posterior
+
+Este ajuste no añade migraciones ni cambia código productivo del backend.
+Se conservan arriba los resultados históricos; no se presenta la suite backend
+completa como reejecutada para este cambio de interfaz.
+
+- `npm test`: 112 pruebas aprobadas.
+- `npm run test:e2e -- --workers=2 --reporter=line`: 72 recorridos aprobados.
+  Incluyen total de 127 socios con tamaños 25/50/100, total sin filtros al buscar
+  durante la carga inicial, paginador compacto, ocho coaches simultáneos,
+  resumen por fila y preservación de valores históricos ocultos de beneficios.
+- `npm run typecheck` y `npm run lint`: correctos. Tras el último ajuste del
+  contador se repitió ESLint sobre el controlador y su prueba; el build volvió
+  a validar TypeScript y se repitió la suite E2E completa.
+- `npm run build` y `npm run cf:build`: correctos; misma advertencia de Windows
+  de OpenNext, sin desplegar ni validar el runtime remoto.
+- `gradlew.bat postgresIntegrationTest --tests '*ClientPaginationIntegrationTests' --no-daemon --console=plain`:
+  4 pruebas PostgreSQL aprobadas, ninguna omitida; total independiente del tamaño.
+- `git diff --check`: correcto. Revisión visual de escritorio/móvil realizada.
+
+Durante QA se regeneró la caché de desarrollo de Next.js porque estaba sirviendo
+CSS anterior. No se modificaron datos locales del usuario ni configuración de
+producción.
 
 Se mantienen fuera de alcance el Local Connector, HikCentral/hardware, cobro
 automático SaaS, biometría y refactorizaciones generales. La deuda previa de

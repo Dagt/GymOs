@@ -21,7 +21,7 @@ import {
   validateClientForm,
   type ClientRegistrationForm,
 } from "./ClientHelpers";
-import { lastPage } from "@/lib/pagination";
+import { isPageResult, lastPage } from "@/lib/pagination";
 
 export function useClientsController() {
   const [session, setSession] = useState<StoredSession | null>(null);
@@ -30,6 +30,7 @@ export function useClientsController() {
   const [query, setQuery] = useState("");
   const [listParams, setListParams] = useState({ query: "", page: 0, size: 25, revision: 0 });
   const [totalClients, setTotalClients] = useState(0);
+  const [registeredClients, setRegisteredClients] = useState<number | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [form, setForm] = useState<ClientRegistrationForm>(emptyClientForm);
   const [fieldErrors, setFieldErrors] = useState<FieldErrorMap>({});
@@ -99,8 +100,14 @@ export function useClientsController() {
       setLoading(true);
       setListError(null);
       try {
-        const result = await searchClientsPage(accessToken!, listParams);
+        const [result, directory] = await Promise.all([
+          searchClientsPage(accessToken!, listParams),
+          // A search can start before the initial page finishes. Fetch the branch
+          // total independently of that cancelled request, requesting only one row.
+          listParams.query ? searchClientsPage(accessToken!, { size: 1 }) : Promise.resolve(null),
+        ]);
         if (!active) return;
+        if (!isPageResult(result) || (directory !== null && !isPageResult(directory))) throw new Error("No fue posible consultar el total de socios. El servidor devolvió una paginación inválida.");
         const validPage = lastPage(result.totalElements, result.size);
         if (listParams.page > validPage) {
           setListParams((current) => ({ ...current, page: validPage }));
@@ -108,6 +115,8 @@ export function useClientsController() {
         }
         setClients(result.items);
         setTotalClients(result.totalElements);
+        // The directory header is the branch total, not the page length or search matches.
+        setRegisteredClients((directory ?? result).totalElements);
       } catch (exception) {
         if (active) setListError(exception instanceof Error ? exception.message : "No fue posible cargar socios.");
       } finally {
@@ -222,6 +231,7 @@ export function useClientsController() {
     page: listParams.page,
     pageSize: listParams.size,
     totalClients,
+    registeredClients,
     setPage: (page: number) => setListParams((current) => ({ ...current, page })),
     setPageSize: (size: number) => setListParams((current) => ({ ...current, size, page: 0 })),
     manualCardEnabled,

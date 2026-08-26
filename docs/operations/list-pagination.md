@@ -22,6 +22,10 @@ Implementación: `cab3e28`. Cierre de deuda: `INV-001`.
   si fuera el total de la colección.
 - Los controles están antes del listado: rango visible, anterior/siguiente y
   25/50/100 registros por página. Las alertas de inventario usan 10 por página.
+  Son compactos y no heredan las alturas de los formularios; sin recuadro exterior.
+- «Socios registrados» conserva el total sin filtros de la sucursal. El rango
+  del paginador corresponde a los resultados de búsqueda, no al total del padrón.
+  Ninguno de los totales se calcula con la longitud de la página visible.
 - Los listados tienen una altura máxima y scroll interno con barra oculta,
   según la preferencia operativa del piloto. Admiten rueda, touch y teclado;
   reciben foco y tienen nombre accesible. No alargan la página con 100 filas.

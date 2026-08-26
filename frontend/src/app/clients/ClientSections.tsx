@@ -77,19 +77,23 @@ type ClientListProps = {
   page: number;
   pageSize: number;
   total: number;
+  registeredTotal: number | null;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
 };
 
-export function ClientList({ clients, error, loading, page, pageSize, total, onPageChange, onPageSizeChange }: ClientListProps) {
+export function ClientList({ clients, error, loading, page, pageSize, total, registeredTotal, onPageChange, onPageSizeChange }: ClientListProps) {
   return (
     <section className="app-card p-6">
-      <div className="flex items-center justify-between gap-3 mb-6">
+      <div className="flex items-center justify-between gap-3 mb-3">
         <div>
           <p className="text-[0.65rem] font-black uppercase tracking-widest text-[color:var(--brand-primary)] opacity-60">Base de Datos</p>
           <h2 className="text-xl font-black text-[color:var(--brand-primary)] mt-1">Socios registrados</h2>
         </div>
-        <span className="px-3 py-1 bg-[color:var(--brand-surface)] text-[color:var(--brand-primary)] text-xs font-black rounded-full border border-[color:var(--brand-line)]">{error ? "Total no disponible" : `${total} socios`}</span>
+        <div className="text-right text-xs" aria-live="polite">
+          <strong className="block text-[var(--brand-primary)]" data-testid="registered-client-total">{error ? "Total no disponible" : registeredTotal === null ? "Consultando total…" : `${registeredTotal} socios`}</strong>
+          <span className="text-[var(--brand-muted)]">Total en esta sucursal</span>
+        </div>
       </div>
       {!error ? <Pagination label="socios" loading={loading} page={page} size={pageSize} totalElements={total} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} /> : <p role="status" className="text-sm text-[var(--brand-muted)]">No se pudo consultar el listado. Revisa el error y vuelve a buscar.</p>}
       <div className="app-scroll-list mt-4 grid gap-1.5" aria-busy={loading} aria-label="Listado de socios" role="region" tabIndex={0} key={page}>

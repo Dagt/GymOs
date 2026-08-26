@@ -4420,6 +4420,49 @@ button.admin-secondary-link:disabled {
 }
 
 /* Compact operational lists. Pagination and filters stay outside this region. */
+/* Compact navigation has its own controls; it must not inherit form/button heights. */
+.app-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .35rem 1rem;
+  padding: .125rem 0;
+  color: var(--brand-muted);
+  font-size: .75rem;
+  line-height: 1.25rem;
+}
+
+.app-pagination-range { margin: 0; font-variant-numeric: tabular-nums; }
+.app-pagination-controls,
+.app-pagination-size,
+.app-pagination-navigation { display: flex; align-items: center; gap: .4rem; }
+.app-pagination-controls { flex-wrap: wrap; gap: .35rem .75rem; }
+.app-pagination-size,
+.app-pagination-navigation { white-space: nowrap; }
+.app-pagination button,
+.app-pagination select {
+  min-height: 2rem;
+  border: 1px solid var(--brand-line);
+  border-radius: .4rem;
+  background: transparent;
+  padding: .2rem .5rem;
+  color: var(--brand-primary);
+  font: inherit;
+  font-weight: 650;
+  cursor: pointer;
+}
+.app-pagination select { width: auto; }
+.app-pagination button:disabled,
+.app-pagination select:disabled { opacity: .45; cursor: default; }
+.app-pagination button:hover:not(:disabled) { background: var(--brand-surface); }
+.app-pagination button:focus-visible,
+.app-pagination select:focus-visible { outline: 2px solid var(--brand-primary); outline-offset: 2px; }
+@media (pointer: coarse) {
+  .app-pagination button,
+  .app-pagination select { min-height: 2.5rem; }
+}
+
 .app-scroll-list {
   max-height: min(56dvh, 38rem);
   min-height: 0;

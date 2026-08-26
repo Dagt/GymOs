@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { businessDateLabel, coachKey, coachTimeline } from "./coach-trend-model.ts";
+import { businessDateLabel, coachSeriesStyle, coachKey, coachTimeline } from "./coach-trend-model.ts";
 
 const activity = [
   { date: "2026-08-24", coachId: "ana", coachName: "Ana", assignments: 2, firstWorkouts: 1, uniqueClients: 1 },
@@ -29,4 +29,15 @@ test("calendar labels do not shift Monday back to Sunday in negative UTC offsets
   assert.match(businessDateLabel("2026-08-24"), /24/);
   assert.deepEqual(coachTimeline("2026-08-27", "2026-08-24", activity, true), []);
   assert.deepEqual(coachTimeline("invalid", "2026-08-24", activity, true), []);
+});
+
+test("all coaches keep a defined style and series beyond the former five-coach limit", () => {
+  const keys = Array.from({ length: 12 }, (_, index) => coachKey(String(index)));
+  const rows = coachTimeline("2026-08-24", "2026-08-27", [], true, keys);
+  assert.equal(Object.keys(rows[0]).length, 13);
+  for (let index = 0; index < keys.length; index++) {
+    assert.match(coachSeriesStyle(index).color, /^#[\da-f]{6}$/);
+    assert.equal(rows[3][keys[index]], 0);
+  }
+  assert.notDeepEqual(coachSeriesStyle(0), coachSeriesStyle(5));
 });

@@ -49,12 +49,20 @@ test("una consulta de conteos fallida no se presenta como historial vacío y per
   await expect(page.getByRole("navigation", { name: "Paginación de conteos" })).toContainText("1–25 de 127 conteos");
 });
 
-test("socios muestra el total real, permite recorrer 127 y busca fuera de los primeros 50", async ({ page }) => {
+test("socios muestra el total real, permite recorrer 127 y busca fuera de los primeros 50", async ({ page }, testInfo) => {
   await bootPagination(page);
   await page.goto("/clients");
   const pager = page.getByRole("navigation", { name: "Paginación de socios" });
   await expect(pager).toContainText("1–25 de 127 socios");
   await expect(page.getByText("127 socios", { exact: true })).toBeVisible();
+  expect((await pager.boundingBox())!.height).toBeLessThanOrEqual(40);
+  await pager.getByLabel("socios por página").selectOption("100");
+  await expect(pager).toContainText("1–100 de 127 socios");
+  await expect(page.getByTestId("registered-client-total")).toHaveText("127 socios");
+  await expect(pager.getByRole("button", { name: "Siguiente" })).toBeEnabled();
+  await pager.getByRole("button", { name: "Siguiente" }).click();
+  await expect(pager).toContainText("101–127 de 127 socios");
+  await expect(page.getByTestId("registered-client-total")).toHaveText("127 socios");
   await pager.getByLabel("socios por página").selectOption("50");
   await expect(pager).toContainText("1–50 de 127 socios");
   await pager.getByRole("button", { name: "Siguiente" }).click();
@@ -68,9 +76,42 @@ test("socios muestra el total real, permite recorrer 127 y busca fuera de los pr
   await expect(pager).toContainText("1–1 de 1 socios");
   await expect(pager).toContainText("Página 1 de 1");
   await expect(page.getByRole("link", { name: /Socio 126 Prueba/ })).toBeVisible();
+  await expect(page.getByTestId("registered-client-total")).toHaveText("127 socios");
   await page.getByPlaceholder("Busca por nombre, teléfono o email...").fill("No existe");
   await page.getByRole("button", { name: "Buscar Socio" }).click();
   await expect(pager).toContainText("0–0 de 0 socios");
+  await expect(page.getByTestId("registered-client-total")).toHaveText("127 socios");
+  await page.getByPlaceholder("Busca por nombre, teléfono o email...").fill("");
+  await page.getByRole("button", { name: "Buscar Socio" }).click();
+  await expect(pager).toContainText("1–50 de 127 socios");
+  await page.screenshot({ path: testInfo.outputPath("socios-paginador-compacto.png") });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  expect((await pager.boundingBox())!.height).toBeLessThanOrEqual(120);
+  await pager.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("socios-paginador-mobile.png") });
+});
+
+test("el total de socios está disponible aunque se busque antes de completar la carga inicial", async ({ page }) => {
+  let releaseInitial!: () => void;
+  let initialStarted = false;
+  const pending = new Promise<void>((resolve) => { releaseInitial = resolve; });
+  await bootPagination(page, async (route, path, url) => {
+    if (path === "/clients/search" && !url.searchParams.has("query") && url.searchParams.get("size") === "25") {
+      initialStarted = true;
+      await pending;
+      return json(route, paged(clients, url));
+    }
+    return false;
+  });
+  await page.goto("/clients");
+  try {
+    await expect.poll(() => initialStarted).toBe(true);
+    await page.getByPlaceholder("Busca por nombre, teléfono o email...").fill("Socio 126");
+    await page.getByRole("button", { name: "Buscar Socio" }).click();
+    await expect(page.getByRole("navigation", { name: "Paginación de socios" })).toContainText("1–1 de 1 socios");
+    await expect(page.getByTestId("registered-client-total")).toHaveText("127 socios");
+  } finally { releaseInitial(); }
 });
 
 test("una búsqueda lenta de socios no reemplaza resultados más recientes", async ({ page }) => {

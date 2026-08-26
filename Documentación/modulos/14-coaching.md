@@ -207,9 +207,11 @@ reemplazadas permanecen en el historial. `assigned_on` usa la fecha de México,
 no el día UTC del servidor; V91 repara únicamente el defecto histórico que
 coincide con el día UTC de creación, sin modificar los periodos elegidos.
 
-El desempeño individual tiene eje de fechas y una línea por coach (hasta cinco
-visibles), vista acumulada **dentro del periodo** o por día, colores/trazos
-distintos, semanas/tablas consultables y errores diferenciados de cero actividad.
+El desempeño individual tiene eje de fechas y todas las líneas de coaches
+superpuestas sin selector ni límite de cinco, vista acumulada **dentro del
+periodo** o por día, colores/trazos distintos y resumen por coach visible a la
+derecha (debajo en móvil). Conserva semanas/tablas consultables y errores
+diferenciados de cero actividad.
 No suma socios únicos semanales como si fueran personas distintas del periodo.
 Los indicadores actuales excluyen asignaciones futuras/finalizadas y no
 multiplican registros por joins con la biblioteca de rutinas.

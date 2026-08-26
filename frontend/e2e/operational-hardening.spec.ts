@@ -32,6 +32,10 @@ const trend = {
     { date: "2026-08-25", coachId: "luis", coachName: "Luis", assignments: 1, uniqueClients: 1, firstWorkouts: 0 },
   ],
 };
+const coachTotals = [
+  { coachId: "ana", coachName: "Ana", assignments: 5, uniqueClients: 3, firstWorkouts: 3 },
+  { coachId: "luis", coachName: "Luis", assignments: 2, uniqueClients: 1, firstWorkouts: 0 },
+];
 
 async function json(route: Route, value: unknown, status = 200) { await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(value) }); return true; }
 
@@ -49,7 +53,7 @@ async function boot(page: Page, override?: (route: Route, path: string, url: URL
     if (path === "/users/roles") return void await json(route, [{ id: "role-coach", name: "Coach", permissionCount: 7 }]);
     if (path === "/reports/owner-dashboard") return void await json(route, { fromDate: url.searchParams.get("fromDate") ?? from, toDate: url.searchParams.get("toDate") ?? to, paidRevenueCents: 0, saleCount: 0, newClients: 0, activeMemberships: 0, bookingCount: 0, lowStockItems: 0, activeWorkoutAssignments: 2, activeProfessionals: 0, queuedNotifications: 0, enabledAutomations: 0 });
     if (path === "/reports/coaches") return void await json(route, { coachCount: 2, workoutCount: 3, activeAssignments: 2, assignmentsLast30Days: 7 });
-    if (path === "/reports/coaches/workout-assignments/summary") return void await json(route, { from, to, assignments: 7, uniqueClients: 4, activeCoaches: 2, coachesWithoutAssignments: 0, previousAssignments: 1, previousUniqueClients: 1, assignmentChange: 6, uniqueClientChange: 3, page: 0, size: 1, totalDetails: 7, totalPages: 7, coaches: [], details: [] });
+    if (path === "/reports/coaches/workout-assignments/summary") return void await json(route, { from, to, assignments: 7, uniqueClients: 4, activeCoaches: 2, coachesWithoutAssignments: 0, previousAssignments: 1, previousUniqueClients: 1, assignmentChange: 6, uniqueClientChange: 3, page: 0, size: 1, totalDetails: 7, totalPages: 7, coaches: coachTotals, details: [] });
     if (path === "/reports/coaches/workout-assignments/trend") return void await json(route, trend);
     if (path === "/inventory/summary") return void await json(route, { totalValuationCents: 0, totalTrackedProducts: 0, lowStockCount: 0, outOfStockCount: 0, allowNegativeStock: false });
     if (path.endsWith("/reports/summary")) return void await json(route, { fromDate: from, toDate: to, currency: "MXN", sales: { saleCount: 0, totalCents: 0, paidCents: 0, balanceCents: 0, paidSales: 0, partiallyPaidSales: 0, pendingSales: 0 }, payments: { paymentCount: 0, completedPayments: 0, pendingPayments: 0, rejectedPayments: 0, completedCents: 0, pendingCents: 0, rejectedCents: 0 }, salesByStatus: [], salesByBusinessContext: [], paymentsByMethod: [], recentSales: [] });
@@ -69,8 +73,15 @@ test("edita Sauna, conserva VIP y añade el plan VIP diario sin duplicar el bene
     return false;
   });
   await page.goto("/benefits");
+  await expect(page.getByText("Sucursal actual", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("ACTIVE", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Editar Sauna" })).toHaveText("");
+  await page.screenshot({ path: testInfo.outputPath("beneficios-listado-limpio.png") });
   await page.getByRole("button", { name: "Editar Sauna" }).click();
   const drawer = page.getByRole("dialog");
+  await expect(drawer.getByLabel("Vigente desde")).toHaveCount(0);
+  await expect(drawer.getByLabel("Vigente hasta")).toHaveCount(0);
+  await expect(drawer.getByLabel("Requiere evidencia")).toHaveCount(0);
   await expect(drawer.getByLabel("Código", { exact: true })).toBeDisabled();
   await expect(drawer.getByRole("checkbox", { name: "VIP", exact: true })).toBeChecked();
   await drawer.getByRole("checkbox", { name: "VIP diario", exact: true }).check();
@@ -80,6 +91,40 @@ test("edita Sauna, conserva VIP y añade el plan VIP diario sin duplicar el bene
   expect(payload).not.toHaveProperty("benefitType"); expect(payload).not.toHaveProperty("code");
   await expect(page.getByText("Planes: VIP, VIP diario", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "Editar Sauna" })).toHaveCount(1);
+});
+
+test("editar un acceso preserva sus vigencias y evidencia históricas sin exponer controles", async ({ page }) => {
+  const legacy = { ...benefit, validFrom: "2026-01-01", validUntil: "2027-01-01", requiresEvidence: true };
+  let payload: Record<string, unknown> | null = null;
+  await boot(page, async (route, path) => {
+    if (path === "/benefits") return json(route, [legacy]);
+    if (path === `/benefits/${benefitId}`) { payload = route.request().postDataJSON(); return json(route, { ...legacy, ...payload, version: 5 }); }
+    return false;
+  });
+  await page.goto("/benefits"); await page.getByRole("button", { name: "Editar Sauna" }).click();
+  const drawer = page.getByRole("dialog");
+  await expect(drawer.locator('input[type="date"]')).toHaveCount(0);
+  await expect(drawer.getByLabel("Requiere evidencia")).toHaveCount(0);
+  await drawer.getByRole("checkbox", { name: "VIP diario", exact: true }).check();
+  await drawer.getByRole("button", { name: "Guardar cambios" }).click();
+  await expect.poll(() => payload).toMatchObject({ validFrom: legacy.validFrom, validUntil: legacy.validUntil, requiresEvidence: true, planIds: [vip, daily], expectedVersion: 4 });
+});
+
+test("un nuevo acceso no hereda evidencia del formulario de descuentos", async ({ page }) => {
+  let payload: Record<string, unknown> | null = null;
+  await boot(page, async (route, path) => {
+    if (path === "/benefits" && route.request().method() === "POST") { payload = route.request().postDataJSON(); return json(route, { ...benefit, ...payload, id: "88888888-8888-4888-8888-888888888888" }); }
+    return false;
+  });
+  await page.goto("/benefits"); await page.getByRole("button", { name: "Crear beneficio", exact: true }).click();
+  const drawer = page.getByRole("dialog");
+  await drawer.getByLabel("Requiere evidencia").check();
+  await drawer.getByRole("combobox", { name: "Tipo", exact: true }).selectOption("ACCESS");
+  await expect(drawer.getByLabel("Requiere evidencia")).toHaveCount(0);
+  await expect(drawer.locator('input[type="date"]')).toHaveCount(0);
+  await drawer.getByRole("checkbox", { name: "VIP", exact: true }).check();
+  await drawer.getByRole("button", { name: "Crear beneficio", exact: true }).click();
+  await expect.poll(() => payload).toMatchObject({ benefitType: "ACCESS", requiresEvidence: false, planIds: [vip] });
 });
 
 test("un conflicto de edición se explica sin cerrar el formulario ni perder los planes elegidos", async ({ page }) => {
@@ -146,7 +191,14 @@ for (const role of ["Dueno del gimnasio", "Gerente", "Administrador"]) {
     await expect(page.getByText("Renovaciones", { exact: true }).first()).toBeVisible();
     const lines = page.getByTestId("coach-timeline").locator(".recharts-line-curve");
     await expect(lines).toHaveCount(2);
-    expect((await lines.first().getAttribute("d"))?.match(/L/g)?.length).toBeGreaterThan(5);
+    expect((await lines.first().getAttribute("d"))?.match(/[LC]/g)?.length).toBeGreaterThan(5);
+    await expect(page.getByTestId("coaching-dashboard").getByRole("checkbox")).toHaveCount(0);
+    const summary = page.getByRole("region", { name: "Resumen por coach", exact: true });
+    await expect(summary.getByRole("row").filter({ hasText: "Ana" }).getByRole("cell")).toHaveText(["5", "3", "3"]);
+    await expect(summary.getByRole("row").filter({ hasText: "Luis" }).getByRole("cell")).toHaveText(["2", "1", "0"]);
+    const plotBox = (await page.getByTestId("coach-timeline").boundingBox())!;
+    expect((await summary.boundingBox())!.x).toBeGreaterThanOrEqual(plotBox.x + plotBox.width);
+    await expect(page.getByTestId("first-renewal-trend").locator(".recharts-area-curve")).toHaveCount(2);
     expect(queries[0].searchParams.get("from")).toBe(from); expect(queries[0].searchParams.get("to")).toBe(to);
     await page.getByLabel("Vista de evolución por coach").selectOption("daily");
     await expect(page.getByText(/Número de asignaciones creadas cada día/)).toBeVisible();
@@ -157,7 +209,7 @@ for (const role of ["Dueno del gimnasio", "Gerente", "Administrador"]) {
     await page.setViewportSize({ width: 390, height: 844 });
     await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
     const bars = page.getByTestId("coaching-dashboard").locator(".recharts-bar-rectangle .recharts-rectangle");
-    await expect(bars).toHaveCount(8);
+    await expect(bars).toHaveCount(4);
     await expect.poll(() => bars.evaluateAll((elements) => elements.every((bar) => {
       const bounds = bar.getBoundingClientRect();
       const chart = bar.closest("svg")!.getBoundingClientRect();
@@ -173,4 +225,24 @@ test("un error de métricas no se disfraza como cero asignaciones", async ({ pag
   await expect(page.getByRole("alert").filter({ hasText: "No se pudieron consultar" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Reintentar métricas" })).toBeVisible();
   await expect(page.getByTestId("coach-timeline")).toHaveCount(0);
+});
+
+test("muestra todos los coaches superpuestos, incluso más de cinco, con resumen por fila", async ({ page }, testInfo) => {
+  const coaches = Array.from({ length: 8 }, (_, index) => ({ coachId: `coach-${index}`, coachName: index === 7 ? "Valentina Fernández del Castillo" : `Coach ${index + 1}`, assignments: index + 1, uniqueClients: 1, firstWorkouts: 1 }));
+  await boot(page, async (route, path) => {
+    if (path.endsWith("workout-assignments/summary")) return json(route, { from, to, assignments: 36, uniqueClients: 8, coaches, details: [] });
+    if (path === "/reports/coaches") return json(route, { coachCount: 8, workoutCount: 3, activeAssignments: 8, assignmentsLast30Days: 36 });
+    if (path.endsWith("workout-assignments/trend")) return json(route, { ...trend, points: [
+      { weekFrom: "2026-08-17", weekTo: "2026-08-23", assignments: 21, uniqueClients: 6, firstWorkouts: 6 },
+      { weekFrom: "2026-08-24", weekTo: "2026-08-25", assignments: 15, uniqueClients: 2, firstWorkouts: 2 },
+    ], coachActivity: coaches.map((coach, index) => ({ ...coach, date: `2026-08-${18 + index}` })) });
+    return false;
+  });
+  await page.goto("/dashboard"); await page.getByRole("button", { name: "Coaches y Rutinas" }).click();
+  await expect(page.getByTestId("coach-timeline").locator(".recharts-line-curve")).toHaveCount(8);
+  await expect(page.getByRole("list", { name: "Coaches en la gráfica" }).getByRole("listitem")).toHaveCount(8);
+  await expect(page.getByRole("region", { name: "Resumen por coach", exact: true }).getByRole("row")).toHaveCount(9);
+  await expect(page.getByTestId("coaching-dashboard").getByRole("checkbox")).toHaveCount(0);
+  await page.getByTestId("coach-timeline").scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("comparacion-ocho-coaches.png"), fullPage: true });
 });

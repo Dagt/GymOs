@@ -8,8 +8,10 @@ Estado: `ESTABILIZADO`
 - definición y asignación de beneficios económicos;
 - verificación de beneficios de socios;
 - beneficios especiales de tipo `ACCESS` vinculados a planes;
-- edición de nombre, vigencia, estado, reglas económicas y planes vinculados
+- edición de nombre, estado, reglas económicas y planes vinculados
   desde el mismo beneficio; código, tipo, sucursal e ID se conservan;
+- formulario sin vigencias ni control de evidencia para ACCESS; al editar se
+  conservan esos valores históricos, sin relajar la elegibilidad del backend;
 - integración con membresías, acceso y reservas mediante `EligibilityPolicy`.
 
 ## Pendiente

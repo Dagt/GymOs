@@ -1,6 +1,11 @@
 import type { CoachActivityPoint } from "@/lib/api/coaching-types";
 
-export const COACH_COLORS = ["#2563eb", "#b7791f", "#c2410c", "#687d31", "#be185d"];
+// Match the established dashboard palette. More coaches reuse colors with a distinct dash.
+const COACH_COLORS = ["#6366f1", "#14b8a6", "#8b5cf6", "#f59e0b", "#ec4899"];
+const COACH_DASHES = [undefined, "7 4", "2 4", "10 4 2 4"];
+export function coachSeriesStyle(index: number) {
+  return { color: COACH_COLORS[index % COACH_COLORS.length], dash: COACH_DASHES[Math.floor(index / COACH_COLORS.length) % COACH_DASHES.length] };
+}
 export const coachKey = (id: string | null) => `coach:${id ?? "unassigned"}`;
 
 export function businessDateLabel(value: string) {

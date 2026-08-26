@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
+import { Pencil } from "lucide-react";
 import { AppDrawer } from "@/components/AppDrawer";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
@@ -131,6 +132,7 @@ export default function BenefitsPage() {
         discountType: form.benefitType === "ACCESS" ? "NONE" : form.discountType,
         discountPercent: form.benefitType === "ACCESS" ? null : form.discountPercent,
         discountValueCents: form.benefitType === "ACCESS" ? null : form.discountValueCents,
+        requiresEvidence: form.benefitType === "ACCESS" ? editing?.requiresEvidence ?? false : form.requiresEvidence,
         planIds: form.benefitType === "ACCESS" ? selectedPlanIds : [],
       };
       const saved = editing
@@ -204,21 +206,13 @@ export default function BenefitsPage() {
               </section>
             ) : null}
             {benefits.map((benefit) => (
-              <article className="rounded-md border border-[var(--brand-line)] bg-white p-4" key={benefit.id}>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
+              <article className="rounded-xl border border-[var(--brand-line)] p-4" key={benefit.id}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
                     <p className="font-black">{benefit.name}</p>
-                    <p className="mt-1 text-sm text-[var(--brand-muted)]">{benefit.code} - {benefit.benefitType}</p>
+                    <p className="mt-1 text-xs text-[var(--brand-muted)]">{benefit.code} · {benefit.benefitType === "ACCESS" ? "Acceso" : "Descuento"}{benefit.branchId === null ? " · Todas las sucursales" : ""}{benefit.status === "INACTIVE" ? " · Inactivo" : ""}</p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <span className="app-pill">
-                      {benefit.branchId === session.user.branchId
-                        ? "Sucursal actual"
-                        : "Todas las sucursales"}
-                    </span>
-                    <span className="app-pill">{benefit.status}</span>
-                    {canManageBenefits ? <button className="app-button-secondary !px-3 !py-1" onClick={() => void openEditor(benefit)} type="button" aria-label={`Editar ${benefit.name}`}>Editar</button> : null}
-                  </div>
+                  {canManageBenefits ? <button className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--brand-muted)] transition-colors hover:bg-[var(--brand-surface)] hover:text-[var(--brand-primary)] focus-visible:outline-2 focus-visible:outline-offset-2" onClick={() => void openEditor(benefit)} type="button" aria-label={`Editar ${benefit.name}`} title={`Editar ${benefit.name}`}><Pencil className="h-4 w-4" aria-hidden="true" /></button> : null}
                 </div>
                 <p className="mt-3 text-sm text-[var(--brand-muted)]">
                   {benefit.benefitType === "ACCESS" ? "Acceso heredado del plan" : benefit.discountType === "PERCENT" ? `${benefit.discountPercent ?? 0}% de descuento` : benefit.discountType}
@@ -235,14 +229,14 @@ export default function BenefitsPage() {
       </section>
 
       <AppDrawer
-        description="Define descuentos o accesos para la sucursal seleccionada actualmente."
+        description={form.benefitType === "ACCESS" ? "Un mismo acceso puede compartirse entre varios planes." : "Configura el descuento para tus socios."}
         onClose={() => { if (!saving) { setShowBenefitDrawer(false); setEditing(null); } }}
         open={showBenefitDrawer}
         title={editing ? "Editar beneficio" : "Crear beneficio"}
       >
         <form className="grid gap-4" onSubmit={submit}>
           {error ? <p role="alert" className="text-sm text-red-700">{error}</p> : null}
-          {editing ? <p className="text-sm text-[var(--brand-muted)]">El código, tipo y sucursal se conservan para mantener el historial y los puntos de acceso vinculados.</p> : null}
+          {editing ? <p className="text-xs text-[var(--brand-muted)]">El código y tipo se conservan para mantener el historial.</p> : null}
           <Field label="Código" value={form.code} disabled={Boolean(editing)} onChange={(value) => setForm({ ...form, code: value })} />
           <Field label="Nombre" value={form.name} onChange={(value) => setForm({ ...form, name: value })} />
           <label className="grid gap-2 text-sm font-bold text-[#42514a]">
@@ -259,6 +253,7 @@ export default function BenefitsPage() {
                   discountType: benefitType === "ACCESS" ? "NONE" : "PERCENT",
                   discountPercent: benefitType === "ACCESS" ? null : (form.discountPercent ?? 10),
                   discountValueCents: null,
+                  requiresEvidence: benefitType === "ACCESS" ? false : form.requiresEvidence,
                 });
               }}
             >
@@ -273,7 +268,7 @@ export default function BenefitsPage() {
           {form.benefitType === "ACCESS" ? (
             <div className="grid gap-2">
               <p className="text-sm font-bold text-[#42514a]">
-                Vincular a Planes de Membresía (Selección Múltiple)
+                Planes que incluyen este acceso
               </p>
               <div className="app-scroll-list app-scroll-list--short grid gap-2 p-3 rounded-md border border-[var(--brand-line)] bg-gray-50">
                 {plans.map((p) => {
@@ -313,9 +308,7 @@ export default function BenefitsPage() {
               </div>
               {plans.length === 0 ? <p className="text-sm text-amber-800">Crea primero un plan de membresía para poder vincular este acceso.</p> : null}
               {editing ? <p className="text-xs text-amber-800">Puedes vincular varios planes al mismo acceso. Quitar un plan retira este beneficio de los derechos de sus socios.</p> : null}
-              <p className="text-xs font-medium text-gray-500 italic bg-blue-50 p-2.5 rounded-lg border border-blue-100">
-                🔒 Los pases/accesos especiales se heredan automáticamente a los socios que tengan contratado cualquiera de los planes vinculados.
-              </p>
+              {!editing ? <p className="text-xs text-[var(--brand-muted)]">Los socios con cualquiera de estos planes reciben el acceso automáticamente.</p> : null}
             </div>
           ) : (
             <div className="grid gap-4">
@@ -336,14 +329,10 @@ export default function BenefitsPage() {
           <label className="grid gap-2 text-sm font-bold text-[#42514a]">Estado
             <select className="app-input" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as BenefitPayload["status"] })}><option value="ACTIVE">Activo</option><option value="INACTIVE">Inactivo</option></select>
           </label>
-          <div className="grid grid-cols-2 gap-3">
-            <label className="grid gap-2 text-sm font-bold">Vigente desde<input className="app-input" type="date" value={form.validFrom ?? ""} onChange={(event) => setForm({ ...form, validFrom: event.target.value })} /></label>
-            <label className="grid gap-2 text-sm font-bold">Vigente hasta<input className="app-input" type="date" min={form.validFrom || undefined} value={form.validUntil ?? ""} onChange={(event) => setForm({ ...form, validUntil: event.target.value })} /></label>
-          </div>
-          <label className="flex items-center gap-2 text-sm font-bold text-[#42514a]">
+          {form.benefitType !== "ACCESS" ? <label className="flex items-center gap-2 text-sm font-bold text-[#42514a]">
             <input type="checkbox" checked={form.requiresEvidence} onChange={(event) => setForm({ ...form, requiresEvidence: event.target.checked })} />
             Requiere evidencia
-          </label>
+          </label> : null}
           <button
             className="app-button h-11"
             disabled={saving || (form.benefitType === "ACCESS" && selectedPlanIds.length === 0)}

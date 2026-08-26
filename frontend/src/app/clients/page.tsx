@@ -41,7 +41,7 @@ export default function ClientsPage() {
           onCreateClient={() => controller.setShowCreateClient(true)}
         />
         <ClientList clients={controller.clients} error={controller.listError} loading={controller.loading} page={controller.page}
-          pageSize={controller.pageSize} total={controller.totalClients}
+          pageSize={controller.pageSize} total={controller.totalClients} registeredTotal={controller.registeredClients}
           onPageChange={controller.setPage} onPageSizeChange={controller.setPageSize} />
       </section>
 

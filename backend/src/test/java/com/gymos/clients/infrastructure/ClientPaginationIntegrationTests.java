@@ -66,6 +66,12 @@ class ClientPaginationIntegrationTests {
 		assertThat(repository.searchPage(organizationId, branchId, null, null, 0, 25).items())
 				.extracting(ClientSummary::id).containsExactlyElementsOf(visited.subList(0, 25));
 		assertThat(repository.search(organizationId, branchId, null, null, 50)).hasSize(50);
+		for (int size : List.of(25, 50, 100)) {
+			var firstPage = repository.searchPage(organizationId, branchId, null, null, 0, size);
+			assertThat(firstPage.items()).hasSize(size);
+			assertThat(firstPage.totalElements()).isEqualTo(127);
+			assertThat(firstPage.totalPages()).isEqualTo((int) Math.ceil(127.0 / size));
+		}
 		var beyondEnd = repository.searchPage(organizationId, branchId, null, null, 9, 25);
 		assertThat(beyondEnd.items()).isEmpty();
 		assertThat(beyondEnd.totalElements()).isEqualTo(127);
