@@ -64,6 +64,7 @@ test("un profesional externo con consultorio acepta una hora solicitada sin disp
 async function bootAsManager(page: Page) {
   const user = {
     userId: "66666666-6666-4666-8666-666666666666",
+    accountScope: "TENANT",
     organizationId,
     branchId,
     username: "gerencia@gymos.test",

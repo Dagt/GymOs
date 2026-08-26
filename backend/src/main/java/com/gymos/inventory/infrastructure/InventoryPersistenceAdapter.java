@@ -1,6 +1,8 @@
 package com.gymos.inventory.infrastructure;
 
 import com.gymos.catalog.api.CatalogProductOperations;
+import com.gymos.common.api.PageResponse;
+import com.gymos.inventory.application.query.InventoryHistorySearchCriteria;
 import com.gymos.inventory.application.port.InventoryCommandPort;
 import com.gymos.inventory.application.port.InventoryQueryPort;
 import com.gymos.inventory.application.query.InventoryBranchSettingsView;
@@ -75,12 +77,14 @@ class InventoryPersistenceAdapter implements InventoryQueryPort, InventoryComman
 	@Override public void updateBranchSettings(UUID organizationId, UUID branchId, boolean allowNegativeStock, UUID actorUserId, OffsetDateTime now) { stockCommands.updateBranchSettings(organizationId, branchId, allowNegativeStock, actorUserId, now); }
 
 	@Override public List<InventoryPhysicalCountView> physicalCounts(UUID organizationId, UUID branchId) { return physicalCountRepository.list(organizationId, branchId); }
+	@Override public PageResponse<InventoryPhysicalCountView> searchPhysicalCounts(UUID organizationId, UUID branchId, InventoryHistorySearchCriteria criteria) { return physicalCountRepository.search(organizationId, branchId, criteria); }
 	@Override public Optional<InventoryPhysicalCountView> physicalCountDetail(UUID organizationId, UUID branchId, UUID countId) { return physicalCountRepository.findById(organizationId, branchId, countId); }
 	@Override public UUID createPhysicalCount(UUID organizationId, UUID branchId, String notes, UUID actorUserId, OffsetDateTime now) { return physicalCountRepository.create(organizationId, branchId, notes, actorUserId, now); }
 	@Override public void updatePhysicalCountItem(UUID physicalCountId, UUID productId, int systemQuantity, Integer countedQuantity, Long unitCostCents, String notes, OffsetDateTime now) { physicalCountRepository.updateItem(physicalCountId, productId, systemQuantity, countedQuantity, unitCostCents, notes, now); }
 	@Override public void updatePhysicalCountStatus(UUID organizationId, UUID branchId, UUID physicalCountId, String status, UUID actorUserId, OffsetDateTime now) { physicalCountRepository.updateStatus(organizationId, branchId, physicalCountId, status, actorUserId, now); }
 
 	@Override public List<InventoryTransferView> transfers(UUID organizationId, UUID branchId) { return transferRepository.list(organizationId, branchId); }
+	@Override public PageResponse<InventoryTransferView> searchTransfers(UUID organizationId, UUID branchId, InventoryHistorySearchCriteria criteria) { return transferRepository.search(organizationId, branchId, criteria); }
 	@Override public Optional<InventoryTransferView> transferDetail(UUID organizationId, UUID branchId, UUID transferId) { return transferRepository.findById(organizationId, branchId, transferId); }
 	@Override public UUID createTransfer(UUID organizationId, UUID originBranchId, UUID destinationBranchId, String notes, UUID actorUserId, OffsetDateTime now) { return transferRepository.create(organizationId, originBranchId, destinationBranchId, notes, actorUserId, now); }
 	@Override public void addTransferItem(UUID transferId, UUID productId, int requestedQuantity, Long unitCostCents) { transferRepository.addItem(transferId, productId, requestedQuantity, unitCostCents); }

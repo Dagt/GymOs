@@ -1,5 +1,7 @@
 package com.gymos.inventory.infrastructure;
 
+import com.gymos.common.api.PageResponse;
+import com.gymos.inventory.application.query.InventoryHistorySearchCriteria;
 import com.gymos.inventory.application.query.InventoryPhysicalCountItemView;
 import com.gymos.inventory.application.query.InventoryPhysicalCountView;
 import java.time.OffsetDateTime;
@@ -18,13 +20,27 @@ class InventoryPhysicalCountRepository {
 	}
 
 	List<InventoryPhysicalCountView> list(UUID organizationId, UUID branchId) {
+		return listItems(organizationId, branchId, new InventoryHistorySearchCriteria(0, 50, false));
+	}
+
+	PageResponse<InventoryPhysicalCountView> search(UUID organizationId, UUID branchId, InventoryHistorySearchCriteria criteria) {
+		long total = jdbcClient.sql("SELECT COUNT(*) FROM inventory_physical_count WHERE organization_id=:organizationId AND branch_id=:branchId" + activeFilter(criteria))
+				.param("organizationId", organizationId).param("branchId", branchId).query(Long.class).single();
+		return PageResponse.of(listItems(organizationId, branchId, criteria), criteria.page(), criteria.size(), total);
+	}
+
+	private String activeFilter(InventoryHistorySearchCriteria criteria) {
+		return criteria.activeOnly() ? " AND status IN ('IN_PROGRESS', 'PENDING_APPROVAL')" : "";
+	}
+
+	private List<InventoryPhysicalCountView> listItems(UUID organizationId, UUID branchId, InventoryHistorySearchCriteria criteria) {
 		var headers = jdbcClient.sql("""
 				SELECT id, organization_id, branch_id, status, notes, created_at, updated_at, created_by, approved_at, approved_by
 				FROM inventory_physical_count
 				WHERE organization_id = :organizationId AND branch_id = :branchId
-				ORDER BY created_at DESC LIMIT 50
-				""")
+				""" + activeFilter(criteria) + " ORDER BY created_at DESC, id DESC LIMIT :size OFFSET :offset")
 				.param("organizationId", organizationId).param("branchId", branchId)
+				.param("size", criteria.size()).param("offset", (long) criteria.page() * criteria.size())
 				.query((rs, rowNum) -> new InventoryPhysicalCountView(
 						rs.getObject("id", UUID.class), rs.getObject("organization_id", UUID.class), rs.getObject("branch_id", UUID.class),
 						rs.getString("status"), rs.getString("notes"), rs.getObject("created_at", OffsetDateTime.class),

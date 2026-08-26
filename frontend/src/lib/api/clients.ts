@@ -1,4 +1,5 @@
 import { apiFetch, normalizePayload } from "./client";
+import type { PageResult } from "../pagination";
 import type {
   ClientDetailResponse,
   ClientImportResult,
@@ -17,6 +18,16 @@ export async function searchClients(
   if (status.trim()) params.set("status", status.trim());
   const suffix = params.toString() ? `?${params.toString()}` : "";
   return apiFetch<ClientSummary[]>(`/clients${suffix}`, accessToken);
+}
+
+export function searchClientsPage(
+  accessToken: string,
+  { query = "", status = "", page = 0, size = 25 }: { query?: string; status?: string; page?: number; size?: number } = {},
+): Promise<PageResult<ClientSummary>> {
+  const params = new URLSearchParams({ page: String(page), size: String(size) });
+  if (query.trim()) params.set("query", query.trim());
+  if (status.trim()) params.set("status", status.trim());
+  return apiFetch<PageResult<ClientSummary>>(`/clients/search?${params}`, accessToken);
 }
 
 export async function createClient(

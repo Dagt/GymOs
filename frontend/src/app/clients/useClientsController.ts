@@ -10,7 +10,7 @@ import {
   getPaymentConfiguration,
   getPlans,
   getStoredSession,
-  searchClients,
+  searchClientsPage,
   type ClientPayload,
   type ClientSummary,
   type PlanSummary,
@@ -21,12 +21,16 @@ import {
   validateClientForm,
   type ClientRegistrationForm,
 } from "./ClientHelpers";
+import { lastPage } from "@/lib/pagination";
 
 export function useClientsController() {
   const [session, setSession] = useState<StoredSession | null>(null);
   const [clients, setClients] = useState<ClientSummary[]>([]);
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [query, setQuery] = useState("");
+  const [listParams, setListParams] = useState({ query: "", page: 0, size: 25, revision: 0 });
+  const [totalClients, setTotalClients] = useState(0);
+  const [listError, setListError] = useState<string | null>(null);
   const [form, setForm] = useState<ClientRegistrationForm>(emptyClientForm);
   const [fieldErrors, setFieldErrors] = useState<FieldErrorMap>({});
   const [createdClientId, setCreatedClientId] = useState<string | null>(null);
@@ -57,7 +61,6 @@ export function useClientsController() {
       setLoading(true);
       setError(null);
       try {
-        const results = await searchClients(storedSession.accessToken, "");
         const refreshedSession = getStoredSession() ?? storedSession;
         const canLoadPlans = hasPermission(refreshedSession, "sale.create")
           && hasPermission(refreshedSession, "catalog.read");
@@ -69,7 +72,6 @@ export function useClientsController() {
           : null;
         if (!active) return;
         setSession(getStoredSession() ?? refreshedSession);
-        setClients(results);
         setPlans(activePlans);
         setManualCardEnabled(Boolean(paymentConfiguration?.receptionManualTerminalEnabled));
         setMercadoPagoEnabled(Boolean(paymentConfiguration?.mercadoPagoReady));
@@ -77,8 +79,6 @@ export function useClientsController() {
         if (active) {
           setError(exception instanceof Error ? exception.message : "No fue posible cargar socios.");
         }
-      } finally {
-        if (active) setLoading(false);
       }
     }
 
@@ -89,27 +89,38 @@ export function useClientsController() {
     };
   }, []);
 
-  async function loadClients(
-    activeSession = getStoredSession() ?? session,
-    activeQuery = query,
-    clearPreviousError = true,
-  ) {
-    if (!activeSession) return;
-    setLoading(true);
-    if (clearPreviousError) setError(null);
-    try {
-      setClients(await searchClients(activeSession.accessToken, activeQuery));
-      setSession(getStoredSession() ?? activeSession);
-    } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible cargar socios.");
-    } finally {
-      setLoading(false);
+  const accessToken = session?.accessToken;
+  useEffect(() => {
+    if (!accessToken) return;
+    let active = true;
+    async function load() {
+      await Promise.resolve();
+      if (!active) return;
+      setLoading(true);
+      setListError(null);
+      try {
+        const result = await searchClientsPage(accessToken!, listParams);
+        if (!active) return;
+        const validPage = lastPage(result.totalElements, result.size);
+        if (listParams.page > validPage) {
+          setListParams((current) => ({ ...current, page: validPage }));
+          return;
+        }
+        setClients(result.items);
+        setTotalClients(result.totalElements);
+      } catch (exception) {
+        if (active) setListError(exception instanceof Error ? exception.message : "No fue posible cargar socios.");
+      } finally {
+        if (active) setLoading(false);
+      }
     }
-  }
+    void load();
+    return () => { active = false; };
+  }, [accessToken, listParams]);
 
-  async function submitSearch(event: FormEvent<HTMLFormElement>) {
+  function submitSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await loadClients();
+    setListParams((current) => ({ ...current, query: query.trim(), page: 0, revision: current.revision + 1 }));
   }
 
   async function submitCreate(event: FormEvent<HTMLFormElement>) {
@@ -183,7 +194,8 @@ export function useClientsController() {
     }
 
     setForm({ ...emptyClientForm });
-    await loadClients(getStoredSession() ?? activeSession, query, false);
+    setQuery("");
+    setListParams((current) => ({ ...current, query: "", page: 0, revision: current.revision + 1 }));
     if (operationError) setError(operationError);
     setShowCreateClient(false);
     setSaving(false);
@@ -202,10 +214,15 @@ export function useClientsController() {
     canCreateMembershipSale,
     clients,
     createdClientId,
-    error,
+    error: error ?? listError,
     fieldErrors,
     form,
     loading,
+    page: listParams.page,
+    pageSize: listParams.size,
+    totalClients,
+    setPage: (page: number) => setListParams((current) => ({ ...current, page })),
+    setPageSize: (size: number) => setListParams((current) => ({ ...current, size, page: 0 })),
     manualCardEnabled,
     mercadoPagoEnabled,
     message,

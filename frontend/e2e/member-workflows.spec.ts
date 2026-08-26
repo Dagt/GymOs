@@ -7,11 +7,11 @@ const targetPlanId = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
 
 test("la lista de socios muestra plan actual y vigencia con colores tenues", async ({ page }) => {
   await bootMemberWorkflow(page, async (route, path) => {
-    if (route.request().method() === "GET" && path === "/clients") {
-      return fulfill(route, [
+    if (route.request().method() === "GET" && path === "/clients/search") {
+      return fulfill(route, { items: [
         clientSummary("Andrea", "Full", "ACTIVE"),
         clientSummary("Sylvia", "Regular", "EXPIRED"),
-      ]);
+      ], page: 0, size: 25, totalElements: 2, totalPages: 1 });
     }
     return false;
   });
@@ -275,6 +275,7 @@ async function bootMemberWorkflow(
 ) {
   const user = {
     userId: "14141414-1414-4414-8414-141414141414",
+    accountScope: "TENANT",
     organizationId: "15151515-1515-4515-8515-151515151515",
     branchId: "16161616-1616-4616-8616-161616161616",
     username: "recepcion@example.test",
@@ -336,9 +337,9 @@ async function bootMemberWorkflow(
   });
 
   await page.addInitScript((currentUser) => {
-    window.localStorage.setItem("gymos.accessToken", "member-e2e-access");
-    window.localStorage.setItem("gymos.refreshToken", "member-e2e-refresh");
-    window.localStorage.setItem("gymos.currentUser", JSON.stringify(currentUser));
+    window.sessionStorage.setItem("gymos.accessToken", "member-e2e-access");
+    window.sessionStorage.setItem("gymos.refreshToken", "member-e2e-refresh");
+    window.sessionStorage.setItem("gymos.currentUser", JSON.stringify(currentUser));
   }, user);
 }
 

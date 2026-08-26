@@ -1,6 +1,8 @@
 import { apiFetch, normalizePayload } from "./client";
+import type { PageResult } from "../pagination";
 import type {
   InventoryBranchSettings,
+  InventoryHistorySearchParams,
   InventoryMovement,
   InventoryMovementPage,
   InventoryMovementPayload,
@@ -105,6 +107,12 @@ export async function getInventoryPhysicalCounts(accessToken: string): Promise<I
   return apiFetch<InventoryPhysicalCount[]>("/inventory/physical-counts", accessToken);
 }
 
+export function searchInventoryPhysicalCounts(accessToken: string, params: InventoryHistorySearchParams = {}): Promise<PageResult<InventoryPhysicalCount>> {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => { if (value !== undefined) query.set(key, String(value)); });
+  return apiFetch<PageResult<InventoryPhysicalCount>>(`/inventory/physical-counts/search?${query}`, accessToken);
+}
+
 export async function getInventoryPhysicalCount(accessToken: string, countId: string): Promise<InventoryPhysicalCount> {
   return apiFetch<InventoryPhysicalCount>(`/inventory/physical-counts/${countId}`, accessToken);
 }
@@ -143,6 +151,12 @@ export async function cancelInventoryPhysicalCount(accessToken: string, countId:
 // Branch Transfers (Transferencias)
 export async function getInventoryTransfers(accessToken: string): Promise<InventoryTransfer[]> {
   return apiFetch<InventoryTransfer[]>("/inventory/transfers", accessToken);
+}
+
+export function searchInventoryTransfers(accessToken: string, params: InventoryHistorySearchParams = {}): Promise<PageResult<InventoryTransfer>> {
+  const query = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => { if (value !== undefined) query.set(key, String(value)); });
+  return apiFetch<PageResult<InventoryTransfer>>(`/inventory/transfers/search?${query}`, accessToken);
 }
 
 export async function getInventoryTransfer(accessToken: string, transferId: string): Promise<InventoryTransfer> {

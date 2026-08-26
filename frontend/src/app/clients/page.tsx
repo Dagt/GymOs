@@ -11,7 +11,6 @@ import {
   CreateClientDrawer,
 } from "./ClientSections";
 import { useClientsController } from "./useClientsController";
-import "./clients-scroll.css";
 
 export default function ClientsPage() {
   const controller = useClientsController();
@@ -27,7 +26,6 @@ export default function ClientsPage() {
   return (
     <AppShell
       eyebrow="Socios"
-      pageClassName="clients-scroll-page"
       session={controller.session}
       subtitle="Registro de socios, membresía inicial opcional y búsqueda para recepción."
       title="Socios"
@@ -42,7 +40,9 @@ export default function ClientsPage() {
           canCreate={controller.canCreateClient}
           onCreateClient={() => controller.setShowCreateClient(true)}
         />
-        <ClientList clients={controller.clients} loading={controller.loading} />
+        <ClientList clients={controller.clients} loading={controller.loading} page={controller.page}
+          pageSize={controller.pageSize} total={controller.totalClients}
+          onPageChange={controller.setPage} onPageSizeChange={controller.setPageSize} />
       </section>
 
       <CreateClientDrawer

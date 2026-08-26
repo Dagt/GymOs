@@ -25,7 +25,9 @@ public class CoachingCatalogRepository {
 				FROM exercise e
 				WHERE (e.organization_id IS NULL OR e.organization_id = :organizationId)
 				  AND e.status = 'ACTIVE'
-				  AND (:term = '' OR e.normalized_name LIKE :pattern OR EXISTS (
+				  AND (:term = '' OR e.normalized_name LIKE :pattern OR lower(e.name) LIKE :pattern
+				      OR lower(COALESCE(e.primary_muscle_group, '')) LIKE :pattern
+				      OR lower(COALESCE(e.equipment, '')) LIKE :pattern OR EXISTS (
 				      SELECT 1 FROM exercise_alias a
 				      WHERE a.exercise_id = e.id AND a.normalized_alias LIKE :pattern
 				  ))
@@ -41,11 +43,11 @@ public class CoachingCatalogRepository {
 				       e.primary_muscle_group, e.secondary_muscle_groups, e.movement_pattern,
 				       e.exercise_type, e.equipment, e.suggested_level, e.laterality,
 				       e.media_url, e.warnings, e.origin, e.status, e.created_by, e.created_at, e.updated_at
-				""" + filters + " ORDER BY e.name LIMIT :size OFFSET :offset");
+				""" + filters + " ORDER BY e.name, e.id LIMIT :size OFFSET :offset");
 		bindFilters(dataQuery, organizationId, term, pattern, muscle, equipment, type);
 		List<ExerciseRecord> items = dataQuery
 				.param("size", size)
-				.param("offset", page * size)
+				.param("offset", (long) page * size)
 				.query(this::mapExercise)
 				.list();
 		return new ExercisePage(items, page, size, total, (int) Math.ceil(total / (double) size));

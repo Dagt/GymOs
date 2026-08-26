@@ -4413,11 +4413,7 @@ button.admin-secondary-link:disabled {
   grid-auto-rows: 5.5rem;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-top: 1rem;
-  max-height: min(64vh, 43rem);
-  overflow-y: auto;
-  overscroll-behavior: contain;
   padding: 0.1rem 0.45rem 0.1rem 0.1rem;
-  scrollbar-gutter: stable;
 }
 
 .exercise-catalog-card {
@@ -5813,7 +5809,6 @@ button.admin-secondary-link:disabled {
   .exercise-catalog-list {
     grid-auto-rows: 5.5rem;
     grid-template-columns: 1fr;
-    max-height: 65vh;
   }
 
   .workout-builder-actions,

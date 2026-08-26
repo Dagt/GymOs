@@ -263,3 +263,11 @@ export type WeeklyTrendReport = {
   weeks: number;
   points: WeeklyTrendPoint[];
 };
+export type ExerciseSearchParams = {
+  query?: string;
+  muscleGroup?: string;
+  equipment?: string;
+  type?: string;
+  page?: number;
+  size?: number;
+};

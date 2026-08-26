@@ -9,6 +9,7 @@ import type {
   CreateExercisePayload,
   Exercise,
   ExercisePage,
+  ExerciseSearchParams,
   AssignmentReport,
   WorkoutAssignment,
   WorkoutDetail,
@@ -208,7 +209,7 @@ export async function getCoachReport(accessToken: string): Promise<CoachReport> 
 
 export async function getExercises(
   accessToken: string,
-  params: { query?: string; muscleGroup?: string; equipment?: string; type?: string; page?: number; size?: number } = {},
+  params: ExerciseSearchParams = {},
 ): Promise<ExercisePage> {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {

@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AppShell, LoadingScreen } from "@/components/AppShell";
 import { AppDrawer } from "@/components/AppDrawer";
+import { Pagination } from "@/components/Pagination";
+import { usePaginatedQuery } from "@/lib/usePaginatedQuery";
 import { AuthRequired } from "@/components/AuthRequired";
 import {
   AreaChart,
@@ -44,6 +46,7 @@ import {
   type CoachSummary,
   type CreateExercisePayload,
   type Exercise,
+  type ExerciseSearchParams,
   type StoredSession,
   type WeeklyTrendPoint,
   type WeeklyTrendReport,
@@ -140,7 +143,9 @@ export default function CoachesPage() {
   const [branches, setBranches] = useState<BranchSummary[]>([]);
   const [coaches, setCoaches] = useState<CoachSummary[]>([]);
   const [workouts, setWorkouts] = useState<WorkoutSummary[]>([]);
-  const [exercisePage, setExercisePage] = useState<Exercise[]>([]);
+  const canReadExercises = Boolean(session && !isMetricsOnlySupervisor(session) && session.user.permissions.includes("exercise.read"));
+  const exerciseList = usePaginatedQuery<Exercise, ExerciseSearchParams>(session?.accessToken, getExercises, {}, 25, canReadExercises);
+  const exercisePage = exerciseList.items;
   const [equipmentCatalogOptions, setEquipmentCatalogOptions] = useState<string[]>([]);
   const [report, setReport] = useState<AssignmentReport | null>(null);
   const [trend, setTrend] = useState<WeeklyTrendReport | null>(null);
@@ -207,7 +212,6 @@ export default function CoachesPage() {
           loadedBranches,
           loadedCoaches,
           loadedWorkouts,
-          loadedExercises,
           loadedEquipmentOptions,
           loadedReport,
           loadedTrend,
@@ -216,9 +220,6 @@ export default function CoachesPage() {
             getBranches(stored.accessToken),
             getCoaches(stored.accessToken),
             canReadWorkouts ? getWorkouts(stored.accessToken) : Promise.resolve([]),
-            canReadExercises
-              ? getExercises(stored.accessToken, { size: 100 })
-              : Promise.resolve({ items: [] }),
             canReadExercises
               ? getExerciseEquipmentOptions(stored.accessToken)
               : Promise.resolve([]),
@@ -233,7 +234,6 @@ export default function CoachesPage() {
         setBranches(loadedBranches);
         setCoaches(loadedCoaches);
         setWorkouts(loadedWorkouts);
-        setExercisePage(loadedExercises.items);
         setEquipmentCatalogOptions(loadedEquipmentOptions);
         setReport(loadedReport);
         setTrend(loadedTrend);
@@ -281,15 +281,13 @@ export default function CoachesPage() {
     };
   }, [clientQuery, session]);
 
+  const updateExerciseFilters = exerciseList.setFilters;
+  useEffect(() => {
+    const timer = window.setTimeout(() => updateExerciseFilters({ query: exerciseQuery.trim() }), 300);
+    return () => window.clearTimeout(timer);
+  }, [exerciseQuery, updateExerciseFilters]);
+
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId);
-  const filteredExercises = useMemo(() => {
-    const query = exerciseQuery.trim().toLowerCase();
-    if (!query) return exercisePage;
-    return exercisePage.filter((exercise) =>
-      [exercise.name, exercise.primaryMuscleGroup, exercise.equipment]
-        .some((value) => value?.toLowerCase().includes(query)),
-    );
-  }, [exercisePage, exerciseQuery]);
   const equipmentOptions = useMemo(() => {
     const organizationEquipment = exercisePage
       .filter((exercise) => exercise.origin !== "SYSTEM")
@@ -341,11 +339,9 @@ export default function CoachesPage() {
     const canReadExercises = !supervisorMetricsOnly
       && session.user.permissions.includes("exercise.read");
     const canReadMetrics = session.user.permissions.includes("coach.metrics.read");
-    const [nextWorkouts, nextExercises, nextEquipmentOptions, nextReport, nextTrend] = await Promise.all([
+    exerciseList.refresh();
+    const [nextWorkouts, nextEquipmentOptions, nextReport, nextTrend] = await Promise.all([
       canReadWorkouts ? getWorkouts(session.accessToken) : Promise.resolve(workouts),
-      canReadExercises
-        ? getExercises(session.accessToken, { query: exerciseQuery, size: 100 })
-        : Promise.resolve({ items: exercisePage }),
       canReadExercises
         ? getExerciseEquipmentOptions(session.accessToken)
         : Promise.resolve(equipmentCatalogOptions),
@@ -358,7 +354,6 @@ export default function CoachesPage() {
         }) : Promise.resolve(trend),
     ]);
     setWorkouts(nextWorkouts);
-    setExercisePage(nextExercises.items);
     setEquipmentCatalogOptions(nextEquipmentOptions);
     setReport(nextReport);
     setTrend(nextTrend);
@@ -412,9 +407,8 @@ export default function CoachesPage() {
       const saved = editingExerciseId
         ? await updateExerciseCatalog(session.accessToken, editingExerciseId, exerciseForm)
         : await createExercise(session.accessToken, exerciseForm);
-      setExercisePage((current) =>
-        [...current.filter((item) => item.id !== saved.id), saved]
-          .sort((a, b) => a.name.localeCompare(b.name)));
+      exerciseList.refresh();
+      if (saved.equipment?.trim()) setEquipmentCatalogOptions((current) => [...new Set([...current, saved.equipment!.trim()])]);
       resetExerciseForm();
       setMessage(`Ejercicio “${saved.name}” guardado correctamente.`);
     } catch (exception) {
@@ -509,8 +503,7 @@ export default function CoachesPage() {
       const updated = file
         ? await uploadExerciseMedia(session.accessToken, editingExerciseId, file)
         : await removeExerciseMedia(session.accessToken, editingExerciseId);
-      setExercisePage((current) =>
-        current.map((exercise) => exercise.id === updated.id ? updated : exercise));
+      exerciseList.refresh();
       setExerciseForm((current) => ({ ...current, mediaUrl: updated.mediaUrl }));
       setMessage(file ? "Medio del ejercicio actualizado." : "Medio del ejercicio eliminado.");
     } catch (exception) {
@@ -986,11 +979,11 @@ export default function CoachesPage() {
                         {block.exercises.map((exercise, exerciseIndex) => (
                           <ExerciseEditor
                             blockIndex={blockIndex}
-                            catalogExercises={exercisePage}
+                            accessToken={canReadExercises ? session.accessToken : undefined}
                             exercise={exercise}
                             exerciseIndex={exerciseIndex}
                             key={exerciseIndex}
-                            listId={`exercise-options-${sessionIndex}-${blockIndex}`}
+                            listId={`exercise-options-${sessionIndex}-${blockIndex}-${exerciseIndex}`}
                             onChange={(patch) =>
                               updateExercise(sessionIndex, blockIndex, exerciseIndex, patch)}
                             onDelete={() => mutateBlock(sessionIndex, blockIndex, (current) => ({
@@ -1004,11 +997,6 @@ export default function CoachesPage() {
                             total={block.exercises.length}
                           />
                         ))}
-                        <datalist id={`exercise-options-${sessionIndex}-${blockIndex}`}>
-                          {exercisePage.map((exercise) => (
-                            <option key={exercise.id} value={exercise.name} />
-                          ))}
-                        </datalist>
                         <div className="workout-add-exercise">
                           <button
                             aria-label={`Agregar ejercicio vacío al bloque ${blockIndex + 1}`}
@@ -1185,7 +1173,7 @@ export default function CoachesPage() {
               <div className="exercise-catalog-toolbar">
                 <div>
                   <h2 className="text-xl font-semibold">Catálogo de ejercicios</h2>
-                  <p className="text-sm text-[#637268]">{exercisePage.length} opciones normalizadas para reutilizar en tus rutinas.</p>
+                  <p className="text-sm text-[#637268]">{exerciseList.total} opciones para reutilizar en tus rutinas.</p>
                 </div>
                 <div>
                   <input
@@ -1199,8 +1187,12 @@ export default function CoachesPage() {
                   </button>
                 </div>
               </div>
+              <div className="mt-4"><Pagination label="ejercicios" page={exerciseList.page} size={exerciseList.size} totalElements={exerciseList.total}
+                loading={exerciseList.loading || saving} onPageChange={exerciseList.setPage} onPageSizeChange={exerciseList.setPageSize} /></div>
+              {exerciseList.error ? <p role="alert" className="mt-3 text-sm text-red-700">{exerciseList.error}</p> : null}
+              {!exerciseList.loading && !exerciseList.error && exercisePage.length === 0 ? <p className="mt-4 text-sm text-[#637268]">No hay ejercicios que coincidan con la búsqueda.</p> : null}
               <div className="exercise-catalog-list">
-                {filteredExercises.map((exercise) => {
+                {exercisePage.map((exercise) => {
                   const manageable = canManageExerciseCatalog
                     || exercise.createdBy === session.user.userId;
                   return (
@@ -1885,7 +1877,7 @@ function GuidedSelect({
 
 function ExerciseEditor({
   blockIndex,
-  catalogExercises,
+  accessToken,
   exercise,
   exerciseIndex,
   listId,
@@ -1895,7 +1887,7 @@ function ExerciseEditor({
   total,
 }: {
   blockIndex: number;
-  catalogExercises: Exercise[];
+  accessToken: string | undefined;
   exercise: WorkoutExerciseDraft;
   exerciseIndex: number;
   listId: string;
@@ -1908,6 +1900,26 @@ function ExerciseEditor({
   const [editorOpen, setEditorOpen] = useState(
     () => exerciseIndex === 0 || !exercise.exerciseName.trim(),
   );
+  const options = usePaginatedQuery<Exercise, ExerciseSearchParams>(accessToken, getExercises, { query: exercise.exerciseName }, 25, editorOpen);
+  const updateOptions = options.setFilters;
+  useEffect(() => {
+    const timer = window.setTimeout(() => updateOptions({ query: exercise.exerciseName.trim() }), 250);
+    return () => window.clearTimeout(timer);
+  }, [exercise.exerciseName, updateOptions]);
+  const catalogExercises = options.items;
+  const suggestionsHint = options.error
+    ? "No se pudieron cargar las sugerencias. Puedes escribir el nombre del ejercicio."
+    : options.total > options.size
+      ? `${options.total} coincidencias. Escribe más para acotar las sugerencias.`
+      : null;
+  useEffect(() => {
+    if (exercise.exerciseId) return;
+    const matches = catalogExercises.filter((item) => item.name.trim().toLocaleLowerCase("es-MX") === exercise.exerciseName.trim().toLocaleLowerCase("es-MX"));
+    if (matches.length === 1) {
+      const match = matches[0];
+      onChange({ exerciseId: match.id, equipment: match.equipment, primaryMuscleGroup: match.primaryMuscleGroup, movementPattern: match.movementPattern });
+    }
+  }, [catalogExercises, exercise.exerciseId, exercise.exerciseName, onChange]);
   const exerciseSummary = exercise.exerciseName.trim() || `Ejercicio ${exerciseIndex + 1}`;
   const setPlan = exercise.setPlan ?? [];
   const usesDetailedSets = setPlan.length > 0;
@@ -1987,29 +1999,36 @@ function ExerciseEditor({
           />
         </div>
         <div className={`workout-exercise-quick-grid${usesDetailedSets ? " detailed" : ""}`}>
-          <Field label="Ejercicio">
-            <input
-              autoFocus={!exercise.exerciseName.trim()}
-              className="app-input"
-              list={listId}
-              onChange={(event) => {
-                const value = event.target.value;
-                const normalizedValue = value.trim().toLocaleLowerCase("es-MX");
-                const match = catalogExercises.find((item) =>
-                  item.name.trim().toLocaleLowerCase("es-MX") === normalizedValue,
-                );
-                onChange({
-                  exerciseName: value,
-                  exerciseId: match?.id ?? null,
-                  equipment: match?.equipment ?? null,
-                  primaryMuscleGroup: match?.primaryMuscleGroup ?? null,
-                  movementPattern: match?.movementPattern ?? null,
-                });
-              }}
-              placeholder="Escribe para buscar en el catálogo"
-              value={exercise.exerciseName}
-            />
-          </Field>
+          <div className="grid content-start gap-1">
+            <Field label="Ejercicio">
+              <input
+                aria-describedby={suggestionsHint ? `${listId}-hint` : undefined}
+                autoFocus={!exercise.exerciseName.trim()}
+                className="app-input"
+                list={listId}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  const normalizedValue = value.trim().toLocaleLowerCase("es-MX");
+                  const match = catalogExercises.find((item) =>
+                    item.name.trim().toLocaleLowerCase("es-MX") === normalizedValue,
+                  );
+                  onChange({
+                    exerciseName: value,
+                    exerciseId: match?.id ?? null,
+                    equipment: match?.equipment ?? null,
+                    primaryMuscleGroup: match?.primaryMuscleGroup ?? null,
+                    movementPattern: match?.movementPattern ?? null,
+                  });
+                }}
+                placeholder="Escribe para buscar en el catálogo"
+                value={exercise.exerciseName}
+              />
+              <datalist id={listId}>
+                {catalogExercises.map((item) => <option key={item.id} value={item.name} />)}
+              </datalist>
+            </Field>
+            {suggestionsHint ? <small className={`text-xs ${options.error ? "text-red-700" : "text-[var(--brand-muted)]"}`} id={`${listId}-hint`} role={options.error ? "alert" : undefined}>{suggestionsHint}</small> : null}
+          </div>
           {usesDetailedSets ? (
             <div className="workout-detailed-summary">
               <span>Series personalizadas</span>
@@ -2572,10 +2591,6 @@ function normalizeRole(role: string) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
 }
-
-
-
-
 
 
 

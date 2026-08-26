@@ -2,6 +2,8 @@ package com.gymos.inventory.application;
 
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
+import com.gymos.common.api.PageResponse;
+import com.gymos.inventory.application.query.InventoryHistorySearchCriteria;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.inventory.application.command.InventoryMovementCommand;
 import com.gymos.inventory.application.port.InventoryCommandPort;
@@ -140,6 +142,12 @@ public class InventoryService {
 	}
 
 	@Transactional(readOnly = true)
+	public PageResponse<InventoryPhysicalCountView> searchPhysicalCounts(GymOsPrincipal principal, InventoryHistorySearchCriteria criteria) {
+		requireBranch(principal);
+		return queries.searchPhysicalCounts(principal.organizationId(), principal.branchId(), criteria);
+	}
+
+	@Transactional(readOnly = true)
 	public InventoryPhysicalCountView physicalCountDetail(GymOsPrincipal principal, UUID countId) {
 		requireBranch(principal);
 		return queries.physicalCountDetail(principal.organizationId(), principal.branchId(), countId)
@@ -214,6 +222,12 @@ public class InventoryService {
 	public List<InventoryTransferView> transfers(GymOsPrincipal principal) {
 		requireBranch(principal);
 		return queries.transfers(principal.organizationId(), principal.branchId());
+	}
+
+	@Transactional(readOnly = true)
+	public PageResponse<InventoryTransferView> searchTransfers(GymOsPrincipal principal, InventoryHistorySearchCriteria criteria) {
+		requireBranch(principal);
+		return queries.searchTransfers(principal.organizationId(), principal.branchId(), criteria);
 	}
 
 	@Transactional(readOnly = true)

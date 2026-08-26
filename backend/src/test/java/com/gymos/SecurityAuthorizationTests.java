@@ -33,6 +33,14 @@ class SecurityAuthorizationTests {
 	private JwtService jwtService;
 
 	@Test
+	@WithMockUser(authorities = "client.read")
+	void inventoryPagedHistoriesStillRequireInventoryRead() throws Exception {
+		for (String path : java.util.List.of("search", "movements/search", "physical-counts/search", "transfers/search")) {
+			mockMvc.perform(get("/api/v1/inventory/" + path)).andExpect(status().isForbidden());
+		}
+	}
+
+	@Test
 	void validJwtWithoutOrganizationPermissionReturnsForbiddenInsteadOfInvalidSession() throws Exception {
 		String token = jwtService.accessToken(new GymOsPrincipal(
 				UUID.randomUUID(),

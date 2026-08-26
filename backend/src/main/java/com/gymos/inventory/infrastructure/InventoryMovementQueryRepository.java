@@ -33,18 +33,29 @@ class InventoryMovementQueryRepository {
 	}
 
 	MovementPageRecords search(UUID organizationId, UUID branchId, InventoryMovementSearchCriteria criteria) {
-		String productFilter = criteria.productId() == null ? "" : " AND m.product_id=:productId";
-		var itemSpec = jdbcClient.sql(SELECT_MOVEMENTS + productFilter
+		String filters = (criteria.productId() == null ? "" : " AND m.product_id=:productId")
+				+ (criteria.type() == null ? "" : " AND m.movement_type=:type")
+				+ (criteria.query() == null ? "" : " AND (LOWER(cp.name) LIKE :query OR LOWER(cp.sku) LIKE :query OR LOWER(COALESCE(m.reason, '')) LIKE :query)");
+		var itemSpec = jdbcClient.sql(SELECT_MOVEMENTS + filters
 				+ " ORDER BY m.occurred_at DESC, m.id DESC LIMIT :size OFFSET :offset")
 				.param("organizationId", organizationId).param("branchId", branchId)
-				.param("size", criteria.size()).param("offset", criteria.page() * criteria.size());
+				.param("size", criteria.size()).param("offset", (long) criteria.page() * criteria.size());
 		var countSpec = jdbcClient.sql("""
 				SELECT COUNT(*) FROM inventory_movement m
+				JOIN catalog_product cp ON cp.id=m.product_id AND cp.organization_id=m.organization_id
 				WHERE m.organization_id=:organizationId AND m.branch_id=:branchId
-				""" + productFilter).param("organizationId", organizationId).param("branchId", branchId);
+				""" + filters).param("organizationId", organizationId).param("branchId", branchId);
 		if (criteria.productId() != null) {
 			itemSpec = itemSpec.param("productId", criteria.productId());
 			countSpec = countSpec.param("productId", criteria.productId());
+		}
+		if (criteria.query() != null) {
+			itemSpec = itemSpec.param("query", "%" + criteria.query() + "%");
+			countSpec = countSpec.param("query", "%" + criteria.query() + "%");
+		}
+		if (criteria.type() != null) {
+			itemSpec = itemSpec.param("type", criteria.type());
+			countSpec = countSpec.param("type", criteria.type());
 		}
 		return new MovementPageRecords(itemSpec.query(this::map).list(), countSpec.query(Long.class).single());
 	}

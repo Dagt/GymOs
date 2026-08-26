@@ -40,13 +40,16 @@ class InventoryStockQueryRepository {
 		String queryFilter = hasText(criteria.query())
 				? " AND (LOWER(cp.name) LIKE :query OR LOWER(cp.sku) LIKE :query OR LOWER(COALESCE(cp.barcode,'')) LIKE :query)"
 				: "";
+		if (criteria.lowStockOnly()) queryFilter += " AND s.reorder_point>0 AND s.quantity_on_hand<=s.reorder_point";
 		var itemSpec = jdbcClient.sql(SELECT_STOCK + queryFilter + " ORDER BY " + orderBy(criteria.sort()) + " LIMIT :size OFFSET :offset")
 				.param("organizationId", organizationId).param("branchId", branchId)
-				.param("size", criteria.size()).param("offset", criteria.page() * criteria.size());
+				.param("size", criteria.size()).param("offset", (long) criteria.page() * criteria.size());
 		var countSpec = jdbcClient.sql("""
 				SELECT COUNT(*) FROM catalog_product cp
 				JOIN catalog_product_branch cpb ON cpb.organization_id=cp.organization_id
 				  AND cpb.product_id=cp.id AND cpb.branch_id=:branchId
+				LEFT JOIN inventory_stock s ON s.product_id=cp.id AND s.organization_id=cp.organization_id
+				  AND s.branch_id=:branchId AND s.deleted_at IS NULL
 				WHERE cp.organization_id=:organizationId AND cp.product_type='PHYSICAL'
 				  AND cp.inventory_tracked=TRUE AND cp.deleted_at IS NULL AND cp.archived_at IS NULL
 				""" + queryFilter).param("organizationId", organizationId).param("branchId", branchId);

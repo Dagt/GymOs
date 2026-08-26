@@ -28,6 +28,7 @@ export {
   getClient,
   importClientsCsv,
   searchClients,
+  searchClientsPage,
   updateClient,
 } from "./api/clients";
 export type {
@@ -231,6 +232,8 @@ export {
   getLowInventoryStock,
   receiveInventoryTransfer,
   searchInventoryMovements,
+  searchInventoryPhysicalCounts,
+  searchInventoryTransfers,
   searchInventoryStock,
   shipInventoryTransfer,
   updateInventoryBranchSettings,

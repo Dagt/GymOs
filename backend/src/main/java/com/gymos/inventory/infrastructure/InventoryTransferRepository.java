@@ -1,5 +1,7 @@
 package com.gymos.inventory.infrastructure;
 
+import com.gymos.common.api.PageResponse;
+import com.gymos.inventory.application.query.InventoryHistorySearchCriteria;
 import com.gymos.inventory.application.query.InventoryTransferItemView;
 import com.gymos.inventory.application.query.InventoryTransferView;
 import java.time.OffsetDateTime;
@@ -18,6 +20,23 @@ class InventoryTransferRepository {
 	}
 
 	List<InventoryTransferView> list(UUID organizationId, UUID branchId) {
+		return listItems(organizationId, branchId, new InventoryHistorySearchCriteria(0, 50, false));
+	}
+
+	PageResponse<InventoryTransferView> search(UUID organizationId, UUID branchId, InventoryHistorySearchCriteria criteria) {
+		long total = jdbcClient.sql("""
+				SELECT COUNT(*) FROM inventory_transfer t
+				WHERE t.organization_id=:organizationId AND (t.origin_branch_id=:branchId OR t.destination_branch_id=:branchId)
+				""" + activeFilter(criteria))
+				.param("organizationId", organizationId).param("branchId", branchId).query(Long.class).single();
+		return PageResponse.of(listItems(organizationId, branchId, criteria), criteria.page(), criteria.size(), total);
+	}
+
+	private String activeFilter(InventoryHistorySearchCriteria criteria) {
+		return criteria.activeOnly() ? " AND t.status IN ('REQUESTED', 'SHIPPED')" : "";
+	}
+
+	private List<InventoryTransferView> listItems(UUID organizationId, UUID branchId, InventoryHistorySearchCriteria criteria) {
 		var headers = jdbcClient.sql("""
 				SELECT t.id, t.organization_id, t.origin_branch_id, ob.name AS origin_branch_name,
 				       t.destination_branch_id, db.name AS destination_branch_name,
@@ -28,9 +47,9 @@ class InventoryTransferRepository {
 				JOIN branch db ON db.id = t.destination_branch_id
 				WHERE t.organization_id = :organizationId
 				  AND (t.origin_branch_id = :branchId OR t.destination_branch_id = :branchId)
-				ORDER BY t.created_at DESC LIMIT 50
-				""")
+				""" + activeFilter(criteria) + " ORDER BY t.created_at DESC, t.id DESC LIMIT :size OFFSET :offset")
 				.param("organizationId", organizationId).param("branchId", branchId)
+				.param("size", criteria.size()).param("offset", (long) criteria.page() * criteria.size())
 				.query((rs, rowNum) -> new InventoryTransferView(
 						rs.getObject("id", UUID.class), rs.getObject("organization_id", UUID.class),
 						rs.getObject("origin_branch_id", UUID.class), rs.getString("origin_branch_name"),

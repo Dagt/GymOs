@@ -1,8 +1,12 @@
 package com.gymos.clients.infrastructure;
 
+import com.gymos.common.api.PageResponse;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -246,9 +250,20 @@ public class ClientRepository {
 	}
 
 	public List<ClientSummary> search(UUID organizationId, UUID branchId, String query, String status, int limit) {
-		String normalizedQuery = query == null || query.isBlank() ? null : "%" + query.trim().toLowerCase() + "%";
-		String normalizedStatus = status == null || status.isBlank() ? null : status.trim().toUpperCase();
-		StringBuilder sql = new StringBuilder("""
+		return searchItems(clientFilter(organizationId, branchId, query, status), limit, 0);
+	}
+
+	public PageResponse<ClientSummary> searchPage(UUID organizationId, UUID branchId, String query, String status, int page, int size) {
+		int safePage = Math.max(0, page);
+		int safeSize = Math.min(100, Math.max(1, size));
+		ClientFilter filter = clientFilter(organizationId, branchId, query, status);
+		long total = jdbcClient.sql("SELECT COUNT(*) FROM client c JOIN person p ON p.id = c.person_id " + filter.predicate())
+				.params(filter.parameters()).query(Long.class).single();
+		return PageResponse.of(searchItems(filter, safeSize, (long) safePage * safeSize), safePage, safeSize, total);
+	}
+
+	private List<ClientSummary> searchItems(ClientFilter filter, int limit, long offset) {
+		String sql = """
 				SELECT c.id AS client_id, p.first_name, p.last_name, p.maternal_last_name, p.phone, p.email,
 				       c.status AS client_status, current_membership.plan_name AS current_plan_name,
 				       current_membership.membership_status, c.joined_at, c.updated_at
@@ -283,6 +298,28 @@ public class ClientRepository {
 				        m.activated_at DESC
 				    LIMIT 1
 				) current_membership ON TRUE
+				""" + filter.predicate() + " ORDER BY c.updated_at DESC, c.id DESC LIMIT :limit OFFSET :offset";
+		return jdbcClient.sql(sql).params(filter.parameters()).param("limit", limit).param("offset", offset)
+				.query((resultSet, rowNumber) -> new ClientSummary(
+						resultSet.getObject("client_id", UUID.class),
+						resultSet.getString("first_name"),
+						resultSet.getString("last_name"),
+						resultSet.getString("maternal_last_name"),
+						resultSet.getString("phone"),
+						resultSet.getString("email"),
+						resultSet.getString("client_status"),
+						resultSet.getString("current_plan_name"),
+						resultSet.getString("membership_status"),
+						resultSet.getObject("joined_at", OffsetDateTime.class),
+						resultSet.getObject("updated_at", OffsetDateTime.class)
+				)).list();
+	}
+
+	private ClientFilter clientFilter(UUID organizationId, UUID branchId, String query, String status) {
+		Map<String, Object> parameters = new HashMap<>();
+		parameters.put("organizationId", organizationId);
+		parameters.put("branchId", branchId);
+		StringBuilder sql = new StringBuilder("""
 				WHERE c.organization_id = :organizationId
 				  AND c.deleted_at IS NULL
 				  AND p.deleted_at IS NULL
@@ -304,10 +341,12 @@ public class ClientRepository {
 				      )
 				  )
 				""");
-		if (normalizedStatus != null) {
+		if (status != null && !status.isBlank()) {
 			sql.append(" AND c.status = :status\n");
+			parameters.put("status", status.trim().toUpperCase(Locale.ROOT));
 		}
-		if (normalizedQuery != null) {
+		if (query != null && !query.isBlank()) {
+			parameters.put("query", "%" + query.trim().toLowerCase(Locale.ROOT) + "%");
 			sql.append("""
 					AND (
 					    LOWER(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) LIKE :query
@@ -316,36 +355,10 @@ public class ClientRepository {
 					)
 					""");
 		}
-		sql.append("""
-				ORDER BY c.updated_at DESC
-				LIMIT :limit
-				""");
-		var spec = jdbcClient.sql(sql.toString())
-				.param("organizationId", organizationId)
-				.param("branchId", branchId)
-				.param("limit", limit)
-				;
-		if (normalizedStatus != null) {
-			spec = spec.param("status", normalizedStatus);
-		}
-		if (normalizedQuery != null) {
-			spec = spec.param("query", normalizedQuery);
-		}
-		return spec.query((resultSet, rowNumber) -> new ClientSummary(
-						resultSet.getObject("client_id", UUID.class),
-						resultSet.getString("first_name"),
-						resultSet.getString("last_name"),
-						resultSet.getString("maternal_last_name"),
-						resultSet.getString("phone"),
-						resultSet.getString("email"),
-						resultSet.getString("client_status"),
-						resultSet.getString("current_plan_name"),
-						resultSet.getString("membership_status"),
-						resultSet.getObject("joined_at", OffsetDateTime.class),
-						resultSet.getObject("updated_at", OffsetDateTime.class)
-				))
-				.list();
+		return new ClientFilter(sql.toString(), parameters);
 	}
+
+	private record ClientFilter(String predicate, Map<String, Object> parameters) { }
 
 	public List<ClientTimelineEntry> timeline(UUID organizationId, UUID clientId) {
 		return jdbcClient.sql("""

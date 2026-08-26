@@ -14,11 +14,13 @@ import {
   searchProducts,
   type ClientSummary,
   type ProductSummary,
+  type ProductSearchParams,
   type SaleSummary,
   type StoredSession,
 } from "@/lib/api";
 import { calculateSubtotal, isMembershipPlanProduct, resolveScannedProduct } from "./pos-model";
 import { playScanBeep, useBarcodeScanner } from "./barcode-scanner";
+import { usePaginatedQuery } from "@/lib/usePaginatedQuery";
 import {
   type CartItem,
   type PaymentMethod,
@@ -30,7 +32,8 @@ import {
 
 export default function PosPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
-  const [products, setProducts] = useState<ProductSummary[]>([]);
+  const productList = usePaginatedQuery<ProductSummary, ProductSearchParams>(session?.accessToken, searchProducts, { status: "ACTIVE", sort: "name,asc" });
+  const products = productList.items;
   const [sales, setSales] = useState<SaleSummary[]>([]);
   const [clientQuery, setClientQuery] = useState("");
   const [productQuery, setProductQuery] = useState("");
@@ -46,7 +49,6 @@ export default function PosPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [productLoading, setProductLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [highlightedProductId, setHighlightedProductId] = useState<string | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
@@ -84,27 +86,11 @@ export default function PosPage() {
     return () => { active = false; };
   }, []);
 
+  const setProductFilters = productList.setFilters;
   useEffect(() => {
-    if (!session) return;
-    let active = true;
-    const timer = window.setTimeout(() => {
-      setProductLoading(true);
-      searchProducts(session.accessToken, {
-        q: productQuery.trim(),
-        status: "ACTIVE",
-        page: 0,
-        size: 50,
-        sort: "name,asc",
-      })
-        .then((page) => { if (active) setProducts(page.items); })
-        .catch((exception) => { if (active) setError(exception instanceof Error ? exception.message : "No fue posible buscar productos."); })
-        .finally(() => { if (active) setProductLoading(false); });
-    }, productQuery.trim() ? 250 : 0);
-    return () => {
-      active = false;
-      window.clearTimeout(timer);
-    };
-  }, [productQuery, session]);
+    const timer = window.setTimeout(() => setProductFilters((current) => ({ ...current, q: productQuery.trim() })), 250);
+    return () => window.clearTimeout(timer);
+  }, [productQuery, setProductFilters]);
 
   const subtotal = useMemo(
     () => calculateSubtotal(cart),
@@ -247,7 +233,13 @@ export default function PosPage() {
         <div className="grid gap-8 lg:grid-cols-[1fr_400px] xl:grid-cols-[1fr_480px]">
           <div className="flex flex-col gap-8">
             <ProductGrid
-              loading={productLoading}
+              loading={productList.loading}
+              error={productList.error}
+              page={productList.page}
+              pageSize={productList.size}
+              total={productList.total}
+              onPageChange={productList.setPage}
+              onPageSizeChange={productList.setPageSize}
               productQuery={productQuery}
               products={products}
               onAddProduct={addProduct}

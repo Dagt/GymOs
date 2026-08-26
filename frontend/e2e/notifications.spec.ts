@@ -54,23 +54,25 @@ test("una automatizacion de membresia puede enviar correo al socio del evento", 
         updatedAt: null,
       });
     }
+    if (path === "/notifications/email-configuration") return fulfill(route, { ready: true, emailEnabled: true, providerKey: "SMTP", providerAvailable: true });
     if (path.startsWith("/notifications")) return fulfill(route, []);
     return false;
   });
 
   await page.goto("/automations");
-  await page.getByRole("button", { name: "Usar receta: Avisar que la membresía vencerá" }).click();
+  await page.getByRole("button", { name: "+ Nueva automatización" }).click();
   const drawer = page.getByRole("dialog");
-  await expect(drawer.getByLabel("Nombre para reconocerla")).toHaveValue("Avisar que la membresía vencerá");
-  await expect(drawer.getByLabel("2. ¿A quién debe avisar?")).toHaveValue("EMAIL");
-  await drawer.getByLabel("Nombre para reconocerla").fill("Aviso por correo");
-  await drawer.locator("select").nth(0).selectOption("MEMBERSHIP_EXPIRING");
-  await drawer.locator("select").nth(1).selectOption("EMAIL");
-  await drawer.getByPlaceholder("Asunto de la notificación").fill("Tu membresia vence pronto");
+  await expect(drawer.getByLabel("Nombre de la automatización")).toHaveValue("");
+  await drawer.getByLabel("Nombre de la automatización").fill("Aviso por correo");
+  await drawer.getByRole("combobox", { name: "Evento", exact: true }).selectOption("MEMBERSHIP_EXPIRING");
+  await drawer.getByRole("button", { name: "Continuar", exact: true }).click();
+  await drawer.getByRole("combobox", { name: "Canal", exact: true }).selectOption("EMAIL");
+  await drawer.getByLabel("Asunto", { exact: true }).fill("Tu membresia vence pronto");
   await drawer.locator("textarea").fill("Hola {{recipientName}}, tu membresia vence el {{endsOn}}.");
-  await drawer.getByRole("button", { name: "Guardar y activar" }).click();
+  await drawer.getByRole("button", { name: "Revisar", exact: true }).click();
+  await drawer.getByRole("button", { name: "Activar automatización", exact: true }).click();
 
-  await expect(page.getByText("Automatización “Aviso por correo” creada y activa.")).toBeVisible();
+  await expect(page.getByText("Automatización creada y activa.")).toBeVisible();
   expect(createdPayload).not.toBeNull();
   const action = JSON.parse(String(createdPayload?.actionConfigJson)) as Record<string, unknown>;
   expect(action).toMatchObject({
@@ -90,6 +92,7 @@ async function boot(
     window.localStorage.setItem("gymos.refreshToken", "e2e-refresh-token");
     window.localStorage.setItem("gymos.currentUser", JSON.stringify({
       userId: "44444444-4444-4444-8444-444444444444",
+      accountScope: "TENANT",
       organizationId: "11111111-1111-4111-8111-111111111111",
       branchId: "22222222-2222-4222-8222-222222222222",
       username: "owner@gymos.test",

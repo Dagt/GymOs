@@ -2,6 +2,8 @@
 
 import { type FormEvent, useState } from "react";
 import { AppDrawer } from "@/components/AppDrawer";
+import { Pagination } from "@/components/Pagination";
+import { InventoryProductPicker } from "@/features/inventory/components/InventoryProductPicker";
 import {
   type BranchSummary,
   type InventoryBranchSettings,
@@ -199,9 +201,10 @@ export function InventoryStockPanel({
   sort,
   stock,
   total,
-  totalPages,
+  pageSize,
   onExportCsv,
   onPageChange,
+  onPageSizeChange,
   onQueryChange,
   onRefresh,
   onSelectProduct,
@@ -214,9 +217,10 @@ export function InventoryStockPanel({
   sort: NonNullable<InventoryStockSearchParams["sort"]>;
   stock: InventoryStock[];
   total: number;
-  totalPages: number;
+  pageSize: number;
   onExportCsv: () => void;
   onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
   onQueryChange: (value: string) => void;
   onRefresh: () => void;
   onSelectProduct: (item: InventoryStock) => void;
@@ -232,8 +236,8 @@ export function InventoryStockPanel({
             <p className="app-card-copy">{total} productos en almacén</p>
           </div>
           <div className="flex gap-2">
-            <button className="app-button-secondary h-8 px-3 text-xs" onClick={onExportCsv} type="button">
-              Exportar CSV
+            <button className="app-button-secondary h-8 px-3 text-xs" disabled={loading || stock.length === 0} onClick={onExportCsv} type="button">
+              Exportar página CSV
             </button>
             <button className="app-button-secondary h-8 px-3 text-xs" onClick={onRefresh} type="button">
               Actualizar
@@ -267,6 +271,8 @@ export function InventoryStockPanel({
           </label>
         </div>
 
+        <div className="mt-4"><Pagination page={page} size={pageSize} totalElements={total} loading={loading} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} label="existencias" /></div>
+
         {loading ? (
           <div className="mt-4 grid gap-2.5" role="status" aria-label="Cargando existencias">
             {[0, 1, 2].map((row) => (
@@ -282,7 +288,7 @@ export function InventoryStockPanel({
         ) : null}
 
         {!loading && stock.length > 0 ? (
-          <div className="mt-4 grid gap-2 max-h-[460px] overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="mt-4 grid gap-2">
             {stock.map((item) => {
               const isSelected = item.productId === selectedProductId;
               return (
@@ -329,7 +335,6 @@ export function InventoryStockPanel({
         ) : null}
       </div>
 
-      <Pagination page={page} totalPages={totalPages} onPageChange={onPageChange} label="existencias" />
     </section>
   );
 }
@@ -391,9 +396,15 @@ export function InventoryMovementSummary({
 
 export function InventoryAlertsPanel({
   lowStock,
+  page, pageSize, total, loading, onPageChange,
   onSelectProduct,
 }: {
   lowStock: InventoryStock[];
+  page: number;
+  pageSize: number;
+  total: number;
+  loading: boolean;
+  onPageChange: (page: number) => void;
   onSelectProduct?: (item: InventoryStock) => void;
 }) {
   return (
@@ -404,18 +415,19 @@ export function InventoryAlertsPanel({
           <h2 className="app-card-title">Alertas de Stock Bajo</h2>
         </div>
         <span className="rounded-full bg-[#fff4f4] px-2.5 py-0.5 text-xs font-bold text-[#8c2f2f]">
-          {lowStock.length}
+          {total}
         </span>
       </div>
 
-      {lowStock.length === 0 ? (
+      <Pagination label="alertas" page={page} size={pageSize} totalElements={total} loading={loading} onPageChange={onPageChange} />
+      {!loading && lowStock.length === 0 ? (
         <p className="text-xs text-[var(--brand-muted)] flex-1 flex items-center justify-center py-4">
           Sin productos bajo el nivel mínimo de reorden.
         </p>
       ) : (
-        <div className="flex-1 min-h-0 flex flex-col justify-start gap-2 max-h-[380px] overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="flex-1 min-h-0 flex flex-col justify-start gap-2">
           {lowStock.map((item) => (
-            <div
+            <button type="button"
               key={item.productId}
               className={`shrink-0 h-fit rounded-lg border border-[#e5b7b7] bg-[#fff4f4] p-3 text-xs flex items-center justify-between gap-3 transition ${
                 onSelectProduct ? "cursor-pointer hover:border-[#8c2f2f]" : ""
@@ -431,7 +443,7 @@ export function InventoryAlertsPanel({
               <span className="text-[10px] font-bold text-[#8c2f2f] bg-white px-2 py-1 rounded border border-[#e5b7b7]">
                 Reordenar
               </span>
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -440,33 +452,36 @@ export function InventoryAlertsPanel({
 }
 
 export function InventoryMovementsTable({
+  accessToken,
   loading,
   movements,
   page,
-  productIdFilter,
-  products,
+  product,
   query,
-  totalPages,
+  total, pageSize,
   typeFilter,
   onClearFilters,
   onExportCsv,
   onPageChange,
-  onProductIdFilterChange,
+  onPageSizeChange,
+  onProductChange,
   onQueryChange,
   onTypeFilterChange,
 }: {
+  accessToken: string;
   loading: boolean;
   movements: InventoryMovement[];
   page: number;
-  productIdFilter: string;
-  products: InventoryStock[];
+  product: InventoryStock | null;
   query: string;
-  totalPages: number;
+  total: number;
+  pageSize: number;
   typeFilter: string;
   onClearFilters: () => void;
   onExportCsv: () => void;
   onPageChange: (page: number) => void;
-  onProductIdFilterChange: (productId: string) => void;
+  onPageSizeChange: (size: number) => void;
+  onProductChange: (product: InventoryStock | null) => void;
   onQueryChange: (query: string) => void;
   onTypeFilterChange: (type: string) => void;
 }) {
@@ -476,10 +491,10 @@ export function InventoryMovementsTable({
         <div>
           <p className="app-eyebrow">Bitácora general de almacén</p>
           <h2 className="app-card-title">Historial de Movimientos</h2>
-          <p className="app-card-copy">Consulal el registro completo de todos los productos y movimientos.</p>
+          <p className="app-card-copy">Busca en el historial completo. Los filtros se aplican a todas las páginas.</p>
         </div>
-        <button className="app-button-secondary h-8 px-3 text-xs" onClick={onExportCsv} type="button">
-          Exportar CSV
+        <button className="app-button-secondary h-8 px-3 text-xs" disabled={loading || movements.length === 0} onClick={onExportCsv} type="button">
+          Exportar página CSV
         </button>
       </div>
 
@@ -490,26 +505,13 @@ export function InventoryMovementsTable({
           <input
             className="app-input h-8 min-h-8 px-2.5 text-xs"
             placeholder="Nombre de producto, SKU o motivo..."
+            maxLength={200}
             value={query}
             onChange={(e) => onQueryChange(e.target.value)}
           />
         </label>
 
-        <label className="grid gap-1 text-xs font-semibold text-[#536158]">
-          <span>Producto</span>
-          <select
-            className="app-input h-8 min-h-8 bg-white px-2 text-xs"
-            value={productIdFilter}
-            onChange={(e) => onProductIdFilterChange(e.target.value)}
-          >
-            <option value="">Todos los productos</option>
-            {products.map((p) => (
-              <option key={p.productId} value={p.productId}>
-                {p.productName}
-              </option>
-            ))}
-          </select>
-        </label>
+        <InventoryProductPicker accessToken={accessToken} allowClear selected={product} onChange={onProductChange} />
 
         <label className="grid gap-1 text-xs font-semibold text-[#536158]">
           <span>Tipo de movimiento</span>
@@ -541,6 +543,7 @@ export function InventoryMovementsTable({
         </button>
       </div>
 
+      <Pagination page={page} size={pageSize} totalElements={total} loading={loading} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} label="movimientos" />
       {loading ? (
         <div className="h-32 animate-pulse rounded-lg bg-[#eef1eb]" role="status" aria-label="Cargando movimientos" />
       ) : null}
@@ -552,7 +555,7 @@ export function InventoryMovementsTable({
       ) : null}
 
       {!loading && movements.length > 0 ? (
-        <div className="max-h-[500px] overflow-y-auto overflow-x-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="overflow-x-auto">
           <table className="w-full border-collapse text-xs">
             <thead>
               <tr className="border-b border-[#e4e8df] text-left uppercase tracking-wider text-[#6f7a73] font-semibold">
@@ -593,19 +596,25 @@ export function InventoryMovementsTable({
         </div>
       ) : null}
 
-      <Pagination page={page} totalPages={totalPages} onPageChange={onPageChange} label="movimientos" />
     </section>
   );
 }
 
 export function InventoryAuditsCard({
   counts,
+  activeCount, page, pageSize, total, loading, onPageChange, onPageSizeChange,
   onOpenDrawer,
 }: {
   counts: InventoryPhysicalCount[];
+  activeCount: InventoryPhysicalCount | null;
+  page: number;
+  pageSize: number;
+  total: number;
+  loading: boolean;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
   onOpenDrawer: () => void;
 }) {
-  const activeCount = counts.find((c) => c.status === "IN_PROGRESS" || c.status === "PENDING_APPROVAL");
 
   return (
     <section className="app-card p-5 space-y-4">
@@ -635,13 +644,14 @@ export function InventoryAuditsCard({
 
       <div>
         <p className="app-eyebrow mb-2">Historial de Conteos Físicos</p>
-        {counts.length === 0 ? (
+        <Pagination label="conteos" page={page} size={pageSize} totalElements={total} loading={loading} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
+        {!loading && counts.length === 0 ? (
           <p className="rounded-lg border border-dashed border-[var(--brand-line)] p-6 text-center text-xs text-[var(--brand-muted)]">
             Sin historial de auditorías de conteo físico registradas.
           </p>
         ) : (
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3 max-h-60 overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {counts.slice(0, 6).map((c) => (
+          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {counts.map((c) => (
               <div className="rounded-lg border border-[#eef0eb] bg-[var(--brand-surface)] p-3 text-xs flex flex-col justify-between gap-2" key={c.id}>
                 <div>
                   <span className="font-bold text-[#111815]">{formatDateTime(c.createdAt)}</span>
@@ -659,6 +669,7 @@ export function InventoryAuditsCard({
 
 export function InventoryTransfersCard({
   transfers,
+  activeTransfersCount, page, pageSize, total, loading, onPageChange, onPageSizeChange,
   onCancelTransfer,
   onOpenDrawer,
   onReceiveTransfer,
@@ -666,13 +677,19 @@ export function InventoryTransfersCard({
   saving,
 }: {
   transfers: InventoryTransfer[];
+  activeTransfersCount: number;
+  page: number;
+  pageSize: number;
+  total: number;
+  loading: boolean;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
   onCancelTransfer?: (transferId: string) => void;
   onOpenDrawer: () => void;
   onReceiveTransfer?: (transferId: string) => void;
   onShipTransfer?: (transferId: string) => void;
   saving?: boolean;
 }) {
-  const activeTransfers = transfers.filter((t) => t.status === "REQUESTED" || t.status === "SHIPPED");
 
   return (
     <section className="app-card p-5 space-y-4">
@@ -690,16 +707,17 @@ export function InventoryTransfersCard({
       <div className="flex items-center gap-2">
         <span className="text-xs text-[#6f7a73]">Transferencias activas:</span>
         <span className="rounded-full bg-[#f0f4ef] px-2.5 py-0.5 text-xs font-bold text-[#31543d]">
-          {activeTransfers.length}
+          {activeTransfersCount}
         </span>
       </div>
 
-      {transfers.length === 0 ? (
+      <Pagination label="transferencias" page={page} size={pageSize} totalElements={total} loading={loading || saving} onPageChange={onPageChange} onPageSizeChange={onPageSizeChange} />
+      {!loading && transfers.length === 0 ? (
         <p className="rounded-lg border border-dashed border-[var(--brand-line)] p-6 text-center text-xs text-[var(--brand-muted)]">
           No hay registros de transferencias de inventario en esta sucursal.
         </p>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-2 max-h-[460px] overflow-y-auto pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-2">
           {transfers.map((t) => (
             <div className="rounded-lg border border-[#e4e8df] bg-[var(--brand-surface)] p-4 text-xs flex flex-col justify-between gap-3" key={t.id}>
               <div className="space-y-2">
@@ -769,14 +787,14 @@ export function InventoryTransfersCard({
 }
 
 export function InventoryMovementDrawer({
+  accessToken,
   movementType,
   open,
   quantity,
   reason,
   reorderPoint,
   saving,
-  selectedProductId,
-  stock,
+  selectedProduct,
   unitCostCents,
   onClose,
   onMovementTypeChange,
@@ -787,18 +805,18 @@ export function InventoryMovementDrawer({
   onSubmit,
   onUnitCostChange,
 }: {
+  accessToken: string;
   movementType: ManualMovementType;
   open: boolean;
   quantity: number;
   reason: string;
   reorderPoint: string;
   saving: boolean;
-  selectedProductId: string;
-  stock: InventoryStock[];
+  selectedProduct: InventoryStock | null;
   unitCostCents: string;
   onClose: () => void;
   onMovementTypeChange: (value: ManualMovementType) => void;
-  onProductChange: (value: string) => void;
+  onProductChange: (value: InventoryStock) => void;
   onQuantityChange: (value: number) => void;
   onReasonChange: (value: string) => void;
   onReorderPointChange: (value: string) => void;
@@ -814,19 +832,7 @@ export function InventoryMovementDrawer({
     >
       <form className="grid gap-4" onSubmit={onSubmit}>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Producto">
-            <select
-              className="app-input"
-              onChange={(event) => onProductChange(event.target.value)}
-              value={selectedProductId}
-            >
-              {stock.map((item) => (
-                <option key={item.productId} value={item.productId}>
-                  {item.productName}
-                </option>
-              ))}
-            </select>
-          </Field>
+          <InventoryProductPicker accessToken={accessToken} disabled={saving} selected={selectedProduct} onChange={(product) => { if (product) onProductChange(product); }} />
           <Field label="Tipo">
             <select
               className="app-input"
@@ -878,7 +884,7 @@ export function InventoryMovementDrawer({
         </Field>
         <button
           className="form-primary-button"
-          disabled={saving || !selectedProductId || !reason.trim()}
+          disabled={saving || !selectedProduct || !reason.trim()}
           type="submit"
         >
           {saving ? "Registrando..." : "Registrar movimiento"}
@@ -889,7 +895,8 @@ export function InventoryMovementDrawer({
 }
 
 export function InventoryPhysicalCountDrawer({
-  counts,
+  activeCount,
+  loading,
   open,
   saving,
   onApproveCount,
@@ -898,7 +905,8 @@ export function InventoryPhysicalCountDrawer({
   onSaveCountItem,
   onStartCount,
 }: {
-  counts: InventoryPhysicalCount[];
+  activeCount: InventoryPhysicalCount | null;
+  loading: boolean;
   open: boolean;
   saving: boolean;
   onApproveCount: (countId: string) => void;
@@ -908,7 +916,6 @@ export function InventoryPhysicalCountDrawer({
   onStartCount: (notes?: string) => void;
 }) {
   const [notes, setNotes] = useState("");
-  const activeCount = counts.find((c) => c.status === "IN_PROGRESS" || c.status === "PENDING_APPROVAL") ?? null;
 
   return (
     <AppDrawer
@@ -918,7 +925,7 @@ export function InventoryPhysicalCountDrawer({
       title="Auditoría / Conteo Físico"
     >
       <div className="grid gap-6">
-        {!activeCount ? (
+        {loading && !activeCount ? <p role="status">Cargando conteo activo…</p> : !activeCount ? (
           <div className="rounded-lg border border-[var(--brand-line)] bg-[#fdfefc] p-4 grid gap-3">
             <h3 className="font-semibold text-sm text-[#111815]">Iniciar nueva sesión de conteo</h3>
             <label className="grid gap-1 text-xs font-semibold text-[#536158]">
@@ -954,7 +961,7 @@ export function InventoryPhysicalCountDrawer({
               </span>
             </div>
 
-            <div className="max-h-72 overflow-y-auto grid gap-2 pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="grid gap-2">
               {activeCount.items && activeCount.items.length > 0 ? (
                 activeCount.items.map((item) => (
                   <div
@@ -973,6 +980,7 @@ export function InventoryPhysicalCountDrawer({
                     <div className="flex items-center gap-2">
                       <label className="text-[11px] font-semibold text-[#536158]">Físico:</label>
                       <input
+                        aria-label={`Cantidad física de ${item.productName}`}
                         className="app-input w-24 text-right h-9 font-bold text-sm bg-white"
                         defaultValue={item.countedQuantity ?? ""}
                         onBlur={(e) => {
@@ -995,7 +1003,7 @@ export function InventoryPhysicalCountDrawer({
             <div className="flex gap-2 justify-end pt-2">
               <button
                 className="app-button-secondary"
-                disabled={saving}
+                disabled={saving || loading}
                 onClick={() => onCancelCount(activeCount.id)}
                 type="button"
               >
@@ -1003,7 +1011,7 @@ export function InventoryPhysicalCountDrawer({
               </button>
               <button
                 className="app-button"
-                disabled={saving}
+                disabled={saving || loading}
                 onClick={() => onApproveCount(activeCount.id)}
                 type="button"
               >
@@ -1018,19 +1026,19 @@ export function InventoryPhysicalCountDrawer({
 }
 
 export function InventoryTransferDrawer({
+  accessToken,
   activeBranchId,
   branches,
   open,
   saving,
-  stock,
   onClose,
   onCreateTransfer,
 }: {
+  accessToken: string;
   activeBranchId?: string;
   branches: BranchSummary[];
   open: boolean;
   saving: boolean;
-  stock: InventoryStock[];
   onClose: () => void;
   onCreateTransfer: (
     destBranchId: string,
@@ -1040,18 +1048,17 @@ export function InventoryTransferDrawer({
 }) {
   const [destBranchId, setDestBranchId] = useState("");
   const [notes, setNotes] = useState("");
-  const [selectedProductId, setSelectedProductId] = useState("");
+  const [selectedStockItem, setSelectedStockItem] = useState<InventoryStock | null>(null);
   const [requestedQty, setRequestedQty] = useState(1);
   const [items, setItems] = useState<Array<{ productId: string; productName: string; requestedQuantity: number }>>([]);
   const [itemError, setItemError] = useState<string | null>(null);
 
   const destinationBranches = activeBranchId ? branches.filter((b) => b.id !== activeBranchId) : branches;
-  const selectedStockItem = stock.find((s) => s.productId === selectedProductId) ?? null;
 
   function addItem() {
     setItemError(null);
-    if (!selectedProductId || requestedQty <= 0) return;
-    const prod = stock.find((s) => s.productId === selectedProductId);
+    if (!selectedStockItem || requestedQty <= 0) return;
+    const prod = selectedStockItem;
     if (!prod) return;
 
     if (requestedQty > prod.quantityOnHand) {
@@ -1060,8 +1067,8 @@ export function InventoryTransferDrawer({
     }
 
     setItems((prev) => [
-      ...prev.filter((i) => i.productId !== selectedProductId),
-      { productId: selectedProductId, productName: prod.productName, requestedQuantity: requestedQty },
+      ...prev.filter((i) => i.productId !== prod.productId),
+      { productId: prod.productId, productName: prod.productName, requestedQuantity: requestedQty },
     ]);
   }
 
@@ -1108,23 +1115,10 @@ export function InventoryTransferDrawer({
           </Field>
 
           <div className="grid sm:grid-cols-[1fr_auto_auto] gap-2 items-end">
-            <Field label={`Producto ${selectedStockItem ? `(Disponible: ${selectedStockItem.quantityOnHand} u.)` : ""}`}>
-              <select
-                className="app-input"
-                value={selectedProductId}
-                onChange={(e) => {
-                  setSelectedProductId(e.target.value);
-                  setItemError(null);
-                }}
-              >
-                <option value="">-- Producto --</option>
-                {stock.map((s) => (
-                  <option key={s.productId} value={s.productId}>
-                    {s.productName}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            <div className="min-w-0">
+              <InventoryProductPicker accessToken={accessToken} disabled={saving} selected={selectedStockItem} onChange={(product) => { setSelectedStockItem(product); setItemError(null); }} />
+              {selectedStockItem ? <p className="mt-1 text-xs text-[var(--brand-muted)]">Disponible: {selectedStockItem.quantityOnHand} u.</p> : null}
+            </div>
             <Field label="Cantidad">
               <input
                 className="app-input w-20 text-center"
@@ -1183,43 +1177,6 @@ export function InventoryTransferDrawer({
   );
 }
 
-function Pagination({
-  label,
-  onPageChange,
-  page,
-  totalPages,
-}: {
-  label: string;
-  onPageChange: (page: number) => void;
-  page: number;
-  totalPages: number;
-}) {
-  if (totalPages <= 1) return null;
-  return (
-    <nav aria-label={`Paginación de ${label}`} className="mt-4 flex items-center justify-between gap-3 text-xs">
-      <button
-        className="app-button-secondary h-8 px-3"
-        disabled={page <= 0}
-        onClick={() => onPageChange(page - 1)}
-        type="button"
-      >
-        Anterior
-      </button>
-      <span className="font-semibold text-[var(--brand-muted)]">
-        Página {page + 1} de {totalPages}
-      </span>
-      <button
-        className="app-button-secondary h-8 px-3"
-        disabled={page + 1 >= totalPages}
-        onClick={() => onPageChange(page + 1)}
-        type="button"
-      >
-        Siguiente
-      </button>
-    </nav>
-  );
-}
-
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return <label className="grid gap-1 text-xs font-semibold text-[#536158]">{label}{children}</label>;
 }
@@ -1240,4 +1197,3 @@ function formatMoney(cents: number, currency: string) {
 function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("es-MX", { dateStyle: "short", timeStyle: "short" }).format(new Date(value));
 }
-

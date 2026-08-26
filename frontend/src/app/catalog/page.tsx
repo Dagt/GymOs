@@ -10,6 +10,7 @@ import { CatalogProductDrawer } from "@/features/catalog/components/CatalogProdu
 import { CatalogProductTable } from "@/features/catalog/components/CatalogProductTable";
 import { CatalogSummaryCards } from "@/features/catalog/components/CatalogSummaryCards";
 import { CatalogCategoryManager } from "@/features/catalog/components/CatalogCategoryManager";
+import { Pagination } from "@/components/Pagination";
 
 type CatalogView = "products" | "plans" | "categories";
 
@@ -49,12 +50,15 @@ function CatalogContent() {
                 onClear={controller.catalogFilters.clear} onSearchChange={controller.catalogFilters.setSearchInput}
                 onUpdate={controller.catalogFilters.update} />
             </div>
+            <Pagination label="artículos" page={controller.catalogFilters.filters.page ?? 0}
+              size={controller.catalogFilters.filters.size ?? 25} totalElements={controller.totalProducts}
+              loading={controller.loading || controller.saving}
+              onPageChange={(page) => controller.catalogFilters.update("page", String(page))}
+              onPageSizeChange={(size) => controller.catalogFilters.update("size", String(size))} />
             <CatalogProductTable canArchive={controller.canArchive} canManageStatus={controller.canManageStatus}
               canUpdate={controller.canUpdate} loading={controller.loading} products={controller.products}
               saving={controller.saving} onArchive={controller.archiveCatalogProduct} onEdit={controller.openProductEdition}
               onRestore={controller.restoreCatalogProduct} onToggleStatus={controller.toggleProductStatus} />
-            <CatalogPagination page={controller.catalogFilters.filters.page ?? 0} totalPages={controller.totalPages}
-              onPageChange={(page) => controller.catalogFilters.update("page", String(page))} />
           </section>
         ) : null}
         {view === "plans" ? <PlanList canUpdate={controller.canUpdate} plans={controller.plans} onEditPlan={controller.openPlanEdition} /> : null}
@@ -99,12 +103,6 @@ function CatalogNavigation({ canManageCategories, onChange, view }: { canManageC
   return <nav aria-label="Secciones del catálogo" className="grid gap-2 rounded-xl border border-[var(--brand-line)] bg-white p-2 shadow-sm sm:grid-cols-3">{options.map((option) => <button key={option.value} type="button" onClick={() => onChange(option.value)} className={view === option.value ? "app-button h-10 w-full" : "app-button-secondary h-10 w-full"}>{option.label}</button>)}</nav>;
 }
 
-function CatalogPagination({ onPageChange, page, totalPages }: { onPageChange: (page: number) => void; page: number; totalPages: number }) {
-  if (totalPages <= 1) return null;
-  return <nav aria-label="Paginación del catálogo" className="flex items-center justify-end gap-3"><button className="app-button-secondary" disabled={page <= 0} onClick={() => onPageChange(page - 1)} type="button">Anterior</button><span className="text-sm text-[var(--brand-muted)]">{page + 1} / {totalPages}</span><button className="app-button-secondary" disabled={page + 1 >= totalPages} onClick={() => onPageChange(page + 1)} type="button">Siguiente</button></nav>;
-}
-
 function AuthRequired() {
   return <AuthRequiredCard message="Se requiere una cuenta autorizada." title="Inicia sesión para ver el catálogo" />;
 }
-

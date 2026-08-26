@@ -545,6 +545,9 @@ async function bootAs(
 }
 
 function responseFor(path: string, currentUser: TestUser) {
+  if (path === "/clients/search") {
+    return { items: [], page: 0, size: 25, totalElements: 0, totalPages: 0 };
+  }
   if (path === "/auth/me") {
     return currentUser;
   }

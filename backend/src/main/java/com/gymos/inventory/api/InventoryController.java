@@ -1,6 +1,8 @@
 package com.gymos.inventory.api;
 
 import com.gymos.common.api.Correlation;
+import com.gymos.common.api.PageResponse;
+import com.gymos.inventory.application.query.InventoryHistorySearchCriteria;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.inventory.application.InventoryService;
 import com.gymos.inventory.application.command.InventoryMovementCommand;
@@ -64,8 +66,9 @@ public class InventoryController {
 			@RequestParam(required = false) String q,
 			@RequestParam(defaultValue = "0") @Min(0) int page,
 			@RequestParam(defaultValue = "25") @Min(1) @Max(100) int size,
-			@RequestParam(defaultValue = "name,asc") String sort) {
-		return inventoryService.searchStock(principal, new InventoryStockSearchCriteria(q, page, size, sort));
+			@RequestParam(defaultValue = "name,asc") String sort,
+			@RequestParam(defaultValue = "false") boolean lowStockOnly) {
+		return inventoryService.searchStock(principal, new InventoryStockSearchCriteria(q, page, size, sort, lowStockOnly));
 	}
 
 	@GetMapping("/{productId}")
@@ -85,9 +88,11 @@ public class InventoryController {
 	@GetMapping("/movements/search")
 	InventoryMovementPageView searchMovements(@AuthenticationPrincipal GymOsPrincipal principal,
 			@RequestParam(required = false) UUID productId,
+			@RequestParam(required = false) @Size(max = 200) String q,
+			@RequestParam(required = false) @Pattern(regexp = "INITIAL|PURCHASE|ADJUSTMENT_IN|ADJUSTMENT_OUT|WASTE|INTERNAL_CONSUMPTION|RETURN|TRANSFER_OUT|TRANSFER_IN|SALE") String type,
 			@RequestParam(defaultValue = "0") @Min(0) int page,
 			@RequestParam(defaultValue = "25") @Min(1) @Max(100) int size) {
-		return inventoryService.searchMovements(principal, new InventoryMovementSearchCriteria(productId, page, size));
+		return inventoryService.searchMovements(principal, new InventoryMovementSearchCriteria(productId, page, size, q, type));
 	}
 
 	@PostMapping("/movements")
@@ -111,6 +116,14 @@ public class InventoryController {
 	@GetMapping("/physical-counts/{countId}")
 	InventoryPhysicalCountView physicalCountDetail(@AuthenticationPrincipal GymOsPrincipal principal, @PathVariable UUID countId) {
 		return inventoryService.physicalCountDetail(principal, countId);
+	}
+
+	@GetMapping("/physical-counts/search")
+	PageResponse<InventoryPhysicalCountView> searchPhysicalCounts(@AuthenticationPrincipal GymOsPrincipal principal,
+			@RequestParam(defaultValue = "0") @Min(0) int page,
+			@RequestParam(defaultValue = "25") @Min(1) @Max(100) int size,
+			@RequestParam(defaultValue = "false") boolean activeOnly) {
+		return inventoryService.searchPhysicalCounts(principal, new InventoryHistorySearchCriteria(page, size, activeOnly));
 	}
 
 	@PostMapping("/physical-counts")
@@ -147,6 +160,14 @@ public class InventoryController {
 	@GetMapping("/transfers/{transferId}")
 	InventoryTransferView transferDetail(@AuthenticationPrincipal GymOsPrincipal principal, @PathVariable UUID transferId) {
 		return inventoryService.transferDetail(principal, transferId);
+	}
+
+	@GetMapping("/transfers/search")
+	PageResponse<InventoryTransferView> searchTransfers(@AuthenticationPrincipal GymOsPrincipal principal,
+			@RequestParam(defaultValue = "0") @Min(0) int page,
+			@RequestParam(defaultValue = "25") @Min(1) @Max(100) int size,
+			@RequestParam(defaultValue = "false") boolean activeOnly) {
+		return inventoryService.searchTransfers(principal, new InventoryHistorySearchCriteria(page, size, activeOnly));
 	}
 
 	@PostMapping("/transfers")

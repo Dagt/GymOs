@@ -178,7 +178,7 @@ test.describe("coaches y rutinas", () => {
     await expect.poll(() => mediaUploaded).toBe(true);
   });
 
-  test("crea un equipo reutilizable y mantiene el catálogo contenido", async ({ page }) => {
+  test("crea un equipo reutilizable y mantiene el catálogo paginado sin scroll interno", async ({ page }) => {
     let createPayload: Record<string, unknown> | null = null;
     await bootCoaching(page, async (route, path) => {
       if (route.request().method() === "POST" && path === "/exercises") {
@@ -195,13 +195,21 @@ test.describe("coaches y rutinas", () => {
         });
         return true;
       }
+      if (route.request().method() === "GET" && path === "/exercises" && createPayload) {
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify({
+          items: [exercise(), { ...exercise(), ...createPayload, id: customExerciseId, origin: "COACH", createdBy: userId }],
+          page: 0, size: 25, totalElements: 2, totalPages: 1,
+        }) });
+        return true;
+      }
       return false;
     });
 
     await page.goto("/coaches");
     await page.getByRole("button", { name: "Ejercicios", exact: true }).click();
     const catalog = page.locator(".exercise-catalog-list");
-    await expect(catalog).toHaveCSS("overflow-y", "auto");
+    await expect(catalog).toHaveCSS("overflow-y", "visible");
+    await expect(page.getByRole("navigation", { name: "Paginación de ejercicios" })).toBeVisible();
     await page.getByRole("button", { name: "+ Nuevo ejercicio" }).click();
     await page.getByLabel("Nombre", { exact: true }).fill("Empuje de trineo");
     await page.getByLabel("Grupo muscular principal").selectOption("Cuerpo completo");
