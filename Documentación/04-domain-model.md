@@ -41,6 +41,7 @@ Atributos:
 - timezone
 - status
 - phone
+- brandProfile (opcional; hereda de Organization cuando falta)
 - createdAt
 - updatedAt
 
@@ -48,6 +49,10 @@ Invariantes:
 - Una sucursal siempre pertenece a una organización.
 - El código de sucursal es único dentro de la organización.
 - Las operaciones físicas como ventas, accesos, inventario y reservas deben asociarse a sucursal cuando aplique.
+- Dos sucursales del mismo tenant pueden usar marcas distintas sin duplicar
+  socios, catálogo, planes o beneficios.
+- La identidad visual efectiva se resuelve por sucursal y usa la marca de la
+  organización únicamente como fallback.
 
 Eventos:
 - BranchRegistered
@@ -470,6 +475,11 @@ Reglas reforzadas:
 
 Beneficio comercial aplicable a clientes, planes, productos o accesos. Puede representar estudiante, adulto mayor, convenio, promocion, descuento porcentual, descuento fijo, precio especial o beneficio de acceso.
 
+Cuando se vincula a un plan multi-sucursal, el beneficio puede declarar alcance
+del plan y ser heredado en todas sus sucursales válidas. Un alcance local debe
+ser una decisión explícita, no una consecuencia accidental de la sucursal donde
+se creó.
+
 ### ClientBenefit
 
 Asignacion de un beneficio a un cliente dentro de una organizacion y, opcionalmente, una sucursal. Estados iniciales: `ASSIGNED`, `VERIFIED`, `EXPIRED`, `REJECTED`.
@@ -480,7 +490,10 @@ Evidencia documental asociada a un beneficio asignado. Guarda referencia a objet
 
 ### VisitPass
 
-Derecho de acceso por visita unica, paquete de visitas o pase diario. Controla visitas totales, restantes, vigencia y venta origen.
+Derecho de acceso por visita unica, paquete de visitas o pase diario. Controla
+visitas totales, restantes, vigencia y venta origen. El objetivo multi-sucursal
+mantiene un solo saldo por socio dentro de la organización y registra la
+sucursal de cada consumo.
 
 ### SaleRefund
 

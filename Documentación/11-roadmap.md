@@ -1,6 +1,6 @@
 # 11. Roadmap de implementación
 
-Corte: 23 de agosto de 2026
+Corte: 26 de agosto de 2026
 
 Este documento expresa secuencia y estado, no sustituye el estado verificable del documento 13 ni la deuda del 28.
 
@@ -60,6 +60,17 @@ Este documento expresa secuencia y estado, no sustituye el estado verificable de
 - Sistema visual unificado y feedback global.
 
 ## En curso inmediato
+
+### Ajustes del primer cliente
+
+- completar inscripción inicial, autenticación y alta de socios sin membresía,
+  registro desde kiosco y baja lógica automática por inactividad;
+- modelar paquetes de visitas con un solo saldo utilizable en las sucursales
+  permitidas del mismo tenant, nunca entre organizaciones;
+- hacer que los beneficios ligados a un plan multi-sucursal se hereden en todas
+  las sucursales donde el plan es válido, salvo alcance local explícito;
+- resolver nombre, logo, colores y comunicación por sucursal, usando la marca de
+  la organización como fallback corporativo.
 
 ### Administración comercial de GymFort
 

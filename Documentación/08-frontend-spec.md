@@ -251,12 +251,15 @@ Implementacion frontend:
 - Personalizador de marca local con nombre visible, URL de logo y colores por cliente.
 
 Reglas de producto:
-- La personalizacion visual ya pertenece al gimnasio/tenant y se persiste en backend.
+- La personalización visual pertenece al tenant, admite una marca corporativa y
+  perfiles de marca por sucursal, y se persiste en backend.
 - El panel de plataforma conserva tema neutral; gerencia, recepción, coaches y
-  kiosco usan la marca del gimnasio activo. En el menú lateral tenant aparecen
-  primero el logo, nombre del gimnasio y sucursal; debajo se muestra la sesión
+  kiosco usan la marca efectiva de la sucursal activa. En el menú lateral tenant
+  aparecen primero el logo, nombre de marca y sucursal; debajo se muestra la sesión
   activa y la atribución GymFort queda discreta y permanente en el pie.
-- La marca tambien viaja en `CurrentUser` para que roles sin permiso de administracion puedan ver logo, color principal, acento y fondo del gimnasio activo.
+- La marca efectiva también viaja en `CurrentUser` para que roles sin permiso de
+  administración puedan ver logo, color principal, acento y fondo de la
+  sucursal activa.
 - Ninguna regla de negocio se mueve al frontend.
 - Los formularios deben usar etiquetas de negocio entendibles para recepcion y administracion.
 
@@ -338,12 +341,17 @@ Modo soporte:
 - Las acciones quedan auditadas con origen `PLATFORM_SUPPORT`.
 - Fuera de soporte, Admin GymOS mantiene la marca neutral de GymFort.
 
-Marca por gimnasio:
-- `TenantThemeProvider` aplica tokens CSS desde la organizacion activa.
+Marca por tenant y sucursal:
+- `TenantThemeProvider` aplica tokens CSS del perfil efectivo: sucursal activa
+  con fallback de organización.
 - Campos soportados: `brandName`, `logoUrl`, `primaryColor`, `accentColor`, `surfaceColor`.
-- Plataforma usa tema neutral; tenant usa su propia marca en dueño, gerencia, recepcion, coaches, kiosco y pantallas internas.
-- La marca lateral usa los colores del tenant y muestra el logo configurado cuando `logoUrl` existe.
-- Las sucursales no tienen marca propia; todas heredan logo y colores configurados en el gimnasio.
+- Plataforma usa tema neutral; el contexto tenant usa la marca efectiva de la
+  sucursal en dueño, gerencia, recepción, coaches, kiosco y pantallas internas.
+- La marca lateral usa los colores efectivos y muestra el logo de sucursal o su
+  fallback cuando `logoUrl` existe.
+- Una sucursal puede definir nombre de marca, logo y colores propios. Los campos
+  no configurados heredan la marca corporativa de la organización. Cambiar de
+  sucursal cambia el tema efectivo sin cambiar de tenant (`CFG-003`).
 - El logo se carga desde un selector de archivo, no escribiendo una URL manualmente.
 - Los logos se persisten mediante los endpoints administrados de organizaciones
   y almacenamiento S3-compatible; el frontend usa el proxy de lectura
@@ -398,10 +406,15 @@ Formularios:
 - La portada no muestra una banda decorativa de `Caja lista`, `Pagos por revisar`
   o `Sucursal activa`; prioriza búsqueda de socio y acciones operativas reales.
 - Las acciones de recepcion se agrupan en la misma cuadricula: caja/POS, socios, ventas, kiosco, reservas y beneficios. No se usa una seccion desplegable secundaria para herramientas normales de mostrador.
-- La paleta de recepcion debe derivar de la marca del tenant (`primaryColor`, `accentColor`, `surfaceColor`) y no de colores fijos por modulo.
+- La paleta de recepción debe derivar de la marca efectiva de la sucursal
+  (`primaryColor`, `accentColor`, `surfaceColor`) y no de colores fijos por
+  módulo; la organización aporta el fallback.
 - El dashboard de recepcion prioriza una banda visual con el color principal y acciones asimetricas; evita verse como una lista plana de tarjetas independientes.
 - El kiosco muestra logo, nombre y colores del gimnasio propietario del terminal.
-- `/settings/organization` permite configurar marca solo en la seccion del gimnasio; la seccion de sucursales solo administra datos operativos de cada sede.
+- `/settings/organization` conserva la marca corporativa en la sección del
+  gimnasio y permite editar/previsualizar la marca efectiva de cada sede desde
+  la sección de sucursales. La UI debe distinguir claramente valores propios de
+  valores heredados.
 
 ## Coaches y rutinas
 

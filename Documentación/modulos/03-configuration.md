@@ -1,7 +1,7 @@
 # Configuración y marca
 
 Estado: `FUNCIONAL`
-Última revisión: 21 de agosto de 2026
+Última revisión: 26 de agosto de 2026
 
 ## Implementado
 
@@ -20,6 +20,9 @@ Estado: `FUNCIONAL`
 
 ## Pendiente
 
+- perfil de marca por sucursal (`brandName`, logo y colores) con fallback de la
+  organización y propagación a consola, recepción, kiosco, correos, recibos y
+  PDFs (`CFG-003`);
 - pruebas de permisos y aislamiento específicas;
 - eliminación explícita del logotipo y cola durable para reintentar la limpieza
   de objetos huérfanos (`CFG-001`);

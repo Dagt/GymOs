@@ -232,6 +232,15 @@ Regla:
 - valid_until
 - active
 
+Regla objetivo multi-sucursal:
+- Un beneficio ligado a un plan multi-sucursal puede tener alcance
+  `PLAN_BRANCHES`; en ese caso la elegibilidad se deriva de las sucursales donde
+  el plan es válido y no de la sucursal desde la que se creó la definición.
+- Los beneficios deliberadamente locales conservan alcance `LOCAL`. Una futura
+  selección parcial de sedes se representa con una relación de alcance, no con
+  copias del mismo beneficio.
+- La organización continúa siendo la frontera tenant en todos los casos.
+
 ### client_benefit
 - client_id
 - benefit_id
@@ -239,6 +248,33 @@ Regla:
 - verified_at
 - valid_until
 - verified_by
+
+### visit_package_entitlement (objetivo)
+- organization_id
+- client_id
+- sale_id
+- total_visits
+- remaining_visits
+- valid_from
+- valid_until
+- branch_scope (`ALL_BRANCHES` o `SELECTED_BRANCHES`)
+- status
+
+### visit_package_branch (objetivo)
+- entitlement_id
+- branch_id
+
+### visit_package_consumption (objetivo)
+- entitlement_id
+- branch_id
+- access_id
+- consumed_at
+- idempotency_key
+
+Regla:
+- El saldo es único para el socio dentro del tenant. Dos sucursales nunca crean
+  saldos independientes para la misma compra; el consumo atómico registra la
+  sede donde ocurrió.
 
 ### sale
 - client_id
@@ -665,6 +701,9 @@ Migraciones nuevas:
 - `V25__manager_permissions_and_client_branch_visibility.sql`: agrega `client.home_branch_id`, filtra socios por sucursal/plan multi-sucursal y revoca permisos de administracion de datos/sucursales al rol `Gerente`.
 - `V26__branch_branding_and_owner_branch_selection.sql`: historicamente agrego marca opcional por sucursal (`brand_name`, `logo_url`, colores) y soportaba que el dueño entrara sin sucursal operativa por defecto.
 - `V27__reception_booking_scope_and_gym_branding.sql`: elimina marca visual de `branch`, deja logo/colores exclusivamente en `organization` y revoca `resource.manage` a recepcion.
+- La decisión de V27 describe el estado implementado, pero queda superada como
+  objetivo de producto por `CFG-003`: un mismo tenant puede operar marcas
+  distintas por sucursal.
 - `V47__advanced_coach_profiles.sql`: registra `coach.profile.manage` y lo
   asigna a los roles administrativos que pueden editar el perfil y las
   sucursales de un coach.
@@ -731,8 +770,28 @@ Permisos:
 Notas de integridad:
 
 - Los colores deben validarse como `#RRGGBB` desde API/frontend.
-- La marca pertenece a la organizacion, no a la sesion local ni al navegador.
+- La organización conserva una marca corporativa de fallback. El objetivo
+  `CFG-003` agrega una marca operativa por sucursal, resuelta desde el
+  `branch_id` de la sesión u operación, no desde datos locales del navegador.
 - El panel de plataforma no toma la marca del tenant; usa identidad neutral de GymFort para evitar confusion entre administracion SaaS y operacion del gimnasio.
+
+### branch_brand_profile (objetivo CFG-003)
+
+- organization_id
+- branch_id (PK)
+- brand_name
+- logo_object_key
+- primary_color
+- accent_color
+- surface_color
+- reply_to_email
+- updated_at
+- updated_by
+- version
+
+Si un atributo de la sucursal no está configurado se usa el valor de
+`organization`. Consola, kiosco, correo, recibos y PDFs deben recibir el mismo
+perfil efectivo para evitar mezclar marcas del mismo tenant.
 
 ## Hito 7.8 - Separacion de roles plataforma/tenant
 

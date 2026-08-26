@@ -367,22 +367,28 @@ Precondiciones:
 - Cliente activo en la organizacion.
 - Permisos `visit.read`, `visit.create` y/o `visit.consume` segun operacion.
 
-Flujo:
-1. Recepcion busca y selecciona un cliente activo desde control de acceso.
-2. Sistema muestra paquetes de visita recientes del cliente en la sucursal activa.
-3. Recepcion crea un paquete indicando tipo, total de visitas y vigencia.
-4. Sistema registra el paquete como `ACTIVE` con `remainingVisits = totalVisits`.
-5. Cuando el cliente usa una visita, recepcion consume el paquete.
-6. Sistema descuenta una visita en una actualizacion atomica.
+Flujo objetivo:
+1. Recepcion busca y selecciona un cliente activo del tenant.
+2. Sistema muestra los paquetes del socio y su saldo único, sin limitar la
+   consulta a la sucursal donde se vendieron.
+3. Recepcion vende un paquete indicando total de visitas, vigencia y sucursales
+   admitidas (`todas` o una selección).
+4. Sistema registra el paquete como `ACTIVE` con
+   `remainingVisits = totalVisits`.
+5. Cuando el cliente usa una visita en cualquier sucursal admitida, el sistema
+   descuenta del mismo saldo mediante actualización atómica e idempotente.
+6. El consumo registra la sucursal y el acceso que lo originaron.
 7. Si no quedan visitas, el paquete cambia a `CONSUMED`.
-8. La creacion y el consumo quedan auditados.
+8. La venta, creación y consumos quedan auditados.
 
 Criterios:
 - No se crean paquetes para clientes inactivos.
 - No se consume un paquete fuera de vigencia.
 - No se consume un paquete ya agotado.
-- La operacion respeta organizacion y sucursal activa.
-- La integracion automatica con ventas queda preparada por `saleId`, pero la creacion manual ya es usable para piloto.
+- La operación nunca cruza organizaciones; sólo usa las sucursales permitidas
+  dentro del mismo tenant.
+- Dos consumos concurrentes no pueden gastar la misma visita.
+- El paquete nace de una venta y conserva `saleId`.
 
 ## UC-024 Reembolso manual de venta
 
@@ -524,24 +530,27 @@ Resultado esperado:
 - Desde cualquier modulo en soporte, Admin GymOS puede volver a administracion de gimnasios.
 - Las acciones en soporte quedan auditadas con origen `PLATFORM_SUPPORT`.
 
-## UC-029 Configurar marca por gimnasio
+## UC-029 Configurar marca por gimnasio y sucursal
 
 Actor: Admin GymOS en soporte o dueño del gimnasio con permisos de configuracion.
 
 Precondiciones:
 - Organizacion existente.
 
-Flujo:
-1. Usuario abre configuracion del gimnasio.
-2. Captura nombre de marca, logo opcional y colores.
-3. Frontend valida colores `#RRGGBB`.
-4. Backend guarda la marca en `organization`.
-5. Gerencia, recepcion, coaches y kiosco usan la marca del tenant.
-6. El shell mantiene atribución permanente GymFort junto a la marca tenant.
+Flujo objetivo:
+1. Usuario abre configuración del gimnasio y selecciona una sucursal.
+2. Captura nombre de marca, logo opcional, colores y datos de comunicación de
+   esa sucursal; también puede conservar valores heredados de la organización.
+3. Frontend valida colores `#RRGGBB` y previsualiza la marca efectiva.
+4. Backend guarda el perfil con `organizationId` y `branchId`.
+5. Gerencia, recepción, coaches y kiosco usan la marca de la sucursal activa.
+6. Correos, recibos y PDFs usan la sucursal de la operación para resolver marca.
+7. El shell mantiene atribución permanente GymFort junto a la marca operativa.
 
 Resultado esperado:
 - La marca no afecta el panel neutral de Admin GymOS fuera de soporte.
-- Cada gimnasio puede verse distinto cuando lo usan sus usuarios internos.
+- Dos sucursales del mismo tenant pueden verse distintas sin separar sus socios,
+  catálogo, planes o beneficios.
 
 ## UC-030 Crear usuarios internos por rol
 

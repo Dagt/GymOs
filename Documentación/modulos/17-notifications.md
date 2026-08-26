@@ -1,7 +1,7 @@
 # Notificaciones
 
 Estado: `FUNCIONAL / ZEPTOMAIL OPERATIVO`
-Última revisión: 22 de agosto de 2026
+Última revisión: 26 de agosto de 2026
 Rama auditada: `feature/automations-zoho-email`
 
 ## Propósito
@@ -67,6 +67,13 @@ Cuando no se proporciona un HTML específico, el adaptador genera una plantilla 
 El logo almacenado por GymFort puede ser una ruta relativa `/api/tenant-logo/...`; el backend la convierte usando `GYMOS_FRONTEND_BASE_URL`. En producción debe ser una URL pública como `https://gymfort.mx`. En desarrollo, si la base apunta a `localhost`/`127.0.0.1`, el `<img>` se omite para no producir una imagen rota en Gmail/Outlook.
 
 Se mantiene `text/plain` como alternativa del mensaje HTML.
+
+Estado vigente: la plantilla resuelve nombre, logo, colores y `Reply-To` desde
+la organización. El objetivo `CFG-003` es conservar la sucursal de origen en
+cada notificación y resolver desde ella la marca efectiva; cualquier campo no
+configurado hereda el valor corporativo. Así, dos marcas que operan como
+sucursales del mismo tenant no mezclan identidad visual ni dirección de
+respuesta.
 
 ## Resolución de destinatarios
 
@@ -135,6 +142,9 @@ No bloquea el funcionamiento actual:
 - monitorización continua de reputación y entregabilidad en producción;
 - DMARC/política final y runbook de reputación según el dominio productivo;
 - múltiples integraciones/proveedores por tenant si producto lo requiere;
+- branding y configuración de comunicación por sucursal, con fallback de
+  organización, para que correos originados en marcas distintas del mismo
+  tenant usen identidad visual y Reply-To correctos (`CFG-003`);
 - WhatsApp, push y campañas promocionales con consentimiento específico.
 
 Runbooks: `../../docs/operations/email-delivery.md` y `../../docs/operations/zeptomail-email.md`.

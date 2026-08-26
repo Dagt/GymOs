@@ -49,6 +49,12 @@ registro inicial desde el kiosco. El borrado físico se descarta para conservar
 ventas, pagos, membresías y auditoría. El análisis y los lotes restantes están
 en [retroalimentación del primer cliente](32-retroalimentacion-primer-cliente.md).
 
+Topología confirmada para los lotes siguientes: el cliente operará sus dos
+marcas como sucursales de un solo tenant. Compartirán socios, catálogo, planes y
+beneficios; cada sucursal deberá resolver su propia marca visual y de
+comunicación. Paquetes de visitas y beneficios multi-sucursal se mantienen
+dentro de esa organización, no entre tenants.
+
 El corte posterior mantiene los listados compactos con scroll interno oculto y
 controles de página visibles. Detecta backend/frontend incompatibles y separa
 errores de listas vacías. Coaches exige periodos sin solape por socio/sucursal,
@@ -77,23 +83,23 @@ Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún 
 
 | Módulo | Estado | Implementado | Pendiente principal |
 |---|---|---|---|
-| [Organizaciones](modulos/01-organizations.md) | FUNCIONAL | Plataforma, tenants, sucursales, equipo, soporte y marca persistente | Matriz negativa transversal (`ORG-001`) |
+| [Organizaciones](modulos/01-organizations.md) | FUNCIONAL | Plataforma, tenants, sucursales, equipo, soporte y marca organizacional persistente | Marca distinta por sucursal (`CFG-003`) y matriz negativa (`ORG-001`) |
 | [Identidad y seguridad](modulos/02-identity-security.md) | ESTABILIZADO PARA PRODUCCIÓN PILOTO | Ámbitos PLATFORM/TENANT, bootstrap, JWT/refresh v2, soporte temporal, invitación de dueño, recuperación de staff y revocación de sesiones | Endurecer almacenamiento cliente del refresh (`AUTH-001`) |
-| [Configuración](modulos/03-configuration.md) | FUNCIONAL | Marca tenant, cobros, kiosco y correo por permisos; UI unificada | Completar ciclo eliminación/reemplazo de logo (`CFG-001`) |
+| [Configuración](modulos/03-configuration.md) | FUNCIONAL | Marca tenant, cobros, kiosco y correo por permisos; UI unificada | Perfil de marca por sucursal (`CFG-003`) y ciclo de logo (`CFG-001`) |
 | [Onboarding](modulos/04-onboarding.md) | FUNCIONAL | Checklist, setup piloto idempotente e importación inicial | Recuperación probada de altas parciales (`ONB-001`) |
 | [Socios](modulos/05-clients.md) | FUNCIONAL | Alta, búsqueda, detalle, importación, inscripción, baja automática reversible y visibilidad multi-sucursal | PII, duplicados y pruebas CRUD (`CLI-001`) |
 | [Catálogo](modulos/06-catalog.md) | ESTABILIZADO | Productos, planes, categorías, unidades y asociación por sucursal | Volumen, legacy y archivos (`CAT-001`) |
 | [Ventas](modulos/07-sales.md) | FUNCIONAL | POS, ventas contextualizadas, inscripción separada, pagos, reembolsos, recibos e inventario | Concurrencia/conciliación E2E (`SAL-001`) |
 | [Membresías](modulos/08-memberships.md) | ESTABILIZADO | Periodos inclusivos, activa única, alta con inscripción, renovación, cambio y cotización | E2E financiero completo |
-| [Beneficios/elegibilidad](modulos/09-benefits.md) | ESTABILIZADO | Descuentos y acceso heredado; edición de planes vinculados con control de versión | Ampliar matriz negativa transversal |
-| [Acceso](modulos/10-access.md) | ESTABILIZADO PARA INICIAR CONNECTOR | Elegibilidad, provider explícito, puntos, bitácora, permisos físicos, estado deseado, Connector API durable y protegida, salud, eventos/candidatos y consola con diagnóstico legacy | Connector local, adapter HikCentral, aceptación del torniquete y resiliencia en sitio (`ACC-002`) |
+| [Beneficios/elegibilidad](modulos/09-benefits.md) | ESTABILIZADO | Descuentos y acceso heredado; edición de planes vinculados con control de versión | Herencia en todas las sedes del plan multi-sucursal (`BEN-003`) |
+| [Acceso](modulos/10-access.md) | ESTABILIZADO PARA INICIAR CONNECTOR | Elegibilidad, provider explícito, puntos, bitácora, permisos físicos, estado deseado, Connector API durable y protegida, salud, eventos/candidatos y consola con diagnóstico legacy | Paquetes de visitas entre sucursales (`ACC-005`) y Connector/HikCentral (`ACC-002`) |
 | [Kiosco](modulos/11-selfservice.md) | FUNCIONAL / ACEPTACIÓN | Apertura sólo por Recepción, sesión aislada, registro/verificación sin plan, membresías, pagos, domiciliación, reservas, wellness y datos | Publicar ejecución automatizada de Stripe sandbox (`SELF-001`) |
 | [Reservas](modulos/12-bookings.md) | FUNCIONAL | Recursos, disponibilidad, pago y acceso multi-sucursal | Colisiones/cancelación/E2E (`BKG-001`) |
 | [Inventario](modulos/13-inventory.md) | ESTABILIZADO | Existencias, movimientos, alertas, transferencias y conteos paginados; valuación | Feedback por partida (`INV-002`) |
 | [Coaches](modulos/14-coaching.md) | ESTABILIZADO | Perfiles, rutinas versionadas, asignación sin solapes, cierre por vencimiento, métricas temporales, CSV/PDF | Cleanup durable de medios (`COA-018`) |
 | [Wellness](modulos/15-wellness.md) | ESTABILIZADO | Profesionales, servicios, disponibilidad, agenda y citas | E2E y hardening multi-tenant |
 | [Automatizaciones](modulos/16-automations.md) | FUNCIONAL / CERRADO V1 | Reglas, inbox durable, leases, idempotencia, reintentos, actividad/problemas, prueba con socio real y permisos de Gerencia | Mantener CI; trigger de domiciliación activada es mejora futura |
-| [Notificaciones](modulos/17-notifications.md) | FUNCIONAL / ZEPTOMAIL OPERATIVO | Cola durable, ZeptoMail real, remitente central, Reply-To tenant, branding/logo, prueba, preferencias y recuperación | Bounce/complaint webhooks y reputación productiva |
+| [Notificaciones](modulos/17-notifications.md) | FUNCIONAL / ZEPTOMAIL OPERATIVO | Cola durable, ZeptoMail real, remitente central, Reply-To tenant, branding/logo, prueba, preferencias y recuperación | Branding/Reply-To por sucursal (`CFG-003`) y bounce/complaint webhooks |
 | [Reportes](modulos/18-reporting.md) | PARCIAL | Reportes por dominio y métricas coaches/operación | Definiciones KPI y filtros homogéneos (`REP-001`) |
 | [Auditoría](modulos/19-audit.md) | FUNCIONAL | Registro de mutaciones sensibles y motivos operativos | Matriz/retención/inmutabilidad (`AUD-001`) |
 | [Operación común](modulos/20-common-operations.md) | FUNCIONAL PARA LOCAL | Errores correlacionados, Flyway, métricas, Docker, CI y runbooks | Restore, staging y simulacros (`DB-001`, `OPS-001`) |
@@ -115,7 +121,10 @@ Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún 
 - Crear automatización se hace desde cero, sin plantillas recomendadas.
 - `Probar ahora` para EMAIL usa búsqueda dinámica y un socio real con correo.
 - Correo V1 usa preferentemente `Nombre del gimnasio <notificaciones@gymfort.mx>` + `Reply-To` propio del tenant.
-- Branding del correo usa nombre, colores y logo de la organización; logos locales no pueden cargarse desde clientes externos.
+- Branding de correo vigente usa la organización. El objetivo `CFG-003` resuelve
+  nombre, colores, logo y Reply-To desde la sucursal que originó la operación,
+  con fallback organizacional; logos locales no pueden cargarse desde clientes
+  externos.
 - Una conexión física V1 es única por sucursal y conserva su proveedor; un punto
   productivo requiere exactamente un beneficio `ACCESS` y un recurso externo
   explícito.

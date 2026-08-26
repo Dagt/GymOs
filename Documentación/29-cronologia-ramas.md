@@ -71,9 +71,10 @@ de socios sin plan y alta desde kiosco.
 
 ### No incluido
 
-- variantes de catálogo/códigos múltiples, paquetes de visitas entre tenants,
-  alcance multi-sucursal de beneficios ni branding por sucursal; quedan en los
-  lotes 2–5 del análisis del primer cliente;
+- variantes de catálogo/códigos múltiples, paquetes de visitas compartidos
+  entre sucursales del mismo tenant, alcance multi-sucursal de beneficios ni
+  branding por sucursal; quedan en los lotes 2–5 del análisis del primer
+  cliente;
 - borrado de cualquier dato demo ambiguo, modificado o con actividad;
 - fusión automática a `main`;
 - GymFort Local Connector, adapter HikCentral o integración con hardware;

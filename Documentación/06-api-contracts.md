@@ -12,7 +12,7 @@ Base path: `/api/v1`
 - `GET /auth/me`
 - `POST /auth/select-branch`
 
-`CurrentUser` devuelve tambien contexto visual minimo del tenant activo:
+`CurrentUser` debe devolver el contexto visual efectivo de la sucursal activa:
 
 - `organizationName`
 - `brandName`
@@ -21,7 +21,9 @@ Base path: `/api/v1`
 - `accentColor`
 - `surfaceColor`
 
-Estos campos permiten que recepcion, gerencia, dueno y coaches apliquen marca del gimnasio sin necesitar permisos administrativos de `GET /organizations/current`.
+Estos campos permiten que recepción, gerencia, dueño y coaches apliquen la marca
+de la sucursal sin necesitar permisos administrativos. Mientras `CFG-003` no
+esté implementado, el backend devuelve la marca de `organization` como fallback.
 
 ## 6.1.1 Organizaciones y sucursales
 
@@ -44,7 +46,16 @@ Nota implementada Hito 7.6:
 
 `POST /organizations/current/branches` crea una nueva sucursal activa para la organizacion actual y asigna acceso al administrador que la crea. Requiere permiso `branch.create`. Esto habilita gimnasios con multiples sucursales desde la configuracion administrativa.
 
-La marca se configura exclusivamente en la organizacion/gimnasio (`brandName`, `logoUrl`, `primaryColor`, `accentColor`, `surfaceColor`). Las sucursales no aceptan marca propia y heredan siempre el logo y colores del gimnasio.
+Estado vigente: la marca sólo se configura en la organización. Contrato objetivo
+`CFG-003`: cada sucursal puede sobrescribir `brandName`, `logoUrl`,
+`primaryColor`, `accentColor`, `surfaceColor` y datos de comunicación; los campos
+omitidos heredan el valor de la organización.
+
+Rutas objetivo:
+
+- `GET /organizations/current/branches/{branchId}/branding`
+- `PUT /organizations/current/branches/{branchId}/branding`
+- `POST /organizations/current/branches/{branchId}/logo`
 
 Nota implementada Hito 7.9:
 
@@ -222,7 +233,10 @@ domiciliación del socio. Gerencia puede activar o desactivar estas modalidades
 si la cuenta ya está vinculada, pero no puede crear, sustituir ni verificar la
 cuenta Stripe.
 
-La sesion publica de kiosco usa logo, nombre visible y colores del gimnasio al que pertenece el terminal. La sucursal vinculada define el contexto operativo del kiosco, no una marca visual propia.
+La sesión pública de kiosco debe usar nombre, logo y colores efectivos de la
+sucursal vinculada al perfil. Si la sucursal no define algún atributo, hereda el
+de la organización. El estado implementado aún usa exclusivamente la marca del
+tenant y queda pendiente en `CFG-003`.
 
 El frontend abre `/kiosk/launch` desde recepción, solicita la sesión limitada y
 la entrega a una pestaña nueva mediante almacenamiento efímero del navegador.
@@ -371,6 +385,12 @@ El backend rechaza cualquier valor no reconocido con
 
 `multiBranchAccess=true` marca el plan como valido para todas las sucursales activas del gimnasio. La venta y la membresia conservan la sucursal donde se originaron, pero las consultas de socios, acceso, kiosco y detalle de membresias aceptan esa membresia desde cualquier sucursal del mismo tenant.
 
+Los beneficios asociados a un plan multi-sucursal deben declarar alcance. Con
+`scope=PLAN_BRANCHES`, se heredan en todas las sucursales donde el plan es
+válido, aunque la definición se haya creado desde otra sede. `scope=LOCAL`
+mantiene un beneficio restringido deliberadamente a una sucursal. El backend no
+debe duplicar definiciones para materializar este comportamiento (`BEN-003`).
+
 `PATCH /catalog/plans/{planId}` permite gestionar planes ya creados sin cambiar el SKU: nombre, descripcion, precio, moneda, duracion, gracia, beneficios, `multiBranchAccess` y estado.
 
 El SKU es único dentro del gimnasio, no por sucursal. Si `POST /catalog/plans`
@@ -413,6 +433,22 @@ La activación ocurre como consecuencia de pago completado.
 - `POST /clients/{clientId}/benefits`
 - `PATCH /clients/{clientId}/benefits/{id}`
 - `POST /clients/{clientId}/benefits/{id}/verify`
+
+Extensión objetivo de alta/edición:
+
+```json
+{
+  "scope": "PLAN_BRANCHES",
+  "branchIds": [],
+  "membershipPlanIds": ["uuid-plan-multisucursal"]
+}
+```
+
+- `LOCAL` exige una sucursal;
+- `PLAN_BRANCHES` deriva las sedes desde el plan vinculado;
+- `SELECTED_BRANCHES` exige IDs pertenecientes al mismo tenant;
+- la consulta efectiva recibe la sucursal activa, pero no descarta un beneficio
+  `PLAN_BRANCHES` por el `branch_id` de su creación.
 
 ## 6.8 Ventas
 
@@ -883,7 +919,9 @@ Query opcional:
 
 - `clientId`: filtra paquetes de un cliente.
 
-Devuelve hasta 100 paquetes recientes de la sucursal activa.
+Estado vigente: devuelve hasta 100 paquetes recientes de la sucursal activa.
+Contrato objetivo `ACC-005`: devuelve los paquetes del socio válidos para esa
+sucursal y el mismo saldo independientemente de la sede donde se vendieron.
 
 ### `POST /api/v1/access/visit-passes`
 
@@ -898,7 +936,9 @@ Request:
   "passType": "VISIT_PACK",
   "totalVisits": 5,
   "validFrom": "2026-07-16",
-  "validUntil": "2026-08-15"
+  "validUntil": "2026-08-15",
+  "branchScope": "ALL_BRANCHES",
+  "branchIds": []
 }
 ```
 
@@ -928,7 +968,9 @@ Request:
 }
 ```
 
-Descuenta una visita de forma atomica. Si era la ultima, cambia el estado a `CONSUMED`.
+Descuenta una visita de forma atómica sobre el saldo único del tenant, registra
+la sucursal activa y una llave idempotente de consumo. Si era la última, cambia
+el estado a `CONSUMED`. `SELECTED_BRANCHES` rechaza consumos fuera del alcance.
 
 Errores:
 
@@ -1131,7 +1173,9 @@ Endpoints afectados:
 Reglas:
 
 - `primaryColor`, `accentColor` y `surfaceColor` deben usar formato hexadecimal `#RRGGBB`.
-- La marca se guarda por organizacion/gimnasio. Gerencia, recepcion, coaches, kiosco y pantallas internas usan siempre la marca del tenant activo.
+- La organización guarda la marca corporativa de fallback. El objetivo
+  `CFG-003` permite sobrescribirla por sucursal; gerencia, recepción, coaches,
+  kiosco y pantallas internas usan el perfil efectivo de la sucursal activa.
 - La consola de plataforma conserva tema neutral y atribución GymFort; las
   consolas tenant combinan esa atribución con la marca del gimnasio.
 
@@ -1274,8 +1318,9 @@ rechazan.
 `GET /api/v1/organizations/current`
 
 - requiere `organization.read` o `organization.update`;
-- devuelve los datos y la marca de la organización activa;
-- no depende de una sucursal seleccionada.
+- devuelve los datos y la marca corporativa de fallback de la organización;
+- no depende de una sucursal seleccionada. La marca operativa se resuelve en el
+  contrato de branding de sucursal.
 
 `POST /api/v1/organizations/current/logo`
 

@@ -1,7 +1,7 @@
 # Organizaciones y sucursales
 
 Estado: `FUNCIONAL`
-Última revisión: 21 de agosto de 2026
+Última revisión: 26 de agosto de 2026
 Código: `backend/.../organizations`, `/platform/gymnasiums`, `/settings/organization`, `/users`
 
 ## Implementado
@@ -28,6 +28,9 @@ Código: `backend/.../organizations`, `/platform/gymnasiums`, `/settings/organiz
 
 ## Pendiente
 
+- permitir que un solo tenant tenga perfiles de marca distintos por sucursal,
+  con la organización como fallback; las sucursales siguen compartiendo socios,
+  catálogo, planes y beneficios;
 - matriz negativa exhaustiva de aislamiento por UUID y sucursal (`GEN-001`);
 - cobertura CRUD completa de usuarios y sucursales;
 - retirar accesos directos a infraestructura que queden en application (`GEN-002`).

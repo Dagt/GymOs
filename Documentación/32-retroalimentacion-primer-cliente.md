@@ -6,6 +6,13 @@ Corte: 26 de agosto de 2026
 
 Rama: `feature/client-onboarding-lifecycle`, basada en `main` `a5ea75f`
 
+## Topología operativa confirmada
+
+El cliente tendrá **un solo tenant/organización con dos sucursales**. Aunque las
+sucursales operan con nombres, logos y colores de marcas distintas, comparten el
+catálogo, los socios, los planes y los beneficios del tenant. Ninguna de estas
+necesidades requiere compartir datos o derechos entre organizaciones.
+
 ## Agrupación de trabajo
 
 ### Lote 1 — Alta y ciclo de vida del socio
@@ -41,19 +48,18 @@ vida de socios.
 Código afectado: módulo `catalog`, `CatalogProductService`, persistencia de
 `catalog_product`, drawer de catálogo, POS e inventario.
 
-### Lote 3 — Paquetes de visitas entre marcas
+### Lote 3 — Paquetes de visitas entre sucursales del mismo tenant
 
-Existe `visit_pass`, pero es manual, pertenece a una sola organización y una
-sola sucursal, y `AccessService` lo consume con ese mismo alcance. Los planes
-`multiBranchAccess` sólo cruzan sucursales del mismo tenant. Dos marcas
-independientes deben mantenerse como organizaciones distintas para conservar
-branding, configuración y aislamiento.
+Existe `visit_pass`, pero es manual y queda ligado a una sola sucursal;
+`AccessService` lo consume con ese mismo alcance. Esto impide vender un paquete
+de N visitas que el socio pueda consumir indistintamente en cualquiera de las
+dos sucursales de la organización.
 
-La solución requiere un grupo/portafolio propietario y un derecho comercial
-compartido entre organizaciones: paquete de N visitas, ventana de vigencia,
-sedes admitidas, ledger de consumos e idempotencia. También debe integrarse con
-Catálogo, Ventas, Acceso y reportes. Reutilizar el `visit_pass` local sin ese
-modelo rompería el aislamiento multi-tenant.
+La solución deseada permanece dentro del tenant: un producto/plan de visitas
+con cantidad total, ventana de vigencia y alcance de sucursales (`todas` o una
+selección). El socio conserva un solo saldo y cada consumo registra en qué
+sucursal ocurrió, con atomicidad e idempotencia. Debe integrarse con Catálogo,
+Ventas, Acceso y reportes sin duplicar el paquete por sucursal.
 
 ### Lote 4 — Beneficios multi-sucursal
 
@@ -62,26 +68,30 @@ de elegibilidad exige que el beneficio sea global (`branch_id IS NULL`) o que
 coincida con la sucursal activa. Vincularlo a un plan multi-sucursal no cambia
 ese alcance, por eso el socio hereda el beneficio sólo en la sede donde se creó.
 
-La mejora debe hacer explícito el alcance al crear el beneficio: una sucursal,
-todas las sucursales de la organización o una selección de sucursales. Para dos
-marcas/organizaciones distintas debe apoyarse en el modelo de grupo del lote 3,
-no duplicar filas silenciosamente.
+El comportamiento deseado es que un beneficio ligado a un plan
+`multiBranchAccess=true` sea heredable en todas las sucursales donde ese plan es
+válido, aunque el beneficio se haya creado desde una sucursal concreta. No debe
+copiarse una fila por sede. La definición debe distinguir entre un beneficio
+del plan con alcance multi-sucursal y un beneficio deliberadamente local; la UI
+debe mostrar y validar ese alcance de forma explícita.
 
 Código afectado: `BenefitRepository`, `EligibilityRepository`, contratos y UI de
 beneficios, además de las proyecciones de acceso.
 
-### Lote 5 — Multibranding de comunicaciones
+### Lote 5 — Multibranding por sucursal
 
 El branding vigente está en `organization`; las columnas de marca por sucursal
 que aparecieron en V26 fueron retiradas en V27. `NotificationBrandRepository` y
 `notification_channel_configuration` también resuelven una sola identidad y un
 solo remitente por organización.
 
-Para dos marcas independientes, el camino seguro inmediato es una organización
-por marca. El modelo de grupo del lote 3 permitirá que compartan derechos sin
-compartir identidad visual. Si una misma organización debiera operar varias
-marcas, sería necesario agregar perfil de marca por sucursal y resolverlo en
-correo, consola, kiosco, recibos y almacenamiento de logos.
+El comportamiento deseado es mantener una sola organización y agregar un perfil
+de marca por sucursal: nombre visible, logo, color principal, acento, superficie
+y configuración de comunicación aplicable. La marca de la organización funciona
+como fallback corporativo. La resolución debe partir siempre de la sucursal de
+la operación y aplicarse en consola, recepción, kiosco, correos, recibos, PDFs y
+almacenamiento de logos. Un usuario que cambia de sucursal debe ver la marca de
+la sucursal seleccionada sin cambiar de tenant.
 
 ## Decisiones de seguridad y datos
 

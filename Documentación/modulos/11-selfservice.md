@@ -90,6 +90,8 @@ Estado: `FUNCIONAL / LISTO PARA ACEPTACIÓN CONECTADA`
 
 ## Pendiente
 
+- resolver nombre, logo y colores desde la sucursal del kiosco, usando la marca
+  de organización sólo como fallback (`CFG-003`);
 - ejecutar `stripeTest` con credenciales Stripe exclusivamente test y cuenta
   Connect sandbox dentro de CI protegido; el corte actual validó backend,
   frontend, ruteo por consola, Compose y la imagen real Stripe CLI, pero la
