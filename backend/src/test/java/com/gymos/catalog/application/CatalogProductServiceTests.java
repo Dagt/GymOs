@@ -176,32 +176,80 @@ class CatalogProductServiceTests {
 	}
 
 	@Test
-	void batchCreatesIndependentSellableVariantsInsideOneExistingFamily() {
+	void batchAppliesCommonValuesAndKeepsVariantOverridesInsideOneExistingFamily() {
 		UUID familyId = UUID.randomUUID();
 		when(families.find(principal.organizationId(), familyId)).thenReturn(Optional.of(
 				new ProductFamilySummaryView(familyId, "Psychotic", "Insane Labz", null, 0, 0)));
 		when(products.findProduct(eq(principal.organizationId()), eq(principal.branchId()), any()))
 				.thenAnswer(invocation -> Optional.of(createdProduct(invocation.getArgument(2))));
 		CreateProductVariantsCommand request = new CreateProductVariantsCommand(
-				familyId, null, null, null, "MXN", true, "ACTIVE", "PIECE", true, 0,
+				familyId, null, null, null, "Bote de 35 scoops", 65_000, 40_000L,
+				"MXN", true, "ACTIVE", "PIECE", true, 5, 0,
 				null, null, List.of("preentreno"), List.of(
-				new CreateProductVariantsCommand.Variant("Frutos rojos", "PSY-RED", "Bote", 65_000,
-						List.of("750100000001"), 40_000L, null, null, null),
-				new CreateProductVariantsCommand.Variant("Chicle", "PSY-GUM", "Bote", 67_000,
-						List.of("750100000002", "750100000009"), 41_000L, null, null, null)
+				new CreateProductVariantsCommand.Variant("Manzana", "PSY-MAN", "750100000001",
+						List.of(), null, null, null, null, null, null),
+				new CreateProductVariantsCommand.Variant("Frutos rojos", "PSY-FRU", "750100000002",
+						List.of("750100000009"), null, null, null, null, null, null),
+				new CreateProductVariantsCommand.Variant("Chicle", "PSY-CHI", "750100000003",
+						List.of(), "Bote de 40 scoops", 67_000L, 41_000L, null, null, null)
 		));
 
 		var result = service.createVariants(principal, request, "test");
 
 		assertThat(result.id()).isEqualTo(familyId);
-		assertThat(result.variants()).hasSize(2);
+		assertThat(result.variants()).hasSize(3);
 		ArgumentCaptor<ProductMutation> mutations = ArgumentCaptor.forClass(ProductMutation.class);
-		verify(commands, org.mockito.Mockito.times(2)).create(mutations.capture());
+		verify(commands, org.mockito.Mockito.times(3)).create(mutations.capture());
 		assertThat(mutations.getAllValues()).extracting(ProductMutation::familyId).containsOnly(familyId);
 		assertThat(mutations.getAllValues()).extracting(ProductMutation::variantName)
-				.containsExactly("Frutos rojos", "Chicle");
+				.containsExactly("Manzana", "Frutos rojos", "Chicle");
+		assertThat(mutations.getAllValues()).extracting(ProductMutation::presentation)
+				.containsExactly("Bote de 35 scoops", "Bote de 35 scoops", "Bote de 40 scoops");
 		assertThat(mutations.getAllValues()).extracting(ProductMutation::priceCents)
-				.containsExactly(65_000L, 67_000L);
+				.containsExactly(65_000L, 65_000L, 67_000L);
+		assertThat(mutations.getAllValues()).extracting(ProductMutation::referenceCostCents)
+				.containsExactly(40_000L, 40_000L, 41_000L);
+		verify(commands).replaceBarcodes(eq(principal.organizationId()), any(),
+				eq(List.of("750100000002", "750100000009")), eq(true), eq(principal.userId()), any());
+	}
+
+	@Test
+	void duplicatedSkuInsideBatchIsRejectedBeforeAnyWrite() {
+		CreateProductVariantsCommand request = batchWithVariants(List.of(
+				variant("Manzana", "PSY-MAN", "750100000001"),
+				variant("Chicle", "PSY-MAN", "750100000002")
+		));
+
+		assertThatThrownBy(() -> service.createVariants(principal, request, "test"))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.code()).isEqualTo("PRODUCT_VARIANT_SKU_DUPLICATED"));
+		verify(commands, never()).create(any());
+		verify(families, never()).create(any());
+	}
+
+	@Test
+	void duplicatedBarcodeInsideBatchIsRejectedBeforeAnyWrite() {
+		CreateProductVariantsCommand request = batchWithVariants(List.of(
+				variant("Manzana", "PSY-MAN", "750100000001"),
+				variant("Chicle", "PSY-CHI", "750100000001")
+		));
+
+		assertThatThrownBy(() -> service.createVariants(principal, request, "test"))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.code()).isEqualTo("PRODUCT_VARIANT_BARCODE_DUPLICATED"));
+		verify(commands, never()).create(any());
+		verify(families, never()).create(any());
+	}
+
+	private CreateProductVariantsCommand batchWithVariants(List<CreateProductVariantsCommand.Variant> variants) {
+		return new CreateProductVariantsCommand(
+				null, "Psychotic", "Insane Labz", null, "Bote", 55_000, 32_000L,
+				"MXN", true, "ACTIVE", "PIECE", true, null, 0, null, null, List.of(), variants);
+	}
+
+	private CreateProductVariantsCommand.Variant variant(String name, String sku, String barcode) {
+		return new CreateProductVariantsCommand.Variant(
+				name, sku, barcode, List.of(), null, null, null, null, null, null);
 	}
 
 	private ProductCommand command(long version) {

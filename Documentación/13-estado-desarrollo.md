@@ -51,9 +51,14 @@ en [retroalimentación del primer cliente](32-retroalimentacion-primer-cliente.m
 
 El segundo lote resuelve el alta repetitiva de sabores: Catálogo separa familia
 comercial de variante vendible, admite múltiples códigos por variante y ofrece
-alta masiva transaccional. Cada sabor conserva SKU, precio, costo, stock,
-movimientos y ventas propios. V95 mantiene los IDs existentes y POS/inventario
-pueden resolver cualquiera de sus códigos.
+alta masiva transaccional. El refinamiento operativo captura presentación,
+precio, costo, proveedor, categoría, unidad, impuestos, inventario, mínimo y
+etiquetas una sola vez; las filas normales requieren sólo sabor, código y SKU
+sugerido/editable. Los overrides y aliases quedan plegados. Cada sabor conserva
+SKU, precio, costo, stock, movimientos y ventas propios. V95 permanece sin
+cambios, mantiene los IDs existentes y POS/inventario resuelven cualquiera de
+sus códigos. El stock mínimo común se inicializa también dentro de la transacción
+del lote y sólo está disponible con `inventory.manage`.
 
 Topología confirmada para los lotes siguientes: el cliente operará sus dos
 marcas como sucursales de un solo tenant. Compartirán socios, catálogo, planes y

@@ -150,11 +150,15 @@ export type ProductVariantBatchPayload = {
   familyName?: string | null;
   brand?: string | null;
   description?: string | null;
+  commonPresentation?: string | null;
+  commonPriceCents: number;
+  commonReferenceCostCents?: number | null;
   currency: string;
   taxable: boolean;
   status: "ACTIVE" | "INACTIVE";
   unitOfMeasure?: string | null;
   inventoryTracked: boolean;
+  commonReorderPoint?: number | null;
   displayOrder: number;
   supplierName?: string | null;
   categoryId?: string | null;
@@ -162,10 +166,11 @@ export type ProductVariantBatchPayload = {
   variants: Array<{
     variantName: string;
     sku: string;
-    presentation?: string | null;
-    priceCents: number;
-    barcodes: string[];
-    referenceCostCents?: number | null;
+    primaryBarcode?: string | null;
+    additionalBarcodes: string[];
+    presentationOverride?: string | null;
+    priceCentsOverride?: number | null;
+    referenceCostCentsOverride?: number | null;
     promotionalPriceCents?: number | null;
     promotionStartsAt?: string | null;
     promotionEndsAt?: string | null;

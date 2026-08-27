@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.gymos.catalog.application.port.CatalogProductCommandPort.ProductMutation;
+import com.gymos.catalog.application.query.ProductSearchCriteria;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository;
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -74,6 +75,7 @@ class CatalogPersistenceIntegrationTests {
 	@Test
 	void everyBarcodeAliasResolvesTheSameVariantAndRemainsBranchScoped() {
 		UUID productId = UUID.randomUUID();
+		UUID secondProductId = UUID.randomUUID();
 		OffsetDateTime now = OffsetDateTime.now();
 		products.create(new ProductMutation(
 				organizationId, productId, "PSY-RED", "Psychotic · Frutos rojos", null, "PHYSICAL", 65_000,
@@ -82,6 +84,13 @@ class CatalogPersistenceIntegrationTests {
 		products.attachBranch(organizationId, firstBranchId, productId, userId, now);
 		products.replaceBarcodes(organizationId, productId,
 				java.util.List.of("750100000001", "750100000009"), true, userId, now);
+		products.create(new ProductMutation(
+				organizationId, secondProductId, "PSY-CHI", "Psychotic · Chicle", null, "PHYSICAL", 65_000,
+				"MXN", true, "ACTIVE", "750100000002", "Insane Labz", "Bote", "PIECE", true, 1, null, now, userId
+		));
+		products.attachBranch(organizationId, firstBranchId, secondProductId, userId, now);
+		products.replaceBarcodes(organizationId, secondProductId,
+				java.util.List.of("750100000002"), true, userId, now);
 
 		assertThat(productQueries.findActiveByBarcode(organizationId, firstBranchId, "750100000001"))
 				.get().extracting(com.gymos.catalog.application.query.ProductSummaryView::id).isEqualTo(productId);
@@ -91,6 +100,17 @@ class CatalogPersistenceIntegrationTests {
 				.get().extracting(com.gymos.catalog.application.query.ProductSummaryView::barcodes)
 				.isEqualTo(java.util.List.of("750100000001", "750100000009"));
 		assertThat(productQueries.findActiveByBarcode(organizationId, secondBranchId, "750100000009")).isEmpty();
+		assertThat(productQueries.findActiveByBarcode(organizationId, firstBranchId, "750100000002"))
+				.get().extracting(com.gymos.catalog.application.query.ProductSummaryView::id).isEqualTo(secondProductId);
+		assertThat(searchByCode("750100000001")).containsExactly(productId);
+		assertThat(searchByCode("750100000009")).containsExactly(productId);
+		assertThat(searchByCode("750100000002")).containsExactly(secondProductId);
+	}
+
+	private java.util.List<UUID> searchByCode(String code) {
+		return productQueries.search(organizationId, firstBranchId,
+				new ProductSearchCriteria(code, null, null, null, null, false, 0, 25, "name,asc"))
+				.items().stream().map(com.gymos.catalog.application.query.ProductSummaryView::id).toList();
 	}
 
 	@Test

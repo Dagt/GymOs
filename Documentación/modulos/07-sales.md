@@ -47,3 +47,5 @@ V95 no cambia el modelo financiero. Una variante continúa siendo el mismo tipo
 de `catalog_product` que las ventas ya referencian; familia y códigos alias sólo
 mejoran la captura y resolución del artículo. `sale_item` conserva `product_id`
 y snapshot comercial, por lo que sabores, precios y devoluciones no se mezclan.
+Los defaults del alta masiva se copian a cada variante antes de persistirla; las
+ventas nunca resuelven precio o costo desde la familia.

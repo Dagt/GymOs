@@ -183,7 +183,7 @@ export function useCatalogController() {
     }
   }
 
-  async function submitProductVariants(payload: ProductVariantBatchPayload, commonReorderPoint: number) {
+  async function submitProductVariants(payload: ProductVariantBatchPayload) {
     const activeSession = getStoredSession() ?? session;
     if (!activeSession) return;
     setSaving(true);
@@ -191,14 +191,9 @@ export function useCatalogController() {
     setMessage(null);
     try {
       const family = await createProductVariants(activeSession.accessToken, payload);
-      const warnings: string[] = [];
-      if (canManageInventory && payload.inventoryTracked) {
-        const results = await Promise.allSettled(family.variants.map((variant) => updateInventorySettings(activeSession.accessToken, variant.id, { reorderPoint: commonReorderPoint })));
-        if (results.some((result) => result.status === "rejected")) warnings.push("no se guardó el stock mínimo de algunas variantes");
-      }
       await reloadCatalog();
       setShowVariantDrawer(false);
-      setMessage(`${family.variants.length} variantes de ${family.name} creadas.${warnings.length ? ` ${warnings.join(" y ")}.` : ""}`);
+      setMessage(`${family.variants.length} variantes de ${family.name} creadas.`);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible crear las variantes.");
     } finally {

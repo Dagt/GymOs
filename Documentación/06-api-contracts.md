@@ -370,9 +370,20 @@ principal.
 
 `POST /catalog/product-families/variants` crea de una a 50 variantes en una sola
 transacción. Acepta `familyId` para agregar sabores a una familia existente o
-`familyName`/`brand` para crearla. Los datos comunes se envían una vez y cada
-variante define `variantName`, `sku`, `priceCents`, presentación, costo opcional
-y hasta 20 códigos. Una colisión de SKU o código revierte todo el lote.
+`familyName`/`brand` para crearla. El nivel común acepta
+`commonPresentation`, `commonPriceCents`, `commonReferenceCostCents`, proveedor,
+categoría, unidad, impuestos, estado, seguimiento de inventario y etiquetas.
+`commonReorderPoint` es opcional, requiere `inventory.manage` y se inicializa en
+cada variante dentro de la misma transacción.
+Cada elemento de `variants` define normalmente `variantName`, `sku` y
+`primaryBarcode`; puede agregar `additionalBarcodes` y overrides de presentación,
+precio, costo y promoción. El backend calcula los valores efectivos con el dato
+común cuando el override es nulo.
+
+Antes de escribir, el servicio normaliza y valida todos los SKU y códigos del
+request. Un duplicado interno o existente revierte todo el lote. El código
+principal y los adicionales suman como máximo 20; los adicionales son aliases
+de la misma variante, no sabores diferentes.
 
 `unitOfMeasure` ya no es texto libre en el alta web. Para productos físicos usa
 uno de los valores canónicos:

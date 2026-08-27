@@ -740,17 +740,21 @@ Actor: usuario con `catalog.create` y sucursal activa.
 Flujo:
 1. Abre Catálogo y elige `Producto con variantes`.
 2. Selecciona una familia existente o captura una sola vez nombre y marca.
-3. Agrega filas para sabores/presentaciones; cada fila define SKU, precio y uno
-   o más códigos de barras.
-4. Opcionalmente despliega categoría, unidad, seguimiento de inventario, stock
-   mínimo y etiquetas comunes.
-5. Backend crea el lote transaccionalmente y adjunta cada variante a la sucursal
+3. Captura una sola vez presentación, precio, costo y demás datos comunes.
+4. Agrega filas compactas para sabor, código principal y SKU autogenerado pero
+   editable. Enter después del código mueve el foco sin enviar el formulario.
+5. Sólo una variante excepcional despliega `Personalizar` para cambiar
+   presentación, precio, costo o promoción; los aliases quedan bajo
+   `Agregar otro código`.
+6. Backend crea el lote transaccionalmente y adjunta cada variante a la sucursal
    activa.
-6. POS puede identificar la variante correcta con cualquiera de sus códigos;
+7. POS puede identificar la variante correcta con cualquiera de sus códigos;
    ventas e inventario operan sobre su `catalog_product` individual.
 
 Criterios:
 - no se repiten nombre, marca ni configuración común por sabor;
+- los datos comunes sólo son defaults de creación y no acoplan ediciones
+  posteriores entre variantes;
 - cada variante mantiene precio, costo, SKU, stock y movimientos propios;
 - una colisión de SKU o código revierte el lote completo;
 - un código no puede apuntar a dos variantes activas de la misma organización;

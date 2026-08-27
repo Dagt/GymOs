@@ -14,6 +14,8 @@ Estado: `ESTABILIZADO`
 - stock, costos, mínimos y movimientos separados por variante vendible, aunque
   varias variantes pertenezcan a la misma familia comercial;
 - búsqueda por cualquiera de los códigos alias de la variante;
+- el stock mínimo común del alta sólo inicializa el mismo valor en cada variante;
+  después puede editarse por separado sin afectar los demás sabores;
 - frontend separado en existencias, movimientos, transferencias y auditorías.
 - existencias, movimientos, alertas, transferencias y conteos paginados en
   servidor, con totales filtrados y navegación explícita;

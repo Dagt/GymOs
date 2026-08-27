@@ -19,6 +19,7 @@ import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
@@ -131,30 +132,69 @@ class CatalogProductService {
 		}
 		validateCategory(principal.organizationId(), request.categoryId(), null);
 		List<String> tags = normalizeTags(request.tags());
+		List<PreparedVariant> prepared = prepareBatchVariants(principal.organizationId(), request);
 		OffsetDateTime now = OffsetDateTime.now();
 		ProductFamilySummaryView family = resolveBatchFamily(principal, request, now);
 		List<ProductSummaryView> created = new ArrayList<>();
-		for (int index = 0; index < request.variants().size(); index++) {
-			CreateProductVariantsCommand.Variant variant = request.variants().get(index);
-			String variantName = trimToNull(variant.variantName());
-			if (variantName == null) {
-				throw new BusinessException("PRODUCT_VARIANT_NAME_REQUIRED", "Cada variante necesita sabor o presentacion.");
-			}
-			String productName = family.name() + " · " + variantName;
-			List<String> barcodes = normalizeBarcodes(null, variant.barcodes());
+		for (int index = 0; index < prepared.size(); index++) {
+			PreparedVariant variant = prepared.get(index);
+			String productName = family.name() + " · " + variant.variantName();
 			ProductCommand command = new ProductCommand(
 					variant.sku(), productName, request.description(), "PHYSICAL", "GENERAL_PRODUCT",
 					variant.priceCents(), request.currency(), request.taxable(), request.status(),
-					primaryBarcode(barcodes), family.brand(), variant.presentation(), unit,
+					primaryBarcode(variant.barcodes()), family.brand(), variant.presentation(), unit,
 					request.inventoryTracked(), request.displayOrder() + index, request.supplierName(),
 					variant.referenceCostCents(), variant.promotionalPriceCents(), variant.promotionStartsAt(),
-					variant.promotionEndsAt(), request.categoryId(), tags, null, family.id(), variantName, barcodes
+					variant.promotionEndsAt(), request.categoryId(), tags, null, family.id(),
+					variant.variantName(), variant.barcodes()
 			);
 			created.add(createProduct(principal, command, correlationId));
 		}
 		auditService.record(principal, "PRODUCT_VARIANTS_CREATED", "CATALOG_PRODUCT_FAMILY", family.id(),
 				"BACKOFFICE", "{\"variants\":" + created.size() + "}", correlationId);
 		return new ProductFamilyView(family.id(), family.name(), family.brand(), created);
+	}
+
+	private List<PreparedVariant> prepareBatchVariants(UUID organizationId,
+			CreateProductVariantsCommand request) {
+		Set<String> skus = new HashSet<>();
+		Set<String> barcodes = new HashSet<>();
+		List<PreparedVariant> prepared = new ArrayList<>();
+		for (CreateProductVariantsCommand.Variant variant : request.variants()) {
+			String variantName = trimToNull(variant.variantName());
+			if (variantName == null) {
+				throw new BusinessException("PRODUCT_VARIANT_NAME_REQUIRED", "Cada variante necesita sabor o presentacion.");
+			}
+			String sku = normalizeRequired(variant.sku());
+			if (sku.isBlank()) {
+				throw new BusinessException("PRODUCT_SKU_REQUIRED", "Cada variante necesita un SKU.");
+			}
+			if (!skus.add(sku)) {
+				throw new BusinessException("PRODUCT_VARIANT_SKU_DUPLICATED",
+						"El SKU " + sku + " esta repetido dentro del lote.");
+			}
+			if (products.skuExists(organizationId, sku, null)) throw duplicateSku();
+			List<String> variantBarcodes = normalizeBarcodes(
+					variant.primaryBarcode(), variant.additionalBarcodes());
+			for (String barcode : variantBarcodes) {
+				if (!barcodes.add(barcode)) {
+					throw new BusinessException("PRODUCT_VARIANT_BARCODE_DUPLICATED",
+							"El codigo de barras " + barcode + " esta repetido dentro del lote.");
+				}
+			}
+			validateBarcodeAvailability(organizationId, variantBarcodes, null);
+			long priceCents = variant.priceCentsOverride() == null
+					? request.commonPriceCents() : variant.priceCentsOverride();
+			Long referenceCostCents = variant.referenceCostCentsOverride() == null
+					? request.commonReferenceCostCents() : variant.referenceCostCentsOverride();
+			String presentationOverride = trimToNull(variant.presentationOverride());
+			String presentation = presentationOverride == null
+					? request.commonPresentation() : presentationOverride;
+			prepared.add(new PreparedVariant(
+					variantName, sku, presentation, priceCents, variantBarcodes, referenceCostCents,
+					variant.promotionalPriceCents(), variant.promotionStartsAt(), variant.promotionEndsAt()));
+		}
+		return prepared;
 	}
 
 	ProductSummaryView updateProduct(GymOsPrincipal principal, UUID productId, ProductCommand request, String correlationId) {
@@ -503,4 +543,17 @@ class CatalogProductService {
 	private BusinessException duplicateSku() { return new BusinessException("PRODUCT_SKU_ALREADY_EXISTS", "Ya existe otro producto con ese SKU."); }
 	private BusinessException concurrentModification() { return new BusinessException("PRODUCT_CONCURRENT_MODIFICATION", "El producto cambio mientras lo editabas. Recargalo antes de guardar."); }
 	private BusinessException notFound() { return new BusinessException("PRODUCT_NOT_FOUND", "El producto no existe en la sucursal activa o fue archivado."); }
+
+	private record PreparedVariant(
+			String variantName,
+			String sku,
+			String presentation,
+			long priceCents,
+			List<String> barcodes,
+			Long referenceCostCents,
+			Long promotionalPriceCents,
+			OffsetDateTime promotionStartsAt,
+			OffsetDateTime promotionEndsAt
+	) {
+	}
 }

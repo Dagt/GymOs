@@ -120,14 +120,14 @@ test.describe("catalogo e inventario", () => {
     }
   });
 
-  test("alta masiva crea sabores independientes sin repetir los datos del producto", async ({ page }) => {
+  test("alta masiva hereda datos comunes y permite personalizar sólo una variante", async ({ page }) => {
     let batchPayload: Record<string, unknown> | null = null;
-    await bootCatalog(page, owner(), async (route, path) => {
+    await bootCatalog(page, ownerWithInventory(), async (route, path) => {
       if (route.request().method() === "POST" && path === "/catalog/product-families/variants") {
         batchPayload = route.request().postDataJSON() as Record<string, unknown>;
         await route.fulfill({
           contentType: "application/json",
-          body: JSON.stringify({ id: "family-psychotic", name: "Psychotic", brand: "Insane Labz", variants: [{ ...product, id: "variant-red", name: "Psychotic · Frutos rojos", sku: "PSY-RED" }, { ...product, id: "variant-gum", name: "Psychotic · Chicle", sku: "PSY-GUM" }] }),
+          body: JSON.stringify({ id: "family-psychotic", name: "Psychotic", brand: "Insane Labz", variants: [{ ...product, id: "variant-apple", name: "Psychotic · Manzana", sku: "PSY-MAN" }, { ...product, id: "variant-red", name: "Psychotic · Frutos rojos", sku: "PSY-FRU" }, { ...product, id: "variant-gum", name: "Psychotic · Chicle", sku: "PSY-CHI" }] }),
         });
         return true;
       }
@@ -138,24 +138,148 @@ test.describe("catalogo e inventario", () => {
     await page.getByRole("button", { name: "Producto con variantes" }).click();
     await page.getByLabel("Nombre del producto").fill("Psychotic");
     await page.getByLabel("Marca").fill("Insane Labz");
-    await page.getByLabel("Sabor o variante").nth(0).fill("Frutos rojos");
-    await page.getByLabel("SKU").nth(0).fill("PSY-RED");
-    await page.locator('input[name="variantPrice-0"]').fill("650");
-    await page.getByLabel("Códigos de barras").nth(0).fill("750100000001\n750100000009");
-    await page.getByLabel("Sabor o variante").nth(1).fill("Chicle");
-    await page.getByLabel("SKU").nth(1).fill("PSY-GUM");
-    await page.locator('input[name="variantPrice-1"]').fill("670");
-    await page.getByLabel("Códigos de barras").nth(1).fill("750100000002");
-    await page.getByRole("button", { name: "Crear 2 variantes" }).click();
+    await page.getByLabel("Presentación común").fill("Bote de 35 scoops");
+    await page.getByLabel("Precio común").fill("550");
+    await page.getByLabel("Costo común").fill("320");
+    await page.getByLabel("Proveedor").fill("Distribuidora Norte");
+    await page.getByLabel("Stock mínimo común").fill("5");
 
-    await expect.poll(() => (batchPayload?.variants as Array<Record<string, unknown>> | undefined)?.length).toBe(2);
-    expect((batchPayload?.variants as Array<Record<string, unknown>>)[0]).toMatchObject({
-      variantName: "Frutos rojos",
-      sku: "PSY-RED",
-      priceCents: 65000,
-      barcodes: ["750100000001", "750100000009"],
+    await page.getByLabel("Sabor o variante").nth(0).fill("Manzana");
+    await expect(page.locator('input[name="variantSku-0"]')).toHaveValue("PSY-MAN");
+    await page.getByLabel("Código de barras").nth(0).fill("750100000001");
+    await page.getByRole("button", { name: "+ Agregar otro código" }).nth(0).click();
+    await page.locator('input[name="variantAlias-0-0"]').fill("750100000009");
+
+    await page.getByLabel("Sabor o variante").nth(1).fill("Frutos rojos");
+    await expect(page.locator('input[name="variantSku-1"]')).toHaveValue("PSY-FRU");
+    await page.getByLabel("Código de barras").nth(1).fill("750100000002");
+    await page.getByRole("button", { name: "Personalizar" }).nth(1).click();
+    await page.getByLabel("Presentación diferente").fill("Bote de 40 scoops");
+    await page.getByLabel("Precio diferente").fill("580");
+    await page.getByLabel("Costo diferente").fill("335");
+
+    await page.getByRole("button", { name: "+ Agregar variante" }).click();
+    await page.getByLabel("Sabor o variante").nth(2).fill("Chicle");
+    await expect(page.locator('input[name="variantSku-2"]')).toHaveValue("PSY-CHI");
+    await page.getByLabel("Código de barras").nth(2).fill("750100000003");
+    await page.getByRole("button", { name: "Crear 3 variantes" }).click();
+
+    await expect.poll(() => (batchPayload?.variants as Array<Record<string, unknown>> | undefined)?.length).toBe(3);
+    expect(batchPayload).toMatchObject({
+      commonPresentation: "Bote de 35 scoops",
+      commonPriceCents: 55000,
+      commonReferenceCostCents: 32000,
+      commonReorderPoint: 5,
+      supplierName: "Distribuidora Norte",
     });
-    await expect(page.getByText("2 variantes de Psychotic creadas.")).toBeVisible();
+    expect((batchPayload?.variants as Array<Record<string, unknown>>)[0]).toMatchObject({
+      variantName: "Manzana",
+      sku: "PSY-MAN",
+      primaryBarcode: "750100000001",
+      additionalBarcodes: ["750100000009"],
+      priceCentsOverride: null,
+    });
+    expect((batchPayload?.variants as Array<Record<string, unknown>>)[1]).toMatchObject({
+      variantName: "Frutos rojos",
+      presentationOverride: "Bote de 40 scoops",
+      priceCentsOverride: 58000,
+      referenceCostCentsOverride: 33500,
+    });
+    await expect(page.getByText("3 variantes de Psychotic creadas.")).toBeVisible();
+  });
+
+  test("Enter del escáner mueve el foco sin enviar accidentalmente el formulario", async ({ page }) => {
+    let submissions = 0;
+    await bootCatalog(page, owner(), async (route, path) => {
+      if (route.request().method() === "POST" && path === "/catalog/product-families/variants") {
+        submissions += 1;
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify({ id: "family", name: "Psychotic", brand: null, variants: [] }) });
+        return true;
+      }
+      return false;
+    });
+    await page.goto("/catalog");
+    await page.getByRole("button", { name: "Producto con variantes" }).click();
+    await page.getByLabel("Nombre del producto").fill("Psychotic");
+    await page.getByLabel("Precio común").fill("550");
+    await page.getByLabel("Sabor o variante").nth(0).fill("Manzana");
+    await page.locator('input[name="variantSku-0"]').fill("SKU-MANUAL");
+    await page.getByLabel("Sabor o variante").nth(0).fill("Manzana verde");
+    await expect(page.locator('input[name="variantSku-0"]')).toHaveValue("SKU-MANUAL");
+    await page.getByLabel("Código de barras").nth(0).fill("750100000001");
+    await page.getByLabel("Código de barras").nth(0).press("Enter");
+
+    await expect(page.getByLabel("Sabor o variante").nth(1)).toBeFocused();
+    expect(submissions).toBe(0);
+
+    await page.getByLabel("Sabor o variante").nth(1).fill("Chicle");
+    await page.getByLabel("Código de barras").nth(1).fill("750100000002");
+    await page.getByLabel("Código de barras").nth(1).press("Enter");
+    await expect(page.getByRole("button", { name: "+ Agregar variante" })).toBeFocused();
+    expect(submissions).toBe(0);
+  });
+
+  test("alta de diez variantes conserva un único bloque de datos comunes", async ({ page }) => {
+    let batchSize = 0;
+    await bootCatalog(page, owner(), async (route, path) => {
+      if (route.request().method() === "POST" && path === "/catalog/product-families/variants") {
+        const payload = route.request().postDataJSON() as { variants: unknown[] };
+        batchSize = payload.variants.length;
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify({ id: "family", name: "Psychotic", brand: null, variants: payload.variants.map((_, index) => ({ ...product, id: `variant-${index}` })) }) });
+        return true;
+      }
+      return false;
+    });
+    await page.goto("/catalog");
+    await page.getByRole("button", { name: "Producto con variantes" }).click();
+    await page.getByLabel("Nombre del producto").fill("Psychotic");
+    await page.getByLabel("Presentación común").fill("Bote");
+    await page.getByLabel("Precio común").fill("550");
+    for (let index = 2; index < 10; index += 1) await page.getByRole("button", { name: "+ Agregar variante" }).click();
+    for (let index = 0; index < 10; index += 1) {
+      await page.getByLabel("Sabor o variante").nth(index).fill(`Sabor ${index + 1}`);
+      await page.getByLabel("Código de barras").nth(index).fill(`7501000000${String(index).padStart(2, "0")}`);
+    }
+    await page.getByRole("button", { name: "Crear 10 variantes" }).click();
+    await expect.poll(() => batchSize).toBe(10);
+  });
+
+  test("una familia existente recibe nuevas variantes sin duplicar nombre y marca", async ({ page }) => {
+    let batchPayload: Record<string, unknown> | null = null;
+    await bootCatalog(page, owner(), async (route, path) => {
+      if (route.request().method() === "GET" && path === "/catalog/product-families") {
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify([{ id: "family-psychotic", name: "Psychotic", brand: "Insane Labz", description: null, activeVariants: 3, totalVariants: 3 }]) });
+        return true;
+      }
+      if (route.request().method() === "POST" && path === "/catalog/product-families/variants") {
+        batchPayload = route.request().postDataJSON() as Record<string, unknown>;
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify({ id: "family-psychotic", name: "Psychotic", brand: "Insane Labz", variants: [{ ...product, id: "variant-grape" }, { ...product, id: "variant-watermelon" }] }) });
+        return true;
+      }
+      return false;
+    });
+    await page.goto("/catalog");
+    await page.getByRole("button", { name: "Producto con variantes" }).click();
+    await page.getByLabel("Familia comercial").selectOption("family-psychotic");
+    await expect(page.getByText("Agregarás nuevas variantes a esta familia.")).toBeVisible();
+    await page.getByLabel("Precio común").fill("550");
+    await page.getByLabel("Sabor o variante").nth(0).fill("Uva");
+    await page.getByLabel("Código de barras").nth(0).fill("750100000011");
+    await page.getByLabel("Sabor o variante").nth(1).fill("Sandía");
+    await page.getByLabel("Código de barras").nth(1).fill("750100000012");
+    await page.getByRole("button", { name: "Crear 2 variantes" }).click();
+    await expect.poll(() => batchPayload?.familyId).toBe("family-psychotic");
+    expect(batchPayload).toMatchObject({ familyId: "family-psychotic", familyName: null, brand: null });
+  });
+
+  test("un creador sin permiso de costos no ve campos comunes ni overrides protegidos", async ({ page }) => {
+    await bootCatalog(page, creatorWithoutCosts());
+    await page.goto("/catalog");
+    await page.getByRole("button", { name: "Producto con variantes" }).click();
+    await expect(page.getByLabel("Costo común")).toHaveCount(0);
+    await expect(page.getByLabel("Proveedor")).toHaveCount(0);
+    await page.getByRole("button", { name: "Personalizar" }).first().click();
+    await expect(page.getByLabel("Costo diferente")).toHaveCount(0);
   });
 
   test("POS consulta el catalogo paginado y no descarga el endpoint completo", async ({ page }) => {
@@ -284,6 +408,18 @@ function owner(): TestUser {
 
 function editorWithoutCosts(): TestUser {
   return user(["catalog.read", "catalog.update"]);
+}
+
+function creatorWithoutCosts(): TestUser {
+  return user(["catalog.read", "catalog.create"]);
+}
+
+function ownerWithInventory(): TestUser {
+  return user([
+    "catalog.read", "catalog.create", "catalog.update", "catalog.status.manage", "catalog.archive",
+    "catalog.category.manage", "catalog.image.manage", "catalog.cost.read", "inventory.manage",
+    "sale.create", "sale.read",
+  ]);
 }
 
 function user(permissions: string[]): TestUser {

@@ -158,8 +158,12 @@ prorrateo y los accesos heredados se recalculan después del pago.
 Regla de catalogo:
 - Productos y servicios de mostrador se capturan en el formulario de producto.
 - `Producto con variantes` ofrece un alta masiva sencilla: familia nueva o
-  existente y filas repetibles para sabor, SKU, precio y códigos. Categoría,
-  unidad, inventario mínimo y etiquetas permanecen plegados como opcionales.
+  existente, un bloque único de datos comunes y filas repetibles que muestran
+  sólo sabor, código principal y SKU editable/autogenerado. `Personalizar`
+  despliega presentación, precio, costo y promoción únicamente para la fila
+  excepcional. `Agregar otro código` revela aliases avanzados con su explicación.
+- Enter en el código principal nunca envía el formulario: mueve el foco a la
+  siguiente variante o al botón para agregarla. El flujo admite hasta 50 filas.
 - El formulario individual permite varios códigos, uno por línea; el primero es
   principal y todos identifican la misma variante en POS.
 - Listados y detalle muestran familia, variante y cantidad/lista de códigos sin

@@ -15,7 +15,8 @@ Estado: `ESTABILIZADO`
 - activación, archivado, imágenes y múltiples códigos de barras por variante;
 - familias comerciales de organización y variantes vendibles independientes;
 - alta masiva de hasta 50 sabores/presentaciones, con configuración común
-  capturada una sola vez y transacción completa ante colisiones;
+  capturada una sola vez, filas normales de sabor/código/SKU, overrides y
+  aliases bajo demanda, y transacción completa ante colisiones;
 - unidad de producto físico guiada por un selector cerrado de valores comunes,
   normalización de etiquetas heredadas y validación canónica en backend;
 - disponibilidad y configuración por sucursal;
@@ -29,6 +30,8 @@ Estado: `ESTABILIZADO`
   el SKU vendible para conservar ventas, existencias y auditoría;
 - cada código activo es único por organización y cualquiera de sus alias puede
   resolver la variante exacta;
+- los defaults comunes se materializan al crear; no existe herencia posterior
+  y cada variante continúa editable, vendible e inventariable por separado;
 - los registros históricos conservan snapshots;
 - los listados operativos deben ser paginados.
 

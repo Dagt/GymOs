@@ -16,11 +16,15 @@ record CreateProductVariantsRequest(
 		@Size(max = 160) String familyName,
 		@Size(max = 160) String brand,
 		@Size(max = 2000) String description,
+		@Size(max = 160) String commonPresentation,
+		@Min(0) long commonPriceCents,
+		@Min(0) Long commonReferenceCostCents,
 		@NotBlank @Pattern(regexp = "[A-Za-z]{3}") String currency,
 		boolean taxable,
 		@NotBlank @Pattern(regexp = "ACTIVE|INACTIVE") String status,
 		@Size(max = 40) String unitOfMeasure,
 		boolean inventoryTracked,
+		@Min(0) Integer commonReorderPoint,
 		@Min(0) int displayOrder,
 		@Size(max = 160) String supplierName,
 		UUID categoryId,
@@ -29,8 +33,10 @@ record CreateProductVariantsRequest(
 ) {
 	CreateProductVariantsCommand toCommand() {
 		return new CreateProductVariantsCommand(
-				familyId, familyName, brand, description, currency, taxable, status, unitOfMeasure,
-				inventoryTracked, displayOrder, supplierName, categoryId, tags == null ? List.of() : tags,
+				familyId, familyName, brand, description, commonPresentation, commonPriceCents,
+				commonReferenceCostCents, currency, taxable, status, unitOfMeasure,
+				inventoryTracked, commonReorderPoint, displayOrder, supplierName, categoryId,
+				tags == null ? List.of() : tags,
 				variants.stream().map(VariantRequest::toCommand).toList()
 		);
 	}
@@ -38,18 +44,21 @@ record CreateProductVariantsRequest(
 	record VariantRequest(
 			@NotBlank @Size(max = 160) String variantName,
 			@NotBlank @Size(max = 64) String sku,
-			@Size(max = 160) String presentation,
-			@Min(0) long priceCents,
-			@Size(max = 20) List<@Size(max = 128) String> barcodes,
-			@Min(0) Long referenceCostCents,
+			@Size(max = 128) String primaryBarcode,
+			@Size(max = 20) List<@Size(max = 128) String> additionalBarcodes,
+			@Size(max = 160) String presentationOverride,
+			@Min(0) Long priceCentsOverride,
+			@Min(0) Long referenceCostCentsOverride,
 			@Min(0) Long promotionalPriceCents,
 			OffsetDateTime promotionStartsAt,
 			OffsetDateTime promotionEndsAt
 	) {
 		CreateProductVariantsCommand.Variant toCommand() {
 			return new CreateProductVariantsCommand.Variant(
-					variantName, sku, presentation, priceCents, barcodes == null ? List.of() : barcodes,
-					referenceCostCents, promotionalPriceCents, promotionStartsAt, promotionEndsAt
+					variantName, sku, primaryBarcode,
+					additionalBarcodes == null ? List.of() : additionalBarcodes,
+					presentationOverride, priceCentsOverride, referenceCostCentsOverride,
+					promotionalPriceCents, promotionStartsAt, promotionEndsAt
 			);
 		}
 	}

@@ -195,6 +195,11 @@ precio, SKU ni existencias. Cada sabor/presentación permanece como
 familia es de la organización y las variantes conservan disponibilidad por
 sucursal mediante `catalog_product_branch`.
 
+Los datos comunes del alta masiva son valores por defecto del lote; una vez
+creada, cada variante sigue siendo un producto vendible independiente. No hay
+herencia dinámica persistida: presentación, precio y costo efectivos se copian
+al `catalog_product` de cada variante durante la creación.
+
 ### catalog_product_barcode
 - organization_id
 - product_id
@@ -206,6 +211,8 @@ Reglas:
 - una variante acepta hasta 20 códigos;
 - un código activo identifica una sola variante dentro de la organización;
 - todos los alias resuelven el mismo `catalog_product` en POS e inventario;
+- los códigos adicionales son aliases de la misma variante, no sabores
+  diferentes;
 - archivar desactiva sus alias y restaurar vuelve a validar su unicidad.
 
 ### plan

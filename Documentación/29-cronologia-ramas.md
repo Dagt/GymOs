@@ -47,6 +47,7 @@ y alta masiva simple, preservando los IDs usados por ventas e inventario.
 | 26 ago 2026 | La pestaña pasa a `Inscripciones`, todos sus valores adoptan autosave sin botón y el selector público se compacta y separa del formulario |
 | 26 ago 2026 | PR #19 integra el lote; el cierre centra el selector del kiosco y presenta fallos de identidad breves sin exponer diagnóstico HTTP |
 | 27 ago 2026 | Se crea `feature/catalog-product-variants-barcodes`; V95 conserva productos históricos, agrega familias/códigos alias y alta masiva de variantes |
+| 27 ago 2026 | El alta masiva se refina sin migración: datos comunes una vez, filas sabor/código/SKU, SKU sugerido editable, overrides y aliases bajo demanda |
 
 ## 3. Alcance material de la rama activa
 
@@ -55,8 +56,8 @@ y alta masiva simple, preservando los IDs usados por ventas e inventario.
 - familia comercial por organización y variante vendible con ID estable;
 - hasta 20 códigos por variante, código principal compatible y alias exactos en
   catálogo, POS e inventario;
-- alta masiva transaccional de sabores/presentaciones, con configuración común
-  plegable y reutilización de familias existentes;
+- alta masiva transaccional con datos comunes capturados una vez, filas compactas
+  sabor/código/SKU, overrides por excepción y reutilización de familias existentes;
 - V95 validada desde una base vacía y sobre V94 con conservación de IDs;
 - cargo de inscripción configurable, cotizado y persistido como partida
   financiera independiente;
@@ -106,8 +107,9 @@ y alta masiva simple, preservando los IDs usados por ventas e inventario.
 - `DatabaseMigrationTests` valida instalación limpia y upgrade V94 → V95 sin
   cambiar IDs de producto;
 - suite frontend, typecheck y lint exitosos; `pos-model.test.ts` cubre alias;
-- `e2e/catalog-inventory.spec.ts` valida alta simple de dos sabores y lectura
-  HID con código secundario;
+- `e2e/catalog-inventory.spec.ts` valida herencia, override aislado, captura HID
+  sin submit accidental, diez sabores, familia existente, permisos y lectura
+  POS con código secundario;
 - `git diff --check` y revisión de que no se versionen secretos.
 
 ## 5. Regla de integración
