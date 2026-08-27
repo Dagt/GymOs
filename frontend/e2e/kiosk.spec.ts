@@ -84,6 +84,57 @@ test("una apertura directa explica que no existe un ID de computadora que captur
   await expect(page.getByRole("button", { name: "Continuar de forma segura" })).toHaveCount(0);
 });
 
+test("un fallo de verificación mantiene el formulario centrado y oculta el detalle técnico", async ({ page }) => {
+  const verificationSession = {
+    ...sessionResponse(),
+    capabilities: { ...capabilities(), clientRegistrationAllowed: true },
+  };
+  await page.addInitScript((storedSession) => {
+    window.sessionStorage.setItem("gymos.kioskBrowserSession", JSON.stringify(storedSession));
+  }, verificationSession);
+  await mockKiosk(page, async (route, path) => {
+    const method = route.request().method();
+    if (method === "POST" && path === `/self-service/sessions/${sessionId}/reset`) {
+      return fulfill(route, verificationSession);
+    }
+    if (method === "POST" && path === `/self-service/sessions/${sessionId}/verify`) {
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({
+          code: "SELF_SERVICE_VERIFICATION_FAILED",
+          message: "No fue posible verificar la sesión con los datos proporcionados.",
+          correlationId: "513486c1-9ea8-4d9c-bf0b-dcb8acc53c40",
+        }),
+      });
+      return true;
+    }
+    return false;
+  });
+
+  await page.goto("/kiosk/reception");
+  const card = page.locator(".kiosk-verify");
+  const selector = page.locator(".kiosk-entry-selector");
+  const cardBefore = await card.boundingBox();
+  const selectorBox = await selector.boundingBox();
+  expect(cardBefore).not.toBeNull();
+  expect(selectorBox).not.toBeNull();
+  if (!cardBefore || !selectorBox) throw new Error("No fue posible medir el formulario del kiosco.");
+  expect(Math.abs(selectorBox.x + selectorBox.width / 2 - (cardBefore.x + cardBefore.width / 2))).toBeLessThan(1);
+
+  await page.getByPlaceholder("Correo o teléfono").fill("nadie@example.com");
+  await page.getByLabel("Fecha de nacimiento en formato día mes año").fill("21/07/2015");
+  await page.getByRole("button", { name: "Continuar de forma segura" }).click();
+
+  await expect(card.getByRole("alert")).toContainText("No pudimos verificar tus datos.");
+  await expect(card.getByRole("alert")).toContainText("Quiero registrarme");
+  await expect(page.getByText(/SELF_SERVICE_VERIFICATION_FAILED|CorrelationId|HTTP en/)).toHaveCount(0);
+  const cardAfter = await card.boundingBox();
+  expect(cardAfter).not.toBeNull();
+  if (!cardAfter) throw new Error("No fue posible medir el formulario después del error.");
+  expect(Math.abs(cardAfter.x - cardBefore.x)).toBeLessThan(1);
+});
+
 test("un socio nuevo se registra en el kiosco y continúa a su primer plan", async ({ page }) => {
   let registrationPayload: Record<string, unknown> | null = null;
   const registrationSession = {

@@ -37,6 +37,8 @@ Estado: `FUNCIONAL / LISTO PARA ACEPTACIÓN CONECTADA`
 - marca tenant, atribución GymFort y superficie sin navegación administrativa;
 - feedback de sesión compacto, descartable y temporal para que un mensaje de
   éxito no permanezca visible para el siguiente socio;
+- fallo de identificación con mensaje público breve dentro de la tarjeta, sin
+  desplazar el formulario ni exponer detalles técnicos de la API;
 - lanzamiento desde recepción con permiso dedicado, sin registrar una
   computadora o navegador;
 - apertura en una pestaña aislada sin colocar la credencial de kiosco en la URL;

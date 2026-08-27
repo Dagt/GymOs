@@ -60,6 +60,9 @@ Refinamiento de aceptación del kiosco:
   opciones compactas y separadas del encabezado del formulario. El registro
   comienza en el paso `1`; el feedback exitoso puede cerrarse y desaparece
   automáticamente para no contaminar la siguiente atención.
+- El selector queda centrado. Si la identidad no puede verificarse, el error se
+  muestra dentro de la tarjeta con instrucciones breves, conserva la alineación
+  y oculta status HTTP, rutas, códigos internos y correlation IDs.
 
 ### Lote 2 — Variantes comerciales y códigos de barras
 

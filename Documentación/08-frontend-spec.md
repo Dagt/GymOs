@@ -426,6 +426,10 @@ Formularios:
   apagada, la interfaz indica `Función deshabilitada` y no promete una
   habilitación automática. Readiness no apaga ni sobrescribe la preferencia
   guardada.
+- En la identificación pública, el selector `Ya soy socio` / `Quiero
+  registrarme` permanece centrado dentro de la tarjeta. Un fallo de verificación
+  se presenta dentro de esa misma tarjeta, no altera su eje horizontal y nunca
+  expone status HTTP, rutas, códigos internos ni correlation IDs al socio.
 - `/reception` no debe depender de permisos administrativos como lectura completa de organizacion. Si el usuario tiene `branchId`, debe mostrar dashboard operativo aunque no pueda consultar `/organizations/current`.
 - El estado sin sucursal para recepcion no debe mostrar onboarding, alta de gimnasio ni configuracion de tenant; solo selector de sucursal permitida o instruccion de pedir acceso al dueño/gerente.
 - Si un usuario de recepcion tiene exactamente una sucursal permitida pero la sesion guardada no trae `branchId`, el frontend debe seleccionarla automaticamente antes de pintar la consola.

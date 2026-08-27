@@ -196,7 +196,7 @@ export default function KioskPage() {
       );
       await openMemberDashboard(nextSummary);
     } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible verificar.");
+      setError(friendlyVerificationError(exception));
     }
   }
 
@@ -702,7 +702,7 @@ export default function KioskPage() {
           </aside>
         </header>
 
-        {error && session ? (
+        {error && session && summary ? (
           <div className="kiosk-feedback error" role="alert">
             <CircleAlert aria-hidden="true" size={18} />
             <p>{error}</p>
@@ -738,6 +738,13 @@ export default function KioskPage() {
                     <span><strong>Quiero registrarme</strong><small>Crear un expediente nuevo</small></span>
                   </button>
                 </div>
+              </div>
+            ) : null}
+            {error ? (
+              <div className="kiosk-feedback kiosk-inline-feedback error" role="alert">
+                <CircleAlert aria-hidden="true" size={18} />
+                <p>{error}</p>
+                <button aria-label="Cerrar mensaje" onClick={() => setError(null)} type="button"><X aria-hidden="true" size={17} /></button>
               </div>
             ) : null}
             {entryMode === "verify" ? (
@@ -1235,6 +1242,18 @@ function supportReference(exception: unknown) {
   const rawMessage = exception instanceof Error ? exception.message : "";
   const correlationId = rawMessage.match(/CorrelationId:\s*([a-zA-Z0-9-]+)/)?.[1];
   return correlationId ? ` Referencia para soporte: ${correlationId}.` : "";
+}
+
+function friendlyVerificationError(exception: unknown) {
+  const rawMessage = exception instanceof Error ? exception.message : "";
+  if (rawMessage.includes("SELF_SERVICE_SESSION_BLOCKED")) {
+    return "Se alcanzó el límite de intentos. Espera un momento o solicita apoyo en recepción.";
+  }
+  if (["SELF_SERVICE_SESSION_EXPIRED", "SELF_SERVICE_SESSION_INVALID", "SELF_SERVICE_SESSION_ENDED"]
+    .some((code) => rawMessage.includes(code))) {
+    return "La sesión segura terminó. Solicita en recepción que vuelvan a abrir el kiosco.";
+  }
+  return "No pudimos verificar tus datos. Revísalos o elige “Quiero registrarme” si aún no tienes expediente.";
 }
 
 

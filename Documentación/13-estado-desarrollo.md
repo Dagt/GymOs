@@ -68,6 +68,10 @@ dependencia de Stripe sólo en capacidades encendidas y mejora la elección entr
 identificación y registro en el kiosco. Los mensajes de éxito del kiosco son
 temporales y descartables.
 
+La aceptación final centra el selector de entrada y mantiene los errores de
+identificación dentro de la tarjeta con copy público, sin desplazar el
+formulario ni exponer diagnóstico HTTP.
+
 El corte posterior mantiene los listados compactos con scroll interno oculto y
 controles de página visibles. Detecta backend/frontend incompatibles y separa
 errores de listas vacías. Coaches exige periodos sin solape por socio/sucursal,

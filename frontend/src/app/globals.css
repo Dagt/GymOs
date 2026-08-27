@@ -5264,8 +5264,10 @@ button.admin-secondary-link:disabled {
 .kiosk-entry-selector {
   display: grid;
   gap: .45rem;
+  justify-self: center;
   margin-bottom: 1.6rem;
   max-width: 31rem;
+  width: 100%;
 }
 
 .kiosk-entry-selector > p {
@@ -5900,7 +5902,7 @@ button.admin-secondary-link:disabled {
   justify-self: center;
   max-width: min(34rem, 100%);
   padding: .7rem .8rem;
-  width: max-content;
+  width: min(34rem, 100%);
 }
 
 .kiosk-feedback p {
@@ -5933,6 +5935,13 @@ button.admin-secondary-link:disabled {
   background: rgba(20, 83, 45, .3);
   border: 1px solid rgba(134, 239, 172, .26);
   color: #dcfce7;
+}
+
+.kiosk-inline-feedback {
+  justify-self: stretch;
+  margin-bottom: 1rem;
+  max-width: none;
+  width: 100%;
 }
 
 .kiosk-feature-note {
