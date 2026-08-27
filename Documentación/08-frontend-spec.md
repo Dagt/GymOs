@@ -157,11 +157,18 @@ prorrateo y los accesos heredados se recalculan después del pago.
 
 Regla de catalogo:
 - Productos y servicios de mostrador se capturan en el formulario de producto.
-- `Producto con variantes` ofrece un alta masiva sencilla: familia nueva o
+- `Producto con variantes` ofrece un alta masiva sencilla: producto base nuevo o
   existente, un bloque único de datos comunes y filas repetibles que muestran
   sólo sabor, código principal y SKU editable/autogenerado. `Personalizar`
   despliega presentación, precio, costo y promoción únicamente para la fila
   excepcional. `Agregar otro código` revela aliases avanzados con su explicación.
+- La UI no expone `familia comercial` como entidad administrable: inicia con
+  `Producto base nuevo` y ofrece `Agregar variantes a producto existente` como
+  acción secundaria. El catálogo permite abrir ese flujo con el producto base
+  ya seleccionado.
+- `Nuevo artículo o cargo` no solicita sabor al crear un producto individual.
+  Muestra un único código principal y deja los códigos alternativos bajo una
+  acción avanzada; al editar una variante real sí conserva su nombre de sabor.
 - Enter en el código principal nunca envía el formulario: mueve el foco a la
   siguiente variante o al botón para agregarla. El flujo admite hasta 50 filas.
 - El formulario individual permite varios códigos, uno por línea; el primero es

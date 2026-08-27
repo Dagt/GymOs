@@ -55,6 +55,8 @@ export function useCatalogController() {
   const [showProductDrawer, setShowProductDrawer] = useState(false);
   const [showVariantDrawer, setShowVariantDrawer] = useState(false);
   const [variantDrawerKey, setVariantDrawerKey] = useState(0);
+  const [variantInitialFamilyId, setVariantInitialFamilyId] = useState<string | null>(null);
+  const [editingProductIsVariant, setEditingProductIsVariant] = useState(false);
   const catalogFilters = useCatalogFilters();
   const filtersKey = JSON.stringify(catalogFilters.filters);
   const planEditor = useCatalogPlanEditor(session, reloadCatalog);
@@ -223,6 +225,7 @@ export function useCatalogController() {
 
   function openProductCreation() {
     setEditingProductId(null);
+    setEditingProductIsVariant(false);
     setExistingImageObjectKey(null);
     setForm(emptyProduct);
     setPrice("");
@@ -232,9 +235,10 @@ export function useCatalogController() {
     setShowProductDrawer(true);
   }
 
-  function openVariantCreation() {
+  function openVariantCreation(familyId: string | null = null) {
     setError(null);
     setMessage(null);
+    setVariantInitialFamilyId(familyId);
     setVariantDrawerKey((current) => current + 1);
     setShowVariantDrawer(true);
   }
@@ -242,6 +246,7 @@ export function useCatalogController() {
   async function openProductEdition(product: ProductSummary) {
     if (product.archived) return;
     setEditingProductId(product.id);
+    setEditingProductIsVariant(isVisibleVariant(product, families));
     setExistingImageObjectKey(product.imageObjectKey);
     setForm(productToDraft(product));
     setPrice(String(product.priceCents / 100));
@@ -262,6 +267,7 @@ export function useCatalogController() {
 
   function resetProductDrawer() {
     setEditingProductId(null);
+    setEditingProductIsVariant(false);
     setExistingImageObjectKey(null);
     setForm(emptyProduct);
     setPrice("");
@@ -323,6 +329,7 @@ export function useCatalogController() {
     categories,
     families,
     editingProductId,
+    editingProductIsVariant,
     editingPlanId: planEditor.editingId,
     error: error ?? planEditor.error,
     existingImageObjectKey,
@@ -354,12 +361,16 @@ export function useCatalogController() {
     showProductDrawer,
     showVariantDrawer,
     variantDrawerKey,
+    variantInitialFamilyId,
     submitPlan: planEditor.submit,
     submitProduct,
     submitProductVariants,
     resetPlanDrawer: planEditor.close,
     resetProductDrawer,
-    resetVariantDrawer: () => setShowVariantDrawer(false),
+    resetVariantDrawer: () => {
+      setShowVariantDrawer(false);
+      setVariantInitialFamilyId(null);
+    },
     reloadCatalog,
     tagsText,
     toggleProductStatus,
@@ -374,6 +385,12 @@ export function useCatalogController() {
     canUpdate: hasPermission(session, "catalog.update"),
     canReadCosts: hasPermission(session, "catalog.cost.read"),
   };
+}
+
+function isVisibleVariant(product: ProductSummary, families: ProductFamilySummary[]) {
+  if (!product.familyId || !product.familyName || !product.variantName) return false;
+  const family = families.find((candidate) => candidate.id === product.familyId);
+  return (family?.totalVariants ?? 0) > 1 || product.name.startsWith(`${product.familyName} ·`);
 }
 
 function loadCatalog(accessToken: string, filters: import("@/lib/api").ProductSearchParams) {

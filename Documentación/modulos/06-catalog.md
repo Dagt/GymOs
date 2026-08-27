@@ -32,6 +32,9 @@ Estado: `ESTABILIZADO`
   resolver la variante exacta;
 - los defaults comunes se materializan al crear; no existe herencia posterior
   y cada variante continúa editable, vendible e inventariable por separado;
+- `catalog_product_family` es una estructura interna: la UX habla de producto
+  base, lo crea automáticamente y permite ampliarlo desde el catálogo. Productos
+  individuales no exponen sabor ni aliases múltiples salvo bajo opción avanzada;
 - los registros históricos conservan snapshots;
 - los listados operativos deben ser paginados.
 

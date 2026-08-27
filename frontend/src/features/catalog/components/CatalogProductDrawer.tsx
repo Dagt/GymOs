@@ -10,6 +10,7 @@ type Props = {
   canManageInventory: boolean;
   canReadCosts: boolean;
   editing: boolean;
+  editingVariant: boolean;
   existingImage: boolean;
   form: ProductPayload;
   open: boolean;
@@ -34,6 +35,7 @@ export function CatalogProductDrawer({
   canManageInventory,
   canReadCosts,
   editing,
+  editingVariant,
   existingImage,
   form,
   open,
@@ -72,8 +74,28 @@ export function CatalogProductDrawer({
     });
   }
 
+  function changePrimaryBarcode(value: string) {
+    const aliases = form.barcodes.slice(1);
+    const barcodes = value || aliases.length ? [value, ...aliases] : [];
+    change({ barcode: value.trim() || null, barcodes });
+  }
+
+  function addAlternateBarcode() {
+    const current = form.barcodes.length ? form.barcodes : [""];
+    if (current.length >= 20) return;
+    change({ barcodes: [...current, ""] });
+  }
+
+  function changeAlternateBarcode(index: number, value: string) {
+    change({ barcodes: form.barcodes.map((barcode, currentIndex) => currentIndex === index ? value : barcode) });
+  }
+
+  function removeAlternateBarcode(index: number) {
+    change({ barcodes: form.barcodes.filter((_, currentIndex) => currentIndex !== index) });
+  }
+
   return (
-    <AppDrawer onClose={onClose} open={open} title={editing ? "Editar artículo o cargo" : "Nuevo artículo o cargo"}>
+    <AppDrawer onClose={onClose} open={open} title={editing ? editingVariant ? "Editar variante" : "Editar artículo o cargo" : "Nuevo artículo o cargo"}>
       <form className="grid gap-4" onSubmit={onSubmit}>
         <section className="grid gap-4 rounded-xl border border-[#d8ddd2] bg-white p-4">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -81,6 +103,7 @@ export function CatalogProductDrawer({
             <TextField label="SKU" name="productSku" placeholder={form.productType === "SERVICE" ? "SCOOP-PRE" : "AGUA-600"} value={form.sku} onChange={(sku) => change({ sku })} />
             <NumberField label="Precio" name="productPrice" step="0.01" value={price} onChange={onPriceChange} />
             <SelectField label="Tipo" name="productType" options={[{ label: "Producto físico", value: "PHYSICAL" }, { label: "Cargo de caja", value: "SERVICE" }]} value={form.productType} onChange={changeType} />
+            {form.productType === "PHYSICAL" ? <TextField label="Código de barras" name="productBarcode" placeholder="Escanea o captura" required={false} value={form.barcodes[0] ?? ""} onChange={changePrimaryBarcode} /> : null}
             <SelectField label="Categoría" name="productCategory" required={false} options={[{ label: "Sin categoría", value: "" }, ...options]} value={form.categoryId ?? ""} onChange={(categoryId) => change({ categoryId: categoryId || null })} />
             {form.productType === "PHYSICAL" && form.inventoryTracked && canManageInventory ? (
               <NumberField label="Stock mínimo" min="0" name="productReorderPoint" required={false} value={reorderPoint} onChange={onReorderPointChange} />
@@ -100,23 +123,8 @@ export function CatalogProductDrawer({
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             {form.productType === "PHYSICAL" ? (
               <>
-                <div className="sm:col-span-2">
-                  <TextAreaField
-                    help="Uno por línea. El primero será el código principal; cualquiera identificará esta misma variante en caja."
-                    label="Códigos de barras"
-                    name="productBarcodes"
-                    placeholder={"7501234567890\n7501234567891"}
-                    required={false}
-                    rows={3}
-                    value={form.barcodes.join("\n")}
-                    onChange={(value) => {
-                      const barcodes = value.split(/\r?\n/);
-                      change({ barcode: barcodes.find((item) => item.trim())?.trim() || null, barcodes });
-                    }}
-                  />
-                </div>
                 <TextField label="Marca" name="productBrand" placeholder="Marca" required={false} value={form.brand ?? ""} onChange={(brand) => change({ brand: brand || null })} />
-                <TextField label="Variante o sabor" name="productVariantName" placeholder="Frutos rojos" required={false} value={form.variantName ?? ""} onChange={(variantName) => change({ variantName: variantName || null })} />
+                {editingVariant ? <TextField help="Esta presentación pertenece a un producto con variantes." label="Sabor o variante" name="productVariantName" placeholder="Frutos rojos" required={false} value={form.variantName ?? ""} onChange={(variantName) => change({ variantName: variantName || null })} /> : null}
                 <TextField label="Presentación" name="productPresentation" placeholder="Bote de 30 porciones" required={false} value={form.presentation ?? ""} onChange={(presentation) => change({ presentation: presentation || null })} />
                 <SelectField
                   label="Unidad"
@@ -125,6 +133,20 @@ export function CatalogProductDrawer({
                   value={form.unitOfMeasure ?? "PIECE"}
                   onChange={(unitOfMeasure) => change({ unitOfMeasure })}
                 />
+                <div className="grid gap-2 sm:col-span-2">
+                  <div>
+                    <p className="text-sm font-medium">Códigos alternativos</p>
+                    <p className="mt-1 text-xs text-[var(--brand-muted)]">Sólo agrégalos si este mismo artículo puede llegar con otro código. Todos usarán el mismo SKU e inventario.</p>
+                  </div>
+                  {form.barcodes.slice(1).map((barcode, aliasIndex) => {
+                    const barcodeIndex = aliasIndex + 1;
+                    return <div className="flex items-end gap-2" key={barcodeIndex}>
+                      <div className="min-w-0 flex-1"><TextField label={`Código alternativo ${barcodeIndex}`} name={`productBarcodeAlias-${barcodeIndex}`} required={false} value={barcode} onChange={(value) => changeAlternateBarcode(barcodeIndex, value)} /></div>
+                      <button aria-label={`Quitar código alternativo ${barcodeIndex}`} className="mb-2 text-xs font-semibold text-[#9b2c2c]" onClick={() => removeAlternateBarcode(barcodeIndex)} type="button">Quitar</button>
+                    </div>;
+                  })}
+                  {form.barcodes.length < 20 ? <button className="w-fit text-xs font-semibold text-[var(--brand-primary)]" onClick={addAlternateBarcode} type="button">+ Agregar código alternativo</button> : null}
+                </div>
               </>
             ) : null}
             <TextField label="Etiquetas" name="productTags" placeholder="energía, cafeína, preentreno" required={false} value={tagsText} onChange={onTagsTextChange} />

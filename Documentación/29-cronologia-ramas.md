@@ -48,6 +48,7 @@ y alta masiva simple, preservando los IDs usados por ventas e inventario.
 | 26 ago 2026 | PR #19 integra el lote; el cierre centra el selector del kiosco y presenta fallos de identidad breves sin exponer diagnóstico HTTP |
 | 27 ago 2026 | Se crea `feature/catalog-product-variants-barcodes`; V95 conserva productos históricos, agrega familias/códigos alias y alta masiva de variantes |
 | 27 ago 2026 | El alta masiva se refina sin migración: datos comunes una vez, filas sabor/código/SKU, SKU sugerido editable, overrides y aliases bajo demanda |
+| 27 ago 2026 | La UX oculta la familia técnica: producto base automático, ampliación desde catálogo y alta individual con un código principal más aliases avanzados |
 
 ## 3. Alcance material de la rama activa
 

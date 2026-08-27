@@ -739,7 +739,9 @@ Actor: usuario con `catalog.create` y sucursal activa.
 
 Flujo:
 1. Abre Catálogo y elige `Producto con variantes`.
-2. Selecciona una familia existente o captura una sola vez nombre y marca.
+2. Por defecto captura un producto base nuevo con nombre y marca. La familia es
+   interna y se crea automáticamente; si quiere ampliar un producto anterior,
+   usa `Agregar variantes a producto existente` o la acción del catálogo.
 3. Captura una sola vez presentación, precio, costo y demás datos comunes.
 4. Agrega filas compactas para sabor, código principal y SKU autogenerado pero
    editable. Enter después del código mueve el foco sin enviar el formulario.
@@ -758,6 +760,8 @@ Criterios:
 - cada variante mantiene precio, costo, SKU, stock y movimientos propios;
 - una colisión de SKU o código revierte el lote completo;
 - un código no puede apuntar a dos variantes activas de la misma organización;
+- el alta individual no solicita sabor: muestra un código principal y reserva
+  los códigos alternativos para el caso excepcional del mismo SKU/empaque;
 - productos, ventas y movimientos existentes conservan sus IDs y relaciones al
   aplicar V95.
 

@@ -25,6 +25,7 @@ type Props = {
   families: ProductFamilySummary[];
   canManageInventory: boolean;
   canReadCosts: boolean;
+  initialFamilyId: string | null;
   open: boolean;
   saving: boolean;
   onClose: () => void;
@@ -52,12 +53,14 @@ export function CatalogVariantBatchDrawer({
   families,
   canManageInventory,
   canReadCosts,
+  initialFamilyId,
   open,
   saving,
   onClose,
   onSubmit,
 }: Props) {
-  const [familyId, setFamilyId] = useState("");
+  const [familyId, setFamilyId] = useState(initialFamilyId ?? "");
+  const [usingExistingProduct, setUsingExistingProduct] = useState(Boolean(initialFamilyId));
   const [familyName, setFamilyName] = useState("");
   const [brand, setBrand] = useState("");
   const [commonPresentation, setCommonPresentation] = useState("");
@@ -82,9 +85,9 @@ export function CatalogVariantBatchDrawer({
     const parsedReorderPoint = Number(reorderPoint || "0");
     if (!Number.isFinite(parsedReorderPoint) || parsedReorderPoint < 0) return;
     await onSubmit({
-      familyId: familyId || null,
-      familyName: familyId ? null : familyName.trim(),
-      brand: familyId ? null : brand.trim() || null,
+      familyId: usingExistingProduct ? familyId || null : null,
+      familyName: usingExistingProduct ? null : familyName.trim(),
+      brand: usingExistingProduct ? null : brand.trim() || null,
       commonPresentation: commonPresentation.trim() || null,
       commonPriceCents: centsRequired(commonPrice),
       commonReferenceCostCents: canReadCosts ? centsOptional(commonCost) : null,
@@ -154,6 +157,20 @@ export function CatalogVariantBatchDrawer({
     if (!skuPrefixManuallyEdited) applySkuPrefix(suggestSkuPrefix(family.name), false);
   }
 
+  function createNewBaseProduct() {
+    setUsingExistingProduct(false);
+    setFamilyId("");
+    setFamilyName("");
+    setBrand("");
+    if (!skuPrefixManuallyEdited) applySkuPrefix("", false);
+  }
+
+  function addToExistingProduct() {
+    setUsingExistingProduct(true);
+    setFamilyName("");
+    setBrand("");
+  }
+
   function addVariant(focus = false) {
     const nextIndex = variants.length;
     setVariants((current) => [...current, blankVariant()]);
@@ -171,30 +188,37 @@ export function CatalogVariantBatchDrawer({
   }
 
   return (
-    <AppDrawer onClose={onClose} open={open} title="Producto con variantes">
+    <AppDrawer onClose={onClose} open={open} title={usingExistingProduct ? "Agregar variantes" : "Crear producto con variantes"}>
       <form className="grid gap-5" onSubmit={submit}>
         <section className="grid gap-4 rounded-xl border border-[var(--brand-line)] bg-white p-4">
-          <div>
-            <p className="font-semibold">Producto base</p>
-            <p className="mt-1 text-xs text-[var(--brand-muted)]">Estos valores se aplicarán a todas las variantes de este lote.</p>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="font-semibold">{usingExistingProduct ? "Producto base existente" : "Producto base nuevo"}</p>
+              <p className="mt-1 max-w-2xl text-xs text-[var(--brand-muted)]">{usingExistingProduct
+                ? "Selecciona el producto al que agregarás sabores o presentaciones."
+                : "Captura los datos una vez. GymFort organizará automáticamente sus sabores o presentaciones; no necesitas administrar grupos por separado."}</p>
+            </div>
+            {usingExistingProduct ? (
+              <button className="text-xs font-semibold text-[var(--brand-primary)]" onClick={createNewBaseProduct} type="button">Crear producto base nuevo</button>
+            ) : families.length ? (
+              <button className="text-xs font-semibold text-[var(--brand-primary)]" onClick={addToExistingProduct} type="button">Agregar variantes a producto existente</button>
+            ) : null}
           </div>
-          <SelectField
-            label="Familia comercial"
-            name="variantFamily"
-            required={false}
-            options={[{ label: "Crear una familia nueva", value: "" }, ...families.map((family) => ({ label: `${family.name}${family.brand ? ` · ${family.brand}` : ""}`, value: family.id }))]}
-            value={familyId}
-            onChange={selectFamily}
-          />
-          {!familyId ? (
+          {usingExistingProduct ? (
+            <>
+              <SelectField
+                label="Producto base"
+                name="variantFamily"
+                options={[{ label: "Selecciona un producto", value: "" }, ...families.map((family) => ({ label: `${family.name}${family.brand ? ` · ${family.brand}` : ""} (${family.totalVariants} ${family.totalVariants === 1 ? "variante" : "variantes"})`, value: family.id }))]}
+                value={familyId}
+                onChange={selectFamily}
+              />
+              {selectedFamily ? <div className="rounded-lg bg-[var(--brand-surface)] px-3 py-2 text-sm"><span className="font-semibold">{selectedFamily.name}</span>{selectedFamily.brand ? ` · ${selectedFamily.brand}` : ""}<span className="ml-2 text-xs text-[var(--brand-muted)]">Las nuevas variantes quedarán dentro de este producto.</span></div> : null}
+            </>
+          ) : (
             <div className="grid gap-4 sm:grid-cols-2">
               <TextField label="Nombre del producto" name="variantFamilyName" placeholder="Psychotic" value={familyName} onChange={changeFamilyName} />
               <TextField label="Marca" name="variantBrand" placeholder="Insane Labz" required={false} value={brand} onChange={setBrand} />
-            </div>
-          ) : (
-            <div className="rounded-lg bg-[var(--brand-surface)] px-3 py-2 text-sm">
-              <span className="font-semibold">{selectedFamily?.name}</span>{selectedFamily?.brand ? ` · ${selectedFamily.brand}` : ""}
-              <span className="ml-2 text-xs text-[var(--brand-muted)]">Agregarás nuevas variantes a esta familia.</span>
             </div>
           )}
           <div className="grid gap-4 sm:grid-cols-2">

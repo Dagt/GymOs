@@ -95,6 +95,10 @@ Implementación V95:
   `Agregar otro código` conserva los aliases como capacidad avanzada. Los datos
   comunes son defaults del lote: después de crearse, cada variante vuelve a ser
   completamente independiente;
+- el administrador ya no necesita localizar una pantalla de familias: el alta
+  crea el producto base automáticamente y `Agregar variantes a producto
+  existente` reutiliza el grupo interno. El alta individual sólo solicita un
+  código principal y no muestra sabor salvo al editar una variante real;
 - el lote es transaccional: una colisión evita altas parciales;
 - POS, búsqueda de catálogo e inventario resuelven cualquiera de los alias;
 - V95 migra el código existente como alias principal y agrupa productos físicos

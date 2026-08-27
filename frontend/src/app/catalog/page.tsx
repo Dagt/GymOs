@@ -64,8 +64,10 @@ function CatalogContent() {
               onPageChange={(page) => controller.catalogFilters.update("page", String(page))}
               onPageSizeChange={(size) => controller.catalogFilters.update("size", String(size))} />
             <CatalogProductTable canArchive={controller.canArchive} canManageStatus={controller.canManageStatus}
-              canUpdate={controller.canUpdate} loading={controller.loading} products={controller.products}
+              canCreate={controller.canCreate} canUpdate={controller.canUpdate} loading={controller.loading} products={controller.products}
+              families={controller.families}
               saving={controller.saving} onArchive={controller.archiveCatalogProduct} onEdit={controller.openProductEdition}
+              onAddVariant={(product) => controller.openVariantCreation(product.familyId)}
               onRestore={controller.restoreCatalogProduct} onToggleStatus={controller.toggleProductStatus} />
           </section>
         ) : null}
@@ -78,6 +80,7 @@ function CatalogContent() {
         canManageInventory={controller.canManageInventory}
         canReadCosts={controller.canReadCosts}
         editing={Boolean(controller.editingProductId)}
+        editingVariant={controller.editingProductIsVariant}
         existingImage={Boolean(controller.existingImageObjectKey)}
         form={controller.form}
         open={controller.showProductDrawer}
@@ -101,6 +104,7 @@ function CatalogContent() {
         families={controller.families}
         canManageInventory={controller.canManageInventory}
         canReadCosts={controller.canReadCosts}
+        initialFamilyId={controller.variantInitialFamilyId}
         open={controller.showVariantDrawer}
         saving={controller.saving}
         onClose={controller.resetVariantDrawer}

@@ -120,6 +120,33 @@ test.describe("catalogo e inventario", () => {
     }
   });
 
+  test("alta individual muestra un código principal y mantiene aliases como opción avanzada", async ({ page }) => {
+    let createPayload: Record<string, unknown> | null = null;
+    await bootCatalog(page, owner(), async (route, path) => {
+      if (route.request().method() === "POST" && path === "/catalog/products") {
+        createPayload = route.request().postDataJSON() as Record<string, unknown>;
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify({ ...product, id: "single-product", name: "Agua mineral", sku: "AGUA-MIN" }) });
+        return true;
+      }
+      return false;
+    });
+    await page.goto("/catalog");
+    await page.getByRole("button", { name: /Nuevo art.culo o cargo/i }).click();
+    await expect(page.getByLabel("Sabor o variante")).toHaveCount(0);
+    await page.getByRole("textbox", { name: "Nombre *" }).fill("Agua mineral");
+    await page.getByLabel("SKU").fill("AGUA-MIN");
+    await page.getByRole("spinbutton", { name: "Precio *" }).fill("25");
+    await page.getByLabel("Código de barras").fill("750000000101");
+    await page.getByText(/M.s datos/i).click();
+    await expect(page.getByLabel("Códigos de barras")).toHaveCount(0);
+    await page.getByRole("button", { name: "+ Agregar código alternativo" }).click();
+    await page.locator('input[name="productBarcodeAlias-1"]').fill("750000000109");
+    await page.getByRole("button", { name: "Crear producto" }).click();
+
+    await expect.poll(() => createPayload?.barcodes).toEqual(["750000000101", "750000000109"]);
+    expect(createPayload).toMatchObject({ barcode: "750000000101", variantName: null });
+  });
+
   test("alta masiva hereda datos comunes y permite personalizar sólo una variante", async ({ page }) => {
     let batchPayload: Record<string, unknown> | null = null;
     await bootCatalog(page, ownerWithInventory(), async (route, path) => {
@@ -136,6 +163,8 @@ test.describe("catalogo e inventario", () => {
 
     await page.goto("/catalog");
     await page.getByRole("button", { name: "Producto con variantes" }).click();
+    await expect(page.getByLabel("Familia comercial")).toHaveCount(0);
+    await expect(page.getByText("Producto base nuevo", { exact: true })).toBeVisible();
     await page.getByLabel("Nombre del producto").fill("Psychotic");
     await page.getByLabel("Marca").fill("Insane Labz");
     await page.getByLabel("Presentación común").fill("Bote de 35 scoops");
@@ -244,7 +273,7 @@ test.describe("catalogo e inventario", () => {
     await expect.poll(() => batchSize).toBe(10);
   });
 
-  test("una familia existente recibe nuevas variantes sin duplicar nombre y marca", async ({ page }) => {
+  test("un producto base existente recibe nuevas variantes sin exponer familias técnicas", async ({ page }) => {
     let batchPayload: Record<string, unknown> | null = null;
     await bootCatalog(page, owner(), async (route, path) => {
       if (route.request().method() === "GET" && path === "/catalog/product-families") {
@@ -260,8 +289,9 @@ test.describe("catalogo e inventario", () => {
     });
     await page.goto("/catalog");
     await page.getByRole("button", { name: "Producto con variantes" }).click();
-    await page.getByLabel("Familia comercial").selectOption("family-psychotic");
-    await expect(page.getByText("Agregarás nuevas variantes a esta familia.")).toBeVisible();
+    await page.getByRole("button", { name: "Agregar variantes a producto existente" }).click();
+    await page.getByLabel("Producto base").selectOption("family-psychotic");
+    await expect(page.getByText("Las nuevas variantes quedarán dentro de este producto.")).toBeVisible();
     await page.getByLabel("Precio común").fill("550");
     await page.getByLabel("Sabor o variante").nth(0).fill("Uva");
     await page.getByLabel("Código de barras").nth(0).fill("750100000011");
@@ -270,6 +300,21 @@ test.describe("catalogo e inventario", () => {
     await page.getByRole("button", { name: "Crear 2 variantes" }).click();
     await expect.poll(() => batchPayload?.familyId).toBe("family-psychotic");
     expect(batchPayload).toMatchObject({ familyId: "family-psychotic", familyName: null, brand: null });
+  });
+
+  test("el catálogo permite agregar una variante con el producto base preseleccionado", async ({ page }) => {
+    await bootCatalog(page, owner(), async (route, path) => {
+      if (route.request().method() === "GET" && path === "/catalog/product-families") {
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify([{ id: product.familyId, name: "Agua", brand: "GymOS", description: null, activeVariants: 1, totalVariants: 1 }]) });
+        return true;
+      }
+      return false;
+    });
+    await page.goto("/catalog");
+    await page.getByRole("button", { name: "Agregar variante" }).click();
+    await expect(page.getByRole("heading", { name: "Agregar variantes" })).toBeVisible();
+    await expect(page.getByLabel("Producto base")).toHaveValue(product.familyId);
+    await expect(page.getByText("Las nuevas variantes quedarán dentro de este producto.")).toBeVisible();
   });
 
   test("un creador sin permiso de costos no ve campos comunes ni overrides protegidos", async ({ page }) => {

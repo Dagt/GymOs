@@ -1,22 +1,25 @@
 import Link from "next/link";
-import type { ProductSummary } from "@/lib/api";
+import type { ProductFamilySummary, ProductSummary } from "@/lib/api";
 import { formatMoney } from "@/app/catalog/CatalogHelpers";
 
 type CatalogProductTableProps = {
   loading: boolean;
+  families: ProductFamilySummary[];
   products: ProductSummary[];
   saving: boolean;
   canArchive: boolean;
+  canCreate: boolean;
   canManageStatus: boolean;
   canUpdate: boolean;
   onArchive: (product: ProductSummary) => void;
+  onAddVariant: (product: ProductSummary) => void;
   onEdit: (product: ProductSummary) => void;
   onRestore: (product: ProductSummary) => void;
   onToggleStatus: (product: ProductSummary) => void;
 };
 
-export function CatalogProductTable({ loading, products, saving, canArchive, canManageStatus, canUpdate,
-  onArchive, onEdit, onRestore, onToggleStatus }: CatalogProductTableProps) {
+export function CatalogProductTable({ families, loading, products, saving, canArchive, canCreate, canManageStatus, canUpdate,
+  onAddVariant, onArchive, onEdit, onRestore, onToggleStatus }: CatalogProductTableProps) {
   return (
     <section className="app-card overflow-hidden">
       <div className="flex items-center justify-between border-b border-[#e3e7df] px-3 py-2.5">
@@ -37,8 +40,8 @@ export function CatalogProductTable({ loading, products, saving, canArchive, can
               {products.map((product) => (
                 <tr className={product.archived ? "bg-[#faf7f2] opacity-80" : "hover:bg-[#fafbf9]"} key={product.id}>
                   <td className="px-3 py-2">
-                    <p className="font-semibold leading-tight">{product.familyName ?? product.name}</p>
-                    {product.variantName ? <p className="mt-0.5 text-[11px] font-medium leading-tight text-[#405348]">{product.variantName}{product.presentation && product.presentation !== product.variantName ? ` · ${product.presentation}` : ""}</p> : null}
+                    <p className="font-semibold leading-tight">{isVisibleVariant(product, families) ? product.familyName : product.name}</p>
+                    {isVisibleVariant(product, families) ? <p className="mt-0.5 text-[11px] font-medium leading-tight text-[#405348]">{product.variantName}{product.presentation && product.presentation !== product.variantName ? ` · ${product.presentation}` : ""}</p> : product.presentation ? <p className="mt-0.5 text-[11px] leading-tight text-[#405348]">{product.presentation}</p> : null}
                     <p className="mt-0.5 text-[10px] leading-tight text-[#6f7a73]">{product.sku}{barcodeCount(product) ? ` · ${barcodeCount(product)} ${barcodeCount(product) === 1 ? "código" : "códigos"}` : ""}</p>
                   </td>
                   <td className="px-3 py-2">{product.categoryName ?? "Sin categoría"}</td>
@@ -52,6 +55,7 @@ export function CatalogProductTable({ loading, products, saving, canArchive, can
                       canArchive ? <Action disabled={saving} label="Restaurar" onClick={() => onRestore(product)} /> : null
                     ) : (<>
                       {canUpdate ? <Action label="Editar" onClick={() => onEdit(product)} /> : null}
+                      {canCreate && product.productType === "PHYSICAL" && product.familyId ? <Action label="Agregar variante" onClick={() => onAddVariant(product)} /> : null}
                       {canManageStatus ? <Action disabled={saving} label={product.status === "ACTIVE" ? "Desactivar" : "Activar"} onClick={() => onToggleStatus(product)} /> : null}
                       {canArchive ? <Action danger disabled={saving} label="Archivar" onClick={() => onArchive(product)} /> : null}
                     </>)}
@@ -64,6 +68,12 @@ export function CatalogProductTable({ loading, products, saving, canArchive, can
       ) : null}
     </section>
   );
+}
+
+function isVisibleVariant(product: ProductSummary, families: ProductFamilySummary[]) {
+  if (!product.familyId || !product.familyName || !product.variantName) return false;
+  return (families.find((family) => family.id === product.familyId)?.totalVariants ?? 0) > 1
+    || product.name.startsWith(`${product.familyName} ·`);
 }
 
 function barcodeCount(product: ProductSummary) {
