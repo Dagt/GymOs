@@ -11,7 +11,10 @@ import type {
   ProductPayload,
   ProductSummary,
   ProductPage,
+  ProductFamilyResult,
+  ProductFamilySummary,
   ProductSearchParams,
+  ProductVariantBatchPayload,
   UpdateMembershipPlanPayload,
 } from "./catalog-types";
 
@@ -42,6 +45,17 @@ export async function searchProducts(accessToken: string, params: ProductSearchP
 
 export async function createProduct(accessToken: string, payload: ProductPayload): Promise<ProductSummary> {
   return apiFetch<ProductSummary>("/catalog/products", accessToken, { method: "POST", body: JSON.stringify(normalizePayload(payload)) });
+}
+
+export async function getProductFamilies(accessToken: string): Promise<ProductFamilySummary[]> {
+  return apiFetch<ProductFamilySummary[]>("/catalog/product-families", accessToken);
+}
+
+export async function createProductVariants(accessToken: string, payload: ProductVariantBatchPayload): Promise<ProductFamilyResult> {
+  return apiFetch<ProductFamilyResult>("/catalog/product-families/variants", accessToken, {
+    method: "POST",
+    body: JSON.stringify(normalizePayload(payload)),
+  });
 }
 
 export async function updateProduct(accessToken: string, productId: string, payload: ProductPayload): Promise<ProductSummary> {

@@ -157,6 +157,13 @@ prorrateo y los accesos heredados se recalculan después del pago.
 
 Regla de catalogo:
 - Productos y servicios de mostrador se capturan en el formulario de producto.
+- `Producto con variantes` ofrece un alta masiva sencilla: familia nueva o
+  existente y filas repetibles para sabor, SKU, precio y códigos. Categoría,
+  unidad, inventario mínimo y etiquetas permanecen plegados como opcionales.
+- El formulario individual permite varios códigos, uno por línea; el primero es
+  principal y todos identifican la misma variante en POS.
+- Listados y detalle muestran familia, variante y cantidad/lista de códigos sin
+  fusionar existencias ni precios entre sabores.
 - Las membresias se capturan en un formulario separado de plan de membresia.
 - Al crear un plan, el frontend debe usar `POST /catalog/membership-plans`; el backend crea en una sola transaccion el producto tecnico `MEMBERSHIP_PLAN` y el registro `membership_plan` con duracion y dias de gracia.
 - Los beneficios pueden capturarse como texto separado por comas o saltos de linea; el backend los guarda como JSON valido.

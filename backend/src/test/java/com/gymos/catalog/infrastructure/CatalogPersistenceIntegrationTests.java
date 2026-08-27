@@ -72,6 +72,28 @@ class CatalogPersistenceIntegrationTests {
 	}
 
 	@Test
+	void everyBarcodeAliasResolvesTheSameVariantAndRemainsBranchScoped() {
+		UUID productId = UUID.randomUUID();
+		OffsetDateTime now = OffsetDateTime.now();
+		products.create(new ProductMutation(
+				organizationId, productId, "PSY-RED", "Psychotic · Frutos rojos", null, "PHYSICAL", 65_000,
+				"MXN", true, "ACTIVE", "750100000001", "Insane Labz", "Bote", "PIECE", true, 0, null, now, userId
+		));
+		products.attachBranch(organizationId, firstBranchId, productId, userId, now);
+		products.replaceBarcodes(organizationId, productId,
+				java.util.List.of("750100000001", "750100000009"), true, userId, now);
+
+		assertThat(productQueries.findActiveByBarcode(organizationId, firstBranchId, "750100000001"))
+				.get().extracting(com.gymos.catalog.application.query.ProductSummaryView::id).isEqualTo(productId);
+		assertThat(productQueries.findActiveByBarcode(organizationId, firstBranchId, " 750100000009 "))
+				.get().extracting(com.gymos.catalog.application.query.ProductSummaryView::id).isEqualTo(productId);
+		assertThat(productQueries.findActiveByBarcode(organizationId, firstBranchId, "750100000009"))
+				.get().extracting(com.gymos.catalog.application.query.ProductSummaryView::barcodes)
+				.isEqualTo(java.util.List.of("750100000001", "750100000009"));
+		assertThat(productQueries.findActiveByBarcode(organizationId, secondBranchId, "750100000009")).isEmpty();
+	}
+
+	@Test
 	void kioskMembershipOptionsAreVisibleOnlyInTheAttachedBranch() {
 		UUID productId = UUID.randomUUID();
 		UUID planId = UUID.randomUUID();

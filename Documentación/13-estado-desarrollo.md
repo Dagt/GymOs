@@ -1,10 +1,10 @@
 # 13. Estado actual de desarrollo
 
 Estado: FUENTE CANÓNICA / EN PROGRESO
-Corte: 26 de agosto de 2026
-Código auditado: `feature/client-onboarding-lifecycle`, basada en `main`
-`a5ea75f` e incluyendo V93–V94 sobre el cierre integrado de paginación y
-endurecimiento operativo V91–V92. No implica despliegue productivo de la rama.
+Corte: 27 de agosto de 2026
+Código auditado: `feature/catalog-product-variants-barcodes`, basada en `main`
+después de integrar el PR #19 e incluyendo V95. No implica despliegue
+productivo de la rama.
 
 ## 1. Resumen ejecutivo
 
@@ -48,6 +48,12 @@ financiera, baja automática reversible, autenticación en kiosco sin plan y
 registro inicial desde el kiosco. El borrado físico se descarta para conservar
 ventas, pagos, membresías y auditoría. El análisis y los lotes restantes están
 en [retroalimentación del primer cliente](32-retroalimentacion-primer-cliente.md).
+
+El segundo lote resuelve el alta repetitiva de sabores: Catálogo separa familia
+comercial de variante vendible, admite múltiples códigos por variante y ofrece
+alta masiva transaccional. Cada sabor conserva SKU, precio, costo, stock,
+movimientos y ventas propios. V95 mantiene los IDs existentes y POS/inventario
+pueden resolver cualquiera de sus códigos.
 
 Topología confirmada para los lotes siguientes: el cliente operará sus dos
 marcas como sucursales de un solo tenant. Compartirán socios, catálogo, planes y
@@ -206,21 +212,26 @@ Evidencia disponible:
 - recorrido visual de Access en escritorio y móvil, incluidos los formularios de
   proveedor/puntos sin desbordamiento horizontal ni errores de consola;
 - suites backend/frontend y CI de rama continúan siendo la red de regresión.
+- V95 pasó migración PostgreSQL limpia y upgrade desde V94; la prueba conserva
+  IDs de dos productos existentes, los agrupa y migra sus códigos principales;
+- catálogo/POS pasaron pruebas unitarias, typecheck y lint; el E2E crea dos
+  sabores en una sola operación y escanea un código alias secundario.
 
 La carga real del logo en correo debe verificarse después del despliegue con `GYMOS_FRONTEND_BASE_URL=https://gymfort.mx`; localhost no es accesible desde Gmail/Outlook.
 
 ## 5. Próximo bloque
 
-Automatizaciones/ZeptoMail ya no forman parte del bloque inmediato de implementación. Los siguientes frentes son:
+Después de cerrar variantes/códigos, el siguiente lote funcional del primer
+cliente es **paquetes de visitas multi-sucursal dentro del mismo tenant**:
 
-1. ejecutar descubrimiento del HikCentral/terminal del primer cliente y confirmar
-   licencia, API/SDK y topología;
-2. implementar, empaquetar y operar GymFort Local Connector + adapter HikCentral;
-3. demostrar concesión, revocación, reconciliación, eventos y recuperación con el
-   torniquete real sin mover biometría a GymFort Cloud;
-4. cerrar la evolución de cobranza comercial: impuestos, cobro SaaS automático,
-   CFDI, ajustes y reportes;
-5. ejecutar Stripe sandbox automatizado y cerrar autorización multi-tenant,
-   backup/restore y observabilidad de piloto.
+1. producto vendible con cantidad de visitas y ventana de vigencia;
+2. alcance a todas o a una selección de sucursales;
+3. saldo único por socio, sin duplicarlo por sede;
+4. consumo atómico e idempotente que registre la sucursal;
+5. integración con ventas, acceso y reportes.
+
+Beneficios multi-sucursal y branding por sucursal continúan después como lotes
+4 y 5. El Connector HikCentral, cobranza SaaS y hardening operativo permanecen
+como frentes transversales separados.
 
 El detalle vive en `modulos/`, la deuda única en el documento 28 y la situación Git en el documento 29.

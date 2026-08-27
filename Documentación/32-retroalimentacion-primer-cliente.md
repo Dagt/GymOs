@@ -1,10 +1,11 @@
 # Retroalimentación del primer cliente
 
-Estado: ANÁLISIS COMPLETO / LOTE 1 IMPLEMENTADO
+Estado: ANÁLISIS COMPLETO / LOTES 1 Y 2 IMPLEMENTADOS
 
 Corte: 26 de agosto de 2026
 
-Rama: `feature/client-onboarding-lifecycle`, basada en `main` `a5ea75f`
+Rama activa: `feature/catalog-product-variants-barcodes`, basada en `main`
+después de integrar el PR #19.
 
 ## Topología operativa confirmada
 
@@ -64,7 +65,7 @@ Refinamiento de aceptación del kiosco:
   muestra dentro de la tarjeta con instrucciones breves, conserva la alineación
   y oculta status HTTP, rutas, códigos internos y correlation IDs.
 
-### Lote 2 — Variantes comerciales y códigos de barras
+### Lote 2 — Variantes comerciales y códigos de barras — IMPLEMENTADO
 
 Hoy `catalog_product` contiene un solo `barcode`, `brand` y `presentation`, y la
 unicidad del código se valida por organización. Por ello cada sabor se registra
@@ -76,6 +77,25 @@ vida de socios.
 
 Código afectado: módulo `catalog`, `CatalogProductService`, persistencia de
 `catalog_product`, drawer de catálogo, POS e inventario.
+
+Implementación V95:
+
+- `catalog_product_family` modela el producto base por organización;
+- `catalog_product` conserva el ID de la unidad vendible y agrega familia y
+  nombre de variante, sin romper ventas, inventario, devoluciones o auditoría;
+- `catalog_product_barcode` admite hasta 20 códigos por variante, con uno
+  principal y unicidad activa por organización;
+- el alta `Producto con variantes` captura familia/marca una vez y permite
+  agregar sabores con SKU, precio, costo y códigos propios; la configuración
+  menos frecuente queda plegada;
+- el lote es transaccional: una colisión evita altas parciales;
+- POS, búsqueda de catálogo e inventario resuelven cualquiera de los alias;
+- V95 migra el código existente como alias principal y agrupa productos físicos
+  con el mismo nombre/marca sin cambiar sus IDs.
+
+Compatibilidad deliberada: `catalog_product.barcode` permanece como espejo del
+código principal durante la transición. El negocio y las consultas nuevas usan
+`catalog_product_barcode`; no se recrean partidas de venta ni movimientos.
 
 ### Lote 3 — Paquetes de visitas entre sucursales del mismo tenant
 

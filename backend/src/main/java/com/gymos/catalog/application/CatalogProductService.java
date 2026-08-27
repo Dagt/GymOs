@@ -1,12 +1,17 @@
 package com.gymos.catalog.application;
 
 import com.gymos.audit.api.AuditService;
+import com.gymos.catalog.application.command.CreateProductVariantsCommand;
 import com.gymos.catalog.application.command.ProductCommand;
 import com.gymos.catalog.application.port.CatalogCategoryQueryPort;
 import com.gymos.catalog.application.port.CatalogDependencyQueryPort;
 import com.gymos.catalog.application.port.CatalogProductCommandPort;
 import com.gymos.catalog.application.port.CatalogProductCommandPort.ProductMutation;
+import com.gymos.catalog.application.port.CatalogProductFamilyPort;
+import com.gymos.catalog.application.port.CatalogProductFamilyPort.FamilyMutation;
 import com.gymos.catalog.application.port.CatalogProductQueryPort;
+import com.gymos.catalog.application.query.ProductFamilySummaryView;
+import com.gymos.catalog.application.query.ProductFamilyView;
 import com.gymos.catalog.application.query.ProductPageView;
 import com.gymos.catalog.application.query.ProductSearchCriteria;
 import com.gymos.catalog.application.query.ProductSummaryView;
@@ -14,6 +19,7 @@ import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -36,15 +42,23 @@ class CatalogProductService {
 	private final CatalogProductCommandPort commands;
 	private final CatalogDependencyQueryPort dependencies;
 	private final CatalogCategoryQueryPort categories;
+	private final CatalogProductFamilyPort families;
 	private final AuditService auditService;
 
 	CatalogProductService(CatalogProductQueryPort products, CatalogProductCommandPort commands,
-			CatalogDependencyQueryPort dependencies, CatalogCategoryQueryPort categories, AuditService auditService) {
+			CatalogDependencyQueryPort dependencies, CatalogCategoryQueryPort categories,
+			CatalogProductFamilyPort families, AuditService auditService) {
 		this.products = products;
 		this.commands = commands;
 		this.dependencies = dependencies;
 		this.categories = categories;
+		this.families = families;
 		this.auditService = auditService;
+	}
+
+	List<ProductFamilySummaryView> families(GymOsPrincipal principal) {
+		CatalogAccessGuard.requireBranch(principal);
+		return families.list(principal.organizationId(), principal.branchId());
 	}
 
 	List<ProductSummaryView> products(GymOsPrincipal principal) {
@@ -87,18 +101,60 @@ class CatalogProductService {
 		validate(request);
 		String sku = normalizeRequired(request.sku());
 		if (products.skuExists(principal.organizationId(), sku, null)) throw duplicateSku();
-		String barcode = normalizeNullable(request.barcode());
-		validateBarcodeAvailability(principal.organizationId(), barcode, null);
+		List<String> barcodes = normalizeBarcodes(request.barcode(), request.barcodes());
+		validateBarcodeAvailability(principal.organizationId(), barcodes, null);
 		validateCategory(principal.organizationId(), request.categoryId(), null);
 		List<String> tags = normalizeTags(request.tags());
 		UUID productId = UUID.randomUUID();
 		OffsetDateTime now = OffsetDateTime.now();
-		commands.create(mutation(principal, productId, request, sku, barcode, null, null, now));
+		UUID familyId = resolveFamily(principal, request, null, now);
+		String variantName = resolveVariantName(request);
+		commands.create(mutation(principal, productId, request, sku, primaryBarcode(barcodes), null, null,
+				now, familyId, variantName));
 		commands.attachBranch(principal.organizationId(), principal.branchId(), productId, principal.userId(), now);
 		commands.replaceCategory(principal.organizationId(), productId, request.categoryId(), principal.userId(), now);
 		commands.replaceTags(principal.organizationId(), productId, tags, principal.userId(), now);
+		commands.replaceBarcodes(principal.organizationId(), productId, barcodes, true, principal.userId(), now);
 		auditService.record(principal, "PRODUCT_CREATED", "CATALOG_PRODUCT", productId, "BACKOFFICE", null, correlationId);
 		return visible(principal, requireProduct(principal.organizationId(), principal.branchId(), productId));
+	}
+
+	ProductFamilyView createVariants(GymOsPrincipal principal, CreateProductVariantsCommand request,
+			String correlationId) {
+		CatalogAccessGuard.requireBranch(principal);
+		if (request.variants() == null || request.variants().isEmpty() || request.variants().size() > 50) {
+			throw new BusinessException("PRODUCT_VARIANTS_INVALID", "Agrega entre 1 y 50 variantes.");
+		}
+		String unit = normalizeNullable(request.unitOfMeasure());
+		if (unit != null && !UNITS.contains(unit)) {
+			throw new BusinessException("PRODUCT_UNIT_INVALID", "Selecciona una unidad valida para las variantes.");
+		}
+		validateCategory(principal.organizationId(), request.categoryId(), null);
+		List<String> tags = normalizeTags(request.tags());
+		OffsetDateTime now = OffsetDateTime.now();
+		ProductFamilySummaryView family = resolveBatchFamily(principal, request, now);
+		List<ProductSummaryView> created = new ArrayList<>();
+		for (int index = 0; index < request.variants().size(); index++) {
+			CreateProductVariantsCommand.Variant variant = request.variants().get(index);
+			String variantName = trimToNull(variant.variantName());
+			if (variantName == null) {
+				throw new BusinessException("PRODUCT_VARIANT_NAME_REQUIRED", "Cada variante necesita sabor o presentacion.");
+			}
+			String productName = family.name() + " · " + variantName;
+			List<String> barcodes = normalizeBarcodes(null, variant.barcodes());
+			ProductCommand command = new ProductCommand(
+					variant.sku(), productName, request.description(), "PHYSICAL", "GENERAL_PRODUCT",
+					variant.priceCents(), request.currency(), request.taxable(), request.status(),
+					primaryBarcode(barcodes), family.brand(), variant.presentation(), unit,
+					request.inventoryTracked(), request.displayOrder() + index, request.supplierName(),
+					variant.referenceCostCents(), variant.promotionalPriceCents(), variant.promotionStartsAt(),
+					variant.promotionEndsAt(), request.categoryId(), tags, null, family.id(), variantName, barcodes
+			);
+			created.add(createProduct(principal, command, correlationId));
+		}
+		auditService.record(principal, "PRODUCT_VARIANTS_CREATED", "CATALOG_PRODUCT_FAMILY", family.id(),
+				"BACKOFFICE", "{\"variants\":" + created.size() + "}", correlationId);
+		return new ProductFamilyView(family.id(), family.name(), family.brand(), created);
 	}
 
 	ProductSummaryView updateProduct(GymOsPrincipal principal, UUID productId, ProductCommand request, String correlationId) {
@@ -116,17 +172,21 @@ class CatalogProductService {
 		validateTransition(principal.organizationId(), existing, request);
 		String sku = normalizeRequired(request.sku());
 		if (products.skuExists(principal.organizationId(), sku, productId)) throw duplicateSku();
-		String barcode = normalizeNullable(request.barcode());
-		validateBarcodeAvailability(principal.organizationId(), barcode, productId);
+		List<String> barcodes = normalizeBarcodes(request.barcode(), request.barcodes());
+		validateBarcodeAvailability(principal.organizationId(), barcodes, productId);
 		validateCategory(principal.organizationId(), request.categoryId(), existing.categoryId());
 		List<String> tags = normalizeTags(request.tags());
 		OffsetDateTime now = OffsetDateTime.now();
-		int updated = commands.update(mutation(principal, productId, request, sku, barcode, existing.imageObjectKey(), existing, now));
+		UUID familyId = resolveFamily(principal, request, existing, now);
+		String variantName = resolveVariantName(request, existing);
+		int updated = commands.update(mutation(principal, productId, request, sku, primaryBarcode(barcodes),
+				existing.imageObjectKey(), existing, now, familyId, variantName));
 		if (updated != 1) throw concurrentModification();
 		commands.replaceCategory(principal.organizationId(), productId, request.categoryId(), principal.userId(), now);
 		commands.replaceTags(principal.organizationId(), productId, tags, principal.userId(), now);
+		commands.replaceBarcodes(principal.organizationId(), productId, barcodes, true, principal.userId(), now);
 		auditService.record(principal, "PRODUCT_UPDATED", "CATALOG_PRODUCT", productId, "BACKOFFICE",
-				describeChanges(principal, existing, request, sku, barcode, tags), correlationId);
+				describeChanges(principal, existing, request, sku, barcodes, tags), correlationId);
 		return visible(principal, requireProduct(principal.organizationId(), principal.branchId(), productId));
 	}
 
@@ -155,9 +215,11 @@ class CatalogProductService {
 		if (dependencies.hasActiveMembershipPlan(principal.organizationId(), productId)) {
 			throw new BusinessException("PRODUCT_ARCHIVE_NOT_ALLOWED", "El producto tiene un plan de membresia activo.");
 		}
-		if (commands.archive(principal.organizationId(), productId, principal.userId(), OffsetDateTime.now()) != 1) {
+		OffsetDateTime now = OffsetDateTime.now();
+		if (commands.archive(principal.organizationId(), productId, principal.userId(), now) != 1) {
 			throw notFound();
 		}
+		commands.setBarcodesActive(principal.organizationId(), productId, false);
 		auditService.record(principal, "PRODUCT_ARCHIVED", "CATALOG_PRODUCT", productId, "BACKOFFICE", null, correlationId);
 	}
 
@@ -171,17 +233,19 @@ class CatalogProductService {
 		}
 		if (!archived.archived()) throw new BusinessException("PRODUCT_NOT_ARCHIVED", "El producto no esta archivado.");
 		if (products.skuExists(principal.organizationId(), archived.sku(), productId)) throw duplicateSku();
-		validateBarcodeAvailability(principal.organizationId(), archived.barcode(), productId);
+		validateBarcodeAvailability(principal.organizationId(), archived.barcodes(), productId);
 		if (commands.restore(principal.organizationId(), productId, "INACTIVE", principal.userId(), OffsetDateTime.now()) != 1) {
 			throw notFound();
 		}
+		commands.setBarcodesActive(principal.organizationId(), productId, true);
 		auditService.record(principal, "PRODUCT_RESTORED", "CATALOG_PRODUCT", productId,
 				"BACKOFFICE", "INACTIVE", correlationId);
 		return visible(principal, requireProduct(principal.organizationId(), principal.branchId(), productId));
 	}
 
 	private ProductMutation mutation(GymOsPrincipal principal, UUID productId, ProductCommand request,
-			String sku, String barcode, String imageObjectKey, ProductSummaryView existing, OffsetDateTime now) {
+			String sku, String barcode, String imageObjectKey, ProductSummaryView existing, OffsetDateTime now,
+			UUID familyId, String variantName) {
 		return new ProductMutation(
 				principal.organizationId(), productId, sku, request.name().trim(),
 				CatalogBenefitsSerializer.blankToNull(request.description()), normalizeRequired(request.productType()),
@@ -190,12 +254,13 @@ class CatalogProductService {
 				trimToNull(request.presentation()), normalizeNullable(request.unitOfMeasure()), request.inventoryTracked(),
 				request.displayOrder(), imageObjectKey, effectiveSupplier(principal, request, existing),
 				effectiveReferenceCost(principal, request, existing), request.promotionalPriceCents(),
-				request.promotionStartsAt(), request.promotionEndsAt(), request.version(), now, principal.userId()
+				request.promotionStartsAt(), request.promotionEndsAt(), request.version(), now, principal.userId(),
+				familyId, variantName
 		);
 	}
 
 	private String describeChanges(GymOsPrincipal principal, ProductSummaryView existing, ProductCommand request,
-			String sku, String barcode, List<String> tags) {
+			String sku, List<String> barcodes, List<String> tags) {
 		List<String> changes = new ArrayList<>();
 		change(changes, "sku", existing.sku(), sku);
 		change(changes, "name", existing.name(), request.name().trim());
@@ -206,9 +271,10 @@ class CatalogProductService {
 		change(changes, "currency", existing.currency(), normalizeRequired(request.currency()));
 		change(changes, "taxable", existing.taxable(), request.taxable());
 		change(changes, "status", existing.status(), normalizeStatus(request.status()));
-		change(changes, "barcode", existing.barcode(), barcode);
+		change(changes, "barcodes", existing.barcodes(), barcodes);
 		change(changes, "brand", existing.brand(), trimToNull(request.brand()));
 		change(changes, "presentation", existing.presentation(), trimToNull(request.presentation()));
+		change(changes, "variantName", existing.variantName(), resolveVariantName(request, existing));
 		change(changes, "unitOfMeasure", existing.unitOfMeasure(), normalizeNullable(request.unitOfMeasure()));
 		change(changes, "inventoryTracked", existing.inventoryTracked(), request.inventoryTracked());
 		change(changes, "displayOrder", existing.displayOrder(), request.displayOrder());
@@ -281,16 +347,93 @@ class CatalogProductService {
 			throw new BusinessException("PRODUCT_PROMOTION_DATES_INVALID",
 					"La vigencia final debe ser posterior al inicio de la promocion.");
 		}
-		String barcode = normalizeNullable(request.barcode());
-		if (barcode != null && !barcode.matches("[A-Z0-9._-]{3,128}")) {
-			throw new BusinessException("PRODUCT_BARCODE_INVALID", "El codigo de barras contiene caracteres no permitidos.");
+		for (String barcode : normalizeBarcodes(request.barcode(), request.barcodes())) {
+			if (!barcode.matches("[A-Z0-9._-]{3,128}")) {
+				throw new BusinessException("PRODUCT_BARCODE_INVALID", "El codigo de barras contiene caracteres no permitidos.");
+			}
 		}
 	}
 
-	private void validateBarcodeAvailability(UUID organizationId, String barcode, UUID excludedProductId) {
-		if (barcode != null && products.barcodeExists(organizationId, barcode, excludedProductId)) {
-			throw new BusinessException("PRODUCT_BARCODE_ALREADY_EXISTS", "Ya existe otro producto con ese codigo de barras.");
+	private void validateBarcodeAvailability(UUID organizationId, List<String> barcodes, UUID excludedProductId) {
+		for (String barcode : barcodes) {
+			if (products.barcodeExists(organizationId, barcode, excludedProductId)) {
+				throw new BusinessException("PRODUCT_BARCODE_ALREADY_EXISTS",
+						"Ya existe otro producto con el codigo de barras " + barcode + ".");
+			}
 		}
+	}
+
+	private ProductFamilySummaryView resolveBatchFamily(GymOsPrincipal principal,
+			CreateProductVariantsCommand request, OffsetDateTime now) {
+		if (request.familyId() != null) {
+			return families.find(principal.organizationId(), request.familyId())
+					.orElseThrow(() -> new BusinessException("PRODUCT_FAMILY_NOT_FOUND", "La familia seleccionada no existe."));
+		}
+		String name = trimToNull(request.familyName());
+		if (name == null) {
+			throw new BusinessException("PRODUCT_FAMILY_NAME_REQUIRED", "Indica el nombre del producto base.");
+		}
+		String brand = trimToNull(request.brand());
+		if (families.findByIdentity(principal.organizationId(), name, brand).isPresent()) {
+			throw new BusinessException("PRODUCT_FAMILY_ALREADY_EXISTS",
+					"La familia ya existe. Seleccionala para agregar las nuevas variantes.");
+		}
+		UUID familyId = UUID.randomUUID();
+		families.create(new FamilyMutation(familyId, principal.organizationId(), name, brand,
+				CatalogBenefitsSerializer.blankToNull(request.description()), now, principal.userId()));
+		return new ProductFamilySummaryView(familyId, name, brand,
+				CatalogBenefitsSerializer.blankToNull(request.description()), 0, 0);
+	}
+
+	private UUID resolveFamily(GymOsPrincipal principal, ProductCommand request,
+			ProductSummaryView existing, OffsetDateTime now) {
+		if (!"PHYSICAL".equals(normalizeRequired(request.productType()))) return null;
+		UUID requestedFamilyId = request.familyId();
+		if (requestedFamilyId == null && existing != null) requestedFamilyId = existing.familyId();
+		if (requestedFamilyId != null) {
+			return families.find(principal.organizationId(), requestedFamilyId)
+					.orElseThrow(() -> new BusinessException("PRODUCT_FAMILY_NOT_FOUND", "La familia seleccionada no existe."))
+					.id();
+		}
+		String name = request.name().trim();
+		String brand = trimToNull(request.brand());
+		var matching = families.findByIdentity(principal.organizationId(), name, brand);
+		if (matching.isPresent()) return matching.get().id();
+		UUID familyId = UUID.randomUUID();
+		families.create(new FamilyMutation(familyId, principal.organizationId(), name, brand,
+				CatalogBenefitsSerializer.blankToNull(request.description()), now, principal.userId()));
+		return familyId;
+	}
+
+	private String resolveVariantName(ProductCommand request) {
+		return resolveVariantName(request, null);
+	}
+
+	private String resolveVariantName(ProductCommand request, ProductSummaryView existing) {
+		if (!"PHYSICAL".equals(normalizeRequired(request.productType()))) return null;
+		String explicit = trimToNull(request.variantName());
+		if (explicit != null) return explicit;
+		if (existing != null && existing.variantName() != null) return existing.variantName();
+		String presentation = trimToNull(request.presentation());
+		return presentation == null ? request.name().trim() : presentation;
+	}
+
+	private List<String> normalizeBarcodes(String primaryBarcode, List<String> aliases) {
+		LinkedHashSet<String> normalized = new LinkedHashSet<>();
+		String primary = normalizeNullable(primaryBarcode);
+		if (primary != null) normalized.add(primary);
+		if (aliases != null) {
+			aliases.stream().filter(Objects::nonNull).map(this::normalizeNullable)
+					.filter(Objects::nonNull).forEach(normalized::add);
+		}
+		if (normalized.size() > 20) {
+			throw new BusinessException("PRODUCT_BARCODES_INVALID", "Usa hasta 20 codigos de barras por variante.");
+		}
+		return List.copyOf(normalized);
+	}
+
+	private String primaryBarcode(List<String> barcodes) {
+		return barcodes.isEmpty() ? null : barcodes.getFirst();
 	}
 
 	private void validateCategory(UUID organizationId, UUID categoryId, UUID existingCategoryId) {

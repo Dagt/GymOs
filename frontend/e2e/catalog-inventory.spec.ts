@@ -33,8 +33,12 @@ const product = {
   taxable: true,
   status: "ACTIVE",
   barcode: "750000000001",
+  barcodes: ["750000000001", "750000000009"],
   brand: "GymOS",
   presentation: "600 ml",
+  familyId: "ffffffff-ffff-4fff-8fff-ffffffffffff",
+  familyName: "Agua",
+  variantName: "600 ml",
   unitOfMeasure: "PIECE",
   inventoryTracked: true,
   displayOrder: 1,
@@ -116,6 +120,44 @@ test.describe("catalogo e inventario", () => {
     }
   });
 
+  test("alta masiva crea sabores independientes sin repetir los datos del producto", async ({ page }) => {
+    let batchPayload: Record<string, unknown> | null = null;
+    await bootCatalog(page, owner(), async (route, path) => {
+      if (route.request().method() === "POST" && path === "/catalog/product-families/variants") {
+        batchPayload = route.request().postDataJSON() as Record<string, unknown>;
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({ id: "family-psychotic", name: "Psychotic", brand: "Insane Labz", variants: [{ ...product, id: "variant-red", name: "Psychotic · Frutos rojos", sku: "PSY-RED" }, { ...product, id: "variant-gum", name: "Psychotic · Chicle", sku: "PSY-GUM" }] }),
+        });
+        return true;
+      }
+      return false;
+    });
+
+    await page.goto("/catalog");
+    await page.getByRole("button", { name: "Producto con variantes" }).click();
+    await page.getByLabel("Nombre del producto").fill("Psychotic");
+    await page.getByLabel("Marca").fill("Insane Labz");
+    await page.getByLabel("Sabor o variante").nth(0).fill("Frutos rojos");
+    await page.getByLabel("SKU").nth(0).fill("PSY-RED");
+    await page.locator('input[name="variantPrice-0"]').fill("650");
+    await page.getByLabel("Códigos de barras").nth(0).fill("750100000001\n750100000009");
+    await page.getByLabel("Sabor o variante").nth(1).fill("Chicle");
+    await page.getByLabel("SKU").nth(1).fill("PSY-GUM");
+    await page.locator('input[name="variantPrice-1"]').fill("670");
+    await page.getByLabel("Códigos de barras").nth(1).fill("750100000002");
+    await page.getByRole("button", { name: "Crear 2 variantes" }).click();
+
+    await expect.poll(() => (batchPayload?.variants as Array<Record<string, unknown>> | undefined)?.length).toBe(2);
+    expect((batchPayload?.variants as Array<Record<string, unknown>>)[0]).toMatchObject({
+      variantName: "Frutos rojos",
+      sku: "PSY-RED",
+      priceCents: 65000,
+      barcodes: ["750100000001", "750100000009"],
+    });
+    await expect(page.getByText("2 variantes de Psychotic creadas.")).toBeVisible();
+  });
+
   test("POS consulta el catalogo paginado y no descarga el endpoint completo", async ({ page }) => {
     let paginatedSearches = 0;
     let completeCatalogRequests = 0;
@@ -182,7 +224,7 @@ test.describe("catalogo e inventario", () => {
     await page.goto("/pos");
     await expect(page.getByRole("button", { name: /Agua/ })).toBeVisible();
 
-    await scanBarcode(page, product.barcode);
+    await scanBarcode(page, product.barcodes[1]);
     await expect(page.getByRole("heading", { name: "Carrito (1)" })).toBeVisible();
     const cart = page.locator("form").filter({
       has: page.getByRole("heading", { name: "Carrito (1)" }),
@@ -227,7 +269,7 @@ function responseFor(path: string) {
     return { items: [product], page: 0, size: 25, totalElements: 1, totalPages: 1 };
   }
   if (path === "/catalog/products/summary") return summary;
-  if (path === "/catalog/categories" || path === "/catalog/plans") return [];
+  if (path === "/catalog/categories" || path === "/catalog/plans" || path === "/catalog/product-families") return [];
   if (path.startsWith("/sales")) return [];
   if (path === "/organizations/current/branches") return [];
   return [];

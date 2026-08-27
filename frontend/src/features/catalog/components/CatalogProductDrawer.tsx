@@ -65,6 +65,10 @@ export function CatalogProductDrawer({
       unitOfMeasure: productType === "PHYSICAL" ? form.unitOfMeasure ?? "PIECE" : null,
       referenceCostCents: productType === "PHYSICAL" ? form.referenceCostCents : null,
       supplierName: productType === "PHYSICAL" ? form.supplierName : null,
+      familyId: productType === "PHYSICAL" ? form.familyId : null,
+      variantName: productType === "PHYSICAL" ? form.variantName : null,
+      barcodes: productType === "PHYSICAL" ? form.barcodes : [],
+      barcode: productType === "PHYSICAL" ? form.barcode : null,
     });
   }
 
@@ -96,8 +100,23 @@ export function CatalogProductDrawer({
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             {form.productType === "PHYSICAL" ? (
               <>
-                <TextField label="Código de barras" name="productBarcode" placeholder="7501234567890" required={false} value={form.barcode ?? ""} onChange={(barcode) => change({ barcode: barcode || null })} />
+                <div className="sm:col-span-2">
+                  <TextAreaField
+                    help="Uno por línea. El primero será el código principal; cualquiera identificará esta misma variante en caja."
+                    label="Códigos de barras"
+                    name="productBarcodes"
+                    placeholder={"7501234567890\n7501234567891"}
+                    required={false}
+                    rows={3}
+                    value={form.barcodes.join("\n")}
+                    onChange={(value) => {
+                      const barcodes = value.split(/\r?\n/);
+                      change({ barcode: barcodes.find((item) => item.trim())?.trim() || null, barcodes });
+                    }}
+                  />
+                </div>
                 <TextField label="Marca" name="productBrand" placeholder="Marca" required={false} value={form.brand ?? ""} onChange={(brand) => change({ brand: brand || null })} />
+                <TextField label="Variante o sabor" name="productVariantName" placeholder="Frutos rojos" required={false} value={form.variantName ?? ""} onChange={(variantName) => change({ variantName: variantName || null })} />
                 <TextField label="Presentación" name="productPresentation" placeholder="Bote de 30 porciones" required={false} value={form.presentation ?? ""} onChange={(presentation) => change({ presentation: presentation || null })} />
                 <SelectField
                   label="Unidad"

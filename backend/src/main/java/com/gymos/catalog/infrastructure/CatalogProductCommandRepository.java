@@ -23,14 +23,14 @@ public class CatalogProductCommandRepository implements CatalogProductCommandPor
 				    id, organization_id, sku, name, description, product_type, commercial_subtype,
 				    price_cents, currency, taxable, status, barcode, brand, presentation, unit_of_measure,
 				    inventory_tracked, display_order, image_object_key, supplier_name, reference_cost_cents,
-				    promotional_price_cents, promotion_starts_at, promotion_ends_at,
+				    promotional_price_cents, promotion_starts_at, promotion_ends_at, family_id, variant_name,
 				    created_at, updated_at, created_by, updated_by, version
 				)
 				VALUES (
 				    :id, :organizationId, :sku, :name, :description, :productType, :commercialSubtype,
 				    :priceCents, :currency, :taxable, :status, :barcode, :brand, :presentation, :unitOfMeasure,
 				    :inventoryTracked, :displayOrder, :imageObjectKey, :supplierName, :referenceCostCents,
-				    :promotionalPriceCents, :promotionStartsAt, :promotionEndsAt,
+				    :promotionalPriceCents, :promotionStartsAt, :promotionEndsAt, :familyId, :variantName,
 				    :now, :now, :userId, :userId, 0
 				)
 				""")
@@ -57,6 +57,8 @@ public class CatalogProductCommandRepository implements CatalogProductCommandPor
 				.param("promotionalPriceCents", product.promotionalPriceCents())
 				.param("promotionStartsAt", product.promotionStartsAt())
 				.param("promotionEndsAt", product.promotionEndsAt())
+				.param("familyId", product.familyId())
+				.param("variantName", product.variantName())
 				.param("now", product.now())
 				.param("userId", product.userId())
 				.update();
@@ -103,6 +105,8 @@ public class CatalogProductCommandRepository implements CatalogProductCommandPor
 				    promotional_price_cents = :promotionalPriceCents,
 				    promotion_starts_at = :promotionStartsAt,
 				    promotion_ends_at = :promotionEndsAt,
+				    family_id = :familyId,
+				    variant_name = :variantName,
 				    updated_at = :now,
 				    updated_by = :userId,
 				    version = version + 1
@@ -133,6 +137,8 @@ public class CatalogProductCommandRepository implements CatalogProductCommandPor
 				.param("promotionalPriceCents", product.promotionalPriceCents())
 				.param("promotionStartsAt", product.promotionStartsAt())
 				.param("promotionEndsAt", product.promotionEndsAt())
+				.param("familyId", product.familyId())
+				.param("variantName", product.variantName())
 				.param("expectedVersion", product.expectedVersion())
 				.param("now", product.now())
 				.param("userId", product.userId())
@@ -205,6 +211,45 @@ public class CatalogProductCommandRepository implements CatalogProductCommandPor
 				.param("productId", productId)
 				.update();
 		tags.forEach(tag -> attachTag(organizationId, productId, tag, userId, now));
+	}
+
+	@Override
+	public void replaceBarcodes(UUID organizationId, UUID productId, List<String> barcodes, boolean active,
+			UUID userId, OffsetDateTime now) {
+		jdbcClient.sql("DELETE FROM catalog_product_barcode WHERE organization_id=:organizationId AND product_id=:productId")
+				.param("organizationId", organizationId)
+				.param("productId", productId)
+				.update();
+		for (int index = 0; index < barcodes.size(); index++) {
+			jdbcClient.sql("""
+					INSERT INTO catalog_product_barcode (
+					 id, organization_id, product_id, barcode, is_primary, active, created_at, created_by
+					) VALUES (
+					 :id, :organizationId, :productId, :barcode, :primary, :active, :now, :userId
+					)
+					""")
+					.param("id", UUID.randomUUID())
+					.param("organizationId", organizationId)
+					.param("productId", productId)
+					.param("barcode", barcodes.get(index))
+					.param("primary", index == 0)
+					.param("active", active)
+					.param("now", now)
+					.param("userId", userId)
+					.update();
+		}
+	}
+
+	@Override
+	public void setBarcodesActive(UUID organizationId, UUID productId, boolean active) {
+		jdbcClient.sql("""
+				UPDATE catalog_product_barcode SET active=:active
+				WHERE organization_id=:organizationId AND product_id=:productId
+				""")
+				.param("active", active)
+				.param("organizationId", organizationId)
+				.param("productId", productId)
+				.update();
 	}
 
 	private int updateLifecycle(UUID organizationId, UUID productId, String status, OffsetDateTime archivedAt,

@@ -157,6 +157,8 @@ Regla:
   socio nunca tuvo una, desde `joined_at`.
 
 ### product
+- `catalog_product` sigue representando la unidad vendible y conserva su `id`:
+  ventas, movimientos, existencias y snapshots no se migran a otra entidad.
 - sku
 - name
 - description
@@ -165,7 +167,9 @@ Regla:
 - currency
 - active
 - inventory_tracked
-- barcode
+- barcode (espejo temporal del código principal para compatibilidad)
+- family_id
+- variant_name
 - brand
 - presentation
 - unit_of_measure
@@ -176,6 +180,33 @@ Regla:
 - categoria principal mediante `catalog_product_category`
 - etiquetas mediante `catalog_product_tag`
 - behavior_key
+
+### catalog_product_family
+- id
+- organization_id
+- name
+- brand
+- description
+- version
+
+Regla: la familia describe el producto base, por ejemplo `Psychotic`; no tiene
+precio, SKU ni existencias. Cada sabor/presentación permanece como
+`catalog_product` vendible, con precio, costo, SKU e inventario propios. La
+familia es de la organización y las variantes conservan disponibilidad por
+sucursal mediante `catalog_product_branch`.
+
+### catalog_product_barcode
+- organization_id
+- product_id
+- barcode
+- is_primary
+- active
+
+Reglas:
+- una variante acepta hasta 20 códigos;
+- un código activo identifica una sola variante dentro de la organización;
+- todos los alias resuelven el mismo `catalog_product` en POS e inventario;
+- archivar desactiva sus alias y restaurar vuelve a validar su unicidad.
 
 ### plan
 - product_id

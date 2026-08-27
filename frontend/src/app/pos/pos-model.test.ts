@@ -32,13 +32,14 @@ test("pos model provides data-dense configuration for power-user cashier operati
 
 test("findProductByBarcodeOrSku locates product by exact barcode or SKU", () => {
   const products: ProductSummary[] = [
-    product({ id: "1", name: "Agua 600ml", priceCents: 2000, sku: "AGUA-600", barcode: "7501234567890" }),
+    product({ id: "1", name: "Agua 600ml", priceCents: 2000, sku: "AGUA-600", barcode: "7501234567890", barcodes: ["7501234567890", "7501234567891"] }),
     product({ id: "2", name: "Proteina Scoop", priceCents: 3500, sku: "SCOOP-WHEY" }),
   ];
 
   // Match by barcode
   const foundBarcode = findProductByBarcodeOrSku(products, "7501234567890");
   assert.equal(foundBarcode?.id, "1");
+  assert.equal(findProductByBarcodeOrSku(products, "7501234567891")?.id, "1");
 
   // Match by SKU (case insensitive)
   const foundSku = findProductByBarcodeOrSku(products, "scoop-whey");
@@ -114,8 +115,12 @@ function product(overrides: Partial<ProductSummary> & Pick<ProductSummary, "id" 
     taxable: true,
     status: "ACTIVE",
     barcode: null,
+    barcodes: [],
     brand: null,
     presentation: null,
+    familyId: null,
+    familyName: null,
+    variantName: null,
     unitOfMeasure: null,
     inventoryTracked: false,
     displayOrder: 0,

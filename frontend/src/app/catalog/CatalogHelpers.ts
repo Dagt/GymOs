@@ -16,8 +16,11 @@ export const emptyProduct: ProductPayload = {
   taxable: true,
   status: "ACTIVE",
   barcode: null,
+  barcodes: [],
   brand: null,
   presentation: null,
+  familyId: null,
+  variantName: null,
   unitOfMeasure: "PIECE",
   inventoryTracked: true,
   displayOrder: 0,
@@ -43,8 +46,11 @@ export function productToDraft(product: import("@/lib/api").ProductSummary): Pro
     taxable: product.taxable,
     status: product.status,
     barcode: product.barcode,
+    barcodes: product.barcodes?.length ? product.barcodes : product.barcode ? [product.barcode] : [],
     brand: product.brand,
     presentation: product.presentation,
+    familyId: product.familyId,
+    variantName: product.variantName,
     unitOfMeasure: product.productType === "PHYSICAL"
       ? normalizeCatalogUnit(product.unitOfMeasure) ?? "PIECE"
       : null,
@@ -88,6 +94,7 @@ export const emptyPlan: PlanDraft = {
 };
 
 export function productDraftToPayload(form: ProductPayload, price: string): ProductPayload {
+  const barcodes = [...new Set(form.barcodes.map((barcode) => barcode.trim()).filter(Boolean))];
   return {
     ...form,
     commercialSubtype: form.productType === "PHYSICAL" ? "GENERAL_PRODUCT" : "GENERAL_SERVICE",
@@ -96,6 +103,9 @@ export function productDraftToPayload(form: ProductPayload, price: string): Prod
     sku: form.sku.trim(),
     name: form.name.trim(),
     description: form.description?.trim() || null,
+    barcode: barcodes[0] ?? null,
+    barcodes,
+    variantName: form.variantName?.trim() || null,
     unitOfMeasure: form.productType === "PHYSICAL"
       ? normalizeCatalogUnit(form.unitOfMeasure) ?? "PIECE"
       : null,

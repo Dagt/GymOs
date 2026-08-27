@@ -733,6 +733,30 @@ Reglas:
 - `HIKCENTRAL` identifica el primer contrato cloud; la operación contra un
   torniquete real sigue pendiente del Connector y adapter validados en sitio.
 
+## UC-035 Dar de alta un producto con sabores y códigos múltiples
+
+Actor: usuario con `catalog.create` y sucursal activa.
+
+Flujo:
+1. Abre Catálogo y elige `Producto con variantes`.
+2. Selecciona una familia existente o captura una sola vez nombre y marca.
+3. Agrega filas para sabores/presentaciones; cada fila define SKU, precio y uno
+   o más códigos de barras.
+4. Opcionalmente despliega categoría, unidad, seguimiento de inventario, stock
+   mínimo y etiquetas comunes.
+5. Backend crea el lote transaccionalmente y adjunta cada variante a la sucursal
+   activa.
+6. POS puede identificar la variante correcta con cualquiera de sus códigos;
+   ventas e inventario operan sobre su `catalog_product` individual.
+
+Criterios:
+- no se repiten nombre, marca ni configuración común por sabor;
+- cada variante mantiene precio, costo, SKU, stock y movimientos propios;
+- una colisión de SKU o código revierte el lote completo;
+- un código no puede apuntar a dos variantes activas de la misma organización;
+- productos, ventas y movimientos existentes conservan sus IDs y relaciones al
+  aplicar V95.
+
 ## Anexo Hito 3.5 final
 
 La verificación segura de kiosco, la idempotencia por hash y los eventos por

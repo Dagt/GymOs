@@ -5,9 +5,11 @@ import {
   archiveProduct,
   changeProductStatus,
   createProduct,
+  createProductVariants,
   getCatalogCategories,
   getInventoryStockDetail,
   getPlans,
+  getProductFamilies,
   getStoredSession,
   removeProductImage,
   restoreProduct,
@@ -18,7 +20,9 @@ import {
   type CatalogCategory,
   type PlanSummary,
   type ProductPayload,
+  type ProductFamilySummary,
   type ProductSummary,
+  type ProductVariantBatchPayload,
   type StoredSession,
 } from "@/lib/api";
 import { getCatalogSummary } from "@/lib/api/catalog";
@@ -35,6 +39,7 @@ export function useCatalogController() {
   const [totalProducts, setTotalProducts] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [categories, setCategories] = useState<CatalogCategory[]>([]);
+  const [families, setFamilies] = useState<ProductFamilySummary[]>([]);
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [form, setForm] = useState<ProductPayload>(emptyProduct);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -48,6 +53,8 @@ export function useCatalogController() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showProductDrawer, setShowProductDrawer] = useState(false);
+  const [showVariantDrawer, setShowVariantDrawer] = useState(false);
+  const [variantDrawerKey, setVariantDrawerKey] = useState(0);
   const catalogFilters = useCatalogFilters();
   const filtersKey = JSON.stringify(catalogFilters.filters);
   const planEditor = useCatalogPlanEditor(session, reloadCatalog);
@@ -71,7 +78,7 @@ export function useCatalogController() {
       if (!active) return;
       setLoading(true);
       try {
-        const [page, loadedPlans, loadedCategories, loadedSummary] = await loadCatalog(
+        const [page, loadedPlans, loadedCategories, loadedSummary, loadedFamilies] = await loadCatalog(
           token,
           catalogFilters.filters,
         );
@@ -86,6 +93,7 @@ export function useCatalogController() {
         setPlans(loadedPlans);
         setCategories(loadedCategories);
         setSummary(loadedSummary);
+        setFamilies(loadedFamilies);
       } catch (exception) {
         if (active) {
           setError(exception instanceof Error ? exception.message : "No fue posible cargar catálogo.");
@@ -105,7 +113,7 @@ export function useCatalogController() {
   async function reloadCatalog() {
     const activeSession = getStoredSession() ?? session;
     if (!activeSession) return;
-    const [page, loadedPlans, loadedCategories, loadedSummary] = await loadCatalog(
+    const [page, loadedPlans, loadedCategories, loadedSummary, loadedFamilies] = await loadCatalog(
       activeSession.accessToken,
       catalogFilters.filters,
     );
@@ -120,6 +128,7 @@ export function useCatalogController() {
     setPlans(loadedPlans);
     setCategories(loadedCategories);
     setSummary(loadedSummary);
+    setFamilies(loadedFamilies);
   }
 
   async function submitProduct(event: FormEvent<HTMLFormElement>) {
@@ -174,6 +183,29 @@ export function useCatalogController() {
     }
   }
 
+  async function submitProductVariants(payload: ProductVariantBatchPayload, commonReorderPoint: number) {
+    const activeSession = getStoredSession() ?? session;
+    if (!activeSession) return;
+    setSaving(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const family = await createProductVariants(activeSession.accessToken, payload);
+      const warnings: string[] = [];
+      if (canManageInventory && payload.inventoryTracked) {
+        const results = await Promise.allSettled(family.variants.map((variant) => updateInventorySettings(activeSession.accessToken, variant.id, { reorderPoint: commonReorderPoint })));
+        if (results.some((result) => result.status === "rejected")) warnings.push("no se guardó el stock mínimo de algunas variantes");
+      }
+      await reloadCatalog();
+      setShowVariantDrawer(false);
+      setMessage(`${family.variants.length} variantes de ${family.name} creadas.${warnings.length ? ` ${warnings.join(" y ")}.` : ""}`);
+    } catch (exception) {
+      setError(exception instanceof Error ? exception.message : "No fue posible crear las variantes.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   async function removeCurrentProductImage() {
     const activeSession = getStoredSession() ?? session;
     if (!activeSession || !editingProductId || !existingImageObjectKey) return;
@@ -203,6 +235,13 @@ export function useCatalogController() {
     setTagsText("");
     setProductImage(null);
     setShowProductDrawer(true);
+  }
+
+  function openVariantCreation() {
+    setError(null);
+    setMessage(null);
+    setVariantDrawerKey((current) => current + 1);
+    setShowVariantDrawer(true);
   }
 
   async function openProductEdition(product: ProductSummary) {
@@ -287,6 +326,7 @@ export function useCatalogController() {
     restoreCatalogProduct,
     catalogFilters,
     categories,
+    families,
     editingProductId,
     editingPlanId: planEditor.editingId,
     error: error ?? planEditor.error,
@@ -297,6 +337,7 @@ export function useCatalogController() {
     openPlanCreation: planEditor.create,
     openPlanEdition: planEditor.edit,
     openProductCreation,
+    openVariantCreation,
     openProductEdition,
     planForm: planEditor.form,
     plans,
@@ -316,10 +357,14 @@ export function useCatalogController() {
     setTagsText,
     showPlanDrawer: planEditor.open,
     showProductDrawer,
+    showVariantDrawer,
+    variantDrawerKey,
     submitPlan: planEditor.submit,
     submitProduct,
+    submitProductVariants,
     resetPlanDrawer: planEditor.close,
     resetProductDrawer,
+    resetVariantDrawer: () => setShowVariantDrawer(false),
     reloadCatalog,
     tagsText,
     toggleProductStatus,
@@ -342,6 +387,7 @@ function loadCatalog(accessToken: string, filters: import("@/lib/api").ProductSe
     getPlans(accessToken),
     getCatalogCategories(accessToken, true),
     getCatalogSummary(accessToken),
+    getProductFamilies(accessToken),
   ]);
 }
 

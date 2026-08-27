@@ -172,6 +172,11 @@ class DatabaseMigrationTests {
 			assertThat(tableExists(connection, "client_lifecycle_configuration")).isTrue();
 			assertThat(columnExists(connection, "client_lifecycle_configuration", "inactivity_months")).isTrue();
 			assertThat(columnExists(connection, "client_lifecycle_configuration", "registration_recharge_months")).isFalse();
+			assertThat(tableExists(connection, "catalog_product_family")).isTrue();
+			assertThat(tableExists(connection, "catalog_product_barcode")).isTrue();
+			assertThat(columnExists(connection, "catalog_product", "family_id")).isTrue();
+			assertThat(columnExists(connection, "catalog_product", "variant_name")).isTrue();
+			assertThat(indexExists(connection, "uq_catalog_product_barcode_active")).isTrue();
 			assertThat(indexExists(connection, "ix_client_automatic_inactivation")).isTrue();
 			assertThat(columnExists(connection, "membership", "auto_renew")).isTrue();
 			assertThat(columnExists(connection, "membership", "cancelled_at")).isTrue();
@@ -207,6 +212,69 @@ class DatabaseMigrationTests {
 			assertThat(columnExists(connection, "branch", "surface_color")).isFalse();
 			assertThat(roleHasPermission(connection, "Recepcion", "resource.manage")).isFalse();
 			assertThat(roleHasPermission(connection, "Recepcion", "booking.manage")).isTrue();
+		}
+	}
+
+	@Test
+	void upgradeFromV94BackfillsFamiliesAndBarcodeAliasesWithoutChangingProductIds() throws Exception {
+		String schema = migrationSchema("catalog_variants_v94");
+		migrateSchema(schema, "94");
+		UUID organizationId = UUID.randomUUID();
+		UUID firstProductId = UUID.randomUUID();
+		UUID secondProductId = UUID.randomUUID();
+		try (var connection = schemaConnection(schema)) {
+			insertOrganization(connection, organizationId);
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO catalog_product (
+					    id, organization_id, sku, name, description, product_type,
+					    price_cents, currency, taxable, status, barcode, brand, presentation,
+					    created_at, updated_at, version
+					) VALUES
+					    (?, ?, 'PSY-RED', 'Psychotic', null, 'PHYSICAL', 65000, 'MXN', true, 'ACTIVE', '750100000001', 'Insane Labz', 'Frutos rojos', now(), now(), 0),
+					    (?, ?, 'PSY-GUM', 'Psychotic', null, 'PHYSICAL', 65000, 'MXN', true, 'ACTIVE', '750100000002', 'Insane Labz', 'Chicle', now(), now(), 0)
+					""")) {
+				statement.setObject(1, firstProductId);
+				statement.setObject(2, organizationId);
+				statement.setObject(3, secondProductId);
+				statement.setObject(4, organizationId);
+				statement.executeUpdate();
+			}
+		}
+
+		migrateSchema(schema, null);
+
+		try (var connection = schemaConnection(schema)) {
+			try (var statement = connection.prepareStatement("""
+					SELECT COUNT(DISTINCT family_id) AS families,
+					       COUNT(*) FILTER (WHERE id IN (?, ?)) AS products,
+					       STRING_AGG(variant_name, ',' ORDER BY variant_name) AS variants
+					FROM catalog_product
+					WHERE organization_id = ? AND id IN (?, ?)
+					""")) {
+				statement.setObject(1, firstProductId);
+				statement.setObject(2, secondProductId);
+				statement.setObject(3, organizationId);
+				statement.setObject(4, firstProductId);
+				statement.setObject(5, secondProductId);
+				try (var resultSet = statement.executeQuery()) {
+					assertThat(resultSet.next()).isTrue();
+					assertThat(resultSet.getInt("families")).isEqualTo(1);
+					assertThat(resultSet.getInt("products")).isEqualTo(2);
+					assertThat(resultSet.getString("variants")).isEqualTo("Chicle,Frutos rojos");
+				}
+			}
+			try (var statement = connection.prepareStatement("""
+					SELECT COUNT(*) FROM catalog_product_barcode
+					WHERE organization_id = ? AND product_id IN (?, ?) AND active = TRUE AND is_primary = TRUE
+					""")) {
+				statement.setObject(1, organizationId);
+				statement.setObject(2, firstProductId);
+				statement.setObject(3, secondProductId);
+				try (var resultSet = statement.executeQuery()) {
+					assertThat(resultSet.next()).isTrue();
+					assertThat(resultSet.getInt(1)).isEqualTo(2);
+				}
+			}
 		}
 	}
 

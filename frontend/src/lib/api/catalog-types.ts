@@ -21,8 +21,12 @@ export type ProductSummary = {
   taxable: boolean;
   status: "ACTIVE" | "INACTIVE";
   barcode: string | null;
+  barcodes: string[];
   brand: string | null;
   presentation: string | null;
+  familyId: string | null;
+  familyName: string | null;
+  variantName: string | null;
   unitOfMeasure: string | null;
   inventoryTracked: boolean;
   displayOrder: number;
@@ -107,8 +111,11 @@ export type ProductPayload = {
   taxable: boolean;
   status: "ACTIVE" | "INACTIVE";
   barcode?: string | null;
+  barcodes: string[];
   brand?: string | null;
   presentation?: string | null;
+  familyId?: string | null;
+  variantName?: string | null;
   unitOfMeasure?: string | null;
   inventoryTracked: boolean;
   displayOrder: number;
@@ -120,6 +127,49 @@ export type ProductPayload = {
   categoryId?: string | null;
   tags: string[];
   version?: number | null;
+};
+
+export type ProductFamilySummary = {
+  id: string;
+  name: string;
+  brand: string | null;
+  description: string | null;
+  activeVariants: number;
+  totalVariants: number;
+};
+
+export type ProductFamilyResult = {
+  id: string;
+  name: string;
+  brand: string | null;
+  variants: ProductSummary[];
+};
+
+export type ProductVariantBatchPayload = {
+  familyId?: string | null;
+  familyName?: string | null;
+  brand?: string | null;
+  description?: string | null;
+  currency: string;
+  taxable: boolean;
+  status: "ACTIVE" | "INACTIVE";
+  unitOfMeasure?: string | null;
+  inventoryTracked: boolean;
+  displayOrder: number;
+  supplierName?: string | null;
+  categoryId?: string | null;
+  tags: string[];
+  variants: Array<{
+    variantName: string;
+    sku: string;
+    presentation?: string | null;
+    priceCents: number;
+    barcodes: string[];
+    referenceCostCents?: number | null;
+    promotionalPriceCents?: number | null;
+    promotionStartsAt?: string | null;
+    promotionEndsAt?: string | null;
+  }>;
 };
 
 export type ProductPage = {

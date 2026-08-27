@@ -342,6 +342,8 @@ Autenticacion y sucursal activa:
 - `GET /catalog/products`
 - `GET /catalog/products/search`
 - `GET /catalog/products/by-barcode/{barcode}`
+- `GET /catalog/product-families`
+- `POST /catalog/product-families/variants`
 - `POST /catalog/products`
 - `GET /catalog/products/{id}`
 - `PUT|PATCH /catalog/products/{id}`
@@ -354,11 +356,23 @@ Autenticacion y sucursal activa:
 - `GET|POST /catalog/categories`
 - `PATCH|DELETE /catalog/categories/{id}`
 
-`GET /catalog/products/search` devuelve `items`, `page`, `size`, `totalElements` y `totalPages`. Acepta búsqueda por nombre, SKU, código de barras y etiqueta, además de filtros por tipo, categoría, estado y seguimiento de inventario.
+`GET /catalog/products/search` devuelve `items`, `page`, `size`, `totalElements` y `totalPages`. Acepta búsqueda por nombre de familia o variante, SKU, cualquiera de sus códigos de barras y etiqueta, además de filtros por tipo, categoría, estado y seguimiento de inventario.
 
 `GET /catalog/products/by-barcode/{barcode}` hace una consulta exacta de un
-producto activo de la sucursal y excluye planes. El POS lo usa como fallback
+producto activo de la sucursal y excluye planes. La coincidencia considera
+cualquier alias activo, no sólo el código principal. El POS lo usa como fallback
 cuando el código escaneado no está en la página local.
+
+`ProductSummary` expone `familyId`, `familyName`, `variantName`, `barcodes` y
+conserva `barcode` como espejo compatible del primer código. Crear o actualizar
+un producto individual acepta `barcodes`; el primer elemento queda como
+principal.
+
+`POST /catalog/product-families/variants` crea de una a 50 variantes en una sola
+transacción. Acepta `familyId` para agregar sabores a una familia existente o
+`familyName`/`brand` para crearla. Los datos comunes se envían una vez y cada
+variante define `variantName`, `sku`, `priceCents`, presentación, costo opcional
+y hasta 20 códigos. Una colisión de SKU o código revierte todo el lote.
 
 `unitOfMeasure` ya no es texto libre en el alta web. Para productos físicos usa
 uno de los valores canónicos:

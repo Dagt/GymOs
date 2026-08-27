@@ -73,7 +73,9 @@ export default function CatalogProductDetailPage() {
             <Detail label="Precio promocional" value={product.promotionalPriceCents == null ? "Sin promoción" : formatMoney(product.promotionalPriceCents, product.currency)} />
             {canReadCosts ? <Detail label="Costo de referencia" value={product.referenceCostCents == null ? "Sin costo" : formatMoney(product.referenceCostCents, product.currency)} /> : null}
             {canReadCosts ? <Detail label="Proveedor" value={product.supplierName ?? "Sin proveedor"} /> : null}
-            <Detail label="Código de barras" value={product.barcode ?? "Sin código"} />
+            <Detail label="Familia" value={product.familyName ?? "Sin familia"} />
+            <Detail label="Variante" value={product.variantName ?? "Sin variante"} />
+            <Detail label="Códigos de barras" value={(product.barcodes?.length ? product.barcodes : product.barcode ? [product.barcode] : []).join(", ") || "Sin códigos"} />
             <Detail label="Marca" value={product.brand ?? "Sin marca"} />
             <Detail label="Presentación" value={product.presentation ?? "Sin presentación"} />
             <Detail label="Unidad" value={catalogUnitLabel(product.unitOfMeasure)} />

@@ -8,9 +8,10 @@ type CatalogToolbarProps = {
   canCreate: boolean;
   onNewPlan: () => void;
   onNewProduct: () => void;
+  onNewVariants: () => void;
 };
 
-export function CatalogToolbar({ canCreate, onNewPlan, onNewProduct }: CatalogToolbarProps) {
+export function CatalogToolbar({ canCreate, onNewPlan, onNewProduct, onNewVariants }: CatalogToolbarProps) {
   return (
     <section className="app-card flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
       <div>
@@ -18,9 +19,12 @@ export function CatalogToolbar({ canCreate, onNewPlan, onNewProduct }: CatalogTo
         <h2 className="app-card-title">Artículos y planes</h2>
       </div>
       {canCreate ? (
-        <div className="grid w-full gap-2 sm:grid-cols-2 lg:w-auto">
+        <div className="grid w-full gap-2 sm:grid-cols-3 lg:w-auto">
           <button className="app-button-secondary h-11 min-w-48" onClick={onNewProduct} type="button">
             Nuevo artículo o cargo
+          </button>
+          <button className="app-button-secondary h-11 min-w-48" onClick={onNewVariants} type="button">
+            Producto con variantes
           </button>
           <button className="app-button h-11 min-w-48" onClick={onNewPlan} type="button">
             Nuevo plan
@@ -117,4 +121,3 @@ export function PlanDrawer({ editingPlanId, form, open, saving, onClose, onFormC
     </AppDrawer>
   );
 }
-

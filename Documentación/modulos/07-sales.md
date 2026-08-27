@@ -42,3 +42,8 @@ la primera alta. Se persiste como una partida `REGISTRATION_FEE` separada de
 y concepto participan en el hash de idempotencia. V94 unifica la decisión
 temporal: la reinscripción usa exclusivamente `inactivityMonths`, incluso si la
 baja automática está desactivada; no cambia el modelo financiero ni el desglose.
+
+V95 no cambia el modelo financiero. Una variante continúa siendo el mismo tipo
+de `catalog_product` que las ventas ya referencian; familia y códigos alias sólo
+mejoran la captura y resolución del artículo. `sale_item` conserva `product_id`
+y snapshot comercial, por lo que sabores, precios y devoluciones no se mezclan.

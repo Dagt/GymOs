@@ -58,6 +58,8 @@ export {
   createCatalogCategory,
   createPlan,
   createProduct,
+  createProductVariants,
+  getProductFamilies,
   getProductByBarcode,
   getPlans,
   getProducts,
@@ -76,9 +78,12 @@ export type {
   PlanPayload,
   PlanSummary,
   ProductPayload,
+  ProductFamilyResult,
+  ProductFamilySummary,
   ProductSummary,
   ProductPage,
   ProductSearchParams,
+  ProductVariantBatchPayload,
   UpdateMembershipPlanPayload,
 } from "./api/catalog-types";
 export * from "./api/benefits";

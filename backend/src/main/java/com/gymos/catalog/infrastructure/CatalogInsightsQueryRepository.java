@@ -31,7 +31,10 @@ class CatalogInsightsQueryRepository implements CatalogInsightsQueryPort {
 				  COUNT(*) FILTER (WHERE product_type<>'MEMBERSHIP_PLAN' AND archived_at IS NULL AND NOT EXISTS (
 				      SELECT 1 FROM catalog_product_category pc WHERE pc.organization_id=cp.organization_id AND pc.product_id=cp.id
 				  )) AS uncategorized_products,
-				  COUNT(*) FILTER (WHERE product_type<>'MEMBERSHIP_PLAN' AND archived_at IS NULL AND barcode IS NULL) AS without_barcode,
+				  COUNT(*) FILTER (WHERE product_type<>'MEMBERSHIP_PLAN' AND archived_at IS NULL AND NOT EXISTS (
+				      SELECT 1 FROM catalog_product_barcode barcode
+				      WHERE barcode.organization_id=cp.organization_id AND barcode.product_id=cp.id AND barcode.active=TRUE
+				  )) AS without_barcode,
 				  COUNT(*) FILTER (WHERE product_type<>'MEMBERSHIP_PLAN' AND archived_at IS NULL AND image_object_key IS NULL) AS without_image,
 				  (SELECT COUNT(*) FROM inventory_stock s
 				    JOIN catalog_product p ON p.id=s.product_id AND p.organization_id=s.organization_id

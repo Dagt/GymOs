@@ -36,7 +36,11 @@ export function CatalogProductTable({ loading, products, saving, canArchive, can
             <tbody className="divide-y divide-[#e3e7df]">
               {products.map((product) => (
                 <tr className={product.archived ? "bg-[#faf7f2] opacity-80" : "hover:bg-[#fafbf9]"} key={product.id}>
-                  <td className="px-3 py-2"><p className="font-semibold leading-tight">{product.name}</p><p className="mt-0.5 text-[10px] leading-tight text-[#6f7a73]">{product.sku}{product.barcode ? ` · ${product.barcode}` : ""}</p></td>
+                  <td className="px-3 py-2">
+                    <p className="font-semibold leading-tight">{product.familyName ?? product.name}</p>
+                    {product.variantName ? <p className="mt-0.5 text-[11px] font-medium leading-tight text-[#405348]">{product.variantName}{product.presentation && product.presentation !== product.variantName ? ` · ${product.presentation}` : ""}</p> : null}
+                    <p className="mt-0.5 text-[10px] leading-tight text-[#6f7a73]">{product.sku}{barcodeCount(product) ? ` · ${barcodeCount(product)} ${barcodeCount(product) === 1 ? "código" : "códigos"}` : ""}</p>
+                  </td>
                   <td className="px-3 py-2">{product.categoryName ?? "Sin categoría"}</td>
                   <td className="px-3 py-2">{product.productType === "PHYSICAL" ? "Producto" : "Cargo"}</td>
                   <td className="px-3 py-2 font-medium">{formatMoney(product.priceCents, product.currency)}</td>
@@ -60,6 +64,10 @@ export function CatalogProductTable({ loading, products, saving, canArchive, can
       ) : null}
     </section>
   );
+}
+
+function barcodeCount(product: ProductSummary) {
+  return product.barcodes?.length ?? (product.barcode ? 1 : 0);
 }
 
 function ProductStatus({ product }: { product: ProductSummary }) {

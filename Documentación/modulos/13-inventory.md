@@ -1,7 +1,7 @@
 # Inventarios
 
 Estado: `ESTABILIZADO`
-Última revisión: 25 de agosto de 2026
+Última revisión: 27 de agosto de 2026
 
 ## Implementado
 
@@ -11,6 +11,9 @@ Estado: `ESTABILIZADO`
 - conteos físicos y ajustes;
 - costos, valuación y alertas de reabastecimiento;
 - integración con ventas, devoluciones y catálogo;
+- stock, costos, mínimos y movimientos separados por variante vendible, aunque
+  varias variantes pertenezcan a la misma familia comercial;
+- búsqueda por cualquiera de los códigos alias de la variante;
 - frontend separado en existencias, movimientos, transferencias y auditorías.
 - existencias, movimientos, alertas, transferencias y conteos paginados en
   servidor, con totales filtrados y navegación explícita;
@@ -35,5 +38,6 @@ Estado: `ESTABILIZADO`
 Base histórica: PR #6. Última revisión dentro del árbol integrado actual:
 25-ago-2026. `INV-001` queda resuelta con los contratos `/search`,
 `InventoryPaginationIntegrationTests` sobre 127 registros y la suite E2E de
-paginación. No se modifica el esquema ni el ciclo de aprobación de conteos.
+paginación. V95 agrega familias/códigos al catálogo sin modificar las claves de
+producto usadas por stock, conteos, transferencias o movimientos.
 Contrato y límites: [paginación de listados](../../docs/operations/list-pagination.md).

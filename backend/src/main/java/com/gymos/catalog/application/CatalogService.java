@@ -1,6 +1,7 @@
 package com.gymos.catalog.application;
 
 import com.gymos.catalog.application.command.CategoryCommand;
+import com.gymos.catalog.application.command.CreateProductVariantsCommand;
 import com.gymos.catalog.application.command.CreateMembershipPlanCommand;
 import com.gymos.catalog.application.command.CreatePlanCommand;
 import com.gymos.catalog.application.command.ProductCommand;
@@ -10,6 +11,8 @@ import com.gymos.catalog.application.query.CatalogSummaryView;
 import com.gymos.catalog.application.query.CategoryView;
 import com.gymos.catalog.application.query.PlanView;
 import com.gymos.catalog.application.query.ProductDetailView;
+import com.gymos.catalog.application.query.ProductFamilySummaryView;
+import com.gymos.catalog.application.query.ProductFamilyView;
 import com.gymos.catalog.application.query.ProductPageView;
 import com.gymos.catalog.application.query.ProductSearchCriteria;
 import com.gymos.catalog.application.query.ProductSummaryView;
@@ -42,8 +45,10 @@ public class CatalogService {
 	@Transactional(readOnly = true) public ProductSummaryView productByBarcode(GymOsPrincipal principal, String barcode) { return productService.productByBarcode(principal, barcode); }
 	@Transactional(readOnly = true) public ProductPageView searchProducts(GymOsPrincipal principal, ProductSearchCriteria criteria) { return productService.search(principal, criteria); }
 	@Transactional(readOnly = true) public CatalogSummaryView summary(GymOsPrincipal principal) { return insightsService.summary(principal); }
+	@Transactional(readOnly = true) public List<ProductFamilySummaryView> productFamilies(GymOsPrincipal principal) { return productService.families(principal); }
 	@Transactional(readOnly = true) public ProductDetailView productDetail(GymOsPrincipal principal, UUID productId, int historyLimit) { return insightsService.detail(principal, productId, historyLimit); }
 	@Transactional public ProductSummaryView createProduct(GymOsPrincipal principal, ProductCommand request, String correlationId) { return productService.createProduct(principal, request, correlationId); }
+	@Transactional public ProductFamilyView createProductVariants(GymOsPrincipal principal, CreateProductVariantsCommand request, String correlationId) { return productService.createVariants(principal, request, correlationId); }
 	@Transactional public ProductSummaryView updateProduct(GymOsPrincipal principal, UUID productId, ProductCommand request, String correlationId) { return productService.updateProduct(principal, productId, request, correlationId); }
 	@Transactional public ProductSummaryView changeProductStatus(GymOsPrincipal principal, UUID productId, String status, String correlationId) { return productService.changeStatus(principal, productId, status, correlationId); }
 	@Transactional public void archiveProduct(GymOsPrincipal principal, UUID productId, String correlationId) { productService.archiveProduct(principal, productId, correlationId); }
