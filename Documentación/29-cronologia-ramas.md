@@ -43,6 +43,7 @@ de inactividad y separa intención de kiosco de readiness de Stripe.
 | 26 ago 2026 | PR #18 integra paginación y hardening V91–V92 en `main` (`a5ea75f`) |
 | 26 ago 2026 | Se crea `feature/client-onboarding-lifecycle` y V93 agrupa el primer lote de retroalimentación del cliente real |
 | 26 ago 2026 | V94 conserva `inactivityMonths` como umbral único; configuración de kiosco adopta autosave e intención independiente de Stripe; launch/reset resuelven capacidades vigentes |
+| 26 ago 2026 | El cierre visual compacta socios, extiende autosave a cobros/socios, condiciona `Stripe pendiente` al toggle encendido y rediseña la entrada del kiosco |
 
 ## 3. Alcance material de la rama activa
 
@@ -97,8 +98,9 @@ de inactividad y separa intención de kiosco de readiness de Stripe.
   upgrade desde V93, inactividad, persistencia financiera de la inscripción y
   configuración real de launch/reset del kiosco;
 - 113/113 pruebas frontend, typecheck, lint y build Next de producción;
-- 25/25 recorridos E2E dirigidos de kiosco/configuración en Chromium, incluido
-  registro nuevo, alta sin membresía previa, autosave y estados de Stripe;
+- 26/26 recorridos E2E dirigidos de kiosco/configuración en Chromium, incluido
+  registro nuevo, alta sin membresía previa, autosave con rollback en kiosco,
+  cobros y socios, y estados condicionales de Stripe;
 - `git diff --check` y revisión de que no se versionen secretos.
 
 La evidencia local no sustituye los checks del PR. Ausencia de un status

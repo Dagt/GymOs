@@ -44,14 +44,19 @@ Refinamiento de aceptación del kiosco:
   sucursal. Stripe readiness sólo representa disponibilidad técnica.
 - Una capacidad monetaria puede quedar configurada con Stripe pendiente; los
   planes y cotizaciones son visibles, pero Checkout permanece bloqueado.
-- Los toggles administrativos usan autosave serializado, muestran estado y
-  revierten la UI cuando falla el backend.
+- Los toggles administrativos de kiosco, medios de cobro y socios usan autosave
+  serializado, muestran estado y revierten la UI cuando falla el backend.
+- `Stripe pendiente` sólo aparece si la capacidad correspondiente está
+  encendida; una capacidad apagada no promete habilitarse automáticamente.
 - Una sesión nueva o reiniciada vuelve a resolver la configuración vigente del
   terminal. Por ello `clientRegistration=true` produce
   `clientRegistrationAllowed=true` y muestra `Quiero registrarme` sin depender
   de Stripe, planes o membresías.
 - Un socio sin plan siempre distingue entre operación disponible, Stripe
   pendiente, contratación deshabilitada y catálogo vacío.
+- El acceso público diferencia `Ya soy socio` de `Quiero registrarme` mediante
+  opciones legibles y compactas. El feedback exitoso puede cerrarse y desaparece
+  automáticamente para no contaminar la siguiente atención.
 
 ### Lote 2 — Variantes comerciales y códigos de barras
 

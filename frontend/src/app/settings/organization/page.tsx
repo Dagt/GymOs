@@ -327,25 +327,16 @@ export default function OrganizationSettingsPage() {
   }
 
   async function savePaymentConfiguration(next: PaymentConfiguration) {
-    if (!session) return;
-    setSaving(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const updated = await updatePaymentConfiguration(session.accessToken, {
-        receptionManualTerminalEnabled: next.receptionManualTerminalEnabled,
-        receptionMercadoPagoEnabled: next.receptionMercadoPagoEnabled,
-        mercadoPagoTerminalId: next.mercadoPagoTerminalId,
-        stripeSelfCheckoutEnabled: next.stripeSelfCheckoutEnabled,
-        stripeRecurringEnabled: next.stripeRecurringEnabled,
-      });
-      setPaymentConfiguration(updated);
-      setMessage("Configuracion de cobros actualizada.");
-    } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible actualizar los cobros.");
-    } finally {
-      setSaving(false);
-    }
+    if (!session) throw new Error("La sesión ya no está disponible.");
+    const updated = await updatePaymentConfiguration(session.accessToken, {
+      receptionManualTerminalEnabled: next.receptionManualTerminalEnabled,
+      receptionMercadoPagoEnabled: next.receptionMercadoPagoEnabled,
+      mercadoPagoTerminalId: next.mercadoPagoTerminalId,
+      stripeSelfCheckoutEnabled: next.stripeSelfCheckoutEnabled,
+      stripeRecurringEnabled: next.stripeRecurringEnabled,
+    });
+    setPaymentConfiguration(updated);
+    return updated;
   }
 
   async function connectStripe() {
@@ -484,7 +475,7 @@ export default function OrganizationSettingsPage() {
 
       {activeOperationalSection === "payments" && paymentConfiguration ? (
         <PaymentConfigurationCard
-          key={`${paymentConfiguration.receptionManualTerminalEnabled}-${paymentConfiguration.receptionMercadoPagoEnabled}-${paymentConfiguration.mercadoPagoConnected}-${paymentConfiguration.mercadoPagoTerminalId ?? "none"}-${paymentConfiguration.stripeSelfCheckoutEnabled}-${paymentConfiguration.stripeRecurringEnabled}-${paymentConfiguration.stripeConnected}-${paymentConfiguration.stripeAccountId ?? "none"}`}
+          key={`${paymentConfiguration.mercadoPagoConnected}-${paymentConfiguration.mercadoPagoAccountId ?? "none"}-${paymentConfiguration.mercadoPagoTerminalId ?? "none"}-${paymentConfiguration.stripeConnected}-${paymentConfiguration.stripeAccountId ?? "none"}`}
           canManage={session.user.permissions.includes("payment.settings.manage") || session.user.permissions.includes("platform.admin")}
           canManageStripeAccount={canManageStripeAccount}
           configuration={paymentConfiguration}

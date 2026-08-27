@@ -134,6 +134,7 @@ test("un socio nuevo se registra en el kiosco y continúa a su primer plan", asy
 
   await expect(page.getByText("Tu registro quedó listo. Ahora puedes elegir tu primera membresía.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Contrata una membresía" })).toBeVisible();
+  await expect(page.getByText("Tu registro quedó listo. Ahora puedes elegir tu primera membresía.")).toBeHidden({ timeout: 6_000 });
   expect(registrationPayload).toEqual({
     firstName: "Lucía",
     lastName: "Nueva",

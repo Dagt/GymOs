@@ -409,14 +409,22 @@ Formularios:
   rechaza la creación de sesión aunque exista una concesión heredada.
 - `/settings/organization` incluye la sección navegable y enlazable `Socios`.
   Dentro de ella, `Socios e inscripción` contiene un solo campo `Periodo de
-  inactividad`; el bloque no se renderiza permanentemente fuera de las pestañas.
-- La configuración de kiosco usa autosave para sus toggles: muestra
+  inactividad`, colocado en el mismo bloque que `Dar de baja automáticamente`.
+  Inscripción e inactividad se presentan en tarjetas compactas y sus valores
+  pueden prepararse aunque la función correspondiente permanezca apagada; el
+  bloque no se renderiza permanentemente fuera de las pestañas.
+- Las configuraciones de kiosco, medios de cobro y socios usan autosave para
+  sus toggles: muestran
   `Guardando...`/`Guardado`, serializa cambios rápidos y, ante error, restaura el
   último estado confirmado y muestra `AppNotice`. No existe botón global de
-  guardado para esos toggles.
+  guardado para esos toggles. Concepto, importe y periodo conservan una acción
+  compacta de guardado porque son valores editables, no interruptores binarios.
 - Los toggles monetarios representan intención y permanecen configurables con
-  Stripe pendiente. Readiness se muestra sólo como estado secundario `Pendiente
-  de Stripe`; no apaga ni sobrescribe la preferencia guardada.
+  Stripe pendiente. Readiness se muestra como el estado secundario discreto
+  `Stripe pendiente` únicamente cuando la capacidad está encendida; si está
+  apagada, la interfaz indica `Función deshabilitada` y no promete una
+  habilitación automática. Readiness no apaga ni sobrescribe la preferencia
+  guardada.
 - `/reception` no debe depender de permisos administrativos como lectura completa de organizacion. Si el usuario tiene `branchId`, debe mostrar dashboard operativo aunque no pueda consultar `/organizations/current`.
 - El estado sin sucursal para recepcion no debe mostrar onboarding, alta de gimnasio ni configuracion de tenant; solo selector de sucursal permitida o instruccion de pedir acceso al dueño/gerente.
 - Si un usuario de recepcion tiene exactamente una sucursal permitida pero la sesion guardada no trae `branchId`, el frontend debe seleccionarla automaticamente antes de pintar la consola.

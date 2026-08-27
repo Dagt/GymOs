@@ -9,8 +9,10 @@ Estado: `FUNCIONAL`
 - configuración diferenciada de plataforma y tenant;
 - cobros, capacidades de kiosco y remitente de correo por permisos separados;
 - sección `Socios` dentro de `/settings/organization`, con inscripción y baja
-  automática gobernadas por un único `inactivityMonths`;
-- autosave serializado de capacidades booleanas del kiosco por sucursal, con
+  automática gobernadas por un único `inactivityMonths`; periodo y baja
+  automática comparten un bloque compacto y los valores pueden configurarse
+  sin encender la función;
+- autosave serializado de toggles de kiosco, medios de cobro y socios, con
   rollback visible ante error;
 - capacidades de kiosco persistidas como intención del gimnasio, independientes
   de la disponibilidad técnica actual de Stripe;
@@ -43,3 +45,5 @@ inactividad y reinscripción. `registrationFeeEnabled` y
 En kiosco, CONFIGURED expresa lo que el gimnasio desea ofrecer, READY expresa
 la disponibilidad técnica del proveedor y EFFECTIVE exige ambas condiciones al
 ejecutar. Un ajuste configurado no se pierde mientras Stripe está pendiente.
+El indicador de dependencia sólo se muestra para capacidades configuradas en
+`true`; una capacidad apagada se describe como deshabilitada.

@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { CircleAlert, CircleCheck, UserPlus, UserRound, X } from "lucide-react";
 import { CSSProperties, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   changeMembershipPlanFromKiosk,
@@ -53,6 +54,14 @@ import {
 import { consumeKioskLaunch } from "@/lib/kiosk-launch";
 
 const KIOSK_OPERATION_KEYS = "gymos.kioskOperationKeys";
+const EMPTY_REGISTRATION = {
+  firstName: "",
+  lastName: "",
+  maternalLastName: "",
+  gender: "",
+  phone: "",
+  email: "",
+};
 type KioskPanel = "memberships" | "resources" | "wellness" | "payments" | "profile" | "autopay";
 type MembershipCheckoutKind = "enrollment" | "renewal" | "change";
 type MembershipCheckoutReview = {
@@ -71,14 +80,7 @@ export default function KioskPage() {
   const [entryMode, setEntryMode] = useState<KioskEntryMode>("verify");
   const [registrationBusy, setRegistrationBusy] = useState(false);
   const [registrationBirthDateDisplay, setRegistrationBirthDateDisplay] = useState("");
-  const [registration, setRegistration] = useState({
-    firstName: "",
-    lastName: "",
-    maternalLastName: "",
-    gender: "",
-    phone: "",
-    email: "",
-  });
+  const [registration, setRegistration] = useState({ ...EMPTY_REGISTRATION });
   const [targetPlanId, setTargetPlanId] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
@@ -616,8 +618,10 @@ export default function KioskPage() {
     const reset = await resetKioskSession(session.sessionId, session.sessionToken);
     writeBrowserKioskSession(reset);
     setSession(reset);
-    setSummary(null); setIdentifier(""); setBirthDateDisplay("");
+    setSummary(null); setIdentifier(""); setBirthDateDisplay(""); setEntryMode("verify");
+    setRegistration({ ...EMPTY_REGISTRATION }); setRegistrationBirthDateDisplay("");
     setContactEmail(""); setContactPhone(""); setResources([]); setSlots([]); setSelectedSlot(null); setMessage(messageText);
+    setError(null);
     setWellnessProfessionals([]); setWellnessProfessionalId(""); setWellnessServices([]); setWellnessServiceId("");
     setWellnessSlots([]); setWellnessSlot(null); setWellnessNotes("");
     setAutopayMembership(null); setAutopayMandate(null); setAutopayTerms(null); setAutopayAccepted(false);
@@ -625,6 +629,12 @@ export default function KioskPage() {
     operationKeys.current.clear();
     clearPersistedOperationKeys();
   }, [session]);
+
+  useEffect(() => {
+    if (!message) return;
+    const timer = window.setTimeout(() => setMessage(null), 4_000);
+    return () => window.clearTimeout(timer);
+  }, [message]);
 
   useEffect(() => {
     if (!session || !summary) return;
@@ -692,8 +702,20 @@ export default function KioskPage() {
           </aside>
         </header>
 
-        {error && session ? <p className="kiosk-notice error">{error}</p> : null}
-        {message ? <p className="kiosk-notice ok">{message}</p> : null}
+        {error && session ? (
+          <div className="kiosk-feedback error" role="alert">
+            <CircleAlert aria-hidden="true" size={18} />
+            <p>{error}</p>
+            <button aria-label="Cerrar mensaje" onClick={() => setError(null)} type="button"><X aria-hidden="true" size={17} /></button>
+          </div>
+        ) : null}
+        {message ? (
+          <div className="kiosk-feedback ok" role="status">
+            <CircleCheck aria-hidden="true" size={18} />
+            <p>{message}</p>
+            <button aria-label="Cerrar mensaje" onClick={() => setMessage(null)} type="button"><X aria-hidden="true" size={17} /></button>
+          </div>
+        ) : null}
 
         {!session ? (
           <section className="kiosk-card kiosk-verify text-center">
@@ -704,9 +726,18 @@ export default function KioskPage() {
         ) : !summary ? (
           <section className="kiosk-card kiosk-verify">
             {session.capabilities.clientRegistrationAllowed ? (
-              <div className="grid grid-cols-2 gap-2" role="tablist" aria-label="Acceso al kiosco">
-                <button aria-selected={entryMode === "verify"} className={entryMode === "verify" ? "kiosk-primary-action small" : "kiosk-secondary-action"} onClick={() => { setEntryMode("verify"); setError(null); }} role="tab" type="button">Ya soy socio</button>
-                <button aria-selected={entryMode === "register"} className={entryMode === "register" ? "kiosk-primary-action small" : "kiosk-secondary-action"} onClick={() => { setEntryMode("register"); setError(null); }} role="tab" type="button">Quiero registrarme</button>
+              <div className="kiosk-entry-selector">
+                <p>¿Cómo quieres continuar?</p>
+                <div className="kiosk-entry-options" role="tablist" aria-label="Acceso al kiosco">
+                  <button aria-label="Ya soy socio" aria-selected={entryMode === "verify"} className={`kiosk-entry-option ${entryMode === "verify" ? "active" : ""}`} onClick={() => { setEntryMode("verify"); setError(null); setMessage(null); }} role="tab" type="button">
+                    <span className="kiosk-entry-icon"><UserRound aria-hidden="true" size={22} /></span>
+                    <span><strong>Ya soy socio</strong><small>Entrar con mis datos</small></span>
+                  </button>
+                  <button aria-label="Quiero registrarme" aria-selected={entryMode === "register"} className={`kiosk-entry-option ${entryMode === "register" ? "active" : ""}`} onClick={() => { setEntryMode("register"); setError(null); setMessage(null); }} role="tab" type="button">
+                    <span className="kiosk-entry-icon"><UserPlus aria-hidden="true" size={22} /></span>
+                    <span><strong>Quiero registrarme</strong><small>Crear un expediente nuevo</small></span>
+                  </button>
+                </div>
               </div>
             ) : null}
             {entryMode === "verify" ? (

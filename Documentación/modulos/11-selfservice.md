@@ -12,7 +12,8 @@ Estado: `FUNCIONAL / LISTO PARA ACEPTACIÓN CONECTADA`
   cuando todavía no tiene ninguna membresía;
 - alta de un socio nuevo desde el propio kiosco cuando Recepción habilita la
   capacidad `clientRegistration` para la sucursal; el alta deja la sesión
-  verificada y abre la contratación del primer plan;
+  verificada y abre la contratación del primer plan; el selector de entrada
+  distingue visualmente entre socio existente y registro nuevo;
 - membresías, pagos, reservas y domiciliación disponibles también en una sede
   secundaria cuando el plan vigente es multi-sucursal;
 - rate limiting, bloqueo por intentos y auditoría;
@@ -34,6 +35,8 @@ Estado: `FUNCIONAL / LISTO PARA ACEPTACIÓN CONECTADA`
 - contrato de alta/renovación/cambio sin método manual ni `validateNow`,
   conectado a Stripe Checkout y confirmado sólo por webhook/conciliación;
 - marca tenant, atribución GymFort y superficie sin navegación administrativa;
+- feedback de sesión compacto, descartable y temporal para que un mensaje de
+  éxito no permanezca visible para el siguiente socio;
 - lanzamiento desde recepción con permiso dedicado, sin registrar una
   computadora o navegador;
 - apertura en una pestaña aislada sin colocar la credencial de kiosco en la URL;

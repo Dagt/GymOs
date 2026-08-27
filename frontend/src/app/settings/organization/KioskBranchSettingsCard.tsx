@@ -182,18 +182,25 @@ function KioskOptionGroup({ item, options, title, onToggle }: {
       <h4 className="font-semibold">{title}</h4>
       {options.map((option) => {
         const ready = requirementReady(item, option.requirement);
+        const configured = item.capabilities[option.key];
+        const pendingProvider = configured && !ready;
         return (
           <article className="flex items-start justify-between gap-4 rounded-xl border bg-white p-4" key={option.key}>
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <strong className="block text-sm">{option.title}</strong>
-                {!ready ? <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-900">Pendiente de Stripe</span> : null}
+                {pendingProvider ? (
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-700">
+                    <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                    Stripe pendiente
+                  </span>
+                ) : null}
               </div>
               <span className="mt-1 block text-xs leading-5 text-[var(--brand-muted)]">
-                {ready ? option.description : requirementMessage(option.requirement)}
+                {pendingProvider ? requirementMessage(option.requirement) : configured ? option.description : `Función deshabilitada. ${option.description}`}
               </span>
             </div>
-            <ToggleSwitch checked={item.capabilities[option.key]} label={`${option.title} en ${item.branchName}`} onChange={(next) => onToggle(item.branchId, option.key, next)} />
+            <ToggleSwitch checked={configured} label={`${option.title} en ${item.branchName}`} onChange={(next) => onToggle(item.branchId, option.key, next)} />
           </article>
         );
       })}
