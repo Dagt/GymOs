@@ -4,6 +4,7 @@ import com.gymos.audit.api.AuditService;
 import com.gymos.clients.api.operations.ClientLookupOperations;
 import com.gymos.clients.api.events.ClientAccessStatusChangedV1;
 import com.gymos.clients.api.operations.ClientVerificationResult;
+import com.gymos.clients.api.operations.RegisterSelfServiceClientCommand;
 import com.gymos.clients.api.operations.SelfServiceClientProfile;
 import com.gymos.clients.api.operations.UpdateSelfServiceContactCommand;
 import com.gymos.clients.api.operations.VerifyClientIdentityCommand;
@@ -150,18 +151,100 @@ public class ClientService implements ClientLookupOperations {
 	}
 
 	@Override
-	@Transactional(readOnly = true)
+	@Transactional
 	public Optional<ClientVerificationResult> verifyForSelfService(VerifyClientIdentityCommand command) {
 		if (command.birthDate() == null || command.identifier() == null || command.identifier().isBlank()) {
 			return Optional.empty();
 		}
-		return clientRepository.verifyForSelfService(
+		var client = clientRepository.verifyForSelfService(
 						command.organizationId(),
 						command.branchId(),
 						command.identifier(),
 						command.birthDate()
 				)
-				.map(client -> new ClientVerificationResult(client.id(), client.fullName()));
+				.orElse(null);
+		if (client == null) {
+			return Optional.empty();
+		}
+		if ("INACTIVE".equals(client.status())) {
+			OffsetDateTime now = OffsetDateTime.now();
+			if (!commandRepository.reactivateClient(command.organizationId(), client.id(), command.branchId(), now)) {
+				return Optional.empty();
+			}
+			auditService.recordSystem(
+					command.organizationId(), command.branchId(), null,
+					"CLIENT_REACTIVATED", "CLIENT", client.id(), "SELF_SERVICE_KIOSK",
+					"Regreso después de inactividad", "self-service-reactivation:" + client.id()
+			);
+			eventPublisher.publishEvent(new ClientAccessStatusChangedV1(
+					"client-self-service-reactivated:" + client.id() + ":" + now,
+					command.organizationId(), client.id(), "INACTIVE", "ACTIVE", now
+			));
+		}
+		return Optional.of(new ClientVerificationResult(client.id(), client.fullName()));
+	}
+
+	@Override
+	@Transactional
+	public ClientVerificationResult registerForSelfService(RegisterSelfServiceClientCommand command) {
+		if (command.organizationId() == null || command.branchId() == null
+				|| !clientRepository.branchExists(command.organizationId(), command.branchId())) {
+			throw new BusinessException("BRANCH_NOT_FOUND", "La sucursal no está disponible.");
+		}
+		requireBirthDate(command.birthDate());
+		String firstName = requiredName(command.firstName(), "CLIENT_FIRST_NAME_REQUIRED", "Captura el nombre.");
+		String lastName = requiredName(command.lastName(), "CLIENT_LAST_NAME_REQUIRED", "Captura el apellido paterno.");
+		String email = blankToNull(command.email());
+		String phone = blankToNull(command.phone());
+		if (email == null && phone == null) {
+			throw new BusinessException(
+					"SELF_SERVICE_CONTACT_REQUIRED", "Captura un correo o teléfono para identificarte."
+			);
+		}
+		String identifier = email == null ? phone : email;
+		var existing = clientRepository.verifyForSelfService(
+				command.organizationId(), command.branchId(), identifier, command.birthDate()
+		).orElse(null);
+		if (existing != null) {
+			if ("ACTIVE".equals(existing.status())) {
+				throw new BusinessException(
+						"SELF_SERVICE_CLIENT_ALREADY_EXISTS",
+						"Ya existe un socio con esos datos. Elige iniciar sesión."
+				);
+			}
+			OffsetDateTime now = OffsetDateTime.now();
+			if (!commandRepository.reactivateClient(command.organizationId(), existing.id(), command.branchId(), now)) {
+				throw new BusinessException(
+						"SELF_SERVICE_REACTIVATION_REQUIRES_RECEPTION",
+						"Solicita apoyo en recepción para reactivar este expediente."
+				);
+			}
+			auditService.recordSystem(
+					command.organizationId(), command.branchId(), null,
+					"CLIENT_REACTIVATED", "CLIENT", existing.id(), "SELF_SERVICE_KIOSK",
+					"Registro de regreso desde kiosco", "self-service-registration-reactivation:" + existing.id()
+			);
+			eventPublisher.publishEvent(new ClientAccessStatusChangedV1(
+					"client-self-service-registration-reactivated:" + existing.id() + ":" + now,
+					command.organizationId(), existing.id(), "INACTIVE", "ACTIVE", now
+			));
+			return new ClientVerificationResult(existing.id(), existing.fullName());
+		}
+		ensureUniqueContact(command.organizationId(), email, phone, null);
+		OffsetDateTime now = OffsetDateTime.now();
+		UUID personId = UUID.randomUUID();
+		UUID clientId = UUID.randomUUID();
+		commandRepository.createClient(new CreateClientRecord(
+				command.organizationId(), command.branchId(), null, personId, clientId,
+				firstName, lastName, blankToNull(command.maternalLastName()), command.birthDate(),
+				blankToNull(command.gender()), phone, email, null, "Registro desde kiosco", now
+		));
+		auditService.recordSystem(
+				command.organizationId(), command.branchId(), null,
+				"CLIENT_REGISTERED", "CLIENT", clientId, "SELF_SERVICE_KIOSK",
+				"Alta iniciada por el socio", "self-service-registration:" + clientId
+		);
+		return new ClientVerificationResult(clientId, (firstName + " " + lastName).trim());
 	}
 
 	@Override
@@ -263,5 +346,13 @@ public class ClientService implements ClientLookupOperations {
 
 	private String blankToNull(String value) {
 		return value == null || value.isBlank() ? null : value.trim();
+	}
+
+	private String requiredName(String value, String code, String message) {
+		String normalized = blankToNull(value);
+		if (normalized == null) {
+			throw new BusinessException(code, message);
+		}
+		return normalized;
 	}
 }

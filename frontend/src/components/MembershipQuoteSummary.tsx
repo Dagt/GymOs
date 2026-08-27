@@ -15,7 +15,8 @@ export function MembershipQuoteSummary({
   return (
     <div className="grid gap-1 text-xs font-medium text-gray-600">
       <p>
-        Precio de lista: {formatMoney(quote.listPriceCents, quote.currency)}
+        Plan: {formatMoney(quote.planPriceCents, quote.currency)}
+        {quote.registrationFeeCents > 0 ? ` · ${quote.registrationFeeLabel ?? "Inscripción"}: ${formatMoney(quote.registrationFeeCents, quote.currency)}` : ""}
         {" · "}Descuento: {formatMoney(quote.discountCents, quote.currency)}
         {" · "}Total: <strong>{formatMoney(quote.totalCents, quote.currency)}</strong>
       </p>

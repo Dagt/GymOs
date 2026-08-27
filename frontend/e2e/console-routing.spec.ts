@@ -356,6 +356,7 @@ test.describe("consolas por rol", () => {
             branchName: branch.name,
             status: "ACTIVE",
             capabilities: {
+              clientRegistrationAllowed: false,
               membershipEnrollmentAllowed: false,
               membershipRenewalAllowed: false,
               membershipPlanChangeAllowed: false,
@@ -380,6 +381,256 @@ test.describe("consolas por rol", () => {
     const kioskSettings = page.locator("#kiosk-settings");
     await expect(kioskSettings.getByRole("heading", { name: "Centro" })).toBeVisible();
     await expect(kioskSettings.getByRole("heading", { name: "Revolucion 115" })).toHaveCount(0);
+  });
+
+  test("configuración de socios compacta sus bloques y autosave revierte errores", async ({ page }) => {
+    let lifecycle = {
+      organizationId: org.id,
+      registrationFeeEnabled: false,
+      registrationFeeCents: 15000,
+      registrationFeeLabel: "Inscripción",
+      currency: "MXN",
+      autoInactivationEnabled: false,
+      inactivityMonths: 6,
+      updatedAt: null as string | null,
+      version: 0,
+    };
+    const savedPayloads: Array<Record<string, unknown>> = [];
+    let failNextSave = false;
+    await bootAs(page, user({
+      console: "TENANT_OWNER",
+      roles: ["Dueno del gimnasio"],
+      permissions: ownerPermissions(),
+    }), async (route, path) => {
+      if (path === "/client-lifecycle-settings" && route.request().method() === "GET") {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify(lifecycle),
+        });
+        return true;
+      }
+      if (path === "/client-lifecycle-settings" && route.request().method() === "PUT") {
+        const payload = route.request().postDataJSON() as Record<string, unknown>;
+        savedPayloads.push(payload);
+        if (failNextSave) {
+          failNextSave = false;
+          await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ message: "Fallo simulado de socios" }) });
+          return true;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        lifecycle = { ...lifecycle, ...payload, updatedAt: "2026-08-26T12:00:00Z", version: lifecycle.version + 1 };
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify(lifecycle) });
+        return true;
+      }
+      return false;
+    });
+
+    await page.goto("/settings/organization#client-lifecycle-settings");
+
+    await expect(page.getByRole("button", { name: "Inscripciones" })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("heading", { name: "Socios e inscripción" })).toBeVisible();
+    await expect(page.getByLabel("Periodo de inactividad")).toHaveValue("6");
+    await expect(page.getByText("Volver a cobrar después de")).toHaveCount(0);
+    await expect(page.getByText("Dar de baja después de")).toHaveCount(0);
+    await expect(page.locator("#client-lifecycle-settings article")).toHaveCount(2);
+    await expect(page.getByRole("button", { name: "Guardar concepto, importe y periodo" })).toHaveCount(0);
+    await expect(page.getByText("Los toggles se guardan automáticamente.")).toHaveCount(0);
+
+    await page.getByLabel("Concepto").fill("Alta anual");
+    await page.getByLabel("Importe (MXN)").fill("175");
+    await page.getByLabel("Periodo de inactividad").fill("8");
+    await expect(page.getByText("Guardando...")).toBeVisible();
+    await expect(page.getByText("Guardado")).toBeVisible();
+    expect(savedPayloads.at(-1)).toMatchObject({
+      registrationFeeLabel: "Alta anual",
+      registrationFeeCents: 17500,
+      inactivityMonths: 8,
+    });
+
+    const registrationFee = page.getByRole("switch", { name: "Cobrar inscripción" });
+    const automaticInactivation = page.getByRole("switch", { name: "Dar de baja automáticamente" });
+    await registrationFee.click();
+    await automaticInactivation.click();
+    await expect(page.getByText("Guardando...")).toBeVisible();
+    await expect(page.getByText("Guardado")).toBeVisible();
+    expect(savedPayloads.at(-1)).toMatchObject({
+      registrationFeeEnabled: true,
+      autoInactivationEnabled: true,
+      inactivityMonths: 8,
+    });
+
+    failNextSave = true;
+    await automaticInactivation.click();
+    await expect(page.getByText("Fallo simulado de socios")).toBeVisible();
+    await expect(automaticInactivation).toHaveAttribute("aria-checked", "true");
+  });
+
+  test("medios de cobro usa autosave serializado y rollback", async ({ page }) => {
+    const savedPayloads: Array<Record<string, unknown>> = [];
+    let failNextSave = false;
+    let paymentConfiguration = {
+      receptionManualTerminalEnabled: false,
+      receptionMercadoPagoEnabled: false,
+      mercadoPagoAccountId: null,
+      mercadoPagoTerminalId: null,
+      mercadoPagoConnected: false,
+      mercadoPagoReady: false,
+      stripeSelfCheckoutEnabled: false,
+      stripeRecurringEnabled: false,
+      stripeAccountId: "acct_test",
+      stripeConnected: true,
+      stripeCheckoutReady: false,
+      stripeRecurringReady: false,
+    };
+    await bootAs(page, user({
+      console: "TENANT_OWNER",
+      roles: ["Dueno del gimnasio"],
+      permissions: ownerPermissions().concat("payment.settings.manage", "payment.provider.stripe.manage"),
+    }), async (route, path) => {
+      if (path === "/payment-settings" && route.request().method() === "GET") {
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify(paymentConfiguration) });
+        return true;
+      }
+      if (path === "/payment-settings" && route.request().method() === "PUT") {
+        const payload = route.request().postDataJSON() as Record<string, unknown>;
+        savedPayloads.push(payload);
+        if (failNextSave) {
+          failNextSave = false;
+          await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ message: "Fallo simulado de cobros" }) });
+          return true;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        paymentConfiguration = {
+          ...paymentConfiguration,
+          ...payload,
+          stripeCheckoutReady: Boolean(payload.stripeSelfCheckoutEnabled && paymentConfiguration.stripeConnected),
+          stripeRecurringReady: Boolean(payload.stripeRecurringEnabled && payload.stripeSelfCheckoutEnabled && paymentConfiguration.stripeConnected),
+        };
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify(paymentConfiguration) });
+        return true;
+      }
+      return false;
+    });
+
+    await page.goto("/settings/organization#payment-settings");
+    const manualTerminal = page.getByRole("switch", { name: "Terminal independiente" });
+    const stripeCheckout = page.getByRole("switch", { name: "Self checkout con Stripe" });
+    const recurring = page.getByRole("switch", { name: "Domiciliación con Stripe" });
+    await expect(manualTerminal).toBeVisible();
+    await manualTerminal.click();
+    await stripeCheckout.click();
+    await expect(page.getByText("Guardando...")).toBeVisible();
+    await expect(page.getByText("Guardado")).toBeVisible();
+    expect(savedPayloads.at(-1)).toMatchObject({
+      receptionManualTerminalEnabled: true,
+      stripeSelfCheckoutEnabled: true,
+    });
+    await expect(page.getByRole("button", { name: "Guardar configuración de cobro" })).toHaveCount(0);
+
+    failNextSave = true;
+    await recurring.click();
+    await expect(page.getByText("Fallo simulado de cobros")).toBeVisible();
+    await expect(recurring).toHaveAttribute("aria-checked", "false");
+  });
+
+  test("toggles del kiosco conservan intención, autosave serializa y revierte errores", async ({ page }) => {
+    const savedPayloads: Array<Record<string, boolean>> = [];
+    let failNextSave = false;
+    const settingsFrom = (payload: Record<string, boolean>) => ({
+      branchId: branches[0].id,
+      branchName: branches[0].name,
+      status: "ACTIVE",
+      capabilities: {
+        clientRegistrationAllowed: payload.clientRegistration,
+        membershipEnrollmentAllowed: payload.membershipEnrollment,
+        membershipRenewalAllowed: payload.membershipRenewal,
+        membershipPlanChangeAllowed: payload.membershipPlanChange,
+        resourceBookingAllowed: payload.resourceBooking,
+        wellnessBookingAllowed: payload.wellnessBooking,
+        profileUpdateAllowed: payload.profileUpdate,
+        autopayAllowed: payload.autopay,
+        onlineCardPaymentsReady: false,
+        recurringCardPaymentsReady: false,
+      },
+      updatedAt: "2026-08-26T12:00:00Z",
+    });
+    const initial = {
+      clientRegistration: false,
+      membershipEnrollment: true,
+      membershipRenewal: true,
+      membershipPlanChange: true,
+      resourceBooking: true,
+      wellnessBooking: false,
+      profileUpdate: true,
+      autopay: true,
+    };
+    await bootAs(page, user({
+      console: "TENANT_OWNER",
+      roles: ["Dueno del gimnasio"],
+      permissions: ownerPermissions().concat("selfservice.settings.manage"),
+    }), async (route, path) => {
+      if (path === "/kiosk-settings/branches" && route.request().method() === "GET") {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify([settingsFrom(initial)]),
+        });
+        return true;
+      }
+      if (path === `/kiosk-settings/branches/${branches[0].id}` && route.request().method() === "PUT") {
+        const payload = route.request().postDataJSON() as Record<string, boolean>;
+        savedPayloads.push(payload);
+        if (failNextSave) {
+          failNextSave = false;
+          await route.fulfill({
+            status: 500,
+            contentType: "application/json",
+            body: JSON.stringify({ message: "Fallo simulado de autosave" }),
+          });
+          return true;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify(settingsFrom(payload)) });
+        return true;
+      }
+      return false;
+    });
+
+    await page.goto("/settings/organization#kiosk-settings");
+    const enrollment = page.getByRole("switch", { name: `Comprar membresía en ${branches[0].name}` });
+    const registration = page.getByRole("switch", { name: `Registrar nuevos socios en ${branches[0].name}` });
+    const resourceBooking = page.getByRole("switch", { name: `Reservas gratuitas en ${branches[0].name}` });
+    const profileUpdate = page.getByRole("switch", { name: `Actualizar contacto en ${branches[0].name}` });
+
+    await expect(enrollment).toHaveAttribute("aria-checked", "true");
+    await expect(enrollment).toBeEnabled();
+    const enrollmentRow = page.locator("#kiosk-settings article").filter({ hasText: "Comprar membresía" });
+    await expect(enrollmentRow.getByText("Stripe pendiente")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Guardar configuración del kiosco" })).toHaveCount(0);
+
+    await enrollment.click();
+    await expect(enrollmentRow.getByText("Stripe pendiente")).toHaveCount(0);
+    await expect(enrollmentRow.getByText(/Función deshabilitada/)).toBeVisible();
+    await enrollment.click();
+
+    await registration.click();
+    await resourceBooking.click();
+    await expect(page.getByText("Guardando...")).toBeVisible();
+    await expect(page.getByText("Guardado")).toBeVisible();
+
+    const latest = savedPayloads.at(-1);
+    expect(latest).toMatchObject({
+      clientRegistration: true,
+      membershipEnrollment: true,
+      membershipRenewal: true,
+      membershipPlanChange: true,
+      resourceBooking: false,
+      autopay: true,
+    });
+
+    failNextSave = true;
+    await profileUpdate.click();
+    await expect(page.getByText("Fallo simulado de autosave")).toBeVisible();
+    await expect(profileUpdate).toHaveAttribute("aria-checked", "true");
   });
 
   test("recepcion entra a mostrador y no ve administracion", async ({ page }) => {

@@ -55,6 +55,7 @@ class MembershipSalesService {
 
 	private MembershipSaleResult create(MembershipSaleDraft draft) {
 		String requestHash = SalesIdempotency.membershipSaleRequestHash(draft.clientId(), draft.sourceMembershipId(), draft.targetPlanId(), draft.productId(),
+				draft.registrationFeeCents(), draft.registrationFeeLabel(),
 				draft.listPriceCents(), draft.discountCents(), draft.totalCents(), draft.currency(), draft.appliedBenefits(),
 				draft.method(), draft.reference(), draft.validateNow(), draft.notes(), draft.businessContext());
 		String normalizedKey = SalesIdempotency.blankToNull(draft.idempotencyKey());
@@ -79,6 +80,7 @@ class MembershipSalesService {
 		String paymentHash = SalesIdempotency.paymentRequestHash(draft.method(), draft.totalCents(), draft.reference(), null, draft.validateNow(), draft.notes());
 		boolean created = commandRepository.create(new MembershipSaleRecord(saleId, paymentId, draft.organizationId(), draft.branchId(), draft.clientId(), draft.actorUserId(),
 				draft.sourceMembershipId(), draft.targetPlanId(), draft.productId(), draft.planName(), saleNumber, saleStatus, normalizedMethod, paymentStatus,
+				draft.planPriceCents(), draft.registrationFeeCents(), draft.registrationFeeLabel(),
 				draft.listPriceCents(), draft.discountCents(), draft.totalCents(), paidCents, balanceCents, draft.currency(),
 				draft.appliedBenefits(),
 				SalesIdempotency.blankToNull(draft.reference()), SalesIdempotency.blankToNull(draft.notes()),
@@ -115,6 +117,9 @@ class MembershipSalesService {
 			UUID targetPlanId,
 			UUID productId,
 			String planName,
+			long planPriceCents,
+			long registrationFeeCents,
+			String registrationFeeLabel,
 			long listPriceCents,
 			long discountCents,
 			long totalCents,
@@ -138,6 +143,9 @@ class MembershipSalesService {
 					command.planId(),
 					command.productId(),
 					command.planName(),
+					command.planPriceCents(),
+					command.registrationFeeCents(),
+					command.registrationFeeLabel(),
 					command.listPriceCents(),
 					command.discountCents(),
 					command.totalCents(),
@@ -163,6 +171,9 @@ class MembershipSalesService {
 					command.planId(),
 					command.productId(),
 					command.planName(),
+					command.planPriceCents(),
+					command.registrationFeeCents(),
+					command.registrationFeeLabel(),
 					command.listPriceCents(),
 					command.discountCents(),
 					command.totalCents(),
@@ -188,6 +199,9 @@ class MembershipSalesService {
 					command.targetPlanId(),
 					command.productId(),
 					command.planName(),
+					command.planPriceCents(),
+					command.registrationFeeCents(),
+					command.registrationFeeLabel(),
 					command.listPriceCents(),
 					command.discountCents(),
 					command.totalCents(),

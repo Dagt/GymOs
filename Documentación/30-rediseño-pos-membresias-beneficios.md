@@ -132,6 +132,11 @@ también.
 13. **IMPLEMENTADA:** recepción puede consultar los accesos efectivos de una
     ficha con permisos de lectura de socio/membresía/beneficio, sin recibir
     acceso al módulo administrativo de dispositivos o bitácoras.
+14. **OBJETIVO `BEN-003`:** el alcance local de V58 se conserva cuando es
+    explícito, pero un beneficio ligado a un plan multi-sucursal debe heredarse
+    en todas las sucursales válidas del plan dentro del mismo tenant. La
+    definición no se duplica por sede y la UI distingue alcance local de alcance
+    del plan.
 
 ## Operación del POS
 

@@ -71,11 +71,31 @@ public class MembershipSaleCommandRepository {
 				.param("organizationId", record.organizationId())
 				.param("productId", record.productId())
 				.param("name", record.planName())
-				.param("listPriceCents", record.listPriceCents())
+				.param("listPriceCents", record.planPriceCents())
 				.param("discountCents", record.discountCents())
-				.param("totalCents", record.totalCents())
+				.param("totalCents", record.planPriceCents() - record.discountCents())
 				.param("occurredAt", record.occurredAt())
 				.update();
+
+		if (record.registrationFeeCents() > 0) {
+			jdbcClient.sql("""
+					INSERT INTO sale_item (
+					    id, sale_id, organization_id, product_id, item_type, name, quantity,
+					    unit_price_cents, discount_cents, total_cents, created_at
+					)
+					VALUES (
+					    :id, :saleId, :organizationId, NULL, 'REGISTRATION_FEE', :name, 1,
+					    :amountCents, 0, :amountCents, :occurredAt
+					)
+					""")
+					.param("id", UUID.randomUUID())
+					.param("saleId", record.saleId())
+					.param("organizationId", record.organizationId())
+					.param("name", record.registrationFeeLabel())
+					.param("amountCents", record.registrationFeeCents())
+					.param("occurredAt", record.occurredAt())
+					.update();
+		}
 
 		for (int index = 0; index < record.appliedBenefits().size(); index++) {
 			MembershipBenefitSnapshot benefit = record.appliedBenefits().get(index);
@@ -151,6 +171,9 @@ public class MembershipSaleCommandRepository {
 			String saleStatus,
 			String paymentMethod,
 			String paymentStatus,
+			long planPriceCents,
+			long registrationFeeCents,
+			String registrationFeeLabel,
 			long listPriceCents,
 			long discountCents,
 			long totalCents,

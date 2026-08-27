@@ -143,7 +143,10 @@ Configuración recomendada:
 
 ### Branding
 
-El email consume marca tenant (`brandName`, `logoUrl`, `primaryColor`, `accentColor`, `surfaceColor`). Los logos relativos se convierten usando `GYMOS_FRONTEND_BASE_URL`.
+El email consume hoy la marca del tenant. El objetivo `CFG-003` resuelve
+`brandName`, `logoUrl`, `primaryColor`, `accentColor`, `surfaceColor` y Reply-To
+desde la sucursal que originó el mensaje, con fallback de organización. Los
+logos relativos se convierten usando `GYMOS_FRONTEND_BASE_URL`.
 
 En producción debe ser público (`https://gymfort.mx`). `localhost`/`127.0.0.1` no son accesibles para Gmail/Outlook y se omiten del HTML para evitar imágenes rotas.
 

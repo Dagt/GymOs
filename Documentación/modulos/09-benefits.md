@@ -1,7 +1,7 @@
 # Beneficios y elegibilidad
 
 Estado: `ESTABILIZADO`
-Última revisión: 25 de agosto de 2026
+Última revisión: 26 de agosto de 2026
 
 ## Implementado
 
@@ -99,6 +99,13 @@ global deliberada, que se rotula explícitamente. La migración recupera desde
 `branch_id`. Las asignaciones directas y su verificación quedan aisladas por
 sucursal.
 
+Este comportamiento vigente no satisface los planes multi-sucursal. El objetivo
+`BEN-003` establece que un beneficio vinculado a un plan
+`multiBranchAccess=true` debe heredarse en todas las sucursales donde el plan es
+válido, aun si fue creado desde una de ellas. No se duplicará el beneficio por
+sucursal: el contrato distinguirá alcance local de alcance del plan y la UI lo
+hará explícito.
+
 Un descuento con `requiresEvidence=true` no se presenta como vigente mientras
 siga en `ASSIGNED`: la ficha lo marca como pendiente y ofrece verificación sólo
 a quien tenga `client.benefit.verify`. Sin evidencia requerida, la asignación es
@@ -146,7 +153,7 @@ reemplazado posteriormente.
 ## Visitas y paquetes históricos
 
 La infraestructura histórica de `VisitPass` no se considera parte del modelo
-vigente de Benefits. No se añadirá una relación genérica producto -> beneficio
-para soportar paquetes de visitas. Las visitas comerciales normales se modelan
-como planes de membresía de un día y heredan `ACCESS` exactamente igual que
-cualquier otro plan.
+vigente de Benefits. Las visitas diarias continúan como planes de un día. Para
+paquetes de N visitas se diseñará un derecho vendible con saldo único y alcance
+de sucursales dentro de la misma organización; no es intercambio entre tenants
+ni una duplicación del paquete por sede.

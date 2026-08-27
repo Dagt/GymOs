@@ -37,7 +37,8 @@ Principios:
 - Estados visibles para pagos pendientes, en revisión, aprobados o rechazados.
 
 Funciones esperadas:
-- Identificación del cliente.
+- Identificación del socio existente y registro de uno nuevo cuando la capacidad
+  por sucursal está configurada.
 - Resumen de membresía.
 - Pagos pendientes.
 - Renovación de membresía.
@@ -45,6 +46,14 @@ Funciones esperadas:
 - Cotización y redirección a Stripe Checkout/Setup cuando existe un cobro.
 - Consulta de estado y comprobante confirmado por proveedor.
 - Actualización de teléfono, correo y contacto de emergencia cuando esté permitido.
+
+Estados obligatorios para un socio sin membresía:
+- contratación configurada y Stripe listo: catálogo, cotización y Checkout;
+- contratación configurada y Stripe pendiente: catálogo y cotización visibles,
+  aviso explícito y CTA de pago deshabilitado;
+- contratación deshabilitada: instrucción de acudir a recepción sin prometer
+  que puede contratar;
+- catálogo vacío: aviso distinto a la indisponibilidad de Stripe.
 
 ## 8.2 Layout de recepción
 
@@ -251,12 +260,15 @@ Implementacion frontend:
 - Personalizador de marca local con nombre visible, URL de logo y colores por cliente.
 
 Reglas de producto:
-- La personalizacion visual ya pertenece al gimnasio/tenant y se persiste en backend.
+- La personalización visual pertenece al tenant, admite una marca corporativa y
+  perfiles de marca por sucursal, y se persiste en backend.
 - El panel de plataforma conserva tema neutral; gerencia, recepción, coaches y
-  kiosco usan la marca del gimnasio activo. En el menú lateral tenant aparecen
-  primero el logo, nombre del gimnasio y sucursal; debajo se muestra la sesión
+  kiosco usan la marca efectiva de la sucursal activa. En el menú lateral tenant
+  aparecen primero el logo, nombre de marca y sucursal; debajo se muestra la sesión
   activa y la atribución GymFort queda discreta y permanente en el pie.
-- La marca tambien viaja en `CurrentUser` para que roles sin permiso de administracion puedan ver logo, color principal, acento y fondo del gimnasio activo.
+- La marca efectiva también viaja en `CurrentUser` para que roles sin permiso de
+  administración puedan ver logo, color principal, acento y fondo de la
+  sucursal activa.
 - Ninguna regla de negocio se mueve al frontend.
 - Los formularios deben usar etiquetas de negocio entendibles para recepcion y administracion.
 
@@ -338,12 +350,17 @@ Modo soporte:
 - Las acciones quedan auditadas con origen `PLATFORM_SUPPORT`.
 - Fuera de soporte, Admin GymOS mantiene la marca neutral de GymFort.
 
-Marca por gimnasio:
-- `TenantThemeProvider` aplica tokens CSS desde la organizacion activa.
+Marca por tenant y sucursal:
+- `TenantThemeProvider` aplica tokens CSS del perfil efectivo: sucursal activa
+  con fallback de organización.
 - Campos soportados: `brandName`, `logoUrl`, `primaryColor`, `accentColor`, `surfaceColor`.
-- Plataforma usa tema neutral; tenant usa su propia marca en dueño, gerencia, recepcion, coaches, kiosco y pantallas internas.
-- La marca lateral usa los colores del tenant y muestra el logo configurado cuando `logoUrl` existe.
-- Las sucursales no tienen marca propia; todas heredan logo y colores configurados en el gimnasio.
+- Plataforma usa tema neutral; el contexto tenant usa la marca efectiva de la
+  sucursal en dueño, gerencia, recepción, coaches, kiosco y pantallas internas.
+- La marca lateral usa los colores efectivos y muestra el logo de sucursal o su
+  fallback cuando `logoUrl` existe.
+- Una sucursal puede definir nombre de marca, logo y colores propios. Los campos
+  no configurados heredan la marca corporativa de la organización. Cambiar de
+  sucursal cambia el tema efectivo sin cambiar de tenant (`CFG-003`).
 - El logo se carga desde un selector de archivo, no escribiendo una URL manualmente.
 - Los logos se persisten mediante los endpoints administrados de organizaciones
   y almacenamiento S3-compatible; el frontend usa el proxy de lectura
@@ -390,6 +407,29 @@ Formularios:
   `RECEPTION` y existe `selfservice.session.launch`. Dueño, administrador,
   gerente y soporte no ven la acción, no acceden por URL directa y el backend
   rechaza la creación de sesión aunque exista una concesión heredada.
+- `/settings/organization` incluye la sección navegable y enlazable
+  `Inscripciones`.
+  Dentro de ella, `Socios e inscripción` contiene un solo campo `Periodo de
+  inactividad`, colocado en el mismo bloque que `Dar de baja automáticamente`.
+  Inscripción e inactividad se presentan en tarjetas compactas y sus valores
+  pueden prepararse aunque la función correspondiente permanezca apagada; el
+  bloque no se renderiza permanentemente fuera de las pestañas.
+- Las configuraciones de kiosco y medios de cobro usan autosave para sus
+  toggles. En `Inscripciones`, toggles, concepto, importe y periodo se guardan
+  automáticamente con debounce controlado. Estos formularios muestran
+  `Guardando...`/`Guardado`, serializan cambios rápidos y, ante error, restauran
+  el último estado confirmado y muestran `AppNotice`. No existe botón global de
+  guardado ni una leyenda redundante de autosave.
+- Los toggles monetarios representan intención y permanecen configurables con
+  Stripe pendiente. Readiness se muestra como el estado secundario discreto
+  `Stripe pendiente` únicamente cuando la capacidad está encendida; si está
+  apagada, la interfaz indica `Función deshabilitada` y no promete una
+  habilitación automática. Readiness no apaga ni sobrescribe la preferencia
+  guardada.
+- En la identificación pública, el selector `Ya soy socio` / `Quiero
+  registrarme` permanece centrado dentro de la tarjeta. Un fallo de verificación
+  se presenta dentro de esa misma tarjeta, no altera su eje horizontal y nunca
+  expone status HTTP, rutas, códigos internos ni correlation IDs al socio.
 - `/reception` no debe depender de permisos administrativos como lectura completa de organizacion. Si el usuario tiene `branchId`, debe mostrar dashboard operativo aunque no pueda consultar `/organizations/current`.
 - El estado sin sucursal para recepcion no debe mostrar onboarding, alta de gimnasio ni configuracion de tenant; solo selector de sucursal permitida o instruccion de pedir acceso al dueño/gerente.
 - Si un usuario de recepcion tiene exactamente una sucursal permitida pero la sesion guardada no trae `branchId`, el frontend debe seleccionarla automaticamente antes de pintar la consola.
@@ -398,10 +438,15 @@ Formularios:
 - La portada no muestra una banda decorativa de `Caja lista`, `Pagos por revisar`
   o `Sucursal activa`; prioriza búsqueda de socio y acciones operativas reales.
 - Las acciones de recepcion se agrupan en la misma cuadricula: caja/POS, socios, ventas, kiosco, reservas y beneficios. No se usa una seccion desplegable secundaria para herramientas normales de mostrador.
-- La paleta de recepcion debe derivar de la marca del tenant (`primaryColor`, `accentColor`, `surfaceColor`) y no de colores fijos por modulo.
+- La paleta de recepción debe derivar de la marca efectiva de la sucursal
+  (`primaryColor`, `accentColor`, `surfaceColor`) y no de colores fijos por
+  módulo; la organización aporta el fallback.
 - El dashboard de recepcion prioriza una banda visual con el color principal y acciones asimetricas; evita verse como una lista plana de tarjetas independientes.
 - El kiosco muestra logo, nombre y colores del gimnasio propietario del terminal.
-- `/settings/organization` permite configurar marca solo en la seccion del gimnasio; la seccion de sucursales solo administra datos operativos de cada sede.
+- `/settings/organization` conserva la marca corporativa en la sección del
+  gimnasio y permite editar/previsualizar la marca efectiva de cada sede desde
+  la sección de sucursales. La UI debe distinguir claramente valores propios de
+  valores heredados.
 
 ## Coaches y rutinas
 

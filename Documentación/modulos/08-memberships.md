@@ -1,7 +1,7 @@
 # Membresías
 
 Estado: `ESTABILIZADO`
-Última revisión: 22 de agosto de 2026
+Última revisión: 26 de agosto de 2026
 
 ## Implementado
 
@@ -15,9 +15,18 @@ Estado: `ESTABILIZADO`
 - planes multi-sucursal y restricciones de reservas;
 - herencia dinámica de beneficios `ACCESS` desde el plan vigente mediante la
   política transversal de elegibilidad.
+- cotización de alta con desglose autoritativo entre plan, inscripción,
+  descuentos y total; la inscripción sólo aplica cuando la política de ciclo de
+  vida del socio determina que corresponde mediante el único umbral
+  `inactivityMonths`.
 
 ## Pendiente
 
+- paquetes de N visitas con vigencia y saldo único consumible en todas o en una
+  selección de sucursales del mismo tenant (`ACC-005`);
+- garantizar que un beneficio ligado a un plan multi-sucursal se herede en
+  todas las sucursales cubiertas por el plan, salvo alcance local explícito
+  (`BEN-003`);
 - E2E HTTP/navegador con pagos rechazados y validación posterior;
 - parametrizar zona operativa por tenant si GymFort sale del alcance México;
 - optimizar el alta rápida de un cliente nuevo desde recepción antes de contratar
@@ -49,16 +58,22 @@ pago. El cambio sólo admite una membresía activa: cancela el periodo actual,
 crea una membresía del nuevo plan desde la fecha operativa, no prorratea ni
 transfiere días pendientes y actualiza inmediatamente los accesos heredados.
 
+La primera membresía cobra inscripción cuando está habilitada. En altas
+posteriores sólo vuelve a cobrarla cuando
+`latestMembershipGraceEnd + inactivityMonths <= effectiveDate`; desactivar la
+baja automática no altera esta regla.
+
 La renovación rápida vive dentro de `/reception`. La entrada lateral y la
 tarjeta que enviaban a `/reception/renewals` fueron retiradas; esa URL sólo
 redirige al inicio para conservar marcadores antiguos. El bloque embebido
 permite buscar socio, renovar el mismo plan, cambiar a otro plan activo o
 contratar el inicial, siempre con cotización y registro de pago.
 
-## Planes de visita diaria
+## Planes de visita diaria y paquetes
 
-La decisión vigente para visitas es reutilizar el motor de membresías en lugar
-de desarrollar paquetes comerciales de N accesos.
+La decisión vigente para visitas individuales es reutilizar el motor de
+membresías. Los paquetes comerciales de N accesos son una capacidad adicional
+pendiente y no sustituyen ese flujo.
 
 Una visita normal es un `membership_plan` con `durationDays = 1`. Al usar fechas
 inclusivas, una contratación para la fecha operativa genera:
@@ -90,7 +105,9 @@ Este diseño permite que Access trate de forma idéntica una mensualidad, una
 anualidad o una visita diaria: sólo importa que exista una membresía vigente y
 qué beneficios `ACCESS` hereda de su plan.
 
-Los paquetes históricos `VisitPass` dejan de ser el modelo comercial objetivo.
-Su infraestructura puede mantenerse temporalmente hasta retirarla de manera
-segura, pero no debe condicionar nuevas integraciones entre Catálogo, Ventas y
-Accesos.
+Los paquetes históricos `VisitPass` no cubren el objetivo confirmado porque su
+saldo está limitado a una sucursal. El modelo futuro debe vender N visitas con
+vigencia y alcance de sedes dentro del mismo tenant; el socio tendrá un solo
+saldo y cada consumo registrará la sucursal. Su infraestructura puede mantenerse
+temporalmente, pero no debe condicionar el nuevo contrato entre Catálogo,
+Ventas y Acceso.

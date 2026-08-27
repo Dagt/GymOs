@@ -25,7 +25,7 @@ public class SelfServiceRepository {
 				)
 				SELECT gen_random_uuid(), :organizationId, :branchId, 'Kiosco de sucursal',
 				       'KIOSK-MAIN', 'ACTIVE',
-			       '{"membershipEnrollment":true,"membershipRenewal":true,"membershipPlanChange":true,"resourceBooking":true,"wellnessBooking":false,"profileUpdate":true,"autopay":true}'::jsonb,
+			       '{"clientRegistration":false,"membershipEnrollment":true,"membershipRenewal":true,"membershipPlanChange":true,"resourceBooking":true,"wellnessBooking":false,"profileUpdate":true,"autopay":true}'::jsonb,
 				       :now, :now, :userId, :userId, 0
 				WHERE EXISTS (
 				    SELECT 1 FROM branch
@@ -79,7 +79,7 @@ public class SelfServiceRepository {
 				SELECT branch.id AS branch_id, branch.name AS branch_name,
 				       COALESCE(terminal.status, 'NOT_CONFIGURED') AS status,
 				       COALESCE(terminal.allowed_actions_json,
-				           '{"membershipEnrollment":true,"membershipRenewal":true,"membershipPlanChange":true,"resourceBooking":true,"wellnessBooking":false,"profileUpdate":true,"autopay":true}'::jsonb
+				           '{"clientRegistration":false,"membershipEnrollment":true,"membershipRenewal":true,"membershipPlanChange":true,"resourceBooking":true,"wellnessBooking":false,"profileUpdate":true,"autopay":true}'::jsonb
 				       )::text AS allowed_actions_json,
 				       terminal.updated_at
 				FROM branch
@@ -118,6 +118,7 @@ public class SelfServiceRepository {
 				SELECT gen_random_uuid(), :organizationId, :branchId, 'Kiosco de sucursal',
 				       'KIOSK-MAIN', 'ACTIVE',
 				       jsonb_build_object(
+				           'clientRegistration', :clientRegistration,
 				           'membershipEnrollment', :membershipEnrollment,
 				           'membershipRenewal', :membershipRenewal,
 				           'membershipPlanChange', :membershipPlanChange,
@@ -141,6 +142,7 @@ public class SelfServiceRepository {
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
 				.param("actorUserId", actorUserId)
+				.param("clientRegistration", data.clientRegistration())
 				.param("membershipEnrollment", data.membershipEnrollment())
 				.param("membershipRenewal", data.membershipRenewal())
 				.param("membershipPlanChange", data.membershipPlanChange())
@@ -250,12 +252,12 @@ public class SelfServiceRepository {
 				.update();
 	}
 
-	public void markVerified(UUID sessionId, UUID clientId, OffsetDateTime expiresAt) {
+	public void markVerified(UUID sessionId, UUID clientId, OffsetDateTime expiresAt, String verificationMethod) {
 		OffsetDateTime now = OffsetDateTime.now();
 		jdbcClient.sql("""
 				UPDATE self_service_session
 				SET client_id = :clientId,
-				    verification_method = 'CONTACT_BIRTH_DATE',
+				    verification_method = :verificationMethod,
 				    verification_attempts = 0,
 				    blocked_until = NULL,
 				    expires_at = :expiresAt,
@@ -265,6 +267,7 @@ public class SelfServiceRepository {
 				WHERE id = :sessionId
 				""")
 				.param("clientId", clientId)
+				.param("verificationMethod", verificationMethod)
 				.param("expiresAt", expiresAt)
 				.param("updatedAt", now)
 				.param("sessionId", sessionId)
@@ -655,6 +658,7 @@ public class SelfServiceRepository {
 	) {}
 
 	public record BranchKioskConfigurationData(
+			boolean clientRegistration,
 			boolean membershipEnrollment, boolean membershipRenewal,
 			boolean membershipPlanChange, boolean resourceBooking,
 			boolean wellnessBooking, boolean profileUpdate, boolean autopay

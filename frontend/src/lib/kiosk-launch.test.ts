@@ -9,6 +9,7 @@ const session: KioskSessionResponse = {
   primaryColor: "#123456", accentColor: "#abcdef", surfaceColor: "#ffffff",
   expiresAt: "2099-07-31T20:00:00Z", verified: false,
   capabilities: {
+    clientRegistrationAllowed: false,
     membershipEnrollmentAllowed: true, membershipRenewalAllowed: true,
     membershipPlanChangeAllowed: true, resourceBookingAllowed: true,
     wellnessBookingAllowed: false, profileUpdateAllowed: true, autopayAllowed: true,

@@ -1,14 +1,19 @@
 # Autoservicio y kiosco
 
 Estado: `FUNCIONAL / LISTO PARA ACEPTACIÓN CONECTADA`
-Última revisión: 21 de agosto de 2026
+Última revisión: 26 de agosto de 2026
 
 ## Implementado
 
 - sesión temporal con token aleatorio almacenado como hash;
 - apertura exclusiva desde Recepción; dueño, administrador, gerente y soporte
   pueden configurar lo permitido por sus permisos, pero no lanzan sesiones;
-- verificación genérica de socio por contacto y fecha de nacimiento;
+- verificación genérica de socio por contacto y fecha de nacimiento, incluso
+  cuando todavía no tiene ninguna membresía;
+- alta de un socio nuevo desde el propio kiosco cuando Recepción habilita la
+  capacidad `clientRegistration` para la sucursal; el alta deja la sesión
+  verificada y abre la contratación del primer plan; el selector de entrada
+  distingue visualmente entre socio existente y registro nuevo;
 - membresías, pagos, reservas y domiciliación disponibles también en una sede
   secundaria cuando el plan vigente es multi-sucursal;
 - rate limiting, bloqueo por intentos y auditoría;
@@ -18,10 +23,22 @@ Estado: `FUNCIONAL / LISTO PARA ACEPTACIÓN CONECTADA`
   elegible y vuelve a validar la elegibilidad al consultar horarios y reservar;
 - capacidades canónicas por perfil lógico de sucursal, expuestas a la sesión y aplicadas en cada
   endpoint implementado;
+- capacidades configuradas persistidas como intención, sin convertir a `false`
+  compra, renovación, cambio o domiciliación porque Stripe siga pendiente;
+- disponibilidad efectiva resuelta al ejecutar como intención configurada más
+  readiness de Stripe; el catálogo y la cotización permanecen consultables y
+  Checkout continúa protegido por readiness;
+- reinicio de sesión que vuelve a consultar el perfil vigente del terminal, de
+  modo que cambios como `clientRegistration=true` aparecen sin conservar una
+  copia antigua dentro de la sesión;
 - actualización real y auditada de correo/teléfono desde sesión verificada;
 - contrato de alta/renovación/cambio sin método manual ni `validateNow`,
   conectado a Stripe Checkout y confirmado sólo por webhook/conciliación;
 - marca tenant, atribución GymFort y superficie sin navegación administrativa;
+- feedback de sesión compacto, descartable y temporal para que un mensaje de
+  éxito no permanezca visible para el siguiente socio;
+- fallo de identificación con mensaje público breve dentro de la tarjeta, sin
+  desplazar el formulario ni exponer detalles técnicos de la API;
 - lanzamiento desde recepción con permiso dedicado, sin registrar una
   computadora o navegador;
 - apertura en una pestaña aislada sin colocar la credencial de kiosco en la URL;
@@ -65,9 +82,12 @@ Estado: `FUNCIONAL / LISTO PARA ACEPTACIÓN CONECTADA`
   una caída.
 - cotización autoritativa final, incluidos beneficios y descuento, antes de
   crear la venta o abandonar GymFort para abrir Stripe Checkout;
+- desglose de inscripción en la contratación inicial y conciliación del total
+  completo por Stripe;
 - configuración administrativa de capacidades por sucursal, sin alta ni
   asignación de computadoras o terminales físicas; la pantalla muestra una sola
-  configuración correspondiente a la sucursal elegida en el selector global;
+  configuración correspondiente a la sucursal elegida en el selector global,
+  guarda cada toggle automáticamente y revierte el cambio si el backend falla;
 - navegación del socio organizada por tareas (`Membresías`, `Reservar`,
   `Wellness`, `Pagos`, `Mis datos` y `Domiciliación`) para evitar mezclar todos
   los formularios en una sola pantalla;
@@ -84,6 +104,8 @@ Estado: `FUNCIONAL / LISTO PARA ACEPTACIÓN CONECTADA`
 
 ## Pendiente
 
+- resolver nombre, logo y colores desde la sucursal del kiosco, usando la marca
+  de organización sólo como fallback (`CFG-003`);
 - ejecutar `stripeTest` con credenciales Stripe exclusivamente test y cuenta
   Connect sandbox dentro de CI protegido; el corte actual validó backend,
   frontend, ruteo por consola, Compose y la imagen real Stripe CLI, pero la

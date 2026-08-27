@@ -18,6 +18,7 @@ public class SelfServiceCapabilityPolicy {
 	public SelfServiceCapabilities resolve(String allowedActionsJson) {
 		JsonNode actions = parse(allowedActionsJson);
 		return new SelfServiceCapabilities(
+				enabled(actions, "clientRegistration", "selfRegistration", "registration"),
 				enabled(actions, "membershipEnrollment", "membershipPurchase", "enrollment"),
 				enabled(actions, "membershipRenewal", "renewal", "renew"),
 				enabled(actions, "membershipPlanChange", "planChange", "changePlan"),

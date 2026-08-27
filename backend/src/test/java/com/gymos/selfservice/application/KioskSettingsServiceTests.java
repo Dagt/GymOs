@@ -1,26 +1,33 @@
 package com.gymos.selfservice.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.audit.api.AuditService;
-import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.payments.api.PaymentConfigurationOperations;
 import com.gymos.payments.api.PaymentConfigurationView;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository;
+import com.gymos.selfservice.infrastructure.SelfServiceRepository.BranchKioskConfigurationData;
+import com.gymos.selfservice.infrastructure.SelfServiceRepository.BranchKioskConfigurationRecord;
+import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class KioskSettingsServiceTests {
 	private final SelfServiceRepository repository = mock(SelfServiceRepository.class);
 	private final PaymentConfigurationOperations paymentConfiguration = mock(PaymentConfigurationOperations.class);
 	private final KioskSettingsService service = new KioskSettingsService(
 			repository,
-			mock(SelfServiceCapabilityPolicy.class),
+			new SelfServiceCapabilityPolicy(new ObjectMapper()),
 			paymentConfiguration,
 			mock(AuditService.class)
 	);
@@ -31,32 +38,45 @@ class KioskSettingsServiceTests {
 	);
 
 	@Test
-	void paymentCapabilitiesRequireStripeSelfCheckout() {
+	void configuredPaymentCapabilitiesArePersistedWhileStripeIsPending() {
 		when(paymentConfiguration.configuration(organizationId)).thenReturn(
 				new PaymentConfigurationView(false, false, null, null, false, false, false, null, false)
 		);
+		when(repository.configureBranch(eq(organizationId), eq(branchId), eq(principal.userId()), any()))
+				.thenReturn(true);
+		when(repository.branchConfigurations(organizationId)).thenReturn(List.of(
+				new BranchKioskConfigurationRecord(
+						branchId,
+						"Centro",
+						"ACTIVE",
+						"""
+						{"clientRegistration":true,"membershipEnrollment":true,"membershipRenewal":true,
+						 "membershipPlanChange":true,"resourceBooking":true,"wellnessBooking":false,
+						 "profileUpdate":true,"autopay":true}
+						""",
+						OffsetDateTime.now()
+				)
+		));
 
-		assertThatThrownBy(() -> service.configure(
+		var result = service.configure(
 				principal,
 				branchId,
-				new KioskSettingsService.UpdateKioskSettings(true, false, false, false, false, false, false),
+				new KioskSettingsService.UpdateKioskSettings(true, true, true, true, true, false, true, true),
 				"correlation"
-		)).isInstanceOfSatisfying(BusinessException.class, exception ->
-				assertThat(exception.code()).isEqualTo("KIOSK_STRIPE_CHECKOUT_REQUIRED"));
-	}
-
-	@Test
-	void autopayCapabilityRequiresStripeRecurringBilling() {
-		when(paymentConfiguration.configuration(organizationId)).thenReturn(
-				new PaymentConfigurationView(false, false, null, null, false, true, false, "acct_test", true)
 		);
 
-		assertThatThrownBy(() -> service.configure(
-				principal,
-				branchId,
-				new KioskSettingsService.UpdateKioskSettings(false, false, false, false, false, false, true),
-				"correlation"
-		)).isInstanceOfSatisfying(BusinessException.class, exception ->
-				assertThat(exception.code()).isEqualTo("KIOSK_STRIPE_RECURRING_REQUIRED"));
+		ArgumentCaptor<BranchKioskConfigurationData> persisted =
+				ArgumentCaptor.forClass(BranchKioskConfigurationData.class);
+		verify(repository).configureBranch(
+				eq(organizationId), eq(branchId), eq(principal.userId()), persisted.capture());
+		assertThat(persisted.getValue().clientRegistration()).isTrue();
+		assertThat(persisted.getValue().membershipEnrollment()).isTrue();
+		assertThat(persisted.getValue().membershipRenewal()).isTrue();
+		assertThat(persisted.getValue().membershipPlanChange()).isTrue();
+		assertThat(persisted.getValue().autopay()).isTrue();
+		assertThat(result.capabilities().membershipEnrollmentAllowed()).isTrue();
+		assertThat(result.capabilities().autopayAllowed()).isTrue();
+		assertThat(result.capabilities().onlineCardPaymentsReady()).isFalse();
+		assertThat(result.capabilities().recurringCardPaymentsReady()).isFalse();
 	}
 }

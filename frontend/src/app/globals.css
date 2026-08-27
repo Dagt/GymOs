@@ -5261,6 +5261,88 @@ button.admin-secondary-link:disabled {
   width: 100%;
 }
 
+.kiosk-entry-selector {
+  display: grid;
+  gap: .45rem;
+  justify-self: center;
+  margin-bottom: 1.6rem;
+  max-width: 31rem;
+  width: 100%;
+}
+
+.kiosk-entry-selector > p {
+  color: rgba(255, 255, 255, .62);
+  font-size: .66rem;
+  font-weight: 900;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.kiosk-entry-options {
+  display: grid;
+  gap: .55rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.kiosk-entry-option {
+  align-items: center;
+  background: rgba(255, 255, 255, .055);
+  border: 1px solid rgba(255, 255, 255, .16);
+  border-radius: .8rem;
+  color: white;
+  display: flex;
+  gap: .55rem;
+  min-height: 3.55rem;
+  padding: .45rem .55rem;
+  text-align: left;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+
+.kiosk-entry-option:hover {
+  background: rgba(255, 255, 255, .09);
+  transform: translateY(-1px);
+}
+
+.kiosk-entry-option.active {
+  background: color-mix(in srgb, var(--brand-accent) 13%, rgba(255, 255, 255, .075));
+  border-color: color-mix(in srgb, var(--brand-accent) 70%, white 8%);
+  box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--brand-accent) 75%, transparent);
+}
+
+.kiosk-entry-icon {
+  align-items: center;
+  background: rgba(255, 255, 255, .09);
+  border-radius: .6rem;
+  color: rgba(255, 255, 255, .78);
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 2.15rem;
+  justify-content: center;
+  width: 2.15rem;
+}
+
+.kiosk-entry-option.active .kiosk-entry-icon {
+  background: var(--brand-accent);
+  color: #07111f;
+}
+
+.kiosk-entry-option > span:last-child {
+  display: grid;
+  gap: .2rem;
+  min-width: 0;
+}
+
+.kiosk-entry-option strong {
+  font-size: .8rem;
+  font-weight: 950;
+}
+
+.kiosk-entry-option small {
+  color: rgba(255, 255, 255, .58);
+  font-size: .65rem;
+  line-height: 1.3;
+}
+
 .kiosk-dashboard-hero {
   align-items: center;
   background: linear-gradient(120deg, color-mix(in srgb, var(--brand-primary) 48%, #102435), rgba(255, 255, 255, 0.08));
@@ -5810,22 +5892,56 @@ button.admin-secondary-link:disabled {
   width: 100%;
 }
 
-.kiosk-notice {
-  border-radius: 0.75rem;
-  font-weight: 800;
-  padding: 1rem;
+.kiosk-feedback {
+  align-items: center;
+  border-radius: .8rem;
+  display: flex;
+  font-size: .82rem;
+  font-weight: 750;
+  gap: .65rem;
+  justify-self: center;
+  max-width: min(34rem, 100%);
+  padding: .7rem .8rem;
+  width: min(34rem, 100%);
 }
 
-.kiosk-notice.error {
-  background: rgba(127, 29, 29, 0.46);
-  border: 1px solid rgba(252, 165, 165, 0.35);
+.kiosk-feedback p {
+  line-height: 1.4;
+}
+
+.kiosk-feedback > svg {
+  flex: 0 0 auto;
+}
+
+.kiosk-feedback button {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: currentColor;
+  display: inline-flex;
+  flex: 0 0 auto;
+  justify-content: center;
+  opacity: .68;
+  padding: .2rem;
+}
+
+.kiosk-feedback.error {
+  background: rgba(127, 29, 29, .34);
+  border: 1px solid rgba(252, 165, 165, .28);
   color: #fecaca;
 }
 
-.kiosk-notice.ok {
-  background: rgba(20, 83, 45, 0.46);
-  border: 1px solid rgba(134, 239, 172, 0.35);
+.kiosk-feedback.ok {
+  background: rgba(20, 83, 45, .3);
+  border: 1px solid rgba(134, 239, 172, .26);
   color: #dcfce7;
+}
+
+.kiosk-inline-feedback {
+  justify-self: stretch;
+  margin-bottom: 1rem;
+  max-width: none;
+  width: 100%;
 }
 
 .kiosk-feature-note {
@@ -5887,6 +6003,10 @@ button.admin-secondary-link:disabled {
 
   .kiosk-header aside {
     text-align: left;
+  }
+
+  .kiosk-entry-options {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -1,6 +1,7 @@
 package com.gymos.selfservice.application;
 
 public enum SelfServiceCapability {
+	CLIENT_REGISTRATION,
 	MEMBERSHIP_ENROLLMENT,
 	MEMBERSHIP_RENEWAL,
 	MEMBERSHIP_PLAN_CHANGE,

@@ -2,7 +2,7 @@
 
 Estado: `CONTROL PLANE CLOUD ESTABILIZADO PARA INICIAR CONNECTOR / CONNECTOR LOCAL Y ADAPTER HIKCENTRAL PENDIENTES`
 
-Última revisión: 24 de agosto de 2026
+Última revisión: 26 de agosto de 2026
 
 ## 1. Alcance y fuente de verdad
 
@@ -26,6 +26,11 @@ duplica esas reglas. Tampoco administra usuarios internos, cobros ni biometría.
 Una visita comercial normal se representa mediante una membresía de un día. La
 infraestructura histórica `visit_pass` permanece por compatibilidad, pero ya no
 forma parte del flujo principal de la consola.
+
+El objetivo `ACC-005` agrega paquetes de N visitas sin salir del tenant: un solo
+saldo por socio, vigencia, todas o una selección de sucursales admitidas y un
+ledger atómico/idempotente que conserva la sucursal de cada consumo. No se
+crearán saldos independientes por sede.
 
 ## 2. Estado real de la entrega
 

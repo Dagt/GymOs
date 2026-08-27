@@ -259,6 +259,10 @@ Decisiones implementadas:
 - La marca del gimnasio se aplica por tenant con `TenantThemeProvider`; la
   plataforma conserva tema neutral y todas las consolas muestran atribución
   permanente de producto GymFort.
+- Extensión objetivo `CFG-003`: dentro del tenant,
+  `TenantThemeProvider` resuelve primero el perfil de la sucursal activa y usa
+  la organización como fallback. La frontera de seguridad continúa siendo la
+  organización; la marca no crea un tenant adicional.
 - El feedback de éxito, advertencia y error usa notificaciones flotantes
   globales, accesibles y visibles independientemente del scroll.
 - La administracion de muchos gimnasios y sucursales usa un patron maestro-detalle para evitar saturacion visual.

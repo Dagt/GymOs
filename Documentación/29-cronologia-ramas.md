@@ -2,27 +2,25 @@
 
 Estado: AUDITADO
 
-Corte: 24 de agosto de 2026
+Corte: 26 de agosto de 2026
 
-Rama de trabajo: `feature/platform-identity-separation`
+Rama de trabajo: `feature/client-onboarding-lifecycle`
 
-Base integrada: `main` en `88981b4` (`Merge pull request #15`)
+Integración actual: PR #19 desde `feature/client-onboarding-lifecycle` hacia
+`main`
 
 ## 1. Situación vigente
 
-El PR #15 ya integró en `main` la administración comercial, la separación
-`PLATFORM`/`TENANT`, el bootstrap inicial y el aprovisionamiento transaccional de
-gimnasios. La rama actual fue adelantada a ese merge y contiene exclusivamente
-el cierre posterior: concurrencia PostgreSQL del bootstrap, detección por
-permiso efectivo, retiro seguro del fixture histórico, Compose, CI y runbook.
-
-Este cierre debe publicarse en un PR nuevo; el PR #15 fusionado es inmutable. No
-debe fusionarse hasta que el nuevo CI y la revisión de seguridad estén verdes.
+El PR #19 incorpora sobre `main` el primer lote de retroalimentación del cliente
+real. V93 implementa inscripción, baja automática reversible, autenticación de
+socios sin plan y alta desde kiosco. V94 unifica el periodo de inactividad y
+separa intención de kiosco de readiness de Stripe.
 
 | Rama | Estado | Acción |
 |---|---|---|
-| `main` | Incluye PR #15 en `88981b4` | Recibir el hardening sólo por un PR nuevo y verde |
-| `feature/platform-identity-separation` | Activa sobre el `main` fusionado | Publicar PR de cierre; revisar CI/seguridad; no fusionar automáticamente |
+| `main` | Recibe el lote mediante PR #19 | Continuar desde el cierre validado |
+| `feature/client-onboarding-lifecycle` | Integrada mediante PR #19 | Histórica; no fusionar otra vez |
+| `feature/platform-identity-separation` | Integrada antes del corte actual | Histórica; no fusionar otra vez |
 | `feature/platform-client-billing-management` | Integrada mediante PR #15 | Histórica; no fusionar otra vez |
 | `feature/physical-access-control` | Integrada mediante PR #14 | Histórica; no fusionar otra vez |
 | `feature/pricing-and-billing` | Integrada en `main` | Histórica; no fusionar otra vez |
@@ -42,11 +40,31 @@ debe fusionarse hasta que el nuevo CI y la revisión de seguridad estén verdes.
 | 24 ago 2026 | JWT/refresh, soporte temporal, bootstrap y rutas frontend adoptan `accountScope` explícito |
 | 24 ago 2026 | PR #15 integra administración comercial e identidad en `main` (`88981b4`) |
 | 24 ago 2026 | V88 y el hardening posterior coordinan bootstrap, retiran fixture vacío y amplían CI |
+| 26 ago 2026 | PR #18 integra paginación y hardening V91–V92 en `main` (`a5ea75f`) |
+| 26 ago 2026 | Se crea `feature/client-onboarding-lifecycle` y V93 agrupa el primer lote de retroalimentación del cliente real |
+| 26 ago 2026 | V94 conserva `inactivityMonths` como umbral único; configuración de kiosco adopta autosave e intención independiente de Stripe; launch/reset resuelven capacidades vigentes |
+| 26 ago 2026 | El cierre visual compacta socios, extiende autosave a cobros/socios, condiciona `Stripe pendiente` al toggle encendido y rediseña la entrada del kiosco |
+| 26 ago 2026 | La pestaña pasa a `Inscripciones`, todos sus valores adoptan autosave sin botón y el selector público se compacta y separa del formulario |
+| 26 ago 2026 | PR #19 integra el lote; el cierre centra el selector del kiosco y presenta fallos de identidad breves sin exponer diagnóstico HTTP |
 
 ## 3. Alcance material de la rama activa
 
 ### Implementado
 
+- cargo de inscripción configurable, cotizado y persistido como partida
+  financiera independiente;
+- baja automática reversible de socios sin vigencia, con fecha, motivo,
+  auditoría y evento de cambio de estado;
+- verificación de socios sin plan y reactivación segura de bajas automáticas;
+- capacidad opt-in por sucursal para alta desde kiosco y continuación inmediata
+  al primer plan;
+- sección `Inscripciones` con un solo periodo de inactividad y V94 compatible con bases
+  donde V93 ya fue aplicada;
+- capacidades deseadas del kiosco persistidas sin readiness, autosave con
+  rollback y estados distintos para Stripe pendiente, función deshabilitada y
+  catálogo vacío;
+- prueba PostgreSQL real desde settings hasta `allowed_actions_json`, launch y
+  reset de la sesión;
 - administración comercial de gimnasios desde la navegación lateral de
   plataforma;
 - identidades `PLATFORM` sin organización/sucursal e identidades `TENANT` con
@@ -65,31 +83,44 @@ debe fusionarse hasta que el nuevo CI y la revisión de seguridad estén verdes.
 
 ### No incluido
 
+- variantes de catálogo/códigos múltiples, paquetes de visitas compartidos
+  entre sucursales del mismo tenant, alcance multi-sucursal de beneficios ni
+  branding por sucursal; quedan en los lotes 2–5 del análisis del primer
+  cliente;
 - borrado de cualquier dato demo ambiguo, modificado o con actividad;
-- fusión automática a `main`;
 - GymFort Local Connector, adapter HikCentral o integración con hardware;
 - cobro SaaS recurrente automático, CFDI o conciliación bancaria completa;
 - una suite E2E homogénea para todos los recorridos críticos.
 
 ## 4. Evidencia de validación local
 
-- 413 pruebas backend unitarias;
-- 59 pruebas PostgreSQL/Testcontainers, incluidas migraciones limpias/upgrade;
-- `build` backend y construcción de imagen Docker;
-- 94/94 pruebas frontend, typecheck, lint y build Next;
-- bundle OpenNext para Cloudflare;
-- `npm audit` con cero vulnerabilidades;
-- construcción completa de imágenes backend/frontend mediante Compose;
+- 453 pruebas backend unitarias;
+- 92 pruebas PostgreSQL/Testcontainers, incluidas V93–V94 sobre base limpia y
+  upgrade desde V93, inactividad, persistencia financiera de la inscripción y
+  configuración real de launch/reset del kiosco;
+- 113/113 pruebas frontend, typecheck, lint y build Next de producción;
+- 27/27 recorridos E2E dirigidos de kiosco/configuración en Chromium, incluido
+  registro nuevo, alta sin membresía previa, autosave con rollback en kiosco,
+  cobros y socios, estados condicionales de Stripe y estabilidad visual ante un
+  fallo de verificación;
 - `git diff --check` y revisión de que no se versionen secretos.
 
-La evidencia local no sustituye los checks del PR. Ausencia de un status
-publicado no se interpreta como pipeline verde.
+El workflow remoto del PR #19 no alcanzó a iniciar steps: GitHub marcó frontend
+y backend sin runner por pagos recientes fallidos o límite de gasto insuficiente
+en Actions. Se reintentó una vez con el mismo resultado. Esta limitación de la
+cuenta queda separada de la evidencia local y no se interpreta como una falla
+del código.
 
 ## 5. Regla de integración
 
-1. La rama actual se publica y abre contra `main` como PR revisable.
-2. CI, migraciones y revisión de seguridad deben terminar correctamente.
-3. El bootstrap se habilita sólo durante la creación inicial y sus variables se
-   eliminan después, conforme al runbook.
-4. No se fusiona ni despliega automáticamente desde esta tarea.
+1. La rama se integra mediante el PR #19 tras completar la revisión de
+   aceptación.
+2. CI debe terminar correctamente antes del merge cuando GitHub Actions pueda
+   asignar runners. Para el PR #19, el merge se autorizó con evidencia local
+   completa porque Actions quedó bloqueado antes de ejecutar un solo step por
+   configuración de pagos/límite de gasto de la cuenta.
+3. La capacidad `clientRegistration` permanece deshabilitada en perfiles
+   existentes hasta que el gimnasio la active por sucursal.
+4. El merge fue autorizado expresamente para este cierre; el despliegue sigue
+   siendo una acción independiente.
 5. Las ramas remotas sólo se eliminan por decisión explícita.

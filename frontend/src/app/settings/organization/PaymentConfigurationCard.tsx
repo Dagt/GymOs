@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+import { AppNotice } from "@/components/AppNotice";
 import { ToggleSwitch } from "@/components/ToggleSwitch";
 import type { MercadoPagoTerminal, PaymentConfiguration } from "@/lib/api";
 
@@ -27,42 +28,104 @@ export function PaymentConfigurationCard({
   onConnectStripe: () => Promise<void>;
   onLoadMercadoPagoTerminals: () => Promise<void>;
   onRefreshStripe: () => Promise<void>;
-  onSave: (configuration: PaymentConfiguration) => Promise<void>;
+  onSave: (configuration: PaymentConfiguration) => Promise<PaymentConfiguration>;
 }) {
   const [draft, setDraft] = useState(configuration);
+  const [saveStatus, setSaveStatus] = useState<"saving" | "saved" | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const draftRef = useRef(configuration);
+  const saveStateRef = useRef({
+    revision: 0,
+    queuedRevision: 0,
+    completedRevision: 0,
+    running: false,
+    confirmed: configuration,
+  });
 
   function setManualTerminal(checked: boolean) {
-    setDraft((current) => ({
+    const current = draftRef.current;
+    changeToggle({
       ...current,
       receptionManualTerminalEnabled: checked,
       receptionMercadoPagoEnabled: checked ? false : current.receptionMercadoPagoEnabled,
-    }));
+    });
   }
 
   function setMercadoPago(checked: boolean) {
-    setDraft((current) => ({
+    const current = draftRef.current;
+    changeToggle({
       ...current,
       receptionMercadoPagoEnabled: checked,
       receptionManualTerminalEnabled: checked ? false : current.receptionManualTerminalEnabled,
-    }));
+    });
   }
 
   function setStripeCheckout(checked: boolean) {
-    setDraft((current) => ({
+    const current = draftRef.current;
+    changeToggle({
       ...current,
       stripeSelfCheckoutEnabled: checked,
       stripeRecurringEnabled: checked ? current.stripeRecurringEnabled : false,
-    }));
+    });
+  }
+
+  function changeToggle(next: PaymentConfiguration) {
+    const state = saveStateRef.current;
+    state.revision += 1;
+    state.queuedRevision = state.revision;
+    draftRef.current = next;
+    setDraft(next);
+    setError(null);
+    setSaveStatus("saving");
+    void persistQueuedChanges();
+  }
+
+  async function persistQueuedChanges() {
+    const state = saveStateRef.current;
+    if (state.running) return;
+    state.running = true;
+    try {
+      while (state.completedRevision < state.queuedRevision) {
+        const requestedRevision = state.queuedRevision;
+        const desired = draftRef.current;
+        try {
+          const updated = await onSave(desired);
+          state.confirmed = updated;
+          state.completedRevision = requestedRevision;
+          if (state.revision === requestedRevision) {
+            draftRef.current = updated;
+            setDraft(updated);
+            setSaveStatus("saved");
+          }
+        } catch (exception) {
+          state.completedRevision = state.queuedRevision;
+          state.revision = state.queuedRevision;
+          draftRef.current = state.confirmed;
+          setDraft(state.confirmed);
+          setSaveStatus(null);
+          setError(exception instanceof Error ? exception.message : "No fue posible guardar los medios de cobro.");
+          return;
+        }
+      }
+    } finally {
+      state.running = false;
+    }
   }
 
   return (
     <section className="app-card settings-detail-panel grid scroll-mt-6 gap-5 p-5" id="payment-settings">
-      <div>
-        <h2 className="text-xl font-semibold">Medios de cobro</h2>
-        <p className="mt-2 max-w-3xl text-sm text-[var(--brand-muted)]">
-          Configura cómo cobra recepción y qué pagos con Stripe puede ofrecer el kiosco.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-semibold">Medios de cobro</h2>
+          <p className="mt-2 max-w-3xl text-sm text-[var(--brand-muted)]">
+            Configura cómo cobra recepción y qué pagos con Stripe puede ofrecer el kiosco.
+          </p>
+        </div>
+        <span aria-live="polite" className="min-h-5 text-xs font-semibold text-[var(--brand-muted)]">
+          {saveStatus === "saving" ? "Guardando..." : saveStatus === "saved" ? "Guardado" : null}
+        </span>
       </div>
+      {error ? <AppNotice message={error} tone="error" /> : null}
 
       <div className="grid gap-8 xl:grid-cols-2">
         <div className="grid content-start gap-4">
@@ -74,7 +137,7 @@ export function PaymentConfigurationCard({
           <PaymentToggleRow
             checked={draft.receptionManualTerminalEnabled}
             description="Registra pagos realizados en una terminal externa."
-            disabled={!canManage}
+            disabled={!canManage || saving}
             label="Terminal independiente"
             onChange={setManualTerminal}
           />
@@ -84,7 +147,7 @@ export function PaymentConfigurationCard({
             description={draft.mercadoPagoConnected
               ? `Terminal Point vinculada${draft.mercadoPagoTerminalId ? ` · ${draft.mercadoPagoTerminalId}` : " · selecciona una terminal"}`
               : "Vincula Mercado Pago para usar una terminal Point integrada."}
-            disabled={!canManage || !draft.mercadoPagoConnected}
+            disabled={!canManage || saving || !draft.mercadoPagoConnected}
             label="Mercado Pago Point"
             onChange={setMercadoPago}
           />
@@ -139,7 +202,7 @@ export function PaymentConfigurationCard({
             description={draft.stripeConnected
               ? "Compras, renovaciones y cambios de plan desde el kiosco."
               : "Vincula Stripe para habilitar pagos en autoservicio."}
-            disabled={!canManage || !draft.stripeConnected}
+            disabled={!canManage || saving || !draft.stripeConnected}
             label="Self checkout con Stripe"
             onChange={setStripeCheckout}
           />
@@ -149,9 +212,9 @@ export function PaymentConfigurationCard({
             description={draft.stripeSelfCheckoutEnabled
               ? "Domiciliación y cobros recurrentes desde el kiosco."
               : "Primero habilita self checkout con Stripe."}
-            disabled={!canManage || !draft.stripeConnected || !draft.stripeSelfCheckoutEnabled}
+            disabled={!canManage || saving || !draft.stripeConnected || !draft.stripeSelfCheckoutEnabled}
             label="Domiciliación con Stripe"
-            onChange={(checked) => setDraft((current) => ({ ...current, stripeRecurringEnabled: checked }))}
+            onChange={(checked) => changeToggle({ ...draftRef.current, stripeRecurringEnabled: checked })}
           />
 
           {canManageStripeAccount ? (
@@ -173,13 +236,7 @@ export function PaymentConfigurationCard({
         </div>
       </div>
 
-      {canManage ? (
-        <div className="flex justify-end border-t border-[var(--brand-line)] pt-5">
-          <button className="app-button" disabled={saving} onClick={() => void onSave(draft)} type="button">
-            {saving ? "Guardando..." : "Guardar configuración de cobro"}
-          </button>
-        </div>
-      ) : null}
+      {canManage ? <p className="border-t border-[var(--brand-line)] pt-4 text-right text-xs text-[var(--brand-muted)]">Los medios de cobro se guardan automáticamente al cambiar un toggle.</p> : null}
     </section>
   );
 }

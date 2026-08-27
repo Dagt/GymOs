@@ -3,6 +3,7 @@ package com.gymos.selfservice.application.result;
 import com.gymos.selfservice.application.SelfServiceCapability;
 
 public record SelfServiceCapabilities(
+		boolean clientRegistrationAllowed,
 		boolean membershipEnrollmentAllowed,
 		boolean membershipRenewalAllowed,
 		boolean membershipPlanChangeAllowed,
@@ -15,6 +16,7 @@ public record SelfServiceCapabilities(
 ) {
 	public SelfServiceCapabilities withPaymentReadiness(boolean onlineCardPaymentsReady, boolean recurringCardPaymentsReady) {
 		return new SelfServiceCapabilities(
+				clientRegistrationAllowed,
 				membershipEnrollmentAllowed,
 				membershipRenewalAllowed,
 				membershipPlanChangeAllowed,
@@ -29,6 +31,7 @@ public record SelfServiceCapabilities(
 
 	public boolean allows(SelfServiceCapability capability) {
 		return switch (capability) {
+			case CLIENT_REGISTRATION -> clientRegistrationAllowed;
 			case MEMBERSHIP_ENROLLMENT -> membershipEnrollmentAllowed;
 			case MEMBERSHIP_RENEWAL -> membershipRenewalAllowed;
 			case MEMBERSHIP_PLAN_CHANGE -> membershipPlanChangeAllowed;

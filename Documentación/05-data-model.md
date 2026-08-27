@@ -126,10 +126,35 @@ Regla:
 - person_id
 - status
 - joined_at
+- inactivated_at
+- inactivation_reason
 - notes
 
 Regla:
 - El socio pertenece a la organizacion/tenant, no se duplica por sucursal. Las ventas, membresias, accesos, reservas y pases conservan `branch_id` cuando la operacion es local a una sucursal.
+- La baja automática usa `status=INACTIVE` e
+  `inactivation_reason=MEMBERSHIP_INACTIVITY`; no elimina el expediente ni sus
+  relaciones financieras.
+
+### client_lifecycle_configuration
+- organization_id
+- registration_fee_enabled
+- registration_fee_cents
+- registration_fee_label
+- auto_inactivation_enabled
+- inactivity_months
+- updated_at
+- updated_by
+- version
+
+Regla:
+- `inactivity_months` es el único umbral temporal para determinar periodo de
+  inactividad y reinscripción.
+- La inscripción corresponde en la primera membresía o cuando
+  `latestMembershipGraceEnd + inactivity_months <= effectiveDate`, aunque la
+  baja automática esté desactivada.
+- La inactividad se mide desde el fin de la última gracia de membresía o, si el
+  socio nunca tuvo una, desde `joined_at`.
 
 ### product
 - sku
@@ -209,6 +234,15 @@ Regla:
 - valid_until
 - active
 
+Regla objetivo multi-sucursal:
+- Un beneficio ligado a un plan multi-sucursal puede tener alcance
+  `PLAN_BRANCHES`; en ese caso la elegibilidad se deriva de las sucursales donde
+  el plan es válido y no de la sucursal desde la que se creó la definición.
+- Los beneficios deliberadamente locales conservan alcance `LOCAL`. Una futura
+  selección parcial de sedes se representa con una relación de alcance, no con
+  copias del mismo beneficio.
+- La organización continúa siendo la frontera tenant en todos los casos.
+
 ### client_benefit
 - client_id
 - benefit_id
@@ -216,6 +250,33 @@ Regla:
 - verified_at
 - valid_until
 - verified_by
+
+### visit_package_entitlement (objetivo)
+- organization_id
+- client_id
+- sale_id
+- total_visits
+- remaining_visits
+- valid_from
+- valid_until
+- branch_scope (`ALL_BRANCHES` o `SELECTED_BRANCHES`)
+- status
+
+### visit_package_branch (objetivo)
+- entitlement_id
+- branch_id
+
+### visit_package_consumption (objetivo)
+- entitlement_id
+- branch_id
+- access_id
+- consumed_at
+- idempotency_key
+
+Regla:
+- El saldo es único para el socio dentro del tenant. Dos sucursales nunca crean
+  saldos independientes para la misma compra; el consumo atómico registra la
+  sede donde ocurrió.
 
 ### sale
 - client_id
@@ -230,11 +291,17 @@ Regla:
 ### sale_item
 - sale_id
 - product_id
+- item_type
 - quantity
 - unit_price
 - discount_amount
 - total_amount
 - behavior_snapshot_json
+
+Regla:
+- Una alta con inscripción genera una partida `MEMBERSHIP_PLAN` con producto y
+  una partida `REGISTRATION_FEE` sin producto. Ambas integran subtotal, total y
+  pago, pero los beneficios de membresía sólo descuentan el plan.
 
 ### payment
 - sale_id
@@ -636,6 +703,9 @@ Migraciones nuevas:
 - `V25__manager_permissions_and_client_branch_visibility.sql`: agrega `client.home_branch_id`, filtra socios por sucursal/plan multi-sucursal y revoca permisos de administracion de datos/sucursales al rol `Gerente`.
 - `V26__branch_branding_and_owner_branch_selection.sql`: historicamente agrego marca opcional por sucursal (`brand_name`, `logo_url`, colores) y soportaba que el dueño entrara sin sucursal operativa por defecto.
 - `V27__reception_booking_scope_and_gym_branding.sql`: elimina marca visual de `branch`, deja logo/colores exclusivamente en `organization` y revoca `resource.manage` a recepcion.
+- La decisión de V27 describe el estado implementado, pero queda superada como
+  objetivo de producto por `CFG-003`: un mismo tenant puede operar marcas
+  distintas por sucursal.
 - `V47__advanced_coach_profiles.sql`: registra `coach.profile.manage` y lo
   asigna a los roles administrativos que pueden editar el perfil y las
   sucursales de un coach.
@@ -702,8 +772,28 @@ Permisos:
 Notas de integridad:
 
 - Los colores deben validarse como `#RRGGBB` desde API/frontend.
-- La marca pertenece a la organizacion, no a la sesion local ni al navegador.
+- La organización conserva una marca corporativa de fallback. El objetivo
+  `CFG-003` agrega una marca operativa por sucursal, resuelta desde el
+  `branch_id` de la sesión u operación, no desde datos locales del navegador.
 - El panel de plataforma no toma la marca del tenant; usa identidad neutral de GymFort para evitar confusion entre administracion SaaS y operacion del gimnasio.
+
+### branch_brand_profile (objetivo CFG-003)
+
+- organization_id
+- branch_id (PK)
+- brand_name
+- logo_object_key
+- primary_color
+- accent_color
+- surface_color
+- reply_to_email
+- updated_at
+- updated_by
+- version
+
+Si un atributo de la sucursal no está configurado se usa el valor de
+`organization`. Consola, kiosco, correo, recibos y PDFs deben recibir el mismo
+perfil efectivo para evitar mezclar marcas del mismo tenant.
 
 ## Hito 7.8 - Separacion de roles plataforma/tenant
 
@@ -799,3 +889,23 @@ mensualidad se actualiza el resumen de `platform_branch_billing` y el siguiente
 corte; al acumular pagos de implementación por el importe acordado, la
 implementación queda liquidada. No hay borrado ni actualización operativa del
 historial de pagos.
+
+## Extensión V93 — Alta y ciclo de vida del socio
+
+`V93__client_onboarding_lifecycle.sql` agrega `client.inactivated_at`,
+`client.inactivation_reason`, la configuración por organización
+`client_lifecycle_configuration` y el índice parcial
+`ix_client_automatic_inactivation`. También incorpora la capacidad opt-in
+`clientRegistration=false` a los perfiles de kiosco existentes.
+
+La baja automática es lógica y reversible. Una inscripción cobrada se conserva
+como partida `sale_item` de tipo `REGISTRATION_FEE`; no requiere convertir el
+cargo en un producto físico ni provoca movimientos de inventario.
+
+## Extensión V94 — Umbral canónico de inactividad
+
+`V94__unify_client_inactivity_period.sql` conserva `inactivity_months` como el
+único umbral temporal y elimina `registration_recharge_months`. La migración no
+reescribe V93 ni modifica su checksum. En una base donde V93 ya fue aplicada se
+conserva el valor existente de `inactivity_months`; desde V94 ese mismo valor
+gobierna tanto la baja automática como el nuevo cobro de inscripción al volver.

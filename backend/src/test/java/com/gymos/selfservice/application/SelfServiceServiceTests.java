@@ -13,6 +13,8 @@ import com.gymos.audit.api.AuditService;
 import com.gymos.bookings.api.operations.BookingOperations;
 import com.gymos.bookings.api.operations.BookingOperations.BookingResource;
 import com.gymos.clients.api.operations.ClientLookupOperations;
+import com.gymos.clients.api.operations.ClientVerificationResult;
+import com.gymos.clients.api.operations.RegisterSelfServiceClientCommand;
 import com.gymos.clients.api.operations.SelfServiceClientProfile;
 import com.gymos.clients.api.operations.UpdateSelfServiceContactCommand;
 import com.gymos.common.api.BusinessException;
@@ -138,6 +140,42 @@ class SelfServiceServiceTests {
 	}
 
 	@Test
+	void unverifiedVisitorCanRegisterAndContinueInTheSameSession() {
+		UUID terminalId = UUID.randomUUID();
+		OffsetDateTime startedAt = OffsetDateTime.now().minusMinutes(1);
+		SessionRecord unverified = new SessionRecord(
+				sessionId, organizationId, branchId, terminalId, null, "ACTIVE", startedAt,
+				OffsetDateTime.now().plusMinutes(10), null, null, tokenHash(token), 0, null,
+				OffsetDateTime.now(), UUID.randomUUID(), "{\"clientRegistration\":true}"
+		);
+		SessionRecord verified = new SessionRecord(
+				sessionId, organizationId, branchId, terminalId, clientId, "ACTIVE", startedAt,
+				OffsetDateTime.now().plusMinutes(10), null, "SELF_REGISTRATION", tokenHash(token), 0, null,
+				OffsetDateTime.now(), UUID.randomUUID(), "{\"clientRegistration\":true}"
+		);
+		when(repository.session(sessionId)).thenReturn(Optional.of(unverified), Optional.of(verified));
+		when(clients.registerForSelfService(any(RegisterSelfServiceClientCommand.class)))
+				.thenReturn(new ClientVerificationResult(clientId, "Andrea Nueva"));
+		when(clients.selfServiceProfile(organizationId, clientId)).thenReturn(Optional.of(
+				new SelfServiceClientProfile(clientId, "Andrea Nueva", "an***@example.com", "***1234")
+		));
+
+		var result = service.register(
+				sessionId, token,
+				new RegisterSelfServiceClientCommand(
+						null, null, "Andrea", "Nueva", null, LocalDate.of(1995, 5, 20),
+						"FEMALE", "+525555551234", "andrea@example.com"
+				),
+				"correlation", "127.0.0.1"
+		);
+
+		assertThat(result.clientName()).isEqualTo("Andrea Nueva");
+		verify(repository).markVerified(
+				sessionId, clientId, startedAt.plusHours(12), "SELF_REGISTRATION");
+		verify(clients).registerForSelfService(any(RegisterSelfServiceClientCommand.class));
+	}
+
+	@Test
 	void launchCreatesLogicalBranchProfileAndKeepsBrowserModeForTwelveHours() {
 		UUID userId = UUID.randomUUID();
 		GymOsPrincipal principal = new GymOsPrincipal(
@@ -207,6 +245,32 @@ class SelfServiceServiceTests {
 				);
 
 		verifyNoInteractions(memberships);
+	}
+
+	@Test
+	void configuredEnrollmentExposesPlansButBlocksCheckoutWhileStripeIsPending() {
+		givenSession("""
+				{"membershipEnrollment":true}
+				""");
+		when(repository.planOptions(organizationId, branchId)).thenReturn(List.of());
+
+		assertThat(service.membershipOptions(sessionId, token)).isEmpty();
+		verify(repository).planOptions(organizationId, branchId);
+
+		assertThatThrownBy(() -> service.enroll(
+				sessionId,
+				token,
+				UUID.randomUUID(),
+				"kiosk:pending-stripe",
+				"correlation",
+				"127.0.0.1"
+		))
+				.isInstanceOfSatisfying(
+						BusinessException.class,
+						exception -> assertThat(exception.code())
+								.isEqualTo("SELF_SERVICE_CARD_PAYMENTS_NOT_READY")
+				);
+		verifyNoInteractions(membershipEnrollments);
 	}
 
 	@Test
