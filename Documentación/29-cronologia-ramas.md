@@ -105,15 +105,20 @@ separa intención de kiosco de readiness de Stripe.
   fallo de verificación;
 - `git diff --check` y revisión de que no se versionen secretos.
 
-La evidencia local no sustituye los checks del PR. Ausencia de un status
-publicado no se interpreta como pipeline verde.
+El workflow remoto del PR #19 no alcanzó a iniciar steps: GitHub marcó frontend
+y backend sin runner por pagos recientes fallidos o límite de gasto insuficiente
+en Actions. Se reintentó una vez con el mismo resultado. Esta limitación de la
+cuenta queda separada de la evidencia local y no se interpreta como una falla
+del código.
 
 ## 5. Regla de integración
 
 1. La rama se integra mediante el PR #19 tras completar la revisión de
    aceptación.
-2. CI, migraciones y revisión de seguridad deben terminar correctamente antes
-   del merge.
+2. CI debe terminar correctamente antes del merge cuando GitHub Actions pueda
+   asignar runners. Para el PR #19, el merge se autorizó con evidencia local
+   completa porque Actions quedó bloqueado antes de ejecutar un solo step por
+   configuración de pagos/límite de gasto de la cuenta.
 3. La capacidad `clientRegistration` permanece deshabilitada en perfiles
    existentes hasta que el gimnasio la active por sucursal.
 4. El merge fue autorizado expresamente para este cierre; el despliegue sigue
