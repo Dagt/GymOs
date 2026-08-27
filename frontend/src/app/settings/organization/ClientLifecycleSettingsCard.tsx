@@ -27,6 +27,7 @@ export function ClientLifecycleSettingsCard({ accessToken }: { accessToken: stri
   const feeAmountRef = useRef("0");
   const saveStateRef = useRef<LifecycleSaveState | null>(null);
   const generationRef = useRef(0);
+  const autosaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const generation = generationRef.current + 1;
@@ -55,17 +56,19 @@ export function ClientLifecycleSettingsCard({ accessToken }: { accessToken: stri
       });
     return () => {
       active = false;
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
       if (generationRef.current === generation) generationRef.current += 1;
     };
   }, [accessToken]);
 
-  function editSettings(next: ClientLifecycleSettings) {
+  function editSettings(next: ClientLifecycleSettings, autosave = false) {
     const state = saveStateRef.current;
     if (state) state.revision += 1;
     settingsRef.current = next;
     setSettings(next);
     setSaveStatus(null);
     setError(null);
+    if (autosave) scheduleSave();
   }
 
   function editFeeAmount(next: string) {
@@ -75,6 +78,7 @@ export function ClientLifecycleSettingsCard({ accessToken }: { accessToken: stri
     setFeeAmount(next);
     setSaveStatus(null);
     setError(null);
+    scheduleSave();
   }
 
   function toggle(key: "registrationFeeEnabled" | "autoInactivationEnabled", checked: boolean) {
@@ -90,22 +94,30 @@ export function ClientLifecycleSettingsCard({ accessToken }: { accessToken: stri
     queueSave();
   }
 
-  function saveValues() {
-    const current = settingsRef.current;
-    if (!current) return;
-    const validationError = validate(current, feeAmountRef.current);
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
-    const state = saveStateRef.current;
-    if (state && state.revision <= state.completedRevision) state.revision = state.completedRevision + 1;
-    queueSave();
+  function scheduleSave() {
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    setSaveStatus("saving");
+    autosaveTimerRef.current = setTimeout(() => {
+      autosaveTimerRef.current = null;
+      const current = settingsRef.current;
+      if (!current) return;
+      const validationError = validate(current, feeAmountRef.current);
+      if (validationError) {
+        setSaveStatus(null);
+        setError(validationError);
+        return;
+      }
+      queueSave();
+    }, 500);
   }
 
   function queueSave() {
     const state = saveStateRef.current;
     if (!state) return;
+    if (autosaveTimerRef.current) {
+      clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
     state.queuedRevision = state.revision;
     setSaveStatus("saving");
     void persistQueuedChanges(generationRef.current);
@@ -184,7 +196,7 @@ export function ClientLifecycleSettingsCard({ accessToken }: { accessToken: stri
             <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_9rem]">
               <label className="grid gap-1.5 text-xs font-semibold">
                 Concepto
-                <input className="app-input h-10" maxLength={120} onChange={(event) => editSettings({ ...settings, registrationFeeLabel: event.target.value })} value={settings.registrationFeeLabel} />
+                <input className="app-input h-10" maxLength={120} onChange={(event) => editSettings({ ...settings, registrationFeeLabel: event.target.value }, true)} value={settings.registrationFeeLabel} />
               </label>
               <label className="grid gap-1.5 text-xs font-semibold">
                 Importe ({settings.currency})
@@ -208,7 +220,7 @@ export function ClientLifecycleSettingsCard({ accessToken }: { accessToken: stri
             <label className="grid max-w-xs gap-1.5 text-xs font-semibold">
               Periodo de inactividad
               <span className="flex items-center gap-2">
-                <input className="app-input h-10 w-20" max="120" min="1" onChange={(event) => editSettings({ ...settings, inactivityMonths: Number(event.target.value) })} type="number" value={settings.inactivityMonths} />
+                <input className="app-input h-10 w-20" max="120" min="1" onChange={(event) => editSettings({ ...settings, inactivityMonths: Number(event.target.value) }, true)} type="number" value={settings.inactivityMonths} />
                 <span className="font-normal text-[var(--brand-muted)]">meses sin membresía</span>
               </span>
             </label>
@@ -217,12 +229,6 @@ export function ClientLifecycleSettingsCard({ accessToken }: { accessToken: stri
             </p>
           </article>
 
-          <div className="flex items-center justify-end gap-3 lg:col-span-2">
-            <span className="text-xs text-[var(--brand-muted)]">Los toggles se guardan automáticamente.</span>
-            <button className="app-button" disabled={saveStatus === "saving"} onClick={saveValues} type="button">
-              Guardar concepto, importe y periodo
-            </button>
-          </div>
         </div>
       ) : null}
     </section>

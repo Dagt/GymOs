@@ -8,12 +8,13 @@ Estado: `FUNCIONAL`
 - nombre, marca y logotipo por organización;
 - configuración diferenciada de plataforma y tenant;
 - cobros, capacidades de kiosco y remitente de correo por permisos separados;
-- sección `Socios` dentro de `/settings/organization`, con inscripción y baja
+- sección `Inscripciones` dentro de `/settings/organization`, con inscripción y baja
   automática gobernadas por un único `inactivityMonths`; periodo y baja
   automática comparten un bloque compacto y los valores pueden configurarse
   sin encender la función;
-- autosave serializado de toggles de kiosco, medios de cobro y socios, con
-  rollback visible ante error;
+- autosave serializado de toggles de kiosco y medios de cobro, y autosave con
+  debounce para todos los valores de inscripción, con rollback visible ante
+  error y sin botón global;
 - capacidades de kiosco persistidas como intención del gimnasio, independientes
   de la disponibilidad técnica actual de Stripe;
 - resumen y servicios conectados sobre superficies claras compartidas con el

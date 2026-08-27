@@ -126,6 +126,7 @@ test("un socio nuevo se registra en el kiosco y continúa a su primer plan", asy
 
   await page.goto("/kiosk/reception");
   await page.getByRole("tab", { name: "Quiero registrarme" }).click();
+  await expect(page.locator(".kiosk-step > span")).toHaveText("1");
   await page.getByLabel("Nombre", { exact: true }).fill("Lucía");
   await page.getByLabel("Apellido paterno").fill("Nueva");
   await page.getByLabel("Teléfono", { exact: true }).fill("5512345678");

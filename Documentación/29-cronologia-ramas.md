@@ -44,6 +44,7 @@ de inactividad y separa intención de kiosco de readiness de Stripe.
 | 26 ago 2026 | Se crea `feature/client-onboarding-lifecycle` y V93 agrupa el primer lote de retroalimentación del cliente real |
 | 26 ago 2026 | V94 conserva `inactivityMonths` como umbral único; configuración de kiosco adopta autosave e intención independiente de Stripe; launch/reset resuelven capacidades vigentes |
 | 26 ago 2026 | El cierre visual compacta socios, extiende autosave a cobros/socios, condiciona `Stripe pendiente` al toggle encendido y rediseña la entrada del kiosco |
+| 26 ago 2026 | La pestaña pasa a `Inscripciones`, todos sus valores adoptan autosave sin botón y el selector público se compacta y separa del formulario |
 
 ## 3. Alcance material de la rama activa
 
@@ -56,7 +57,7 @@ de inactividad y separa intención de kiosco de readiness de Stripe.
 - verificación de socios sin plan y reactivación segura de bajas automáticas;
 - capacidad opt-in por sucursal para alta desde kiosco y continuación inmediata
   al primer plan;
-- sección `Socios` con un solo periodo de inactividad y V94 compatible con bases
+- sección `Inscripciones` con un solo periodo de inactividad y V94 compatible con bases
   donde V93 ya fue aplicada;
 - capacidades deseadas del kiosco persistidas sin readiness, autosave con
   rollback y estados distintos para Stripe pendiente, función deshabilitada y

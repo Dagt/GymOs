@@ -5263,13 +5263,14 @@ button.admin-secondary-link:disabled {
 
 .kiosk-entry-selector {
   display: grid;
-  gap: .65rem;
-  margin-bottom: .4rem;
+  gap: .45rem;
+  margin-bottom: 1.6rem;
+  max-width: 31rem;
 }
 
 .kiosk-entry-selector > p {
   color: rgba(255, 255, 255, .62);
-  font-size: .72rem;
+  font-size: .66rem;
   font-weight: 900;
   letter-spacing: .12em;
   text-transform: uppercase;
@@ -5277,7 +5278,7 @@ button.admin-secondary-link:disabled {
 
 .kiosk-entry-options {
   display: grid;
-  gap: .7rem;
+  gap: .55rem;
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
@@ -5285,12 +5286,12 @@ button.admin-secondary-link:disabled {
   align-items: center;
   background: rgba(255, 255, 255, .055);
   border: 1px solid rgba(255, 255, 255, .16);
-  border-radius: 1rem;
+  border-radius: .8rem;
   color: white;
   display: flex;
-  gap: .75rem;
-  min-height: 4.65rem;
-  padding: .7rem .8rem;
+  gap: .55rem;
+  min-height: 3.55rem;
+  padding: .45rem .55rem;
   text-align: left;
   transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
 }
@@ -5309,13 +5310,13 @@ button.admin-secondary-link:disabled {
 .kiosk-entry-icon {
   align-items: center;
   background: rgba(255, 255, 255, .09);
-  border-radius: .75rem;
+  border-radius: .6rem;
   color: rgba(255, 255, 255, .78);
   display: inline-flex;
   flex: 0 0 auto;
-  height: 2.75rem;
+  height: 2.15rem;
   justify-content: center;
-  width: 2.75rem;
+  width: 2.15rem;
 }
 
 .kiosk-entry-option.active .kiosk-entry-icon {
@@ -5330,13 +5331,13 @@ button.admin-secondary-link:disabled {
 }
 
 .kiosk-entry-option strong {
-  font-size: .92rem;
+  font-size: .8rem;
   font-weight: 950;
 }
 
 .kiosk-entry-option small {
   color: rgba(255, 255, 255, .58);
-  font-size: .73rem;
+  font-size: .65rem;
   line-height: 1.3;
 }
 

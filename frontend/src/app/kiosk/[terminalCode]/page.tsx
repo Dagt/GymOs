@@ -730,11 +730,11 @@ export default function KioskPage() {
                 <p>¿Cómo quieres continuar?</p>
                 <div className="kiosk-entry-options" role="tablist" aria-label="Acceso al kiosco">
                   <button aria-label="Ya soy socio" aria-selected={entryMode === "verify"} className={`kiosk-entry-option ${entryMode === "verify" ? "active" : ""}`} onClick={() => { setEntryMode("verify"); setError(null); setMessage(null); }} role="tab" type="button">
-                    <span className="kiosk-entry-icon"><UserRound aria-hidden="true" size={22} /></span>
+                    <span className="kiosk-entry-icon"><UserRound aria-hidden="true" size={18} /></span>
                     <span><strong>Ya soy socio</strong><small>Entrar con mis datos</small></span>
                   </button>
                   <button aria-label="Quiero registrarme" aria-selected={entryMode === "register"} className={`kiosk-entry-option ${entryMode === "register" ? "active" : ""}`} onClick={() => { setEntryMode("register"); setError(null); setMessage(null); }} role="tab" type="button">
-                    <span className="kiosk-entry-icon"><UserPlus aria-hidden="true" size={22} /></span>
+                    <span className="kiosk-entry-icon"><UserPlus aria-hidden="true" size={18} /></span>
                     <span><strong>Quiero registrarme</strong><small>Crear un expediente nuevo</small></span>
                   </button>
                 </div>
@@ -753,7 +753,7 @@ export default function KioskPage() {
               </form>
             ) : (
               <form className="grid gap-4" onSubmit={register}>
-                <div className="kiosk-step"><span>N</span><div><h2>Crea tu expediente</h2><p>Después podrás revisar y contratar tu primera membresía.</p></div></div>
+                <div className="kiosk-step"><span>1</span><div><h2>Crea tu expediente</h2><p>Después podrás revisar y contratar tu primera membresía.</p></div></div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="kiosk-field">Nombre<input autoComplete="given-name" className="kiosk-input compact" maxLength={120} onChange={(event) => setRegistration({ ...registration, firstName: event.target.value })} required value={registration.firstName} /></label>
                   <label className="kiosk-field">Apellido paterno<input autoComplete="family-name" className="kiosk-input compact" maxLength={120} onChange={(event) => setRegistration({ ...registration, lastName: event.target.value })} required value={registration.lastName} /></label>

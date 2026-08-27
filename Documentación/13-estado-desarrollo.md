@@ -62,10 +62,11 @@ Stripe pendiente, las operaciones monetarias continúan bloqueadas y una sesión
 reiniciada vuelve a resolver la configuración vigente del terminal.
 
 El cierre visual de aceptación compacta la configuración de inscripción e
-inactividad, extiende el autosave con rollback a los toggles de medios de cobro
-y socios, muestra dependencia de Stripe sólo en capacidades encendidas y mejora
-la elección entre identificación y registro en el kiosco. Los mensajes de éxito
-del kiosco son temporales y descartables.
+inactividad, renombra su pestaña a `Inscripciones`, extiende el autosave con
+rollback a medios de cobro y a todos los valores de inscripción, muestra
+dependencia de Stripe sólo en capacidades encendidas y mejora la elección entre
+identificación y registro en el kiosco. Los mensajes de éxito del kiosco son
+temporales y descartables.
 
 El corte posterior mantiene los listados compactos con scroll interno oculto y
 controles de página visibles. Detecta backend/frontend incompatibles y separa

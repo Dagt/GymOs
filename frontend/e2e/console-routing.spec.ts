@@ -427,12 +427,25 @@ test.describe("consolas por rol", () => {
 
     await page.goto("/settings/organization#client-lifecycle-settings");
 
-    await expect(page.getByRole("button", { name: "Socios" })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("button", { name: "Inscripciones" })).toHaveAttribute("aria-pressed", "true");
     await expect(page.getByRole("heading", { name: "Socios e inscripción" })).toBeVisible();
     await expect(page.getByLabel("Periodo de inactividad")).toHaveValue("6");
     await expect(page.getByText("Volver a cobrar después de")).toHaveCount(0);
     await expect(page.getByText("Dar de baja después de")).toHaveCount(0);
     await expect(page.locator("#client-lifecycle-settings article")).toHaveCount(2);
+    await expect(page.getByRole("button", { name: "Guardar concepto, importe y periodo" })).toHaveCount(0);
+    await expect(page.getByText("Los toggles se guardan automáticamente.")).toHaveCount(0);
+
+    await page.getByLabel("Concepto").fill("Alta anual");
+    await page.getByLabel("Importe (MXN)").fill("175");
+    await page.getByLabel("Periodo de inactividad").fill("8");
+    await expect(page.getByText("Guardando...")).toBeVisible();
+    await expect(page.getByText("Guardado")).toBeVisible();
+    expect(savedPayloads.at(-1)).toMatchObject({
+      registrationFeeLabel: "Alta anual",
+      registrationFeeCents: 17500,
+      inactivityMonths: 8,
+    });
 
     const registrationFee = page.getByRole("switch", { name: "Cobrar inscripción" });
     const automaticInactivation = page.getByRole("switch", { name: "Dar de baja automáticamente" });
@@ -443,7 +456,7 @@ test.describe("consolas por rol", () => {
     expect(savedPayloads.at(-1)).toMatchObject({
       registrationFeeEnabled: true,
       autoInactivationEnabled: true,
-      inactivityMonths: 6,
+      inactivityMonths: 8,
     });
 
     failNextSave = true;

@@ -550,7 +550,7 @@ function OperationalSettingsNavigation({
         <span>Selecciona el bloque que deseas configurar.</span>
       </div>
       <div className="settings-section-tabs">
-        {showClients ? <SettingsSectionButton active={activeSection === "clients"} label="Socios" onClick={() => onSelect("clients")} /> : null}
+        {showClients ? <SettingsSectionButton active={activeSection === "clients"} label="Inscripciones" onClick={() => onSelect("clients")} /> : null}
         {showPayments ? <SettingsSectionButton active={activeSection === "payments"} label="Medios de cobro" onClick={() => onSelect("payments")} /> : null}
         {showKiosk ? <SettingsSectionButton active={activeSection === "kiosk"} label="Kiosco web" onClick={() => onSelect("kiosk")} /> : null}
         {showEmail ? <SettingsSectionButton active={activeSection === "email"} label="Correo electrónico" onClick={() => onSelect("email")} /> : null}

@@ -407,18 +407,19 @@ Formularios:
   `RECEPTION` y existe `selfservice.session.launch`. Dueño, administrador,
   gerente y soporte no ven la acción, no acceden por URL directa y el backend
   rechaza la creación de sesión aunque exista una concesión heredada.
-- `/settings/organization` incluye la sección navegable y enlazable `Socios`.
+- `/settings/organization` incluye la sección navegable y enlazable
+  `Inscripciones`.
   Dentro de ella, `Socios e inscripción` contiene un solo campo `Periodo de
   inactividad`, colocado en el mismo bloque que `Dar de baja automáticamente`.
   Inscripción e inactividad se presentan en tarjetas compactas y sus valores
   pueden prepararse aunque la función correspondiente permanezca apagada; el
   bloque no se renderiza permanentemente fuera de las pestañas.
-- Las configuraciones de kiosco, medios de cobro y socios usan autosave para
-  sus toggles: muestran
-  `Guardando...`/`Guardado`, serializa cambios rápidos y, ante error, restaura el
-  último estado confirmado y muestra `AppNotice`. No existe botón global de
-  guardado para esos toggles. Concepto, importe y periodo conservan una acción
-  compacta de guardado porque son valores editables, no interruptores binarios.
+- Las configuraciones de kiosco y medios de cobro usan autosave para sus
+  toggles. En `Inscripciones`, toggles, concepto, importe y periodo se guardan
+  automáticamente con debounce controlado. Estos formularios muestran
+  `Guardando...`/`Guardado`, serializan cambios rápidos y, ante error, restauran
+  el último estado confirmado y muestran `AppNotice`. No existe botón global de
+  guardado ni una leyenda redundante de autosave.
 - Los toggles monetarios representan intención y permanecen configurables con
   Stripe pendiente. Readiness se muestra como el estado secundario discreto
   `Stripe pendiente` únicamente cuando la capacidad está encendida; si está
