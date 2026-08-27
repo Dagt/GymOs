@@ -6,20 +6,20 @@ Corte: 26 de agosto de 2026
 
 Rama de trabajo: `feature/client-onboarding-lifecycle`
 
-Base integrada: `main` en `a5ea75f` (`Merge pull request #18`)
+Integración actual: PR #19 desde `feature/client-onboarding-lifecycle` hacia
+`main`
 
 ## 1. Situación vigente
 
-`main` ya contiene los cierres de identidad, administración comercial,
-paginación y endurecimiento hasta V92. La rama actual parte directamente de ese
-corte e implementa V93: inscripción, baja automática reversible, autenticación
-de socios sin plan y alta desde kiosco. El refinamiento V94 unifica el periodo
-de inactividad y separa intención de kiosco de readiness de Stripe.
+El PR #19 incorpora sobre `main` el primer lote de retroalimentación del cliente
+real. V93 implementa inscripción, baja automática reversible, autenticación de
+socios sin plan y alta desde kiosco. V94 unifica el periodo de inactividad y
+separa intención de kiosco de readiness de Stripe.
 
 | Rama | Estado | Acción |
 |---|---|---|
-| `main` | Incluye PR #18 en `a5ea75f` | Base estable de esta rama |
-| `feature/client-onboarding-lifecycle` | Activa sobre `main` | Revisar V93 y publicar por PR con CI verde |
+| `main` | Recibe el lote mediante PR #19 | Continuar desde el cierre validado |
+| `feature/client-onboarding-lifecycle` | Integrada mediante PR #19 | Histórica; no fusionar otra vez |
 | `feature/platform-identity-separation` | Integrada antes del corte actual | Histórica; no fusionar otra vez |
 | `feature/platform-client-billing-management` | Integrada mediante PR #15 | Histórica; no fusionar otra vez |
 | `feature/physical-access-control` | Integrada mediante PR #14 | Histórica; no fusionar otra vez |
@@ -45,6 +45,7 @@ de inactividad y separa intención de kiosco de readiness de Stripe.
 | 26 ago 2026 | V94 conserva `inactivityMonths` como umbral único; configuración de kiosco adopta autosave e intención independiente de Stripe; launch/reset resuelven capacidades vigentes |
 | 26 ago 2026 | El cierre visual compacta socios, extiende autosave a cobros/socios, condiciona `Stripe pendiente` al toggle encendido y rediseña la entrada del kiosco |
 | 26 ago 2026 | La pestaña pasa a `Inscripciones`, todos sus valores adoptan autosave sin botón y el selector público se compacta y separa del formulario |
+| 26 ago 2026 | PR #19 integra el lote; el cierre centra el selector del kiosco y presenta fallos de identidad breves sin exponer diagnóstico HTTP |
 
 ## 3. Alcance material de la rama activa
 
@@ -87,7 +88,6 @@ de inactividad y separa intención de kiosco de readiness de Stripe.
   branding por sucursal; quedan en los lotes 2–5 del análisis del primer
   cliente;
 - borrado de cualquier dato demo ambiguo, modificado o con actividad;
-- fusión automática a `main`;
 - GymFort Local Connector, adapter HikCentral o integración con hardware;
 - cobro SaaS recurrente automático, CFDI o conciliación bancaria completa;
 - una suite E2E homogénea para todos los recorridos críticos.
@@ -99,9 +99,10 @@ de inactividad y separa intención de kiosco de readiness de Stripe.
   upgrade desde V93, inactividad, persistencia financiera de la inscripción y
   configuración real de launch/reset del kiosco;
 - 113/113 pruebas frontend, typecheck, lint y build Next de producción;
-- 26/26 recorridos E2E dirigidos de kiosco/configuración en Chromium, incluido
+- 27/27 recorridos E2E dirigidos de kiosco/configuración en Chromium, incluido
   registro nuevo, alta sin membresía previa, autosave con rollback en kiosco,
-  cobros y socios, y estados condicionales de Stripe;
+  cobros y socios, estados condicionales de Stripe y estabilidad visual ante un
+  fallo de verificación;
 - `git diff --check` y revisión de que no se versionen secretos.
 
 La evidencia local no sustituye los checks del PR. Ausencia de un status
@@ -109,9 +110,12 @@ publicado no se interpreta como pipeline verde.
 
 ## 5. Regla de integración
 
-1. La rama actual se publica y abre contra `main` como PR revisable.
-2. CI, migraciones y revisión de seguridad deben terminar correctamente.
+1. La rama se integra mediante el PR #19 tras completar la revisión de
+   aceptación.
+2. CI, migraciones y revisión de seguridad deben terminar correctamente antes
+   del merge.
 3. La capacidad `clientRegistration` permanece deshabilitada en perfiles
    existentes hasta que el gimnasio la active por sucursal.
-4. No se fusiona ni despliega automáticamente desde esta tarea.
+4. El merge fue autorizado expresamente para este cierre; el despliegue sigue
+   siendo una acción independiente.
 5. Las ramas remotas sólo se eliminan por decisión explícita.
