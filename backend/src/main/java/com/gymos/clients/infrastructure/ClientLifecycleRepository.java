@@ -22,7 +22,6 @@ public class ClientLifecycleRepository {
 				       COALESCE(configuration.registration_fee_enabled, false) AS registration_fee_enabled,
 				       COALESCE(configuration.registration_fee_cents, 0) AS registration_fee_cents,
 				       COALESCE(configuration.registration_fee_label, 'Inscripción') AS registration_fee_label,
-				       COALESCE(configuration.registration_recharge_months, 6) AS registration_recharge_months,
 				       COALESCE(configuration.auto_inactivation_enabled, false) AS auto_inactivation_enabled,
 				       COALESCE(configuration.inactivity_months, 6) AS inactivity_months,
 				       configuration.updated_at, COALESCE(configuration.version, 0) AS version
@@ -39,7 +38,6 @@ public class ClientLifecycleRepository {
 						rs.getLong("registration_fee_cents"),
 						rs.getString("registration_fee_label"),
 						rs.getString("default_currency"),
-						rs.getInt("registration_recharge_months"),
 						rs.getBoolean("auto_inactivation_enabled"),
 						rs.getInt("inactivity_months"),
 						rs.getObject("updated_at", OffsetDateTime.class),
@@ -54,26 +52,24 @@ public class ClientLifecycleRepository {
 			boolean registrationFeeEnabled,
 			long registrationFeeCents,
 			String registrationFeeLabel,
-			int registrationRechargeMonths,
 			boolean autoInactivationEnabled,
 			int inactivityMonths
 	) {
 		jdbcClient.sql("""
 				INSERT INTO client_lifecycle_configuration (
 				    organization_id, registration_fee_enabled, registration_fee_cents,
-				    registration_fee_label, registration_recharge_months,
-				    auto_inactivation_enabled, inactivity_months, updated_at, updated_by, version
+				    registration_fee_label, auto_inactivation_enabled, inactivity_months,
+				    updated_at, updated_by, version
 				)
 				VALUES (
 				    :organizationId, :registrationFeeEnabled, :registrationFeeCents,
-				    :registrationFeeLabel, :registrationRechargeMonths,
-				    :autoInactivationEnabled, :inactivityMonths, now(), :actorUserId, 0
+				    :registrationFeeLabel, :autoInactivationEnabled, :inactivityMonths,
+				    now(), :actorUserId, 0
 				)
 				ON CONFLICT (organization_id) DO UPDATE SET
 				    registration_fee_enabled = EXCLUDED.registration_fee_enabled,
 				    registration_fee_cents = EXCLUDED.registration_fee_cents,
 				    registration_fee_label = EXCLUDED.registration_fee_label,
-				    registration_recharge_months = EXCLUDED.registration_recharge_months,
 				    auto_inactivation_enabled = EXCLUDED.auto_inactivation_enabled,
 				    inactivity_months = EXCLUDED.inactivity_months,
 				    updated_at = now(),
@@ -84,7 +80,6 @@ public class ClientLifecycleRepository {
 				.param("registrationFeeEnabled", registrationFeeEnabled)
 				.param("registrationFeeCents", registrationFeeCents)
 				.param("registrationFeeLabel", registrationFeeLabel)
-				.param("registrationRechargeMonths", registrationRechargeMonths)
 				.param("autoInactivationEnabled", autoInactivationEnabled)
 				.param("inactivityMonths", inactivityMonths)
 				.param("actorUserId", actorUserId)
@@ -174,7 +169,6 @@ public class ClientLifecycleRepository {
 			long registrationFeeCents,
 			String registrationFeeLabel,
 			String currency,
-			int registrationRechargeMonths,
 			boolean autoInactivationEnabled,
 			int inactivityMonths,
 			OffsetDateTime updatedAt,

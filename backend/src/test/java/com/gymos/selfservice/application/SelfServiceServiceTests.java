@@ -248,6 +248,32 @@ class SelfServiceServiceTests {
 	}
 
 	@Test
+	void configuredEnrollmentExposesPlansButBlocksCheckoutWhileStripeIsPending() {
+		givenSession("""
+				{"membershipEnrollment":true}
+				""");
+		when(repository.planOptions(organizationId, branchId)).thenReturn(List.of());
+
+		assertThat(service.membershipOptions(sessionId, token)).isEmpty();
+		verify(repository).planOptions(organizationId, branchId);
+
+		assertThatThrownBy(() -> service.enroll(
+				sessionId,
+				token,
+				UUID.randomUUID(),
+				"kiosk:pending-stripe",
+				"correlation",
+				"127.0.0.1"
+		))
+				.isInstanceOfSatisfying(
+						BusinessException.class,
+						exception -> assertThat(exception.code())
+								.isEqualTo("SELF_SERVICE_CARD_PAYMENTS_NOT_READY")
+				);
+		verifyNoInteractions(membershipEnrollments);
+	}
+
+	@Test
 	void renewalOfMultiBranchMembershipMustBeManagedAtItsOriginBranch() {
 		givenSession("""
 				{"membershipRenewal":true}

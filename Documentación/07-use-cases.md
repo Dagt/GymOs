@@ -250,15 +250,17 @@ Actor: Cliente.
 
 Precondiciones:
 - Recepción abrió una sesión de navegador para una sucursal con perfil lógico activo.
-- Cliente existente.
-- Acciones de autoservicio habilitadas por la organización.
+- Cliente existente o capacidad de registro de socios habilitada en la sucursal.
+- Acciones de autoservicio configuradas para el perfil de la sucursal.
 
 Flujo:
 1. Cliente recibe una sesión temporal en el kiosco abierto por Recepción.
-2. Sistema verifica identidad mediante mecanismo configurado.
+2. El socio existente se identifica o el nuevo elige `Quiero registrarme`,
+   captura sus datos y queda verificado sin depender de Stripe.
 3. Sistema muestra resumen limitado: estado, membresía vigente, vencimiento y pagos pendientes.
 4. Cliente selecciona contratar, renovar, cambiar plan, domiciliar, reservar o actualizar datos permitidos.
-5. Backend valida elegibilidad, reglas de membresía, beneficios y montos.
+5. Backend valida elegibilidad, reglas de membresía, beneficios, montos y la
+   disponibilidad técnica del proveedor al ejecutar una operación monetaria.
 6. Si hay pago, se crea venta o pago según corresponda.
 7. Si existe cobro, Stripe Checkout/Setup captura la tarjeta y el pago permanece pendiente.
 8. Sólo webhook firmado y conciliación autoritativa completan el pago y sus efectos.
@@ -276,9 +278,34 @@ Errores:
 Criterios:
 - El kiosco no muestra información administrativa.
 - No se activa ni renueva membresía sin pago completo.
+- Una capacidad configurada conserva la intención aunque Stripe esté pendiente;
+  en ese estado los planes son visibles y Checkout permanece bloqueado.
+- Al reiniciar la sesión se vuelve a leer la configuración vigente del terminal.
 - Las reglas de negocio se ejecutan en backend.
 - La sesión se cierra automáticamente por inactividad.
 - Toda acción queda auditada.
+
+## UC-017A Inscripción e inactividad del socio
+
+Actor: Recepción, kiosco o worker de ciclo de vida.
+
+Flujo:
+1. La organización configura `inactivityMonths` entre 1 y 120.
+2. La primera membresía cobra inscripción si `registrationFeeEnabled=true`.
+3. Para un socio con historial se obtiene el final de gracia más reciente.
+4. Si `latestMembershipGraceEnd + inactivityMonths <= effectiveDate`, una nueva
+   alta vuelve a cobrar inscripción; antes de esa fecha no la cobra.
+5. Independientemente, si `autoInactivationEnabled=true`, el worker cambia al
+   socio a `INACTIVE` con motivo `MEMBERSHIP_INACTIVITY` al alcanzar el mismo
+   umbral.
+
+Criterios:
+- `inactivityMonths` es el único umbral temporal para determinar periodo de
+  inactividad y reinscripción.
+- Desactivar la baja automática no desactiva el nuevo cobro de inscripción.
+- La baja no elimina expediente, membresías, ventas, pagos ni auditoría.
+- Sólo una baja con motivo `MEMBERSHIP_INACTIVITY` puede reactivarse desde el
+  kiosco; una baja `MANUAL` requiere intervención del personal.
 
 ## UC-018 Renovacion idempotente por pago completado
 

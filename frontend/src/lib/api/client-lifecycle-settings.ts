@@ -6,7 +6,6 @@ export type ClientLifecycleSettings = {
   registrationFeeCents: number;
   registrationFeeLabel: string;
   currency: string;
-  registrationRechargeMonths: number;
   autoInactivationEnabled: boolean;
   inactivityMonths: number;
   updatedAt: string | null;
@@ -18,7 +17,6 @@ export type UpdateClientLifecycleSettings = Pick<
   | "registrationFeeEnabled"
   | "registrationFeeCents"
   | "registrationFeeLabel"
-  | "registrationRechargeMonths"
   | "autoInactivationEnabled"
   | "inactivityMonths"
 >;

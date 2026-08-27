@@ -356,6 +356,7 @@ test.describe("consolas por rol", () => {
             branchName: branch.name,
             status: "ACTIVE",
             capabilities: {
+              clientRegistrationAllowed: false,
               membershipEnrollmentAllowed: false,
               membershipRenewalAllowed: false,
               membershipPlanChangeAllowed: false,
@@ -380,6 +381,135 @@ test.describe("consolas por rol", () => {
     const kioskSettings = page.locator("#kiosk-settings");
     await expect(kioskSettings.getByRole("heading", { name: "Centro" })).toBeVisible();
     await expect(kioskSettings.getByRole("heading", { name: "Revolucion 115" })).toHaveCount(0);
+  });
+
+  test("configuración de socios vive en su pestaña y usa un solo periodo", async ({ page }) => {
+    await bootAs(page, user({
+      console: "TENANT_OWNER",
+      roles: ["Dueno del gimnasio"],
+      permissions: ownerPermissions(),
+    }), async (route, path) => {
+      if (path === "/client-lifecycle-settings") {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({
+            organizationId: org.id,
+            registrationFeeEnabled: false,
+            registrationFeeCents: 0,
+            registrationFeeLabel: "Inscripción",
+            currency: "MXN",
+            autoInactivationEnabled: false,
+            inactivityMonths: 6,
+            updatedAt: null,
+            version: 0,
+          }),
+        });
+        return true;
+      }
+      return false;
+    });
+
+    await page.goto("/settings/organization#client-lifecycle-settings");
+
+    await expect(page.getByRole("button", { name: "Socios" })).toHaveAttribute("aria-pressed", "true");
+    await expect(page.getByRole("heading", { name: "Socios e inscripción" })).toBeVisible();
+    await expect(page.getByLabel("Periodo de inactividad")).toHaveValue("6");
+    await expect(page.getByText("Volver a cobrar después de")).toHaveCount(0);
+    await expect(page.getByText("Dar de baja después de")).toHaveCount(0);
+  });
+
+  test("toggles del kiosco conservan intención, autosave serializa y revierte errores", async ({ page }) => {
+    const savedPayloads: Array<Record<string, boolean>> = [];
+    let failNextSave = false;
+    const settingsFrom = (payload: Record<string, boolean>) => ({
+      branchId: branches[0].id,
+      branchName: branches[0].name,
+      status: "ACTIVE",
+      capabilities: {
+        clientRegistrationAllowed: payload.clientRegistration,
+        membershipEnrollmentAllowed: payload.membershipEnrollment,
+        membershipRenewalAllowed: payload.membershipRenewal,
+        membershipPlanChangeAllowed: payload.membershipPlanChange,
+        resourceBookingAllowed: payload.resourceBooking,
+        wellnessBookingAllowed: payload.wellnessBooking,
+        profileUpdateAllowed: payload.profileUpdate,
+        autopayAllowed: payload.autopay,
+        onlineCardPaymentsReady: false,
+        recurringCardPaymentsReady: false,
+      },
+      updatedAt: "2026-08-26T12:00:00Z",
+    });
+    const initial = {
+      clientRegistration: false,
+      membershipEnrollment: true,
+      membershipRenewal: true,
+      membershipPlanChange: true,
+      resourceBooking: true,
+      wellnessBooking: false,
+      profileUpdate: true,
+      autopay: true,
+    };
+    await bootAs(page, user({
+      console: "TENANT_OWNER",
+      roles: ["Dueno del gimnasio"],
+      permissions: ownerPermissions().concat("selfservice.settings.manage"),
+    }), async (route, path) => {
+      if (path === "/kiosk-settings/branches" && route.request().method() === "GET") {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify([settingsFrom(initial)]),
+        });
+        return true;
+      }
+      if (path === `/kiosk-settings/branches/${branches[0].id}` && route.request().method() === "PUT") {
+        const payload = route.request().postDataJSON() as Record<string, boolean>;
+        savedPayloads.push(payload);
+        if (failNextSave) {
+          failNextSave = false;
+          await route.fulfill({
+            status: 500,
+            contentType: "application/json",
+            body: JSON.stringify({ message: "Fallo simulado de autosave" }),
+          });
+          return true;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        await route.fulfill({ contentType: "application/json", body: JSON.stringify(settingsFrom(payload)) });
+        return true;
+      }
+      return false;
+    });
+
+    await page.goto("/settings/organization#kiosk-settings");
+    const enrollment = page.getByRole("switch", { name: `Comprar membresía en ${branches[0].name}` });
+    const registration = page.getByRole("switch", { name: `Registrar nuevos socios en ${branches[0].name}` });
+    const resourceBooking = page.getByRole("switch", { name: `Reservas gratuitas en ${branches[0].name}` });
+    const profileUpdate = page.getByRole("switch", { name: `Actualizar contacto en ${branches[0].name}` });
+
+    await expect(enrollment).toHaveAttribute("aria-checked", "true");
+    await expect(enrollment).toBeEnabled();
+    await expect(page.getByText("Pendiente de Stripe").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Guardar configuración del kiosco" })).toHaveCount(0);
+
+    await registration.click();
+    await resourceBooking.click();
+    await expect(page.getByText("Guardando...")).toBeVisible();
+    await expect(page.getByText("Guardado")).toBeVisible();
+
+    const latest = savedPayloads.at(-1);
+    expect(latest).toMatchObject({
+      clientRegistration: true,
+      membershipEnrollment: true,
+      membershipRenewal: true,
+      membershipPlanChange: true,
+      resourceBooking: false,
+      autopay: true,
+    });
+
+    failNextSave = true;
+    await profileUpdate.click();
+    await expect(page.getByText("Fallo simulado de autosave")).toBeVisible();
+    await expect(profileUpdate).toHaveAttribute("aria-checked", "true");
   });
 
   test("recepcion entra a mostrador y no ve administracion", async ({ page }) => {

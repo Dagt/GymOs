@@ -55,13 +55,13 @@ test("el kiosco aplica capacidades, no ofrece pago manual y actualiza contacto",
   await page.getByLabel("Fecha de nacimiento en formato día mes año").fill("10/05/1994");
   await page.getByRole("button", { name: "Continuar de forma segura" }).click();
 
-  await expect(page.getByText(/Los pagos con tarjeta todavía no están disponibles/i)).toBeVisible();
+  await expect(page.getByText(/Los pagos en línea todavía no están disponibles/i)).toBeVisible();
   await expect(page.getByText("Activa", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Membresía actual" })).toBeVisible();
   await expect(page.getByText("Vigente hasta 31 jul 2026")).toBeVisible();
   await expect(page.getByText("Profesionales de bienestar")).toHaveCount(0);
   await expect(page.getByLabel("Referencia de pago")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Revisar renovación de Plan mensual" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Revisar renovación de Plan mensual" })).toBeEnabled();
 
   await page.getByRole("button", { name: /^Mis datos /i }).click();
   await page.getByLabel("Nuevo correo").fill("nuevo@example.com");
@@ -145,6 +145,127 @@ test("un socio nuevo se registra en el kiosco y continúa a su primer plan", asy
   });
 });
 
+test("muestra planes y cotización pero bloquea checkout cuando Stripe está pendiente", async ({ page }) => {
+  let enrollmentRequests = 0;
+  await mockKiosk(page, async (route, path) => {
+    const method = route.request().method();
+    if (method === "POST" && path === "/self-service/kiosk-sessions") return fulfill(route, sessionResponse());
+    if (method === "POST" && path === `/self-service/sessions/${sessionId}/verify`) {
+      return fulfill(route, {
+        ...summaryResponse(),
+        memberships: [],
+        capabilities: {
+          ...capabilities(),
+          membershipEnrollmentAllowed: true,
+          membershipRenewalAllowed: false,
+          membershipPlanChangeAllowed: false,
+          autopayAllowed: false,
+          onlineCardPaymentsReady: false,
+        },
+      });
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/membership-options`) {
+      return fulfill(route, [{
+        id: planId,
+        productId: "44444444-4444-4444-8444-444444444444",
+        name: "Plan mensual",
+        priceCents: 79900,
+        currency: "MXN",
+        durationDays: 30,
+        graceDays: 3,
+      }]);
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/membership-quotes/${planId}`) {
+      return fulfill(route, membershipQuote());
+    }
+    if (method === "POST" && path === `/self-service/sessions/${sessionId}/membership-enrollments`) {
+      enrollmentRequests += 1;
+      return fulfill(route, {});
+    }
+    return false;
+  });
+
+  await openLaunchedKiosk(page);
+  await page.getByPlaceholder("Correo o teléfono").fill("andrea@example.com");
+  await page.getByLabel("Fecha de nacimiento en formato día mes año").fill("10/05/1994");
+  await page.getByRole("button", { name: "Continuar de forma segura" }).click();
+
+  await expect(page.getByText("Plan mensual", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Los pagos en línea todavía no están disponibles/i)).toBeVisible();
+  await expect(page.getByText(/No hay planes disponibles actualmente/i)).toHaveCount(0);
+  await page.getByRole("button", { name: "Revisar contratación de Plan mensual" }).click();
+  await expect(page.getByLabel("Revisión de membresía")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Pago pendiente de Stripe" })).toBeDisabled();
+  expect(enrollmentRequests).toBe(0);
+});
+
+test("distingue contratación deshabilitada de catálogo vacío", async ({ page }) => {
+  let optionsRequests = 0;
+  await mockKiosk(page, async (route, path) => {
+    const method = route.request().method();
+    if (method === "POST" && path === "/self-service/kiosk-sessions") return fulfill(route, sessionResponse());
+    if (method === "POST" && path === `/self-service/sessions/${sessionId}/verify`) {
+      return fulfill(route, {
+        ...summaryResponse(),
+        memberships: [],
+        capabilities: {
+          ...capabilities(),
+          membershipEnrollmentAllowed: false,
+          membershipRenewalAllowed: false,
+          membershipPlanChangeAllowed: false,
+        },
+      });
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/membership-options`) {
+      optionsRequests += 1;
+      return fulfill(route, []);
+    }
+    return false;
+  });
+
+  await openLaunchedKiosk(page);
+  await page.getByPlaceholder("Correo o teléfono").fill("andrea@example.com");
+  await page.getByLabel("Fecha de nacimiento en formato día mes año").fill("10/05/1994");
+  await page.getByRole("button", { name: "Continuar de forma segura" }).click();
+
+  await expect(page.getByText(/La contratación de membresías desde el kiosco no está habilitada/i)).toBeVisible();
+  await expect(page.getByText(/Puedes contratar una nueva/i)).toHaveCount(0);
+  await expect(page.getByText(/No hay planes disponibles actualmente/i)).toHaveCount(0);
+  expect(optionsRequests).toBe(0);
+});
+
+test("explica cuando la contratación está activa pero el catálogo está vacío", async ({ page }) => {
+  await mockKiosk(page, async (route, path) => {
+    const method = route.request().method();
+    if (method === "POST" && path === "/self-service/kiosk-sessions") return fulfill(route, sessionResponse());
+    if (method === "POST" && path === `/self-service/sessions/${sessionId}/verify`) {
+      return fulfill(route, {
+        ...summaryResponse(),
+        memberships: [],
+        capabilities: {
+          ...capabilities(),
+          membershipEnrollmentAllowed: true,
+          membershipRenewalAllowed: false,
+          membershipPlanChangeAllowed: false,
+          onlineCardPaymentsReady: true,
+        },
+      });
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/membership-options`) {
+      return fulfill(route, []);
+    }
+    return false;
+  });
+
+  await openLaunchedKiosk(page);
+  await page.getByPlaceholder("Correo o teléfono").fill("andrea@example.com");
+  await page.getByLabel("Fecha de nacimiento en formato día mes año").fill("10/05/1994");
+  await page.getByRole("button", { name: "Continuar de forma segura" }).click();
+
+  await expect(page.getByText("No hay planes disponibles actualmente. Solicita apoyo en recepción.")).toBeVisible();
+  await expect(page.getByText(/pagos en línea todavía no están disponibles/i)).toHaveCount(0);
+});
+
 test("una membresia multi-sucursal permite reservar pero se administra en su sucursal de origen", async ({ page }) => {
   await mockKiosk(page, async (route, path) => {
     const method = route.request().method();
@@ -204,6 +325,7 @@ test("una recarga recupera el modo kiosco y borra al socio anterior", async ({ p
 
   await expect(page.getByRole("heading", { name: "Verifica tu identidad" })).toBeVisible();
   await expect(page.getByPlaceholder("Correo o teléfono")).toHaveValue("");
+  await expect(page.getByRole("tab", { name: "Quiero registrarme" })).toHaveCount(0);
   expect(resetRequests).toBeGreaterThan(0);
 });
 

@@ -45,14 +45,13 @@ public class ClientLifecycleController {
 			boolean registrationFeeEnabled,
 			@Min(0) long registrationFeeCents,
 			@Size(max = 120) String registrationFeeLabel,
-			@Min(1) @Max(120) int registrationRechargeMonths,
 			boolean autoInactivationEnabled,
 			@Min(1) @Max(120) int inactivityMonths
 	) {
 		UpdateClientLifecycleConfiguration toCommand() {
 			return new UpdateClientLifecycleConfiguration(
 					registrationFeeEnabled, registrationFeeCents, registrationFeeLabel,
-					registrationRechargeMonths, autoInactivationEnabled, inactivityMonths
+					autoInactivationEnabled, inactivityMonths
 			);
 		}
 	}

@@ -13,7 +13,8 @@ Base integrada: `main` en `a5ea75f` (`Merge pull request #18`)
 `main` ya contiene los cierres de identidad, administración comercial,
 paginación y endurecimiento hasta V92. La rama actual parte directamente de ese
 corte e implementa V93: inscripción, baja automática reversible, autenticación
-de socios sin plan y alta desde kiosco.
+de socios sin plan y alta desde kiosco. El refinamiento V94 unifica el periodo
+de inactividad y separa intención de kiosco de readiness de Stripe.
 
 | Rama | Estado | Acción |
 |---|---|---|
@@ -41,6 +42,7 @@ de socios sin plan y alta desde kiosco.
 | 24 ago 2026 | V88 y el hardening posterior coordinan bootstrap, retiran fixture vacío y amplían CI |
 | 26 ago 2026 | PR #18 integra paginación y hardening V91–V92 en `main` (`a5ea75f`) |
 | 26 ago 2026 | Se crea `feature/client-onboarding-lifecycle` y V93 agrupa el primer lote de retroalimentación del cliente real |
+| 26 ago 2026 | V94 conserva `inactivityMonths` como umbral único; configuración de kiosco adopta autosave e intención independiente de Stripe; launch/reset resuelven capacidades vigentes |
 
 ## 3. Alcance material de la rama activa
 
@@ -53,6 +55,13 @@ de socios sin plan y alta desde kiosco.
 - verificación de socios sin plan y reactivación segura de bajas automáticas;
 - capacidad opt-in por sucursal para alta desde kiosco y continuación inmediata
   al primer plan;
+- sección `Socios` con un solo periodo de inactividad y V94 compatible con bases
+  donde V93 ya fue aplicada;
+- capacidades deseadas del kiosco persistidas sin readiness, autosave con
+  rollback y estados distintos para Stripe pendiente, función deshabilitada y
+  catálogo vacío;
+- prueba PostgreSQL real desde settings hasta `allowed_actions_json`, launch y
+  reset de la sesión;
 - administración comercial de gimnasios desde la navegación lateral de
   plataforma;
 - identidades `PLATFORM` sin organización/sucursal e identidades `TENANT` con
@@ -83,12 +92,13 @@ de socios sin plan y alta desde kiosco.
 
 ## 4. Evidencia de validación local
 
-- 452 pruebas backend unitarias;
-- 88 pruebas PostgreSQL/Testcontainers, incluidas V93 sobre base limpia,
-  inactividad y persistencia financiera de la inscripción;
+- 453 pruebas backend unitarias;
+- 92 pruebas PostgreSQL/Testcontainers, incluidas V93–V94 sobre base limpia y
+  upgrade desde V93, inactividad, persistencia financiera de la inscripción y
+  configuración real de launch/reset del kiosco;
 - 113/113 pruebas frontend, typecheck, lint y build Next de producción;
-- 10/10 recorridos E2E de kiosco en Chromium, incluido registro nuevo y alta
-  sin membresía previa;
+- 25/25 recorridos E2E dirigidos de kiosco/configuración en Chromium, incluido
+  registro nuevo, alta sin membresía previa, autosave y estados de Stripe;
 - `git diff --check` y revisión de que no se versionen secretos.
 
 La evidencia local no sustituye los checks del PR. Ausencia de un status

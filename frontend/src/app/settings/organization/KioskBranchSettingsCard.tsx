@@ -1,23 +1,31 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppNotice } from "@/components/AppNotice";
 import { ToggleSwitch } from "@/components/ToggleSwitch";
 import {
   getKioskBranchSettings,
   updateKioskBranchSettings,
   type KioskBranchSettings,
+  type UpdateKioskBranchSettings,
 } from "@/lib/api";
 
 type EditableKey = "clientRegistrationAllowed" | "membershipEnrollmentAllowed" | "membershipRenewalAllowed" |
   "membershipPlanChangeAllowed" | "resourceBookingAllowed" | "wellnessBookingAllowed" |
   "profileUpdateAllowed" | "autopayAllowed";
 type Requirement = "ONLINE_CARD" | "RECURRING_CARD" | null;
+type SaveStatus = "saving" | "saved" | null;
 type KioskOption = {
   key: EditableKey;
   title: string;
   description: string;
   requirement: Requirement;
+};
+type BranchSaveState = {
+  revision: number;
+  completedRevision: number;
+  running: boolean;
+  confirmed: KioskBranchSettings;
 };
 
 const paymentOptions: KioskOption[] = [
@@ -36,70 +44,125 @@ const serviceOptions: KioskOption[] = [
 
 export function KioskBranchSettingsCard({ accessToken, activeBranchId }: { accessToken: string; activeBranchId?: string | null }) {
   const [items, setItems] = useState<KioskBranchSettings[]>([]);
-  const [saving, setSaving] = useState<string | null>(null);
+  const [saveStatuses, setSaveStatuses] = useState<Record<string, SaveStatus>>({});
   const [error, setError] = useState<string | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const itemsRef = useRef<KioskBranchSettings[]>([]);
+  const saveStatesRef = useRef(new Map<string, BranchSaveState>());
+  const generationRef = useRef(0);
 
   useEffect(() => {
+    const generation = generationRef.current + 1;
+    generationRef.current = generation;
     let active = true;
     getKioskBranchSettings(accessToken)
-      .then((loaded) => { if (active) setItems(activeBranchId ? loaded.filter((item) => item.branchId === activeBranchId) : []); })
-      .catch((exception) => { if (active) setError(exception instanceof Error ? exception.message : "No fue posible cargar el kiosco."); });
-    return () => { active = false; };
+      .then((loaded) => {
+        if (!active || generationRef.current !== generation) return;
+        const visible = activeBranchId ? loaded.filter((item) => item.branchId === activeBranchId) : [];
+        itemsRef.current = visible;
+        saveStatesRef.current = new Map(visible.map((item) => [item.branchId, {
+          revision: 0,
+          completedRevision: 0,
+          running: false,
+          confirmed: item,
+        }]));
+        setItems(visible);
+        setSaveStatuses({});
+      })
+      .catch((exception) => {
+        if (active && generationRef.current === generation) {
+          setError(exception instanceof Error ? exception.message : "No fue posible cargar el kiosco.");
+        }
+      });
+    return () => {
+      active = false;
+      if (generationRef.current === generation) generationRef.current += 1;
+    };
   }, [accessToken, activeBranchId]);
 
   function toggle(branchId: string, key: EditableKey, checked: boolean) {
-    setItems((current) => current.map((item) => item.branchId === branchId
-      ? { ...item, capabilities: { ...item.capabilities, [key]: checked } }
-      : item));
+    const current = itemsRef.current.find((item) => item.branchId === branchId);
+    if (!current) return;
+    const next = { ...current, capabilities: { ...current.capabilities, [key]: checked } };
+    replaceItem(next);
+    const state = saveStatesRef.current.get(branchId) ?? {
+      revision: 0,
+      completedRevision: 0,
+      running: false,
+      confirmed: current,
+    };
+    state.revision += 1;
+    saveStatesRef.current.set(branchId, state);
+    setError(null);
+    setSaveStatus(branchId, "saving");
+    void persistQueuedChanges(branchId, generationRef.current);
   }
 
-  async function save(item: KioskBranchSettings) {
-    setSaving(item.branchId);
-    setError(null);
-    setMessage(null);
+  async function persistQueuedChanges(branchId: string, generation: number) {
+    const state = saveStatesRef.current.get(branchId);
+    if (!state || state.running) return;
+    state.running = true;
     try {
-      const capabilities = item.capabilities;
-      const updated = await updateKioskBranchSettings(accessToken, item.branchId, {
-        clientRegistration: capabilities.clientRegistrationAllowed,
-	        membershipEnrollment: capabilities.onlineCardPaymentsReady && capabilities.membershipEnrollmentAllowed,
-        membershipRenewal: capabilities.onlineCardPaymentsReady && capabilities.membershipRenewalAllowed,
-        membershipPlanChange: capabilities.onlineCardPaymentsReady && capabilities.membershipPlanChangeAllowed,
-        resourceBooking: capabilities.resourceBookingAllowed,
-        wellnessBooking: capabilities.wellnessBookingAllowed,
-        profileUpdate: capabilities.profileUpdateAllowed,
-        autopay: capabilities.recurringCardPaymentsReady && capabilities.autopayAllowed,
-      });
-      setItems((current) => current.map((entry) => entry.branchId === updated.branchId ? updated : entry));
-      setMessage("Configuración del kiosco actualizada.");
-    } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible guardar el kiosco.");
+      while (state.completedRevision < state.revision) {
+        const requestedRevision = state.revision;
+        const desired = itemsRef.current.find((item) => item.branchId === branchId);
+        if (!desired) return;
+        try {
+          const updated = await updateKioskBranchSettings(
+            accessToken,
+            branchId,
+            toUpdatePayload(desired),
+          );
+          state.confirmed = updated;
+          state.completedRevision = requestedRevision;
+          if (state.revision === requestedRevision && generationRef.current === generation) {
+            replaceItem(updated);
+            setSaveStatus(branchId, "saved");
+          }
+        } catch (exception) {
+          state.completedRevision = state.revision;
+          if (generationRef.current === generation) {
+            replaceItem(state.confirmed);
+            setSaveStatus(branchId, null);
+            setError(exception instanceof Error ? exception.message : "No fue posible guardar el kiosco.");
+          }
+          return;
+        }
+      }
     } finally {
-      setSaving(null);
+      state.running = false;
     }
+  }
+
+  function replaceItem(next: KioskBranchSettings) {
+    itemsRef.current = itemsRef.current.map((item) => item.branchId === next.branchId ? next : item);
+    setItems(itemsRef.current);
+  }
+
+  function setSaveStatus(branchId: string, status: SaveStatus) {
+    setSaveStatuses((current) => ({ ...current, [branchId]: status }));
   }
 
   return (
     <section className="app-card settings-detail-panel grid scroll-mt-6 gap-5 p-5" id="kiosk-settings">
       <div>
         <h2 className="text-xl font-semibold">Kiosco web</h2>
-        <p className="mt-2 max-w-3xl text-sm text-[var(--brand-muted)]">Elige qué puede hacer el socio en la sucursal seleccionada.</p>
+        <p className="mt-2 max-w-3xl text-sm text-[var(--brand-muted)]">Elige qué desea ofrecer el gimnasio. Stripe se muestra como disponibilidad técnica y no borra esta configuración.</p>
       </div>
       {error ? <AppNotice message={error} tone="error" /> : null}
-      {message ? <AppNotice message={message} tone="success" /> : null}
       <div className="grid gap-4">
         {items.length === 0 && !error ? <p className="text-sm text-[var(--brand-muted)]">Selecciona una sucursal activa para configurar su kiosco.</p> : null}
         {items.map((item) => (
           <div className="grid gap-5" key={item.branchId}>
-            <h3 className="sr-only">{item.branchName}</h3>
+            <div className="flex items-center justify-between gap-4">
+              <h3 className="sr-only">{item.branchName}</h3>
+              <span aria-live="polite" className="ml-auto text-xs font-semibold text-[var(--brand-muted)]">
+                {saveStatuses[item.branchId] === "saving" ? "Guardando..." : null}
+                {saveStatuses[item.branchId] === "saved" ? "Guardado" : null}
+              </span>
+            </div>
             <div className="grid gap-8 xl:grid-cols-2">
               <KioskOptionGroup item={item} options={paymentOptions} title="Pagos y membresías" onToggle={toggle} />
               <KioskOptionGroup item={item} options={serviceOptions} title="Servicios y perfil" onToggle={toggle} />
-            </div>
-            <div className="flex justify-end pt-1">
-              <button className="app-button" disabled={saving === item.branchId} onClick={() => void save(item)} type="button">
-                {saving === item.branchId ? "Guardando..." : "Guardar configuración del kiosco"}
-              </button>
             </div>
           </div>
         ))}
@@ -118,22 +181,38 @@ function KioskOptionGroup({ item, options, title, onToggle }: {
     <section className="grid content-start gap-3">
       <h4 className="font-semibold">{title}</h4>
       {options.map((option) => {
-        const disabled = !requirementReady(item, option.requirement);
-        const checked = !disabled && item.capabilities[option.key];
+        const ready = requirementReady(item, option.requirement);
         return (
-          <article className={`bg-white flex items-start justify-between gap-4 rounded-xl border p-4 ${disabled ? "opacity-60" : ""}`} key={option.key}>
+          <article className="flex items-start justify-between gap-4 rounded-xl border bg-white p-4" key={option.key}>
             <div className="min-w-0">
-              <strong className="block text-sm">{option.title}</strong>
+              <div className="flex flex-wrap items-center gap-2">
+                <strong className="block text-sm">{option.title}</strong>
+                {!ready ? <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-amber-900">Pendiente de Stripe</span> : null}
+              </div>
               <span className="mt-1 block text-xs leading-5 text-[var(--brand-muted)]">
-                {disabled ? requirementMessage(option.requirement) : option.description}
+                {ready ? option.description : requirementMessage(option.requirement)}
               </span>
             </div>
-            <ToggleSwitch checked={checked} disabled={disabled} label={`${option.title} en ${item.branchName}`} onChange={(next) => onToggle(item.branchId, option.key, next)} />
+            <ToggleSwitch checked={item.capabilities[option.key]} label={`${option.title} en ${item.branchName}`} onChange={(next) => onToggle(item.branchId, option.key, next)} />
           </article>
         );
       })}
     </section>
   );
+}
+
+function toUpdatePayload(item: KioskBranchSettings): UpdateKioskBranchSettings {
+  const capabilities = item.capabilities;
+  return {
+    clientRegistration: capabilities.clientRegistrationAllowed,
+    membershipEnrollment: capabilities.membershipEnrollmentAllowed,
+    membershipRenewal: capabilities.membershipRenewalAllowed,
+    membershipPlanChange: capabilities.membershipPlanChangeAllowed,
+    resourceBooking: capabilities.resourceBookingAllowed,
+    wellnessBooking: capabilities.wellnessBookingAllowed,
+    profileUpdate: capabilities.profileUpdateAllowed,
+    autopay: capabilities.autopayAllowed,
+  };
 }
 
 function requirementReady(item: KioskBranchSettings, requirement: Requirement) {
@@ -143,7 +222,7 @@ function requirementReady(item: KioskBranchSettings, requirement: Requirement) {
 }
 
 function requirementMessage(requirement: Requirement) {
-  if (requirement === "ONLINE_CARD") return "Activa self checkout con Stripe en Medios de cobro.";
-  if (requirement === "RECURRING_CARD") return "Activa domiciliación con Stripe en Medios de cobro.";
+  if (requirement === "ONLINE_CARD") return "Se habilitará automáticamente cuando Stripe esté listo para pagos en línea.";
+  if (requirement === "RECURRING_CARD") return "Se habilitará automáticamente cuando Stripe esté listo para domiciliación.";
   return "Esta función no está disponible.";
 }

@@ -33,8 +33,18 @@ export function ClientLifecycleSettingsCard({ accessToken }: { accessToken: stri
   async function save() {
     if (!settings) return;
     const amountCents = Math.round(Number(feeAmount) * 100);
-    if (!Number.isFinite(amountCents) || amountCents < 0) {
+    if (!Number.isInteger(settings.inactivityMonths)
+        || settings.inactivityMonths < 1
+        || settings.inactivityMonths > 120) {
+      setError("El periodo de inactividad debe estar entre 1 y 120 meses.");
+      return;
+    }
+    if (!Number.isFinite(amountCents) || (settings.registrationFeeEnabled && amountCents <= 0)) {
       setError("Captura un importe de inscripción válido.");
+      return;
+    }
+    if (settings.registrationFeeEnabled && !settings.registrationFeeLabel.trim()) {
+      setError("Captura el concepto que aparecerá en la venta de inscripción.");
       return;
     }
     setSaving(true);
@@ -44,14 +54,13 @@ export function ClientLifecycleSettingsCard({ accessToken }: { accessToken: stri
       const updated = await updateClientLifecycleSettings(accessToken, {
         registrationFeeEnabled: settings.registrationFeeEnabled,
         registrationFeeCents: amountCents,
-        registrationFeeLabel: settings.registrationFeeLabel,
-        registrationRechargeMonths: settings.registrationRechargeMonths,
+        registrationFeeLabel: settings.registrationFeeLabel.trim(),
         autoInactivationEnabled: settings.autoInactivationEnabled,
         inactivityMonths: settings.inactivityMonths,
       });
       setSettings(updated);
       setFeeAmount((updated.registrationFeeCents / 100).toFixed(2));
-      setMessage("Reglas de inscripción e inactividad actualizadas.");
+      setMessage("Configuración de socios actualizada.");
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible guardar las reglas de socios.");
     } finally {
@@ -62,34 +71,65 @@ export function ClientLifecycleSettingsCard({ accessToken }: { accessToken: stri
   if (!settings && !error) return null;
 
   return (
-    <section className="app-card grid gap-5 p-5" id="client-lifecycle-settings">
+    <section className="app-card settings-detail-panel grid scroll-mt-6 gap-6 p-5" id="client-lifecycle-settings">
       <div>
-        <h2 className="text-xl font-semibold">Inscripción y socios inactivos</h2>
+        <h2 className="text-xl font-semibold">Socios e inscripción</h2>
         <p className="mt-2 max-w-3xl text-sm text-[var(--brand-muted)]">
-          Configura el cargo de entrada y la baja automática. La baja conserva ventas, pagos y auditoría; el socio puede reactivarse al regresar.
+          Configura la inscripción y cómo GymFort gestiona periodos prolongados sin membresía.
         </p>
       </div>
       {error ? <AppNotice message={error} tone="error" /> : null}
       {message ? <AppNotice message={message} tone="success" /> : null}
       {settings ? (
-        <div className="grid gap-5 xl:grid-cols-2">
+        <div className="grid gap-5">
+          <article className="grid gap-3 rounded-xl border bg-white p-5">
+            <label className="grid max-w-sm gap-2 text-sm font-semibold">
+              Periodo de inactividad
+              <span className="flex items-center gap-3">
+                <input
+                  className="app-input w-28"
+                  max="120"
+                  min="1"
+                  onChange={(event) => setSettings({ ...settings, inactivityMonths: Number(event.target.value) })}
+                  type="number"
+                  value={settings.inactivityMonths}
+                />
+                <span className="font-normal">meses sin membresía</span>
+              </span>
+            </label>
+            <p className="max-w-3xl text-sm text-[var(--brand-muted)]">
+              GymFort considera que un socio ha entrado en periodo de inactividad cuando ha transcurrido este tiempo desde el final de su última vigencia.
+            </p>
+          </article>
+
           <article className="grid gap-4 rounded-xl border bg-white p-5">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--brand-muted)]">Inscripción</p>
             <div className="flex items-start justify-between gap-4">
-              <div><strong>Cobrar inscripción</strong><p className="mt-1 text-sm text-[var(--brand-muted)]">Se agrega automáticamente a la primera membresía y después del periodo de regreso.</p></div>
+              <div>
+                <strong>Cobrar inscripción</strong>
+                <p className="mt-1 text-sm text-[var(--brand-muted)]">Se cobra en la primera membresía y nuevamente cuando el socio regresa después del periodo de inactividad.</p>
+              </div>
               <ToggleSwitch checked={settings.registrationFeeEnabled} label="Cobrar inscripción" onChange={(checked) => setSettings({ ...settings, registrationFeeEnabled: checked })} />
             </div>
-            <label className="grid gap-2 text-sm font-semibold">Concepto<input className="app-input" maxLength={120} onChange={(event) => setSettings({ ...settings, registrationFeeLabel: event.target.value })} value={settings.registrationFeeLabel} /></label>
-            <label className="grid gap-2 text-sm font-semibold">Importe ({settings.currency})<input className="app-input" min="0" onChange={(event) => setFeeAmount(event.target.value)} step="0.01" type="number" value={feeAmount} /></label>
-            <label className="grid gap-2 text-sm font-semibold">Volver a cobrar después de<input className="app-input" max="120" min="1" onChange={(event) => setSettings({ ...settings, registrationRechargeMonths: Number(event.target.value) })} type="number" value={settings.registrationRechargeMonths} /><span className="text-xs font-normal text-[var(--brand-muted)]">Meses desde el fin de la última membresía.</span></label>
+            {settings.registrationFeeEnabled ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-2 text-sm font-semibold">Concepto<input className="app-input" maxLength={120} onChange={(event) => setSettings({ ...settings, registrationFeeLabel: event.target.value })} value={settings.registrationFeeLabel} /></label>
+                <label className="grid gap-2 text-sm font-semibold">Importe ({settings.currency})<input className="app-input" min="0.01" onChange={(event) => setFeeAmount(event.target.value)} step="0.01" type="number" value={feeAmount} /></label>
+              </div>
+            ) : null}
           </article>
+
           <article className="grid content-start gap-4 rounded-xl border bg-white p-5">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-[var(--brand-muted)]">Gestión de inactividad</p>
             <div className="flex items-start justify-between gap-4">
-              <div><strong>Baja automática por inactividad</strong><p className="mt-1 text-sm text-[var(--brand-muted)]">Marca como inactivo al socio sin membresía vigente; no elimina su historial.</p></div>
-              <ToggleSwitch checked={settings.autoInactivationEnabled} label="Baja automática" onChange={(checked) => setSettings({ ...settings, autoInactivationEnabled: checked })} />
+              <div>
+                <strong>Dar de baja automáticamente</strong>
+                <p className="mt-1 text-sm text-[var(--brand-muted)]">Al alcanzar el periodo de inactividad, GymFort cambia al socio a INACTIVE. No elimina su expediente, ventas, pagos, membresías ni auditoría.</p>
+              </div>
+              <ToggleSwitch checked={settings.autoInactivationEnabled} label="Dar de baja automáticamente" onChange={(checked) => setSettings({ ...settings, autoInactivationEnabled: checked })} />
             </div>
-            <label className="grid gap-2 text-sm font-semibold">Dar de baja después de<input className="app-input" max="120" min="1" onChange={(event) => setSettings({ ...settings, inactivityMonths: Number(event.target.value) })} type="number" value={settings.inactivityMonths} /><span className="text-xs font-normal text-[var(--brand-muted)]">Meses desde la última vigencia. El valor habitual es 6.</span></label>
           </article>
-          <div className="flex justify-end xl:col-span-2"><button className="app-button" disabled={saving} onClick={() => void save()} type="button">{saving ? "Guardando..." : "Guardar reglas de socios"}</button></div>
+          <div className="flex justify-end"><button className="app-button" disabled={saving} onClick={() => void save()} type="button">{saving ? "Guardando..." : "Guardar configuración de socios"}</button></div>
         </div>
       ) : null}
     </section>

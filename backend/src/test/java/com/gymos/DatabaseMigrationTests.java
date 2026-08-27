@@ -170,6 +170,8 @@ class DatabaseMigrationTests {
 			assertThat(columnExists(connection, "client", "inactivated_at")).isTrue();
 			assertThat(columnExists(connection, "client", "inactivation_reason")).isTrue();
 			assertThat(tableExists(connection, "client_lifecycle_configuration")).isTrue();
+			assertThat(columnExists(connection, "client_lifecycle_configuration", "inactivity_months")).isTrue();
+			assertThat(columnExists(connection, "client_lifecycle_configuration", "registration_recharge_months")).isFalse();
 			assertThat(indexExists(connection, "ix_client_automatic_inactivation")).isTrue();
 			assertThat(columnExists(connection, "membership", "auto_renew")).isTrue();
 			assertThat(columnExists(connection, "membership", "cancelled_at")).isTrue();
@@ -205,6 +207,44 @@ class DatabaseMigrationTests {
 			assertThat(columnExists(connection, "branch", "surface_color")).isFalse();
 			assertThat(roleHasPermission(connection, "Recepcion", "resource.manage")).isFalse();
 			assertThat(roleHasPermission(connection, "Recepcion", "booking.manage")).isTrue();
+		}
+	}
+
+	@Test
+	void upgradeFromV93KeepsInactivityMonthsAsCanonicalThreshold() throws Exception {
+		String schema = migrationSchema("client_lifecycle_v93");
+		migrateSchema(schema, "93");
+		UUID organizationId = UUID.randomUUID();
+		try (var connection = schemaConnection(schema)) {
+			insertOrganization(connection, organizationId);
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO client_lifecycle_configuration (
+					    organization_id, registration_fee_enabled, registration_fee_cents,
+					    registration_fee_label, registration_recharge_months,
+					    auto_inactivation_enabled, inactivity_months
+					) VALUES (?, TRUE, 15000, 'Inscripción', 12, TRUE, 6)
+					""")) {
+				statement.setObject(1, organizationId);
+				statement.executeUpdate();
+			}
+		}
+
+		migrateSchema(schema, null);
+
+		try (var connection = schemaConnection(schema)) {
+			assertThat(columnExists(connection, schema, "client_lifecycle_configuration", "registration_recharge_months")).isFalse();
+			assertThat(columnExists(connection, schema, "client_lifecycle_configuration", "inactivity_months")).isTrue();
+			try (var statement = connection.prepareStatement("""
+					SELECT inactivity_months
+					FROM client_lifecycle_configuration
+					WHERE organization_id = ?
+					""")) {
+				statement.setObject(1, organizationId);
+				try (var resultSet = statement.executeQuery()) {
+					assertThat(resultSet.next()).isTrue();
+					assertThat(resultSet.getInt("inactivity_months")).isEqualTo(6);
+				}
+			}
 		}
 	}
 
@@ -625,15 +665,22 @@ class DatabaseMigrationTests {
 	}
 
 	private boolean columnExists(java.sql.Connection connection, String table, String column) throws Exception {
+		return columnExists(connection, "public", table, column);
+	}
+
+	private boolean columnExists(
+			java.sql.Connection connection, String schema, String table, String column
+	) throws Exception {
 		try (var statement = connection.prepareStatement("""
 				SELECT 1
 				FROM information_schema.columns
-				WHERE table_schema = 'public'
+				WHERE table_schema = ?
 				  AND table_name = ?
 				  AND column_name = ?
 				""")) {
-			statement.setString(1, table);
-			statement.setString(2, column);
+			statement.setString(1, schema);
+			statement.setString(2, table);
+			statement.setString(3, column);
 			try (var resultSet = statement.executeQuery()) {
 				return resultSet.next();
 			}

@@ -401,7 +401,7 @@ export default function KioskPage() {
     planId: string,
     membership: KioskMembership | null = null,
   ) {
-    if (!session || !summary?.capabilities.onlineCardPaymentsReady || !planId) return;
+    if (!session || !summary || !planId) return;
     setWorkingMembershipId(membership?.id ?? "enrollment");
     setMembershipReview(null);
     setMembershipError(null);
@@ -907,17 +907,19 @@ export default function KioskPage() {
               <div className="kiosk-card">
                 <div className="kiosk-member-header">
                   <span>{activeMembership ? "Tu membresía" : "Comienza aquí"}</span>
-                  <h2>{activeMembership ? "Membresía actual" : "Contrata una membresía"}</h2>
+                  <h2>{activeMembership ? "Membresía actual" : summary.capabilities.membershipEnrollmentAllowed ? "Contrata una membresía" : "Membresías"}</h2>
                   <p className="kiosk-section-intro">
                     {activeMembership
                       ? activeMembership.managedAtCurrentBranch
                         ? "Consulta tu vigencia y elige exactamente qué quieres hacer. Nada cambia hasta que revises el importe y completes el pago."
                         : "Tu membresía multi-sucursal es válida aquí para acceso y reservas. Su renovación, cambio de plan y domiciliación se administran en la sucursal donde la contrataste."
-                      : "Elige el plan que quieres contratar. Verás el importe final antes de ir al pago seguro con Stripe."}
+                      : summary.capabilities.membershipEnrollmentAllowed
+                        ? "Elige un plan y consulta el importe final. El pago sólo se habilita cuando Stripe está listo."
+                        : "Consulta aquí el estado de tus membresías y solicita apoyo en recepción para contratar."}
                   </p>
                 </div>
                 {!summary.capabilities.onlineCardPaymentsReady && (summary.capabilities.membershipEnrollmentAllowed || summary.capabilities.membershipRenewalAllowed || summary.capabilities.membershipPlanChangeAllowed) ? (
-                  <p className="kiosk-feature-note">Los pagos con tarjeta todavía no están disponibles. Tu membresía no será modificada; solicita apoyo en recepción.</p>
+                  <p className="kiosk-feature-note">Los pagos en línea todavía no están disponibles. Podrás contratar cuando el gimnasio termine de configurar Stripe o puedes acudir a recepción.</p>
                 ) : null}
 
                 {membershipError ? <div className="kiosk-membership-error" role="alert">{membershipError}</div> : null}
@@ -941,8 +943,12 @@ export default function KioskPage() {
                     ) : null}
                     <div className="kiosk-review-actions">
                       <button className="kiosk-secondary-action" disabled={workingMembershipId !== null} onClick={() => setMembershipReview(null)} type="button">Volver sin cambios</button>
-                      <button className="kiosk-primary-action small" disabled={workingMembershipId !== null} onClick={() => void completeMembershipCheckout()} type="button">
-                        {workingMembershipId !== null ? "Abriendo Stripe..." : "Confirmar y continuar a Stripe"}
+                      <button className="kiosk-primary-action small" disabled={workingMembershipId !== null || !summary.capabilities.onlineCardPaymentsReady} onClick={() => void completeMembershipCheckout()} type="button">
+                        {workingMembershipId !== null
+                          ? "Abriendo Stripe..."
+                          : summary.capabilities.onlineCardPaymentsReady
+                            ? "Confirmar y continuar a Stripe"
+                            : "Pago pendiente de Stripe"}
                       </button>
                     </div>
                   </section>
@@ -967,7 +973,7 @@ export default function KioskPage() {
                         <article className="kiosk-membership-action-card">
                           <span className="kiosk-action-number">1</span>
                           <div><h3>Renovar el mismo plan</h3><p>Conserva <strong>{activeMembership.planName}</strong> y extiende su vigencia.</p></div>
-                          <button className="kiosk-primary-action small" disabled={workingMembershipId !== null || !summary.capabilities.onlineCardPaymentsReady} onClick={() => void reviewMembershipCheckout("renewal", activeMembership.planId, activeMembership)} type="button">
+                          <button className="kiosk-primary-action small" disabled={workingMembershipId !== null} onClick={() => void reviewMembershipCheckout("renewal", activeMembership.planId, activeMembership)} type="button">
                             {workingMembershipId === activeMembership.id ? "Calculando importe..." : `Revisar renovación de ${activeMembership.planName}`}
                           </button>
                         </article>
@@ -985,7 +991,7 @@ export default function KioskPage() {
                                 </select>
                               </label>
                               {selectedTargetPlan && selectedTargetPlan.id !== activeMembership.planId ? <p className="kiosk-plan-summary">{formatMoney(selectedTargetPlan.priceCents, selectedTargetPlan.currency)} · {selectedTargetPlan.durationDays} días</p> : null}
-                              <button className="kiosk-secondary-action kiosk-full-action" disabled={workingMembershipId !== null || !summary.capabilities.onlineCardPaymentsReady || !selectedTargetPlan || selectedTargetPlan.id === activeMembership.planId} onClick={() => selectedTargetPlan && void reviewMembershipCheckout("change", selectedTargetPlan.id, activeMembership)} type="button">
+                              <button className="kiosk-secondary-action kiosk-full-action" disabled={workingMembershipId !== null || !selectedTargetPlan || selectedTargetPlan.id === activeMembership.planId} onClick={() => selectedTargetPlan && void reviewMembershipCheckout("change", selectedTargetPlan.id, activeMembership)} type="button">
                                 {selectedTargetPlan && selectedTargetPlan.id !== activeMembership.planId ? `Revisar cambio a ${selectedTargetPlan.name}` : "Selecciona otro plan"}
                               </button>
                             </>
@@ -1010,14 +1016,16 @@ export default function KioskPage() {
                   <div className="kiosk-enrollment-flow">
                     <div className="kiosk-empty-membership">
                       <strong>No tienes una membresía activa</strong>
-                      <p>Puedes contratar una nueva o, si tu plan anterior venció, renovarlo.</p>
+                      <p>{summary.capabilities.membershipEnrollmentAllowed
+                        ? "Revisa las opciones disponibles para tu primera membresía."
+                        : "La contratación de membresías desde el kiosco no está habilitada. Solicita apoyo en recepción."}</p>
                     </div>
 
                     {lastExpiredMembership?.managedAtCurrentBranch && summary.capabilities.membershipRenewalAllowed ? (
                       <article className="kiosk-membership-action-card renewal">
                         <span className="kiosk-action-number">R</span>
                         <div><h3>Renovar tu plan anterior</h3><p><strong>{lastExpiredMembership.planName}</strong> venció el {formatDay(lastExpiredMembership.endsOn)}.</p></div>
-                        <button className="kiosk-secondary-action kiosk-full-action" disabled={workingMembershipId !== null || !summary.capabilities.onlineCardPaymentsReady} onClick={() => void reviewMembershipCheckout("renewal", lastExpiredMembership.planId, lastExpiredMembership)} type="button">
+                        <button className="kiosk-secondary-action kiosk-full-action" disabled={workingMembershipId !== null} onClick={() => void reviewMembershipCheckout("renewal", lastExpiredMembership.planId, lastExpiredMembership)} type="button">
                           {workingMembershipId === lastExpiredMembership.id ? "Calculando importe..." : `Revisar renovación de ${lastExpiredMembership.planName}`}
                         </button>
                       </article>
@@ -1037,11 +1045,11 @@ export default function KioskPage() {
                                 </button>
                               ))}
                             </div>
-                            <button className="kiosk-primary-action small" disabled={workingMembershipId !== null || !summary.capabilities.onlineCardPaymentsReady || !selectedTargetPlan} onClick={() => selectedTargetPlan && void reviewMembershipCheckout("enrollment", selectedTargetPlan.id)} type="button">
+                            <button className="kiosk-primary-action small" disabled={workingMembershipId !== null || !selectedTargetPlan} onClick={() => selectedTargetPlan && void reviewMembershipCheckout("enrollment", selectedTargetPlan.id)} type="button">
                               {workingMembershipId === "enrollment" ? "Calculando importe..." : selectedTargetPlan ? `Revisar contratación de ${selectedTargetPlan.name}` : "Elige un plan"}
                             </button>
                           </>
-                        ) : <p className="kiosk-muted">No hay planes disponibles para contratación. Solicita apoyo en recepción.</p>}
+                        ) : <p className="kiosk-muted">No hay planes disponibles actualmente. Solicita apoyo en recepción.</p>}
                       </section>
                     ) : null}
                   </div>

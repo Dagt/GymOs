@@ -49,10 +49,16 @@ public class ClientLifecycleService implements ClientLifecycleOperations {
 					"Captura el nombre que aparecerá en la venta de inscripción."
 			);
 		}
+		if (command.inactivityMonths() < 1 || command.inactivityMonths() > 120) {
+			throw new BusinessException(
+					"CLIENT_INACTIVITY_MONTHS_INVALID",
+					"El periodo de inactividad debe estar entre 1 y 120 meses."
+			);
+		}
 		ClientLifecycleConfiguration saved = repository.save(
 				principal.organizationId(), principal.userId(), command.registrationFeeEnabled(),
-				command.registrationFeeCents(), label, command.registrationRechargeMonths(),
-				command.autoInactivationEnabled(), command.inactivityMonths()
+				command.registrationFeeCents(), label, command.autoInactivationEnabled(),
+				command.inactivityMonths()
 		);
 		auditService.record(
 				principal, "CLIENT_LIFECYCLE_CONFIGURATION_UPDATED", "ORGANIZATION",
@@ -67,17 +73,17 @@ public class ClientLifecycleService implements ClientLifecycleOperations {
 	public RegistrationFee registrationFee(UUID organizationId, UUID clientId, LocalDate effectiveOn) {
 		ClientLifecycleConfiguration configuration = requiredConfiguration(organizationId);
 		if (!configuration.registrationFeeEnabled() || configuration.registrationFeeCents() <= 0) {
-			return RegistrationFee.none(configuration.currency(), configuration.registrationRechargeMonths());
+			return RegistrationFee.none(configuration.currency(), configuration.inactivityMonths());
 		}
 		LocalDate latestMembershipEnd = repository.latestMembershipEnd(organizationId, clientId).orElse(null);
 		boolean due = latestMembershipEnd == null
-				|| !latestMembershipEnd.plusMonths(configuration.registrationRechargeMonths()).isAfter(effectiveOn);
+				|| !latestMembershipEnd.plusMonths(configuration.inactivityMonths()).isAfter(effectiveOn);
 		if (!due) {
-			return RegistrationFee.none(configuration.currency(), configuration.registrationRechargeMonths());
+			return RegistrationFee.none(configuration.currency(), configuration.inactivityMonths());
 		}
 		return new RegistrationFee(
 				true, configuration.registrationFeeCents(), configuration.registrationFeeLabel(),
-				configuration.currency(), configuration.registrationRechargeMonths()
+				configuration.currency(), configuration.inactivityMonths()
 		);
 	}
 
@@ -97,7 +103,6 @@ public class ClientLifecycleService implements ClientLifecycleOperations {
 			boolean registrationFeeEnabled,
 			long registrationFeeCents,
 			String registrationFeeLabel,
-			int registrationRechargeMonths,
 			boolean autoInactivationEnabled,
 			int inactivityMonths
 	) {

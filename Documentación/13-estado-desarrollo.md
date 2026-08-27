@@ -3,7 +3,7 @@
 Estado: FUENTE CANÓNICA / EN PROGRESO
 Corte: 26 de agosto de 2026
 Código auditado: `feature/client-onboarding-lifecycle`, basada en `main`
-`a5ea75f` e incluyendo V93 sobre el cierre integrado de paginación y
+`a5ea75f` e incluyendo V93–V94 sobre el cierre integrado de paginación y
 endurecimiento operativo V91–V92. No implica despliegue productivo de la rama.
 
 ## 1. Resumen ejecutivo
@@ -55,6 +55,12 @@ beneficios; cada sucursal deberá resolver su propia marca visual y de
 comunicación. Paquetes de visitas y beneficios multi-sucursal se mantienen
 dentro de esa organización, no entre tenants.
 
+El refinamiento V94 usa `inactivityMonths` como único umbral temporal para
+inactividad y reinscripción. La configuración de kiosco separa la intención por
+sucursal de la readiness de Stripe: planes y cotizaciones siguen visibles con
+Stripe pendiente, las operaciones monetarias continúan bloqueadas y una sesión
+reiniciada vuelve a resolver la configuración vigente del terminal.
+
 El corte posterior mantiene los listados compactos con scroll interno oculto y
 controles de página visibles. Detecta backend/frontend incompatibles y separa
 errores de listas vacías. Coaches exige periodos sin solape por socio/sucursal,
@@ -85,7 +91,7 @@ Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún 
 |---|---|---|---|
 | [Organizaciones](modulos/01-organizations.md) | FUNCIONAL | Plataforma, tenants, sucursales, equipo, soporte y marca organizacional persistente | Marca distinta por sucursal (`CFG-003`) y matriz negativa (`ORG-001`) |
 | [Identidad y seguridad](modulos/02-identity-security.md) | ESTABILIZADO PARA PRODUCCIÓN PILOTO | Ámbitos PLATFORM/TENANT, bootstrap, JWT/refresh v2, soporte temporal, invitación de dueño, recuperación de staff y revocación de sesiones | Endurecer almacenamiento cliente del refresh (`AUTH-001`) |
-| [Configuración](modulos/03-configuration.md) | FUNCIONAL | Marca tenant, cobros, kiosco y correo por permisos; UI unificada | Perfil de marca por sucursal (`CFG-003`) y ciclo de logo (`CFG-001`) |
+| [Configuración](modulos/03-configuration.md) | FUNCIONAL | Marca tenant, cobros, socios, kiosco con autosave y correo por permisos; UI unificada | Perfil de marca por sucursal (`CFG-003`) y ciclo de logo (`CFG-001`) |
 | [Onboarding](modulos/04-onboarding.md) | FUNCIONAL | Checklist, setup piloto idempotente e importación inicial | Recuperación probada de altas parciales (`ONB-001`) |
 | [Socios](modulos/05-clients.md) | FUNCIONAL | Alta, búsqueda, detalle, importación, inscripción, baja automática reversible y visibilidad multi-sucursal | PII, duplicados y pruebas CRUD (`CLI-001`) |
 | [Catálogo](modulos/06-catalog.md) | ESTABILIZADO | Productos, planes, categorías, unidades y asociación por sucursal | Volumen, legacy y archivos (`CAT-001`) |
@@ -93,7 +99,7 @@ Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún 
 | [Membresías](modulos/08-memberships.md) | ESTABILIZADO | Periodos inclusivos, activa única, alta con inscripción, renovación, cambio y cotización | E2E financiero completo |
 | [Beneficios/elegibilidad](modulos/09-benefits.md) | ESTABILIZADO | Descuentos y acceso heredado; edición de planes vinculados con control de versión | Herencia en todas las sedes del plan multi-sucursal (`BEN-003`) |
 | [Acceso](modulos/10-access.md) | ESTABILIZADO PARA INICIAR CONNECTOR | Elegibilidad, provider explícito, puntos, bitácora, permisos físicos, estado deseado, Connector API durable y protegida, salud, eventos/candidatos y consola con diagnóstico legacy | Paquetes de visitas entre sucursales (`ACC-005`) y Connector/HikCentral (`ACC-002`) |
-| [Kiosco](modulos/11-selfservice.md) | FUNCIONAL / ACEPTACIÓN | Apertura sólo por Recepción, sesión aislada, registro/verificación sin plan, membresías, pagos, domiciliación, reservas, wellness y datos | Publicar ejecución automatizada de Stripe sandbox (`SELF-001`) |
+| [Kiosco](modulos/11-selfservice.md) | FUNCIONAL / ACEPTACIÓN | Apertura sólo por Recepción, sesión aislada, registro/verificación sin plan, intención separada de readiness, membresías, pagos, domiciliación, reservas, wellness y datos | Publicar ejecución automatizada de Stripe sandbox (`SELF-001`) |
 | [Reservas](modulos/12-bookings.md) | FUNCIONAL | Recursos, disponibilidad, pago y acceso multi-sucursal | Colisiones/cancelación/E2E (`BKG-001`) |
 | [Inventario](modulos/13-inventory.md) | ESTABILIZADO | Existencias, movimientos, alertas, transferencias y conteos paginados; valuación | Feedback por partida (`INV-002`) |
 | [Coaches](modulos/14-coaching.md) | ESTABILIZADO | Perfiles, rutinas versionadas, asignación sin solapes, cierre por vencimiento, métricas temporales, CSV/PDF | Cleanup durable de medios (`COA-018`) |
@@ -113,7 +119,9 @@ Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún 
 - Gerencia conserva `payment.settings.manage` para modalidades ya vinculadas; cuenta Stripe exige `payment.provider.stripe.manage` o `platform.admin`.
 - V80 concede a Gerencia `automation.read`, `automation.manage`, `automation.execute`, `notification.read` y `notification.manage`; no concede control avanzado del scheduler.
 - Terminal manual y Mercado Pago Point son excluyentes.
-- Comprar/renovar/cambiar plan en kiosco requiere Stripe self checkout; domiciliación requiere además recurring.
+- Configurar compra/renovación/cambio/domiciliación en kiosco no requiere que
+  Stripe esté listo; ejecutar Checkout sí requiere self checkout ready y
+  domiciliación requiere además recurring ready.
 - Redirect de Stripe no confirma cobro: webhook firmado + consulta autoritativa producen efectos idempotentes.
 - Automatizaciones no ejecuta lógica de dominio: consume eventos y genera notificaciones.
 - `RECURRING_CHARGE_DUE` significa llegada de fecha de cobro recurrente; no activación inicial del mandato.

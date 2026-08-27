@@ -11,10 +11,10 @@ public interface ClientLifecycleOperations {
 			long amountCents,
 			String label,
 			String currency,
-			int rechargeMonths
+			int inactivityMonths
 	) {
-		public static RegistrationFee none(String currency, int rechargeMonths) {
-			return new RegistrationFee(false, 0, null, currency, rechargeMonths);
+		public static RegistrationFee none(String currency, int inactivityMonths) {
+			return new RegistrationFee(false, 0, null, currency, inactivityMonths);
 		}
 	}
 }

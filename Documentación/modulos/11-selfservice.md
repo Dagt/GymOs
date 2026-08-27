@@ -22,6 +22,14 @@ Estado: `FUNCIONAL / LISTO PARA ACEPTACIÓN CONECTADA`
   elegible y vuelve a validar la elegibilidad al consultar horarios y reservar;
 - capacidades canónicas por perfil lógico de sucursal, expuestas a la sesión y aplicadas en cada
   endpoint implementado;
+- capacidades configuradas persistidas como intención, sin convertir a `false`
+  compra, renovación, cambio o domiciliación porque Stripe siga pendiente;
+- disponibilidad efectiva resuelta al ejecutar como intención configurada más
+  readiness de Stripe; el catálogo y la cotización permanecen consultables y
+  Checkout continúa protegido por readiness;
+- reinicio de sesión que vuelve a consultar el perfil vigente del terminal, de
+  modo que cambios como `clientRegistration=true` aparecen sin conservar una
+  copia antigua dentro de la sesión;
 - actualización real y auditada de correo/teléfono desde sesión verificada;
 - contrato de alta/renovación/cambio sin método manual ni `validateNow`,
   conectado a Stripe Checkout y confirmado sólo por webhook/conciliación;
@@ -73,7 +81,8 @@ Estado: `FUNCIONAL / LISTO PARA ACEPTACIÓN CONECTADA`
   completo por Stripe;
 - configuración administrativa de capacidades por sucursal, sin alta ni
   asignación de computadoras o terminales físicas; la pantalla muestra una sola
-  configuración correspondiente a la sucursal elegida en el selector global;
+  configuración correspondiente a la sucursal elegida en el selector global,
+  guarda cada toggle automáticamente y revierte el cambio si el backend falla;
 - navegación del socio organizada por tareas (`Membresías`, `Reservar`,
   `Wellness`, `Pagos`, `Mis datos` y `Domiciliación`) para evitar mezclar todos
   los formularios en una sola pantalla;

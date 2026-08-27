@@ -51,22 +51,6 @@ public class KioskSettingsService {
 			GymOsPrincipal principal, UUID branchId, UpdateKioskSettings command, String correlationId
 	) {
 		requireOrganization(principal);
-		var payments = paymentConfiguration.configuration(principal.organizationId());
-		boolean requiresOnlineCardPayments = command.membershipEnrollment()
-				|| command.membershipRenewal()
-				|| command.membershipPlanChange();
-		if (requiresOnlineCardPayments && !payments.stripeCheckoutReady()) {
-			throw new BusinessException(
-					"KIOSK_STRIPE_CHECKOUT_REQUIRED",
-					"Habilita Stripe para self checkout antes de ofrecer compras, renovaciones o cambios de plan en el kiosco."
-			);
-		}
-		if (command.autopay() && !payments.stripeRecurringReady()) {
-			throw new BusinessException(
-					"KIOSK_STRIPE_RECURRING_REQUIRED",
-					"Habilita la domiciliacion con Stripe antes de ofrecerla en el kiosco."
-			);
-		}
 		if (!repository.configureBranch(
 				principal.organizationId(), branchId, principal.userId(),
 				new BranchKioskConfigurationData(

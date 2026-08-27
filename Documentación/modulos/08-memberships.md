@@ -17,7 +17,8 @@ Estado: `ESTABILIZADO`
   política transversal de elegibilidad.
 - cotización de alta con desglose autoritativo entre plan, inscripción,
   descuentos y total; la inscripción sólo aplica cuando la política de ciclo de
-  vida del socio determina que corresponde.
+  vida del socio determina que corresponde mediante el único umbral
+  `inactivityMonths`.
 
 ## Pendiente
 
@@ -56,6 +57,11 @@ Renovar y cambiar plan abren un drawer en la propia ficha con cotización y
 pago. El cambio sólo admite una membresía activa: cancela el periodo actual,
 crea una membresía del nuevo plan desde la fecha operativa, no prorratea ni
 transfiere días pendientes y actualiza inmediatamente los accesos heredados.
+
+La primera membresía cobra inscripción cuando está habilitada. En altas
+posteriores sólo vuelve a cobrarla cuando
+`latestMembershipGraceEnd + inactivityMonths <= effectiveDate`; desactivar la
+baja automática no altera esta regla.
 
 La renovación rápida vive dentro de `/reception`. La entrada lateral y la
 tarjeta que enviaban a `/reception/renewals` fueron retiradas; esa URL sólo

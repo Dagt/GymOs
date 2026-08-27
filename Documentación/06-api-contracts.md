@@ -185,7 +185,8 @@ Estado comercial de gimnasio cliente:
 - `POST /self-service/sessions/{sessionId}/autopay/{membershipId}/revoke`
 - `POST /self-service/sessions/{sessionId}/end`
 - `POST /self-service/sessions/{sessionId}/reset` — limpia identidad y datos
-  visibles para el siguiente socio, conservando sólo el modo kiosco.
+  visibles para el siguiente socio y vuelve a resolver la configuración vigente
+  del terminal; no reutiliza un `allowed_actions_json` congelado en la sesión.
 - `GET /self-service/sessions/{sessionId}/wellness/professionals`
 - `GET /self-service/sessions/{sessionId}/wellness/professionals/{professionalId}/services`
 - `GET /self-service/sessions/{sessionId}/wellness/professionals/{professionalId}/availability`
@@ -193,6 +194,15 @@ Estado comercial de gimnasio cliente:
   acepta servicios activos con costo cero.
 
 Los endpoints de autoservicio sólo exponen acciones permitidas para clientes en una sesión temporal de kiosco. Las reglas de pagos, membresías, beneficios y permisos se validan en backend.
+
+Las capacidades configuradas del kiosco representan la intención del gimnasio.
+Payment readiness representa disponibilidad técnica. `allowed_actions_json`
+persiste exclusivamente la intención por sucursal; las capacidades efectivas de
+una operación monetaria se resuelven en runtime como `configuredAllowed &&
+providerReady`. La falta temporal de Stripe no cambia a `false` la configuración
+guardada. Los planes y sus precios pueden consultarse cuando la contratación está
+configurada aunque Checkout aún no esté disponible; crear el cobro sigue
+requiriendo `stripeCheckoutReady=true`.
 
 `POST /self-service/sessions/{sessionId}/registrations` requiere la capacidad
 `clientRegistration`, nombre, apellido y fecha de nacimiento, además de al menos
@@ -300,9 +310,12 @@ actualizado la fila. Las membresías canceladas no se presentan como plan actual
 `GET /client-lifecycle-settings` acepta `organization.update` o `sale.create` y
 devuelve la política efectiva, incluyendo valores predeterminados aunque todavía
 no exista una fila. `PUT /client-lifecycle-settings` requiere
-`organization.update` y configura cargo de inscripción, meses para volver a
-cobrarlo y baja automática por inactividad. El importe se expresa en centavos y
-la moneda proviene de la organización.
+`organization.update` y recibe `registrationFeeEnabled`,
+`registrationFeeCents`, `registrationFeeLabel`, `autoInactivationEnabled` e
+`inactivityMonths`. `inactivityMonths` es el único umbral temporal para
+determinar periodo de inactividad y reinscripción; no existe un campo separado
+para meses de recobro. El importe se expresa en centavos y la moneda proviene de
+la organización.
 
 Autorización de alta:
 

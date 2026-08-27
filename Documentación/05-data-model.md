@@ -141,7 +141,6 @@ Regla:
 - registration_fee_enabled
 - registration_fee_cents
 - registration_fee_label
-- registration_recharge_months
 - auto_inactivation_enabled
 - inactivity_months
 - updated_at
@@ -149,8 +148,11 @@ Regla:
 - version
 
 Regla:
-- La inscripción corresponde en la primera membresía o cuando la última vigencia
-  terminó al menos los meses configurados antes de la fecha operativa.
+- `inactivity_months` es el único umbral temporal para determinar periodo de
+  inactividad y reinscripción.
+- La inscripción corresponde en la primera membresía o cuando
+  `latestMembershipGraceEnd + inactivity_months <= effectiveDate`, aunque la
+  baja automática esté desactivada.
 - La inactividad se mide desde el fin de la última gracia de membresía o, si el
   socio nunca tuvo una, desde `joined_at`.
 
@@ -899,3 +901,11 @@ historial de pagos.
 La baja automática es lógica y reversible. Una inscripción cobrada se conserva
 como partida `sale_item` de tipo `REGISTRATION_FEE`; no requiere convertir el
 cargo en un producto físico ni provoca movimientos de inventario.
+
+## Extensión V94 — Umbral canónico de inactividad
+
+`V94__unify_client_inactivity_period.sql` conserva `inactivity_months` como el
+único umbral temporal y elimina `registration_recharge_months`. La migración no
+reescribe V93 ni modifica su checksum. En una base donde V93 ya fue aplicada se
+conserva el valor existente de `inactivity_months`; desde V94 ese mismo valor
+gobierna tanto la baja automática como el nuevo cobro de inscripción al volver.

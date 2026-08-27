@@ -19,14 +19,17 @@ necesidades requiere compartir datos o derechos entre organizaciones.
 
 Incluye inscripción, baja automática reversible, autenticación sin plan y alta
 desde kiosco. Las cuatro necesidades comparten la identidad del socio y el
-momento de su primera venta, por lo que se implementan juntas en V93.
+momento de su primera venta, por lo que se implementan juntas en V93 y se
+refinan de forma compatible mediante V94.
 
-- Configuración por organización para activar el cargo, definir importe,
-  concepto y meses para volver a cobrarlo.
+- Configuración por organización para activar el cargo, definir importe y
+  concepto. `inactivityMonths` es el único umbral temporal para determinar
+  periodo de inactividad y reinscripción.
 - La cotización autoritativa aplica descuentos únicamente al plan y agrega la
   inscripción como partida financiera separada.
 - La inscripción se cobra en la primera membresía o cuando han transcurrido los
-  meses configurados desde el fin de la última vigencia.
+  meses de inactividad desde el fin de gracia de la última vigencia, aunque la
+  baja automática esté desactivada.
 - Un socio sin membresía puede autenticarse en el kiosco de su sucursal de alta.
 - El kiosco puede habilitar por sucursal el registro de un socio nuevo y llevarlo
   directamente a la contratación de su primer plan.
@@ -34,6 +37,21 @@ momento de su primera venta, por lo que se implementan juntas en V93.
   plazo configurado. No se borra físicamente: ventas, pagos, membresías y
   auditoría deben conservarse. Sólo una baja automática puede reactivarse desde
   el kiosco; una baja manual requiere intervención del personal.
+
+Refinamiento de aceptación del kiosco:
+
+- `allowed_actions_json` representa lo que el gimnasio desea ofrecer por
+  sucursal. Stripe readiness sólo representa disponibilidad técnica.
+- Una capacidad monetaria puede quedar configurada con Stripe pendiente; los
+  planes y cotizaciones son visibles, pero Checkout permanece bloqueado.
+- Los toggles administrativos usan autosave serializado, muestran estado y
+  revierten la UI cuando falla el backend.
+- Una sesión nueva o reiniciada vuelve a resolver la configuración vigente del
+  terminal. Por ello `clientRegistration=true` produce
+  `clientRegistrationAllowed=true` y muestra `Quiero registrarme` sin depender
+  de Stripe, planes o membresías.
+- Un socio sin plan siempre distingue entre operación disponible, Stripe
+  pendiente, contratación deshabilitada y catálogo vacío.
 
 ### Lote 2 — Variantes comerciales y códigos de barras
 
@@ -104,3 +122,5 @@ la sucursal seleccionada sin cambiar de tenant.
   a autenticarse; los límites por IP y sesión también aplican al alta.
 - La inscripción forma parte del total conciliado por Stripe y de la llave de
   idempotencia, evitando que reintentos alteren el importe de la operación.
+- V93 no se modifica. V94 elimina `registration_recharge_months` y conserva el
+  valor ya almacenado en `inactivity_months` como canónico.

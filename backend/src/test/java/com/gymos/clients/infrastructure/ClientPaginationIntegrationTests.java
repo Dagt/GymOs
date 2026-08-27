@@ -153,6 +153,59 @@ class ClientPaginationIntegrationTests {
 				.query(String.class).single()).isEqualTo("MEMBERSHIP_INACTIVITY");
 	}
 
+	@Test
+	void automaticInactivityUsesTheExactCanonicalThresholdAndHonorsItsOwnToggle() {
+		UUID exactThresholdClient = client(
+				organizationId, branchId, "Socio en umbral", now.minusMonths(6));
+		jdbc.sql("""
+				INSERT INTO client_lifecycle_configuration (
+				    organization_id, registration_fee_enabled,
+				    auto_inactivation_enabled, inactivity_months
+				) VALUES (:organizationId, true, false, 6)
+				""").param("organizationId", organizationId).update();
+
+		assertThat(lifecycle.automaticInactivityCandidates(LocalDate.of(2026, 8, 25), 100))
+				.extracting(ClientLifecycleRepository.ClientInactivityCandidate::clientId)
+				.doesNotContain(exactThresholdClient);
+
+		jdbc.sql("""
+				UPDATE client_lifecycle_configuration
+				SET auto_inactivation_enabled = true
+				WHERE organization_id = :organizationId
+				""").param("organizationId", organizationId).update();
+
+		assertThat(lifecycle.automaticInactivityCandidates(LocalDate.of(2026, 8, 25), 100))
+				.extracting(ClientLifecycleRepository.ClientInactivityCandidate::clientId)
+				.contains(exactThresholdClient);
+	}
+
+	@Test
+	void selfServiceReactivationAcceptsAutomaticInactivityButRejectsManualInactivity() {
+		UUID automaticallyInactive = client(
+				organizationId, branchId, "Baja automática", now.minusMonths(7));
+		UUID manuallyInactive = client(
+				organizationId, branchId, "Baja manual", now.minusMonths(7));
+		jdbc.sql("""
+				UPDATE client
+				SET status = 'INACTIVE', inactivation_reason = 'MEMBERSHIP_INACTIVITY', inactivated_at = now()
+				WHERE id = :id
+				""").param("id", automaticallyInactive).update();
+		jdbc.sql("""
+				UPDATE client
+				SET status = 'INACTIVE', inactivation_reason = 'MANUAL', inactivated_at = now()
+				WHERE id = :id
+				""").param("id", manuallyInactive).update();
+
+		assertThat(commands.reactivateClient(
+				organizationId, automaticallyInactive, branchId, now)).isTrue();
+		assertThat(commands.reactivateClient(
+				organizationId, manuallyInactive, branchId, now)).isFalse();
+		assertThat(jdbc.sql("SELECT status FROM client WHERE id = :id")
+				.param("id", automaticallyInactive).query(String.class).single()).isEqualTo("ACTIVE");
+		assertThat(jdbc.sql("SELECT status FROM client WHERE id = :id")
+				.param("id", manuallyInactive).query(String.class).single()).isEqualTo("INACTIVE");
+	}
+
 	private UUID client(UUID org, UUID branch, String name, OffsetDateTime timestamp) {
 		UUID id = UUID.randomUUID();
 		commands.createClient(new CreateClientRecord(org, branch, null, UUID.randomUUID(), id, name, "Prueba", null,

@@ -37,7 +37,8 @@ Principios:
 - Estados visibles para pagos pendientes, en revisión, aprobados o rechazados.
 
 Funciones esperadas:
-- Identificación del cliente.
+- Identificación del socio existente y registro de uno nuevo cuando la capacidad
+  por sucursal está configurada.
 - Resumen de membresía.
 - Pagos pendientes.
 - Renovación de membresía.
@@ -45,6 +46,14 @@ Funciones esperadas:
 - Cotización y redirección a Stripe Checkout/Setup cuando existe un cobro.
 - Consulta de estado y comprobante confirmado por proveedor.
 - Actualización de teléfono, correo y contacto de emergencia cuando esté permitido.
+
+Estados obligatorios para un socio sin membresía:
+- contratación configurada y Stripe listo: catálogo, cotización y Checkout;
+- contratación configurada y Stripe pendiente: catálogo y cotización visibles,
+  aviso explícito y CTA de pago deshabilitado;
+- contratación deshabilitada: instrucción de acudir a recepción sin prometer
+  que puede contratar;
+- catálogo vacío: aviso distinto a la indisponibilidad de Stripe.
 
 ## 8.2 Layout de recepción
 
@@ -398,6 +407,16 @@ Formularios:
   `RECEPTION` y existe `selfservice.session.launch`. Dueño, administrador,
   gerente y soporte no ven la acción, no acceden por URL directa y el backend
   rechaza la creación de sesión aunque exista una concesión heredada.
+- `/settings/organization` incluye la sección navegable y enlazable `Socios`.
+  Dentro de ella, `Socios e inscripción` contiene un solo campo `Periodo de
+  inactividad`; el bloque no se renderiza permanentemente fuera de las pestañas.
+- La configuración de kiosco usa autosave para sus toggles: muestra
+  `Guardando...`/`Guardado`, serializa cambios rápidos y, ante error, restaura el
+  último estado confirmado y muestra `AppNotice`. No existe botón global de
+  guardado para esos toggles.
+- Los toggles monetarios representan intención y permanecen configurables con
+  Stripe pendiente. Readiness se muestra sólo como estado secundario `Pendiente
+  de Stripe`; no apaga ni sobrescribe la preferencia guardada.
 - `/reception` no debe depender de permisos administrativos como lectura completa de organizacion. Si el usuario tiene `branchId`, debe mostrar dashboard operativo aunque no pueda consultar `/organizations/current`.
 - El estado sin sucursal para recepcion no debe mostrar onboarding, alta de gimnasio ni configuracion de tenant; solo selector de sucursal permitida o instruccion de pedir acceso al dueño/gerente.
 - Si un usuario de recepcion tiene exactamente una sucursal permitida pero la sesion guardada no trae `branchId`, el frontend debe seleccionarla automaticamente antes de pintar la consola.

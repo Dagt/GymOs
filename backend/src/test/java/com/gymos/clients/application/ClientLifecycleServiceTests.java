@@ -21,7 +21,7 @@ class ClientLifecycleServiceTests {
 
 	@Test
 	void firstMembershipIncludesConfiguredRegistrationFee() {
-		givenEnabledConfiguration();
+		givenEnabledConfiguration(true);
 		when(repository.latestMembershipEnd(organizationId, clientId)).thenReturn(Optional.empty());
 
 		var fee = service.registrationFee(organizationId, clientId, effectiveOn);
@@ -33,7 +33,7 @@ class ClientLifecycleServiceTests {
 
 	@Test
 	void registrationFeeReturnsAfterConfiguredMembershipGap() {
-		givenEnabledConfiguration();
+		givenEnabledConfiguration(true);
 		when(repository.latestMembershipEnd(organizationId, clientId))
 				.thenReturn(Optional.of(effectiveOn.minusMonths(6)));
 
@@ -42,18 +42,30 @@ class ClientLifecycleServiceTests {
 
 	@Test
 	void recentMembershipDoesNotPayRegistrationAgain() {
-		givenEnabledConfiguration();
+		givenEnabledConfiguration(true);
 		when(repository.latestMembershipEnd(organizationId, clientId))
 				.thenReturn(Optional.of(effectiveOn.minusMonths(5)));
 
 		assertThat(service.registrationFee(organizationId, clientId, effectiveOn).due()).isFalse();
 	}
 
-	private void givenEnabledConfiguration() {
+	@Test
+	void registrationFeeUsesInactivityPeriodEvenWhenAutomaticInactivationIsDisabled() {
+		givenEnabledConfiguration(false);
+		when(repository.latestMembershipEnd(organizationId, clientId))
+				.thenReturn(Optional.of(effectiveOn.minusMonths(6)));
+
+		var fee = service.registrationFee(organizationId, clientId, effectiveOn);
+
+		assertThat(fee.due()).isTrue();
+		assertThat(fee.inactivityMonths()).isEqualTo(6);
+	}
+
+	private void givenEnabledConfiguration(boolean autoInactivationEnabled) {
 		when(repository.configuration(organizationId)).thenReturn(Optional.of(
 				new ClientLifecycleConfiguration(
-						organizationId, true, 500_00, "Inscripción", "MXN", 6,
-						true, 6, null, 0
+						organizationId, true, 500_00, "Inscripción", "MXN",
+						autoInactivationEnabled, 6, null, 0
 				)
 		));
 	}

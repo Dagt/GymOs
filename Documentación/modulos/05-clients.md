@@ -23,7 +23,9 @@ Estado: `FUNCIONAL`
 - V57 crea de forma canónica los permisos `client.*` y garantiza que dueño,
   gerencia y recepción puedan consultar, registrar y actualizar socios también
   en instalaciones iniciadas desde una base vacía.
-- V93 agrega reglas por organización para inscripción y baja automática. La
+- V93 agrega reglas por organización para inscripción y baja automática; V94
+  retira el umbral duplicado y deja `inactivityMonths` como único periodo tanto
+  para reinscripción como para baja automática. La
   baja es `INACTIVE`, conserva el historial financiero/auditable y registra
   fecha y motivo; los expedientes dados de baja automáticamente pueden volver a
   activarse al identificarse o registrarse en el kiosco.
@@ -57,4 +59,5 @@ respuestas fuera de orden y vista móvil están en `e2e/pagination.spec.ts`.
 Contrato y límites: [paginación de listados](../../docs/operations/list-pagination.md).
 
 V93 se cubre con `ClientLifecycleServiceTests`,
-`ClientPaginationIntegrationTests` y la suite de migraciones PostgreSQL.
+`ClientPaginationIntegrationTests` y la suite de migraciones PostgreSQL. V94 se
+cubre desde base vacía y desde una base detenida después de V93.

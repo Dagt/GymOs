@@ -52,7 +52,7 @@ import { KioskBranchSettingsCard } from "./KioskBranchSettingsCard";
 import { NotificationEmailSettingsCard } from "./NotificationEmailSettingsCard";
 import { ClientLifecycleSettingsCard } from "./ClientLifecycleSettingsCard";
 
-type OperationalSection = "payments" | "kiosk" | "email" | "history";
+type OperationalSection = "clients" | "payments" | "kiosk" | "email" | "history";
 
 export default function OrganizationSettingsPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
@@ -180,6 +180,7 @@ export default function OrganizationSettingsPage() {
   const canManageEmailSettings = Boolean(session?.user.permissions.includes("notification.settings.manage") || session?.user.permissions.includes("platform.admin"));
   const canManageStripeAccount = Boolean(session?.user.permissions.includes("payment.provider.stripe.manage") || session?.user.permissions.includes("platform.admin"));
   const availableOperationalSections: OperationalSection[] = [
+    ...(canManageOrganization ? ["clients"] as OperationalSection[] : []),
     ...(paymentConfiguration ? ["payments", "history"] as OperationalSection[] : []),
     ...(canManageKioskSettings ? ["kiosk"] as OperationalSection[] : []),
     ...(canManageEmailSettings ? ["email"] as OperationalSection[] : []),
@@ -468,15 +469,18 @@ export default function OrganizationSettingsPage() {
         </section>
       ) : null}
 
-      {canManageOrganization ? <ClientLifecycleSettingsCard accessToken={session.accessToken} /> : null}
-
       <OperationalSettingsNavigation
         activeSection={activeOperationalSection}
+        showClients={canManageOrganization}
         showEmail={canManageEmailSettings}
         showKiosk={canManageKioskSettings}
         showPayments={Boolean(paymentConfiguration)}
         onSelect={selectOperationalSection}
       />
+
+      {activeOperationalSection === "clients" && canManageOrganization ? (
+        <ClientLifecycleSettingsCard accessToken={session.accessToken} />
+      ) : null}
 
       {activeOperationalSection === "payments" && paymentConfiguration ? (
         <PaymentConfigurationCard
@@ -534,18 +538,20 @@ export default function OrganizationSettingsPage() {
 
 function OperationalSettingsNavigation({
   activeSection,
+  showClients,
   showEmail,
   showKiosk,
   showPayments,
   onSelect,
 }: {
   activeSection: OperationalSection;
+  showClients: boolean;
   showEmail: boolean;
   showKiosk: boolean;
   showPayments: boolean;
   onSelect: (section: OperationalSection) => void;
 }) {
-  if (!showEmail && !showKiosk && !showPayments) return null;
+  if (!showClients && !showEmail && !showKiosk && !showPayments) return null;
   return (
     <nav aria-label="Configuración operativa" className="settings-section-nav">
       <div>
@@ -553,6 +559,7 @@ function OperationalSettingsNavigation({
         <span>Selecciona el bloque que deseas configurar.</span>
       </div>
       <div className="settings-section-tabs">
+        {showClients ? <SettingsSectionButton active={activeSection === "clients"} label="Socios" onClick={() => onSelect("clients")} /> : null}
         {showPayments ? <SettingsSectionButton active={activeSection === "payments"} label="Medios de cobro" onClick={() => onSelect("payments")} /> : null}
         {showKiosk ? <SettingsSectionButton active={activeSection === "kiosk"} label="Kiosco web" onClick={() => onSelect("kiosk")} /> : null}
         {showEmail ? <SettingsSectionButton active={activeSection === "email"} label="Correo electrónico" onClick={() => onSelect("email")} /> : null}
@@ -585,6 +592,7 @@ function SettingsSectionButton({
 
 function operationalSectionFromHash(hash: string): OperationalSection {
   return ({
+    "#client-lifecycle-settings": "clients",
     "#payment-settings": "payments",
     "#kiosk-settings": "kiosk",
     "#email-settings": "email",
@@ -594,6 +602,7 @@ function operationalSectionFromHash(hash: string): OperationalSection {
 
 function operationalSectionHash(section: OperationalSection) {
   return ({
+    clients: "#client-lifecycle-settings",
     payments: "#payment-settings",
     kiosk: "#kiosk-settings",
     email: "#email-settings",
