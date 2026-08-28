@@ -517,10 +517,15 @@ para rutinas; el socio no tiene vista remota en V1.
   “Inscripción: configuración general / no cobrar”. Un plan privado sigue
   disponible para Recepción.
 - `SPECIAL_PRICE` exige seleccionar planes; `ACCESS` permite alcance local o de
-  cobertura del plan sin copiar el beneficio a otra sede.
+  cobertura del plan sin copiar el beneficio a otra sede. La UI aclara primero
+  qué planes lo incluyen y después si será válido sólo en la sucursal actual o
+  en las sucursales cubiertas por cada plan.
 - Catálogo incorpora una sección propia “Paquetes de visitas” con un formulario
   breve: nombre, SKU, precio, visitas, vigencia, sedes, accesos, inscripción,
   kiosco y estado.
+- Cada alta vive dentro de su propia pestaña: artículos/cargos y variantes en
+  “Artículos”, planes en “Planes de membresía”, paquetes en “Paquetes de visitas”
+  y categorías en “Categorías”. No existe una barra global que mezcle acciones.
 - El expediente muestra como máximo un paquete abierto, su saldo/vigencia y el
   historial de consumos. Si existe uno pendiente o activo, oculta el CTA de
   compra y explica el motivo.
@@ -533,3 +538,7 @@ para rutinas; el socio no tiene vista remota en V1.
   catálogo.
 - El POS genérico identifica los paquetes configurados y dirige al flujo
   dedicado; no permite cobrar el servicio sin crear su entitlement.
+- Registro e identificación se consideran completos al recibir el resumen del
+  socio. Si falla después una consulta opcional del dashboard, éste conserva el
+  acceso y muestra un aviso breve; nunca presenta falsamente “datos incorrectos”
+  ni expone ruta HTTP, código interno o diagnóstico técnico.

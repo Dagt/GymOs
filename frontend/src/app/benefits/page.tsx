@@ -326,12 +326,24 @@ export default function BenefitsPage() {
               {plans.length === 0 ? <p className="text-sm text-amber-800">Crea primero un plan de membresía para poder vincular este acceso.</p> : null}
               {editing ? <p className="text-xs text-amber-800">Puedes vincular varios planes al mismo acceso. Quitar un plan retira este beneficio de los derechos de sus socios.</p> : null}
               {!editing ? <p className="text-xs text-[var(--brand-muted)]">Los socios con cualquiera de estos planes reciben el acceso automáticamente.</p> : null}
-              <label className="grid gap-2 text-sm font-bold text-[#42514a]">Dónde se reconoce
-                <select className="app-input" value={form.accessScope ?? "LOCAL"} onChange={(event) => setForm({ ...form, accessScope: event.target.value as BenefitPayload["accessScope"] })}>
-                  <option value="LOCAL">Sólo en esta sucursal</option>
-                  <option value="PLAN_COVERAGE">En las sucursales cubiertas por el plan</option>
-                </select>
-              </label>
+              <fieldset className="grid gap-2">
+                <legend className="text-sm font-bold text-[#42514a]">Dónde será válido este acceso</legend>
+                <p className="text-xs text-[var(--brand-muted)]">Siempre aplica únicamente a los planes seleccionados arriba.</p>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <label className={`cursor-pointer rounded-lg border p-3 text-sm ${form.accessScope !== "PLAN_COVERAGE" ? "border-[var(--brand-primary)] bg-[#f3f7f2]" : "border-[var(--brand-line)] bg-white"}`}>
+                    <span className="flex items-start gap-2">
+                      <input checked={form.accessScope !== "PLAN_COVERAGE"} className="mt-0.5 h-4 w-4 accent-[var(--brand-primary)]" name="benefitAccessScope" onChange={() => setForm({ ...form, accessScope: "LOCAL" })} type="radio" />
+                      <span><strong className="block text-[#111815]">Sólo en la sucursal actual</strong><span className="mt-1 block text-xs font-normal text-[var(--brand-muted)]">Aunque el plan sea multisucursal, este acceso se reconoce únicamente aquí.</span></span>
+                    </span>
+                  </label>
+                  <label className={`cursor-pointer rounded-lg border p-3 text-sm ${form.accessScope === "PLAN_COVERAGE" ? "border-[var(--brand-primary)] bg-[#f3f7f2]" : "border-[var(--brand-line)] bg-white"}`}>
+                    <span className="flex items-start gap-2">
+                      <input checked={form.accessScope === "PLAN_COVERAGE"} className="mt-0.5 h-4 w-4 accent-[var(--brand-primary)]" name="benefitAccessScope" onChange={() => setForm({ ...form, accessScope: "PLAN_COVERAGE" })} type="radio" />
+                      <span><strong className="block text-[#111815]">En las sucursales de cada plan</strong><span className="mt-1 block text-xs font-normal text-[var(--brand-muted)]">Sigue la cobertura de cada plan seleccionado sin crear copias del beneficio.</span></span>
+                    </span>
+                  </label>
+                </div>
+              </fieldset>
             </div>
           ) : (
             <div className="grid gap-4">

@@ -90,7 +90,7 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 		return query("""
 				entitlement.organization_id = :organizationId
 				AND entitlement.client_id = :clientId
-				AND sale.idempotency_key = :idempotencyKey
+				AND purchase_sale.idempotency_key = :idempotencyKey
 				""", organizationId, clientId, null, idempotencyKey.trim());
 	}
 
@@ -303,9 +303,15 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 				       entitlement.valid_from, entitlement.valid_until, entitlement.pending_expires_at,
 				       entitlement.created_at, entitlement.updated_at
 				FROM visit_package_entitlement entitlement
-				JOIN visit_package_plan plan ON plan.id = entitlement.visit_package_plan_id
-				JOIN catalog_product product ON product.id = plan.product_id
-				JOIN sale ON sale.id = entitlement.sale_id
+				JOIN visit_package_plan plan
+				  ON plan.id = entitlement.visit_package_plan_id
+				 AND plan.organization_id = entitlement.organization_id
+				JOIN catalog_product product
+				  ON product.id = plan.product_id
+				 AND product.organization_id = entitlement.organization_id
+				JOIN sale purchase_sale
+				  ON purchase_sale.id = entitlement.sale_id
+				 AND purchase_sale.organization_id = entitlement.organization_id
 				WHERE """ + predicate + " AND entitlement.deleted_at IS NULL ORDER BY entitlement.created_at DESC LIMIT 1")
 				.param("organizationId", organizationId);
 		if (clientId != null) statement = statement.param("clientId", clientId);
@@ -313,15 +319,26 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 		if (idempotencyKey != null) statement = statement.param("idempotencyKey", idempotencyKey);
 		return statement.query((rs, row) -> {
 			UUID entitlementId = rs.getObject("id", UUID.class);
+			UUID resolvedClientId = rs.getObject("client_id", UUID.class);
+			UUID packagePlanId = rs.getObject("visit_package_plan_id", UUID.class);
+			UUID resolvedSaleId = rs.getObject("sale_id", UUID.class);
+			String packageName = rs.getString("package_name");
+			String status = rs.getString("status");
+			int totalVisits = rs.getInt("total_visits");
+			int remainingVisits = rs.getInt("remaining_visits");
+			LocalDate validFrom = rs.getObject("valid_from", LocalDate.class);
+			LocalDate validUntil = rs.getObject("valid_until", LocalDate.class);
+			OffsetDateTime pendingExpiresAt = rs.getObject("pending_expires_at", OffsetDateTime.class);
+			OffsetDateTime createdAt = rs.getObject("created_at", OffsetDateTime.class);
+			OffsetDateTime updatedAt = rs.getObject("updated_at", OffsetDateTime.class);
+			// Read the complete row before issuing the two snapshot queries. Some JDBC drivers
+			// close the active ResultSet when another statement uses the same transaction connection.
+			List<UUID> resolvedBranchIds = branchIds(organizationId, entitlementId);
+			List<UUID> resolvedBenefitIds = benefitIds(organizationId, entitlementId);
 			return new VisitPackageEntitlementView(
-					entitlementId, rs.getObject("client_id", UUID.class),
-					rs.getObject("visit_package_plan_id", UUID.class), rs.getObject("sale_id", UUID.class),
-					rs.getString("package_name"), rs.getString("status"), rs.getInt("total_visits"),
-					rs.getInt("remaining_visits"), rs.getObject("valid_from", LocalDate.class),
-					rs.getObject("valid_until", LocalDate.class),
-					rs.getObject("pending_expires_at", OffsetDateTime.class),
-					branchIds(organizationId, entitlementId), benefitIds(organizationId, entitlementId),
-					rs.getObject("created_at", OffsetDateTime.class), rs.getObject("updated_at", OffsetDateTime.class));
+					entitlementId, resolvedClientId, packagePlanId, resolvedSaleId,
+					packageName, status, totalVisits, remainingVisits, validFrom, validUntil,
+					pendingExpiresAt, resolvedBranchIds, resolvedBenefitIds, createdAt, updatedAt);
 		}).optional();
 	}
 

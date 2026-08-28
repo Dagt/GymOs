@@ -39,6 +39,18 @@ test("el kiosco aplica capacidades, no ofrece pago manual y actualiza contacto",
         graceDays: 3,
       }]);
     }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/visit-package`) {
+      await route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({
+          code: "INTERNAL_ERROR",
+          message: "Ocurrió un error inesperado.",
+          correlationId: "existing-member-package-read-failure",
+        }),
+      });
+      return true;
+    }
     if (method === "PATCH" && path === `/self-service/sessions/${sessionId}/contact-data`) {
       contactPayload = route.request().postDataJSON() as Record<string, unknown>;
       return fulfill(route, {
@@ -59,6 +71,8 @@ test("el kiosco aplica capacidades, no ofrece pago manual y actualiza contacto",
   await expect(page.getByText(/Los pagos en línea todavía no están disponibles/i)).toBeVisible();
   await expect(page.getByText("Activa", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Membresía actual" })).toBeVisible();
+  await expect(page.locator(".kiosk-feedback.error")).toContainText("Tu expediente se verificó correctamente");
+  await expect(page.getByText(/INTERNAL_ERROR|HTTP en \/self-service|Código:/)).toHaveCount(0);
   await expect(page.getByText("Vigente hasta 31 jul 2026")).toBeVisible();
   await expect(page.getByText("Profesionales de bienestar")).toHaveCount(0);
   await expect(page.getByLabel("Referencia de pago")).toHaveCount(0);
@@ -237,6 +251,18 @@ test("un socio nuevo se registra en el kiosco y continúa a su primer plan", asy
         graceDays: 3,
       }]);
     }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/visit-package`) {
+      await route.fulfill({
+        status: 500,
+        contentType: "application/json",
+        body: JSON.stringify({
+          code: "INTERNAL_ERROR",
+          message: "Ocurrió un error inesperado.",
+          correlationId: "55440a2c-8a1f-422e-9d5b-886fd1212e97",
+        }),
+      });
+      return true;
+    }
     return false;
   });
 
@@ -251,6 +277,8 @@ test("un socio nuevo se registra en el kiosco y continúa a su primer plan", asy
 
   await expect(page.getByText("Tu registro quedó listo. Ahora puedes elegir tu primera membresía.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Contrata una membresía" })).toBeVisible();
+  await expect(page.locator(".kiosk-feedback.error")).toContainText("Tu expediente se verificó correctamente");
+  await expect(page.getByText(/INTERNAL_ERROR|HTTP en \/self-service|Código:/)).toHaveCount(0);
   await expect(page.getByText("Tu registro quedó listo. Ahora puedes elegir tu primera membresía.")).toBeHidden({ timeout: 6_000 });
   expect(registrationPayload).toEqual({
     firstName: "Lucía",
@@ -893,7 +921,7 @@ async function mockKiosk(
       return;
     }
     if (route.request().method() === "GET" && path === `/self-service/sessions/${sessionId}/visit-package`) {
-      await fulfill(route, null);
+      await route.fulfill({ status: 204, body: "" });
       return;
     }
     await route.fulfill({

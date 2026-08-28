@@ -1551,3 +1551,7 @@ habilitado para autoservicio. La exclusividad rechaza un segundo paquete
 `PENDING_PAYMENT|ACTIVE` antes de crear datos parciales y también se protege con
 una restricción única en PostgreSQL. El contrato integral y sus errores están
 fijados en el documento 33.
+
+`GET .../visit-package` responde `200` con el paquete abierto o `204 No Content`
+cuando el socio no tiene uno. La ausencia de paquete es un estado normal y no
+debe invalidar el registro, la identificación ni la carga del dashboard.

@@ -247,7 +247,7 @@ export default function KioskPage() {
               : "Tu registro quedó listo. Solicita apoyo en recepción para contratar."
         : "Tu expediente fue reactivado correctamente.");
     } catch (exception) {
-      setError(exception instanceof Error ? exception.message : "No fue posible completar el registro.");
+      setError(friendlyRegistrationError(exception));
     } finally {
       setRegistrationBusy(false);
     }
@@ -255,7 +255,9 @@ export default function KioskPage() {
 
   async function openMemberDashboard(nextSummary: KioskSummaryResponse) {
     if (!session) return;
-    const [options, packageOptions, openPackage, bookingResources, professionals] = await Promise.all([
+    // La identidad ya fue verificada. Una consulta secundaria del dashboard no debe
+    // convertir ese éxito en un mensaje falso de registro o datos incorrectos.
+    const [membershipResult, packageOptionsResult, openPackageResult, resourcesResult, professionalsResult] = await Promise.allSettled([
       nextSummary.capabilities.membershipPlanChangeAllowed
         || nextSummary.capabilities.membershipEnrollmentAllowed
         ? getKioskMembershipOptions(session.sessionId, session.sessionToken)
@@ -271,6 +273,15 @@ export default function KioskPage() {
         ? getKioskWellnessProfessionals(session.sessionId, session.sessionToken)
         : Promise.resolve([]),
     ]);
+    const options = settledValue(membershipResult, []);
+    // If the balance cannot be read, do not offer another package: the backend
+    // still enforces exclusivity, and the UI must not suggest a potentially invalid purchase.
+    const packageOptions = openPackageResult.status === "rejected"
+      ? []
+      : settledValue(packageOptionsResult, []);
+    const openPackage = settledValue(openPackageResult, undefined);
+    const bookingResources = settledValue(resourcesResult, []);
+    const professionals = settledValue(professionalsResult, []);
     setSummary(nextSummary);
     setActivePanel("memberships");
     setMembershipReview(null);
@@ -289,6 +300,11 @@ export default function KioskPage() {
     setResourceId(bookingResources[0]?.id ?? "");
     setWellnessProfessionals(professionals);
     setWellnessProfessionalId(professionals[0]?.id ?? "");
+    const firstFailure = [membershipResult, packageOptionsResult, openPackageResult, resourcesResult, professionalsResult]
+      .find((result): result is PromiseRejectedResult => result.status === "rejected");
+    if (firstFailure) {
+      setError(`Tu expediente se verificó correctamente, pero no pudimos cargar todas las opciones del kiosco. Intenta recargar o solicita apoyo en recepción.${supportReference(firstFailure.reason)}`);
+    }
   }
 
   useEffect(() => {
@@ -861,7 +877,7 @@ export default function KioskPage() {
               </form>
             ) : (
               <form className="grid gap-4" onSubmit={register}>
-                <div className="kiosk-step"><span>1</span><div><h2>Crea tu expediente</h2><p>Después podrás revisar y contratar tu primera membresía.</p></div></div>
+                <div className="kiosk-step"><span>1</span><div><h2>Crea tu expediente</h2><p>Después podrás revisar las opciones disponibles en este gimnasio.</p></div></div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <label className="kiosk-field">Nombre<input autoComplete="given-name" className="kiosk-input compact" maxLength={120} onChange={(event) => setRegistration({ ...registration, firstName: event.target.value })} required value={registration.firstName} /></label>
                   <label className="kiosk-field">Apellido paterno<input autoComplete="family-name" className="kiosk-input compact" maxLength={120} onChange={(event) => setRegistration({ ...registration, lastName: event.target.value })} required value={registration.lastName} /></label>
@@ -1425,7 +1441,29 @@ function friendlyVerificationError(exception: unknown) {
     .some((code) => rawMessage.includes(code))) {
     return "La sesión segura terminó. Solicita en recepción que vuelvan a abrir el kiosco.";
   }
+  if (rawMessage.includes("INTERNAL_ERROR") || /\(5\d{2}\s/.test(rawMessage)) {
+    return `No pudimos consultar tu expediente en este momento. Intenta nuevamente o solicita apoyo en recepción.${supportReference(exception)}`;
+  }
   return "No pudimos verificar tus datos. Revísalos o elige “Quiero registrarme” si aún no tienes expediente.";
+}
+
+function friendlyRegistrationError(exception: unknown) {
+  const rawMessage = exception instanceof Error ? exception.message : "";
+  if (rawMessage.includes("SELF_SERVICE_CLIENT_ALREADY_EXISTS")) {
+    return "Ya existe un socio con esos datos. Elige “Ya soy socio” para entrar.";
+  }
+  if (rawMessage.includes("SELF_SERVICE_REACTIVATION_REQUIRES_RECEPTION")) {
+    return "Tu expediente requiere apoyo de recepción para reactivarse.";
+  }
+  if (["SELF_SERVICE_SESSION_EXPIRED", "SELF_SERVICE_SESSION_INVALID", "SELF_SERVICE_SESSION_ENDED"]
+    .some((code) => rawMessage.includes(code))) {
+    return "La sesión segura terminó. Solicita en recepción que vuelvan a abrir el kiosco.";
+  }
+  return `No pudimos completar el registro. Intenta nuevamente o solicita apoyo en recepción.${supportReference(exception)}`;
+}
+
+function settledValue<T>(result: PromiseSettledResult<T>, fallback: T): T {
+  return result.status === "fulfilled" ? result.value : fallback;
 }
 
 

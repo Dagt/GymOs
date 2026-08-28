@@ -56,6 +56,7 @@ paquetes de visitas compartidos dentro de un tenant.
 | 27 ago 2026 | PR #20 integra variantes/códigos en `main` (`2162b7d`) |
 | 27 ago 2026 | Se crea `feature/multibranch-plans-benefits-visits`; se aprueba documento 33 y se inicia la secuencia V96–V99 |
 | 28 ago 2026 | V99 fija vigencia por compra; venta, pago, activación, exclusividad, consumo, Catálogo, expediente y kiosco de paquetes quedan integrados |
+| 28 ago 2026 | La aceptación manual desacopla identidad de consultas opcionales, formaliza `204` sin paquete, corrige la lectura JDBC y ubica cada alta dentro de su pestaña de Catálogo |
 
 ## 3. Alcance material de la rama activa
 

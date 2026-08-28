@@ -4,30 +4,26 @@ import { NumberField, SelectField, TextAreaField, TextField } from "@/components
 import type { MembershipPlanPayload, PlanSummary } from "@/lib/api";
 import { formatMoney, type PlanDraft } from "./CatalogHelpers";
 
-type CatalogToolbarProps = {
+type ProductActionsProps = {
   canCreate: boolean;
-  onNewPlan: () => void;
   onNewProduct: () => void;
   onNewVariants: () => void;
 };
 
-export function CatalogToolbar({ canCreate, onNewPlan, onNewProduct, onNewVariants }: CatalogToolbarProps) {
+export function ProductActions({ canCreate, onNewProduct, onNewVariants }: ProductActionsProps) {
   return (
-    <section className="app-card flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
+    <section className="app-card flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
       <div>
-        <p className="app-eyebrow">Sucursal activa</p>
-        <h2 className="app-card-title">Artículos, planes y paquetes</h2>
+        <h2 className="app-card-title">Artículos y cargos</h2>
+        <p className="mt-1 text-sm text-[var(--brand-muted)]">Crea aquí productos simples o varias presentaciones del mismo producto.</p>
       </div>
       {canCreate ? (
-        <div className="grid w-full gap-2 sm:grid-cols-3 lg:w-auto">
-          <button className="app-button-secondary h-11 min-w-48" onClick={onNewProduct} type="button">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button className="app-button h-10" onClick={onNewProduct} type="button">
             Nuevo artículo o cargo
           </button>
-          <button className="app-button-secondary h-11 min-w-48" onClick={onNewVariants} type="button">
+          <button className="app-button-secondary h-10" onClick={onNewVariants} type="button">
             Producto con variantes
-          </button>
-          <button className="app-button h-11 min-w-48" onClick={onNewPlan} type="button">
-            Nuevo plan
           </button>
         </div>
       ) : null}
@@ -36,17 +32,25 @@ export function CatalogToolbar({ canCreate, onNewPlan, onNewProduct, onNewVarian
 }
 
 type PlanListProps = {
+  canCreate: boolean;
   canUpdate: boolean;
   plans: PlanSummary[];
+  onCreatePlan: () => void;
   onEditPlan: (plan: PlanSummary) => void;
 };
 
-export function PlanList({ canUpdate, plans, onEditPlan }: PlanListProps) {
+export function PlanList({ canCreate, canUpdate, plans, onCreatePlan, onEditPlan }: PlanListProps) {
   return (
     <section className="app-card p-4">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="app-card-title">Planes de membresía</h2>
-        <span className="text-sm text-[#6f7a73]">{plans.length}</span>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h2 className="app-card-title">Planes de membresía</h2>
+          <p className="mt-1 text-sm text-[var(--brand-muted)]">Configura vigencia, precio, inscripción y disponibilidad en kiosco.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-[#6f7a73]">{plans.length}</span>
+          {canCreate ? <button className="app-button h-10" onClick={onCreatePlan} type="button">Nuevo plan</button> : null}
+        </div>
       </div>
       {plans.length === 0 ? (
         <p className="mt-4 rounded-lg border border-dashed border-[var(--brand-line)] p-6 text-center text-sm text-[var(--brand-muted)]">

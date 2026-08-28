@@ -72,6 +72,27 @@ const summary = {
 };
 
 test.describe("catalogo e inventario", () => {
+  test("cada alta aparece únicamente dentro de su pestaña comercial", async ({ page }) => {
+    await bootCatalog(page, owner());
+    await page.goto("/catalog");
+
+    await expect(page.getByRole("button", { name: /Nuevo art.culo o cargo/i })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Producto con variantes" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Nuevo plan" })).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Planes de membresía" }).click();
+    await expect(page.getByRole("button", { name: "Nuevo plan" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Nuevo art.culo o cargo/i })).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Paquetes de visitas" }).click();
+    await expect(page.getByRole("button", { name: "Nuevo paquete" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Nuevo plan" })).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Categorías" }).click();
+    await expect(page.getByRole("heading", { name: "Nueva categoría" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Nuevo paquete" })).toHaveCount(0);
+  });
+
   test("filtros persisten en URL y la edicion envia version optimista", async ({ page }) => {
     let updatePayload: Record<string, unknown> | null = null;
     await bootCatalog(page, owner(), async (route, path) => {

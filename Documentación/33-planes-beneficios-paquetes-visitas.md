@@ -382,6 +382,11 @@ visibles, pero el POST de compra rechaza la operación antes de crear venta o
 entitlement. Cuando Stripe cambia a ready, el mismo valor configurado habilita
 Checkout sin volver a guardar ajustes.
 
+La consulta del paquete vigente devuelve `204 No Content` cuando no existe un
+saldo abierto. Ese resultado es normal. Registro e identificación no dependen de
+que el socio tenga paquete y una falla de carga secundaria no revierte ni oculta
+una identidad ya verificada.
+
 Los endpoints de consumo pertenecen al módulo `access`; no se exponen como un
 botón normal para descontar saldos manualmente.
 
@@ -399,7 +404,9 @@ botón normal para descontar saldos manualmente.
 ### Beneficio
 
 - `SPECIAL_PRICE` muestra “Aplica a” y exige al menos un plan;
-- `ACCESS` muestra “Sólo esta sucursal / Sucursales cubiertas por el plan”;
+- `ACCESS` separa dos decisiones: qué planes lo incluyen y dónde es válido;
+- “Sucursal actual” mantiene el acceso local aunque el plan sea multisucursal;
+- “Sucursales de cada plan” sigue su cobertura sin duplicar beneficios;
 - no se obliga a crear un beneficio para vender un plan privado.
 
 ### Paquete de visitas
@@ -408,6 +415,10 @@ Los paquetes no viven en Configuración del sistema. Se administran en
 `Catálogo`, inmediatamente junto a `Planes de membresía`, porque ambos son
 ofertas comerciales vendibles. Configuración sólo conserva la capacidad por
 sucursal que permite o impide ofrecer paquetes en ese kiosco.
+
+Las acciones de alta son locales a cada pestaña del Catálogo: artículo/cargo y
+variantes en `Artículos`, nuevo plan en `Planes de membresía`, nuevo paquete en
+`Paquetes de visitas` y categorías dentro de `Categorías`.
 
 El alta solicita únicamente:
 

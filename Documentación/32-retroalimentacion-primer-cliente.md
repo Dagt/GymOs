@@ -135,6 +135,12 @@ El diseño completo, las políticas de venta, los snapshots, la exclusividad y e
 ledger idempotente están definidos en
 [`33-planes-beneficios-paquetes-visitas.md`](33-planes-beneficios-paquetes-visitas.md).
 
+La validación manual posterior detectó que consultar un paquete inexistente
+podía terminar como error 500 después de crear o identificar correctamente al
+socio. El contrato corregido devuelve `204`, desacopla las consultas opcionales
+del dashboard y nunca muestra rutas, códigos internos ni diagnóstico HTTP al
+usuario del kiosco.
+
 ### Lote 4 — Beneficios multi-sucursal
 
 Los beneficios son locales cuando `benefit.branch_id` tiene valor. La evaluación
@@ -147,7 +153,9 @@ El comportamiento deseado es que un beneficio ligado a un plan
 válido, aunque el beneficio se haya creado desde una sucursal concreta. No debe
 copiarse una fila por sede. La definición debe distinguir entre un beneficio
 del plan con alcance multi-sucursal y un beneficio deliberadamente local; la UI
-debe mostrar y validar ese alcance de forma explícita.
+debe mostrar y validar ese alcance de forma explícita. La interfaz lo presenta
+como dos decisiones consecutivas: planes que incluyen el acceso y sucursales en
+las que será válido.
 
 Código afectado: `BenefitRepository`, `EligibilityRepository`, contratos y UI de
 beneficios, además de las proyecciones de acceso.

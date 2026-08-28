@@ -133,11 +133,14 @@ public class SelfServiceController {
 	}
 
 	@GetMapping("/sessions/{sessionId}/visit-package")
-	VisitPackageEntitlementView currentVisitPackage(
+	ResponseEntity<VisitPackageEntitlementView> currentVisitPackage(
 			@PathVariable UUID sessionId,
 			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken
 	) {
-		return selfServiceService.currentVisitPackage(sessionId, sessionToken);
+		VisitPackageEntitlementView entitlement = selfServiceService.currentVisitPackage(sessionId, sessionToken);
+		return entitlement == null
+				? ResponseEntity.noContent().build()
+				: ResponseEntity.ok(entitlement);
 	}
 
 	@PostMapping("/sessions/{sessionId}/visit-package-purchases")

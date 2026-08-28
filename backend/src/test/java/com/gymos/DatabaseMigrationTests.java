@@ -364,6 +364,10 @@ class DatabaseMigrationTests {
 			}
 			var repository = new VisitPackageEntitlementRepository(
 					JdbcClient.create(new SingleConnectionDataSource(connection, true)));
+			assertThat(repository.open(organizationId, UUID.randomUUID())).isEmpty();
+			var currentEntitlement = repository.open(organizationId, clientId).orElseThrow();
+			assertThat(currentEntitlement.id()).isEqualTo(activeEntitlementId);
+			assertThat(currentEntitlement.remainingVisits()).isEqualTo(10);
 			OffsetDateTime occurredAt = OffsetDateTime.now();
 			var firstConsumption = repository.consumeForAccess(
 					organizationId, branchId, clientId, List.of(), deviceId, "door-event-1",

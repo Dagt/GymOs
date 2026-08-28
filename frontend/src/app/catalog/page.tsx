@@ -5,7 +5,7 @@ import { DEFAULT_PAGE_SIZE } from "@/lib/pagination";
 import { Suspense, useState } from "react";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
-import { CatalogToolbar, PlanDrawer, PlanList } from "./CatalogSections";
+import { PlanDrawer, PlanList, ProductActions } from "./CatalogSections";
 import { useCatalogController } from "./useCatalogController";
 import { CatalogFilters } from "@/features/catalog/components/CatalogFilters";
 import { CatalogProductDrawer } from "@/features/catalog/components/CatalogProductDrawer";
@@ -48,10 +48,10 @@ function CatalogContent() {
       {controller.error ? <InlineError message={controller.error} /> : null}
       {controller.message ? <p className="rounded-md border border-[var(--brand-line)] bg-[var(--brand-surface)] px-3 py-2 text-sm text-[#31563c]">{controller.message}</p> : null}
       <section className="grid gap-4">
-        <CatalogToolbar canCreate={controller.canCreate} onNewPlan={openPlanCreation} onNewProduct={openProductCreation} onNewVariants={openVariantCreation} />
         <CatalogNavigation canManageCategories={controller.canManageCategories} view={view} onChange={setView} />
         {view === "products" ? (
           <section className="grid gap-3">
+            <ProductActions canCreate={controller.canCreate} onNewProduct={openProductCreation} onNewVariants={openVariantCreation} />
             <div className="grid gap-3 xl:grid-cols-[260px_minmax(0,1fr)] xl:items-stretch">
               <CatalogSummaryCards summary={controller.summary} />
               <CatalogFilters categories={controller.categories} filters={controller.catalogFilters.filters}
@@ -72,7 +72,7 @@ function CatalogContent() {
               onRestore={controller.restoreCatalogProduct} onToggleStatus={controller.toggleProductStatus} />
           </section>
         ) : null}
-        {view === "plans" ? <PlanList canUpdate={controller.canUpdate} plans={controller.plans} onEditPlan={controller.openPlanEdition} /> : null}
+        {view === "plans" ? <PlanList canCreate={controller.canCreate} canUpdate={controller.canUpdate} plans={controller.plans} onCreatePlan={openPlanCreation} onEditPlan={controller.openPlanEdition} /> : null}
         {view === "visit-packages" ? <VisitPackagePlansSection accessToken={controller.session.accessToken} canCreate={controller.canCreate} canUpdate={controller.canUpdate} /> : null}
         {view === "categories" && controller.canManageCategories ? <CatalogCategoryManager accessToken={controller.session.accessToken} categories={controller.categories} onChanged={controller.reloadCatalog} /> : null}
       </section>
