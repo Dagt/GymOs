@@ -11,12 +11,15 @@ import static org.mockito.Mockito.when;
 
 import com.gymos.audit.api.AuditService;
 import com.gymos.catalog.application.command.ProductCommand;
+import com.gymos.catalog.application.command.CreateProductVariantsCommand;
 import com.gymos.catalog.application.port.CatalogCategoryQueryPort;
 import com.gymos.catalog.application.port.CatalogDependencyQueryPort;
 import com.gymos.catalog.application.port.CatalogProductCommandPort;
 import com.gymos.catalog.application.port.CatalogProductCommandPort.ProductMutation;
+import com.gymos.catalog.application.port.CatalogProductFamilyPort;
 import com.gymos.catalog.application.port.CatalogProductQueryPort;
 import com.gymos.catalog.application.query.ProductSummaryView;
+import com.gymos.catalog.application.query.ProductFamilySummaryView;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import java.time.OffsetDateTime;
@@ -32,6 +35,7 @@ class CatalogProductServiceTests {
 	private CatalogProductQueryPort products;
 	private CatalogProductCommandPort commands;
 	private CatalogDependencyQueryPort dependencies;
+	private CatalogProductFamilyPort families;
 	private CatalogProductService service;
 	private GymOsPrincipal principal;
 
@@ -40,8 +44,9 @@ class CatalogProductServiceTests {
 		products = mock(CatalogProductQueryPort.class);
 		commands = mock(CatalogProductCommandPort.class);
 		dependencies = mock(CatalogDependencyQueryPort.class);
+		families = mock(CatalogProductFamilyPort.class);
 		service = new CatalogProductService(products, commands, dependencies,
-				mock(CatalogCategoryQueryPort.class), mock(AuditService.class));
+				mock(CatalogCategoryQueryPort.class), families, mock(AuditService.class));
 		principal = new GymOsPrincipal(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
 				"owner", "Owner", Set.of("catalog.manage"));
 	}
@@ -149,6 +154,104 @@ class CatalogProductServiceTests {
 		verify(commands, never()).create(any());
 	}
 
+	@Test
+	void createProductPersistsEveryBarcodeAliasAndKeepsFirstAsLegacyPrimary() {
+		when(families.findByIdentity(eq(principal.organizationId()), any(), any())).thenReturn(Optional.empty());
+		when(products.findProduct(eq(principal.organizationId()), eq(principal.branchId()), any()))
+				.thenAnswer(invocation -> Optional.of(createdProduct(invocation.getArgument(2))));
+		ProductCommand request = new ProductCommand(
+				"PSY-RED", "Psychotic", null, "PHYSICAL", "GENERAL_PRODUCT", 65_000,
+				"MXN", true, "ACTIVE", null, "Insane Labz", "Bote", "PIECE", true, 0,
+				null, null, null, null, null, null, List.of(), null, null, "Frutos rojos",
+				List.of("750100000001", "750100000009")
+		);
+
+		service.createProduct(principal, request, "test");
+
+		ArgumentCaptor<ProductMutation> mutation = ArgumentCaptor.forClass(ProductMutation.class);
+		verify(commands).create(mutation.capture());
+		assertThat(mutation.getValue().barcode()).isEqualTo("750100000001");
+		verify(commands).replaceBarcodes(eq(principal.organizationId()), eq(mutation.getValue().productId()),
+				eq(List.of("750100000001", "750100000009")), eq(true), eq(principal.userId()), any());
+	}
+
+	@Test
+	void batchAppliesCommonValuesAndKeepsVariantOverridesInsideOneExistingFamily() {
+		UUID familyId = UUID.randomUUID();
+		when(families.find(principal.organizationId(), familyId)).thenReturn(Optional.of(
+				new ProductFamilySummaryView(familyId, "Psychotic", "Insane Labz", null, 0, 0)));
+		when(products.findProduct(eq(principal.organizationId()), eq(principal.branchId()), any()))
+				.thenAnswer(invocation -> Optional.of(createdProduct(invocation.getArgument(2))));
+		CreateProductVariantsCommand request = new CreateProductVariantsCommand(
+				familyId, null, null, null, "Bote de 35 scoops", 65_000, 40_000L,
+				"MXN", true, "ACTIVE", "PIECE", true, 5, 0,
+				null, null, List.of("preentreno"), List.of(
+				new CreateProductVariantsCommand.Variant("Manzana", "PSY-MAN", "750100000001",
+						List.of(), null, null, null, null, null, null),
+				new CreateProductVariantsCommand.Variant("Frutos rojos", "PSY-FRU", "750100000002",
+						List.of("750100000009"), null, null, null, null, null, null),
+				new CreateProductVariantsCommand.Variant("Chicle", "PSY-CHI", "750100000003",
+						List.of(), "Bote de 40 scoops", 67_000L, 41_000L, null, null, null)
+		));
+
+		var result = service.createVariants(principal, request, "test");
+
+		assertThat(result.id()).isEqualTo(familyId);
+		assertThat(result.variants()).hasSize(3);
+		ArgumentCaptor<ProductMutation> mutations = ArgumentCaptor.forClass(ProductMutation.class);
+		verify(commands, org.mockito.Mockito.times(3)).create(mutations.capture());
+		assertThat(mutations.getAllValues()).extracting(ProductMutation::familyId).containsOnly(familyId);
+		assertThat(mutations.getAllValues()).extracting(ProductMutation::variantName)
+				.containsExactly("Manzana", "Frutos rojos", "Chicle");
+		assertThat(mutations.getAllValues()).extracting(ProductMutation::presentation)
+				.containsExactly("Bote de 35 scoops", "Bote de 35 scoops", "Bote de 40 scoops");
+		assertThat(mutations.getAllValues()).extracting(ProductMutation::priceCents)
+				.containsExactly(65_000L, 65_000L, 67_000L);
+		assertThat(mutations.getAllValues()).extracting(ProductMutation::referenceCostCents)
+				.containsExactly(40_000L, 40_000L, 41_000L);
+		verify(commands).replaceBarcodes(eq(principal.organizationId()), any(),
+				eq(List.of("750100000002", "750100000009")), eq(true), eq(principal.userId()), any());
+	}
+
+	@Test
+	void duplicatedSkuInsideBatchIsRejectedBeforeAnyWrite() {
+		CreateProductVariantsCommand request = batchWithVariants(List.of(
+				variant("Manzana", "PSY-MAN", "750100000001"),
+				variant("Chicle", "PSY-MAN", "750100000002")
+		));
+
+		assertThatThrownBy(() -> service.createVariants(principal, request, "test"))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.code()).isEqualTo("PRODUCT_VARIANT_SKU_DUPLICATED"));
+		verify(commands, never()).create(any());
+		verify(families, never()).create(any());
+	}
+
+	@Test
+	void duplicatedBarcodeInsideBatchIsRejectedBeforeAnyWrite() {
+		CreateProductVariantsCommand request = batchWithVariants(List.of(
+				variant("Manzana", "PSY-MAN", "750100000001"),
+				variant("Chicle", "PSY-CHI", "750100000001")
+		));
+
+		assertThatThrownBy(() -> service.createVariants(principal, request, "test"))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.code()).isEqualTo("PRODUCT_VARIANT_BARCODE_DUPLICATED"));
+		verify(commands, never()).create(any());
+		verify(families, never()).create(any());
+	}
+
+	private CreateProductVariantsCommand batchWithVariants(List<CreateProductVariantsCommand.Variant> variants) {
+		return new CreateProductVariantsCommand(
+				null, "Psychotic", "Insane Labz", null, "Bote", 55_000, 32_000L,
+				"MXN", true, "ACTIVE", "PIECE", true, null, 0, null, null, List.of(), variants);
+	}
+
+	private CreateProductVariantsCommand.Variant variant(String name, String sku, String barcode) {
+		return new CreateProductVariantsCommand.Variant(
+				name, sku, barcode, List.of(), null, null, null, null, null, null);
+	}
+
 	private ProductCommand command(long version) {
 		return command(version, "PIECE");
 	}
@@ -178,6 +281,16 @@ class CatalogProductServiceTests {
 				id, "SKU-1", "Producto", null, "PHYSICAL", "GENERAL_PRODUCT", 1_000, "MXN", true,
 				"ACTIVE", "750123", null, null, null, true, 0, null,
 				"Proveedor original", 700L, 900L, null, null, null, null, List.of(), false, null, now, now, 0
+		);
+	}
+
+	private ProductSummaryView createdProduct(UUID id) {
+		OffsetDateTime now = OffsetDateTime.now();
+		return new ProductSummaryView(
+				id, "SKU", "Psychotic", null, "PHYSICAL", "GENERAL_PRODUCT", 65_000, "MXN", true,
+				"ACTIVE", null, "Insane Labz", "Bote", "PIECE", true, 0, null,
+				null, null, null, null, null, null, null, List.of(), false, null, now, now, 0,
+				null, "Psychotic", "Variante", List.of()
 		);
 	}
 }

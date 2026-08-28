@@ -2,23 +2,23 @@
 
 Estado: AUDITADO
 
-Corte: 26 de agosto de 2026
+Corte: 27 de agosto de 2026
 
-Rama de trabajo: `feature/client-onboarding-lifecycle`
+Rama de trabajo: `feature/catalog-product-variants-barcodes`
 
-Integración actual: PR #19 desde `feature/client-onboarding-lifecycle` hacia
-`main`
+Base actual: `main` después de integrar PR #19. El lote 2 permanece en su rama
+y no está fusionado.
 
 ## 1. Situación vigente
 
-El PR #19 incorpora sobre `main` el primer lote de retroalimentación del cliente
-real. V93 implementa inscripción, baja automática reversible, autenticación de
-socios sin plan y alta desde kiosco. V94 unifica el periodo de inactividad y
-separa intención de kiosco de readiness de Stripe.
+El PR #19 ya incorporó el primer lote. La rama activa implementa el lote 2 con
+V95: familias comerciales, variantes vendibles, múltiples códigos por variante
+y alta masiva simple, preservando los IDs usados por ventas e inventario.
 
 | Rama | Estado | Acción |
 |---|---|---|
-| `main` | Recibe el lote mediante PR #19 | Continuar desde el cierre validado |
+| `main` | Contiene el lote 1 mediante PR #19 | Base del lote 2; no fusionar sin revisión |
+| `feature/catalog-product-variants-barcodes` | Activa | Validar y publicar sin merge automático |
 | `feature/client-onboarding-lifecycle` | Integrada mediante PR #19 | Histórica; no fusionar otra vez |
 | `feature/platform-identity-separation` | Integrada antes del corte actual | Histórica; no fusionar otra vez |
 | `feature/platform-client-billing-management` | Integrada mediante PR #15 | Histórica; no fusionar otra vez |
@@ -46,11 +46,24 @@ separa intención de kiosco de readiness de Stripe.
 | 26 ago 2026 | El cierre visual compacta socios, extiende autosave a cobros/socios, condiciona `Stripe pendiente` al toggle encendido y rediseña la entrada del kiosco |
 | 26 ago 2026 | La pestaña pasa a `Inscripciones`, todos sus valores adoptan autosave sin botón y el selector público se compacta y separa del formulario |
 | 26 ago 2026 | PR #19 integra el lote; el cierre centra el selector del kiosco y presenta fallos de identidad breves sin exponer diagnóstico HTTP |
+| 27 ago 2026 | Se crea `feature/catalog-product-variants-barcodes`; V95 conserva productos históricos, agrega familias/códigos alias y alta masiva de variantes |
+| 27 ago 2026 | El alta masiva se refina sin migración: datos comunes una vez, filas sabor/código/SKU, SKU sugerido editable, overrides y aliases bajo demanda |
+| 27 ago 2026 | La UX oculta la familia técnica: producto base automático, ampliación desde catálogo y alta individual con un código principal más aliases avanzados |
+| 27 ago 2026 | La captura de variantes se compacta en una tabla y admite sabor, tamaño/porciones o ambos sin exponer un control fiscal aislado |
+| 27 ago 2026 | El flujo elimina textos explicativos y campos promocionales permanentes del alta masiva |
+| 27 ago 2026 | El drawer se rediseña como lista de una fila inicial más editor enfocado; inventario y datos secundarios dejan de ocupar bloques permanentes |
 
 ## 3. Alcance material de la rama activa
 
 ### Implementado
 
+- familia comercial por organización y variante vendible con ID estable;
+- hasta 20 códigos por variante, código principal compatible y alias exactos en
+  catálogo, POS e inventario;
+- alta masiva transaccional con datos comunes capturados una vez, tabla compacta
+  variante/código/SKU, sabor y/o tamaño, overrides por excepción y reutilización
+  de familias existentes;
+- V95 validada desde una base vacía y sobre V94 con conservación de IDs;
 - cargo de inscripción configurable, cotizado y persistido como partida
   financiera independiente;
 - baja automática reversible de socios sin vigencia, con fecha, motivo,
@@ -83,10 +96,9 @@ separa intención de kiosco de readiness de Stripe.
 
 ### No incluido
 
-- variantes de catálogo/códigos múltiples, paquetes de visitas compartidos
-  entre sucursales del mismo tenant, alcance multi-sucursal de beneficios ni
-  branding por sucursal; quedan en los lotes 2–5 del análisis del primer
-  cliente;
+- paquetes de visitas compartidos entre sucursales del mismo tenant, alcance
+  multi-sucursal de beneficios y branding por sucursal; quedan en los lotes
+  3–5 del análisis del primer cliente;
 - borrado de cualquier dato demo ambiguo, modificado o con actividad;
 - GymFort Local Connector, adapter HikCentral o integración con hardware;
 - cobro SaaS recurrente automático, CFDI o conciliación bancaria completa;
@@ -94,33 +106,20 @@ separa intención de kiosco de readiness de Stripe.
 
 ## 4. Evidencia de validación local
 
-- 453 pruebas backend unitarias;
-- 92 pruebas PostgreSQL/Testcontainers, incluidas V93–V94 sobre base limpia y
-  upgrade desde V93, inactividad, persistencia financiera de la inscripción y
-  configuración real de launch/reset del kiosco;
-- 113/113 pruebas frontend, typecheck, lint y build Next de producción;
-- 27/27 recorridos E2E dirigidos de kiosco/configuración en Chromium, incluido
-  registro nuevo, alta sin membresía previa, autosave con rollback en kiosco,
-  cobros y socios, estados condicionales de Stripe y estabilidad visual ante un
-  fallo de verificación;
+- `CatalogProductServiceTests` cubre códigos múltiples y lotes de variantes;
+- `CatalogPersistenceIntegrationTests` demuestra resolución exacta de alias y
+  alcance por sucursal;
+- `DatabaseMigrationTests` valida instalación limpia y upgrade V94 → V95 sin
+  cambiar IDs de producto;
+- suite frontend, typecheck y lint exitosos; `pos-model.test.ts` cubre alias;
+- `e2e/catalog-inventory.spec.ts` valida herencia, override aislado, captura HID
+  sin submit accidental, diez sabores, familia existente, permisos y lectura
+  POS con código secundario;
 - `git diff --check` y revisión de que no se versionen secretos.
-
-El workflow remoto del PR #19 no alcanzó a iniciar steps: GitHub marcó frontend
-y backend sin runner por pagos recientes fallidos o límite de gasto insuficiente
-en Actions. Se reintentó una vez con el mismo resultado. Esta limitación de la
-cuenta queda separada de la evidencia local y no se interpreta como una falla
-del código.
 
 ## 5. Regla de integración
 
-1. La rama se integra mediante el PR #19 tras completar la revisión de
-   aceptación.
-2. CI debe terminar correctamente antes del merge cuando GitHub Actions pueda
-   asignar runners. Para el PR #19, el merge se autorizó con evidencia local
-   completa porque Actions quedó bloqueado antes de ejecutar un solo step por
-   configuración de pagos/límite de gasto de la cuenta.
-3. La capacidad `clientRegistration` permanece deshabilitada en perfiles
-   existentes hasta que el gimnasio la active por sucursal.
-4. El merge fue autorizado expresamente para este cierre; el despliegue sigue
-   siendo una acción independiente.
-5. Las ramas remotas sólo se eliminan por decisión explícita.
+1. `feature/catalog-product-variants-barcodes` no se fusiona automáticamente.
+2. CI y revisión de aceptación deben terminar antes de cualquier merge.
+3. El despliegue y la migración V95 siguen siendo acciones independientes.
+4. Las ramas remotas sólo se eliminan por decisión explícita.

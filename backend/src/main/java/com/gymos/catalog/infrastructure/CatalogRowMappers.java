@@ -24,11 +24,17 @@ final class CatalogRowMappers {
 				resultSet.getObject("category_id", UUID.class), resultSet.getString("category_name"), tags(resultSet.getString("tags_csv")),
 				resultSet.getObject("archived_at", OffsetDateTime.class) != null,
 				resultSet.getObject("archived_at", OffsetDateTime.class), resultSet.getObject("created_at", OffsetDateTime.class),
-				resultSet.getObject("updated_at", OffsetDateTime.class), resultSet.getLong("version")
+				resultSet.getObject("updated_at", OffsetDateTime.class), resultSet.getLong("version"),
+				resultSet.getObject("family_id", UUID.class), resultSet.getString("family_name"),
+				resultSet.getString("variant_name"), barcodes(resultSet.getString("barcodes_csv"), resultSet.getString("barcode"))
 		);
 	}
 
 	private static List<String> tags(String value) { return value == null || value.isBlank() ? List.of() : List.of(value.split(",")); }
+	private static List<String> barcodes(String value, String legacyBarcode) {
+		if (value != null && !value.isBlank()) return List.of(value.split(","));
+		return legacyBarcode == null || legacyBarcode.isBlank() ? List.of() : List.of(legacyBarcode);
+	}
 
 	static RowMapper<PlanView> planSummary() {
 		return (resultSet, rowNumber) -> new PlanView(

@@ -20,8 +20,11 @@ public record ProductRequest(
 		boolean taxable,
 		@NotBlank @Pattern(regexp = "ACTIVE|INACTIVE") String status,
 		@Size(max = 128) String barcode,
+		@Size(max = 20) List<@Size(max = 128) String> barcodes,
 		@Size(max = 160) String brand,
 		@Size(max = 160) String presentation,
+		UUID familyId,
+		@Size(max = 160) String variantName,
 		@Size(max = 40) String unitOfMeasure,
 		boolean inventoryTracked,
 		@Min(0) int displayOrder,
@@ -39,7 +42,7 @@ public record ProductRequest(
 				sku, name, description, productType, resolvedSubtype(), priceCents, currency, taxable, status,
 				barcode, brand, presentation, unitOfMeasure, inventoryTracked, displayOrder,
 				supplierName, referenceCostCents, promotionalPriceCents, promotionStartsAt, promotionEndsAt,
-				categoryId, tags, version
+				categoryId, tags, version, familyId, variantName, barcodes == null ? List.of() : barcodes
 		);
 	}
 

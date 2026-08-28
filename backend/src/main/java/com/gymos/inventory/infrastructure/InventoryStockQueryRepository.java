@@ -38,7 +38,11 @@ class InventoryStockQueryRepository {
 
 	StockPageRecords search(UUID organizationId, UUID branchId, InventoryStockSearchCriteria criteria) {
 		String queryFilter = hasText(criteria.query())
-				? " AND (LOWER(cp.name) LIKE :query OR LOWER(cp.sku) LIKE :query OR LOWER(COALESCE(cp.barcode,'')) LIKE :query)"
+				? " AND (LOWER(cp.name) LIKE :query OR LOWER(cp.sku) LIKE :query"
+						+ " OR EXISTS (SELECT 1 FROM catalog_product_barcode alias"
+						+ " WHERE alias.organization_id=cp.organization_id AND alias.product_id=cp.id"
+						+ " AND alias.active=TRUE"
+						+ " AND LOWER(alias.barcode) LIKE :query))"
 				: "";
 		if (criteria.lowStockOnly()) queryFilter += " AND s.reorder_point>0 AND s.quantity_on_hand<=s.reorder_point";
 		var itemSpec = jdbcClient.sql(SELECT_STOCK + queryFilter + " ORDER BY " + orderBy(criteria.sort()) + " LIMIT :size OFFSET :offset")

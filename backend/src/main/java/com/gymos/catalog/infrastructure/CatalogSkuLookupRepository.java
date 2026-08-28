@@ -29,11 +29,10 @@ class CatalogSkuLookupRepository {
 	private int countByBarcode(UUID organizationId, String barcode) {
 		return jdbcClient.sql("""
 				SELECT COUNT(*)
-				FROM catalog_product
-				WHERE organization_id = :organizationId
-				  AND barcode = :barcode
-				  AND deleted_at IS NULL
-				  AND archived_at IS NULL
+				FROM catalog_product_barcode alias
+				WHERE alias.organization_id = :organizationId
+				  AND UPPER(BTRIM(alias.barcode)) = UPPER(BTRIM(:barcode))
+				  AND alias.active = TRUE
 				""")
 				.param("organizationId", organizationId)
 				.param("barcode", barcode)
@@ -44,12 +43,11 @@ class CatalogSkuLookupRepository {
 	private int countByBarcodeExcludingProduct(UUID organizationId, String barcode, UUID excludedProductId) {
 		return jdbcClient.sql("""
 				SELECT COUNT(*)
-				FROM catalog_product
-				WHERE organization_id = :organizationId
-				  AND barcode = :barcode
-				  AND deleted_at IS NULL
-				  AND archived_at IS NULL
-				  AND id <> :excludedProductId
+				FROM catalog_product_barcode alias
+				WHERE alias.organization_id = :organizationId
+				  AND UPPER(BTRIM(alias.barcode)) = UPPER(BTRIM(:barcode))
+				  AND alias.active = TRUE
+				  AND alias.product_id <> :excludedProductId
 				""")
 				.param("organizationId", organizationId)
 				.param("barcode", barcode)

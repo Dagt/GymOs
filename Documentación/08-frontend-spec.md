@@ -157,6 +157,32 @@ prorrateo y los accesos heredados se recalculan después del pago.
 
 Regla de catalogo:
 - Productos y servicios de mostrador se capturan en el formulario de producto.
+- `Producto con variantes` ofrece un alta masiva sencilla: producto base nuevo o
+  existente, datos comunes principales visibles y datos secundarios plegados en
+  `Más datos del producto`. Inicia con una sola variante y muestra renglones
+  mínimos de variante, código principal, SKU editable/autogenerado y `Detalles`. El
+  nombre de variante puede expresar sabor, tamaño o ambos (`Manzana · 60
+  porciones`). `Detalles` reemplaza temporalmente la lista con un editor enfocado
+  de presentación, precio y costo; los aliases permanecen plegados dentro de ese
+  editor. El alta masiva no incorpora promociones.
+- `Controlar inventario` es un control compacto junto a `Stock mínimo`; no ocupa
+  una tarjeta de ancho completo.
+- El alta masiva no expone un control fiscal adicional que no exista en el alta
+  individual; conserva el valor canónico utilizado actualmente por catálogo.
+- La UI no expone `familia comercial` como entidad administrable: inicia con
+  `Producto base nuevo` y ofrece `Agregar variantes a producto existente` como
+  acción secundaria. El catálogo permite abrir ese flujo con el producto base
+  ya seleccionado.
+- `Nuevo artículo o cargo` no solicita sabor al crear un producto individual.
+  Muestra el botón compacto `+ Código alternativo` inmediatamente debajo del
+  código principal; no desplaza aliases a `Más datos` ni muestra explicaciones
+  permanentes. Al editar una variante real sí conserva su nombre de variante.
+- Enter en el código principal nunca envía el formulario: mueve el foco a la
+  siguiente variante o al botón para agregarla. El flujo admite hasta 50 filas.
+- El formulario individual permite varios códigos, uno por línea; el primero es
+  principal y todos identifican la misma variante en POS.
+- Listados y detalle muestran familia, variante y cantidad/lista de códigos sin
+  fusionar existencias ni precios entre sabores.
 - Las membresias se capturan en un formulario separado de plan de membresia.
 - Al crear un plan, el frontend debe usar `POST /catalog/membership-plans`; el backend crea en una sola transaccion el producto tecnico `MEMBERSHIP_PLAN` y el registro `membership_plan` con duracion y dias de gracia.
 - Los beneficios pueden capturarse como texto separado por comas o saltos de linea; el backend los guarda como JSON valido.

@@ -93,6 +93,19 @@ class InventoryPaginationIntegrationTests {
 	}
 
 	@Test
+	void stockSearchFindsProductByActiveAlternateBarcode() {
+		products.replaceBarcodes(organizationId, waterId,
+				List.of("750000000001", "750000000099"), true, userId, OffsetDateTime.now());
+
+		var result = stockQueries.search(organizationId, branchId,
+				new InventoryStockSearchCriteria("750000000099", 0, 25, "name,asc"));
+
+		assertThat(result.total()).isEqualTo(1);
+		assertThat(result.items()).extracting(InventoryRepository.InventoryStockRecord::productId)
+				.containsExactly(waterId);
+	}
+
+	@Test
 	void stockQuantityAndAvailabilityAreIsolatedByBranch() {
 		var center = stockQueries.stockDetail(organizationId, branchId, waterId).orElseThrow();
 		var north = stockQueries.stockDetail(organizationId, secondBranchId, waterId).orElseThrow();

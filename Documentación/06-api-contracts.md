@@ -342,6 +342,8 @@ Autenticacion y sucursal activa:
 - `GET /catalog/products`
 - `GET /catalog/products/search`
 - `GET /catalog/products/by-barcode/{barcode}`
+- `GET /catalog/product-families`
+- `POST /catalog/product-families/variants`
 - `POST /catalog/products`
 - `GET /catalog/products/{id}`
 - `PUT|PATCH /catalog/products/{id}`
@@ -354,11 +356,34 @@ Autenticacion y sucursal activa:
 - `GET|POST /catalog/categories`
 - `PATCH|DELETE /catalog/categories/{id}`
 
-`GET /catalog/products/search` devuelve `items`, `page`, `size`, `totalElements` y `totalPages`. Acepta búsqueda por nombre, SKU, código de barras y etiqueta, además de filtros por tipo, categoría, estado y seguimiento de inventario.
+`GET /catalog/products/search` devuelve `items`, `page`, `size`, `totalElements` y `totalPages`. Acepta búsqueda por nombre de familia o variante, SKU, cualquiera de sus códigos de barras y etiqueta, además de filtros por tipo, categoría, estado y seguimiento de inventario.
 
 `GET /catalog/products/by-barcode/{barcode}` hace una consulta exacta de un
-producto activo de la sucursal y excluye planes. El POS lo usa como fallback
+producto activo de la sucursal y excluye planes. La coincidencia considera
+cualquier alias activo, no sólo el código principal. El POS lo usa como fallback
 cuando el código escaneado no está en la página local.
+
+`ProductSummary` expone `familyId`, `familyName`, `variantName`, `barcodes` y
+conserva `barcode` como espejo compatible del primer código. Crear o actualizar
+un producto individual acepta `barcodes`; el primer elemento queda como
+principal.
+
+`POST /catalog/product-families/variants` crea de una a 50 variantes en una sola
+transacción. Acepta `familyId` para agregar sabores a una familia existente o
+`familyName`/`brand` para crearla. El nivel común acepta
+`commonPresentation`, `commonPriceCents`, `commonReferenceCostCents`, proveedor,
+categoría, unidad, impuestos, estado, seguimiento de inventario y etiquetas.
+`commonReorderPoint` es opcional, requiere `inventory.manage` y se inicializa en
+cada variante dentro de la misma transacción.
+Cada elemento de `variants` define normalmente `variantName`, `sku` y
+`primaryBarcode`; puede agregar `additionalBarcodes` y overrides de presentación,
+precio, costo y promoción. El backend calcula los valores efectivos con el dato
+común cuando el override es nulo.
+
+Antes de escribir, el servicio normaliza y valida todos los SKU y códigos del
+request. Un duplicado interno o existente revierte todo el lote. El código
+principal y los adicionales suman como máximo 20; los adicionales son aliases
+de la misma variante, no sabores diferentes.
 
 `unitOfMeasure` ya no es texto libre en el alta web. Para productos físicos usa
 uno de los valores canónicos:

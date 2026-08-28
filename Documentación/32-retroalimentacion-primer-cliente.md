@@ -1,10 +1,11 @@
 # Retroalimentación del primer cliente
 
-Estado: ANÁLISIS COMPLETO / LOTE 1 IMPLEMENTADO
+Estado: ANÁLISIS COMPLETO / LOTES 1 Y 2 IMPLEMENTADOS
 
 Corte: 26 de agosto de 2026
 
-Rama: `feature/client-onboarding-lifecycle`, basada en `main` `a5ea75f`
+Rama activa: `feature/catalog-product-variants-barcodes`, basada en `main`
+después de integrar el PR #19.
 
 ## Topología operativa confirmada
 
@@ -64,7 +65,7 @@ Refinamiento de aceptación del kiosco:
   muestra dentro de la tarjeta con instrucciones breves, conserva la alineación
   y oculta status HTTP, rutas, códigos internos y correlation IDs.
 
-### Lote 2 — Variantes comerciales y códigos de barras
+### Lote 2 — Variantes comerciales y códigos de barras — IMPLEMENTADO
 
 Hoy `catalog_product` contiene un solo `barcode`, `brand` y `presentation`, y la
 unicidad del código se valida por organización. Por ello cada sabor se registra
@@ -76,6 +77,43 @@ vida de socios.
 
 Código afectado: módulo `catalog`, `CatalogProductService`, persistencia de
 `catalog_product`, drawer de catálogo, POS e inventario.
+
+Implementación V95:
+
+- `catalog_product_family` modela el producto base por organización;
+- `catalog_product` conserva el ID de la unidad vendible y agrega familia y
+  nombre de variante, sin romper ventas, inventario, devoluciones o auditoría;
+- `catalog_product_barcode` admite hasta 20 códigos por variante, con uno
+  principal y unicidad activa por organización;
+- el alta `Producto con variantes` captura una vez producto base, marca,
+  presentación, precio, costo, proveedor, categoría, unidad, inventario, mínimo
+  y etiquetas; los datos secundarios quedan plegados, inventario usa un control
+  corto y la lista inicia con una sola fila de variante, código principal y SKU
+  sugerido editable. La variante puede identificar sabor, tamaño/porciones o ambos;
+- el stock mínimo común se aplica a todas las variantes dentro de la misma
+  transacción y conserva el permiso `inventory.manage`;
+- `Detalles` reemplaza la lista con un editor enfocado únicamente en la variante
+  excepcional: presentación, precio, costo y aliases plegados. El lote no pide
+  promociones ni apila varios formularios abiertos. Los datos
+  comunes son defaults del lote: después de crearse, cada variante vuelve a ser
+  completamente independiente;
+- el administrador ya no necesita localizar una pantalla de familias: el alta
+  crea el producto base automáticamente y `Agregar variantes a producto
+  existente` reutiliza el grupo interno. El alta individual sólo solicita un
+  código principal, coloca el botón de alias en ese mismo bloque y no muestra
+  sabor salvo al editar una variante real;
+- el mismo producto/sabor en 35 y 60 porciones usa dos variantes del mismo
+  producto base, cada una con presentación, precio, costo, SKU, código y stock
+  independientes;
+- el drawer no agrega un checkbox fiscal que no exista en el alta individual;
+- el lote es transaccional: una colisión evita altas parciales;
+- POS, búsqueda de catálogo e inventario resuelven cualquiera de los alias;
+- V95 migra el código existente como alias principal y agrupa productos físicos
+  con el mismo nombre/marca sin cambiar sus IDs.
+
+Compatibilidad deliberada: `catalog_product.barcode` permanece como espejo del
+código principal durante la transición. El negocio y las consultas nuevas usan
+`catalog_product_barcode`; no se recrean partidas de venta ni movimientos.
 
 ### Lote 3 — Paquetes de visitas entre sucursales del mismo tenant
 

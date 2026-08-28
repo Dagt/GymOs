@@ -1,7 +1,7 @@
 # 28. Registro vivo de hallazgos y deuda técnica
 
 Estado: VIGENTE / OBLIGATORIO
-Corte: 26 de agosto de 2026
+Corte: 27 de agosto de 2026
 
 ## 1. Propósito y regla de actualización
 
@@ -46,6 +46,7 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 
 | ID | Módulo | Resolución | Evidencia |
 |---|---|---|---|
+| CAT-003 | Catálogo/POS/inventario | RESUELTA el 27/08/2026 en `feature/catalog-product-variants-barcodes`: V95 separa familia comercial y variante vendible, agrega códigos alias únicos por organización y alta masiva sin cambiar IDs históricos. El refinamiento captura datos comunes una vez, limita la fila normal a sabor/código/SKU y reserva overrides/aliases para excepciones. POS, catálogo e inventario resuelven cualquier alias. | `CatalogProductServiceTests`, `CatalogPersistenceIntegrationTests`, `DatabaseMigrationTests`, `pos-model.test.ts` y `e2e/catalog-inventory.spec.ts` con herencia, overrides, Enter HID, 10 variantes y familia existente. |
 | SELF-003 | Autoservicio/configuración | RESUELTA el 26/08/2026 en `feature/client-onboarding-lifecycle`: la configuración por sucursal conserva intención aunque Stripe esté pendiente; los toggles usan autosave serializado con rollback; launch/reset resuelven la configuración vigente y el alta de socio no depende del proveedor. | `KioskSettingsServiceTests`, `SelfServiceKioskConfigurationIntegrationTests`, `SelfServiceServiceTests`, `e2e/kiosk.spec.ts` y `e2e/console-routing.spec.ts`. |
 | CLI-002 | Socios/ciclo de vida | RESUELTA el 26/08/2026 en `feature/client-onboarding-lifecycle`: V94 elimina el periodo duplicado y `inactivityMonths` gobierna baja automática y reinscripción sin acoplar sus toggles. | `ClientLifecycleServiceTests`, `ClientPaginationIntegrationTests`, `DatabaseMigrationTests` y migración V94 desde base vacía/V93. |
 | INV-001 | Inventarios/paginación | RESUELTA el 25/08/2026 en `cab3e28`: transferencias y conteos tienen contratos `/search`, total filtrado, páginas y tamaño parametrizados. La UI permite recorrer el historial completo; los indicadores activos y selectores son independientes de la página. Existencias, movimientos y alertas usan la misma navegación. | `InventoryPaginationIntegrationTests` con 127 registros, `InventoryControllerTests`, `SecurityAuthorizationTests` y `e2e/pagination.spec.ts`; sin migraciones. Alcance y límites en `docs/operations/list-pagination.md`. |

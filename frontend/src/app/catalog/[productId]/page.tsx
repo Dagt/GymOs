@@ -8,7 +8,7 @@ import { AuthRequired } from "@/components/AuthRequired";
 import { catalogUnitLabel } from "@/features/catalog/catalog-units";
 import { getStoredSession, type StoredSession } from "@/lib/api";
 import { getProductDetail } from "@/lib/api/catalog";
-import type { ProductDetail } from "@/lib/api/catalog-types";
+import type { ProductDetail, ProductSummary } from "@/lib/api/catalog-types";
 import { formatMoney } from "../CatalogHelpers";
 
 export default function CatalogProductDetailPage() {
@@ -73,7 +73,9 @@ export default function CatalogProductDetailPage() {
             <Detail label="Precio promocional" value={product.promotionalPriceCents == null ? "Sin promoción" : formatMoney(product.promotionalPriceCents, product.currency)} />
             {canReadCosts ? <Detail label="Costo de referencia" value={product.referenceCostCents == null ? "Sin costo" : formatMoney(product.referenceCostCents, product.currency)} /> : null}
             {canReadCosts ? <Detail label="Proveedor" value={product.supplierName ?? "Sin proveedor"} /> : null}
-            <Detail label="Código de barras" value={product.barcode ?? "Sin código"} />
+            {isVisibleVariant(product) ? <Detail label="Producto base" value={product.familyName ?? ""} /> : null}
+            {isVisibleVariant(product) ? <Detail label="Sabor o variante" value={product.variantName ?? ""} /> : null}
+            <Detail label="Códigos de barras" value={(product.barcodes?.length ? product.barcodes : product.barcode ? [product.barcode] : []).join(", ") || "Sin códigos"} />
             <Detail label="Marca" value={product.brand ?? "Sin marca"} />
             <Detail label="Presentación" value={product.presentation ?? "Sin presentación"} />
             <Detail label="Unidad" value={catalogUnitLabel(product.unitOfMeasure)} />
@@ -112,6 +114,10 @@ export default function CatalogProductDetailPage() {
       </section>
     </AppShell>
   );
+}
+
+function isVisibleVariant(product: ProductSummary) {
+  return Boolean(product.familyName && product.variantName && product.name.startsWith(`${product.familyName} ·`));
 }
 
 function Detail({ label, value }: { label: string; value: string }) {

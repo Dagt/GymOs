@@ -1,7 +1,7 @@
 # Catálogo comercial
 
 Estado: `ESTABILIZADO`
-Última revisión: 25 de agosto de 2026
+Última revisión: 27 de agosto de 2026
 
 ## Implementado
 
@@ -12,7 +12,12 @@ Estado: `ESTABILIZADO`
 - filtros de URL que reinician la página al cambiar, navegación visible antes
   de la tabla y recuperación de la última página válida después de archivar;
 - POS paginado con búsquedas globales, sin perder el carrito al cambiar de página;
-- activación, archivado, imágenes y código de barras;
+- activación, archivado, imágenes y múltiples códigos de barras por variante;
+- familias comerciales de organización y variantes vendibles independientes;
+- alta masiva de hasta 50 sabores/presentaciones, con configuración común
+  capturada una sola vez, lista compacta de variante/código/SKU que inicia con una
+  fila, soporte explícito para sabor, tamaño/porciones o ambos y editor enfocado
+  para precio/costo/presentación/aliases por excepción, sin altas parciales;
 - unidad de producto físico guiada por un selector cerrado de valores comunes,
   normalización de etiquetas heredadas y validación canónica en backend;
 - disponibilidad y configuración por sucursal;
@@ -22,6 +27,18 @@ Estado: `ESTABILIZADO`
 
 - el catálogo define qué se vende; inventario controla existencias;
 - una membresía no es un producto físico;
+- una familia no es vendible ni posee inventario; `catalog_product` sigue siendo
+  el SKU vendible para conservar ventas, existencias y auditoría;
+- cada código activo es único por organización y cualquiera de sus alias puede
+  resolver la variante exacta;
+- los defaults comunes se materializan al crear; no existe herencia posterior
+  y cada variante continúa editable, vendible e inventariable por separado;
+- `catalog_product_family` es una estructura interna: la UX habla de producto
+  base, lo crea automáticamente y permite ampliarlo desde el catálogo. Productos
+  individuales no exponen sabor ni aliases múltiples salvo bajo opción avanzada;
+- cada tamaño del mismo sabor sigue siendo una variante vendible independiente;
+  el tamaño efectivo puede sobrescribir la presentación común sin compartir SKU
+  ni inventario con otra presentación;
 - los registros históricos conservan snapshots;
 - los listados operativos deben ser paginados.
 
@@ -31,8 +48,9 @@ Estado: `ESTABILIZADO`
 - completar ciclo de archivos e imágenes;
 - mantener fronteras con ventas e inventario (`GEN-002`).
 
-Última validación: `CatalogProductServiceTests`, pruebas frontend de unidades y
-E2E del selector cerrado, 30-jul-2026.
+Última validación: `CatalogProductServiceTests`,
+`CatalogPersistenceIntegrationTests`, `DatabaseMigrationTests`, pruebas
+frontend de POS y E2E de alta masiva, 27-ago-2026.
 
 `e2e/pagination.spec.ts` cubre 127 productos, filtros, archivado del último
 registro de una página y carrito entre páginas. Esto no equivale a una prueba

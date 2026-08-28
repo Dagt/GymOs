@@ -18,7 +18,20 @@ class CatalogProductQueryRepository {
 			cp.supplier_name, cp.reference_cost_cents, cp.promotional_price_cents,
 			cp.promotion_starts_at, cp.promotion_ends_at,
 			category.id AS category_id, category.name AS category_name, tags.tags_csv,
-			cp.archived_at, cp.created_at, cp.updated_at, cp.version
+			cp.archived_at, cp.created_at, cp.updated_at, cp.version,
+			family.id AS family_id, family.name AS family_name, cp.variant_name,
+			barcodes.barcodes_csv
+			""";
+	private static final String FAMILY_JOIN = """
+			LEFT JOIN catalog_product_family family
+			  ON family.organization_id=cp.organization_id AND family.id=cp.family_id
+			""";
+	private static final String BARCODE_JOIN = """
+			LEFT JOIN LATERAL (
+			 SELECT STRING_AGG(alias.barcode, ',' ORDER BY alias.is_primary DESC, alias.created_at, alias.id) AS barcodes_csv
+			 FROM catalog_product_barcode alias
+			 WHERE alias.organization_id=cp.organization_id AND alias.product_id=cp.id
+			) barcodes ON TRUE
 			""";
 	private static final String CATEGORY_JOIN = """
 			LEFT JOIN LATERAL (
@@ -73,7 +86,10 @@ class CatalogProductQueryRepository {
 
 	Optional<ProductSummaryView> findActiveByBarcode(UUID organizationId, UUID branchId, String barcode) {
 		String sql = baseSelect() + " WHERE cp.organization_id=:organizationId" + availability(branchId)
-				+ " AND cp.product_type<>'MEMBERSHIP_PLAN' AND cp.barcode=:barcode AND cp.status='ACTIVE'"
+				+ " AND cp.product_type<>'MEMBERSHIP_PLAN' AND cp.status='ACTIVE'"
+				+ " AND EXISTS (SELECT 1 FROM catalog_product_barcode alias"
+				+ " WHERE alias.organization_id=cp.organization_id AND alias.product_id=cp.id"
+				+ " AND alias.active=TRUE AND UPPER(BTRIM(alias.barcode))=UPPER(BTRIM(:barcode)))"
 				+ " AND cp.deleted_at IS NULL AND cp.archived_at IS NULL";
 		return bindBranch(jdbcClient.sql(sql).param("organizationId", organizationId).param("barcode", barcode), branchId)
 				.query(CatalogRowMappers.productSummary()).optional();
@@ -113,7 +129,10 @@ class CatalogProductQueryRepository {
 		return ProductPageView.of(items, criteria.page(), criteria.size(), total);
 	}
 
-	private String baseSelect() { return "SELECT " + PRODUCT_COLUMNS + " FROM catalog_product cp " + CATEGORY_JOIN + TAG_JOIN; }
+	private String baseSelect() {
+		return "SELECT " + PRODUCT_COLUMNS + " FROM catalog_product cp "
+				+ FAMILY_JOIN + CATEGORY_JOIN + TAG_JOIN + BARCODE_JOIN;
+	}
 
 	private String availability(UUID branchId) {
 		if (branchId == null) return "";
@@ -125,7 +144,7 @@ class CatalogProductQueryRepository {
 		StringBuilder value = new StringBuilder(" AND cp.deleted_at IS NULL");
 		value.append(availability(branchId));
 		if (!criteria.includeArchived()) value.append(" AND cp.archived_at IS NULL");
-		if (hasText(criteria.query())) value.append(" AND (LOWER(cp.name) LIKE :query OR LOWER(cp.sku) LIKE :query OR LOWER(COALESCE(cp.barcode,'')) LIKE :query OR EXISTS (SELECT 1 FROM catalog_product_tag spt JOIN catalog_tag st ON st.id=spt.tag_id WHERE spt.organization_id=cp.organization_id AND spt.product_id=cp.id AND st.normalized_name LIKE :query))");
+		if (hasText(criteria.query())) value.append(" AND (LOWER(cp.name) LIKE :query OR LOWER(cp.sku) LIKE :query OR EXISTS (SELECT 1 FROM catalog_product_family search_family WHERE search_family.organization_id=cp.organization_id AND search_family.id=cp.family_id AND LOWER(search_family.name) LIKE :query) OR EXISTS (SELECT 1 FROM catalog_product_barcode search_barcode WHERE search_barcode.organization_id=cp.organization_id AND search_barcode.product_id=cp.id AND LOWER(search_barcode.barcode) LIKE :query) OR EXISTS (SELECT 1 FROM catalog_product_tag spt JOIN catalog_tag st ON st.id=spt.tag_id WHERE spt.organization_id=cp.organization_id AND spt.product_id=cp.id AND st.normalized_name LIKE :query))");
 		if (hasText(criteria.productType())) value.append(" AND cp.product_type=:productType"); else value.append(" AND cp.product_type <> 'MEMBERSHIP_PLAN'");
 		if (hasText(criteria.status())) value.append(" AND cp.status=:status");
 		if (criteria.inventoryTracked() != null) value.append(" AND cp.inventory_tracked=:inventoryTracked");

@@ -14,6 +14,9 @@ public interface CatalogProductCommandPort {
 	void replaceCategory(UUID organizationId, UUID productId, UUID categoryId, UUID userId, OffsetDateTime now);
 	int updateImageKey(UUID organizationId, UUID productId, String imageObjectKey, UUID userId, OffsetDateTime now);
 	void replaceTags(UUID organizationId, UUID productId, List<String> tags, UUID userId, OffsetDateTime now);
+	void replaceBarcodes(UUID organizationId, UUID productId, List<String> barcodes, boolean active,
+			UUID userId, OffsetDateTime now);
+	void setBarcodesActive(UUID organizationId, UUID productId, boolean active);
 
 	record ProductMutation(
 			UUID organizationId, UUID productId, String sku, String name, String description,
@@ -22,8 +25,24 @@ public interface CatalogProductCommandPort {
 			boolean inventoryTracked, int displayOrder, String imageObjectKey,
 			String supplierName, Long referenceCostCents, Long promotionalPriceCents,
 			OffsetDateTime promotionStartsAt, OffsetDateTime promotionEndsAt,
-			Long expectedVersion, OffsetDateTime now, UUID userId
+			Long expectedVersion, OffsetDateTime now, UUID userId,
+			UUID familyId, String variantName
 	) {
+		public ProductMutation(
+				UUID organizationId, UUID productId, String sku, String name, String description,
+				String productType, String commercialSubtype, long priceCents, String currency, boolean taxable,
+				String status, String barcode, String brand, String presentation, String unitOfMeasure,
+				boolean inventoryTracked, int displayOrder, String imageObjectKey, String supplierName,
+				Long referenceCostCents, Long promotionalPriceCents, OffsetDateTime promotionStartsAt,
+				OffsetDateTime promotionEndsAt, Long expectedVersion, OffsetDateTime now, UUID userId
+		) {
+			this(organizationId, productId, sku, name, description, productType, commercialSubtype,
+					priceCents, currency, taxable, status, barcode, brand, presentation, unitOfMeasure,
+					inventoryTracked, displayOrder, imageObjectKey, supplierName, referenceCostCents,
+					promotionalPriceCents, promotionStartsAt, promotionEndsAt, expectedVersion, now, userId,
+					null, null);
+		}
+
 		public ProductMutation(
 				UUID organizationId, UUID productId, String sku, String name, String description,
 				String productType, String commercialSubtype, long priceCents, String currency,
@@ -36,7 +55,7 @@ public interface CatalogProductCommandPort {
 			this(organizationId, productId, sku, name, description, productType, commercialSubtype,
 					priceCents, currency, taxable, status, barcode, brand, presentation, unitOfMeasure,
 					inventoryTracked, displayOrder, imageObjectKey, supplierName, referenceCostCents,
-					promotionalPriceCents, promotionStartsAt, promotionEndsAt, null, now, userId);
+					promotionalPriceCents, promotionStartsAt, promotionEndsAt, null, now, userId, null, null);
 		}
 
 		public ProductMutation(
@@ -48,7 +67,8 @@ public interface CatalogProductCommandPort {
 		) {
 			this(organizationId, productId, sku, name, description, productType, defaultSubtype(productType),
 					priceCents, currency, taxable, status, barcode, brand, presentation, unitOfMeasure,
-					inventoryTracked, displayOrder, imageObjectKey, null, null, null, null, null, null, now, userId);
+					inventoryTracked, displayOrder, imageObjectKey, null, null, null, null, null, null, now, userId,
+					null, null);
 		}
 
 		private static String defaultSubtype(String productType) {

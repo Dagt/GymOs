@@ -733,6 +733,45 @@ Reglas:
 - `HIKCENTRAL` identifica el primer contrato cloud; la operación contra un
   torniquete real sigue pendiente del Connector y adapter validados en sitio.
 
+## UC-035 Dar de alta un producto con sabores y códigos múltiples
+
+Actor: usuario con `catalog.create` y sucursal activa.
+
+Flujo:
+1. Abre Catálogo y elige `Producto con variantes`.
+2. Por defecto captura un producto base nuevo con nombre y marca. La familia es
+   interna y se crea automáticamente; si quiere ampliar un producto anterior,
+   usa `Agregar variantes a producto existente` o la acción del catálogo.
+3. Captura una sola vez presentación, precio, costo y demás datos comunes.
+4. El flujo inicia con una sola fila compacta; `+ Agregar` crea únicamente las
+   adicionales necesarias. Cada fila solicita variante, código principal y SKU
+   autogenerado pero editable. Enter mueve el foco sin enviar el formulario.
+5. `Detalles` sustituye temporalmente la lista para editar una sola variante:
+   presentación, precio, costo y aliases plegados. Volver restaura la lista sin
+   mostrar simultáneamente formularios expandidos. El lote no pide promociones.
+6. Backend crea el lote transaccionalmente y adjunta cada variante a la sucursal
+   activa.
+7. POS puede identificar la variante correcta con cualquiera de sus códigos;
+   ventas e inventario operan sobre su `catalog_product` individual.
+
+Criterios:
+- no se repiten nombre, marca ni configuración común por sabor;
+- los datos comunes sólo son defaults de creación y no acoplan ediciones
+  posteriores entre variantes;
+- cada variante mantiene precio, costo, SKU, stock y movimientos propios;
+- dos presentaciones del mismo sabor (por ejemplo `Manzana · 35 porciones` y
+  `Manzana · 60 porciones`) son variantes distintas con SKU, código e inventario
+  independientes;
+- si comparten identidad comercial, marca y fórmula pero cambia el contenido o
+  número de porciones, pertenecen al mismo producto base; cada tamaño lleva su
+  propio precio y costo mediante overrides de la variante;
+- una colisión de SKU o código revierte el lote completo;
+- un código no puede apuntar a dos variantes activas de la misma organización;
+- el alta individual no solicita sabor: muestra el código principal y el botón
+  compacto para aliases en el mismo bloque, antes de `Más datos`;
+- productos, ventas y movimientos existentes conservan sus IDs y relaciones al
+  aplicar V95.
+
 ## Anexo Hito 3.5 final
 
 La verificación segura de kiosco, la idempotencia por hash y los eventos por

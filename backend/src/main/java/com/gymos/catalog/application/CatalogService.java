@@ -1,6 +1,8 @@
 package com.gymos.catalog.application;
 
+import com.gymos.catalog.api.events.ProductVariantInventoryDefaultsRequestedV1;
 import com.gymos.catalog.application.command.CategoryCommand;
+import com.gymos.catalog.application.command.CreateProductVariantsCommand;
 import com.gymos.catalog.application.command.CreateMembershipPlanCommand;
 import com.gymos.catalog.application.command.CreatePlanCommand;
 import com.gymos.catalog.application.command.ProductCommand;
@@ -10,12 +12,16 @@ import com.gymos.catalog.application.query.CatalogSummaryView;
 import com.gymos.catalog.application.query.CategoryView;
 import com.gymos.catalog.application.query.PlanView;
 import com.gymos.catalog.application.query.ProductDetailView;
+import com.gymos.catalog.application.query.ProductFamilySummaryView;
+import com.gymos.catalog.application.query.ProductFamilyView;
 import com.gymos.catalog.application.query.ProductPageView;
 import com.gymos.catalog.application.query.ProductSearchCriteria;
 import com.gymos.catalog.application.query.ProductSummaryView;
+import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,15 +32,17 @@ public class CatalogService {
 	private final CatalogCategoryService categoryService;
 	private final CatalogProductImageService imageService;
 	private final CatalogInsightsService insightsService;
+	private final ApplicationEventPublisher eventPublisher;
 
 	public CatalogService(CatalogProductService productService, CatalogMembershipPlanService membershipPlanService,
 			CatalogCategoryService categoryService, CatalogProductImageService imageService,
-			CatalogInsightsService insightsService) {
+			CatalogInsightsService insightsService, ApplicationEventPublisher eventPublisher) {
 		this.productService = productService;
 		this.membershipPlanService = membershipPlanService;
 		this.categoryService = categoryService;
 		this.imageService = imageService;
 		this.insightsService = insightsService;
+		this.eventPublisher = eventPublisher;
 	}
 
 	@Transactional(readOnly = true) public List<ProductSummaryView> products(GymOsPrincipal principal) { return productService.products(principal); }
@@ -42,8 +50,26 @@ public class CatalogService {
 	@Transactional(readOnly = true) public ProductSummaryView productByBarcode(GymOsPrincipal principal, String barcode) { return productService.productByBarcode(principal, barcode); }
 	@Transactional(readOnly = true) public ProductPageView searchProducts(GymOsPrincipal principal, ProductSearchCriteria criteria) { return productService.search(principal, criteria); }
 	@Transactional(readOnly = true) public CatalogSummaryView summary(GymOsPrincipal principal) { return insightsService.summary(principal); }
+	@Transactional(readOnly = true) public List<ProductFamilySummaryView> productFamilies(GymOsPrincipal principal) { return productService.families(principal); }
 	@Transactional(readOnly = true) public ProductDetailView productDetail(GymOsPrincipal principal, UUID productId, int historyLimit) { return insightsService.detail(principal, productId, historyLimit); }
 	@Transactional public ProductSummaryView createProduct(GymOsPrincipal principal, ProductCommand request, String correlationId) { return productService.createProduct(principal, request, correlationId); }
+	@Transactional public ProductFamilyView createProductVariants(GymOsPrincipal principal, CreateProductVariantsCommand request, String correlationId) {
+		if (request.commonReorderPoint() != null && !canManageInventory(principal)) {
+			throw new BusinessException("INVENTORY_PERMISSION_REQUIRED", "No tienes permiso para configurar el stock minimo.");
+		}
+		if (request.commonReorderPoint() != null && !request.inventoryTracked()) {
+			throw new BusinessException("INVENTORY_REORDER_POINT_INVALID", "Activa el control de inventario para configurar el stock minimo.");
+		}
+		ProductFamilyView result = productService.createVariants(principal, request, correlationId);
+		if (request.commonReorderPoint() != null) {
+			eventPublisher.publishEvent(new ProductVariantInventoryDefaultsRequestedV1(
+					principal,
+					result.variants().stream().map(ProductSummaryView::id).toList(),
+					request.commonReorderPoint(),
+					correlationId));
+		}
+		return result;
+	}
 	@Transactional public ProductSummaryView updateProduct(GymOsPrincipal principal, UUID productId, ProductCommand request, String correlationId) { return productService.updateProduct(principal, productId, request, correlationId); }
 	@Transactional public ProductSummaryView changeProductStatus(GymOsPrincipal principal, UUID productId, String status, String correlationId) { return productService.changeStatus(principal, productId, status, correlationId); }
 	@Transactional public void archiveProduct(GymOsPrincipal principal, UUID productId, String correlationId) { productService.archiveProduct(principal, productId, correlationId); }
@@ -58,4 +84,9 @@ public class CatalogService {
 	@Transactional public void archiveCategory(GymOsPrincipal principal, UUID categoryId, String correlationId) { categoryService.archive(principal, categoryId, correlationId); }
 	@Transactional public ProductSummaryView uploadProductImage(GymOsPrincipal principal, UUID productId, UploadProductImageCommand command, String correlationId) { return imageService.upload(principal, productId, command, correlationId); }
 	@Transactional public ProductSummaryView removeProductImage(GymOsPrincipal principal, UUID productId, String correlationId) { return imageService.remove(principal, productId, correlationId); }
+
+	private boolean canManageInventory(GymOsPrincipal principal) {
+		return principal.permissions().contains("inventory.manage")
+				|| principal.permissions().contains("platform.admin");
+	}
 }

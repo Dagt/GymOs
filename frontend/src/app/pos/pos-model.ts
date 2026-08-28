@@ -35,7 +35,7 @@ export function findProductByBarcodeOrSku(
 
   // 1. First priority: exact barcode match
   const byBarcode = products.find(
-    (product) => product.barcode && product.barcode.trim().toLowerCase() === normalizedCode,
+    (product) => barcodeAliases(product).some((barcode) => barcode.trim().toLowerCase() === normalizedCode),
   );
   if (byBarcode) return byBarcode;
 
@@ -46,6 +46,10 @@ export function findProductByBarcodeOrSku(
   if (bySku) return bySku;
 
   return null;
+}
+
+function barcodeAliases(product: ProductSummary) {
+  return product.barcodes?.length ? product.barcodes : product.barcode ? [product.barcode] : [];
 }
 
 export function isMembershipPlanProduct(product: ProductSummary): boolean {

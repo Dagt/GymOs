@@ -10,6 +10,7 @@ import { useCatalogController } from "./useCatalogController";
 import { CatalogFilters } from "@/features/catalog/components/CatalogFilters";
 import { CatalogProductDrawer } from "@/features/catalog/components/CatalogProductDrawer";
 import { CatalogProductTable } from "@/features/catalog/components/CatalogProductTable";
+import { CatalogVariantBatchDrawer } from "@/features/catalog/components/CatalogVariantBatchDrawer";
 import { CatalogSummaryCards } from "@/features/catalog/components/CatalogSummaryCards";
 import { CatalogCategoryManager } from "@/features/catalog/components/CatalogCategoryManager";
 import { Pagination } from "@/components/Pagination";
@@ -36,12 +37,17 @@ function CatalogContent() {
     controller.openPlanCreation();
   }
 
+  function openVariantCreation() {
+    setView("products");
+    controller.openVariantCreation();
+  }
+
   return (
     <AppShell eyebrow="Administración" session={controller.session} subtitle="Catálogo de la sucursal activa." title="Catálogo">
       {controller.error ? <InlineError message={controller.error} /> : null}
       {controller.message ? <p className="rounded-md border border-[var(--brand-line)] bg-[var(--brand-surface)] px-3 py-2 text-sm text-[#31563c]">{controller.message}</p> : null}
       <section className="grid gap-4">
-        <CatalogToolbar canCreate={controller.canCreate} onNewPlan={openPlanCreation} onNewProduct={openProductCreation} />
+        <CatalogToolbar canCreate={controller.canCreate} onNewPlan={openPlanCreation} onNewProduct={openProductCreation} onNewVariants={openVariantCreation} />
         <CatalogNavigation canManageCategories={controller.canManageCategories} view={view} onChange={setView} />
         {view === "products" ? (
           <section className="grid gap-3">
@@ -58,8 +64,10 @@ function CatalogContent() {
               onPageChange={(page) => controller.catalogFilters.update("page", String(page))}
               onPageSizeChange={(size) => controller.catalogFilters.update("size", String(size))} />
             <CatalogProductTable canArchive={controller.canArchive} canManageStatus={controller.canManageStatus}
-              canUpdate={controller.canUpdate} loading={controller.loading} products={controller.products}
+              canCreate={controller.canCreate} canUpdate={controller.canUpdate} loading={controller.loading} products={controller.products}
+              families={controller.families}
               saving={controller.saving} onArchive={controller.archiveCatalogProduct} onEdit={controller.openProductEdition}
+              onAddVariant={(product) => controller.openVariantCreation(product.familyId)}
               onRestore={controller.restoreCatalogProduct} onToggleStatus={controller.toggleProductStatus} />
           </section>
         ) : null}
@@ -72,6 +80,7 @@ function CatalogContent() {
         canManageInventory={controller.canManageInventory}
         canReadCosts={controller.canReadCosts}
         editing={Boolean(controller.editingProductId)}
+        editingVariant={controller.editingProductIsVariant}
         existingImage={Boolean(controller.existingImageObjectKey)}
         form={controller.form}
         open={controller.showProductDrawer}
@@ -88,6 +97,18 @@ function CatalogContent() {
         onImageChange={controller.setProductImage}
         onRemoveImage={controller.removeCurrentProductImage}
         onSubmit={controller.submitProduct}
+      />
+      <CatalogVariantBatchDrawer
+        key={controller.variantDrawerKey}
+        categories={controller.categories}
+        families={controller.families}
+        canManageInventory={controller.canManageInventory}
+        canReadCosts={controller.canReadCosts}
+        initialFamilyId={controller.variantInitialFamilyId}
+        open={controller.showVariantDrawer}
+        saving={controller.saving}
+        onClose={controller.resetVariantDrawer}
+        onSubmit={controller.submitProductVariants}
       />
       <PlanDrawer editingPlanId={controller.editingPlanId} form={controller.planForm} open={controller.showPlanDrawer}
         saving={controller.saving} onClose={controller.resetPlanDrawer} onFormChange={controller.setPlanForm}
