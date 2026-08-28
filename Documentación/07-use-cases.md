@@ -743,11 +743,11 @@ Flujo:
    interna y se crea automáticamente; si quiere ampliar un producto anterior,
    usa `Agregar variantes a producto existente` o la acción del catálogo.
 3. Captura una sola vez presentación, precio, costo y demás datos comunes.
-4. Agrega filas compactas para sabor, código principal y SKU autogenerado pero
-   editable. Enter después del código mueve el foco sin enviar el formulario.
-5. Sólo una variante excepcional despliega `Personalizar` para cambiar
-   presentación, precio, costo o promoción; los aliases quedan bajo
-   `Agregar otro código`.
+4. Agrega filas compactas para variante, código principal y SKU autogenerado
+   pero editable. La variante describe lo que cambia: sabor, tamaño/porciones o
+   ambos. Enter después del código mueve el foco sin enviar el formulario.
+5. Sólo una variante excepcional despliega `Opciones` para cambiar tamaño o
+   presentación, precio, costo o promoción y para agregar códigos alternativos.
 6. Backend crea el lote transaccionalmente y adjunta cada variante a la sucursal
    activa.
 7. POS puede identificar la variante correcta con cualquiera de sus códigos;
@@ -758,6 +758,9 @@ Criterios:
 - los datos comunes sólo son defaults de creación y no acoplan ediciones
   posteriores entre variantes;
 - cada variante mantiene precio, costo, SKU, stock y movimientos propios;
+- dos presentaciones del mismo sabor (por ejemplo `Manzana · 35 porciones` y
+  `Manzana · 60 porciones`) son variantes distintas con SKU, código e inventario
+  independientes;
 - una colisión de SKU o código revierte el lote completo;
 - un código no puede apuntar a dos variantes activas de la misma organización;
 - el alta individual no solicita sabor: muestra un código principal y reserva

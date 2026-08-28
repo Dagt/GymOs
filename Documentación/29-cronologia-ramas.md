@@ -49,6 +49,7 @@ y alta masiva simple, preservando los IDs usados por ventas e inventario.
 | 27 ago 2026 | Se crea `feature/catalog-product-variants-barcodes`; V95 conserva productos históricos, agrega familias/códigos alias y alta masiva de variantes |
 | 27 ago 2026 | El alta masiva se refina sin migración: datos comunes una vez, filas sabor/código/SKU, SKU sugerido editable, overrides y aliases bajo demanda |
 | 27 ago 2026 | La UX oculta la familia técnica: producto base automático, ampliación desde catálogo y alta individual con un código principal más aliases avanzados |
+| 27 ago 2026 | La captura de variantes se compacta en una tabla y admite sabor, tamaño/porciones o ambos; `Opciones` concentra overrides y aliases sin exponer un control fiscal aislado |
 
 ## 3. Alcance material de la rama activa
 
@@ -57,8 +58,9 @@ y alta masiva simple, preservando los IDs usados por ventas e inventario.
 - familia comercial por organización y variante vendible con ID estable;
 - hasta 20 códigos por variante, código principal compatible y alias exactos en
   catálogo, POS e inventario;
-- alta masiva transaccional con datos comunes capturados una vez, filas compactas
-  sabor/código/SKU, overrides por excepción y reutilización de familias existentes;
+- alta masiva transaccional con datos comunes capturados una vez, tabla compacta
+  variante/código/SKU, sabor y/o tamaño, overrides por excepción y reutilización
+  de familias existentes;
 - V95 validada desde una base vacía y sobre V94 con conservación de IDs;
 - cargo de inscripción configurable, cotizado y persistido como partida
   financiera independiente;

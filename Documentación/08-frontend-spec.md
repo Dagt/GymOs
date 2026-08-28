@@ -158,10 +158,13 @@ prorrateo y los accesos heredados se recalculan después del pago.
 Regla de catalogo:
 - Productos y servicios de mostrador se capturan en el formulario de producto.
 - `Producto con variantes` ofrece un alta masiva sencilla: producto base nuevo o
-  existente, un bloque único de datos comunes y filas repetibles que muestran
-  sólo sabor, código principal y SKU editable/autogenerado. `Personalizar`
-  despliega presentación, precio, costo y promoción únicamente para la fila
-  excepcional. `Agregar otro código` revela aliases avanzados con su explicación.
+  existente, un bloque único de datos comunes y una tabla compacta que muestra
+  sólo variante, código principal, SKU editable/autogenerado y acciones. El
+  nombre de variante puede expresar sabor, tamaño o ambos (`Manzana · 60
+  porciones`). `Opciones` despliega presentación/tamaño, precio, costo,
+  promoción y códigos alternativos únicamente para la fila excepcional.
+- El alta masiva no expone un control fiscal adicional que no exista en el alta
+  individual; conserva el valor canónico utilizado actualmente por catálogo.
 - La UI no expone `familia comercial` como entidad administrable: inicia con
   `Producto base nuevo` y ofrece `Agregar variantes a producto existente` como
   acción secundaria. El catálogo permite abrir ese flujo con el producto base

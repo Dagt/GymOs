@@ -85,20 +85,22 @@ Implementación V95:
   nombre de variante, sin romper ventas, inventario, devoluciones o auditoría;
 - `catalog_product_barcode` admite hasta 20 códigos por variante, con uno
   principal y unicidad activa por organización;
-- el alta `Producto con variantes` captura una vez familia, marca, presentación,
-  precio, costo, proveedor, categoría, unidad, impuestos, inventario, mínimo y
-  etiquetas; cada fila normal pide sólo sabor, código principal y SKU sugerido
-  editable;
+- el alta `Producto con variantes` captura una vez producto base, marca,
+  presentación, precio, costo, proveedor, categoría, unidad, inventario, mínimo
+  y etiquetas; una tabla compacta pide sólo variante, código principal y SKU
+  sugerido editable. La variante puede identificar sabor, tamaño/porciones o
+  ambos;
 - el stock mínimo común se aplica a todas las variantes dentro de la misma
   transacción y conserva el permiso `inventory.manage`;
-- `Personalizar` abre overrides únicamente para la variante excepcional y
-  `Agregar otro código` conserva los aliases como capacidad avanzada. Los datos
+- `Opciones` abre overrides y códigos alternativos únicamente para la variante
+  excepcional. Los datos
   comunes son defaults del lote: después de crearse, cada variante vuelve a ser
   completamente independiente;
 - el administrador ya no necesita localizar una pantalla de familias: el alta
   crea el producto base automáticamente y `Agregar variantes a producto
   existente` reutiliza el grupo interno. El alta individual sólo solicita un
   código principal y no muestra sabor salvo al editar una variante real;
+- el drawer no agrega un checkbox fiscal que no exista en el alta individual;
 - el lote es transaccional: una colisión evita altas parciales;
 - POS, búsqueda de catálogo e inventario resuelven cualquiera de los alias;
 - V95 migra el código existente como alias principal y agrupa productos físicos

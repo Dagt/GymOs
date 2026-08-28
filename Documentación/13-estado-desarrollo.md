@@ -52,9 +52,10 @@ en [retroalimentación del primer cliente](32-retroalimentacion-primer-cliente.m
 El segundo lote resuelve el alta repetitiva de sabores: Catálogo separa familia
 comercial de variante vendible, admite múltiples códigos por variante y ofrece
 alta masiva transaccional. El refinamiento operativo captura presentación,
-precio, costo, proveedor, categoría, unidad, impuestos, inventario, mínimo y
-etiquetas una sola vez; las filas normales requieren sólo sabor, código y SKU
-sugerido/editable. Los overrides y aliases quedan plegados. Cada sabor conserva
+precio, costo, proveedor, categoría, unidad, inventario, mínimo y etiquetas una
+sola vez; las filas normales forman una tabla compacta y requieren sólo variante,
+código y SKU sugerido/editable. La variante puede ser sabor, tamaño/porciones o
+ambos; overrides y aliases quedan plegados bajo `Opciones`. Cada variante conserva
 SKU, precio, costo, stock, movimientos y ventas propios. V95 permanece sin
 cambios, mantiene los IDs existentes y POS/inventario resuelven cualquiera de
 sus códigos. El stock mínimo común se inicializa también dentro de la transacción
@@ -62,7 +63,8 @@ del lote y sólo está disponible con `inventory.manage`.
 La UX ya no obliga a entender ni administrar familias: crea el producto base
 automáticamente, permite agregar variantes desde el propio catálogo y separa el
 código principal de los aliases avanzados. El formulario individual no mezcla
-la captura normal con campos de sabor.
+la captura normal con campos de sabor y el alta masiva no introduce un control
+fiscal distinto al resto del catálogo.
 
 Topología confirmada para los lotes siguientes: el cliente operará sus dos
 marcas como sucursales de un solo tenant. Compartirán socios, catálogo, planes y

@@ -15,8 +15,9 @@ Estado: `ESTABILIZADO`
 - activación, archivado, imágenes y múltiples códigos de barras por variante;
 - familias comerciales de organización y variantes vendibles independientes;
 - alta masiva de hasta 50 sabores/presentaciones, con configuración común
-  capturada una sola vez, filas normales de sabor/código/SKU, overrides y
-  aliases bajo demanda, y transacción completa ante colisiones;
+  capturada una sola vez, tabla compacta de variante/código/SKU, soporte explícito
+  para sabor, tamaño/porciones o ambos, overrides y aliases bajo `Opciones`, y
+  transacción completa ante colisiones;
 - unidad de producto físico guiada por un selector cerrado de valores comunes,
   normalización de etiquetas heredadas y validación canónica en backend;
 - disponibilidad y configuración por sucursal;
@@ -35,6 +36,9 @@ Estado: `ESTABILIZADO`
 - `catalog_product_family` es una estructura interna: la UX habla de producto
   base, lo crea automáticamente y permite ampliarlo desde el catálogo. Productos
   individuales no exponen sabor ni aliases múltiples salvo bajo opción avanzada;
+- cada tamaño del mismo sabor sigue siendo una variante vendible independiente;
+  el tamaño efectivo puede sobrescribir la presentación común sin compartir SKU
+  ni inventario con otra presentación;
 - los registros históricos conservan snapshots;
 - los listados operativos deben ser paginados.
 

@@ -10,8 +10,7 @@ type VariantDraft = {
   skuManuallyEdited: boolean;
   primaryBarcode: string;
   additionalBarcodes: string[];
-  aliasesOpen: boolean;
-  customized: boolean;
+  optionsOpen: boolean;
   presentationOverride: string;
   priceOverride: string;
   costOverride: string;
@@ -38,8 +37,7 @@ const blankVariant = (): VariantDraft => ({
   skuManuallyEdited: false,
   primaryBarcode: "",
   additionalBarcodes: [],
-  aliasesOpen: false,
-  customized: false,
+  optionsOpen: false,
   presentationOverride: "",
   priceOverride: "",
   costOverride: "",
@@ -73,7 +71,6 @@ export function CatalogVariantBatchDrawer({
   const [reorderPoint, setReorderPoint] = useState("0");
   const [tags, setTags] = useState("");
   const [status, setStatus] = useState<ProductVariantBatchPayload["status"]>("ACTIVE");
-  const [taxable, setTaxable] = useState(true);
   const [skuPrefix, setSkuPrefix] = useState("");
   const [skuPrefixManuallyEdited, setSkuPrefixManuallyEdited] = useState(false);
   const [variants, setVariants] = useState<VariantDraft[]>([blankVariant(), blankVariant()]);
@@ -92,7 +89,7 @@ export function CatalogVariantBatchDrawer({
       commonPriceCents: centsRequired(commonPrice),
       commonReferenceCostCents: canReadCosts ? centsOptional(commonCost) : null,
       currency: "MXN",
-      taxable,
+      taxable: true,
       status,
       unitOfMeasure,
       inventoryTracked,
@@ -106,12 +103,12 @@ export function CatalogVariantBatchDrawer({
         sku: variant.sku.trim(),
         primaryBarcode: variant.primaryBarcode.trim() || null,
         additionalBarcodes: unique(variant.additionalBarcodes.map((barcode) => barcode.trim()).filter(Boolean)),
-        presentationOverride: variant.customized ? variant.presentationOverride.trim() || null : null,
-        priceCentsOverride: variant.customized ? centsOptional(variant.priceOverride) : null,
-        referenceCostCentsOverride: variant.customized && canReadCosts ? centsOptional(variant.costOverride) : null,
-        promotionalPriceCents: variant.customized ? centsOptional(variant.promotionalPrice) : null,
-        promotionStartsAt: variant.customized ? isoDateTime(variant.promotionStartsAt) : null,
-        promotionEndsAt: variant.customized ? isoDateTime(variant.promotionEndsAt) : null,
+        presentationOverride: variant.presentationOverride.trim() || null,
+        priceCentsOverride: centsOptional(variant.priceOverride),
+        referenceCostCentsOverride: canReadCosts ? centsOptional(variant.costOverride) : null,
+        promotionalPriceCents: centsOptional(variant.promotionalPrice),
+        promotionStartsAt: isoDateTime(variant.promotionStartsAt),
+        promotionEndsAt: isoDateTime(variant.promotionEndsAt),
       })),
     });
   }
@@ -233,63 +230,65 @@ export function CatalogVariantBatchDrawer({
             <SelectField label="Estado inicial" name="variantStatus" options={[{ label: "Activo", value: "ACTIVE" }, { label: "Inactivo", value: "INACTIVE" }]} value={status} onChange={(value) => setStatus(value as ProductVariantBatchPayload["status"])} />
             {canManageInventory && inventoryTracked ? <NumberField label="Stock mínimo común" min="0" name="variantReorderPoint" value={reorderPoint} onChange={setReorderPoint} /> : null}
           </div>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {canManageInventory ? <Check checked={inventoryTracked} label="Controlar inventario de cada variante" onChange={setInventoryTracked} /> : null}
-            <Check checked={taxable} label="Producto gravable" onChange={setTaxable} />
-          </div>
+          {canManageInventory ? <Check checked={inventoryTracked} label="Controlar inventario de cada variante" onChange={setInventoryTracked} /> : null}
         </section>
 
         <section className="grid gap-3">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="font-semibold">Variantes</p>
-              <p className="text-xs text-[var(--brand-muted)]">Normalmente sólo necesitas sabor, código y SKU. Abre Personalizar únicamente para excepciones.</p>
+              <p className="max-w-2xl text-xs text-[var(--brand-muted)]">Escribe lo que cambia: Manzana, 60 porciones o Manzana · 60 porciones. Usa Opciones sólo si también cambia la presentación, el precio o los códigos.</p>
             </div>
             <button ref={addVariantButton} className="app-button-secondary h-9 px-3" onClick={() => addVariant(true)} type="button">+ Agregar variante</button>
           </div>
-          <div className="hidden grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,.8fr)_auto] gap-3 px-4 text-xs font-semibold uppercase tracking-wide text-[var(--brand-muted)] md:grid">
-            <span>Sabor o variante</span><span>Código de barras</span><span>SKU</span><span>Acciones</span>
-          </div>
-          {variants.map((variant, index) => (
-            <article className="grid gap-3 rounded-xl border border-[var(--brand-line)] bg-white p-4" key={index}>
-              <div className="grid items-start gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,.8fr)_auto]">
-                <CompactField label="Sabor o variante" name={`variantName-${index}`} placeholder="Manzana" value={variant.variantName} onChange={(value) => updateVariantName(index, value)} />
-                <div className="grid gap-1.5">
+          <div className="overflow-hidden rounded-xl border border-[var(--brand-line)] bg-white">
+            <div className="hidden grid-cols-[minmax(0,1.15fr)_minmax(0,1.1fr)_minmax(0,.8fr)_auto] gap-2 border-b border-[var(--brand-line)] bg-[var(--brand-surface)] px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--brand-muted)] md:grid">
+              <span>Variante</span><span>Código de barras</span><span>SKU</span><span>Acciones</span>
+            </div>
+            {variants.map((variant, index) => (
+              <article className="border-b border-[var(--brand-line)] last:border-b-0" data-testid={`variant-row-${index}`} key={index}>
+                <div className="grid items-center gap-2 px-3 py-2 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1.1fr)_minmax(0,.8fr)_auto]">
+                  <CompactField label="Sabor, tamaño o variante" name={`variantName-${index}`} placeholder="Manzana · 60 porciones" value={variant.variantName} onChange={(value) => updateVariantName(index, value)} />
                   <CompactField label="Código de barras" name={`variantBarcode-${index}`} placeholder="Escanea o captura" required={false} value={variant.primaryBarcode} onChange={(primaryBarcode) => updateVariant(index, { primaryBarcode })} onKeyDown={(event) => handleBarcodeEnter(event, index)} />
-                  <button className="w-fit text-xs font-semibold text-[var(--brand-primary)]" onClick={() => updateVariant(index, { aliasesOpen: true, additionalBarcodes: variant.additionalBarcodes.length ? variant.additionalBarcodes : [""] })} type="button">+ Agregar otro código</button>
+                  <CompactField label="SKU" name={`variantSku-${index}`} placeholder="PSY-MAN60" value={variant.sku} onChange={(sku) => updateVariant(index, { sku, skuManuallyEdited: true })} />
+                  <div className="flex items-center justify-end gap-3 md:min-w-[8.5rem]">
+                    <button aria-expanded={variant.optionsOpen} className="text-xs font-semibold text-[var(--brand-primary)]" onClick={() => updateVariant(index, { optionsOpen: !variant.optionsOpen })} type="button">{variant.optionsOpen ? "Cerrar" : "Opciones"}</button>
+                    {variants.length > 1 ? <button className="text-xs font-semibold text-[#9b2c2c]" onClick={() => setVariants((current) => current.filter((_, currentIndex) => currentIndex !== index))} type="button">Quitar</button> : null}
+                  </div>
                 </div>
-                <CompactField label="SKU" name={`variantSku-${index}`} placeholder="PSY-MAN" value={variant.sku} onChange={(sku) => updateVariant(index, { sku, skuManuallyEdited: true })} />
-                <div className="flex gap-3 pt-1 md:flex-col md:items-end md:pt-7">
-                  <button className="text-xs font-semibold text-[var(--brand-primary)]" onClick={() => updateVariant(index, { customized: !variant.customized })} type="button">{variant.customized ? "Ocultar opciones" : "Personalizar"}</button>
-                  {variants.length > 1 ? <button className="text-xs font-semibold text-[#9b2c2c]" onClick={() => setVariants((current) => current.filter((_, currentIndex) => currentIndex !== index))} type="button">Quitar</button> : null}
-                </div>
-              </div>
 
-              {variant.aliasesOpen ? (
-                <div className="grid gap-2 rounded-lg bg-[var(--brand-surface)] p-3">
-                  <p className="text-xs text-[var(--brand-muted)]">Úsalo sólo si esta misma variante puede llegar con más de un código, por ejemplo por cambio de empaque o proveedor.</p>
-                  {variant.additionalBarcodes.map((barcode, aliasIndex) => (
-                    <div className="flex items-end gap-2" key={aliasIndex}>
-                      <div className="min-w-0 flex-1"><CompactField label={`Código alternativo ${aliasIndex + 1}`} name={`variantAlias-${index}-${aliasIndex}`} required={false} value={barcode} onChange={(value) => updateVariant(index, { additionalBarcodes: variant.additionalBarcodes.map((item, currentIndex) => currentIndex === aliasIndex ? value : item) })} /></div>
-                      <button aria-label={`Quitar código alternativo ${aliasIndex + 1}`} className="mb-2 text-xs font-semibold text-[#9b2c2c]" onClick={() => updateVariant(index, { additionalBarcodes: variant.additionalBarcodes.filter((_, currentIndex) => currentIndex !== aliasIndex) })} type="button">Quitar</button>
+                {variant.optionsOpen ? (
+                  <div className="grid gap-3 border-t border-dashed border-[var(--brand-line)] bg-[var(--brand-surface)] px-3 py-3">
+                    <div>
+                      <p className="text-xs font-semibold">Datos diferentes para esta variante</p>
+                      <p className="text-xs text-[var(--brand-muted)]">Deja vacíos los campos que deban usar los datos comunes del producto.</p>
                     </div>
-                  ))}
-                  {variant.additionalBarcodes.length < 19 ? <button className="w-fit text-xs font-semibold text-[var(--brand-primary)]" onClick={() => updateVariant(index, { additionalBarcodes: [...variant.additionalBarcodes, ""] })} type="button">+ Otro código alternativo</button> : null}
-                </div>
-              ) : null}
-
-              {variant.customized ? (
-                <div className="grid gap-4 rounded-lg border border-dashed border-[var(--brand-line)] p-3 sm:grid-cols-2">
-                  <TextField label="Presentación diferente" name={`variantPresentation-${index}`} placeholder={commonPresentation || "Bote de 40 scoops"} required={false} value={variant.presentationOverride} onChange={(presentationOverride) => updateVariant(index, { presentationOverride })} />
-                  <NumberField label="Precio diferente" name={`variantPrice-${index}`} required={false} step="0.01" value={variant.priceOverride} onChange={(priceOverride) => updateVariant(index, { priceOverride })} />
-                  {canReadCosts ? <NumberField label="Costo diferente" name={`variantCost-${index}`} required={false} step="0.01" value={variant.costOverride} onChange={(costOverride) => updateVariant(index, { costOverride })} /> : null}
-                  <NumberField label="Precio promocional" name={`variantPromoPrice-${index}`} required={false} step="0.01" value={variant.promotionalPrice} onChange={(promotionalPrice) => updateVariant(index, { promotionalPrice })} />
-                  <DateTimeField label="Inicio de promoción" name={`variantPromoStart-${index}`} value={variant.promotionStartsAt} onChange={(promotionStartsAt) => updateVariant(index, { promotionStartsAt })} />
-                  <DateTimeField label="Fin de promoción" name={`variantPromoEnd-${index}`} value={variant.promotionEndsAt} onChange={(promotionEndsAt) => updateVariant(index, { promotionEndsAt })} />
-                </div>
-              ) : null}
-            </article>
-          ))}
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      <TextField label="Tamaño o presentación diferente" name={`variantPresentation-${index}`} placeholder={commonPresentation || "Bote de 60 porciones"} required={false} value={variant.presentationOverride} onChange={(presentationOverride) => updateVariant(index, { presentationOverride })} />
+                      <NumberField label="Precio diferente" name={`variantPrice-${index}`} required={false} step="0.01" value={variant.priceOverride} onChange={(priceOverride) => updateVariant(index, { priceOverride })} />
+                      {canReadCosts ? <NumberField label="Costo diferente" name={`variantCost-${index}`} required={false} step="0.01" value={variant.costOverride} onChange={(costOverride) => updateVariant(index, { costOverride })} /> : null}
+                      <NumberField label="Precio promocional" name={`variantPromoPrice-${index}`} required={false} step="0.01" value={variant.promotionalPrice} onChange={(promotionalPrice) => updateVariant(index, { promotionalPrice })} />
+                      <DateTimeField label="Inicio de promoción" name={`variantPromoStart-${index}`} value={variant.promotionStartsAt} onChange={(promotionStartsAt) => updateVariant(index, { promotionStartsAt })} />
+                      <DateTimeField label="Fin de promoción" name={`variantPromoEnd-${index}`} value={variant.promotionEndsAt} onChange={(promotionEndsAt) => updateVariant(index, { promotionEndsAt })} />
+                    </div>
+                    <div className="grid gap-2 rounded-lg border border-[var(--brand-line)] bg-white p-3">
+                      <div>
+                        <p className="text-xs font-semibold">Códigos alternativos</p>
+                        <p className="text-xs text-[var(--brand-muted)]">Sólo para otro código de esta misma variante, por ejemplo por cambio de empaque. Comparte SKU e inventario.</p>
+                      </div>
+                      {variant.additionalBarcodes.map((barcode, aliasIndex) => (
+                        <div className="flex items-end gap-2" key={aliasIndex}>
+                          <div className="min-w-0 flex-1"><CompactField label={`Código alternativo ${aliasIndex + 1}`} name={`variantAlias-${index}-${aliasIndex}`} required={false} value={barcode} onChange={(value) => updateVariant(index, { additionalBarcodes: variant.additionalBarcodes.map((item, currentIndex) => currentIndex === aliasIndex ? value : item) })} /></div>
+                          <button aria-label={`Quitar código alternativo ${aliasIndex + 1}`} className="mb-2 text-xs font-semibold text-[#9b2c2c]" onClick={() => updateVariant(index, { additionalBarcodes: variant.additionalBarcodes.filter((_, currentIndex) => currentIndex !== aliasIndex) })} type="button">Quitar</button>
+                        </div>
+                      ))}
+                      {variant.additionalBarcodes.length < 19 ? <button className="w-fit text-xs font-semibold text-[var(--brand-primary)]" onClick={() => updateVariant(index, { additionalBarcodes: [...variant.additionalBarcodes, ""] })} type="button">+ Agregar código alternativo</button> : null}
+                    </div>
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
         </section>
 
         <button className="app-button h-12" disabled={saving} type="submit">{saving ? "Creando variantes..." : `Crear ${variants.length} variantes`}</button>
@@ -307,7 +306,7 @@ function CompactField({ label, name, onChange, onKeyDown, placeholder, required 
   required?: boolean;
   value: string;
 }) {
-  return <label className="form-field" htmlFor={name}><span className="md:sr-only">{label}{required ? <b>*</b> : null}</span><input className="app-input" id={name} name={name} onChange={(event) => onChange(event.target.value)} onKeyDown={onKeyDown} placeholder={placeholder} required={required} value={value} /></label>;
+  return <label className="form-field gap-1" htmlFor={name}><span className="md:sr-only">{label}{required ? <b>*</b> : null}</span><input className="app-input h-9 min-h-9 px-2 py-1 text-sm" id={name} name={name} onChange={(event) => onChange(event.target.value)} onKeyDown={onKeyDown} placeholder={placeholder} required={required} value={value} /></label>;
 }
 
 function DateTimeField({ label, name, onChange, value }: { label: string; name: string; onChange: (value: string) => void; value: string }) {
@@ -344,13 +343,29 @@ function uniqueGeneratedSku(prefix: string, variantName: string, variants: Varia
 
 function availableSku(prefix: string, variantName: string, used: Set<string>) {
   const normalizedPrefix = normalizeSkuPart(prefix, 12);
-  const variant = normalizeSkuPart(variantName, 3);
+  const variant = suggestVariantSkuPart(variantName);
   if (!normalizedPrefix || !variant) return "";
   const base = `${normalizedPrefix}-${variant}`;
   if (!used.has(base)) return base;
   let suffix = 2;
   while (used.has(`${base}-${suffix}`)) suffix += 1;
   return `${base}-${suffix}`;
+}
+
+function suggestVariantSkuPart(value: string) {
+  const words = value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toUpperCase()
+    .split(/[^A-Z0-9]+/)
+    .filter(Boolean);
+  const firstWord = words[0] ?? "";
+  const letters = firstWord.replace(/[^A-Z]/g, "").slice(0, 3);
+  const firstNumber = words.map((word) => word.match(/\d+/)?.[0]).find(Boolean) ?? "";
+  const fallback = normalizeSkuPart(firstWord, 6);
+  const base = letters || fallback;
+  const numericSuffix = firstNumber && !base.includes(firstNumber) ? firstNumber.slice(0, 4) : "";
+  return `${base}${numericSuffix}`.slice(0, 8);
 }
 
 function suggestSkuPrefix(value: string) {
