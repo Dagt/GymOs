@@ -162,8 +162,8 @@ Regla de catalogo:
   sólo variante, código principal, SKU editable/autogenerado y acciones. El
   nombre de variante puede expresar sabor, tamaño o ambos (`Manzana · 60
   porciones`). `Precio / tamaño` despliega solamente presentación, precio y
-  costo propios; la promoción queda en un detalle secundario y el botón `+`
-  junto al código principal agrega aliases sin abrir otro bloque explicativo.
+  costo propios. El alta masiva no incorpora promociones y el botón `+` junto
+  al código principal agrega un alias sin abrir otro bloque explicativo.
 - El alta masiva no expone un control fiscal adicional que no exista en el alta
   individual; conserva el valor canónico utilizado actualmente por catálogo.
 - La UI no expone `familia comercial` como entidad administrable: inicia con

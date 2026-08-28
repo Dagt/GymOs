@@ -138,7 +138,9 @@ test.describe("catalogo e inventario", () => {
     await page.getByRole("spinbutton", { name: "Precio *" }).fill("25");
     await page.getByLabel("Código de barras").fill("750000000101");
     await page.getByRole("button", { name: "+ Código alternativo" }).click();
+    await expect(page.getByRole("button", { name: "+ Código alternativo" })).toHaveCount(0);
     await page.locator('input[name="productBarcodeAlias-1"]').fill("750000000109");
+    await expect(page.getByRole("button", { name: "+ Código alternativo" })).toBeVisible();
     await page.getByText(/M.s datos/i).click();
     await expect(page.getByLabel("Códigos de barras")).toHaveCount(0);
     await expect(page.getByText("Códigos alternativos", { exact: true })).toHaveCount(0);
@@ -183,13 +185,16 @@ test.describe("catalogo e inventario", () => {
     await page.getByLabel("Código de barras").nth(0).fill("750100000001");
     const appleRow = page.getByTestId("variant-row-0");
     await appleRow.getByRole("button", { name: "Agregar código alternativo a variante 1" }).click();
+    await expect(appleRow.getByRole("button", { name: "Agregar código alternativo a variante 1" })).toHaveCount(0);
     await appleRow.locator('input[name="variantAlias-0-0"]').fill("750100000009");
+    await expect(appleRow.getByRole("button", { name: "Agregar código alternativo a variante 1" })).toBeVisible();
 
     await page.getByLabel("Sabor, tamaño o variante").nth(1).fill("Frutos rojos");
     await expect(page.locator('input[name="variantSku-1"]')).toHaveValue("PSY-FRU");
     await page.getByLabel("Código de barras").nth(1).fill("750100000002");
     const redFruitRow = page.getByTestId("variant-row-1");
     await redFruitRow.getByRole("button", { name: "Precio / tamaño" }).click();
+    await expect(redFruitRow.getByText(/Promoción/i)).toHaveCount(0);
     await redFruitRow.getByLabel("Presentación / tamaño").fill("Bote de 40 scoops");
     await redFruitRow.getByLabel("Precio", { exact: true }).fill("580");
     await redFruitRow.getByLabel("Costo", { exact: true }).fill("335");

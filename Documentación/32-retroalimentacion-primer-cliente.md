@@ -93,8 +93,8 @@ Implementación V95:
 - el stock mínimo común se aplica a todas las variantes dentro de la misma
   transacción y conserva el permiso `inventory.manage`;
 - `Precio / tamaño` abre presentación, precio y costo únicamente para la variante
-  excepcional; promoción queda plegada y los códigos alternativos se agregan
-  directamente junto al código principal. Los datos
+  excepcional; el lote no pide promociones y los códigos alternativos se agregan
+  directamente junto al código principal, uno a la vez. Los datos
   comunes son defaults del lote: después de crearse, cada variante vuelve a ser
   completamente independiente;
 - el administrador ya no necesita localizar una pantalla de familias: el alta

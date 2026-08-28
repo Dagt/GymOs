@@ -747,8 +747,8 @@ Flujo:
    pero editable. La variante describe lo que cambia: sabor, tamaño/porciones o
    ambos. Enter después del código mueve el foco sin enviar el formulario.
 5. Sólo una variante excepcional despliega `Precio / tamaño` para cambiar
-   presentación, precio o costo; la promoción queda plegada y los códigos
-   alternativos se agregan con el `+` contiguo al código principal.
+   presentación, precio o costo. El alta masiva no solicita promociones y los
+   códigos alternativos se agregan con el `+` contiguo al código principal.
 6. Backend crea el lote transaccionalmente y adjunta cada variante a la sucursal
    activa.
 7. POS puede identificar la variante correcta con cualquiera de sus códigos;

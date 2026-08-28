@@ -82,7 +82,7 @@ export function CatalogProductDrawer({
 
   function addAlternateBarcode() {
     const current = form.barcodes.length ? form.barcodes : [""];
-    if (current.length >= 20) return;
+    if (current.length >= 20 || current.slice(1).some((barcode) => !barcode.trim())) return;
     change({ barcodes: [...current, ""] });
   }
 
@@ -113,7 +113,7 @@ export function CatalogProductDrawer({
                     <button aria-label={`Quitar código alternativo ${barcodeIndex}`} className="mb-2 text-xs font-semibold text-[#9b2c2c]" onClick={() => removeAlternateBarcode(barcodeIndex)} type="button">Quitar</button>
                   </div>;
                 })}
-                {form.barcodes.length < 20 ? <button className="w-fit text-xs font-semibold text-[var(--brand-primary)]" onClick={addAlternateBarcode} type="button">+ Código alternativo</button> : null}
+                {form.barcodes.length < 20 && form.barcodes.slice(1).every((barcode) => barcode.trim()) ? <button className="w-fit text-xs font-semibold text-[var(--brand-primary)]" onClick={addAlternateBarcode} type="button">+ Código alternativo</button> : null}
               </div>
             ) : null}
             <SelectField label="Categoría" name="productCategory" required={false} options={[{ label: "Sin categoría", value: "" }, ...options]} value={form.categoryId ?? ""} onChange={(categoryId) => change({ categoryId: categoryId || null })} />
