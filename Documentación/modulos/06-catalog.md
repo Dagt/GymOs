@@ -15,9 +15,9 @@ Estado: `ESTABILIZADO`
 - activación, archivado, imágenes y múltiples códigos de barras por variante;
 - familias comerciales de organización y variantes vendibles independientes;
 - alta masiva de hasta 50 sabores/presentaciones, con configuración común
-  capturada una sola vez, tabla compacta de variante/código/SKU, soporte explícito
-  para sabor, tamaño/porciones o ambos, precio/costo/presentación por excepción,
-  aliases junto al código y transacción completa ante colisiones;
+  capturada una sola vez, lista compacta de variante/código/SKU que inicia con una
+  fila, soporte explícito para sabor, tamaño/porciones o ambos y editor enfocado
+  para precio/costo/presentación/aliases por excepción, sin altas parciales;
 - unidad de producto físico guiada por un selector cerrado de valores comunes,
   normalización de etiquetas heredadas y validación canónica en backend;
 - disponibilidad y configuración por sucursal;

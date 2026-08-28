@@ -743,12 +743,12 @@ Flujo:
    interna y se crea automáticamente; si quiere ampliar un producto anterior,
    usa `Agregar variantes a producto existente` o la acción del catálogo.
 3. Captura una sola vez presentación, precio, costo y demás datos comunes.
-4. Agrega filas compactas para variante, código principal y SKU autogenerado
-   pero editable. La variante describe lo que cambia: sabor, tamaño/porciones o
-   ambos. Enter después del código mueve el foco sin enviar el formulario.
-5. Sólo una variante excepcional despliega `Precio / tamaño` para cambiar
-   presentación, precio o costo. El alta masiva no solicita promociones y los
-   códigos alternativos se agregan con el `+` contiguo al código principal.
+4. El flujo inicia con una sola fila compacta; `+ Agregar` crea únicamente las
+   adicionales necesarias. Cada fila solicita variante, código principal y SKU
+   autogenerado pero editable. Enter mueve el foco sin enviar el formulario.
+5. `Detalles` sustituye temporalmente la lista para editar una sola variante:
+   presentación, precio, costo y aliases plegados. Volver restaura la lista sin
+   mostrar simultáneamente formularios expandidos. El lote no pide promociones.
 6. Backend crea el lote transaccionalmente y adjunta cada variante a la sucursal
    activa.
 7. POS puede identificar la variante correcta con cualquiera de sus códigos;

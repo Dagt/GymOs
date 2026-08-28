@@ -53,10 +53,11 @@ El segundo lote resuelve el alta repetitiva de sabores: Catálogo separa familia
 comercial de variante vendible, admite múltiples códigos por variante y ofrece
 alta masiva transaccional. El refinamiento operativo captura presentación,
 precio, costo, proveedor, categoría, unidad, inventario, mínimo y etiquetas una
-sola vez; las filas normales forman una tabla compacta y requieren sólo variante,
-código y SKU sugerido/editable. La variante puede ser sabor, tamaño/porciones o
-ambos; precio, costo y presentación quedan bajo `Precio / tamaño`, sin campos de
-promoción en el alta masiva, y los aliases se agregan junto al código. Cada variante conserva
+sola vez; los datos secundarios permanecen plegados y el control de inventario es
+compacto. El lote inicia con una fila y la lista requiere sólo variante, código y
+SKU sugerido/editable. La variante puede ser sabor, tamaño/porciones o ambos;
+`Detalles` abre un editor enfocado de una sola variante para presentación, precio,
+costo y aliases, sin promociones ni expansiones acumuladas. Cada variante conserva
 SKU, precio, costo, stock, movimientos y ventas propios. V95 permanece sin
 cambios, mantiene los IDs existentes y POS/inventario resuelven cualquiera de
 sus códigos. El stock mínimo común se inicializa también dentro de la transacción

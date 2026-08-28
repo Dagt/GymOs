@@ -10,7 +10,6 @@ type VariantDraft = {
   skuManuallyEdited: boolean;
   primaryBarcode: string;
   additionalBarcodes: string[];
-  optionsOpen: boolean;
   presentationOverride: string;
   priceOverride: string;
   costOverride: string;
@@ -34,7 +33,6 @@ const blankVariant = (): VariantDraft => ({
   skuManuallyEdited: false,
   primaryBarcode: "",
   additionalBarcodes: [],
-  optionsOpen: false,
   presentationOverride: "",
   priceOverride: "",
   costOverride: "",
@@ -67,9 +65,12 @@ export function CatalogVariantBatchDrawer({
   const [status, setStatus] = useState<ProductVariantBatchPayload["status"]>("ACTIVE");
   const [skuPrefix, setSkuPrefix] = useState("");
   const [skuPrefixManuallyEdited, setSkuPrefixManuallyEdited] = useState(false);
-  const [variants, setVariants] = useState<VariantDraft[]>([blankVariant(), blankVariant()]);
+  const [variants, setVariants] = useState<VariantDraft[]>([blankVariant()]);
+  const [editingVariantIndex, setEditingVariantIndex] = useState<number | null>(null);
   const addVariantButton = useRef<HTMLButtonElement>(null);
   const selectedFamily = families.find((family) => family.id === familyId);
+  const detailIndex = editingVariantIndex ?? -1;
+  const editingVariant = variants[detailIndex] ?? null;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -161,8 +162,14 @@ export function CatalogVariantBatchDrawer({
 
   function addVariant(focus = false) {
     const nextIndex = variants.length;
+    setEditingVariantIndex(null);
     setVariants((current) => [...current, blankVariant()]);
     if (focus) window.setTimeout(() => document.getElementById(`variantName-${nextIndex}`)?.focus(), 0);
+  }
+
+  function removeVariant(index: number) {
+    setEditingVariantIndex(null);
+    setVariants((current) => current.filter((_, currentIndex) => currentIndex !== index));
   }
 
   function handleBarcodeEnter(event: KeyboardEvent<HTMLInputElement>, index: number) {
@@ -209,66 +216,80 @@ export function CatalogVariantBatchDrawer({
               <TextField label="Marca" name="variantBrand" placeholder="Insane Labz" required={false} value={brand} onChange={setBrand} />
             </div>
           )}
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-3">
             <TextField label="Presentación común" name="variantCommonPresentation" placeholder="Bote de 35 scoops" required={false} value={commonPresentation} onChange={setCommonPresentation} />
             <NumberField label="Precio común" name="variantCommonPrice" step="0.01" value={commonPrice} onChange={setCommonPrice} />
             {canReadCosts ? <NumberField label="Costo común" name="variantCommonCost" required={false} step="0.01" value={commonCost} onChange={setCommonCost} /> : null}
-            {canReadCosts ? <TextField label="Proveedor" name="variantSupplier" placeholder="Proveedor" required={false} value={supplierName} onChange={setSupplierName} /> : null}
-            <SelectField label="Categoría" name="variantCategory" required={false} options={[{ label: "Sin categoría", value: "" }, ...categoryOptions(categories)]} value={categoryId} onChange={setCategoryId} />
-            <SelectField label="Unidad" name="variantUnit" options={[...CATALOG_UNIT_OPTIONS]} value={unitOfMeasure} onChange={setUnitOfMeasure} />
-            <TextField label="Etiquetas" name="variantTags" placeholder="preentreno, energía" required={false} value={tags} onChange={setTags} />
-            <TextField help="Se usa para sugerir SKU editables, por ejemplo PSY-MAN." label="Prefijo SKU" name="variantSkuPrefix" placeholder="PSY" required={false} value={skuPrefix} onChange={(value) => applySkuPrefix(value, true)} />
-            <SelectField label="Estado inicial" name="variantStatus" options={[{ label: "Activo", value: "ACTIVE" }, { label: "Inactivo", value: "INACTIVE" }]} value={status} onChange={(value) => setStatus(value as ProductVariantBatchPayload["status"])} />
-            {canManageInventory && inventoryTracked ? <NumberField label="Stock mínimo común" min="0" name="variantReorderPoint" value={reorderPoint} onChange={setReorderPoint} /> : null}
           </div>
-          {canManageInventory ? <Check checked={inventoryTracked} label="Controlar inventario de cada variante" onChange={setInventoryTracked} /> : null}
+          {canManageInventory ? (
+            <div className="flex flex-wrap items-end gap-3 rounded-lg bg-[var(--brand-surface)] px-3 py-2">
+              <Check checked={inventoryTracked} label="Controlar inventario" onChange={setInventoryTracked} />
+              {inventoryTracked ? <div className="w-36"><CompactOverrideField label="Stock mínimo" name="variantReorderPoint" placeholder="0" type="number" value={reorderPoint} onChange={setReorderPoint} /></div> : null}
+            </div>
+          ) : null}
+          <details className="rounded-lg border border-[var(--brand-line)] px-3 py-2">
+            <summary className="cursor-pointer text-sm font-semibold text-[var(--brand-primary)]">Más datos del producto</summary>
+            <div className="mt-3 grid gap-4 sm:grid-cols-2">
+              {canReadCosts ? <TextField label="Proveedor" name="variantSupplier" placeholder="Proveedor" required={false} value={supplierName} onChange={setSupplierName} /> : null}
+              <SelectField label="Categoría" name="variantCategory" required={false} options={[{ label: "Sin categoría", value: "" }, ...categoryOptions(categories)]} value={categoryId} onChange={setCategoryId} />
+              <SelectField label="Unidad" name="variantUnit" options={[...CATALOG_UNIT_OPTIONS]} value={unitOfMeasure} onChange={setUnitOfMeasure} />
+              <TextField label="Etiquetas" name="variantTags" placeholder="preentreno, energía" required={false} value={tags} onChange={setTags} />
+              <TextField label="Prefijo SKU" name="variantSkuPrefix" placeholder="PSY" required={false} value={skuPrefix} onChange={(value) => applySkuPrefix(value, true)} />
+              <SelectField label="Estado inicial" name="variantStatus" options={[{ label: "Activo", value: "ACTIVE" }, { label: "Inactivo", value: "INACTIVE" }]} value={status} onChange={(value) => setStatus(value as ProductVariantBatchPayload["status"])} />
+            </div>
+          </details>
         </section>
 
         <section className="grid gap-3">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <p className="font-semibold">Variantes</p>
-            <button ref={addVariantButton} className="app-button-secondary h-9 px-3" onClick={() => addVariant(true)} type="button">+ Agregar variante</button>
-          </div>
-          <div className="overflow-hidden rounded-xl border border-[var(--brand-line)] bg-white">
-            <div className="hidden grid-cols-[minmax(0,1.15fr)_minmax(0,1.1fr)_minmax(0,.8fr)_auto] gap-2 border-b border-[var(--brand-line)] bg-[var(--brand-surface)] px-3 py-2 text-[11px] font-semibold uppercase tracking-wide text-[var(--brand-muted)] md:grid">
-              <span>Variante</span><span>Código de barras</span><span>SKU</span><span>Acciones</span>
-            </div>
-            {variants.map((variant, index) => (
-              <article className="border-b border-[var(--brand-line)] last:border-b-0" data-testid={`variant-row-${index}`} key={index}>
-                <div className="grid items-center gap-2 px-3 py-2 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1.1fr)_minmax(0,.8fr)_auto]">
-                  <CompactField label="Sabor, tamaño o variante" name={`variantName-${index}`} placeholder="Manzana · 60 porciones" value={variant.variantName} onChange={(value) => updateVariantName(index, value)} />
-                  <div className="flex min-w-0 items-end gap-1">
-                    <div className="min-w-0 flex-1"><CompactField label="Código de barras" name={`variantBarcode-${index}`} placeholder="Escanea o captura" required={false} value={variant.primaryBarcode} onChange={(primaryBarcode) => updateVariant(index, { primaryBarcode })} onKeyDown={(event) => handleBarcodeEnter(event, index)} /></div>
-                    {variant.additionalBarcodes.length < 19 && variant.additionalBarcodes.every((barcode) => barcode.trim()) ? <button aria-label={`Agregar código alternativo a variante ${index + 1}`} className="flex h-9 w-8 shrink-0 items-center justify-center rounded-md border border-[var(--brand-line)] text-base font-semibold text-[var(--brand-primary)]" onClick={() => updateVariant(index, { additionalBarcodes: [...variant.additionalBarcodes, ""] })} title="Agregar código alternativo" type="button">+</button> : null}
-                  </div>
-                  <CompactField label="SKU" name={`variantSku-${index}`} placeholder="PSY-MAN60" value={variant.sku} onChange={(sku) => updateVariant(index, { sku, skuManuallyEdited: true })} />
-                  <div className="flex items-center justify-end gap-3 md:min-w-[10rem]">
-                    <button aria-expanded={variant.optionsOpen} className="text-xs font-semibold text-[var(--brand-primary)]" onClick={() => updateVariant(index, { optionsOpen: !variant.optionsOpen })} type="button">{variant.optionsOpen ? "Cerrar" : "Precio / tamaño"}</button>
-                    {variants.length > 1 ? <button className="text-xs font-semibold text-[#9b2c2c]" onClick={() => setVariants((current) => current.filter((_, currentIndex) => currentIndex !== index))} type="button">Quitar</button> : null}
-                  </div>
+          {editingVariant ? (
+            <div className="overflow-hidden rounded-xl border border-[var(--brand-line)] bg-white" data-testid="variant-detail-editor">
+              <div className="flex items-center justify-between gap-3 border-b border-[var(--brand-line)] px-3 py-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold">Detalles de variante {detailIndex + 1}</p>
+                  <p className="truncate text-xs text-[var(--brand-muted)]">{editingVariant.variantName || "Variante sin nombre"}</p>
                 </div>
-
-                {variant.additionalBarcodes.length ? (
-                  <div className="grid gap-1.5 border-t border-dashed border-[var(--brand-line)] px-3 py-2">
-                    {variant.additionalBarcodes.map((barcode, aliasIndex) => (
-                      <div className="flex items-end gap-2" key={aliasIndex}>
-                        <div className="min-w-0 flex-1"><CompactField label={`Código alternativo ${aliasIndex + 1}`} name={`variantAlias-${index}-${aliasIndex}`} required={false} value={barcode} onChange={(value) => updateVariant(index, { additionalBarcodes: variant.additionalBarcodes.map((item, currentIndex) => currentIndex === aliasIndex ? value : item) })} /></div>
-                        <button aria-label={`Quitar código alternativo ${aliasIndex + 1}`} className="mb-2 text-xs font-semibold text-[#9b2c2c]" onClick={() => updateVariant(index, { additionalBarcodes: variant.additionalBarcodes.filter((_, currentIndex) => currentIndex !== aliasIndex) })} type="button">Quitar</button>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
-
-                {variant.optionsOpen ? (
-                  <div className="grid gap-3 border-t border-dashed border-[var(--brand-line)] bg-[var(--brand-surface)] px-3 py-2 sm:grid-cols-3">
-                    <CompactOverrideField label="Presentación / tamaño" name={`variantPresentation-${index}`} placeholder={commonPresentation ? `Común: ${commonPresentation}` : "Ej. Bote de 60 porciones"} value={variant.presentationOverride} onChange={(presentationOverride) => updateVariant(index, { presentationOverride })} />
-                    <CompactOverrideField inputMode="decimal" label="Precio" name={`variantPrice-${index}`} placeholder={commonPrice ? `Común: $${commonPrice}` : "Precio especial"} type="number" value={variant.priceOverride} onChange={(priceOverride) => updateVariant(index, { priceOverride })} />
-                    {canReadCosts ? <CompactOverrideField inputMode="decimal" label="Costo" name={`variantCost-${index}`} placeholder={commonCost ? `Común: $${commonCost}` : "Costo especial"} type="number" value={variant.costOverride} onChange={(costOverride) => updateVariant(index, { costOverride })} /> : null}
-                  </div>
-                ) : null}
-              </article>
-            ))}
-          </div>
+                <button className="text-xs font-semibold text-[var(--brand-primary)]" onClick={() => setEditingVariantIndex(null)} type="button">Volver a variantes</button>
+              </div>
+              <div className="grid gap-3 bg-[var(--brand-surface)] px-3 py-3 sm:grid-cols-3">
+                <CompactOverrideField label="Presentación / tamaño" name={`variantPresentation-${detailIndex}`} placeholder={commonPresentation ? `Común: ${commonPresentation}` : "Ej. Bote de 60 porciones"} value={editingVariant.presentationOverride} onChange={(presentationOverride) => updateVariant(detailIndex, { presentationOverride })} />
+                <CompactOverrideField inputMode="decimal" label="Precio" name={`variantPrice-${detailIndex}`} placeholder={commonPrice ? `Común: $${commonPrice}` : "Precio especial"} type="number" value={editingVariant.priceOverride} onChange={(priceOverride) => updateVariant(detailIndex, { priceOverride })} />
+                {canReadCosts ? <CompactOverrideField inputMode="decimal" label="Costo" name={`variantCost-${detailIndex}`} placeholder={commonCost ? `Común: $${commonCost}` : "Costo especial"} type="number" value={editingVariant.costOverride} onChange={(costOverride) => updateVariant(detailIndex, { costOverride })} /> : null}
+              </div>
+              <details className="border-t border-[var(--brand-line)] px-3 py-2">
+                <summary className="cursor-pointer text-xs font-semibold text-[var(--brand-primary)]">Códigos alternativos ({editingVariant.additionalBarcodes.length})</summary>
+                <div className="mt-2 grid gap-2">
+                  {editingVariant.additionalBarcodes.map((barcode, aliasIndex) => (
+                    <div className="flex items-end gap-2" key={aliasIndex}>
+                      <div className="min-w-0 flex-1"><CompactField label={`Código alternativo ${aliasIndex + 1}`} name={`variantAlias-${detailIndex}-${aliasIndex}`} required={false} value={barcode} onChange={(value) => updateVariant(detailIndex, { additionalBarcodes: editingVariant.additionalBarcodes.map((item, currentIndex) => currentIndex === aliasIndex ? value : item) })} /></div>
+                      <button aria-label={`Quitar código alternativo ${aliasIndex + 1}`} className="mb-2 text-xs font-semibold text-[#9b2c2c]" onClick={() => updateVariant(detailIndex, { additionalBarcodes: editingVariant.additionalBarcodes.filter((_, currentIndex) => currentIndex !== aliasIndex) })} type="button">Quitar</button>
+                    </div>
+                  ))}
+                  {editingVariant.additionalBarcodes.length < 19 && editingVariant.additionalBarcodes.every((barcode) => barcode.trim()) ? <button className="w-fit text-xs font-semibold text-[var(--brand-primary)]" onClick={() => updateVariant(detailIndex, { additionalBarcodes: [...editingVariant.additionalBarcodes, ""] })} type="button">+ Código alternativo</button> : null}
+                </div>
+              </details>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-3">
+                <p className="font-semibold">Variantes <span className="text-xs font-normal text-[var(--brand-muted)]">({variants.length})</span></p>
+                <button ref={addVariantButton} className="text-xs font-semibold text-[var(--brand-primary)]" onClick={() => addVariant(true)} type="button">+ Agregar</button>
+              </div>
+              <div className="grid gap-1.5">
+                {variants.map((variant, index) => (
+                  <article className="grid items-center gap-2 rounded-lg border border-[var(--brand-line)] bg-white p-2 md:grid-cols-[1.75rem_minmax(0,1.15fr)_minmax(0,1fr)_minmax(0,.75fr)_auto]" data-testid={`variant-row-${index}`} key={index}>
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[var(--brand-surface)] text-xs font-semibold text-[var(--brand-muted)]">{index + 1}</span>
+                    <CompactField label="Variante" name={`variantName-${index}`} placeholder="Manzana · 60 porciones" value={variant.variantName} onChange={(value) => updateVariantName(index, value)} />
+                    <CompactField label="Código de barras" name={`variantBarcode-${index}`} placeholder="Escanea o captura" required={false} value={variant.primaryBarcode} onChange={(primaryBarcode) => updateVariant(index, { primaryBarcode })} onKeyDown={(event) => handleBarcodeEnter(event, index)} />
+                    <CompactField label="SKU" name={`variantSku-${index}`} placeholder="PSY-MAN60" value={variant.sku} onChange={(sku) => updateVariant(index, { sku, skuManuallyEdited: true })} />
+                    <div className="flex items-center justify-end gap-3 md:min-w-[7rem]">
+                      <button className="text-xs font-semibold text-[var(--brand-primary)]" onClick={() => setEditingVariantIndex(index)} type="button">Detalles</button>
+                      {variants.length > 1 ? <button aria-label={`Quitar variante ${index + 1}`} className="text-base font-semibold text-[#9b2c2c]" onClick={() => removeVariant(index)} title="Quitar variante" type="button">×</button> : null}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </>
+          )}
         </section>
 
         <button className="app-button h-12" disabled={saving} type="submit">{saving ? "Creando variantes..." : `Crear ${variants.length} ${variants.length === 1 ? "variante" : "variantes"}`}</button>
@@ -286,7 +307,7 @@ function CompactField({ label, name, onChange, onKeyDown, placeholder, required 
   required?: boolean;
   value: string;
 }) {
-  return <label className="form-field gap-1" htmlFor={name}><span className="md:sr-only">{label}{required ? <b>*</b> : null}</span><input className="app-input h-9 min-h-9 px-2 py-1 text-sm" id={name} name={name} onChange={(event) => onChange(event.target.value)} onKeyDown={onKeyDown} placeholder={placeholder} required={required} value={value} /></label>;
+  return <label className="form-field gap-1" htmlFor={name}><span className="md:sr-only">{label}{required ? <b>*</b> : null}</span><input aria-label={label} className="app-input h-9 min-h-9 px-2 py-1 text-sm" id={name} name={name} onChange={(event) => onChange(event.target.value)} onKeyDown={onKeyDown} placeholder={placeholder} required={required} value={value} /></label>;
 }
 
 function CompactOverrideField({ inputMode, label, name, onChange, placeholder, type = "text", value }: {
@@ -302,7 +323,7 @@ function CompactOverrideField({ inputMode, label, name, onChange, placeholder, t
 }
 
 function Check({ checked, label, onChange }: { checked: boolean; label: string; onChange: (checked: boolean) => void }) {
-  return <label className="flex h-11 items-center gap-3 rounded-md border border-[var(--brand-line)] px-3 text-sm font-medium"><input checked={checked} className="h-4 w-4 accent-[var(--brand-primary)]" onChange={(event) => onChange(event.target.checked)} type="checkbox" />{label}</label>;
+  return <label className="inline-flex h-9 w-fit items-center gap-2 text-sm font-medium"><input checked={checked} className="h-4 w-4 accent-[var(--brand-primary)]" onChange={(event) => onChange(event.target.checked)} type="checkbox" />{label}</label>;
 }
 
 function categoryOptions(categories: CatalogCategory[]) {

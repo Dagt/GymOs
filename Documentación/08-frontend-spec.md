@@ -158,12 +158,15 @@ prorrateo y los accesos heredados se recalculan después del pago.
 Regla de catalogo:
 - Productos y servicios de mostrador se capturan en el formulario de producto.
 - `Producto con variantes` ofrece un alta masiva sencilla: producto base nuevo o
-  existente, un bloque único de datos comunes y una tabla compacta que muestra
-  sólo variante, código principal, SKU editable/autogenerado y acciones. El
+  existente, datos comunes principales visibles y datos secundarios plegados en
+  `Más datos del producto`. Inicia con una sola variante y muestra renglones
+  mínimos de variante, código principal, SKU editable/autogenerado y `Detalles`. El
   nombre de variante puede expresar sabor, tamaño o ambos (`Manzana · 60
-  porciones`). `Precio / tamaño` despliega solamente presentación, precio y
-  costo propios. El alta masiva no incorpora promociones y el botón `+` junto
-  al código principal agrega un alias sin abrir otro bloque explicativo.
+  porciones`). `Detalles` reemplaza temporalmente la lista con un editor enfocado
+  de presentación, precio y costo; los aliases permanecen plegados dentro de ese
+  editor. El alta masiva no incorpora promociones.
+- `Controlar inventario` es un control compacto junto a `Stock mínimo`; no ocupa
+  una tarjeta de ancho completo.
 - El alta masiva no expone un control fiscal adicional que no exista en el alta
   individual; conserva el valor canónico utilizado actualmente por catálogo.
 - La UI no expone `familia comercial` como entidad administrable: inicia con

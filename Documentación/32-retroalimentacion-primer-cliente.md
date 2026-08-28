@@ -87,14 +87,14 @@ Implementación V95:
   principal y unicidad activa por organización;
 - el alta `Producto con variantes` captura una vez producto base, marca,
   presentación, precio, costo, proveedor, categoría, unidad, inventario, mínimo
-  y etiquetas; una tabla compacta pide sólo variante, código principal y SKU
-  sugerido editable. La variante puede identificar sabor, tamaño/porciones o
-  ambos;
+  y etiquetas; los datos secundarios quedan plegados, inventario usa un control
+  corto y la lista inicia con una sola fila de variante, código principal y SKU
+  sugerido editable. La variante puede identificar sabor, tamaño/porciones o ambos;
 - el stock mínimo común se aplica a todas las variantes dentro de la misma
   transacción y conserva el permiso `inventory.manage`;
-- `Precio / tamaño` abre presentación, precio y costo únicamente para la variante
-  excepcional; el lote no pide promociones y los códigos alternativos se agregan
-  directamente junto al código principal, uno a la vez. Los datos
+- `Detalles` reemplaza la lista con un editor enfocado únicamente en la variante
+  excepcional: presentación, precio, costo y aliases plegados. El lote no pide
+  promociones ni apila varios formularios abiertos. Los datos
   comunes son defaults del lote: después de crearse, cada variante vuelve a ser
   completamente independiente;
 - el administrador ya no necesita localizar una pantalla de familias: el alta
