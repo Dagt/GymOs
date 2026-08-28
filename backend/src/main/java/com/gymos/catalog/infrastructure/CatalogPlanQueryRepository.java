@@ -24,7 +24,8 @@ class CatalogPlanQueryRepository {
 		JdbcClient.StatementSpec spec = jdbcClient.sql("""
 				SELECT mp.id, mp.product_id, cp.sku, cp.name, cp.price_cents, cp.currency,
 				       mp.duration_days, mp.grace_days, mp.benefits_json::text AS benefits_json,
-				       mp.multi_branch_access, mp.status, mp.created_at, mp.updated_at
+				       mp.multi_branch_access, mp.self_service_acquisition_enabled,
+				       mp.registration_fee_policy, mp.status, mp.created_at, mp.updated_at
 				FROM membership_plan mp
 				JOIN catalog_product cp ON cp.id = mp.product_id
 				WHERE mp.organization_id = :organizationId
@@ -45,7 +46,8 @@ class CatalogPlanQueryRepository {
 		JdbcClient.StatementSpec spec = jdbcClient.sql("""
 				SELECT mp.id, mp.product_id, cp.sku, cp.name, cp.price_cents, cp.currency,
 				       mp.duration_days, mp.grace_days, mp.benefits_json::text AS benefits_json,
-				       mp.multi_branch_access, mp.status, mp.created_at, mp.updated_at
+				       mp.multi_branch_access, mp.self_service_acquisition_enabled,
+				       mp.registration_fee_policy, mp.status, mp.created_at, mp.updated_at
 				FROM membership_plan mp
 				JOIN catalog_product cp ON cp.id = mp.product_id
 				WHERE mp.organization_id = :organizationId
@@ -63,7 +65,8 @@ class CatalogPlanQueryRepository {
 		return jdbcClient.sql("""
 				SELECT mp.id, mp.product_id, cp.sku, cp.name, cp.price_cents, cp.currency,
 				       mp.duration_days, mp.grace_days, mp.benefits_json::text AS benefits_json,
-				       mp.multi_branch_access, mp.status, mp.created_at, mp.updated_at
+				       mp.multi_branch_access, mp.self_service_acquisition_enabled,
+				       mp.registration_fee_policy, mp.status, mp.created_at, mp.updated_at
 				FROM membership_plan mp
 				JOIN catalog_product cp ON cp.id = mp.product_id
 				WHERE mp.organization_id = :organizationId

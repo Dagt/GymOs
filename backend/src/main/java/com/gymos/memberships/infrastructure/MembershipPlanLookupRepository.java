@@ -17,7 +17,8 @@ class MembershipPlanLookupRepository {
 	Optional<PlanForRenewal> forRenewal(UUID organizationId, UUID planId) {
 		return jdbcClient.sql("""
 				SELECT mp.id AS plan_id, mp.product_id, cp.name AS plan_name,
-				       mp.duration_days, mp.grace_days, mp.multi_branch_access, cp.price_cents, cp.currency
+				       mp.duration_days, mp.grace_days, mp.multi_branch_access,
+				       mp.registration_fee_policy, cp.price_cents, cp.currency
 				FROM membership_plan mp
 				JOIN catalog_product cp ON cp.id = mp.product_id
 				WHERE mp.organization_id = :organizationId
@@ -36,7 +37,8 @@ class MembershipPlanLookupRepository {
 	Optional<PlanForRenewal> forProduct(UUID organizationId, UUID productId) {
 		return jdbcClient.sql("""
 				SELECT mp.id AS plan_id, mp.product_id, cp.name AS plan_name,
-				       mp.duration_days, mp.grace_days, mp.multi_branch_access, cp.price_cents, cp.currency
+				       mp.duration_days, mp.grace_days, mp.multi_branch_access,
+				       mp.registration_fee_policy, cp.price_cents, cp.currency
 				FROM membership_plan mp
 				JOIN catalog_product cp ON cp.id = mp.product_id
 				WHERE mp.organization_id = :organizationId

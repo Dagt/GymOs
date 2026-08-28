@@ -14,6 +14,8 @@ export type BenefitSummary = {
   validUntil: string | null;
   status: "ACTIVE" | "INACTIVE";
   planIds: string[];
+  accessScope?: "LOCAL" | "PLAN_COVERAGE";
+  applicablePlanIds?: string[];
   version?: number;
 };
 
@@ -32,6 +34,8 @@ export type BenefitPayload = {
   validUntil?: string | null;
   status: "ACTIVE" | "INACTIVE";
   planIds?: string[];
+  accessScope?: "LOCAL" | "PLAN_COVERAGE";
+  applicablePlanIds?: string[];
 };
 
 export type ClientBenefitSummary = {

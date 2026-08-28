@@ -101,10 +101,33 @@ public class ClientLifecycleRepository {
 				.optional();
 	}
 
+	public Optional<LocalDate> latestVisitPackageEnd(UUID organizationId, UUID clientId) {
+		return jdbcClient.sql("""
+				SELECT MAX(
+				    CASE
+				        WHEN status = 'ACTIVE' THEN valid_until
+				        ELSE LEAST(valid_until, updated_at::date)
+				    END
+				)
+				FROM visit_package_entitlement
+				WHERE organization_id = :organizationId
+				  AND client_id = :clientId
+				  AND activated_at IS NOT NULL
+				  AND deleted_at IS NULL
+				""")
+				.param("organizationId", organizationId)
+				.param("clientId", clientId)
+				.query(LocalDate.class)
+				.optional();
+	}
+
 	public List<ClientInactivityCandidate> automaticInactivityCandidates(LocalDate effectiveOn, int limit) {
 		return jdbcClient.sql("""
 				SELECT client.id, client.organization_id, client.home_branch_id,
-				       COALESCE(history.latest_membership_end, client.joined_at::date) AS last_activity_on
+				       GREATEST(
+				           COALESCE(history.latest_membership_end, client.joined_at::date),
+				           COALESCE(package_history.latest_package_end, client.joined_at::date)
+				       ) AS last_activity_on
 				FROM client
 				JOIN client_lifecycle_configuration configuration
 				  ON configuration.organization_id = client.organization_id
@@ -116,9 +139,23 @@ public class ClientLifecycleRepository {
 				      AND membership.client_id = client.id
 				      AND membership.deleted_at IS NULL
 				) history ON true
+				LEFT JOIN LATERAL (
+				    SELECT MAX(
+				        CASE WHEN entitlement.status = 'ACTIVE' THEN entitlement.valid_until
+				             ELSE LEAST(entitlement.valid_until, entitlement.updated_at::date) END
+				    ) AS latest_package_end
+				    FROM visit_package_entitlement entitlement
+				    WHERE entitlement.organization_id = client.organization_id
+				      AND entitlement.client_id = client.id
+				      AND entitlement.activated_at IS NOT NULL
+				      AND entitlement.deleted_at IS NULL
+				) package_history ON true
 				WHERE client.status = 'ACTIVE'
 				  AND client.deleted_at IS NULL
-				  AND COALESCE(history.latest_membership_end, client.joined_at::date)
+				  AND GREATEST(
+				      COALESCE(history.latest_membership_end, client.joined_at::date),
+				      COALESCE(package_history.latest_package_end, client.joined_at::date)
+				  )
 				      <= :effectiveOn - (configuration.inactivity_months * INTERVAL '1 month')
 				  AND NOT EXISTS (
 				      SELECT 1
@@ -129,7 +166,18 @@ public class ClientLifecycleRepository {
 				        AND active_membership.grace_ends_on >= :effectiveOn
 				        AND active_membership.deleted_at IS NULL
 				  )
-				ORDER BY COALESCE(history.latest_membership_end, client.joined_at::date), client.id
+				  AND NOT EXISTS (
+				      SELECT 1
+				      FROM visit_package_entitlement active_package
+				      WHERE active_package.organization_id = client.organization_id
+				        AND active_package.client_id = client.id
+				        AND active_package.status = 'ACTIVE'
+				        AND active_package.remaining_visits > 0
+				        AND active_package.valid_from <= :effectiveOn
+				        AND active_package.valid_until >= :effectiveOn
+				        AND active_package.deleted_at IS NULL
+				  )
+				ORDER BY last_activity_on, client.id
 				LIMIT :limit
 				FOR UPDATE OF client SKIP LOCKED
 				""")

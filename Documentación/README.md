@@ -29,6 +29,8 @@ GymFort es la identidad comercial vigente. `GymOS`/`gymos` permanece como nombre
 19. `modulos/22-platform-billing.md`: operación comercial de GymFort por cliente y sucursal.
 20. `32-retroalimentacion-primer-cliente.md`: análisis, agrupación y avance de
     las necesidades validadas con el primer cliente real.
+21. `33-planes-beneficios-paquetes-visitas.md`: arquitectura aprobada para
+    políticas de planes, beneficios y paquetes de visitas multi-sucursal.
 
 Para **Automatizaciones y Notificaciones**, las fichas `modulos/16-automations.md`, `modulos/17-notifications.md` y el diseño rector `31-diseño-automatizaciones-kiosco.md` representan el corte funcional vigente. Las notas etiquetadas como hitos históricos dentro de documentos generales como `06-api-contracts.md` u `08-frontend-spec.md` describen etapas de evolución y no deben prevalecer sobre esas fichas cuando exista una diferencia de detalle.
 

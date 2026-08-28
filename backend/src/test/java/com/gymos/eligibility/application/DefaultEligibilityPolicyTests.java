@@ -40,7 +40,7 @@ class DefaultEligibilityPolicyTests {
 	@Test
 	void exposesPricingBenefitsThroughTheSamePolicy() {
 		EligibleBenefit discount = benefit(UUID.randomUUID(), BenefitType.PRICING);
-		when(facts.pricingBenefits(organizationId, branchId, clientId, effectiveOn))
+		when(facts.pricingBenefits(organizationId, branchId, clientId, effectiveOn, null))
 				.thenReturn(List.of(discount));
 
 		var decision = policy.evaluate(EligibilityRequest.membershipPricing(

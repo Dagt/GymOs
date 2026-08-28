@@ -13,6 +13,7 @@ import com.gymos.platformadmin.infrastructure.PlatformCustomerAccountRepository.
 import com.gymos.platformbilling.infrastructure.PlatformBillingRepository;
 import com.gymos.platformbilling.infrastructure.PlatformBillingRepository.BillingPaymentWrite;
 import com.gymos.platformbilling.infrastructure.PlatformBillingRepository.BillingUpdateRecord;
+import com.gymos.visitpackages.infrastructure.VisitPackageEntitlementRepository;
 import java.math.BigDecimal;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -181,6 +182,20 @@ class DatabaseMigrationTests {
 			assertThat(columnExists(connection, "membership", "auto_renew")).isTrue();
 			assertThat(columnExists(connection, "membership", "cancelled_at")).isTrue();
 			assertThat(columnExists(connection, "membership_plan", "multi_branch_access")).isTrue();
+			assertThat(columnExists(connection, "membership_plan", "self_service_acquisition_enabled")).isTrue();
+			assertThat(columnExists(connection, "membership_plan", "registration_fee_policy")).isTrue();
+			assertThat(columnExists(connection, "benefit", "access_scope")).isTrue();
+			assertThat(tableExists(connection, "pricing_benefit_membership_plan")).isTrue();
+			assertThat(tableExists(connection, "visit_package_plan")).isTrue();
+			assertThat(tableExists(connection, "visit_package_plan_branch")).isTrue();
+			assertThat(tableExists(connection, "visit_package_plan_benefit")).isTrue();
+			assertThat(tableExists(connection, "visit_package_entitlement")).isTrue();
+			assertThat(tableExists(connection, "visit_package_entitlement_branch")).isTrue();
+			assertThat(tableExists(connection, "visit_package_entitlement_benefit")).isTrue();
+			assertThat(tableExists(connection, "visit_package_consumption")).isTrue();
+			assertThat(columnExists(connection, "visit_package_entitlement", "validity_days")).isTrue();
+			assertThat(indexExists(connection, "ux_visit_package_entitlement_open_client")).isTrue();
+			assertThat(indexExists(connection, "ux_visit_package_consumption_idempotency")).isTrue();
 			assertThat(columnExists(connection, "automation_rule", "trigger_type")).isTrue();
 			assertThat(columnExists(connection, "automation_rule", "next_run_at")).isTrue();
 			assertThat(columnExists(connection, "branch", "brand_name")).isFalse();
@@ -212,6 +227,162 @@ class DatabaseMigrationTests {
 			assertThat(columnExists(connection, "branch", "surface_color")).isFalse();
 			assertThat(roleHasPermission(connection, "Recepcion", "resource.manage")).isFalse();
 			assertThat(roleHasPermission(connection, "Recepcion", "booking.manage")).isTrue();
+		}
+	}
+
+	@Test
+	void upgradeFromV95AddsPlanPoliciesAndVisitPackagesWithoutReinterpretingLegacyPasses() throws Exception {
+		String schema = migrationSchema("plans_visits_v95");
+		migrateSchema(schema, "95");
+		try (var connection = schemaConnection(schema)) {
+			assertThat(tableExists(connection, schema, "visit_pass")).isTrue();
+			assertThat(tableExists(connection, schema, "visit_package_plan")).isFalse();
+		}
+
+		migrateSchema(schema, null);
+
+		try (var connection = schemaConnection(schema)) {
+			assertThat(columnExists(connection, schema, "membership_plan", "self_service_acquisition_enabled")).isTrue();
+			assertThat(columnExists(connection, schema, "membership_plan", "registration_fee_policy")).isTrue();
+			assertThat(columnExists(connection, schema, "benefit", "access_scope")).isTrue();
+			assertThat(tableExists(connection, schema, "pricing_benefit_membership_plan")).isTrue();
+			assertThat(tableExists(connection, schema, "visit_package_plan")).isTrue();
+			assertThat(tableExists(connection, schema, "visit_package_entitlement")).isTrue();
+			assertThat(tableExists(connection, schema, "visit_package_consumption")).isTrue();
+			assertThat(columnExists(connection, schema, "visit_package_entitlement", "validity_days")).isTrue();
+			assertThat(tableExists(connection, schema, "visit_pass")).isTrue();
+		}
+	}
+
+	@Test
+	void visitPackageEntitlementAllowsOnlyOneOpenPackagePerClient() throws Exception {
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		UUID personId = UUID.randomUUID();
+		UUID clientId = UUID.randomUUID();
+		UUID productId = UUID.randomUUID();
+		UUID planId = UUID.randomUUID();
+		UUID firstSaleId = UUID.randomUUID();
+		UUID secondSaleId = UUID.randomUUID();
+		try (var connection = DriverManager.getConnection(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())) {
+			insertOrganization(connection, organizationId);
+			insertBranch(connection, organizationId, branchId);
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO person (
+					    id, organization_id, first_name, last_name, email, phone, status,
+					    created_at, updated_at, version
+					) VALUES (?, ?, 'Paola', 'Visitas', ?, ?, 'ACTIVE', now(), now(), 0)
+					""")) {
+				statement.setObject(1, personId);
+				statement.setObject(2, organizationId);
+				statement.setString(3, "visitas-" + personId + "@example.com");
+				statement.setString(4, "+521" + Math.abs(personId.hashCode()));
+				statement.executeUpdate();
+			}
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO client (
+					    id, organization_id, person_id, home_branch_id, status, joined_at,
+					    created_at, updated_at, version
+					) VALUES (?, ?, ?, ?, 'ACTIVE', now(), now(), now(), 0)
+					""")) {
+				statement.setObject(1, clientId);
+				statement.setObject(2, organizationId);
+				statement.setObject(3, personId);
+				statement.setObject(4, branchId);
+				statement.executeUpdate();
+			}
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO catalog_product (
+					    id, organization_id, sku, name, product_type, commercial_subtype,
+					    price_cents, currency, taxable, status, created_at, updated_at, version
+					) VALUES (?, ?, ?, '10 visitas', 'SERVICE', 'VISIT_PASS',
+					          90000, 'MXN', TRUE, 'ACTIVE', now(), now(), 0)
+					""")) {
+				statement.setObject(1, productId);
+				statement.setObject(2, organizationId);
+				statement.setString(3, "VISITAS-" + productId);
+				statement.executeUpdate();
+			}
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO visit_package_plan (
+					    id, organization_id, product_id, total_visits, validity_days,
+					    branch_scope, self_service_acquisition_enabled,
+					    registration_fee_policy, status, created_at, updated_at, version
+					) VALUES (?, ?, ?, 10, 45, 'ALL_BRANCHES', TRUE, 'DEFAULT',
+					          'ACTIVE', now(), now(), 0)
+					""")) {
+				statement.setObject(1, planId);
+				statement.setObject(2, organizationId);
+				statement.setObject(3, productId);
+				statement.executeUpdate();
+			}
+			String clientKey = clientId.toString().substring(0, 8);
+			insertSale(connection, firstSaleId, organizationId, branchId, "VP-1-" + clientKey, "vp-1-" + clientId);
+			insertSale(connection, secondSaleId, organizationId, branchId, "VP-2-" + clientKey, "vp-2-" + clientId);
+			insertVisitPackageEntitlement(connection, UUID.randomUUID(), organizationId, branchId, clientId, planId, firstSaleId, "PENDING_PAYMENT");
+
+			assertThatThrownBy(() -> insertVisitPackageEntitlement(
+					connection, UUID.randomUUID(), organizationId, branchId, clientId, planId,
+					secondSaleId, "ACTIVE"))
+					.isInstanceOf(SQLException.class);
+
+			try (var statement = connection.prepareStatement("""
+					UPDATE visit_package_entitlement
+					SET status = 'CANCELLED', updated_at = now()
+					WHERE organization_id = ? AND client_id = ?
+					""")) {
+				statement.setObject(1, organizationId);
+				statement.setObject(2, clientId);
+				statement.executeUpdate();
+			}
+			UUID activeEntitlementId = UUID.randomUUID();
+			assertThatCode(() -> insertVisitPackageEntitlement(
+					connection, activeEntitlementId, organizationId, branchId, clientId, planId,
+					secondSaleId, "ACTIVE")).doesNotThrowAnyException();
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO visit_package_entitlement_branch (
+					    entitlement_id, branch_id, organization_id, created_at
+					) VALUES (?, ?, ?, now())
+					""")) {
+				statement.setObject(1, activeEntitlementId);
+				statement.setObject(2, branchId);
+				statement.setObject(3, organizationId);
+				statement.executeUpdate();
+			}
+			UUID deviceId = UUID.randomUUID();
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO access_device (
+					    id, organization_id, branch_id, name, device_code, device_type,
+					    status, provider, created_at, updated_at, version
+					) VALUES (?, ?, ?, 'Entrada', ?, 'TURNSTILE', 'ACTIVE', 'SIMULATED', now(), now(), 0)
+					""")) {
+				statement.setObject(1, deviceId);
+				statement.setObject(2, organizationId);
+				statement.setObject(3, branchId);
+				statement.setString(4, "VISIT-" + deviceId);
+				statement.executeUpdate();
+			}
+			var repository = new VisitPackageEntitlementRepository(
+					JdbcClient.create(new SingleConnectionDataSource(connection, true)));
+			OffsetDateTime occurredAt = OffsetDateTime.now();
+			var firstConsumption = repository.consumeForAccess(
+					organizationId, branchId, clientId, List.of(), deviceId, "door-event-1",
+					LocalDate.now(), occurredAt);
+			var retriedConsumption = repository.consumeForAccess(
+					organizationId, branchId, clientId, List.of(), deviceId, "door-event-1",
+					LocalDate.now(), occurredAt.plusSeconds(1));
+
+			assertThat(firstConsumption).isPresent();
+			assertThat(retriedConsumption).contains(firstConsumption.orElseThrow());
+			assertThat(firstConsumption.orElseThrow().remainingAfter()).isEqualTo(9);
+			try (var statement = connection.prepareStatement(
+					"SELECT remaining_visits FROM visit_package_entitlement WHERE id=?")) {
+				statement.setObject(1, activeEntitlementId);
+				try (var result = statement.executeQuery()) {
+					assertThat(result.next()).isTrue();
+					assertThat(result.getInt(1)).isEqualTo(9);
+				}
+			}
 		}
 	}
 
@@ -915,6 +1086,33 @@ class DatabaseMigrationTests {
 			statement.setObject(3, branchId);
 			statement.setString(4, saleNumber);
 			statement.setString(5, idempotencyKey);
+			statement.executeUpdate();
+		}
+	}
+
+	private void insertVisitPackageEntitlement(
+			java.sql.Connection connection, UUID entitlementId, UUID organizationId,
+			UUID branchId, UUID clientId, UUID planId, UUID saleId, String status
+	) throws SQLException {
+		try (var statement = connection.prepareStatement("""
+				INSERT INTO visit_package_entitlement (
+				    id, organization_id, home_branch_id, client_id, visit_package_plan_id,
+				    sale_id, status, total_visits, remaining_visits, validity_days, valid_from, valid_until,
+				    activated_at, pending_expires_at, created_at, updated_at, version
+				) VALUES (?, ?, ?, ?, ?, ?, ?, 10, 10, 45, current_date, current_date + 44,
+				          CASE WHEN ? = 'ACTIVE' THEN now() ELSE NULL END,
+				          CASE WHEN ? = 'PENDING_PAYMENT' THEN now() + interval '30 minutes' ELSE NULL END,
+				          now(), now(), 0)
+				""")) {
+			statement.setObject(1, entitlementId);
+			statement.setObject(2, organizationId);
+			statement.setObject(3, branchId);
+			statement.setObject(4, clientId);
+			statement.setObject(5, planId);
+			statement.setObject(6, saleId);
+			statement.setString(7, status);
+			statement.setString(8, status);
+			statement.setString(9, status);
 			statement.executeUpdate();
 		}
 	}

@@ -56,6 +56,14 @@ public interface EligibilityPolicy {
 					Purpose.MEMBERSHIP_PRICING, Set.of(), Set.of());
 		}
 
+		public static EligibilityRequest membershipPricing(
+				UUID organizationId, UUID branchId, UUID clientId, LocalDate effectiveOn, UUID targetPlanId
+		) {
+			return new EligibilityRequest(
+					organizationId, branchId, clientId, effectiveOn,
+					Purpose.MEMBERSHIP_PRICING, Set.of(targetPlanId), Set.of());
+		}
+
 		public static EligibilityRequest booking(
 				UUID organizationId, UUID branchId, UUID clientId, LocalDate effectiveOn,
 				Set<UUID> requiredPlanIds

@@ -76,8 +76,12 @@ public class ClientLifecycleService implements ClientLifecycleOperations {
 			return RegistrationFee.none(configuration.currency(), configuration.inactivityMonths());
 		}
 		LocalDate latestMembershipEnd = repository.latestMembershipEnd(organizationId, clientId).orElse(null);
-		boolean due = latestMembershipEnd == null
-				|| !latestMembershipEnd.plusMonths(configuration.inactivityMonths()).isAfter(effectiveOn);
+		LocalDate latestVisitPackageEnd = repository.latestVisitPackageEnd(organizationId, clientId).orElse(null);
+		LocalDate latestAccessEnd = latestMembershipEnd == null ? latestVisitPackageEnd
+				: latestVisitPackageEnd == null ? latestMembershipEnd
+				: latestMembershipEnd.isAfter(latestVisitPackageEnd) ? latestMembershipEnd : latestVisitPackageEnd;
+		boolean due = latestAccessEnd == null
+				|| !latestAccessEnd.plusMonths(configuration.inactivityMonths()).isAfter(effectiveOn);
 		if (!due) {
 			return RegistrationFee.none(configuration.currency(), configuration.inactivityMonths());
 		}

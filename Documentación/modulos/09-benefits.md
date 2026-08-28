@@ -154,6 +154,15 @@ reemplazado posteriormente.
 
 La infraestructura histórica de `VisitPass` no se considera parte del modelo
 vigente de Benefits. Las visitas diarias continúan como planes de un día. Para
-paquetes de N visitas se diseñará un derecho vendible con saldo único y alcance
+paquetes de N visitas existe un derecho vendible con saldo único y alcance
 de sucursales dentro de la misma organización; no es intercambio entre tenants
 ni una duplicación del paquete por sede.
+
+## Alcances V96–V99
+
+- `SPECIAL_PRICE` exige `applicablePlanIds`; sólo modifica el plan objetivo.
+- `ACCESS/LOCAL` conserva la semántica por sucursal.
+- `ACCESS/PLAN_COVERAGE` se reconoce en las sedes cubiertas por el plan que lo
+  concede, sin copiar el beneficio.
+- Un paquete captura como snapshot sus beneficios `ACCESS`; cambios posteriores
+  a la definición no alteran lo ya vendido.

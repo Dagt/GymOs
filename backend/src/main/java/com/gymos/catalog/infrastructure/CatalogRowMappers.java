@@ -42,6 +42,7 @@ final class CatalogRowMappers {
 				resultSet.getString("sku"), resultSet.getString("name"), resultSet.getLong("price_cents"),
 				resultSet.getString("currency"), resultSet.getInt("duration_days"), resultSet.getInt("grace_days"),
 				resultSet.getString("benefits_json"), resultSet.getBoolean("multi_branch_access"),
+				resultSet.getBoolean("self_service_acquisition_enabled"), resultSet.getString("registration_fee_policy"),
 				resultSet.getString("status"), resultSet.getObject("created_at", OffsetDateTime.class),
 				resultSet.getObject("updated_at", OffsetDateTime.class)
 		);

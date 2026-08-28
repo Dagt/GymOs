@@ -29,6 +29,9 @@ const defaultForm: BenefitPayload = {
   combinable: false,
   priority: 10,
   status: "ACTIVE",
+  accessScope: "LOCAL",
+  planIds: [],
+  applicablePlanIds: [],
 };
 
 export default function BenefitsPage() {
@@ -36,6 +39,7 @@ export default function BenefitsPage() {
   const [benefits, setBenefits] = useState<BenefitSummary[]>([]);
   const [plans, setPlans] = useState<PlanSummary[]>([]);
   const [selectedPlanIds, setSelectedPlanIds] = useState<string[]>([]);
+  const [selectedApplicablePlanIds, setSelectedApplicablePlanIds] = useState<string[]>([]);
   const [form, setForm] = useState<BenefitPayload>(defaultForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -107,8 +111,11 @@ export default function BenefitsPage() {
         discountPercent: benefit.discountPercent, discountValueCents: benefit.discountValueCents,
         requiresEvidence: benefit.requiresEvidence, combinable: benefit.combinable, priority: benefit.priority,
         status: benefit.status, validFrom: benefit.validFrom, validUntil: benefit.validUntil,
+        accessScope: benefit.accessScope ?? "LOCAL",
+        applicablePlanIds: benefit.applicablePlanIds ?? [],
       } : { ...defaultForm });
       setSelectedPlanIds(benefit?.planIds ?? []);
+      setSelectedApplicablePlanIds(benefit?.applicablePlanIds ?? []);
       setShowBenefitDrawer(true);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible cargar los planes.");
@@ -134,6 +141,8 @@ export default function BenefitsPage() {
         discountValueCents: form.benefitType === "ACCESS" ? null : form.discountValueCents,
         requiresEvidence: form.benefitType === "ACCESS" ? editing?.requiresEvidence ?? false : form.requiresEvidence,
         planIds: form.benefitType === "ACCESS" ? selectedPlanIds : [],
+        accessScope: form.benefitType === "ACCESS" ? form.accessScope ?? "LOCAL" : "LOCAL",
+        applicablePlanIds: form.benefitType !== "ACCESS" && form.discountType === "SPECIAL_PRICE" ? selectedApplicablePlanIds : [],
       };
       const saved = editing
         ? await updateBenefit(session.accessToken, editing.id, payload, editing.version ?? 0)
@@ -142,6 +151,7 @@ export default function BenefitsPage() {
       setMessage(editing ? "Beneficio actualizado. Los planes vinculados comparten el mismo beneficio." : "Beneficio creado.");
       setForm(defaultForm);
       setSelectedPlanIds([]);
+      setSelectedApplicablePlanIds([]);
       setShowBenefitDrawer(false);
       setEditing(null);
     } catch (exception) {
@@ -210,7 +220,7 @@ export default function BenefitsPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-black">{benefit.name}</p>
-                    <p className="mt-1 text-xs text-[var(--brand-muted)]">{benefit.code} · {benefit.benefitType === "ACCESS" ? "Acceso" : "Descuento"}{benefit.branchId === null ? " · Todas las sucursales" : ""}{benefit.status === "INACTIVE" ? " · Inactivo" : ""}</p>
+                    <p className="mt-1 text-xs text-[var(--brand-muted)]">{benefit.code} · {benefit.benefitType === "ACCESS" ? "Acceso" : "Descuento"}{benefit.accessScope === "PLAN_COVERAGE" ? " · Cobertura del plan" : benefit.branchId === null ? " · Todas las sucursales" : " · Local"}{benefit.status === "INACTIVE" ? " · Inactivo" : ""}</p>
                   </div>
                   {canManageBenefits ? <button className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--brand-muted)] transition-colors hover:bg-[var(--brand-surface)] hover:text-[var(--brand-primary)] focus-visible:outline-2 focus-visible:outline-offset-2" onClick={() => void openEditor(benefit)} type="button" aria-label={`Editar ${benefit.name}`} title={`Editar ${benefit.name}`}><Pencil className="h-4 w-4" aria-hidden="true" /></button> : null}
                 </div>
@@ -220,6 +230,10 @@ export default function BenefitsPage() {
                 {benefit.benefitType === "ACCESS" ? (
                   <p className="mt-2 text-xs font-bold text-[var(--brand-primary)]">
                     Planes: {benefit.planIds.map((id) => plans.find((plan) => plan.id === id)?.name ?? "Plan histórico vinculado").join(", ") || "Sin planes vinculados"}
+                  </p>
+                ) : benefit.discountType === "SPECIAL_PRICE" ? (
+                  <p className="mt-2 text-xs font-bold text-[var(--brand-primary)]">
+                    Aplica a: {(benefit.applicablePlanIds ?? []).map((id) => plans.find((plan) => plan.id === id)?.name ?? "Plan histórico").join(", ") || "Requiere configuración"}
                   </p>
                 ) : null}
               </article>
@@ -254,7 +268,10 @@ export default function BenefitsPage() {
                   discountPercent: benefitType === "ACCESS" ? null : (form.discountPercent ?? 10),
                   discountValueCents: null,
                   requiresEvidence: benefitType === "ACCESS" ? false : form.requiresEvidence,
+                  accessScope: benefitType === "ACCESS" ? "LOCAL" : "LOCAL",
                 });
+                setSelectedPlanIds([]);
+                setSelectedApplicablePlanIds([]);
               }}
             >
               <option value="STUDENT">Estudiante</option>
@@ -309,6 +326,12 @@ export default function BenefitsPage() {
               {plans.length === 0 ? <p className="text-sm text-amber-800">Crea primero un plan de membresía para poder vincular este acceso.</p> : null}
               {editing ? <p className="text-xs text-amber-800">Puedes vincular varios planes al mismo acceso. Quitar un plan retira este beneficio de los derechos de sus socios.</p> : null}
               {!editing ? <p className="text-xs text-[var(--brand-muted)]">Los socios con cualquiera de estos planes reciben el acceso automáticamente.</p> : null}
+              <label className="grid gap-2 text-sm font-bold text-[#42514a]">Dónde se reconoce
+                <select className="app-input" value={form.accessScope ?? "LOCAL"} onChange={(event) => setForm({ ...form, accessScope: event.target.value as BenefitPayload["accessScope"] })}>
+                  <option value="LOCAL">Sólo en esta sucursal</option>
+                  <option value="PLAN_COVERAGE">En las sucursales cubiertas por el plan</option>
+                </select>
+              </label>
             </div>
           ) : (
             <div className="grid gap-4">
@@ -321,6 +344,20 @@ export default function BenefitsPage() {
                 {form.discountType === "PERCENT" ? "Descuento %" : "Importe (MXN)"}
                 <input className="app-input" required type="number" min="0.01" step="0.01" max={form.discountType === "PERCENT" ? 100 : undefined} value={form.discountType === "PERCENT" ? form.discountPercent ?? 0 : (form.discountValueCents ?? 0) / 100} onChange={(event) => setForm(form.discountType === "PERCENT" ? { ...form, discountPercent: Number(event.target.value), discountValueCents: null } : { ...form, discountValueCents: Math.round(Number(event.target.value) * 100), discountPercent: null })} />
               </label>
+              {form.discountType === "SPECIAL_PRICE" ? (
+                <div className="grid gap-2">
+                  <p className="text-sm font-bold text-[#42514a]">Aplica a estos planes</p>
+                  <div className="app-scroll-list app-scroll-list--short grid gap-2 rounded-md border border-[var(--brand-line)] bg-gray-50 p-3">
+                    {plans.map((plan) => (
+                      <label key={plan.id} className="flex cursor-pointer items-center gap-2 text-xs font-bold text-gray-800">
+                        <input type="checkbox" checked={selectedApplicablePlanIds.includes(plan.id)} onChange={(event) => setSelectedApplicablePlanIds((current) => event.target.checked ? [...new Set([...current, plan.id])] : current.filter((id) => id !== plan.id))} />
+                        <span>{plan.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                  <p className="text-xs text-[var(--brand-muted)]">El precio absoluto sólo modifica los planes seleccionados.</p>
+                </div>
+              ) : null}
               <p className="text-xs font-medium text-gray-500 italic bg-gray-50 p-2.5 rounded-lg border border-gray-100">
                 💡 Este convenio/descuento podrá asignarse a perfiles de socios y aplicarse sobre la suscripción de su plan.
               </p>
@@ -335,7 +372,7 @@ export default function BenefitsPage() {
           </label> : null}
           <button
             className="app-button h-11"
-            disabled={saving || (form.benefitType === "ACCESS" && selectedPlanIds.length === 0)}
+            disabled={saving || (form.benefitType === "ACCESS" && selectedPlanIds.length === 0) || (form.benefitType !== "ACCESS" && form.discountType === "SPECIAL_PRICE" && selectedApplicablePlanIds.length === 0)}
             type="submit"
           >
             {saving ? "Guardando..." : editing ? "Guardar cambios" : "Crear beneficio"}

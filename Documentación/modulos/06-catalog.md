@@ -56,3 +56,21 @@ frontend de POS y E2E de alta masiva, 27-ago-2026.
 registro de una página y carrito entre páginas. Esto no equivale a una prueba
 de carga productiva ni cierra el ciclo de imágenes de `CAT-001`.
 Contrato y límites: [paginación de listados](../../docs/operations/list-pagination.md).
+
+## Lote activo: políticas y paquetes de visitas
+
+- `membership_plan` separa cobertura, disponibilidad para nuevas operaciones de
+  kiosco y política de inscripción. Ocultar un plan no impide que Recepción lo
+  venda ni que su titular lo renueve.
+- `SPECIAL_PRICE` se relaciona con planes aplicables mediante una tabla distinta
+  de `benefit_membership_plan`.
+- `visit_package_plan` configura un producto `SERVICE/VISIT_PASS` con visitas,
+  vigencia, sedes y accesos. La UI vive en Catálogo inmediatamente junto a
+  `Planes de membresía`, no en Configuración del sistema.
+- La definición es de organización; `branchScope` decide dónde puede usarse. No
+  se crean copias de saldo por sucursal.
+- Planes y paquetes muestran “Mostrar para contratar en kiosco” y
+  “Inscripción: configuración general / no cobrar”. Son políticas independientes
+  por oferta; Recepción conserva acceso a las ofertas ocultas.
+
+Contrato integral: `../33-planes-beneficios-paquetes-visitas.md`.

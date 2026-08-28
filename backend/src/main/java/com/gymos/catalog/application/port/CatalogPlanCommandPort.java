@@ -10,8 +10,17 @@ public interface CatalogPlanCommandPort {
 
 	record PlanMutation(
 			UUID organizationId, UUID planId, UUID productId, int durationDays, int graceDays,
-			String benefitsJson, boolean multiBranchAccess, String status,
+			String benefitsJson, boolean multiBranchAccess, boolean selfServiceAcquisitionEnabled,
+			String registrationFeePolicy, String status,
 			OffsetDateTime now, UUID userId
 	) {
+		public PlanMutation(
+				UUID organizationId, UUID planId, UUID productId, int durationDays, int graceDays,
+				String benefitsJson, boolean multiBranchAccess, String status,
+				OffsetDateTime now, UUID userId
+		) {
+			this(organizationId, planId, productId, durationDays, graceDays, benefitsJson,
+					multiBranchAccess, true, "DEFAULT", status, now, userId);
+		}
 	}
 }

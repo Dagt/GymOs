@@ -61,6 +61,7 @@ public class BenefitService {
 		}
 		UUID benefitId = benefitRepository.createBenefit(principal, benefitBranchId, command);
 		benefitRepository.replaceMembershipPlans(principal, benefitId, command.planIds());
+		benefitRepository.replaceApplicableMembershipPlans(principal, benefitId, command.applicablePlanIds());
 		auditService.record(principal, "BENEFIT_CREATED", "BENEFIT", benefitId, "BACKOFFICE", null, correlationId);
 		if ("ACCESS".equalsIgnoreCase(command.benefitType())) {
 			eventPublisher.publishEvent(new AccessBenefitConfigurationChangedV1(
@@ -82,17 +83,38 @@ public class BenefitService {
 	private void validatePlanLinks(GymOsPrincipal principal, CreateBenefitCommand command,
 			UUID benefitBranchId, List<UUID> existingPlanIds) {
 		boolean accessBenefit = "ACCESS".equalsIgnoreCase(command.benefitType());
+		boolean specialPrice = "SPECIAL_PRICE".equalsIgnoreCase(command.discountType());
 		if (!accessBenefit && !command.planIds().isEmpty()) {
 			throw new BusinessException("BENEFIT_PLAN_LINK_NOT_ALLOWED", "Solo los beneficios de acceso pueden vincularse con planes.");
 		}
 		if (accessBenefit && command.planIds().isEmpty()) {
 			throw new BusinessException("BENEFIT_PLAN_REQUIRED", "Selecciona al menos un plan para el beneficio de acceso.");
 		}
+		if (accessBenefit && !command.applicablePlanIds().isEmpty()) {
+			throw new BusinessException("BENEFIT_PRICING_PLAN_LINK_NOT_ALLOWED", "Un beneficio de acceso no utiliza planes de precio especial.");
+		}
+		if (!accessBenefit && !"LOCAL".equalsIgnoreCase(command.accessScope())) {
+			throw new BusinessException("BENEFIT_ACCESS_SCOPE_NOT_ALLOWED", "El alcance por cobertura sólo aplica a beneficios de acceso.");
+		}
+		if (!accessBenefit && specialPrice && command.applicablePlanIds().isEmpty()) {
+			throw new BusinessException("BENEFIT_APPLICABLE_PLAN_REQUIRED", "Selecciona al menos un plan para el precio especial.");
+		}
+		if (!accessBenefit && !specialPrice && !command.applicablePlanIds().isEmpty()) {
+			throw new BusinessException("BENEFIT_APPLICABLE_PLAN_NOT_ALLOWED", "Los planes aplicables sólo se configuran para precios especiales.");
+		}
+		String accessScope = command.accessScope().trim().toUpperCase();
+		if (!"LOCAL".equals(accessScope) && !"PLAN_COVERAGE".equals(accessScope)) {
+			throw new BusinessException("BENEFIT_ACCESS_SCOPE_INVALID", "Selecciona un alcance de acceso válido.");
+		}
 		// Existing links can remain for historical memberships after a plan is retired.
 		// Only newly linked plans must be currently available; no silent removal of rights.
 		List<UUID> newPlans = command.planIds().stream().filter(id -> !existingPlanIds.contains(id)).toList();
 		if (!benefitRepository.membershipPlansExist(principal.organizationId(), newPlans)) {
 			throw new BusinessException("MEMBERSHIP_PLAN_NOT_AVAILABLE", "Uno o mas planes no existen o no pertenecen a la organizacion.");
+		}
+		if (!command.applicablePlanIds().isEmpty()
+				&& !benefitRepository.membershipPlansExist(principal.organizationId(), command.applicablePlanIds())) {
+			throw new BusinessException("MEMBERSHIP_PLAN_NOT_AVAILABLE", "Uno o más planes aplicables no existen o no pertenecen a la organización.");
 		}
 		validateDiscountDefinition(command, accessBenefit);
 		if (command.validFrom() != null && command.validUntil() != null
@@ -120,12 +142,14 @@ public class BenefitService {
 		CreateBenefitCommand definition = new CreateBenefitCommand(
 				current.branchId(), current.code(), command.name(), current.benefitType(), command.discountType(),
 				command.discountValueCents(), command.discountPercent(), command.requiresEvidence(), command.combinable(),
-				command.priority(), command.validFrom(), command.validUntil(), command.status(), command.planIds());
+				command.priority(), command.validFrom(), command.validUntil(), command.status(), command.planIds(),
+				command.accessScope(), command.applicablePlanIds());
 		validatePlanLinks(principal, definition, current.branchId() == null ? principal.branchId() : current.branchId(), current.planIds());
 		if (!benefitRepository.updateBenefit(principal.organizationId(), benefitId, definition, command.expectedVersion())) {
 			throw new BusinessException("BENEFIT_VERSION_CONFLICT", "Otro usuario modificó este beneficio. Actualiza la lista y vuelve a intentarlo.");
 		}
 		benefitRepository.replaceMembershipPlans(principal, benefitId, command.planIds());
+		benefitRepository.replaceApplicableMembershipPlans(principal, benefitId, command.applicablePlanIds());
 		auditService.record(principal, "BENEFIT_UPDATED", "BENEFIT", benefitId, "BACKOFFICE", null, correlationId);
 		if ("ACCESS".equals(current.benefitType())) {
 			// Include removed plans too: their members must lose rights on reconciliation.

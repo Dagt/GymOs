@@ -5,6 +5,8 @@ import com.gymos.bookings.api.operations.BookingOperations;
 import com.gymos.bookings.api.operations.BookingOperations.BookingAvailability;
 import com.gymos.bookings.api.operations.BookingOperations.BookingResource;
 import com.gymos.bookings.api.operations.BookingOperations.BookingResult;
+import com.gymos.catalog.api.VisitPackagePlanOperations;
+import com.gymos.catalog.api.VisitPackagePlanOperations.VisitPackagePlanSnapshot;
 import com.gymos.clients.api.operations.ClientLookupOperations;
 import com.gymos.clients.api.operations.RegisterSelfServiceClientCommand;
 import com.gymos.clients.api.operations.SelfServiceClientProfile;
@@ -35,6 +37,7 @@ import com.gymos.selfservice.application.result.SelfServiceMembershipSaleResult;
 import com.gymos.selfservice.application.result.SelfServiceMembershipSummaryResult;
 import com.gymos.selfservice.application.result.SelfServiceCapabilities;
 import com.gymos.selfservice.application.result.SelfServiceSummaryResult;
+import com.gymos.selfservice.application.result.SelfServiceVisitPackageSaleResult;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.MembershipRecord;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.AutopayMembershipRecord;
@@ -42,6 +45,11 @@ import com.gymos.selfservice.infrastructure.SelfServiceRepository.PendingPayment
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.PlanOptionRecord;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.SessionRecord;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.TerminalRecord;
+import com.gymos.visitpackages.api.operations.VisitPackageOperations;
+import com.gymos.visitpackages.api.operations.VisitPackageOperations.PurchaseVisitPackageCommand;
+import com.gymos.visitpackages.api.operations.VisitPackageOperations.VisitPackageEntitlementView;
+import com.gymos.visitpackages.api.operations.VisitPackageOperations.VisitPackagePurchaseResult;
+import com.gymos.visitpackages.api.operations.VisitPackageOperations.VisitPackageQuoteView;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -79,6 +87,8 @@ public class SelfServiceService {
 	private final PaymentConfigurationOperations paymentConfigurationService;
 	private final StripeCheckoutOperations stripeCheckoutOperations;
 	private final StripeRecurringOperations stripeRecurringOperations;
+	private final VisitPackagePlanOperations visitPackagePlans;
+	private final VisitPackageOperations visitPackages;
 
 	@Autowired
 	public SelfServiceService(
@@ -93,7 +103,9 @@ public class SelfServiceService {
 			SelfServiceCapabilityPolicy capabilityPolicy,
 			PaymentConfigurationOperations paymentConfigurationService,
 			StripeCheckoutOperations stripeCheckoutOperations,
-			StripeRecurringOperations stripeRecurringOperations
+			StripeRecurringOperations stripeRecurringOperations,
+			VisitPackagePlanOperations visitPackagePlans,
+			VisitPackageOperations visitPackages
 	) {
 		this.repository = repository;
 		this.membershipOperations = membershipOperations;
@@ -107,6 +119,8 @@ public class SelfServiceService {
 		this.paymentConfigurationService = paymentConfigurationService;
 		this.stripeCheckoutOperations = stripeCheckoutOperations;
 		this.stripeRecurringOperations = stripeRecurringOperations;
+		this.visitPackagePlans = visitPackagePlans;
+		this.visitPackages = visitPackages;
 	}
 
 	SelfServiceService(
@@ -125,7 +139,7 @@ public class SelfServiceService {
 		this(repository, membershipOperations, membershipEnrollmentOperations,
 				(principal, clientId, planId) -> { throw new UnsupportedOperationException("Pricing not configured in test."); },
 				clientLookupOperations, bookingOperations, auditService, rateLimiter, capabilityPolicy,
-				paymentConfigurationService, stripeCheckoutOperations, stripeRecurringOperations);
+				paymentConfigurationService, stripeCheckoutOperations, stripeRecurringOperations, null, null);
 	}
 
 	@Transactional
@@ -245,12 +259,91 @@ public class SelfServiceService {
 	}
 
 	@Transactional
-	public MembershipQuoteView membershipQuote(UUID sessionId, String sessionToken, UUID planId) {
+	public MembershipQuoteView membershipQuote(
+			UUID sessionId, String sessionToken, UUID planId, String operation, UUID membershipId
+	) {
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
-		capabilityPolicy.requireMembershipOptions(capabilities(session));
+		SelfServiceCapabilities capabilities = capabilities(session);
+		String normalizedOperation = operation == null ? "ENROLLMENT" : operation.trim().toUpperCase();
+		switch (normalizedOperation) {
+			case "ENROLLMENT" -> {
+				capabilityPolicy.require(capabilities, SelfServiceCapability.MEMBERSHIP_ENROLLMENT);
+				requirePlanAvailableForSelfService(session, planId);
+			}
+			case "PLAN_CHANGE" -> {
+				capabilityPolicy.require(capabilities, SelfServiceCapability.MEMBERSHIP_PLAN_CHANGE);
+				requireMembershipQuoteContext(session, membershipId, planId, false);
+				requirePlanAvailableForSelfService(session, planId);
+			}
+			case "RENEWAL" -> {
+				capabilityPolicy.require(capabilities, SelfServiceCapability.MEMBERSHIP_RENEWAL);
+				requireMembershipQuoteContext(session, membershipId, planId, true);
+			}
+			default -> throw new BusinessException(
+					"SELF_SERVICE_MEMBERSHIP_OPERATION_INVALID",
+					"Selecciona una operación de membresía válida."
+			);
+		}
 		return membershipPricingOperations.quoteForCheckout(
 				kioskPrincipal(session), session.clientId(), planId
 		);
+	}
+
+	@Transactional
+	public MembershipQuoteView membershipQuote(UUID sessionId, String sessionToken, UUID planId) {
+		return membershipQuote(sessionId, sessionToken, planId, "ENROLLMENT", null);
+	}
+
+	@Transactional
+	public List<VisitPackagePlanSnapshot> visitPackageOptions(UUID sessionId, String sessionToken) {
+		SessionRecord session = verifiedSession(sessionId, sessionToken);
+		capabilityPolicy.require(capabilities(session), SelfServiceCapability.VISIT_PACKAGE_PURCHASE);
+		return visitPackagePlans.selfServicePlans(session.organizationId(), session.branchId());
+	}
+
+	@Transactional
+	public VisitPackageQuoteView visitPackageQuote(UUID sessionId, String sessionToken, UUID packagePlanId) {
+		SessionRecord session = verifiedSession(sessionId, sessionToken);
+		capabilityPolicy.require(capabilities(session), SelfServiceCapability.VISIT_PACKAGE_PURCHASE);
+		requireVisitPackageAvailableForSelfService(session, packagePlanId);
+		return visitPackages.quote(kioskPrincipal(session), session.clientId(), packagePlanId);
+	}
+
+	@Transactional
+	public VisitPackageEntitlementView currentVisitPackage(UUID sessionId, String sessionToken) {
+		SessionRecord session = verifiedSession(sessionId, sessionToken);
+		return visitPackages.current(kioskPrincipal(session), session.clientId()).orElse(null);
+	}
+
+	public SelfServiceVisitPackageSaleResult purchaseVisitPackage(
+			UUID sessionId, String sessionToken, UUID packagePlanId, String idempotencyKey,
+			String correlationId, String originIp
+	) {
+		rateLimiter.check("kiosk:visit-package:ip:" + originIp, 30, Duration.ofMinutes(1));
+		rateLimiter.check("kiosk:visit-package:session:" + sessionId, 5, Duration.ofMinutes(1));
+		SessionRecord session = verifiedSession(sessionId, sessionToken);
+		SelfServiceCapabilities capabilities = capabilities(session);
+		capabilityPolicy.require(capabilities, SelfServiceCapability.VISIT_PACKAGE_PURCHASE);
+		capabilityPolicy.requireOnlineCardPayments(capabilities);
+		requireVisitPackageAvailableForSelfService(session, packagePlanId);
+		VisitPackagePurchaseResult purchase = visitPackages.purchase(
+				kioskPrincipal(session),
+				new PurchaseVisitPackageCommand(
+						session.clientId(), packagePlanId, "CARD_ONLINE", null, false,
+						"Paquete de visitas con tarjeta desde kiosco", idempotencyKey),
+				correlationId);
+		StripeCheckoutOperations.CheckoutSessionResult checkout = purchase.balanceCents() > 0
+				? stripeCheckout(session, purchase, "Paquete de visitas", idempotencyKey)
+				: null;
+		auditService.recordSystem(
+				session.organizationId(), session.branchId(), null,
+				"SELF_SERVICE_VISIT_PACKAGE_CHECKOUT_STARTED", "SALE", purchase.saleId(),
+				"SELF_SERVICE_KIOSK", null, correlationId);
+		return new SelfServiceVisitPackageSaleResult(
+				purchase.entitlementId(), purchase.saleId(), purchase.paymentId(), purchase.saleNumber(),
+				purchase.saleStatus(), purchase.entitlementStatus(), purchase.totalCents(), purchase.paidCents(),
+				purchase.balanceCents(), purchase.currency(), checkout == null ? null : checkout.operationId(),
+				checkout == null ? null : checkout.checkoutUrl(), checkout == null ? null : checkout.status());
 	}
 
 	@Transactional
@@ -319,6 +412,7 @@ public class SelfServiceService {
 		SelfServiceCapabilities capabilities = capabilities(session);
 		capabilityPolicy.require(capabilities, SelfServiceCapability.MEMBERSHIP_ENROLLMENT);
 		capabilityPolicy.requireOnlineCardPayments(capabilities);
+		requirePlanAvailableForSelfService(session, planId);
 		MembershipSaleOperationResult response = membershipEnrollmentOperations.enroll(
 				kioskPrincipal(session),
 				new EnrollMembershipOperationCommand(
@@ -347,6 +441,7 @@ public class SelfServiceService {
 		capabilityPolicy.require(capabilities, SelfServiceCapability.MEMBERSHIP_PLAN_CHANGE);
 		capabilityPolicy.requireOnlineCardPayments(capabilities);
 		requireMembershipManagedAtCurrentBranch(session, membershipId);
+		requirePlanAvailableForSelfService(session, request.targetPlanId());
 		MembershipSaleOperationResult response = membershipOperations.changePlan(kioskPrincipal(session), membershipId, request, correlationId);
 		var checkout = stripeCheckout(session, response, "Cambio de plan de membresia", request.idempotencyKey());
 		auditService.recordSystem(session.organizationId(), session.branchId(), null, "SELF_SERVICE_MEMBERSHIP_CHECKOUT_STARTED", "SALE", response.saleId(), "SELF_SERVICE_KIOSK", null, correlationId);
@@ -469,6 +564,18 @@ public class SelfServiceService {
 		));
 	}
 
+	private StripeCheckoutOperations.CheckoutSessionResult stripeCheckout(
+			SessionRecord session,
+			VisitPackagePurchaseResult sale,
+			String description,
+			String idempotencyKey
+	) {
+		return stripeCheckoutOperations.createCheckout(new StripeCheckoutOperations.CreateCheckoutSessionCommand(
+				session.organizationId(), session.branchId(), session.clientId(), sale.saleId(), sale.paymentId(),
+				sale.balanceCents(), sale.currency(), false, description, "stripe:" + idempotencyKey
+		));
+	}
+
 	private RecurringMembershipContext recurringContext(SessionRecord session, UUID membershipId) {
 		AutopayMembershipRecord membership = repository.autopayMembership(
 				session.organizationId(), session.branchId(), session.clientId(), membershipId
@@ -575,7 +682,46 @@ public class SelfServiceService {
 		)) {
 			throw new BusinessException(
 					"MEMBERSHIP_HOME_BRANCH_REQUIRED",
-					"Renovaciones, cambios de plan y domiciliacion deben administrarse en la sucursal donde se contrato la membresia."
+					"Esta membresía no puede administrarse desde la sucursal actual."
+			);
+		}
+	}
+
+	private void requirePlanAvailableForSelfService(SessionRecord session, UUID planId) {
+		if (!repository.planAvailableForSelfService(session.organizationId(), session.branchId(), planId)) {
+			throw new BusinessException(
+					"SELF_SERVICE_MEMBERSHIP_PLAN_NOT_AVAILABLE",
+					"Este plan no está disponible para nuevas operaciones en el kiosco."
+			);
+		}
+	}
+
+	private void requireVisitPackageAvailableForSelfService(SessionRecord session, UUID packagePlanId) {
+		boolean available = visitPackagePlans.selfServicePlans(session.organizationId(), session.branchId()).stream()
+				.anyMatch(plan -> plan.id().equals(packagePlanId));
+		if (!available) {
+			throw new BusinessException(
+					"SELF_SERVICE_VISIT_PACKAGE_NOT_AVAILABLE",
+					"Este paquete de visitas no está disponible en el kiosco.");
+		}
+	}
+
+	private void requireMembershipQuoteContext(
+			SessionRecord session, UUID membershipId, UUID planId, boolean samePlanRequired
+	) {
+		if (membershipId == null) {
+			throw new BusinessException(
+					"SELF_SERVICE_MEMBERSHIP_REQUIRED",
+					"Selecciona la membresía que deseas administrar."
+			);
+		}
+		requireMembershipManagedAtCurrentBranch(session, membershipId);
+		if (samePlanRequired && !repository.membershipUsesPlan(
+				session.organizationId(), session.clientId(), membershipId, planId
+		)) {
+			throw new BusinessException(
+					"SELF_SERVICE_MEMBERSHIP_PLAN_MISMATCH",
+					"La renovación debe utilizar el plan actual de la membresía."
 			);
 		}
 	}

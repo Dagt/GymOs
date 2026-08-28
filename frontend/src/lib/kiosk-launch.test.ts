@@ -10,7 +10,7 @@ const session: KioskSessionResponse = {
   expiresAt: "2099-07-31T20:00:00Z", verified: false,
   capabilities: {
     clientRegistrationAllowed: false,
-    membershipEnrollmentAllowed: true, membershipRenewalAllowed: true,
+    membershipEnrollmentAllowed: true, visitPackagePurchaseAllowed: false, membershipRenewalAllowed: true,
     membershipPlanChangeAllowed: true, resourceBookingAllowed: true,
     wellnessBookingAllowed: false, profileUpdateAllowed: true, autopayAllowed: true,
     onlineCardPaymentsReady: true, recurringCardPaymentsReady: true,

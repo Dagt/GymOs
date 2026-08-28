@@ -4,8 +4,10 @@ import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.sales.api.operations.CreateMembershipPlanChangeSaleCommand;
 import com.gymos.sales.api.operations.CreateMembershipEnrollmentSaleCommand;
 import com.gymos.sales.api.operations.CreateMembershipRenewalSaleCommand;
+import com.gymos.sales.api.operations.CreateVisitPackageSaleCommand;
 import com.gymos.sales.api.operations.MembershipSaleResult;
 import com.gymos.sales.api.operations.SalesOperations;
+import com.gymos.sales.api.operations.VisitPackageSaleResult;
 import com.gymos.sales.application.command.CreateSaleCommand;
 import com.gymos.sales.application.command.ManualPaymentCommand;
 import com.gymos.sales.application.command.RequestRefundCommand;
@@ -76,6 +78,12 @@ public class SalesService implements SalesOperations {
 	@Transactional
 	public MembershipSaleResult createMembershipPlanChange(CreateMembershipPlanChangeSaleCommand command) {
 		return membershipSalesService.changePlan(command);
+	}
+
+	@Override
+	@Transactional
+	public VisitPackageSaleResult createVisitPackagePurchase(CreateVisitPackageSaleCommand command) {
+		return membershipSalesService.visitPackage(command);
 	}
 
 	public SaleDetailResult addPayment(GymOsPrincipal principal, UUID saleId, ManualPaymentCommand request, String correlationId) {

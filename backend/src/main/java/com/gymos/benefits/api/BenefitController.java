@@ -77,7 +77,8 @@ public class BenefitController {
 		return benefitService.updateBenefit(principal, benefitId, new UpdateBenefitCommand(
 				request.name(), request.discountType(), request.discountValueCents(), request.discountPercent(),
 				request.requiresEvidence(), request.combinable(), request.priority(), request.validFrom(),
-				request.validUntil(), request.status(), request.planIds(), request.expectedVersion()), correlationId(servletRequest));
+				request.validUntil(), request.status(), request.planIds(), request.accessScope(),
+				request.applicablePlanIds(), request.expectedVersion()), correlationId(servletRequest));
 	}
 
 	public record UpdateBenefitRequest(
@@ -87,7 +88,10 @@ public class BenefitController {
 			boolean requiresEvidence, boolean combinable, @Min(0) int priority,
 			LocalDate validFrom, LocalDate validUntil,
 			@NotBlank @Pattern(regexp = "ACTIVE|INACTIVE") String status,
-			@Size(max = 100) List<@NotNull UUID> planIds, @NotNull @Min(0) Long expectedVersion
+			@Size(max = 100) List<@NotNull UUID> planIds,
+			@Pattern(regexp = "LOCAL|PLAN_COVERAGE") String accessScope,
+			@Size(max = 100) List<@NotNull UUID> applicablePlanIds,
+			@NotNull @Min(0) Long expectedVersion
 	) {}
 
 	@PostMapping("/client-benefits/{clientBenefitId}/verify")
@@ -118,11 +122,14 @@ public class BenefitController {
 			LocalDate validFrom,
 			LocalDate validUntil,
 			@NotBlank @Pattern(regexp = "ACTIVE|INACTIVE") String status,
-			@Size(max = 100) List<@NotNull UUID> planIds
+			@Size(max = 100) List<@NotNull UUID> planIds,
+			@Pattern(regexp = "LOCAL|PLAN_COVERAGE") String accessScope,
+			@Size(max = 100) List<@NotNull UUID> applicablePlanIds
 	) {
 		CreateBenefitCommand toCommand() {
 			return new CreateBenefitCommand(branchId, code, name, benefitType, discountType, discountValueCents,
-					discountPercent, requiresEvidence, combinable, priority, validFrom, validUntil, status, planIds);
+					discountPercent, requiresEvidence, combinable, priority, validFrom, validUntil, status, planIds,
+					accessScope, applicablePlanIds);
 		}
 	}
 

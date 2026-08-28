@@ -15,12 +15,15 @@ public record UpdateMembershipPlanRequest(
 		@Min(0) int graceDays,
 		@Size(max = 4000) String benefits,
 		boolean multiBranchAccess,
+		Boolean selfServiceAcquisitionEnabled,
+		@Pattern(regexp = "DEFAULT|WAIVED") String registrationFeePolicy,
 		@NotBlank @Pattern(regexp = "ACTIVE|INACTIVE") String status
 ) {
 	UpdateMembershipPlanCommand toCommand() {
 		return new UpdateMembershipPlanCommand(
 				name, description, priceCents, currency, durationDays, graceDays,
-				benefits, multiBranchAccess, status
+				benefits, multiBranchAccess, selfServiceAcquisitionEnabled == null || selfServiceAcquisitionEnabled,
+				registrationFeePolicy == null ? "DEFAULT" : registrationFeePolicy, status
 		);
 	}
 }

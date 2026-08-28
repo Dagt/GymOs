@@ -101,6 +101,19 @@ test("membership plans remain visible in catalog but cannot enter the retail car
   assert.equal(isMembershipPlanProduct(plan), true);
 });
 
+test("visit packages use their dedicated purchase flow instead of the retail cart", () => {
+  const visitPackage = product({
+    id: "visits",
+    name: "10 visitas",
+    priceCents: 90000,
+    sku: "VISIT-10",
+    productType: "SERVICE",
+    commercialSubtype: "VISIT_PASS",
+  });
+
+  assert.equal(isMembershipPlanProduct(visitPackage), true);
+});
+
 function product(overrides: Partial<ProductSummary> & Pick<ProductSummary, "id" | "name" | "sku" | "priceCents">): ProductSummary {
   const { id, name, sku, priceCents, ...optionalOverrides } = overrides;
   return {

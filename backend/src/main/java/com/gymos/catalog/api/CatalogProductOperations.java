@@ -18,8 +18,15 @@ public interface CatalogProductOperations {
 			long priceCents,
 			String currency,
 			boolean inventoryTracked,
-			String status
+			String status,
+			boolean managedVisitPackage
 	) {
+		public CatalogProductSnapshot(
+				UUID id, String sku, String name, String productType, long priceCents,
+				String currency, boolean inventoryTracked, String status
+		) {
+			this(id, sku, name, productType, priceCents, currency, inventoryTracked, status, false);
+		}
 		public boolean active() {
 			return "ACTIVE".equals(status);
 		}

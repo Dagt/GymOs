@@ -3,6 +3,7 @@ import type { RenewMembershipResponse } from "./membership-types";
 export type KioskCapabilities = {
   clientRegistrationAllowed: boolean;
   membershipEnrollmentAllowed: boolean;
+  visitPackagePurchaseAllowed: boolean;
   membershipRenewalAllowed: boolean;
   membershipPlanChangeAllowed: boolean;
   resourceBookingAllowed: boolean;
@@ -29,6 +30,7 @@ export type KioskMembership = {
   endsOn: string;
   graceEndsOn: string;
   managedAtCurrentBranch: boolean;
+  autopayManagedAtCurrentBranch?: boolean;
 };
 
 export type KioskPendingPayment = {
@@ -64,6 +66,71 @@ export type KioskMembershipQuote = {
   totalCents: number;
   currency: string;
   appliedBenefits: Array<{ benefitId: string; code: string; name: string; discountCents: number }>;
+};
+
+export type KioskVisitPackagePlan = {
+  id: string;
+  productId: string;
+  sku: string;
+  name: string;
+  priceCents: number;
+  currency: string;
+  totalVisits: number;
+  validityDays: number;
+  branchScope: "ALL_BRANCHES" | "SELECTED_BRANCHES";
+  branchIds: string[];
+  benefitIds: string[];
+  selfServiceAcquisitionEnabled: boolean;
+  registrationFeePolicy: "DEFAULT" | "WAIVED";
+};
+
+export type KioskVisitPackageQuote = {
+  clientId: string;
+  packagePlanId: string;
+  packageName: string;
+  totalVisits: number;
+  validityDays: number;
+  packagePriceCents: number;
+  registrationFeeCents: number;
+  registrationFeeLabel: string | null;
+  totalCents: number;
+  currency: string;
+  branchIds: string[];
+  benefitIds: string[];
+};
+
+export type KioskVisitPackageEntitlement = {
+  id: string;
+  clientId: string;
+  packagePlanId: string;
+  saleId: string;
+  packageName: string;
+  status: "PENDING_PAYMENT" | "ACTIVE" | "CONSUMED" | "EXPIRED" | "CANCELLED";
+  totalVisits: number;
+  remainingVisits: number;
+  validFrom: string | null;
+  validUntil: string | null;
+  pendingExpiresAt: string | null;
+  branchIds: string[];
+  benefitIds: string[];
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type KioskVisitPackageCheckout = {
+  entitlementId: string;
+  saleId: string;
+  paymentId: string;
+  saleNumber: string;
+  saleStatus: string;
+  entitlementStatus: string;
+  totalCents: number;
+  paidCents: number;
+  balanceCents: number;
+  currency: string;
+  providerOperationId: string | null;
+  checkoutUrl: string | null;
+  checkoutStatus: string | null;
 };
 
 export type KioskSessionResponse = {

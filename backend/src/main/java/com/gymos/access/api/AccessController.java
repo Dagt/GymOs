@@ -287,10 +287,11 @@ public class AccessController {
 	public record AccessRequest(
 			UUID clientId,
 			@Size(max = 180) String identifier,
-			@Size(max = 80) String deviceCode
+			@Size(max = 80) String deviceCode,
+			@Size(max = 140) String idempotencyKey
 	) {
 		private AccessRequestCommand toCommand() {
-			return new AccessRequestCommand(clientId, identifier, deviceCode);
+			return new AccessRequestCommand(clientId, identifier, deviceCode, idempotencyKey);
 		}
 	}
 

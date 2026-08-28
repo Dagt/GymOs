@@ -180,6 +180,23 @@ class ClientPaginationIntegrationTests {
 	}
 
 	@Test
+	void activeVisitPackagePreventsAutomaticInactivityAndBecomesTheLatestActivity() {
+		UUID clientId = client(organizationId, branchId, "Socio con visitas", now.minusMonths(9));
+		LocalDate validUntil = LocalDate.of(2026, 9, 30);
+		activeVisitPackage(clientId, validUntil);
+		jdbc.sql("""
+				INSERT INTO client_lifecycle_configuration (
+				    organization_id, auto_inactivation_enabled, inactivity_months
+				) VALUES (:organizationId, true, 6)
+				""").param("organizationId", organizationId).update();
+
+		assertThat(lifecycle.latestVisitPackageEnd(organizationId, clientId)).contains(validUntil);
+		assertThat(lifecycle.automaticInactivityCandidates(LocalDate.of(2026, 8, 25), 100))
+				.extracting(ClientLifecycleRepository.ClientInactivityCandidate::clientId)
+				.doesNotContain(clientId);
+	}
+
+	@Test
 	void selfServiceReactivationAcceptsAutomaticInactivityButRejectsManualInactivity() {
 		UUID automaticallyInactive = client(
 				organizationId, branchId, "Baja automática", now.minusMonths(7));
@@ -225,5 +242,59 @@ class ClientPaginationIntegrationTests {
 		jdbc.sql("INSERT INTO branch (id,organization_id,name,code,status,timezone,created_at,updated_at,version) VALUES (:id,:org,:code,:code,'ACTIVE','America/Mexico_City',now(),now(),0)")
 				.param("id", id).param("org", organization).param("code", code).update();
 		return id;
+	}
+
+	private void activeVisitPackage(UUID clientId, LocalDate validUntil) {
+		UUID productId = UUID.randomUUID();
+		UUID planId = UUID.randomUUID();
+		UUID saleId = UUID.randomUUID();
+		UUID entitlementId = UUID.randomUUID();
+		jdbc.sql("""
+				INSERT INTO catalog_product (
+				    id, organization_id, sku, name, product_type, commercial_subtype,
+				    price_cents, currency, taxable, status, created_at, updated_at, version
+				) VALUES (
+				    :id, :organizationId, :sku, '10 visitas', 'SERVICE', 'VISIT_PASS',
+				    90000, 'MXN', true, 'ACTIVE', now(), now(), 0
+				)
+				""").param("id", productId).param("organizationId", organizationId)
+				.param("sku", "VISIT-" + productId).update();
+		jdbc.sql("""
+				INSERT INTO visit_package_plan (
+				    id, organization_id, product_id, total_visits, validity_days, branch_scope,
+				    self_service_acquisition_enabled, registration_fee_policy, status,
+				    created_at, updated_at, version
+				) VALUES (
+				    :id, :organizationId, :productId, 10, 45, 'SELECTED_BRANCHES',
+				    true, 'DEFAULT', 'ACTIVE', now(), now(), 0
+				)
+				""").param("id", planId).param("organizationId", organizationId)
+				.param("productId", productId).update();
+		jdbc.sql("""
+				INSERT INTO sale (
+				    id, organization_id, branch_id, client_id, sale_number, status,
+				    subtotal_cents, discount_cents, total_cents, paid_cents, balance_cents,
+				    currency, sold_at, created_at, updated_at, version
+				) VALUES (
+				    :id, :organizationId, :branchId, :clientId, :number, 'PAID',
+				    90000, 0, 90000, 90000, 0, 'MXN', now(), now(), now(), 0
+				)
+				""").param("id", saleId).param("organizationId", organizationId)
+				.param("branchId", branchId).param("clientId", clientId)
+				.param("number", "VP-" + saleId.toString().substring(0, 8)).update();
+		jdbc.sql("""
+				INSERT INTO visit_package_entitlement (
+				    id, organization_id, home_branch_id, client_id, visit_package_plan_id,
+				    sale_id, status, total_visits, remaining_visits, validity_days,
+				    valid_from, valid_until, activated_at, created_at, updated_at, version
+				) VALUES (
+				    :id, :organizationId, :branchId, :clientId, :planId,
+				    :saleId, 'ACTIVE', 10, 10, 45, :validFrom, :validUntil,
+				    now(), now(), now(), 0
+				)
+				""").param("id", entitlementId).param("organizationId", organizationId)
+				.param("branchId", branchId).param("clientId", clientId).param("planId", planId)
+				.param("saleId", saleId).param("validFrom", validUntil.minusDays(44))
+				.param("validUntil", validUntil).update();
 	}
 }

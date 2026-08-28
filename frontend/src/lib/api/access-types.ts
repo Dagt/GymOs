@@ -86,6 +86,7 @@ export type AccessRequestPayload = {
   clientId?: string | null;
   identifier?: string | null;
   deviceCode?: string | null;
+  idempotencyKey?: string | null;
 };
 
 export type ManualOpenPayload = {

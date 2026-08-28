@@ -13,9 +13,10 @@ import { CatalogProductTable } from "@/features/catalog/components/CatalogProduc
 import { CatalogVariantBatchDrawer } from "@/features/catalog/components/CatalogVariantBatchDrawer";
 import { CatalogSummaryCards } from "@/features/catalog/components/CatalogSummaryCards";
 import { CatalogCategoryManager } from "@/features/catalog/components/CatalogCategoryManager";
+import { VisitPackagePlansSection } from "@/features/catalog/components/VisitPackagePlansSection";
 import { Pagination } from "@/components/Pagination";
 
-type CatalogView = "products" | "plans" | "categories";
+type CatalogView = "products" | "plans" | "visit-packages" | "categories";
 
 export default function CatalogPage() {
   return <Suspense fallback={<LoadingScreen text="Cargando catálogo..." />}><CatalogContent /></Suspense>;
@@ -43,7 +44,7 @@ function CatalogContent() {
   }
 
   return (
-    <AppShell eyebrow="Administración" session={controller.session} subtitle="Catálogo de la sucursal activa." title="Catálogo">
+    <AppShell eyebrow="Catálogo comercial" session={controller.session} subtitle="Artículos, planes de membresía y paquetes de visitas de la sucursal activa." title="Catálogo">
       {controller.error ? <InlineError message={controller.error} /> : null}
       {controller.message ? <p className="rounded-md border border-[var(--brand-line)] bg-[var(--brand-surface)] px-3 py-2 text-sm text-[#31563c]">{controller.message}</p> : null}
       <section className="grid gap-4">
@@ -72,6 +73,7 @@ function CatalogContent() {
           </section>
         ) : null}
         {view === "plans" ? <PlanList canUpdate={controller.canUpdate} plans={controller.plans} onEditPlan={controller.openPlanEdition} /> : null}
+        {view === "visit-packages" ? <VisitPackagePlansSection accessToken={controller.session.accessToken} canCreate={controller.canCreate} canUpdate={controller.canUpdate} /> : null}
         {view === "categories" && controller.canManageCategories ? <CatalogCategoryManager accessToken={controller.session.accessToken} categories={controller.categories} onChanged={controller.reloadCatalog} /> : null}
       </section>
       <CatalogProductDrawer
@@ -120,10 +122,11 @@ function CatalogContent() {
 function CatalogNavigation({ canManageCategories, onChange, view }: { canManageCategories: boolean; onChange: (view: CatalogView) => void; view: CatalogView }) {
   const options: { label: string; value: CatalogView }[] = [
     { label: "Artículos", value: "products" },
-    { label: "Planes", value: "plans" },
+    { label: "Planes de membresía", value: "plans" },
+    { label: "Paquetes de visitas", value: "visit-packages" },
     ...(canManageCategories ? [{ label: "Categorías", value: "categories" as CatalogView }] : []),
   ];
-  return <nav aria-label="Secciones del catálogo" className="grid gap-2 rounded-xl border border-[var(--brand-line)] bg-white p-2 shadow-sm sm:grid-cols-3">{options.map((option) => <button key={option.value} type="button" onClick={() => onChange(option.value)} className={view === option.value ? "app-button h-10 w-full" : "app-button-secondary h-10 w-full"}>{option.label}</button>)}</nav>;
+  return <nav aria-label="Secciones del catálogo" className="grid gap-2 rounded-xl border border-[var(--brand-line)] bg-white p-2 shadow-sm sm:grid-cols-2 xl:grid-cols-4">{options.map((option) => <button key={option.value} type="button" onClick={() => onChange(option.value)} className={view === option.value ? "app-button h-10 w-full" : "app-button-secondary h-10 w-full"}>{option.label}</button>)}</nav>;
 }
 
 function AuthRequired() {

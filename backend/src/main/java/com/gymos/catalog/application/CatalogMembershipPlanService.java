@@ -56,6 +56,7 @@ class CatalogMembershipPlanService {
 		planCommands.create(new PlanMutation(
 				principal.organizationId(), planId, request.productId(), request.durationDays(), request.graceDays(),
 				benefitsSerializer.normalizeJson(request.benefitsJson()), request.multiBranchAccess(),
+				request.selfServiceAcquisitionEnabled(), normalizeRegistrationFeePolicy(request.registrationFeePolicy()),
 				request.status().trim().toUpperCase(), now, principal.userId()
 		));
 		auditService.record(principal, "PLAN_CREATED", "MEMBERSHIP_PLAN", planId, "BACKOFFICE", null, correlationId);
@@ -109,7 +110,8 @@ class CatalogMembershipPlanService {
 		return createPlan(
 				principal,
 				new CreatePlanCommand(productId, request.durationDays(), request.graceDays(),
-						benefitsSerializer.textToJson(request.benefits()), request.multiBranchAccess(), request.status()),
+						benefitsSerializer.textToJson(request.benefits()), request.multiBranchAccess(),
+						request.selfServiceAcquisitionEnabled(), request.registrationFeePolicy(), request.status()),
 				correlationId
 		);
 	}
@@ -140,10 +142,19 @@ class CatalogMembershipPlanService {
 		planCommands.update(new PlanMutation(
 				principal.organizationId(), planId, existing.productId(), request.durationDays(), request.graceDays(),
 				benefitsSerializer.textToJson(request.benefits()), request.multiBranchAccess(),
+				request.selfServiceAcquisitionEnabled(), normalizeRegistrationFeePolicy(request.registrationFeePolicy()),
 				request.status().trim().toUpperCase(), now, principal.userId()
 		));
 		auditService.record(principal, "PLAN_UPDATED", "MEMBERSHIP_PLAN", planId, "BACKOFFICE", null, correlationId);
 		return plans.findPlan(principal.organizationId(), principal.branchId(), planId)
 				.orElseThrow(() -> new BusinessException("PLAN_NOT_FOUND", "El plan no esta disponible en esta sucursal."));
+	}
+
+	private String normalizeRegistrationFeePolicy(String value) {
+		String normalized = value == null ? "DEFAULT" : value.trim().toUpperCase();
+		if (!"DEFAULT".equals(normalized) && !"WAIVED".equals(normalized)) {
+			throw new BusinessException("REGISTRATION_FEE_POLICY_INVALID", "Selecciona una política de inscripción válida.");
+		}
+		return normalized;
 	}
 }

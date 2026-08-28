@@ -12,6 +12,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.audit.api.AuditService;
 import com.gymos.bookings.api.operations.BookingOperations;
 import com.gymos.bookings.api.operations.BookingOperations.BookingResource;
+import com.gymos.catalog.api.VisitPackagePlanOperations;
+import com.gymos.catalog.api.VisitPackagePlanOperations.VisitPackagePlanSnapshot;
 import com.gymos.clients.api.operations.ClientLookupOperations;
 import com.gymos.clients.api.operations.ClientVerificationResult;
 import com.gymos.clients.api.operations.RegisterSelfServiceClientCommand;
@@ -22,6 +24,7 @@ import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.security.RateLimiter;
 import com.gymos.memberships.api.operations.MembershipOperations;
 import com.gymos.memberships.api.operations.MembershipEnrollmentOperations;
+import com.gymos.memberships.api.operations.MembershipPricingOperations;
 import com.gymos.memberships.api.operations.MembershipSaleOperationResult;
 import com.gymos.memberships.api.operations.RenewMembershipOperationCommand;
 import com.gymos.payments.api.PaymentConfigurationView;
@@ -34,6 +37,8 @@ import com.gymos.selfservice.infrastructure.SelfServiceRepository;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.AutopayMembershipRecord;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.SessionRecord;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.TerminalRecord;
+import com.gymos.visitpackages.api.operations.VisitPackageOperations;
+import com.gymos.visitpackages.api.operations.VisitPackageOperations.VisitPackagePurchaseResult;
 import java.time.Duration;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -54,6 +59,7 @@ class SelfServiceServiceTests {
 	private final SelfServiceRepository repository = mock(SelfServiceRepository.class);
 	private final MembershipOperations memberships = mock(MembershipOperations.class);
 	private final MembershipEnrollmentOperations membershipEnrollments = mock(MembershipEnrollmentOperations.class);
+	private final MembershipPricingOperations membershipPricing = mock(MembershipPricingOperations.class);
 	private final ClientLookupOperations clients = mock(ClientLookupOperations.class);
 	private final BookingOperations bookings = mock(BookingOperations.class);
 	private final AuditService audit = mock(AuditService.class);
@@ -63,6 +69,8 @@ class SelfServiceServiceTests {
 	private final PaymentConfigurationOperations paymentConfigurationService = mock(PaymentConfigurationOperations.class);
 	private final StripeCheckoutOperations stripeCheckoutOperations = mock(StripeCheckoutOperations.class);
 	private final StripeRecurringOperations stripeRecurringOperations = mock(StripeRecurringOperations.class);
+	private final VisitPackagePlanOperations visitPackagePlans = mock(VisitPackagePlanOperations.class);
+	private final VisitPackageOperations visitPackages = mock(VisitPackageOperations.class);
 
 	private final UUID sessionId = UUID.randomUUID();
 	private final UUID organizationId = UUID.randomUUID();
@@ -76,10 +84,12 @@ class SelfServiceServiceTests {
 		when(paymentConfigurationService.configuration(organizationId)).thenReturn(new PaymentConfigurationView(
 				true, false, null, null, false, false, false, null, false
 		));
+		when(repository.planAvailableForSelfService(any(), any(), any())).thenReturn(true);
 		service = new SelfServiceService(
 				repository,
 				memberships,
 				membershipEnrollments,
+				membershipPricing,
 				clients,
 				bookings,
 				audit,
@@ -87,7 +97,9 @@ class SelfServiceServiceTests {
 				capabilityPolicy,
 				paymentConfigurationService,
 				stripeCheckoutOperations,
-				stripeRecurringOperations
+				stripeRecurringOperations,
+				visitPackagePlans,
+				visitPackages
 		);
 	}
 
@@ -136,6 +148,74 @@ class SelfServiceServiceTests {
 		assertThat(result.providerOperationId()).isEqualTo(operationId);
 		assertThat(result.checkoutUrl()).isEqualTo("https://checkout.stripe.test/session");
 		verify(membershipEnrollments).enroll(any(), any(), any());
+		verify(stripeCheckoutOperations).createCheckout(any());
+	}
+
+	@Test
+	void hiddenPlanCannotBeEnrolledBySendingItsIdDirectly() {
+		givenSession("""
+				{"membershipEnrollment":true}
+				""");
+		when(paymentConfigurationService.configuration(organizationId)).thenReturn(new PaymentConfigurationView(
+				true, false, null, null, false, true, false, "acct_test", true
+		));
+		UUID hiddenPlanId = UUID.randomUUID();
+		when(repository.planAvailableForSelfService(organizationId, branchId, hiddenPlanId)).thenReturn(false);
+
+		assertThatThrownBy(() -> service.enroll(
+				sessionId, token, hiddenPlanId, "kiosk:hidden", "correlation", "127.0.0.1"
+		)).isInstanceOfSatisfying(BusinessException.class,
+				exception -> assertThat(exception.code()).isEqualTo("SELF_SERVICE_MEMBERSHIP_PLAN_NOT_AVAILABLE"));
+
+		verifyNoInteractions(membershipEnrollments);
+	}
+
+	@Test
+	void configuredVisitPackagesRemainVisibleWhileStripeIsPendingButPurchaseIsBlocked() {
+		givenSession("""
+				{"visitPackagePurchase":true}
+				""");
+		UUID packagePlanId = UUID.randomUUID();
+		VisitPackagePlanSnapshot plan = visitPackagePlan(packagePlanId);
+		when(visitPackagePlans.selfServicePlans(organizationId, branchId)).thenReturn(List.of(plan));
+
+		assertThat(service.visitPackageOptions(sessionId, token)).containsExactly(plan);
+		assertThatThrownBy(() -> service.purchaseVisitPackage(
+				sessionId, token, packagePlanId, "kiosk:package:pending", "correlation", "127.0.0.1"))
+				.isInstanceOfSatisfying(BusinessException.class,
+						exception -> assertThat(exception.code()).isEqualTo("SELF_SERVICE_CARD_PAYMENTS_NOT_READY"));
+
+		verifyNoInteractions(visitPackages);
+	}
+
+	@Test
+	void configuredVisitPackageBecomesPurchasableWhenStripeBecomesReadyWithoutSavingAgain() {
+		givenSession("""
+				{"visitPackagePurchase":true}
+				""");
+		when(paymentConfigurationService.configuration(organizationId)).thenReturn(new PaymentConfigurationView(
+				true, false, null, null, false, true, false, "acct_test", true
+		));
+		UUID packagePlanId = UUID.randomUUID();
+		UUID entitlementId = UUID.randomUUID();
+		UUID saleId = UUID.randomUUID();
+		UUID paymentId = UUID.randomUUID();
+		UUID operationId = UUID.randomUUID();
+		when(visitPackagePlans.selfServicePlans(organizationId, branchId))
+				.thenReturn(List.of(visitPackagePlan(packagePlanId)));
+		when(visitPackages.purchase(any(), any(), any())).thenReturn(new VisitPackagePurchaseResult(
+				entitlementId, saleId, paymentId, "S-PACKAGE", "PENDING_PAYMENT", "PENDING_PAYMENT",
+				50000, 0, 50000, "MXN"));
+		when(stripeCheckoutOperations.createCheckout(any())).thenReturn(
+				new StripeCheckoutOperations.CheckoutSessionResult(
+						operationId, "cs_package", "https://checkout.stripe.test/package", "OPEN"));
+
+		var result = service.purchaseVisitPackage(
+				sessionId, token, packagePlanId, "kiosk:package:ready", "correlation", "127.0.0.1");
+
+		assertThat(result.entitlementId()).isEqualTo(entitlementId);
+		assertThat(result.checkoutUrl()).isEqualTo("https://checkout.stripe.test/package");
+		verify(visitPackages).purchase(any(), any(), any());
 		verify(stripeCheckoutOperations).createCheckout(any());
 	}
 
@@ -274,7 +354,7 @@ class SelfServiceServiceTests {
 	}
 
 	@Test
-	void renewalOfMultiBranchMembershipMustBeManagedAtItsOriginBranch() {
+	void renewalOutsideCoverageRemainsBlocked() {
 		givenSession("""
 				{"membershipRenewal":true}
 				""");
@@ -302,6 +382,37 @@ class SelfServiceServiceTests {
 				);
 
 		verifyNoInteractions(memberships);
+	}
+
+	@Test
+	void renewalCoveredByMultiBranchPlanCanStartFromSecondaryBranch() {
+		givenSession("""
+				{"membershipRenewal":true}
+				""");
+		when(paymentConfigurationService.configuration(organizationId)).thenReturn(new PaymentConfigurationView(
+				true, false, null, null, false, true, false, "acct_test", true
+		));
+		UUID membershipId = UUID.randomUUID();
+		UUID saleId = UUID.randomUUID();
+		UUID paymentId = UUID.randomUUID();
+		UUID operationId = UUID.randomUUID();
+		when(repository.membershipBelongsToBranch(organizationId, branchId, clientId, membershipId))
+				.thenReturn(true);
+		when(memberships.renew(any(), any(), any(), any())).thenReturn(new MembershipSaleOperationResult(
+				saleId, "V-REMOTE", "PENDING_PAYMENT", 75_000, 0, 75_000, "MXN", null, paymentId
+		));
+		when(stripeCheckoutOperations.createCheckout(any())).thenReturn(
+				new StripeCheckoutOperations.CheckoutSessionResult(
+						operationId, "cs_remote", "https://checkout.stripe.test/remote", "OPEN"));
+
+		var result = service.renew(
+				sessionId, token, membershipId,
+				new RenewMembershipOperationCommand("CARD_ONLINE", null, false, null, "kiosk:remote"),
+				"correlation", "127.0.0.1");
+
+		assertThat(result.saleId()).isEqualTo(saleId);
+		assertThat(result.checkoutUrl()).isEqualTo("https://checkout.stripe.test/remote");
+		verify(memberships).renew(any(), any(), any(), any());
 	}
 
 	@Test
@@ -405,6 +516,13 @@ class SelfServiceServiceTests {
 		assertThat(command.getValue().context().clientId()).isEqualTo(clientId);
 		assertThat(command.getValue().context().membershipId()).isEqualTo(membershipId);
 		assertThat(command.getValue().context().nextChargeOn()).isEqualTo(nextChargeOn);
+	}
+
+	private VisitPackagePlanSnapshot visitPackagePlan(UUID packagePlanId) {
+		return new VisitPackagePlanSnapshot(
+				packagePlanId, UUID.randomUUID(), "VISITAS-10", "10 visitas",
+				50000, "MXN", 10, 30, "ALL_BRANCHES", List.of(branchId),
+				List.of(UUID.randomUUID()), true, "DEFAULT");
 	}
 
 	private void givenSession(String allowedActionsJson) {

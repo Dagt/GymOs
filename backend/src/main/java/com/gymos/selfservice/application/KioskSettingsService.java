@@ -55,7 +55,7 @@ public class KioskSettingsService {
 				principal.organizationId(), branchId, principal.userId(),
 				new BranchKioskConfigurationData(
 						command.clientRegistration(),
-						command.membershipEnrollment(), command.membershipRenewal(),
+						command.membershipEnrollment(), command.visitPackagePurchase(), command.membershipRenewal(),
 						command.membershipPlanChange(), command.resourceBooking(),
 						command.wellnessBooking(), command.profileUpdate(), command.autopay()
 				)
@@ -80,10 +80,19 @@ public class KioskSettingsService {
 
 	public record UpdateKioskSettings(
 			boolean clientRegistration,
-			boolean membershipEnrollment, boolean membershipRenewal,
+			boolean membershipEnrollment, boolean visitPackagePurchase, boolean membershipRenewal,
 			boolean membershipPlanChange, boolean resourceBooking,
 			boolean wellnessBooking, boolean profileUpdate, boolean autopay
-	) {}
+	) {
+		public UpdateKioskSettings(
+				boolean clientRegistration, boolean membershipEnrollment, boolean membershipRenewal,
+				boolean membershipPlanChange, boolean resourceBooking, boolean wellnessBooking,
+				boolean profileUpdate, boolean autopay
+		) {
+			this(clientRegistration, membershipEnrollment, false, membershipRenewal,
+					membershipPlanChange, resourceBooking, wellnessBooking, profileUpdate, autopay);
+		}
+	}
 
 	public record BranchKioskSettings(
 			UUID branchId, String branchName, String status,

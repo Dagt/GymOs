@@ -2,7 +2,8 @@ import { apiFetch } from "./client";
 
 export type KioskBranchCapabilities = {
   clientRegistrationAllowed: boolean;
-	  membershipEnrollmentAllowed: boolean;
+  membershipEnrollmentAllowed: boolean;
+  visitPackagePurchaseAllowed: boolean;
   membershipRenewalAllowed: boolean;
   membershipPlanChangeAllowed: boolean;
   resourceBookingAllowed: boolean;
@@ -23,7 +24,8 @@ export type KioskBranchSettings = {
 
 export type UpdateKioskBranchSettings = {
   clientRegistration: boolean;
-	  membershipEnrollment: boolean;
+  membershipEnrollment: boolean;
+  visitPackagePurchase: boolean;
   membershipRenewal: boolean;
   membershipPlanChange: boolean;
   resourceBooking: boolean;

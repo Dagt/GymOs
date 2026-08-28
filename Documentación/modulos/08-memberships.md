@@ -22,11 +22,9 @@ Estado: `ESTABILIZADO`
 
 ## Pendiente
 
-- paquetes de N visitas con vigencia y saldo único consumible en todas o en una
-  selección de sucursales del mismo tenant (`ACC-005`);
-- garantizar que un beneficio ligado a un plan multi-sucursal se herede en
-  todas las sucursales cubiertas por el plan, salvo alcance local explícito
-  (`BEN-003`);
+- cerrar E2E/aceptación de paquetes de N visitas y consumo en dos sedes
+  (`ACC-005`);
+- completar la matriz física/E2E de beneficios `PLAN_COVERAGE` (`BEN-003`);
 - E2E HTTP/navegador con pagos rechazados y validación posterior;
 - parametrizar zona operativa por tenant si GymFort sale del alcance México;
 - optimizar el alta rápida de un cliente nuevo desde recepción antes de contratar
@@ -106,8 +104,19 @@ anualidad o una visita diaria: sólo importa que exista una membresía vigente y
 qué beneficios `ACCESS` hereda de su plan.
 
 Los paquetes históricos `VisitPass` no cubren el objetivo confirmado porque su
-saldo está limitado a una sucursal. El modelo futuro debe vender N visitas con
+saldo está limitado a una sucursal. El modelo vigente vende N visitas con
 vigencia y alcance de sedes dentro del mismo tenant; el socio tendrá un solo
 saldo y cada consumo registrará la sucursal. Su infraestructura puede mantenerse
 temporalmente, pero no debe condicionar el nuevo contrato entre Catálogo,
 Ventas y Acceso.
+
+V96 inicia ese contrato sin convertir paquetes en membresías. Cada plan agrega
+`selfServiceAcquisitionEnabled` y `registrationFeePolicy`; una membresía
+multi-sucursal se muestra y puede renovarse desde una sede cubierta. Un socio
+puede tener una membresía y un paquete, pero no dos paquetes abiertos. Si la
+membresía concede el acceso, no se consume el paquete.
+
+Estas políticas sí aplican a los planes de membresía, no sólo a los paquetes:
+un plan oculto queda fuera de altas/cambios del kiosco pero se vende en
+Recepción y se renueva si el socio ya lo posee; `WAIVED` omite inscripción en
+alta, renovación o cambio cuyo plan objetivo tenga esa política.

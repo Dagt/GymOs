@@ -50,7 +50,7 @@ class KioskSettingsServiceTests {
 						"Centro",
 						"ACTIVE",
 						"""
-						{"clientRegistration":true,"membershipEnrollment":true,"membershipRenewal":true,
+						{"clientRegistration":true,"membershipEnrollment":true,"visitPackagePurchase":true,"membershipRenewal":true,
 						 "membershipPlanChange":true,"resourceBooking":true,"wellnessBooking":false,
 						 "profileUpdate":true,"autopay":true}
 						""",
@@ -61,7 +61,7 @@ class KioskSettingsServiceTests {
 		var result = service.configure(
 				principal,
 				branchId,
-				new KioskSettingsService.UpdateKioskSettings(true, true, true, true, true, false, true, true),
+				new KioskSettingsService.UpdateKioskSettings(true, true, true, true, true, true, false, true, true),
 				"correlation"
 		);
 
@@ -71,10 +71,12 @@ class KioskSettingsServiceTests {
 				eq(organizationId), eq(branchId), eq(principal.userId()), persisted.capture());
 		assertThat(persisted.getValue().clientRegistration()).isTrue();
 		assertThat(persisted.getValue().membershipEnrollment()).isTrue();
+		assertThat(persisted.getValue().visitPackagePurchase()).isTrue();
 		assertThat(persisted.getValue().membershipRenewal()).isTrue();
 		assertThat(persisted.getValue().membershipPlanChange()).isTrue();
 		assertThat(persisted.getValue().autopay()).isTrue();
 		assertThat(result.capabilities().membershipEnrollmentAllowed()).isTrue();
+		assertThat(result.capabilities().visitPackagePurchaseAllowed()).isTrue();
 		assertThat(result.capabilities().autopayAllowed()).isTrue();
 		assertThat(result.capabilities().onlineCardPaymentsReady()).isFalse();
 		assertThat(result.capabilities().recurringCardPaymentsReady()).isFalse();

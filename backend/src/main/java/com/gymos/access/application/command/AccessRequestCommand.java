@@ -5,6 +5,7 @@ import java.util.UUID;
 public record AccessRequestCommand(
 		UUID clientId,
 		String identifier,
-		String deviceCode
+		String deviceCode,
+		String idempotencyKey
 ) {
 }

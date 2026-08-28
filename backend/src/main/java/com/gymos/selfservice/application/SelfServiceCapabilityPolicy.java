@@ -20,6 +20,7 @@ public class SelfServiceCapabilityPolicy {
 		return new SelfServiceCapabilities(
 				enabled(actions, "clientRegistration", "selfRegistration", "registration"),
 				enabled(actions, "membershipEnrollment", "membershipPurchase", "enrollment"),
+				enabled(actions, "visitPackagePurchase", "visitPassPurchase"),
 				enabled(actions, "membershipRenewal", "renewal", "renew"),
 				enabled(actions, "membershipPlanChange", "planChange", "changePlan"),
 				enabled(actions, "resourceBooking", "booking", "bookings"),

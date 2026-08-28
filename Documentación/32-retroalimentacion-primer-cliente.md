@@ -1,11 +1,11 @@
 # Retroalimentación del primer cliente
 
-Estado: ANÁLISIS COMPLETO / LOTES 1 Y 2 IMPLEMENTADOS
+Estado: ANÁLISIS COMPLETO / LOTES 1 Y 2 IMPLEMENTADOS / LOTES 3–4 EN DESARROLLO
 
 Corte: 26 de agosto de 2026
 
-Rama activa: `feature/catalog-product-variants-barcodes`, basada en `main`
-después de integrar el PR #19.
+Rama activa: `feature/multibranch-plans-benefits-visits`, basada en `main`
+después de integrar el PR #20.
 
 ## Topología operativa confirmada
 
@@ -128,6 +128,13 @@ selección). El socio conserva un solo saldo y cada consumo registra en qué
 sucursal ocurrió, con atomicidad e idempotencia. Debe integrarse con Catálogo,
 Ventas, Acceso y reportes sin duplicar el paquete por sucursal.
 
+Decisión confirmada: un socio no puede mantener dos paquetes pendientes o
+activos simultáneamente. El paquete es independiente de la membresía ilimitada,
+no apila saldos y sólo se consume cuando una membresía no concede ya el acceso.
+El diseño completo, las políticas de venta, los snapshots, la exclusividad y el
+ledger idempotente están definidos en
+[`33-planes-beneficios-paquetes-visitas.md`](33-planes-beneficios-paquetes-visitas.md).
+
 ### Lote 4 — Beneficios multi-sucursal
 
 Los beneficios son locales cuando `benefit.branch_id` tiene valor. La evaluación
@@ -144,6 +151,20 @@ debe mostrar y validar ese alcance de forma explícita.
 
 Código afectado: `BenefitRepository`, `EligibilityRepository`, contratos y UI de
 beneficios, además de las proyecciones de acceso.
+
+Antes de esos dos recorridos se corrigen las políticas de los planes actuales:
+disponibilidad para nuevas contrataciones en kiosco, exención de inscripción,
+renovación de una membresía multi-sucursal desde otra sede y aplicabilidad de
+`SPECIAL_PRICE` a planes explícitos. Estas reglas son la primera fase porque los
+paquetes de visitas deben reutilizarlas sin crear una segunda interpretación
+financiera.
+
+Implementación confirmada: esas dos políticas pertenecen también a cada plan de
+membresía. En Catálogo, el plan puede marcarse “Mostrar para contratar en
+kiosco” o quedar oculto para nuevas altas/cambios, y puede usar inscripción
+general o `WAIVED`. Ocultarlo no impide venderlo en Recepción ni renovar a quien
+ya lo posee. Los paquetes de visitas viven en esa misma pantalla de Catálogo,
+junto a los planes; no se administran desde Configuración del sistema.
 
 ### Lote 5 — Multibranding por sucursal
 

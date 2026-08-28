@@ -77,6 +77,8 @@ export type PlanDraft = {
   graceDays: string;
   benefitsJson: string;
   multiBranchAccess: boolean;
+  selfServiceAcquisitionEnabled: boolean;
+  registrationFeePolicy: "DEFAULT" | "WAIVED";
   status: MembershipPlanPayload["status"];
 };
 
@@ -90,6 +92,8 @@ export const emptyPlan: PlanDraft = {
   graceDays: "0",
   benefitsJson: "",
   multiBranchAccess: false,
+  selfServiceAcquisitionEnabled: true,
+  registrationFeePolicy: "DEFAULT",
   status: "ACTIVE",
 };
 
@@ -132,6 +136,8 @@ export function planDraftToPayload(plan: PlanDraft): MembershipPlanPayload {
     graceDays: Number(plan.graceDays || "0"),
     benefits: plan.benefitsJson.trim() || null,
     multiBranchAccess: plan.multiBranchAccess,
+    selfServiceAcquisitionEnabled: plan.selfServiceAcquisitionEnabled,
+    registrationFeePolicy: plan.registrationFeePolicy,
     status: plan.status,
   };
 }
@@ -147,6 +153,8 @@ export function planToDraft(plan: PlanSummary): PlanDraft {
     graceDays: String(plan.graceDays),
     benefitsJson: benefitsToText(plan.benefitsJson),
     multiBranchAccess: plan.multiBranchAccess,
+    selfServiceAcquisitionEnabled: plan.selfServiceAcquisitionEnabled,
+    registrationFeePolicy: plan.registrationFeePolicy,
     status: plan.status,
   };
 }

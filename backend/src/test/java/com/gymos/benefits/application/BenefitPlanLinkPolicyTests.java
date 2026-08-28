@@ -44,6 +44,26 @@ class BenefitPlanLinkPolicyTests {
 	}
 
 	@Test
+	void specialPriceRequiresAtLeastOneApplicablePlan() {
+		CreateBenefitCommand command = new CreateBenefitCommand(
+				null, "STUDENT-FULL", "Precio estudiante", "STUDENT", "SPECIAL_PRICE", 60_000, null,
+				false, false, 10, null, null, "ACTIVE", List.of(), "LOCAL", List.of());
+
+		assertCode(command, "BENEFIT_APPLICABLE_PLAN_REQUIRED");
+		verifyNoInteractions(repository, auditService);
+	}
+
+	@Test
+	void percentageBenefitCannotAccidentallyCarryApplicablePlans() {
+		CreateBenefitCommand command = new CreateBenefitCommand(
+				null, "STUDENT", "Estudiante", "STUDENT", "PERCENT", null, 10.0,
+				false, false, 10, null, null, "ACTIVE", List.of(), "LOCAL", List.of(UUID.randomUUID()));
+
+		assertCode(command, "BENEFIT_APPLICABLE_PLAN_NOT_ALLOWED");
+		verifyNoInteractions(repository, auditService);
+	}
+
+	@Test
 	void accessBenefitRejectsPlansOutsideTheOrganization() {
 		UUID planId = UUID.randomUUID();
 		when(repository.membershipPlansExist(organizationId, List.of(planId))).thenReturn(false);

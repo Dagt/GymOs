@@ -510,3 +510,26 @@ El PDF descargable muestra marca o inicial de respaldo, socio, coach, sucursal,
 vigencia, sesiones, bloques, prescripción e indicaciones. El archivo final se
 descarga desde la asignación. La UI nunca muestra precio, cobro, comisión ni POS
 para rutinas; el socio no tiene vista remota en V1.
+
+## Planes y paquetes de visitas
+
+- El editor de plan muestra “Disponible para contratar en kiosco” e
+  “Inscripción: configuración general / no cobrar”. Un plan privado sigue
+  disponible para Recepción.
+- `SPECIAL_PRICE` exige seleccionar planes; `ACCESS` permite alcance local o de
+  cobertura del plan sin copiar el beneficio a otra sede.
+- Catálogo incorpora una sección propia “Paquetes de visitas” con un formulario
+  breve: nombre, SKU, precio, visitas, vigencia, sedes, accesos, inscripción,
+  kiosco y estado.
+- El expediente muestra como máximo un paquete abierto, su saldo/vigencia y el
+  historial de consumos. Si existe uno pendiente o activo, oculta el CTA de
+  compra y explica el motivo.
+- Kiosco distingue intención de compra y readiness de pago igual que las
+  membresías: con Stripe pendiente puede mostrar opciones, pero no inicia
+  Checkout.
+- La pestaña de configuración del kiosco ofrece por sucursal el toggle
+  “Comprar paquetes de visitas” con autosave. El indicador de Stripe sólo
+  aparece si el toggle está encendido; apagarlo no altera las definiciones del
+  catálogo.
+- El POS genérico identifica los paquetes configurados y dirige al flujo
+  dedicado; no permite cobrar el servicio sin crear su entitlement.

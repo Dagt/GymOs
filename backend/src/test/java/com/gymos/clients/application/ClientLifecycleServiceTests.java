@@ -61,6 +61,16 @@ class ClientLifecycleServiceTests {
 		assertThat(fee.inactivityMonths()).isEqualTo(6);
 	}
 
+	@Test
+	void activeVisitPackagePreventsChargingRegistrationAgain() {
+		givenEnabledConfiguration(true);
+		when(repository.latestMembershipEnd(organizationId, clientId)).thenReturn(Optional.empty());
+		when(repository.latestVisitPackageEnd(organizationId, clientId))
+				.thenReturn(Optional.of(effectiveOn.plusDays(30)));
+
+		assertThat(service.registrationFee(organizationId, clientId, effectiveOn).due()).isFalse();
+	}
+
 	private void givenEnabledConfiguration(boolean autoInactivationEnabled) {
 		when(repository.configuration(organizationId)).thenReturn(Optional.of(
 				new ClientLifecycleConfiguration(

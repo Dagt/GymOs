@@ -88,23 +88,26 @@ class SelfServiceKioskConfigurationIntegrationTests {
 		GymOsPrincipal manager = principal(Set.of("selfservice.settings.manage"), Set.of("Gerente"));
 		GymOsPrincipal reception = principal(Set.of("selfservice.session.launch"), Set.of("Recepcion"));
 		UpdateKioskSettings enabled = new UpdateKioskSettings(
-				true, true, true, true, true, false, true, true);
+				true, true, true, true, true, true, false, true, true);
 
 		var configured = settingsService.configure(manager, branchId, enabled, "settings-enabled");
 
 		assertThat(configured.capabilities().clientRegistrationAllowed()).isTrue();
 		assertThat(configured.capabilities().membershipEnrollmentAllowed()).isTrue();
+		assertThat(configured.capabilities().visitPackagePurchaseAllowed()).isTrue();
 		assertThat(configured.capabilities().onlineCardPaymentsReady()).isFalse();
 		assertPersisted("clientRegistration", true);
 		assertPersisted("membershipEnrollment", true);
+		assertPersisted("visitPackagePurchase", true);
 		var launched = selfService.launchSession(reception, "127.0.0.1", "launch-enabled");
 		assertThat(launched.capabilities().clientRegistrationAllowed()).isTrue();
 		assertThat(launched.capabilities().membershipEnrollmentAllowed()).isTrue();
+		assertThat(launched.capabilities().visitPackagePurchaseAllowed()).isTrue();
 		assertThat(launched.capabilities().onlineCardPaymentsReady()).isFalse();
 
 		settingsService.configure(
 				manager, branchId,
-				new UpdateKioskSettings(false, true, true, true, true, false, true, true),
+				new UpdateKioskSettings(false, true, true, true, true, true, false, true, true),
 				"settings-registration-disabled"
 		);
 		var resetDisabled = selfService.reset(
@@ -123,6 +126,7 @@ class SelfServiceKioskConfigurationIntegrationTests {
 		var resetReady = selfService.reset(
 				launched.sessionId(), launched.sessionToken(), "reset-stripe-ready");
 		assertThat(resetReady.capabilities().membershipEnrollmentAllowed()).isTrue();
+		assertThat(resetReady.capabilities().visitPackagePurchaseAllowed()).isTrue();
 		assertThat(resetReady.capabilities().onlineCardPaymentsReady()).isTrue();
 	}
 

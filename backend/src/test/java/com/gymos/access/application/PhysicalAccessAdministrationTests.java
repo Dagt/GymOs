@@ -47,7 +47,8 @@ class PhysicalAccessAdministrationTests {
 			physicalRepository,
 			synchronizationService,
 			new PhysicalAccessProviderCatalog(),
-			connectorService
+			connectorService,
+			mock(com.gymos.visitpackages.api.operations.VisitPackageAccessOperations.class)
 	);
 	private final UUID organizationId = UUID.randomUUID();
 	private final UUID branchId = UUID.randomUUID();

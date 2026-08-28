@@ -6,4 +6,6 @@ public interface SalesOperations {
 	MembershipSaleResult createMembershipRenewal(CreateMembershipRenewalSaleCommand command);
 
 	MembershipSaleResult createMembershipPlanChange(CreateMembershipPlanChangeSaleCommand command);
+
+	VisitPackageSaleResult createVisitPackagePurchase(CreateVisitPackageSaleCommand command);
 }

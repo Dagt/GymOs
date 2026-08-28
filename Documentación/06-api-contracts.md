@@ -1502,3 +1502,52 @@ gimnasio puede consultar o mutar esta información.
   no se editan ni eliminan por esta API;
 - repetir la misma `idempotencyKey` y los mismos datos devuelve el cobro original
   sin avanzar nuevamente el corte; reutilizarla con datos distintos se rechaza.
+
+## Contratos V96–V99 — planes y paquetes de visitas
+
+Los contratos de alta/edición/consulta de planes agregan
+`selfServiceAcquisitionEnabled` y `registrationFeePolicy` (`DEFAULT|WAIVED`).
+Una cotización de kiosco indica `ENROLLMENT`, `PLAN_CHANGE` o `RENEWAL`; sólo la
+renovación del plan ya poseído puede continuar cuando el plan está oculto para
+nuevas contrataciones.
+
+Beneficios agregan `accessScope` y `applicablePlanIds`. `ACCESS` usa `planIds` y
+`accessScope`; `SPECIAL_PRICE` exige `applicablePlanIds`. Ambos vínculos tienen
+semánticas distintas y no son intercambiables.
+
+Administración de paquetes:
+
+```text
+GET   /api/v1/catalog/visit-package-plans
+POST  /api/v1/catalog/visit-package-plans
+PATCH /api/v1/catalog/visit-package-plans/{planId}
+```
+
+El payload contiene producto/importe, `totalVisits`, `validityDays`,
+`branchScope`, `branchIds`, `benefitIds`, disponibilidad de kiosco, política de
+inscripción y estado.
+
+Recepción/expediente:
+
+```text
+POST /api/v1/visit-packages/quotes
+POST /api/v1/visit-packages/purchases
+GET  /api/v1/clients/{clientId}/visit-package
+```
+
+Kiosco verificado:
+
+```text
+GET  /api/v1/self-service/sessions/{sessionId}/visit-package-options
+GET  /api/v1/self-service/sessions/{sessionId}/visit-package-quotes/{planId}
+GET  /api/v1/self-service/sessions/{sessionId}/visit-package
+POST /api/v1/self-service/sessions/{sessionId}/visit-package-purchases
+```
+
+`visitPackagePurchase` se persiste en `allowed_actions_json` como intención de
+la sucursal. Opciones y cotización no exigen readiness de Stripe; el POST de
+compra sí exige Checkout listo, además de capacidad configurada y paquete
+habilitado para autoservicio. La exclusividad rechaza un segundo paquete
+`PENDING_PAYMENT|ACTIVE` antes de crear datos parciales y también se protege con
+una restricción única en PostgreSQL. El contrato integral y sus errores están
+fijados en el documento 33.

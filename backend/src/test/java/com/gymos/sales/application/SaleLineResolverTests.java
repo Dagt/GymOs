@@ -98,4 +98,22 @@ class SaleLineResolverTests {
 
 		assertEquals("SALE_MEMBERSHIP_OPERATION_REQUIRED", exception.code());
 	}
+
+	@Test
+	void rejectsManagedVisitPackageFromGenericPosSoItCannotBeSoldWithoutBalance() {
+		SalesRepository repository = mock(SalesRepository.class);
+		SaleLineResolver resolver = new SaleLineResolver(repository);
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		UUID productId = UUID.randomUUID();
+		when(repository.productForSale(organizationId, branchId, productId)).thenReturn(Optional.of(
+				new ProductForSale(productId, "10 visitas", "SERVICE", 90000, "MXN", true)
+		));
+
+		BusinessException exception = assertThrows(BusinessException.class, () -> resolver.resolve(
+				organizationId, branchId, UUID.randomUUID(),
+				List.of(new SaleItemCommand(productId, 1, 0)), 0));
+
+		assertEquals("SALE_VISIT_PACKAGE_OPERATION_REQUIRED", exception.code());
+	}
 }

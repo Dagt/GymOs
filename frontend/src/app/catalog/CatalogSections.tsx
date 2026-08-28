@@ -16,7 +16,7 @@ export function CatalogToolbar({ canCreate, onNewPlan, onNewProduct, onNewVarian
     <section className="app-card flex flex-col gap-4 p-4 lg:flex-row lg:items-center lg:justify-between">
       <div>
         <p className="app-eyebrow">Sucursal activa</p>
-        <h2 className="app-card-title">Artículos y planes</h2>
+        <h2 className="app-card-title">Artículos, planes y paquetes</h2>
       </div>
       {canCreate ? (
         <div className="grid w-full gap-2 sm:grid-cols-3 lg:w-auto">
@@ -45,7 +45,7 @@ export function PlanList({ canUpdate, plans, onEditPlan }: PlanListProps) {
   return (
     <section className="app-card p-4">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="app-card-title">Planes</h2>
+        <h2 className="app-card-title">Planes de membresía</h2>
         <span className="text-sm text-[#6f7a73]">{plans.length}</span>
       </div>
       {plans.length === 0 ? (
@@ -73,6 +73,8 @@ export function PlanList({ canUpdate, plans, onEditPlan }: PlanListProps) {
                 <span className="rounded-full bg-white px-2 py-1">{plan.durationDays} días</span>
                 {plan.graceDays > 0 ? <span className="rounded-full bg-white px-2 py-1">Gracia {plan.graceDays}</span> : null}
                 {plan.multiBranchAccess ? <span className="rounded-full bg-white px-2 py-1">Multi-sucursal</span> : null}
+                {!plan.selfServiceAcquisitionEnabled ? <span className="rounded-full bg-[#f1ede5] px-2 py-1">Oculto en kiosco</span> : null}
+                {plan.registrationFeePolicy === "WAIVED" ? <span className="rounded-full bg-[#eaf6ed] px-2 py-1 text-[#28733e]">Sin inscripción</span> : null}
               </div>
               {canUpdate ? (
                 <button className="app-button-secondary mt-auto h-9 w-full" onClick={() => onEditPlan(plan)} type="button">
@@ -114,6 +116,13 @@ export function PlanDrawer({ editingPlanId, form, open, saving, onClose, onFormC
           <input checked={form.multiBranchAccess} className="h-4 w-4 accent-[var(--brand-primary)]" onChange={(event) => onFormChange({ ...form, multiBranchAccess: event.target.checked })} type="checkbox" />
           Acceso en todas las sucursales
         </label>
+        <div className="grid gap-3 rounded-lg border border-[var(--brand-line)] bg-[#fbfcfa] p-3 sm:grid-cols-2">
+          <label className="flex items-start gap-3 text-sm">
+            <input checked={form.selfServiceAcquisitionEnabled} className="mt-0.5 h-4 w-4 accent-[var(--brand-primary)]" onChange={(event) => onFormChange({ ...form, selfServiceAcquisitionEnabled: event.target.checked })} type="checkbox" />
+            <span><strong className="block text-[#111815]">Mostrar para contratar en kiosco</strong><span className="text-xs text-[var(--brand-muted)]">Si se apaga, queda oculto para altas y cambios. Quien ya lo tenga todavía podrá renovarlo.</span></span>
+          </label>
+          <SelectField label="Inscripción" name="registrationFeePolicy" options={[{ label: "Aplicar configuración general", value: "DEFAULT" }, { label: "No cobrar inscripción", value: "WAIVED" }]} value={form.registrationFeePolicy} onChange={(value) => onFormChange({ ...form, registrationFeePolicy: value as PlanDraft["registrationFeePolicy"] })} />
+        </div>
         <button className="app-button h-11" disabled={saving} type="submit">
           {saving ? "Guardando..." : editingPlanId ? "Guardar cambios" : "Crear plan"}
         </button>

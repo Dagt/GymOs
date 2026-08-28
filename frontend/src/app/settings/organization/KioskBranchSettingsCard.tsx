@@ -10,7 +10,7 @@ import {
   type UpdateKioskBranchSettings,
 } from "@/lib/api";
 
-type EditableKey = "clientRegistrationAllowed" | "membershipEnrollmentAllowed" | "membershipRenewalAllowed" |
+type EditableKey = "clientRegistrationAllowed" | "membershipEnrollmentAllowed" | "visitPackagePurchaseAllowed" | "membershipRenewalAllowed" |
   "membershipPlanChangeAllowed" | "resourceBookingAllowed" | "wellnessBookingAllowed" |
   "profileUpdateAllowed" | "autopayAllowed";
 type Requirement = "ONLINE_CARD" | "RECURRING_CARD" | null;
@@ -30,6 +30,7 @@ type BranchSaveState = {
 
 const paymentOptions: KioskOption[] = [
   { key: "membershipEnrollmentAllowed", title: "Comprar membresía", description: "Compra y pago con Stripe.", requirement: "ONLINE_CARD" },
+  { key: "visitPackagePurchaseAllowed", title: "Comprar paquetes de visitas", description: "Compra paquetes configurados para esta sucursal.", requirement: "ONLINE_CARD" },
   { key: "membershipRenewalAllowed", title: "Renovar membresía", description: "Renovación y pago desde el kiosco.", requirement: "ONLINE_CARD" },
   { key: "membershipPlanChangeAllowed", title: "Cambiar de plan", description: "Cambio de plan cuando requiere un cobro.", requirement: "ONLINE_CARD" },
   { key: "autopayAllowed", title: "Domiciliación", description: "Alta y gestión de cobros recurrentes.", requirement: "RECURRING_CARD" },
@@ -213,6 +214,7 @@ function toUpdatePayload(item: KioskBranchSettings): UpdateKioskBranchSettings {
   return {
     clientRegistration: capabilities.clientRegistrationAllowed,
     membershipEnrollment: capabilities.membershipEnrollmentAllowed,
+    visitPackagePurchase: capabilities.visitPackagePurchaseAllowed,
     membershipRenewal: capabilities.membershipRenewalAllowed,
     membershipPlanChange: capabilities.membershipPlanChangeAllowed,
     resourceBooking: capabilities.resourceBookingAllowed,

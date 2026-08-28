@@ -18,7 +18,8 @@ class SalesCatalogLookupRepository {
 		return catalog.product(organizationId, branchId, productId)
 				.filter(CatalogProductOperations.CatalogProductSnapshot::active)
 				.map(product -> new ProductForSale(
-						product.id(), product.name(), product.productType(), product.priceCents(), product.currency()
+						product.id(), product.name(), product.productType(), product.priceCents(), product.currency(),
+						product.managedVisitPackage()
 				));
 	}
 }

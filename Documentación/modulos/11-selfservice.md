@@ -125,3 +125,24 @@ Diseño objetivo: `../31-diseño-automatizaciones-kiosco.md`.
 Runbook: `../../docs/operations/kiosk-troubleshooting.md`.
 Operación Stripe: `../../docs/operations/stripe-automation-recovery.md`.
 Pruebas Stripe: `../../docs/testing/stripe-kiosk-test-mode.md`.
+
+## Planes privados y paquetes
+
+La membresía actual multi-sucursal se muestra en cualquier sede cubierta. Las
+nuevas altas y cambios sólo ofrecen planes con
+`selfServiceAcquisitionEnabled=true`; renovar el plan que el socio ya posee
+sigue permitido. Esta autorización también se valida en backend.
+
+Los paquetes se muestran con Stripe pendiente, pero Checkout queda bloqueado.
+`visitPackagePurchase` conserva por sucursal la intención del gimnasio y una
+sesión nueva/reiniciada resuelve ese valor vigente. El catálogo exige además que
+la definición esté activa, cubra la sucursal y permita autoservicio. Cuando
+Stripe pasa a ready, Checkout se habilita sin volver a guardar configuración.
+Un paquete ya pendiente o activo muestra saldo/estado y oculta el CTA para
+comprar otro.
+
+Los planes de membresía tienen su propia política
+`selfServiceAcquisitionEnabled`: al apagarla quedan ocultos para altas y cambios
+del kiosco, pero no para Recepción ni para renovar la membresía que el socio ya
+posee. `registrationFeePolicy=WAIVED` también pertenece al plan de membresía,
+no únicamente a los paquetes.

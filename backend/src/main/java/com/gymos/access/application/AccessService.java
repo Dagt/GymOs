@@ -34,12 +34,15 @@ import com.gymos.eligibility.api.EligibilityPolicy.ActiveMembership;
 import com.gymos.eligibility.api.EligibilityPolicy.EligibilityDecision;
 import com.gymos.eligibility.api.EligibilityPolicy.EligibilityRequest;
 import com.gymos.eligibility.api.EligibilityPolicy.Reason;
+import com.gymos.visitpackages.api.operations.VisitPackageAccessOperations;
+import com.gymos.visitpackages.api.operations.VisitPackageAccessOperations.VisitPackageAccessResult;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -55,6 +58,7 @@ public class AccessService {
 	private final PhysicalAccessSynchronizationService physicalSynchronizationService;
 	private final PhysicalAccessProviderCatalog providerCatalog;
 	private final PhysicalConnectorService connectorService;
+	private final VisitPackageAccessOperations visitPackages;
 
 	public AccessService(
 			AccessRepository accessRepository,
@@ -64,7 +68,8 @@ public class AccessService {
 			PhysicalAccessRepository physicalAccessRepository,
 			PhysicalAccessSynchronizationService physicalSynchronizationService,
 			PhysicalAccessProviderCatalog providerCatalog,
-			PhysicalConnectorService connectorService
+			PhysicalConnectorService connectorService,
+			VisitPackageAccessOperations visitPackages
 	) {
 		this.accessRepository = accessRepository;
 		this.auditService = auditService;
@@ -74,6 +79,7 @@ public class AccessService {
 		this.physicalSynchronizationService = physicalSynchronizationService;
 		this.providerCatalog = providerCatalog;
 		this.connectorService = connectorService;
+		this.visitPackages = visitPackages;
 	}
 
 	@Transactional(readOnly = true)
@@ -503,6 +509,37 @@ public class AccessService {
 			return recordDecision(principal, device, client, null, null, "MEMBERSHIP_CHECK", "DENIED",
 					"RECEPTION", "Cliente inactivo o suspendido.", now, correlationId);
 		}
+
+		String visitIdempotencyKey = "access:" + (
+				request.idempotencyKey() == null || request.idempotencyKey().isBlank()
+						? safeCorrelationId(correlationId)
+						: request.idempotencyKey().trim());
+		Optional<VisitPackageAccessResult> packageAccess = visitPackages.consumeForAccess(
+				principal.organizationId(), principal.branchId(), client.id(), requiredBenefitIds,
+				device.id(), visitIdempotencyKey, BusinessTime.today(), now);
+		if (packageAccess.isPresent()) {
+			VisitPackageAccessResult consumed = packageAccess.get();
+			if (!consumed.clientId().equals(client.id())
+					|| !consumed.branchId().equals(principal.branchId())
+					|| !consumed.accessDeviceId().equals(device.id())) {
+				throw new BusinessException(
+						"ACCESS_IDEMPOTENCY_KEY_REUSED",
+						"La llave de acceso ya corresponde a otro evento.");
+			}
+			if (consumed.accessLogId() != null) {
+				return accessRepository.decision(consumed.accessLogId())
+						.orElseThrow(() -> new BusinessException(
+								"ACCESS_LOG_NOT_FOUND", "No fue posible recuperar la decisión de acceso."));
+			}
+			AccessDecisionResponse decision = recordDecision(
+					principal, device, client, null, null, "VISIT_PACKAGE", "GRANTED", "RECEPTION",
+					"Paquete " + consumed.packageName() + ": " + consumed.remainingAfter()
+							+ " visita(s) restante(s).",
+					now, correlationId);
+			visitPackages.linkAccessLog(principal.organizationId(), consumed.consumptionId(), decision.logId());
+			return decision;
+		}
+
 		if (eligibility.reason() == Reason.BENEFIT_NOT_GRANTED) {
 			return recordDecision(principal, device, client, membership.id(), null, "BENEFIT_CHECK",
 					"DENIED", "RECEPTION", "El plan no incluye el acceso requerido por el dispositivo.",

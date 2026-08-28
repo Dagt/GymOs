@@ -258,6 +258,7 @@ export function useAccessController() {
         clientId: selectedClientId || null,
         identifier,
         deviceCode,
+        idempotencyKey: crypto.randomUUID(),
       });
       setLastDecision(decision);
       setMessage(

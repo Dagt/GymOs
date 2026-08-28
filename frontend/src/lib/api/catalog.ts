@@ -16,6 +16,8 @@ import type {
   ProductSearchParams,
   ProductVariantBatchPayload,
   UpdateMembershipPlanPayload,
+  VisitPackagePlanPayload,
+  VisitPackagePlanSummary,
 } from "./catalog-types";
 
 export async function getProducts(accessToken: string): Promise<ProductSummary[]> {
@@ -103,3 +105,6 @@ export async function getPlans(accessToken: string): Promise<PlanSummary[]> { re
 export async function createPlan(accessToken: string, payload: PlanPayload): Promise<PlanSummary> { return apiFetch<PlanSummary>("/catalog/plans", accessToken, { method: "POST", body: JSON.stringify(normalizePayload(payload)) }); }
 export async function createMembershipPlan(accessToken: string, payload: MembershipPlanPayload): Promise<PlanSummary> { return apiFetch<PlanSummary>("/catalog/membership-plans", accessToken, { method: "POST", body: JSON.stringify(normalizePayload(payload)) }); }
 export async function updateMembershipPlan(accessToken: string, planId: string, payload: UpdateMembershipPlanPayload): Promise<PlanSummary> { return apiFetch<PlanSummary>(`/catalog/plans/${planId}`, accessToken, { method: "PATCH", body: JSON.stringify(normalizePayload(payload)) }); }
+export async function getVisitPackagePlans(accessToken: string): Promise<VisitPackagePlanSummary[]> { return apiFetch<VisitPackagePlanSummary[]>("/catalog/visit-package-plans", accessToken); }
+export async function createVisitPackagePlan(accessToken: string, payload: VisitPackagePlanPayload): Promise<VisitPackagePlanSummary> { return apiFetch<VisitPackagePlanSummary>("/catalog/visit-package-plans", accessToken, { method: "POST", body: JSON.stringify(normalizePayload(payload)) }); }
+export async function updateVisitPackagePlan(accessToken: string, planId: string, payload: VisitPackagePlanPayload): Promise<VisitPackagePlanSummary> { return apiFetch<VisitPackagePlanSummary>(`/catalog/visit-package-plans/${planId}`, accessToken, { method: "PATCH", body: JSON.stringify(normalizePayload(payload)) }); }

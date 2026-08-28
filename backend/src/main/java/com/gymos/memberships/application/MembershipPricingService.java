@@ -72,7 +72,7 @@ public class MembershipPricingService implements MembershipPricingOperations {
 			PlanForRenewal plan
 	) {
 		EligibilityDecision eligibility = eligibilityPolicy.evaluate(EligibilityRequest.membershipPricing(
-				organizationId, branchId, clientId, BusinessTime.today()));
+				organizationId, branchId, clientId, BusinessTime.today(), plan.planId()));
 		if (!eligibility.eligible()) {
 			throw eligibilityException(eligibility.reason());
 		}
@@ -80,8 +80,9 @@ public class MembershipPricingService implements MembershipPricingOperations {
 		QuoteCandidate combinable = applyCombinable(plan.priceCents(), eligible);
 		QuoteCandidate exclusive = bestExclusive(plan.priceCents(), eligible);
 		QuoteCandidate selected = exclusive.totalCents() < combinable.totalCents() ? exclusive : combinable;
-		RegistrationFee registrationFee = clientLifecycleOperations.registrationFee(
-				organizationId, clientId, BusinessTime.today());
+		RegistrationFee registrationFee = "WAIVED".equals(plan.registrationFeePolicy())
+				? RegistrationFee.none(plan.currency(), 0)
+				: clientLifecycleOperations.registrationFee(organizationId, clientId, BusinessTime.today());
 		if (registrationFee.due() && !plan.currency().equalsIgnoreCase(registrationFee.currency())) {
 			throw new BusinessException(
 					"REGISTRATION_FEE_CURRENCY_MISMATCH",

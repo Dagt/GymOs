@@ -95,9 +95,49 @@ export type PlanSummary = {
   graceDays: number;
   benefitsJson: string | null;
   multiBranchAccess: boolean;
+  selfServiceAcquisitionEnabled: boolean;
+  registrationFeePolicy: "DEFAULT" | "WAIVED";
   status: "ACTIVE" | "INACTIVE";
   createdAt: string;
   updatedAt: string;
+};
+
+export type VisitPackagePlanSummary = {
+  id: string;
+  productId: string;
+  sku: string;
+  name: string;
+  description: string | null;
+  priceCents: number;
+  currency: string;
+  totalVisits: number;
+  validityDays: number;
+  branchScope: "ALL_BRANCHES" | "SELECTED_BRANCHES";
+  branchIds: string[];
+  benefitIds: string[];
+  selfServiceAcquisitionEnabled: boolean;
+  registrationFeePolicy: "DEFAULT" | "WAIVED";
+  status: "ACTIVE" | "INACTIVE";
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type VisitPackagePlanPayload = {
+  sku?: string;
+  name: string;
+  description?: string | null;
+  priceCents: number;
+  currency: string;
+  totalVisits: number;
+  validityDays: number;
+  branchScope: "ALL_BRANCHES" | "SELECTED_BRANCHES";
+  branchIds: string[];
+  benefitIds: string[];
+  selfServiceAcquisitionEnabled: boolean;
+  registrationFeePolicy: "DEFAULT" | "WAIVED";
+  status: "ACTIVE" | "INACTIVE";
+  expectedVersion?: number;
 };
 
 export type ProductPayload = {
@@ -223,6 +263,8 @@ export type PlanPayload = {
   graceDays: number;
   benefitsJson?: string | null;
   multiBranchAccess?: boolean;
+  selfServiceAcquisitionEnabled?: boolean;
+  registrationFeePolicy?: "DEFAULT" | "WAIVED";
   status: "ACTIVE" | "INACTIVE";
 };
 
@@ -236,6 +278,8 @@ export type MembershipPlanPayload = {
   graceDays: number;
   benefits?: string | null;
   multiBranchAccess?: boolean;
+  selfServiceAcquisitionEnabled?: boolean;
+  registrationFeePolicy?: "DEFAULT" | "WAIVED";
   status: "ACTIVE" | "INACTIVE";
 };
 

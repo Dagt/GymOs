@@ -14,7 +14,7 @@ public interface EligibilityFactsProvider {
 			UUID organizationId, UUID branchId, UUID clientId, LocalDate effectiveOn);
 
 	List<EligibleBenefit> pricingBenefits(
-			UUID organizationId, UUID branchId, UUID clientId, LocalDate effectiveOn);
+			UUID organizationId, UUID branchId, UUID clientId, LocalDate effectiveOn, UUID targetPlanId);
 
 	List<EligibleBenefit> accessBenefits(
 			UUID organizationId, UUID branchId, UUID clientId, LocalDate effectiveOn);

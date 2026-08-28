@@ -772,6 +772,41 @@ Criterios:
 - productos, ventas y movimientos existentes conservan sus IDs y relaciones al
   aplicar V95.
 
+## UC-036 Contratar o renovar un plan multi-sucursal
+
+Un socio con plan multi-sucursal creado en A puede ver y renovar su membresía
+desde el kiosco B. La renovación deriva el plan desde la membresía; una alta o
+cambio exige que el plan esté disponible para autoservicio. Recepción conserva
+la facultad de vender planes privados. `WAIVED` omite inscripción y `DEFAULT`
+aplica la política general.
+
+## UC-037 Definir un paquete de visitas
+
+El administrador crea nombre, precio, visitas, vigencia, sedes, accesos y
+política de inscripción. Se genera un servicio `VISIT_PASS` configurado; un
+servicio genérico con ese nombre no concede acceso.
+
+## UC-038 Comprar un paquete de visitas
+
+El sistema bloquea la compra si el socio ya tiene un paquete `PENDING_PAYMENT`
+o `ACTIVE`, incluso ante solicitudes concurrentes. Pago confirmado activa un
+snapshot del saldo y cobertura; un paquete consumido, vencido o cancelado
+permite volver a comprar.
+
+En kiosco, `visitPackagePurchase=true` permite ver y cotizar únicamente
+definiciones activas, cubiertas por la sucursal y habilitadas para autoservicio.
+Stripe pendiente no oculta el catálogo, pero bloquea la creación de Checkout.
+Cuando el proveedor pasa a ready, la compra queda operativa sin volver a guardar
+la configuración. Un entitlement ya abierto muestra saldo o pago pendiente y
+suprime el CTA de una segunda compra.
+
+## UC-039 Consumir una visita
+
+Acceso intenta primero la membresía. Sólo si ésta no concede entrada consume de
+forma atómica una visita de un paquete activo, vigente, con saldo y cobertura
+para sucursal/beneficio. Repetir el mismo evento devuelve la misma decisión sin
+descontar de nuevo.
+
 ## Anexo Hito 3.5 final
 
 La verificación segura de kiosco, la idempotencia por hash y los eventos por

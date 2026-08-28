@@ -125,12 +125,12 @@ Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún 
 | [Configuración](modulos/03-configuration.md) | FUNCIONAL | Marca tenant, cobros, socios, kiosco con autosave y correo por permisos; UI unificada | Perfil de marca por sucursal (`CFG-003`) y ciclo de logo (`CFG-001`) |
 | [Onboarding](modulos/04-onboarding.md) | FUNCIONAL | Checklist, setup piloto idempotente e importación inicial | Recuperación probada de altas parciales (`ONB-001`) |
 | [Socios](modulos/05-clients.md) | FUNCIONAL | Alta, búsqueda, detalle, importación, inscripción, baja automática reversible y visibilidad multi-sucursal | PII, duplicados y pruebas CRUD (`CLI-001`) |
-| [Catálogo](modulos/06-catalog.md) | ESTABILIZADO | Productos, planes, categorías, unidades y asociación por sucursal | Volumen, legacy y archivos (`CAT-001`) |
-| [Ventas](modulos/07-sales.md) | FUNCIONAL | POS, ventas contextualizadas, inscripción separada, pagos, reembolsos, recibos e inventario | Concurrencia/conciliación E2E (`SAL-001`) |
-| [Membresías](modulos/08-memberships.md) | ESTABILIZADO | Periodos inclusivos, activa única, alta con inscripción, renovación, cambio y cotización | E2E financiero completo |
-| [Beneficios/elegibilidad](modulos/09-benefits.md) | ESTABILIZADO | Descuentos y acceso heredado; edición de planes vinculados con control de versión | Herencia en todas las sedes del plan multi-sucursal (`BEN-003`) |
-| [Acceso](modulos/10-access.md) | ESTABILIZADO PARA INICIAR CONNECTOR | Elegibilidad, provider explícito, puntos, bitácora, permisos físicos, estado deseado, Connector API durable y protegida, salud, eventos/candidatos y consola con diagnóstico legacy | Paquetes de visitas entre sucursales (`ACC-005`) y Connector/HikCentral (`ACC-002`) |
-| [Kiosco](modulos/11-selfservice.md) | FUNCIONAL / ACEPTACIÓN | Apertura sólo por Recepción, sesión aislada, registro/verificación sin plan, intención separada de readiness, membresías, pagos, domiciliación, reservas, wellness y datos | Publicar ejecución automatizada de Stripe sandbox (`SELF-001`) |
+| [Catálogo](modulos/06-catalog.md) | ESTABILIZADO | Productos, planes de membresía, paquetes de visitas, categorías, unidades y asociación por sucursal | Volumen, legacy y archivos (`CAT-001`) |
+| [Ventas](modulos/07-sales.md) | FUNCIONAL | POS, ventas contextualizadas, inscripción separada, compra dedicada de membresías/paquetes, pagos, recibos e inventario | Concurrencia/conciliación E2E y política de reembolso parcial (`SAL-001`) |
+| [Membresías](modulos/08-memberships.md) | ESTABILIZADO | Periodos inclusivos, activa única, alta con inscripción, renovación/cambio multi-sucursal, visibilidad de kiosco y exención por plan | E2E financiero completo |
+| [Beneficios/elegibilidad](modulos/09-benefits.md) | ESTABILIZADO | Descuentos por plan y acceso `LOCAL|PLAN_COVERAGE`, incluidas sedes cubiertas sin duplicar beneficios | Matriz PostgreSQL/E2E y mapeos físicos locales (`BEN-003`) |
+| [Acceso](modulos/10-access.md) | ESTABILIZADO PARA INICIAR CONNECTOR | Elegibilidad, puntos, bitácora, Connector API y consumo atómico/idempotente de paquetes con prioridad de membresía | Aceptación concurrente/torniquete de paquetes (`ACC-005`) y Connector/HikCentral (`ACC-002`) |
+| [Kiosco](modulos/11-selfservice.md) | FUNCIONAL / ACEPTACIÓN | Apertura sólo por Recepción, sesión aislada, registro, membresías, paquetes visibles con Stripe pendiente, Checkout protegido, domiciliación, reservas, wellness y datos | Publicar ejecución automatizada de Stripe sandbox y E2E de paquetes (`SELF-001`) |
 | [Reservas](modulos/12-bookings.md) | FUNCIONAL | Recursos, disponibilidad, pago y acceso multi-sucursal | Colisiones/cancelación/E2E (`BKG-001`) |
 | [Inventario](modulos/13-inventory.md) | ESTABILIZADO | Existencias, movimientos, alertas, transferencias y conteos paginados; valuación | Feedback por partida (`INV-002`) |
 | [Coaches](modulos/14-coaching.md) | ESTABILIZADO | Perfiles, rutinas versionadas, asignación sin solapes, cierre por vencimiento, métricas temporales, CSV/PDF | Cleanup durable de medios (`COA-018`) |
@@ -233,19 +233,28 @@ Evidencia disponible:
 
 La carga real del logo en correo debe verificarse después del despliegue con `GYMOS_FRONTEND_BASE_URL=https://gymfort.mx`; localhost no es accesible desde Gmail/Outlook.
 
-## 5. Próximo bloque
+## 5. Bloque activo
 
-Después de cerrar variantes/códigos, el siguiente lote funcional del primer
-cliente es **paquetes de visitas multi-sucursal dentro del mismo tenant**:
+Después de integrar variantes/códigos mediante PR #20, la rama
+`feature/multibranch-plans-benefits-visits` implementa y valida **planes,
+beneficios y paquetes de visitas multi-sucursal dentro del mismo tenant**:
 
 1. producto vendible con cantidad de visitas y ventana de vigencia;
 2. alcance a todas o a una selección de sucursales;
 3. saldo único por socio, sin duplicarlo por sede;
 4. consumo atómico e idempotente que registre la sucursal;
-5. integración con ventas, acceso y reportes.
+5. integración con ventas, acceso y reportes;
+6. exclusividad de un solo paquete `PENDING_PAYMENT` o `ACTIVE` por socio;
+7. planes privados de kiosco, exención de inscripción y precios especiales por
+   plan.
 
-Beneficios multi-sucursal y branding por sucursal continúan después como lotes
-4 y 5. El Connector HikCentral, cobranza SaaS y hardening operativo permanecen
-como frentes transversales separados.
+V96–V99, los contratos, la compra dedicada, la activación por pago, el consumo
+desde Access y las superficies de Catálogo/Recepción/kiosco están implementados.
+Los paquetes viven junto a los planes en Catálogo; Configuración sólo conserva
+la intención por sucursal del kiosco. Cada plan de membresía también puede
+ocultarse de nuevas altas/cambios del kiosco y quedar exento de inscripción.
+Quedan validación E2E/aceptación, reportes e integración física concurrente.
+Branding por sucursal continúa después. El Connector HikCentral, cobranza SaaS
+y hardening operativo permanecen como frentes separados.
 
 El detalle vive en `modulos/`, la deuda única en el documento 28 y la situación Git en el documento 29.

@@ -3,6 +3,7 @@ package com.gymos.selfservice.api;
 import com.gymos.bookings.api.operations.BookingOperations.BookingAvailability;
 import com.gymos.bookings.api.operations.BookingOperations.BookingResource;
 import com.gymos.bookings.api.operations.BookingOperations.BookingResult;
+import com.gymos.catalog.api.VisitPackagePlanOperations.VisitPackagePlanSnapshot;
 import com.gymos.clients.api.operations.SelfServiceClientProfile;
 import com.gymos.clients.api.operations.RegisterSelfServiceClientCommand;
 import com.gymos.common.api.Correlation;
@@ -20,10 +21,13 @@ import com.gymos.selfservice.application.result.CreateSessionResult;
 import com.gymos.selfservice.application.result.SelfServiceMembershipSaleResult;
 import com.gymos.selfservice.application.result.SelfServiceCapabilities;
 import com.gymos.selfservice.application.result.SelfServiceSummaryResult;
+import com.gymos.selfservice.application.result.SelfServiceVisitPackageSaleResult;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.MembershipRecord;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.PendingPaymentRecord;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.SelfServicePaymentRecord;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository.PlanOptionRecord;
+import com.gymos.visitpackages.api.operations.VisitPackageOperations.VisitPackageEntitlementView;
+import com.gymos.visitpackages.api.operations.VisitPackageOperations.VisitPackageQuoteView;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -104,9 +108,48 @@ public class SelfServiceController {
 	MembershipQuoteView membershipQuote(
 			@PathVariable UUID sessionId,
 			@PathVariable UUID planId,
+			@RequestParam(defaultValue = "ENROLLMENT") String operation,
+			@RequestParam(required = false) UUID membershipId,
 			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken
 	) {
-		return selfServiceService.membershipQuote(sessionId, sessionToken, planId);
+		return selfServiceService.membershipQuote(sessionId, sessionToken, planId, operation, membershipId);
+	}
+
+	@GetMapping("/sessions/{sessionId}/visit-package-options")
+	List<VisitPackagePlanSnapshot> visitPackageOptions(
+			@PathVariable UUID sessionId,
+			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken
+	) {
+		return selfServiceService.visitPackageOptions(sessionId, sessionToken);
+	}
+
+	@GetMapping("/sessions/{sessionId}/visit-package-quotes/{packagePlanId}")
+	VisitPackageQuoteView visitPackageQuote(
+			@PathVariable UUID sessionId,
+			@PathVariable UUID packagePlanId,
+			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken
+	) {
+		return selfServiceService.visitPackageQuote(sessionId, sessionToken, packagePlanId);
+	}
+
+	@GetMapping("/sessions/{sessionId}/visit-package")
+	VisitPackageEntitlementView currentVisitPackage(
+			@PathVariable UUID sessionId,
+			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken
+	) {
+		return selfServiceService.currentVisitPackage(sessionId, sessionToken);
+	}
+
+	@PostMapping("/sessions/{sessionId}/visit-package-purchases")
+	SelfServiceVisitPackageSaleResult purchaseVisitPackage(
+			@PathVariable UUID sessionId,
+			@Valid @RequestBody PurchaseVisitPackageRequest request,
+			@RequestHeader(name = "X-Self-Service-Session-Token", required = false) String sessionToken,
+			HttpServletRequest servletRequest
+	) {
+		return selfServiceService.purchaseVisitPackage(
+				sessionId, sessionToken, request.packagePlanId(), request.idempotencyKey(),
+				correlationId(servletRequest), clientIpResolver.resolve(servletRequest));
 	}
 
 	@GetMapping("/sessions/{sessionId}/booking-resources")
@@ -253,6 +296,10 @@ public class SelfServiceController {
 	public record CreateBookingRequest(@NotNull UUID resourceId, @NotNull OffsetDateTime startsAt, @NotNull OffsetDateTime endsAt, @Size(max = 2000) String notes) {}
 	public record RenewMembershipRequest(@NotBlank @Size(max = 160) String idempotencyKey) { private RenewMembershipOperationCommand toCommand() { return new RenewMembershipOperationCommand("CARD_ONLINE", null, false, "Renovacion con tarjeta desde kiosco", idempotencyKey); } }
 	public record EnrollMembershipRequest(@NotNull UUID planId, @NotBlank @Size(max = 160) String idempotencyKey) {}
+	public record PurchaseVisitPackageRequest(
+			@NotNull UUID packagePlanId,
+			@NotBlank @Size(max = 160) String idempotencyKey
+	) {}
 	public record ChangePlanRequest(@NotNull UUID targetPlanId, @NotBlank @Size(max = 160) String idempotencyKey) { private ChangeMembershipPlanOperationCommand toCommand() { return new ChangeMembershipPlanOperationCommand(targetPlanId, "CARD_ONLINE", null, false, "Cambio de plan con tarjeta desde kiosco", idempotencyKey); } }
 	public record SetupAutopayRequest(
 			@NotBlank @Size(max = 40) String termsVersion,

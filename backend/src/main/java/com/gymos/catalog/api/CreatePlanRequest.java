@@ -14,9 +14,13 @@ public record CreatePlanRequest(
 		@Min(0) int graceDays,
 		@Size(max = 4000) String benefitsJson,
 		boolean multiBranchAccess,
+		Boolean selfServiceAcquisitionEnabled,
+		@Pattern(regexp = "DEFAULT|WAIVED") String registrationFeePolicy,
 		@NotBlank @Pattern(regexp = "ACTIVE|INACTIVE") String status
 ) {
 	CreatePlanCommand toCommand() {
-		return new CreatePlanCommand(productId, durationDays, graceDays, benefitsJson, multiBranchAccess, status);
+		return new CreatePlanCommand(productId, durationDays, graceDays, benefitsJson, multiBranchAccess,
+				selfServiceAcquisitionEnabled == null || selfServiceAcquisitionEnabled,
+				registrationFeePolicy == null ? "DEFAULT" : registrationFeePolicy, status);
 	}
 }

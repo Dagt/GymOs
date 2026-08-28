@@ -25,7 +25,7 @@ public class SelfServiceRepository {
 				)
 				SELECT gen_random_uuid(), :organizationId, :branchId, 'Kiosco de sucursal',
 				       'KIOSK-MAIN', 'ACTIVE',
-			       '{"clientRegistration":false,"membershipEnrollment":true,"membershipRenewal":true,"membershipPlanChange":true,"resourceBooking":true,"wellnessBooking":false,"profileUpdate":true,"autopay":true}'::jsonb,
+			       '{"clientRegistration":false,"membershipEnrollment":true,"visitPackagePurchase":false,"membershipRenewal":true,"membershipPlanChange":true,"resourceBooking":true,"wellnessBooking":false,"profileUpdate":true,"autopay":true}'::jsonb,
 				       :now, :now, :userId, :userId, 0
 				WHERE EXISTS (
 				    SELECT 1 FROM branch
@@ -79,7 +79,7 @@ public class SelfServiceRepository {
 				SELECT branch.id AS branch_id, branch.name AS branch_name,
 				       COALESCE(terminal.status, 'NOT_CONFIGURED') AS status,
 				       COALESCE(terminal.allowed_actions_json,
-				           '{"clientRegistration":false,"membershipEnrollment":true,"membershipRenewal":true,"membershipPlanChange":true,"resourceBooking":true,"wellnessBooking":false,"profileUpdate":true,"autopay":true}'::jsonb
+			           '{"clientRegistration":false,"membershipEnrollment":true,"visitPackagePurchase":false,"membershipRenewal":true,"membershipPlanChange":true,"resourceBooking":true,"wellnessBooking":false,"profileUpdate":true,"autopay":true}'::jsonb
 				       )::text AS allowed_actions_json,
 				       terminal.updated_at
 				FROM branch
@@ -118,8 +118,9 @@ public class SelfServiceRepository {
 				SELECT gen_random_uuid(), :organizationId, :branchId, 'Kiosco de sucursal',
 				       'KIOSK-MAIN', 'ACTIVE',
 				       jsonb_build_object(
-				           'clientRegistration', :clientRegistration,
-				           'membershipEnrollment', :membershipEnrollment,
+					           'clientRegistration', :clientRegistration,
+					           'membershipEnrollment', :membershipEnrollment,
+					           'visitPackagePurchase', :visitPackagePurchase,
 				           'membershipRenewal', :membershipRenewal,
 				           'membershipPlanChange', :membershipPlanChange,
 				           'resourceBooking', :resourceBooking,
@@ -144,6 +145,7 @@ public class SelfServiceRepository {
 				.param("actorUserId", actorUserId)
 				.param("clientRegistration", data.clientRegistration())
 				.param("membershipEnrollment", data.membershipEnrollment())
+				.param("visitPackagePurchase", data.visitPackagePurchase())
 				.param("membershipRenewal", data.membershipRenewal())
 				.param("membershipPlanChange", data.membershipPlanChange())
 				.param("resourceBooking", data.resourceBooking())
@@ -363,7 +365,8 @@ public class SelfServiceRepository {
 		return jdbcClient.sql("""
 				SELECT m.id, m.plan_id, cp.name AS plan_name, m.status,
 				       m.starts_on, m.ends_on, m.grace_ends_on,
-				       (m.branch_id = :branchId) AS managed_at_current_branch
+				       (m.branch_id = :branchId OR mp.multi_branch_access = true) AS managed_at_current_branch,
+				       (m.branch_id = :branchId) AS autopay_managed_at_current_branch
 				FROM membership m
 				JOIN membership_plan mp ON mp.id = m.plan_id
 				JOIN catalog_product cp ON cp.id = mp.product_id
@@ -385,7 +388,8 @@ public class SelfServiceRepository {
 						resultSet.getObject("starts_on", LocalDate.class),
 						resultSet.getObject("ends_on", LocalDate.class),
 						resultSet.getObject("grace_ends_on", LocalDate.class),
-						resultSet.getBoolean("managed_at_current_branch")
+						resultSet.getBoolean("managed_at_current_branch"),
+						resultSet.getBoolean("autopay_managed_at_current_branch")
 				))
 				.list();
 	}
@@ -399,12 +403,14 @@ public class SelfServiceRepository {
 		return jdbcClient.sql("""
 				SELECT EXISTS (
 				    SELECT 1
-				    FROM membership
-				    WHERE organization_id = :organizationId
-				      AND branch_id = :branchId
-				      AND client_id = :clientId
-				      AND id = :membershipId
-				      AND deleted_at IS NULL
+				    FROM membership m
+				    JOIN membership_plan mp ON mp.id = m.plan_id
+				    WHERE m.organization_id = :organizationId
+				      AND (m.branch_id = :branchId OR mp.multi_branch_access = true)
+				      AND m.client_id = :clientId
+				      AND m.id = :membershipId
+				      AND m.deleted_at IS NULL
+				      AND mp.deleted_at IS NULL
 				)
 				""")
 				.param("organizationId", organizationId)
@@ -460,15 +466,16 @@ public class SelfServiceRepository {
 				WHERE mp.organization_id = :organizationId
 				  AND mp.status = 'ACTIVE'
 				  AND mp.deleted_at IS NULL
+				  AND mp.self_service_acquisition_enabled = true
 				  AND cp.status = 'ACTIVE'
 				  AND cp.deleted_at IS NULL
-				  AND EXISTS (
+				  AND (mp.multi_branch_access = true OR EXISTS (
 				      SELECT 1
 				      FROM catalog_product_branch cpb
 				      WHERE cpb.organization_id = mp.organization_id
 				        AND cpb.product_id = mp.product_id
 				        AND cpb.branch_id = :branchId
-				  )
+				  ))
 				ORDER BY cp.price_cents, cp.name
 				""")
 				.param("organizationId", organizationId)
@@ -483,6 +490,57 @@ public class SelfServiceRepository {
 						resultSet.getInt("grace_days")
 				))
 				.list();
+	}
+
+	public boolean planAvailableForSelfService(UUID organizationId, UUID branchId, UUID planId) {
+		return jdbcClient.sql("""
+				SELECT EXISTS (
+				    SELECT 1
+				    FROM membership_plan mp
+				    JOIN catalog_product cp ON cp.id = mp.product_id
+				    WHERE mp.organization_id = :organizationId
+				      AND mp.id = :planId
+				      AND mp.status = 'ACTIVE'
+				      AND mp.deleted_at IS NULL
+				      AND mp.self_service_acquisition_enabled = true
+				      AND cp.status = 'ACTIVE'
+				      AND cp.deleted_at IS NULL
+				      AND (mp.multi_branch_access = true OR EXISTS (
+				          SELECT 1
+				          FROM catalog_product_branch cpb
+				          WHERE cpb.organization_id = mp.organization_id
+				            AND cpb.product_id = mp.product_id
+				            AND cpb.branch_id = :branchId
+				      ))
+				)
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("planId", planId)
+				.query(Boolean.class)
+				.single();
+	}
+
+	public boolean membershipUsesPlan(
+			UUID organizationId, UUID clientId, UUID membershipId, UUID planId
+	) {
+		return jdbcClient.sql("""
+				SELECT EXISTS (
+				    SELECT 1
+				    FROM membership
+				    WHERE organization_id = :organizationId
+				      AND client_id = :clientId
+				      AND id = :membershipId
+				      AND plan_id = :planId
+				      AND deleted_at IS NULL
+				)
+				""")
+				.param("organizationId", organizationId)
+				.param("clientId", clientId)
+				.param("membershipId", membershipId)
+				.param("planId", planId)
+				.query(Boolean.class)
+				.single();
 	}
 
 	public List<PendingPaymentRecord> pendingPayments(UUID organizationId, UUID branchId, UUID clientId) {
@@ -620,8 +678,16 @@ public class SelfServiceRepository {
 			LocalDate startsOn,
 			LocalDate endsOn,
 			LocalDate graceEndsOn,
-			boolean managedAtCurrentBranch
+			boolean managedAtCurrentBranch,
+			boolean autopayManagedAtCurrentBranch
 	) {
+		public MembershipRecord(
+				UUID id, UUID planId, String planName, String status, LocalDate startsOn,
+				LocalDate endsOn, LocalDate graceEndsOn, boolean managedAtCurrentBranch
+		) {
+			this(id, planId, planName, status, startsOn, endsOn, graceEndsOn,
+					managedAtCurrentBranch, managedAtCurrentBranch);
+		}
 	}
 
 	public record AutopayMembershipRecord(
@@ -659,10 +725,19 @@ public class SelfServiceRepository {
 
 	public record BranchKioskConfigurationData(
 			boolean clientRegistration,
-			boolean membershipEnrollment, boolean membershipRenewal,
+			boolean membershipEnrollment, boolean visitPackagePurchase, boolean membershipRenewal,
 			boolean membershipPlanChange, boolean resourceBooking,
 			boolean wellnessBooking, boolean profileUpdate, boolean autopay
-	) {}
+	) {
+		public BranchKioskConfigurationData(
+				boolean clientRegistration, boolean membershipEnrollment, boolean membershipRenewal,
+				boolean membershipPlanChange, boolean resourceBooking, boolean wellnessBooking,
+				boolean profileUpdate, boolean autopay
+		) {
+			this(clientRegistration, membershipEnrollment, false, membershipRenewal,
+					membershipPlanChange, resourceBooking, wellnessBooking, profileUpdate, autopay);
+		}
+	}
 
 	public record SelfServicePaymentRecord(
 			UUID id, UUID saleId, String saleNumber, String method, String status,

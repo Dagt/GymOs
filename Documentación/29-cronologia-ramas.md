@@ -4,21 +4,22 @@ Estado: AUDITADO
 
 Corte: 27 de agosto de 2026
 
-Rama de trabajo: `feature/catalog-product-variants-barcodes`
+Rama de trabajo: `feature/multibranch-plans-benefits-visits`
 
-Base actual: `main` después de integrar PR #19. El lote 2 permanece en su rama
-y no está fusionado.
+Base actual: `main` en `2162b7d`, después de integrar PR #20. El lote de planes,
+beneficios y visitas permanece en su rama y no está fusionado.
 
 ## 1. Situación vigente
 
-El PR #19 ya incorporó el primer lote. La rama activa implementa el lote 2 con
-V95: familias comerciales, variantes vendibles, múltiples códigos por variante
-y alta masiva simple, preservando los IDs usados por ventas e inventario.
+Los PR #19 y #20 incorporaron ciclo de vida y catálogo con variantes. La rama
+activa implementa políticas comerciales de planes, beneficios multi-sucursal y
+paquetes de visitas compartidos dentro de un tenant.
 
 | Rama | Estado | Acción |
 |---|---|---|
-| `main` | Contiene el lote 1 mediante PR #19 | Base del lote 2; no fusionar sin revisión |
-| `feature/catalog-product-variants-barcodes` | Activa | Validar y publicar sin merge automático |
+| `main` | Contiene lotes 1 y 2 mediante PR #19/#20 | Base del lote activo |
+| `feature/multibranch-plans-benefits-visits` | Activa | Desarrollar y validar; no fusionar automáticamente |
+| `feature/catalog-product-variants-barcodes` | Integrada mediante PR #20 | Histórica; no fusionar otra vez |
 | `feature/client-onboarding-lifecycle` | Integrada mediante PR #19 | Histórica; no fusionar otra vez |
 | `feature/platform-identity-separation` | Integrada antes del corte actual | Histórica; no fusionar otra vez |
 | `feature/platform-client-billing-management` | Integrada mediante PR #15 | Histórica; no fusionar otra vez |
@@ -52,74 +53,47 @@ y alta masiva simple, preservando los IDs usados por ventas e inventario.
 | 27 ago 2026 | La captura de variantes se compacta en una tabla y admite sabor, tamaño/porciones o ambos sin exponer un control fiscal aislado |
 | 27 ago 2026 | El flujo elimina textos explicativos y campos promocionales permanentes del alta masiva |
 | 27 ago 2026 | El drawer se rediseña como lista de una fila inicial más editor enfocado; inventario y datos secundarios dejan de ocupar bloques permanentes |
+| 27 ago 2026 | PR #20 integra variantes/códigos en `main` (`2162b7d`) |
+| 27 ago 2026 | Se crea `feature/multibranch-plans-benefits-visits`; se aprueba documento 33 y se inicia la secuencia V96–V99 |
+| 28 ago 2026 | V99 fija vigencia por compra; venta, pago, activación, exclusividad, consumo, Catálogo, expediente y kiosco de paquetes quedan integrados |
 
 ## 3. Alcance material de la rama activa
 
 ### Implementado
 
-- familia comercial por organización y variante vendible con ID estable;
-- hasta 20 códigos por variante, código principal compatible y alias exactos en
-  catálogo, POS e inventario;
-- alta masiva transaccional con datos comunes capturados una vez, tabla compacta
-  variante/código/SKU, sabor y/o tamaño, overrides por excepción y reutilización
-  de familias existentes;
-- V95 validada desde una base vacía y sobre V94 con conservación de IDs;
-- cargo de inscripción configurable, cotizado y persistido como partida
-  financiera independiente;
-- baja automática reversible de socios sin vigencia, con fecha, motivo,
-  auditoría y evento de cambio de estado;
-- verificación de socios sin plan y reactivación segura de bajas automáticas;
-- capacidad opt-in por sucursal para alta desde kiosco y continuación inmediata
-  al primer plan;
-- sección `Inscripciones` con un solo periodo de inactividad y V94 compatible con bases
-  donde V93 ya fue aplicada;
-- capacidades deseadas del kiosco persistidas sin readiness, autosave con
-  rollback y estados distintos para Stripe pendiente, función deshabilitada y
-  catálogo vacío;
-- prueba PostgreSQL real desde settings hasta `allowed_actions_json`, launch y
-  reset de la sesión;
-- administración comercial de gimnasios desde la navegación lateral de
-  plataforma;
-- identidades `PLATFORM` sin organización/sucursal e identidades `TENANT` con
-  organización obligatoria, protegidas también por restricciones PostgreSQL;
-- JWT y refresh con scope explícito, sin promoción implícita entre contextos;
-- soporte temporal por gimnasio con motivo, expiración, auditoría y salida
-  explícita;
-- bootstrap concurrente coordinado por PostgreSQL, con detección por permiso
-  efectivo y variables temporales sin conservar el secreto;
-- alta transaccional de organización, primera sucursal y propietario tenant;
-- invitación de un solo uso almacenada únicamente como hash;
-- retiro V88 del fixture histórico exacto cuando está vacío y conservación
-  diagnóstica ante actividad o ambigüedad;
-- guards y rutas frontend que separan la consola SaaS del gimnasio cliente;
-- actualización segura de dependencias frontend y auditoría sin advisories.
+- documento 33 fija alcance, arquitectura, invariantes y secuencia de entrega;
+- V96 agrega visibilidad de kiosco y exención de inscripción por plan, además de
+  aplicabilidad de `SPECIAL_PRICE` a planes explícitos;
+- las cotizaciones respetan `WAIVED`; altas/cambios del kiosco no pueden eludir
+  un plan privado mediante llamadas directas;
+- membresías multi-sucursal pueden mostrarse y renovarse desde otra sede;
+- V97 agrega alcance `LOCAL|PLAN_COVERAGE` a beneficios `ACCESS`;
+- V98 crea definición vendible, entitlement, snapshots y ledger de paquetes;
+- V99 agrega el snapshot de vigencia por entitlement;
+- una restricción impide dos paquetes `PENDING_PAYMENT|ACTIVE` para el mismo
+  socio y tenant;
+- Catálogo coloca paquetes inmediatamente junto a planes de membresía; los
+  planes y paquetes pueden ocultarse de nuevas compras del kiosco y exentarse
+  de inscripción;
+- venta/activación por pago, bloqueo de pases históricos, consumo idempotente,
+  expediente, Recepción y compra de kiosco están implementados.
 
-### No incluido
+### Aún pendiente en la rama
 
-- paquetes de visitas compartidos entre sucursales del mismo tenant, alcance
-  multi-sucursal de beneficios y branding por sucursal; quedan en los lotes
-  3–5 del análisis del primer cliente;
-- borrado de cualquier dato demo ambiguo, modificado o con actividad;
-- GymFort Local Connector, adapter HikCentral o integración con hardware;
-- cobro SaaS recurrente automático, CFDI o conciliación bancaria completa;
-- una suite E2E homogénea para todos los recorridos críticos.
+- reporte/historial operativo de consumos y reversión auditada;
+- matriz PostgreSQL concurrente, HTTP/E2E de dos sedes y Stripe test;
+- retiro definitivo del alta manual `visit_pass` después de regularizar datos;
+- branding por sucursal, fuera de este lote.
 
 ## 4. Evidencia de validación local
 
-- `CatalogProductServiceTests` cubre códigos múltiples y lotes de variantes;
-- `CatalogPersistenceIntegrationTests` demuestra resolución exacta de alias y
-  alcance por sucursal;
-- `DatabaseMigrationTests` valida instalación limpia y upgrade V94 → V95 sin
-  cambiar IDs de producto;
-- suite frontend, typecheck y lint exitosos; `pos-model.test.ts` cubre alias;
-- `e2e/catalog-inventory.spec.ts` valida herencia, override aislado, captura HID
-  sin submit accidental, diez sabores, familia existente, permisos y lectura
-  POS con código secundario;
-- `git diff --check` y revisión de que no se versionen secretos.
+- pruebas de arquitectura, políticas de beneficios, inscripción y autoservicio;
+- `DatabaseMigrationTests` sobre PostgreSQL desde base vacía y upgrade V95;
+- typecheck frontend y suites completas antes de publicar la rama.
 
 ## 5. Regla de integración
 
-1. `feature/catalog-product-variants-barcodes` no se fusiona automáticamente.
+1. `feature/multibranch-plans-benefits-visits` no se fusiona automáticamente.
 2. CI y revisión de aceptación deben terminar antes de cualquier merge.
-3. El despliegue y la migración V95 siguen siendo acciones independientes.
+3. Despliegue V96–V99 y habilitación de compras son acciones independientes.
 4. Las ramas remotas sólo se eliminan por decisión explícita.

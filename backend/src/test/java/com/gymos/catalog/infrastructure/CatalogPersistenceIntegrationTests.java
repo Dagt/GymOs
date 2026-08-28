@@ -140,7 +140,7 @@ class CatalogPersistenceIntegrationTests {
 	}
 
 	@Test
-	void multiBranchPlanIsVisibleForSecondaryResourceConfigurationWithoutBeingSoldThere() {
+	void multiBranchPlanIsAvailableInSecondaryKioskWithoutDuplicatingProductBranchAttachment() {
 		UUID productId = UUID.randomUUID();
 		UUID planId = UUID.randomUUID();
 		OffsetDateTime now = OffsetDateTime.now();
@@ -162,7 +162,8 @@ class CatalogPersistenceIntegrationTests {
 				.extracting(com.gymos.catalog.application.query.PlanView::id)
 				.containsExactly(planId);
 		assertThat(new SelfServiceRepository(jdbcClient).planOptions(organizationId, secondBranchId))
-				.isEmpty();
+				.extracting(SelfServiceRepository.PlanOptionRecord::id)
+				.containsExactly(planId);
 	}
 
 	@Test

@@ -49,3 +49,19 @@ mejoran la captura y resolución del artículo. `sale_item` conserva `product_id
 y snapshot comercial, por lo que sabores, precios y devoluciones no se mezclan.
 Los defaults del alta masiva se copian a cada variante antes de persistirla; las
 ventas nunca resuelven precio o costo desde la familia.
+
+## Integración de paquetes de visitas
+
+Un paquete se vende como `catalog_product` `SERVICE/VISIT_PASS`, con partida
+financiera y snapshots normales. La misma transacción crea un entitlement
+`PENDING_PAYMENT`; únicamente un pago manual confirmado o un webhook conciliado
+lo activa. El redirect de Stripe no concede visitas.
+
+La idempotencia abarca venta, partida, inscripción y entitlement. La regla de un
+solo paquete abierto se valida antes de crear la venta y nuevamente con la
+restricción única de base de datos. Un reembolso después de consumos no cancela
+automáticamente un saldo parcialmente usado.
+
+El POS genérico rechaza paquetes configurados con
+`SALE_VISIT_PACKAGE_OPERATION_REQUIRED`: recepción y kiosco utilizan la
+operación dedicada para que nunca exista una venta pagada sin entitlement.

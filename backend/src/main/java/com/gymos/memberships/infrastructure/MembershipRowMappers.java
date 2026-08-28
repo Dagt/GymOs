@@ -36,6 +36,7 @@ final class MembershipRowMappers {
 				resultSet.getInt("duration_days"),
 				resultSet.getInt("grace_days"),
 				resultSet.getBoolean("multi_branch_access"),
+				resultSet.getString("registration_fee_policy"),
 				resultSet.getLong("price_cents"),
 				resultSet.getString("currency")
 		);

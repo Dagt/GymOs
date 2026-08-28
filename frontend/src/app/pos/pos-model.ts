@@ -54,7 +54,8 @@ function barcodeAliases(product: ProductSummary) {
 
 export function isMembershipPlanProduct(product: ProductSummary): boolean {
   return product.productType === "MEMBERSHIP_PLAN"
-    || product.commercialSubtype === "MEMBERSHIP";
+    || product.commercialSubtype === "MEMBERSHIP"
+    || product.commercialSubtype === "VISIT_PASS";
 }
 
 export async function resolveScannedProduct(

@@ -22,7 +22,8 @@ public class BenefitRepository {
 	public List<BenefitSummary> benefits(UUID organizationId) {
 		List<BenefitSummary> summaries = jdbcClient.sql("""
 				SELECT id, branch_id, code, name, benefit_type, discount_type, discount_value_cents,
-				       discount_percent, requires_evidence, combinable, priority, valid_from, valid_until, status, version
+				       discount_percent, requires_evidence, combinable, priority, valid_from, valid_until,
+				       status, access_scope, version
 				FROM benefit
 				WHERE organization_id = :organizationId
 				  AND deleted_at IS NULL
@@ -44,11 +45,13 @@ public class BenefitRepository {
 						rs.getObject("valid_from", LocalDate.class),
 						rs.getObject("valid_until", LocalDate.class),
 						rs.getString("status"),
-						List.of(), rs.getLong("version")
+						List.of(), rs.getString("access_scope"), List.of(), rs.getLong("version")
 				))
 				.list();
 		return summaries.stream()
-				.map(summary -> summary.withPlanIds(membershipPlanIds(organizationId, summary.id())))
+				.map(summary -> summary.withPlanLinks(
+						membershipPlanIds(organizationId, summary.id()),
+						applicableMembershipPlanIds(organizationId, summary.id())))
 				.toList();
 	}
 
@@ -57,7 +60,8 @@ public class BenefitRepository {
 			return benefits(organizationId);
 		}
 		return benefits(organizationId).stream()
-				.filter(benefit -> benefit.branchId() == null || branchId.equals(benefit.branchId()))
+				.filter(benefit -> "PLAN_COVERAGE".equals(benefit.accessScope())
+						|| benefit.branchId() == null || branchId.equals(benefit.branchId()))
 				.toList();
 	}
 
@@ -124,12 +128,12 @@ public class BenefitRepository {
 				INSERT INTO benefit (
 				    id, organization_id, branch_id, code, name, benefit_type, discount_type,
 				    discount_value_cents, discount_percent, requires_evidence, combinable,
-				    priority, valid_from, valid_until, status, created_at, updated_at, version
+				    priority, valid_from, valid_until, status, access_scope, created_at, updated_at, version
 				)
 				VALUES (
 				    :id, :organizationId, :branchId, :code, :name, :benefitType, :discountType,
 				    :discountValueCents, :discountPercent, :requiresEvidence, :combinable,
-				    :priority, :validFrom, :validUntil, :status, :now, :now, 0
+				    :priority, :validFrom, :validUntil, :status, :accessScope, :now, :now, 0
 				)
 				""")
 				.param("id", id)
@@ -147,6 +151,7 @@ public class BenefitRepository {
 				.param("validFrom", command.validFrom())
 				.param("validUntil", command.validUntil())
 				.param("status", command.status().trim().toUpperCase())
+				.param("accessScope", command.accessScope().trim().toUpperCase())
 				.param("now", now)
 				.update();
 		return id;
@@ -178,6 +183,7 @@ public class BenefitRepository {
 				    discount_value_cents = :discountValueCents, discount_percent = :discountPercent,
 				    requires_evidence = :requiresEvidence, combinable = :combinable, priority = :priority,
 				    valid_from = :validFrom, valid_until = :validUntil, status = :status,
+				    access_scope = :accessScope,
 				    updated_at = :now, version = version + 1
 				WHERE organization_id = :organizationId AND id = :benefitId
 				  AND deleted_at IS NULL AND version = :expectedVersion
@@ -187,7 +193,8 @@ public class BenefitRepository {
 				.param("discountValueCents", command.discountValueCents()).param("discountPercent", command.discountPercent())
 				.param("requiresEvidence", command.requiresEvidence()).param("combinable", command.combinable())
 				.param("priority", command.priority()).param("validFrom", command.validFrom()).param("validUntil", command.validUntil())
-				.param("status", command.status()).param("now", OffsetDateTime.now()).param("expectedVersion", expectedVersion)
+				.param("status", command.status()).param("accessScope", command.accessScope())
+				.param("now", OffsetDateTime.now()).param("expectedVersion", expectedVersion)
 				.update() == 1;
 	}
 
@@ -217,10 +224,50 @@ public class BenefitRepository {
 		}
 	}
 
+	public void replaceApplicableMembershipPlans(GymOsPrincipal principal, UUID benefitId, List<UUID> planIds) {
+		jdbcClient.sql("""
+				DELETE FROM pricing_benefit_membership_plan
+				WHERE organization_id = :organizationId
+				  AND benefit_id = :benefitId
+				""")
+				.param("organizationId", principal.organizationId())
+				.param("benefitId", benefitId)
+				.update();
+		OffsetDateTime now = OffsetDateTime.now();
+		for (UUID planId : planIds.stream().distinct().toList()) {
+			jdbcClient.sql("""
+					INSERT INTO pricing_benefit_membership_plan (
+					    benefit_id, membership_plan_id, organization_id, created_at, created_by
+					)
+					VALUES (:benefitId, :planId, :organizationId, :now, :userId)
+					""")
+					.param("benefitId", benefitId)
+					.param("planId", planId)
+					.param("organizationId", principal.organizationId())
+					.param("now", now)
+					.param("userId", principal.userId())
+					.update();
+		}
+	}
+
 	private List<UUID> membershipPlanIds(UUID organizationId, UUID benefitId) {
 		return jdbcClient.sql("""
 				SELECT membership_plan_id
 				FROM benefit_membership_plan
+				WHERE organization_id = :organizationId
+				  AND benefit_id = :benefitId
+				ORDER BY membership_plan_id
+				""")
+				.param("organizationId", organizationId)
+				.param("benefitId", benefitId)
+				.query(UUID.class)
+				.list();
+	}
+
+	private List<UUID> applicableMembershipPlanIds(UUID organizationId, UUID benefitId) {
+		return jdbcClient.sql("""
+				SELECT membership_plan_id
+				FROM pricing_benefit_membership_plan
 				WHERE organization_id = :organizationId
 				  AND benefit_id = :benefitId
 				ORDER BY membership_plan_id
@@ -381,18 +428,22 @@ public class BenefitRepository {
 			LocalDate validUntil,
 			String status,
 			List<UUID> planIds,
+			String accessScope,
+			List<UUID> applicablePlanIds,
 			long version
 	) {
 		public BenefitSummary(UUID id, UUID branchId, String code, String name, String benefitType,
 				String discountType, Integer discountValueCents, Double discountPercent, boolean requiresEvidence,
 				boolean combinable, int priority, LocalDate validFrom, LocalDate validUntil, String status, List<UUID> planIds) {
 			this(id, branchId, code, name, benefitType, discountType, discountValueCents, discountPercent,
-					requiresEvidence, combinable, priority, validFrom, validUntil, status, planIds, 0);
+					requiresEvidence, combinable, priority, validFrom, validUntil, status, planIds,
+					"LOCAL", List.of(), 0);
 		}
-		BenefitSummary withPlanIds(List<UUID> resolvedPlanIds) {
+		BenefitSummary withPlanLinks(List<UUID> resolvedPlanIds, List<UUID> resolvedApplicablePlanIds) {
 			return new BenefitSummary(id, branchId, code, name, benefitType, discountType,
 					discountValueCents, discountPercent, requiresEvidence, combinable, priority,
-					validFrom, validUntil, status, resolvedPlanIds, version);
+					validFrom, validUntil, status, resolvedPlanIds, accessScope,
+					resolvedApplicablePlanIds, version);
 		}
 	}
 

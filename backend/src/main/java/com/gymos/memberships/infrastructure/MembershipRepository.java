@@ -185,9 +185,17 @@ public class MembershipRepository {
 			int durationDays,
 			int graceDays,
 			boolean multiBranchAccess,
+			String registrationFeePolicy,
 			long priceCents,
 			String currency
 	) {
+		public PlanForRenewal(
+				UUID planId, UUID productId, String planName, int durationDays, int graceDays,
+				boolean multiBranchAccess, long priceCents, String currency
+		) {
+			this(planId, productId, planName, durationDays, graceDays, multiBranchAccess,
+					"DEFAULT", priceCents, currency);
+		}
 	}
 
 	public record MembershipPeriodSummary(

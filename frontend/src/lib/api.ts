@@ -70,6 +70,9 @@ export {
   updateCatalogCategory,
   updateProduct,
   updateMembershipPlan,
+  getVisitPackagePlans,
+  createVisitPackagePlan,
+  updateVisitPackagePlan,
 } from "./api/catalog";
 export type {
   MembershipPlanPayload,
@@ -85,8 +88,17 @@ export type {
   ProductSearchParams,
   ProductVariantBatchPayload,
   UpdateMembershipPlanPayload,
+  VisitPackagePlanPayload,
+  VisitPackagePlanSummary,
 } from "./api/catalog-types";
 export * from "./api/benefits";
+export * from "./api/visit-packages";
+export type {
+  VisitPackageEntitlement,
+  VisitPackagePurchasePayload,
+  VisitPackagePurchaseResult,
+  VisitPackageQuote,
+} from "./api/visit-package-types";
 export {
   addManualPayment,
   createMercadoPagoPointOrder,
@@ -147,10 +159,14 @@ export {
   launchKioskSession,
   getKioskMembershipOptions,
   getKioskMembershipQuote,
+  getKioskVisitPackageOptions,
+  getKioskVisitPackageQuote,
+  getKioskCurrentVisitPackage,
   getKioskSummary,
   renewMembershipFromKiosk,
   resetKioskSession,
   registerKioskClient,
+  purchaseVisitPackageFromKiosk,
   revokeKioskAutopay,
   setupKioskAutopay,
   updateKioskContactData,
@@ -175,6 +191,10 @@ export type {
   KioskSessionContext,
   KioskSessionResponse,
   KioskSummaryResponse,
+  KioskVisitPackageCheckout,
+  KioskVisitPackageEntitlement,
+  KioskVisitPackagePlan,
+  KioskVisitPackageQuote,
 } from "./api/selfservice-types";
 export {
   consumeVisitPass,

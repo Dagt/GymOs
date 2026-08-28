@@ -20,6 +20,7 @@ import {
 } from "./ClientDetailHelpers";
 import { useClientDetailController } from "./useClientDetailController";
 import { EmailPreferencesCard } from "./EmailPreferencesCard";
+import { VisitPackageCard } from "./VisitPackageCard";
 
 export default function ClientDetailPage() {
   const controller = useClientDetailController();
@@ -96,6 +97,9 @@ export default function ClientDetailPage() {
               plans={controller.plans}
               renewingMembershipId={controller.renewingMembershipId}
             />
+          ) : null}
+          {controller.canReadMemberships ? (
+            <VisitPackageCard clientId={controller.data.client.id} session={controller.session} />
           ) : null}
           {controller.canReadBenefits ? (
             <ClientBenefitsSection

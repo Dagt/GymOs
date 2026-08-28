@@ -73,7 +73,7 @@ public class EligibilityRepository implements EligibilityFactsProvider {
 
 	@Override
 	public List<EligibleBenefit> pricingBenefits(
-			UUID organizationId, UUID branchId, UUID clientId, LocalDate effectiveOn
+			UUID organizationId, UUID branchId, UUID clientId, LocalDate effectiveOn, UUID targetPlanId
 	) {
 		return jdbcClient.sql("""
 				SELECT b.id, b.code, b.name, b.discount_type, b.discount_value_cents,
@@ -92,6 +92,13 @@ public class EligibilityRepository implements EligibilityFactsProvider {
 				  AND b.benefit_type <> 'ACCESS'
 				  AND b.status = 'ACTIVE'
 				  AND b.deleted_at IS NULL
+				  AND (b.discount_type <> 'SPECIAL_PRICE' OR EXISTS (
+				      SELECT 1
+				      FROM pricing_benefit_membership_plan pbmp
+				      WHERE pbmp.organization_id = b.organization_id
+				        AND pbmp.benefit_id = b.id
+				        AND pbmp.membership_plan_id = :targetPlanId
+				  ))
 				  AND (b.branch_id IS NULL OR b.branch_id = :branchId)
 				  AND (b.valid_from IS NULL OR b.valid_from <= :effectiveOn)
 				  AND (b.valid_until IS NULL OR b.valid_until >= :effectiveOn)
@@ -102,6 +109,7 @@ public class EligibilityRepository implements EligibilityFactsProvider {
 				.param("branchId", branchId)
 				.param("clientId", clientId)
 				.param("effectiveOn", effectiveOn)
+				.param("targetPlanId", targetPlanId)
 				.query((resultSet, rowNumber) -> new EligibleBenefit(
 						resultSet.getObject("id", UUID.class),
 						resultSet.getString("code"),
@@ -147,7 +155,7 @@ public class EligibilityRepository implements EligibilityFactsProvider {
 				  AND b.benefit_type = 'ACCESS'
 				  AND b.status = 'ACTIVE'
 				  AND b.deleted_at IS NULL
-				  AND (b.branch_id IS NULL OR b.branch_id = :branchId)
+				  AND (b.access_scope = 'PLAN_COVERAGE' OR b.branch_id IS NULL OR b.branch_id = :branchId)
 				  AND (b.valid_from IS NULL OR b.valid_from <= :effectiveOn)
 				  AND (b.valid_until IS NULL OR b.valid_until >= :effectiveOn)
 				ORDER BY b.name, b.id

@@ -380,3 +380,15 @@ abrir el torniquete. Faltan obligatoriamente:
    seguirá realizando Hikvision/HikCentral;
 10. reemplazar `SIMULATED_OPEN` sólo cuando el puerto productivo tenga resultado
     confirmado y runbook probado.
+
+## 14. Paquetes de visitas multi-sucursal
+
+V98/V99 implementan un entitlement con saldo compartido y un ledger idempotente
+por evento. La decisión vigente evalúa primero membresía y sólo después paquete; una
+concesión por membresía nunca resta visitas. El consumo requiere estado
+`ACTIVE`, vigencia, saldo, sucursal y beneficio compatibles y cambia a
+`CONSUMED` al llegar a cero en la misma transacción.
+
+La API manual histórica `visit_pass` queda en compatibilidad mientras se
+regularizan datos, pero no es la arquitectura de nuevas ventas y deberá dejar de
+crear saldos cuando se habilite el flujo nuevo.

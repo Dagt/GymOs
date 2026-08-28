@@ -16,6 +16,14 @@ public class MembershipSaleCommandRepository {
 	}
 
 	public boolean create(MembershipSaleRecord record) {
+		return create(record, "MEMBERSHIP_PLAN");
+	}
+
+	public boolean createVisitPackage(MembershipSaleRecord record) {
+		return create(record, "VISIT_PACKAGE");
+	}
+
+	private boolean create(MembershipSaleRecord record, String itemType) {
 		int inserted = jdbcClient.sql("""
 				INSERT INTO sale (
 				    id, organization_id, branch_id, client_id, sale_number, status,
@@ -63,13 +71,14 @@ public class MembershipSaleCommandRepository {
 				    id, sale_id, organization_id, product_id, item_type, name, quantity,
 				    unit_price_cents, discount_cents, total_cents, created_at
 				)
-				VALUES (:id, :saleId, :organizationId, :productId, 'MEMBERSHIP_PLAN', :name, 1,
+				VALUES (:id, :saleId, :organizationId, :productId, :itemType, :name, 1,
 				        :listPriceCents, :discountCents, :totalCents, :occurredAt)
 				""")
 				.param("id", UUID.randomUUID())
 				.param("saleId", record.saleId())
 				.param("organizationId", record.organizationId())
 				.param("productId", record.productId())
+				.param("itemType", itemType)
 				.param("name", record.planName())
 				.param("listPriceCents", record.planPriceCents())
 				.param("discountCents", record.discountCents())

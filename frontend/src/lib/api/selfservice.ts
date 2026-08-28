@@ -14,6 +14,10 @@ import type {
   KioskRegistrationPayload,
   KioskSessionResponse,
   KioskSummaryResponse,
+  KioskVisitPackageCheckout,
+  KioskVisitPackageEntitlement,
+  KioskVisitPackagePlan,
+  KioskVisitPackageQuote,
   RenewMembershipResponse,
 } from "./selfservice-types";
 
@@ -68,10 +72,61 @@ export async function getKioskMembershipQuote(
   sessionId: string,
   sessionToken: string,
   planId: string,
+  operation: "ENROLLMENT" | "RENEWAL" | "PLAN_CHANGE" = "ENROLLMENT",
+  membershipId?: string,
 ): Promise<KioskMembershipQuote> {
-  return publicApiFetch<KioskMembershipQuote>(`/self-service/sessions/${sessionId}/membership-quotes/${planId}`, {
+  const query = new URLSearchParams({ operation });
+  if (membershipId) query.set("membershipId", membershipId);
+  return publicApiFetch<KioskMembershipQuote>(`/self-service/sessions/${sessionId}/membership-quotes/${planId}?${query.toString()}`, {
     headers: kioskSessionHeaders(sessionToken),
   });
+}
+
+export async function getKioskVisitPackageOptions(
+  sessionId: string,
+  sessionToken: string,
+): Promise<KioskVisitPackagePlan[]> {
+  return publicApiFetch<KioskVisitPackagePlan[]>(
+    `/self-service/sessions/${sessionId}/visit-package-options`,
+    { headers: kioskSessionHeaders(sessionToken) },
+  );
+}
+
+export async function getKioskVisitPackageQuote(
+  sessionId: string,
+  sessionToken: string,
+  packagePlanId: string,
+): Promise<KioskVisitPackageQuote> {
+  return publicApiFetch<KioskVisitPackageQuote>(
+    `/self-service/sessions/${sessionId}/visit-package-quotes/${packagePlanId}`,
+    { headers: kioskSessionHeaders(sessionToken) },
+  );
+}
+
+export async function getKioskCurrentVisitPackage(
+  sessionId: string,
+  sessionToken: string,
+): Promise<KioskVisitPackageEntitlement | undefined> {
+  return publicApiFetch<KioskVisitPackageEntitlement | undefined>(
+    `/self-service/sessions/${sessionId}/visit-package`,
+    { headers: kioskSessionHeaders(sessionToken) },
+  );
+}
+
+export async function purchaseVisitPackageFromKiosk(
+  sessionId: string,
+  sessionToken: string,
+  packagePlanId: string,
+  idempotencyKey: string,
+): Promise<KioskVisitPackageCheckout> {
+  return publicApiFetch<KioskVisitPackageCheckout>(
+    `/self-service/sessions/${sessionId}/visit-package-purchases`,
+    {
+      method: "POST",
+      headers: kioskSessionHeaders(sessionToken),
+      body: JSON.stringify({ packagePlanId, idempotencyKey }),
+    },
+  );
 }
 
 export async function renewMembershipFromKiosk(

@@ -3,6 +3,7 @@ package com.gymos.memberships.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.gymos.clients.api.operations.ClientLifecycleOperations;
@@ -81,6 +82,24 @@ class MembershipPricingServiceTests {
 		assertThat(quote.listPriceCents()).isEqualTo(10_500);
 		assertThat(quote.discountCents()).isEqualTo(1_000);
 		assertThat(quote.totalCents()).isEqualTo(9_500);
+	}
+
+	@Test
+	void waivedPlanNeverRequestsOrAddsRegistrationFee() {
+		when(eligibilityPolicy.evaluate(any())).thenReturn(eligible(List.of()));
+		ClientLifecycleOperations lifecycle = mock(ClientLifecycleOperations.class);
+		MembershipPricingService feeService = new MembershipPricingService(
+				membershipRepository, eligibilityPolicy, lifecycle);
+		PlanForRenewal waivedPlan = new PlanForRenewal(
+				UUID.randomUUID(), UUID.randomUUID(), "Convenio", 30, 3, false,
+				"WAIVED", 8_000, "MXN");
+
+		MembershipQuoteResult quote = feeService.quote(organizationId, branchId, clientId, waivedPlan);
+
+		assertThat(quote.registrationFeeCents()).isZero();
+		assertThat(quote.listPriceCents()).isEqualTo(8_000);
+		assertThat(quote.totalCents()).isEqualTo(8_000);
+		verifyNoInteractions(lifecycle);
 	}
 
 	private EligibilityDecision eligible(List<EligibleBenefit> benefits) {

@@ -99,7 +99,9 @@ export default function PosPage() {
 
   function addProduct(product: ProductSummary): boolean {
     if (isMembershipPlanProduct(product)) {
-      setError("Los planes se gestionan desde la contratación o renovación de membresías.");
+      setError(product.commercialSubtype === "VISIT_PASS"
+        ? "Los paquetes de visitas se venden desde el expediente del socio."
+        : "Los planes se gestionan desde la contratación o renovación de membresías.");
       return false;
     }
     setCart((current) => {
@@ -124,7 +126,9 @@ export default function PosPage() {
       );
       if (!addProduct(match)) {
         playScanBeep("error");
-        setScanError("Los planes se cobran desde el flujo de membresías.");
+        setScanError(match.commercialSubtype === "VISIT_PASS"
+          ? "Los paquetes de visitas se venden desde el expediente del socio."
+          : "Los planes se cobran desde el flujo de membresías.");
         window.setTimeout(() => setScanError(null), 4000);
         return;
       }

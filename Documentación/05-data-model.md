@@ -947,3 +947,31 @@ cargo en un producto físico ni provoca movimientos de inventario.
 reescribe V93 ni modifica su checksum. En una base donde V93 ya fue aplicada se
 conserva el valor existente de `inactivity_months`; desde V94 ese mismo valor
 gobierna tanto la baja automática como el nuevo cobro de inscripción al volver.
+
+## Extensiones V96–V99 — Planes, beneficios y paquetes de visitas
+
+V96 separa la política comercial del plan de su cobertura: `membership_plan`
+incorpora `self_service_acquisition_enabled` y `registration_fee_policy`; la
+tabla `pricing_benefit_membership_plan` limita `SPECIAL_PRICE` a planes
+explícitos. V97 agrega `benefit.access_scope` (`LOCAL` o `PLAN_COVERAGE`) sin
+duplicar beneficios por sucursal.
+
+V98 introduce `visit_package_plan` como definición vendible ligada a un
+`catalog_product` `SERVICE/VISIT_PASS`, sus sucursales y accesos; cada compra se
+materializa en `visit_package_entitlement` con snapshots de cobertura. El saldo
+se descuenta en el ledger idempotente `visit_package_consumption`.
+
+V99 materializa además `validity_days` en cada entitlement. Así, un Checkout
+pendiente conserva la vigencia cotizada y su activación no depende de una
+edición posterior de la definición comercial.
+
+Sólo puede existir un entitlement abierto (`PENDING_PAYMENT` o `ACTIVE`) por
+`organization_id + client_id`. La restricción incluye pagos pendientes para que
+dos Checkouts simultáneos no terminen activando dos paquetes. Una membresía
+vigente y un paquete sí pueden coexistir; un acceso concedido por la membresía
+no consume visitas.
+
+La tabla histórica `visit_pass` permanece por compatibilidad y no se reinterpreta
+por nombre. Su alta manual se retirará al habilitar el comercio nuevo; mientras
+exista un pase histórico activo, la compra nueva deberá bloquearse y solicitar
+regularización explícita. Arquitectura completa: documento 33.

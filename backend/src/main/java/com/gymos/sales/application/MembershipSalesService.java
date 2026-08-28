@@ -7,8 +7,10 @@ import com.gymos.sales.api.events.SaleCreatedV1;
 import com.gymos.sales.api.operations.CreateMembershipPlanChangeSaleCommand;
 import com.gymos.sales.api.operations.CreateMembershipEnrollmentSaleCommand;
 import com.gymos.sales.api.operations.CreateMembershipRenewalSaleCommand;
+import com.gymos.sales.api.operations.CreateVisitPackageSaleCommand;
 import com.gymos.sales.api.operations.MembershipBenefitSnapshot;
 import com.gymos.sales.api.operations.MembershipSaleResult;
+import com.gymos.sales.api.operations.VisitPackageSaleResult;
 import com.gymos.sales.infrastructure.MembershipSaleCommandRepository;
 import com.gymos.sales.infrastructure.MembershipSaleCommandRepository.MembershipSaleRecord;
 import com.gymos.sales.infrastructure.SalesRepository;
@@ -53,7 +55,18 @@ class MembershipSalesService {
 		return create(MembershipSaleDraft.forPlanChange(command));
 	}
 
+	VisitPackageSaleResult visitPackage(CreateVisitPackageSaleCommand command) {
+		MembershipSaleResult sale = create(MembershipSaleDraft.forVisitPackage(command), "VISIT_PACKAGE");
+		return new VisitPackageSaleResult(
+				sale.saleId(), sale.saleNumber(), sale.saleStatus(), sale.totalCents(), sale.paidCents(),
+				sale.balanceCents(), sale.currency(), sale.paymentCompleted(), sale.paymentId());
+	}
+
 	private MembershipSaleResult create(MembershipSaleDraft draft) {
+		return create(draft, "MEMBERSHIP_PLAN");
+	}
+
+	private MembershipSaleResult create(MembershipSaleDraft draft, String itemType) {
 		String requestHash = SalesIdempotency.membershipSaleRequestHash(draft.clientId(), draft.sourceMembershipId(), draft.targetPlanId(), draft.productId(),
 				draft.registrationFeeCents(), draft.registrationFeeLabel(),
 				draft.listPriceCents(), draft.discountCents(), draft.totalCents(), draft.currency(), draft.appliedBenefits(),
@@ -78,14 +91,17 @@ class MembershipSalesService {
 		long paidCents = completed ? draft.totalCents() : 0;
 		long balanceCents = completed ? 0 : draft.totalCents();
 		String paymentHash = SalesIdempotency.paymentRequestHash(draft.method(), draft.totalCents(), draft.reference(), null, draft.validateNow(), draft.notes());
-		boolean created = commandRepository.create(new MembershipSaleRecord(saleId, paymentId, draft.organizationId(), draft.branchId(), draft.clientId(), draft.actorUserId(),
+		MembershipSaleRecord record = new MembershipSaleRecord(saleId, paymentId, draft.organizationId(), draft.branchId(), draft.clientId(), draft.actorUserId(),
 				draft.sourceMembershipId(), draft.targetPlanId(), draft.productId(), draft.planName(), saleNumber, saleStatus, normalizedMethod, paymentStatus,
 				draft.planPriceCents(), draft.registrationFeeCents(), draft.registrationFeeLabel(),
 				draft.listPriceCents(), draft.discountCents(), draft.totalCents(), paidCents, balanceCents, draft.currency(),
 				draft.appliedBenefits(),
 				SalesIdempotency.blankToNull(draft.reference()), SalesIdempotency.blankToNull(draft.notes()),
 				normalizedKey, requestHash, normalizedKey == null ? null : normalizedKey + ":payment", paymentHash,
-				draft.businessContext(), now, completed ? now : null, completed ? draft.actorUserId() : null));
+				draft.businessContext(), now, completed ? now : null, completed ? draft.actorUserId() : null);
+		boolean created = "VISIT_PACKAGE".equals(itemType)
+				? commandRepository.createVisitPackage(record)
+				: commandRepository.create(record);
 		if (!created) {
 			SaleHeader existing = salesRepository.saleHeaderByIdempotencyKey(draft.organizationId(), normalizedKey)
 					.orElseThrow(() -> new IllegalStateException("La venta idempotente existe pero no se pudo recuperar."));
@@ -215,6 +231,16 @@ class MembershipSalesService {
 					"MEMBERSHIP_PLAN_CHANGE",
 					command.correlationId()
 			);
+		}
+
+		static MembershipSaleDraft forVisitPackage(CreateVisitPackageSaleCommand command) {
+			return new MembershipSaleDraft(
+					command.organizationId(), command.branchId(), command.actorUserId(), command.clientId(),
+					null, command.visitPackagePlanId(), command.productId(), command.packageName(),
+					command.packagePriceCents(), command.registrationFeeCents(), command.registrationFeeLabel(),
+					command.packagePriceCents() + command.registrationFeeCents(), 0, command.totalCents(),
+					command.currency(), List.of(), command.method(), command.reference(), command.validateNow(),
+					command.notes(), command.idempotencyKey(), "VISIT_PACKAGE_PURCHASE", command.correlationId());
 		}
 	}
 }

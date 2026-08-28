@@ -44,6 +44,12 @@ class SaleLineResolver {
 			} else if (!currency.equals(product.currency())) {
 				throw new BusinessException("SALE_MIXED_CURRENCY", "Todos los items deben usar la misma moneda.");
 			}
+			if (product.managedVisitPackage()) {
+				throw new BusinessException(
+						"SALE_VISIT_PACKAGE_OPERATION_REQUIRED",
+						"Los paquetes de visitas deben venderse desde el expediente del socio."
+				);
+			}
 
 			long lineSubtotalCents = product.priceCents() * item.quantity();
 			long discountCents = Math.max(0, item.discountCents());

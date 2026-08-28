@@ -3,6 +3,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 const sessionId = "11111111-1111-4111-8111-111111111111";
 const membershipId = "22222222-2222-4222-8222-222222222222";
 const planId = "33333333-3333-4333-8333-333333333333";
+const visitPackagePlanId = "66666666-6666-4666-8666-666666666666";
 
 test("el kiosco aplica capacidades, no ofrece pago manual y actualiza contacto", async ({ page }) => {
   let contactPayload: Record<string, unknown> | null = null;
@@ -82,6 +83,70 @@ test("una apertura directa explica que no existe un ID de computadora que captur
   await expect(page.getByText(/No necesitas registrar esta computadora ni capturar un identificador de terminal/i)).toBeVisible();
   await expect(page.getByRole("link", { name: "Ir a iniciar sesión" })).toBeVisible();
   await expect(page.getByRole("button", { name: "Continuar de forma segura" })).toHaveCount(0);
+});
+
+test("los paquetes configurados siguen visibles con Stripe pendiente y no permiten Checkout", async ({ page }) => {
+  const packageSummary = {
+    ...summaryResponse(),
+    capabilities: {
+      ...capabilities(),
+      membershipRenewalAllowed: false,
+      membershipPlanChangeAllowed: false,
+      visitPackagePurchaseAllowed: true,
+    },
+    memberships: [],
+  };
+  await mockKiosk(page, async (route, path) => {
+    const method = route.request().method();
+    if (method === "POST" && path === `/self-service/sessions/${sessionId}/verify`) {
+      return fulfill(route, packageSummary);
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/visit-package-options`) {
+      return fulfill(route, [{
+        id: visitPackagePlanId,
+        productId: "77777777-7777-4777-8777-777777777777",
+        sku: "VISITAS-10",
+        name: "10 visitas",
+        priceCents: 50000,
+        currency: "MXN",
+        totalVisits: 10,
+        validityDays: 30,
+        branchScope: "ALL_BRANCHES",
+        branchIds: ["99999999-9999-4999-8999-999999999999"],
+        benefitIds: ["88888888-8888-4888-8888-888888888888"],
+        selfServiceAcquisitionEnabled: true,
+        registrationFeePolicy: "DEFAULT",
+      }]);
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/visit-package-quotes/${visitPackagePlanId}`) {
+      return fulfill(route, {
+        clientId: packageSummary.profile.clientId,
+        packagePlanId: visitPackagePlanId,
+        packageName: "10 visitas",
+        totalVisits: 10,
+        validityDays: 30,
+        packagePriceCents: 50000,
+        registrationFeeCents: 0,
+        registrationFeeLabel: null,
+        totalCents: 50000,
+        currency: "MXN",
+        branchIds: ["99999999-9999-4999-8999-999999999999"],
+        benefitIds: ["88888888-8888-4888-8888-888888888888"],
+      });
+    }
+    return false;
+  });
+
+  await openLaunchedKiosk(page);
+  await page.getByPlaceholder("Correo o teléfono").fill("andrea@example.com");
+  await page.getByLabel("Fecha de nacimiento en formato día mes año").fill("10/05/1994");
+  await page.getByRole("button", { name: "Continuar de forma segura" }).click();
+
+  await expect(page.getByRole("heading", { name: "Paquetes de visitas" })).toBeVisible();
+  await expect(page.getByText("10 visitas · 30 días")).toBeVisible();
+  await page.getByRole("button", { name: "Revisar paquete" }).click();
+  await expect(page.getByText("$500.00").first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Pago pendiente de Stripe" })).toBeDisabled();
 });
 
 test("un fallo de verificación mantiene el formulario centrado y oculta el detalle técnico", async ({ page }) => {
@@ -827,6 +892,10 @@ async function mockKiosk(
       await fulfill(route, sessionResponse());
       return;
     }
+    if (route.request().method() === "GET" && path === `/self-service/sessions/${sessionId}/visit-package`) {
+      await fulfill(route, null);
+      return;
+    }
     await route.fulfill({
       status: 404,
       contentType: "application/json",
@@ -848,6 +917,7 @@ function capabilities() {
   return {
     clientRegistrationAllowed: false,
     membershipEnrollmentAllowed: false,
+    visitPackagePurchaseAllowed: false,
     membershipRenewalAllowed: true,
     membershipPlanChangeAllowed: true,
     resourceBookingAllowed: false,

@@ -37,8 +37,9 @@ public class DefaultEligibilityPolicy implements EligibilityPolicy {
 	}
 
 	private EligibilityDecision pricing(EligibilityRequest request) {
+		UUID targetPlanId = request.requiredPlanIds().stream().findFirst().orElse(null);
 		List<EligibleBenefit> benefits = facts.pricingBenefits(
-				request.organizationId(), request.branchId(), request.clientId(), request.effectiveOn());
+				request.organizationId(), request.branchId(), request.clientId(), request.effectiveOn(), targetPlanId);
 		return new EligibilityDecision(true, Reason.ELIGIBLE, null, benefits);
 	}
 

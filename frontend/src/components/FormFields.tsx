@@ -16,6 +16,7 @@ export {
 } from "./form-validation";
 
 type BaseProps = {
+  disabled?: boolean;
   error?: string;
   help?: string;
   label: string;
@@ -26,12 +27,13 @@ type BaseProps = {
   value: string;
 };
 
-export function TextField({ error, help, label, name, onChange, placeholder, required = true, value }: BaseProps) {
+export function TextField({ disabled, error, help, label, name, onChange, placeholder, required = true, value }: BaseProps) {
   return (
     <FieldFrame error={error} help={help} label={label} name={name} required={required}>
       <input
         aria-invalid={Boolean(error)}
         className="app-input"
+        disabled={disabled}
         id={name}
         name={name}
         onChange={(event) => onChange(event.target.value)}
