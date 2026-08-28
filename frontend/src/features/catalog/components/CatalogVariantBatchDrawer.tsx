@@ -185,7 +185,7 @@ export function CatalogVariantBatchDrawer({
   }
 
   return (
-    <AppDrawer onClose={onClose} open={open} title={usingExistingProduct ? "Agregar variantes" : "Crear producto con variantes"}>
+    <AppDrawer onClose={onClose} open={open} title={usingExistingProduct ? "Agregar variantes" : "Crear producto con variantes"} wide>
       <form className="grid gap-5" onSubmit={submit}>
         <section className="grid gap-4 rounded-xl border border-[var(--brand-line)] bg-white p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -235,10 +235,7 @@ export function CatalogVariantBatchDrawer({
 
         <section className="grid gap-3">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <p className="font-semibold">Variantes</p>
-              <p className="max-w-2xl text-xs text-[var(--brand-muted)]">Escribe lo que cambia: Manzana, 60 porciones o Manzana · 60 porciones. Usa Opciones sólo si también cambia la presentación, el precio o los códigos.</p>
-            </div>
+            <p className="font-semibold">Variantes</p>
             <button ref={addVariantButton} className="app-button-secondary h-9 px-3" onClick={() => addVariant(true)} type="button">+ Agregar variante</button>
           </div>
           <div className="overflow-hidden rounded-xl border border-[var(--brand-line)] bg-white">
@@ -249,41 +246,43 @@ export function CatalogVariantBatchDrawer({
               <article className="border-b border-[var(--brand-line)] last:border-b-0" data-testid={`variant-row-${index}`} key={index}>
                 <div className="grid items-center gap-2 px-3 py-2 md:grid-cols-[minmax(0,1.15fr)_minmax(0,1.1fr)_minmax(0,.8fr)_auto]">
                   <CompactField label="Sabor, tamaño o variante" name={`variantName-${index}`} placeholder="Manzana · 60 porciones" value={variant.variantName} onChange={(value) => updateVariantName(index, value)} />
-                  <CompactField label="Código de barras" name={`variantBarcode-${index}`} placeholder="Escanea o captura" required={false} value={variant.primaryBarcode} onChange={(primaryBarcode) => updateVariant(index, { primaryBarcode })} onKeyDown={(event) => handleBarcodeEnter(event, index)} />
+                  <div className="flex min-w-0 items-end gap-1">
+                    <div className="min-w-0 flex-1"><CompactField label="Código de barras" name={`variantBarcode-${index}`} placeholder="Escanea o captura" required={false} value={variant.primaryBarcode} onChange={(primaryBarcode) => updateVariant(index, { primaryBarcode })} onKeyDown={(event) => handleBarcodeEnter(event, index)} /></div>
+                    {variant.additionalBarcodes.length < 19 ? <button aria-label={`Agregar código alternativo a variante ${index + 1}`} className="flex h-9 w-8 shrink-0 items-center justify-center rounded-md border border-[var(--brand-line)] text-base font-semibold text-[var(--brand-primary)]" onClick={() => updateVariant(index, { additionalBarcodes: [...variant.additionalBarcodes, ""] })} title="Agregar código alternativo" type="button">+</button> : null}
+                  </div>
                   <CompactField label="SKU" name={`variantSku-${index}`} placeholder="PSY-MAN60" value={variant.sku} onChange={(sku) => updateVariant(index, { sku, skuManuallyEdited: true })} />
-                  <div className="flex items-center justify-end gap-3 md:min-w-[8.5rem]">
-                    <button aria-expanded={variant.optionsOpen} className="text-xs font-semibold text-[var(--brand-primary)]" onClick={() => updateVariant(index, { optionsOpen: !variant.optionsOpen })} type="button">{variant.optionsOpen ? "Cerrar" : "Opciones"}</button>
+                  <div className="flex items-center justify-end gap-3 md:min-w-[10rem]">
+                    <button aria-expanded={variant.optionsOpen} className="text-xs font-semibold text-[var(--brand-primary)]" onClick={() => updateVariant(index, { optionsOpen: !variant.optionsOpen })} type="button">{variant.optionsOpen ? "Cerrar" : "Precio / tamaño"}</button>
                     {variants.length > 1 ? <button className="text-xs font-semibold text-[#9b2c2c]" onClick={() => setVariants((current) => current.filter((_, currentIndex) => currentIndex !== index))} type="button">Quitar</button> : null}
                   </div>
                 </div>
 
+                {variant.additionalBarcodes.length ? (
+                  <div className="flex flex-wrap items-end gap-2 border-t border-dashed border-[var(--brand-line)] px-3 py-2">
+                    {variant.additionalBarcodes.map((barcode, aliasIndex) => (
+                      <div className="flex min-w-[12rem] flex-1 items-end gap-2" key={aliasIndex}>
+                        <div className="min-w-0 flex-1"><CompactField label={`Código alternativo ${aliasIndex + 1}`} name={`variantAlias-${index}-${aliasIndex}`} required={false} value={barcode} onChange={(value) => updateVariant(index, { additionalBarcodes: variant.additionalBarcodes.map((item, currentIndex) => currentIndex === aliasIndex ? value : item) })} /></div>
+                        <button aria-label={`Quitar código alternativo ${aliasIndex + 1}`} className="mb-2 text-xs font-semibold text-[#9b2c2c]" onClick={() => updateVariant(index, { additionalBarcodes: variant.additionalBarcodes.filter((_, currentIndex) => currentIndex !== aliasIndex) })} type="button">Quitar</button>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
                 {variant.optionsOpen ? (
                   <div className="grid gap-3 border-t border-dashed border-[var(--brand-line)] bg-[var(--brand-surface)] px-3 py-3">
-                    <div>
-                      <p className="text-xs font-semibold">Datos diferentes para esta variante</p>
-                      <p className="text-xs text-[var(--brand-muted)]">Deja vacíos los campos que deban usar los datos comunes del producto.</p>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <CompactOverrideField label="Presentación / tamaño" name={`variantPresentation-${index}`} placeholder={commonPresentation ? `Común: ${commonPresentation}` : "Ej. Bote de 60 porciones"} value={variant.presentationOverride} onChange={(presentationOverride) => updateVariant(index, { presentationOverride })} />
+                      <CompactOverrideField inputMode="decimal" label="Precio" name={`variantPrice-${index}`} placeholder={commonPrice ? `Común: $${commonPrice}` : "Precio especial"} type="number" value={variant.priceOverride} onChange={(priceOverride) => updateVariant(index, { priceOverride })} />
+                      {canReadCosts ? <CompactOverrideField inputMode="decimal" label="Costo" name={`variantCost-${index}`} placeholder={commonCost ? `Común: $${commonCost}` : "Costo especial"} type="number" value={variant.costOverride} onChange={(costOverride) => updateVariant(index, { costOverride })} /> : null}
                     </div>
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                      <TextField label="Tamaño o presentación diferente" name={`variantPresentation-${index}`} placeholder={commonPresentation || "Bote de 60 porciones"} required={false} value={variant.presentationOverride} onChange={(presentationOverride) => updateVariant(index, { presentationOverride })} />
-                      <NumberField label="Precio diferente" name={`variantPrice-${index}`} required={false} step="0.01" value={variant.priceOverride} onChange={(priceOverride) => updateVariant(index, { priceOverride })} />
-                      {canReadCosts ? <NumberField label="Costo diferente" name={`variantCost-${index}`} required={false} step="0.01" value={variant.costOverride} onChange={(costOverride) => updateVariant(index, { costOverride })} /> : null}
-                      <NumberField label="Precio promocional" name={`variantPromoPrice-${index}`} required={false} step="0.01" value={variant.promotionalPrice} onChange={(promotionalPrice) => updateVariant(index, { promotionalPrice })} />
-                      <DateTimeField label="Inicio de promoción" name={`variantPromoStart-${index}`} value={variant.promotionStartsAt} onChange={(promotionStartsAt) => updateVariant(index, { promotionStartsAt })} />
-                      <DateTimeField label="Fin de promoción" name={`variantPromoEnd-${index}`} value={variant.promotionEndsAt} onChange={(promotionEndsAt) => updateVariant(index, { promotionEndsAt })} />
-                    </div>
-                    <div className="grid gap-2 rounded-lg border border-[var(--brand-line)] bg-white p-3">
-                      <div>
-                        <p className="text-xs font-semibold">Códigos alternativos</p>
-                        <p className="text-xs text-[var(--brand-muted)]">Sólo para otro código de esta misma variante, por ejemplo por cambio de empaque. Comparte SKU e inventario.</p>
+                    <details className="rounded-md border border-[var(--brand-line)] bg-white px-3 py-2">
+                      <summary className="cursor-pointer text-xs font-semibold text-[var(--brand-primary)]">Promoción opcional</summary>
+                      <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                        <NumberField label="Precio promocional" name={`variantPromoPrice-${index}`} required={false} step="0.01" value={variant.promotionalPrice} onChange={(promotionalPrice) => updateVariant(index, { promotionalPrice })} />
+                        <DateTimeField label="Inicio de promoción" name={`variantPromoStart-${index}`} value={variant.promotionStartsAt} onChange={(promotionStartsAt) => updateVariant(index, { promotionStartsAt })} />
+                        <DateTimeField label="Fin de promoción" name={`variantPromoEnd-${index}`} value={variant.promotionEndsAt} onChange={(promotionEndsAt) => updateVariant(index, { promotionEndsAt })} />
                       </div>
-                      {variant.additionalBarcodes.map((barcode, aliasIndex) => (
-                        <div className="flex items-end gap-2" key={aliasIndex}>
-                          <div className="min-w-0 flex-1"><CompactField label={`Código alternativo ${aliasIndex + 1}`} name={`variantAlias-${index}-${aliasIndex}`} required={false} value={barcode} onChange={(value) => updateVariant(index, { additionalBarcodes: variant.additionalBarcodes.map((item, currentIndex) => currentIndex === aliasIndex ? value : item) })} /></div>
-                          <button aria-label={`Quitar código alternativo ${aliasIndex + 1}`} className="mb-2 text-xs font-semibold text-[#9b2c2c]" onClick={() => updateVariant(index, { additionalBarcodes: variant.additionalBarcodes.filter((_, currentIndex) => currentIndex !== aliasIndex) })} type="button">Quitar</button>
-                        </div>
-                      ))}
-                      {variant.additionalBarcodes.length < 19 ? <button className="w-fit text-xs font-semibold text-[var(--brand-primary)]" onClick={() => updateVariant(index, { additionalBarcodes: [...variant.additionalBarcodes, ""] })} type="button">+ Agregar código alternativo</button> : null}
-                    </div>
+                    </details>
                   </div>
                 ) : null}
               </article>
@@ -307,6 +306,18 @@ function CompactField({ label, name, onChange, onKeyDown, placeholder, required 
   value: string;
 }) {
   return <label className="form-field gap-1" htmlFor={name}><span className="md:sr-only">{label}{required ? <b>*</b> : null}</span><input className="app-input h-9 min-h-9 px-2 py-1 text-sm" id={name} name={name} onChange={(event) => onChange(event.target.value)} onKeyDown={onKeyDown} placeholder={placeholder} required={required} value={value} /></label>;
+}
+
+function CompactOverrideField({ inputMode, label, name, onChange, placeholder, type = "text", value }: {
+  inputMode?: "decimal";
+  label: string;
+  name: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  type?: "number" | "text";
+  value: string;
+}) {
+  return <label className="form-field gap-1" htmlFor={name}><span className="text-xs">{label}</span><input className="app-input h-9 min-h-9 px-2 py-1 text-sm" id={name} inputMode={inputMode} min={type === "number" ? "0" : undefined} name={name} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} step={type === "number" ? "0.01" : undefined} type={type} value={value} /></label>;
 }
 
 function DateTimeField({ label, name, onChange, value }: { label: string; name: string; onChange: (value: string) => void; value: string }) {

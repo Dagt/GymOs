@@ -49,7 +49,8 @@ y alta masiva simple, preservando los IDs usados por ventas e inventario.
 | 27 ago 2026 | Se crea `feature/catalog-product-variants-barcodes`; V95 conserva productos históricos, agrega familias/códigos alias y alta masiva de variantes |
 | 27 ago 2026 | El alta masiva se refina sin migración: datos comunes una vez, filas sabor/código/SKU, SKU sugerido editable, overrides y aliases bajo demanda |
 | 27 ago 2026 | La UX oculta la familia técnica: producto base automático, ampliación desde catálogo y alta individual con un código principal más aliases avanzados |
-| 27 ago 2026 | La captura de variantes se compacta en una tabla y admite sabor, tamaño/porciones o ambos; `Opciones` concentra overrides y aliases sin exponer un control fiscal aislado |
+| 27 ago 2026 | La captura de variantes se compacta en una tabla y admite sabor, tamaño/porciones o ambos sin exponer un control fiscal aislado |
+| 27 ago 2026 | El flujo elimina texto permanente: aliases quedan junto al código y `Precio / tamaño` hace explícitos los valores propios de cada presentación |
 
 ## 3. Alcance material de la rama activa
 

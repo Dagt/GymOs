@@ -103,7 +103,19 @@ export function CatalogProductDrawer({
             <TextField label="SKU" name="productSku" placeholder={form.productType === "SERVICE" ? "SCOOP-PRE" : "AGUA-600"} value={form.sku} onChange={(sku) => change({ sku })} />
             <NumberField label="Precio" name="productPrice" step="0.01" value={price} onChange={onPriceChange} />
             <SelectField label="Tipo" name="productType" options={[{ label: "Producto físico", value: "PHYSICAL" }, { label: "Cargo de caja", value: "SERVICE" }]} value={form.productType} onChange={changeType} />
-            {form.productType === "PHYSICAL" ? <TextField label="Código de barras" name="productBarcode" placeholder="Escanea o captura" required={false} value={form.barcodes[0] ?? ""} onChange={changePrimaryBarcode} /> : null}
+            {form.productType === "PHYSICAL" ? (
+              <div className="grid content-start gap-1.5">
+                <TextField label="Código de barras" name="productBarcode" placeholder="Escanea o captura" required={false} value={form.barcodes[0] ?? ""} onChange={changePrimaryBarcode} />
+                {form.barcodes.slice(1).map((barcode, aliasIndex) => {
+                  const barcodeIndex = aliasIndex + 1;
+                  return <div className="flex items-end gap-2" key={barcodeIndex}>
+                    <div className="min-w-0 flex-1"><TextField label={`Código alternativo ${barcodeIndex}`} name={`productBarcodeAlias-${barcodeIndex}`} required={false} value={barcode} onChange={(value) => changeAlternateBarcode(barcodeIndex, value)} /></div>
+                    <button aria-label={`Quitar código alternativo ${barcodeIndex}`} className="mb-2 text-xs font-semibold text-[#9b2c2c]" onClick={() => removeAlternateBarcode(barcodeIndex)} type="button">Quitar</button>
+                  </div>;
+                })}
+                {form.barcodes.length < 20 ? <button className="w-fit text-xs font-semibold text-[var(--brand-primary)]" onClick={addAlternateBarcode} type="button">+ Código alternativo</button> : null}
+              </div>
+            ) : null}
             <SelectField label="Categoría" name="productCategory" required={false} options={[{ label: "Sin categoría", value: "" }, ...options]} value={form.categoryId ?? ""} onChange={(categoryId) => change({ categoryId: categoryId || null })} />
             {form.productType === "PHYSICAL" && form.inventoryTracked && canManageInventory ? (
               <NumberField label="Stock mínimo" min="0" name="productReorderPoint" required={false} value={reorderPoint} onChange={onReorderPointChange} />
@@ -133,20 +145,6 @@ export function CatalogProductDrawer({
                   value={form.unitOfMeasure ?? "PIECE"}
                   onChange={(unitOfMeasure) => change({ unitOfMeasure })}
                 />
-                <div className="grid gap-2 sm:col-span-2">
-                  <div>
-                    <p className="text-sm font-medium">Códigos alternativos</p>
-                    <p className="mt-1 text-xs text-[var(--brand-muted)]">Sólo agrégalos si este mismo artículo puede llegar con otro código. Todos usarán el mismo SKU e inventario.</p>
-                  </div>
-                  {form.barcodes.slice(1).map((barcode, aliasIndex) => {
-                    const barcodeIndex = aliasIndex + 1;
-                    return <div className="flex items-end gap-2" key={barcodeIndex}>
-                      <div className="min-w-0 flex-1"><TextField label={`Código alternativo ${barcodeIndex}`} name={`productBarcodeAlias-${barcodeIndex}`} required={false} value={barcode} onChange={(value) => changeAlternateBarcode(barcodeIndex, value)} /></div>
-                      <button aria-label={`Quitar código alternativo ${barcodeIndex}`} className="mb-2 text-xs font-semibold text-[#9b2c2c]" onClick={() => removeAlternateBarcode(barcodeIndex)} type="button">Quitar</button>
-                    </div>;
-                  })}
-                  {form.barcodes.length < 20 ? <button className="w-fit text-xs font-semibold text-[var(--brand-primary)]" onClick={addAlternateBarcode} type="button">+ Agregar código alternativo</button> : null}
-                </div>
               </>
             ) : null}
             <TextField label="Etiquetas" name="productTags" placeholder="energía, cafeína, preentreno" required={false} value={tagsText} onChange={onTagsTextChange} />

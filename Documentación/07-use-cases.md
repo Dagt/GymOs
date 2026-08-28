@@ -746,8 +746,9 @@ Flujo:
 4. Agrega filas compactas para variante, código principal y SKU autogenerado
    pero editable. La variante describe lo que cambia: sabor, tamaño/porciones o
    ambos. Enter después del código mueve el foco sin enviar el formulario.
-5. Sólo una variante excepcional despliega `Opciones` para cambiar tamaño o
-   presentación, precio, costo o promoción y para agregar códigos alternativos.
+5. Sólo una variante excepcional despliega `Precio / tamaño` para cambiar
+   presentación, precio o costo; la promoción queda plegada y los códigos
+   alternativos se agregan con el `+` contiguo al código principal.
 6. Backend crea el lote transaccionalmente y adjunta cada variante a la sucursal
    activa.
 7. POS puede identificar la variante correcta con cualquiera de sus códigos;
@@ -761,10 +762,13 @@ Criterios:
 - dos presentaciones del mismo sabor (por ejemplo `Manzana · 35 porciones` y
   `Manzana · 60 porciones`) son variantes distintas con SKU, código e inventario
   independientes;
+- si comparten identidad comercial, marca y fórmula pero cambia el contenido o
+  número de porciones, pertenecen al mismo producto base; cada tamaño lleva su
+  propio precio y costo mediante overrides de la variante;
 - una colisión de SKU o código revierte el lote completo;
 - un código no puede apuntar a dos variantes activas de la misma organización;
-- el alta individual no solicita sabor: muestra un código principal y reserva
-  los códigos alternativos para el caso excepcional del mismo SKU/empaque;
+- el alta individual no solicita sabor: muestra el código principal y el botón
+  compacto para aliases en el mismo bloque, antes de `Más datos`;
 - productos, ventas y movimientos existentes conservan sus IDs y relaciones al
   aplicar V95.
 

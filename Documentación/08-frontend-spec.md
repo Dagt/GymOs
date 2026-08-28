@@ -161,8 +161,9 @@ Regla de catalogo:
   existente, un bloque único de datos comunes y una tabla compacta que muestra
   sólo variante, código principal, SKU editable/autogenerado y acciones. El
   nombre de variante puede expresar sabor, tamaño o ambos (`Manzana · 60
-  porciones`). `Opciones` despliega presentación/tamaño, precio, costo,
-  promoción y códigos alternativos únicamente para la fila excepcional.
+  porciones`). `Precio / tamaño` despliega solamente presentación, precio y
+  costo propios; la promoción queda en un detalle secundario y el botón `+`
+  junto al código principal agrega aliases sin abrir otro bloque explicativo.
 - El alta masiva no expone un control fiscal adicional que no exista en el alta
   individual; conserva el valor canónico utilizado actualmente por catálogo.
 - La UI no expone `familia comercial` como entidad administrable: inicia con
@@ -170,8 +171,9 @@ Regla de catalogo:
   acción secundaria. El catálogo permite abrir ese flujo con el producto base
   ya seleccionado.
 - `Nuevo artículo o cargo` no solicita sabor al crear un producto individual.
-  Muestra un único código principal y deja los códigos alternativos bajo una
-  acción avanzada; al editar una variante real sí conserva su nombre de sabor.
+  Muestra el botón compacto `+ Código alternativo` inmediatamente debajo del
+  código principal; no desplaza aliases a `Más datos` ni muestra explicaciones
+  permanentes. Al editar una variante real sí conserva su nombre de variante.
 - Enter en el código principal nunca envía el formulario: mueve el foco a la
   siguiente variante o al botón para agregarla. El flujo admite hasta 50 filas.
 - El formulario individual permite varios códigos, uno por línea; el primero es

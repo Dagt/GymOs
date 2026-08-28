@@ -16,8 +16,8 @@ Estado: `ESTABILIZADO`
 - familias comerciales de organización y variantes vendibles independientes;
 - alta masiva de hasta 50 sabores/presentaciones, con configuración común
   capturada una sola vez, tabla compacta de variante/código/SKU, soporte explícito
-  para sabor, tamaño/porciones o ambos, overrides y aliases bajo `Opciones`, y
-  transacción completa ante colisiones;
+  para sabor, tamaño/porciones o ambos, precio/costo/presentación por excepción,
+  aliases junto al código y transacción completa ante colisiones;
 - unidad de producto físico guiada por un selector cerrado de valores comunes,
   normalización de etiquetas heredadas y validación canónica en backend;
 - disponibilidad y configuración por sucursal;

@@ -92,14 +92,19 @@ Implementación V95:
   ambos;
 - el stock mínimo común se aplica a todas las variantes dentro de la misma
   transacción y conserva el permiso `inventory.manage`;
-- `Opciones` abre overrides y códigos alternativos únicamente para la variante
-  excepcional. Los datos
+- `Precio / tamaño` abre presentación, precio y costo únicamente para la variante
+  excepcional; promoción queda plegada y los códigos alternativos se agregan
+  directamente junto al código principal. Los datos
   comunes son defaults del lote: después de crearse, cada variante vuelve a ser
   completamente independiente;
 - el administrador ya no necesita localizar una pantalla de familias: el alta
   crea el producto base automáticamente y `Agregar variantes a producto
   existente` reutiliza el grupo interno. El alta individual sólo solicita un
-  código principal y no muestra sabor salvo al editar una variante real;
+  código principal, coloca el botón de alias en ese mismo bloque y no muestra
+  sabor salvo al editar una variante real;
+- el mismo producto/sabor en 35 y 60 porciones usa dos variantes del mismo
+  producto base, cada una con presentación, precio, costo, SKU, código y stock
+  independientes;
 - el drawer no agrega un checkbox fiscal que no exista en el alta individual;
 - el lote es transaccional: una colisión evita altas parciales;
 - POS, búsqueda de catálogo e inventario resuelven cualquiera de los alias;
