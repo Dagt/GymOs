@@ -44,19 +44,36 @@ public final class ConnectorMain {
     }
 
     private static void activate(ConnectorConfig config, SecretStore secrets, String activationCode) {
+        char[] promptedCode = null;
         if (activationCode == null || activationCode.isBlank()) {
-            throw new IllegalArgumentException("Indica el código de activación de un solo uso.");
+            Console console = System.console();
+            if (console == null) {
+                throw new IllegalArgumentException(
+                        "Indica el código de activación o ejecuta el comando en una consola interactiva.");
+            }
+            promptedCode = console.readPassword("Código de activación GymFort: ");
+            if (promptedCode == null || promptedCode.length == 0) {
+                throw new IllegalArgumentException("El código de activación no puede estar vacío.");
+            }
+            activationCode = new String(promptedCode);
         }
         GymFortCloudClient cloud = new GymFortCloudClient(config.cloudBaseUrl(), config.connectorKey(), null);
-        ActivationResponse response = cloud.activate(activationCode.trim());
-        char[] secret = response.connectorSecret().toCharArray();
         try {
-            secrets.write(CLOUD_SECRET, secret);
+            ActivationResponse response = cloud.activate(activationCode.trim());
+            char[] secret = response.connectorSecret().toCharArray();
+            try {
+                secrets.write(CLOUD_SECRET, secret);
+            } finally {
+                Arrays.fill(secret, '\0');
+            }
+            System.out.println("Connector activado para el proveedor " + response.providerKey()
+                    + ". El secreto quedó protegido localmente.");
         } finally {
-            Arrays.fill(secret, '\0');
+            cloud.close();
+            if (promptedCode != null) {
+                Arrays.fill(promptedCode, '\0');
+            }
         }
-        System.out.println("Connector activado para el proveedor " + response.providerKey()
-                + ". El secreto quedó protegido localmente.");
     }
 
     private static void setSecret(SecretStore secrets, String name) {
@@ -82,6 +99,7 @@ public final class ConnectorMain {
         boolean cloudReady = hasSecret(secrets, CLOUD_SECRET);
         try (AccessProviderDriver driver = driver(config, secrets)) {
             ProviderHealth health = driver.health();
+            System.out.println("Connector version: " + connectorVersion());
             System.out.println("GymFort credential: " + (cloudReady ? "READY" : "MISSING"));
             System.out.println("Provider: " + driver.providerKey());
             System.out.println("Provider health: " + (health.healthy() ? "HEALTHY" : "DEGRADED"));
@@ -102,10 +120,7 @@ public final class ConnectorMain {
         GymFortCloudClient cloud = new GymFortCloudClient(
                 config.cloudBaseUrl(), config.connectorKey(), cloudSecret);
         Arrays.fill(cloudSecret, '\0');
-        String version = ConnectorMain.class.getPackage().getImplementationVersion();
-        if (version == null) {
-            version = "development";
-        }
+        String version = connectorVersion();
         try (ConnectorWorker worker = new ConnectorWorker(
                 cloud, driver, ledger, config.claimLimit(), config.leaseSeconds())) {
             new ConnectorDaemon(
@@ -122,7 +137,8 @@ public final class ConnectorMain {
                 "Configura GYMFORT_HIKCENTRAL_APP_SECRET o ejecuta set-secret hikcentral.appSecret.");
         try {
             HikCentralOpenApiClient api = new HikCentralOpenApiClient(
-                    config.hikCentral().baseUrl(), config.hikCentral().appKey(), appSecret);
+                    config.hikCentral().baseUrl(), config.hikCentral().appKey(), appSecret,
+                    config.hikCentral().trustedCertificatePath());
             return new HikCentralDriver(api, config.hikCentral().managedAccessLevelRefs());
         } finally {
             Arrays.fill(appSecret, '\0');
@@ -137,6 +153,11 @@ public final class ConnectorMain {
         Optional<char[]> value = secrets.read(name);
         value.ifPresent(secret -> Arrays.fill(secret, '\0'));
         return value.isPresent();
+    }
+
+    private static String connectorVersion() {
+        String version = ConnectorMain.class.getPackage().getImplementationVersion();
+        return version == null ? "development" : version;
     }
 
     private static String safe(String value) {

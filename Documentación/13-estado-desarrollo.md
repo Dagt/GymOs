@@ -127,8 +127,8 @@ Connector ya existe como ejecutable independiente: consume el contrato cloud,
 conserva idempotencia durable en SQLite, protege secretos con DPAPI e incluye
 simulador y adapter OpenAPI de HikCentral para asignación exacta de Access
 Levels. Siguen pendientes el enrolamiento asistido, los eventos, el modo medido
-de paquetes, la instalación como servicio y toda validación con HikCentral y el
-torniquete reales.
+de paquetes, el servicio Windows productivo (el piloto usa tarea al iniciar
+sesión) y toda validación con HikCentral y el torniquete reales.
 
 Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún módulo se considera completo por el nombre de una rama: la evidencia proviene de código, migraciones, pruebas y validación del entorno.
 
@@ -145,7 +145,7 @@ Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún 
 | [Ventas](modulos/07-sales.md) | FUNCIONAL | POS, ventas contextualizadas, inscripción separada, compra dedicada de membresías/paquetes, pagos, recibos e inventario | Concurrencia/conciliación E2E y política de reembolso parcial (`SAL-001`) |
 | [Membresías](modulos/08-memberships.md) | ESTABILIZADO | Periodos inclusivos, activa única, alta con inscripción, renovación/cambio multi-sucursal, visibilidad de kiosco y exención por plan | E2E financiero completo |
 | [Beneficios/elegibilidad](modulos/09-benefits.md) | ESTABILIZADO | Descuentos por plan y acceso `LOCAL|PLAN_COVERAGE`, incluidas sedes cubiertas sin duplicar beneficios | Matriz PostgreSQL/E2E y mapeos físicos locales (`BEN-003`) |
-| [Acceso](modulos/10-access.md) | CONNECTOR LOCAL EN DESARROLLO | Elegibilidad, puntos, bitácora, Connector API, consumo atómico/idempotente de paquetes y ejecutable local con adapter OpenAPI HikCentral inicial | Enrolamiento/eventos, instalación y aceptación real de Connector/HikCentral (`ACC-002`); torniquete de paquetes (`ACC-005`) |
+| [Acceso](modulos/10-access.md) | CONNECTOR LOCAL EN DESARROLLO | Elegibilidad, puntos, bitácora, Connector API, consumo atómico/idempotente de paquetes y ejecutable local con paquete Windows piloto y adapter OpenAPI HikCentral inicial | Enrolamiento/eventos, servicio Windows productivo y aceptación real de Connector/HikCentral (`ACC-002`); torniquete de paquetes (`ACC-005`) |
 | [Kiosco](modulos/11-selfservice.md) | FUNCIONAL / ACEPTACIÓN | Apertura sólo por Recepción, sesión aislada, registro, membresías, paquetes visibles con Stripe pendiente, Checkout protegido, domiciliación, reservas, wellness y datos | Publicar ejecución automatizada de Stripe sandbox y E2E de paquetes (`SELF-001`) |
 | [Reservas](modulos/12-bookings.md) | FUNCIONAL | Recursos, disponibilidad, pago y acceso multi-sucursal | Colisiones/cancelación/E2E (`BKG-001`) |
 | [Inventario](modulos/13-inventory.md) | ESTABILIZADO | Existencias, movimientos, alertas, transferencias y conteos paginados; valuación | Feedback por partida (`INV-002`) |

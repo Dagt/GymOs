@@ -19,6 +19,7 @@ Diseño y aceptación:
 
 - [Arquitectura y garantías](docs/architecture.md)
 - [Matriz de aceptación HikCentral](docs/hikcentral-site-acceptance-matrix.md)
+- [Instalación piloto en Windows](docs/windows-pilot-installation.md)
 
 No es todavía una integración certificada para producción: faltan validación
 contra una instalación real, eventos HikCentral, enrolamiento asistido y el
@@ -38,7 +39,12 @@ Desde la raíz:
 ```powershell
 backend\gradlew.bat -p connector test
 backend\gradlew.bat -p connector installDist
+backend\gradlew.bat -p connector pilotChecksum
 ```
+
+`pilotChecksum` produce una imagen Windows autocontenida con su propio Java,
+scripts de instalación y un SHA-256 para verificar la copia. Consulta el
+runbook antes de llevarla al gimnasio.
 
 ## Desarrollo con simulador
 
@@ -72,6 +78,10 @@ directorio predeterminado es `runtime/logs` y puede cambiarse con
 
 Configura `connector.provider=HIKCENTRAL`, `hikcentral.baseUrl`,
 `hikcentral.appKey` y la lista cerrada `hikcentral.managedAccessLevelRefs`.
+`hikcentral.baseUrl` exige HTTPS. Si el servidor usa una CA local, exporta su
+certificado X.509 y configura `hikcentral.trustedCertificatePath`; esto agrega
+esa confianza sin reemplazar las autoridades públicas ni desactivar la
+verificación del nombre del servidor.
 Guarda el App Secret desde una consola interactiva:
 
 ```powershell

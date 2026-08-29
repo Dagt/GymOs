@@ -65,4 +65,40 @@ class ConnectorConfigTest {
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("no debe incluir credenciales");
     }
+
+    @Test
+    void rejectsUnencryptedHikCentralEndpoint() throws Exception {
+        Path configFile = tempDirectory.resolve("connector.properties");
+        Files.writeString(configFile, """
+                cloud.baseUrl=https://gymfort.example
+                connector.key=centro-01
+                connector.provider=HIKCENTRAL
+                hikcentral.baseUrl=http://hikcentral.local:8443
+                hikcentral.appKey=app-key
+                hikcentral.managedAccessLevelRefs=CENTRO_GENERAL
+                """);
+
+        assertThatThrownBy(() -> ConnectorConfig.load(configFile))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("debe utilizar https");
+    }
+
+    @Test
+    void resolvesAnOptionalHikCentralCertificateRelativeToConfig() throws Exception {
+        Path configFile = tempDirectory.resolve("connector.properties");
+        Files.writeString(configFile, """
+                cloud.baseUrl=https://gymfort.example
+                connector.key=centro-01
+                connector.provider=HIKCENTRAL
+                hikcentral.baseUrl=https://hikcentral.local:8443
+                hikcentral.appKey=app-key
+                hikcentral.managedAccessLevelRefs=CENTRO_GENERAL
+                hikcentral.trustedCertificatePath=certificates/hikcentral.cer
+                """);
+
+        ConnectorConfig config = ConnectorConfig.load(configFile);
+
+        assertThat(config.hikCentral().trustedCertificatePath()).isEqualTo(
+                tempDirectory.resolve("certificates/hikcentral.cer").toAbsolutePath().normalize());
+    }
 }

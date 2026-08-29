@@ -7,6 +7,7 @@ import com.gymfort.connector.provider.ProviderHealth;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ThreadLocalRandom;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -82,9 +83,10 @@ public final class ConnectorDaemon {
         cloud.heartbeat(health.healthy() ? "HEALTHY" : "DEGRADED", connectorVersion, instanceId, health.detail());
     }
 
-    private Duration backoff(int failures) {
-        long seconds = Math.min(60, 1L << Math.min(failures, 6));
-        return Duration.ofSeconds(seconds);
+    Duration backoff(int failures) {
+        long baseSeconds = Math.min(40, 1L << Math.min(Math.max(failures, 1), 6));
+        long jitterSeconds = ThreadLocalRandom.current().nextLong(0, (baseSeconds / 2) + 1);
+        return Duration.ofSeconds(Math.min(60, baseSeconds + jitterSeconds));
     }
 
     private void sleep(Duration duration) {

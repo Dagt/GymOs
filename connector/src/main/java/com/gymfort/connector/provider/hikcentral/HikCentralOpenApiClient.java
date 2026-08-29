@@ -7,6 +7,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -33,8 +34,17 @@ public final class HikCentralOpenApiClient implements HikCentralApi {
     private final HikCentralOpenApiSigner signer;
 
     public HikCentralOpenApiClient(URI baseUrl, String appKey, char[] appSecret) {
+        this(baseUrl, appKey, appSecret, null);
+    }
+
+    public HikCentralOpenApiClient(
+            URI baseUrl,
+            String appKey,
+            char[] appSecret,
+            Path trustedCertificatePath
+    ) {
         this(baseUrl, appKey, appSecret,
-                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build(),
+                HikCentralTls.httpClient(trustedCertificatePath),
                 new ObjectMapper(), new HikCentralOpenApiSigner());
     }
 

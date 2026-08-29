@@ -189,9 +189,10 @@ sensitive metadata keys and diagnostic values that look like a URL, IP address
 or credential. Reusing an `externalEventId` returns the original event result
 and performs no secondary update, even if a retry payload differs.
 
-## 6. Person discovery
+## 6. Person discovery contract (not yet consumed by the local adapter)
 
-To help an operator link existing provider persons:
+A future candidate-import loop can help an operator link existing provider
+persons through:
 
 ```http
 POST /api/v1/physical-connectors/person-candidates
@@ -243,7 +244,9 @@ Record from the actual client installation:
 - provider behavior during partial failures.
 
 Do not disable TLS verification to work around the site's local certificate.
-Install the site's CA/certificate in the service account's Java trust store.
+Configure the site's exported public certificate through
+`hikcentral.trustedCertificatePath`; system trust and hostname verification
+remain enabled.
 Never use an OpenAPI package copied from an unrelated HikCentral release.
 
 ## 9. Face enrollment and GymFort identity link
@@ -253,19 +256,19 @@ the opaque HikCentral person identifier. The currently implemented safe flow is:
 
 1. the receptionist creates or locates the person in HikCentral and captures
    the face with the site's supported enrollment terminal;
-2. the Connector publishes the person as a candidate without biometric data;
-3. an Owner or Manager confirms the exact GymFort client in the physical
-   integration console;
+2. the receptionist obtains the opaque HikCentral person identifier;
+3. an Owner or Manager pastes that identifier on the exact GymFort client in
+   the physical integration console;
 4. linking stores `externalPersonRef` and enqueues the complete desired Access
    Level set, regardless of the branch where the membership was sold;
 5. the Connector reconciles only the Access Levels declared as GymFort-owned.
 
-Automatic person creation and assisted enrollment are the next contract
-increment. Today a job without `externalPersonRef` is blocked intentionally;
-the Connector must not guess identity by a fuzzy name. The future workflow will
-create the HikCentral person using an immutable GymFort reference, return the
-new opaque person identifier, then wait for local face capture before enabling
-access.
+Candidate import, automatic person creation and assisted enrollment are later
+contract increments. Today a job without `externalPersonRef` is blocked
+intentionally; the Connector must not guess identity by a fuzzy name. A future
+workflow may create the HikCentral person using an immutable GymFort reference,
+return the new opaque person identifier, then wait for local face capture before
+enabling access.
 
 Long-lived membership rights can be distributed as Access Levels. A metered
 visit-package access cannot be represented as a permanent HikCentral Access

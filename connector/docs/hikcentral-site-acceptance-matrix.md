@@ -13,7 +13,7 @@ Test topology:
 |---|---|---|---|
 | HC-COMP-01 | Query HikCentral version with configured AK/SK | Version returned; no credentials logged | Signed HTTP contract `PASS-AUTO`; live `PENDING-SITE` |
 | HC-COMP-02 | OpenAPI package does not match the installed release | `doctor` is degraded; mutations remain disabled | `PENDING-SITE` |
-| HC-COMP-03 | Site uses a private/self-signed TLS chain | Works only after CA import; no insecure bypass | Policy implemented; `PENDING-SITE` |
+| HC-COMP-03 | Site uses a private/self-signed TLS chain | Works only with its explicit public certificate; no insecure bypass | Policy implemented; `PENDING-SITE` |
 | HC-CFG-01 | A configured GymFort Access Level is absent | `doctor` lists it and stays degraded | `PASS-AUTO` |
 | HC-CFG-02 | Cloud requests an unmanaged Access Level | Job fails terminally before provider mutation | `PASS-AUTO` |
 | HC-CFG-03 | Person has an unrelated manual HikCentral privilege | Reconciliation preserves it | `PASS-AUTO` |
@@ -39,11 +39,12 @@ Test topology:
 | HC-DEL-04 | Two desired revisions exist for one person | Final provider state equals newest exact set | Cloud serialization covered; live `PENDING-SITE` |
 | HC-OUT-01 | Internet/Cloud unavailable | Existing local HikCentral policy remains; Connector never opens by default | Daemon fail-safe implemented; `PENDING-SITE` |
 | HC-OUT-02 | HikCentral unavailable | Heartbeat becomes degraded; jobs retry with bounded delay | Local behavior implemented; `PENDING-SITE` |
-| HC-OUT-03 | Connector restarts after Windows reboot | Durable ledger resumes; service starts under least privilege | Ledger `PASS-AUTO`; service install `BLOCKED-NEXT` |
+| HC-OUT-03 | Connector restarts after Windows logon | Durable ledger resumes; pilot task restarts under the installation account | Ledger/package smoke `PASS-AUTO`; live `PENDING-SITE` |
 | HC-EVT-01 | Duplicate HikCentral event arrives | One cloud access log, no duplicate visit consumption | Cloud endpoint exists; adapter ingestion `BLOCKED-NEXT` |
 | HC-SEC-01 | Secret files/config/logs are inspected | No plaintext Connector/App Secret or biometric payload | DPAPI/config/log policy implemented; deployment `PENDING-SITE` |
 | HC-SEC-02 | Connector credential is revoked | Cloud mutations stop and surface authentication failure | Cloud covered; live `PENDING-SITE` |
 | HC-SEC-03 | Cross-organization reference is attempted | No job/person/device escapes authenticated tenant/branch | Cloud integration covered; live negative test `PENDING-SITE` |
+| HC-SEC-04 | Pilot ZIP is modified after build | SHA-256 verification fails; modified copy is not installed | Checksum generation/verification `PASS-AUTO`; Authenticode signing `BLOCKED-NEXT` |
 
 Production approval requires every relevant `PENDING-SITE` row to pass and every
 `BLOCKED-NEXT` row used by the client to be implemented first. Passing the local

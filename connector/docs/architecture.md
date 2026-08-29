@@ -50,8 +50,9 @@ rather than performing blind additive mutations.
 - Windows persistence uses user-scoped DPAPI; environment variables are the
   non-Windows/runtime-injection path.
 - Provider and Cloud TLS verification stays enabled.
-- Site-local certificate authorities must be installed in the service account's
-  Java trust store.
+- A site-local X.509 certificate can be added as explicit trust through
+  `hikcentral.trustedCertificatePath`; system roots and hostname verification
+  remain active.
 - Logs and health details are sanitized and must never carry biometric data.
 
 ## Deliberate V1 limits

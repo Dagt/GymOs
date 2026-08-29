@@ -50,7 +50,11 @@ public record ConnectorConfig(
             hikCentral = new HikCentralConfig(
                     requireHttpUri(properties, "hikcentral.baseUrl"),
                     required(properties, "hikcentral.appKey", 180),
-                    csv(properties.getProperty("hikcentral.managedAccessLevelRefs")));
+                    csv(properties.getProperty("hikcentral.managedAccessLevelRefs")),
+                    optionalPath(properties, "hikcentral.trustedCertificatePath", path));
+            if (!"https".equals(hikCentral.baseUrl().getScheme())) {
+                throw new IllegalArgumentException("hikcentral.baseUrl debe utilizar https.");
+            }
             if (hikCentral.managedAccessLevelRefs().isEmpty()) {
                 throw new IllegalArgumentException(
                         "hikcentral.managedAccessLevelRefs debe declarar los niveles propiedad de GymFort.");
@@ -146,6 +150,17 @@ public record ConnectorConfig(
         return Set.copyOf(entries);
     }
 
+    private static Path optionalPath(Properties properties, String key, Path configPath) {
+        String value = properties.getProperty(key);
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        Path candidate = Path.of(checked(value.trim(), key, 500));
+        return candidate.isAbsolute()
+                ? candidate.normalize()
+                : configPath.toAbsolutePath().getParent().resolve(candidate).normalize();
+    }
+
     private static String defaultInstanceId() {
         String computer = System.getenv("COMPUTERNAME");
         return computer == null || computer.isBlank() ? "gymfort-local" : computer.trim();
@@ -154,7 +169,8 @@ public record ConnectorConfig(
     public record HikCentralConfig(
             URI baseUrl,
             String appKey,
-            Set<String> managedAccessLevelRefs
+            Set<String> managedAccessLevelRefs,
+            Path trustedCertificatePath
     ) {
         public HikCentralConfig {
             managedAccessLevelRefs = Set.copyOf(managedAccessLevelRefs);
