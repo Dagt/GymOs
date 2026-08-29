@@ -133,6 +133,7 @@ export default function KioskPage() {
   const [activePanel, setActivePanel] = useState<KioskPanel>("memberships");
   const operationKeys = useRef(new Map<string, string>());
   const membershipCheckoutInFlight = useRef(false);
+  const checkoutRef = useRef<HTMLElement | null>(null);
 
   const birthDate = useMemo(() => parseMexicanDate(birthDateDisplay) ?? "", [birthDateDisplay]);
   const registrationBirthDate = useMemo(
@@ -172,6 +173,14 @@ export default function KioskPage() {
     [summary],
   );
   const hiddenPendingPaymentCount = (summary?.paymentActivity.length ?? 0) - visiblePaymentActivity.length;
+
+  useEffect(() => {
+    if (!membershipReview && !visitPackageQuote) return;
+    const frame = window.requestAnimationFrame(() => {
+      checkoutRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [membershipReview, visitPackageQuote]);
 
   useEffect(() => {
     let active = true;
@@ -325,6 +334,7 @@ export default function KioskPage() {
     setSummary(nextSummary);
     setActivePanel("memberships");
     setMembershipReview(null);
+    setVisitPackageQuote(null);
     setMembershipError(null);
     setContactEmail("");
     setContactPhone("");
@@ -332,7 +342,6 @@ export default function KioskPage() {
     setVisitPackagePlans(packageOptions);
     setCurrentVisitPackage(openPackage ?? null);
     setSelectedVisitPackagePlanId(packageOptions[0]?.id ?? "");
-    setVisitPackageQuote(null);
     setVisitPackageError(null);
     const currentMembership = nextSummary.memberships.find((membership) => membership.status === "ACTIVE");
     const currentPlanId = currentMembership?.planId;
@@ -506,6 +515,7 @@ export default function KioskPage() {
     if (!session || !summary || !planId) return;
     setWorkingMembershipId(membership?.id ?? "enrollment");
     setMembershipReview(null);
+    setVisitPackageQuote(null);
     setMembershipError(null);
     setError(null);
     setMessage(null);
@@ -601,6 +611,7 @@ export default function KioskPage() {
     if (!session || !selectedVisitPackagePlanId || currentVisitPackage) return;
     setVisitPackageBusy(true);
     setVisitPackageQuote(null);
+    setMembershipReview(null);
     setVisitPackageError(null);
     setError(null);
     setMessage(null);
@@ -1117,9 +1128,9 @@ export default function KioskPage() {
             {activePanel === "memberships" ? <section className="kiosk-content-grid kiosk-content-grid-single">
               <div className="kiosk-card">
                 <div className="kiosk-member-header">
-                  <span>{activeMembership ? "Tu membresía" : "Comienza aquí"}</span>
-                  <h2>{activeMembership
-                    ? "Membresía actual"
+                  <span>{activeMembership || currentVisitPackage ? "Tus servicios" : "Comienza aquí"}</span>
+                  <h2>{activeMembership || currentVisitPackage
+                    ? "Servicios activos"
                     : summary.capabilities.membershipEnrollmentAllowed && summary.capabilities.visitPackagePurchaseAllowed
                       ? "Elige una opción"
                       : summary.capabilities.membershipEnrollmentAllowed
@@ -1132,6 +1143,8 @@ export default function KioskPage() {
                       ? activeMembership.managedAtCurrentBranch
                         ? "Consulta tu vigencia y elige exactamente qué quieres hacer. Nada cambia hasta que revises el importe y completes el pago."
                         : "Tu membresía multi-sucursal es válida aquí para acceso y reservas. Su renovación, cambio de plan y domiciliación se administran en la sucursal donde la contrataste."
+                      : currentVisitPackage
+                        ? "Consulta en un solo lugar la vigencia y el saldo de tus servicios. También puedes revisar las opciones disponibles para contratar una membresía."
                       : summary.capabilities.membershipEnrollmentAllowed && summary.capabilities.visitPackagePurchaseAllowed
                         ? "Elige un plan o paquete y consulta el importe final. El pago sólo se habilita cuando Stripe está listo."
                         : summary.capabilities.membershipEnrollmentAllowed
@@ -1148,60 +1161,10 @@ export default function KioskPage() {
                 {membershipError ? <div className="kiosk-membership-error" role="alert">{membershipError}</div> : null}
                 {visitPackageError ? <div className="kiosk-membership-error" role="alert">{visitPackageError}</div> : null}
 
-                {membershipReview ? (
-                  <section aria-label="Revisión de membresía" className="kiosk-membership-review">
-                    <div>
-                      <span>Último paso antes del pago</span>
-                      <h3>{membershipActionTitle(membershipReview.kind)}</h3>
-                      <p>Revisa el importe. Tu membresía sólo cambiará cuando Stripe confirme el pago.</p>
-                    </div>
-                    <dl className="kiosk-quote-breakdown">
-                      <div><dt>Plan</dt><dd>{membershipReview.quote.planName}</dd></div>
-                      <div><dt>Precio del plan</dt><dd>{formatMoney(membershipReview.quote.planPriceCents, membershipReview.quote.currency)}</dd></div>
-                      {membershipReview.quote.registrationFeeCents > 0 ? <div><dt>{membershipReview.quote.registrationFeeLabel ?? "Inscripción"}</dt><dd>{formatMoney(membershipReview.quote.registrationFeeCents, membershipReview.quote.currency)}</dd></div> : null}
-                      {membershipReview.quote.discountCents > 0 ? <div><dt>Descuentos</dt><dd>-{formatMoney(membershipReview.quote.discountCents, membershipReview.quote.currency)}</dd></div> : null}
-                      <div className="total"><dt>Total a pagar</dt><dd>{formatMoney(membershipReview.quote.totalCents, membershipReview.quote.currency)}</dd></div>
-                    </dl>
-                    {membershipReview.quote.appliedBenefits.length > 0 ? (
-                      <p className="kiosk-quote-benefits">Beneficios aplicados: {membershipReview.quote.appliedBenefits.map((benefit) => benefit.name).join(", ")}.</p>
-                    ) : null}
-                    <div className="kiosk-review-actions">
-                      <button className="kiosk-secondary-action" disabled={workingMembershipId !== null} onClick={() => setMembershipReview(null)} type="button">Volver sin cambios</button>
-                      <button className="kiosk-primary-action small" disabled={workingMembershipId !== null || !summary.capabilities.onlineCardPaymentsReady} onClick={() => void completeMembershipCheckout()} type="button">
-                        {workingMembershipId !== null
-                          ? "Abriendo Stripe..."
-                          : summary.capabilities.onlineCardPaymentsReady
-                            ? "Confirmar y continuar a Stripe"
-                            : "Pago pendiente de Stripe"}
-                      </button>
-                    </div>
-                  </section>
-                ) : null}
-
-                {visitPackageQuote ? (
-                  <section aria-label="Revisión de paquete" className="kiosk-membership-review">
-                    <div>
-                      <span>Revisa antes de pagar</span>
-                      <h3>{visitPackageQuote.packageName}</h3>
-                      <p>{visitPackageQuote.totalVisits} visitas para usar durante {visitPackageQuote.validityDays} días desde la activación.</p>
-                    </div>
-                    <dl className="kiosk-quote-breakdown">
-                      <div><dt>Paquete</dt><dd>{formatMoney(visitPackageQuote.packagePriceCents, visitPackageQuote.currency)}</dd></div>
-                      {visitPackageQuote.registrationFeeCents > 0 ? <div><dt>{visitPackageQuote.registrationFeeLabel ?? "Inscripción"}</dt><dd>{formatMoney(visitPackageQuote.registrationFeeCents, visitPackageQuote.currency)}</dd></div> : null}
-                      <div className="total"><dt>Total a pagar</dt><dd>{formatMoney(visitPackageQuote.totalCents, visitPackageQuote.currency)}</dd></div>
-                    </dl>
-                    <div className="kiosk-review-actions">
-                      <button className="kiosk-secondary-action" disabled={visitPackageBusy} onClick={() => setVisitPackageQuote(null)} type="button">Volver</button>
-                      <button className="kiosk-primary-action small" disabled={visitPackageBusy || !summary.capabilities.onlineCardPaymentsReady} onClick={() => void completeVisitPackageCheckout()} type="button">
-                        {visitPackageBusy ? "Abriendo Stripe..." : summary.capabilities.onlineCardPaymentsReady ? "Continuar a Stripe" : "Pago pendiente de Stripe"}
-                      </button>
-                    </div>
-                  </section>
-                ) : null}
-
-                {activeMembership ? (
-                  <>
-                    <article className="kiosk-current-membership">
+                {activeMembership || currentVisitPackage ? (
+                  <section aria-label="Servicios activos" className="kiosk-active-products">
+                    {activeMembership ? (
+                    <article className="kiosk-current-membership kiosk-active-product-card">
                       <div className="kiosk-current-membership-heading">
                         <div><span className="kiosk-status-pill active">Activa</span><h3>{activeMembership.planName}</h3></div>
                         <strong>Vigente hasta {formatDay(activeMembership.endsOn)}</strong>
@@ -1210,24 +1173,43 @@ export default function KioskPage() {
                         <span><small>Inicio</small>{formatDay(activeMembership.startsOn)}</span>
                         <span><small>Fin</small>{formatDay(activeMembership.endsOn)}</span>
                       </div>
-                    </article>
-
-                    {activeMembership.managedAtCurrentBranch ? <div className="kiosk-membership-actions">
-                      {summary.capabilities.membershipRenewalAllowed ? (
-                        <article className="kiosk-membership-action-card">
-                          <div><h3>Renovar el mismo plan</h3><p>Conserva <strong>{activeMembership.planName}</strong> y extiende su vigencia.</p></div>
-                          <button className="kiosk-primary-action small" disabled={workingMembershipId !== null} onClick={() => void reviewMembershipCheckout("renewal", activeMembership.planId, activeMembership)} type="button">
-                            {workingMembershipId === activeMembership.id ? "Calculando importe..." : `Revisar renovación de ${activeMembership.planName}`}
-                          </button>
-                        </article>
+                      {!activeMembership.managedAtCurrentBranch ? (
+                        <p className="kiosk-feature-note">
+                          Esta membresía pertenece a otra sucursal. Puedes usar aquí los accesos y recursos incluidos en el plan, pero los cobros y cambios se realizan únicamente en su sucursal de origen.
+                        </p>
                       ) : null}
-
-                    </div> : (
-                      <p className="kiosk-feature-note">
-                        Esta membresía pertenece a otra sucursal. Puedes usar aquí los accesos y recursos incluidos en el plan, pero los cobros y cambios se realizan únicamente en su sucursal de origen.
-                      </p>
-                    )}
-                  </>
+                    </article>
+                    ) : null}
+                    {currentVisitPackage ? (
+                      <article aria-label="Saldo de visitas actual" className="kiosk-current-membership kiosk-active-product-card">
+                        <div className="kiosk-current-membership-heading">
+                          <div>
+                            <span className={currentVisitPackage.status === "ACTIVE" ? "kiosk-status-pill active" : "kiosk-status-pill"}>
+                              {currentVisitPackage.status === "ACTIVE" ? "Activo" : "Pago pendiente"}
+                            </span>
+                            <h3>{currentVisitPackage.packageName}</h3>
+                          </div>
+                          <strong>{currentVisitPackage.remainingVisits} de {currentVisitPackage.totalVisits} visitas disponibles</strong>
+                        </div>
+                        {currentVisitPackage.validUntil ? (
+                          <p className="kiosk-muted">Vigente hasta {formatDay(currentVisitPackage.validUntil)}.</p>
+                        ) : (
+                          <p className="kiosk-muted">El paquete se activará cuando el pago sea confirmado.</p>
+                        )}
+                      </article>
+                    ) : null}
+                    {activeMembership?.managedAtCurrentBranch && summary.capabilities.membershipRenewalAllowed ? (
+                      <div className="kiosk-renewal-bar">
+                        <div>
+                          <strong>Renovar el mismo plan</strong>
+                          <p>Conserva {activeMembership.planName} y extiende su vigencia.</p>
+                        </div>
+                        <button className="kiosk-primary-action small" disabled={workingMembershipId !== null} onClick={() => void reviewMembershipCheckout("renewal", activeMembership.planId, activeMembership)} type="button">
+                          {workingMembershipId === activeMembership.id ? "Calculando importe..." : `Revisar renovación de ${activeMembership.planName}`}
+                        </button>
+                      </div>
+                    ) : null}
+                  </section>
                 ) : (
                   <div className="kiosk-enrollment-flow">
                     <div className="kiosk-empty-membership">
@@ -1241,34 +1223,15 @@ export default function KioskPage() {
                             : "La contratación de membresías desde el kiosco no está habilitada. Solicita apoyo en recepción."}</p>
                     </div>
 
-                    {lastExpiredMembership?.managedAtCurrentBranch && summary.capabilities.membershipRenewalAllowed ? (
-                      <article className="kiosk-membership-action-card renewal">
-                        <div><h3>Renovar tu plan anterior</h3><p><strong>{lastExpiredMembership.planName}</strong> venció el {formatDay(lastExpiredMembership.endsOn)}.</p></div>
-                        <button className="kiosk-primary-action small" disabled={workingMembershipId !== null} onClick={() => void reviewMembershipCheckout("renewal", lastExpiredMembership.planId, lastExpiredMembership)} type="button">
-                          {workingMembershipId === lastExpiredMembership.id ? "Calculando importe..." : `Revisar renovación de ${lastExpiredMembership.planName}`}
-                        </button>
-                      </article>
-                    ) : null}
-
                   </div>
                 )}
 
-                {currentVisitPackage ? (
-                  <article aria-label="Saldo de visitas actual" className="kiosk-current-membership">
-                    <div className="kiosk-current-membership-heading">
-                      <div>
-                        <span className={currentVisitPackage.status === "ACTIVE" ? "kiosk-status-pill active" : "kiosk-status-pill"}>
-                          {currentVisitPackage.status === "ACTIVE" ? "Activo" : "Pago pendiente"}
-                        </span>
-                        <h3>{currentVisitPackage.packageName}</h3>
-                      </div>
-                      <strong>{currentVisitPackage.remainingVisits} de {currentVisitPackage.totalVisits} visitas disponibles</strong>
-                    </div>
-                    {currentVisitPackage.validUntil ? (
-                      <p className="kiosk-muted">Vigente hasta {formatDay(currentVisitPackage.validUntil)}.</p>
-                    ) : (
-                      <p className="kiosk-muted">El paquete se activará cuando el pago sea confirmado.</p>
-                    )}
+                {!activeMembership && lastExpiredMembership?.managedAtCurrentBranch && summary.capabilities.membershipRenewalAllowed ? (
+                  <article className="kiosk-membership-action-card renewal">
+                    <div><h3>Renovar tu plan anterior</h3><p><strong>{lastExpiredMembership.planName}</strong> venció el {formatDay(lastExpiredMembership.endsOn)}.</p></div>
+                    <button className="kiosk-primary-action small" disabled={workingMembershipId !== null} onClick={() => void reviewMembershipCheckout("renewal", lastExpiredMembership.planId, lastExpiredMembership)} type="button">
+                      {workingMembershipId === lastExpiredMembership.id ? "Calculando importe..." : `Revisar renovación de ${lastExpiredMembership.planName}`}
+                    </button>
                   </article>
                 ) : null}
 
@@ -1361,6 +1324,57 @@ export default function KioskPage() {
                   && plans.length === 0 && visitPackagePlans.length === 0 ? (
                     <p className="kiosk-muted kiosk-offers-empty">No hay planes ni paquetes disponibles actualmente. Solicita apoyo en recepción.</p>
                   ) : null}
+
+                {membershipReview ? (
+                  <section aria-label="Revisión de membresía" className="kiosk-membership-review" ref={checkoutRef}>
+                    <div>
+                      <span>Último paso antes del pago</span>
+                      <h3>{membershipActionTitle(membershipReview.kind)}</h3>
+                      <p>Revisa el importe. Tu membresía sólo cambiará cuando Stripe confirme el pago.</p>
+                    </div>
+                    <dl className="kiosk-quote-breakdown">
+                      <div><dt>Plan</dt><dd>{membershipReview.quote.planName}</dd></div>
+                      <div><dt>Precio del plan</dt><dd>{formatMoney(membershipReview.quote.planPriceCents, membershipReview.quote.currency)}</dd></div>
+                      {membershipReview.quote.registrationFeeCents > 0 ? <div><dt>{membershipReview.quote.registrationFeeLabel ?? "Inscripción"}</dt><dd>{formatMoney(membershipReview.quote.registrationFeeCents, membershipReview.quote.currency)}</dd></div> : null}
+                      {membershipReview.quote.discountCents > 0 ? <div><dt>Descuentos</dt><dd>-{formatMoney(membershipReview.quote.discountCents, membershipReview.quote.currency)}</dd></div> : null}
+                      <div className="total"><dt>Total a pagar</dt><dd>{formatMoney(membershipReview.quote.totalCents, membershipReview.quote.currency)}</dd></div>
+                    </dl>
+                    {membershipReview.quote.appliedBenefits.length > 0 ? (
+                      <p className="kiosk-quote-benefits">Beneficios aplicados: {membershipReview.quote.appliedBenefits.map((benefit) => benefit.name).join(", ")}.</p>
+                    ) : null}
+                    <div className="kiosk-review-actions">
+                      <button className="kiosk-secondary-action" disabled={workingMembershipId !== null} onClick={() => setMembershipReview(null)} type="button">Volver sin cambios</button>
+                      <button className="kiosk-primary-action small" disabled={workingMembershipId !== null || !summary.capabilities.onlineCardPaymentsReady} onClick={() => void completeMembershipCheckout()} type="button">
+                        {workingMembershipId !== null
+                          ? "Abriendo Stripe..."
+                          : summary.capabilities.onlineCardPaymentsReady
+                            ? "Confirmar y continuar a Stripe"
+                            : "Pago pendiente de Stripe"}
+                      </button>
+                    </div>
+                  </section>
+                ) : null}
+
+                {visitPackageQuote ? (
+                  <section aria-label="Revisión de paquete" className="kiosk-membership-review" ref={checkoutRef}>
+                    <div>
+                      <span>Revisa antes de pagar</span>
+                      <h3>{visitPackageQuote.packageName}</h3>
+                      <p>{visitPackageQuote.totalVisits} visitas para usar durante {visitPackageQuote.validityDays} días desde la activación.</p>
+                    </div>
+                    <dl className="kiosk-quote-breakdown">
+                      <div><dt>Paquete</dt><dd>{formatMoney(visitPackageQuote.packagePriceCents, visitPackageQuote.currency)}</dd></div>
+                      {visitPackageQuote.registrationFeeCents > 0 ? <div><dt>{visitPackageQuote.registrationFeeLabel ?? "Inscripción"}</dt><dd>{formatMoney(visitPackageQuote.registrationFeeCents, visitPackageQuote.currency)}</dd></div> : null}
+                      <div className="total"><dt>Total a pagar</dt><dd>{formatMoney(visitPackageQuote.totalCents, visitPackageQuote.currency)}</dd></div>
+                    </dl>
+                    <div className="kiosk-review-actions">
+                      <button className="kiosk-secondary-action" disabled={visitPackageBusy} onClick={() => setVisitPackageQuote(null)} type="button">Volver</button>
+                      <button className="kiosk-primary-action small" disabled={visitPackageBusy || !summary.capabilities.onlineCardPaymentsReady} onClick={() => void completeVisitPackageCheckout()} type="button">
+                        {visitPackageBusy ? "Abriendo Stripe..." : summary.capabilities.onlineCardPaymentsReady ? "Continuar a Stripe" : "Pago pendiente de Stripe"}
+                      </button>
+                    </div>
+                  </section>
+                ) : null}
 
                 {previousMemberships.length > 0 ? (
                   <details className="kiosk-membership-history">

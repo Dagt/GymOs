@@ -232,6 +232,19 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 				new BenefitCoverage(
 						sauna, VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT,
 						List.of(fixture.branchA()))));
+		var entitlement = fixture.repository().open(fixture.organizationId(), fixture.clientId()).orElseThrow();
+		assertThat(entitlement.benefits()).hasSize(2);
+		assertThat(entitlement.benefits()).anySatisfy(benefit -> {
+			assertThat(benefit.benefitId()).isEqualTo(general);
+			assertThat(benefit.usageMode()).isEqualTo("CONSUMES_VISIT");
+			assertThat(benefit.branchIds()).containsExactlyInAnyOrder(
+					fixture.branchA(), fixture.branchB());
+		});
+		assertThat(entitlement.benefits()).anySatisfy(benefit -> {
+			assertThat(benefit.benefitId()).isEqualTo(sauna);
+			assertThat(benefit.usageMode()).isEqualTo("INCLUDED_WITH_VISIT");
+			assertThat(benefit.branchIds()).containsExactly(fixture.branchA());
+		});
 		LocalDate date = LocalDate.of(2026, 8, 28);
 		OffsetDateTime start = OffsetDateTime.parse("2026-08-28T14:00:00Z");
 

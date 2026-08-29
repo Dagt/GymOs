@@ -180,8 +180,13 @@ class RecurringBillingPostgresIntegrationTests {
 				VALUES (:id, :name, :name, 'ACTIVE', 'America/Mexico_City', 'MXN', now(), now(), 0)
 				""").param("id", organizationId).param("name", "Gym " + code).update();
 		jdbcClient.sql("""
-				INSERT INTO branch (id, organization_id, name, code, timezone, status, created_at, updated_at, version)
-				VALUES (:id, :organizationId, :name, :code, 'America/Mexico_City', 'ACTIVE', now(), now(), 0)
+				INSERT INTO branch (
+				 id, organization_id, name, code, timezone, status,
+				 stripe_self_checkout_enabled, stripe_recurring_enabled,
+				 created_at, updated_at, version)
+				VALUES (
+				 :id, :organizationId, :name, :code, 'America/Mexico_City', 'ACTIVE',
+				 true, true, now(), now(), 0)
 				""").param("id", branchId).param("organizationId", organizationId)
 				.param("name", "Branch " + code).param("code", code).update();
 		jdbcClient.sql("""

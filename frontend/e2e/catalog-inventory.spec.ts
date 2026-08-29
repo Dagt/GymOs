@@ -167,12 +167,11 @@ test.describe("catalogo e inventario", () => {
     await expect(page.getByRole("checkbox", { name: /^Centro / })).toHaveCount(0);
     await expect(page.getByRole("checkbox", { name: /^Norte / })).toBeDisabled();
     await expect(page.getByText("No hay accesos configurados para paquetes en esta sucursal", { exact: true })).toBeVisible();
-    await expect(page.getByText("Disponible en: Centro", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText(/Disponible en:|No disponible en:/)).toHaveCount(0);
     await expect(page.getByText(/El paquete no amplía un acceso/)).toHaveCount(0);
 
     await page.getByRole("checkbox", { name: /Tecnológica/ }).check();
-    await expect(page.getByText("Disponible en: Centro · No disponible en: Tecnológica", { exact: true })).toBeVisible();
-    await expect(page.getByText("Disponible en: Centro, Tecnológica", { exact: true })).toBeVisible();
+    await expect(page.getByText(/Disponible en:|No disponible en:/)).toHaveCount(0);
     await page.getByRole("checkbox", { name: /Acceso general/ }).check();
     await page.getByRole("checkbox", { name: /Sauna/ }).check();
     await page.getByLabel("Modo para Acceso general").selectOption("INCLUDED_WITH_VISIT");
@@ -260,7 +259,7 @@ test.describe("catalogo e inventario", () => {
 
     await page.getByRole("checkbox", { name: /^Centro/ }).check();
     await expect(page.getByRole("checkbox", { name: /Sauna/ })).toBeEnabled();
-    await expect(page.getByText("Disponible en: Centro · No disponible en: Tecnológica", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText(/Disponible en:|No disponible en:/)).toHaveCount(0);
     for (const name of ["General Centro", "General Tecnológica", "Sauna", "Crioterapia", "Lockers premium"]) {
       await page.getByRole("checkbox", { name: new RegExp(name) }).check();
     }

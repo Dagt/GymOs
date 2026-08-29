@@ -40,12 +40,21 @@ public interface VisitPackageOperations {
 			UUID id, UUID clientId, UUID packagePlanId, UUID saleId, String packageName,
 			String status, int totalVisits, int remainingVisits, LocalDate validFrom,
 			LocalDate validUntil, OffsetDateTime pendingExpiresAt, List<UUID> branchIds,
-			List<UUID> benefitIds, List<VisitPackageConsumptionView> consumptions,
+			List<UUID> benefitIds, List<VisitPackageBenefitView> benefits,
+			List<VisitPackageConsumptionView> consumptions,
 			OffsetDateTime createdAt, OffsetDateTime updatedAt) {
 		public VisitPackageEntitlementView {
 			branchIds = branchIds == null ? List.of() : List.copyOf(branchIds);
 			benefitIds = benefitIds == null ? List.of() : List.copyOf(benefitIds);
+			benefits = benefits == null ? List.of() : List.copyOf(benefits);
 			consumptions = consumptions == null ? List.of() : List.copyOf(consumptions);
+		}
+	}
+
+	record VisitPackageBenefitView(
+			UUID benefitId, String code, String name, String usageMode, List<UUID> branchIds) {
+		public VisitPackageBenefitView {
+			branchIds = branchIds == null ? List.of() : List.copyOf(branchIds);
 		}
 	}
 

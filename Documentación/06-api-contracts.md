@@ -1542,6 +1542,11 @@ GET  /api/v1/clients/{clientId}/visit-packages
 
 La última ruta devuelve historial de entitlements y hasta los consumos más
 recientes con fecha, sucursal, dispositivo y `remainingAfter`.
+Cada entitlement incluye `benefitIds` por compatibilidad y `benefits[]` para la
+representación operativa. Cada elemento de `benefits[]` contiene `benefitId`,
+`code`, `name`, `usageMode` y los `branchIds` del snapshot efectivo. La interfaz
+puede mostrar derechos de paquete por sucursal sin consultar la definición
+comercial viva ni confundirlos con beneficios heredados de una membresía.
 
 Kiosco verificado:
 

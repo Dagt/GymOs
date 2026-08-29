@@ -1,10 +1,9 @@
 # 13. Estado actual de desarrollo
 
 Estado: FUENTE CANÓNICA / EN PROGRESO
-Corte: 27 de agosto de 2026
-Código auditado: `feature/catalog-product-variants-barcodes`, basada en `main`
-después de integrar el PR #19 e incluyendo V95. No implica despliegue
-productivo de la rama.
+Corte: 29 de agosto de 2026
+Código auditado: `feature/multibranch-plans-benefits-visits`, incluyendo V103.
+No implica despliegue productivo ni merge de la rama.
 
 ## Ajuste V103 — operación independiente por sucursal
 
@@ -14,6 +13,10 @@ proveedor por organización y se aplican controles operativos por sede. El
 kiosco elimina indicadores `1/2/A`, evita duplicar domiciliación, unifica las
 acciones amarillas y centra la revisión de contratación. El alta de paquetes
 oculta accesos sin cobertura y compacta la selección del modo de consumo.
+La revisión final de UX agrupa membresía y paquete vigentes como servicios,
+aprovecha todo el ancho para renovar y coloca la cotización después de las
+opciones. El expediente distingue los accesos del paquete activo de aquellos
+heredados por la membresía.
 
 ## 1. Resumen ejecutivo
 
@@ -285,7 +288,7 @@ excluyen de venta/consulta operativa hasta ser corregidas, mientras los snapshot
 ya vendidos permanecen inmutables. El producto técnico `VISIT_PASS` requerido
 para contabilizar la venta queda oculto del catálogo y POS genéricos.
 
-La validación final del 29/08/2026 ejecutó 502/502 pruebas unitarias y 115/115
+La validación final del 29/08/2026 ejecutó 502/502 pruebas unitarias y 116/116
 pruebas PostgreSQL reales de
 migración, concurrencia, idempotencia, snapshots, tenant isolation y dos sedes,
 sin fallos ni omisiones. La matriz Centro/Tecnológica agrega un paquete creado
@@ -296,7 +299,7 @@ accesos físicos no se expanden. El detalle reproducible está en
 Flyway también se ejecutó contra el volumen histórico local que estaba en V85:
 un callback previo a validación reconoce únicamente los checksums exactos del
 V84 piloto y del primer V102 de prueba, mientras el V102 final completa
-idempotentemente las diferencias; V86–V102 se instalaron
+idempotentemente las diferencias; V86–V103 se instalaron
 sin `repair` manual, borrado ni pérdida de datos. V84 permanece igual a la
 versión publicada en `main`. Otro callback acotado prepara el cambio de
 nulabilidad previo a V86 en instalaciones históricas.

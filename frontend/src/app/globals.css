@@ -5646,6 +5646,51 @@ button.admin-secondary-link:disabled {
   padding: 1.2rem;
 }
 
+.kiosk-active-products {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(28rem, 100%), 1fr));
+  margin-top: 1rem;
+}
+
+.kiosk-active-products .kiosk-current-membership {
+  margin-top: 0;
+  min-width: 0;
+}
+
+.kiosk-active-product-card {
+  display: flex;
+  flex-direction: column;
+}
+
+.kiosk-renewal-bar {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 0.9rem;
+  display: grid;
+  gap: 1rem;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.7fr);
+  padding: 1rem;
+}
+
+.kiosk-renewal-bar strong {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 950;
+}
+
+.kiosk-renewal-bar p {
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.45;
+  margin-top: 0.3rem;
+}
+
+.kiosk-renewal-bar .kiosk-primary-action {
+  margin-top: 0;
+}
+
 .kiosk-current-membership-heading {
   align-items: start;
   display: flex;
@@ -5991,6 +6036,7 @@ button.admin-secondary-link:disabled {
   .kiosk-action-grid,
   .kiosk-membership-actions,
   .kiosk-membership-dates,
+  .kiosk-renewal-bar,
   .kiosk-review-actions {
     grid-template-columns: 1fr;
   }

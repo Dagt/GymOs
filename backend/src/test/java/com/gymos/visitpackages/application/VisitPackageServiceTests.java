@@ -164,7 +164,7 @@ class VisitPackageServiceTests {
 		return new VisitPackageEntitlementView(
 				entitlementId, fixture.clientId, fixture.planId, saleId, "10 visitas", status,
 				10, 10, null, null, null, List.of(fixture.branchId), List.of(),
-				List.of(), OffsetDateTime.now(), OffsetDateTime.now());
+				List.of(), List.of(), OffsetDateTime.now(), OffsetDateTime.now());
 	}
 
 	private record Fixture(

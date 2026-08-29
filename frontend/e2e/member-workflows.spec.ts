@@ -63,6 +63,12 @@ test("la ficha muestra beneficios, asigna descuentos y ejecuta el cambio de plan
     if (method === "GET" && path === `/clients/${clientId}/memberships`) {
       return fulfill(route, [currentMembership]);
     }
+    if (method === "GET" && path === `/clients/${clientId}/visit-package`) {
+      return fulfill(route, activeSaunaPackage());
+    }
+    if (method === "GET" && path === `/clients/${clientId}/visit-packages`) {
+      return fulfill(route, [activeSaunaPackage()]);
+    }
     if (method === "GET" && path.startsWith("/memberships/") && path.endsWith("/periods")) {
       return fulfill(route, []);
     }
@@ -155,6 +161,10 @@ test("la ficha muestra beneficios, asigna descuentos y ejecuta el cambio de plan
   await expect(page.getByRole("heading", { name: "Beneficios y accesos" })).toBeVisible();
   await expect(page.getByText("Acceso General")).toBeVisible();
   await expect(page.getByText(/Heredado de Plan Base/)).toBeVisible();
+  const packageAccessSection = page.getByRole("heading", { name: "Accesos del paquete activo" }).locator("..");
+  await expect(packageAccessSection.getByText("Sauna", { exact: true })).toBeVisible();
+  await expect(packageAccessSection.getByText(/Consume una visita del paquete/)).toBeVisible();
+  await expect(packageAccessSection.getByText("Paquete", { exact: true })).toBeVisible();
 
   await page.getByRole("button", { name: "Cambiar plan" }).click();
   const changeDrawer = page.getByRole("dialog");
@@ -371,6 +381,35 @@ function membership(planId: string, planName: string, endsOn: string) {
     graceEndsOn: "2026-09-03",
     saleId: "17171717-1717-4717-8717-171717171717",
     saleNumber: planId === targetPlanId ? "V-PLAN-002" : "V-PLAN-001",
+  };
+}
+
+function activeSaunaPackage() {
+  const branchId = "16161616-1616-4616-8616-161616161616";
+  return {
+    id: "17171717-1717-4717-8717-171717171717",
+    clientId,
+    packagePlanId: "18181818-1818-4818-8818-181818181818",
+    saleId: "19191919-1919-4919-8919-191919191919",
+    packageName: "5 visitas al Sauna",
+    status: "ACTIVE",
+    totalVisits: 5,
+    remainingVisits: 5,
+    validFrom: "2026-08-29",
+    validUntil: "2026-09-27",
+    pendingExpiresAt: null,
+    branchIds: [branchId],
+    benefitIds: ["20202020-2020-4020-8020-202020202020"],
+    benefits: [{
+      benefitId: "20202020-2020-4020-8020-202020202020",
+      code: "SAUNA",
+      name: "Sauna",
+      usageMode: "CONSUMES_VISIT",
+      branchIds: [branchId],
+    }],
+    consumptions: [],
+    createdAt: "2026-08-29T12:00:00Z",
+    updatedAt: "2026-08-29T12:00:00Z",
   };
 }
 

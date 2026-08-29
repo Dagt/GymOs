@@ -589,7 +589,9 @@ test.describe("consolas por rol", () => {
           });
           return true;
         }
-        await new Promise((resolve) => setTimeout(resolve, 40));
+        // Keep the mocked request pending long enough to assert the user-visible
+        // autosave state even when the complete Playwright suite runs concurrently.
+        await new Promise((resolve) => setTimeout(resolve, 250));
         await route.fulfill({ contentType: "application/json", body: JSON.stringify(settingsFrom(payload)) });
         return true;
       }

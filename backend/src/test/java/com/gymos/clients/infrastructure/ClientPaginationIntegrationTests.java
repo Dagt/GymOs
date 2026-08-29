@@ -137,11 +137,7 @@ class ClientPaginationIntegrationTests {
 	@Test
 	void automaticInactivityUsesJoinDateWhenClientNeverHadMembership() {
 		UUID oldClient = client(organizationId, branchId, "Socio antiguo", now.minusMonths(7));
-		jdbc.sql("""
-				INSERT INTO client_lifecycle_configuration (
-				    organization_id, auto_inactivation_enabled, inactivity_months
-				) VALUES (:organizationId, true, 6)
-				""").param("organizationId", organizationId).update();
+		configureAutomaticInactivity(branchId, true, 6);
 
 		var candidates = lifecycle.automaticInactivityCandidates(LocalDate.of(2026, 8, 25), 100);
 
@@ -158,22 +154,13 @@ class ClientPaginationIntegrationTests {
 	void automaticInactivityUsesTheExactCanonicalThresholdAndHonorsItsOwnToggle() {
 		UUID exactThresholdClient = client(
 				organizationId, branchId, "Socio en umbral", now.minusMonths(6));
-		jdbc.sql("""
-				INSERT INTO client_lifecycle_configuration (
-				    organization_id, registration_fee_enabled,
-				    auto_inactivation_enabled, inactivity_months
-				) VALUES (:organizationId, true, false, 6)
-				""").param("organizationId", organizationId).update();
+		configureAutomaticInactivity(branchId, false, 6);
 
 		assertThat(lifecycle.automaticInactivityCandidates(LocalDate.of(2026, 8, 25), 100))
 				.extracting(ClientLifecycleRepository.ClientInactivityCandidate::clientId)
 				.doesNotContain(exactThresholdClient);
 
-		jdbc.sql("""
-				UPDATE client_lifecycle_configuration
-				SET auto_inactivation_enabled = true
-				WHERE organization_id = :organizationId
-				""").param("organizationId", organizationId).update();
+		configureAutomaticInactivity(branchId, true, 6);
 
 		assertThat(lifecycle.automaticInactivityCandidates(LocalDate.of(2026, 8, 25), 100))
 				.extracting(ClientLifecycleRepository.ClientInactivityCandidate::clientId)
@@ -185,11 +172,7 @@ class ClientPaginationIntegrationTests {
 		UUID clientId = client(organizationId, branchId, "Socio con visitas", now.minusMonths(9));
 		LocalDate validUntil = LocalDate.of(2026, 9, 30);
 		activeVisitPackage(clientId, validUntil);
-		jdbc.sql("""
-				INSERT INTO client_lifecycle_configuration (
-				    organization_id, auto_inactivation_enabled, inactivity_months
-				) VALUES (:organizationId, true, 6)
-				""").param("organizationId", organizationId).update();
+		configureAutomaticInactivity(branchId, true, 6);
 
 		assertThat(lifecycle.latestVisitPackageEnd(organizationId, clientId)).contains(validUntil);
 		assertThat(lifecycle.automaticInactivityCandidates(LocalDate.of(2026, 8, 25), 100))
@@ -236,6 +219,21 @@ class ClientPaginationIntegrationTests {
 		jdbc.sql("INSERT INTO organization (id,legal_name,trade_name,status,timezone,default_currency,created_at,updated_at,version) VALUES (:id,'Pagination','Pagination','ACTIVE','America/Mexico_City','MXN',now(),now(),0)")
 				.param("id", id).update();
 		return id;
+	}
+
+	private void configureAutomaticInactivity(UUID branch, boolean enabled, int months) {
+		jdbc.sql("""
+				UPDATE branch
+				SET auto_inactivation_enabled = :enabled,
+				    inactivity_months = :months
+				WHERE organization_id = :organizationId
+				  AND id = :branchId
+				""")
+				.param("enabled", enabled)
+				.param("months", months)
+				.param("organizationId", organizationId)
+				.param("branchId", branch)
+				.update();
 	}
 
 	private UUID branch(UUID organization, String code) {

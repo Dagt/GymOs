@@ -3,6 +3,7 @@ package com.gymos.visitpackages.infrastructure;
 import com.gymos.catalog.api.VisitPackageBenefitUsageMode;
 import com.gymos.common.api.BusinessException;
 import com.gymos.visitpackages.api.operations.VisitPackageOperations.VisitPackageEntitlementView;
+import com.gymos.visitpackages.api.operations.VisitPackageOperations.VisitPackageBenefitView;
 import com.gymos.visitpackages.api.operations.VisitPackageOperations.VisitPackageConsumptionView;
 import com.gymos.visitpackages.api.operations.VisitPackageAccessOperations.VisitPackageAccessResult;
 import com.gymos.visitpackages.application.port.VisitPackageEntitlementPort;
@@ -510,12 +511,15 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 			// Read the complete row before issuing the two snapshot queries. Some JDBC drivers
 			// close the active ResultSet when another statement uses the same transaction connection.
 			List<UUID> resolvedBranchIds = branchIds(organizationId, entitlementId);
-			List<UUID> resolvedBenefitIds = benefitIds(organizationId, entitlementId);
+			List<VisitPackageBenefitView> resolvedBenefits = benefits(organizationId, entitlementId);
+			List<UUID> resolvedBenefitIds = resolvedBenefits.stream()
+					.map(VisitPackageBenefitView::benefitId).toList();
 			List<VisitPackageConsumptionView> resolvedConsumptions = consumptions(organizationId, entitlementId);
 			return new VisitPackageEntitlementView(
 					entitlementId, resolvedClientId, packagePlanId, resolvedSaleId,
 					packageName, status, totalVisits, remainingVisits, validFrom, validUntil,
-					pendingExpiresAt, resolvedBranchIds, resolvedBenefitIds, resolvedConsumptions,
+					pendingExpiresAt, resolvedBranchIds, resolvedBenefitIds, resolvedBenefits,
+					resolvedConsumptions,
 					createdAt, updatedAt);
 		}).optional();
 	}
@@ -528,12 +532,31 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 				.query(UUID.class).list();
 	}
 
-	private List<UUID> benefitIds(UUID organizationId, UUID entitlementId) {
+	private List<VisitPackageBenefitView> benefits(UUID organizationId, UUID entitlementId) {
 		return jdbcClient.sql("""
-				SELECT benefit_id FROM visit_package_entitlement_benefit
-				WHERE organization_id=:organizationId AND entitlement_id=:entitlementId ORDER BY benefit_id
+				SELECT entitlement_benefit.benefit_id, benefit.code, benefit.name,
+				       entitlement_benefit.usage_mode,
+				       COALESCE(array_agg(snapshot.branch_id ORDER BY snapshot.branch_id)
+				           FILTER (WHERE snapshot.branch_id IS NOT NULL), ARRAY[]::uuid[]) AS branch_ids
+				FROM visit_package_entitlement_benefit entitlement_benefit
+				JOIN benefit benefit
+				  ON benefit.organization_id=entitlement_benefit.organization_id
+				 AND benefit.id=entitlement_benefit.benefit_id
+				LEFT JOIN visit_package_entitlement_benefit_branch snapshot
+				  ON snapshot.organization_id=entitlement_benefit.organization_id
+				 AND snapshot.entitlement_id=entitlement_benefit.entitlement_id
+				 AND snapshot.benefit_id=entitlement_benefit.benefit_id
+				WHERE entitlement_benefit.organization_id=:organizationId
+				  AND entitlement_benefit.entitlement_id=:entitlementId
+				GROUP BY entitlement_benefit.benefit_id, benefit.code, benefit.name,
+				         entitlement_benefit.usage_mode
+				ORDER BY benefit.name, entitlement_benefit.benefit_id
 				""").param("organizationId", organizationId).param("entitlementId", entitlementId)
-				.query(UUID.class).list();
+				.query((rs, row) -> new VisitPackageBenefitView(
+						rs.getObject("benefit_id", UUID.class), rs.getString("code"),
+						rs.getString("name"), rs.getString("usage_mode"),
+						List.of((UUID[]) rs.getArray("branch_ids").getArray())))
+				.list();
 	}
 
 	private List<VisitPackageConsumptionView> consumptions(UUID organizationId, UUID entitlementId) {

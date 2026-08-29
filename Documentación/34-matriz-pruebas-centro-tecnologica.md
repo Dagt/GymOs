@@ -148,18 +148,21 @@ Producto principal de aceptación, creado desde Tecnológica:
 | U-03 | Catálogo | Abrir Artículos/Categorías | Sus altas aparecen en la pestaña correspondiente |
 | U-04 | Paquetes | Operar en Tecnológica | Tecnológica aparece como sucursal base fija, sin checkbox; Centro es la única extensión opcional |
 | U-05 | Paquetes | Elegir sólo Tecnológica | No ofrece como válidos Benefits `LOCAL` exclusivos de Centro |
-| U-06 | Paquetes | Elegir ambas sedes | Cada acceso muestra dónde es efectivo; premium indica “sólo Centro” |
+| U-06 | Paquetes | Elegir ambas sedes | Aparecen los accesos compatibles sin repetir leyendas de disponibilidad; backend conserva su cobertura exacta por sede |
 | U-07 | Paquetes | Elegir modo de acceso | Textos visibles: “Consume una visita” / “Se incluye con la visita” |
 | U-08 | Paquetes | Todo incluido, ningún consumo | Validación clara antes de enviar y validación autoritativa backend |
 | U-09 | Kiosco | Identificación fallida y cambio a registro | Crea sesión limpia; no queda ligada al visitante anterior |
 | U-10 | Kiosco | Registro exitoso con consulta secundaria fallida | No duplica socio y no muestra detalles HTTP/correlation ID |
 | U-11 | Kiosco secundario | Plan multisucursal vigente | Aparece para renovación/administración según visibilidad |
 | U-12 | API | Payload legacy sin `usageMode` | Se interpreta conservadoramente como `CONSUMES_VISIT` |
-| U-13 | Catálogo de accesos | Operar en Tecnológica | Lista General Tecnológica y también premium Centro con su cobertura real; no lista Benefits ajenos/inactivos/no ACCESS |
+| U-13 | Catálogo de accesos | Operar en Tecnológica | API entrega ACCESS de la organización aislados por tenant; la UI sólo muestra premium Centro después de agregar Centro al paquete |
 | U-14 | Catálogo/POS genérico | Buscar el producto técnico del paquete | `VISIT_PASS` no aparece ni puede editarse/venderse como artículo normal; el flujo dedicado de paquetes sigue resolviéndolo internamente |
 | U-15 | Venta/kiosco | Consultar una definición dañada por drift posterior | Se omite de superficies operativas (fail-closed) y sigue disponible para reparación administrativa |
 | U-16 | Kiosco | Hay planes y paquetes disponibles | Ambos aparecen en una sola cuadrícula; no existe una sección separada de paquetes |
 | U-17 | Kiosco | Mostrar metadata y CTA | Plan muestra sólo duración; paquete muestra visitas y vigencia; no aparece gracia y el botón de revisión no ocupa todo el ancho |
+| U-18 | Kiosco | Membresía y paquete activos | Ambos aparecen en una sola fila de “Servicios activos” y la renovación ocupa el ancho completo debajo |
+| U-19 | Kiosco | Revisar alta, cambio, renovación o paquete | La cotización aparece después de las opciones como checkout y recibe el desplazamiento de la vista |
+| U-20 | Expediente | Membresía General + paquete Sauna activo | Acceso General se identifica como heredado del plan y Sauna como acceso del paquete; ambos se filtran por la sucursal operada |
 
 ## 8. Evidencia automatizada
 
@@ -180,6 +183,9 @@ Producto principal de aceptación, creado desde Tecnológica:
 | Catálogo organizacional de ACCESS aislado por tenant | `BenefitServiceTests` y `SecurityAuthorizationTests` |
 | Producto técnico fuera de catálogo/POS | `CatalogProductServiceTests` y `CatalogPersistenceIntegrationTests` |
 | Definiciones dañadas fallan cerradas | `VisitPackagePlanServiceTests` |
+| Selector sin leyendas redundantes | `catalog-inventory.spec.ts` |
+| Servicios activos y checkout inferior | `kiosk.spec.ts: muestra membresía y paquete activos en una sola fila de servicios` y pruebas de cotización |
+| Accesos del paquete visibles en expediente | `VisitPackageEntitlementRepositoryIntegrationTests` y `member-workflows.spec.ts` |
 | Flujo de catálogo y kiosco | pruebas frontend y Playwright de catálogo/kiosco |
 
 ## 9. Criterio de aprobación

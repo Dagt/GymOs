@@ -530,13 +530,13 @@ para rutinas; el socio no tiene vista remota en V1.
 - En ese formulario, la sucursal activa se presenta como “Sucursal base”, sin
   checkbox ni forma de quitarla. La lista sólo muestra otras sucursales que se
   pueden agregar; por ello no existe visualmente la combinación “sólo B” al
-  operar en A. “Accesos que
-  consumen una visita” muestra el alcance propio de cada acceso y explica que el
-  paquete no lo amplía; Sauna local de Centro sigue siendo sólo de Centro aunque
-  el saldo cubra también Tecnológica. Una sede sin ningún acceso disponible no
-  puede seleccionarse; al usar varias sedes, la unión de accesos elegidos debe
-  cubrirlas todas. Los accesos incompatibles se deshabilitan y muestran en qué
-  sedes sí descuentan.
+  operar en A. “Accesos del paquete” sólo presenta accesos cuya cobertura cruza
+  alguna sede elegida y omite leyendas repetitivas de “Disponible en / No
+  disponible en”. Esto no amplía el alcance: Sauna local de Centro sigue siendo
+  sólo de Centro aunque el saldo cubra también Tecnológica. Una sede sin ningún
+  acceso disponible no puede seleccionarse; al usar varias sedes, la unión de
+  accesos elegidos debe cubrirlas todas y cada sede debe tener un acceso que
+  consuma visita.
 - Cada alta vive dentro de su propia pestaña: artículos/cargos y variantes en
   “Artículos”, planes en “Planes de membresía”, paquetes en “Paquetes de visitas”
   y categorías en “Categorías”. No existe una barra global que mezcle acciones.
@@ -569,6 +569,14 @@ para rutinas; el socio no tiene vista remota en V1.
   terminal, checkout y domiciliación se habilitan independientemente por sede.
 - En el kiosco, renovación y cambio usan la misma acción primaria; no aparecen
   numeraciones decorativas ni una tarjeta duplicada de domiciliación dentro de
-  Membresías. La revisión de una contratación queda centrada.
+  Membresías. La membresía y el paquete vigentes se presentan en una sola
+  cuadrícula de “Servicios activos”; la renovación ocupa una barra completa
+  debajo de los servicios y no deja una media columna vacía. La revisión de contratación,
+  cambio o renovación aparece después de las opciones como checkout y el kiosco
+  desplaza la vista hacia ella, no hacia el inicio de la pantalla.
 - En paquetes, los accesos ajenos a las sucursales elegidas se ocultan y cada
   acceso seleccionado presenta su modo en una fila compacta.
+- En el expediente, los accesos provenientes de un paquete activo aparecen en
+  una sección distinta de los heredados del plan. La ficha muestra el nombre y
+  si el acceso consume saldo o requiere una visita base, filtrado por la sucursal
+  activa; nunca etiqueta esos derechos como heredados de la membresía.

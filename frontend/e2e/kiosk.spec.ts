@@ -70,7 +70,8 @@ test("el kiosco aplica capacidades, no ofrece pago manual y actualiza contacto",
 
   await expect(page.getByText(/Los pagos en línea todavía no están disponibles/i)).toBeVisible();
   await expect(page.getByText("Activa", { exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Membresía actual" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Servicios activos" })).toBeVisible();
+  await expect(page.locator(".kiosk-active-products > .kiosk-active-product-card")).toHaveCount(1);
   await expect(page.locator(".kiosk-feedback.error")).toHaveCount(0);
   await expect(page.getByText(/INTERNAL_ERROR|HTTP en \/self-service|Código:/)).toHaveCount(0);
   await expect(page.getByText("Vigente hasta 31 jul 2026")).toBeVisible();
@@ -189,6 +190,15 @@ test("los paquetes configurados siguen visibles con Stripe pendiente y no permit
   await page.getByRole("button", { name: "Revisar paquete" }).click();
   await expect(page.getByText("$500.00").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Pago pendiente de Stripe" })).toBeDisabled();
+  const checkout = page.getByLabel("Revisión de paquete");
+  const [pickerAfterReview, checkoutBox] = await Promise.all([
+    offerSection.boundingBox(),
+    checkout.boundingBox(),
+  ]);
+  expect(pickerAfterReview).not.toBeNull();
+  expect(checkoutBox).not.toBeNull();
+  if (!pickerAfterReview || !checkoutBox) throw new Error("No fue posible medir el checkout del kiosco.");
+  expect(checkoutBox.y).toBeGreaterThan(pickerAfterReview.y);
 });
 
 test("una membresía general cotiza un paquete exclusivo de Sauna junto a los cambios de plan", async ({ page }) => {
@@ -274,6 +284,111 @@ test("una membresía general cotiza un paquete exclusivo de Sauna junto a los ca
   await page.getByRole("button", { name: "Revisar paquete" }).click();
   await expect(page.getByRole("heading", { name: "5 sesiones de Sauna" })).toBeVisible();
   await expect(page.getByText("$500.00").first()).toBeVisible();
+  const [optionsBox, checkoutBox] = await Promise.all([
+    page.locator("section.kiosk-plan-picker").boundingBox(),
+    page.getByLabel("Revisión de paquete").boundingBox(),
+  ]);
+  expect(optionsBox).not.toBeNull();
+  expect(checkoutBox).not.toBeNull();
+  if (!optionsBox || !checkoutBox) throw new Error("No fue posible medir la posición del checkout.");
+  expect(checkoutBox.y).toBeGreaterThan(optionsBox.y);
+});
+
+test("muestra membresía y paquete activos en una sola fila de servicios", async ({ page }) => {
+  const otherPlanId = "aaaaaaaa-2222-4222-8222-aaaaaaaaaaaa";
+  await mockKiosk(page, async (route, path) => {
+    const method = route.request().method();
+    if (method === "POST" && path === `/self-service/sessions/${sessionId}/verify`) {
+      return fulfill(route, {
+        ...summaryResponse(),
+        capabilities: {
+          ...capabilities(),
+          membershipPlanChangeAllowed: true,
+          visitPackagePurchaseAllowed: true,
+        },
+      });
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/membership-options`) {
+      return fulfill(route, [{
+        id: planId,
+        productId: "44444444-4444-4444-8444-444444444444",
+        name: "Plan mensual",
+        priceCents: 79900,
+        currency: "MXN",
+        durationDays: 30,
+        graceDays: 3,
+      }, {
+        id: otherPlanId,
+        productId: "bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb",
+        name: "Plan Plus",
+        priceCents: 99900,
+        currency: "MXN",
+        durationDays: 30,
+        graceDays: 0,
+      }]);
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/visit-package-options`) {
+      return fulfill(route, []);
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/visit-package`) {
+      return fulfill(route, {
+        id: "cccccccc-2222-4222-8222-cccccccccccc",
+        clientId: summaryResponse().profile.clientId,
+        packagePlanId: visitPackagePlanId,
+        saleId: "dddddddd-2222-4222-8222-dddddddddddd",
+        packageName: "5 sesiones de Sauna",
+        status: "ACTIVE",
+        totalVisits: 5,
+        remainingVisits: 5,
+        validFrom: "2026-08-01",
+        validUntil: "2026-08-31",
+        pendingExpiresAt: null,
+        branchIds: ["99999999-9999-4999-8999-999999999999"],
+        benefitIds: ["88888888-8888-4888-8888-888888888888"],
+        benefits: [{
+          benefitId: "88888888-8888-4888-8888-888888888888",
+          code: "SAUNA",
+          name: "Sauna",
+          usageMode: "CONSUMES_VISIT",
+          branchIds: ["99999999-9999-4999-8999-999999999999"],
+        }],
+        createdAt: "2026-08-01T10:00:00Z",
+        updatedAt: "2026-08-01T10:00:00Z",
+      });
+    }
+    return false;
+  });
+
+  await openLaunchedKiosk(page);
+  await page.getByPlaceholder("Correo o teléfono").fill("andrea@example.com");
+  await page.getByLabel("Fecha de nacimiento en formato día mes año").fill("10/05/1994");
+  await page.getByRole("button", { name: "Continuar de forma segura" }).click();
+
+  await expect(page.getByRole("heading", { name: "Servicios activos" })).toBeVisible();
+  const activeProducts = page.locator(".kiosk-active-products > .kiosk-active-product-card");
+  await expect(activeProducts).toHaveCount(2);
+  await expect(activeProducts.nth(0).getByRole("heading", { name: "Plan mensual" })).toBeVisible();
+  const renewalBar = page.locator(".kiosk-renewal-bar");
+  await expect(renewalBar.getByRole("button", { name: "Revisar renovación de Plan mensual" })).toBeVisible();
+  await expect(activeProducts.nth(1).getByRole("heading", { name: "5 sesiones de Sauna" })).toBeVisible();
+  await expect(activeProducts.nth(1).getByText("5 de 5 visitas disponibles")).toBeVisible();
+  const [membershipBox, packageBox] = await Promise.all([
+    activeProducts.nth(0).boundingBox(),
+    activeProducts.nth(1).boundingBox(),
+  ]);
+  expect(membershipBox).not.toBeNull();
+  expect(packageBox).not.toBeNull();
+  if (!membershipBox || !packageBox) throw new Error("No fue posible medir los servicios activos.");
+  expect(Math.abs(membershipBox.y - packageBox.y)).toBeLessThan(4);
+  const [activeProductsBox, renewalBox] = await Promise.all([
+    page.locator(".kiosk-active-products").boundingBox(),
+    renewalBar.boundingBox(),
+  ]);
+  expect(activeProductsBox).not.toBeNull();
+  expect(renewalBox).not.toBeNull();
+  if (!activeProductsBox || !renewalBox) throw new Error("No fue posible medir la renovación unificada.");
+  expect(renewalBox.width).toBeGreaterThan(activeProductsBox.width * 0.95);
+  await expect(page.locator(".kiosk-membership-actions")).toHaveCount(0);
 });
 
 test("un segundo paquete abierto se explica sin mostrar el error 400 técnico", async ({ page }) => {

@@ -113,6 +113,13 @@ export type KioskVisitPackageEntitlement = {
   pendingExpiresAt: string | null;
   branchIds: string[];
   benefitIds: string[];
+  benefits?: Array<{
+    benefitId: string;
+    code: string;
+    name: string;
+    usageMode: "CONSUMES_VISIT" | "INCLUDED_WITH_VISIT";
+    branchIds: string[];
+  }>;
   createdAt: string;
   updatedAt: string;
 };

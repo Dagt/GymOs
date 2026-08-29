@@ -538,10 +538,11 @@ El alta solicita únicamente:
 - disponible o no en kiosco.
 
 La interfaz llama a las decisiones “Dónde puede usarse” y “Accesos del
-paquete”. Cada acceso muestra las sedes exactas donde existe y las sedes
-seleccionadas donde no está disponible. La sucursal activa se muestra como base
-fija y no aparece como checkbox; únicamente se marcan las sedes adicionales.
-Otra sede sin ningún acceso queda deshabilitada. Antes de guardar,
+paquete”. La lista se filtra con las sucursales elegidas y no repite debajo de
+cada acceso leyendas “Disponible en / No disponible en”; la cobertura exacta se
+valida y snapshottea en backend. La sucursal activa se muestra como base fija y
+no aparece como checkbox; únicamente se marcan las sedes adicionales. Otra sede
+sin ningún acceso queda deshabilitada. Antes de guardar,
 la interfaz y backend comprueban que cada sede tenga al menos un acceso que
 consuma una visita y explican que un acceso incluido requiere una visita base
 ese día en esa misma sucursal.
@@ -556,6 +557,16 @@ plan sólo muestra días y el paquete muestra visitas más vigencia. La UI omite
 la gracia y usa acciones de revisión compactas y centradas. Una membresía y un
 paquete pueden coexistir; si ya hay otro paquete `PENDING_PAYMENT` o `ACTIVE`,
 el kiosco explica la exclusividad sin mostrar el error HTTP ni códigos internos.
+Los dos productos activos comparten una cuadrícula de “Servicios activos”; la
+renovación ocupa una barra completa debajo de ellos y las cotizaciones aparecen
+al final de las opciones como un checkout, sin reordenar el contenido hacia
+arriba.
+
+En la ficha administrativa del socio, los accesos del paquete se muestran
+separados de los accesos heredados del plan. Se leen del snapshot del entitlement,
+se filtran por la sucursal operada y enseñan su modo de uso. Así, una sesión de
+Sauna consumible es visible para validación manual y para explicar la decisión
+del dispositivo, sin afirmar incorrectamente que fue heredada de la membresía.
 
 El POS genérico no permite agregar al carrito un `SERVICE/VISIT_PASS` que ya
 está administrado por `visit_package_plan`; debe utilizarse la operación

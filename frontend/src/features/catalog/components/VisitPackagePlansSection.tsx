@@ -387,7 +387,6 @@ export function VisitPackagePlansSection({
                 items={accessBenefits.filter((benefit) => benefitCoversAnySelectedBranch(benefit, selectedPackageBranchIds)).map((benefit) => ({
                   id: benefit.id,
                   label: benefit.name,
-                  description: benefitAvailabilityLabel(benefit, branches, selectedPackageBranchIds),
                   disabled: !benefitCoversAnySelectedBranch(benefit, selectedPackageBranchIds),
                 }))}
                 selected={draft.benefits}
@@ -511,25 +510,6 @@ function BenefitUsageList({
       })}
     </div>
   );
-}
-
-function benefitAvailabilityLabel(
-  benefit: BenefitSummary,
-  branches: BranchSummary[],
-  selectedBranchIds: string[],
-) {
-  const coverage = benefitCoverageBranchIds(benefit);
-  const availableNames = branches
-    .filter((branch) => selectedBranchIds.includes(branch.id) && coverage.includes(branch.id))
-    .map((branch) => branch.name);
-  const unavailableNames = branches
-    .filter((branch) => selectedBranchIds.includes(branch.id) && !coverage.includes(branch.id))
-    .map((branch) => branch.name);
-  if (availableNames.length === 0) return "No existe en las sucursales elegidas";
-  const available = `Disponible en: ${availableNames.join(", ")}`;
-  return unavailableNames.length > 0
-    ? `${available} · No disponible en: ${unavailableNames.join(", ")}`
-    : available;
 }
 
 function benefitCoverageBranchIds(benefit: BenefitSummary) {

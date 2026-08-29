@@ -7,12 +7,14 @@ import {
   assignClientBenefit,
   getBenefits,
   getClientBenefits,
+  getCurrentVisitPackage,
   getEffectiveAccessBenefits,
   verifyClientBenefit,
   type BenefitSummary,
   type ClientBenefitSummary,
   type EffectiveAccessBenefit,
   type StoredSession,
+  type VisitPackageEntitlement,
 } from "@/lib/api";
 import {
   isDiscountBenefit,
@@ -36,6 +38,7 @@ export function ClientBenefitsSection({
 }) {
   const [clientBenefits, setClientBenefits] = useState<ClientBenefitSummary[]>([]);
   const [accessBenefits, setAccessBenefits] = useState<EffectiveAccessBenefit[]>([]);
+  const [packageAccessBenefits, setPackageAccessBenefits] = useState<VisitPackageEntitlement["benefits"]>([]);
   const [availableBenefits, setAvailableBenefits] = useState<BenefitSummary[]>([]);
   const [selectedBenefitId, setSelectedBenefitId] = useState("");
   const [validUntil, setValidUntil] = useState("");
@@ -66,6 +69,12 @@ export function ClientBenefitsSection({
             return [];
           })
         : Promise.resolve([]);
+      const packagePromise = canReadAccessBenefits && session.user.branchId
+        ? getCurrentVisitPackage(session.accessToken, clientId).catch(() => {
+            issues.push("No fue posible consultar los accesos del paquete activo.");
+            return null;
+          })
+        : Promise.resolve(null);
       const catalogPromise = canAssignBenefits
         ? getBenefits(session.accessToken).catch(() => {
             issues.push("No fue posible cargar el catálogo de beneficios.");
@@ -73,15 +82,19 @@ export function ClientBenefitsSection({
           })
         : Promise.resolve([]);
 
-      const [assigned, inheritedAccess, catalog] = await Promise.all([
+      const [assigned, inheritedAccess, activePackage, catalog] = await Promise.all([
         assignedPromise,
         accessPromise,
+        packagePromise,
         catalogPromise,
       ]);
       if (!active) return;
 
       setClientBenefits(assigned);
       setAccessBenefits(inheritedAccess);
+      setPackageAccessBenefits((activePackage?.status === "ACTIVE" ? activePackage.benefits : []).filter(
+        (benefit) => benefit.branchIds.includes(session.user.branchId ?? ""),
+      ));
       setAvailableBenefits(
         catalog.filter(
           (benefit) =>
@@ -191,7 +204,7 @@ export function ClientBenefitsSection({
           <p className="app-eyebrow">Elegibilidad vigente</p>
           <h2 className="app-card-title">Beneficios y accesos</h2>
           <p className="mt-1 text-sm text-[#5d6b63]">
-            Los accesos se heredan del plan activo; los descuentos se asignan directamente al socio.
+            Los accesos pueden provenir del plan o del paquete activo; los descuentos se asignan directamente al socio.
           </p>
         </div>
         {canAssignBenefits ? (
@@ -237,6 +250,40 @@ export function ClientBenefitsSection({
                       </div>
                       <span className="rounded bg-blue-100 px-2 py-1 text-[0.65rem] font-bold uppercase text-blue-700">
                         Heredado
+                      </span>
+                    </div>
+                  </article>
+                ))
+              )}
+            </div>
+          </section>
+
+          <section>
+            <h3 className="text-sm font-semibold text-[#26352e]">Accesos del paquete activo</h3>
+            <div className="mt-2 grid gap-2">
+              {!session.user.branchId ? (
+                <EmptyBenefitState text="Selecciona una sucursal para consultar los accesos del paquete." />
+              ) : !canReadAccessBenefits ? (
+                <EmptyBenefitState text="Tu rol no permite consultar reglas de acceso." />
+              ) : packageAccessBenefits.length === 0 ? (
+                <EmptyBenefitState text="No hay un paquete activo con accesos disponibles en esta sucursal." />
+              ) : (
+                packageAccessBenefits.map((benefit) => (
+                  <article
+                    className="rounded-lg border border-[#d8ddd2] bg-[#f7f9f6] p-3"
+                    key={benefit.benefitId}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <strong className="text-sm text-[#26352e]">{benefit.name}</strong>
+                        <p className="mt-1 text-xs text-[#5d6b63]">
+                          {benefit.usageMode === "CONSUMES_VISIT"
+                            ? "Consume una visita del paquete al autorizar este acceso."
+                            : "Se habilita después de registrar una visita del paquete ese día en esta sucursal."}
+                        </p>
+                      </div>
+                      <span className="rounded bg-amber-100 px-2 py-1 text-[0.65rem] font-bold uppercase text-amber-800">
+                        Paquete
                       </span>
                     </div>
                   </article>
