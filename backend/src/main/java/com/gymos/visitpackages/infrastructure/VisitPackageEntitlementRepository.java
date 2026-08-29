@@ -486,7 +486,8 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 				JOIN sale purchase_sale
 				  ON purchase_sale.id = entitlement.sale_id
 				 AND purchase_sale.organization_id = entitlement.organization_id
-				WHERE """ + predicate + " AND entitlement.deleted_at IS NULL ORDER BY entitlement.created_at DESC LIMIT 1")
+				WHERE
+				""" + predicate + " AND entitlement.deleted_at IS NULL ORDER BY entitlement.created_at DESC LIMIT 1")
 				.param("organizationId", organizationId);
 		if (clientId != null) statement = statement.param("clientId", clientId);
 		if (saleId != null) statement = statement.param("saleId", saleId);

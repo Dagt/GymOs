@@ -293,6 +293,66 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 	}
 
 	@Test
+	void packagePurchasedInTecnologicaKeepsCentroPremiumAccessLocalAndUsesOneSharedBalance() {
+		Fixture fixture = fixture(6);
+		UUID generalCentro = fixture.insertAccessBenefit(fixture.branchA(), "GENERAL-CENTRO", "LOCAL");
+		UUID generalTecnologica = fixture.insertAccessBenefit(
+				fixture.branchB(), "GENERAL-TECNOLOGICA", "LOCAL");
+		UUID sauna = fixture.insertAccessBenefit(fixture.branchA(), "SAUNA", "LOCAL");
+		UUID cryotherapy = fixture.insertAccessBenefit(fixture.branchA(), "CRIOTERAPIA", "LOCAL");
+		UUID premiumLockers = fixture.insertAccessBenefit(fixture.branchA(), "LOCKERS-PREMIUM", "LOCAL");
+		fixture.activateFrom(fixture.branchB(), List.of(
+				new BenefitCoverage(
+						generalCentro, VisitPackageBenefitUsageMode.CONSUMES_VISIT,
+						List.of(fixture.branchA())),
+				new BenefitCoverage(
+						generalTecnologica, VisitPackageBenefitUsageMode.CONSUMES_VISIT,
+						List.of(fixture.branchB())),
+				new BenefitCoverage(
+						sauna, VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT,
+						List.of(fixture.branchA())),
+				new BenefitCoverage(
+						cryotherapy, VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT,
+						List.of(fixture.branchA())),
+				new BenefitCoverage(
+						premiumLockers, VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT,
+						List.of(fixture.branchA()))));
+		LocalDate date = LocalDate.of(2026, 8, 28);
+		OffsetDateTime occurredAt = OffsetDateTime.parse("2026-08-28T14:00:00Z");
+
+		assertThat(fixture.authorize(
+				fixture.branchB(), fixture.clientId(), sauna, fixture.deviceB(), "tec-sauna",
+				date, occurredAt)).isEmpty();
+		assertThat(fixture.authorize(
+				fixture.branchB(), fixture.clientId(), generalTecnologica, fixture.deviceB(),
+				"tec-general", date, occurredAt.plusMinutes(1)))
+				.get().extracting(VisitPackageAccessResult::remainingAfter).isEqualTo(5);
+		assertThat(fixture.authorize(
+				fixture.branchA(), fixture.clientId(), sauna, fixture.deviceA(),
+				"centro-sauna-before", date, occurredAt.plusHours(1)))
+				.get().extracting(VisitPackageAccessResult::granted).isEqualTo(false);
+		assertThat(fixture.authorize(
+				fixture.branchA(), fixture.clientId(), generalCentro, fixture.deviceA(),
+				"centro-general", date, occurredAt.plusHours(2)))
+				.get().extracting(VisitPackageAccessResult::remainingAfter).isEqualTo(4);
+		for (var premium : List.of(sauna, cryotherapy, premiumLockers)) {
+			assertThat(fixture.authorize(
+					fixture.branchA(), fixture.clientId(), premium, fixture.deviceA(),
+					"centro-premium-" + premium, date, occurredAt.plusHours(3)))
+					.get().satisfies(result -> {
+						assertThat(result.granted()).isTrue();
+						assertThat(result.usageMode())
+								.isEqualTo(VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT);
+						assertThat(result.remainingAfter()).isEqualTo(4);
+					});
+		}
+
+		assertThat(fixture.remaining()).isEqualTo(4);
+		assertThat(fixture.consumptionCount()).isEqualTo(2);
+		assertThat(fixture.includedAccessCount()).isEqualTo(4);
+	}
+
+	@Test
 	void includedAccessDoesNotReuseABaseVisitFromAnotherEntitlement() {
 		Fixture fixture = fixture(3);
 		UUID general = fixture.insertAccessBenefit(fixture.branchA(), "GENERAL", "LOCAL");
@@ -418,8 +478,8 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 				INSERT INTO organization (id, legal_name, trade_name, status, timezone, default_currency, created_at, updated_at, version)
 				VALUES (:id, 'Visit Gym', 'Visit Gym', 'ACTIVE', 'America/Mexico_City', 'MXN', now(), now(), 0)
 				""").param("id", organizationId).update();
-		insertBranch(jdbc, organizationId, branchA, "Centro", "A-" + branchA);
-		insertBranch(jdbc, organizationId, branchB, "Tecnológica", "B-" + branchB);
+		insertBranch(jdbc, organizationId, branchA, "Sucursal Centro", "CTR-" + branchA.toString().substring(0, 8));
+		insertBranch(jdbc, organizationId, branchB, "Sucursal Tecnológica", "TEC-" + branchB.toString().substring(0, 8));
 		UUID personId = UUID.randomUUID();
 		jdbc.sql("""
 				INSERT INTO person (id, organization_id, first_name, last_name, email, phone, status, created_at, updated_at, version)
@@ -459,7 +519,7 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 				INSERT INTO branch (id, organization_id, name, code, timezone, status, created_at, updated_at, version)
 				VALUES (:id, :organizationId, :name, :code, 'America/Mexico_City', 'ACTIVE', now(), now(), 0)
 				""").param("id", branchId).param("organizationId", organizationId)
-				.param("name", name).param("code", code.substring(0, Math.min(code.length(), 40))).update();
+				.param("name", name).param("code", code.substring(0, Math.min(code.length(), 32))).update();
 	}
 
 	private static void insertProduct(JdbcClient jdbc, UUID organizationId, UUID id, String sku, String name) {
@@ -503,9 +563,19 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 		}
 
 		void activate(List<BenefitCoverage> benefits) {
+			activateFrom(branchA, benefits);
+		}
+
+		void activateFrom(UUID originBranchId, List<BenefitCoverage> benefits) {
+			jdbc.sql("""
+					UPDATE sale SET branch_id=:branchId, updated_at=now()
+					WHERE organization_id=:organizationId AND id=:saleId
+					""")
+					.param("branchId", originBranchId).param("organizationId", organizationId)
+					.param("saleId", saleId).update();
 			transaction.executeWithoutResult(status -> {
 				repository.createPending(
-						organizationId, branchA, clientId, packagePlanId, saleId, "Paquete", totalVisits, 30,
+						organizationId, originBranchId, clientId, packagePlanId, saleId, "Paquete", totalVisits, 30,
 						OffsetDateTime.now().plusMinutes(30), List.of(branchA, branchB), benefits, OffsetDateTime.now());
 				repository.activateBySale(organizationId, saleId, LocalDate.now(), OffsetDateTime.now());
 			});

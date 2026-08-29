@@ -60,6 +60,7 @@ paquetes de visitas compartidos dentro de un tenant.
 | 28 ago 2026 | V100 separa saldo de paquete y alcance de acceso: materializa la intersección beneficio–sucursal, obliga a incluir la sucursal activa, agrega historial operativo, bloquea escrituras legacy y protege refunds después de consumos |
 | 28 ago 2026 | El cierre de aceptación hace organizacional la identificación de kiosco, reinicia sesión al alternar alta/entrada y exige al menos un acceso consumible por cada sucursal elegida en un paquete |
 | 28 ago 2026 | V101 separa accesos que consumen de accesos incluidos por relación paquete–Benefit, snapshottea el modo y audita el uso incluido contra una visita base de la misma fecha operativa y sede |
+| 28 ago 2026 | Docker/PostgreSQL valida 114/114 pruebas; se agrega la matriz Centro/Tecnológica y un paquete originado en Tecnológica con premium local exclusivo de Centro |
 
 ## 3. Alcance material de la rama activa
 
@@ -92,8 +93,6 @@ paquetes de visitas compartidos dentro de un tenant.
 
 ### Aún pendiente en la rama
 
-- ejecución real de la matriz PostgreSQL concurrente y migraciones; las pruebas
-  existen pero Docker no está disponible en el entorno actual;
 - HTTP/E2E integral de dos sedes y Stripe test;
 - reversión administrativa auditada;
 - branding por sucursal, fuera de este lote.
@@ -101,12 +100,13 @@ paquetes de visitas compartidos dentro de un tenant.
 ## 4. Evidencia de validación local
 
 - pruebas de arquitectura, políticas de beneficios, inscripción y autoservicio;
-- suite backend completa: 493/493; frontend: typecheck, lint, build y 114/114
-  pruebas unitarias;
-- E2E completo: 101/101, incluido Catálogo/POS 16/16 y configuración General
-  consume + Sauna incluido;
-- `postgresIntegrationTest` detecta 113 pruebas pero las omite porque Docker no
-  está disponible; esto no se registra como pase de PostgreSQL.
+- suite backend completa: 495/495;
+- PostgreSQL real: 114/114, cero fallos, errores u omisiones; incluye base
+  limpia, upgrade V99→V101, concurrencia, idempotencia, snapshots y aislamiento;
+- frontend: 114/114, typecheck, lint y build Next 16.3.2;
+- E2E completo: 102/102, incluido Catálogo/POS 17/17, kiosco, membresías y
+  configuración General consume + premium Centro incluido;
+- matriz reproducible: `34-matriz-pruebas-centro-tecnologica.md`.
 
 ## 5. Regla de integración
 

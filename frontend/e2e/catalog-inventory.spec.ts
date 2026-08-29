@@ -198,6 +198,93 @@ test.describe("catalogo e inventario", () => {
     });
   });
 
+  test("un paquete creado en Tecnológica sólo habilita premium al incluir Centro", async ({ page }) => {
+    const centro = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    const tecnologica = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+    const generalCentro = "11111111-1111-4111-8111-111111111111";
+    const generalTecnologica = "22222222-2222-4222-8222-222222222222";
+    const sauna = "33333333-3333-4333-8333-333333333333";
+    const cryotherapy = "44444444-4444-4444-8444-444444444444";
+    const premiumLockers = "55555555-5555-4555-8555-555555555555";
+    let createPayload: Record<string, unknown> | null = null;
+    await bootCatalog(page, { ...owner(), branchId: tecnologica }, async (route, path) => {
+      if (path === "/organizations/current/branches") {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify([
+            { id: centro, name: "Centro", code: "CENTRO", timezone: "America/Mexico_City", status: "ACTIVE" },
+            { id: tecnologica, name: "Tecnológica", code: "TEC", timezone: "America/Mexico_City", status: "ACTIVE" },
+          ]),
+        });
+        return true;
+      }
+      if (path === "/benefits") {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify([
+            accessBenefit(generalCentro, centro, "General Centro", "GENERAL-CENTRO", [centro]),
+            accessBenefit(generalTecnologica, tecnologica, "General Tecnológica", "GENERAL-TEC", [tecnologica]),
+            accessBenefit(sauna, centro, "Sauna", "SAUNA", [centro]),
+            accessBenefit(cryotherapy, centro, "Crioterapia", "CRIO", [centro]),
+            accessBenefit(premiumLockers, centro, "Lockers premium", "LOCKERS", [centro]),
+          ]),
+        });
+        return true;
+      }
+      if (path === "/catalog/visit-package-plans" && route.request().method() === "GET") {
+        await route.fulfill({ contentType: "application/json", body: "[]" });
+        return true;
+      }
+      if (path === "/catalog/visit-package-plans" && route.request().method() === "POST") {
+        createPayload = route.request().postDataJSON() as Record<string, unknown>;
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({ id: "package-tech", ...createPayload, priceCents: 150000, currency: "MXN", version: 0 }),
+        });
+        return true;
+      }
+      return false;
+    });
+
+    await page.goto("/catalog");
+    await page.getByRole("button", { name: "Paquetes de visitas" }).click();
+    await page.getByRole("button", { name: "Nuevo paquete" }).click();
+    await page.getByLabel("Dónde puede usarse el saldo").selectOption("SELECTED_BRANCHES");
+
+    await expect(page.getByRole("checkbox", { name: /^Tecnológica / })).toBeChecked();
+    await expect(page.getByRole("checkbox", { name: /^Tecnológica / })).toBeDisabled();
+    await expect(page.getByRole("checkbox", { name: /^Centro/ })).not.toBeChecked();
+    await expect(page.getByRole("checkbox", { name: /Sauna/ })).toBeDisabled();
+    await expect(page.getByText("No existe en las sucursales elegidas", { exact: true }).first()).toBeVisible();
+
+    await page.getByRole("checkbox", { name: /^Centro/ }).check();
+    await expect(page.getByRole("checkbox", { name: /Sauna/ })).toBeEnabled();
+    await expect(page.getByText("Disponible en: Centro · No disponible en: Tecnológica", { exact: true }).first()).toBeVisible();
+    for (const name of ["General Centro", "General Tecnológica", "Sauna", "Crioterapia", "Lockers premium"]) {
+      await page.getByRole("checkbox", { name: new RegExp(name) }).check();
+    }
+    for (const name of ["Sauna", "Crioterapia", "Lockers premium"]) {
+      await page.getByLabel(`Modo para ${name}`).selectOption("INCLUDED_WITH_VISIT");
+    }
+    await page.getByLabel("Código").fill("VISITA-TEC-PREMIUM");
+    await page.getByLabel("Nombre").fill("10 visitas multisucursal + premium Centro");
+    await page.getByLabel("Precio").fill("1500");
+    await page.getByRole("button", { name: "Crear paquete" }).click();
+
+    await expect.poll(() => createPayload).not.toBeNull();
+    expect(createPayload).toMatchObject({
+      branchScope: "SELECTED_BRANCHES",
+      branchIds: [tecnologica, centro],
+      benefits: [
+        { benefitId: generalCentro, usageMode: "CONSUMES_VISIT" },
+        { benefitId: generalTecnologica, usageMode: "CONSUMES_VISIT" },
+        { benefitId: sauna, usageMode: "INCLUDED_WITH_VISIT" },
+        { benefitId: cryotherapy, usageMode: "INCLUDED_WITH_VISIT" },
+        { benefitId: premiumLockers, usageMode: "INCLUDED_WITH_VISIT" },
+      ],
+    });
+  });
+
   test("filtros persisten en URL y la edicion envia version optimista", async ({ page }) => {
     let updatePayload: Record<string, unknown> | null = null;
     await bootCatalog(page, owner(), async (route, path) => {
@@ -634,6 +721,20 @@ function responseFor(path: string) {
   if (path.startsWith("/sales")) return [];
   if (path === "/organizations/current/branches") return [];
   return [];
+}
+
+function accessBenefit(id: string, branchId: string, name: string, code: string, accessBranchIds: string[]) {
+  return {
+    id,
+    branchId,
+    name,
+    code,
+    benefitType: "ACCESS",
+    status: "ACTIVE",
+    accessScope: "LOCAL",
+    accessBranchIds,
+    planIds: [],
+  };
 }
 
 function owner(): TestUser {

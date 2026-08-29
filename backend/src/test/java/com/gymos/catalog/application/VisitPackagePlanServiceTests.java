@@ -3,6 +3,7 @@ package com.gymos.catalog.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -204,6 +205,97 @@ class VisitPackagePlanServiceTests {
 
 		verify(packages).replaceBenefits(
 				organizationId, created.id(), List.of(general, sauna), principal.userId());
+	}
+
+	@Test
+	void acceptsPackageCreatedInTecnologicaWithPremiumAccessRestrictedToCentro() {
+		CatalogProductQueryPort products = mock(CatalogProductQueryPort.class);
+		CatalogProductCommandPort productCommands = mock(CatalogProductCommandPort.class);
+		VisitPackagePlanPort packages = mock(VisitPackagePlanPort.class);
+		VisitPackagePlanService service = new VisitPackagePlanService(
+				products, productCommands, packages, mock(AuditService.class));
+		UUID organizationId = UUID.randomUUID();
+		UUID centro = UUID.randomUUID();
+		UUID tecnologica = UUID.randomUUID();
+		UUID generalCentroId = UUID.randomUUID();
+		UUID generalTecnologicaId = UUID.randomUUID();
+		UUID saunaId = UUID.randomUUID();
+		UUID cryotherapyId = UUID.randomUUID();
+		UUID premiumLockersId = UUID.randomUUID();
+		GymOsPrincipal principal = principal(organizationId, tecnologica);
+		List<VisitPackageBenefitUsage> benefits = List.of(
+				consumes(generalCentroId), consumes(generalTecnologicaId),
+				included(saunaId), included(cryotherapyId), included(premiumLockersId));
+		List<UUID> branches = List.of(tecnologica, centro);
+		when(products.findBySku(organizationId, "10-VISITAS-PREMIUM")).thenReturn(Optional.empty());
+		when(packages.branchesExist(organizationId, branches)).thenReturn(true);
+		when(packages.accessBenefitsExist(
+				organizationId, List.of(
+						generalCentroId, generalTecnologicaId, saunaId, cryotherapyId, premiumLockersId)))
+				.thenReturn(true);
+		when(packages.benefitCoverages(organizationId, benefits, branches)).thenReturn(List.of(
+				new BenefitCoverage(
+						generalCentroId, VisitPackageBenefitUsageMode.CONSUMES_VISIT, List.of(centro)),
+				new BenefitCoverage(
+						generalTecnologicaId, VisitPackageBenefitUsageMode.CONSUMES_VISIT, List.of(tecnologica)),
+				new BenefitCoverage(saunaId, VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT, List.of(centro)),
+				new BenefitCoverage(cryotherapyId, VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT, List.of(centro)),
+				new BenefitCoverage(premiumLockersId, VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT, List.of(centro))));
+		when(packages.find(any(), any())).thenAnswer(invocation -> Optional.of(new VisitPackagePlanView(
+				invocation.getArgument(1), UUID.randomUUID(), "10-VISITAS-PREMIUM",
+				"10 visitas multisucursal + premium Centro", null, 120000, "MXN", 10, 30,
+				"SELECTED_BRANCHES", branches, benefits, true, "DEFAULT", "ACTIVE", 0,
+				OffsetDateTime.now(), OffsetDateTime.now())));
+
+		VisitPackagePlanView created = service.create(
+				principal,
+				new CreateVisitPackagePlanCommand(
+						"10-VISITAS-PREMIUM", "10 visitas multisucursal + premium Centro", null,
+						120000, "MXN", 10, 30, "SELECTED_BRANCHES", branches, benefits,
+						true, "DEFAULT", "ACTIVE"),
+				"correlation");
+
+		verify(productCommands).attachBranch(
+				eq(organizationId), eq(tecnologica), any(UUID.class), eq(principal.userId()),
+				any(OffsetDateTime.class));
+		verify(productCommands).attachBranch(
+				eq(organizationId), eq(centro), any(UUID.class), eq(principal.userId()),
+				any(OffsetDateTime.class));
+		verify(packages).replaceBenefits(organizationId, created.id(), benefits, principal.userId());
+	}
+
+	@Test
+	void rejectsTecnologicaOnlyPackageWhenItsPremiumAccessExistsOnlyInCentro() {
+		CatalogProductCommandPort productCommands = mock(CatalogProductCommandPort.class);
+		VisitPackagePlanPort packages = mock(VisitPackagePlanPort.class);
+		VisitPackagePlanService service = new VisitPackagePlanService(
+				mock(CatalogProductQueryPort.class), productCommands, packages, mock(AuditService.class));
+		UUID organizationId = UUID.randomUUID();
+		UUID tecnologica = UUID.randomUUID();
+		UUID generalTecnologicaId = UUID.randomUUID();
+		UUID saunaCentroId = UUID.randomUUID();
+		List<VisitPackageBenefitUsage> benefits = List.of(
+				consumes(generalTecnologicaId), included(saunaCentroId));
+		when(packages.branchesExist(organizationId, List.of(tecnologica))).thenReturn(true);
+		when(packages.accessBenefitsExist(
+				organizationId, List.of(generalTecnologicaId, saunaCentroId))).thenReturn(true);
+		when(packages.benefitCoverages(organizationId, benefits, List.of(tecnologica))).thenReturn(List.of(
+				new BenefitCoverage(
+						generalTecnologicaId, VisitPackageBenefitUsageMode.CONSUMES_VISIT,
+						List.of(tecnologica)),
+				new BenefitCoverage(
+						saunaCentroId, VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT, List.of())));
+
+		assertThatThrownBy(() -> service.create(
+				principal(organizationId, tecnologica),
+				new CreateVisitPackagePlanCommand(
+						"TEC-SAUNA", "Tecnológica con sauna", null, 80000, "MXN", 10, 30,
+						"SELECTED_BRANCHES", List.of(tecnologica), benefits,
+						true, "DEFAULT", "ACTIVE"),
+				"correlation"))
+				.isInstanceOfSatisfying(BusinessException.class,
+						error -> assertThat(error.code()).isEqualTo("VISIT_PACKAGE_BENEFIT_OUTSIDE_SCOPE"));
+		verify(productCommands, never()).create(any());
 	}
 
 	@Test

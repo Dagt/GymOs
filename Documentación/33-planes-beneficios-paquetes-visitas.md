@@ -584,6 +584,12 @@ evita una baja automática por inactividad.
 
 ## 11. Pruebas obligatorias
 
+La matriz operativa completa para Sucursal Centro y Sucursal Tecnológica está
+en [34-matriz-pruebas-centro-tecnologica.md](34-matriz-pruebas-centro-tecnologica.md).
+Incluye productos creados desde cualquiera de las dos sedes, instalaciones
+premium exclusivas de Centro y las combinaciones válidas e inválidas de
+`LOCAL`, `PLAN_COVERAGE`, `CONSUMES_VISIT` e `INCLUDED_WITH_VISIT`.
+
 ### Planes y kiosco
 
 - plan multisucursal asignado en A aparece en B;
@@ -640,13 +646,12 @@ evita una baja automática por inactividad.
 8. [implementado] UX base de Catálogo, Recepción, expediente y kiosco;
 9. [implementado] historial operativo de saldos y últimos consumos, retiro de
    escrituras legacy y política segura de reembolso después de consumos;
-10. [implementado, validación PostgreSQL pendiente] semántica
+10. [implementado y validado en PostgreSQL] semántica
     `CONSUMES_VISIT|INCLUDED_WITH_VISIT`, snapshot y auditoría sin doble
     decremento;
-11. [en validación] migraciones y pruebas PostgreSQL reales de concurrencia,
-    dos sedes y actualización V99→V101. Las pruebas están codificadas, pero no
-    se consideran evidencia ejecutada mientras Docker/PostgreSQL no esté
-    disponible en el entorno.
+11. [validado el 28/08/2026] migraciones y 114 pruebas PostgreSQL reales de
+    concurrencia, idempotencia, dos sedes, tenant isolation, base limpia y
+    actualización V99→V101, sin fallos ni omisiones.
 
 Cada etapa debe mantener compilación y pruebas verdes. No se habilita compra de
 paquetes en producción hasta que venta, activación, consumo y exclusividad estén

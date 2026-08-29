@@ -139,7 +139,7 @@ class MembershipCommercePersistenceIntegrationTests {
 				VALUES (:id, :organizationId, 'Tecnológica', :code, 'America/Mexico_City',
 				 'ACTIVE', now(), now(), 0)
 				""").param("id", secondaryBranchId).param("organizationId", organizationId)
-				.param("code", "TEC-" + secondaryBranchId).update();
+				.param("code", "TEC-" + secondaryBranchId.toString().substring(0, 8)).update();
 		jdbcClient.sql("UPDATE membership_plan SET multi_branch_access=TRUE WHERE id=:planId")
 				.param("planId", firstPlanId).update();
 		UUID saleId = insertSale("S-MULTIBRANCH-RENEW", "MEMBERSHIP_RENEWAL", 10_000, 0);

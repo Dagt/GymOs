@@ -287,7 +287,7 @@ class DatabaseMigrationTests {
 					""")) {
 				statement.setObject(1, branchB);
 				statement.setObject(2, organizationId);
-				statement.setString(3, "B-" + branchB);
+				statement.setString(3, "TEC-" + branchB.toString().substring(0, 8));
 				statement.executeUpdate();
 			}
 			try (var statement = connection.prepareStatement("""

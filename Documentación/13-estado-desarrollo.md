@@ -265,9 +265,13 @@ ocultarse de nuevas altas/cambios del kiosco y quedar exento de inscripción.
 La identificación de kiosco encuentra al socio en toda la organización y el
 cambio entre identificación/registro reinicia la sesión para el siguiente
 visitante; los fallos opcionales del dashboard ya no contradicen un alta válida.
-Quedan ejecutar en PostgreSQL real las 113 pruebas detectadas de migración,
-concurrencia, idempotencia, snapshots y dos sedes; Docker Desktop no pudo
-iniciarse con los permisos del entorno y la omisión no cuenta como pase.
+La validación del 28/08/2026 ejecutó 114/114 pruebas PostgreSQL reales de
+migración, concurrencia, idempotencia, snapshots, tenant isolation y dos sedes,
+sin fallos ni omisiones. La matriz Centro/Tecnológica agrega un paquete creado
+desde Tecnológica con General local en ambas sedes y Sauna, Crioterapia y
+Lockers premium exclusivamente en Centro; el saldo se comparte, pero los
+accesos físicos no se expanden. El detalle reproducible está en
+`34-matriz-pruebas-centro-tecnologica.md`.
 Branding por sucursal continúa después. El Connector HikCentral, cobranza SaaS
 y hardening operativo permanecen como frentes separados.
 
