@@ -901,6 +901,8 @@ class DatabaseMigrationTests {
 		UUID connectionId = UUID.randomUUID();
 		UUID linkId = UUID.randomUUID();
 		UUID syncStateId = UUID.randomUUID();
+		UUID credentialId = UUID.randomUUID();
+		UUID legacyClaimedJobId = UUID.randomUUID();
 		try (var connection = DriverManager.getConnection(
 				postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())) {
 			try (var statement = connection.createStatement()) {
@@ -980,6 +982,56 @@ class DatabaseMigrationTests {
 			}
 		}
 
+		migrateSchema(schema, "84");
+		try (var connection = schemaConnection(schema)) {
+			// Reproduce the exact V84 shape/checksum applied by early pilot builds.
+			// The current V84 remains immutable as published in main; the compatibility
+			// callbacks and V102 must safely converge this predecessor to the same schema.
+			try (var statement = connection.createStatement()) {
+				statement.execute("DELETE FROM access_provider_sync_job WHERE request_source = 'MIGRATION_V84'");
+				statement.execute("ALTER TABLE access_provider_sync_job DROP CONSTRAINT fk_access_provider_sync_job_claimed_credential");
+				statement.execute("ALTER TABLE access_provider_sync_job ADD CONSTRAINT access_provider_sync_job_claimed_by_credential_id_fkey FOREIGN KEY (claimed_by_credential_id) REFERENCES access_connector_credential(id)");
+				statement.execute("ALTER TABLE access_provider_sync_job DROP CONSTRAINT ck_access_provider_sync_job_claim_token");
+				statement.execute("ALTER TABLE access_provider_sync_job DROP COLUMN claim_token");
+				statement.execute("DROP INDEX ux_access_connector_credential_tenant_identity");
+				statement.execute("UPDATE flyway_schema_history SET checksum = -420660001 WHERE version = '84'");
+			}
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO access_connector_credential (
+					    id, organization_id, branch_id, connection_id, secret_hash, status,
+					    activated_at, created_at, version
+					)
+					VALUES (?, ?, ?, ?, 'legacy-hash', 'ACTIVE', now(), now(), 0)
+					""")) {
+				statement.setObject(1, credentialId);
+				statement.setObject(2, organizationId);
+				statement.setObject(3, branchId);
+				statement.setObject(4, connectionId);
+				statement.executeUpdate();
+			}
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO access_provider_sync_job (
+					    id, organization_id, branch_id, connection_id, sync_state_id, client_id,
+					    desired_version, action, external_person_ref, desired_access_level_refs,
+					    idempotency_key, status, attempts, retryable, available_at, claimed_at,
+					    lease_until, claimed_by_credential_id, request_source, created_at, updated_at, version
+					)
+					VALUES (?, ?, ?, ?, ?, ?, 1, 'UPSERT', 'person-upgrade', '["LEVEL-UPGRADE"]'::jsonb,
+					        ?, 'CLAIMED', 1, TRUE, now(), now(), now() + interval '5 minutes', ?,
+					        'LEGACY_CONNECTOR', now(), now(), 0)
+					""")) {
+				statement.setObject(1, legacyClaimedJobId);
+				statement.setObject(2, organizationId);
+				statement.setObject(3, branchId);
+				statement.setObject(4, connectionId);
+				statement.setObject(5, syncStateId);
+				statement.setObject(6, clientId);
+				statement.setString(7, "legacy-claim-" + legacyClaimedJobId);
+				statement.setObject(8, credentialId);
+				statement.executeUpdate();
+			}
+		}
+
 		Flyway.configure()
 				.dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
 				.locations("classpath:db/migration")
@@ -993,8 +1045,17 @@ class DatabaseMigrationTests {
 			assertThat(tableExists(connection, schema, "access_provider_sync_job")).isTrue();
 			assertThat(tableExists(connection, schema, "access_connector_credential")).isTrue();
 			assertThat(tableExists(connection, schema, "platform_customer_account")).isTrue();
+			assertThat(columnExists(connection, schema, "access_provider_sync_job", "claim_token")).isTrue();
 			try (var statement = connection.createStatement()) {
 				statement.execute("SET search_path TO " + schema);
+			}
+			try (var statement = connection.prepareStatement("""
+					SELECT checksum FROM flyway_schema_history WHERE version = '84' AND success = TRUE
+					""")) {
+				try (var resultSet = statement.executeQuery()) {
+					assertThat(resultSet.next()).isTrue();
+					assertThat(resultSet.getInt("checksum")).isEqualTo(1330761137);
+				}
 			}
 			try (var statement = connection.prepareStatement("""
 					SELECT job.status, job.external_person_ref, state.latest_job_id,
@@ -1002,6 +1063,7 @@ class DatabaseMigrationTests {
 					FROM access_provider_sync_job job
 					JOIN access_provider_sync_state state ON state.id = job.sync_state_id
 					WHERE state.id = ?
+					  AND job.request_source = 'MIGRATION_V102'
 					""")) {
 				statement.setObject(1, syncStateId);
 				try (var resultSet = statement.executeQuery()) {
@@ -1013,6 +1075,50 @@ class DatabaseMigrationTests {
 					assertThat(resultSet.next()).isFalse();
 				}
 			}
+			try (var statement = connection.prepareStatement("""
+					SELECT status, claimed_by_credential_id, claim_token
+					FROM access_provider_sync_job
+					WHERE id = ?
+					""")) {
+				statement.setObject(1, legacyClaimedJobId);
+				try (var resultSet = statement.executeQuery()) {
+					assertThat(resultSet.next()).isTrue();
+					assertThat(resultSet.getString("status")).isEqualTo("PENDING");
+					assertThat(resultSet.getObject("claimed_by_credential_id")).isNull();
+					assertThat(resultSet.getObject("claim_token")).isNull();
+				}
+			}
+		}
+
+		// A short-lived pilot also applied the first V102 draft before its
+		// compatibility statements became idempotent. Only that exact checksum is
+		// accepted and normalized by the beforeValidate callback.
+		try (var connection = schemaConnection(schema);
+				var statement = connection.prepareStatement("""
+						UPDATE flyway_schema_history
+						SET checksum = -182201988
+						WHERE version = '102' AND success = TRUE
+						""")) {
+			assertThat(statement.executeUpdate()).isEqualTo(1);
+		}
+
+		Flyway.configure()
+				.dataSource(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())
+				.locations("classpath:db/migration")
+				.schemas(schema)
+				.defaultSchema(schema)
+				.load()
+				.migrate();
+
+		try (var connection = schemaConnection(schema);
+				var statement = connection.prepareStatement("""
+						SELECT checksum
+						FROM flyway_schema_history
+						WHERE version = '102' AND success = TRUE
+						""");
+				var resultSet = statement.executeQuery()) {
+			assertThat(resultSet.next()).isTrue();
+			assertThat(resultSet.getInt("checksum")).isEqualTo(-557734762);
 		}
 	}
 

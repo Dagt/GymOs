@@ -78,6 +78,20 @@ El mismo `SAUNA` puede ser `INCLUDED_WITH_VISIT` en “10 visitas + Sauna” y
 `CONSUMES_VISIT` en “5 sesiones de Sauna”. Ésta es semántica del producto
 comercial, nunca una propiedad intrínseca de Sauna.
 
+Para configurar estos productos desde cualquier sede, Catálogo obtiene los
+Benefits `ACCESS` activos de toda la organización mediante
+`GET /api/v1/catalog/access-benefits`. La interfaz muestra en qué sucursales es
+efectivo cada uno. Ver Sauna de Centro al operar en Tecnológica sólo permite
+seleccionarlo cuando Centro también forma parte del paquete; no crea Sauna ni
+derechos equivalentes en Tecnológica. El backend vuelve a validar la
+intersección y no confía en el filtrado de la UI.
+
+Si una edición posterior de planes/beneficios deja una definición comercial sin
+cobertura efectiva o una sede sin `CONSUMES_VISIT`, la definición deja de
+publicarse en venta y autoservicio hasta que un administrador la repare. Sigue
+visible en el listado administrativo y los entitlements vendidos conservan sus
+snapshots; no se mutan compras históricas.
+
 No es una `membership` y no utiliza la restricción de una membresía activa. Se
 modela independientemente para no alterar renovaciones, cambios de plan,
 domiciliación ni reportes de membresías ilimitadas.
@@ -554,6 +568,13 @@ La secuencia aplicada es:
 - V101: modo de uso en la relación comercial y snapshots, fecha operativa en el
   consumo base y ledger separado de accesos incluidos. Relaciones preexistentes
   migran como `CONSUMES_VISIT`; no se reinterpretan ventas anteriores.
+- V102: compatibilidad incremental del connector físico. V84 permanece igual a
+  la versión publicada en `main`; un callback `beforeValidate` reconoce sólo
+  los checksums exactos del V84 piloto y del primer V102 de prueba, y V102
+  converge las formas conocidas, reencolando de
+  forma idempotente trabajos `CLAIMED` anteriores al token de reclamo. Un
+  callback `beforeEachMigrate` acotado a la transición V85→V86 prepara la
+  nulabilidad de identidad que V86 necesita.
 
 Defaults compatibles:
 
@@ -569,7 +590,9 @@ explícita. Sus endpoints de alta y consumo operativo rechazan escrituras nuevas
 las compras pasan exclusivamente por el dominio `visit_package_entitlement`.
 Los servicios existentes de subtipo `VISIT_PASS` quedan “sin configurar” hasta
 que un administrador defina visitas, vigencia, sucursales y accesos; no se
-infieren valores por nombre.
+infieren valores por nombre. El producto técnico que respalda una definición
+nueva tampoco aparece como artículo vendible en el catálogo/POS genéricos: se
+opera exclusivamente desde Paquetes de visitas.
 
 Al habilitar las compras nuevas, el alta manual histórica pasa a sólo lectura.
 La consulta de exclusividad también considera un `visit_pass` histórico activo:
@@ -649,10 +672,12 @@ premium exclusivas de Centro y las combinaciones válidas e inválidas de
 10. [implementado y validado en PostgreSQL] semántica
     `CONSUMES_VISIT|INCLUDED_WITH_VISIT`, snapshot y auditoría sin doble
     decremento;
-11. [validado el 28/08/2026] migraciones y 114 pruebas PostgreSQL reales de
+11. [validado el 29/08/2026] migraciones y 115 pruebas PostgreSQL reales de
     concurrencia, idempotencia, dos sedes, tenant isolation, base limpia y
-    actualización V99→V101, sin fallos ni omisiones.
+    upgrades desde V83/V84/V85/V99 hasta V102, sin fallos ni omisiones; el
+    volumen histórico V85 también se actualizó sin `repair` ni pérdida de datos.
 
 Cada etapa debe mantener compilación y pruebas verdes. No se habilita compra de
 paquetes en producción hasta que venta, activación, consumo y exclusividad estén
-integrados de extremo a extremo.
+integrados de extremo a extremo. La evidencia local no sustituye la aceptación
+externa con Stripe sandbox conectado ni la prueba de los dispositivos físicos.

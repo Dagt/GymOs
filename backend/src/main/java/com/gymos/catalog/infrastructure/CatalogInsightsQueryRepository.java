@@ -23,19 +23,19 @@ class CatalogInsightsQueryRepository implements CatalogInsightsQueryPort {
 		return jdbcClient.sql("""
 				SELECT
 				  COUNT(*) FILTER (WHERE product_type='PHYSICAL' AND status='ACTIVE' AND archived_at IS NULL) AS active_products,
-				  COUNT(*) FILTER (WHERE product_type='SERVICE' AND status='ACTIVE' AND archived_at IS NULL) AS active_services,
+				  COUNT(*) FILTER (WHERE product_type='SERVICE' AND commercial_subtype IS DISTINCT FROM 'VISIT_PASS' AND status='ACTIVE' AND archived_at IS NULL) AS active_services,
 				  COUNT(*) FILTER (WHERE product_type='MEMBERSHIP_PLAN' AND status='ACTIVE' AND archived_at IS NULL) AS active_plans,
-				  COUNT(*) FILTER (WHERE product_type<>'MEMBERSHIP_PLAN' AND status='INACTIVE' AND archived_at IS NULL) AS inactive_products,
-				  COUNT(*) FILTER (WHERE product_type<>'MEMBERSHIP_PLAN' AND archived_at IS NOT NULL) AS archived_products,
+				  COUNT(*) FILTER (WHERE product_type<>'MEMBERSHIP_PLAN' AND commercial_subtype IS DISTINCT FROM 'VISIT_PASS' AND status='INACTIVE' AND archived_at IS NULL) AS inactive_products,
+				  COUNT(*) FILTER (WHERE product_type<>'MEMBERSHIP_PLAN' AND commercial_subtype IS DISTINCT FROM 'VISIT_PASS' AND archived_at IS NOT NULL) AS archived_products,
 				  COUNT(*) FILTER (WHERE product_type='PHYSICAL' AND inventory_tracked=TRUE AND archived_at IS NULL) AS tracked_products,
-				  COUNT(*) FILTER (WHERE product_type<>'MEMBERSHIP_PLAN' AND archived_at IS NULL AND NOT EXISTS (
+				  COUNT(*) FILTER (WHERE product_type<>'MEMBERSHIP_PLAN' AND commercial_subtype IS DISTINCT FROM 'VISIT_PASS' AND archived_at IS NULL AND NOT EXISTS (
 				      SELECT 1 FROM catalog_product_category pc WHERE pc.organization_id=cp.organization_id AND pc.product_id=cp.id
 				  )) AS uncategorized_products,
-				  COUNT(*) FILTER (WHERE product_type<>'MEMBERSHIP_PLAN' AND archived_at IS NULL AND NOT EXISTS (
+				  COUNT(*) FILTER (WHERE product_type<>'MEMBERSHIP_PLAN' AND commercial_subtype IS DISTINCT FROM 'VISIT_PASS' AND archived_at IS NULL AND NOT EXISTS (
 				      SELECT 1 FROM catalog_product_barcode barcode
 				      WHERE barcode.organization_id=cp.organization_id AND barcode.product_id=cp.id AND barcode.active=TRUE
 				  )) AS without_barcode,
-				  COUNT(*) FILTER (WHERE product_type<>'MEMBERSHIP_PLAN' AND archived_at IS NULL AND image_object_key IS NULL) AS without_image,
+				  COUNT(*) FILTER (WHERE product_type<>'MEMBERSHIP_PLAN' AND commercial_subtype IS DISTINCT FROM 'VISIT_PASS' AND archived_at IS NULL AND image_object_key IS NULL) AS without_image,
 				  (SELECT COUNT(*) FROM inventory_stock s
 				    JOIN catalog_product p ON p.id=s.product_id AND p.organization_id=s.organization_id
 				    WHERE s.organization_id=:organizationId AND (:branchId IS NULL OR s.branch_id=:branchId)

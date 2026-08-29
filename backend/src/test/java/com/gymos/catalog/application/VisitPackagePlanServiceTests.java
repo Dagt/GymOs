@@ -31,6 +31,55 @@ import org.mockito.ArgumentCaptor;
 
 class VisitPackagePlanServiceTests {
 	@Test
+	void allBranchesPackageBecomesUnavailableWhenANewBranchHasNoConsumingAccess() {
+		VisitPackagePlanPort packages = mock(VisitPackagePlanPort.class);
+		VisitPackagePlanService service = new VisitPackagePlanService(
+				mock(CatalogProductQueryPort.class), mock(CatalogProductCommandPort.class), packages,
+				mock(AuditService.class));
+		UUID organizationId = UUID.randomUUID();
+		UUID originalBranch = UUID.randomUUID();
+		UUID newBranch = UUID.randomUUID();
+		UUID planId = UUID.randomUUID();
+		UUID benefitId = UUID.randomUUID();
+		VisitPackageBenefitUsage benefit = consumes(benefitId);
+		when(packages.find(organizationId, planId)).thenReturn(Optional.of(new VisitPackagePlanView(
+				planId, UUID.randomUUID(), "10-VISITAS", "10 visitas", null, 90_000,
+				"MXN", 10, 30, "ALL_BRANCHES", List.of(), List.of(benefit), true,
+				"DEFAULT", "ACTIVE", 0, OffsetDateTime.now(), OffsetDateTime.now())));
+		when(packages.activeBranchIds(organizationId)).thenReturn(List.of(originalBranch, newBranch));
+		when(packages.benefitCoverages(
+				organizationId, List.of(benefit), List.of(originalBranch, newBranch)))
+				.thenReturn(List.of(new BenefitCoverage(
+						benefitId, VisitPackageBenefitUsageMode.CONSUMES_VISIT, List.of(originalBranch))));
+
+		assertThat(service.activePlan(organizationId, originalBranch, planId)).isEmpty();
+		assertThat(service.activePlan(organizationId, newBranch, planId)).isEmpty();
+	}
+
+	@Test
+	void packageBecomesUnavailableWhenAConfiguredBenefitLosesAllCoverage() {
+		VisitPackagePlanPort packages = mock(VisitPackagePlanPort.class);
+		VisitPackagePlanService service = new VisitPackagePlanService(
+				mock(CatalogProductQueryPort.class), mock(CatalogProductCommandPort.class), packages,
+				mock(AuditService.class));
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		UUID planId = UUID.randomUUID();
+		UUID generalId = UUID.randomUUID();
+		UUID saunaId = UUID.randomUUID();
+		List<VisitPackageBenefitUsage> benefits = List.of(consumes(generalId), included(saunaId));
+		when(packages.find(organizationId, planId)).thenReturn(Optional.of(new VisitPackagePlanView(
+				planId, UUID.randomUUID(), "10-SAUNA", "10 visitas + Sauna", null, 90_000,
+				"MXN", 10, 30, "SELECTED_BRANCHES", List.of(branchId), benefits, true,
+				"DEFAULT", "ACTIVE", 0, OffsetDateTime.now(), OffsetDateTime.now())));
+		when(packages.benefitCoverages(organizationId, benefits, List.of(branchId))).thenReturn(List.of(
+				new BenefitCoverage(generalId, VisitPackageBenefitUsageMode.CONSUMES_VISIT, List.of(branchId)),
+				new BenefitCoverage(saunaId, VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT, List.of())));
+
+		assertThat(service.activePlan(organizationId, branchId, planId)).isEmpty();
+	}
+
+	@Test
 	void createsOneSellableDefinitionWithAllBranchAndAccessSnapshotsConfigured() {
 		CatalogProductQueryPort products = mock(CatalogProductQueryPort.class);
 		CatalogProductCommandPort productCommands = mock(CatalogProductCommandPort.class);

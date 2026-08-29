@@ -30,6 +30,18 @@ nombre técnico interno durante la transición de marca.
   confirmed payment, with idempotent sales, payments and membership periods.
 - Support multi-branch plan access in secondary branches, including eligible
   kiosk lookup and reservations while retaining membership origin ownership.
+- Add visit-package products with one organization-wide balance, explicit
+  `CONSUMES_VISIT` and `INCLUDED_WITH_VISIT` access modes, immutable
+  benefit/branch/mode snapshots and membership-first access decisions.
+- Keep premium facilities branch-local in multi-branch packages, require a
+  consumable base access in every selected branch and make incomplete catalog
+  definitions fail closed without mutating purchases already sold.
+- Expose active ACCESS benefits organization-wide to package administration
+  while displaying and enforcing effective branch coverage; hide the internal
+  `VISIT_PASS` product from generic Catalog and POS workflows.
+- Preserve immutable Flyway history for the physical connector and move later
+  hardening into V102, including safe upgrade compatibility for historical
+  V83–V85 installations.
 - Restrict kiosk launch strictly to Reception in navigation, direct routes,
   HTTP security and business authorization; owners, administrators, managers
   and platform support cannot open a member session.

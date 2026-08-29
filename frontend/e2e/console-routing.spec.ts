@@ -319,7 +319,8 @@ test.describe("consolas por rol", () => {
 
     await page.goto("/dashboard");
 
-    await expect(page.getByRole("heading", { name: /Panel ejecutivo|Dashboard|Metricas/i })).toBeVisible();
+    await expect(page).toHaveURL(/\/reports\/sales/);
+    await expect(page.getByRole("heading", { name: "Reporte de Ventas y Pagos" })).toBeVisible();
     await expect(page.getByText("Gerente", { exact: true })).toBeVisible();
     await expect(page.getByRole("link", { name: "Operación diaria" })).toHaveCount(0);
     await expect(page.locator("body")).toContainText("Gestión operativa");

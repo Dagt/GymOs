@@ -26,6 +26,7 @@ import com.gymos.visitpackages.api.operations.VisitPackageOperations.PurchaseVis
 import com.gymos.visitpackages.api.operations.VisitPackageOperations.VisitPackageEntitlementView;
 import com.gymos.visitpackages.application.port.VisitPackageEntitlementPort;
 import java.time.OffsetDateTime;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -95,6 +96,23 @@ class VisitPackageServiceTests {
 		verify(fixture.sales, never()).createVisitPackagePurchase(any());
 	}
 
+	@Test
+	void quoteUsesTheActiveBranchBusinessDateForExpirationAndRegistration() {
+		Fixture fixture = fixture("DEFAULT");
+		LocalDate branchDate = LocalDate.of(2026, 8, 27);
+		when(fixture.entitlements.businessDate(eq(fixture.organizationId), eq(fixture.branchId), any()))
+				.thenReturn(branchDate);
+
+		fixture.service.quote(fixture.principal, fixture.clientId, fixture.planId);
+
+		verify(fixture.entitlements).expireDue(
+				eq(fixture.organizationId), eq(fixture.clientId), eq(branchDate), any());
+		verify(fixture.lifecycle).registrationFee(
+				eq(fixture.organizationId), eq(fixture.clientId), eq(branchDate));
+		verify(fixture.entitlements).hasActiveLegacyPass(
+				eq(fixture.organizationId), eq(fixture.clientId), eq(branchDate));
+	}
+
 	private Fixture fixture(String feePolicy) {
 		UUID organizationId = UUID.randomUUID();
 		UUID branchId = UUID.randomUUID();
@@ -127,6 +145,8 @@ class VisitPackageServiceTests {
 										List.of(branchId))),
 						true, feePolicy)));
 		when(entitlements.lockActiveClient(organizationId, clientId)).thenReturn(true);
+		when(entitlements.businessDate(eq(organizationId), eq(branchId), any()))
+				.thenReturn(LocalDate.of(2026, 8, 28));
 		when(entitlements.byIdempotencyKey(any(), any(), any())).thenReturn(Optional.empty());
 		when(entitlements.open(organizationId, clientId)).thenReturn(Optional.empty());
 		when(entitlements.hasActiveLegacyPass(eq(organizationId), eq(clientId), any())).thenReturn(false);

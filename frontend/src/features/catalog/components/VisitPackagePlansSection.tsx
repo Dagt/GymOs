@@ -6,7 +6,7 @@ import { AppNotice } from "@/components/AppNotice";
 import { NumberField, SelectField, TextAreaField, TextField } from "@/components/FormFields";
 import {
   createVisitPackagePlan,
-  getBenefits,
+  getCatalogAccessBenefits,
   getBranches,
   getVisitPackagePlans,
   updateVisitPackagePlan,
@@ -98,7 +98,7 @@ export function VisitPackagePlansSection({
         const [loadedPlans, loadedBranches, loadedBenefits] = await Promise.all([
           getVisitPackagePlans(accessToken),
           getBranches(accessToken),
-          getBenefits(accessToken),
+          getCatalogAccessBenefits(accessToken),
         ]);
         if (!active) return;
         setPlans(loadedPlans);

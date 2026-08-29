@@ -10,6 +10,10 @@ export async function getBenefits(accessToken: string): Promise<BenefitSummary[]
   return apiFetch<BenefitSummary[]>("/benefits", accessToken);
 }
 
+export async function getCatalogAccessBenefits(accessToken: string): Promise<BenefitSummary[]> {
+  return apiFetch<BenefitSummary[]>("/catalog/access-benefits", accessToken);
+}
+
 export async function getClientBenefits(
   accessToken: string,
   clientId: string,

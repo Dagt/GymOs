@@ -40,6 +40,15 @@ public class BenefitService {
 	}
 
 	@Transactional(readOnly = true)
+	public List<BenefitSummary> accessBenefitsForCatalog(GymOsPrincipal principal) {
+		requirePrincipal(principal);
+		return benefitRepository.benefits(principal.organizationId()).stream()
+				.filter(benefit -> "ACCESS".equals(benefit.benefitType()))
+				.filter(benefit -> "ACTIVE".equals(benefit.status()))
+				.toList();
+	}
+
+	@Transactional(readOnly = true)
 	public List<ClientBenefitSummary> clientBenefits(GymOsPrincipal principal, UUID clientId) {
 		requirePrincipal(principal);
 		if (!benefitRepository.clientExists(principal.organizationId(), clientId)) {

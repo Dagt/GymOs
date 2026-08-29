@@ -61,6 +61,9 @@ paquetes de visitas compartidos dentro de un tenant.
 | 28 ago 2026 | El cierre de aceptación hace organizacional la identificación de kiosco, reinicia sesión al alternar alta/entrada y exige al menos un acceso consumible por cada sucursal elegida en un paquete |
 | 28 ago 2026 | V101 separa accesos que consumen de accesos incluidos por relación paquete–Benefit, snapshottea el modo y audita el uso incluido contra una visita base de la misma fecha operativa y sede |
 | 28 ago 2026 | Docker/PostgreSQL valida 114/114 pruebas; se agrega la matriz Centro/Tecnológica y un paquete originado en Tecnológica con premium local exclusivo de Centro |
+| 29 ago 2026 | La auditoría final publica un catálogo organizacional de Benefits ACCESS para paquetes sin expandir coberturas, oculta el producto técnico `VISIT_PASS` del catálogo/POS genéricos y hace fail-closed las definiciones operativas incompletas |
+| 29 ago 2026 | V84 permanece igual a `main`; un callback reconoce los checksums exactos del V84 piloto y del primer V102 de prueba, y V102 converge idempotentemente las formas conocidas del connector; el volumen real V85 migra sin `repair` manual, borrado ni pérdida de datos |
+| 29 ago 2026 | La suite elimina dependencias del reloj en fixtures de acceso y una carrera de redirección de gerente; cierre final: backend 502/502, PostgreSQL 115/115 y Playwright 102/102 |
 
 ## 3. Alcance material de la rama activa
 
@@ -81,6 +84,10 @@ paquetes de visitas compartidos dentro de un tenant.
   `business_date` al consumo base y un ledger de accesos incluidos sin segundo
   descuento; el ledger conserva también denegaciones sin visita base para que
   un reintento del mismo evento no cambie de decisión;
+- V102 agrega compatibilidad incremental del connector físico sin reescribir la
+  migración V84 publicada; callbacks acotados reconocen sólo los checksums
+  exactos del V84 piloto y del primer V102 de prueba, y preparan V86 cuando el esquema aún conserva
+  `organization_id NOT NULL`;
 - una restricción impide dos paquetes `PENDING_PAYMENT|ACTIVE` para el mismo
   socio y tenant;
 - Catálogo coloca paquetes inmediatamente junto a planes de membresía; los
@@ -91,7 +98,7 @@ paquetes de visitas compartidos dentro de un tenant.
 - la API legacy `visit_pass` es de sólo lectura y un refund total después de
   consumos requiere revisión administrativa.
 
-### Aún pendiente en la rama
+### Aún pendiente fuera de la validación local
 
 - HTTP/E2E integral de dos sedes y Stripe test;
 - reversión administrativa auditada;
@@ -100,17 +107,21 @@ paquetes de visitas compartidos dentro de un tenant.
 ## 4. Evidencia de validación local
 
 - pruebas de arquitectura, políticas de beneficios, inscripción y autoservicio;
-- suite backend completa: 495/495;
-- PostgreSQL real: 114/114, cero fallos, errores u omisiones; incluye base
-  limpia, upgrade V99→V101, concurrencia, idempotencia, snapshots y aislamiento;
+- suite backend completa: 502/502;
+- PostgreSQL real: 115/115, cero fallos, errores u omisiones; incluye base
+  limpia, upgrades V83/V84/V85/V99→V102, concurrencia, idempotencia, snapshots
+  y aislamiento;
 - frontend: 114/114, typecheck, lint y build Next 16.3.2;
+- OpenNext/Cloudflare: build exitoso; `npm audit` sin vulnerabilidades;
 - E2E completo: 102/102, incluido Catálogo/POS 17/17, kiosco, membresías y
   configuración General consume + premium Centro incluido;
+- Docker Compose: imágenes reconstruidas, PostgreSQL/Redis/MinIO sanos,
+  backend y frontend iniciados; smoke HTTP local exitoso;
 - matriz reproducible: `34-matriz-pruebas-centro-tecnologica.md`.
 
 ## 5. Regla de integración
 
 1. `feature/multibranch-plans-benefits-visits` no se fusiona automáticamente.
 2. CI y revisión de aceptación deben terminar antes de cualquier merge.
-3. Despliegue V96–V101 y habilitación de compras son acciones independientes.
+3. Despliegue V96–V102 y habilitación de compras son acciones independientes.
 4. Las ramas remotas sólo se eliminan por decisión explícita.

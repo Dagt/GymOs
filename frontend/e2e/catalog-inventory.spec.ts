@@ -112,7 +112,7 @@ test.describe("catalogo e inventario", () => {
         });
         return true;
       }
-      if (path === "/benefits") {
+      if (path === "/catalog/access-benefits") {
         await route.fulfill({
           contentType: "application/json",
           body: JSON.stringify([
@@ -218,7 +218,7 @@ test.describe("catalogo e inventario", () => {
         });
         return true;
       }
-      if (path === "/benefits") {
+      if (path === "/catalog/access-benefits") {
         await route.fulfill({
           contentType: "application/json",
           body: JSON.stringify([

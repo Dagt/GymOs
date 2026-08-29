@@ -1460,7 +1460,7 @@ gimnasio puede consultar o mutar esta información.
 - repetir la misma `idempotencyKey` y los mismos datos devuelve el cobro original
   sin avanzar nuevamente el corte; reutilizarla con datos distintos se rechaza.
 
-## Contratos V96–V100 — planes y paquetes de visitas
+## Contratos V96–V101 — planes y paquetes de visitas
 
 Los contratos de alta/edición/consulta de planes agregan
 `selfServiceAcquisitionEnabled` y `registrationFeePolicy` (`DEFAULT|WAIVED`).
@@ -1477,6 +1477,20 @@ La proyección administrativa de un beneficio `ACCESS` incluye
 según `LOCAL` o la cobertura de sus planes. Es una proyección calculada; no
 duplica el beneficio ni sustituye sus relaciones de dominio.
 
+El selector de accesos de paquetes usa un catálogo organizacional independiente:
+
+```text
+GET /api/v1/catalog/access-benefits
+```
+
+Requiere lectura de catálogo y devuelve únicamente Benefits `ACCESS` activos de
+la organización autenticada, incluyendo `accessBranchIds`. Esto permite que, al
+operar en Tecnológica, se pueda configurar conscientemente un paquete
+Centro+Tecnológica con Sauna local de Centro. La respuesta es una lista de
+opciones administrativas, no una concesión de acceso: el backend vuelve a
+intersectar cada Benefit con las sucursales elegidas y rechaza coberturas
+imposibles. Nunca devuelve Benefits de otro tenant.
+
 Administración de paquetes:
 
 ```text
@@ -1486,24 +1500,36 @@ PATCH /api/v1/catalog/visit-package-plans/{planId}
 ```
 
 El payload contiene producto/importe, `totalVisits`, `validityDays`,
-`branchScope`, `branchIds`, `benefitIds`, disponibilidad de kiosco, política de
-inscripción y estado. Si `branchScope=SELECTED_BRANCHES`, `branchIds` debe
+`branchScope`, `branchIds`, `benefits` con `{benefitId, usageMode}`,
+disponibilidad de kiosco, política de inscripción y estado. `usageMode` acepta
+`CONSUMES_VISIT` o `INCLUDED_WITH_VISIT`. El campo legacy `benefitIds` continúa
+aceptándose y se interpreta conservadoramente como `CONSUMES_VISIT`. Si
+`branchScope=SELECTED_BRANCHES`, `branchIds` debe
 incluir la sucursal activa. El backend rechaza tanto una lista vacía como una
 cobertura que contenga exclusivamente otra sede. También exige que la unión de
-los accesos elegidos cubra todas las sucursales del paquete. Una sede sin ningún
-acceso consumible produce `VISIT_PACKAGE_BRANCH_WITHOUT_ACCESS` y no crea datos
-parciales.
+los accesos elegidos cubra todas las sucursales del paquete y que cada sede
+tenga al menos un acceso `CONSUMES_VISIT`. Una sede sin acceso base produce
+`VISIT_PACKAGE_BRANCH_WITHOUT_ACCESS` y no crea datos parciales.
 
-`branchIds` determina dónde existe el saldo; `benefitIds` determina qué accesos
-pueden consumirlo. No son permisos independientes que puedan recombinarse: al
-comprar se toma un snapshot de la intersección de cada acceso con sus sucursales
-válidas. Por ello, Sauna `LOCAL` de Centro no consume en Tecnológica aunque el
-paquete tenga saldo en ambas.
+`branchIds` determina dónde existe el saldo; `benefits` determina qué accesos
+pueden originar una visita o acompañarla. No son permisos independientes que
+puedan recombinarse: al comprar se toma un snapshot de la intersección de cada
+acceso con sus sucursales válidas y de su `usageMode`. Por ello, Sauna `LOCAL`
+de Centro no se reconoce en Tecnológica aunque el paquete tenga saldo en ambas.
 
-Un paquete Centro+Tecnológica puede incluir `GENERAL_ACCESS` válido en ambas y
-`SAUNA` local de Centro: General descuenta en ambas y Sauna sólo en Centro. En
-cambio, Centro+Tecnológica con únicamente Sauna local de Centro se rechaza,
-porque Tecnológica quedaría seleccionada pero sin ningún acceso consumible.
+Un paquete Centro+Tecnológica puede incluir accesos generales consumibles en
+ambas sedes y `SAUNA` local de Centro como incluido: General descuenta una
+unidad; Sauna sólo se concede en Centro, sin otro descuento, después de un
+consumo base del mismo entitlement, fecha operativa y sucursal. En cambio,
+Centro+Tecnológica con únicamente Sauna local de Centro se rechaza, porque no
+hay acceso base y Tecnológica tampoco queda cubierta.
+
+Las definiciones comerciales activas se evalúan de forma fail-closed. Si un
+cambio posterior deja una sede sin acceso consumible o elimina toda la
+cobertura efectiva de un Benefit, el paquete deja de publicarse en opciones
+operativas hasta ser reparado. La lista administrativa conserva la definición
+para poder editarla. Los entitlements vendidos no consultan esa definición viva:
+mantienen sus snapshots históricos.
 
 Recepción/expediente:
 

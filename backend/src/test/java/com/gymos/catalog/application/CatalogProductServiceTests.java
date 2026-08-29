@@ -110,6 +110,38 @@ class CatalogProductServiceTests {
 	}
 
 	@Test
+	void genericProductFlowRejectsVisitPackageProducts() {
+		ProductCommand request = new ProductCommand(
+				"VISITAS-10", "10 visitas", null, "SERVICE", "VISIT_PASS", 50_000,
+				"MXN", true, "ACTIVE", null, null, null, null,
+				false, 0, null, null, null, null, null, null, List.of()
+		);
+
+		assertThatThrownBy(() -> service.createProduct(principal, request, "test"))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.code()).isEqualTo("PRODUCT_COMMERCIAL_SUBTYPE_INVALID"));
+		verify(commands, never()).create(any());
+	}
+
+	@Test
+	void visitPackageProductIsHiddenAndCannotBeEditedAsAnArticle() {
+		UUID packageProductId = UUID.randomUUID();
+		ProductSummaryView regular = costedProduct(UUID.randomUUID());
+		ProductSummaryView packageProduct = visitPackageProduct(packageProductId);
+		when(products.listProducts(principal.organizationId(), principal.branchId()))
+				.thenReturn(List.of(regular, packageProduct));
+		when(products.findProduct(principal.organizationId(), principal.branchId(), packageProductId))
+				.thenReturn(Optional.of(packageProduct));
+
+		assertThat(service.products(principal)).containsExactly(regular);
+		assertThatThrownBy(() -> service.updateProduct(
+				principal, packageProductId, command(packageProduct.version()), "test"))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.code()).isEqualTo("PRODUCT_REQUIRES_VISIT_PACKAGE_WORKFLOW"));
+		verify(commands, never()).update(any());
+	}
+
+	@Test
 	void updateWithoutCostPermissionPreservesProtectedCommercialFields() {
 		GymOsPrincipal updater = new GymOsPrincipal(UUID.randomUUID(), principal.organizationId(), principal.branchId(),
 				"updater", "Updater", Set.of("catalog.update"));
@@ -291,6 +323,16 @@ class CatalogProductServiceTests {
 				"ACTIVE", null, "Insane Labz", "Bote", "PIECE", true, 0, null,
 				null, null, null, null, null, null, null, List.of(), false, null, now, now, 0,
 				null, "Psychotic", "Variante", List.of()
+		);
+	}
+
+	private ProductSummaryView visitPackageProduct(UUID id) {
+		OffsetDateTime now = OffsetDateTime.now();
+		return new ProductSummaryView(
+				id, "VISITAS-10", "10 visitas", null, "SERVICE", "VISIT_PASS", 50_000,
+				"MXN", true, "ACTIVE", null, null, null, null, false, 0, null,
+				null, null, null, null, null, null, null, List.of(), false, null,
+				now, now, 0
 		);
 	}
 }

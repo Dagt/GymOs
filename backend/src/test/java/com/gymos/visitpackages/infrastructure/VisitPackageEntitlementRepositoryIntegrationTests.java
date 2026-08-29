@@ -34,6 +34,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Tag("postgres-integration")
 @Testcontainers(disabledWithoutDocker = true)
 class VisitPackageEntitlementRepositoryIntegrationTests {
+	private static final LocalDate TEST_BUSINESS_DATE = LocalDate.of(2026, 8, 28);
+	private static final OffsetDateTime TEST_OCCURRED_AT = OffsetDateTime.parse("2026-08-28T14:00:00Z");
+
 	@Container
 	static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18-alpine");
 
@@ -445,7 +448,7 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 		assertThat(second.remaining()).isEqualTo(1);
 		assertThat(first.repository().authorizeForAccess(
 				first.organizationId(), second.branchA(), second.clientId(), List.of(secondGeneral),
-				second.deviceA(), "cross-tenant", LocalDate.now(), OffsetDateTime.now())).isEmpty();
+				second.deviceA(), "cross-tenant", TEST_BUSINESS_DATE, TEST_OCCURRED_AT)).isEmpty();
 	}
 
 	@Test
@@ -576,8 +579,8 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 			transaction.executeWithoutResult(status -> {
 				repository.createPending(
 						organizationId, originBranchId, clientId, packagePlanId, saleId, "Paquete", totalVisits, 30,
-						OffsetDateTime.now().plusMinutes(30), List.of(branchA, branchB), benefits, OffsetDateTime.now());
-				repository.activateBySale(organizationId, saleId, LocalDate.now(), OffsetDateTime.now());
+						TEST_OCCURRED_AT.plusMinutes(30), List.of(branchA, branchB), benefits, TEST_OCCURRED_AT);
+				repository.activateBySale(organizationId, saleId, TEST_BUSINESS_DATE, TEST_OCCURRED_AT);
 			});
 		}
 
@@ -657,7 +660,7 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 		) {
 			return transaction.execute(status -> repository.authorizeForAccess(
 					organizationId, branchId, targetClientId, benefits, deviceId, key,
-					LocalDate.now(), OffsetDateTime.now()));
+					TEST_BUSINESS_DATE, TEST_OCCURRED_AT));
 		}
 
 		Optional<VisitPackageAccessResult> authorize(

@@ -31,7 +31,7 @@ import org.springframework.stereotype.Service;
 class CatalogProductService {
 	private static final List<String> TYPES = List.of("PHYSICAL", "SERVICE");
 	private static final List<String> SUBTYPES = List.of(
-			"GENERAL_PRODUCT", "GENERAL_SERVICE", "VISIT_PASS", "BOOKING", "ROUTINE",
+			"GENERAL_PRODUCT", "GENERAL_SERVICE", "BOOKING", "ROUTINE",
 			"CONSULTATION", "WELLNESS_SERVICE"
 	);
 	private static final Set<String> UNITS = Set.of(
@@ -65,14 +65,14 @@ class CatalogProductService {
 	List<ProductSummaryView> products(GymOsPrincipal principal) {
 		CatalogAccessGuard.requireBranch(principal);
 		return products.listProducts(principal.organizationId(), principal.branchId()).stream()
-				.filter(product -> !"MEMBERSHIP_PLAN".equals(product.productType()))
+				.filter(this::genericCatalogProduct)
 				.map(product -> visible(principal, product))
 				.toList();
 	}
 
 	ProductSummaryView product(GymOsPrincipal principal, UUID productId) {
 		CatalogAccessGuard.requireBranch(principal);
-		return visible(principal, requireProduct(principal.organizationId(), principal.branchId(), productId));
+		return visible(principal, requireGenericProduct(principal.organizationId(), principal.branchId(), productId));
 	}
 
 	ProductSummaryView productByBarcode(GymOsPrincipal principal, String barcode) {
@@ -82,7 +82,7 @@ class CatalogProductService {
 			throw new BusinessException("PRODUCT_BARCODE_REQUIRED", "Proporciona un codigo de barras.");
 		}
 		ProductSummaryView product = products.findActiveByBarcode(principal.organizationId(), principal.branchId(), normalized)
-				.filter(candidate -> !"MEMBERSHIP_PLAN".equals(candidate.productType()))
+				.filter(this::genericCatalogProduct)
 				.orElseThrow(() -> new BusinessException(
 						"PRODUCT_BARCODE_NOT_FOUND", "No existe un producto activo con ese codigo de barras en esta sucursal."));
 		return visible(principal, product);
@@ -201,10 +201,7 @@ class CatalogProductService {
 		CatalogAccessGuard.requireBranch(principal);
 		validate(request);
 		ProductSummaryView existing = requireProduct(principal.organizationId(), principal.branchId(), productId);
-		if ("MEMBERSHIP_PLAN".equals(existing.productType())) {
-			throw new BusinessException("PRODUCT_UPDATE_REQUIRES_PLAN_WORKFLOW",
-					"Los productos de membresia se administran desde planes.");
-		}
+		requireGenericWorkflow(existing, "PRODUCT_UPDATE_REQUIRES_PLAN_WORKFLOW");
 		if (request.version() == null) {
 			throw new BusinessException("PRODUCT_VERSION_REQUIRED", "Recarga el producto antes de guardar cambios.");
 		}
@@ -234,10 +231,7 @@ class CatalogProductService {
 		CatalogAccessGuard.requireBranch(principal);
 		String normalizedStatus = normalizeStatus(status);
 		ProductSummaryView product = requireProduct(principal.organizationId(), principal.branchId(), productId);
-		if ("MEMBERSHIP_PLAN".equals(product.productType())) {
-			throw new BusinessException("PRODUCT_STATUS_REQUIRES_PLAN_WORKFLOW",
-					"Los productos de membresia se administran desde planes.");
-		}
+		requireGenericWorkflow(product, "PRODUCT_STATUS_REQUIRES_PLAN_WORKFLOW");
 		if (commands.changeStatus(principal.organizationId(), productId, normalizedStatus,
 				principal.userId(), OffsetDateTime.now()) != 1) throw notFound();
 		String eventType = "ACTIVE".equals(normalizedStatus) ? "PRODUCT_ACTIVATED" : "PRODUCT_DEACTIVATED";
@@ -248,10 +242,7 @@ class CatalogProductService {
 	void archiveProduct(GymOsPrincipal principal, UUID productId, String correlationId) {
 		CatalogAccessGuard.requireBranch(principal);
 		ProductSummaryView product = requireProduct(principal.organizationId(), principal.branchId(), productId);
-		if ("MEMBERSHIP_PLAN".equals(product.productType())) {
-			throw new BusinessException("PRODUCT_ARCHIVE_REQUIRES_PLAN_WORKFLOW",
-					"Los productos de membresia se administran desde planes.");
-		}
+		requireGenericWorkflow(product, "PRODUCT_ARCHIVE_REQUIRES_PLAN_WORKFLOW");
 		if (dependencies.hasActiveMembershipPlan(principal.organizationId(), productId)) {
 			throw new BusinessException("PRODUCT_ARCHIVE_NOT_ALLOWED", "El producto tiene un plan de membresia activo.");
 		}
@@ -267,10 +258,7 @@ class CatalogProductService {
 		CatalogAccessGuard.requireBranch(principal);
 		ProductSummaryView archived = products.findProductIncludingArchived(principal.organizationId(), principal.branchId(), productId)
 				.orElseThrow(this::notFound);
-		if ("MEMBERSHIP_PLAN".equals(archived.productType())) {
-			throw new BusinessException("PRODUCT_RESTORE_REQUIRES_PLAN_WORKFLOW",
-					"Los productos de membresia se administran desde planes.");
-		}
+		requireGenericWorkflow(archived, "PRODUCT_RESTORE_REQUIRES_PLAN_WORKFLOW");
 		if (!archived.archived()) throw new BusinessException("PRODUCT_NOT_ARCHIVED", "El producto no esta archivado.");
 		if (products.skuExists(principal.organizationId(), archived.sku(), productId)) throw duplicateSku();
 		validateBarcodeAvailability(principal.organizationId(), archived.barcodes(), productId);
@@ -529,6 +517,25 @@ class CatalogProductService {
 	private String safe(Object value) { return String.valueOf(value).replace("\\", "\\\\").replace("\"", "\\\""); }
 	private ProductSummaryView requireProduct(UUID organizationId, UUID branchId, UUID productId) {
 		return products.findProduct(organizationId, branchId, productId).orElseThrow(this::notFound);
+	}
+	private ProductSummaryView requireGenericProduct(UUID organizationId, UUID branchId, UUID productId) {
+		ProductSummaryView product = requireProduct(organizationId, branchId, productId);
+		requireGenericWorkflow(product, "PRODUCT_REQUIRES_PLAN_WORKFLOW");
+		return product;
+	}
+	private boolean genericCatalogProduct(ProductSummaryView product) {
+		return !"MEMBERSHIP_PLAN".equals(product.productType())
+				&& !"VISIT_PASS".equals(product.commercialSubtype());
+	}
+	private void requireGenericWorkflow(ProductSummaryView product, String membershipErrorCode) {
+		if ("MEMBERSHIP_PLAN".equals(product.productType())) {
+			throw new BusinessException(membershipErrorCode,
+					"Los productos de membresia se administran desde planes.");
+		}
+		if ("VISIT_PASS".equals(product.commercialSubtype())) {
+			throw new BusinessException("PRODUCT_REQUIRES_VISIT_PACKAGE_WORKFLOW",
+					"Este producto se administra desde Paquetes de visitas.");
+		}
 	}
 	private String normalizeRequired(String value) { return value == null ? "" : value.trim().toUpperCase(); }
 	private String normalizeNullable(String value) { String normalized = normalizeRequired(value); return normalized.isBlank() ? null : normalized; }

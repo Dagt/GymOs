@@ -1,6 +1,6 @@
 # Matriz de pruebas: Centro y Tecnológica
 
-Última actualización: 28 de agosto de 2026
+Última actualización: 29 de agosto de 2026
 Rama: `feature/multibranch-plans-benefits-visits`
 
 ## 1. Objetivo
@@ -96,6 +96,8 @@ No debe emplearse para representar una instalación que físicamente no existe.
 | P-14 | Cualquiera | Una o varias | Código/SKU duplicado | Rechazado sin alta parcial |
 | P-15 | Cualquiera | Una o varias | Paquete oculto | Recepción puede venderlo; kiosco no lo ofrece para compra nueva |
 | P-16 | Cualquiera | Una o varias | Inscripción `WAIVED`/`DEFAULT` | Respeta la política seleccionada igual que un plan |
+| P-17 | Cualquiera | Centro + Tecnológica | Después de crear, Tecnológica pierde su único acceso consumible | La definición permanece editable en administración, pero deja de publicarse para venta/kiosco hasta repararse |
+| P-18 | Cualquiera | Una o varias | Un Benefit seleccionado pierde toda cobertura efectiva | No se vende con configuración ambigua; los entitlements ya vendidos conservan su snapshot |
 
 ## 6. Matriz de compra, acceso y consumo
 
@@ -153,6 +155,9 @@ Producto principal de aceptación, creado desde Tecnológica:
 | U-10 | Kiosco | Registro exitoso con consulta secundaria fallida | No duplica socio y no muestra detalles HTTP/correlation ID |
 | U-11 | Kiosco secundario | Plan multisucursal vigente | Aparece para renovación/administración según visibilidad |
 | U-12 | API | Payload legacy sin `usageMode` | Se interpreta conservadoramente como `CONSUMES_VISIT` |
+| U-13 | Catálogo de accesos | Operar en Tecnológica | Lista General Tecnológica y también premium Centro con su cobertura real; no lista Benefits ajenos/inactivos/no ACCESS |
+| U-14 | Catálogo/POS genérico | Buscar el producto técnico del paquete | `VISIT_PASS` no aparece ni puede editarse/venderse como artículo normal; el flujo dedicado de paquetes sigue resolviéndolo internamente |
+| U-15 | Venta/kiosco | Consultar una definición dañada por drift posterior | Se omite de superficies operativas (fail-closed) y sigue disponible para reparación administrativa |
 
 ## 8. Evidencia automatizada
 
@@ -169,6 +174,10 @@ Producto principal de aceptación, creado desde Tecnológica:
 | Plan multisucursal visible en sede secundaria | `CatalogPersistenceIntegrationTests.multiBranchPlanIsAvailableInSecondaryKioskWithoutDuplicatingProductBranchAttachment` |
 | Idempotencia y concurrencia real | `VisitPackageEntitlementRepositoryIntegrationTests` contra PostgreSQL/Testcontainers |
 | Flyway limpio y upgrade V99 | `DatabaseMigrationTests` |
+| Upgrade histórico del connector V83/V84/V85 | `DatabaseMigrationTests.physicalAccessMigrationUpgradesAnExistingV83Schema` y arranque Docker sobre volumen histórico |
+| Catálogo organizacional de ACCESS aislado por tenant | `BenefitServiceTests` y `SecurityAuthorizationTests` |
+| Producto técnico fuera de catálogo/POS | `CatalogProductServiceTests` y `CatalogPersistenceIntegrationTests` |
+| Definiciones dañadas fallan cerradas | `VisitPackagePlanServiceTests` |
 | Flujo de catálogo y kiosco | pruebas frontend y Playwright de catálogo/kiosco |
 
 ## 9. Criterio de aprobación
@@ -177,7 +186,7 @@ La matriz se aprueba únicamente cuando:
 
 - suites backend unitarias y PostgreSQL terminan sin fallos ni omisiones por
   Docker;
-- migración limpia y upgrade V99→última versión pasan;
+- migración limpia y upgrades históricos V83/V84/V85/V99→última versión pasan;
 - typecheck, lint, build y pruebas frontend pasan;
 - E2E de catálogo, kiosco, membresías, paquetes y acceso pasan;
 - el diff final confirma aislamiento por tenant, idempotencia, snapshots y
@@ -187,17 +196,20 @@ El resultado exacto de la ejecución se registra en los documentos 13, 28 y 29.
 
 ## 10. Resultado de esta ejecución
 
-| Validación | Resultado 28/08/2026 |
+| Validación | Resultado 29/08/2026 |
 |---|---|
-| Backend unitario | PASS — 495/495, sin fallos ni omisiones |
-| PostgreSQL/Testcontainers | PASS — 114/114, sin fallos ni omisiones |
-| Flyway limpio y upgrades históricos | PASS — incluidos en `DatabaseMigrationTests` reales |
+| Backend unitario | PASS — 502/502, sin fallos ni omisiones |
+| PostgreSQL/Testcontainers | PASS — 115/115, sin fallos ni omisiones |
+| Flyway limpio y upgrades históricos | PASS — V83/V84/V85/V99→V102 en `DatabaseMigrationTests`, incluidas las formas conocidas de V84 y la normalización exacta del primer V102 de prueba; volumen Docker V85→V102 sin `repair` manual ni pérdida de datos |
 | Concurrencia con última visita | PASS — dos solicitudes, un consumo, saldo final 0 |
 | Frontend unitario | PASS — 114/114 |
 | TypeScript | PASS — `tsc --noEmit` |
 | ESLint | PASS |
+| Dependencias frontend | PASS — `npm audit --audit-level=high`, 0 vulnerabilidades |
 | Build Next.js 16.3.2 | PASS — 38 rutas generadas |
+| Build OpenNext/Cloudflare | PASS |
 | Playwright completo | PASS — 102/102, incluido origen Tecnológica |
+| Docker Compose y smoke local | PASS — imágenes reconstruidas; PostgreSQL/Redis/MinIO sanos; backend/frontend iniciados y HTTP exitoso |
 | Stripe sandbox conectado | NOT RUN — requiere credenciales/cuenta Connect test externa |
 | Torniquetes y lectores físicos de ambas sedes | NOT RUN — requiere hardware del cliente |
 

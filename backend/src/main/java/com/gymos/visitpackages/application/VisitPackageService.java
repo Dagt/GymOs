@@ -7,7 +7,6 @@ import com.gymos.clients.api.operations.ClientLifecycleOperations;
 import com.gymos.clients.api.operations.ClientLifecycleOperations.RegistrationFee;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
-import com.gymos.common.time.BusinessTime;
 import com.gymos.sales.api.operations.CreateVisitPackageSaleCommand;
 import com.gymos.sales.api.operations.SalesOperations;
 import com.gymos.sales.api.operations.VisitPackageSaleResult;
@@ -55,9 +54,10 @@ public class VisitPackageService implements VisitPackageOperations {
 			throw new BusinessException("CLIENT_NOT_ACTIVE", "El socio no existe o no está activo.");
 		}
 		OffsetDateTime now = OffsetDateTime.now();
-		entitlements.expireDue(principal.organizationId(), clientId, BusinessTime.today(), now);
-		requireNoOtherOpenPackage(principal.organizationId(), clientId);
-		return quoteFor(principal, clientId, requiredPlan(principal, packagePlanId));
+		var businessDate = entitlements.businessDate(principal.organizationId(), principal.branchId(), now);
+		entitlements.expireDue(principal.organizationId(), clientId, businessDate, now);
+		requireNoOtherOpenPackage(principal.organizationId(), clientId, businessDate);
+		return quoteFor(principal, clientId, requiredPlan(principal, packagePlanId), businessDate);
 	}
 
 	@Override
@@ -71,15 +71,16 @@ public class VisitPackageService implements VisitPackageOperations {
 			throw new BusinessException("CLIENT_NOT_ACTIVE", "El socio no existe o no está activo.");
 		}
 		OffsetDateTime now = OffsetDateTime.now();
-		entitlements.expireDue(principal.organizationId(), command.clientId(), BusinessTime.today(), now);
+		var businessDate = entitlements.businessDate(principal.organizationId(), principal.branchId(), now);
+		entitlements.expireDue(principal.organizationId(), command.clientId(), businessDate, now);
 		VisitPackagePlanSnapshot plan = requiredPlan(principal, command.packagePlanId());
-		VisitPackageQuoteView quote = quoteFor(principal, command.clientId(), plan);
+		VisitPackageQuoteView quote = quoteFor(principal, command.clientId(), plan, businessDate);
 		Optional<VisitPackageEntitlementView> retry = entitlements.byIdempotencyKey(
 				principal.organizationId(), command.clientId(), idempotencyKey);
 		if (retry.isPresent() && !retry.get().packagePlanId().equals(command.packagePlanId())) {
 			throw new BusinessException("IDEMPOTENCY_KEY_REUSED", "La llave ya fue usada para otro paquete.");
 		}
-		if (retry.isEmpty()) requireNoOtherOpenPackage(principal.organizationId(), command.clientId());
+		if (retry.isEmpty()) requireNoOtherOpenPackage(principal.organizationId(), command.clientId(), businessDate);
 
 		VisitPackageSaleResult sale = sales.createVisitPackagePurchase(new CreateVisitPackageSaleCommand(
 				principal.organizationId(), principal.branchId(), principal.userId(), command.clientId(),
@@ -119,7 +120,9 @@ public class VisitPackageService implements VisitPackageOperations {
 	public Optional<VisitPackageEntitlementView> current(GymOsPrincipal principal, UUID clientId) {
 		requireBranch(principal);
 		if (!entitlements.lockActiveClient(principal.organizationId(), clientId)) return Optional.empty();
-		entitlements.expireDue(principal.organizationId(), clientId, BusinessTime.today(), OffsetDateTime.now());
+		OffsetDateTime now = OffsetDateTime.now();
+		var businessDate = entitlements.businessDate(principal.organizationId(), principal.branchId(), now);
+		entitlements.expireDue(principal.organizationId(), clientId, businessDate, now);
 		return entitlements.open(principal.organizationId(), clientId);
 	}
 
@@ -133,11 +136,12 @@ public class VisitPackageService implements VisitPackageOperations {
 	}
 
 	private VisitPackageQuoteView quoteFor(
-			GymOsPrincipal principal, UUID clientId, VisitPackagePlanSnapshot plan
+			GymOsPrincipal principal, UUID clientId, VisitPackagePlanSnapshot plan,
+			java.time.LocalDate businessDate
 	) {
 		RegistrationFee fee = "WAIVED".equals(plan.registrationFeePolicy())
 				? RegistrationFee.none(plan.currency(), 0)
-				: lifecycle.registrationFee(principal.organizationId(), clientId, BusinessTime.today());
+				: lifecycle.registrationFee(principal.organizationId(), clientId, businessDate);
 		if (fee.due() && !plan.currency().equalsIgnoreCase(fee.currency())) {
 			throw new BusinessException(
 					"REGISTRATION_FEE_CURRENCY_MISMATCH",
@@ -162,12 +166,12 @@ public class VisitPackageService implements VisitPackageOperations {
 						"VISIT_PACKAGE_PLAN_NOT_AVAILABLE", "El paquete no está disponible en esta sucursal."));
 	}
 
-	private void requireNoOtherOpenPackage(UUID organizationId, UUID clientId) {
+	private void requireNoOtherOpenPackage(UUID organizationId, UUID clientId, java.time.LocalDate businessDate) {
 		if (entitlements.open(organizationId, clientId).isPresent()) {
 			throw new BusinessException(
 					"VISIT_PACKAGE_OPEN_CONFLICT", "El socio ya tiene un paquete pendiente o activo.");
 		}
-		if (entitlements.hasActiveLegacyPass(organizationId, clientId, BusinessTime.today())) {
+		if (entitlements.hasActiveLegacyPass(organizationId, clientId, businessDate)) {
 			throw new BusinessException(
 					"VISIT_PACKAGE_LEGACY_CONFLICT",
 					"El socio tiene un paquete histórico activo. Regularízalo antes de vender otro.");

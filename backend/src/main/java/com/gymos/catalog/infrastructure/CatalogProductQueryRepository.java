@@ -58,7 +58,8 @@ class CatalogProductQueryRepository {
 
 	List<ProductSummaryView> list(UUID organizationId, UUID branchId) {
 		String sql = baseSelect() + " WHERE cp.organization_id=:organizationId" + availability(branchId)
-				+ " AND cp.product_type<>'MEMBERSHIP_PLAN' AND cp.deleted_at IS NULL AND cp.archived_at IS NULL"
+				+ " AND cp.product_type<>'MEMBERSHIP_PLAN' AND cp.commercial_subtype IS DISTINCT FROM 'VISIT_PASS'"
+				+ " AND cp.deleted_at IS NULL AND cp.archived_at IS NULL"
 				+ " ORDER BY cp.display_order, cp.name";
 		return bindBranch(jdbcClient.sql(sql).param("organizationId", organizationId), branchId)
 				.query(CatalogRowMappers.productSummary()).list();
@@ -146,6 +147,7 @@ class CatalogProductQueryRepository {
 		if (!criteria.includeArchived()) value.append(" AND cp.archived_at IS NULL");
 		if (hasText(criteria.query())) value.append(" AND (LOWER(cp.name) LIKE :query OR LOWER(cp.sku) LIKE :query OR EXISTS (SELECT 1 FROM catalog_product_family search_family WHERE search_family.organization_id=cp.organization_id AND search_family.id=cp.family_id AND LOWER(search_family.name) LIKE :query) OR EXISTS (SELECT 1 FROM catalog_product_barcode search_barcode WHERE search_barcode.organization_id=cp.organization_id AND search_barcode.product_id=cp.id AND LOWER(search_barcode.barcode) LIKE :query) OR EXISTS (SELECT 1 FROM catalog_product_tag spt JOIN catalog_tag st ON st.id=spt.tag_id WHERE spt.organization_id=cp.organization_id AND spt.product_id=cp.id AND st.normalized_name LIKE :query))");
 		if (hasText(criteria.productType())) value.append(" AND cp.product_type=:productType"); else value.append(" AND cp.product_type <> 'MEMBERSHIP_PLAN'");
+		value.append(" AND cp.commercial_subtype IS DISTINCT FROM 'VISIT_PASS'");
 		if (hasText(criteria.status())) value.append(" AND cp.status=:status");
 		if (criteria.inventoryTracked() != null) value.append(" AND cp.inventory_tracked=:inventoryTracked");
 		if (criteria.categoryId() != null) value.append(" AND EXISTS (SELECT 1 FROM catalog_product_category pc WHERE pc.organization_id=:organizationId AND pc.product_id=cp.id AND pc.category_id=:categoryId)");

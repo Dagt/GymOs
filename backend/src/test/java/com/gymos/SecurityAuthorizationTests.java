@@ -347,6 +347,13 @@ class SecurityAuthorizationTests {
 	}
 
 	@Test
+	@WithMockUser(authorities = "catalog.read")
+	void catalogReadersCanLoadOrganizationAccessOptionsForVisitPackages() throws Exception {
+		var result = mockMvc.perform(get("/api/v1/catalog/access-benefits")).andReturn();
+		assertThat(result.getResponse().getStatus()).isNotIn(401, 403);
+	}
+
+	@Test
 	@WithMockUser(authorities = "client.read")
 	void clientBenefitAssignmentRequiresAssignPermission() throws Exception {
 		mockMvc.perform(post("/api/v1/clients/99999999-9999-9999-9999-999999999951/benefits")

@@ -58,7 +58,8 @@ public class VisitPackagePlanService implements VisitPackagePlanOperations {
 		return packages.find(organizationId, planId)
 				.filter(plan -> "ACTIVE".equals(plan.status()))
 				.filter(plan -> "ALL_BRANCHES".equals(plan.branchScope()) || plan.branchIds().contains(branchId))
-				.map(plan -> snapshot(organizationId, plan));
+				.flatMap(plan -> operationalSnapshot(organizationId, plan))
+				.filter(plan -> plan.branchIds().contains(branchId));
 	}
 
 	@Override
@@ -68,7 +69,9 @@ public class VisitPackagePlanService implements VisitPackagePlanOperations {
 		return packages.list(organizationId, branchId).stream()
 				.filter(plan -> "ACTIVE".equals(plan.status()))
 				.filter(VisitPackagePlanView::selfServiceAcquisitionEnabled)
-				.map(plan -> snapshot(organizationId, plan))
+				.map(plan -> operationalSnapshot(organizationId, plan))
+				.flatMap(java.util.Optional::stream)
+				.filter(plan -> plan.branchIds().contains(branchId))
 				.toList();
 	}
 
@@ -249,19 +252,33 @@ public class VisitPackagePlanService implements VisitPackagePlanOperations {
 		}
 	}
 
-	private VisitPackagePlanSnapshot snapshot(UUID organizationId, VisitPackagePlanView plan) {
+	private java.util.Optional<VisitPackagePlanSnapshot> operationalSnapshot(
+			UUID organizationId, VisitPackagePlanView plan
+	) {
 		List<UUID> effectiveBranches = "ALL_BRANCHES".equals(plan.branchScope())
 				? packages.activeBranchIds(organizationId) : plan.branchIds();
+		if (effectiveBranches.isEmpty()) return java.util.Optional.empty();
 		List<BenefitCoverage> coverages = packages.benefitCoverages(
 				organizationId, plan.benefits(), effectiveBranches).stream()
 				.map(coverage -> new BenefitCoverage(
 						coverage.benefitId(), coverage.usageMode(), coverage.branchIds()))
 				.toList();
-		return new VisitPackagePlanSnapshot(
+		if (coverages.size() != plan.benefits().size()
+				|| coverages.stream().anyMatch(coverage -> coverage.branchIds().isEmpty())) {
+			return java.util.Optional.empty();
+		}
+		var branchesWithBaseVisit = new HashSet<UUID>();
+		coverages.stream()
+				.filter(coverage -> coverage.usageMode() == VisitPackageBenefitUsageMode.CONSUMES_VISIT)
+				.forEach(coverage -> branchesWithBaseVisit.addAll(coverage.branchIds()));
+		if (!branchesWithBaseVisit.containsAll(effectiveBranches)) {
+			return java.util.Optional.empty();
+		}
+		return java.util.Optional.of(new VisitPackagePlanSnapshot(
 				plan.id(), plan.productId(), plan.sku(), plan.name(), plan.priceCents(), plan.currency(),
 				plan.totalVisits(), plan.validityDays(), plan.branchScope(),
 				effectiveBranches, plan.benefits(), coverages,
-				plan.selfServiceAcquisitionEnabled(), plan.registrationFeePolicy());
+				plan.selfServiceAcquisitionEnabled(), plan.registrationFeePolicy()));
 	}
 
 	private String required(String value, String code) {

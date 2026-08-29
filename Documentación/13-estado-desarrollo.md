@@ -265,13 +265,29 @@ ocultarse de nuevas altas/cambios del kiosco y quedar exento de inscripción.
 La identificación de kiosco encuentra al socio en toda la organización y el
 cambio entre identificación/registro reinicia la sesión para el siguiente
 visitante; los fallos opcionales del dashboard ya no contradicen un alta válida.
-La validación del 28/08/2026 ejecutó 114/114 pruebas PostgreSQL reales de
+El catálogo de accesos para configurar paquetes se resuelve a nivel organización:
+permite ver desde Tecnológica los accesos premium locales de Centro sólo cuando
+Centro forma parte del paquete, sin convertirlos en derechos de Tecnológica. Las
+definiciones que pierden cobertura o dejan una sede sin acceso consumible se
+excluyen de venta/consulta operativa hasta ser corregidas, mientras los snapshots
+ya vendidos permanecen inmutables. El producto técnico `VISIT_PASS` requerido
+para contabilizar la venta queda oculto del catálogo y POS genéricos.
+
+La validación final del 29/08/2026 ejecutó 502/502 pruebas unitarias y 115/115
+pruebas PostgreSQL reales de
 migración, concurrencia, idempotencia, snapshots, tenant isolation y dos sedes,
 sin fallos ni omisiones. La matriz Centro/Tecnológica agrega un paquete creado
 desde Tecnológica con General local en ambas sedes y Sauna, Crioterapia y
 Lockers premium exclusivamente en Centro; el saldo se comparte, pero los
 accesos físicos no se expanden. El detalle reproducible está en
 `34-matriz-pruebas-centro-tecnologica.md`.
+Flyway también se ejecutó contra el volumen histórico local que estaba en V85:
+un callback previo a validación reconoce únicamente los checksums exactos del
+V84 piloto y del primer V102 de prueba, mientras el V102 final completa
+idempotentemente las diferencias; V86–V102 se instalaron
+sin `repair` manual, borrado ni pérdida de datos. V84 permanece igual a la
+versión publicada en `main`. Otro callback acotado prepara el cambio de
+nulabilidad previo a V86 en instalaciones históricas.
 Branding por sucursal continúa después. El Connector HikCentral, cobranza SaaS
 y hardening operativo permanecen como frentes separados.
 

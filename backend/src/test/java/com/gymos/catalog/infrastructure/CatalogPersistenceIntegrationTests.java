@@ -73,6 +73,28 @@ class CatalogPersistenceIntegrationTests {
 	}
 
 	@Test
+	void managedVisitPackageProductIsHiddenFromGenericCatalogButRemainsInternallyResolvable() {
+		UUID productId = UUID.randomUUID();
+		OffsetDateTime now = OffsetDateTime.now();
+		products.create(new ProductMutation(
+				organizationId, productId, "VISITAS-10", "10 visitas", null,
+				"SERVICE", "VISIT_PASS", 50_000, "MXN", true, "ACTIVE",
+				null, null, null, null, false, 0, null,
+				null, null, null, null, null, now, userId
+		));
+		products.attachBranch(organizationId, firstBranchId, productId, userId, now);
+
+		assertThat(productQueries.list(organizationId, firstBranchId))
+				.extracting(com.gymos.catalog.application.query.ProductSummaryView::id)
+				.doesNotContain(productId);
+		assertThat(productQueries.search(organizationId, firstBranchId,
+				new ProductSearchCriteria("10 visitas", null, null, null, null, false, 0, 25, "name,asc"))
+				.items()).extracting(com.gymos.catalog.application.query.ProductSummaryView::id)
+				.doesNotContain(productId);
+		assertThat(productQueries.find(organizationId, firstBranchId, productId)).isPresent();
+	}
+
+	@Test
 	void everyBarcodeAliasResolvesTheSameVariantAndRemainsBranchScoped() {
 		UUID productId = UUID.randomUUID();
 		UUID secondProductId = UUID.randomUUID();

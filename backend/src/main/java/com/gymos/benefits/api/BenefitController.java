@@ -42,6 +42,11 @@ public class BenefitController {
 		return benefitService.benefits(principal);
 	}
 
+	@GetMapping("/catalog/access-benefits")
+	List<BenefitSummary> accessBenefitsForCatalog(@AuthenticationPrincipal GymOsPrincipal principal) {
+		return benefitService.accessBenefitsForCatalog(principal);
+	}
+
 	@GetMapping("/clients/{clientId}/benefits")
 	List<ClientBenefitSummary> clientBenefits(
 			@AuthenticationPrincipal GymOsPrincipal principal,
