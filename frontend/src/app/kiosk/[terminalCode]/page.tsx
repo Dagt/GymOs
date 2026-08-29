@@ -155,6 +155,14 @@ export default function KioskPage() {
     () => plans.filter((plan) => plan.id !== activeMembership?.planId),
     [activeMembership, plans],
   );
+  const commercialMembershipPlans = useMemo(() => {
+    if (!activeMembership) {
+      return summary?.capabilities.membershipEnrollmentAllowed ? plans : [];
+    }
+    return activeMembership.managedAtCurrentBranch && summary?.capabilities.membershipPlanChangeAllowed
+      ? changePlans
+      : [];
+  }, [activeMembership, changePlans, plans, summary]);
   const selectedTargetPlan = useMemo(
     () => plans.find((plan) => plan.id === targetPlanId) ?? null,
     [plans, targetPlanId],
@@ -326,11 +334,17 @@ export default function KioskPage() {
     setSelectedVisitPackagePlanId(packageOptions[0]?.id ?? "");
     setVisitPackageQuote(null);
     setVisitPackageError(null);
-    const currentPlanId = nextSummary.memberships.find((membership) => membership.status === "ACTIVE")?.planId;
-    setTargetPlanId(options.find((plan) => plan.id !== currentPlanId)?.id ?? options[0]?.id ?? "");
+    const currentMembership = nextSummary.memberships.find((membership) => membership.status === "ACTIVE");
+    const currentPlanId = currentMembership?.planId;
+    const alternativePlan = options.find((plan) => plan.id !== currentPlanId);
+    setTargetPlanId(alternativePlan?.id ?? options[0]?.id ?? "");
     setSelectedCommercialOfferType(
       !currentPlanId && options.length > 0
         ? "MEMBERSHIP"
+        : currentMembership?.managedAtCurrentBranch
+            && nextSummary.capabilities.membershipPlanChangeAllowed
+            && alternativePlan
+          ? "MEMBERSHIP"
         : !openPackage && packageOptions.length > 0
           ? "VISIT_PACKAGE"
           : null,
@@ -597,7 +611,7 @@ export default function KioskPage() {
         selectedVisitPackagePlanId,
       ));
     } catch (exception) {
-      setVisitPackageError(exception instanceof Error ? exception.message : "No fue posible calcular el paquete.");
+      setVisitPackageError(visitPackageOperationError(exception, "quote"));
     } finally {
       setVisitPackageBusy(false);
     }
@@ -641,7 +655,7 @@ export default function KioskPage() {
         ? "Tu paquete de visitas quedó activo."
         : "La compra quedó pendiente de confirmación del pago.");
     } catch (exception) {
-      setVisitPackageError(exception instanceof Error ? exception.message : "No fue posible iniciar el pago del paquete.");
+      setVisitPackageError(visitPackageOperationError(exception, "checkout"));
     } finally {
       setVisitPackageBusy(false);
     }
@@ -1208,25 +1222,6 @@ export default function KioskPage() {
                         </article>
                       ) : null}
 
-                      {summary.capabilities.membershipPlanChangeAllowed ? (
-                        <article className="kiosk-membership-action-card">
-                          <div><h3>Cambiar a otro plan</h3><p>Selecciona el nuevo plan. Tu plan actual no aparece como opción de cambio.</p></div>
-                          {changePlans.length > 0 ? (
-                            <>
-                              <label className="kiosk-field">Nuevo plan
-                                <select className="kiosk-input compact" onChange={(event) => { setTargetPlanId(event.target.value); setMembershipReview(null); setMembershipError(null); }} value={changePlans.some((plan) => plan.id === targetPlanId) ? targetPlanId : ""}>
-                                  {changePlans.map((plan) => <option key={plan.id} value={plan.id}>{plan.name} · {formatMoney(plan.priceCents, plan.currency)}</option>)}
-                                </select>
-                              </label>
-                              {selectedTargetPlan && selectedTargetPlan.id !== activeMembership.planId ? <p className="kiosk-plan-summary">{formatMoney(selectedTargetPlan.priceCents, selectedTargetPlan.currency)} · {selectedTargetPlan.durationDays} días</p> : null}
-                              <button className="kiosk-primary-action small" disabled={workingMembershipId !== null || !selectedTargetPlan || selectedTargetPlan.id === activeMembership.planId} onClick={() => selectedTargetPlan && void reviewMembershipCheckout("change", selectedTargetPlan.id, activeMembership)} type="button">
-                                {selectedTargetPlan && selectedTargetPlan.id !== activeMembership.planId ? `Revisar cambio a ${selectedTargetPlan.name}` : "Selecciona otro plan"}
-                              </button>
-                            </>
-                          ) : <p className="kiosk-muted">No hay otro plan disponible para cambiar en este momento.</p>}
-                        </article>
-                      ) : null}
-
                     </div> : (
                       <p className="kiosk-feature-note">
                         Esta membresía pertenece a otra sucursal. Puedes usar aquí los accesos y recursos incluidos en el plan, pero los cobros y cambios se realizan únicamente en su sucursal de origen.
@@ -1277,20 +1272,20 @@ export default function KioskPage() {
                   </article>
                 ) : null}
 
-                {(!activeMembership && summary.capabilities.membershipEnrollmentAllowed && plans.length > 0)
+                {(commercialMembershipPlans.length > 0)
                   || (!currentVisitPackage && summary.capabilities.visitPackagePurchaseAllowed && visitPackagePlans.length > 0) ? (
                     <section className="kiosk-plan-picker" aria-label="Planes y paquetes disponibles">
                       <div>
                         <span>Opciones disponibles</span>
-                        <h3>{!activeMembership && summary.capabilities.membershipEnrollmentAllowed && plans.length > 0
-                          && summary.capabilities.visitPackagePurchaseAllowed && visitPackagePlans.length > 0
-                          ? "Elige un plan o paquete"
-                          : !activeMembership && summary.capabilities.membershipEnrollmentAllowed && plans.length > 0
-                            ? "Elige una membresía"
+                        <h3>{commercialMembershipPlans.length > 0
+                          && !currentVisitPackage && summary.capabilities.visitPackagePurchaseAllowed && visitPackagePlans.length > 0
+                          ? activeMembership ? "Elige otro plan o paquete" : "Elige un plan o paquete"
+                          : commercialMembershipPlans.length > 0
+                            ? activeMembership ? "Elige otro plan" : "Elige una membresía"
                             : "Elige un paquete"}</h3>
                       </div>
                       <div aria-label="Planes y paquetes disponibles" className="kiosk-plan-options" role="radiogroup">
-                        {!activeMembership && summary.capabilities.membershipEnrollmentAllowed ? plans.map((plan) => {
+                        {commercialMembershipPlans.map((plan) => {
                           const selected = selectedCommercialOfferType === "MEMBERSHIP" && targetPlanId === plan.id;
                           return (
                             <button
@@ -1312,7 +1307,7 @@ export default function KioskPage() {
                               <small>{plan.durationDays} días</small>
                             </button>
                           );
-                        }) : null}
+                        })}
                         {!currentVisitPackage && summary.capabilities.visitPackagePurchaseAllowed ? visitPackagePlans.map((plan) => {
                           const selected = selectedCommercialOfferType === "VISIT_PACKAGE" && selectedVisitPackagePlanId === plan.id;
                           return (
@@ -1337,9 +1332,13 @@ export default function KioskPage() {
                           );
                         }) : null}
                       </div>
-                      {selectedCommercialOfferType === "MEMBERSHIP" && !activeMembership ? (
-                        <button className="kiosk-primary-action small kiosk-offer-review-action" disabled={workingMembershipId !== null || !selectedTargetPlan} onClick={() => selectedTargetPlan && void reviewMembershipCheckout("enrollment", selectedTargetPlan.id)} type="button">
-                          {workingMembershipId === "enrollment" ? "Calculando importe..." : selectedTargetPlan ? `Revisar contratación de ${selectedTargetPlan.name}` : "Elige un plan"}
+                      {selectedCommercialOfferType === "MEMBERSHIP" ? (
+                        <button className="kiosk-primary-action small kiosk-offer-review-action" disabled={workingMembershipId !== null || !selectedTargetPlan} onClick={() => selectedTargetPlan && void reviewMembershipCheckout(activeMembership ? "change" : "enrollment", selectedTargetPlan.id, activeMembership)} type="button">
+                          {workingMembershipId === (activeMembership?.id ?? "enrollment")
+                            ? "Calculando importe..."
+                            : selectedTargetPlan
+                              ? activeMembership ? `Revisar cambio a ${selectedTargetPlan.name}` : `Revisar contratación de ${selectedTargetPlan.name}`
+                              : "Elige un plan"}
                         </button>
                       ) : selectedCommercialOfferType === "VISIT_PACKAGE" ? (
                         <button className="kiosk-primary-action small kiosk-offer-review-action" disabled={visitPackageBusy || !selectedVisitPackagePlanId} onClick={() => void reviewVisitPackage()} type="button">
@@ -1495,6 +1494,21 @@ function membershipCheckoutError(exception: unknown) {
       ? ` Motivo: ${apiMessage}`
       : "";
   return `No pudimos abrir el pago. No se realizó ningún cargo ni cambio en tu membresía.${detail}${supportReference(exception)}`;
+}
+
+function visitPackageOperationError(exception: unknown, phase: "quote" | "checkout") {
+  const rawMessage = exception instanceof Error ? exception.message : "";
+  if (rawMessage.includes("VISIT_PACKAGE_OPEN_CONFLICT")) {
+    return "Ya tienes un paquete de visitas activo o un pago pendiente. Debes terminarlo, agotarlo o cancelarlo antes de contratar otro.";
+  }
+  if (rawMessage.includes("VISIT_PACKAGE_LEGACY_CONFLICT")) {
+    return "Tu expediente conserva un paquete anterior activo. Solicita apoyo en recepción antes de contratar otro.";
+  }
+  if (rawMessage.includes("VISIT_PACKAGE_PLAN_NOT_AVAILABLE")) {
+    return "Este paquete no está disponible en la sucursal actual.";
+  }
+  const action = phase === "quote" ? "calcular el importe" : "abrir el pago";
+  return `No pudimos ${action} del paquete. No se realizó ningún cargo. Intenta nuevamente o solicita apoyo en recepción.${supportReference(exception)}`;
 }
 
 function collapseRepeatedPendingPayments(payments: KioskSummaryResponse["paymentActivity"]) {

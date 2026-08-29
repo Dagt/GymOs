@@ -550,9 +550,12 @@ El expediente muestra saldo, vigencia, estado y últimos consumos. Si ya existe
 un paquete pendiente o activo, la UI no ofrece comprar otro y explica por qué.
 
 En el kiosco no existe una sección comercial separada para paquetes: planes y
-paquetes se presentan en la misma lista. El nombre y la metadata distinguen el
-producto; el plan sólo muestra días y el paquete muestra visitas más vigencia.
-La UI omite la gracia y usa acciones de revisión compactas.
+paquetes se presentan en la misma lista incluso si el socio ya tiene una
+membresía y puede cambiarla. El nombre y la metadata distinguen el producto; el
+plan sólo muestra días y el paquete muestra visitas más vigencia. La UI omite
+la gracia y usa acciones de revisión compactas y centradas. Una membresía y un
+paquete pueden coexistir; si ya hay otro paquete `PENDING_PAYMENT` o `ACTIVE`,
+el kiosco explica la exclusividad sin mostrar el error HTTP ni códigos internos.
 
 El POS genérico no permite agregar al carrito un `SERVICE/VISIT_PASS` que ya
 está administrado por `visit_package_plan`; debe utilizarse la operación

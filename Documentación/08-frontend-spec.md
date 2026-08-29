@@ -547,10 +547,12 @@ para rutinas; el socio no tiene vista remota en V1.
   membresías: con Stripe pendiente puede mostrar opciones, pero no inicia
   Checkout.
 - En el kiosco, planes de membresía y paquetes de visitas comparten una sola
-  cuadrícula de opciones. Una membresía muestra únicamente su duración; un
-  paquete muestra visitas y vigencia (por ejemplo, “15 visitas · 30 días”). No
-  se muestran días de gracia y el botón de revisión conserva un ancho compacto,
-  acorde con su texto.
+  cuadrícula de opciones, también cuando el socio ya tiene una membresía y
+  compara un cambio de plan contra un paquete adicional. Una membresía muestra
+  únicamente su duración; un paquete muestra visitas y vigencia (por ejemplo,
+  “15 visitas · 30 días”). No se muestran días de gracia y el botón de revisión
+  conserva un ancho compacto, acorde con su texto, centrado horizontal y
+  verticalmente.
 - La pestaña de configuración del kiosco ofrece por sucursal el toggle
   “Comprar paquetes de visitas” con autosave. El indicador de Stripe sólo
   aparece si el toggle está encendido; apagarlo no altera las definiciones del

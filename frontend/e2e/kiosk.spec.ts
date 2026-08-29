@@ -176,16 +176,160 @@ test("los paquetes configurados siguen visibles con Stripe pendiente y no permit
   await expect(page.getByText(/días de gracia/i)).toHaveCount(0);
   await expect(page.getByText("10 visitas · 30 días")).toBeVisible();
   await page.getByRole("radio", { name: /10 visitas/i }).click();
-  const offerSection = page.getByLabel("Planes y paquetes disponibles").first();
+  const offerSection = page.locator("section.kiosk-plan-picker");
   const reviewButton = page.getByRole("button", { name: "Revisar paquete" });
   const [offerBox, reviewBox] = await Promise.all([offerSection.boundingBox(), reviewButton.boundingBox()]);
   expect(offerBox).not.toBeNull();
   expect(reviewBox).not.toBeNull();
   if (!offerBox || !reviewBox) throw new Error("No fue posible medir la lista de opciones del kiosco.");
   expect(reviewBox.width).toBeLessThan(offerBox.width * 0.8);
+  expect(Math.abs((reviewBox.x + reviewBox.width / 2) - (offerBox.x + offerBox.width / 2))).toBeLessThan(3);
+  await expect(reviewButton).toHaveCSS("align-items", "center");
+  await expect(reviewButton).toHaveCSS("justify-content", "center");
   await page.getByRole("button", { name: "Revisar paquete" }).click();
   await expect(page.getByText("$500.00").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Pago pendiente de Stripe" })).toBeDisabled();
+});
+
+test("una membresía general cotiza un paquete exclusivo de Sauna junto a los cambios de plan", async ({ page }) => {
+  const otherPlanId = "aaaaaaaa-1111-4111-8111-aaaaaaaaaaaa";
+  const activeSummary = {
+    ...summaryResponse(),
+    capabilities: {
+      ...capabilities(),
+      membershipPlanChangeAllowed: true,
+      visitPackagePurchaseAllowed: true,
+    },
+  };
+  await mockKiosk(page, async (route, path) => {
+    const method = route.request().method();
+    if (method === "POST" && path === `/self-service/sessions/${sessionId}/verify`) {
+      return fulfill(route, activeSummary);
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/membership-options`) {
+      return fulfill(route, [{
+        id: planId,
+        productId: "44444444-4444-4444-8444-444444444444",
+        name: "Plan mensual",
+        priceCents: 79900,
+        currency: "MXN",
+        durationDays: 30,
+        graceDays: 3,
+      }, {
+        id: otherPlanId,
+        productId: "bbbbbbbb-1111-4111-8111-bbbbbbbbbbbb",
+        name: "Plan Plus",
+        priceCents: 99900,
+        currency: "MXN",
+        durationDays: 30,
+        graceDays: 0,
+      }]);
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/visit-package-options`) {
+      return fulfill(route, [{
+        id: visitPackagePlanId,
+        productId: "77777777-7777-4777-8777-777777777777",
+        sku: "SAUNA-5",
+        name: "5 sesiones de Sauna",
+        priceCents: 50000,
+        currency: "MXN",
+        totalVisits: 5,
+        validityDays: 30,
+        branchScope: "SELECTED_BRANCHES",
+        branchIds: ["99999999-9999-4999-8999-999999999999"],
+        benefitIds: ["88888888-8888-4888-8888-888888888888"],
+        selfServiceAcquisitionEnabled: true,
+        registrationFeePolicy: "WAIVED",
+      }]);
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/visit-package-quotes/${visitPackagePlanId}`) {
+      return fulfill(route, {
+        clientId: activeSummary.profile.clientId,
+        packagePlanId: visitPackagePlanId,
+        packageName: "5 sesiones de Sauna",
+        totalVisits: 5,
+        validityDays: 30,
+        packagePriceCents: 50000,
+        registrationFeeCents: 0,
+        registrationFeeLabel: null,
+        totalCents: 50000,
+        currency: "MXN",
+        branchIds: ["99999999-9999-4999-8999-999999999999"],
+        benefitIds: ["88888888-8888-4888-8888-888888888888"],
+      });
+    }
+    return false;
+  });
+
+  await openLaunchedKiosk(page);
+  await page.getByPlaceholder("Correo o teléfono").fill("andrea@example.com");
+  await page.getByLabel("Fecha de nacimiento en formato día mes año").fill("10/05/1994");
+  await page.getByRole("button", { name: "Continuar de forma segura" }).click();
+
+  await expect(page.getByRole("heading", { name: "Elige otro plan o paquete" })).toBeVisible();
+  await expect(page.getByRole("radio", { name: /Plan Plus/i })).toBeVisible();
+  await expect(page.getByRole("radio", { name: /5 sesiones de Sauna/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Cambiar a otro plan" })).toHaveCount(0);
+  await page.getByRole("radio", { name: /5 sesiones de Sauna/i }).click();
+  await page.getByRole("button", { name: "Revisar paquete" }).click();
+  await expect(page.getByRole("heading", { name: "5 sesiones de Sauna" })).toBeVisible();
+  await expect(page.getByText("$500.00").first()).toBeVisible();
+});
+
+test("un segundo paquete abierto se explica sin mostrar el error 400 técnico", async ({ page }) => {
+  const packageSummary = {
+    ...summaryResponse(),
+    capabilities: {
+      ...capabilities(),
+      membershipPlanChangeAllowed: false,
+      visitPackagePurchaseAllowed: true,
+    },
+  };
+  await mockKiosk(page, async (route, path) => {
+    const method = route.request().method();
+    if (method === "POST" && path === `/self-service/sessions/${sessionId}/verify`) {
+      return fulfill(route, packageSummary);
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/visit-package-options`) {
+      return fulfill(route, [{
+        id: visitPackagePlanId,
+        productId: "77777777-7777-4777-8777-777777777777",
+        sku: "SAUNA-5",
+        name: "5 sesiones de Sauna",
+        priceCents: 50000,
+        currency: "MXN",
+        totalVisits: 5,
+        validityDays: 30,
+        branchScope: "SELECTED_BRANCHES",
+        branchIds: ["99999999-9999-4999-8999-999999999999"],
+        benefitIds: ["88888888-8888-4888-8888-888888888888"],
+        selfServiceAcquisitionEnabled: true,
+        registrationFeePolicy: "WAIVED",
+      }]);
+    }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/visit-package-quotes/${visitPackagePlanId}`) {
+      await route.fulfill({
+        status: 400,
+        contentType: "application/json",
+        body: JSON.stringify({
+          code: "VISIT_PACKAGE_OPEN_CONFLICT",
+          message: "El socio ya tiene un paquete pendiente o activo.",
+          correlationId: "package-conflict-reference",
+        }),
+      });
+      return true;
+    }
+    return false;
+  });
+
+  await openLaunchedKiosk(page);
+  await page.getByPlaceholder("Correo o teléfono").fill("andrea@example.com");
+  await page.getByLabel("Fecha de nacimiento en formato día mes año").fill("10/05/1994");
+  await page.getByRole("button", { name: "Continuar de forma segura" }).click();
+  await page.getByRole("button", { name: "Revisar paquete" }).click();
+
+  await expect(page.getByText(/Ya tienes un paquete de visitas activo o un pago pendiente/i)).toBeVisible();
+  await expect(page.getByText(/400 HTTP|VISIT_PACKAGE_OPEN_CONFLICT|CorrelationId:/i)).toHaveCount(0);
 });
 
 test("un fallo de verificación mantiene el formulario centrado y oculta el detalle técnico", async ({ page }) => {
