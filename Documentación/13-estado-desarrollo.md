@@ -262,6 +262,9 @@ se bloquea cuando ya hubo consumos.
 Los paquetes viven junto a los planes en Catálogo; Configuración sólo conserva
 la intención por sucursal del kiosco. Cada plan de membresía también puede
 ocultarse de nuevas altas/cambios del kiosco y quedar exento de inscripción.
+El alta de paquetes presenta la sede operativa como sucursal base fija y sólo
+permite agregar otras sedes. En el kiosco, planes y paquetes comparten una sola
+cuadrícula comercial, sin días de gracia visibles y con acciones compactas.
 La identificación de kiosco encuentra al socio en toda la organización y el
 cambio entre identificación/registro reinicia la sesión para el siguiente
 visitante; los fallos opcionales del dashboard ya no contradicen un alta válida.

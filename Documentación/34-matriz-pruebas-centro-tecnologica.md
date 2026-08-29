@@ -146,7 +146,7 @@ Producto principal de aceptación, creado desde Tecnológica:
 | U-01 | Catálogo | Abrir Planes | Acción “Nuevo plan” vive dentro de la pestaña |
 | U-02 | Catálogo | Abrir Paquetes | Acción “Nuevo paquete” vive dentro de la pestaña |
 | U-03 | Catálogo | Abrir Artículos/Categorías | Sus altas aparecen en la pestaña correspondiente |
-| U-04 | Paquetes | Operar en Tecnológica | Tecnológica está seleccionada y no puede quitarse; Centro es opcional |
+| U-04 | Paquetes | Operar en Tecnológica | Tecnológica aparece como sucursal base fija, sin checkbox; Centro es la única extensión opcional |
 | U-05 | Paquetes | Elegir sólo Tecnológica | No ofrece como válidos Benefits `LOCAL` exclusivos de Centro |
 | U-06 | Paquetes | Elegir ambas sedes | Cada acceso muestra dónde es efectivo; premium indica “sólo Centro” |
 | U-07 | Paquetes | Elegir modo de acceso | Textos visibles: “Consume una visita” / “Se incluye con la visita” |
@@ -158,6 +158,8 @@ Producto principal de aceptación, creado desde Tecnológica:
 | U-13 | Catálogo de accesos | Operar en Tecnológica | Lista General Tecnológica y también premium Centro con su cobertura real; no lista Benefits ajenos/inactivos/no ACCESS |
 | U-14 | Catálogo/POS genérico | Buscar el producto técnico del paquete | `VISIT_PASS` no aparece ni puede editarse/venderse como artículo normal; el flujo dedicado de paquetes sigue resolviéndolo internamente |
 | U-15 | Venta/kiosco | Consultar una definición dañada por drift posterior | Se omite de superficies operativas (fail-closed) y sigue disponible para reparación administrativa |
+| U-16 | Kiosco | Hay planes y paquetes disponibles | Ambos aparecen en una sola cuadrícula; no existe una sección separada de paquetes |
+| U-17 | Kiosco | Mostrar metadata y CTA | Plan muestra sólo duración; paquete muestra visitas y vigencia; no aparece gracia y el botón de revisión no ocupa todo el ancho |
 
 ## 8. Evidencia automatizada
 

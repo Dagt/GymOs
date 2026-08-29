@@ -531,22 +531,28 @@ El alta solicita únicamente:
 - nombre, SKU, precio y descripción;
 - número de visitas;
 - vigencia;
-- todas las sucursales o selección;
+- sucursal base fija y sucursales adicionales opcionales;
 - accesos del paquete y, por cada uno, “Consume una visita” o “Se incluye con
   la visita”;
 - inscripción general o exenta;
 - disponible o no en kiosco.
 
-La interfaz llama a las decisiones “Dónde puede usarse el saldo” y “Accesos del
+La interfaz llama a las decisiones “Dónde puede usarse” y “Accesos del
 paquete”. Cada acceso muestra las sedes exactas donde existe y las sedes
-seleccionadas donde no está disponible. La sucursal activa queda seleccionada y
-bloqueada; otra sede sin ningún acceso queda deshabilitada. Antes de guardar,
+seleccionadas donde no está disponible. La sucursal activa se muestra como base
+fija y no aparece como checkbox; únicamente se marcan las sedes adicionales.
+Otra sede sin ningún acceso queda deshabilitada. Antes de guardar,
 la interfaz y backend comprueban que cada sede tenga al menos un acceso que
 consuma una visita y explican que un acceso incluido requiere una visita base
 ese día en esa misma sucursal.
 
 El expediente muestra saldo, vigencia, estado y últimos consumos. Si ya existe
 un paquete pendiente o activo, la UI no ofrece comprar otro y explica por qué.
+
+En el kiosco no existe una sección comercial separada para paquetes: planes y
+paquetes se presentan en la misma lista. El nombre y la metadata distinguen el
+producto; el plan sólo muestra días y el paquete muestra visitas más vigencia.
+La UI omite la gracia y usa acciones de revisión compactas.
 
 El POS genérico no permite agregar al carrito un `SERVICE/VISIT_PASS` que ya
 está administrado por `visit_package_plan`; debe utilizarse la operación

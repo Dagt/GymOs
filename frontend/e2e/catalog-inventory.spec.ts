@@ -160,11 +160,11 @@ test.describe("catalogo e inventario", () => {
     await page.goto("/catalog");
     await page.getByRole("button", { name: "Paquetes de visitas" }).click();
     await page.getByRole("button", { name: "Nuevo paquete" }).click();
-    await page.getByLabel("Dónde puede usarse el saldo").selectOption("SELECTED_BRANCHES");
 
-    await expect(page.getByRole("checkbox", { name: /^Centro / })).toBeChecked();
-    await expect(page.getByRole("checkbox", { name: /^Centro / })).toBeDisabled();
-    await expect(page.getByText("Sucursal activa · siempre incluida", { exact: true })).toBeVisible();
+    const baseBranch = page.getByText("Sucursal base", { exact: true }).locator("..");
+    await expect(baseBranch).toContainText("Centro");
+    await expect(baseBranch).toContainText("Siempre incluida porque estás operando aquí.");
+    await expect(page.getByRole("checkbox", { name: /^Centro / })).toHaveCount(0);
     await expect(page.getByRole("checkbox", { name: /^Norte / })).toBeDisabled();
     await expect(page.getByText("No hay accesos configurados para paquetes en esta sucursal", { exact: true })).toBeVisible();
     await expect(page.getByText("Disponible en: Centro", { exact: true }).first()).toBeVisible();
@@ -249,10 +249,10 @@ test.describe("catalogo e inventario", () => {
     await page.goto("/catalog");
     await page.getByRole("button", { name: "Paquetes de visitas" }).click();
     await page.getByRole("button", { name: "Nuevo paquete" }).click();
-    await page.getByLabel("Dónde puede usarse el saldo").selectOption("SELECTED_BRANCHES");
 
-    await expect(page.getByRole("checkbox", { name: /^Tecnológica / })).toBeChecked();
-    await expect(page.getByRole("checkbox", { name: /^Tecnológica / })).toBeDisabled();
+    const baseBranch = page.getByText("Sucursal base", { exact: true }).locator("..");
+    await expect(baseBranch).toContainText("Tecnológica");
+    await expect(page.getByRole("checkbox", { name: /^Tecnológica / })).toHaveCount(0);
     await expect(page.getByRole("checkbox", { name: /^Centro/ })).not.toBeChecked();
     await expect(page.getByRole("checkbox", { name: /Sauna/ })).toBeDisabled();
     await expect(page.getByText("No existe en las sucursales elegidas", { exact: true }).first()).toBeVisible();

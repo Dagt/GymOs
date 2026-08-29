@@ -74,6 +74,7 @@ test("el kiosco aplica capacidades, no ofrece pago manual y actualiza contacto",
   await expect(page.locator(".kiosk-feedback.error")).toHaveCount(0);
   await expect(page.getByText(/INTERNAL_ERROR|HTTP en \/self-service|Código:/)).toHaveCount(0);
   await expect(page.getByText("Vigente hasta 31 jul 2026")).toBeVisible();
+  await expect(page.getByText(/Periodo de gracia|días de gracia/i)).toHaveCount(0);
   await expect(page.getByText("Profesionales de bienestar")).toHaveCount(0);
   await expect(page.getByLabel("Referencia de pago")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Revisar renovación de Plan mensual" })).toBeEnabled();
@@ -104,6 +105,7 @@ test("los paquetes configurados siguen visibles con Stripe pendiente y no permit
     ...summaryResponse(),
     capabilities: {
       ...capabilities(),
+      membershipEnrollmentAllowed: true,
       membershipRenewalAllowed: false,
       membershipPlanChangeAllowed: false,
       visitPackagePurchaseAllowed: true,
@@ -132,6 +134,17 @@ test("los paquetes configurados siguen visibles con Stripe pendiente y no permit
         registrationFeePolicy: "DEFAULT",
       }]);
     }
+    if (method === "GET" && path === `/self-service/sessions/${sessionId}/membership-options`) {
+      return fulfill(route, [{
+        id: planId,
+        productId: "44444444-4444-4444-8444-444444444444",
+        name: "Plan mensual",
+        priceCents: 79900,
+        currency: "MXN",
+        durationDays: 30,
+        graceDays: 3,
+      }]);
+    }
     if (method === "GET" && path === `/self-service/sessions/${sessionId}/visit-package-quotes/${visitPackagePlanId}`) {
       return fulfill(route, {
         clientId: packageSummary.profile.clientId,
@@ -156,8 +169,20 @@ test("los paquetes configurados siguen visibles con Stripe pendiente y no permit
   await page.getByLabel("Fecha de nacimiento en formato día mes año").fill("10/05/1994");
   await page.getByRole("button", { name: "Continuar de forma segura" }).click();
 
-  await expect(page.getByRole("heading", { name: "Paquetes de visitas" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Elige un plan o paquete" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Paquetes de visitas" })).toHaveCount(0);
+  await expect(page.getByText("Plan mensual", { exact: true })).toBeVisible();
+  await expect(page.getByText("30 días", { exact: true })).toBeVisible();
+  await expect(page.getByText(/días de gracia/i)).toHaveCount(0);
   await expect(page.getByText("10 visitas · 30 días")).toBeVisible();
+  await page.getByRole("radio", { name: /10 visitas/i }).click();
+  const offerSection = page.getByLabel("Planes y paquetes disponibles").first();
+  const reviewButton = page.getByRole("button", { name: "Revisar paquete" });
+  const [offerBox, reviewBox] = await Promise.all([offerSection.boundingBox(), reviewButton.boundingBox()]);
+  expect(offerBox).not.toBeNull();
+  expect(reviewBox).not.toBeNull();
+  if (!offerBox || !reviewBox) throw new Error("No fue posible medir la lista de opciones del kiosco.");
+  expect(reviewBox.width).toBeLessThan(offerBox.width * 0.8);
   await page.getByRole("button", { name: "Revisar paquete" }).click();
   await expect(page.getByText("$500.00").first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Pago pendiente de Stripe" })).toBeDisabled();
@@ -567,7 +592,7 @@ test("un socio sin membresia puede abrir Stripe Checkout con una intencion idemp
         membership: null,
         paymentId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         providerOperationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
-        checkoutUrl: "http://127.0.0.1:3000/kiosk/checkout/result?status=success&session_id=cs_payment",
+        checkoutUrl: `${new URL(page.url()).origin}/kiosk/checkout/result?status=success&session_id=cs_payment`,
         checkoutStatus: "OPEN",
       });
     }
@@ -719,7 +744,7 @@ test("muestra comprobante y permite recuperar una domiciliacion PAST_DUE con otr
     }
     if (method === "POST" && path === `/self-service/sessions/${sessionId}/autopay/${membershipId}/setup`) {
       setupPayload = route.request().postDataJSON() as Record<string, unknown>;
-      return fulfill(route, { mandateId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", status: "PENDING_SETUP", providerOperationId: null, providerSessionId: "cs_replace", checkoutUrl: "http://127.0.0.1:3000/kiosk/checkout/result?status=autopay-success&session_id=cs_replace", termsVersion: "2026-08-03", nextChargeOn: "2026-08-31" });
+      return fulfill(route, { mandateId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", status: "PENDING_SETUP", providerOperationId: null, providerSessionId: "cs_replace", checkoutUrl: `${new URL(page.url()).origin}/kiosk/checkout/result?status=autopay-success&session_id=cs_replace`, termsVersion: "2026-08-03", nextChargeOn: "2026-08-31" });
     }
     return false;
   });
@@ -812,7 +837,7 @@ test("el socio acepta terminos versionados antes de tokenizar la domiciliacion",
         status: "PENDING_SETUP",
         providerOperationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
         providerSessionId: "cs_setup",
-        checkoutUrl: "http://127.0.0.1:3000/kiosk/checkout/result?status=autopay-success&session_id=cs_setup",
+        checkoutUrl: `${new URL(page.url()).origin}/kiosk/checkout/result?status=autopay-success&session_id=cs_setup`,
         termsVersion: "2026-08-03",
         nextChargeOn: "2026-07-31",
       });

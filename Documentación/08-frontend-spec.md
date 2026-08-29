@@ -527,8 +527,10 @@ para rutinas; el socio no tiene vista remota en V1.
 - Catálogo incorpora una sección propia “Paquetes de visitas” con un formulario
   breve: nombre, SKU, precio, visitas, vigencia, sedes, accesos, inscripción,
   kiosco y estado.
-- En ese formulario, “Dónde puede usarse el saldo” mantiene la sucursal activa
-  seleccionada y no permite crear desde A un paquete sólo para B. “Accesos que
+- En ese formulario, la sucursal activa se presenta como “Sucursal base”, sin
+  checkbox ni forma de quitarla. La lista sólo muestra otras sucursales que se
+  pueden agregar; por ello no existe visualmente la combinación “sólo B” al
+  operar en A. “Accesos que
   consumen una visita” muestra el alcance propio de cada acceso y explica que el
   paquete no lo amplía; Sauna local de Centro sigue siendo sólo de Centro aunque
   el saldo cubra también Tecnológica. Una sede sin ningún acceso disponible no
@@ -544,6 +546,11 @@ para rutinas; el socio no tiene vista remota en V1.
 - Kiosco distingue intención de compra y readiness de pago igual que las
   membresías: con Stripe pendiente puede mostrar opciones, pero no inicia
   Checkout.
+- En el kiosco, planes de membresía y paquetes de visitas comparten una sola
+  cuadrícula de opciones. Una membresía muestra únicamente su duración; un
+  paquete muestra visitas y vigencia (por ejemplo, “15 visitas · 30 días”). No
+  se muestran días de gracia y el botón de revisión conserva un ancho compacto,
+  acorde con su texto.
 - La pestaña de configuración del kiosco ofrece por sucursal el toggle
   “Comprar paquetes de visitas” con autosave. El indicador de Stripe sólo
   aparece si el toggle está encendido; apagarlo no altera las definiciones del

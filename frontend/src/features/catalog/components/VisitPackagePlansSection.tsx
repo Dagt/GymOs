@@ -43,7 +43,7 @@ const emptyDraft: Draft = {
   currency: "MXN",
   totalVisits: "10",
   validityDays: "30",
-  branchScope: "ALL_BRANCHES",
+  branchScope: "SELECTED_BRANCHES",
   branchIds: [],
   benefits: [],
   selfServiceAcquisitionEnabled: true,
@@ -81,6 +81,14 @@ export function VisitPackagePlansSection({
     () => draft.branchScope === "ALL_BRANCHES" ? branches.map((branch) => branch.id) : draft.branchIds,
     [branches, draft.branchIds, draft.branchScope],
   );
+  const currentBranch = useMemo(
+    () => branches.find((branch) => branch.id === currentBranchId) ?? null,
+    [branches, currentBranchId],
+  );
+  const additionalBranches = useMemo(
+    () => branches.filter((branch) => branch.id !== currentBranchId),
+    [branches, currentBranchId],
+  );
   const uncoveredSelectedBranches = useMemo(
     () => branchesWithoutConsumingAccess(
       selectedPackageBranchIds,
@@ -116,7 +124,11 @@ export function VisitPackagePlansSection({
 
   function create() {
     setEditingId(null);
-    setDraft({ ...emptyDraft, branchIds: currentBranchId ? [currentBranchId] : [] });
+    setDraft({
+      ...emptyDraft,
+      branchScope: "SELECTED_BRANCHES",
+      branchIds: currentBranchId ? [currentBranchId] : [],
+    });
     setError(null);
     setMessage(null);
     setOpen(true);
@@ -133,9 +145,11 @@ export function VisitPackagePlansSection({
       totalVisits: String(plan.totalVisits),
       validityDays: String(plan.validityDays),
       branchScope: plan.branchScope,
-      branchIds: plan.branchScope === "SELECTED_BRANCHES" && currentBranchId
-        ? Array.from(new Set([...plan.branchIds, currentBranchId]))
-        : plan.branchIds,
+      branchIds: plan.branchScope === "ALL_BRANCHES"
+        ? branches.map((branch) => branch.id)
+        : currentBranchId
+          ? Array.from(new Set([...plan.branchIds, currentBranchId]))
+          : plan.branchIds,
       benefits: plan.benefits ?? plan.benefitIds.map((benefitId) => ({
         benefitId,
         usageMode: "CONSUMES_VISIT" as const,
@@ -295,47 +309,73 @@ export function VisitPackagePlansSection({
 
           <div className="grid gap-4 rounded-xl border border-[var(--brand-line)] bg-[#fbfcfa] p-4 lg:grid-cols-2">
             <div className="grid content-start gap-3">
-              <SelectField
-                label="Dónde puede usarse el saldo"
-                name="visitPackageBranchScope"
-                value={draft.branchScope}
-                options={[{ label: "Todas las sucursales", value: "ALL_BRANCHES" }, { label: "Sólo sucursales seleccionadas", value: "SELECTED_BRANCHES" }]}
-                onChange={(branchScope) => {
-                  const nextScope = branchScope as Draft["branchScope"];
-                  const nextBranchIds = nextScope === "ALL_BRANCHES"
-                    ? branches.map((branch) => branch.id)
-                    : currentBranchId
-                      ? Array.from(new Set([...draft.branchIds, currentBranchId]))
-                      : draft.branchIds;
-                  setDraft({
-                    ...draft,
-                    branchScope: nextScope,
-                    branchIds: nextScope === "SELECTED_BRANCHES" ? nextBranchIds : draft.branchIds,
-                    benefits: compatibleBenefits(draft.benefits, accessBenefits, nextBranchIds),
-                  });
-                }}
-              />
-              {draft.branchScope === "SELECTED_BRANCHES" ? (
+              <div>
+                <p className="text-sm font-semibold text-[#111815]">Dónde puede usarse</p>
+                <p className="mt-1 text-xs text-[var(--brand-muted)]">
+                  La sucursal en la que estás operando siempre forma parte del paquete. Agrega sólo las sucursales adicionales que necesites.
+                </p>
+              </div>
+              {currentBranch ? (
+                <div className="rounded-lg border border-[#bfd7c5] bg-[#edf7ef] px-3 py-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[#477252]">Sucursal base</p>
+                  <p className="mt-0.5 font-semibold text-[#173b22]">{currentBranch.name}</p>
+                  <p className="mt-0.5 text-xs text-[#477252]">Siempre incluida porque estás operando aquí.</p>
+                </div>
+              ) : (
+                <p className="rounded-lg bg-[#fff3df] px-3 py-2 text-xs font-medium text-[#80561f]">
+                  Selecciona una sucursal operativa antes de crear el paquete.
+                </p>
+              )}
+              {additionalBranches.length > 0 ? (
+                <div className="grid gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--brand-muted)]">Agregar otras sucursales</p>
+                  <CheckboxList
+                    empty="No hay otras sucursales activas."
+                    items={additionalBranches.map((branch) => ({
+                      id: branch.id,
+                      label: branch.name,
+                      description: branchHasAvailableAccess(branch.id, accessBenefits)
+                        ? "El saldo también podrá usarse aquí"
+                        : "No hay accesos configurados para paquetes en esta sucursal",
+                      disabled: !branchHasAvailableAccess(branch.id, accessBenefits),
+                    }))}
+                    selected={draft.branchIds.filter((branchId) => branchId !== currentBranchId)}
+                    onChange={(additionalBranchIds) => {
+                      const branchIds = currentBranchId
+                        ? [currentBranchId, ...additionalBranchIds]
+                        : additionalBranchIds;
+                      setDraft({
+                        ...draft,
+                        branchScope: "SELECTED_BRANCHES",
+                        branchIds,
+                        benefits: compatibleBenefits(draft.benefits, accessBenefits, branchIds),
+                      });
+                    }}
+                  />
+                </div>
+              ) : (
+                <p className="text-xs text-[var(--brand-muted)]">No hay otras sucursales activas para agregar.</p>
+              )}
+              {!currentBranchId ? (
                 <CheckboxList
                   empty="No hay sucursales activas."
                   items={branches.map((branch) => ({
                     id: branch.id,
                     label: branch.name,
-                    description: branch.id === currentBranchId
-                      ? "Sucursal activa · siempre incluida"
-                      : branchHasAvailableAccess(branch.id, accessBenefits)
-                        ? undefined
-                        : "No hay accesos configurados para paquetes en esta sucursal",
-                    disabled: branch.id === currentBranchId || !branchHasAvailableAccess(branch.id, accessBenefits),
+                    description: branchHasAvailableAccess(branch.id, accessBenefits)
+                      ? undefined
+                      : "No hay accesos configurados para paquetes en esta sucursal",
+                    disabled: !branchHasAvailableAccess(branch.id, accessBenefits),
                   }))}
                   selected={draft.branchIds}
                   onChange={(branchIds) => setDraft({
                     ...draft,
+                    branchScope: "SELECTED_BRANCHES",
                     branchIds,
                     benefits: compatibleBenefits(draft.benefits, accessBenefits, branchIds),
                   })}
                 />
-              ) : <p className="text-xs text-[var(--brand-muted)]">Incluye las sucursales activas actuales del gimnasio.</p>}
+              ) : null}
             </div>
             <div className="grid content-start gap-2">
               <p className="text-sm font-semibold text-[#111815]">Accesos del paquete</p>
