@@ -40,11 +40,19 @@ class SalesRefundValidationService {
 		if (request.amountCents() > refundable) {
 			throw new BusinessException("REFUND_EXCEEDS_REFUNDABLE_BALANCE", "El reembolso supera el saldo pagado disponible.");
 		}
+		boolean consumedVisitPackage = salesRepository.visitPackageHasConsumptions(principal.organizationId(), saleId);
+		if (request.amountCents() == refundable && consumedVisitPackage) {
+			throw new BusinessException(
+					"VISIT_PACKAGE_CONSUMED_REFUND_REQUIRES_REVIEW",
+					"El paquete ya tiene visitas consumidas. Revisa el saldo antes de procesar un reembolso total.");
+		}
 		if (request.itemized()) {
 			if (salesRepository.hasAmountOnlyRefunds(principal.organizationId(), saleId)) {
 				throw mixedMode();
 			}
-			return new RefundValidationResult(alreadyRefunded, validateItems(principal.organizationId(), saleId, request.items()));
+			return new RefundValidationResult(
+					alreadyRefunded,
+					validateItems(principal.organizationId(), saleId, request.items(), consumedVisitPackage));
 		}
 		if (salesRepository.hasItemizedRefunds(principal.organizationId(), saleId)) {
 			throw mixedMode();
@@ -52,7 +60,10 @@ class SalesRefundValidationService {
 		return new RefundValidationResult(alreadyRefunded, List.of());
 	}
 
-	private List<ValidatedRefundItem> validateItems(UUID organizationId, UUID saleId, List<RefundItemCommand> requestedItems) {
+	private List<ValidatedRefundItem> validateItems(
+			UUID organizationId, UUID saleId, List<RefundItemCommand> requestedItems,
+			boolean consumedVisitPackage
+	) {
 		Map<UUID, RefundableSaleItem> available = new HashMap<>();
 		for (RefundableSaleItem item : salesRepository.refundableSaleItems(organizationId, saleId)) {
 			available.put(item.saleItemId(), item);
@@ -72,6 +83,11 @@ class SalesRefundValidationService {
 			RefundableSaleItem saleItem = available.get(requested.saleItemId());
 			if (saleItem == null) {
 				throw new BusinessException("REFUND_ITEM_NOT_FOUND", "El producto no pertenece a la venta o ya no esta disponible.");
+			}
+			if (consumedVisitPackage && "VISIT_PACKAGE".equals(saleItem.itemType())) {
+				throw new BusinessException(
+						"VISIT_PACKAGE_CONSUMED_REFUND_REQUIRES_REVIEW",
+						"El paquete ya tiene visitas consumidas. Su reembolso requiere revisión administrativa.");
 			}
 			if (requested.quantity() > saleItem.refundableQuantity()) {
 				throw new BusinessException("REFUND_ITEM_EXCEEDS_SOLD_QUANTITY",

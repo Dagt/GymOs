@@ -60,7 +60,8 @@ lo activa. El redirect de Stripe no concede visitas.
 La idempotencia abarca venta, partida, inscripción y entitlement. La regla de un
 solo paquete abierto se valida antes de crear la venta y nuevamente con la
 restricción única de base de datos. Un reembolso después de consumos no cancela
-automáticamente un saldo parcialmente usado.
+automáticamente un saldo parcialmente usado: el refund total se rechaza con
+`VISIT_PACKAGE_CONSUMED_REFUND_REQUIRES_REVIEW` y conserva el ledger.
 
 El POS genérico rechaza paquetes configurados con
 `SALE_VISIT_PACKAGE_OPERATION_REQUIRED`: recepción y kiosco utilizan la

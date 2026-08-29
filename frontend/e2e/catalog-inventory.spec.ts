@@ -93,6 +93,70 @@ test.describe("catalogo e inventario", () => {
     await expect(page.getByRole("button", { name: "Nuevo paquete" })).toHaveCount(0);
   });
 
+  test("un paquete conserva la sucursal activa y no amplía el alcance de sus accesos", async ({ page }) => {
+    const branchA = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+    const branchB = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+    const sauna = "11111111-1111-4111-8111-111111111111";
+    let createPayload: Record<string, unknown> | null = null;
+    await bootCatalog(page, owner(), async (route, path) => {
+      if (path === "/organizations/current/branches") {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify([
+            { id: branchA, name: "Centro", code: "CENTRO", timezone: "America/Mexico_City", status: "ACTIVE", accessScope: "LOCAL" },
+            { id: branchB, name: "Tecnológica", code: "TEC", timezone: "America/Mexico_City", status: "ACTIVE", accessScope: "LOCAL" },
+          ]),
+        });
+        return true;
+      }
+      if (path === "/benefits") {
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify([{ id: sauna, branchId: branchA, name: "Sauna", code: "SAUNA", benefitType: "ACCESS", status: "ACTIVE", accessScope: "LOCAL", planIds: [] }]),
+        });
+        return true;
+      }
+      if (path === "/catalog/visit-package-plans" && route.request().method() === "GET") {
+        await route.fulfill({ contentType: "application/json", body: "[]" });
+        return true;
+      }
+      if (path === "/catalog/visit-package-plans" && route.request().method() === "POST") {
+        createPayload = route.request().postDataJSON() as Record<string, unknown>;
+        await route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify({ id: "package-1", ...createPayload, priceCents: 130000, currency: "MXN", version: 0 }),
+        });
+        return true;
+      }
+      return false;
+    });
+
+    await page.goto("/catalog");
+    await page.getByRole("button", { name: "Paquetes de visitas" }).click();
+    await page.getByRole("button", { name: "Nuevo paquete" }).click();
+    await page.getByLabel("Dónde puede usarse el saldo").selectOption("SELECTED_BRANCHES");
+
+    await expect(page.getByRole("checkbox", { name: /^Centro / })).toBeChecked();
+    await expect(page.getByRole("checkbox", { name: /^Centro / })).toBeDisabled();
+    await expect(page.getByText("Sucursal activa · siempre incluida", { exact: true })).toBeVisible();
+    await expect(page.getByText("Sólo en Centro", { exact: true })).toBeVisible();
+    await expect(page.getByText(/El paquete no amplía un acceso/)).toBeVisible();
+
+    await page.getByRole("checkbox", { name: /Tecnológica/ }).check();
+    await page.getByRole("checkbox", { name: /Sauna/ }).check();
+    await page.getByLabel("Código").fill("VISITA-SAUNA");
+    await page.getByLabel("Nombre").fill("Visitas con sauna");
+    await page.getByLabel("Precio").fill("1300");
+    await page.getByRole("button", { name: "Crear paquete" }).click();
+
+    await expect.poll(() => createPayload).not.toBeNull();
+    expect(createPayload).toMatchObject({
+      branchScope: "SELECTED_BRANCHES",
+      branchIds: [branchA, branchB],
+      benefitIds: [sauna],
+    });
+  });
+
   test("filtros persisten en URL y la edicion envia version optimista", async ({ page }) => {
     let updatePayload: Record<string, unknown> | null = null;
     await bootCatalog(page, owner(), async (route, path) => {

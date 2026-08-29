@@ -13,6 +13,8 @@ public interface VisitPackageOperations {
 			GymOsPrincipal principal, PurchaseVisitPackageCommand command, String correlationId);
 	Optional<VisitPackageEntitlementView> current(
 			GymOsPrincipal principal, UUID clientId);
+	List<VisitPackageEntitlementView> history(
+			GymOsPrincipal principal, UUID clientId, int limit);
 
 	record PurchaseVisitPackageCommand(
 			UUID clientId, UUID packagePlanId, String method, String reference,
@@ -38,10 +40,16 @@ public interface VisitPackageOperations {
 			UUID id, UUID clientId, UUID packagePlanId, UUID saleId, String packageName,
 			String status, int totalVisits, int remainingVisits, LocalDate validFrom,
 			LocalDate validUntil, OffsetDateTime pendingExpiresAt, List<UUID> branchIds,
-			List<UUID> benefitIds, OffsetDateTime createdAt, OffsetDateTime updatedAt) {
+			List<UUID> benefitIds, List<VisitPackageConsumptionView> consumptions,
+			OffsetDateTime createdAt, OffsetDateTime updatedAt) {
 		public VisitPackageEntitlementView {
 			branchIds = branchIds == null ? List.of() : List.copyOf(branchIds);
 			benefitIds = benefitIds == null ? List.of() : List.copyOf(benefitIds);
+			consumptions = consumptions == null ? List.of() : List.copyOf(consumptions);
 		}
 	}
+
+	record VisitPackageConsumptionView(
+			UUID id, String status, OffsetDateTime occurredAt, UUID branchId,
+			String branchName, UUID accessDeviceId, String deviceName, int remainingAfter) {}
 }

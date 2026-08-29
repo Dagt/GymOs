@@ -158,11 +158,13 @@ paquetes de N visitas existe un derecho vendible con saldo único y alcance
 de sucursales dentro de la misma organización; no es intercambio entre tenants
 ni una duplicación del paquete por sede.
 
-## Alcances V96–V99
+## Alcances V96–V100
 
 - `SPECIAL_PRICE` exige `applicablePlanIds`; sólo modifica el plan objetivo.
 - `ACCESS/LOCAL` conserva la semántica por sucursal.
 - `ACCESS/PLAN_COVERAGE` se reconoce en las sedes cubiertas por el plan que lo
   concede, sin copiar el beneficio.
-- Un paquete captura como snapshot sus beneficios `ACCESS`; cambios posteriores
-  a la definición no alteran lo ya vendido.
+- Un paquete captura como snapshot sus beneficios `ACCESS` y, desde V100, las
+  sucursales exactas donde cada uno puede consumir el saldo. Cambios posteriores
+  a la definición no alteran lo ya vendido. Elegir un beneficio en un paquete
+  no lo concede en una sede fuera de su alcance.

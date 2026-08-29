@@ -607,53 +607,17 @@ public class AccessService {
 	@Transactional
 	public VisitPassRecord createVisitPass(GymOsPrincipal principal, CreateVisitPassCommand request, String correlationId) {
 		requireBranch(principal);
-		ClientAccessRecord client = accessRepository.clientById(
-				principal.organizationId(), principal.branchId(), request.clientId())
-				.orElseThrow(() -> new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible."));
-		if (!"ACTIVE".equals(client.status())) {
-			throw new BusinessException("CLIENT_NOT_ACTIVE", "Solo puedes crear paquetes de visita para clientes activos.");
-		}
-		LocalDate validFrom = request.validFrom() == null ? BusinessTime.today() : request.validFrom();
-		if (request.validUntil() != null && request.validUntil().isBefore(validFrom)) {
-			throw new BusinessException("VISIT_PASS_INVALID_RANGE", "La vigencia final no puede ser anterior al inicio.");
-		}
-		UUID passId = accessRepository.createVisitPass(
-				principal.organizationId(),
-				principal.branchId(),
-				request.clientId(),
-				request.saleId(),
-				request.passType(),
-				request.totalVisits(),
-				validFrom,
-				request.validUntil()
-		);
-		auditService.record(principal, "VISIT_PASS_CREATED", "VISIT_PASS", passId, "RECEPTION", client.fullName(), correlationId);
-		return accessRepository.visitPass(principal.organizationId(), principal.branchId(), passId)
-				.orElseThrow(() -> new BusinessException("VISIT_PASS_NOT_FOUND", "El paquete de visitas no esta disponible."));
+		throw new BusinessException(
+				"VISIT_PASS_LEGACY_READ_ONLY",
+				"Los pases históricos son sólo de consulta. Vende un paquete desde Catálogo o desde el expediente del socio.");
 	}
 
 	@Transactional
 	public VisitPassRecord consumeVisitPass(GymOsPrincipal principal, UUID visitPassId, ConsumeVisitPassCommand request, String correlationId) {
 		requireBranch(principal);
-		VisitPassRecord current = accessRepository.visitPass(principal.organizationId(), principal.branchId(), visitPassId)
-				.orElseThrow(() -> new BusinessException("VISIT_PASS_NOT_FOUND", "El paquete de visitas no esta disponible."));
-		LocalDate today = BusinessTime.today();
-		if (!"ACTIVE".equals(current.status())) {
-			throw new BusinessException("VISIT_PASS_NOT_ACTIVE", "El paquete de visitas no esta activo.");
-		}
-		if (current.validFrom().isAfter(today) || (current.validUntil() != null && current.validUntil().isBefore(today))) {
-			throw new BusinessException("VISIT_PASS_OUT_OF_RANGE", "El paquete no esta vigente hoy.");
-		}
-		if (current.remainingVisits() <= 0) {
-			throw new BusinessException("VISIT_PASS_CONSUMED", "El paquete ya no tiene visitas disponibles.");
-		}
-		boolean consumed = accessRepository.consumeVisitPass(principal.organizationId(), principal.branchId(), visitPassId, OffsetDateTime.now());
-		if (!consumed) {
-			throw new BusinessException("VISIT_PASS_CONFLICT", "El paquete fue actualizado por otra operacion. Intenta de nuevo.");
-		}
-		auditService.record(principal, "VISIT_PASS_CONSUMED", "VISIT_PASS", visitPassId, "RECEPTION", request.reason(), correlationId);
-		return accessRepository.visitPass(principal.organizationId(), principal.branchId(), visitPassId)
-				.orElseThrow(() -> new BusinessException("VISIT_PASS_NOT_FOUND", "El paquete de visitas no esta disponible."));
+		throw new BusinessException(
+				"VISIT_PASS_LEGACY_READ_ONLY",
+				"Los pases históricos ya no se consumen manualmente. Usa el acceso normal para descontar un paquete vigente.");
 	}
 
 	private List<PhysicalAccessBenefitView> effectivePhysicalBenefits(GymOsPrincipal principal, UUID clientId) {

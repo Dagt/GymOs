@@ -5,6 +5,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface VisitPackagePlanOperations {
+	record BenefitCoverage(UUID benefitId, List<UUID> branchIds) {
+		public BenefitCoverage {
+			branchIds = branchIds == null ? List.of() : List.copyOf(branchIds);
+		}
+	}
+
 	Optional<VisitPackagePlanSnapshot> activePlan(UUID organizationId, UUID branchId, UUID planId);
 	List<VisitPackagePlanSnapshot> selfServicePlans(UUID organizationId, UUID branchId);
 
@@ -20,12 +26,14 @@ public interface VisitPackagePlanOperations {
 			String branchScope,
 			List<UUID> branchIds,
 			List<UUID> benefitIds,
+			List<BenefitCoverage> benefitCoverages,
 			boolean selfServiceAcquisitionEnabled,
 			String registrationFeePolicy
 	) {
 		public VisitPackagePlanSnapshot {
 			branchIds = branchIds == null ? List.of() : List.copyOf(branchIds);
 			benefitIds = benefitIds == null ? List.of() : List.copyOf(benefitIds);
+			benefitCoverages = benefitCoverages == null ? List.of() : List.copyOf(benefitCoverages);
 		}
 	}
 }

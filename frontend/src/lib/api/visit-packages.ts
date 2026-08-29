@@ -33,3 +33,10 @@ export async function getCurrentVisitPackage(
 ): Promise<VisitPackageEntitlement | null> {
   return apiFetch<VisitPackageEntitlement | null>(`/clients/${clientId}/visit-package`, accessToken);
 }
+
+export async function getVisitPackageHistory(
+  accessToken: string,
+  clientId: string,
+): Promise<VisitPackageEntitlement[]> {
+  return apiFetch<VisitPackageEntitlement[]>(`/clients/${clientId}/visit-packages`, accessToken);
+}

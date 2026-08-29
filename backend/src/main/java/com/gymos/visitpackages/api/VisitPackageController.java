@@ -13,6 +13,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
+import java.util.List;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -53,6 +54,14 @@ public class VisitPackageController {
 			@PathVariable UUID clientId
 	) {
 		return operations.current(principal, clientId).orElse(null);
+	}
+
+	@GetMapping("/clients/{clientId}/visit-packages")
+	List<VisitPackageEntitlementView> history(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@PathVariable UUID clientId
+	) {
+		return operations.history(principal, clientId, 20);
 	}
 
 	public record VisitPackageQuoteRequest(@NotNull UUID clientId, @NotNull UUID packagePlanId) {}

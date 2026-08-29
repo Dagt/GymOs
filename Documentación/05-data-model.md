@@ -948,7 +948,7 @@ reescribe V93 ni modifica su checksum. En una base donde V93 ya fue aplicada se
 conserva el valor existente de `inactivity_months`; desde V94 ese mismo valor
 gobierna tanto la baja automática como el nuevo cobro de inscripción al volver.
 
-## Extensiones V96–V99 — Planes, beneficios y paquetes de visitas
+## Extensiones V96–V100 — Planes, beneficios y paquetes de visitas
 
 V96 separa la política comercial del plan de su cobertura: `membership_plan`
 incorpora `self_service_acquisition_enabled` y `registration_fee_policy`; la
@@ -965,6 +965,12 @@ V99 materializa además `validity_days` en cada entitlement. Así, un Checkout
 pendiente conserva la vigencia cotizada y su activación no depende de una
 edición posterior de la definición comercial.
 
+V100 agrega `visit_package_entitlement_benefit_branch`. Esta tabla materializa
+el snapshot de la intersección entre las sucursales del paquete y el alcance
+efectivo de cada beneficio `ACCESS`. No crea otro saldo: el consumo exige la
+combinación exacta `entitlement + benefit + branch`. Un paquete A+B con Sauna
+`LOCAL` de A conserva saldo compartido A+B, pero Sauna sólo lo descuenta en A.
+
 Sólo puede existir un entitlement abierto (`PENDING_PAYMENT` o `ACTIVE`) por
 `organization_id + client_id`. La restricción incluye pagos pendientes para que
 dos Checkouts simultáneos no terminen activando dos paquetes. Una membresía
@@ -972,6 +978,6 @@ vigente y un paquete sí pueden coexistir; un acceso concedido por la membresía
 no consume visitas.
 
 La tabla histórica `visit_pass` permanece por compatibilidad y no se reinterpreta
-por nombre. Su alta manual se retirará al habilitar el comercio nuevo; mientras
+por nombre. Su alta y consumo manuales rechazan nuevas escrituras; mientras
 exista un pase histórico activo, la compra nueva deberá bloquearse y solicitar
 regularización explícita. Arquitectura completa: documento 33.

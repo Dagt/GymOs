@@ -27,6 +27,16 @@ export type VisitPackageEntitlement = {
   pendingExpiresAt: string | null;
   branchIds: string[];
   benefitIds: string[];
+  consumptions: Array<{
+    id: string;
+    status: "CONSUMED" | "REVERSED";
+    occurredAt: string;
+    branchId: string;
+    branchName: string;
+    accessDeviceId: string | null;
+    deviceName: string | null;
+    remainingAfter: number;
+  }>;
   createdAt: string;
   updatedAt: string;
 };

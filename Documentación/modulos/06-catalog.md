@@ -68,7 +68,11 @@ Contrato y límites: [paginación de listados](../../docs/operations/list-pagina
   vigencia, sedes y accesos. La UI vive en Catálogo inmediatamente junto a
   `Planes de membresía`, no en Configuración del sistema.
 - La definición es de organización; `branchScope` decide dónde puede usarse. No
-  se crean copias de saldo por sucursal.
+  se crean copias de saldo por sucursal. La sucursal activa siempre debe quedar
+  incluida: desde A puede configurarse A o A+B, no exclusivamente B.
+- Los accesos no amplían esa cobertura. Cada beneficio conserva `LOCAL` o
+  `PLAN_COVERAGE` y la compra toma el snapshot de su intersección con las sedes
+  del paquete.
 - Planes y paquetes muestran “Mostrar para contratar en kiosco” y
   “Inscripción: configuración general / no cobrar”. Son políticas independientes
   por oferta; Recepción conserva acceso a las ofertas ocultas.

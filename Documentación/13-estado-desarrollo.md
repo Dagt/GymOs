@@ -246,14 +246,21 @@ beneficios y paquetes de visitas multi-sucursal dentro del mismo tenant**:
 5. integración con ventas, acceso y reportes;
 6. exclusividad de un solo paquete `PENDING_PAYMENT` o `ACTIVE` por socio;
 7. planes privados de kiosco, exención de inscripción y precios especiales por
-   plan.
+   plan;
+8. alcance de paquete separado del alcance de cada acceso: el saldo puede cubrir
+   A+B sin convertir un beneficio `LOCAL` de A en un beneficio de B.
 
-V96–V99, los contratos, la compra dedicada, la activación por pago, el consumo
+V96–V100, los contratos, la compra dedicada, la activación por pago, el consumo
 desde Access y las superficies de Catálogo/Recepción/kiosco están implementados.
+V100 materializa el snapshot acceso–sucursal; la creación de un paquete exige
+incluir la sucursal activa. El expediente ya expone historial y últimos consumos,
+las escrituras `visit_pass` legacy se rechazan y un reembolso total automático
+se bloquea cuando ya hubo consumos.
 Los paquetes viven junto a los planes en Catálogo; Configuración sólo conserva
 la intención por sucursal del kiosco. Cada plan de membresía también puede
 ocultarse de nuevas altas/cambios del kiosco y quedar exento de inscripción.
-Quedan validación E2E/aceptación, reportes e integración física concurrente.
+Quedan ejecutar en PostgreSQL real las pruebas ya codificadas de migración,
+concurrencia, idempotencia y dos sedes; el entorno actual no dispone de Docker.
 Branding por sucursal continúa después. El Connector HikCentral, cobranza SaaS
 y hardening operativo permanecen como frentes separados.
 

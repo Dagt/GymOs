@@ -135,6 +135,22 @@ El diseño completo, las políticas de venta, los snapshots, la exclusividad y e
 ledger idempotente están definidos en
 [`33-planes-beneficios-paquetes-visitas.md`](33-planes-beneficios-paquetes-visitas.md).
 
+Aclaración de aceptación: en paquetes, “sucursales” y “accesos” no se combinan
+como permisos independientes. Las sucursales indican dónde existe el saldo; los
+accesos indican qué entrada puede consumirlo y conservan el alcance configurado
+en Beneficios. Por tanto:
+
+```text
+Paquete: Centro + Tecnológica
+Acceso: Sauna LOCAL de Centro
+Resultado: saldo compartido en ambas, Sauna consume sólo en Centro
+```
+
+V100 conserva esa intersección por cada compra. Además, al configurar desde
+Centro puede elegirse Centro o Centro+Tecnológica, nunca únicamente Tecnológica.
+Esto corrige un defecto real del modelo V98/V99, que almacenaba sucursales y
+beneficios por separado y podía recombinarlos durante el consumo.
+
 La validación manual posterior detectó que consultar un paquete inexistente
 podía terminar como error 500 después de crear o identificar correctamente al
 socio. El contrato corregido devuelve `204`, desacopla las consultas opcionales

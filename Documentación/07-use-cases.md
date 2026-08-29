@@ -784,7 +784,14 @@ aplica la política general.
 
 El administrador crea nombre, precio, visitas, vigencia, sedes, accesos y
 política de inscripción. Se genera un servicio `VISIT_PASS` configurado; un
-servicio genérico con ese nombre no concede acceso.
+servicio genérico con ese nombre no concede acceso. Si el administrador opera
+en A, el paquete debe cubrir A; puede añadir B, pero no crear desde A una
+definición exclusivamente para B.
+
+Las sedes definen dónde existe el saldo. Los accesos definen qué entrada puede
+descontarlo y conservan su propio alcance. El sistema valida y materializa la
+intersección: `paquete A+B + Sauna LOCAL A` queda autorizado para Sauna sólo en
+A, sin conceder Sauna en B.
 
 ## UC-038 Comprar un paquete de visitas
 
@@ -804,8 +811,9 @@ suprime el CTA de una segunda compra.
 
 Acceso intenta primero la membresía. Sólo si ésta no concede entrada consume de
 forma atómica una visita de un paquete activo, vigente, con saldo y cobertura
-para sucursal/beneficio. Repetir el mismo evento devuelve la misma decisión sin
-descontar de nuevo.
+para la combinación exacta sucursal/beneficio. Repetir el mismo evento y
+contexto devuelve la misma decisión sin descontar de nuevo; reutilizar su llave
+para otro socio, sede o dispositivo se rechaza.
 
 ## Anexo Hito 3.5 final
 

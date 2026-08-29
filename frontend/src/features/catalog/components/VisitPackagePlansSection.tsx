@@ -52,10 +52,12 @@ const emptyDraft: Draft = {
 
 export function VisitPackagePlansSection({
   accessToken,
+  currentBranchId,
   canCreate,
   canUpdate,
 }: {
   accessToken: string;
+  currentBranchId: string | null;
   canCreate: boolean;
   canUpdate: boolean;
 }) {
@@ -101,7 +103,7 @@ export function VisitPackagePlansSection({
 
   function create() {
     setEditingId(null);
-    setDraft(emptyDraft);
+    setDraft({ ...emptyDraft, branchIds: currentBranchId ? [currentBranchId] : [] });
     setError(null);
     setMessage(null);
     setOpen(true);
@@ -118,7 +120,9 @@ export function VisitPackagePlansSection({
       totalVisits: String(plan.totalVisits),
       validityDays: String(plan.validityDays),
       branchScope: plan.branchScope,
-      branchIds: plan.branchIds,
+      branchIds: plan.branchScope === "SELECTED_BRANCHES" && currentBranchId
+        ? Array.from(new Set([...plan.branchIds, currentBranchId]))
+        : plan.branchIds,
       benefitIds: plan.benefitIds,
       selfServiceAcquisitionEnabled: plan.selfServiceAcquisitionEnabled,
       registrationFeePolicy: plan.registrationFeePolicy,
@@ -145,8 +149,12 @@ export function VisitPackagePlansSection({
       setError("Selecciona al menos una sucursal.");
       return;
     }
+    if (currentBranchId && draft.branchScope === "SELECTED_BRANCHES" && !draft.branchIds.includes(currentBranchId)) {
+      setError("El paquete debe incluir la sucursal en la que estás operando.");
+      return;
+    }
     if (draft.benefitIds.length === 0) {
-      setError("Selecciona al menos un acceso incluido.");
+      setError("Selecciona al menos un acceso que pueda consumir visitas.");
       return;
     }
     const payload: VisitPackagePlanPayload = {
@@ -252,30 +260,50 @@ export function VisitPackagePlansSection({
           <div className="grid gap-4 rounded-xl border border-[var(--brand-line)] bg-[#fbfcfa] p-4 lg:grid-cols-2">
             <div className="grid content-start gap-3">
               <SelectField
-                label="Dónde se puede usar"
+                label="Dónde puede usarse el saldo"
                 name="visitPackageBranchScope"
                 value={draft.branchScope}
                 options={[{ label: "Todas las sucursales", value: "ALL_BRANCHES" }, { label: "Sólo sucursales seleccionadas", value: "SELECTED_BRANCHES" }]}
-                onChange={(branchScope) => setDraft({ ...draft, branchScope: branchScope as Draft["branchScope"] })}
+                onChange={(branchScope) => setDraft({
+                  ...draft,
+                  branchScope: branchScope as Draft["branchScope"],
+                  branchIds: branchScope === "SELECTED_BRANCHES" && currentBranchId
+                    ? Array.from(new Set([...draft.branchIds, currentBranchId]))
+                    : draft.branchIds,
+                })}
               />
               {draft.branchScope === "SELECTED_BRANCHES" ? (
                 <CheckboxList
                   empty="No hay sucursales activas."
-                  items={branches.map((branch) => ({ id: branch.id, label: branch.name }))}
+                  items={branches.map((branch) => ({
+                    id: branch.id,
+                    label: branch.name,
+                    description: branch.id === currentBranchId ? "Sucursal activa · siempre incluida" : undefined,
+                    disabled: branch.id === currentBranchId,
+                  }))}
                   selected={draft.branchIds}
                   onChange={(branchIds) => setDraft({ ...draft, branchIds })}
                 />
               ) : <p className="text-xs text-[var(--brand-muted)]">Incluye las sucursales activas actuales del gimnasio.</p>}
             </div>
             <div className="grid content-start gap-2">
-              <p className="text-sm font-semibold text-[#111815]">Accesos incluidos</p>
-              <p className="text-xs text-[var(--brand-muted)]">El paquete sólo se descuenta en puntos que pidan uno de estos accesos.</p>
+              <p className="text-sm font-semibold text-[#111815]">Accesos permitidos</p>
+              <p className="text-xs text-[var(--brand-muted)]">
+                Una visita puede descontarse al entrar a estos accesos. Cada uno conserva el alcance configurado en Beneficios.
+              </p>
               <CheckboxList
                 empty="Primero crea un beneficio de tipo Acceso."
-                items={accessBenefits.map((benefit) => ({ id: benefit.id, label: benefit.name }))}
+                items={accessBenefits.map((benefit) => ({
+                  id: benefit.id,
+                  label: benefit.name,
+                  description: benefitScopeLabel(benefit, branches),
+                }))}
                 selected={draft.benefitIds}
                 onChange={(benefitIds) => setDraft({ ...draft, benefitIds })}
               />
+              <p className="rounded-lg bg-[#f1f5ef] px-3 py-2 text-xs text-[#31563c]">
+                El paquete no amplía un acceso. Si Sauna es sólo de Centro, seguirá disponible sólo en Centro aunque el saldo pueda usarse también en Tecnológica.
+              </p>
             </div>
           </div>
 
@@ -302,7 +330,7 @@ function CheckboxList({
   selected,
 }: {
   empty: string;
-  items: { id: string; label: string }[];
+  items: { id: string; label: string; description?: string; disabled?: boolean }[];
   onChange: (ids: string[]) => void;
   selected: string[];
 }) {
@@ -310,20 +338,32 @@ function CheckboxList({
   return (
     <div className="grid max-h-40 gap-1 overflow-y-auto rounded-lg border border-[var(--brand-line)] bg-white p-2">
       {items.map((item) => (
-        <label className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-[#f5f7f4]" key={item.id}>
+        <label className={`flex items-start gap-2 rounded-md px-2 py-1.5 text-sm ${item.disabled ? "cursor-not-allowed bg-[#f5f7f4]" : "hover:bg-[#f5f7f4]"}`} key={item.id}>
           <input
-            className="h-4 w-4 accent-[var(--brand-primary)]"
+            className="mt-0.5 h-4 w-4 accent-[var(--brand-primary)]"
             type="checkbox"
             checked={selected.includes(item.id)}
+            disabled={item.disabled}
             onChange={(event) => onChange(event.target.checked
               ? [...selected, item.id]
               : selected.filter((id) => id !== item.id))}
           />
-          {item.label}
+          <span>
+            <span className="block">{item.label}</span>
+            {item.description ? <span className="block text-[11px] text-[var(--brand-muted)]">{item.description}</span> : null}
+          </span>
         </label>
       ))}
     </div>
   );
+}
+
+function benefitScopeLabel(benefit: BenefitSummary, branches: BranchSummary[]) {
+  if (benefit.accessScope === "PLAN_COVERAGE") {
+    return "Se reconoce únicamente en las sucursales cubiertas por sus planes vinculados";
+  }
+  const branchName = branches.find((branch) => branch.id === benefit.branchId)?.name;
+  return branchName ? `Sólo en ${branchName}` : "Sólo en su sucursal de origen";
 }
 
 function errorMessage(exception: unknown, fallback: string) {

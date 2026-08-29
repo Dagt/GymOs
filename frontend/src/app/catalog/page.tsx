@@ -73,7 +73,7 @@ function CatalogContent() {
           </section>
         ) : null}
         {view === "plans" ? <PlanList canCreate={controller.canCreate} canUpdate={controller.canUpdate} plans={controller.plans} onCreatePlan={openPlanCreation} onEditPlan={controller.openPlanEdition} /> : null}
-        {view === "visit-packages" ? <VisitPackagePlansSection accessToken={controller.session.accessToken} canCreate={controller.canCreate} canUpdate={controller.canUpdate} /> : null}
+        {view === "visit-packages" ? <VisitPackagePlansSection accessToken={controller.session.accessToken} currentBranchId={controller.session.user.branchId} canCreate={controller.canCreate} canUpdate={controller.canUpdate} /> : null}
         {view === "categories" && controller.canManageCategories ? <CatalogCategoryManager accessToken={controller.session.accessToken} categories={controller.categories} onChanged={controller.reloadCatalog} /> : null}
       </section>
       <CatalogProductDrawer

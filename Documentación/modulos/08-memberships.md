@@ -71,7 +71,7 @@ contratar el inicial, siempre con cotización y registro de pago.
 
 La decisión vigente para visitas individuales es reutilizar el motor de
 membresías. Los paquetes comerciales de N accesos son una capacidad adicional
-pendiente y no sustituyen ese flujo.
+implementada y no sustituyen ese flujo.
 
 Una visita normal es un `membership_plan` con `durationDays = 1`. Al usar fechas
 inclusivas, una contratación para la fecha operativa genera:
@@ -115,6 +115,10 @@ V96 inicia ese contrato sin convertir paquetes en membresías. Cada plan agrega
 multi-sucursal se muestra y puede renovarse desde una sede cubierta. Un socio
 puede tener una membresía y un paquete, pero no dos paquetes abiertos. Si la
 membresía concede el acceso, no se consume el paquete.
+
+El paquete no altera el alcance de los beneficios de la membresía. Su saldo
+puede cubrir varias sucursales, pero cada acceso conserva `LOCAL` o
+`PLAN_COVERAGE`; V100 materializa esa intersección para cada compra.
 
 Estas políticas sí aplican a los planes de membresía, no sólo a los paquetes:
 un plan oculto queda fuera de altas/cambios del kiosco pero se vende en

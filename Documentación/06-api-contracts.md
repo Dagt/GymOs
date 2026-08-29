@@ -963,60 +963,17 @@ sucursal y el mismo saldo independientemente de la sede donde se vendieron.
 
 ### `POST /api/v1/access/visit-passes`
 
-Permiso: `visit.create`.
-
-Request:
-
-```json
-{
-  "clientId": "uuid",
-  "saleId": null,
-  "passType": "VISIT_PACK",
-  "totalVisits": 5,
-  "validFrom": "2026-07-16",
-  "validUntil": "2026-08-15",
-  "branchScope": "ALL_BRANCHES",
-  "branchIds": []
-}
-```
-
-Tipos permitidos:
-
-- `DROP_IN`
-- `VISIT_PACK`
-- `COURTESY`
-- `PROMOTION`
-
-Errores:
-
-- `CLIENT_NOT_FOUND`
-- `CLIENT_NOT_ACTIVE`
-- `VISIT_PASS_INVALID_RANGE`
-- `BRANCH_REQUIRED`
+Contrato legacy de sólo lectura. El endpoint se conserva temporalmente para no
+romper integraciones, pero rechaza cualquier alta con
+`VISIT_PASS_LEGACY_READ_ONLY`. Un paquete nuevo debe venderse mediante
+`POST /api/v1/visit-packages/purchases` para crear venta, pago y entitlement de
+forma indivisible.
 
 ### `POST /api/v1/access/visit-passes/{visitPassId}/consume`
 
-Permiso: `visit.consume`.
-
-Request:
-
-```json
-{
-  "reason": "Consumo registrado en recepcion"
-}
-```
-
-Descuenta una visita de forma atómica sobre el saldo único del tenant, registra
-la sucursal activa y una llave idempotente de consumo. Si era la última, cambia
-el estado a `CONSUMED`. `SELECTED_BRANCHES` rechaza consumos fuera del alcance.
-
-Errores:
-
-- `VISIT_PASS_NOT_FOUND`
-- `VISIT_PASS_NOT_ACTIVE`
-- `VISIT_PASS_OUT_OF_RANGE`
-- `VISIT_PASS_CONSUMED`
-- `VISIT_PASS_CONFLICT`
+También rechaza con `VISIT_PASS_LEGACY_READ_ONLY`. Los pases históricos se
+conservan para consulta y regularización, pero no existe un segundo motor de
+consumo paralelo al ledger `visit_package_consumption`.
 
 ## Hito 7 - Refund API
 
@@ -1503,7 +1460,7 @@ gimnasio puede consultar o mutar esta información.
 - repetir la misma `idempotencyKey` y los mismos datos devuelve el cobro original
   sin avanzar nuevamente el corte; reutilizarla con datos distintos se rechaza.
 
-## Contratos V96–V99 — planes y paquetes de visitas
+## Contratos V96–V100 — planes y paquetes de visitas
 
 Los contratos de alta/edición/consulta de planes agregan
 `selfServiceAcquisitionEnabled` y `registrationFeePolicy` (`DEFAULT|WAIVED`).
@@ -1525,7 +1482,15 @@ PATCH /api/v1/catalog/visit-package-plans/{planId}
 
 El payload contiene producto/importe, `totalVisits`, `validityDays`,
 `branchScope`, `branchIds`, `benefitIds`, disponibilidad de kiosco, política de
-inscripción y estado.
+inscripción y estado. Si `branchScope=SELECTED_BRANCHES`, `branchIds` debe
+incluir la sucursal activa. El backend rechaza tanto una lista vacía como una
+cobertura que contenga exclusivamente otra sede.
+
+`branchIds` determina dónde existe el saldo; `benefitIds` determina qué accesos
+pueden consumirlo. No son permisos independientes que puedan recombinarse: al
+comprar se toma un snapshot de la intersección de cada acceso con sus sucursales
+válidas. Por ello, Sauna `LOCAL` de Centro no consume en Tecnológica aunque el
+paquete tenga saldo en ambas.
 
 Recepción/expediente:
 
@@ -1533,7 +1498,11 @@ Recepción/expediente:
 POST /api/v1/visit-packages/quotes
 POST /api/v1/visit-packages/purchases
 GET  /api/v1/clients/{clientId}/visit-package
+GET  /api/v1/clients/{clientId}/visit-packages
 ```
+
+La última ruta devuelve historial de entitlements y hasta los consumos más
+recientes con fecha, sucursal, dispositivo y `remainingAfter`.
 
 Kiosco verificado:
 

@@ -3,6 +3,7 @@ package com.gymos.catalog.application;
 import com.gymos.audit.api.AuditService;
 import com.gymos.catalog.api.VisitPackagePlanOperations;
 import com.gymos.catalog.api.VisitPackagePlanOperations.VisitPackagePlanSnapshot;
+import com.gymos.catalog.api.VisitPackagePlanOperations.BenefitCoverage;
 import com.gymos.catalog.application.command.CreateVisitPackagePlanCommand;
 import com.gymos.catalog.application.command.UpdateVisitPackagePlanCommand;
 import com.gymos.catalog.application.port.CatalogProductCommandPort;
@@ -74,7 +75,7 @@ public class VisitPackagePlanService implements VisitPackagePlanOperations {
 		CatalogAccessGuard.requireBranch(principal);
 		validatePrice(command.priceCents());
 		ValidatedDefinition definition = validate(
-				principal.organizationId(), command.totalVisits(), command.validityDays(), command.branchScope(),
+				principal.organizationId(), principal.branchId(), command.totalVisits(), command.validityDays(), command.branchScope(),
 				command.branchIds(), command.benefitIds(), command.registrationFeePolicy(), command.status());
 		String sku = required(command.sku(), "VISIT_PACKAGE_SKU_REQUIRED").toUpperCase();
 		if (products.findBySku(principal.organizationId(), sku).isPresent()) {
@@ -114,7 +115,7 @@ public class VisitPackagePlanService implements VisitPackagePlanOperations {
 		VisitPackagePlanView current = packages.find(principal.organizationId(), planId)
 				.orElseThrow(() -> new BusinessException("VISIT_PACKAGE_PLAN_NOT_FOUND", "El paquete de visitas no está disponible."));
 		ValidatedDefinition definition = validate(
-				principal.organizationId(), command.totalVisits(), command.validityDays(), command.branchScope(),
+				principal.organizationId(), principal.branchId(), command.totalVisits(), command.validityDays(), command.branchScope(),
 				command.branchIds(), command.benefitIds(), command.registrationFeePolicy(), command.status());
 		ProductSummaryView product = products.findBySku(principal.organizationId(), current.sku())
 				.orElseThrow(() -> new BusinessException("PRODUCT_NOT_FOUND", "El producto del paquete no está disponible."));
@@ -150,7 +151,7 @@ public class VisitPackagePlanService implements VisitPackagePlanOperations {
 	}
 
 	private ValidatedDefinition validate(
-			UUID organizationId, int totalVisits, int validityDays, String branchScope,
+			UUID organizationId, UUID activeBranchId, int totalVisits, int validityDays, String branchScope,
 			List<UUID> branchIds, List<UUID> benefitIds, String registrationFeePolicy, String status
 	) {
 		if (totalVisits < 1 || totalVisits > 10_000) {
@@ -169,9 +170,20 @@ public class VisitPackagePlanService implements VisitPackagePlanOperations {
 		if (effectiveBranches.isEmpty() || !packages.branchesExist(organizationId, effectiveBranches)) {
 			throw new BusinessException("VISIT_PACKAGE_BRANCHES_INVALID", "Selecciona al menos una sucursal activa del gimnasio.");
 		}
+		if (!effectiveBranches.contains(activeBranchId)) {
+			throw new BusinessException(
+					"VISIT_PACKAGE_ACTIVE_BRANCH_REQUIRED",
+					"El paquete debe incluir la sucursal en la que estás operando.");
+		}
 		List<UUID> distinctBenefits = benefitIds.stream().distinct().toList();
 		if (distinctBenefits.isEmpty() || !packages.accessBenefitsExist(organizationId, distinctBenefits)) {
 			throw new BusinessException("VISIT_PACKAGE_BENEFITS_INVALID", "Selecciona al menos un acceso activo del gimnasio.");
+		}
+		if (packages.benefitCoverages(organizationId, distinctBenefits, effectiveBranches).stream()
+				.anyMatch(coverage -> coverage.branchIds().isEmpty())) {
+			throw new BusinessException(
+					"VISIT_PACKAGE_BENEFIT_OUTSIDE_SCOPE",
+					"Uno de los accesos elegidos no se reconoce en ninguna sucursal de este paquete.");
 		}
 		String feePolicy = required(registrationFeePolicy, "REGISTRATION_FEE_POLICY_INVALID").toUpperCase();
 		if (!"DEFAULT".equals(feePolicy) && !"WAIVED".equals(feePolicy)) {
@@ -199,12 +211,17 @@ public class VisitPackagePlanService implements VisitPackagePlanOperations {
 	}
 
 	private VisitPackagePlanSnapshot snapshot(UUID organizationId, VisitPackagePlanView plan) {
+		List<UUID> effectiveBranches = "ALL_BRANCHES".equals(plan.branchScope())
+				? packages.activeBranchIds(organizationId) : plan.branchIds();
+		List<BenefitCoverage> coverages = packages.benefitCoverages(
+				organizationId, plan.benefitIds(), effectiveBranches).stream()
+				.map(coverage -> new BenefitCoverage(coverage.benefitId(), coverage.branchIds()))
+				.toList();
 		return new VisitPackagePlanSnapshot(
 				plan.id(), plan.productId(), plan.sku(), plan.name(), plan.priceCents(), plan.currency(),
 				plan.totalVisits(), plan.validityDays(), plan.branchScope(),
-				"ALL_BRANCHES".equals(plan.branchScope())
-						? packages.activeBranchIds(organizationId) : plan.branchIds(),
-				plan.benefitIds(), plan.selfServiceAcquisitionEnabled(), plan.registrationFeePolicy());
+				effectiveBranches, plan.benefitIds(), coverages,
+				plan.selfServiceAcquisitionEnabled(), plan.registrationFeePolicy());
 	}
 
 	private String required(String value, String code) {

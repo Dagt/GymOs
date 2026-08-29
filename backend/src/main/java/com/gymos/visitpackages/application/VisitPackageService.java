@@ -13,6 +13,7 @@ import com.gymos.sales.api.operations.SalesOperations;
 import com.gymos.sales.api.operations.VisitPackageSaleResult;
 import com.gymos.visitpackages.api.operations.VisitPackageOperations;
 import com.gymos.visitpackages.application.port.VisitPackageEntitlementPort;
+import com.gymos.visitpackages.application.port.VisitPackageEntitlementPort.BenefitCoverage;
 import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.Optional;
@@ -96,7 +97,9 @@ public class VisitPackageService implements VisitPackageOperations {
 		UUID entitlementId = entitlements.createPending(
 				principal.organizationId(), principal.branchId(), command.clientId(), plan.id(), sale.saleId(),
 				plan.name(), plan.totalVisits(), plan.validityDays(), now.plus(PENDING_PAYMENT_TTL),
-				plan.branchIds(), plan.benefitIds(), now);
+				plan.branchIds(), plan.benefitCoverages().stream()
+						.map(coverage -> new BenefitCoverage(coverage.benefitId(), coverage.branchIds()))
+						.toList(), now);
 		if (sale.paymentCompleted()) {
 			activationService.activate(
 					principal.organizationId(), principal.branchId(), sale.saleId(), now,
@@ -117,6 +120,15 @@ public class VisitPackageService implements VisitPackageOperations {
 		if (!entitlements.lockActiveClient(principal.organizationId(), clientId)) return Optional.empty();
 		entitlements.expireDue(principal.organizationId(), clientId, BusinessTime.today(), OffsetDateTime.now());
 		return entitlements.open(principal.organizationId(), clientId);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public java.util.List<VisitPackageEntitlementView> history(
+			GymOsPrincipal principal, UUID clientId, int limit
+	) {
+		requireBranch(principal);
+		return entitlements.history(principal.organizationId(), clientId, Math.max(1, Math.min(limit, 25)));
 	}
 
 	private VisitPackageQuoteView quoteFor(

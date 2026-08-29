@@ -131,6 +131,34 @@ class MembershipCommercePersistenceIntegrationTests {
 	}
 
 	@Test
+	void completedMultiBranchRenewalCanBeResolvedFromASecondaryBranch() {
+		UUID secondaryBranchId = UUID.randomUUID();
+		jdbcClient.sql("""
+				INSERT INTO branch (id, organization_id, name, code, timezone, status,
+				 created_at, updated_at, version)
+				VALUES (:id, :organizationId, 'Tecnológica', :code, 'America/Mexico_City',
+				 'ACTIVE', now(), now(), 0)
+				""").param("id", secondaryBranchId).param("organizationId", organizationId)
+				.param("code", "TEC-" + secondaryBranchId).update();
+		jdbcClient.sql("UPDATE membership_plan SET multi_branch_access=TRUE WHERE id=:planId")
+				.param("planId", firstPlanId).update();
+		UUID saleId = insertSale("S-MULTIBRANCH-RENEW", "MEMBERSHIP_RENEWAL", 10_000, 0);
+		UUID membershipId = UUID.randomUUID();
+		LocalDate today = LocalDate.now();
+		insertMembership(
+				membershipId, firstPlanId, saleId, today, today.plusDays(29), today.plusDays(32));
+
+		assertThat(memberships.bySaleAndPlan(
+				organizationId, secondaryBranchId, saleId, firstPlanId))
+				.get().extracting(MembershipRepository.MembershipSummary::id).isEqualTo(membershipId);
+
+		jdbcClient.sql("UPDATE membership_plan SET multi_branch_access=FALSE WHERE id=:planId")
+				.param("planId", firstPlanId).update();
+		assertThat(memberships.bySaleAndPlan(
+				organizationId, secondaryBranchId, saleId, firstPlanId)).isEmpty();
+	}
+
+	@Test
 	void clientSearchProjectsTheCurrentMembershipPlanAsActive() {
 		LocalDate today = LocalDate.now();
 		UUID saleId = insertSale("S-CLIENT-ACTIVE", "MEMBERSHIP_ENROLLMENT", 10_000, 0);

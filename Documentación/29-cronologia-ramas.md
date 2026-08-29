@@ -57,6 +57,7 @@ paquetes de visitas compartidos dentro de un tenant.
 | 27 ago 2026 | Se crea `feature/multibranch-plans-benefits-visits`; se aprueba documento 33 y se inicia la secuencia V96–V99 |
 | 28 ago 2026 | V99 fija vigencia por compra; venta, pago, activación, exclusividad, consumo, Catálogo, expediente y kiosco de paquetes quedan integrados |
 | 28 ago 2026 | La aceptación manual desacopla identidad de consultas opcionales, formaliza `204` sin paquete, corrige la lectura JDBC y ubica cada alta dentro de su pestaña de Catálogo |
+| 28 ago 2026 | V100 separa saldo de paquete y alcance de acceso: materializa la intersección beneficio–sucursal, obliga a incluir la sucursal activa, agrega historial operativo, bloquea escrituras legacy y protege refunds después de consumos |
 
 ## 3. Alcance material de la rama activa
 
@@ -71,19 +72,24 @@ paquetes de visitas compartidos dentro de un tenant.
 - V97 agrega alcance `LOCAL|PLAN_COVERAGE` a beneficios `ACCESS`;
 - V98 crea definición vendible, entitlement, snapshots y ledger de paquetes;
 - V99 agrega el snapshot de vigencia por entitlement;
+- V100 agrega el snapshot `entitlement + benefit + branch`; un paquete A+B no
+  amplía Sauna `LOCAL` de A hacia B;
 - una restricción impide dos paquetes `PENDING_PAYMENT|ACTIVE` para el mismo
   socio y tenant;
 - Catálogo coloca paquetes inmediatamente junto a planes de membresía; los
   planes y paquetes pueden ocultarse de nuevas compras del kiosco y exentarse
   de inscripción;
 - venta/activación por pago, bloqueo de pases históricos, consumo idempotente,
-  expediente, Recepción y compra de kiosco están implementados.
+  historial en expediente, Recepción y compra de kiosco están implementados;
+- la API legacy `visit_pass` es de sólo lectura y un refund total después de
+  consumos requiere revisión administrativa.
 
 ### Aún pendiente en la rama
 
-- reporte/historial operativo de consumos y reversión auditada;
-- matriz PostgreSQL concurrente, HTTP/E2E de dos sedes y Stripe test;
-- retiro definitivo del alta manual `visit_pass` después de regularizar datos;
+- ejecución real de la matriz PostgreSQL concurrente y migraciones; las pruebas
+  existen pero Docker no está disponible en el entorno actual;
+- HTTP/E2E integral de dos sedes y Stripe test;
+- reversión administrativa auditada;
 - branding por sucursal, fuera de este lote.
 
 ## 4. Evidencia de validación local
@@ -96,5 +102,5 @@ paquetes de visitas compartidos dentro de un tenant.
 
 1. `feature/multibranch-plans-benefits-visits` no se fusiona automáticamente.
 2. CI y revisión de aceptación deben terminar antes de cualquier merge.
-3. Despliegue V96–V99 y habilitación de compras son acciones independientes.
+3. Despliegue V96–V100 y habilitación de compras son acciones independientes.
 4. Las ramas remotas sólo se eliminan por decisión explícita.

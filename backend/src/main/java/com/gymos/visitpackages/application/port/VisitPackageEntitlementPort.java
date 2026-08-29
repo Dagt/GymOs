@@ -9,17 +9,24 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface VisitPackageEntitlementPort {
+	record BenefitCoverage(UUID benefitId, List<UUID> branchIds) {
+		public BenefitCoverage {
+			branchIds = branchIds == null ? List.of() : List.copyOf(branchIds);
+		}
+	}
+
 	boolean lockActiveClient(UUID organizationId, UUID clientId);
 	void expireDue(UUID organizationId, UUID clientId, LocalDate today, OffsetDateTime now);
 	boolean hasActiveLegacyPass(UUID organizationId, UUID clientId, LocalDate today);
 	Optional<VisitPackageEntitlementView> open(UUID organizationId, UUID clientId);
+	List<VisitPackageEntitlementView> history(UUID organizationId, UUID clientId, int limit);
 	Optional<VisitPackageEntitlementView> bySale(UUID organizationId, UUID saleId);
 	Optional<VisitPackageEntitlementView> byIdempotencyKey(
 			UUID organizationId, UUID clientId, String idempotencyKey);
 	UUID createPending(
 			UUID organizationId, UUID homeBranchId, UUID clientId, UUID packagePlanId,
 			UUID saleId, String packageName, int totalVisits, int validityDays,
-			OffsetDateTime pendingExpiresAt, List<UUID> branchIds, List<UUID> benefitIds,
+			OffsetDateTime pendingExpiresAt, List<UUID> branchIds, List<BenefitCoverage> benefitCoverages,
 			OffsetDateTime now);
 	boolean activateBySale(UUID organizationId, UUID saleId, LocalDate validFrom, OffsetDateTime now);
 	Optional<ActivationDefinition> activationDefinition(UUID organizationId, UUID saleId);

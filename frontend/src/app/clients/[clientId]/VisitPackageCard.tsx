@@ -7,6 +7,7 @@ import { TextField } from "@/components/FormFields";
 import {
   createMercadoPagoPointOrder,
   getCurrentVisitPackage,
+  getVisitPackageHistory,
   getPaymentConfiguration,
   getVisitPackagePlans,
   purchaseVisitPackage,
@@ -21,6 +22,7 @@ import {
 export function VisitPackageCard({ clientId, session }: { clientId: string; session: StoredSession }) {
   const [plans, setPlans] = useState<VisitPackagePlanSummary[]>([]);
   const [current, setCurrent] = useState<VisitPackageEntitlement | null>(null);
+  const [history, setHistory] = useState<VisitPackageEntitlement[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState("");
   const [quote, setQuote] = useState<VisitPackageQuote | null>(null);
   const [method, setMethod] = useState<VisitPackagePurchasePayload["method"]>("CASH");
@@ -40,15 +42,17 @@ export function VisitPackageCard({ clientId, session }: { clientId: string; sess
     async function load() {
       setLoading(true);
       try {
-        const [loadedPlans, entitlement] = await Promise.all([
+        const [loadedPlans, entitlement, packageHistory] = await Promise.all([
           canSell ? getVisitPackagePlans(session.accessToken) : Promise.resolve([]),
           getCurrentVisitPackage(session.accessToken, clientId),
+          getVisitPackageHistory(session.accessToken, clientId),
         ]);
         if (!active) return;
         const activePlans = loadedPlans.filter((plan) => plan.status === "ACTIVE");
         setPlans(activePlans);
         setSelectedPlanId((value) => value || activePlans[0]?.id || "");
         setCurrent(entitlement);
+        setHistory(packageHistory);
         if (canSell && hasPermission(session, "payment.settings.read")) {
           const payment = await getPaymentConfiguration(session.accessToken);
           if (!active) return;
@@ -104,7 +108,12 @@ export function VisitPackageCard({ clientId, session }: { clientId: string; sess
         if (!result.paymentId) throw new Error("La venta no devolvió un pago para enviar a Point.");
         await createMercadoPagoPointOrder(session.accessToken, result.paymentId);
       }
-      setCurrent(await getCurrentVisitPackage(session.accessToken, clientId));
+      const [entitlement, packageHistory] = await Promise.all([
+        getCurrentVisitPackage(session.accessToken, clientId),
+        getVisitPackageHistory(session.accessToken, clientId),
+      ]);
+      setCurrent(entitlement);
+      setHistory(packageHistory);
       setOpen(false);
       setMessage(result.entitlementStatus === "ACTIVE"
         ? `Paquete activado. Venta ${result.saleNumber}.`
@@ -143,6 +152,36 @@ export function VisitPackageCard({ clientId, session }: { clientId: string; sess
         ) : null}
         {!loading && !current ? <p className="text-sm text-[var(--brand-muted)]">El socio no tiene un paquete pendiente ni activo.</p> : null}
         {!loading && !current && canSell && plans.length === 0 ? <p className="text-xs text-[#8a5a22]">No hay paquetes activos disponibles en esta sucursal.</p> : null}
+        {!loading && history.length > 0 ? (
+          <section className="grid gap-2 border-t border-[var(--brand-line)] pt-4">
+            <h3 className="text-sm font-semibold text-[#111815]">Historial de paquetes</h3>
+            {history.map((entitlement) => (
+              <article className="rounded-lg border border-[var(--brand-line)] bg-white p-3" key={entitlement.id}>
+                <div className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <strong>{entitlement.packageName}</strong>
+                  <span className="text-xs text-[var(--brand-muted)]">{statusLabel(entitlement.status)}</span>
+                </div>
+                <p className="mt-1 text-xs text-[var(--brand-muted)]">
+                  {entitlement.remainingVisits} de {entitlement.totalVisits} visitas
+                  {entitlement.validFrom ? ` · ${formatDate(entitlement.validFrom)}` : ""}
+                  {entitlement.validUntil ? ` a ${formatDate(entitlement.validUntil)}` : ""}
+                </p>
+                {entitlement.consumptions.length > 0 ? (
+                  <div className="mt-2 grid gap-1 border-t border-[var(--brand-line)] pt-2">
+                    {entitlement.consumptions.slice(0, 5).map((consumption) => (
+                      <p className="text-xs text-[var(--brand-muted)]" key={consumption.id}>
+                        {formatDateTime(consumption.occurredAt)} · {consumption.branchName}
+                        {consumption.deviceName ? ` · ${consumption.deviceName}` : ""}
+                        {` · saldo ${consumption.remainingAfter}`}
+                        {consumption.status === "REVERSED" ? " · revertido" : ""}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </section>
+        ) : null}
       </section>
 
       <AppDrawer onClose={() => setOpen(false)} open={open} title="Vender paquete de visitas">
@@ -192,6 +231,10 @@ function statusLabel(status: VisitPackageEntitlement["status"]) {
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${value}T00:00:00Z`));
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat("es-MX", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
 function money(cents: number, currency: string) {

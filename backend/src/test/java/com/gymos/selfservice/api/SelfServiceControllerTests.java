@@ -36,7 +36,7 @@ class SelfServiceControllerTests {
 				UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
 				"10 visitas", "PENDING_PAYMENT", 10, 10, null, null,
 				OffsetDateTime.now().plusMinutes(30), List.of(UUID.randomUUID()), List.of(),
-				OffsetDateTime.now(), OffsetDateTime.now());
+				List.of(), OffsetDateTime.now(), OffsetDateTime.now());
 		when(service.currentVisitPackage(sessionId, "session-token")).thenReturn(entitlement);
 
 		var response = controller.currentVisitPackage(sessionId, "session-token");

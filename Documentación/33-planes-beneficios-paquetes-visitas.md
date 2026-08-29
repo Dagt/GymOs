@@ -51,6 +51,18 @@ Un paquete de visitas es un producto de acceso consumible. Define:
 - disponibilidad para nuevas compras en kiosco;
 - política de inscripción.
 
+Las sucursales y los accesos elegidos responden preguntas diferentes:
+
+- `branchScope/branchIds`: en qué sucursales existe el saldo compartido;
+- `benefitIds`: qué tipos de acceso pueden descontar una visita;
+- `benefit.accessScope`: en qué sucursales sigue siendo válido cada acceso.
+
+Un paquete nunca amplía el alcance de un beneficio. La regla efectiva por acceso
+es la intersección entre las sucursales del paquete y el alcance del beneficio.
+Por ejemplo, un paquete válido en Centro y Tecnológica que acepte `SAUNA` local
+de Centro conserva saldo en ambas sedes, pero sólo puede descontar por Sauna en
+Centro. Seleccionar Sauna no crea ni muestra un derecho Sauna en Tecnológica.
+
 No es una `membership` y no utiliza la restricción de una membresía activa. Se
 modela independientemente para no alterar renovaciones, cambios de plan,
 domiciliación ni reportes de membresías ilimitadas.
@@ -228,7 +240,9 @@ Relaciones:
   paquete.
 
 La configuración exige visitas y vigencia mayores a cero, al menos una sucursal
-para alcance seleccionado y al menos un beneficio `ACCESS`.
+para alcance seleccionado y al menos un beneficio `ACCESS`. Cuando se crea o
+edita desde una sucursal activa, la cobertura debe incluir esa sucursal: puede
+ser sólo la actual o la actual más otras, nunca exclusivamente una sede ajena.
 
 ### 6.2 Reserva y saldo del socio
 
@@ -257,6 +271,12 @@ copian las sucursales y beneficios permitidos a:
 
 - `visit_package_entitlement_branch`;
 - `visit_package_entitlement_benefit`.
+
+V100 agrega además `visit_package_entitlement_benefit_branch`, que materializa
+la intersección acceso–sucursal comprada. El consumo exige una fila exacta de
+esta tabla; comprobar por separado “sucursal incluida” y “beneficio incluido”
+era insuficiente porque podía combinar dos permisos que nunca coexistieron en
+la misma sede.
 
 Editar un producto después no modifica derechos ya pagados.
 
@@ -292,7 +312,7 @@ El orden de decisión es:
 1. validar socio, sucursal, dispositivo y beneficio requerido;
 2. intentar conceder acceso mediante membresía vigente;
 3. sólo si la membresía no concede ese derecho, buscar un paquete activo,
-   vigente, con saldo, sucursal y beneficio compatibles;
+   vigente, con saldo y una combinación exacta sucursal–beneficio compatible;
 4. descontar exactamente una visita mediante una operación atómica;
 5. insertar el ledger con la misma llave idempotente;
 6. registrar la decisión de acceso y la sucursal de consumo.
@@ -426,9 +446,14 @@ El alta solicita únicamente:
 - número de visitas;
 - vigencia;
 - todas las sucursales o selección;
-- accesos incluidos;
+- accesos permitidos para consumir visitas;
 - inscripción general o exenta;
 - disponible o no en kiosco.
+
+La interfaz llama a las decisiones “Dónde puede usarse el saldo” y “Accesos
+permitidos”. Cada acceso muestra su alcance (`Sólo en Centro`, por
+ejemplo) y aclara que el paquete no lo extiende. La sucursal activa queda
+seleccionada y bloqueada cuando se eligen sedes manualmente.
 
 El expediente muestra saldo, vigencia, estado y últimos consumos. Si ya existe
 un paquete pendiente o activo, la UI no ofrece comprar otro y explica por qué.
@@ -448,6 +473,8 @@ La secuencia aplicada es:
 - V99: snapshot de `validity_days` en el entitlement para que una compra
   pendiente conserve la vigencia cotizada aunque la definición cambie antes de
   confirmar el pago.
+- V100: snapshot de cada combinación `benefit_id + branch_id` autorizada para el
+  entitlement; corrige paquetes multi-sucursal sin alterar V96–V99.
 
 Defaults compatibles:
 
@@ -458,7 +485,9 @@ access_scope = LOCAL
 ```
 
 No se modifica V95. La tabla histórica `visit_pass` se conserva para
-compatibilidad y no se mezcla con el nuevo saldo sin una migración explícita.
+compatibilidad de lectura y no se mezcla con el nuevo saldo sin una migración
+explícita. Sus endpoints de alta y consumo operativo rechazan escrituras nuevas;
+las compras pasan exclusivamente por el dominio `visit_package_entitlement`.
 Los servicios existentes de subtipo `VISIT_PASS` quedan “sin configurar” hasta
 que un administrador defina visitas, vigencia, sucursales y accesos; no se
 infieren valores por nombre.
@@ -504,6 +533,9 @@ evita una baja automática por inactividad.
 - un reintento con la misma llave no descuenta dos veces;
 - consumo concurrente nunca produce saldo negativo;
 - el saldo se comparte entre sucursales permitidas;
+- una combinación `paquete A+B + Sauna LOCAL A` consume en A y no consume en B;
+- un `PLAN_COVERAGE` sólo usa la intersección entre sedes del paquete y cobertura
+  de los planes vinculados al beneficio;
 - una sucursal no permitida no consume;
 - una membresía que ya concede acceso evita el consumo del paquete;
 - al llegar a cero cambia a `CONSUMED`;
@@ -521,8 +553,12 @@ evita una baja automática por inactividad.
 6. [implementado] integración transaccional con venta/pago y activación;
 7. [implementado] consumo idempotente con prioridad de membresía;
 8. [implementado] UX base de Catálogo, Recepción, expediente y kiosco;
-9. [en validación] reportes, documentación, migraciones, E2E y aceptación
-   manual completa.
+9. [implementado] historial operativo de saldos y últimos consumos, retiro de
+   escrituras legacy y política segura de reembolso después de consumos;
+10. [en validación] migraciones y pruebas PostgreSQL reales de concurrencia,
+    dos sedes y actualización V99→V100. Las pruebas están codificadas, pero no
+    se consideran evidencia ejecutada mientras Docker/PostgreSQL no esté
+    disponible en el entorno.
 
 Cada etapa debe mantener compilación y pruebas verdes. No se habilita compra de
 paquetes en producción hasta que venta, activación, consumo y exclusividad estén

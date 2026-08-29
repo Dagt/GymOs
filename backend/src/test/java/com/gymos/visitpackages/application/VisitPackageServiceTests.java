@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 
 import com.gymos.audit.api.AuditService;
 import com.gymos.catalog.api.VisitPackagePlanOperations;
+import com.gymos.catalog.api.VisitPackagePlanOperations.BenefitCoverage;
 import com.gymos.catalog.api.VisitPackagePlanOperations.VisitPackagePlanSnapshot;
 import com.gymos.clients.api.operations.ClientLifecycleOperations;
 import com.gymos.clients.api.operations.ClientLifecycleOperations.RegistrationFee;
@@ -98,7 +99,8 @@ class VisitPackageServiceTests {
 		when(plans.activePlan(organizationId, branchId, planId)).thenReturn(Optional.of(
 				new VisitPackagePlanSnapshot(
 						planId, productId, "10-VISITAS", "10 visitas", 90000, "MXN", 10, 45,
-						"ALL_BRANCHES", List.of(branchId), List.of(benefitId), true, feePolicy)));
+						"ALL_BRANCHES", List.of(branchId), List.of(benefitId),
+						List.of(new BenefitCoverage(benefitId, List.of(branchId))), true, feePolicy)));
 		when(entitlements.lockActiveClient(organizationId, clientId)).thenReturn(true);
 		when(entitlements.byIdempotencyKey(any(), any(), any())).thenReturn(Optional.empty());
 		when(entitlements.open(organizationId, clientId)).thenReturn(Optional.empty());
@@ -117,7 +119,7 @@ class VisitPackageServiceTests {
 		return new VisitPackageEntitlementView(
 				entitlementId, fixture.clientId, fixture.planId, saleId, "10 visitas", status,
 				10, 10, null, null, null, List.of(fixture.branchId), List.of(),
-				OffsetDateTime.now(), OffsetDateTime.now());
+				List.of(), OffsetDateTime.now(), OffsetDateTime.now());
 	}
 
 	private record Fixture(

@@ -124,7 +124,7 @@ class MembershipQueryRepository {
 				JOIN catalog_product cp ON cp.id = mp.product_id
 				JOIN sale s ON s.id = m.sale_id
 				WHERE m.organization_id = :organizationId
-				  AND m.branch_id = :branchId
+				  AND (m.branch_id = :branchId OR mp.multi_branch_access = TRUE)
 				  AND m.sale_id = :saleId
 				  AND m.plan_id = :planId
 				  AND m.deleted_at IS NULL

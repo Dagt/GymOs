@@ -523,6 +523,11 @@ para rutinas; el socio no tiene vista remota en V1.
 - Catálogo incorpora una sección propia “Paquetes de visitas” con un formulario
   breve: nombre, SKU, precio, visitas, vigencia, sedes, accesos, inscripción,
   kiosco y estado.
+- En ese formulario, “Dónde puede usarse el saldo” mantiene la sucursal activa
+  seleccionada y no permite crear desde A un paquete sólo para B. “Accesos que
+  consumen una visita” muestra el alcance propio de cada acceso y explica que el
+  paquete no lo amplía; Sauna local de Centro sigue siendo sólo de Centro aunque
+  el saldo cubra también Tecnológica.
 - Cada alta vive dentro de su propia pestaña: artículos/cargos y variantes en
   “Artículos”, planes en “Planes de membresía”, paquetes en “Paquetes de visitas”
   y categorías en “Categorías”. No existe una barra global que mezcle acciones.

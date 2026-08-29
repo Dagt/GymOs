@@ -46,6 +46,24 @@ class SalesRefundLookupRepository {
 		return total == null ? 0 : total;
 	}
 
+	boolean visitPackageHasConsumptions(UUID organizationId, UUID saleId) {
+		return jdbcClient.sql("""
+				SELECT EXISTS (
+				    SELECT 1
+				    FROM visit_package_entitlement entitlement
+				    JOIN visit_package_consumption consumption
+				      ON consumption.organization_id=entitlement.organization_id
+				     AND consumption.entitlement_id=entitlement.id
+				    WHERE entitlement.organization_id=:organizationId
+				      AND entitlement.sale_id=:saleId
+				      AND entitlement.deleted_at IS NULL
+				      AND consumption.status='CONSUMED'
+				)
+				""")
+				.param("organizationId", organizationId).param("saleId", saleId)
+				.query(Boolean.class).single();
+	}
+
 	List<RefundableSaleItem> refundableItems(UUID organizationId, UUID saleId) {
 		return jdbcClient.sql("""
 				SELECT si.id AS sale_item_id, si.product_id, si.item_type, si.name,

@@ -88,6 +88,64 @@ class SalesRefundServiceTests {
 	}
 
 	@Test
+	void consumedVisitPackageBlocksAutomaticFullRefund() {
+		SalesRepository salesRepository = mock(SalesRepository.class);
+		SalesRefundCommandRepository commandRepository = mock(SalesRefundCommandRepository.class);
+		SalesLookupService lookupService = new SalesLookupService(salesRepository);
+		SalesRefundService service = service(
+				salesRepository, commandRepository, mock(ApplicationEventPublisher.class),
+				mock(AuditService.class), lookupService);
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		UUID saleId = UUID.randomUUID();
+		GymOsPrincipal principal = principal(organizationId, branchId);
+		when(salesRepository.saleHeader(organizationId, saleId)).thenReturn(Optional.of(sale(saleId, branchId, 5_000)));
+		when(salesRepository.processedRefundTotal(organizationId, saleId)).thenReturn(0L);
+		when(salesRepository.visitPackageHasConsumptions(organizationId, saleId)).thenReturn(true);
+
+		assertThatThrownBy(() -> service.process(
+				principal, saleId,
+				new RequestRefundCommand(null, 5_000, "Reembolso total", "refund-package"),
+				"correlation"))
+				.isInstanceOfSatisfying(BusinessException.class,
+						error -> assertThat(error.code())
+							.isEqualTo("VISIT_PACKAGE_CONSUMED_REFUND_REQUIRES_REVIEW"));
+		verify(commandRepository, never()).createProcessed(
+				any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyLong(), any(), any(), any(), any());
+	}
+
+	@Test
+	void consumedVisitPackageBlocksItemizedPackageRefundEvenWhenSaleAlsoContainsRegistrationFee() {
+		SalesRepository salesRepository = mock(SalesRepository.class);
+		SalesRefundCommandRepository commandRepository = mock(SalesRefundCommandRepository.class);
+		SalesRefundService service = service(
+				salesRepository, commandRepository, mock(ApplicationEventPublisher.class),
+				mock(AuditService.class), new SalesLookupService(salesRepository));
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		UUID saleId = UUID.randomUUID();
+		UUID saleItemId = UUID.randomUUID();
+		GymOsPrincipal principal = principal(organizationId, branchId);
+		when(salesRepository.saleHeader(organizationId, saleId)).thenReturn(Optional.of(sale(saleId, branchId, 6_500)));
+		when(salesRepository.processedRefundTotal(organizationId, saleId)).thenReturn(0L);
+		when(salesRepository.visitPackageHasConsumptions(organizationId, saleId)).thenReturn(true);
+		when(salesRepository.refundableSaleItems(organizationId, saleId)).thenReturn(List.of(
+				new RefundableSaleItem(saleItemId, UUID.randomUUID(), "VISIT_PACKAGE", "10 visitas", 1, 0)
+		));
+
+		assertThatThrownBy(() -> service.process(
+				principal, saleId,
+				new RequestRefundCommand(null, 5_000, "Devolver paquete", "refund-package-item",
+						List.of(new RefundItemCommand(saleItemId, 1, false))),
+				"correlation"))
+				.isInstanceOfSatisfying(BusinessException.class,
+						error -> assertThat(error.code())
+								.isEqualTo("VISIT_PACKAGE_CONSUMED_REFUND_REQUIRES_REVIEW"));
+		verify(commandRepository, never()).createProcessed(
+				any(), any(), any(), any(), org.mockito.ArgumentMatchers.anyLong(), any(), any(), any(), any());
+	}
+
+	@Test
 	void accumulatedPartialRefundsPublishRestorationWhenPaidBalanceReachesZero() {
 		SalesRepository salesRepository = mock(SalesRepository.class);
 		SalesRefundCommandRepository commandRepository = mock(SalesRefundCommandRepository.class);

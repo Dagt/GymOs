@@ -192,6 +192,7 @@ class DatabaseMigrationTests {
 			assertThat(tableExists(connection, "visit_package_entitlement")).isTrue();
 			assertThat(tableExists(connection, "visit_package_entitlement_branch")).isTrue();
 			assertThat(tableExists(connection, "visit_package_entitlement_benefit")).isTrue();
+			assertThat(tableExists(connection, "visit_package_entitlement_benefit_branch")).isTrue();
 			assertThat(tableExists(connection, "visit_package_consumption")).isTrue();
 			assertThat(columnExists(connection, "visit_package_entitlement", "validity_days")).isTrue();
 			assertThat(indexExists(connection, "ux_visit_package_entitlement_open_client")).isTrue();
@@ -249,8 +250,136 @@ class DatabaseMigrationTests {
 			assertThat(tableExists(connection, schema, "visit_package_plan")).isTrue();
 			assertThat(tableExists(connection, schema, "visit_package_entitlement")).isTrue();
 			assertThat(tableExists(connection, schema, "visit_package_consumption")).isTrue();
+			assertThat(tableExists(connection, schema, "visit_package_entitlement_benefit_branch")).isTrue();
 			assertThat(columnExists(connection, schema, "visit_package_entitlement", "validity_days")).isTrue();
 			assertThat(tableExists(connection, schema, "visit_pass")).isTrue();
+		}
+	}
+
+	@Test
+	void upgradeFromV99BackfillsPackageBenefitBranchesWithoutExpandingLocalAccess() throws Exception {
+		String schema = migrationSchema("package_scope_v99");
+		migrateSchema(schema, "99");
+		UUID organizationId = UUID.randomUUID();
+		UUID branchA = UUID.randomUUID();
+		UUID branchB = UUID.randomUUID();
+		UUID personId = UUID.randomUUID();
+		UUID clientId = UUID.randomUUID();
+		UUID productId = UUID.randomUUID();
+		UUID planId = UUID.randomUUID();
+		UUID saleId = UUID.randomUUID();
+		UUID entitlementId = UUID.randomUUID();
+		UUID benefitId = UUID.randomUUID();
+		try (var connection = schemaConnection(schema)) {
+			insertOrganization(connection, organizationId);
+			insertBranch(connection, organizationId, branchA);
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO branch (id, organization_id, name, code, timezone, status,
+					 created_at, updated_at, version)
+					VALUES (?, ?, 'Tecnológica', ?, 'America/Mexico_City', 'ACTIVE', now(), now(), 0)
+					""")) {
+				statement.setObject(1, branchB);
+				statement.setObject(2, organizationId);
+				statement.setString(3, "B-" + branchB);
+				statement.executeUpdate();
+			}
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO person (id, organization_id, first_name, last_name, email, status,
+					 created_at, updated_at, version)
+					VALUES (?, ?, 'Paola', 'Snapshot', ?, 'ACTIVE', now(), now(), 0)
+					""")) {
+				statement.setObject(1, personId);
+				statement.setObject(2, organizationId);
+				statement.setString(3, personId + "@snapshot.test");
+				statement.executeUpdate();
+			}
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO client (id, organization_id, person_id, home_branch_id, status,
+					 joined_at, created_at, updated_at, version)
+					VALUES (?, ?, ?, ?, 'ACTIVE', now(), now(), now(), 0)
+					""")) {
+				statement.setObject(1, clientId);
+				statement.setObject(2, organizationId);
+				statement.setObject(3, personId);
+				statement.setObject(4, branchA);
+				statement.executeUpdate();
+			}
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO catalog_product (id, organization_id, sku, name, product_type,
+					 commercial_subtype, price_cents, currency, taxable, status, created_at, updated_at, version)
+					VALUES (?, ?, ?, 'Paquete', 'SERVICE', 'VISIT_PASS', 1000, 'MXN', TRUE,
+					 'ACTIVE', now(), now(), 0)
+					""")) {
+				statement.setObject(1, productId);
+				statement.setObject(2, organizationId);
+				statement.setString(3, "VP-" + productId);
+				statement.executeUpdate();
+			}
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO visit_package_plan (id, organization_id, product_id, total_visits,
+					 validity_days, branch_scope, self_service_acquisition_enabled,
+					 registration_fee_policy, status, created_at, updated_at, version)
+					VALUES (?, ?, ?, 10, 30, 'ALL_BRANCHES', TRUE, 'DEFAULT', 'ACTIVE', now(), now(), 0)
+					""")) {
+				statement.setObject(1, planId);
+				statement.setObject(2, organizationId);
+				statement.setObject(3, productId);
+				statement.executeUpdate();
+			}
+			insertSale(connection, saleId, organizationId, branchA, "V99-" + saleId, "V99-" + saleId);
+			insertVisitPackageEntitlement(
+					connection, entitlementId, organizationId, branchA, clientId, planId, saleId, "ACTIVE");
+			for (UUID branchId : List.of(branchA, branchB)) {
+				try (var statement = connection.prepareStatement("""
+						INSERT INTO visit_package_entitlement_branch
+						 (entitlement_id, branch_id, organization_id, created_at)
+						VALUES (?, ?, ?, now())
+						""")) {
+					statement.setObject(1, entitlementId);
+					statement.setObject(2, branchId);
+					statement.setObject(3, organizationId);
+					statement.executeUpdate();
+				}
+			}
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO benefit (id, organization_id, branch_id, code, name, benefit_type,
+					 discount_type, requires_evidence, combinable, priority, status, access_scope,
+					 created_at, updated_at, version)
+					VALUES (?, ?, ?, ?, 'Sauna', 'ACCESS', 'NONE', FALSE, FALSE, 100,
+					 'ACTIVE', 'LOCAL', now(), now(), 0)
+					""")) {
+				statement.setObject(1, benefitId);
+				statement.setObject(2, organizationId);
+				statement.setObject(3, branchA);
+				statement.setString(4, "SAUNA-" + benefitId);
+				statement.executeUpdate();
+			}
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO visit_package_entitlement_benefit
+					 (entitlement_id, benefit_id, organization_id, created_at)
+					VALUES (?, ?, ?, now())
+					""")) {
+				statement.setObject(1, entitlementId);
+				statement.setObject(2, benefitId);
+				statement.setObject(3, organizationId);
+				statement.executeUpdate();
+			}
+		}
+
+		migrateSchema(schema, null);
+
+		try (var connection = schemaConnection(schema);
+				var statement = connection.prepareStatement("""
+					SELECT branch_id FROM visit_package_entitlement_benefit_branch
+					WHERE entitlement_id=? AND benefit_id=?
+					""")) {
+			statement.setObject(1, entitlementId);
+			statement.setObject(2, benefitId);
+			try (var result = statement.executeQuery()) {
+				assertThat(result.next()).isTrue();
+				assertThat(result.getObject(1, UUID.class)).isEqualTo(branchA);
+				assertThat(result.next()).isFalse();
+			}
 		}
 	}
 

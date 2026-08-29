@@ -7,6 +7,12 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface VisitPackagePlanPort {
+	record BenefitCoverage(UUID benefitId, List<UUID> branchIds) {
+		public BenefitCoverage {
+			branchIds = branchIds == null ? List.of() : List.copyOf(branchIds);
+		}
+	}
+
 	List<VisitPackagePlanView> list(UUID organizationId, UUID branchId);
 	Optional<VisitPackagePlanView> find(UUID organizationId, UUID planId);
 	void create(
@@ -22,5 +28,7 @@ public interface VisitPackagePlanPort {
 	boolean branchesExist(UUID organizationId, List<UUID> branchIds);
 	List<UUID> activeBranchIds(UUID organizationId);
 	boolean accessBenefitsExist(UUID organizationId, List<UUID> benefitIds);
+	List<BenefitCoverage> benefitCoverages(
+			UUID organizationId, List<UUID> benefitIds, List<UUID> packageBranchIds);
 	boolean configuredProduct(UUID organizationId, UUID productId);
 }

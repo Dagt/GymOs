@@ -60,9 +60,43 @@ public class BenefitRepository {
 			return benefits(organizationId);
 		}
 		return benefits(organizationId).stream()
-				.filter(benefit -> "PLAN_COVERAGE".equals(benefit.accessScope())
-						|| benefit.branchId() == null || branchId.equals(benefit.branchId()))
+				.filter(benefit -> !"ACCESS".equals(benefit.benefitType())
+						|| accessBenefitCoversBranch(organizationId, benefit, branchId))
 				.toList();
+	}
+
+	private boolean accessBenefitCoversBranch(
+			UUID organizationId, BenefitSummary benefit, UUID branchId
+	) {
+		if (!"PLAN_COVERAGE".equals(benefit.accessScope())) {
+			return benefit.branchId() == null || branchId.equals(benefit.branchId());
+		}
+		return jdbcClient.sql("""
+				SELECT EXISTS (
+				    SELECT 1
+				    FROM benefit_membership_plan benefit_plan
+				    JOIN membership_plan membership_plan
+				      ON membership_plan.organization_id = benefit_plan.organization_id
+				     AND membership_plan.id = benefit_plan.membership_plan_id
+				     AND membership_plan.status = 'ACTIVE'
+				     AND membership_plan.deleted_at IS NULL
+				    WHERE benefit_plan.organization_id = :organizationId
+				      AND benefit_plan.benefit_id = :benefitId
+				      AND (
+				          membership_plan.multi_branch_access = TRUE
+				          OR EXISTS (
+				              SELECT 1 FROM catalog_product_branch product_branch
+				              WHERE product_branch.organization_id = membership_plan.organization_id
+				                AND product_branch.product_id = membership_plan.product_id
+				                AND product_branch.branch_id = :branchId
+				          )
+				      )
+				)
+				""")
+				.param("organizationId", organizationId)
+				.param("benefitId", benefit.id())
+				.param("branchId", branchId)
+				.query(Boolean.class).single();
 	}
 
 	public Optional<BenefitSummary> benefit(UUID organizationId, UUID benefitId) {

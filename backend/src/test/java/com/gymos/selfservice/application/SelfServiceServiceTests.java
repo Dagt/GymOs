@@ -522,7 +522,7 @@ class SelfServiceServiceTests {
 		return new VisitPackagePlanSnapshot(
 				packagePlanId, UUID.randomUUID(), "VISITAS-10", "10 visitas",
 				50000, "MXN", 10, 30, "ALL_BRANCHES", List.of(branchId),
-				List.of(UUID.randomUUID()), true, "DEFAULT");
+				List.of(UUID.randomUUID()), List.of(), true, "DEFAULT");
 	}
 
 	private void givenSession(String allowedActionsJson) {

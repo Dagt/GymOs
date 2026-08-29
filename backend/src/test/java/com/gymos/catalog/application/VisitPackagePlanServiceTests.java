@@ -14,6 +14,7 @@ import com.gymos.catalog.application.port.CatalogProductCommandPort;
 import com.gymos.catalog.application.port.CatalogProductCommandPort.ProductMutation;
 import com.gymos.catalog.application.port.CatalogProductQueryPort;
 import com.gymos.catalog.application.port.VisitPackagePlanPort;
+import com.gymos.catalog.application.port.VisitPackagePlanPort.BenefitCoverage;
 import com.gymos.catalog.application.query.VisitPackagePlanView;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
@@ -82,6 +83,52 @@ class VisitPackagePlanServiceTests {
 				"correlation"))
 				.isInstanceOf(BusinessException.class)
 				.hasMessageContaining("acceso activo");
+		verify(productCommands, never()).create(any());
+	}
+
+	@Test
+	void rejectsCreatingAPackageOnlyForTheOppositeBranch() {
+		CatalogProductCommandPort productCommands = mock(CatalogProductCommandPort.class);
+		VisitPackagePlanPort packages = mock(VisitPackagePlanPort.class);
+		VisitPackagePlanService service = new VisitPackagePlanService(
+				mock(CatalogProductQueryPort.class), productCommands, packages, mock(AuditService.class));
+		UUID organizationId = UUID.randomUUID();
+		UUID activeBranch = UUID.randomUUID();
+		UUID oppositeBranch = UUID.randomUUID();
+		UUID benefitId = UUID.randomUUID();
+		when(packages.branchesExist(organizationId, List.of(oppositeBranch))).thenReturn(true);
+
+		assertThatThrownBy(() -> service.create(principal(organizationId, activeBranch),
+				new CreateVisitPackagePlanCommand(
+						"5-VISITAS", "5 visitas", null, 50000, "MXN", 5, 30,
+						"SELECTED_BRANCHES", List.of(oppositeBranch), List.of(benefitId),
+						true, "DEFAULT", "ACTIVE"), "correlation"))
+				.isInstanceOfSatisfying(BusinessException.class,
+						error -> assertThat(error.code()).isEqualTo("VISIT_PACKAGE_ACTIVE_BRANCH_REQUIRED"));
+		verify(productCommands, never()).create(any());
+	}
+
+	@Test
+	void rejectsAnAccessThatHasNoEffectiveBranchInsideThePackage() {
+		CatalogProductCommandPort productCommands = mock(CatalogProductCommandPort.class);
+		VisitPackagePlanPort packages = mock(VisitPackagePlanPort.class);
+		VisitPackagePlanService service = new VisitPackagePlanService(
+				mock(CatalogProductQueryPort.class), productCommands, packages, mock(AuditService.class));
+		UUID organizationId = UUID.randomUUID();
+		UUID activeBranch = UUID.randomUUID();
+		UUID benefitId = UUID.randomUUID();
+		when(packages.branchesExist(organizationId, List.of(activeBranch))).thenReturn(true);
+		when(packages.accessBenefitsExist(organizationId, List.of(benefitId))).thenReturn(true);
+		when(packages.benefitCoverages(organizationId, List.of(benefitId), List.of(activeBranch)))
+				.thenReturn(List.of(new BenefitCoverage(benefitId, List.of())));
+
+		assertThatThrownBy(() -> service.create(principal(organizationId, activeBranch),
+				new CreateVisitPackagePlanCommand(
+						"5-VISITAS", "5 visitas", null, 50000, "MXN", 5, 30,
+						"SELECTED_BRANCHES", List.of(activeBranch), List.of(benefitId),
+						true, "DEFAULT", "ACTIVE"), "correlation"))
+				.isInstanceOfSatisfying(BusinessException.class,
+						error -> assertThat(error.code()).isEqualTo("VISIT_PACKAGE_BENEFIT_OUTSIDE_SCOPE"));
 		verify(productCommands, never()).create(any());
 	}
 

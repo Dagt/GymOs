@@ -77,6 +77,10 @@ public class SalesRepository {
 		return refundLookup.processedTotal(organizationId, saleId);
 	}
 
+	public boolean visitPackageHasConsumptions(UUID organizationId, UUID saleId) {
+		return refundLookup.visitPackageHasConsumptions(organizationId, saleId);
+	}
+
 	public List<RefundableSaleItem> refundableSaleItems(UUID organizationId, UUID saleId) {
 		return refundLookup.refundableItems(organizationId, saleId);
 	}

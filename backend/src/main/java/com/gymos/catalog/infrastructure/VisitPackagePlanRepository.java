@@ -2,6 +2,7 @@ package com.gymos.catalog.infrastructure;
 
 import com.gymos.catalog.application.query.VisitPackagePlanView;
 import com.gymos.catalog.application.port.VisitPackagePlanPort;
+import com.gymos.catalog.application.port.VisitPackagePlanPort.BenefitCoverage;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -181,6 +182,67 @@ public class VisitPackagePlanRepository implements VisitPackagePlanPort {
 	}
 
 	@Override
+	public List<BenefitCoverage> benefitCoverages(
+			UUID organizationId, List<UUID> benefitIds, List<UUID> packageBranchIds
+	) {
+		if (benefitIds == null || benefitIds.isEmpty() || packageBranchIds == null || packageBranchIds.isEmpty()) {
+			return List.of();
+		}
+		List<BenefitBranch> rows = jdbcClient.sql("""
+				SELECT benefit.id AS benefit_id, package_branch.id AS branch_id
+				FROM benefit benefit
+				JOIN branch package_branch
+				  ON package_branch.organization_id = benefit.organization_id
+				 AND package_branch.id IN (:packageBranchIds)
+				 AND package_branch.status = 'ACTIVE'
+				 AND package_branch.deleted_at IS NULL
+				WHERE benefit.organization_id = :organizationId
+				  AND benefit.id IN (:benefitIds)
+				  AND benefit.benefit_type = 'ACCESS'
+				  AND benefit.status = 'ACTIVE'
+				  AND benefit.deleted_at IS NULL
+				  AND (
+				      (benefit.access_scope = 'LOCAL'
+				       AND (benefit.branch_id IS NULL OR benefit.branch_id = package_branch.id))
+				      OR
+				      (benefit.access_scope = 'PLAN_COVERAGE' AND EXISTS (
+				          SELECT 1
+				          FROM benefit_membership_plan benefit_plan
+				          JOIN membership_plan membership_plan
+				            ON membership_plan.organization_id = benefit_plan.organization_id
+				           AND membership_plan.id = benefit_plan.membership_plan_id
+				           AND membership_plan.status = 'ACTIVE'
+				           AND membership_plan.deleted_at IS NULL
+				          WHERE benefit_plan.organization_id = benefit.organization_id
+				            AND benefit_plan.benefit_id = benefit.id
+				            AND (
+				                membership_plan.multi_branch_access = TRUE
+				                OR EXISTS (
+				                    SELECT 1 FROM catalog_product_branch product_branch
+				                    WHERE product_branch.organization_id = membership_plan.organization_id
+				                      AND product_branch.product_id = membership_plan.product_id
+				                      AND product_branch.branch_id = package_branch.id
+				                )
+				            )
+				      ))
+				  )
+				ORDER BY benefit.id, package_branch.id
+				""")
+				.param("organizationId", organizationId)
+				.param("benefitIds", benefitIds.stream().distinct().toList())
+				.param("packageBranchIds", packageBranchIds.stream().distinct().toList())
+				.query((rs, row) -> new BenefitBranch(
+						rs.getObject("benefit_id", UUID.class), rs.getObject("branch_id", UUID.class)))
+				.list();
+		return benefitIds.stream().distinct()
+				.map(benefitId -> new BenefitCoverage(benefitId, rows.stream()
+						.filter(row -> row.benefitId().equals(benefitId))
+						.map(BenefitBranch::branchId)
+						.toList()))
+				.toList();
+	}
+
+	@Override
 	public boolean configuredProduct(UUID organizationId, UUID productId) {
 		return jdbcClient.sql("""
 				SELECT EXISTS (
@@ -216,4 +278,6 @@ public class VisitPackagePlanRepository implements VisitPackagePlanPort {
 				WHERE organization_id=:organizationId AND visit_package_plan_id=:planId ORDER BY benefit_id
 				""").param("organizationId", organizationId).param("planId", planId).query(UUID.class).list();
 	}
+
+	private record BenefitBranch(UUID benefitId, UUID branchId) {}
 }

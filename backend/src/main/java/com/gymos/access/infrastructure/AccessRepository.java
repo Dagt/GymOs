@@ -239,13 +239,37 @@ public class AccessRepository {
 		List<UUID> distinctIds = benefitIds.stream().distinct().toList();
 		Integer count = jdbcClient.sql("""
 				SELECT COUNT(*)
-				FROM benefit
-				WHERE organization_id = :organizationId
-				  AND id IN (:benefitIds)
-				  AND benefit_type = 'ACCESS'
-				  AND status = 'ACTIVE'
-				  AND deleted_at IS NULL
-				  AND (branch_id IS NULL OR branch_id = :branchId)
+				FROM benefit benefit
+				WHERE benefit.organization_id = :organizationId
+				  AND benefit.id IN (:benefitIds)
+				  AND benefit.benefit_type = 'ACCESS'
+				  AND benefit.status = 'ACTIVE'
+				  AND benefit.deleted_at IS NULL
+				  AND (
+				      (benefit.access_scope = 'LOCAL'
+				       AND (benefit.branch_id IS NULL OR benefit.branch_id = :branchId))
+				      OR
+				      (benefit.access_scope = 'PLAN_COVERAGE' AND EXISTS (
+				          SELECT 1
+				          FROM benefit_membership_plan benefit_plan
+				          JOIN membership_plan membership_plan
+				            ON membership_plan.organization_id = benefit_plan.organization_id
+				           AND membership_plan.id = benefit_plan.membership_plan_id
+				           AND membership_plan.status = 'ACTIVE'
+				           AND membership_plan.deleted_at IS NULL
+				          WHERE benefit_plan.organization_id = benefit.organization_id
+				            AND benefit_plan.benefit_id = benefit.id
+				            AND (
+				                membership_plan.multi_branch_access = TRUE
+				                OR EXISTS (
+				                    SELECT 1 FROM catalog_product_branch product_branch
+				                    WHERE product_branch.organization_id = membership_plan.organization_id
+				                      AND product_branch.product_id = membership_plan.product_id
+				                      AND product_branch.branch_id = :branchId
+				                )
+				            )
+				      ))
+				  )
 				""")
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
@@ -257,14 +281,38 @@ public class AccessRepository {
 
 	public List<PhysicalAccessBenefitRecord> physicalAccessBenefits(UUID organizationId, UUID branchId) {
 		return jdbcClient.sql("""
-				SELECT id, code, name
-				FROM benefit
-				WHERE organization_id = :organizationId
-				  AND benefit_type = 'ACCESS'
-				  AND status = 'ACTIVE'
-				  AND deleted_at IS NULL
-				  AND (branch_id IS NULL OR branch_id = :branchId)
-				ORDER BY name, code
+				SELECT benefit.id, benefit.code, benefit.name
+				FROM benefit benefit
+				WHERE benefit.organization_id = :organizationId
+				  AND benefit.benefit_type = 'ACCESS'
+				  AND benefit.status = 'ACTIVE'
+				  AND benefit.deleted_at IS NULL
+				  AND (
+				      (benefit.access_scope = 'LOCAL'
+				       AND (benefit.branch_id IS NULL OR benefit.branch_id = :branchId))
+				      OR
+				      (benefit.access_scope = 'PLAN_COVERAGE' AND EXISTS (
+				          SELECT 1
+				          FROM benefit_membership_plan benefit_plan
+				          JOIN membership_plan membership_plan
+				            ON membership_plan.organization_id = benefit_plan.organization_id
+				           AND membership_plan.id = benefit_plan.membership_plan_id
+				           AND membership_plan.status = 'ACTIVE'
+				           AND membership_plan.deleted_at IS NULL
+				          WHERE benefit_plan.organization_id = benefit.organization_id
+				            AND benefit_plan.benefit_id = benefit.id
+				            AND (
+				                membership_plan.multi_branch_access = TRUE
+				                OR EXISTS (
+				                    SELECT 1 FROM catalog_product_branch product_branch
+				                    WHERE product_branch.organization_id = membership_plan.organization_id
+				                      AND product_branch.product_id = membership_plan.product_id
+				                      AND product_branch.branch_id = :branchId
+				                )
+				            )
+				      ))
+				  )
+				ORDER BY benefit.name, benefit.code
 				""")
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)

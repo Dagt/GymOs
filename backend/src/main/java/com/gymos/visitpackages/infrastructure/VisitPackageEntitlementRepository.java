@@ -1,8 +1,11 @@
 package com.gymos.visitpackages.infrastructure;
 
+import com.gymos.common.api.BusinessException;
 import com.gymos.visitpackages.api.operations.VisitPackageOperations.VisitPackageEntitlementView;
+import com.gymos.visitpackages.api.operations.VisitPackageOperations.VisitPackageConsumptionView;
 import com.gymos.visitpackages.api.operations.VisitPackageAccessOperations.VisitPackageAccessResult;
 import com.gymos.visitpackages.application.port.VisitPackageEntitlementPort;
+import com.gymos.visitpackages.application.port.VisitPackageEntitlementPort.BenefitCoverage;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -71,7 +74,26 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 				entitlement.organization_id = :organizationId
 				AND entitlement.client_id = :clientId
 				AND entitlement.status IN ('PENDING_PAYMENT', 'ACTIVE')
-				""", organizationId, clientId, null, null);
+				""", organizationId, clientId, null, null, null);
+	}
+
+	@Override
+	public List<VisitPackageEntitlementView> history(UUID organizationId, UUID clientId, int limit) {
+		List<UUID> ids = jdbcClient.sql("""
+				SELECT id FROM visit_package_entitlement
+				WHERE organization_id=:organizationId AND client_id=:clientId
+				  AND deleted_at IS NULL
+				ORDER BY created_at DESC, id DESC
+				LIMIT :limit
+				""")
+				.param("organizationId", organizationId).param("clientId", clientId)
+				.param("limit", limit).query(UUID.class).list();
+		return ids.stream()
+				.map(id -> query("""
+						entitlement.organization_id = :organizationId
+						AND entitlement.id = :entitlementId
+						""", organizationId, null, null, null, id).orElseThrow())
+				.toList();
 	}
 
 	@Override
@@ -79,7 +101,7 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 		return query("""
 				entitlement.organization_id = :organizationId
 				AND entitlement.sale_id = :saleId
-				""", organizationId, null, saleId, null);
+				""", organizationId, null, saleId, null, null);
 	}
 
 	@Override
@@ -91,14 +113,14 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 				entitlement.organization_id = :organizationId
 				AND entitlement.client_id = :clientId
 				AND purchase_sale.idempotency_key = :idempotencyKey
-				""", organizationId, clientId, null, idempotencyKey.trim());
+				""", organizationId, clientId, null, idempotencyKey.trim(), null);
 	}
 
 	@Override
 	public UUID createPending(
 			UUID organizationId, UUID homeBranchId, UUID clientId, UUID packagePlanId,
 			UUID saleId, String packageName, int totalVisits, int validityDays,
-			OffsetDateTime pendingExpiresAt, List<UUID> branchIds, List<UUID> benefitIds,
+			OffsetDateTime pendingExpiresAt, List<UUID> branchIds, List<BenefitCoverage> benefitCoverages,
 			OffsetDateTime now
 	) {
 		UUID id = UUID.randomUUID();
@@ -127,7 +149,11 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 					.param("entitlementId", id).param("branchId", branchId)
 					.param("organizationId", organizationId).param("now", now).update();
 		}
-		for (UUID benefitId : benefitIds.stream().distinct().toList()) {
+		for (BenefitCoverage coverage : benefitCoverages.stream()
+				.collect(java.util.stream.Collectors.toMap(
+						BenefitCoverage::benefitId, value -> value, (first, ignored) -> first,
+						java.util.LinkedHashMap::new)).values()) {
+			UUID benefitId = coverage.benefitId();
 			jdbcClient.sql("""
 					INSERT INTO visit_package_entitlement_benefit (
 					    entitlement_id, benefit_id, organization_id, created_at
@@ -135,6 +161,19 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 					""")
 					.param("entitlementId", id).param("benefitId", benefitId)
 					.param("organizationId", organizationId).param("now", now).update();
+			for (UUID branchId : coverage.branchIds().stream().distinct().toList()) {
+				if (!branchIds.contains(branchId)) {
+					throw new IllegalArgumentException("Benefit coverage must be contained in package branches");
+				}
+				jdbcClient.sql("""
+						INSERT INTO visit_package_entitlement_benefit_branch (
+						    entitlement_id, benefit_id, branch_id, organization_id, created_at
+						) VALUES (:entitlementId, :benefitId, :branchId, :organizationId, :now)
+						""")
+						.param("entitlementId", id).param("benefitId", benefitId)
+						.param("branchId", branchId).param("organizationId", organizationId)
+						.param("now", now).update();
+			}
 		}
 		return id;
 	}
@@ -188,7 +227,17 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 				.param("organizationId", organizationId).param("clientId", clientId)
 				.query(UUID.class).optional();
 		Optional<VisitPackageAccessResult> existing = consumptionByKey(organizationId, idempotencyKey);
-		if (existing.isPresent()) return existing;
+		if (existing.isPresent()) {
+			VisitPackageAccessResult previous = existing.get();
+			if (!previous.clientId().equals(clientId)
+					|| !previous.branchId().equals(branchId)
+					|| !java.util.Objects.equals(previous.accessDeviceId(), accessDeviceId)) {
+				throw new BusinessException(
+						"VISIT_PACKAGE_ACCESS_KEY_REUSED",
+						"El identificador del evento ya corresponde a otro acceso.");
+			}
+			return existing;
+		}
 
 		jdbcClient.sql("""
 				UPDATE visit_package_entitlement
@@ -203,9 +252,10 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 				? ""
 				: """
 				  AND EXISTS (
-				      SELECT 1 FROM visit_package_entitlement_benefit entitlement_benefit
+				      SELECT 1 FROM visit_package_entitlement_benefit_branch entitlement_benefit
 				      WHERE entitlement_benefit.organization_id=entitlement.organization_id
 				        AND entitlement_benefit.entitlement_id=entitlement.id
+				        AND entitlement_benefit.branch_id=:branchId
 				        AND entitlement_benefit.benefit_id IN (:requiredBenefitIds)
 				  )
 				""";
@@ -294,7 +344,8 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 	}
 
 	private Optional<VisitPackageEntitlementView> query(
-			String predicate, UUID organizationId, UUID clientId, UUID saleId, String idempotencyKey
+			String predicate, UUID organizationId, UUID clientId, UUID saleId, String idempotencyKey,
+			UUID filterEntitlementId
 	) {
 		JdbcClient.StatementSpec statement = jdbcClient.sql("""
 				SELECT entitlement.id, entitlement.client_id, entitlement.visit_package_plan_id,
@@ -317,6 +368,7 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 		if (clientId != null) statement = statement.param("clientId", clientId);
 		if (saleId != null) statement = statement.param("saleId", saleId);
 		if (idempotencyKey != null) statement = statement.param("idempotencyKey", idempotencyKey);
+		if (filterEntitlementId != null) statement = statement.param("entitlementId", filterEntitlementId);
 		return statement.query((rs, row) -> {
 			UUID entitlementId = rs.getObject("id", UUID.class);
 			UUID resolvedClientId = rs.getObject("client_id", UUID.class);
@@ -335,10 +387,12 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 			// close the active ResultSet when another statement uses the same transaction connection.
 			List<UUID> resolvedBranchIds = branchIds(organizationId, entitlementId);
 			List<UUID> resolvedBenefitIds = benefitIds(organizationId, entitlementId);
+			List<VisitPackageConsumptionView> resolvedConsumptions = consumptions(organizationId, entitlementId);
 			return new VisitPackageEntitlementView(
 					entitlementId, resolvedClientId, packagePlanId, resolvedSaleId,
 					packageName, status, totalVisits, remainingVisits, validFrom, validUntil,
-					pendingExpiresAt, resolvedBranchIds, resolvedBenefitIds, createdAt, updatedAt);
+					pendingExpiresAt, resolvedBranchIds, resolvedBenefitIds, resolvedConsumptions,
+					createdAt, updatedAt);
 		}).optional();
 	}
 
@@ -356,5 +410,33 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 				WHERE organization_id=:organizationId AND entitlement_id=:entitlementId ORDER BY benefit_id
 				""").param("organizationId", organizationId).param("entitlementId", entitlementId)
 				.query(UUID.class).list();
+	}
+
+	private List<VisitPackageConsumptionView> consumptions(UUID organizationId, UUID entitlementId) {
+		return jdbcClient.sql("""
+				SELECT consumption.id, consumption.status, consumption.occurred_at,
+				       consumption.branch_id, branch.name AS branch_name,
+				       consumption.access_device_id, device.name AS device_name,
+				       consumption.remaining_after
+				FROM visit_package_consumption consumption
+				JOIN branch branch
+				  ON branch.organization_id=consumption.organization_id
+				 AND branch.id=consumption.branch_id
+				LEFT JOIN access_device device
+				  ON device.organization_id=consumption.organization_id
+				 AND device.id=consumption.access_device_id
+				WHERE consumption.organization_id=:organizationId
+				  AND consumption.entitlement_id=:entitlementId
+				ORDER BY consumption.occurred_at DESC, consumption.id DESC
+				LIMIT 20
+				""")
+				.param("organizationId", organizationId).param("entitlementId", entitlementId)
+				.query((rs, row) -> new VisitPackageConsumptionView(
+						rs.getObject("id", UUID.class), rs.getString("status"),
+						rs.getObject("occurred_at", OffsetDateTime.class),
+						rs.getObject("branch_id", UUID.class), rs.getString("branch_name"),
+						rs.getObject("access_device_id", UUID.class), rs.getString("device_name"),
+						rs.getInt("remaining_after")))
+				.list();
 	}
 }
