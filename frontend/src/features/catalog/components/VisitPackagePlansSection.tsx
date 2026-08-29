@@ -76,6 +76,18 @@ export function VisitPackagePlansSection({
     () => benefits.filter((benefit) => benefit.benefitType === "ACCESS" && benefit.status === "ACTIVE"),
     [benefits],
   );
+  const selectedPackageBranchIds = useMemo(
+    () => draft.branchScope === "ALL_BRANCHES" ? branches.map((branch) => branch.id) : draft.branchIds,
+    [branches, draft.branchIds, draft.branchScope],
+  );
+  const uncoveredSelectedBranches = useMemo(
+    () => branchesWithoutSelectedAccess(
+      selectedPackageBranchIds,
+      draft.benefitIds,
+      accessBenefits,
+    ),
+    [accessBenefits, draft.benefitIds, selectedPackageBranchIds],
+  );
 
   useEffect(() => {
     let active = true;
@@ -155,6 +167,22 @@ export function VisitPackagePlansSection({
     }
     if (draft.benefitIds.length === 0) {
       setError("Selecciona al menos un acceso que pueda consumir visitas.");
+      return;
+    }
+    const incompatibleBenefit = draft.benefitIds.find((benefitId) => {
+      const benefit = accessBenefits.find((item) => item.id === benefitId);
+      return !benefit || !benefitCoversAnySelectedBranch(benefit, selectedPackageBranchIds);
+    });
+    if (incompatibleBenefit) {
+      setError("Quita los accesos que no existen en ninguna de las sucursales elegidas.");
+      return;
+    }
+    if (uncoveredSelectedBranches.length > 0) {
+      const names = branches
+        .filter((branch) => uncoveredSelectedBranches.includes(branch.id))
+        .map((branch) => branch.name)
+        .join(", ");
+      setError(`Selecciona al menos un acceso disponible en: ${names}.`);
       return;
     }
     const payload: VisitPackagePlanPayload = {
@@ -264,13 +292,20 @@ export function VisitPackagePlansSection({
                 name="visitPackageBranchScope"
                 value={draft.branchScope}
                 options={[{ label: "Todas las sucursales", value: "ALL_BRANCHES" }, { label: "Sólo sucursales seleccionadas", value: "SELECTED_BRANCHES" }]}
-                onChange={(branchScope) => setDraft({
-                  ...draft,
-                  branchScope: branchScope as Draft["branchScope"],
-                  branchIds: branchScope === "SELECTED_BRANCHES" && currentBranchId
-                    ? Array.from(new Set([...draft.branchIds, currentBranchId]))
-                    : draft.branchIds,
-                })}
+                onChange={(branchScope) => {
+                  const nextScope = branchScope as Draft["branchScope"];
+                  const nextBranchIds = nextScope === "ALL_BRANCHES"
+                    ? branches.map((branch) => branch.id)
+                    : currentBranchId
+                      ? Array.from(new Set([...draft.branchIds, currentBranchId]))
+                      : draft.branchIds;
+                  setDraft({
+                    ...draft,
+                    branchScope: nextScope,
+                    branchIds: nextScope === "SELECTED_BRANCHES" ? nextBranchIds : draft.branchIds,
+                    benefitIds: compatibleBenefitIds(draft.benefitIds, accessBenefits, nextBranchIds),
+                  });
+                }}
               />
               {draft.branchScope === "SELECTED_BRANCHES" ? (
                 <CheckboxList
@@ -278,11 +313,19 @@ export function VisitPackagePlansSection({
                   items={branches.map((branch) => ({
                     id: branch.id,
                     label: branch.name,
-                    description: branch.id === currentBranchId ? "Sucursal activa · siempre incluida" : undefined,
-                    disabled: branch.id === currentBranchId,
+                    description: branch.id === currentBranchId
+                      ? "Sucursal activa · siempre incluida"
+                      : branchHasAvailableAccess(branch.id, accessBenefits)
+                        ? undefined
+                        : "No hay accesos configurados para paquetes en esta sucursal",
+                    disabled: branch.id === currentBranchId || !branchHasAvailableAccess(branch.id, accessBenefits),
                   }))}
                   selected={draft.branchIds}
-                  onChange={(branchIds) => setDraft({ ...draft, branchIds })}
+                  onChange={(branchIds) => setDraft({
+                    ...draft,
+                    branchIds,
+                    benefitIds: compatibleBenefitIds(draft.benefitIds, accessBenefits, branchIds),
+                  })}
                 />
               ) : <p className="text-xs text-[var(--brand-muted)]">Incluye las sucursales activas actuales del gimnasio.</p>}
             </div>
@@ -296,7 +339,8 @@ export function VisitPackagePlansSection({
                 items={accessBenefits.map((benefit) => ({
                   id: benefit.id,
                   label: benefit.name,
-                  description: benefitScopeLabel(benefit, branches),
+                  description: benefitAvailabilityLabel(benefit, branches, selectedPackageBranchIds),
+                  disabled: !benefitCoversAnySelectedBranch(benefit, selectedPackageBranchIds),
                 }))}
                 selected={draft.benefitIds}
                 onChange={(benefitIds) => setDraft({ ...draft, benefitIds })}
@@ -304,6 +348,14 @@ export function VisitPackagePlansSection({
               <p className="rounded-lg bg-[#f1f5ef] px-3 py-2 text-xs text-[#31563c]">
                 El paquete no amplía un acceso. Si Sauna es sólo de Centro, seguirá disponible sólo en Centro aunque el saldo pueda usarse también en Tecnológica.
               </p>
+              {uncoveredSelectedBranches.length > 0 ? (
+                <p className="rounded-lg bg-[#fff3df] px-3 py-2 text-xs font-medium text-[#80561f]">
+                  Falta elegir un acceso disponible en {branches
+                    .filter((branch) => uncoveredSelectedBranches.includes(branch.id))
+                    .map((branch) => branch.name)
+                    .join(", ")}.
+                </p>
+              ) : null}
             </div>
           </div>
 
@@ -358,14 +410,71 @@ function CheckboxList({
   );
 }
 
-function benefitScopeLabel(benefit: BenefitSummary, branches: BranchSummary[]) {
-  if (benefit.accessScope === "PLAN_COVERAGE") {
-    return "Se reconoce únicamente en las sucursales cubiertas por sus planes vinculados";
-  }
-  const branchName = branches.find((branch) => branch.id === benefit.branchId)?.name;
-  return branchName ? `Sólo en ${branchName}` : "Sólo en su sucursal de origen";
+function benefitAvailabilityLabel(
+  benefit: BenefitSummary,
+  branches: BranchSummary[],
+  selectedBranchIds: string[],
+) {
+  const coverage = benefitCoverageBranchIds(benefit);
+  const availableNames = branches
+    .filter((branch) => selectedBranchIds.includes(branch.id) && coverage.includes(branch.id))
+    .map((branch) => branch.name);
+  const unavailableNames = branches
+    .filter((branch) => selectedBranchIds.includes(branch.id) && !coverage.includes(branch.id))
+    .map((branch) => branch.name);
+  if (availableNames.length === 0) return "No existe en las sucursales elegidas";
+  const available = `Descuenta visitas en: ${availableNames.join(", ")}`;
+  return unavailableNames.length > 0
+    ? `${available} · No disponible en: ${unavailableNames.join(", ")}`
+    : available;
+}
+
+function benefitCoverageBranchIds(benefit: BenefitSummary) {
+  if (benefit.accessBranchIds && benefit.accessBranchIds.length > 0) return benefit.accessBranchIds;
+  return benefit.branchId ? [benefit.branchId] : [];
+}
+
+function benefitCoversAnySelectedBranch(benefit: BenefitSummary, selectedBranchIds: string[]) {
+  const coverage = benefitCoverageBranchIds(benefit);
+  return selectedBranchIds.some((branchId) => coverage.includes(branchId));
+}
+
+function branchHasAvailableAccess(branchId: string, benefits: BenefitSummary[]) {
+  return benefits.some((benefit) => benefitCoverageBranchIds(benefit).includes(branchId));
+}
+
+function branchesWithoutSelectedAccess(
+  branchIds: string[],
+  selectedBenefitIds: string[],
+  benefits: BenefitSummary[],
+) {
+  const selectedBenefits = benefits.filter((benefit) => selectedBenefitIds.includes(benefit.id));
+  return branchIds.filter((branchId) => !selectedBenefits.some(
+    (benefit) => benefitCoverageBranchIds(benefit).includes(branchId),
+  ));
+}
+
+function compatibleBenefitIds(
+  benefitIds: string[],
+  benefits: BenefitSummary[],
+  branchIds: string[],
+) {
+  return benefitIds.filter((benefitId) => {
+    const benefit = benefits.find((item) => item.id === benefitId);
+    return benefit ? benefitCoversAnySelectedBranch(benefit, branchIds) : false;
+  });
 }
 
 function errorMessage(exception: unknown, fallback: string) {
-  return exception instanceof Error ? exception.message : fallback;
+  const rawMessage = exception instanceof Error ? exception.message : "";
+  if (rawMessage.includes("VISIT_PACKAGE_ACTIVE_BRANCH_REQUIRED")) {
+    return "El paquete debe incluir la sucursal en la que estás operando.";
+  }
+  if (rawMessage.includes("VISIT_PACKAGE_BRANCH_WITHOUT_ACCESS")) {
+    return "Cada sucursal elegida debe tener al menos un acceso disponible.";
+  }
+  if (rawMessage.includes("VISIT_PACKAGE_BENEFIT_OUTSIDE_SCOPE")) {
+    return "Quita los accesos que no existen en las sucursales elegidas.";
+  }
+  return rawMessage || fallback;
 }

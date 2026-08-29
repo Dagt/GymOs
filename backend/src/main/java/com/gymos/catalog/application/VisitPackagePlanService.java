@@ -15,6 +15,7 @@ import com.gymos.catalog.application.query.VisitPackagePlanView;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import java.time.OffsetDateTime;
+import java.util.HashSet;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -179,11 +180,19 @@ public class VisitPackagePlanService implements VisitPackagePlanOperations {
 		if (distinctBenefits.isEmpty() || !packages.accessBenefitsExist(organizationId, distinctBenefits)) {
 			throw new BusinessException("VISIT_PACKAGE_BENEFITS_INVALID", "Selecciona al menos un acceso activo del gimnasio.");
 		}
-		if (packages.benefitCoverages(organizationId, distinctBenefits, effectiveBranches).stream()
-				.anyMatch(coverage -> coverage.branchIds().isEmpty())) {
+		List<VisitPackagePlanPort.BenefitCoverage> benefitCoverages =
+				packages.benefitCoverages(organizationId, distinctBenefits, effectiveBranches);
+		if (benefitCoverages.stream().anyMatch(coverage -> coverage.branchIds().isEmpty())) {
 			throw new BusinessException(
 					"VISIT_PACKAGE_BENEFIT_OUTSIDE_SCOPE",
 					"Uno de los accesos elegidos no se reconoce en ninguna sucursal de este paquete.");
+		}
+		var coveredBranches = new HashSet<UUID>();
+		benefitCoverages.forEach(coverage -> coveredBranches.addAll(coverage.branchIds()));
+		if (!coveredBranches.containsAll(effectiveBranches)) {
+			throw new BusinessException(
+					"VISIT_PACKAGE_BRANCH_WITHOUT_ACCESS",
+					"Cada sucursal del paquete debe tener al menos uno de los accesos elegidos.");
 		}
 		String feePolicy = required(registrationFeePolicy, "REGISTRATION_FEE_POLICY_INVALID").toUpperCase();
 		if (!"DEFAULT".equals(feePolicy) && !"WAIVED".equals(feePolicy)) {

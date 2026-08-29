@@ -71,7 +71,7 @@ test("el kiosco aplica capacidades, no ofrece pago manual y actualiza contacto",
   await expect(page.getByText(/Los pagos en línea todavía no están disponibles/i)).toBeVisible();
   await expect(page.getByText("Activa", { exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Membresía actual" })).toBeVisible();
-  await expect(page.locator(".kiosk-feedback.error")).toContainText("Tu expediente se verificó correctamente");
+  await expect(page.locator(".kiosk-feedback.error")).toHaveCount(0);
   await expect(page.getByText(/INTERNAL_ERROR|HTTP en \/self-service|Código:/)).toHaveCount(0);
   await expect(page.getByText("Vigente hasta 31 jul 2026")).toBeVisible();
   await expect(page.getByText("Profesionales de bienestar")).toHaveCount(0);
@@ -164,6 +164,7 @@ test("los paquetes configurados siguen visibles con Stripe pendiente y no permit
 });
 
 test("un fallo de verificación mantiene el formulario centrado y oculta el detalle técnico", async ({ page }) => {
+  let resetRequests = 0;
   const verificationSession = {
     ...sessionResponse(),
     capabilities: { ...capabilities(), clientRegistrationAllowed: true },
@@ -174,6 +175,7 @@ test("un fallo de verificación mantiene el formulario centrado y oculta el deta
   await mockKiosk(page, async (route, path) => {
     const method = route.request().method();
     if (method === "POST" && path === `/self-service/sessions/${sessionId}/reset`) {
+      resetRequests += 1;
       return fulfill(route, verificationSession);
     }
     if (method === "POST" && path === `/self-service/sessions/${sessionId}/verify`) {
@@ -212,6 +214,12 @@ test("un fallo de verificación mantiene el formulario centrado y oculta el deta
   expect(cardAfter).not.toBeNull();
   if (!cardAfter) throw new Error("No fue posible medir el formulario después del error.");
   expect(Math.abs(cardAfter.x - cardBefore.x)).toBeLessThan(1);
+
+  const resetRequestsBeforeModeChange = resetRequests;
+  await page.getByRole("tab", { name: "Quiero registrarme" }).click();
+  await expect(page.getByRole("heading", { name: "Crea tu expediente" })).toBeVisible();
+  await expect.poll(() => resetRequests).toBe(resetRequestsBeforeModeChange + 1);
+  await expect(card.getByRole("alert")).toHaveCount(0);
 });
 
 test("un socio nuevo se registra en el kiosco y continúa a su primer plan", async ({ page }) => {
@@ -277,7 +285,7 @@ test("un socio nuevo se registra en el kiosco y continúa a su primer plan", asy
 
   await expect(page.getByText("Tu registro quedó listo. Ahora puedes elegir tu primera membresía.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "Contrata una membresía" })).toBeVisible();
-  await expect(page.locator(".kiosk-feedback.error")).toContainText("Tu expediente se verificó correctamente");
+  await expect(page.locator(".kiosk-feedback.error")).toHaveCount(0);
   await expect(page.getByText(/INTERNAL_ERROR|HTTP en \/self-service|Código:/)).toHaveCount(0);
   await expect(page.getByText("Tu registro quedó listo. Ahora puedes elegir tu primera membresía.")).toBeHidden({ timeout: 6_000 });
   expect(registrationPayload).toEqual({

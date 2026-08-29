@@ -121,7 +121,7 @@ class ClientPaginationIntegrationTests {
 	}
 
 	@Test
-	void selfServiceVerificationDoesNotRequireMembershipAndKeepsBranchScope() {
+	void selfServiceVerificationDoesNotRequireMembershipOrHideAnOrganizationClientByHomeBranch() {
 		UUID clientId = client(organizationId, branchId, "Socio sin plan", now);
 
 		assertThat(repository.verifyForSelfService(
@@ -130,7 +130,8 @@ class ClientPaginationIntegrationTests {
 				.contains(clientId);
 		assertThat(repository.verifyForSelfService(
 				organizationId, otherBranchId, clientId + "@example.test", LocalDate.of(1990, 1, 1)))
-				.isEmpty();
+				.map(ClientRepository.SelfServiceClientRecord::id)
+				.contains(clientId);
 	}
 
 	@Test

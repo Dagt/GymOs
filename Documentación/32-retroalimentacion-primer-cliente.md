@@ -142,9 +142,14 @@ en Beneficios. Por tanto:
 
 ```text
 Paquete: Centro + Tecnológica
-Acceso: Sauna LOCAL de Centro
-Resultado: saldo compartido en ambas, Sauna consume sólo en Centro
+Accesos: General válido en ambas + Sauna LOCAL de Centro
+Resultado: saldo compartido; General consume en ambas y Sauna sólo en Centro
 ```
+
+Si Sauna local de Centro fuera el único acceso, no se permite guardar Centro +
+Tecnológica: cada sucursal seleccionada debe tener al menos un acceso consumible.
+Tampoco se puede seleccionar Tecnológica como única sede cuando se opera desde
+Centro. Estas reglas se validan tanto en la interfaz como en backend.
 
 V100 conserva esa intersección por cada compra. Además, al configurar desde
 Centro puede elegirse Centro o Centro+Tecnológica, nunca únicamente Tecnológica.
@@ -156,6 +161,11 @@ podía terminar como error 500 después de crear o identificar correctamente al
 socio. El contrato corregido devuelve `204`, desacopla las consultas opcionales
 del dashboard y nunca muestra rutas, códigos internos ni diagnóstico HTTP al
 usuario del kiosco.
+
+Una segunda aceptación mostró además una identidad asociada en servidor después
+de que la pantalla había informado falsamente un fallo. El ajuste definitivo
+separa identidad de sede, conserva el éxito aunque falle una consulta opcional y
+reinicia la sesión al alternar entre socio existente y registro nuevo.
 
 ### Lote 4 — Beneficios multi-sucursal
 

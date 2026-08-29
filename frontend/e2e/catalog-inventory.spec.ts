@@ -96,7 +96,9 @@ test.describe("catalogo e inventario", () => {
   test("un paquete conserva la sucursal activa y no amplía el alcance de sus accesos", async ({ page }) => {
     const branchA = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
     const branchB = "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee";
+    const branchC = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
     const sauna = "11111111-1111-4111-8111-111111111111";
+    const generalAccess = "22222222-2222-4222-8222-222222222222";
     let createPayload: Record<string, unknown> | null = null;
     await bootCatalog(page, owner(), async (route, path) => {
       if (path === "/organizations/current/branches") {
@@ -105,6 +107,7 @@ test.describe("catalogo e inventario", () => {
           body: JSON.stringify([
             { id: branchA, name: "Centro", code: "CENTRO", timezone: "America/Mexico_City", status: "ACTIVE", accessScope: "LOCAL" },
             { id: branchB, name: "Tecnológica", code: "TEC", timezone: "America/Mexico_City", status: "ACTIVE", accessScope: "LOCAL" },
+            { id: branchC, name: "Norte", code: "NORTE", timezone: "America/Mexico_City", status: "ACTIVE", accessScope: "LOCAL" },
           ]),
         });
         return true;
@@ -112,7 +115,30 @@ test.describe("catalogo e inventario", () => {
       if (path === "/benefits") {
         await route.fulfill({
           contentType: "application/json",
-          body: JSON.stringify([{ id: sauna, branchId: branchA, name: "Sauna", code: "SAUNA", benefitType: "ACCESS", status: "ACTIVE", accessScope: "LOCAL", planIds: [] }]),
+          body: JSON.stringify([
+            {
+              id: generalAccess,
+              branchId: branchA,
+              name: "Acceso general",
+              code: "GENERAL",
+              benefitType: "ACCESS",
+              status: "ACTIVE",
+              accessScope: "PLAN_COVERAGE",
+              accessBranchIds: [branchA, branchB],
+              planIds: [],
+            },
+            {
+              id: sauna,
+              branchId: branchA,
+              name: "Sauna",
+              code: "SAUNA",
+              benefitType: "ACCESS",
+              status: "ACTIVE",
+              accessScope: "LOCAL",
+              accessBranchIds: [branchA],
+              planIds: [],
+            },
+          ]),
         });
         return true;
       }
@@ -139,10 +165,15 @@ test.describe("catalogo e inventario", () => {
     await expect(page.getByRole("checkbox", { name: /^Centro / })).toBeChecked();
     await expect(page.getByRole("checkbox", { name: /^Centro / })).toBeDisabled();
     await expect(page.getByText("Sucursal activa · siempre incluida", { exact: true })).toBeVisible();
-    await expect(page.getByText("Sólo en Centro", { exact: true })).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: /^Norte / })).toBeDisabled();
+    await expect(page.getByText("No hay accesos configurados para paquetes en esta sucursal", { exact: true })).toBeVisible();
+    await expect(page.getByText("Descuenta visitas en: Centro", { exact: true }).first()).toBeVisible();
     await expect(page.getByText(/El paquete no amplía un acceso/)).toBeVisible();
 
     await page.getByRole("checkbox", { name: /Tecnológica/ }).check();
+    await expect(page.getByText("Descuenta visitas en: Centro · No disponible en: Tecnológica", { exact: true })).toBeVisible();
+    await expect(page.getByText("Descuenta visitas en: Centro, Tecnológica", { exact: true })).toBeVisible();
+    await page.getByRole("checkbox", { name: /Acceso general/ }).check();
     await page.getByRole("checkbox", { name: /Sauna/ }).check();
     await page.getByLabel("Código").fill("VISITA-SAUNA");
     await page.getByLabel("Nombre").fill("Visitas con sauna");
@@ -153,7 +184,7 @@ test.describe("catalogo e inventario", () => {
     expect(createPayload).toMatchObject({
       branchScope: "SELECTED_BRANCHES",
       branchIds: [branchA, branchB],
-      benefitIds: [sauna],
+      benefitIds: [generalAccess, sauna],
     });
   });
 

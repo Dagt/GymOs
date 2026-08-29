@@ -1472,6 +1472,11 @@ Beneficios agregan `accessScope` y `applicablePlanIds`. `ACCESS` usa `planIds` y
 `accessScope`; `SPECIAL_PRICE` exige `applicablePlanIds`. Ambos vínculos tienen
 semánticas distintas y no son intercambiables.
 
+La proyección administrativa de un beneficio `ACCESS` incluye
+`accessBranchIds`: las sucursales activas donde ese acceso se reconoce realmente
+según `LOCAL` o la cobertura de sus planes. Es una proyección calculada; no
+duplica el beneficio ni sustituye sus relaciones de dominio.
+
 Administración de paquetes:
 
 ```text
@@ -1484,13 +1489,21 @@ El payload contiene producto/importe, `totalVisits`, `validityDays`,
 `branchScope`, `branchIds`, `benefitIds`, disponibilidad de kiosco, política de
 inscripción y estado. Si `branchScope=SELECTED_BRANCHES`, `branchIds` debe
 incluir la sucursal activa. El backend rechaza tanto una lista vacía como una
-cobertura que contenga exclusivamente otra sede.
+cobertura que contenga exclusivamente otra sede. También exige que la unión de
+los accesos elegidos cubra todas las sucursales del paquete. Una sede sin ningún
+acceso consumible produce `VISIT_PACKAGE_BRANCH_WITHOUT_ACCESS` y no crea datos
+parciales.
 
 `branchIds` determina dónde existe el saldo; `benefitIds` determina qué accesos
 pueden consumirlo. No son permisos independientes que puedan recombinarse: al
 comprar se toma un snapshot de la intersección de cada acceso con sus sucursales
 válidas. Por ello, Sauna `LOCAL` de Centro no consume en Tecnológica aunque el
 paquete tenga saldo en ambas.
+
+Un paquete Centro+Tecnológica puede incluir `GENERAL_ACCESS` válido en ambas y
+`SAUNA` local de Centro: General descuenta en ambas y Sauna sólo en Centro. En
+cambio, Centro+Tecnológica con únicamente Sauna local de Centro se rechaza,
+porque Tecnológica quedaría seleccionada pero sin ningún acceso consumible.
 
 Recepción/expediente:
 
@@ -1524,3 +1537,10 @@ fijados en el documento 33.
 `GET .../visit-package` responde `200` con el paquete abierto o `204 No Content`
 cuando el socio no tiene uno. La ausencia de paquete es un estado normal y no
 debe invalidar el registro, la identificación ni la carga del dashboard.
+
+La identificación por contacto y fecha de nacimiento busca al socio dentro de
+su organización, no sólo en su `home_branch_id`. La sucursal de la sesión sigue
+siendo el contexto para derechos y operaciones posteriores. Cambiar entre
+`Ya soy socio` y `Quiero registrarme` ejecuta `POST .../reset` antes de aceptar
+datos de otra persona; una falla secundaria al cargar opciones no revierte ni
+presenta como fallida una identificación o alta ya confirmada.

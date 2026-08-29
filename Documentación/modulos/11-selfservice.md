@@ -9,7 +9,8 @@ Estado: `FUNCIONAL / LISTO PARA ACEPTACIÓN CONECTADA`
 - apertura exclusiva desde Recepción; dueño, administrador, gerente y soporte
   pueden configurar lo permitido por sus permisos, pero no lanzan sesiones;
 - verificación genérica de socio por contacto y fecha de nacimiento, incluso
-  cuando todavía no tiene ninguna membresía;
+  cuando todavía no tiene ninguna membresía y sin limitar la identidad a su
+  sucursal de alta;
 - alta de un socio nuevo desde el propio kiosco cuando Recepción habilita la
   capacidad `clientRegistration` para la sucursal; el alta deja la sesión
   verificada y abre la contratación del primer plan; el selector de entrada
@@ -31,6 +32,8 @@ Estado: `FUNCIONAL / LISTO PARA ACEPTACIÓN CONECTADA`
 - reinicio de sesión que vuelve a consultar el perfil vigente del terminal, de
   modo que cambios como `clientRegistration=true` aparecen sin conservar una
   copia antigua dentro de la sesión;
+- cambio entre `Ya soy socio` y `Quiero registrarme` mediante ese reinicio,
+  limpiando la identidad anterior antes de capturar a la siguiente persona;
 - actualización real y auditada de correo/teléfono desde sesión verificada;
 - contrato de alta/renovación/cambio sin método manual ni `validateNow`,
   conectado a Stripe Checkout y confirmado sólo por webhook/conciliación;
@@ -39,6 +42,8 @@ Estado: `FUNCIONAL / LISTO PARA ACEPTACIÓN CONECTADA`
   éxito no permanezca visible para el siguiente socio;
 - fallo de identificación con mensaje público breve dentro de la tarjeta, sin
   desplazar el formulario ni exponer detalles técnicos de la API;
+- una consulta secundaria fallida de planes, paquetes o reservas se muestra en
+  su sección y no convierte una identificación/alta exitosa en error de datos;
 - lanzamiento desde recepción con permiso dedicado, sin registrar una
   computadora o navegador;
 - apertura en una pestaña aislada sin colocar la credencial de kiosco en la URL;

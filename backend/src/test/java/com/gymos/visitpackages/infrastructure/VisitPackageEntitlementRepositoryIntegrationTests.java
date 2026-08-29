@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.gymos.common.api.BusinessException;
 import com.gymos.access.infrastructure.AccessRepository;
+import com.gymos.benefits.infrastructure.BenefitRepository;
 import com.gymos.catalog.infrastructure.VisitPackagePlanRepository;
 import com.gymos.visitpackages.api.operations.VisitPackageAccessOperations.VisitPackageAccessResult;
 import com.gymos.visitpackages.application.port.VisitPackageEntitlementPort.BenefitCoverage;
@@ -97,6 +98,13 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 				.extracting(record -> record.id()).contains(localSauna, planCoverage);
 		assertThat(access.physicalAccessBenefits(fixture.organizationId(), fixture.branchB()))
 				.extracting(record -> record.id()).contains(planCoverage).doesNotContain(localSauna);
+		var benefits = new BenefitRepository(fixture.jdbc());
+		assertThat(benefits.benefit(fixture.organizationId(), localSauna)).get()
+				.satisfies(benefit -> assertThat(benefit.accessBranchIds())
+						.containsExactly(fixture.branchA()));
+		assertThat(benefits.benefit(fixture.organizationId(), planCoverage)).get()
+				.satisfies(benefit -> assertThat(benefit.accessBranchIds())
+						.containsExactlyInAnyOrder(fixture.branchA(), fixture.branchB()));
 
 		fixture.jdbc().sql("UPDATE membership_plan SET multi_branch_access=FALSE WHERE id=:id")
 				.param("id", membershipPlanId).update();

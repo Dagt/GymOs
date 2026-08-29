@@ -790,8 +790,10 @@ definición exclusivamente para B.
 
 Las sedes definen dónde existe el saldo. Los accesos definen qué entrada puede
 descontarlo y conservan su propio alcance. El sistema valida y materializa la
-intersección: `paquete A+B + Sauna LOCAL A` queda autorizado para Sauna sólo en
-A, sin conceder Sauna en B.
+intersección. Cada sede elegida debe quedar cubierta por al menos uno de los
+accesos seleccionados. `paquete A+B + Acceso general A+B + Sauna LOCAL A`
+permite General en A/B y Sauna sólo en A, sin conceder Sauna en B. Si Sauna es
+el único acceso, la definición A+B se rechaza porque B quedaría inoperante.
 
 ## UC-038 Comprar un paquete de visitas
 

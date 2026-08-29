@@ -167,4 +167,6 @@ ni una duplicación del paquete por sede.
 - Un paquete captura como snapshot sus beneficios `ACCESS` y, desde V100, las
   sucursales exactas donde cada uno puede consumir el saldo. Cambios posteriores
   a la definición no alteran lo ya vendido. Elegir un beneficio en un paquete
-  no lo concede en una sede fuera de su alcance.
+  no lo concede en una sede fuera de su alcance. La proyección administrativa
+  expone `accessBranchIds` calculado para que Catálogo deshabilite combinaciones
+  imposibles sin copiar el beneficio.

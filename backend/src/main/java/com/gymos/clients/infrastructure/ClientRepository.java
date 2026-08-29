@@ -171,24 +171,10 @@ public class ClientRepository {
 				          )
 				      )
 				  )
-				  AND (
-				      c.home_branch_id IS NULL
-				      OR c.home_branch_id = :branchId
-				      OR EXISTS (
-				          SELECT 1
-				          FROM membership m
-				          JOIN membership_plan mp ON mp.id = m.plan_id
-				          WHERE m.organization_id = c.organization_id
-				            AND m.client_id = c.id
-				            AND mp.multi_branch_access = true
-				            AND m.deleted_at IS NULL
-				      )
-				  )
 				ORDER BY c.joined_at DESC
 				LIMIT 1
 				""")
 				.param("organizationId", organizationId)
-				.param("branchId", branchId)
 				.param("emailIdentifier", identifiers.email())
 				.param("phoneIdentifier", identifiers.phone())
 				.param("localPhoneIdentifier", identifiers.localPhone())

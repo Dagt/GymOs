@@ -91,6 +91,8 @@ export default function KioskPage() {
   const [identifier, setIdentifier] = useState("");
   const [birthDateDisplay, setBirthDateDisplay] = useState("");
   const [entryMode, setEntryMode] = useState<KioskEntryMode>("verify");
+  const [entrySwitchBusy, setEntrySwitchBusy] = useState(false);
+  const [verificationBusy, setVerificationBusy] = useState(false);
   const [registrationBusy, setRegistrationBusy] = useState(false);
   const [registrationBirthDateDisplay, setRegistrationBirthDateDisplay] = useState("");
   const [registration, setRegistration] = useState({ ...EMPTY_REGISTRATION });
@@ -200,6 +202,7 @@ export default function KioskPage() {
     }
     setError(null);
     setMessage(null);
+    setVerificationBusy(true);
     try {
       const nextSummary = await verifyKioskSession(
         session.sessionId,
@@ -210,6 +213,33 @@ export default function KioskPage() {
       await openMemberDashboard(nextSummary);
     } catch (exception) {
       setError(friendlyVerificationError(exception));
+    } finally {
+      setVerificationBusy(false);
+    }
+  }
+
+  async function switchEntryMode(nextMode: KioskEntryMode) {
+    if (!session || nextMode === entryMode || entrySwitchBusy) return;
+    setEntrySwitchBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      // Cambiar entre identificación y alta significa que otra persona puede estar
+      // usando el kiosco. El backend también debe olvidar cualquier identidad que
+      // haya quedado asociada aunque la respuesta anterior se haya interrumpido.
+      const reset = await resetKioskSession(session.sessionId, session.sessionToken);
+      writeBrowserKioskSession(reset);
+      setSession(reset);
+      setSummary(null);
+      setIdentifier("");
+      setBirthDateDisplay("");
+      setRegistration({ ...EMPTY_REGISTRATION });
+      setRegistrationBirthDateDisplay("");
+      setEntryMode(nextMode);
+    } catch (exception) {
+      setError(friendlySessionResetError(exception));
+    } finally {
+      setEntrySwitchBusy(false);
     }
   }
 
@@ -300,10 +330,13 @@ export default function KioskPage() {
     setResourceId(bookingResources[0]?.id ?? "");
     setWellnessProfessionals(professionals);
     setWellnessProfessionalId(professionals[0]?.id ?? "");
-    const firstFailure = [membershipResult, packageOptionsResult, openPackageResult, resourcesResult, professionalsResult]
+    if (membershipResult.status === "rejected") {
+      setMembershipError(`No pudimos cargar las opciones de membresía. Intenta recargar o solicita apoyo en recepción.${supportReference(membershipResult.reason)}`);
+    }
+    const packageFailure = [packageOptionsResult, openPackageResult]
       .find((result): result is PromiseRejectedResult => result.status === "rejected");
-    if (firstFailure) {
-      setError(`Tu expediente se verificó correctamente, pero no pudimos cargar todas las opciones del kiosco. Intenta recargar o solicita apoyo en recepción.${supportReference(firstFailure.reason)}`);
+    if (packageFailure) {
+      setVisitPackageError(`No pudimos cargar los paquetes de visitas en este momento.${supportReference(packageFailure.reason)}`);
     }
   }
 
@@ -846,11 +879,11 @@ export default function KioskPage() {
               <div className="kiosk-entry-selector">
                 <p>¿Cómo quieres continuar?</p>
                 <div className="kiosk-entry-options" role="tablist" aria-label="Acceso al kiosco">
-                  <button aria-label="Ya soy socio" aria-selected={entryMode === "verify"} className={`kiosk-entry-option ${entryMode === "verify" ? "active" : ""}`} onClick={() => { setEntryMode("verify"); setError(null); setMessage(null); }} role="tab" type="button">
+                  <button aria-label="Ya soy socio" aria-selected={entryMode === "verify"} className={`kiosk-entry-option ${entryMode === "verify" ? "active" : ""}`} disabled={entrySwitchBusy} onClick={() => void switchEntryMode("verify")} role="tab" type="button">
                     <span className="kiosk-entry-icon"><UserRound aria-hidden="true" size={18} /></span>
                     <span><strong>Ya soy socio</strong><small>Entrar con mis datos</small></span>
                   </button>
-                  <button aria-label="Quiero registrarme" aria-selected={entryMode === "register"} className={`kiosk-entry-option ${entryMode === "register" ? "active" : ""}`} onClick={() => { setEntryMode("register"); setError(null); setMessage(null); }} role="tab" type="button">
+                  <button aria-label="Quiero registrarme" aria-selected={entryMode === "register"} className={`kiosk-entry-option ${entryMode === "register" ? "active" : ""}`} disabled={entrySwitchBusy} onClick={() => void switchEntryMode("register")} role="tab" type="button">
                     <span className="kiosk-entry-icon"><UserPlus aria-hidden="true" size={18} /></span>
                     <span><strong>Quiero registrarme</strong><small>Crear un expediente nuevo</small></span>
                   </button>
@@ -873,7 +906,7 @@ export default function KioskPage() {
                   <input aria-label="Fecha de nacimiento en formato día mes año" autoComplete="bday" className="kiosk-input compact" inputMode="numeric" maxLength={10} onChange={(event) => setBirthDateDisplay(formatMexicanDateInput(event.target.value))} placeholder="DD/MM/AAAA" required type="text" value={birthDateDisplay} />
                   <small>Formato: día/mes/año, por ejemplo 25/08/1990.</small>
                 </label>
-                <button className="kiosk-primary-action" type="submit">Continuar de forma segura</button>
+                <button className="kiosk-primary-action" disabled={verificationBusy || entrySwitchBusy} type="submit">{verificationBusy ? "Verificando..." : "Continuar de forma segura"}</button>
               </form>
             ) : (
               <form className="grid gap-4" onSubmit={register}>
@@ -1455,11 +1488,23 @@ function friendlyRegistrationError(exception: unknown) {
   if (rawMessage.includes("SELF_SERVICE_REACTIVATION_REQUIRES_RECEPTION")) {
     return "Tu expediente requiere apoyo de recepción para reactivarse.";
   }
+  if (rawMessage.includes("SELF_SERVICE_SESSION_ALREADY_VERIFIED")) {
+    return "La pantalla conservó una sesión anterior. Cambia a “Ya soy socio” y vuelve a “Quiero registrarme” para limpiarla.";
+  }
   if (["SELF_SERVICE_SESSION_EXPIRED", "SELF_SERVICE_SESSION_INVALID", "SELF_SERVICE_SESSION_ENDED"]
     .some((code) => rawMessage.includes(code))) {
     return "La sesión segura terminó. Solicita en recepción que vuelvan a abrir el kiosco.";
   }
   return `No pudimos completar el registro. Intenta nuevamente o solicita apoyo en recepción.${supportReference(exception)}`;
+}
+
+function friendlySessionResetError(exception: unknown) {
+  const rawMessage = exception instanceof Error ? exception.message : "";
+  if (["SELF_SERVICE_SESSION_EXPIRED", "SELF_SERVICE_SESSION_INVALID", "SELF_SERVICE_SESSION_ENDED"]
+    .some((code) => rawMessage.includes(code))) {
+    return "La sesión segura terminó. Solicita en recepción que vuelvan a abrir el kiosco.";
+  }
+  return `No pudimos preparar la pantalla para el siguiente socio. Solicita apoyo en recepción.${supportReference(exception)}`;
 }
 
 function settledValue<T>(result: PromiseSettledResult<T>, fallback: T): T {

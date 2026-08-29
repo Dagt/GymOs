@@ -186,6 +186,9 @@ public class SelfServiceService {
 				Duration.ofMinutes(10)
 		);
 		ensureNotBlocked(session);
+		if (session.clientId() != null) {
+			return summary(sessionId, sessionToken);
+		}
 		var client = clientLookupOperations.verifyForSelfService(new VerifyClientIdentityCommand(session.organizationId(), session.branchId(), request.identifier(), request.birthDate())).orElse(null);
 		if (client == null) {
 			recordFailedVerification(session, correlationId);

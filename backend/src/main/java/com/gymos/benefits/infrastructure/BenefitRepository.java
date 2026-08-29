@@ -45,13 +45,14 @@ public class BenefitRepository {
 						rs.getObject("valid_from", LocalDate.class),
 						rs.getObject("valid_until", LocalDate.class),
 						rs.getString("status"),
-						List.of(), rs.getString("access_scope"), List.of(), rs.getLong("version")
+						List.of(), rs.getString("access_scope"), List.of(), List.of(), rs.getLong("version")
 				))
 				.list();
 		return summaries.stream()
 				.map(summary -> summary.withPlanLinks(
 						membershipPlanIds(organizationId, summary.id()),
 						applicableMembershipPlanIds(organizationId, summary.id())))
+				.map(summary -> summary.withAccessBranches(accessBranchIds(organizationId, summary)))
 				.toList();
 	}
 
@@ -61,18 +62,35 @@ public class BenefitRepository {
 		}
 		return benefits(organizationId).stream()
 				.filter(benefit -> !"ACCESS".equals(benefit.benefitType())
-						|| accessBenefitCoversBranch(organizationId, benefit, branchId))
+						|| accessBenefitCoversBranch(benefit, branchId))
 				.toList();
 	}
 
-	private boolean accessBenefitCoversBranch(
-			UUID organizationId, BenefitSummary benefit, UUID branchId
-	) {
+	private boolean accessBenefitCoversBranch(BenefitSummary benefit, UUID branchId) {
+		return benefit.accessBranchIds().contains(branchId);
+	}
+
+	private List<UUID> accessBranchIds(UUID organizationId, BenefitSummary benefit) {
+		if (!"ACCESS".equals(benefit.benefitType()) || !"ACTIVE".equals(benefit.status())) {
+			return List.of();
+		}
 		if (!"PLAN_COVERAGE".equals(benefit.accessScope())) {
-			return benefit.branchId() == null || branchId.equals(benefit.branchId());
+			if (benefit.branchId() != null) {
+				return List.of(benefit.branchId());
+			}
+			return jdbcClient.sql("""
+					SELECT id FROM branch
+					WHERE organization_id=:organizationId AND status='ACTIVE' AND deleted_at IS NULL
+					ORDER BY id
+					""").param("organizationId", organizationId).query(UUID.class).list();
 		}
 		return jdbcClient.sql("""
-				SELECT EXISTS (
+				SELECT branch.id
+				FROM branch branch
+				WHERE branch.organization_id=:organizationId
+				  AND branch.status='ACTIVE'
+				  AND branch.deleted_at IS NULL
+				  AND EXISTS (
 				    SELECT 1
 				    FROM benefit_membership_plan benefit_plan
 				    JOIN membership_plan membership_plan
@@ -88,15 +106,15 @@ public class BenefitRepository {
 				              SELECT 1 FROM catalog_product_branch product_branch
 				              WHERE product_branch.organization_id = membership_plan.organization_id
 				                AND product_branch.product_id = membership_plan.product_id
-				                AND product_branch.branch_id = :branchId
+				                AND product_branch.branch_id = branch.id
 				          )
 				      )
 				)
+				ORDER BY branch.id
 				""")
 				.param("organizationId", organizationId)
 				.param("benefitId", benefit.id())
-				.param("branchId", branchId)
-				.query(Boolean.class).single();
+				.query(UUID.class).list();
 	}
 
 	public Optional<BenefitSummary> benefit(UUID organizationId, UUID benefitId) {
@@ -464,20 +482,32 @@ public class BenefitRepository {
 			List<UUID> planIds,
 			String accessScope,
 			List<UUID> applicablePlanIds,
+			List<UUID> accessBranchIds,
 			long version
 	) {
+		public BenefitSummary {
+			planIds = planIds == null ? List.of() : List.copyOf(planIds);
+			applicablePlanIds = applicablePlanIds == null ? List.of() : List.copyOf(applicablePlanIds);
+			accessBranchIds = accessBranchIds == null ? List.of() : List.copyOf(accessBranchIds);
+		}
 		public BenefitSummary(UUID id, UUID branchId, String code, String name, String benefitType,
 				String discountType, Integer discountValueCents, Double discountPercent, boolean requiresEvidence,
 				boolean combinable, int priority, LocalDate validFrom, LocalDate validUntil, String status, List<UUID> planIds) {
 			this(id, branchId, code, name, benefitType, discountType, discountValueCents, discountPercent,
 					requiresEvidence, combinable, priority, validFrom, validUntil, status, planIds,
-					"LOCAL", List.of(), 0);
+					"LOCAL", List.of(), List.of(), 0);
 		}
 		BenefitSummary withPlanLinks(List<UUID> resolvedPlanIds, List<UUID> resolvedApplicablePlanIds) {
 			return new BenefitSummary(id, branchId, code, name, benefitType, discountType,
 					discountValueCents, discountPercent, requiresEvidence, combinable, priority,
 					validFrom, validUntil, status, resolvedPlanIds, accessScope,
-					resolvedApplicablePlanIds, version);
+					resolvedApplicablePlanIds, accessBranchIds, version);
+		}
+		BenefitSummary withAccessBranches(List<UUID> resolvedAccessBranchIds) {
+			return new BenefitSummary(id, branchId, code, name, benefitType, discountType,
+					discountValueCents, discountPercent, requiresEvidence, combinable, priority,
+					validFrom, validUntil, status, planIds, accessScope,
+					applicablePlanIds, resolvedAccessBranchIds, version);
 		}
 	}
 

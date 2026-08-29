@@ -59,9 +59,12 @@ Las sucursales y los accesos elegidos responden preguntas diferentes:
 
 Un paquete nunca amplía el alcance de un beneficio. La regla efectiva por acceso
 es la intersección entre las sucursales del paquete y el alcance del beneficio.
-Por ejemplo, un paquete válido en Centro y Tecnológica que acepte `SAUNA` local
-de Centro conserva saldo en ambas sedes, pero sólo puede descontar por Sauna en
-Centro. Seleccionar Sauna no crea ni muestra un derecho Sauna en Tecnológica.
+Por ejemplo, un paquete válido en Centro y Tecnológica puede aceptar
+`GENERAL_ACCESS` válido en ambas y `SAUNA` local de Centro: General descuenta en
+ambas sedes y Sauna sólo en Centro. Seleccionar Sauna no crea ni muestra ese
+derecho en Tecnológica. Para evitar una sede nominal pero inoperante, todas las
+sucursales elegidas deben quedar cubiertas por la unión de accesos seleccionados;
+Centro+Tecnológica con únicamente Sauna local de Centro se rechaza.
 
 No es una `membership` y no utiliza la restricción de una membresía activa. Se
 modela independientemente para no alterar renovaciones, cambios de plan,
@@ -243,6 +246,8 @@ La configuración exige visitas y vigencia mayores a cero, al menos una sucursal
 para alcance seleccionado y al menos un beneficio `ACCESS`. Cuando se crea o
 edita desde una sucursal activa, la cobertura debe incluir esa sucursal: puede
 ser sólo la actual o la actual más otras, nunca exclusivamente una sede ajena.
+Cada sede efectiva debe tener por lo menos uno de los accesos seleccionados;
+ningún beneficio puede quedar completamente fuera del alcance del paquete.
 
 ### 6.2 Reserva y saldo del socio
 
@@ -407,6 +412,11 @@ saldo abierto. Ese resultado es normal. Registro e identificación no dependen d
 que el socio tenga paquete y una falla de carga secundaria no revierte ni oculta
 una identidad ya verificada.
 
+La identidad se resuelve dentro de toda la organización. `home_branch_id` no
+impide reconocer al socio desde otra sede; la autorización concreta sigue
+evaluándose con la sucursal del kiosco. Alternar entre identificación y registro
+reinicia la sesión antes de capturar a la siguiente persona.
+
 Los endpoints de consumo pertenecen al módulo `access`; no se exponen como un
 botón normal para descontar saldos manualmente.
 
@@ -451,9 +461,10 @@ El alta solicita únicamente:
 - disponible o no en kiosco.
 
 La interfaz llama a las decisiones “Dónde puede usarse el saldo” y “Accesos
-permitidos”. Cada acceso muestra su alcance (`Sólo en Centro`, por
-ejemplo) y aclara que el paquete no lo extiende. La sucursal activa queda
-seleccionada y bloqueada cuando se eligen sedes manualmente.
+permitidos”. Cada acceso muestra las sedes exactas donde descuenta y las sedes
+seleccionadas donde no está disponible. La sucursal activa queda seleccionada y
+bloqueada; otra sede sin ningún acceso disponible queda deshabilitada. Antes de
+guardar, la interfaz y backend comprueban que cada sede tenga al menos uno.
 
 El expediente muestra saldo, vigencia, estado y últimos consumos. Si ya existe
 un paquete pendiente o activo, la UI no ofrece comprar otro y explica por qué.
@@ -533,7 +544,8 @@ evita una baja automática por inactividad.
 - un reintento con la misma llave no descuenta dos veces;
 - consumo concurrente nunca produce saldo negativo;
 - el saldo se comparte entre sucursales permitidas;
-- una combinación `paquete A+B + Sauna LOCAL A` consume en A y no consume en B;
+- una combinación `paquete A+B + General A+B + Sauna LOCAL A` consume General
+  en ambas y Sauna únicamente en A;
 - un `PLAN_COVERAGE` sólo usa la intersección entre sedes del paquete y cobertura
   de los planes vinculados al beneficio;
 - una sucursal no permitida no consume;

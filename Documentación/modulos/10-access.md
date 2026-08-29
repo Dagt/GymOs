@@ -392,7 +392,9 @@ y cambia a
 
 `visit_package_entitlement_benefit_branch` evita que dos snapshots separados se
 recombinen: paquete A+B y Sauna `LOCAL` de A no autoriza Sauna en B. El saldo
-sigue siendo único y puede gastarse en B mediante otro acceso válido allí.
+sigue siendo único y puede gastarse en B mediante otro acceso válido allí. La
+configuración exige precisamente ese otro acceso; no permite seleccionar B si
+la unión de accesos elegidos sólo cubre A.
 
 La API manual histórica `visit_pass` queda para lectura mientras se regularizan
 datos. Sus operaciones de alta y consumo rechazan nuevas escrituras con

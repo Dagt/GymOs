@@ -456,6 +456,10 @@ Formularios:
   registrarme` permanece centrado dentro de la tarjeta. Un fallo de verificación
   se presenta dentro de esa misma tarjeta, no altera su eje horizontal y nunca
   expone status HTTP, rutas, códigos internos ni correlation IDs al socio.
+- Cambiar entre esas dos opciones reinicia primero la sesión segura en backend,
+  limpia contacto, fecha y formulario y evita que el siguiente visitante herede
+  una identidad asociada. La búsqueda de identidad es organizacional; la sede
+  activa se aplica después a derechos y operaciones.
 - `/reception` no debe depender de permisos administrativos como lectura completa de organizacion. Si el usuario tiene `branchId`, debe mostrar dashboard operativo aunque no pueda consultar `/organizations/current`.
 - El estado sin sucursal para recepcion no debe mostrar onboarding, alta de gimnasio ni configuracion de tenant; solo selector de sucursal permitida o instruccion de pedir acceso al dueño/gerente.
 - Si un usuario de recepcion tiene exactamente una sucursal permitida pero la sesion guardada no trae `branchId`, el frontend debe seleccionarla automaticamente antes de pintar la consola.
@@ -527,7 +531,10 @@ para rutinas; el socio no tiene vista remota en V1.
   seleccionada y no permite crear desde A un paquete sólo para B. “Accesos que
   consumen una visita” muestra el alcance propio de cada acceso y explica que el
   paquete no lo amplía; Sauna local de Centro sigue siendo sólo de Centro aunque
-  el saldo cubra también Tecnológica.
+  el saldo cubra también Tecnológica. Una sede sin ningún acceso disponible no
+  puede seleccionarse; al usar varias sedes, la unión de accesos elegidos debe
+  cubrirlas todas. Los accesos incompatibles se deshabilitan y muestran en qué
+  sedes sí descuentan.
 - Cada alta vive dentro de su propia pestaña: artículos/cargos y variantes en
   “Artículos”, planes en “Planes de membresía”, paquetes en “Paquetes de visitas”
   y categorías en “Categorías”. No existe una barra global que mezcle acciones.

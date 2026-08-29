@@ -968,8 +968,10 @@ edición posterior de la definición comercial.
 V100 agrega `visit_package_entitlement_benefit_branch`. Esta tabla materializa
 el snapshot de la intersección entre las sucursales del paquete y el alcance
 efectivo de cada beneficio `ACCESS`. No crea otro saldo: el consumo exige la
-combinación exacta `entitlement + benefit + branch`. Un paquete A+B con Sauna
-`LOCAL` de A conserva saldo compartido A+B, pero Sauna sólo lo descuenta en A.
+combinación exacta `entitlement + benefit + branch`. Un paquete A+B con acceso
+General válido en ambas y Sauna `LOCAL` de A conserva saldo compartido, pero
+Sauna sólo lo descuenta en A. La definición no acepta B si ningún acceso
+seleccionado puede consumir allí.
 
 Sólo puede existir un entitlement abierto (`PENDING_PAYMENT` o `ACTIVE`) por
 `organization_id + client_id`. La restricción incluye pagos pendientes para que

@@ -43,6 +43,8 @@ class VisitPackagePlanServiceTests {
 		when(packages.activeBranchIds(organizationId)).thenReturn(List.of(branchA, branchB));
 		when(packages.branchesExist(organizationId, List.of(branchA, branchB))).thenReturn(true);
 		when(packages.accessBenefitsExist(organizationId, List.of(benefitId))).thenReturn(true);
+		when(packages.benefitCoverages(organizationId, List.of(benefitId), List.of(branchA, branchB)))
+				.thenReturn(List.of(new BenefitCoverage(benefitId, List.of(branchA, branchB))));
 		when(packages.find(any(), any())).thenAnswer(invocation -> Optional.of(new VisitPackagePlanView(
 				invocation.getArgument(1), UUID.randomUUID(), "10-VISITAS", "10 visitas", null,
 				90000, "MXN", 10, 45, "ALL_BRANCHES", List.of(), List.of(benefitId),
@@ -129,6 +131,32 @@ class VisitPackagePlanServiceTests {
 						true, "DEFAULT", "ACTIVE"), "correlation"))
 				.isInstanceOfSatisfying(BusinessException.class,
 						error -> assertThat(error.code()).isEqualTo("VISIT_PACKAGE_BENEFIT_OUTSIDE_SCOPE"));
+		verify(productCommands, never()).create(any());
+	}
+
+	@Test
+	void rejectsBranchesThatHaveNoneOfTheSelectedAccesses() {
+		CatalogProductCommandPort productCommands = mock(CatalogProductCommandPort.class);
+		VisitPackagePlanPort packages = mock(VisitPackagePlanPort.class);
+		VisitPackagePlanService service = new VisitPackagePlanService(
+				mock(CatalogProductQueryPort.class), productCommands, packages, mock(AuditService.class));
+		UUID organizationId = UUID.randomUUID();
+		UUID activeBranch = UUID.randomUUID();
+		UUID secondBranch = UUID.randomUUID();
+		UUID localAccess = UUID.randomUUID();
+		when(packages.branchesExist(organizationId, List.of(activeBranch, secondBranch))).thenReturn(true);
+		when(packages.accessBenefitsExist(organizationId, List.of(localAccess))).thenReturn(true);
+		when(packages.benefitCoverages(
+				organizationId, List.of(localAccess), List.of(activeBranch, secondBranch)))
+				.thenReturn(List.of(new BenefitCoverage(localAccess, List.of(activeBranch))));
+
+		assertThatThrownBy(() -> service.create(principal(organizationId, activeBranch),
+				new CreateVisitPackagePlanCommand(
+						"5-VISITAS", "5 visitas", null, 50000, "MXN", 5, 30,
+						"SELECTED_BRANCHES", List.of(activeBranch, secondBranch), List.of(localAccess),
+						true, "DEFAULT", "ACTIVE"), "correlation"))
+				.isInstanceOfSatisfying(BusinessException.class,
+						error -> assertThat(error.code()).isEqualTo("VISIT_PACKAGE_BRANCH_WITHOUT_ACCESS"));
 		verify(productCommands, never()).create(any());
 	}
 

@@ -29,8 +29,9 @@ Estado: `FUNCIONAL`
   baja es `INACTIVE`, conserva el historial financiero/auditable y registra
   fecha y motivo; los expedientes dados de baja automáticamente pueden volver a
   activarse al identificarse o registrarse en el kiosco.
-- un socio sin plan puede verificarse desde el kiosco de su sucursal de alta;
-  ya no se exige una membresía histórica para encontrarlo.
+- un socio sin plan puede verificarse desde cualquier kiosco de su organización;
+  no se exige membresía histórica ni coincidencia con `home_branch_id` para
+  encontrar la identidad. La sede sí se aplica después a derechos y operaciones.
 
 ## Matriz operativa
 

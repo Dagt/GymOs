@@ -256,6 +256,27 @@ class SelfServiceServiceTests {
 	}
 
 	@Test
+	void repeatedVerificationOfAnAssociatedSessionReturnsItsCurrentClientWithoutReplacingIt() {
+		givenSession("{\"clientRegistration\":true}");
+		when(clients.selfServiceProfile(organizationId, clientId)).thenReturn(Optional.of(
+				new SelfServiceClientProfile(clientId, "Andrea Existente", "an***@example.com", "***1234")
+		));
+		when(repository.memberships(organizationId, branchId, clientId)).thenReturn(List.of());
+		when(repository.pendingPayments(organizationId, branchId, clientId)).thenReturn(List.of());
+		when(repository.paymentActivity(organizationId, branchId, clientId)).thenReturn(List.of());
+
+		var result = service.verify(
+				sessionId, token,
+				new com.gymos.selfservice.application.command.VerifySessionCommand(
+						"otra-persona@example.com", LocalDate.of(1990, 1, 1)),
+				"correlation", "127.0.0.1");
+
+		assertThat(result.clientName()).isEqualTo("Andrea Existente");
+		verify(clients, org.mockito.Mockito.never()).verifyForSelfService(any());
+		verify(repository, org.mockito.Mockito.never()).markVerified(any(), any(), any(), any());
+	}
+
+	@Test
 	void launchCreatesLogicalBranchProfileAndKeepsBrowserModeForTwelveHours() {
 		UUID userId = UUID.randomUUID();
 		GymOsPrincipal principal = new GymOsPrincipal(

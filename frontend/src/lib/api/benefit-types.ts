@@ -16,6 +16,7 @@ export type BenefitSummary = {
   planIds: string[];
   accessScope?: "LOCAL" | "PLAN_COVERAGE";
   applicablePlanIds?: string[];
+  accessBranchIds?: string[];
   version?: number;
 };
 
