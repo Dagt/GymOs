@@ -1,8 +1,8 @@
 # Accesos y control físico
 
-Estado: `CONTROL PLANE CLOUD ESTABILIZADO PARA INICIAR CONNECTOR / CONNECTOR LOCAL Y ADAPTER HIKCENTRAL PENDIENTES`
+Estado: `CONTROL PLANE CLOUD ESTABILIZADO / CONNECTOR LOCAL EN DESARROLLO / HIKCENTRAL PENDIENTE DE ACEPTACIÓN REAL`
 
-Última revisión: 26 de agosto de 2026
+Última revisión: 29 de agosto de 2026
 
 ## 1. Alcance y fuente de verdad
 
@@ -41,8 +41,8 @@ crearán saldos independientes por sede.
 | Control plane del Connector | ESTABILIZADO | Activación, secreto rotatorio, protección de fallos, heartbeat, jobs con lease, resultados, eventos y candidatos |
 | Sincronización automática | IMPLEMENTADO | Eventos de membresía, estado del socio y configuración de beneficios; reconciliación manual de recuperación |
 | Consola administrativa | ESTABILIZADA | Secuencia proveedor → puntos → derechos → recursos → personas → salud; alerta de puntos legacy con 0 o múltiples derechos |
-| GymFort Local Connector ejecutable | PENDIENTE CONNECTOR | Debe instalarse dentro de la LAN del primer cliente |
-| Adapter contra HikCentral Professional | PENDIENTE HIKCENTRAL REAL | Requiere descubrimiento de versión, licencia, API/SDK, topología y pruebas físicas |
+| GymFort Local Connector ejecutable | IMPLEMENTADO, NO CERTIFICADO | Módulo independiente `connector/`: cliente cloud, leases, ledger SQLite idempotente, DPAPI, diagnóstico, simulador y distribución Gradle |
+| Adapter contra HikCentral Professional | IMPLEMENTADO, PENDIENTE HIKCENTRAL REAL | OpenAPI AK/SK, versión, Access Levels y asignación exacta; falta instalación, enrolamiento/eventos y pruebas físicas |
 | Apertura real del torniquete | PENDIENTE HARDWARE | `commands/open` conserva `SIMULATED_OPEN`; no se afirma operación física |
 
 Configurar `HIKCENTRAL` en la consola significa que el contrato cloud está listo
@@ -315,8 +315,10 @@ en sitio:
 - operaciones oficiales disponibles para personas, niveles, apertura y eventos;
 - política de disponibilidad cuando Internet o Cloud no responden.
 
-No se codifica ningún endpoint, puerto ni payload de HikCentral hasta validar esa
-instalación concreta.
+Los endpoints estables de la OpenAPI oficial quedan encapsulados sólo en el
+adapter local, nunca en el dominio. `doctor` debe confirmar versión,
+credenciales y Access Levels en la instalación concreta antes de habilitar
+mutaciones.
 
 ## 11. Datos y migraciones
 
@@ -367,9 +369,12 @@ La entrega deja GymFort Cloud listo para iniciar la integración, no listo para
 abrir el torniquete. Faltan obligatoriamente:
 
 1. descubrimiento técnico de la instalación del cliente;
-2. implementar, empaquetar y actualizar de forma segura GymFort Local Connector;
-3. implementar el adapter HikCentral contra API/SDK oficial confirmado;
-4. comprobar alta/actualización, concesión, revocación y reconciliación reales;
+2. instalar el build versionado del GymFort Local Connector como servicio de
+   mínimo privilegio y definir actualización/rollback;
+3. ejecutar `doctor` contra la OpenAPI instalada y validar su paquete contra la
+   versión real de HikCentral;
+4. completar enrolamiento asistido, eventos y comprobar alta/actualización,
+   concesión, revocación y reconciliación reales;
 5. comprobar eventos reales, reloj, duplicados y mapeo de dispositivos;
 6. probar caída/recuperación de Internet, Cloud, Connector y HikCentral;
 7. definir instalación como servicio, logs sanitizados, métricas, alertas,

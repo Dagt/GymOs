@@ -1,0 +1,12 @@
+package com.gymfort.connector.provider;
+
+public enum ProviderCapability {
+    VERSION_DISCOVERY,
+    PERSON_LOOKUP,
+    PERSON_PROVISIONING,
+    ACCESS_LEVEL_ASSIGNMENT,
+    EVENT_POLLING,
+    EVENT_SUBSCRIPTION,
+    REMOTE_OPEN,
+    BIOMETRIC_ENROLLMENT
+}

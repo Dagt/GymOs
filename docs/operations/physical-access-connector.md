@@ -1,10 +1,13 @@
 # GymFort Local Connector contract
 
-Last reviewed: 2026-08-23.
+Last reviewed: 2026-08-29.
 
-This document is the implementation handoff for the local process that will
-bridge GymFort Cloud with a physical-access provider. The cloud contract is
-implemented. No HikCentral SDK/API call is implemented or assumed here.
+This document is the implementation and operations contract for the local
+process that bridges GymFort Cloud with a physical-access provider. The cloud
+contract and the first executable under `connector/` are implemented. The
+HikCentral adapter uses the official OpenAPI AK/SK contract for version
+discovery and exact Access Level assignment. It is not certified against the
+client's live installation yet.
 
 ## 1. Trust boundary
 
@@ -219,9 +222,15 @@ unmatched. It never links by fuzzy name. A privileged human confirms the match.
 - Preserve the provider's local decision capability during Internet outages.
 - Never open a door merely because Cloud is unreachable.
 
-## 8. HikCentral discovery gate
+## 8. HikCentral compatibility and discovery gate
 
-Before writing the adapter, record from the actual client installation:
+The adapter targets the stable HikCentral OpenAPI boundary instead of a
+terminal model or a hard-coded HikCentral release. The OpenAPI package installed
+at the site still has to be compatible with that HikCentral Professional
+release. Before enabling provider mutation, `doctor` must verify the live
+version, credentials and every Access Level owned by GymFort.
+
+Record from the actual client installation:
 
 - HikCentral Professional edition/version and active licenses;
 - terminal/controller model and firmware;
@@ -233,10 +242,40 @@ Before writing the adapter, record from the actual client installation:
 - rate limits, pagination, time zones and event retention;
 - provider behavior during partial failures.
 
-Do not infer endpoints from another HikCentral version or from unofficial
-examples.
+Do not disable TLS verification to work around the site's local certificate.
+Install the site's CA/certificate in the service account's Java trust store.
+Never use an OpenAPI package copied from an unrelated HikCentral release.
 
-## 9. Site acceptance gate
+## 9. Face enrollment and GymFort identity link
+
+Face templates remain inside HikCentral and its terminals. GymFort stores only
+the opaque HikCentral person identifier. The currently implemented safe flow is:
+
+1. the receptionist creates or locates the person in HikCentral and captures
+   the face with the site's supported enrollment terminal;
+2. the Connector publishes the person as a candidate without biometric data;
+3. an Owner or Manager confirms the exact GymFort client in the physical
+   integration console;
+4. linking stores `externalPersonRef` and enqueues the complete desired Access
+   Level set, regardless of the branch where the membership was sold;
+5. the Connector reconciles only the Access Levels declared as GymFort-owned.
+
+Automatic person creation and assisted enrollment are the next contract
+increment. Today a job without `externalPersonRef` is blocked intentionally;
+the Connector must not guess identity by a fuzzy name. The future workflow will
+create the HikCentral person using an immutable GymFort reference, return the
+new opaque person identifier, then wait for local face capture before enabling
+access.
+
+Long-lived membership rights can be distributed as Access Levels. A metered
+visit-package access cannot be represented as a permanent HikCentral Access
+Level because that would bypass GymFort's atomic visit consumption. It requires
+the later online/local decision mode: recognition event → GymFort eligibility
+and consumption → one opening command. Until that path passes real hardware
+tests, visit packages must not be advertised as physically enforced by this
+adapter.
+
+## 10. Site acceptance gate
 
 Do not label the integration productive until the real site passes:
 

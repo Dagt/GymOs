@@ -1,0 +1,8 @@
+.gradle/
+build/
+runtime/
+connector.properties
+*.db
+*.db-shm
+*.db-wal
+*.dpapi
