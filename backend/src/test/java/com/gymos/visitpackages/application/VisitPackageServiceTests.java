@@ -11,6 +11,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.gymos.audit.api.AuditService;
+import com.gymos.catalog.api.VisitPackageBenefitUsage;
+import com.gymos.catalog.api.VisitPackageBenefitUsageMode;
 import com.gymos.catalog.api.VisitPackagePlanOperations;
 import com.gymos.catalog.api.VisitPackagePlanOperations.BenefitCoverage;
 import com.gymos.catalog.api.VisitPackagePlanOperations.VisitPackagePlanSnapshot;
@@ -29,6 +31,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 class VisitPackageServiceTests {
 	@Test
@@ -53,6 +56,17 @@ class VisitPackageServiceTests {
 		assertThat(result.entitlementId()).isEqualTo(entitlementId);
 		assertThat(result.entitlementStatus()).isEqualTo("ACTIVE");
 		assertThat(result.totalCents()).isEqualTo(105000);
+		@SuppressWarnings("unchecked")
+		ArgumentCaptor<List<VisitPackageEntitlementPort.BenefitCoverage>> coverageCaptor =
+				ArgumentCaptor.forClass(List.class);
+		verify(fixture.entitlements).createPending(
+				any(), any(), any(), any(), eq(saleId), any(), anyInt(), anyInt(),
+				any(), any(), coverageCaptor.capture(), any());
+		assertThat(coverageCaptor.getValue())
+				.extracting(VisitPackageEntitlementPort.BenefitCoverage::usageMode)
+				.containsExactly(
+						VisitPackageBenefitUsageMode.CONSUMES_VISIT,
+						VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT);
 		verify(fixture.activation).activate(
 				eq(fixture.organizationId), eq(fixture.branchId), eq(saleId), any(), eq("payment-completed:" + saleId));
 	}
@@ -88,6 +102,7 @@ class VisitPackageServiceTests {
 		UUID planId = UUID.randomUUID();
 		UUID productId = UUID.randomUUID();
 		UUID benefitId = UUID.randomUUID();
+		UUID includedBenefitId = UUID.randomUUID();
 		VisitPackagePlanOperations plans = mock(VisitPackagePlanOperations.class);
 		VisitPackageEntitlementPort entitlements = mock(VisitPackageEntitlementPort.class);
 		ClientLifecycleOperations lifecycle = mock(ClientLifecycleOperations.class);
@@ -99,8 +114,18 @@ class VisitPackageServiceTests {
 		when(plans.activePlan(organizationId, branchId, planId)).thenReturn(Optional.of(
 				new VisitPackagePlanSnapshot(
 						planId, productId, "10-VISITAS", "10 visitas", 90000, "MXN", 10, 45,
-						"ALL_BRANCHES", List.of(branchId), List.of(benefitId),
-						List.of(new BenefitCoverage(benefitId, List.of(branchId))), true, feePolicy)));
+						"ALL_BRANCHES", List.of(branchId),
+						List.of(new VisitPackageBenefitUsage(
+								benefitId, VisitPackageBenefitUsageMode.CONSUMES_VISIT),
+								new VisitPackageBenefitUsage(
+										includedBenefitId, VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT)),
+						List.of(
+								new BenefitCoverage(
+										benefitId, VisitPackageBenefitUsageMode.CONSUMES_VISIT, List.of(branchId)),
+								new BenefitCoverage(
+										includedBenefitId, VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT,
+										List.of(branchId))),
+						true, feePolicy)));
 		when(entitlements.lockActiveClient(organizationId, clientId)).thenReturn(true);
 		when(entitlements.byIdempotencyKey(any(), any(), any())).thenReturn(Optional.empty());
 		when(entitlements.open(organizationId, clientId)).thenReturn(Optional.empty());

@@ -98,7 +98,8 @@ public class VisitPackageService implements VisitPackageOperations {
 				principal.organizationId(), principal.branchId(), command.clientId(), plan.id(), sale.saleId(),
 				plan.name(), plan.totalVisits(), plan.validityDays(), now.plus(PENDING_PAYMENT_TTL),
 				plan.branchIds(), plan.benefitCoverages().stream()
-						.map(coverage -> new BenefitCoverage(coverage.benefitId(), coverage.branchIds()))
+						.map(coverage -> new BenefitCoverage(
+								coverage.benefitId(), coverage.usageMode(), coverage.branchIds()))
 						.toList(), now);
 		if (sale.paymentCompleted()) {
 			activationService.activate(

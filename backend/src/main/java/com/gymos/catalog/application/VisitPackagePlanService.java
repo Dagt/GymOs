@@ -4,6 +4,8 @@ import com.gymos.audit.api.AuditService;
 import com.gymos.catalog.api.VisitPackagePlanOperations;
 import com.gymos.catalog.api.VisitPackagePlanOperations.VisitPackagePlanSnapshot;
 import com.gymos.catalog.api.VisitPackagePlanOperations.BenefitCoverage;
+import com.gymos.catalog.api.VisitPackageBenefitUsage;
+import com.gymos.catalog.api.VisitPackageBenefitUsageMode;
 import com.gymos.catalog.application.command.CreateVisitPackagePlanCommand;
 import com.gymos.catalog.application.command.UpdateVisitPackagePlanCommand;
 import com.gymos.catalog.application.port.CatalogProductCommandPort;
@@ -16,6 +18,7 @@ import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import java.time.OffsetDateTime;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
@@ -77,7 +80,7 @@ public class VisitPackagePlanService implements VisitPackagePlanOperations {
 		validatePrice(command.priceCents());
 		ValidatedDefinition definition = validate(
 				principal.organizationId(), principal.branchId(), command.totalVisits(), command.validityDays(), command.branchScope(),
-				command.branchIds(), command.benefitIds(), command.registrationFeePolicy(), command.status());
+				command.branchIds(), command.benefits(), command.registrationFeePolicy(), command.status());
 		String sku = required(command.sku(), "VISIT_PACKAGE_SKU_REQUIRED").toUpperCase();
 		if (products.findBySku(principal.organizationId(), sku).isPresent()) {
 			throw new BusinessException("PRODUCT_SKU_ALREADY_EXISTS", "Ese código ya pertenece a otro artículo o plan.");
@@ -101,7 +104,7 @@ public class VisitPackagePlanService implements VisitPackagePlanOperations {
 				principal.organizationId(), packageId,
 				"SELECTED_BRANCHES".equals(definition.branchScope()) ? definition.effectiveBranchIds() : List.of(),
 				principal.userId());
-		packages.replaceBenefits(principal.organizationId(), packageId, definition.benefitIds(), principal.userId());
+		packages.replaceBenefits(principal.organizationId(), packageId, definition.benefits(), principal.userId());
 		auditService.record(principal, "VISIT_PACKAGE_PLAN_CREATED", "VISIT_PACKAGE_PLAN", packageId,
 				"BACKOFFICE", null, correlationId);
 		return packages.find(principal.organizationId(), packageId).orElseThrow();
@@ -117,7 +120,7 @@ public class VisitPackagePlanService implements VisitPackagePlanOperations {
 				.orElseThrow(() -> new BusinessException("VISIT_PACKAGE_PLAN_NOT_FOUND", "El paquete de visitas no está disponible."));
 		ValidatedDefinition definition = validate(
 				principal.organizationId(), principal.branchId(), command.totalVisits(), command.validityDays(), command.branchScope(),
-				command.branchIds(), command.benefitIds(), command.registrationFeePolicy(), command.status());
+				command.branchIds(), command.benefits(), command.registrationFeePolicy(), command.status());
 		ProductSummaryView product = products.findBySku(principal.organizationId(), current.sku())
 				.orElseThrow(() -> new BusinessException("PRODUCT_NOT_FOUND", "El producto del paquete no está disponible."));
 		OffsetDateTime now = OffsetDateTime.now();
@@ -145,7 +148,7 @@ public class VisitPackagePlanService implements VisitPackagePlanOperations {
 				principal.organizationId(), planId,
 				"SELECTED_BRANCHES".equals(definition.branchScope()) ? definition.effectiveBranchIds() : List.of(),
 				principal.userId());
-		packages.replaceBenefits(principal.organizationId(), planId, definition.benefitIds(), principal.userId());
+		packages.replaceBenefits(principal.organizationId(), planId, definition.benefits(), principal.userId());
 		auditService.record(principal, "VISIT_PACKAGE_PLAN_UPDATED", "VISIT_PACKAGE_PLAN", planId,
 				"BACKOFFICE", null, correlationId);
 		return packages.find(principal.organizationId(), planId).orElseThrow();
@@ -153,7 +156,8 @@ public class VisitPackagePlanService implements VisitPackagePlanOperations {
 
 	private ValidatedDefinition validate(
 			UUID organizationId, UUID activeBranchId, int totalVisits, int validityDays, String branchScope,
-			List<UUID> branchIds, List<UUID> benefitIds, String registrationFeePolicy, String status
+			List<UUID> branchIds, List<VisitPackageBenefitUsage> benefits,
+			String registrationFeePolicy, String status
 	) {
 		if (totalVisits < 1 || totalVisits > 10_000) {
 			throw new BusinessException("VISIT_PACKAGE_TOTAL_INVALID", "Las visitas deben estar entre 1 y 10000.");
@@ -176,23 +180,33 @@ public class VisitPackagePlanService implements VisitPackagePlanOperations {
 					"VISIT_PACKAGE_ACTIVE_BRANCH_REQUIRED",
 					"El paquete debe incluir la sucursal en la que estás operando.");
 		}
-		List<UUID> distinctBenefits = benefitIds.stream().distinct().toList();
-		if (distinctBenefits.isEmpty() || !packages.accessBenefitsExist(organizationId, distinctBenefits)) {
+		List<VisitPackageBenefitUsage> normalizedBenefits = normalizeBenefits(benefits);
+		List<UUID> distinctBenefitIds = normalizedBenefits.stream()
+				.map(VisitPackageBenefitUsage::benefitId).toList();
+		if (distinctBenefitIds.isEmpty() || !packages.accessBenefitsExist(organizationId, distinctBenefitIds)) {
 			throw new BusinessException("VISIT_PACKAGE_BENEFITS_INVALID", "Selecciona al menos un acceso activo del gimnasio.");
 		}
+		if (normalizedBenefits.stream().noneMatch(
+				benefit -> benefit.usageMode() == VisitPackageBenefitUsageMode.CONSUMES_VISIT)) {
+			throw new BusinessException(
+					"VISIT_PACKAGE_CONSUMING_BENEFIT_REQUIRED",
+					"Selecciona al menos un acceso que descuente una visita.");
+		}
 		List<VisitPackagePlanPort.BenefitCoverage> benefitCoverages =
-				packages.benefitCoverages(organizationId, distinctBenefits, effectiveBranches);
+				packages.benefitCoverages(organizationId, normalizedBenefits, effectiveBranches);
 		if (benefitCoverages.stream().anyMatch(coverage -> coverage.branchIds().isEmpty())) {
 			throw new BusinessException(
 					"VISIT_PACKAGE_BENEFIT_OUTSIDE_SCOPE",
 					"Uno de los accesos elegidos no se reconoce en ninguna sucursal de este paquete.");
 		}
-		var coveredBranches = new HashSet<UUID>();
-		benefitCoverages.forEach(coverage -> coveredBranches.addAll(coverage.branchIds()));
-		if (!coveredBranches.containsAll(effectiveBranches)) {
+		var branchesWithBaseVisit = new HashSet<UUID>();
+		benefitCoverages.stream()
+				.filter(coverage -> coverage.usageMode() == VisitPackageBenefitUsageMode.CONSUMES_VISIT)
+				.forEach(coverage -> branchesWithBaseVisit.addAll(coverage.branchIds()));
+		if (!branchesWithBaseVisit.containsAll(effectiveBranches)) {
 			throw new BusinessException(
 					"VISIT_PACKAGE_BRANCH_WITHOUT_ACCESS",
-					"Cada sucursal del paquete debe tener al menos uno de los accesos elegidos.");
+					"Cada sucursal del paquete debe tener al menos un acceso que descuente una visita.");
 		}
 		String feePolicy = required(registrationFeePolicy, "REGISTRATION_FEE_POLICY_INVALID").toUpperCase();
 		if (!"DEFAULT".equals(feePolicy) && !"WAIVED".equals(feePolicy)) {
@@ -202,7 +216,23 @@ public class VisitPackagePlanService implements VisitPackagePlanOperations {
 		if (!"ACTIVE".equals(normalizedStatus) && !"INACTIVE".equals(normalizedStatus)) {
 			throw new BusinessException("VISIT_PACKAGE_STATUS_INVALID", "Selecciona un estado válido.");
 		}
-		return new ValidatedDefinition(normalizedScope, effectiveBranches, distinctBenefits, feePolicy, normalizedStatus);
+		return new ValidatedDefinition(normalizedScope, effectiveBranches, normalizedBenefits, feePolicy, normalizedStatus);
+	}
+
+	private List<VisitPackageBenefitUsage> normalizeBenefits(List<VisitPackageBenefitUsage> benefits) {
+		if (benefits == null || benefits.isEmpty()) return List.of();
+		var byBenefit = new LinkedHashMap<UUID, VisitPackageBenefitUsage>();
+		for (VisitPackageBenefitUsage benefit : benefits) {
+			if (benefit == null || benefit.benefitId() == null || benefit.usageMode() == null) {
+				throw new BusinessException(
+						"VISIT_PACKAGE_BENEFITS_INVALID", "Completa el acceso y cómo utiliza el saldo.");
+			}
+			if (byBenefit.putIfAbsent(benefit.benefitId(), benefit) != null) {
+				throw new BusinessException(
+						"VISIT_PACKAGE_BENEFIT_DUPLICATED", "No repitas el mismo acceso dentro del paquete.");
+			}
+		}
+		return List.copyOf(byBenefit.values());
 	}
 
 	private String normalizeCurrency(String value) {
@@ -223,13 +253,14 @@ public class VisitPackagePlanService implements VisitPackagePlanOperations {
 		List<UUID> effectiveBranches = "ALL_BRANCHES".equals(plan.branchScope())
 				? packages.activeBranchIds(organizationId) : plan.branchIds();
 		List<BenefitCoverage> coverages = packages.benefitCoverages(
-				organizationId, plan.benefitIds(), effectiveBranches).stream()
-				.map(coverage -> new BenefitCoverage(coverage.benefitId(), coverage.branchIds()))
+				organizationId, plan.benefits(), effectiveBranches).stream()
+				.map(coverage -> new BenefitCoverage(
+						coverage.benefitId(), coverage.usageMode(), coverage.branchIds()))
 				.toList();
 		return new VisitPackagePlanSnapshot(
 				plan.id(), plan.productId(), plan.sku(), plan.name(), plan.priceCents(), plan.currency(),
 				plan.totalVisits(), plan.validityDays(), plan.branchScope(),
-				effectiveBranches, plan.benefitIds(), coverages,
+				effectiveBranches, plan.benefits(), coverages,
 				plan.selfServiceAcquisitionEnabled(), plan.registrationFeePolicy());
 	}
 
@@ -243,7 +274,7 @@ public class VisitPackagePlanService implements VisitPackagePlanOperations {
 	}
 
 	private record ValidatedDefinition(
-			String branchScope, List<UUID> effectiveBranchIds, List<UUID> benefitIds,
+			String branchScope, List<UUID> effectiveBranchIds, List<VisitPackageBenefitUsage> benefits,
 			String registrationFeePolicy, String status
 	) {}
 }

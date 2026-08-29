@@ -12,6 +12,7 @@ import {
   updateVisitPackagePlan,
   type BenefitSummary,
   type BranchSummary,
+  type VisitPackageBenefitUsage,
   type VisitPackagePlanPayload,
   type VisitPackagePlanSummary,
 } from "@/lib/api";
@@ -27,7 +28,7 @@ type Draft = {
   validityDays: string;
   branchScope: VisitPackagePlanPayload["branchScope"];
   branchIds: string[];
-  benefitIds: string[];
+  benefits: VisitPackageBenefitUsage[];
   selfServiceAcquisitionEnabled: boolean;
   registrationFeePolicy: VisitPackagePlanPayload["registrationFeePolicy"];
   status: VisitPackagePlanPayload["status"];
@@ -44,7 +45,7 @@ const emptyDraft: Draft = {
   validityDays: "30",
   branchScope: "ALL_BRANCHES",
   branchIds: [],
-  benefitIds: [],
+  benefits: [],
   selfServiceAcquisitionEnabled: true,
   registrationFeePolicy: "DEFAULT",
   status: "ACTIVE",
@@ -81,12 +82,12 @@ export function VisitPackagePlansSection({
     [branches, draft.branchIds, draft.branchScope],
   );
   const uncoveredSelectedBranches = useMemo(
-    () => branchesWithoutSelectedAccess(
+    () => branchesWithoutConsumingAccess(
       selectedPackageBranchIds,
-      draft.benefitIds,
+      draft.benefits,
       accessBenefits,
     ),
-    [accessBenefits, draft.benefitIds, selectedPackageBranchIds],
+    [accessBenefits, draft.benefits, selectedPackageBranchIds],
   );
 
   useEffect(() => {
@@ -135,7 +136,10 @@ export function VisitPackagePlansSection({
       branchIds: plan.branchScope === "SELECTED_BRANCHES" && currentBranchId
         ? Array.from(new Set([...plan.branchIds, currentBranchId]))
         : plan.branchIds,
-      benefitIds: plan.benefitIds,
+      benefits: plan.benefits ?? plan.benefitIds.map((benefitId) => ({
+        benefitId,
+        usageMode: "CONSUMES_VISIT" as const,
+      })),
       selfServiceAcquisitionEnabled: plan.selfServiceAcquisitionEnabled,
       registrationFeePolicy: plan.registrationFeePolicy,
       status: plan.status,
@@ -165,12 +169,16 @@ export function VisitPackagePlansSection({
       setError("El paquete debe incluir la sucursal en la que estás operando.");
       return;
     }
-    if (draft.benefitIds.length === 0) {
-      setError("Selecciona al menos un acceso que pueda consumir visitas.");
+    if (draft.benefits.length === 0) {
+      setError("Selecciona al menos un acceso para el paquete.");
       return;
     }
-    const incompatibleBenefit = draft.benefitIds.find((benefitId) => {
-      const benefit = accessBenefits.find((item) => item.id === benefitId);
+    if (!draft.benefits.some((benefit) => benefit.usageMode === "CONSUMES_VISIT")) {
+      setError("Selecciona al menos un acceso que consuma una visita.");
+      return;
+    }
+    const incompatibleBenefit = draft.benefits.find((usage) => {
+      const benefit = accessBenefits.find((item) => item.id === usage.benefitId);
       return !benefit || !benefitCoversAnySelectedBranch(benefit, selectedPackageBranchIds);
     });
     if (incompatibleBenefit) {
@@ -195,7 +203,7 @@ export function VisitPackagePlansSection({
       validityDays,
       branchScope: draft.branchScope,
       branchIds: draft.branchScope === "ALL_BRANCHES" ? [] : draft.branchIds,
-      benefitIds: draft.benefitIds,
+      benefits: draft.benefits,
       selfServiceAcquisitionEnabled: draft.selfServiceAcquisitionEnabled,
       registrationFeePolicy: draft.registrationFeePolicy,
       status: draft.status,
@@ -303,7 +311,7 @@ export function VisitPackagePlansSection({
                     ...draft,
                     branchScope: nextScope,
                     branchIds: nextScope === "SELECTED_BRANCHES" ? nextBranchIds : draft.branchIds,
-                    benefitIds: compatibleBenefitIds(draft.benefitIds, accessBenefits, nextBranchIds),
+                    benefits: compatibleBenefits(draft.benefits, accessBenefits, nextBranchIds),
                   });
                 }}
               />
@@ -324,17 +332,17 @@ export function VisitPackagePlansSection({
                   onChange={(branchIds) => setDraft({
                     ...draft,
                     branchIds,
-                    benefitIds: compatibleBenefitIds(draft.benefitIds, accessBenefits, branchIds),
+                    benefits: compatibleBenefits(draft.benefits, accessBenefits, branchIds),
                   })}
                 />
               ) : <p className="text-xs text-[var(--brand-muted)]">Incluye las sucursales activas actuales del gimnasio.</p>}
             </div>
             <div className="grid content-start gap-2">
-              <p className="text-sm font-semibold text-[#111815]">Accesos permitidos</p>
+              <p className="text-sm font-semibold text-[#111815]">Accesos del paquete</p>
               <p className="text-xs text-[var(--brand-muted)]">
-                Una visita puede descontarse al entrar a estos accesos. Cada uno conserva el alcance configurado en Beneficios.
+                Elige qué acceso registra la visita y cuáles quedan incluidos después, sin otro descuento.
               </p>
-              <CheckboxList
+              <BenefitUsageList
                 empty="Primero crea un beneficio de tipo Acceso."
                 items={accessBenefits.map((benefit) => ({
                   id: benefit.id,
@@ -342,15 +350,22 @@ export function VisitPackagePlansSection({
                   description: benefitAvailabilityLabel(benefit, branches, selectedPackageBranchIds),
                   disabled: !benefitCoversAnySelectedBranch(benefit, selectedPackageBranchIds),
                 }))}
-                selected={draft.benefitIds}
-                onChange={(benefitIds) => setDraft({ ...draft, benefitIds })}
+                selected={draft.benefits}
+                onChange={(benefits) => {
+                  setDraft({ ...draft, benefits });
+                  setError(null);
+                }}
               />
+              <div className="grid gap-1 rounded-lg bg-[#f1f5ef] px-3 py-2 text-xs text-[#31563c]">
+                <p><strong>Consume una visita:</strong> descuenta una unidad del saldo.</p>
+                <p><strong>Se incluye con la visita:</strong> requiere una visita registrada ese día en esa misma sucursal.</p>
+              </div>
               <p className="rounded-lg bg-[#f1f5ef] px-3 py-2 text-xs text-[#31563c]">
                 El paquete no amplía un acceso. Si Sauna es sólo de Centro, seguirá disponible sólo en Centro aunque el saldo pueda usarse también en Tecnológica.
               </p>
               {uncoveredSelectedBranches.length > 0 ? (
                 <p className="rounded-lg bg-[#fff3df] px-3 py-2 text-xs font-medium text-[#80561f]">
-                  Falta elegir un acceso disponible en {branches
+                  Falta un acceso que consuma una visita en {branches
                     .filter((branch) => uncoveredSelectedBranches.includes(branch.id))
                     .map((branch) => branch.name)
                     .join(", ")}.
@@ -410,6 +425,61 @@ function CheckboxList({
   );
 }
 
+function BenefitUsageList({
+  empty,
+  items,
+  onChange,
+  selected,
+}: {
+  empty: string;
+  items: { id: string; label: string; description?: string; disabled?: boolean }[];
+  onChange: (benefits: VisitPackageBenefitUsage[]) => void;
+  selected: VisitPackageBenefitUsage[];
+}) {
+  if (items.length === 0) {
+    return <p className="rounded-lg border border-dashed border-[var(--brand-line)] p-3 text-xs text-[var(--brand-muted)]">{empty}</p>;
+  }
+  return (
+    <div className="grid max-h-56 gap-1 overflow-y-auto rounded-lg border border-[var(--brand-line)] bg-white p-2">
+      {items.map((item) => {
+        const usage = selected.find((benefit) => benefit.benefitId === item.id);
+        return (
+          <div className={`grid gap-2 rounded-md px-2 py-2 ${item.disabled ? "bg-[#f5f7f4]" : "hover:bg-[#f5f7f4]"}`} key={item.id}>
+            <label className={`flex items-start gap-2 text-sm ${item.disabled ? "cursor-not-allowed" : ""}`}>
+              <input
+                className="mt-0.5 h-4 w-4 accent-[var(--brand-primary)]"
+                type="checkbox"
+                checked={Boolean(usage)}
+                disabled={item.disabled}
+                onChange={(event) => onChange(event.target.checked
+                  ? [...selected, { benefitId: item.id, usageMode: "CONSUMES_VISIT" }]
+                  : selected.filter((benefit) => benefit.benefitId !== item.id))}
+              />
+              <span>
+                <span className="block font-medium text-[#111815]">{item.label}</span>
+                {item.description ? <span className="block text-[11px] text-[var(--brand-muted)]">{item.description}</span> : null}
+              </span>
+            </label>
+            {usage ? (
+              <select
+                aria-label={`Modo para ${item.label}`}
+                className="h-9 rounded-lg border border-[var(--brand-line)] bg-white px-2 text-xs font-medium text-[#111815]"
+                value={usage.usageMode}
+                onChange={(event) => onChange(selected.map((benefit) => benefit.benefitId === item.id
+                  ? { ...benefit, usageMode: event.target.value as VisitPackageBenefitUsage["usageMode"] }
+                  : benefit))}
+              >
+                <option value="CONSUMES_VISIT">Consume una visita</option>
+                <option value="INCLUDED_WITH_VISIT">Se incluye con la visita</option>
+              </select>
+            ) : null}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function benefitAvailabilityLabel(
   benefit: BenefitSummary,
   branches: BranchSummary[],
@@ -423,7 +493,7 @@ function benefitAvailabilityLabel(
     .filter((branch) => selectedBranchIds.includes(branch.id) && !coverage.includes(branch.id))
     .map((branch) => branch.name);
   if (availableNames.length === 0) return "No existe en las sucursales elegidas";
-  const available = `Descuenta visitas en: ${availableNames.join(", ")}`;
+  const available = `Disponible en: ${availableNames.join(", ")}`;
   return unavailableNames.length > 0
     ? `${available} · No disponible en: ${unavailableNames.join(", ")}`
     : available;
@@ -443,24 +513,27 @@ function branchHasAvailableAccess(branchId: string, benefits: BenefitSummary[]) 
   return benefits.some((benefit) => benefitCoverageBranchIds(benefit).includes(branchId));
 }
 
-function branchesWithoutSelectedAccess(
+function branchesWithoutConsumingAccess(
   branchIds: string[],
-  selectedBenefitIds: string[],
+  selectedUsages: VisitPackageBenefitUsage[],
   benefits: BenefitSummary[],
 ) {
-  const selectedBenefits = benefits.filter((benefit) => selectedBenefitIds.includes(benefit.id));
+  const consumingBenefitIds = selectedUsages
+    .filter((usage) => usage.usageMode === "CONSUMES_VISIT")
+    .map((usage) => usage.benefitId);
+  const selectedBenefits = benefits.filter((benefit) => consumingBenefitIds.includes(benefit.id));
   return branchIds.filter((branchId) => !selectedBenefits.some(
     (benefit) => benefitCoverageBranchIds(benefit).includes(branchId),
   ));
 }
 
-function compatibleBenefitIds(
-  benefitIds: string[],
+function compatibleBenefits(
+  selected: VisitPackageBenefitUsage[],
   benefits: BenefitSummary[],
   branchIds: string[],
 ) {
-  return benefitIds.filter((benefitId) => {
-    const benefit = benefits.find((item) => item.id === benefitId);
+  return selected.filter((usage) => {
+    const benefit = benefits.find((item) => item.id === usage.benefitId);
     return benefit ? benefitCoversAnySelectedBranch(benefit, branchIds) : false;
   });
 }
@@ -471,10 +544,13 @@ function errorMessage(exception: unknown, fallback: string) {
     return "El paquete debe incluir la sucursal en la que estás operando.";
   }
   if (rawMessage.includes("VISIT_PACKAGE_BRANCH_WITHOUT_ACCESS")) {
-    return "Cada sucursal elegida debe tener al menos un acceso disponible.";
+    return "Cada sucursal elegida debe tener al menos un acceso que consuma una visita.";
   }
   if (rawMessage.includes("VISIT_PACKAGE_BENEFIT_OUTSIDE_SCOPE")) {
     return "Quita los accesos que no existen en las sucursales elegidas.";
+  }
+  if (rawMessage.includes("VISIT_PACKAGE_CONSUMING_BENEFIT_REQUIRED")) {
+    return "Selecciona al menos un acceso que consuma una visita.";
   }
   return rawMessage || fallback;
 }

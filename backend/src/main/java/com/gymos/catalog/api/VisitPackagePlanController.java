@@ -66,7 +66,8 @@ public class VisitPackagePlanController {
 			@Min(1) int validityDays,
 			@NotBlank @Pattern(regexp = "ALL_BRANCHES|SELECTED_BRANCHES") String branchScope,
 			@Size(max = 100) List<@NotNull UUID> branchIds,
-			@Size(min = 1, max = 100) List<@NotNull UUID> benefitIds,
+			@Size(max = 100) List<@Valid BenefitUsageRequest> benefits,
+			@Size(max = 100) List<@NotNull UUID> benefitIds,
 			Boolean selfServiceAcquisitionEnabled,
 			@Pattern(regexp = "DEFAULT|WAIVED") String registrationFeePolicy,
 			@NotBlank @Pattern(regexp = "ACTIVE|INACTIVE") String status
@@ -74,7 +75,8 @@ public class VisitPackagePlanController {
 		CreateVisitPackagePlanCommand toCommand() {
 			return new CreateVisitPackagePlanCommand(
 					sku, name, description, priceCents, currency, totalVisits, validityDays, branchScope,
-					branchIds, benefitIds, selfServiceAcquisitionEnabled == null || selfServiceAcquisitionEnabled,
+					branchIds, resolvedBenefits(benefits, benefitIds),
+					selfServiceAcquisitionEnabled == null || selfServiceAcquisitionEnabled,
 					registrationFeePolicy == null ? "DEFAULT" : registrationFeePolicy, status);
 		}
 	}
@@ -88,7 +90,8 @@ public class VisitPackagePlanController {
 			@Min(1) int validityDays,
 			@NotBlank @Pattern(regexp = "ALL_BRANCHES|SELECTED_BRANCHES") String branchScope,
 			@Size(max = 100) List<@NotNull UUID> branchIds,
-			@Size(min = 1, max = 100) List<@NotNull UUID> benefitIds,
+			@Size(max = 100) List<@Valid BenefitUsageRequest> benefits,
+			@Size(max = 100) List<@NotNull UUID> benefitIds,
 			Boolean selfServiceAcquisitionEnabled,
 			@Pattern(regexp = "DEFAULT|WAIVED") String registrationFeePolicy,
 			@NotBlank @Pattern(regexp = "ACTIVE|INACTIVE") String status,
@@ -97,8 +100,30 @@ public class VisitPackagePlanController {
 		UpdateVisitPackagePlanCommand toCommand() {
 			return new UpdateVisitPackagePlanCommand(
 					name, description, priceCents, currency, totalVisits, validityDays, branchScope,
-					branchIds, benefitIds, selfServiceAcquisitionEnabled == null || selfServiceAcquisitionEnabled,
+					branchIds, resolvedBenefits(benefits, benefitIds),
+					selfServiceAcquisitionEnabled == null || selfServiceAcquisitionEnabled,
 					registrationFeePolicy == null ? "DEFAULT" : registrationFeePolicy, status, expectedVersion);
 		}
+	}
+
+	public record BenefitUsageRequest(
+			@NotNull UUID benefitId,
+			@NotNull VisitPackageBenefitUsageMode usageMode
+	) {
+		VisitPackageBenefitUsage toUsage() {
+			return new VisitPackageBenefitUsage(benefitId, usageMode);
+		}
+	}
+
+	private static List<VisitPackageBenefitUsage> resolvedBenefits(
+			List<BenefitUsageRequest> benefits, List<UUID> legacyBenefitIds
+	) {
+		if (benefits != null && !benefits.isEmpty()) {
+			return benefits.stream().map(BenefitUsageRequest::toUsage).toList();
+		}
+		return legacyBenefitIds == null ? List.of() : legacyBenefitIds.stream()
+				.map(benefitId -> new VisitPackageBenefitUsage(
+						benefitId, VisitPackageBenefitUsageMode.CONSUMES_VISIT))
+				.toList();
 	}
 }

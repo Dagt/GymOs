@@ -63,6 +63,10 @@ restricción única de base de datos. Un reembolso después de consumos no cance
 automáticamente un saldo parcialmente usado: el refund total se rechaza con
 `VISIT_PACKAGE_CONSUMED_REFUND_REQUIRES_REVIEW` y conserva el ledger.
 
+La venta snapshottea también el modo de cada acceso. Cambiar posteriormente
+Sauna de “incluido” a “consume” sólo afecta compras nuevas; una compra pagada o
+pendiente conserva exactamente la semántica cotizada.
+
 El POS genérico rechaza paquetes configurados con
 `SALE_VISIT_PACKAGE_OPERATION_REQUIRED`: recepción y kiosco utilizan la
 operación dedicada para que nunca exista una venta pagada sin entitlement.

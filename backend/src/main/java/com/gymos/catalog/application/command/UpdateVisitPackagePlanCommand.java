@@ -1,5 +1,6 @@
 package com.gymos.catalog.application.command;
 
+import com.gymos.catalog.api.VisitPackageBenefitUsage;
 import java.util.List;
 import java.util.UUID;
 
@@ -12,7 +13,7 @@ public record UpdateVisitPackagePlanCommand(
 		int validityDays,
 		String branchScope,
 		List<UUID> branchIds,
-		List<UUID> benefitIds,
+		List<VisitPackageBenefitUsage> benefits,
 		boolean selfServiceAcquisitionEnabled,
 		String registrationFeePolicy,
 		String status,
@@ -20,6 +21,6 @@ public record UpdateVisitPackagePlanCommand(
 ) {
 	public UpdateVisitPackagePlanCommand {
 		branchIds = branchIds == null ? List.of() : List.copyOf(branchIds);
-		benefitIds = benefitIds == null ? List.of() : List.copyOf(benefitIds);
+		benefits = benefits == null ? List.of() : List.copyOf(benefits);
 	}
 }

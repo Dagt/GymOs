@@ -1,5 +1,7 @@
 package com.gymos.catalog.application.port;
 
+import com.gymos.catalog.api.VisitPackageBenefitUsage;
+import com.gymos.catalog.api.VisitPackageBenefitUsageMode;
 import com.gymos.catalog.application.query.VisitPackagePlanView;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -7,7 +9,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface VisitPackagePlanPort {
-	record BenefitCoverage(UUID benefitId, List<UUID> branchIds) {
+	record BenefitCoverage(
+			UUID benefitId,
+			VisitPackageBenefitUsageMode usageMode,
+			List<UUID> branchIds
+	) {
 		public BenefitCoverage {
 			branchIds = branchIds == null ? List.of() : List.copyOf(branchIds);
 		}
@@ -24,11 +30,12 @@ public interface VisitPackagePlanPort {
 			boolean selfServiceAcquisitionEnabled, String registrationFeePolicy, String status,
 			long expectedVersion, UUID userId, OffsetDateTime now);
 	void replaceBranches(UUID organizationId, UUID planId, List<UUID> branchIds, UUID userId);
-	void replaceBenefits(UUID organizationId, UUID planId, List<UUID> benefitIds, UUID userId);
+	void replaceBenefits(
+			UUID organizationId, UUID planId, List<VisitPackageBenefitUsage> benefits, UUID userId);
 	boolean branchesExist(UUID organizationId, List<UUID> branchIds);
 	List<UUID> activeBranchIds(UUID organizationId);
 	boolean accessBenefitsExist(UUID organizationId, List<UUID> benefitIds);
 	List<BenefitCoverage> benefitCoverages(
-			UUID organizationId, List<UUID> benefitIds, List<UUID> packageBranchIds);
+			UUID organizationId, List<VisitPackageBenefitUsage> benefits, List<UUID> packageBranchIds);
 	boolean configuredProduct(UUID organizationId, UUID productId);
 }

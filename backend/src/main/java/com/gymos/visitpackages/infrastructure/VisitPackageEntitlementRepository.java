@@ -1,5 +1,6 @@
 package com.gymos.visitpackages.infrastructure;
 
+import com.gymos.catalog.api.VisitPackageBenefitUsageMode;
 import com.gymos.common.api.BusinessException;
 import com.gymos.visitpackages.api.operations.VisitPackageOperations.VisitPackageEntitlementView;
 import com.gymos.visitpackages.api.operations.VisitPackageOperations.VisitPackageConsumptionView;
@@ -156,10 +157,11 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 			UUID benefitId = coverage.benefitId();
 			jdbcClient.sql("""
 					INSERT INTO visit_package_entitlement_benefit (
-					    entitlement_id, benefit_id, organization_id, created_at
-					) VALUES (:entitlementId, :benefitId, :organizationId, :now)
+					    entitlement_id, benefit_id, organization_id, usage_mode, created_at
+					) VALUES (:entitlementId, :benefitId, :organizationId, :usageMode, :now)
 					""")
 					.param("entitlementId", id).param("benefitId", benefitId)
+					.param("usageMode", coverage.usageMode().name())
 					.param("organizationId", organizationId).param("now", now).update();
 			for (UUID branchId : coverage.branchIds().stream().distinct().toList()) {
 				if (!branchIds.contains(branchId)) {
@@ -167,11 +169,14 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 				}
 				jdbcClient.sql("""
 						INSERT INTO visit_package_entitlement_benefit_branch (
-						    entitlement_id, benefit_id, branch_id, organization_id, created_at
-						) VALUES (:entitlementId, :benefitId, :branchId, :organizationId, :now)
+						    entitlement_id, benefit_id, branch_id, organization_id, usage_mode, created_at
+						) VALUES (
+						    :entitlementId, :benefitId, :branchId, :organizationId, :usageMode, :now
+						)
 						""")
 						.param("entitlementId", id).param("benefitId", benefitId)
 						.param("branchId", branchId).param("organizationId", organizationId)
+						.param("usageMode", coverage.usageMode().name())
 						.param("now", now).update();
 			}
 		}
@@ -215,10 +220,13 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 	}
 
 	@Override
-	public Optional<VisitPackageAccessResult> consumeForAccess(
+	public Optional<VisitPackageAccessResult> authorizeForAccess(
 			UUID organizationId, UUID branchId, UUID clientId, List<UUID> requiredBenefitIds,
 			UUID accessDeviceId, String idempotencyKey, LocalDate businessDate, OffsetDateTime occurredAt
 	) {
+		jdbcClient.sql("SELECT pg_advisory_xact_lock(hashtextextended(:lockKey, 0))")
+				.param("lockKey", organizationId + ":visit-package-access:" + idempotencyKey)
+				.query((rs, row) -> Boolean.TRUE).single();
 		jdbcClient.sql("""
 				SELECT id FROM client
 				WHERE organization_id=:organizationId AND id=:clientId AND deleted_at IS NULL
@@ -226,7 +234,7 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 				""")
 				.param("organizationId", organizationId).param("clientId", clientId)
 				.query(UUID.class).optional();
-		Optional<VisitPackageAccessResult> existing = consumptionByKey(organizationId, idempotencyKey);
+		Optional<VisitPackageAccessResult> existing = usageByKey(organizationId, idempotencyKey);
 		if (existing.isPresent()) {
 			VisitPackageAccessResult previous = existing.get();
 			if (!previous.clientId().equals(clientId)
@@ -248,39 +256,96 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 				.param("organizationId", organizationId).param("clientId", clientId)
 				.param("businessDate", businessDate).param("occurredAt", occurredAt).update();
 
-		String benefitPredicate = requiredBenefitIds == null || requiredBenefitIds.isEmpty()
-				? ""
+		boolean benefitRequired = requiredBenefitIds != null && !requiredBenefitIds.isEmpty();
+		String benefitPredicate = benefitRequired
+				? " AND entitlement_benefit.benefit_id IN (:requiredBenefitIds) "
 				: """
-				  AND EXISTS (
-				      SELECT 1 FROM visit_package_entitlement_benefit_branch entitlement_benefit
-				      WHERE entitlement_benefit.organization_id=entitlement.organization_id
-				        AND entitlement_benefit.entitlement_id=entitlement.id
-				        AND entitlement_benefit.branch_id=:branchId
-				        AND entitlement_benefit.benefit_id IN (:requiredBenefitIds)
-				  )
+				  AND entitlement_benefit.usage_mode = 'CONSUMES_VISIT'
 				""";
 		JdbcClient.StatementSpec candidateStatement = jdbcClient.sql("""
-				SELECT entitlement.id
+				SELECT entitlement.id AS entitlement_id,
+				       entitlement_benefit.benefit_id,
+				       entitlement_benefit.usage_mode,
+				       entitlement.remaining_visits
 				FROM visit_package_entitlement entitlement
 				JOIN visit_package_entitlement_branch entitlement_branch
 				  ON entitlement_branch.organization_id=entitlement.organization_id
 				 AND entitlement_branch.entitlement_id=entitlement.id
+				JOIN visit_package_entitlement_benefit_branch entitlement_benefit
+				  ON entitlement_benefit.organization_id=entitlement.organization_id
+				 AND entitlement_benefit.entitlement_id=entitlement.id
+				 AND entitlement_benefit.branch_id=entitlement_branch.branch_id
 				WHERE entitlement.organization_id=:organizationId
 				  AND entitlement.client_id=:clientId
 				  AND entitlement_branch.branch_id=:branchId
 				  AND entitlement.status='ACTIVE'
-				  AND entitlement.remaining_visits > 0
 				  AND entitlement.valid_from <= :businessDate
 				  AND entitlement.valid_until >= :businessDate
 				  AND entitlement.deleted_at IS NULL
-				""" + benefitPredicate + " FOR UPDATE OF entitlement LIMIT 1")
+				  AND (
+				      entitlement_benefit.usage_mode = 'INCLUDED_WITH_VISIT'
+				      OR entitlement.remaining_visits > 0
+				  )
+				""" + benefitPredicate + """
+				ORDER BY CASE entitlement_benefit.usage_mode
+				           WHEN 'CONSUMES_VISIT' THEN 0 ELSE 1 END,
+				         entitlement_benefit.benefit_id
+				FOR UPDATE OF entitlement
+				LIMIT 1
+				""")
 				.param("organizationId", organizationId).param("clientId", clientId)
 				.param("branchId", branchId).param("businessDate", businessDate);
-		if (requiredBenefitIds != null && !requiredBenefitIds.isEmpty()) {
+		if (benefitRequired) {
 			candidateStatement = candidateStatement.param("requiredBenefitIds", requiredBenefitIds);
 		}
-		Optional<UUID> entitlementId = candidateStatement.query(UUID.class).optional();
-		if (entitlementId.isEmpty()) return Optional.empty();
+		Optional<AccessCandidate> candidate = candidateStatement.query((rs, row) -> new AccessCandidate(
+				rs.getObject("entitlement_id", UUID.class),
+				rs.getObject("benefit_id", UUID.class),
+				VisitPackageBenefitUsageMode.valueOf(rs.getString("usage_mode")),
+				rs.getInt("remaining_visits"))).optional();
+		if (candidate.isEmpty()) return Optional.empty();
+		AccessCandidate selected = candidate.get();
+
+		if (selected.usageMode() == VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT) {
+			Optional<UUID> baseConsumptionId = jdbcClient.sql("""
+					SELECT id
+					FROM visit_package_consumption
+					WHERE organization_id=:organizationId
+					  AND entitlement_id=:entitlementId
+					  AND branch_id=:branchId
+					  AND business_date=:businessDate
+					  AND status='CONSUMED'
+					ORDER BY occurred_at, id
+					LIMIT 1
+					""")
+					.param("organizationId", organizationId)
+					.param("entitlementId", selected.entitlementId())
+					.param("branchId", branchId)
+					.param("businessDate", businessDate)
+					.query(UUID.class).optional();
+			UUID includedAccessId = UUID.randomUUID();
+			jdbcClient.sql("""
+					INSERT INTO visit_package_included_access (
+					    id, organization_id, entitlement_id, benefit_id, branch_id,
+					    access_device_id, base_consumption_id, idempotency_key,
+					    status, remaining_after, business_date, occurred_at, created_at
+					) VALUES (
+					    :id, :organizationId, :entitlementId, :benefitId, :branchId,
+					    :accessDeviceId, :baseConsumptionId, :idempotencyKey,
+					    :status, :remainingAfter, :businessDate, :occurredAt, :occurredAt
+					)
+					""")
+					.param("id", includedAccessId).param("organizationId", organizationId)
+					.param("entitlementId", selected.entitlementId())
+					.param("benefitId", selected.benefitId()).param("branchId", branchId)
+					.param("accessDeviceId", accessDeviceId)
+					.param("baseConsumptionId", baseConsumptionId.orElse(null))
+					.param("idempotencyKey", idempotencyKey).param("businessDate", businessDate)
+					.param("status", baseConsumptionId.isPresent() ? "GRANTED" : "DENIED")
+					.param("remainingAfter", selected.remainingAfter())
+					.param("occurredAt", occurredAt).update();
+			return usageByKey(organizationId, idempotencyKey);
+		}
 
 		int remainingAfter = jdbcClient.sql("""
 				UPDATE visit_package_entitlement
@@ -291,57 +356,115 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 				  AND status='ACTIVE' AND remaining_visits > 0
 				RETURNING remaining_visits
 				""")
-				.param("organizationId", organizationId).param("entitlementId", entitlementId.get())
+				.param("organizationId", organizationId).param("entitlementId", selected.entitlementId())
 				.param("occurredAt", occurredAt).query(Integer.class).single();
 		UUID consumptionId = UUID.randomUUID();
 		jdbcClient.sql("""
 				INSERT INTO visit_package_consumption (
-				    id, organization_id, entitlement_id, branch_id, access_device_id,
-				    idempotency_key, status, remaining_after, occurred_at, created_at
+				    id, organization_id, entitlement_id, benefit_id, branch_id, access_device_id,
+				    idempotency_key, status, remaining_after, business_date, occurred_at, created_at
 				) VALUES (
-				    :id, :organizationId, :entitlementId, :branchId, :accessDeviceId,
-				    :idempotencyKey, 'CONSUMED', :remainingAfter, :occurredAt, :occurredAt
+				    :id, :organizationId, :entitlementId, :benefitId, :branchId, :accessDeviceId,
+				    :idempotencyKey, 'CONSUMED', :remainingAfter, :businessDate, :occurredAt, :occurredAt
 				)
 				""")
 				.param("id", consumptionId).param("organizationId", organizationId)
-				.param("entitlementId", entitlementId.get()).param("branchId", branchId)
+				.param("entitlementId", selected.entitlementId())
+				.param("benefitId", selected.benefitId()).param("branchId", branchId)
 				.param("accessDeviceId", accessDeviceId).param("idempotencyKey", idempotencyKey)
-				.param("remainingAfter", remainingAfter).param("occurredAt", occurredAt).update();
-		return consumptionByKey(organizationId, idempotencyKey);
+				.param("remainingAfter", remainingAfter).param("businessDate", businessDate)
+				.param("occurredAt", occurredAt).update();
+		return usageByKey(organizationId, idempotencyKey);
 	}
 
 	@Override
-	public boolean linkAccessLog(UUID organizationId, UUID consumptionId, UUID accessLogId) {
-		return jdbcClient.sql("""
-				UPDATE visit_package_consumption
-				SET access_log_id=:accessLogId
-				WHERE organization_id=:organizationId AND id=:consumptionId
-				  AND (access_log_id IS NULL OR access_log_id=:accessLogId)
-				""")
-				.param("organizationId", organizationId).param("consumptionId", consumptionId)
+	public boolean linkAccessLog(
+			UUID organizationId, UUID usageId, VisitPackageBenefitUsageMode usageMode, UUID accessLogId
+	) {
+		String table = usageMode == VisitPackageBenefitUsageMode.CONSUMES_VISIT
+				? "visit_package_consumption" : "visit_package_included_access";
+		return jdbcClient.sql("UPDATE " + table + " SET access_log_id=:accessLogId "
+				+ "WHERE organization_id=:organizationId AND id=:usageId "
+				+ "AND (access_log_id IS NULL OR access_log_id=:accessLogId) "
+				+ "AND EXISTS (SELECT 1 FROM access_log "
+				+ "WHERE organization_id=:organizationId AND id=:accessLogId)")
+				.param("organizationId", organizationId).param("usageId", usageId)
 				.param("accessLogId", accessLogId).update() == 1;
+	}
+
+	private Optional<VisitPackageAccessResult> usageByKey(UUID organizationId, String idempotencyKey) {
+		Optional<VisitPackageAccessResult> consumption = consumptionByKey(organizationId, idempotencyKey);
+		return consumption.isPresent() ? consumption : includedAccessByKey(organizationId, idempotencyKey);
 	}
 
 	private Optional<VisitPackageAccessResult> consumptionByKey(UUID organizationId, String idempotencyKey) {
 		return jdbcClient.sql("""
-				SELECT consumption.id, consumption.entitlement_id, entitlement.client_id,
+				SELECT consumption.id, consumption.id AS base_consumption_id, consumption.benefit_id,
+				       consumption.entitlement_id, entitlement.client_id,
 				       consumption.branch_id, consumption.access_device_id, product.name AS package_name,
 				       consumption.remaining_after, consumption.access_log_id
 				FROM visit_package_consumption consumption
-				JOIN visit_package_entitlement entitlement ON entitlement.id=consumption.entitlement_id
-				JOIN visit_package_plan plan ON plan.id=entitlement.visit_package_plan_id
-				JOIN catalog_product product ON product.id=plan.product_id
+				JOIN visit_package_entitlement entitlement
+				  ON entitlement.organization_id=consumption.organization_id
+				 AND entitlement.id=consumption.entitlement_id
+				JOIN visit_package_plan plan
+				  ON plan.organization_id=entitlement.organization_id
+				 AND plan.id=entitlement.visit_package_plan_id
+				JOIN catalog_product product
+				  ON product.organization_id=plan.organization_id
+				 AND product.id=plan.product_id
 				WHERE consumption.organization_id=:organizationId
 				  AND consumption.idempotency_key=:idempotencyKey
 				""")
 				.param("organizationId", organizationId).param("idempotencyKey", idempotencyKey)
 				.query((rs, row) -> new VisitPackageAccessResult(
-						rs.getObject("id", UUID.class), rs.getObject("entitlement_id", UUID.class),
+						rs.getObject("id", UUID.class), rs.getObject("base_consumption_id", UUID.class),
+						rs.getObject("benefit_id", UUID.class), VisitPackageBenefitUsageMode.CONSUMES_VISIT,
+						rs.getObject("entitlement_id", UUID.class),
 						rs.getObject("client_id", UUID.class), rs.getObject("branch_id", UUID.class),
 						rs.getObject("access_device_id", UUID.class), rs.getString("package_name"),
-						rs.getInt("remaining_after"), rs.getObject("access_log_id", UUID.class)))
+						rs.getInt("remaining_after"), true,
+						rs.getObject("access_log_id", UUID.class)))
 				.optional();
 	}
+
+	private Optional<VisitPackageAccessResult> includedAccessByKey(
+			UUID organizationId, String idempotencyKey
+	) {
+		return jdbcClient.sql("""
+				SELECT included.id, included.base_consumption_id, included.benefit_id, included.status,
+				       included.entitlement_id, entitlement.client_id, included.branch_id,
+				       included.access_device_id, product.name AS package_name,
+				       included.remaining_after, included.access_log_id
+				FROM visit_package_included_access included
+				JOIN visit_package_entitlement entitlement
+				  ON entitlement.organization_id=included.organization_id
+				 AND entitlement.id=included.entitlement_id
+				JOIN visit_package_plan plan
+				  ON plan.organization_id=entitlement.organization_id
+				 AND plan.id=entitlement.visit_package_plan_id
+				JOIN catalog_product product
+				  ON product.organization_id=plan.organization_id
+				 AND product.id=plan.product_id
+				WHERE included.organization_id=:organizationId
+				  AND included.idempotency_key=:idempotencyKey
+				""")
+				.param("organizationId", organizationId).param("idempotencyKey", idempotencyKey)
+				.query((rs, row) -> new VisitPackageAccessResult(
+						rs.getObject("id", UUID.class), rs.getObject("base_consumption_id", UUID.class),
+						rs.getObject("benefit_id", UUID.class), VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT,
+						rs.getObject("entitlement_id", UUID.class),
+						rs.getObject("client_id", UUID.class), rs.getObject("branch_id", UUID.class),
+						rs.getObject("access_device_id", UUID.class), rs.getString("package_name"),
+						rs.getInt("remaining_after"), "GRANTED".equals(rs.getString("status")),
+						rs.getObject("access_log_id", UUID.class)))
+				.optional();
+	}
+
+	private record AccessCandidate(
+			UUID entitlementId, UUID benefitId, VisitPackageBenefitUsageMode usageMode,
+			int remainingAfter
+	) {}
 
 	private Optional<VisitPackageEntitlementView> query(
 			String predicate, UUID organizationId, UUID clientId, UUID saleId, String idempotencyKey,

@@ -1,5 +1,7 @@
 package com.gymos.catalog.infrastructure;
 
+import com.gymos.catalog.api.VisitPackageBenefitUsage;
+import com.gymos.catalog.api.VisitPackageBenefitUsageMode;
 import com.gymos.catalog.application.query.VisitPackagePlanView;
 import com.gymos.catalog.application.port.VisitPackagePlanPort;
 import com.gymos.catalog.application.port.VisitPackagePlanPort.BenefitCoverage;
@@ -137,16 +139,19 @@ public class VisitPackagePlanRepository implements VisitPackagePlanPort {
 		}
 	}
 
-	public void replaceBenefits(UUID organizationId, UUID planId, List<UUID> benefitIds, UUID userId) {
+	public void replaceBenefits(
+			UUID organizationId, UUID planId, List<VisitPackageBenefitUsage> benefits, UUID userId
+	) {
 		jdbcClient.sql("DELETE FROM visit_package_plan_benefit WHERE organization_id=:organizationId AND visit_package_plan_id=:planId")
 				.param("organizationId", organizationId).param("planId", planId).update();
-		for (UUID benefitId : benefitIds.stream().distinct().toList()) {
+		for (VisitPackageBenefitUsage benefit : benefits) {
 			jdbcClient.sql("""
 					INSERT INTO visit_package_plan_benefit (
-					    visit_package_plan_id, benefit_id, organization_id, created_at, created_by
-					) VALUES (:planId, :benefitId, :organizationId, now(), :userId)
+					    visit_package_plan_id, benefit_id, organization_id, usage_mode, created_at, created_by
+					) VALUES (:planId, :benefitId, :organizationId, :usageMode, now(), :userId)
 					""")
-					.param("planId", planId).param("benefitId", benefitId)
+					.param("planId", planId).param("benefitId", benefit.benefitId())
+					.param("usageMode", benefit.usageMode().name())
 					.param("organizationId", organizationId).param("userId", userId).update();
 		}
 	}
@@ -183,11 +188,12 @@ public class VisitPackagePlanRepository implements VisitPackagePlanPort {
 
 	@Override
 	public List<BenefitCoverage> benefitCoverages(
-			UUID organizationId, List<UUID> benefitIds, List<UUID> packageBranchIds
+			UUID organizationId, List<VisitPackageBenefitUsage> benefits, List<UUID> packageBranchIds
 	) {
-		if (benefitIds == null || benefitIds.isEmpty() || packageBranchIds == null || packageBranchIds.isEmpty()) {
+		if (benefits == null || benefits.isEmpty() || packageBranchIds == null || packageBranchIds.isEmpty()) {
 			return List.of();
 		}
+		List<UUID> benefitIds = benefits.stream().map(VisitPackageBenefitUsage::benefitId).toList();
 		List<BenefitBranch> rows = jdbcClient.sql("""
 				SELECT benefit.id AS benefit_id, package_branch.id AS branch_id
 				FROM benefit benefit
@@ -234,9 +240,9 @@ public class VisitPackagePlanRepository implements VisitPackagePlanPort {
 				.query((rs, row) -> new BenefitBranch(
 						rs.getObject("benefit_id", UUID.class), rs.getObject("branch_id", UUID.class)))
 				.list();
-		return benefitIds.stream().distinct()
-				.map(benefitId -> new BenefitCoverage(benefitId, rows.stream()
-						.filter(row -> row.benefitId().equals(benefitId))
+		return benefits.stream()
+				.map(benefit -> new BenefitCoverage(benefit.benefitId(), benefit.usageMode(), rows.stream()
+						.filter(row -> row.benefitId().equals(benefit.benefitId()))
 						.map(BenefitBranch::branchId)
 						.toList()))
 				.toList();
@@ -261,7 +267,7 @@ public class VisitPackagePlanRepository implements VisitPackagePlanPort {
 	) {
 		return new VisitPackagePlanView(
 				id, productId, sku, name, description, priceCents, currency, totalVisits, validityDays,
-				branchScope, branchIds(organizationId, id), benefitIds(organizationId, id),
+				branchScope, branchIds(organizationId, id), benefits(organizationId, id),
 				selfServiceAcquisitionEnabled, registrationFeePolicy, status, version, createdAt, updatedAt);
 	}
 
@@ -272,11 +278,15 @@ public class VisitPackagePlanRepository implements VisitPackagePlanPort {
 				""").param("organizationId", organizationId).param("planId", planId).query(UUID.class).list();
 	}
 
-	private List<UUID> benefitIds(UUID organizationId, UUID planId) {
+	private List<VisitPackageBenefitUsage> benefits(UUID organizationId, UUID planId) {
 		return jdbcClient.sql("""
-				SELECT benefit_id FROM visit_package_plan_benefit
+				SELECT benefit_id, usage_mode FROM visit_package_plan_benefit
 				WHERE organization_id=:organizationId AND visit_package_plan_id=:planId ORDER BY benefit_id
-				""").param("organizationId", organizationId).param("planId", planId).query(UUID.class).list();
+				""").param("organizationId", organizationId).param("planId", planId)
+				.query((rs, row) -> new VisitPackageBenefitUsage(
+						rs.getObject("benefit_id", UUID.class),
+						VisitPackageBenefitUsageMode.valueOf(rs.getString("usage_mode"))))
+				.list();
 	}
 
 	private record BenefitBranch(UUID benefitId, UUID branchId) {}

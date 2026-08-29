@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.gymos.common.api.BusinessException;
 import com.gymos.access.infrastructure.AccessRepository;
 import com.gymos.benefits.infrastructure.BenefitRepository;
+import com.gymos.catalog.api.VisitPackageBenefitUsage;
+import com.gymos.catalog.api.VisitPackageBenefitUsageMode;
 import com.gymos.catalog.infrastructure.VisitPackagePlanRepository;
 import com.gymos.visitpackages.api.operations.VisitPackageAccessOperations.VisitPackageAccessResult;
 import com.gymos.visitpackages.application.port.VisitPackageEntitlementPort.BenefitCoverage;
@@ -46,7 +48,8 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 	void localBenefitInTwoBranchPackageConsumesOnlyAtItsOwnBranch() {
 		Fixture fixture = fixture(2);
 		UUID sauna = fixture.insertAccessBenefit(fixture.branchA(), "SAUNA", "LOCAL");
-		fixture.activate(List.of(new BenefitCoverage(sauna, List.of(fixture.branchA()))));
+		fixture.activate(List.of(new BenefitCoverage(
+				sauna, VisitPackageBenefitUsageMode.CONSUMES_VISIT, List.of(fixture.branchA()))));
 
 		assertThat(fixture.consume(
 				fixture.branchB(), fixture.clientId(), List.of(sauna), fixture.deviceB(), "sauna-b")).isEmpty();
@@ -86,11 +89,13 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 		var plans = new VisitPackagePlanRepository(fixture.jdbc());
 
 		assertThat(plans.benefitCoverages(
-				fixture.organizationId(), List.of(localSauna), List.of(fixture.branchA(), fixture.branchB())))
+				fixture.organizationId(), List.of(consumes(localSauna)),
+				List.of(fixture.branchA(), fixture.branchB())))
 				.singleElement().satisfies(coverage -> assertThat(coverage.branchIds())
 						.containsExactly(fixture.branchA()));
 		assertThat(plans.benefitCoverages(
-				fixture.organizationId(), List.of(planCoverage), List.of(fixture.branchA(), fixture.branchB())))
+				fixture.organizationId(), List.of(consumes(planCoverage)),
+				List.of(fixture.branchA(), fixture.branchB())))
 				.singleElement().satisfies(coverage -> assertThat(coverage.branchIds())
 						.containsExactlyInAnyOrder(fixture.branchA(), fixture.branchB()));
 		var access = new AccessRepository(fixture.jdbc());
@@ -114,7 +119,8 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 				""").param("productId", membershipProductId).param("branchId", fixture.branchA())
 				.param("organizationId", fixture.organizationId()).update();
 		assertThat(plans.benefitCoverages(
-				fixture.organizationId(), List.of(planCoverage), List.of(fixture.branchA(), fixture.branchB())))
+				fixture.organizationId(), List.of(consumes(planCoverage)),
+				List.of(fixture.branchA(), fixture.branchB())))
 				.singleElement().satisfies(coverage -> assertThat(coverage.branchIds())
 						.containsExactly(fixture.branchA()));
 
@@ -127,17 +133,19 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 	@Test
 	void oneRemainingVisitAllowsExactlyOneOfTwoConcurrentRequests() throws Exception {
 		Fixture fixture = fixture(1);
-		fixture.activate(List.of());
+		UUID general = fixture.activateConsuming(List.of(fixture.branchA()));
 		var barrier = new CyclicBarrier(2);
 		var executor = Executors.newFixedThreadPool(2);
 		try {
 			var first = executor.submit(() -> {
 				barrier.await();
-				return fixture.consume(fixture.branchA(), fixture.clientId(), List.of(), fixture.deviceA(), "race-1");
+				return fixture.consume(
+						fixture.branchA(), fixture.clientId(), List.of(general), fixture.deviceA(), "race-1");
 			});
 			var second = executor.submit(() -> {
 				barrier.await();
-				return fixture.consume(fixture.branchA(), fixture.clientId(), List.of(), fixture.deviceA(), "race-2");
+				return fixture.consume(
+						fixture.branchA(), fixture.clientId(), List.of(general), fixture.deviceA(), "race-2");
 			});
 			assertThat(List.of(first.get(), second.get()).stream().filter(Optional::isPresent).count()).isEqualTo(1);
 			assertThat(fixture.remaining()).isZero();
@@ -150,7 +158,7 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 	@Test
 	void tenVisitsAcceptTenOfElevenConcurrentUniqueRequestsWithoutGoingNegative() throws Exception {
 		Fixture fixture = fixture(10);
-		fixture.activate(List.of());
+		UUID general = fixture.activateConsuming(List.of(fixture.branchA()));
 		var barrier = new CyclicBarrier(11);
 		var executor = Executors.newFixedThreadPool(11);
 		try {
@@ -160,7 +168,7 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 				futures.add(executor.submit(() -> {
 					barrier.await();
 					return fixture.consume(
-							fixture.branchA(), fixture.clientId(), List.of(), fixture.deviceA(), "burst-" + request);
+							fixture.branchA(), fixture.clientId(), List.of(general), fixture.deviceA(), "burst-" + request);
 				}));
 			}
 			long accepted = 0;
@@ -176,16 +184,16 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 	@Test
 	void idempotencyRetryDoesNotConsumeTwiceAndRejectsChangedContext() {
 		Fixture fixture = fixture(3);
-		fixture.activate(List.of());
+		UUID general = fixture.activateConsuming(List.of(fixture.branchA()));
 		var first = fixture.consume(
-				fixture.branchA(), fixture.clientId(), List.of(), fixture.deviceA(), "same-event").orElseThrow();
+				fixture.branchA(), fixture.clientId(), List.of(general), fixture.deviceA(), "same-event").orElseThrow();
 		var retry = fixture.consume(
-				fixture.branchA(), fixture.clientId(), List.of(), fixture.deviceA(), "same-event").orElseThrow();
+				fixture.branchA(), fixture.clientId(), List.of(general), fixture.deviceA(), "same-event").orElseThrow();
 
 		assertThat(retry).isEqualTo(first);
 		assertThat(fixture.remaining()).isEqualTo(2);
 		assertThatThrownBy(() -> fixture.consume(
-				fixture.branchB(), fixture.clientId(), List.of(), fixture.deviceB(), "same-event"))
+				fixture.branchB(), fixture.clientId(), List.of(general), fixture.deviceB(), "same-event"))
 				.isInstanceOfSatisfying(BusinessException.class,
 						error -> assertThat(error.code()).isEqualTo("VISIT_PACKAGE_ACCESS_KEY_REUSED"));
 	}
@@ -193,9 +201,9 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 	@Test
 	void twoBranchesShareOneBalanceAndHistoryKeepsBranchAndDevice() {
 		Fixture fixture = fixture(3);
-		fixture.activate(List.of());
-		fixture.consume(fixture.branchA(), fixture.clientId(), List.of(), fixture.deviceA(), "shared-a");
-		fixture.consume(fixture.branchB(), fixture.clientId(), List.of(), fixture.deviceB(), "shared-b");
+		UUID general = fixture.activateConsuming(List.of(fixture.branchA(), fixture.branchB()));
+		fixture.consume(fixture.branchA(), fixture.clientId(), List.of(general), fixture.deviceA(), "shared-a");
+		fixture.consume(fixture.branchB(), fixture.clientId(), List.of(general), fixture.deviceB(), "shared-b");
 
 		assertThat(fixture.remaining()).isEqualTo(1);
 		var history = fixture.repository().history(fixture.organizationId(), fixture.clientId(), 20);
@@ -207,6 +215,190 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 			assertThat(entitlement.consumptions()).extracting(consumption -> consumption.deviceName())
 					.containsExactlyInAnyOrder("Entrada A", "Entrada B");
 		});
+	}
+
+	@Test
+	void includedAccessRequiresABaseVisitAndNeverDecrementsAgain() {
+		Fixture fixture = fixture(4);
+		UUID general = fixture.insertAccessBenefit(fixture.branchA(), "GENERAL", "PLAN_COVERAGE");
+		UUID sauna = fixture.insertAccessBenefit(fixture.branchA(), "SAUNA", "LOCAL");
+		fixture.activate(List.of(
+				new BenefitCoverage(
+						general, VisitPackageBenefitUsageMode.CONSUMES_VISIT,
+						List.of(fixture.branchA(), fixture.branchB())),
+				new BenefitCoverage(
+						sauna, VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT,
+						List.of(fixture.branchA()))));
+		LocalDate date = LocalDate.of(2026, 8, 28);
+		OffsetDateTime start = OffsetDateTime.parse("2026-08-28T14:00:00Z");
+
+		VisitPackageAccessResult deniedBeforeBase = fixture.authorize(
+				fixture.branchA(), fixture.clientId(), sauna, fixture.deviceA(), "sauna-before",
+				date, start).orElseThrow();
+		assertThat(deniedBeforeBase.granted()).isFalse();
+		assertThat(deniedBeforeBase.baseConsumptionId()).isNull();
+		VisitPackageAccessResult base = fixture.authorize(
+				fixture.branchA(), fixture.clientId(), general, fixture.deviceA(), "general-centro",
+				date, start.plusMinutes(1)).orElseThrow();
+		VisitPackageAccessResult included = fixture.authorize(
+				fixture.branchA(), fixture.clientId(), sauna, fixture.deviceA(), "sauna-centro",
+				date, start.plusHours(1)).orElseThrow();
+
+		assertThat(base.usageMode()).isEqualTo(VisitPackageBenefitUsageMode.CONSUMES_VISIT);
+		assertThat(included.usageMode()).isEqualTo(VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT);
+		assertThat(included.baseConsumptionId()).isEqualTo(base.usageId());
+		assertThat(included.remainingAfter()).isEqualTo(3);
+		assertThat(fixture.remaining()).isEqualTo(3);
+		assertThat(fixture.consumptionCount()).isEqualTo(1);
+		assertThat(fixture.includedAccessCount()).isEqualTo(2);
+		assertThat(fixture.authorize(
+				fixture.branchA(), fixture.clientId(), sauna, fixture.deviceA(), "sauna-before",
+				date, start.plusHours(2))).contains(deniedBeforeBase);
+		assertThat(fixture.authorize(
+				fixture.branchA(), fixture.clientId(), sauna, fixture.deviceA(), "sauna-centro",
+				date, start.plusHours(2))).contains(included);
+		assertThat(fixture.includedAccessCount()).isEqualTo(2);
+		assertThat(fixture.authorize(
+				fixture.branchB(), fixture.clientId(), sauna, fixture.deviceB(), "sauna-tecnologica",
+				date, start.plusHours(3))).isEmpty();
+	}
+
+	@Test
+	void includedAccessDoesNotReuseABaseVisitFromAnotherDayOrBranch() {
+		Fixture fixture = fixture(5);
+		UUID general = fixture.insertAccessBenefit(fixture.branchA(), "GENERAL", "PLAN_COVERAGE");
+		UUID recovery = fixture.insertAccessBenefit(fixture.branchA(), "RECOVERY", "PLAN_COVERAGE");
+		fixture.activate(List.of(
+				new BenefitCoverage(
+						general, VisitPackageBenefitUsageMode.CONSUMES_VISIT,
+						List.of(fixture.branchA(), fixture.branchB())),
+				new BenefitCoverage(
+						recovery, VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT,
+						List.of(fixture.branchA(), fixture.branchB()))));
+		LocalDate firstDay = LocalDate.of(2026, 8, 28);
+		OffsetDateTime occurredAt = OffsetDateTime.parse("2026-08-28T14:00:00Z");
+		fixture.authorize(
+				fixture.branchA(), fixture.clientId(), general, fixture.deviceA(), "base-a",
+				firstDay, occurredAt).orElseThrow();
+
+		assertThat(fixture.authorize(
+				fixture.branchB(), fixture.clientId(), recovery, fixture.deviceB(), "included-b",
+				firstDay, occurredAt.plusHours(1))).get()
+				.extracting(VisitPackageAccessResult::granted).isEqualTo(false);
+		assertThat(fixture.authorize(
+				fixture.branchA(), fixture.clientId(), recovery, fixture.deviceA(), "included-next-day",
+				firstDay.plusDays(1), occurredAt.plusDays(1))).get()
+				.extracting(VisitPackageAccessResult::granted).isEqualTo(false);
+		assertThat(fixture.remaining()).isEqualTo(4);
+	}
+
+	@Test
+	void includedAccessDoesNotReuseABaseVisitFromAnotherEntitlement() {
+		Fixture fixture = fixture(3);
+		UUID general = fixture.insertAccessBenefit(fixture.branchA(), "GENERAL", "LOCAL");
+		UUID sauna = fixture.insertAccessBenefit(fixture.branchA(), "SAUNA", "LOCAL");
+		List<BenefitCoverage> coverages = List.of(
+				new BenefitCoverage(
+						general, VisitPackageBenefitUsageMode.CONSUMES_VISIT,
+						List.of(fixture.branchA())),
+				new BenefitCoverage(
+						sauna, VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT,
+						List.of(fixture.branchA())));
+		fixture.activate(coverages);
+		LocalDate date = LocalDate.of(2026, 8, 28);
+		OffsetDateTime occurredAt = OffsetDateTime.parse("2026-08-28T14:00:00Z");
+		fixture.authorize(
+				fixture.branchA(), fixture.clientId(), general, fixture.deviceA(), "first-entitlement-base",
+				date, occurredAt).orElseThrow();
+
+		fixture.cancelAndActivateReplacement(coverages, date, occurredAt.plusMinutes(5));
+
+		assertThat(fixture.authorize(
+				fixture.branchA(), fixture.clientId(), sauna, fixture.deviceA(), "replacement-sauna",
+				date, occurredAt.plusHours(1))).get()
+				.extracting(VisitPackageAccessResult::granted).isEqualTo(false);
+		assertThat(fixture.activeRemaining()).isEqualTo(3);
+		assertThat(fixture.consumptionCount()).isEqualTo(1);
+	}
+
+	@Test
+	void saunaCanBeTheConsumingAccessOfAnExclusivePackage() {
+		Fixture fixture = fixture(2);
+		UUID sauna = fixture.insertAccessBenefit(fixture.branchA(), "SAUNA-SESSION", "LOCAL");
+		fixture.activate(List.of(new BenefitCoverage(
+				sauna, VisitPackageBenefitUsageMode.CONSUMES_VISIT, List.of(fixture.branchA()))));
+
+		assertThat(fixture.consume(
+				fixture.branchA(), fixture.clientId(), List.of(sauna), fixture.deviceA(), "sauna-1"))
+				.get().extracting(VisitPackageAccessResult::remainingAfter).isEqualTo(1);
+		assertThat(fixture.consume(
+				fixture.branchA(), fixture.clientId(), List.of(sauna), fixture.deviceA(), "sauna-2"))
+				.get().extracting(VisitPackageAccessResult::remainingAfter).isEqualTo(0);
+		assertThat(fixture.consumptionCount()).isEqualTo(2);
+	}
+
+	@Test
+	void soldEntitlementKeepsItsUsageModeAfterCommercialConfigurationChanges() {
+		Fixture fixture = fixture(3);
+		UUID general = fixture.insertAccessBenefit(fixture.branchA(), "GENERAL", "LOCAL");
+		UUID sauna = fixture.insertAccessBenefit(fixture.branchA(), "SAUNA", "LOCAL");
+		fixture.setCommercialUsage(general, VisitPackageBenefitUsageMode.CONSUMES_VISIT);
+		fixture.setCommercialUsage(sauna, VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT);
+		fixture.activate(List.of(
+				new BenefitCoverage(
+						general, VisitPackageBenefitUsageMode.CONSUMES_VISIT, List.of(fixture.branchA())),
+				new BenefitCoverage(
+						sauna, VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT, List.of(fixture.branchA()))));
+		fixture.setCommercialUsage(sauna, VisitPackageBenefitUsageMode.CONSUMES_VISIT);
+		LocalDate date = LocalDate.of(2026, 8, 28);
+		OffsetDateTime occurredAt = OffsetDateTime.parse("2026-08-28T14:00:00Z");
+
+		fixture.authorize(
+				fixture.branchA(), fixture.clientId(), general, fixture.deviceA(), "snapshot-base",
+				date, occurredAt).orElseThrow();
+		VisitPackageAccessResult saunaUsage = fixture.authorize(
+				fixture.branchA(), fixture.clientId(), sauna, fixture.deviceA(), "snapshot-sauna",
+				date, occurredAt.plusHours(1)).orElseThrow();
+
+		assertThat(fixture.commercialUsage(sauna))
+				.isEqualTo(VisitPackageBenefitUsageMode.CONSUMES_VISIT);
+		assertThat(fixture.snapshotUsage(sauna))
+				.isEqualTo(VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT);
+		assertThat(saunaUsage.usageMode()).isEqualTo(VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT);
+		assertThat(fixture.remaining()).isEqualTo(2);
+	}
+
+	@Test
+	void idempotencyAndBalancesRemainIsolatedByOrganization() {
+		Fixture first = fixture(2);
+		Fixture second = fixture(2);
+		UUID firstGeneral = first.activateConsuming(List.of(first.branchA()));
+		UUID secondGeneral = second.activateConsuming(List.of(second.branchA()));
+
+		assertThat(first.consume(
+				first.branchA(), first.clientId(), List.of(firstGeneral), first.deviceA(), "shared-key"))
+				.isPresent();
+		assertThat(second.consume(
+				second.branchA(), second.clientId(), List.of(secondGeneral), second.deviceA(), "shared-key"))
+				.isPresent();
+		assertThat(first.remaining()).isEqualTo(1);
+		assertThat(second.remaining()).isEqualTo(1);
+		assertThat(first.repository().authorizeForAccess(
+				first.organizationId(), second.branchA(), second.clientId(), List.of(secondGeneral),
+				second.deviceA(), "cross-tenant", LocalDate.now(), OffsetDateTime.now())).isEmpty();
+	}
+
+	@Test
+	void businessDateUsesTheTimezoneOfTheRequestedBranch() {
+		Fixture fixture = fixture(1);
+		assertThat(fixture.repository().businessDate(
+				fixture.organizationId(), fixture.branchA(),
+				OffsetDateTime.parse("2026-08-29T05:30:00Z")))
+				.isEqualTo(LocalDate.of(2026, 8, 28));
+	}
+
+	private static VisitPackageBenefitUsage consumes(UUID benefitId) {
+		return new VisitPackageBenefitUsage(benefitId, VisitPackageBenefitUsageMode.CONSUMES_VISIT);
 	}
 
 	private Fixture fixture(int totalVisits) {
@@ -319,12 +511,92 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 			});
 		}
 
+		void cancelAndActivateReplacement(
+				List<BenefitCoverage> benefits, LocalDate validFrom, OffsetDateTime now
+		) {
+			jdbc.sql("""
+					UPDATE visit_package_entitlement
+					SET status='CANCELLED', updated_at=:now, version=version + 1
+					WHERE organization_id=:organizationId AND sale_id=:saleId
+					""")
+					.param("organizationId", organizationId).param("saleId", saleId)
+					.param("now", now).update();
+			UUID replacementSaleId = UUID.randomUUID();
+			jdbc.sql("""
+					INSERT INTO sale (id, organization_id, branch_id, client_id, sale_number, status,
+					 subtotal_cents, discount_cents, total_cents, paid_cents, balance_cents, currency,
+					 sold_at, created_at, updated_at, version, idempotency_key)
+					VALUES (:id, :organizationId, :branchId, :clientId, :number, 'PAID', 1000, 0,
+					 1000, 1000, 0, 'MXN', :now, :now, :now, 0, :key)
+					""")
+					.param("id", replacementSaleId).param("organizationId", organizationId)
+					.param("branchId", branchA).param("clientId", clientId)
+					.param("number", "VP-" + replacementSaleId)
+					.param("key", "sale-" + replacementSaleId).param("now", now).update();
+			transaction.executeWithoutResult(status -> {
+				repository.createPending(
+						organizationId, branchA, clientId, packagePlanId, replacementSaleId,
+						"Paquete reemplazo", totalVisits, 30, now.plusMinutes(30),
+						List.of(branchA, branchB), benefits, now);
+				repository.activateBySale(organizationId, replacementSaleId, validFrom, now);
+			});
+		}
+
+		UUID activateConsuming(List<UUID> branches) {
+			UUID general = insertAccessBenefit(branchA, "GENERAL", "PLAN_COVERAGE");
+			activate(List.of(new BenefitCoverage(
+					general, VisitPackageBenefitUsageMode.CONSUMES_VISIT, branches)));
+			return general;
+		}
+
+		void setCommercialUsage(UUID benefitId, VisitPackageBenefitUsageMode usageMode) {
+			jdbc.sql("""
+					INSERT INTO visit_package_plan_benefit
+					    (visit_package_plan_id, benefit_id, organization_id, usage_mode, created_at)
+					VALUES (:planId, :benefitId, :organizationId, :usageMode, now())
+					ON CONFLICT (visit_package_plan_id, benefit_id)
+					DO UPDATE SET usage_mode=EXCLUDED.usage_mode
+					""")
+					.param("planId", packagePlanId).param("benefitId", benefitId)
+					.param("organizationId", organizationId).param("usageMode", usageMode.name())
+					.update();
+		}
+
+		VisitPackageBenefitUsageMode commercialUsage(UUID benefitId) {
+			return VisitPackageBenefitUsageMode.valueOf(jdbc.sql("""
+					SELECT usage_mode FROM visit_package_plan_benefit
+					WHERE organization_id=:organizationId
+					  AND visit_package_plan_id=:planId AND benefit_id=:benefitId
+					""")
+					.param("organizationId", organizationId).param("planId", packagePlanId)
+					.param("benefitId", benefitId).query(String.class).single());
+		}
+
+		VisitPackageBenefitUsageMode snapshotUsage(UUID benefitId) {
+			return VisitPackageBenefitUsageMode.valueOf(jdbc.sql("""
+					SELECT usage_mode FROM visit_package_entitlement_benefit_branch
+					WHERE organization_id=:organizationId AND benefit_id=:benefitId
+					ORDER BY created_at DESC LIMIT 1
+					""")
+					.param("organizationId", organizationId).param("benefitId", benefitId)
+					.query(String.class).single());
+		}
+
 		Optional<VisitPackageAccessResult> consume(
 				UUID branchId, UUID targetClientId, List<UUID> benefits, UUID deviceId, String key
 		) {
-			return transaction.execute(status -> repository.consumeForAccess(
+			return transaction.execute(status -> repository.authorizeForAccess(
 					organizationId, branchId, targetClientId, benefits, deviceId, key,
 					LocalDate.now(), OffsetDateTime.now()));
+		}
+
+		Optional<VisitPackageAccessResult> authorize(
+				UUID branchId, UUID targetClientId, UUID benefitId, UUID deviceId, String key,
+				LocalDate businessDate, OffsetDateTime occurredAt
+		) {
+			return transaction.execute(status -> repository.authorizeForAccess(
+					organizationId, branchId, targetClientId, List.of(benefitId), deviceId, key,
+					businessDate, occurredAt));
 		}
 
 		int remaining() {
@@ -332,8 +604,22 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 					.param("saleId", saleId).query(Integer.class).single();
 		}
 
+		int activeRemaining() {
+			return jdbc.sql("""
+					SELECT remaining_visits FROM visit_package_entitlement
+					WHERE organization_id=:organizationId AND client_id=:clientId AND status='ACTIVE'
+					""")
+					.param("organizationId", organizationId).param("clientId", clientId)
+					.query(Integer.class).single();
+		}
+
 		int consumptionCount() {
 			return jdbc.sql("SELECT COUNT(*) FROM visit_package_consumption WHERE organization_id=:organizationId")
+					.param("organizationId", organizationId).query(Integer.class).single();
+		}
+
+		int includedAccessCount() {
+			return jdbc.sql("SELECT COUNT(*) FROM visit_package_included_access WHERE organization_id=:organizationId")
 					.param("organizationId", organizationId).query(Integer.class).single();
 		}
 	}

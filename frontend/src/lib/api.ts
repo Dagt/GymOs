@@ -88,6 +88,8 @@ export type {
   ProductSearchParams,
   ProductVariantBatchPayload,
   UpdateMembershipPlanPayload,
+  VisitPackageBenefitUsage,
+  VisitPackageBenefitUsageMode,
   VisitPackagePlanPayload,
   VisitPackagePlanSummary,
 } from "./api/catalog-types";

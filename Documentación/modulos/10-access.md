@@ -383,18 +383,29 @@ abrir el torniquete. Faltan obligatoriamente:
 
 ## 14. Paquetes de visitas multi-sucursal
 
-V98–V100 implementan un entitlement con saldo compartido y un ledger idempotente
-por evento. La decisión vigente evalúa primero membresía y sólo después paquete; una
-concesión por membresía nunca resta visitas. El consumo requiere estado
-`ACTIVE`, vigencia, saldo y una combinación exacta sucursal–beneficio compatible
-y cambia a
-`CONSUMED` al llegar a cero en la misma transacción.
+V98–V101 implementan un entitlement con saldo compartido, snapshot de modo y
+ledgers idempotentes por evento. La decisión evalúa primero membresía y sólo
+después paquete; una concesión por membresía nunca resta visitas. Un acceso
+`CONSUMES_VISIT` requiere estado `ACTIVE`, vigencia y saldo, descuenta una unidad
+y cambia a `CONSUMED` al llegar a cero en la misma transacción.
+
+Un acceso `INCLUDED_WITH_VISIT` exige un consumo `CONSUMES_VISIT` exitoso del
+mismo entitlement, misma `business_date` de la sucursal y misma sucursal. Se
+registra en `visit_package_included_access`, referencia el consumo base y nunca
+reduce saldo. Si la membresía concedió General y por ello el paquete no fue
+consumido, ese paquete no habilita después un acceso incluido: es la regla V1
+estricta y evita mezclar productos.
+
+El mismo ledger conserva una evaluación `DENIED` cuando falta la visita base.
+La llave idempotente se vincula al `access_log`, de modo que repetir exactamente
+el mismo evento después de entrar por General no transforma retroactivamente
+esa denegación en una concesión.
 
 `visit_package_entitlement_benefit_branch` evita que dos snapshots separados se
 recombinen: paquete A+B y Sauna `LOCAL` de A no autoriza Sauna en B. El saldo
 sigue siendo único y puede gastarse en B mediante otro acceso válido allí. La
-configuración exige precisamente ese otro acceso; no permite seleccionar B si
-la unión de accesos elegidos sólo cubre A.
+configuración exige precisamente otro acceso `CONSUMES_VISIT`; no permite
+seleccionar B si sólo existen accesos incluidos o locales de A.
 
 La API manual histórica `visit_pass` queda para lectura mientras se regularizan
 datos. Sus operaciones de alta y consumo rechazan nuevas escrituras con

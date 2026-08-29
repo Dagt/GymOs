@@ -9,6 +9,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.gymos.audit.api.AuditService;
+import com.gymos.catalog.api.VisitPackageBenefitUsage;
+import com.gymos.catalog.api.VisitPackageBenefitUsageMode;
 import com.gymos.catalog.application.command.CreateVisitPackagePlanCommand;
 import com.gymos.catalog.application.port.CatalogProductCommandPort;
 import com.gymos.catalog.application.port.CatalogProductCommandPort.ProductMutation;
@@ -38,21 +40,23 @@ class VisitPackagePlanServiceTests {
 		UUID branchA = UUID.randomUUID();
 		UUID branchB = UUID.randomUUID();
 		UUID benefitId = UUID.randomUUID();
+		VisitPackageBenefitUsage benefit = consumes(benefitId);
 		GymOsPrincipal principal = principal(organizationId, branchA);
 		when(products.findBySku(organizationId, "10-VISITAS")).thenReturn(Optional.empty());
 		when(packages.activeBranchIds(organizationId)).thenReturn(List.of(branchA, branchB));
 		when(packages.branchesExist(organizationId, List.of(branchA, branchB))).thenReturn(true);
 		when(packages.accessBenefitsExist(organizationId, List.of(benefitId))).thenReturn(true);
-		when(packages.benefitCoverages(organizationId, List.of(benefitId), List.of(branchA, branchB)))
-				.thenReturn(List.of(new BenefitCoverage(benefitId, List.of(branchA, branchB))));
+		when(packages.benefitCoverages(organizationId, List.of(benefit), List.of(branchA, branchB)))
+				.thenReturn(List.of(new BenefitCoverage(
+						benefitId, VisitPackageBenefitUsageMode.CONSUMES_VISIT, List.of(branchA, branchB))));
 		when(packages.find(any(), any())).thenAnswer(invocation -> Optional.of(new VisitPackagePlanView(
 				invocation.getArgument(1), UUID.randomUUID(), "10-VISITAS", "10 visitas", null,
-				90000, "MXN", 10, 45, "ALL_BRANCHES", List.of(), List.of(benefitId),
+				90000, "MXN", 10, 45, "ALL_BRANCHES", List.of(), List.of(benefit),
 				true, "WAIVED", "ACTIVE", 0, OffsetDateTime.now(), OffsetDateTime.now())));
 
 		VisitPackagePlanView result = service.create(principal, new CreateVisitPackagePlanCommand(
 				"10-visitas", "10 visitas", null, 90000, "mxn", 10, 45, "ALL_BRANCHES",
-				List.of(), List.of(benefitId), true, "WAIVED", "ACTIVE"), "correlation");
+				List.of(), List.of(benefit), true, "WAIVED", "ACTIVE"), "correlation");
 
 		assertThat(result.sku()).isEqualTo("10-VISITAS");
 		ArgumentCaptor<ProductMutation> mutation = ArgumentCaptor.forClass(ProductMutation.class);
@@ -62,7 +66,7 @@ class VisitPackagePlanServiceTests {
 		verify(productCommands).attachBranch(organizationId, branchA, mutation.getValue().productId(), principal.userId(), mutation.getValue().now());
 		verify(productCommands).attachBranch(organizationId, branchB, mutation.getValue().productId(), principal.userId(), mutation.getValue().now());
 		verify(packages).replaceBranches(organizationId, result.id(), List.of(), principal.userId());
-		verify(packages).replaceBenefits(organizationId, result.id(), List.of(benefitId), principal.userId());
+		verify(packages).replaceBenefits(organizationId, result.id(), List.of(benefit), principal.userId());
 	}
 
 	@Test
@@ -81,7 +85,7 @@ class VisitPackagePlanServiceTests {
 		assertThatThrownBy(() -> service.create(principal(organizationId, branchId),
 				new CreateVisitPackagePlanCommand(
 						"5-VISITAS", "5 visitas", null, 50000, "MXN", 5, 30,
-						"SELECTED_BRANCHES", List.of(branchId), List.of(benefitId), true, "DEFAULT", "ACTIVE"),
+						"SELECTED_BRANCHES", List.of(branchId), List.of(consumes(benefitId)), true, "DEFAULT", "ACTIVE"),
 				"correlation"))
 				.isInstanceOf(BusinessException.class)
 				.hasMessageContaining("acceso activo");
@@ -103,7 +107,7 @@ class VisitPackagePlanServiceTests {
 		assertThatThrownBy(() -> service.create(principal(organizationId, activeBranch),
 				new CreateVisitPackagePlanCommand(
 						"5-VISITAS", "5 visitas", null, 50000, "MXN", 5, 30,
-						"SELECTED_BRANCHES", List.of(oppositeBranch), List.of(benefitId),
+						"SELECTED_BRANCHES", List.of(oppositeBranch), List.of(consumes(benefitId)),
 						true, "DEFAULT", "ACTIVE"), "correlation"))
 				.isInstanceOfSatisfying(BusinessException.class,
 						error -> assertThat(error.code()).isEqualTo("VISIT_PACKAGE_ACTIVE_BRANCH_REQUIRED"));
@@ -121,13 +125,15 @@ class VisitPackagePlanServiceTests {
 		UUID benefitId = UUID.randomUUID();
 		when(packages.branchesExist(organizationId, List.of(activeBranch))).thenReturn(true);
 		when(packages.accessBenefitsExist(organizationId, List.of(benefitId))).thenReturn(true);
-		when(packages.benefitCoverages(organizationId, List.of(benefitId), List.of(activeBranch)))
-				.thenReturn(List.of(new BenefitCoverage(benefitId, List.of())));
+		VisitPackageBenefitUsage benefit = consumes(benefitId);
+		when(packages.benefitCoverages(organizationId, List.of(benefit), List.of(activeBranch)))
+				.thenReturn(List.of(new BenefitCoverage(
+						benefitId, VisitPackageBenefitUsageMode.CONSUMES_VISIT, List.of())));
 
 		assertThatThrownBy(() -> service.create(principal(organizationId, activeBranch),
 				new CreateVisitPackagePlanCommand(
 						"5-VISITAS", "5 visitas", null, 50000, "MXN", 5, 30,
-						"SELECTED_BRANCHES", List.of(activeBranch), List.of(benefitId),
+						"SELECTED_BRANCHES", List.of(activeBranch), List.of(benefit),
 						true, "DEFAULT", "ACTIVE"), "correlation"))
 				.isInstanceOfSatisfying(BusinessException.class,
 						error -> assertThat(error.code()).isEqualTo("VISIT_PACKAGE_BENEFIT_OUTSIDE_SCOPE"));
@@ -146,18 +152,90 @@ class VisitPackagePlanServiceTests {
 		UUID localAccess = UUID.randomUUID();
 		when(packages.branchesExist(organizationId, List.of(activeBranch, secondBranch))).thenReturn(true);
 		when(packages.accessBenefitsExist(organizationId, List.of(localAccess))).thenReturn(true);
+		VisitPackageBenefitUsage benefit = consumes(localAccess);
 		when(packages.benefitCoverages(
-				organizationId, List.of(localAccess), List.of(activeBranch, secondBranch)))
-				.thenReturn(List.of(new BenefitCoverage(localAccess, List.of(activeBranch))));
+				organizationId, List.of(benefit), List.of(activeBranch, secondBranch)))
+				.thenReturn(List.of(new BenefitCoverage(
+						localAccess, VisitPackageBenefitUsageMode.CONSUMES_VISIT, List.of(activeBranch))));
 
 		assertThatThrownBy(() -> service.create(principal(organizationId, activeBranch),
 				new CreateVisitPackagePlanCommand(
 						"5-VISITAS", "5 visitas", null, 50000, "MXN", 5, 30,
-						"SELECTED_BRANCHES", List.of(activeBranch, secondBranch), List.of(localAccess),
+						"SELECTED_BRANCHES", List.of(activeBranch, secondBranch), List.of(benefit),
 						true, "DEFAULT", "ACTIVE"), "correlation"))
 				.isInstanceOfSatisfying(BusinessException.class,
 						error -> assertThat(error.code()).isEqualTo("VISIT_PACKAGE_BRANCH_WITHOUT_ACCESS"));
 		verify(productCommands, never()).create(any());
+	}
+
+	@Test
+	void acceptsIncludedAccessWhenEveryBranchStillHasAConsumingAccess() {
+		CatalogProductQueryPort products = mock(CatalogProductQueryPort.class);
+		CatalogProductCommandPort productCommands = mock(CatalogProductCommandPort.class);
+		VisitPackagePlanPort packages = mock(VisitPackagePlanPort.class);
+		VisitPackagePlanService service = new VisitPackagePlanService(
+				products, productCommands, packages, mock(AuditService.class));
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		UUID generalId = UUID.randomUUID();
+		UUID saunaId = UUID.randomUUID();
+		GymOsPrincipal principal = principal(organizationId, branchId);
+		VisitPackageBenefitUsage general = consumes(generalId);
+		VisitPackageBenefitUsage sauna = included(saunaId);
+		when(products.findBySku(organizationId, "10-VISITAS-SAUNA")).thenReturn(Optional.empty());
+		when(packages.branchesExist(organizationId, List.of(branchId))).thenReturn(true);
+		when(packages.accessBenefitsExist(organizationId, List.of(generalId, saunaId))).thenReturn(true);
+		when(packages.benefitCoverages(organizationId, List.of(general, sauna), List.of(branchId)))
+				.thenReturn(List.of(
+						new BenefitCoverage(generalId, VisitPackageBenefitUsageMode.CONSUMES_VISIT, List.of(branchId)),
+						new BenefitCoverage(saunaId, VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT, List.of(branchId))));
+		when(packages.find(any(), any())).thenAnswer(invocation -> Optional.of(new VisitPackagePlanView(
+				invocation.getArgument(1), UUID.randomUUID(), "10-VISITAS-SAUNA", "10 visitas + Sauna", null,
+				90000, "MXN", 10, 30, "SELECTED_BRANCHES", List.of(branchId), List.of(general, sauna),
+				true, "DEFAULT", "ACTIVE", 0, OffsetDateTime.now(), OffsetDateTime.now())));
+
+		VisitPackagePlanView created = service.create(
+				principal,
+				new CreateVisitPackagePlanCommand(
+						"10-VISITAS-SAUNA", "10 visitas + Sauna", null, 90000, "MXN", 10, 30,
+						"SELECTED_BRANCHES", List.of(branchId), List.of(general, sauna),
+						true, "DEFAULT", "ACTIVE"),
+				"correlation");
+
+		verify(packages).replaceBenefits(
+				organizationId, created.id(), List.of(general, sauna), principal.userId());
+	}
+
+	@Test
+	void rejectsAPackageMadeOnlyOfIncludedAccesses() {
+		CatalogProductCommandPort productCommands = mock(CatalogProductCommandPort.class);
+		VisitPackagePlanPort packages = mock(VisitPackagePlanPort.class);
+		VisitPackagePlanService service = new VisitPackagePlanService(
+				mock(CatalogProductQueryPort.class), productCommands, packages, mock(AuditService.class));
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		UUID saunaId = UUID.randomUUID();
+		when(packages.branchesExist(organizationId, List.of(branchId))).thenReturn(true);
+		when(packages.accessBenefitsExist(organizationId, List.of(saunaId))).thenReturn(true);
+
+		assertThatThrownBy(() -> service.create(
+				principal(organizationId, branchId),
+				new CreateVisitPackagePlanCommand(
+						"SAUNA-INCLUIDO", "Sauna incluido", null, 50000, "MXN", 5, 30,
+						"SELECTED_BRANCHES", List.of(branchId), List.of(included(saunaId)),
+						true, "DEFAULT", "ACTIVE"),
+				"correlation"))
+				.isInstanceOfSatisfying(BusinessException.class,
+						error -> assertThat(error.code()).isEqualTo("VISIT_PACKAGE_CONSUMING_BENEFIT_REQUIRED"));
+		verify(productCommands, never()).create(any());
+	}
+
+	private VisitPackageBenefitUsage consumes(UUID benefitId) {
+		return new VisitPackageBenefitUsage(benefitId, VisitPackageBenefitUsageMode.CONSUMES_VISIT);
+	}
+
+	private VisitPackageBenefitUsage included(UUID benefitId) {
+		return new VisitPackageBenefitUsage(benefitId, VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT);
 	}
 
 	private GymOsPrincipal principal(UUID organizationId, UUID branchId) {

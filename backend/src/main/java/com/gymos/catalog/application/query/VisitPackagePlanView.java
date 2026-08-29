@@ -1,5 +1,7 @@
 package com.gymos.catalog.application.query;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.gymos.catalog.api.VisitPackageBenefitUsage;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -16,7 +18,7 @@ public record VisitPackagePlanView(
 		int validityDays,
 		String branchScope,
 		List<UUID> branchIds,
-		List<UUID> benefitIds,
+		List<VisitPackageBenefitUsage> benefits,
 		boolean selfServiceAcquisitionEnabled,
 		String registrationFeePolicy,
 		String status,
@@ -26,6 +28,11 @@ public record VisitPackagePlanView(
 ) {
 	public VisitPackagePlanView {
 		branchIds = branchIds == null ? List.of() : List.copyOf(branchIds);
-		benefitIds = benefitIds == null ? List.of() : List.copyOf(benefitIds);
+		benefits = benefits == null ? List.of() : List.copyOf(benefits);
+	}
+
+	@JsonProperty("benefitIds")
+	public List<UUID> benefitIds() {
+		return benefits.stream().map(VisitPackageBenefitUsage::benefitId).toList();
 	}
 }

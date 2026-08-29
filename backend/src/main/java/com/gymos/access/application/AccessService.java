@@ -514,36 +514,48 @@ public class AccessService {
 				request.idempotencyKey() == null || request.idempotencyKey().isBlank()
 						? safeCorrelationId(correlationId)
 						: request.idempotencyKey().trim());
-		Optional<VisitPackageAccessResult> packageAccess = visitPackages.consumeForAccess(
+		Optional<VisitPackageAccessResult> packageAccess = visitPackages.authorizeForAccess(
 				principal.organizationId(), principal.branchId(), client.id(), requiredBenefitIds,
-				device.id(), visitIdempotencyKey, BusinessTime.today(), now);
+				device.id(), visitIdempotencyKey, now);
+		VisitPackageAccessResult deniedPackageUsage = null;
 		if (packageAccess.isPresent()) {
-			VisitPackageAccessResult consumed = packageAccess.get();
-			if (!consumed.clientId().equals(client.id())
-					|| !consumed.branchId().equals(principal.branchId())
-					|| !consumed.accessDeviceId().equals(device.id())) {
+			VisitPackageAccessResult packageUsage = packageAccess.get();
+			if (!packageUsage.clientId().equals(client.id())
+					|| !packageUsage.branchId().equals(principal.branchId())
+					|| !java.util.Objects.equals(packageUsage.accessDeviceId(), device.id())) {
 				throw new BusinessException(
 						"ACCESS_IDEMPOTENCY_KEY_REUSED",
 						"La llave de acceso ya corresponde a otro evento.");
 			}
-			if (consumed.accessLogId() != null) {
-				return accessRepository.decision(consumed.accessLogId())
+			if (packageUsage.accessLogId() != null) {
+				return accessRepository.decision(packageUsage.accessLogId())
 						.orElseThrow(() -> new BusinessException(
 								"ACCESS_LOG_NOT_FOUND", "No fue posible recuperar la decisión de acceso."));
 			}
-			AccessDecisionResponse decision = recordDecision(
-					principal, device, client, null, null, "VISIT_PACKAGE", "GRANTED", "RECEPTION",
-					"Paquete " + consumed.packageName() + ": " + consumed.remainingAfter()
-							+ " visita(s) restante(s).",
-					now, correlationId);
-			visitPackages.linkAccessLog(principal.organizationId(), consumed.consumptionId(), decision.logId());
-			return decision;
+			if (!packageUsage.granted()) {
+				deniedPackageUsage = packageUsage;
+			} else {
+				String packageAccessType = packageUsage.consumedVisit()
+					? "VISIT_PACKAGE" : "VISIT_PACKAGE_INCLUDED";
+				String packageReason = packageUsage.consumedVisit()
+					? "Paquete " + packageUsage.packageName() + ": " + packageUsage.remainingAfter()
+							+ " visita(s) restante(s)."
+					: "Acceso incluido en la visita registrada hoy en esta sucursal. Saldo: "
+							+ packageUsage.remainingAfter() + ".";
+				return recordPackageAwareDecision(
+						principal, device, client, null, null, packageAccessType, "GRANTED",
+						packageReason, now, correlationId, packageUsage);
+			}
 		}
 
 		if (eligibility.reason() == Reason.BENEFIT_NOT_GRANTED) {
-			return recordDecision(principal, device, client, membership.id(), null, "BENEFIT_CHECK",
-					"DENIED", "RECEPTION", "El plan no incluye el acceso requerido por el dispositivo.",
-					now, correlationId);
+			return recordPackageAwareDecision(
+					principal, device, client, membership.id(), null,
+					deniedPackageUsage == null ? "BENEFIT_CHECK" : "VISIT_PACKAGE_INCLUDED", "DENIED",
+					deniedPackageUsage == null
+							? "El plan no incluye el acceso requerido por el dispositivo."
+							: "Este acceso incluido requiere una visita del mismo paquete registrada hoy en esta sucursal.",
+					now, correlationId, deniedPackageUsage);
 		}
 
 		TemporaryPassRecord pass = accessRepository.validTemporaryPass(principal.organizationId(), principal.branchId(), client.id(), now)
@@ -552,13 +564,40 @@ public class AccessService {
 			boolean consumed = accessRepository.consumeTemporaryPass(
 					principal.organizationId(), principal.branchId(), pass.id(), now);
 			if (!consumed) {
-				return recordDecision(principal, device, client, null, pass.id(), "TEMPORARY_PASS", "DENIED",
-						"RECEPTION", "La autorizacion temporal ya fue consumida o vencio.", now, correlationId);
+				return recordPackageAwareDecision(
+						principal, device, client, null, pass.id(), "TEMPORARY_PASS", "DENIED",
+						"La autorizacion temporal ya fue consumida o vencio.", now, correlationId,
+						deniedPackageUsage);
 			}
-			return recordDecision(principal, device, client, null, pass.id(), "TEMPORARY_PASS", "GRANTED", "RECEPTION", "Autorizacion temporal vigente.", now, correlationId);
+			return recordPackageAwareDecision(
+					principal, device, client, null, pass.id(), "TEMPORARY_PASS", "GRANTED",
+					"Autorizacion temporal vigente.", now, correlationId, deniedPackageUsage);
 		}
 
-		return recordDecision(principal, device, client, null, null, "MEMBERSHIP_CHECK", "DENIED", "RECEPTION", "Sin membresia activa ni pase temporal vigente.", now, correlationId);
+		return recordPackageAwareDecision(
+				principal, device, client, null, null,
+				deniedPackageUsage == null ? "MEMBERSHIP_CHECK" : "VISIT_PACKAGE_INCLUDED", "DENIED",
+				deniedPackageUsage == null
+						? "Sin membresia activa ni pase temporal vigente."
+						: "Este acceso incluido requiere una visita del mismo paquete registrada hoy en esta sucursal.",
+				now, correlationId, deniedPackageUsage);
+	}
+
+	private AccessDecisionResponse recordPackageAwareDecision(
+			GymOsPrincipal principal, AccessDeviceRecord device, ClientAccessRecord client,
+			UUID membershipId, UUID temporaryPassId, String accessType, String decision,
+			String reason, OffsetDateTime occurredAt, String correlationId,
+			VisitPackageAccessResult packageUsage
+	) {
+		AccessDecisionResponse response = recordDecision(
+				principal, device, client, membershipId, temporaryPassId, accessType, decision,
+				"RECEPTION", reason, occurredAt, correlationId);
+		if (packageUsage != null) {
+			visitPackages.linkAccessLog(
+					principal.organizationId(), packageUsage.usageId(), packageUsage.usageMode(),
+					response.logId());
+		}
+		return response;
 	}
 
 	@Transactional

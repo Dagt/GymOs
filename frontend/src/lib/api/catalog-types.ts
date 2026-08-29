@@ -102,6 +102,13 @@ export type PlanSummary = {
   updatedAt: string;
 };
 
+export type VisitPackageBenefitUsageMode = "CONSUMES_VISIT" | "INCLUDED_WITH_VISIT";
+
+export type VisitPackageBenefitUsage = {
+  benefitId: string;
+  usageMode: VisitPackageBenefitUsageMode;
+};
+
 export type VisitPackagePlanSummary = {
   id: string;
   productId: string;
@@ -115,6 +122,7 @@ export type VisitPackagePlanSummary = {
   branchScope: "ALL_BRANCHES" | "SELECTED_BRANCHES";
   branchIds: string[];
   benefitIds: string[];
+  benefits: VisitPackageBenefitUsage[];
   selfServiceAcquisitionEnabled: boolean;
   registrationFeePolicy: "DEFAULT" | "WAIVED";
   status: "ACTIVE" | "INACTIVE";
@@ -133,7 +141,7 @@ export type VisitPackagePlanPayload = {
   validityDays: number;
   branchScope: "ALL_BRANCHES" | "SELECTED_BRANCHES";
   branchIds: string[];
-  benefitIds: string[];
+  benefits: VisitPackageBenefitUsage[];
   selfServiceAcquisitionEnabled: boolean;
   registrationFeePolicy: "DEFAULT" | "WAIVED";
   status: "ACTIVE" | "INACTIVE";

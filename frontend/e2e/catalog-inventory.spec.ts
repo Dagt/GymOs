@@ -167,24 +167,34 @@ test.describe("catalogo e inventario", () => {
     await expect(page.getByText("Sucursal activa · siempre incluida", { exact: true })).toBeVisible();
     await expect(page.getByRole("checkbox", { name: /^Norte / })).toBeDisabled();
     await expect(page.getByText("No hay accesos configurados para paquetes en esta sucursal", { exact: true })).toBeVisible();
-    await expect(page.getByText("Descuenta visitas en: Centro", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Disponible en: Centro", { exact: true }).first()).toBeVisible();
     await expect(page.getByText(/El paquete no amplía un acceso/)).toBeVisible();
 
     await page.getByRole("checkbox", { name: /Tecnológica/ }).check();
-    await expect(page.getByText("Descuenta visitas en: Centro · No disponible en: Tecnológica", { exact: true })).toBeVisible();
-    await expect(page.getByText("Descuenta visitas en: Centro, Tecnológica", { exact: true })).toBeVisible();
+    await expect(page.getByText("Disponible en: Centro · No disponible en: Tecnológica", { exact: true })).toBeVisible();
+    await expect(page.getByText("Disponible en: Centro, Tecnológica", { exact: true })).toBeVisible();
     await page.getByRole("checkbox", { name: /Acceso general/ }).check();
     await page.getByRole("checkbox", { name: /Sauna/ }).check();
+    await page.getByLabel("Modo para Acceso general").selectOption("INCLUDED_WITH_VISIT");
+    await page.getByLabel("Modo para Sauna").selectOption("INCLUDED_WITH_VISIT");
     await page.getByLabel("Código").fill("VISITA-SAUNA");
     await page.getByLabel("Nombre").fill("Visitas con sauna");
     await page.getByLabel("Precio").fill("1300");
+    await page.getByRole("button", { name: "Crear paquete" }).click();
+    await expect(page.getByText("Selecciona al menos un acceso que consuma una visita.", { exact: true })).toBeVisible();
+    expect(createPayload).toBeNull();
+
+    await page.getByLabel("Modo para Acceso general").selectOption("CONSUMES_VISIT");
     await page.getByRole("button", { name: "Crear paquete" }).click();
 
     await expect.poll(() => createPayload).not.toBeNull();
     expect(createPayload).toMatchObject({
       branchScope: "SELECTED_BRANCHES",
       branchIds: [branchA, branchB],
-      benefitIds: [generalAccess, sauna],
+      benefits: [
+        { benefitId: generalAccess, usageMode: "CONSUMES_VISIT" },
+        { benefitId: sauna, usageMode: "INCLUDED_WITH_VISIT" },
+      ],
     });
   });
 

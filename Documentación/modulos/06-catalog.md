@@ -72,8 +72,10 @@ Contrato y límites: [paginación de listados](../../docs/operations/list-pagina
   incluida: desde A puede configurarse A o A+B, no exclusivamente B.
 - Los accesos no amplían esa cobertura. Cada beneficio conserva `LOCAL` o
   `PLAN_COVERAGE` y la compra toma el snapshot de su intersección con las sedes
-  del paquete. Todas las sedes elegidas deben quedar cubiertas por al menos un
-  acceso; no puede guardarse una sede donde el paquete sería inoperante.
+  del paquete. La relación comercial además define `CONSUMES_VISIT` o
+  `INCLUDED_WITH_VISIT`; no se modifica el Benefit. Todas las sedes elegidas
+  deben quedar cubiertas por al menos un acceso que consuma una visita; no puede
+  guardarse una sede donde el paquete sería incapaz de originar su visita base.
 - Planes y paquetes muestran “Mostrar para contratar en kiosco” y
   “Inscripción: configuración general / no cobrar”. Son políticas independientes
   por oferta; Recepción conserva acceso a las ofertas ocultas.

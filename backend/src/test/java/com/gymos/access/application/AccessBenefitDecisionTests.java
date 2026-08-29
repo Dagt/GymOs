@@ -18,6 +18,7 @@ import com.gymos.access.infrastructure.AccessRepository.AccessDeviceRecord;
 import com.gymos.access.infrastructure.AccessRepository.ClientAccessRecord;
 import com.gymos.access.infrastructure.PhysicalAccessRepository;
 import com.gymos.audit.api.AuditService;
+import com.gymos.catalog.api.VisitPackageBenefitUsageMode;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.eligibility.api.EligibilityPolicy;
 import com.gymos.eligibility.api.EligibilityPolicy.ActiveMembership;
@@ -72,7 +73,7 @@ class AccessBenefitDecisionTests {
 				principal, new AccessRequestCommand(clientId, null, null, "membership-first"),
 				correlationId.toString()).accessType()).isEqualTo("MEMBERSHIP_CHECK");
 
-		verify(visitPackages, never()).consumeForAccess(any(), any(), any(), any(), any(), any(), any(), any());
+		verify(visitPackages, never()).authorizeForAccess(any(), any(), any(), any(), any(), any(), any());
 	}
 
 	@Test
@@ -96,8 +97,8 @@ class AccessBenefitDecisionTests {
 				deviceId, "Entrada", "MAIN", "TURNSTILE", "ACTIVE", "SIMULATED", null);
 		ClientAccessRecord client = new ClientAccessRecord(clientId, "Socio", null, null, "ACTIVE");
 		VisitPackageAccessResult consumption = new VisitPackageAccessResult(
-				consumptionId, UUID.randomUUID(), clientId, branchId, deviceId,
-				"10 visitas", 8, null);
+				consumptionId, consumptionId, benefitId, VisitPackageBenefitUsageMode.CONSUMES_VISIT,
+				UUID.randomUUID(), clientId, branchId, deviceId, "10 visitas", 8, true, null);
 		AccessDecisionResponse granted = new AccessDecisionResponse(
 				logId, "GRANTED", "VISIT_PACKAGE", "8 restantes", "SIMULATED_OPEN", OffsetDateTime.now(),
 				device.name(), device.deviceCode(), clientId, client.fullName(), null, null, null);
@@ -107,9 +108,9 @@ class AccessBenefitDecisionTests {
 				.thenReturn(List.of(benefitId));
 		when(eligibilityPolicy.evaluate(any())).thenReturn(
 				new EligibilityDecision(false, Reason.ACTIVE_MEMBERSHIP_REQUIRED, null, List.of()));
-		when(visitPackages.consumeForAccess(
+		when(visitPackages.authorizeForAccess(
 				eq(organizationId), eq(branchId), eq(clientId), eq(List.of(benefitId)), eq(deviceId),
-				eq("access:visit-1"), any(), any())).thenReturn(Optional.of(consumption));
+				eq("access:visit-1"), any())).thenReturn(Optional.of(consumption));
 		when(repository.createAccessLog(
 				eq(organizationId), eq(branchId), eq(deviceId), eq(clientId), eq(null), eq(null),
 				eq("VISIT_PACKAGE"), eq("GRANTED"), eq("RECEPTION"), any(), eq("SIMULATED_OPEN"),
@@ -120,7 +121,110 @@ class AccessBenefitDecisionTests {
 				principal, new AccessRequestCommand(clientId, null, null, "visit-1"),
 				correlationId.toString()).accessType()).isEqualTo("VISIT_PACKAGE");
 
-		verify(visitPackages).linkAccessLog(organizationId, consumptionId, logId);
+		verify(visitPackages).linkAccessLog(
+				organizationId, consumptionId, VisitPackageBenefitUsageMode.CONSUMES_VISIT, logId);
+	}
+
+	@Test
+	void grantsIncludedPackageAccessWithoutReportingAnotherConsumption() {
+		AccessRepository repository = mock(AccessRepository.class);
+		EligibilityPolicy eligibilityPolicy = mock(EligibilityPolicy.class);
+		VisitPackageAccessOperations visitPackages = mock(VisitPackageAccessOperations.class);
+		AccessService service = service(repository, mock(AuditService.class), eligibilityPolicy, visitPackages);
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		UUID userId = UUID.randomUUID();
+		UUID clientId = UUID.randomUUID();
+		UUID deviceId = UUID.randomUUID();
+		UUID saunaId = UUID.randomUUID();
+		UUID includedUsageId = UUID.randomUUID();
+		UUID baseConsumptionId = UUID.randomUUID();
+		UUID logId = UUID.randomUUID();
+		UUID correlationId = UUID.randomUUID();
+		GymOsPrincipal principal = new GymOsPrincipal(
+				userId, organizationId, branchId, "reception@gymos.local", "Recepcion", Set.of());
+		AccessDeviceRecord device = new AccessDeviceRecord(
+				deviceId, "Sauna", "SAUNA", "ZONE", "ACTIVE", "SIMULATED", null);
+		ClientAccessRecord client = new ClientAccessRecord(clientId, "Socio", null, null, "ACTIVE");
+		VisitPackageAccessResult includedUsage = new VisitPackageAccessResult(
+				includedUsageId, baseConsumptionId, saunaId,
+				VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT, UUID.randomUUID(), clientId,
+				branchId, deviceId, "10 visitas + Sauna", 9, true, null);
+		AccessDecisionResponse granted = new AccessDecisionResponse(
+				logId, "GRANTED", "VISIT_PACKAGE_INCLUDED", "Saldo 9", "SIMULATED_OPEN",
+				OffsetDateTime.now(), device.name(), device.deviceCode(), clientId, client.fullName(),
+				null, null, null);
+		when(repository.defaultDevice(organizationId, branchId)).thenReturn(Optional.of(device));
+		when(repository.clientById(organizationId, branchId, clientId)).thenReturn(Optional.of(client));
+		when(repository.deviceRequiredBenefitIds(organizationId, branchId, deviceId))
+				.thenReturn(List.of(saunaId));
+		when(eligibilityPolicy.evaluate(any())).thenReturn(
+				new EligibilityDecision(false, Reason.ACTIVE_MEMBERSHIP_REQUIRED, null, List.of()));
+		when(visitPackages.authorizeForAccess(
+				eq(organizationId), eq(branchId), eq(clientId), eq(List.of(saunaId)), eq(deviceId),
+				eq("access:sauna-1"), any())).thenReturn(Optional.of(includedUsage));
+		when(repository.createAccessLog(
+				eq(organizationId), eq(branchId), eq(deviceId), eq(clientId), eq(null), eq(null),
+				eq("VISIT_PACKAGE_INCLUDED"), eq("GRANTED"), eq("RECEPTION"), any(),
+				eq("SIMULATED_OPEN"), any(), eq(userId), eq(correlationId))).thenReturn(logId);
+		when(repository.decision(logId)).thenReturn(Optional.of(granted));
+
+		assertThat(service.requestAccess(
+				principal, new AccessRequestCommand(clientId, null, null, "sauna-1"),
+				correlationId.toString()).accessType()).isEqualTo("VISIT_PACKAGE_INCLUDED");
+
+		verify(visitPackages).linkAccessLog(
+				organizationId, includedUsageId, VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT, logId);
+	}
+
+	@Test
+	void recordsAndLinksIncludedPackageDenialWhenBaseVisitIsMissing() {
+		AccessRepository repository = mock(AccessRepository.class);
+		EligibilityPolicy eligibilityPolicy = mock(EligibilityPolicy.class);
+		VisitPackageAccessOperations visitPackages = mock(VisitPackageAccessOperations.class);
+		AccessService service = service(repository, mock(AuditService.class), eligibilityPolicy, visitPackages);
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		UUID userId = UUID.randomUUID();
+		UUID clientId = UUID.randomUUID();
+		UUID deviceId = UUID.randomUUID();
+		UUID saunaId = UUID.randomUUID();
+		UUID usageId = UUID.randomUUID();
+		UUID logId = UUID.randomUUID();
+		UUID correlationId = UUID.randomUUID();
+		GymOsPrincipal principal = new GymOsPrincipal(
+				userId, organizationId, branchId, "reception@gymos.local", "Recepcion", Set.of());
+		AccessDeviceRecord device = new AccessDeviceRecord(
+				deviceId, "Sauna", "SAUNA", "ZONE", "ACTIVE", "SIMULATED", null);
+		ClientAccessRecord client = new ClientAccessRecord(clientId, "Socio", null, null, "ACTIVE");
+		VisitPackageAccessResult deniedUsage = new VisitPackageAccessResult(
+				usageId, null, saunaId, VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT,
+				UUID.randomUUID(), clientId, branchId, deviceId, "10 visitas + Sauna", 9, false, null);
+		AccessDecisionResponse denied = new AccessDecisionResponse(
+				logId, "DENIED", "VISIT_PACKAGE_INCLUDED", "Requiere visita base", "NO_ACTION",
+				OffsetDateTime.now(), device.name(), device.deviceCode(), clientId, client.fullName(),
+				null, null, null);
+		when(repository.defaultDevice(organizationId, branchId)).thenReturn(Optional.of(device));
+		when(repository.clientById(organizationId, branchId, clientId)).thenReturn(Optional.of(client));
+		when(repository.deviceRequiredBenefitIds(organizationId, branchId, deviceId))
+				.thenReturn(List.of(saunaId));
+		when(eligibilityPolicy.evaluate(any())).thenReturn(
+				new EligibilityDecision(false, Reason.ACTIVE_MEMBERSHIP_REQUIRED, null, List.of()));
+		when(visitPackages.authorizeForAccess(
+				eq(organizationId), eq(branchId), eq(clientId), eq(List.of(saunaId)), eq(deviceId),
+				eq("access:sauna-without-base"), any())).thenReturn(Optional.of(deniedUsage));
+		when(repository.createAccessLog(
+				eq(organizationId), eq(branchId), eq(deviceId), eq(clientId), eq(null), eq(null),
+				eq("VISIT_PACKAGE_INCLUDED"), eq("DENIED"), eq("RECEPTION"), any(),
+				eq("NOT_SENT"), any(), eq(userId), eq(correlationId))).thenReturn(logId);
+		when(repository.decision(logId)).thenReturn(Optional.of(denied));
+
+		assertThat(service.requestAccess(
+				principal, new AccessRequestCommand(clientId, null, null, "sauna-without-base"),
+				correlationId.toString()).decision()).isEqualTo("DENIED");
+
+		verify(visitPackages).linkAccessLog(
+				organizationId, usageId, VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT, logId);
 	}
 
 	@Test

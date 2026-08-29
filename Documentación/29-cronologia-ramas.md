@@ -59,6 +59,7 @@ paquetes de visitas compartidos dentro de un tenant.
 | 28 ago 2026 | La aceptación manual desacopla identidad de consultas opcionales, formaliza `204` sin paquete, corrige la lectura JDBC y ubica cada alta dentro de su pestaña de Catálogo |
 | 28 ago 2026 | V100 separa saldo de paquete y alcance de acceso: materializa la intersección beneficio–sucursal, obliga a incluir la sucursal activa, agrega historial operativo, bloquea escrituras legacy y protege refunds después de consumos |
 | 28 ago 2026 | El cierre de aceptación hace organizacional la identificación de kiosco, reinicia sesión al alternar alta/entrada y exige al menos un acceso consumible por cada sucursal elegida en un paquete |
+| 28 ago 2026 | V101 separa accesos que consumen de accesos incluidos por relación paquete–Benefit, snapshottea el modo y audita el uso incluido contra una visita base de la misma fecha operativa y sede |
 
 ## 3. Alcance material de la rama activa
 
@@ -75,6 +76,10 @@ paquetes de visitas compartidos dentro de un tenant.
 - V99 agrega el snapshot de vigencia por entitlement;
 - V100 agrega el snapshot `entitlement + benefit + branch`; un paquete A+B no
   amplía Sauna `LOCAL` de A hacia B;
+- V101 agrega `CONSUMES_VISIT|INCLUDED_WITH_VISIT` a la relación y snapshots,
+  `business_date` al consumo base y un ledger de accesos incluidos sin segundo
+  descuento; el ledger conserva también denegaciones sin visita base para que
+  un reintento del mismo evento no cambie de decisión;
 - una restricción impide dos paquetes `PENDING_PAYMENT|ACTIVE` para el mismo
   socio y tenant;
 - Catálogo coloca paquetes inmediatamente junto a planes de membresía; los
@@ -96,12 +101,16 @@ paquetes de visitas compartidos dentro de un tenant.
 ## 4. Evidencia de validación local
 
 - pruebas de arquitectura, políticas de beneficios, inscripción y autoservicio;
-- `DatabaseMigrationTests` sobre PostgreSQL desde base vacía y upgrade V95;
-- typecheck frontend y suites completas antes de publicar la rama.
+- suite backend completa: 493/493; frontend: typecheck, lint, build y 114/114
+  pruebas unitarias;
+- E2E completo: 101/101, incluido Catálogo/POS 16/16 y configuración General
+  consume + Sauna incluido;
+- `postgresIntegrationTest` detecta 113 pruebas pero las omite porque Docker no
+  está disponible; esto no se registra como pase de PostgreSQL.
 
 ## 5. Regla de integración
 
 1. `feature/multibranch-plans-benefits-visits` no se fusiona automáticamente.
 2. CI y revisión de aceptación deben terminar antes de cualquier merge.
-3. Despliegue V96–V100 y habilitación de compras son acciones independientes.
+3. Despliegue V96–V101 y habilitación de compras son acciones independientes.
 4. Las ramas remotas sólo se eliminan por decisión explícita.

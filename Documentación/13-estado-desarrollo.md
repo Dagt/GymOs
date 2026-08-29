@@ -250,11 +250,13 @@ beneficios y paquetes de visitas multi-sucursal dentro del mismo tenant**:
 8. alcance de paquete separado del alcance de cada acceso: el saldo puede cubrir
    A+B sin convertir un beneficio `LOCAL` de A en un beneficio de B.
 
-V96–V100, los contratos, la compra dedicada, la activación por pago, el consumo
+V96–V101, los contratos, la compra dedicada, la activación por pago, el consumo
 desde Access y las superficies de Catálogo/Recepción/kiosco están implementados.
 V100 materializa el snapshot acceso–sucursal; la creación de un paquete exige
 incluir la sucursal activa y que cada sede elegida tenga al menos un acceso
-consumible. El expediente ya expone historial y últimos consumos,
+consumible. V101 separa el acceso que descuenta saldo del acceso incluido con
+una visita base, snapshottea ese modo y audita el segundo sin decremento bajo la
+regla mismo entitlement + fecha operativa + sucursal. El expediente ya expone historial y últimos consumos,
 las escrituras `visit_pass` legacy se rechazan y un reembolso total automático
 se bloquea cuando ya hubo consumos.
 Los paquetes viven junto a los planes en Catálogo; Configuración sólo conserva
@@ -263,8 +265,9 @@ ocultarse de nuevas altas/cambios del kiosco y quedar exento de inscripción.
 La identificación de kiosco encuentra al socio en toda la organización y el
 cambio entre identificación/registro reinicia la sesión para el siguiente
 visitante; los fallos opcionales del dashboard ya no contradicen un alta válida.
-Quedan ejecutar en PostgreSQL real las pruebas ya codificadas de migración,
-concurrencia, idempotencia y dos sedes; el entorno actual no dispone de Docker.
+Quedan ejecutar en PostgreSQL real las 113 pruebas detectadas de migración,
+concurrencia, idempotencia, snapshots y dos sedes; Docker Desktop no pudo
+iniciarse con los permisos del entorno y la omisión no cuenta como pase.
 Branding por sucursal continúa después. El Connector HikCentral, cobranza SaaS
 y hardening operativo permanecen como frentes separados.
 

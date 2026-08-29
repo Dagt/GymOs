@@ -12,6 +12,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.audit.api.AuditService;
 import com.gymos.bookings.api.operations.BookingOperations;
 import com.gymos.bookings.api.operations.BookingOperations.BookingResource;
+import com.gymos.catalog.api.VisitPackageBenefitUsage;
+import com.gymos.catalog.api.VisitPackageBenefitUsageMode;
 import com.gymos.catalog.api.VisitPackagePlanOperations;
 import com.gymos.catalog.api.VisitPackagePlanOperations.VisitPackagePlanSnapshot;
 import com.gymos.clients.api.operations.ClientLookupOperations;
@@ -543,7 +545,9 @@ class SelfServiceServiceTests {
 		return new VisitPackagePlanSnapshot(
 				packagePlanId, UUID.randomUUID(), "VISITAS-10", "10 visitas",
 				50000, "MXN", 10, 30, "ALL_BRANCHES", List.of(branchId),
-				List.of(UUID.randomUUID()), List.of(), true, "DEFAULT");
+				List.of(new VisitPackageBenefitUsage(
+						UUID.randomUUID(), VisitPackageBenefitUsageMode.CONSUMES_VISIT)),
+				List.of(), true, "DEFAULT");
 	}
 
 	private void givenSession(String allowedActionsJson) {

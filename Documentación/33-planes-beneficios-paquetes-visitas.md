@@ -54,17 +54,29 @@ Un paquete de visitas es un producto de acceso consumible. Define:
 Las sucursales y los accesos elegidos responden preguntas diferentes:
 
 - `branchScope/branchIds`: en qué sucursales existe el saldo compartido;
-- `benefitIds`: qué tipos de acceso pueden descontar una visita;
+- `benefits[]`: qué accesos forman parte del paquete y cómo interactúan con su
+  saldo;
 - `benefit.accessScope`: en qué sucursales sigue siendo válido cada acceso.
 
 Un paquete nunca amplía el alcance de un beneficio. La regla efectiva por acceso
 es la intersección entre las sucursales del paquete y el alcance del beneficio.
-Por ejemplo, un paquete válido en Centro y Tecnológica puede aceptar
-`GENERAL_ACCESS` válido en ambas y `SAUNA` local de Centro: General descuenta en
-ambas sedes y Sauna sólo en Centro. Seleccionar Sauna no crea ni muestra ese
-derecho en Tecnológica. Para evitar una sede nominal pero inoperante, todas las
-sucursales elegidas deben quedar cubiertas por la unión de accesos seleccionados;
-Centro+Tecnológica con únicamente Sauna local de Centro se rechaza.
+La relación paquete–beneficio, no el `Benefit`, define uno de estos modos:
+
+- `CONSUMES_VISIT`: autoriza el acceso y descuenta una unidad;
+- `INCLUDED_WITH_VISIT`: autoriza sin otro descuento sólo después de un consumo
+  base del mismo entitlement, misma fecha operativa y misma sucursal.
+
+Por ejemplo, un paquete válido en Centro y Tecnológica puede configurar
+`GENERAL_ACCESS` como `CONSUMES_VISIT` en ambas y `SAUNA` local de Centro como
+`INCLUDED_WITH_VISIT`. General descuenta en ambas sedes; Sauna sólo se concede
+en Centro después de registrar General allí ese día y no vuelve a descontar.
+Seleccionar Sauna no crea ni muestra ese derecho en Tecnológica. Cada sucursal
+elegida debe tener al menos un acceso `CONSUMES_VISIT`; un paquete compuesto
+sólo por accesos incluidos se rechaza.
+
+El mismo `SAUNA` puede ser `INCLUDED_WITH_VISIT` en “10 visitas + Sauna” y
+`CONSUMES_VISIT` en “5 sesiones de Sauna”. Ésta es semántica del producto
+comercial, nunca una propiedad intrínseca de Sauna.
 
 No es una `membership` y no utiliza la restricción de una membresía activa. Se
 modela independientemente para no alterar renovaciones, cambios de plan,
@@ -240,14 +252,14 @@ Relaciones:
 - `visit_package_plan_branch`: sucursales permitidas cuando el alcance es
   `SELECTED_BRANCHES`;
 - `visit_package_plan_benefit`: beneficios `ACCESS` que puede satisfacer el
-  paquete.
+  paquete y su `usage_mode` (`CONSUMES_VISIT|INCLUDED_WITH_VISIT`).
 
 La configuración exige visitas y vigencia mayores a cero, al menos una sucursal
 para alcance seleccionado y al menos un beneficio `ACCESS`. Cuando se crea o
 edita desde una sucursal activa, la cobertura debe incluir esa sucursal: puede
 ser sólo la actual o la actual más otras, nunca exclusivamente una sede ajena.
-Cada sede efectiva debe tener por lo menos uno de los accesos seleccionados;
-ningún beneficio puede quedar completamente fuera del alcance del paquete.
+Cada sede efectiva debe tener por lo menos un acceso `CONSUMES_VISIT`; ningún
+beneficio puede quedar completamente fuera del alcance del paquete.
 
 ### 6.2 Reserva y saldo del socio
 
@@ -271,17 +283,17 @@ pending_expires_at           expiración del Checkout pendiente
 version / auditoría temporal
 ```
 
-La definición comercial se materializa como snapshot al activar la compra. Se
-copian las sucursales y beneficios permitidos a:
+La definición comercial se materializa como snapshot al reservar la compra
+pendiente. Se copian las sucursales, beneficios y modos comprados a:
 
 - `visit_package_entitlement_branch`;
 - `visit_package_entitlement_benefit`.
 
-V100 agrega además `visit_package_entitlement_benefit_branch`, que materializa
-la intersección acceso–sucursal comprada. El consumo exige una fila exacta de
-esta tabla; comprobar por separado “sucursal incluida” y “beneficio incluido”
-era insuficiente porque podía combinar dos permisos que nunca coexistieron en
-la misma sede.
+V100 agrega `visit_package_entitlement_benefit_branch`, que materializa la
+intersección acceso–sucursal comprada. V101 añade `usage_mode` tanto al snapshot
+general como a esta combinación exacta. El motor exige esa fila: comprobar por
+separado “sucursal incluida” y “beneficio incluido” era insuficiente porque
+podía combinar permisos que nunca coexistieron en la misma sede.
 
 Editar un producto después no modifica derechos ya pagados.
 
@@ -317,10 +329,14 @@ El orden de decisión es:
 1. validar socio, sucursal, dispositivo y beneficio requerido;
 2. intentar conceder acceso mediante membresía vigente;
 3. sólo si la membresía no concede ese derecho, buscar un paquete activo,
-   vigente, con saldo y una combinación exacta sucursal–beneficio compatible;
-4. descontar exactamente una visita mediante una operación atómica;
-5. insertar el ledger con la misma llave idempotente;
-6. registrar la decisión de acceso y la sucursal de consumo.
+   vigente y una combinación snapshot exacta sucursal–beneficio compatible;
+4. si el modo es `CONSUMES_VISIT`, exigir saldo, descontar exactamente una
+   unidad e insertar el consumo base;
+5. si el modo es `INCLUDED_WITH_VISIT`, localizar un consumo exitoso del mismo
+   entitlement, misma `business_date` y misma sucursal; conceder sin decremento;
+6. registrar idempotentemente la decisión y su relación con el consumo base;
+   si falta la visita base, conservar también la denegación sin saldo para que
+   el mismo evento nunca cambie de respuesta al reintentarse.
 
 `visit_package_consumption` conserva:
 
@@ -328,9 +344,11 @@ El orden de decisión es:
 id
 organization_id
 entitlement_id
+benefit_id
 branch_id
 access_device_id / access_log_id
 idempotency_key
+business_date
 occurred_at
 status                       CONSUMED | REVERSED
 reason / reversal metadata
@@ -340,6 +358,34 @@ Una llave única por organización y evento impide descontar dos veces cuando el
 lector, Connector o API reintentan. La actualización exige
 `remaining_visits > 0`, estado `ACTIVE` y vigencia actual. Al llegar a cero, el
 entitlement cambia a `CONSUMED` en la misma transacción.
+
+`visit_package_included_access` conserva cada uso incluido sin alterar saldo:
+
+```text
+entitlement_id / benefit_id / branch_id
+base_consumption_id
+access_device_id / access_log_id
+idempotency_key
+status                       GRANTED | DENIED
+remaining_after
+business_date / occurred_at
+```
+
+La referencia compuesta al consumo base obliga a que pertenezca al mismo
+entitlement, organización, sucursal y fecha operativa. `business_date` se
+calcula con el timezone de la sucursal, no con UTC ni con la zona del servidor.
+Una fila `GRANTED` exige `base_consumption_id`; una fila `DENIED` exige que sea
+nulo. Ambas quedan vinculadas a la decisión final de `access_log`, por lo que
+un reintento devuelve la primera decisión aunque entre ambos intentos se haya
+registrado una visita General.
+Un bloqueo transaccional por socio protege el saldo, y un advisory lock por
+organización+llave protege la idempotencia incluso ante eventos concurrentes.
+
+V1 exige estrictamente un consumo base del mismo paquete. Si una membresía
+concede General, el paquete no se consume; por tanto Sauna
+`INCLUDED_WITH_VISIT` de ese paquete no se habilita por esa entrada. Una futura
+regla de “visita base concedida por cualquier producto” requeriría otra decisión
+de negocio y no se infiere silenciosamente.
 
 El paquete no se consume cuando una membresía ya autorizó el acceso, la sucursal
 no está cubierta, el dispositivo requiere otro beneficio o la decisión termina
@@ -379,6 +425,22 @@ Beneficios extienden sus contratos con:
 accessScope
 applicablePlanIds
 ```
+
+Paquetes de visitas aceptan y devuelven la semántica de cada relación:
+
+```json
+{
+  "benefits": [
+    { "benefitId": "...GENERAL...", "usageMode": "CONSUMES_VISIT" },
+    { "benefitId": "...SAUNA...", "usageMode": "INCLUDED_WITH_VISIT" }
+  ]
+}
+```
+
+`benefitIds` continúa aceptándose temporalmente en escritura como contrato
+legacy y se interpreta de forma conservadora como `CONSUMES_VISIT`. Las
+respuestas incluyen `benefits` y conservan `benefitIds` derivado para clientes
+anteriores.
 
 Comercio/Recepción:
 
@@ -456,15 +518,18 @@ El alta solicita únicamente:
 - número de visitas;
 - vigencia;
 - todas las sucursales o selección;
-- accesos permitidos para consumir visitas;
+- accesos del paquete y, por cada uno, “Consume una visita” o “Se incluye con
+  la visita”;
 - inscripción general o exenta;
 - disponible o no en kiosco.
 
-La interfaz llama a las decisiones “Dónde puede usarse el saldo” y “Accesos
-permitidos”. Cada acceso muestra las sedes exactas donde descuenta y las sedes
+La interfaz llama a las decisiones “Dónde puede usarse el saldo” y “Accesos del
+paquete”. Cada acceso muestra las sedes exactas donde existe y las sedes
 seleccionadas donde no está disponible. La sucursal activa queda seleccionada y
-bloqueada; otra sede sin ningún acceso disponible queda deshabilitada. Antes de
-guardar, la interfaz y backend comprueban que cada sede tenga al menos uno.
+bloqueada; otra sede sin ningún acceso queda deshabilitada. Antes de guardar,
+la interfaz y backend comprueban que cada sede tenga al menos un acceso que
+consuma una visita y explican que un acceso incluido requiere una visita base
+ese día en esa misma sucursal.
 
 El expediente muestra saldo, vigencia, estado y últimos consumos. Si ya existe
 un paquete pendiente o activo, la UI no ofrece comprar otro y explica por qué.
@@ -486,6 +551,9 @@ La secuencia aplicada es:
   confirmar el pago.
 - V100: snapshot de cada combinación `benefit_id + branch_id` autorizada para el
   entitlement; corrige paquetes multi-sucursal sin alterar V96–V99.
+- V101: modo de uso en la relación comercial y snapshots, fecha operativa en el
+  consumo base y ledger separado de accesos incluidos. Relaciones preexistentes
+  migran como `CONSUMES_VISIT`; no se reinterpretan ventas anteriores.
 
 Defaults compatibles:
 
@@ -541,6 +609,11 @@ evita una baja automática por inactividad.
 - dos compras pendientes/activas para el mismo socio son rechazadas;
 - paquete consumido o vencido permite una nueva compra;
 - cada entrada descuenta exactamente una visita;
+- General `CONSUMES_VISIT` + Sauna `INCLUDED_WITH_VISIT` descuenta una sola
+  unidad durante la visita;
+- un acceso incluido sin consumo base se deniega;
+- consumos de otro entitlement, fecha o sucursal no habilitan el incluido;
+- un paquete exclusivo de Sauna funciona con Sauna `CONSUMES_VISIT`;
 - un reintento con la misma llave no descuenta dos veces;
 - consumo concurrente nunca produce saldo negativo;
 - el saldo se comparte entre sucursales permitidas;
@@ -567,8 +640,11 @@ evita una baja automática por inactividad.
 8. [implementado] UX base de Catálogo, Recepción, expediente y kiosco;
 9. [implementado] historial operativo de saldos y últimos consumos, retiro de
    escrituras legacy y política segura de reembolso después de consumos;
-10. [en validación] migraciones y pruebas PostgreSQL reales de concurrencia,
-    dos sedes y actualización V99→V100. Las pruebas están codificadas, pero no
+10. [implementado, validación PostgreSQL pendiente] semántica
+    `CONSUMES_VISIT|INCLUDED_WITH_VISIT`, snapshot y auditoría sin doble
+    decremento;
+11. [en validación] migraciones y pruebas PostgreSQL reales de concurrencia,
+    dos sedes y actualización V99→V101. Las pruebas están codificadas, pero no
     se consideran evidencia ejecutada mientras Docker/PostgreSQL no esté
     disponible en el entorno.
 

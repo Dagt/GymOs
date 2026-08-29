@@ -194,7 +194,13 @@ class DatabaseMigrationTests {
 			assertThat(tableExists(connection, "visit_package_entitlement_benefit")).isTrue();
 			assertThat(tableExists(connection, "visit_package_entitlement_benefit_branch")).isTrue();
 			assertThat(tableExists(connection, "visit_package_consumption")).isTrue();
+			assertThat(tableExists(connection, "visit_package_included_access")).isTrue();
 			assertThat(columnExists(connection, "visit_package_entitlement", "validity_days")).isTrue();
+			assertThat(columnExists(connection, "visit_package_plan_benefit", "usage_mode")).isTrue();
+			assertThat(columnExists(connection, "visit_package_entitlement_benefit", "usage_mode")).isTrue();
+			assertThat(columnExists(connection, "visit_package_entitlement_benefit_branch", "usage_mode")).isTrue();
+			assertThat(columnExists(connection, "visit_package_consumption", "business_date")).isTrue();
+			assertThat(columnExists(connection, "visit_package_consumption", "benefit_id")).isTrue();
 			assertThat(indexExists(connection, "ux_visit_package_entitlement_open_client")).isTrue();
 			assertThat(indexExists(connection, "ux_visit_package_consumption_idempotency")).isTrue();
 			assertThat(columnExists(connection, "automation_rule", "trigger_type")).isTrue();
@@ -270,6 +276,7 @@ class DatabaseMigrationTests {
 		UUID saleId = UUID.randomUUID();
 		UUID entitlementId = UUID.randomUUID();
 		UUID benefitId = UUID.randomUUID();
+		UUID consumptionId = UUID.randomUUID();
 		try (var connection = schemaConnection(schema)) {
 			insertOrganization(connection, organizationId);
 			insertBranch(connection, organizationId, branchA);
@@ -364,13 +371,36 @@ class DatabaseMigrationTests {
 				statement.setObject(3, organizationId);
 				statement.executeUpdate();
 			}
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO visit_package_plan_benefit
+					 (visit_package_plan_id, benefit_id, organization_id, created_at)
+					VALUES (?, ?, ?, now())
+					""")) {
+				statement.setObject(1, planId);
+				statement.setObject(2, benefitId);
+				statement.setObject(3, organizationId);
+				statement.executeUpdate();
+			}
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO visit_package_consumption
+					 (id, organization_id, entitlement_id, branch_id, idempotency_key,
+					  status, remaining_after, occurred_at, created_at)
+					VALUES (?, ?, ?, ?, 'legacy-consumption', 'CONSUMED', 9,
+					        '2026-08-29T05:30:00Z', '2026-08-29T05:30:00Z')
+					""")) {
+				statement.setObject(1, consumptionId);
+				statement.setObject(2, organizationId);
+				statement.setObject(3, entitlementId);
+				statement.setObject(4, branchA);
+				statement.executeUpdate();
+			}
 		}
 
 		migrateSchema(schema, null);
 
 		try (var connection = schemaConnection(schema);
 				var statement = connection.prepareStatement("""
-					SELECT branch_id FROM visit_package_entitlement_benefit_branch
+					SELECT branch_id, usage_mode FROM visit_package_entitlement_benefit_branch
 					WHERE entitlement_id=? AND benefit_id=?
 					""")) {
 			statement.setObject(1, entitlementId);
@@ -378,7 +408,40 @@ class DatabaseMigrationTests {
 			try (var result = statement.executeQuery()) {
 				assertThat(result.next()).isTrue();
 				assertThat(result.getObject(1, UUID.class)).isEqualTo(branchA);
+				assertThat(result.getString(2)).isEqualTo("CONSUMES_VISIT");
 				assertThat(result.next()).isFalse();
+			}
+			try (var planStatement = connection.prepareStatement("""
+					SELECT usage_mode FROM visit_package_entitlement_benefit
+					WHERE entitlement_id=? AND benefit_id=?
+					""")) {
+				planStatement.setObject(1, entitlementId);
+				planStatement.setObject(2, benefitId);
+				try (var result = planStatement.executeQuery()) {
+					assertThat(result.next()).isTrue();
+					assertThat(result.getString(1)).isEqualTo("CONSUMES_VISIT");
+				}
+			}
+			try (var commercialStatement = connection.prepareStatement("""
+					SELECT usage_mode FROM visit_package_plan_benefit
+					WHERE visit_package_plan_id=? AND benefit_id=?
+					""")) {
+				commercialStatement.setObject(1, planId);
+				commercialStatement.setObject(2, benefitId);
+				try (var result = commercialStatement.executeQuery()) {
+					assertThat(result.next()).isTrue();
+					assertThat(result.getString(1)).isEqualTo("CONSUMES_VISIT");
+				}
+			}
+			try (var consumptionStatement = connection.prepareStatement("""
+					SELECT business_date, benefit_id FROM visit_package_consumption WHERE id=?
+					""")) {
+				consumptionStatement.setObject(1, consumptionId);
+				try (var result = consumptionStatement.executeQuery()) {
+					assertThat(result.next()).isTrue();
+					assertThat(result.getObject(1, LocalDate.class)).isEqualTo(LocalDate.of(2026, 8, 28));
+					assertThat(result.getObject(2, UUID.class)).isNull();
+				}
 			}
 		}
 	}
@@ -478,6 +541,42 @@ class DatabaseMigrationTests {
 				statement.setObject(3, organizationId);
 				statement.executeUpdate();
 			}
+			UUID benefitId = UUID.randomUUID();
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO benefit (
+					    id, organization_id, branch_id, code, name, benefit_type, discount_type,
+					    requires_evidence, combinable, priority, status, access_scope,
+					    created_at, updated_at, version
+					) VALUES (?, ?, ?, ?, 'Acceso general', 'ACCESS', 'NONE', FALSE, FALSE, 100,
+					          'ACTIVE', 'LOCAL', now(), now(), 0)
+					""")) {
+				statement.setObject(1, benefitId);
+				statement.setObject(2, organizationId);
+				statement.setObject(3, branchId);
+				statement.setString(4, "GENERAL-" + benefitId);
+				statement.executeUpdate();
+			}
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO visit_package_entitlement_benefit
+					    (entitlement_id, benefit_id, organization_id, usage_mode, created_at)
+					VALUES (?, ?, ?, 'CONSUMES_VISIT', now())
+					""")) {
+				statement.setObject(1, activeEntitlementId);
+				statement.setObject(2, benefitId);
+				statement.setObject(3, organizationId);
+				statement.executeUpdate();
+			}
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO visit_package_entitlement_benefit_branch
+					    (entitlement_id, benefit_id, branch_id, organization_id, usage_mode, created_at)
+					VALUES (?, ?, ?, ?, 'CONSUMES_VISIT', now())
+					""")) {
+				statement.setObject(1, activeEntitlementId);
+				statement.setObject(2, benefitId);
+				statement.setObject(3, branchId);
+				statement.setObject(4, organizationId);
+				statement.executeUpdate();
+			}
 			UUID deviceId = UUID.randomUUID();
 			try (var statement = connection.prepareStatement("""
 					INSERT INTO access_device (
@@ -498,11 +597,11 @@ class DatabaseMigrationTests {
 			assertThat(currentEntitlement.id()).isEqualTo(activeEntitlementId);
 			assertThat(currentEntitlement.remainingVisits()).isEqualTo(10);
 			OffsetDateTime occurredAt = OffsetDateTime.now();
-			var firstConsumption = repository.consumeForAccess(
-					organizationId, branchId, clientId, List.of(), deviceId, "door-event-1",
+			var firstConsumption = repository.authorizeForAccess(
+					organizationId, branchId, clientId, List.of(benefitId), deviceId, "door-event-1",
 					LocalDate.now(), occurredAt);
-			var retriedConsumption = repository.consumeForAccess(
-					organizationId, branchId, clientId, List.of(), deviceId, "door-event-1",
+			var retriedConsumption = repository.authorizeForAccess(
+					organizationId, branchId, clientId, List.of(benefitId), deviceId, "door-event-1",
 					LocalDate.now(), occurredAt.plusSeconds(1));
 
 			assertThat(firstConsumption).isPresent();

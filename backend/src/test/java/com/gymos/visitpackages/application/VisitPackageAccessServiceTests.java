@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.gymos.catalog.api.VisitPackageBenefitUsageMode;
 import com.gymos.common.api.BusinessException;
 import com.gymos.visitpackages.api.operations.VisitPackageAccessOperations.VisitPackageAccessResult;
 import com.gymos.visitpackages.application.port.VisitPackageEntitlementPort;
@@ -29,22 +30,27 @@ class VisitPackageAccessServiceTests {
 		UUID deviceId = UUID.randomUUID();
 		LocalDate today = LocalDate.of(2026, 8, 28);
 		OffsetDateTime now = OffsetDateTime.parse("2026-08-28T18:00:00Z");
+		UUID usageId = UUID.randomUUID();
+		UUID entitlementId = UUID.randomUUID();
 		VisitPackageAccessResult expected = new VisitPackageAccessResult(
-				UUID.randomUUID(), UUID.randomUUID(), clientId, branchId, deviceId, "10 visitas", 9, null);
-		when(repository.consumeForAccess(
+				usageId, usageId, benefitId, VisitPackageBenefitUsageMode.CONSUMES_VISIT,
+				entitlementId, clientId, branchId, deviceId, "10 visitas", 9, true, null);
+		when(repository.businessDate(organizationId, branchId, now)).thenReturn(today);
+		when(repository.authorizeForAccess(
 				organizationId, branchId, clientId, List.of(benefitId), deviceId, "door-event-1", today, now))
 				.thenReturn(Optional.of(expected));
 
-		assertThat(service.consumeForAccess(
+		assertThat(service.authorizeForAccess(
 				organizationId, branchId, clientId, List.of(benefitId), deviceId,
-				" door-event-1 ", today, now)).contains(expected);
+				" door-event-1 ", now)).contains(expected);
+		verify(repository).businessDate(organizationId, branchId, now);
 	}
 
 	@Test
 	void rejectsAConsumptionWithoutAnIdempotencyKey() {
-		assertThatThrownBy(() -> service.consumeForAccess(
+		assertThatThrownBy(() -> service.authorizeForAccess(
 				UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), List.of(), UUID.randomUUID(),
-				" ", LocalDate.now(), OffsetDateTime.now()))
+				" ", OffsetDateTime.now()))
 				.isInstanceOfSatisfying(
 						BusinessException.class,
 						error -> assertThat(error.code()).isEqualTo("VISIT_PACKAGE_ACCESS_KEY_INVALID"));
@@ -55,10 +61,14 @@ class VisitPackageAccessServiceTests {
 		UUID organizationId = UUID.randomUUID();
 		UUID consumptionId = UUID.randomUUID();
 		UUID accessLogId = UUID.randomUUID();
-		when(repository.linkAccessLog(organizationId, consumptionId, accessLogId)).thenReturn(true);
+		when(repository.linkAccessLog(
+				organizationId, consumptionId, VisitPackageBenefitUsageMode.CONSUMES_VISIT, accessLogId))
+				.thenReturn(true);
 
-		service.linkAccessLog(organizationId, consumptionId, accessLogId);
+		service.linkAccessLog(
+				organizationId, consumptionId, VisitPackageBenefitUsageMode.CONSUMES_VISIT, accessLogId);
 
-		verify(repository).linkAccessLog(organizationId, consumptionId, accessLogId);
+		verify(repository).linkAccessLog(
+				organizationId, consumptionId, VisitPackageBenefitUsageMode.CONSUMES_VISIT, accessLogId);
 	}
 }

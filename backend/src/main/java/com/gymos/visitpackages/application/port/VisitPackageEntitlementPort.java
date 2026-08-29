@@ -1,5 +1,6 @@
 package com.gymos.visitpackages.application.port;
 
+import com.gymos.catalog.api.VisitPackageBenefitUsageMode;
 import com.gymos.visitpackages.api.operations.VisitPackageOperations.VisitPackageEntitlementView;
 import com.gymos.visitpackages.api.operations.VisitPackageAccessOperations.VisitPackageAccessResult;
 import java.time.LocalDate;
@@ -9,7 +10,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface VisitPackageEntitlementPort {
-	record BenefitCoverage(UUID benefitId, List<UUID> branchIds) {
+	record BenefitCoverage(
+			UUID benefitId,
+			VisitPackageBenefitUsageMode usageMode,
+			List<UUID> branchIds
+	) {
 		public BenefitCoverage {
 			branchIds = branchIds == null ? List.of() : List.copyOf(branchIds);
 		}
@@ -31,10 +36,11 @@ public interface VisitPackageEntitlementPort {
 	boolean activateBySale(UUID organizationId, UUID saleId, LocalDate validFrom, OffsetDateTime now);
 	Optional<ActivationDefinition> activationDefinition(UUID organizationId, UUID saleId);
 	LocalDate businessDate(UUID organizationId, UUID branchId, OffsetDateTime occurredAt);
-	Optional<VisitPackageAccessResult> consumeForAccess(
+	Optional<VisitPackageAccessResult> authorizeForAccess(
 			UUID organizationId, UUID branchId, UUID clientId, List<UUID> requiredBenefitIds,
 			UUID accessDeviceId, String idempotencyKey, LocalDate businessDate, OffsetDateTime occurredAt);
-	boolean linkAccessLog(UUID organizationId, UUID consumptionId, UUID accessLogId);
+	boolean linkAccessLog(
+			UUID organizationId, UUID usageId, VisitPackageBenefitUsageMode usageMode, UUID accessLogId);
 
 	record ActivationDefinition(UUID entitlementId, int validityDays, String status) {}
 }
