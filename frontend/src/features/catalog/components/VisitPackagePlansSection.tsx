@@ -384,7 +384,7 @@ export function VisitPackagePlansSection({
               </p>
               <BenefitUsageList
                 empty="Primero crea un beneficio de tipo Acceso."
-                items={accessBenefits.map((benefit) => ({
+                items={accessBenefits.filter((benefit) => benefitCoversAnySelectedBranch(benefit, selectedPackageBranchIds)).map((benefit) => ({
                   id: benefit.id,
                   label: benefit.name,
                   description: benefitAvailabilityLabel(benefit, branches, selectedPackageBranchIds),
@@ -396,13 +396,6 @@ export function VisitPackagePlansSection({
                   setError(null);
                 }}
               />
-              <div className="grid gap-1 rounded-lg bg-[#f1f5ef] px-3 py-2 text-xs text-[#31563c]">
-                <p><strong>Consume una visita:</strong> descuenta una unidad del saldo.</p>
-                <p><strong>Se incluye con la visita:</strong> requiere una visita registrada ese día en esa misma sucursal.</p>
-              </div>
-              <p className="rounded-lg bg-[#f1f5ef] px-3 py-2 text-xs text-[#31563c]">
-                El paquete no amplía un acceso. Si Sauna es sólo de Centro, seguirá disponible sólo en Centro aunque el saldo pueda usarse también en Tecnológica.
-              </p>
               {uncoveredSelectedBranches.length > 0 ? (
                 <p className="rounded-lg bg-[#fff3df] px-3 py-2 text-xs font-medium text-[#80561f]">
                   Falta un acceso que consuma una visita en {branches
@@ -484,7 +477,7 @@ function BenefitUsageList({
       {items.map((item) => {
         const usage = selected.find((benefit) => benefit.benefitId === item.id);
         return (
-          <div className={`grid gap-2 rounded-md px-2 py-2 ${item.disabled ? "bg-[#f5f7f4]" : "hover:bg-[#f5f7f4]"}`} key={item.id}>
+          <div className={`grid items-center gap-2 rounded-md px-2 py-1.5 sm:grid-cols-[minmax(0,1fr)_11rem] ${item.disabled ? "bg-[#f5f7f4]" : "hover:bg-[#f5f7f4]"}`} key={item.id}>
             <label className={`flex items-start gap-2 text-sm ${item.disabled ? "cursor-not-allowed" : ""}`}>
               <input
                 className="mt-0.5 h-4 w-4 accent-[var(--brand-primary)]"
@@ -503,7 +496,7 @@ function BenefitUsageList({
             {usage ? (
               <select
                 aria-label={`Modo para ${item.label}`}
-                className="h-9 rounded-lg border border-[var(--brand-line)] bg-white px-2 text-xs font-medium text-[#111815]"
+                className="h-8 rounded-lg border border-[var(--brand-line)] bg-white px-2 text-xs font-medium text-[#111815]"
                 value={usage.usageMode}
                 onChange={(event) => onChange(selected.map((benefit) => benefit.benefitId === item.id
                   ? { ...benefit, usageMode: event.target.value as VisitPackageBenefitUsage["usageMode"] }

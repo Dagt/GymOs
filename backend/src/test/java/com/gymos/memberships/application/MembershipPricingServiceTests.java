@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Test;
 class MembershipPricingServiceTests {
 	private final MembershipRepository membershipRepository = mock(MembershipRepository.class);
 	private final EligibilityPolicy eligibilityPolicy = mock(EligibilityPolicy.class);
-	private final ClientLifecycleOperations clientLifecycle = (organizationId, clientId, effectiveOn) ->
+	private final ClientLifecycleOperations clientLifecycle = (organizationId, branchId, clientId, effectiveOn) ->
 			RegistrationFee.none("MXN", 6);
 	private final MembershipPricingService service = new MembershipPricingService(
 			membershipRepository, eligibilityPolicy, clientLifecycle);
@@ -71,7 +71,7 @@ class MembershipPricingServiceTests {
 		MembershipPricingService feeService = new MembershipPricingService(
 				membershipRepository,
 				eligibilityPolicy,
-				(organizationId, clientId, effectiveOn) ->
+				(organizationId, branchId, clientId, effectiveOn) ->
 						new RegistrationFee(true, 500, "Inscripción", "MXN", 6)
 		);
 

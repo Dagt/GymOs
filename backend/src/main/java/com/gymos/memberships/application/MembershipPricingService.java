@@ -82,7 +82,7 @@ public class MembershipPricingService implements MembershipPricingOperations {
 		QuoteCandidate selected = exclusive.totalCents() < combinable.totalCents() ? exclusive : combinable;
 		RegistrationFee registrationFee = "WAIVED".equals(plan.registrationFeePolicy())
 				? RegistrationFee.none(plan.currency(), 0)
-				: clientLifecycleOperations.registrationFee(organizationId, clientId, BusinessTime.today());
+				: clientLifecycleOperations.registrationFee(organizationId, branchId, clientId, BusinessTime.today());
 		if (registrationFee.due() && !plan.currency().equalsIgnoreCase(registrationFee.currency())) {
 			throw new BusinessException(
 					"REGISTRATION_FEE_CURRENCY_MISMATCH",

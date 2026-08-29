@@ -223,7 +223,7 @@ public class PaymentWebhookService {
 	}
 
 	private JsonNode fetchStripeSession(OperationRecord operation) {
-		String accountId = configurationRepository.configuration(operation.organizationId()).stripeAccountId();
+		String accountId = configurationRepository.providerConfiguration(operation.organizationId()).stripeAccountId();
 		if (accountId == null || accountId.isBlank()) {
 			throw new BusinessException("STRIPE_ACCOUNT_MISSING", "La cuenta conectada de Stripe ya no esta disponible.");
 		}

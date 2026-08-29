@@ -35,14 +35,15 @@ public class KioskSettingsService {
 	@Transactional
 	public List<BranchKioskSettings> configurations(GymOsPrincipal principal) {
 		requireOrganization(principal);
-		var payments = paymentConfiguration.configuration(principal.organizationId());
 		return repository.branchConfigurations(principal.organizationId()).stream()
-				.map(record -> new BranchKioskSettings(
+				.map(record -> {
+					var payments = paymentConfiguration.configuration(principal.organizationId(), record.branchId());
+					return new BranchKioskSettings(
 						record.branchId(), record.branchName(), record.status(),
 						capabilityPolicy.resolve(record.allowedActionsJson()).withPaymentReadiness(
 								payments.stripeCheckoutReady(), payments.stripeRecurringReady()
-						), record.updatedAt()
-				))
+						), record.updatedAt());
+				})
 				.toList();
 	}
 

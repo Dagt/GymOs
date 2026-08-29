@@ -58,7 +58,7 @@ public class MercadoPagoProviderService implements MercadoPagoPointOperations {
 	public ProviderLink beginOauth(GymOsPrincipal principal, String correlationId) {
 		requireTenant(principal);
 		requireConfigured();
-		configurationRepository.configuration(principal.organizationId());
+		configurationRepository.providerConfiguration(principal.organizationId());
 		String state = PaymentProviderEncoding.randomUrlSafe(32);
 		String verifier = PaymentProviderEncoding.randomUrlSafe(48);
 		providerRepository.createOauthRequest(
@@ -144,16 +144,16 @@ public class MercadoPagoProviderService implements MercadoPagoPointOperations {
 		terminal.put("id", terminalId.trim());
 		terminal.put("operating_mode", "PDV");
 		http.exchange("PATCH", mercadoPagoUrl("/terminals/v1/setup"), bearer(accessToken), json(body), "application/json");
-		configurationRepository.selectMercadoPagoTerminal(principal.organizationId(), principal.userId(), terminalId.trim());
+		configurationRepository.selectMercadoPagoTerminal(principal.organizationId(), principal.branchId(), principal.userId(), terminalId.trim());
 		auditService.record(principal, "MERCADO_PAGO_TERMINAL_SELECTED", "ORGANIZATION_PAYMENT_CONFIGURATION",
 				principal.organizationId(), "BACKOFFICE", terminalId.trim(), correlationId);
-		return configurationRepository.configuration(principal.organizationId());
+		return configurationRepository.configuration(principal.organizationId(), principal.branchId());
 	}
 
 	@Override
 	public PointOrderResult createOrder(CreatePointOrderCommand command) {
 		validateOrder(command);
-		PaymentConfigurationView configuration = configurationRepository.configuration(command.organizationId());
+		PaymentConfigurationView configuration = configurationRepository.configuration(command.organizationId(), command.branchId());
 		if (!configuration.mercadoPagoReady()) {
 			throw new BusinessException("MERCADO_PAGO_POINT_DISABLED", "El cobro integrado con Mercado Pago Point no esta habilitado.");
 		}

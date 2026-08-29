@@ -2,6 +2,7 @@ import { apiFetch } from "./client";
 
 export type ClientLifecycleSettings = {
   organizationId: string;
+  branchId: string;
   registrationFeeEnabled: boolean;
   registrationFeeCents: number;
   registrationFeeLabel: string;

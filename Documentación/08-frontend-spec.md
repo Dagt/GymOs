@@ -561,3 +561,12 @@ para rutinas; el socio no tiene vista remota en V1.
   socio. Si falla después una consulta opcional del dashboard, éste conserva el
   acceso y muestra un aviso breve; nunca presenta falsamente “datos incorrectos”
   ni expone ruta HTTP, código interno o diagnóstico técnico.
+
+- `Socios e inscripción` y `Medios de cobro` indican explícitamente la sucursal
+  activa. Las cuentas de proveedor se comparten, pero inscripción, inactividad,
+  terminal, checkout y domiciliación se habilitan independientemente por sede.
+- En el kiosco, renovación y cambio usan la misma acción primaria; no aparecen
+  numeraciones decorativas ni una tarjeta duplicada de domiciliación dentro de
+  Membresías. La revisión de una contratación queda centrada.
+- En paquetes, los accesos ajenos a las sucursales elegidas se ocultan y cada
+  acceso seleccionado presenta su modo en una fila compacta.

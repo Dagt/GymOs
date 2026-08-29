@@ -983,3 +983,12 @@ La tabla histórica `visit_pass` permanece por compatibilidad y no se reinterpre
 por nombre. Su alta y consumo manuales rechazan nuevas escrituras; mientras
 exista un pase histórico activo, la compra nueva deberá bloquearse y solicitar
 regularización explícita. Arquitectura completa: documento 33.
+
+## Extensión V103 — configuración operativa por sucursal
+
+Los importes y reglas de inscripción, la baja automática por inactividad y las
+habilitaciones de cobro viven en `branch`. Una compra toma la configuración de
+la sucursal donde se realiza y la baja automática toma la sucursal base del
+socio. Las credenciales y cuentas conectadas de Stripe y Mercado Pago continúan
+siendo de la organización; cada sucursal decide si las utiliza y qué terminal
+Point tiene asignada.

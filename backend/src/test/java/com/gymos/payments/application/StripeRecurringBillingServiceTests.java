@@ -60,7 +60,7 @@ class StripeRecurringBillingServiceTests {
 	@Test
 	void setupRequiresExplicitCurrentConsent() {
 		RecurringMembershipContext context = context();
-		when(configurationRepository.configuration(context.organizationId())).thenReturn(readyConfiguration());
+		when(configurationRepository.configuration(context.organizationId(), context.branchId())).thenReturn(readyConfiguration());
 
 		assertThatThrownBy(() -> service.beginSetup(new BeginMandateSetupCommand(
 				context, StripeRecurringBillingService.TERMS_VERSION, false,
@@ -99,7 +99,7 @@ class StripeRecurringBillingServiceTests {
 				"OPEN", 0, "MXN", "https://checkout.stripe.test/setup", "{}", null
 		);
 
-		when(configurationRepository.configuration(context.organizationId())).thenReturn(readyConfiguration());
+		when(configurationRepository.configuration(context.organizationId(), context.branchId())).thenReturn(readyConfiguration());
 		when(recurringRepository.reserveCustomer(context.organizationId(), context.clientId())).thenReturn(customer);
 		when(recurringRepository.createPendingMandate(any())).thenReturn(mandateId);
 		when(recurringRepository.mandate(mandateId)).thenReturn(Optional.of(mandate));
@@ -135,7 +135,7 @@ class StripeRecurringBillingServiceTests {
 		OperationRecord operation = setupOperation(pending);
 		MandateRecord active = mandate("ACTIVE", UUID.randomUUID(), "pm_tokenized", "4242");
 		when(recurringRepository.mandate(pending.id())).thenReturn(Optional.of(pending));
-		when(configurationRepository.configuration(pending.organizationId())).thenReturn(readyConfiguration());
+		when(configurationRepository.providerConfiguration(pending.organizationId())).thenReturn(readyConfiguration());
 		when(http.exchange(eq("GET"), eq("https://stripe.test/v1/checkout/sessions/cs_setup"), any(), isNull(), isNull()))
 				.thenReturn(objectMapper.readTree("{\"id\":\"cs_setup\",\"mode\":\"setup\",\"status\":\"complete\",\"setup_intent\":\"seti_test\"}"));
 		when(http.exchange(eq("GET"), eq("https://stripe.test/v1/setup_intents/seti_test"), any(), isNull(), isNull()))
@@ -166,7 +166,8 @@ class StripeRecurringBillingServiceTests {
 		OperationRecord uncertain = recurringOperation(charge, operationId, originalKey, null, "CREATED");
 		OperationRecord created = recurringOperation(charge, operationId, originalKey, "pi_recovered", "REQUIRES_CONFIRMATION");
 		OperationRecord processing = recurringOperation(charge, operationId, originalKey, "pi_recovered", "PROCESSING");
-		when(configurationRepository.configuration(charge.organizationId())).thenReturn(readyConfiguration());
+		when(configurationRepository.configuration(charge.organizationId(), charge.branchId())).thenReturn(readyConfiguration());
+		when(configurationRepository.providerConfiguration(charge.organizationId())).thenReturn(readyConfiguration());
 		when(providerRepository.latestOperationForRecurringCharge(charge.organizationId(), charge.id()))
 				.thenReturn(Optional.of(uncertain));
 		when(providerRepository.operation(uncertain.id())).thenReturn(

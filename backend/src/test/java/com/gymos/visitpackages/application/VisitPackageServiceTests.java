@@ -38,7 +38,7 @@ class VisitPackageServiceTests {
 	@Test
 	void paidPurchaseCreatesAndActivatesOneEntitlementWithCoverageSnapshots() {
 		Fixture fixture = fixture("DEFAULT");
-		when(fixture.lifecycle.registrationFee(any(), any(), any()))
+		when(fixture.lifecycle.registrationFee(any(), any(), any(), any()))
 				.thenReturn(new RegistrationFee(true, 15000, "Inscripción", "MXN", 6));
 		UUID saleId = UUID.randomUUID();
 		UUID paymentId = UUID.randomUUID();
@@ -80,7 +80,7 @@ class VisitPackageServiceTests {
 
 		assertThat(quote.registrationFeeCents()).isZero();
 		assertThat(quote.totalCents()).isEqualTo(90000);
-		verify(fixture.lifecycle, never()).registrationFee(any(), any(), any());
+		verify(fixture.lifecycle, never()).registrationFee(any(), any(), any(), any());
 	}
 
 	@Test
@@ -108,7 +108,7 @@ class VisitPackageServiceTests {
 		verify(fixture.entitlements).expireDue(
 				eq(fixture.organizationId), eq(fixture.clientId), eq(branchDate), any());
 		verify(fixture.lifecycle).registrationFee(
-				eq(fixture.organizationId), eq(fixture.clientId), eq(branchDate));
+				eq(fixture.organizationId), eq(fixture.branchId), eq(fixture.clientId), eq(branchDate));
 		verify(fixture.entitlements).hasActiveLegacyPass(
 				eq(fixture.organizationId), eq(fixture.clientId), eq(branchDate));
 	}
@@ -150,7 +150,7 @@ class VisitPackageServiceTests {
 		when(entitlements.byIdempotencyKey(any(), any(), any())).thenReturn(Optional.empty());
 		when(entitlements.open(organizationId, clientId)).thenReturn(Optional.empty());
 		when(entitlements.hasActiveLegacyPass(eq(organizationId), eq(clientId), any())).thenReturn(false);
-		when(lifecycle.registrationFee(any(), any(), any())).thenReturn(RegistrationFee.none("MXN", 6));
+		when(lifecycle.registrationFee(any(), any(), any(), any())).thenReturn(RegistrationFee.none("MXN", 6));
 		VisitPackageService service = new VisitPackageService(
 				plans, entitlements, lifecycle, sales, activation, audit);
 		return new Fixture(

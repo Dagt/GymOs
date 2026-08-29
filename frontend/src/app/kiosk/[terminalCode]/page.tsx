@@ -1201,7 +1201,6 @@ export default function KioskPage() {
                     {activeMembership.managedAtCurrentBranch ? <div className="kiosk-membership-actions">
                       {summary.capabilities.membershipRenewalAllowed ? (
                         <article className="kiosk-membership-action-card">
-                          <span className="kiosk-action-number">1</span>
                           <div><h3>Renovar el mismo plan</h3><p>Conserva <strong>{activeMembership.planName}</strong> y extiende su vigencia.</p></div>
                           <button className="kiosk-primary-action small" disabled={workingMembershipId !== null} onClick={() => void reviewMembershipCheckout("renewal", activeMembership.planId, activeMembership)} type="button">
                             {workingMembershipId === activeMembership.id ? "Calculando importe..." : `Revisar renovación de ${activeMembership.planName}`}
@@ -1211,7 +1210,6 @@ export default function KioskPage() {
 
                       {summary.capabilities.membershipPlanChangeAllowed ? (
                         <article className="kiosk-membership-action-card">
-                          <span className="kiosk-action-number">2</span>
                           <div><h3>Cambiar a otro plan</h3><p>Selecciona el nuevo plan. Tu plan actual no aparece como opción de cambio.</p></div>
                           {changePlans.length > 0 ? (
                             <>
@@ -1221,7 +1219,7 @@ export default function KioskPage() {
                                 </select>
                               </label>
                               {selectedTargetPlan && selectedTargetPlan.id !== activeMembership.planId ? <p className="kiosk-plan-summary">{formatMoney(selectedTargetPlan.priceCents, selectedTargetPlan.currency)} · {selectedTargetPlan.durationDays} días</p> : null}
-                              <button className="kiosk-secondary-action kiosk-full-action" disabled={workingMembershipId !== null || !selectedTargetPlan || selectedTargetPlan.id === activeMembership.planId} onClick={() => selectedTargetPlan && void reviewMembershipCheckout("change", selectedTargetPlan.id, activeMembership)} type="button">
+                              <button className="kiosk-primary-action small" disabled={workingMembershipId !== null || !selectedTargetPlan || selectedTargetPlan.id === activeMembership.planId} onClick={() => selectedTargetPlan && void reviewMembershipCheckout("change", selectedTargetPlan.id, activeMembership)} type="button">
                                 {selectedTargetPlan && selectedTargetPlan.id !== activeMembership.planId ? `Revisar cambio a ${selectedTargetPlan.name}` : "Selecciona otro plan"}
                               </button>
                             </>
@@ -1229,13 +1227,6 @@ export default function KioskPage() {
                         </article>
                       ) : null}
 
-                      {summary.capabilities.autopayAllowed ? (
-                        <article className="kiosk-membership-action-card">
-                          <span className="kiosk-action-number">A</span>
-                          <div><h3>Domiciliación</h3><p>Autoriza o sustituye la tarjeta usada para las renovaciones automáticas.</p></div>
-                          <button className="kiosk-secondary-action kiosk-full-action" disabled={autopayBusy} onClick={() => void openAutopay(activeMembership)} type="button">Administrar domiciliación</button>
-                        </article>
-                      ) : null}
                     </div> : (
                       <p className="kiosk-feature-note">
                         Esta membresía pertenece a otra sucursal. Puedes usar aquí los accesos y recursos incluidos en el plan, pero los cobros y cambios se realizan únicamente en su sucursal de origen.
@@ -1257,9 +1248,8 @@ export default function KioskPage() {
 
                     {lastExpiredMembership?.managedAtCurrentBranch && summary.capabilities.membershipRenewalAllowed ? (
                       <article className="kiosk-membership-action-card renewal">
-                        <span className="kiosk-action-number">R</span>
                         <div><h3>Renovar tu plan anterior</h3><p><strong>{lastExpiredMembership.planName}</strong> venció el {formatDay(lastExpiredMembership.endsOn)}.</p></div>
-                        <button className="kiosk-secondary-action kiosk-full-action" disabled={workingMembershipId !== null} onClick={() => void reviewMembershipCheckout("renewal", lastExpiredMembership.planId, lastExpiredMembership)} type="button">
+                        <button className="kiosk-primary-action small" disabled={workingMembershipId !== null} onClick={() => void reviewMembershipCheckout("renewal", lastExpiredMembership.planId, lastExpiredMembership)} type="button">
                           {workingMembershipId === lastExpiredMembership.id ? "Calculando importe..." : `Revisar renovación de ${lastExpiredMembership.planName}`}
                         </button>
                       </article>

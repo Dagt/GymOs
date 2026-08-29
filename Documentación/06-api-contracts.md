@@ -1570,3 +1570,10 @@ siendo el contexto para derechos y operaciones posteriores. Cambiar entre
 `Ya soy socio` y `Quiero registrarme` ejecuta `POST .../reset` antes de aceptar
 datos de otra persona; una falla secundaria al cargar opciones no revierte ni
 presenta como fallida una identificación o alta ya confirmada.
+
+### Configuración operativa por sucursal (V103)
+
+`GET/PUT /client-lifecycle-settings` y `GET/PUT /payment-settings` se resuelven
+con la sucursal activa del principal. Cambiar inscripción, inactividad,
+checkout o domiciliación en Centro no modifica Tecnológica. Los endpoints de
+vinculación de proveedor siguen administrando una cuenta organizacional.

@@ -6,6 +6,15 @@ Código auditado: `feature/catalog-product-variants-barcodes`, basada en `main`
 después de integrar el PR #19 e incluyendo V95. No implica despliegue
 productivo de la rama.
 
+## Ajuste V103 — operación independiente por sucursal
+
+Inscripción, umbral/baja por inactividad y habilitaciones de medios de cobro ya
+no se comparten forzosamente entre sucursales. Se conserva una sola conexión de
+proveedor por organización y se aplican controles operativos por sede. El
+kiosco elimina indicadores `1/2/A`, evita duplicar domiciliación, unifica las
+acciones amarillas y centra la revisión de contratación. El alta de paquetes
+oculta accesos sin cobertura y compacta la selección del modo de consumo.
+
 ## 1. Resumen ejecutivo
 
 GymFort opera como monolito modular multi-tenant y multi-sucursal. El piloto incluye consolas SaaS y de gimnasio, recepción/POS, kiosco aislado, comercio y membresías, reservas, inventario, coaches, wellness, automatizaciones, correo transaccional durable y cobranza comercial controlada de GymFort.

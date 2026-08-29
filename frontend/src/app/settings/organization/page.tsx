@@ -470,12 +470,13 @@ export default function OrganizationSettingsPage() {
       />
 
       {activeOperationalSection === "clients" && canManageOrganization ? (
-        <ClientLifecycleSettingsCard accessToken={session.accessToken} />
+        <ClientLifecycleSettingsCard key={activeBranch?.id ?? "no-branch"} accessToken={session.accessToken} branchName={activeBranch?.name} />
       ) : null}
 
       {activeOperationalSection === "payments" && paymentConfiguration ? (
         <PaymentConfigurationCard
-          key={`${paymentConfiguration.mercadoPagoConnected}-${paymentConfiguration.mercadoPagoAccountId ?? "none"}-${paymentConfiguration.mercadoPagoTerminalId ?? "none"}-${paymentConfiguration.stripeConnected}-${paymentConfiguration.stripeAccountId ?? "none"}`}
+          branchName={activeBranch?.name}
+          key={`${activeBranch?.id ?? "no-branch"}-${paymentConfiguration.mercadoPagoConnected}-${paymentConfiguration.mercadoPagoAccountId ?? "none"}-${paymentConfiguration.mercadoPagoTerminalId ?? "none"}-${paymentConfiguration.stripeConnected}-${paymentConfiguration.stripeAccountId ?? "none"}`}
           canManage={session.user.permissions.includes("payment.settings.manage") || session.user.permissions.includes("platform.admin")}
           canManageStripeAccount={canManageStripeAccount}
           configuration={paymentConfiguration}

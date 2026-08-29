@@ -71,6 +71,11 @@ class DatabaseMigrationTests {
 			assertThat(tableExists(connection, "inventory_stock")).isTrue();
 			assertThat(tableExists(connection, "resource")).isTrue();
 			assertThat(tableExists(connection, "booking")).isTrue();
+			assertThat(columnExists(connection, "branch", "registration_fee_enabled")).isTrue();
+			assertThat(columnExists(connection, "branch", "inactivity_months")).isTrue();
+			assertThat(columnExists(connection, "branch", "stripe_self_checkout_enabled")).isTrue();
+			assertThat(columnExists(connection, "branch", "stripe_recurring_enabled")).isTrue();
+			assertThat(columnExists(connection, "branch", "mercado_pago_terminal_id")).isTrue();
 			assertThat(indexExists(connection, "ux_inventory_movement_sale_product_effect")).isTrue();
 			assertThat(tableExists(connection, "coach")).isTrue();
 			assertThat(tableExists(connection, "workout")).isTrue();
@@ -234,6 +239,67 @@ class DatabaseMigrationTests {
 			assertThat(columnExists(connection, "branch", "surface_color")).isFalse();
 			assertThat(roleHasPermission(connection, "Recepcion", "resource.manage")).isFalse();
 			assertThat(roleHasPermission(connection, "Recepcion", "booking.manage")).isTrue();
+		}
+	}
+
+	@Test
+	void branchOperationalSettingsRemainIndependent() throws Exception {
+		UUID organizationId = UUID.randomUUID();
+		UUID centroId = UUID.randomUUID();
+		UUID tecnologicaId = UUID.randomUUID();
+		try (var connection = DriverManager.getConnection(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())) {
+			insertOrganization(connection, organizationId);
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO branch (id, organization_id, name, code, timezone, status, created_at, updated_at, version)
+					VALUES (?, ?, ?, ?, 'America/Mexico_City', 'ACTIVE', now(), now(), 0)
+					""")) {
+				statement.setObject(1, centroId);
+				statement.setObject(2, organizationId);
+				statement.setString(3, "Centro");
+				statement.setString(4, "CENTRO-" + centroId.toString().substring(0, 8));
+				statement.executeUpdate();
+				statement.setObject(1, tecnologicaId);
+				statement.setObject(2, organizationId);
+				statement.setString(3, "Tecnológica");
+				statement.setString(4, "TEC-" + tecnologicaId.toString().substring(0, 8));
+				statement.executeUpdate();
+			}
+			try (var statement = connection.prepareStatement("""
+					UPDATE branch
+					SET registration_fee_enabled = TRUE,
+					    registration_fee_cents = 25000,
+					    auto_inactivation_enabled = TRUE,
+					    inactivity_months = 4,
+					    reception_manual_terminal_enabled = FALSE,
+					    stripe_self_checkout_enabled = TRUE,
+					    stripe_recurring_enabled = TRUE
+					WHERE organization_id = ? AND id = ?
+					""")) {
+				statement.setObject(1, organizationId);
+				statement.setObject(2, centroId);
+				assertThat(statement.executeUpdate()).isEqualTo(1);
+			}
+			try (var statement = connection.prepareStatement("""
+					SELECT registration_fee_enabled, registration_fee_cents,
+					       auto_inactivation_enabled, inactivity_months,
+					       reception_manual_terminal_enabled,
+					       stripe_self_checkout_enabled, stripe_recurring_enabled
+					FROM branch
+					WHERE organization_id = ? AND id = ?
+					""")) {
+				statement.setObject(1, organizationId);
+				statement.setObject(2, tecnologicaId);
+				try (var result = statement.executeQuery()) {
+					assertThat(result.next()).isTrue();
+					assertThat(result.getBoolean("registration_fee_enabled")).isFalse();
+					assertThat(result.getLong("registration_fee_cents")).isZero();
+					assertThat(result.getBoolean("auto_inactivation_enabled")).isFalse();
+					assertThat(result.getInt("inactivity_months")).isEqualTo(6);
+					assertThat(result.getBoolean("reception_manual_terminal_enabled")).isTrue();
+					assertThat(result.getBoolean("stripe_self_checkout_enabled")).isFalse();
+					assertThat(result.getBoolean("stripe_recurring_enabled")).isFalse();
+				}
+			}
 		}
 	}
 

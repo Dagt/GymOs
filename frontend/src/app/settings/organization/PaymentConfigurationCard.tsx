@@ -7,6 +7,7 @@ import type { MercadoPagoTerminal, PaymentConfiguration } from "@/lib/api";
 
 export function PaymentConfigurationCard({
   canManage,
+  branchName,
   canManageStripeAccount,
   configuration,
   mercadoPagoTerminals,
@@ -19,6 +20,7 @@ export function PaymentConfigurationCard({
   onSave,
 }: {
   canManage: boolean;
+  branchName?: string;
   canManageStripeAccount: boolean;
   configuration: PaymentConfiguration;
   mercadoPagoTerminals: MercadoPagoTerminal[];
@@ -118,7 +120,7 @@ export function PaymentConfigurationCard({
         <div>
           <h2 className="text-xl font-semibold">Medios de cobro</h2>
           <p className="mt-2 max-w-3xl text-sm text-[var(--brand-muted)]">
-            Configura cómo cobra recepción y qué pagos con Stripe puede ofrecer el kiosco.
+            Configura cómo cobra {branchName ?? "la sucursal activa"}. Las cuentas conectadas se comparten, pero estas habilitaciones son independientes.
           </p>
         </div>
         <span aria-live="polite" className="min-h-5 text-xs font-semibold text-[var(--brand-muted)]">

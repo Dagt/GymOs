@@ -39,7 +39,7 @@ class KioskSettingsServiceTests {
 
 	@Test
 	void configuredPaymentCapabilitiesArePersistedWhileStripeIsPending() {
-		when(paymentConfiguration.configuration(organizationId)).thenReturn(
+		when(paymentConfiguration.configuration(organizationId, branchId)).thenReturn(
 				new PaymentConfigurationView(false, false, null, null, false, false, false, null, false)
 		);
 		when(repository.configureBranch(eq(organizationId), eq(branchId), eq(principal.userId()), any()))

@@ -33,7 +33,7 @@ class SalesFinancialIntegrityGuard {
 	@Before("execution(* com.gymos.sales.application.SalesService.create(..)) && args(principal,request,..)")
 	void guardInitialPayment(GymOsPrincipal principal, CreateSaleCommand request) {
 		if (principal != null && request != null && request.payment() != null) {
-			paymentConfigurationService.requireReceptionMethod(principal.organizationId(), request.payment().method());
+			paymentConfigurationService.requireReceptionMethod(principal.organizationId(), principal.branchId(), request.payment().method());
 			requireProviderPending(request.payment());
 		}
 	}
@@ -43,7 +43,7 @@ class SalesFinancialIntegrityGuard {
 		if (principal == null || request == null) {
 			return;
 		}
-		paymentConfigurationService.requireReceptionMethod(principal.organizationId(), request.method());
+		paymentConfigurationService.requireReceptionMethod(principal.organizationId(), principal.branchId(), request.method());
 		requireProviderPending(request);
 		String key = normalizedKey(request.idempotencyKey());
 		if (key != null && integrityRepository.paymentSaleByIdempotencyKey(principal.organizationId(), key).isPresent()) {

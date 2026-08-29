@@ -79,7 +79,7 @@ class MembershipSalesService {
 				return toResult(draft.organizationId(), existing.get());
 			}
 		}
-		paymentConfigurationOperations.requireReceptionMethod(draft.organizationId(), draft.method());
+		paymentConfigurationOperations.requireReceptionMethod(draft.organizationId(), draft.branchId(), draft.method());
 		OffsetDateTime now = OffsetDateTime.now();
 		UUID saleId = UUID.randomUUID();
 		UUID paymentId = UUID.randomUUID();

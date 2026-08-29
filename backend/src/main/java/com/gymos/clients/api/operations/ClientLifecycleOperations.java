@@ -4,7 +4,7 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 public interface ClientLifecycleOperations {
-	RegistrationFee registrationFee(UUID organizationId, UUID clientId, LocalDate effectiveOn);
+	RegistrationFee registrationFee(UUID organizationId, UUID branchId, UUID clientId, LocalDate effectiveOn);
 
 	record RegistrationFee(
 			boolean due,

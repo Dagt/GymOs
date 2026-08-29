@@ -296,11 +296,16 @@ public class RecurringBillingRepository {
 				   AND charge.next_attempt_at <= :now
 				   AND (charge.locked_until IS NULL OR charge.locked_until < :now)
 				   AND EXISTS (
-				       SELECT 1 FROM organization_payment_configuration configuration
-				       WHERE configuration.organization_id = charge.organization_id
+				       SELECT 1
+				       FROM organization_payment_configuration provider
+				       JOIN branch configuration
+				         ON configuration.organization_id = provider.organization_id
+				        AND configuration.id = mandate.branch_id
+				        AND configuration.deleted_at IS NULL
+				       WHERE provider.organization_id = charge.organization_id
 				         AND configuration.stripe_self_checkout_enabled = TRUE
 				         AND configuration.stripe_recurring_enabled = TRUE
-				         AND configuration.stripe_connected_at IS NOT NULL
+				         AND provider.stripe_connected_at IS NOT NULL
 				   )
 				 ORDER BY charge.next_attempt_at, charge.created_at
 				 LIMIT :limit

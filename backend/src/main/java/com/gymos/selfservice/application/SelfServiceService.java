@@ -171,7 +171,7 @@ public class SelfServiceService {
 				terminal.surfaceColor(),
 				browserExpiresAt,
 				false,
-				capabilities(terminal.organizationId(), terminal.allowedActionsJson())
+				capabilities(terminal.organizationId(), terminal.branchId(), terminal.allowedActionsJson())
 		);
 	}
 
@@ -648,7 +648,7 @@ public class SelfServiceService {
 				terminal.surfaceColor(),
 				browserExpiresAt,
 				false,
-				capabilities(terminal.organizationId(), terminal.allowedActionsJson())
+				capabilities(terminal.organizationId(), terminal.branchId(), terminal.allowedActionsJson())
 		);
 	}
 
@@ -668,11 +668,11 @@ public class SelfServiceService {
 	}
 
 	private SelfServiceCapabilities capabilities(SessionRecord session) {
-		return capabilities(session.organizationId(), session.allowedActionsJson());
+		return capabilities(session.organizationId(), session.branchId(), session.allowedActionsJson());
 	}
 
-	private SelfServiceCapabilities capabilities(UUID organizationId, String allowedActionsJson) {
-		var paymentConfiguration = paymentConfigurationService.configuration(organizationId);
+	private SelfServiceCapabilities capabilities(UUID organizationId, UUID branchId, String allowedActionsJson) {
+		var paymentConfiguration = paymentConfigurationService.configuration(organizationId, branchId);
 		return capabilityPolicy.resolve(allowedActionsJson).withPaymentReadiness(
 				paymentConfiguration.stripeCheckoutReady(),
 				paymentConfiguration.stripeRecurringReady()

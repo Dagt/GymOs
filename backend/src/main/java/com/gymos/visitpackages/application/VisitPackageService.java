@@ -141,7 +141,7 @@ public class VisitPackageService implements VisitPackageOperations {
 	) {
 		RegistrationFee fee = "WAIVED".equals(plan.registrationFeePolicy())
 				? RegistrationFee.none(plan.currency(), 0)
-				: lifecycle.registrationFee(principal.organizationId(), clientId, businessDate);
+				: lifecycle.registrationFee(principal.organizationId(), principal.branchId(), clientId, businessDate);
 		if (fee.due() && !plan.currency().equalsIgnoreCase(fee.currency())) {
 			throw new BusinessException(
 					"REGISTRATION_FEE_CURRENCY_MISMATCH",

@@ -16,24 +16,22 @@ public class ClientLifecycleRepository {
 		this.jdbcClient = jdbcClient;
 	}
 
-	public Optional<ClientLifecycleConfiguration> configuration(UUID organizationId) {
+	public Optional<ClientLifecycleConfiguration> configuration(UUID organizationId, UUID branchId) {
 		return jdbcClient.sql("""
-				SELECT organization.id AS organization_id, organization.default_currency,
-				       COALESCE(configuration.registration_fee_enabled, false) AS registration_fee_enabled,
-				       COALESCE(configuration.registration_fee_cents, 0) AS registration_fee_cents,
-				       COALESCE(configuration.registration_fee_label, 'Inscripción') AS registration_fee_label,
-				       COALESCE(configuration.auto_inactivation_enabled, false) AS auto_inactivation_enabled,
-				       COALESCE(configuration.inactivity_months, 6) AS inactivity_months,
-				       configuration.updated_at, COALESCE(configuration.version, 0) AS version
+				SELECT organization.id AS organization_id, branch.id AS branch_id, organization.default_currency,
+				       branch.registration_fee_enabled, branch.registration_fee_cents,
+				       branch.registration_fee_label, branch.auto_inactivation_enabled,
+				       branch.inactivity_months, branch.updated_at, branch.version
 				FROM organization
-				LEFT JOIN client_lifecycle_configuration configuration
-				  ON configuration.organization_id = organization.id
-				WHERE organization.id = :organizationId
-				  AND organization.deleted_at IS NULL
+				JOIN branch ON branch.organization_id = organization.id
+				 AND branch.id = :branchId AND branch.deleted_at IS NULL
+				WHERE organization.id = :organizationId AND organization.deleted_at IS NULL
 				""")
 				.param("organizationId", organizationId)
+				.param("branchId", branchId)
 				.query((rs, row) -> new ClientLifecycleConfiguration(
 						rs.getObject("organization_id", UUID.class),
+						rs.getObject("branch_id", UUID.class),
 						rs.getBoolean("registration_fee_enabled"),
 						rs.getLong("registration_fee_cents"),
 						rs.getString("registration_fee_label"),
@@ -48,6 +46,7 @@ public class ClientLifecycleRepository {
 
 	public ClientLifecycleConfiguration save(
 			UUID organizationId,
+			UUID branchId,
 			UUID actorUserId,
 			boolean registrationFeeEnabled,
 			long registrationFeeCents,
@@ -56,27 +55,16 @@ public class ClientLifecycleRepository {
 			int inactivityMonths
 	) {
 		jdbcClient.sql("""
-				INSERT INTO client_lifecycle_configuration (
-				    organization_id, registration_fee_enabled, registration_fee_cents,
-				    registration_fee_label, auto_inactivation_enabled, inactivity_months,
-				    updated_at, updated_by, version
-				)
-				VALUES (
-				    :organizationId, :registrationFeeEnabled, :registrationFeeCents,
-				    :registrationFeeLabel, :autoInactivationEnabled, :inactivityMonths,
-				    now(), :actorUserId, 0
-				)
-				ON CONFLICT (organization_id) DO UPDATE SET
-				    registration_fee_enabled = EXCLUDED.registration_fee_enabled,
-				    registration_fee_cents = EXCLUDED.registration_fee_cents,
-				    registration_fee_label = EXCLUDED.registration_fee_label,
-				    auto_inactivation_enabled = EXCLUDED.auto_inactivation_enabled,
-				    inactivity_months = EXCLUDED.inactivity_months,
-				    updated_at = now(),
-				    updated_by = EXCLUDED.updated_by,
-				    version = client_lifecycle_configuration.version + 1
+				UPDATE branch SET registration_fee_enabled = :registrationFeeEnabled,
+				    registration_fee_cents = :registrationFeeCents,
+				    registration_fee_label = :registrationFeeLabel,
+				    auto_inactivation_enabled = :autoInactivationEnabled,
+				    inactivity_months = :inactivityMonths, updated_at = now(),
+				    updated_by = :actorUserId, version = version + 1
+				WHERE organization_id = :organizationId AND id = :branchId AND deleted_at IS NULL
 				""")
 				.param("organizationId", organizationId)
+				.param("branchId", branchId)
 				.param("registrationFeeEnabled", registrationFeeEnabled)
 				.param("registrationFeeCents", registrationFeeCents)
 				.param("registrationFeeLabel", registrationFeeLabel)
@@ -84,7 +72,7 @@ public class ClientLifecycleRepository {
 				.param("inactivityMonths", inactivityMonths)
 				.param("actorUserId", actorUserId)
 				.update();
-		return configuration(organizationId).orElseThrow();
+		return configuration(organizationId, branchId).orElseThrow();
 	}
 
 	public Optional<LocalDate> latestMembershipEnd(UUID organizationId, UUID clientId) {
@@ -129,9 +117,11 @@ public class ClientLifecycleRepository {
 				           COALESCE(package_history.latest_package_end, client.joined_at::date)
 				       ) AS last_activity_on
 				FROM client
-				JOIN client_lifecycle_configuration configuration
+				JOIN branch configuration
 				  ON configuration.organization_id = client.organization_id
+				 AND configuration.id = client.home_branch_id
 				 AND configuration.auto_inactivation_enabled = true
+				 AND configuration.deleted_at IS NULL
 				LEFT JOIN LATERAL (
 				    SELECT MAX(membership.grace_ends_on) AS latest_membership_end
 				    FROM membership
@@ -213,6 +203,7 @@ public class ClientLifecycleRepository {
 
 	public record ClientLifecycleConfiguration(
 			UUID organizationId,
+			UUID branchId,
 			boolean registrationFeeEnabled,
 			long registrationFeeCents,
 			String registrationFeeLabel,

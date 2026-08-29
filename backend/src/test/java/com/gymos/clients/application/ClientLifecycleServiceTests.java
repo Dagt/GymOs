@@ -16,6 +16,7 @@ class ClientLifecycleServiceTests {
 	private final ClientLifecycleRepository repository = mock(ClientLifecycleRepository.class);
 	private final ClientLifecycleService service = new ClientLifecycleService(repository, mock(AuditService.class));
 	private final UUID organizationId = UUID.randomUUID();
+	private final UUID branchId = UUID.randomUUID();
 	private final UUID clientId = UUID.randomUUID();
 	private final LocalDate effectiveOn = LocalDate.of(2026, 8, 26);
 
@@ -24,7 +25,7 @@ class ClientLifecycleServiceTests {
 		givenEnabledConfiguration(true);
 		when(repository.latestMembershipEnd(organizationId, clientId)).thenReturn(Optional.empty());
 
-		var fee = service.registrationFee(organizationId, clientId, effectiveOn);
+		var fee = service.registrationFee(organizationId, branchId, clientId, effectiveOn);
 
 		assertThat(fee.due()).isTrue();
 		assertThat(fee.amountCents()).isEqualTo(500_00);
@@ -37,7 +38,7 @@ class ClientLifecycleServiceTests {
 		when(repository.latestMembershipEnd(organizationId, clientId))
 				.thenReturn(Optional.of(effectiveOn.minusMonths(6)));
 
-		assertThat(service.registrationFee(organizationId, clientId, effectiveOn).due()).isTrue();
+		assertThat(service.registrationFee(organizationId, branchId, clientId, effectiveOn).due()).isTrue();
 	}
 
 	@Test
@@ -46,7 +47,7 @@ class ClientLifecycleServiceTests {
 		when(repository.latestMembershipEnd(organizationId, clientId))
 				.thenReturn(Optional.of(effectiveOn.minusMonths(5)));
 
-		assertThat(service.registrationFee(organizationId, clientId, effectiveOn).due()).isFalse();
+		assertThat(service.registrationFee(organizationId, branchId, clientId, effectiveOn).due()).isFalse();
 	}
 
 	@Test
@@ -55,7 +56,7 @@ class ClientLifecycleServiceTests {
 		when(repository.latestMembershipEnd(organizationId, clientId))
 				.thenReturn(Optional.of(effectiveOn.minusMonths(6)));
 
-		var fee = service.registrationFee(organizationId, clientId, effectiveOn);
+		var fee = service.registrationFee(organizationId, branchId, clientId, effectiveOn);
 
 		assertThat(fee.due()).isTrue();
 		assertThat(fee.inactivityMonths()).isEqualTo(6);
@@ -68,13 +69,13 @@ class ClientLifecycleServiceTests {
 		when(repository.latestVisitPackageEnd(organizationId, clientId))
 				.thenReturn(Optional.of(effectiveOn.plusDays(30)));
 
-		assertThat(service.registrationFee(organizationId, clientId, effectiveOn).due()).isFalse();
+		assertThat(service.registrationFee(organizationId, branchId, clientId, effectiveOn).due()).isFalse();
 	}
 
 	private void givenEnabledConfiguration(boolean autoInactivationEnabled) {
-		when(repository.configuration(organizationId)).thenReturn(Optional.of(
+		when(repository.configuration(organizationId, branchId)).thenReturn(Optional.of(
 				new ClientLifecycleConfiguration(
-						organizationId, true, 500_00, "Inscripción", "MXN",
+						organizationId, branchId, true, 500_00, "Inscripción", "MXN",
 						autoInactivationEnabled, 6, null, 0
 				)
 		));

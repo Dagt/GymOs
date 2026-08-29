@@ -24,7 +24,8 @@ public class ClientLifecycleService implements ClientLifecycleOperations {
 	@Transactional(readOnly = true)
 	public ClientLifecycleConfiguration configuration(GymOsPrincipal principal) {
 		requireOrganization(principal);
-		return requiredConfiguration(principal.organizationId());
+		requireBranch(principal);
+		return requiredConfiguration(principal.organizationId(), principal.branchId());
 	}
 
 	@Transactional
@@ -34,6 +35,7 @@ public class ClientLifecycleService implements ClientLifecycleOperations {
 			String correlationId
 	) {
 		requireOrganization(principal);
+		requireBranch(principal);
 		String label = command.registrationFeeLabel() == null
 				? "Inscripción"
 				: command.registrationFeeLabel().trim();
@@ -56,13 +58,13 @@ public class ClientLifecycleService implements ClientLifecycleOperations {
 			);
 		}
 		ClientLifecycleConfiguration saved = repository.save(
-				principal.organizationId(), principal.userId(), command.registrationFeeEnabled(),
+				principal.organizationId(), principal.branchId(), principal.userId(), command.registrationFeeEnabled(),
 				command.registrationFeeCents(), label, command.autoInactivationEnabled(),
 				command.inactivityMonths()
 		);
 		auditService.record(
-				principal, "CLIENT_LIFECYCLE_CONFIGURATION_UPDATED", "ORGANIZATION",
-				principal.organizationId(), "BACKOFFICE",
+				principal, "CLIENT_LIFECYCLE_CONFIGURATION_UPDATED", "BRANCH",
+				principal.branchId(), "BACKOFFICE",
 				"Inscripción y baja automática de socios", correlationId
 		);
 		return saved;
@@ -70,8 +72,8 @@ public class ClientLifecycleService implements ClientLifecycleOperations {
 
 	@Override
 	@Transactional(readOnly = true)
-	public RegistrationFee registrationFee(UUID organizationId, UUID clientId, LocalDate effectiveOn) {
-		ClientLifecycleConfiguration configuration = requiredConfiguration(organizationId);
+	public RegistrationFee registrationFee(UUID organizationId, UUID branchId, UUID clientId, LocalDate effectiveOn) {
+		ClientLifecycleConfiguration configuration = requiredConfiguration(organizationId, branchId);
 		if (!configuration.registrationFeeEnabled() || configuration.registrationFeeCents() <= 0) {
 			return RegistrationFee.none(configuration.currency(), configuration.inactivityMonths());
 		}
@@ -91,10 +93,16 @@ public class ClientLifecycleService implements ClientLifecycleOperations {
 		);
 	}
 
-	private ClientLifecycleConfiguration requiredConfiguration(UUID organizationId) {
-		return repository.configuration(organizationId).orElseThrow(() -> new BusinessException(
-				"ORGANIZATION_NOT_FOUND", "La organización no está disponible."
+	private ClientLifecycleConfiguration requiredConfiguration(UUID organizationId, UUID branchId) {
+		return repository.configuration(organizationId, branchId).orElseThrow(() -> new BusinessException(
+				"BRANCH_NOT_FOUND", "La sucursal no está disponible."
 		));
+	}
+
+	private void requireBranch(GymOsPrincipal principal) {
+		if (principal == null || principal.branchId() == null) {
+			throw new BusinessException("BRANCH_CONTEXT_REQUIRED", "Selecciona una sucursal.");
+		}
 	}
 
 	private void requireOrganization(GymOsPrincipal principal) {

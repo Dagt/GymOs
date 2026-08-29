@@ -78,7 +78,7 @@ class PaymentWebhookServiceTests {
 
 		when(repository.operationByExternalId("STRIPE", "cs_test_123")).thenReturn(Optional.of(operation));
 		when(repository.registerWebhook(eq("STRIPE"), eq("evt_test_123"), eq("checkout.session.completed"), anyString(), eq(organizationId))).thenReturn(true);
-		when(configurationRepository.configuration(organizationId)).thenReturn(new PaymentConfigurationView(
+		when(configurationRepository.providerConfiguration(organizationId)).thenReturn(new PaymentConfigurationView(
 				true, false, null, null, false, true, false, "acct_test", true
 		));
 		when(http.exchange(eq("GET"), eq("https://stripe.test/v1/checkout/sessions/cs_test_123?expand[]=payment_intent.latest_charge"), any(), isNull(), isNull()))

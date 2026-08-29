@@ -19,12 +19,13 @@ class PaymentConfigurationServiceTests {
 	private final PaymentConfigurationRepository repository = mock(PaymentConfigurationRepository.class);
 	private final PaymentConfigurationService service = new PaymentConfigurationService(repository, mock(AuditService.class));
 	private final UUID organizationId = UUID.randomUUID();
+	private final UUID branchId = UUID.randomUUID();
 
 	@Test
 	void cannotEnableMercadoPagoBeforeAccountIsConnected() {
-		when(repository.configuration(organizationId)).thenReturn(configuration(true, false));
+		when(repository.configuration(organizationId, branchId)).thenReturn(configuration(true, false));
 		var principal = new GymOsPrincipal(
-				UUID.randomUUID(), organizationId, UUID.randomUUID(), "owner", "Owner", Set.of("payment.settings.manage")
+				UUID.randomUUID(), organizationId, branchId, "owner", "Owner", Set.of("payment.settings.manage")
 		);
 
 		assertThatThrownBy(() -> service.update(
@@ -37,9 +38,9 @@ class PaymentConfigurationServiceTests {
 
 	@Test
 	void cannotEnableManualTerminalAndMercadoPagoAtTheSameTime() {
-		when(repository.configuration(organizationId)).thenReturn(configuration(false, true));
+		when(repository.configuration(organizationId, branchId)).thenReturn(configuration(false, true));
 		var principal = new GymOsPrincipal(
-				UUID.randomUUID(), organizationId, UUID.randomUUID(), "owner", "Owner", Set.of("payment.settings.manage")
+				UUID.randomUUID(), organizationId, branchId, "owner", "Owner", Set.of("payment.settings.manage")
 		);
 
 		assertThatThrownBy(() -> service.update(
@@ -52,16 +53,16 @@ class PaymentConfigurationServiceTests {
 
 	@Test
 	void disabledManualTerminalBlocksCardManualRegistration() {
-		when(repository.configuration(organizationId)).thenReturn(configuration(false, false));
+		when(repository.configuration(organizationId, branchId)).thenReturn(configuration(false, false));
 
-		assertThatThrownBy(() -> service.requireReceptionMethod(organizationId, "CARD_MANUAL"))
+		assertThatThrownBy(() -> service.requireReceptionMethod(organizationId, branchId, "CARD_MANUAL"))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						org.assertj.core.api.Assertions.assertThat(exception.code()).isEqualTo("RECEPTION_MANUAL_CARD_DISABLED"));
 	}
 
 	@Test
 	void recurringBillingCanBeEnabledAfterStripeCheckoutIsConnected() {
-		when(repository.configuration(organizationId)).thenReturn(
+		when(repository.configuration(organizationId, branchId)).thenReturn(
 				new PaymentConfigurationView(
 						true, false, null, null, false, true, false, "acct_test", true
 				),
@@ -70,7 +71,7 @@ class PaymentConfigurationServiceTests {
 				)
 		);
 		var principal = new GymOsPrincipal(
-				UUID.randomUUID(), organizationId, UUID.randomUUID(), "owner", "Owner", Set.of("payment.settings.manage")
+				UUID.randomUUID(), organizationId, branchId, "owner", "Owner", Set.of("payment.settings.manage")
 		);
 
 		PaymentConfigurationView result = service.update(
@@ -81,7 +82,7 @@ class PaymentConfigurationServiceTests {
 
 		assertThat(result.stripeRecurringReady()).isTrue();
 		verify(repository).update(
-				organizationId, principal.userId(),
+				organizationId, branchId, principal.userId(),
 				new UpdatePaymentConfigurationCommand(true, false, null, true, true)
 		);
 	}

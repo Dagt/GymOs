@@ -91,7 +91,7 @@ public class StripeRecurringBillingService implements StripeRecurringOperations 
 		}
 		RecurringMembershipContext context = command.context();
 		validateContext(context);
-		requireRecurringReady(context.organizationId());
+		requireRecurringReady(context.organizationId(), context.branchId());
 		RecurringTerms terms = terms(context);
 		if (!command.accepted() || !TERMS_VERSION.equals(command.termsVersion())) {
 			throw new BusinessException(
@@ -152,7 +152,7 @@ public class StripeRecurringBillingService implements StripeRecurringOperations 
 			return setupResult(mandate, operation);
 		}
 
-		PaymentConfigurationView configuration = configurationRepository.configuration(context.organizationId());
+		PaymentConfigurationView configuration = configurationRepository.configuration(context.organizationId(), context.branchId());
 		Map<String, Object> body = PaymentProviderEncoding.values();
 		body.put("mode", "setup");
 		body.put("customer", customer.externalCustomerId());
@@ -302,7 +302,7 @@ public class StripeRecurringBillingService implements StripeRecurringOperations 
 				|| charge.amountCents() == null || charge.amountCents() <= 0) {
 			throw new BusinessException("RECURRING_CHARGE_INVALID", "El cargo recurrente no tiene una venta pendiente valida.");
 		}
-		requireRecurringReady(charge.organizationId());
+		requireRecurringReady(charge.organizationId(), charge.branchId());
 		String key = "stripe-recurring:" + charge.id() + ":attempt:" + charge.attemptNumber();
 		OperationRecord latest = providerRepository.latestOperationForRecurringCharge(
 				charge.organizationId(), charge.id()
@@ -319,7 +319,7 @@ public class StripeRecurringBillingService implements StripeRecurringOperations 
 				))
 				: existing.id();
 		OperationRecord operation = providerRepository.operation(operationId).orElseThrow();
-		String accountId = configurationRepository.configuration(charge.organizationId()).stripeAccountId();
+		String accountId = configurationRepository.providerConfiguration(charge.organizationId()).stripeAccountId();
 		if (operation.externalOperationId() == null) {
 			Map<String, Object> body = PaymentProviderEncoding.values();
 			body.put("amount", charge.amountCents());
@@ -353,7 +353,7 @@ public class StripeRecurringBillingService implements StripeRecurringOperations 
 	}
 
 	public OperationRecord confirmRecurringPayment(OperationRecord operation) {
-		String accountId = configurationRepository.configuration(operation.organizationId()).stripeAccountId();
+		String accountId = configurationRepository.providerConfiguration(operation.organizationId()).stripeAccountId();
 		Map<String, Object> confirmation = PaymentProviderEncoding.values();
 		confirmation.put("off_session", true);
 		JsonNode confirmed = http.exchange(
@@ -462,7 +462,7 @@ public class StripeRecurringBillingService implements StripeRecurringOperations 
 	}
 
 	private void cancelAwaitingPayments(MandateRecord mandate, String reason) {
-		String accountId = configurationRepository.configuration(mandate.organizationId()).stripeAccountId();
+		String accountId = configurationRepository.providerConfiguration(mandate.organizationId()).stripeAccountId();
 		for (ChargeRecord charge : recurringRepository.awaitingProviderCharges(mandate.id())) {
 			OperationRecord operation = providerRepository.operation(charge.providerOperationId()).orElse(null);
 			if (operation == null || operation.externalOperationId() == null) continue;
@@ -486,7 +486,7 @@ public class StripeRecurringBillingService implements StripeRecurringOperations 
 	}
 
 	private void detachPaymentMethod(UUID organizationId, String paymentMethodId, UUID mandateId) {
-		String accountId = configurationRepository.configuration(organizationId).stripeAccountId();
+		String accountId = configurationRepository.providerConfiguration(organizationId).stripeAccountId();
 		http.exchange(
 				"POST", stripeUrl("/v1/payment_methods/" + paymentMethodId + "/detach"),
 				stripeHeaders(accountId, "stripe-detach:" + mandateId), "",
@@ -497,7 +497,7 @@ public class StripeRecurringBillingService implements StripeRecurringOperations 
 	private CustomerRecord ensureCustomer(RecurringMembershipContext context) {
 		CustomerRecord customer = recurringRepository.reserveCustomer(context.organizationId(), context.clientId());
 		if (customer.externalCustomerId() != null && !customer.externalCustomerId().isBlank()) return customer;
-		String accountId = configurationRepository.configuration(context.organizationId()).stripeAccountId();
+		String accountId = configurationRepository.providerConfiguration(context.organizationId()).stripeAccountId();
 		Map<String, Object> body = PaymentProviderEncoding.values();
 		body.put("description", "Socio GymOS " + context.clientId());
 		body.put("metadata[gymos_organization_id]", context.organizationId());
@@ -544,9 +544,9 @@ public class StripeRecurringBillingService implements StripeRecurringOperations 
 		);
 	}
 
-	private void requireRecurringReady(UUID organizationId) {
+	private void requireRecurringReady(UUID organizationId, UUID branchId) {
 		requireConfigured();
-		PaymentConfigurationView configuration = configurationRepository.configuration(organizationId);
+		PaymentConfigurationView configuration = configurationRepository.configuration(organizationId, branchId);
 		if (!configuration.stripeRecurringReady() || configuration.stripeAccountId() == null) {
 			throw new BusinessException(
 					"STRIPE_RECURRING_DISABLED",
@@ -564,7 +564,7 @@ public class StripeRecurringBillingService implements StripeRecurringOperations 
 	}
 
 	private JsonNode fetchStripeObject(UUID organizationId, String path) {
-		String accountId = configurationRepository.configuration(organizationId).stripeAccountId();
+		String accountId = configurationRepository.providerConfiguration(organizationId).stripeAccountId();
 		if (accountId == null || accountId.isBlank()) {
 			throw new BusinessException("STRIPE_ACCOUNT_MISSING", "La cuenta conectada de Stripe no esta disponible.");
 		}

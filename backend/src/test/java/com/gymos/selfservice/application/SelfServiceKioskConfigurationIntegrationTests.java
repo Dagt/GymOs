@@ -64,7 +64,7 @@ class SelfServiceKioskConfigurationIntegrationTests {
 		var capabilityPolicy = new SelfServiceCapabilityPolicy(new ObjectMapper());
 		var paymentConfiguration = mock(PaymentConfigurationOperations.class);
 		payments = new AtomicReference<>(pendingStripe());
-		when(paymentConfiguration.configuration(organizationId)).thenAnswer(invocation -> payments.get());
+		when(paymentConfiguration.configuration(organizationId, branchId)).thenAnswer(invocation -> payments.get());
 		var audit = mock(AuditService.class);
 		settingsService = new KioskSettingsService(
 				repository, capabilityPolicy, paymentConfiguration, audit);

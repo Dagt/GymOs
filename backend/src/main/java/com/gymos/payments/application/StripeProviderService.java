@@ -46,7 +46,7 @@ public class StripeProviderService implements StripeCheckoutOperations {
 	public ProviderLink beginOnboarding(GymOsPrincipal principal, String correlationId) {
 		requireTenant(principal);
 		requireConfigured();
-		configurationRepository.configuration(principal.organizationId());
+		configurationRepository.providerConfiguration(principal.organizationId());
 		String accountId = providerRepository.connection(principal.organizationId(), PROVIDER)
 				.map(PaymentProviderRepository.ConnectionRecord::externalAccountId)
 				.filter(value -> value != null && !value.isBlank())
@@ -85,13 +85,13 @@ public class StripeProviderService implements StripeCheckoutOperations {
 		);
 		auditService.record(principal, connected ? "STRIPE_CONNECTED" : "STRIPE_CONNECTION_CHECKED",
 				"PAYMENT_PROVIDER_CONNECTION", principal.organizationId(), "BACKOFFICE", null, correlationId);
-		return configurationRepository.configuration(principal.organizationId());
+		return configurationRepository.configuration(principal.organizationId(), principal.branchId());
 	}
 
 	@Override
 	public CheckoutSessionResult createCheckout(CreateCheckoutSessionCommand command) {
 		validateCheckout(command);
-		PaymentConfigurationView configuration = configurationRepository.configuration(command.organizationId());
+		PaymentConfigurationView configuration = configurationRepository.configuration(command.organizationId(), command.branchId());
 		if (!configuration.stripeCheckoutReady() || configuration.stripeAccountId() == null) {
 			throw new BusinessException("STRIPE_CHECKOUT_DISABLED", "Stripe self checkout no esta habilitado para este gimnasio.");
 		}

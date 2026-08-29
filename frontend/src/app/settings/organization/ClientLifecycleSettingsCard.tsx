@@ -18,7 +18,7 @@ type LifecycleSaveState = {
   confirmed: ClientLifecycleSettings;
 };
 
-export function ClientLifecycleSettingsCard({ accessToken }: { accessToken: string }) {
+export function ClientLifecycleSettingsCard({ accessToken, branchName }: { accessToken: string; branchName?: string }) {
   const [settings, setSettings] = useState<ClientLifecycleSettings | null>(null);
   const [feeAmount, setFeeAmount] = useState("0");
   const [saveStatus, setSaveStatus] = useState<SaveStatus>(null);
@@ -174,7 +174,7 @@ export function ClientLifecycleSettingsCard({ accessToken }: { accessToken: stri
         <div>
           <h2 className="text-xl font-semibold">Socios e inscripción</h2>
           <p className="mt-2 max-w-3xl text-sm text-[var(--brand-muted)]">
-            Configura la inscripción y cómo GymFort gestiona periodos prolongados sin membresía.
+            Configura la inscripción y la inactividad únicamente para {branchName ?? "la sucursal activa"}.
           </p>
         </div>
         <SaveIndicator status={saveStatus} />

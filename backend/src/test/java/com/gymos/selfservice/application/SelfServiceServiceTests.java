@@ -83,7 +83,7 @@ class SelfServiceServiceTests {
 
 	@BeforeEach
 	void setUp() {
-		when(paymentConfigurationService.configuration(organizationId)).thenReturn(new PaymentConfigurationView(
+		when(paymentConfigurationService.configuration(org.mockito.ArgumentMatchers.eq(organizationId), any())).thenReturn(new PaymentConfigurationView(
 				true, false, null, null, false, false, false, null, false
 		));
 		when(repository.planAvailableForSelfService(any(), any(), any())).thenReturn(true);
@@ -120,7 +120,7 @@ class SelfServiceServiceTests {
 		givenSession("""
 				{"membershipEnrollment":true}
 				""");
-		when(paymentConfigurationService.configuration(organizationId)).thenReturn(new PaymentConfigurationView(
+		when(paymentConfigurationService.configuration(org.mockito.ArgumentMatchers.eq(organizationId), any())).thenReturn(new PaymentConfigurationView(
 				true, false, null, null, false, true, false, "acct_test", true
 		));
 		UUID planId = UUID.randomUUID();
@@ -158,7 +158,7 @@ class SelfServiceServiceTests {
 		givenSession("""
 				{"membershipEnrollment":true}
 				""");
-		when(paymentConfigurationService.configuration(organizationId)).thenReturn(new PaymentConfigurationView(
+		when(paymentConfigurationService.configuration(org.mockito.ArgumentMatchers.eq(organizationId), any())).thenReturn(new PaymentConfigurationView(
 				true, false, null, null, false, true, false, "acct_test", true
 		));
 		UUID hiddenPlanId = UUID.randomUUID();
@@ -195,7 +195,7 @@ class SelfServiceServiceTests {
 		givenSession("""
 				{"visitPackagePurchase":true}
 				""");
-		when(paymentConfigurationService.configuration(organizationId)).thenReturn(new PaymentConfigurationView(
+		when(paymentConfigurationService.configuration(org.mockito.ArgumentMatchers.eq(organizationId), any())).thenReturn(new PaymentConfigurationView(
 				true, false, null, null, false, true, false, "acct_test", true
 		));
 		UUID packagePlanId = UUID.randomUUID();
@@ -381,7 +381,7 @@ class SelfServiceServiceTests {
 		givenSession("""
 				{"membershipRenewal":true}
 				""");
-		when(paymentConfigurationService.configuration(organizationId)).thenReturn(new PaymentConfigurationView(
+		when(paymentConfigurationService.configuration(org.mockito.ArgumentMatchers.eq(organizationId), any())).thenReturn(new PaymentConfigurationView(
 				true, false, null, null, false, true, false, "acct_test", true
 		));
 		UUID membershipId = UUID.randomUUID();
@@ -412,7 +412,7 @@ class SelfServiceServiceTests {
 		givenSession("""
 				{"membershipRenewal":true}
 				""");
-		when(paymentConfigurationService.configuration(organizationId)).thenReturn(new PaymentConfigurationView(
+		when(paymentConfigurationService.configuration(org.mockito.ArgumentMatchers.eq(organizationId), any())).thenReturn(new PaymentConfigurationView(
 				true, false, null, null, false, true, false, "acct_test", true
 		));
 		UUID membershipId = UUID.randomUUID();
@@ -511,7 +511,7 @@ class SelfServiceServiceTests {
 		givenSession("""
 				{"autopay":true}
 				""");
-		when(paymentConfigurationService.configuration(organizationId)).thenReturn(new PaymentConfigurationView(
+		when(paymentConfigurationService.configuration(org.mockito.ArgumentMatchers.eq(organizationId), any())).thenReturn(new PaymentConfigurationView(
 				true, false, null, null, false, true, true, "acct_test", true
 		));
 		UUID membershipId = UUID.randomUUID();

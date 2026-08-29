@@ -22,13 +22,14 @@ public class PaymentConfigurationService implements PaymentConfigurationOperatio
 	@Transactional
 	public PaymentConfigurationView configuration(GymOsPrincipal principal) {
 		requireTenant(principal);
-		return repository.configuration(principal.organizationId());
+		requireBranch(principal);
+		return repository.configuration(principal.organizationId(), principal.branchId());
 	}
 
 	@Transactional
 	@Override
-	public PaymentConfigurationView configuration(java.util.UUID organizationId) {
-		return repository.configuration(organizationId);
+	public PaymentConfigurationView configuration(java.util.UUID organizationId, java.util.UUID branchId) {
+		return repository.configuration(organizationId, branchId);
 	}
 
 	@Transactional
@@ -38,7 +39,8 @@ public class PaymentConfigurationService implements PaymentConfigurationOperatio
 			String correlationId
 	) {
 		requireTenant(principal);
-		PaymentConfigurationView current = repository.configuration(principal.organizationId());
+		requireBranch(principal);
+		PaymentConfigurationView current = repository.configuration(principal.organizationId(), principal.branchId());
 		if (command.receptionManualTerminalEnabled() && command.receptionMercadoPagoEnabled()) {
 			throw new BusinessException(
 					"RECEPTION_CARD_METHOD_EXCLUSIVE",
@@ -64,22 +66,22 @@ public class PaymentConfigurationService implements PaymentConfigurationOperatio
 					"El cobro recurrente requiere que Stripe self checkout este habilitado."
 			);
 		}
-		repository.update(principal.organizationId(), principal.userId(), command);
+		repository.update(principal.organizationId(), principal.branchId(), principal.userId(), command);
 		auditService.record(
 				principal,
 				"PAYMENT_CONFIGURATION_UPDATED",
-				"ORGANIZATION_PAYMENT_CONFIGURATION",
-				principal.organizationId(),
+				"BRANCH_PAYMENT_CONFIGURATION",
+				principal.branchId(),
 				"BACKOFFICE",
 				null,
 				correlationId
 		);
-		return repository.configuration(principal.organizationId());
+		return repository.configuration(principal.organizationId(), principal.branchId());
 	}
 
 	@Override
-	public void requireReceptionMethod(java.util.UUID organizationId, String method) {
-		PaymentConfigurationView configuration = repository.configuration(organizationId);
+	public void requireReceptionMethod(java.util.UUID organizationId, java.util.UUID branchId, String method) {
+		PaymentConfigurationView configuration = repository.configuration(organizationId, branchId);
 		if ("CARD_MANUAL".equalsIgnoreCase(method) && !configuration.receptionManualTerminalEnabled()) {
 			throw new BusinessException(
 					"RECEPTION_MANUAL_CARD_DISABLED",
@@ -97,6 +99,12 @@ public class PaymentConfigurationService implements PaymentConfigurationOperatio
 	private void requireTenant(GymOsPrincipal principal) {
 		if (principal == null || principal.organizationId() == null) {
 			throw new BusinessException("ORGANIZATION_REQUIRED", "Selecciona un gimnasio para continuar.");
+		}
+	}
+
+	private void requireBranch(GymOsPrincipal principal) {
+		if (principal == null || principal.branchId() == null) {
+			throw new BusinessException("BRANCH_REQUIRED", "Selecciona una sucursal para continuar.");
 		}
 	}
 

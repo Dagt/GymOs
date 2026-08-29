@@ -5504,10 +5504,13 @@ button.admin-secondary-link:disabled {
 }
 
 .kiosk-primary-action.kiosk-offer-review-action {
+  align-self: center;
   display: inline-flex;
   justify-content: center;
+  margin-inline: auto;
   max-width: 100%;
   padding-inline: 1.5rem;
+  text-align: center;
   width: auto;
 }
 
@@ -5696,7 +5699,7 @@ button.admin-secondary-link:disabled {
 .kiosk-membership-actions {
   display: grid;
   gap: 0.9rem;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   margin-top: 1rem;
 }
 

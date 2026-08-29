@@ -168,7 +168,7 @@ test.describe("catalogo e inventario", () => {
     await expect(page.getByRole("checkbox", { name: /^Norte / })).toBeDisabled();
     await expect(page.getByText("No hay accesos configurados para paquetes en esta sucursal", { exact: true })).toBeVisible();
     await expect(page.getByText("Disponible en: Centro", { exact: true }).first()).toBeVisible();
-    await expect(page.getByText(/El paquete no amplía un acceso/)).toBeVisible();
+    await expect(page.getByText(/El paquete no amplía un acceso/)).toHaveCount(0);
 
     await page.getByRole("checkbox", { name: /Tecnológica/ }).check();
     await expect(page.getByText("Disponible en: Centro · No disponible en: Tecnológica", { exact: true })).toBeVisible();
@@ -254,8 +254,9 @@ test.describe("catalogo e inventario", () => {
     await expect(baseBranch).toContainText("Tecnológica");
     await expect(page.getByRole("checkbox", { name: /^Tecnológica / })).toHaveCount(0);
     await expect(page.getByRole("checkbox", { name: /^Centro/ })).not.toBeChecked();
-    await expect(page.getByRole("checkbox", { name: /Sauna/ })).toBeDisabled();
-    await expect(page.getByText("No existe en las sucursales elegidas", { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("checkbox", { name: /Sauna/ })).toHaveCount(0);
+    await expect(page.getByRole("checkbox", { name: /Crioterapia/ })).toHaveCount(0);
+    await expect(page.getByRole("checkbox", { name: /Lockers premium/ })).toHaveCount(0);
 
     await page.getByRole("checkbox", { name: /^Centro/ }).check();
     await expect(page.getByRole("checkbox", { name: /Sauna/ })).toBeEnabled();

@@ -849,7 +849,8 @@ test("el socio acepta terminos versionados antes de tokenizar la domiciliacion",
   await page.getByPlaceholder("Correo o teléfono").fill("andrea@example.com");
   await page.getByLabel("Fecha de nacimiento en formato día mes año").fill("10/05/1994");
   await page.getByRole("button", { name: "Continuar de forma segura" }).click();
-  await page.getByRole("button", { name: "Administrar domiciliación" }).click();
+  await expect(page.getByRole("button", { name: "Administrar domiciliación" })).toHaveCount(0);
+  await page.getByRole("button", { name: "Domiciliación" }).click();
 
   await expect(page.getByText("Autorizo cargos automáticos para renovar mi membresía.")).toBeVisible();
   const continueButton = page.getByRole("button", { name: "Continuar a captura segura de tarjeta" });
