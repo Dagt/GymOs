@@ -20,6 +20,7 @@ import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -78,13 +79,30 @@ public class PhysicalAccessSynchronizationService {
 				connection.organizationId(), connection.branchId(), connection.id())) {
 			mappings.putIfAbsent(mapping.benefitId(), mapping);
 		}
+		Map<UUID, Set<String>> authorizationModes = new LinkedHashMap<>();
+		for (var mode : accessRepository.physicalBenefitAuthorizationModes(
+				connection.organizationId(), connection.branchId(), connection.id())) {
+			authorizationModes.computeIfAbsent(mode.benefitId(), ignored -> new java.util.HashSet<>())
+					.add(mode.authorizationMode());
+		}
+		Set<UUID> mixedModeBenefits = authorizationModes.entrySet().stream()
+				.filter(entry -> entry.getValue().size() > 1)
+				.map(Map.Entry::getKey)
+				.collect(java.util.stream.Collectors.toUnmodifiableSet());
+		Set<UUID> onlineBenefitIds = authorizationModes.entrySet().stream()
+				.filter(entry -> entry.getValue().equals(Set.of("GYMFORT_ONLINE")))
+				.map(Map.Entry::getKey)
+				.collect(java.util.stream.Collectors.toUnmodifiableSet());
+		List<EligibilityPolicy.EligibleBenefit> providerManagedBenefits = effectiveBenefits.stream()
+				.filter(benefit -> !onlineBenefitIds.contains(benefit.id()))
+				.toList();
 
-		List<String> missingBenefits = effectiveBenefits.stream()
+		List<String> missingBenefits = providerManagedBenefits.stream()
 				.filter(benefit -> !mappings.containsKey(benefit.id()))
 				.map(EligibilityPolicy.EligibleBenefit::name)
 				.toList();
 		List<String> desiredRefs = missingBenefits.isEmpty()
-				? effectiveBenefits.stream()
+				? providerManagedBenefits.stream()
 						.map(benefit -> mappings.get(benefit.id()).externalAccessLevelRef())
 						.distinct()
 						.sorted()
@@ -100,6 +118,9 @@ public class PhysicalAccessSynchronizationService {
 		} else if (link == null) {
 			blockedCode = "EXTERNAL_PERSON_LINK_REQUIRED";
 			error = "Falta vincular al socio con la persona del proveedor físico.";
+		} else if (effectiveBenefits.stream().anyMatch(benefit -> mixedModeBenefits.contains(benefit.id()))) {
+			blockedCode = "PHYSICAL_AUTHORIZATION_MODE_CONFLICT";
+			error = "Un mismo beneficio no puede abrirse a la vez por HikCentral y por GymFort en línea.";
 		} else if (!missingBenefits.isEmpty()) {
 			blockedCode = "ACCESS_LEVEL_MAPPING_REQUIRED";
 			error = "Falta mapear el nivel externo para: " + String.join(", ", missingBenefits) + ".";

@@ -1,13 +1,18 @@
 package com.gymos.access.api;
 
 import com.gymos.access.application.PhysicalConnectorService;
+import com.gymos.access.application.AccessService;
+import com.gymos.access.application.AccessService.PhysicalAuthorizationInput;
+import com.gymos.access.application.AccessService.PhysicalAuthorizationView;
 import com.gymos.access.application.PhysicalConnectorService.ConnectorActivationView;
 import com.gymos.access.application.PhysicalConnectorService.ConnectorHealthView;
 import com.gymos.access.application.PhysicalConnectorService.ConnectorJobView;
 import com.gymos.access.application.PhysicalConnectorService.PersonCandidateInput;
+import com.gymos.access.application.PhysicalConnectorService.DeviceCandidateInput;
 import com.gymos.access.application.PhysicalConnectorService.PhysicalEventInput;
 import com.gymos.access.application.PhysicalConnectorService.PhysicalEventView;
 import com.gymos.access.infrastructure.PhysicalAccessRepository.PersonCandidateRecord;
+import com.gymos.access.infrastructure.PhysicalAccessRepository.DeviceCandidateRecord;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.ClientIpResolver;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,6 +26,7 @@ import jakarta.validation.constraints.Size;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -36,12 +42,15 @@ public class PhysicalConnectorController {
 	public static final String CONNECTOR_SECRET_HEADER = "X-GymFort-Connector-Secret";
 
 	private final PhysicalConnectorService connectorService;
+	private final AccessService accessService;
 	private final ClientIpResolver clientIpResolver;
 
 	public PhysicalConnectorController(
-			PhysicalConnectorService connectorService, ClientIpResolver clientIpResolver
+			PhysicalConnectorService connectorService, AccessService accessService,
+			ClientIpResolver clientIpResolver
 	) {
 		this.connectorService = connectorService;
+		this.accessService = accessService;
 		this.clientIpResolver = clientIpResolver;
 	}
 
@@ -66,7 +75,8 @@ public class PhysicalConnectorController {
 		var connector = connectorService.authenticate(
 				connectorKey, connectorSecret, clientIpResolver.resolve(servletRequest), correlationId);
 		return connectorService.heartbeat(
-				connector, request.status(), request.connectorVersion(), request.instanceId(), request.lastError());
+				connector, request.status(), request.connectorVersion(), request.instanceId(),
+				request.capabilities(), request.lastError());
 	}
 
 	@PostMapping("/jobs/claim")
@@ -156,6 +166,47 @@ public class PhysicalConnectorController {
 		return connectorService.ingestPersonCandidate(connector, request.toInput());
 	}
 
+	@PostMapping("/device-candidates")
+	DeviceCandidateRecord deviceCandidate(
+			@RequestHeader(name = CONNECTOR_KEY_HEADER, required = false) String connectorKey,
+			@RequestHeader(name = CONNECTOR_SECRET_HEADER, required = false) String connectorSecret,
+			@Valid @RequestBody ConnectorDeviceCandidateRequest request,
+			HttpServletRequest servletRequest
+	) {
+		String correlationId = correlationId(servletRequest);
+		var connector = connectorService.authenticate(
+				connectorKey, connectorSecret, clientIpResolver.resolve(servletRequest), correlationId);
+		return connectorService.ingestDeviceCandidate(connector, request.toInput());
+	}
+
+	@PostMapping("/authorizations")
+	PhysicalAuthorizationView authorize(
+			@RequestHeader(name = CONNECTOR_KEY_HEADER, required = false) String connectorKey,
+			@RequestHeader(name = CONNECTOR_SECRET_HEADER, required = false) String connectorSecret,
+			@Valid @RequestBody ConnectorAuthorizationRequest request,
+			HttpServletRequest servletRequest
+	) {
+		String correlationId = correlationId(servletRequest);
+		var connector = connectorService.authenticate(
+				connectorKey, connectorSecret, clientIpResolver.resolve(servletRequest), correlationId);
+		return accessService.requestPhysicalAccess(connector, request.toInput(), correlationId);
+	}
+
+	@PostMapping("/authorizations/{authorizationId}/actuation")
+	PhysicalAuthorizationView reportActuation(
+			@RequestHeader(name = CONNECTOR_KEY_HEADER, required = false) String connectorKey,
+			@RequestHeader(name = CONNECTOR_SECRET_HEADER, required = false) String connectorSecret,
+			@PathVariable UUID authorizationId,
+			@Valid @RequestBody ConnectorActuationRequest request,
+			HttpServletRequest servletRequest
+	) {
+		String correlationId = correlationId(servletRequest);
+		var connector = connectorService.authenticate(
+				connectorKey, connectorSecret, clientIpResolver.resolve(servletRequest), correlationId);
+		return accessService.reportPhysicalActuation(
+				connector, authorizationId, request.status(), request.externalOperationRef(), request.error());
+	}
+
 	private String correlationId(HttpServletRequest request) {
 		Object value = request.getAttribute(Correlation.ATTRIBUTE);
 		return value == null ? UUID.randomUUID().toString() : value.toString();
@@ -171,6 +222,7 @@ public class PhysicalConnectorController {
 			@Pattern(regexp = "HEALTHY|DEGRADED") String status,
 			@Size(max = 80) String connectorVersion,
 			@Size(max = 120) String instanceId,
+			@Size(max = 30) Set<@Pattern(regexp = "[A-Z][A-Z0-9_]{0,79}") String> capabilities,
 			@Size(max = 1000) String lastError
 	) {
 	}
@@ -230,5 +282,41 @@ public class PhysicalConnectorController {
 			return new PersonCandidateInput(
 					externalPersonRef, externalDisplayName, email, phone, externalEmployeeNumber);
 		}
+	}
+
+	public record ConnectorDeviceCandidateRequest(
+			@NotBlank @Size(max = 180) String externalDeviceRef,
+			@Size(max = 180) String externalDeviceName,
+			@Size(max = 80) String externalDeviceType,
+			@Size(max = 20) Map<@Size(max = 60) String, @Size(max = 240) String> metadata
+	) {
+		private DeviceCandidateInput toInput() {
+			return new DeviceCandidateInput(
+					externalDeviceRef, externalDeviceName, externalDeviceType, metadata);
+		}
+	}
+
+	public record ConnectorAuthorizationRequest(
+			@NotBlank @Size(max = 60) String providerKey,
+			@NotBlank @Size(max = 180) String externalEventId,
+			@Size(max = 180) String externalPersonRef,
+			@NotBlank @Size(max = 180) String externalDeviceRef,
+			OffsetDateTime occurredAt,
+			@Pattern(regexp = "GRANTED|DENIED") String providerDecision,
+			@NotBlank @Size(max = 80) String eventType,
+			@Size(max = 20) Map<@Size(max = 60) String, @Size(max = 240) String> metadata
+	) {
+		private PhysicalAuthorizationInput toInput() {
+			return new PhysicalAuthorizationInput(
+					providerKey, externalEventId, externalPersonRef, externalDeviceRef,
+					occurredAt, providerDecision, eventType, metadata);
+		}
+	}
+
+	public record ConnectorActuationRequest(
+			@NotBlank @Pattern(regexp = "SUCCEEDED|FAILED|UNCERTAIN") String status,
+			@Size(max = 180) String externalOperationRef,
+			@Size(max = 1000) String error
+	) {
 	}
 }

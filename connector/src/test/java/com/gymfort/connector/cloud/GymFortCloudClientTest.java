@@ -51,7 +51,8 @@ class GymFortCloudClientTest {
             });
             client.complete(jobId, claimToken, "hikcentral:done");
             client.extendLease(jobId, claimToken, 90);
-            client.heartbeat("HEALTHY", "0.1.0", "centro-01", null);
+            client.heartbeat("HEALTHY", "0.1.0", "centro-01", null,
+                    java.util.Set.of("EVENT_POLLING", "REMOTE_OPEN"));
         }
 
         assertThat(requests).hasSize(5);
@@ -63,6 +64,9 @@ class GymFortCloudClientTest {
         assertThat(requests.get(2).body())
                 .contains("\"claimToken\":\"" + claimToken + "\"")
                 .contains("\"externalOperationRef\":\"hikcentral:done\"");
+        assertThat(requests.get(4).body())
+                .contains("\"EVENT_POLLING\"")
+                .contains("\"REMOTE_OPEN\"");
     }
 
     private void respond(HttpExchange exchange) throws IOException {

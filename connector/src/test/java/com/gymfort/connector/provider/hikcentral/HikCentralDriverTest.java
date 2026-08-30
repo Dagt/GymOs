@@ -54,6 +54,17 @@ class HikCentralDriverTest {
         assertThat(driver.health().detail()).contains("CENTRO_SAUNA");
     }
 
+    @Test
+    void onlineOnlyDriverDoesNotQueryOrAdvertiseAccessLevelAssignment() {
+        FakeApi api = new FakeApi(Set.of("MANUAL_SECURITY"));
+        HikCentralDriver driver = new HikCentralDriver(api, Set.of());
+
+        assertThat(driver.health().healthy()).isTrue();
+        assertThat(driver.capabilities())
+                .doesNotContain(com.gymfort.connector.provider.ProviderCapability.ACCESS_LEVEL_ASSIGNMENT);
+        assertThat(api.accessLevelLookups).isZero();
+    }
+
     private static ProviderSyncCommand command(
             ProviderSyncCommand.Action action,
             List<String> desired
@@ -66,6 +77,7 @@ class HikCentralDriverTest {
     private static final class FakeApi implements HikCentralApi {
         private final Map<String, Set<String>> assignments = new HashMap<>();
         private final List<String> operations = new ArrayList<>();
+        private int accessLevelLookups;
 
         private FakeApi(Set<String> accessLevelIds) {
             accessLevelIds.forEach(id -> assignments.put(id, new HashSet<>()));
@@ -78,6 +90,7 @@ class HikCentralDriverTest {
 
         @Override
         public Set<String> accessLevelIds() {
+            accessLevelLookups++;
             return Set.copyOf(assignments.keySet());
         }
 

@@ -164,7 +164,16 @@ public class AccessController {
 	) {
 		return accessService.linkPhysicalDevice(
 				principal, deviceId, request.externalDeviceRef(), request.externalDeviceName(),
+				request.authorizationMode(),
 				correlationId(servletRequest));
+	}
+
+	@GetMapping("/physical-integration/device-candidates")
+	java.util.List<com.gymos.access.infrastructure.PhysicalAccessRepository.DeviceCandidateRecord> physicalDeviceCandidates(
+			@AuthenticationPrincipal GymOsPrincipal principal,
+			@RequestParam(defaultValue = "100") int limit
+	) {
+		return accessService.physicalDeviceCandidates(principal, limit);
 	}
 
 	@DeleteMapping("/physical-integration/devices/{deviceId}/link")
@@ -385,7 +394,8 @@ public class AccessController {
 
 	public record PhysicalDeviceLinkRequest(
 			@NotBlank @Size(max = 180) String externalDeviceRef,
-			@Size(max = 180) String externalDeviceName
+			@Size(max = 180) String externalDeviceName,
+			@Pattern(regexp = "PROVIDER_MANAGED|GYMFORT_ONLINE") String authorizationMode
 	) {
 	}
 

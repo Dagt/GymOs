@@ -6,6 +6,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.gymfort.connector.cloud.CloudModels.ActivationResponse;
 import com.gymfort.connector.cloud.CloudModels.ClaimedJob;
+import com.gymfort.connector.cloud.CloudModels.PersonCandidate;
+import com.gymfort.connector.cloud.CloudModels.DeviceCandidate;
+import com.gymfort.connector.cloud.CloudModels.AuthorizationRequest;
+import com.gymfort.connector.cloud.CloudModels.AuthorizationResponse;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -15,6 +19,7 @@ import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public final class GymFortCloudClient implements CloudGateway {
@@ -89,12 +94,49 @@ public final class GymFortCloudClient implements CloudGateway {
 
     @Override
     public void heartbeat(String status, String connectorVersion, String instanceId, String lastError) {
+        heartbeat(status, connectorVersion, instanceId, lastError, Set.of());
+    }
+
+    @Override
+    public void heartbeat(
+            String status, String connectorVersion, String instanceId,
+            String lastError, Set<String> capabilities
+    ) {
         post("/api/v1/physical-connectors/heartbeat",
                 Map.of("status", status,
                         "connectorVersion", connectorVersion,
                         "instanceId", instanceId,
+                        "capabilities", capabilities == null ? Set.of() : capabilities,
                         "lastError", lastError == null ? "" : safeError(lastError)),
                 Void.class, true);
+    }
+
+    @Override
+    public void publishPerson(PersonCandidate candidate) {
+        post("/api/v1/physical-connectors/person-candidates", candidate, Void.class, true);
+    }
+
+    @Override
+    public void publishDevice(DeviceCandidate candidate) {
+        post("/api/v1/physical-connectors/device-candidates", candidate, Void.class, true);
+    }
+
+    @Override
+    public AuthorizationResponse authorize(AuthorizationRequest request) {
+        return post("/api/v1/physical-connectors/authorizations", request,
+                AuthorizationResponse.class, true);
+    }
+
+    @Override
+    public void reportActuation(
+            UUID authorizationId, String status, String externalOperationRef, String error
+    ) {
+        java.util.LinkedHashMap<String, Object> body = new java.util.LinkedHashMap<>();
+        body.put("status", status);
+        body.put("externalOperationRef", externalOperationRef);
+        body.put("error", error);
+        post("/api/v1/physical-connectors/authorizations/" + authorizationId + "/actuation",
+                body, Void.class, true);
     }
 
     @Override

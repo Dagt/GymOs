@@ -6,6 +6,8 @@ import com.gymfort.connector.config.ConnectorConfig;
 import com.gymfort.connector.core.ConnectorDaemon;
 import com.gymfort.connector.core.ConnectorWorker;
 import com.gymfort.connector.core.SqliteExecutionLedger;
+import com.gymfort.connector.core.ConnectorStateStore;
+import com.gymfort.connector.core.ProviderRuntimeWorker;
 import com.gymfort.connector.provider.AccessProviderDriver;
 import com.gymfort.connector.provider.ProviderHealth;
 import com.gymfort.connector.provider.hikcentral.HikCentralDriver;
@@ -122,9 +124,12 @@ public final class ConnectorMain {
         Arrays.fill(cloudSecret, '\0');
         String version = connectorVersion();
         try (ConnectorWorker worker = new ConnectorWorker(
-                cloud, driver, ledger, config.claimLimit(), config.leaseSeconds())) {
+                cloud, driver, ledger, config.claimLimit(), config.leaseSeconds());
+             ProviderRuntimeWorker runtimeWorker = new ProviderRuntimeWorker(
+                     cloud, driver, new ConnectorStateStore(config.stateDirectory()),
+                     config.discoveryInterval())) {
             new ConnectorDaemon(
-                    cloud, worker, driver, version, config.instanceId(),
+                    cloud, worker, runtimeWorker, driver, version, config.instanceId(),
                     config.pollInterval(), config.heartbeatInterval()).run();
         }
     }
@@ -138,7 +143,8 @@ public final class ConnectorMain {
         try {
             HikCentralOpenApiClient api = new HikCentralOpenApiClient(
                     config.hikCentral().baseUrl(), config.hikCentral().appKey(), appSecret,
-                    config.hikCentral().trustedCertificatePath());
+                    config.hikCentral().trustedCertificatePath(),
+                    config.hikCentral().capabilityProfilePath());
             return new HikCentralDriver(api, config.hikCentral().managedAccessLevelRefs());
         } finally {
             Arrays.fill(appSecret, '\0');

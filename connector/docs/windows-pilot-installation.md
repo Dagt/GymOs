@@ -77,13 +77,18 @@ cd .\GymFortConnector-pilot
   -HikCentralBaseUrl "https://hikcentral-centro:8443" `
   -HikCentralAppKey "APP_KEY" `
   -ManagedAccessLevelRefs "CENTRO_GENERAL","CENTRO_SAUNA" `
-  -HikCentralTrustedCertificate "C:\Temp\hikcentral-centro.cer"
+  -HikCentralTrustedCertificate "C:\Temp\hikcentral-centro.cer" `
+  -HikCentralCapabilityProfile ".\config\hikcentral-profile-centro.json"
 ```
 
 The installer interactively requests the App Secret and then the one-time
 GymFort activation code. Both are protected with Windows DPAPI and are not
 written to the properties file. `doctor` must pass before the automatic task is
 registered.
+
+Omit `-ManagedAccessLevelRefs` when every physical point is
+`GYMFORT_ONLINE`. In that topology HikCentral recognizes the enrolled person,
+but GymFort does not distribute autonomous door permissions.
 
 The pilot task runs at logon under that same Windows account and restarts after
 failure. For the test period that account must remain logged in. A later
@@ -116,7 +121,7 @@ restarts the previous task.
 
 ## 6. Link the first test member
 
-Current pilot flow:
+Pilot flow:
 
 1. create or locate the person in HikCentral and capture the face there;
 2. obtain the opaque HikCentral person ID;
@@ -125,10 +130,11 @@ Current pilot flow:
 4. force reconciliation once or wait for the queued synchronization;
 5. confirm in GymFort that desired state is `SYNCED` and in HikCentral that only
    the expected managed Access Levels were assigned;
-6. test recognition at the closed turnstile with reception present.
+6. select `GYMFORT_ONLINE` only for devices whose event and remote-open operations passed the attended matrix;
+7. test recognition at the closed turnstile with reception present.
 
-Never link by name alone. Automatic person creation/candidate import remains a
-subsequent increment.
+Never link by name alone. The Connector imports opaque person and device candidates,
+but an administrator must explicitly link each candidate to the exact GymFort record.
 
 ## 7. Stop or remove the pilot
 
@@ -144,9 +150,9 @@ after a verified backup.
 
 ## 8. Test boundary
 
-The pilot can reconcile long-lived membership Access Levels. It does not yet
-consume a visit package from a face event or remotely open the turnstile. Do not
-assign a permanent Access Level for a metered package: that would bypass
-GymFort's balance and idempotency rules. Execute the site matrix and keep the
-physical system attended until the remaining event/opening path is built and
-accepted.
+The pilot implements both provider-managed synchronization and GymFort online
+authorization, including transactional visit-package consumption and remote open.
+Do not assign a permanent Access Level for a metered package: that would bypass
+GymFort's balance and idempotency rules. The exact installed OpenAPI contract,
+event semantics, resource identifiers and physical relay behavior still require
+the attended site matrix before production enablement.

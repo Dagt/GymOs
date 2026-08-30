@@ -9,6 +9,7 @@ import com.gymos.access.infrastructure.PhysicalAccessRepository.ConnectionRecord
 import com.gymos.access.infrastructure.PhysicalAccessRepository.ConnectorContext;
 import com.gymos.access.infrastructure.PhysicalAccessRepository.JobCounts;
 import com.gymos.access.infrastructure.PhysicalAccessRepository.PersonCandidateRecord;
+import com.gymos.access.infrastructure.PhysicalAccessRepository.DeviceCandidateRecord;
 import com.gymos.access.infrastructure.PhysicalAccessRepository.SyncJobRecord;
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
@@ -87,6 +88,10 @@ public class PhysicalConnectorService {
 		this.rateLimiter = rateLimiter;
 		this.properties = properties;
 		this.dummyCredentialHash = passwordEncoder.encode("physical-connector-dummy-" + UUID.randomUUID());
+	}
+
+	Duration onlineAuthorizationMaxEventAge() {
+		return properties.onlineAuthorizationMaxEventAge();
 	}
 
 	@Transactional
@@ -215,6 +220,7 @@ public class PhysicalConnectorService {
 			String reportedStatus,
 			String connectorVersion,
 			String instanceId,
+			Set<String> capabilities,
 			String lastError
 	) {
 		String status = reportedStatus == null || reportedStatus.isBlank()
@@ -224,13 +230,21 @@ public class PhysicalConnectorService {
 		}
 		String safeError = "HEALTHY".equals(status) ? null
 				: safeDiagnostic(trim(lastError, 1000));
+		List<String> safeCapabilities = normalizeCapabilities(capabilities);
 		OffsetDateTime now = OffsetDateTime.now();
 		repository.updateHeartbeat(
 				connector, status, trim(connectorVersion, 80),
-				safeDiagnostic(trim(instanceId, 120)), safeError, now);
+				safeDiagnostic(trim(instanceId, 120)), toJson(safeCapabilities), safeError, now);
 		JobCounts counts = repository.jobCounts(
 				connector.organizationId(), connector.branchId(), connector.connectionId());
 		return new ConnectorHealthView(status, now, counts.pending(), counts.failed());
+	}
+
+	public ConnectorHealthView heartbeat(
+			ConnectorContext connector, String reportedStatus, String connectorVersion,
+			String instanceId, String lastError
+	) {
+		return heartbeat(connector, reportedStatus, connectorVersion, instanceId, Set.of(), lastError);
 	}
 
 	@Transactional
@@ -330,6 +344,11 @@ public class PhysicalConnectorService {
 				.orElseThrow(() -> new BusinessException(
 						"PHYSICAL_EVENT_DEVICE_UNRESOLVED",
 						"El recurso externo no está vinculado a un punto de esta sucursal."));
+		if (!"PROVIDER_MANAGED".equals(deviceLink.authorizationMode())) {
+			throw new BusinessException(
+					"PHYSICAL_EVENT_AUTHORIZATION_REQUIRED",
+					"Este punto requiere autorización en línea de GymFort antes de abrir.");
+		}
 		String externalPersonRef = trim(input.externalPersonRef(), 180);
 		var clientLink = externalPersonRef == null ? null : repository.clientLinkByExternalRef(
 				connector.organizationId(), connector.branchId(), connector.connectionId(), externalPersonRef).orElse(null);
@@ -381,6 +400,20 @@ public class PhysicalConnectorService {
 					connector.organizationId(), connector.branchId(), connector.connectionId(), candidate.id()).orElse(candidate);
 		}
 		return candidate;
+	}
+
+	@Transactional
+	public DeviceCandidateRecord ingestDeviceCandidate(
+			ConnectorContext connector, DeviceCandidateInput input
+	) {
+		String externalRef = requiredText(
+				input.externalDeviceRef(), "PHYSICAL_DEVICE_REF_REQUIRED",
+				"El recurso externo requiere una referencia.", 180);
+		Map<String, String> metadata = sanitizeMetadata(input.metadata());
+		return repository.upsertDeviceCandidate(
+				connector, externalRef, trim(input.externalDeviceName(), 180),
+				normalizedCode(input.externalDeviceType(), "UNKNOWN", 80),
+				toJson(metadata), OffsetDateTime.now());
 	}
 
 	@Transactional(readOnly = true)
@@ -567,7 +600,7 @@ public class PhysicalConnectorService {
 		return claimToken;
 	}
 
-	private Map<String, String> sanitizeMetadata(Map<String, String> requested) {
+	Map<String, String> sanitizeMetadata(Map<String, String> requested) {
 		if (requested == null || requested.isEmpty()) {
 			return Map.of();
 		}
@@ -648,7 +681,23 @@ public class PhysicalConnectorService {
 		}
 	}
 
-	private String toJson(Map<String, String> value) {
+	private List<String> normalizeCapabilities(Set<String> capabilities) {
+		if (capabilities == null) return List.of();
+		if (capabilities.size() > 30) {
+			throw new BusinessException("CONNECTOR_CAPABILITIES_INVALID",
+					"El Connector reportó demasiadas capacidades.");
+		}
+		return capabilities.stream().map(value -> value == null ? "" : value.trim().toUpperCase(Locale.ROOT))
+				.peek(value -> {
+					if (!value.matches("[A-Z][A-Z0-9_]{0,79}")) {
+						throw new BusinessException("CONNECTOR_CAPABILITIES_INVALID",
+								"El Connector reportó una capacidad inválida.");
+					}
+				})
+				.distinct().sorted().toList();
+	}
+
+	private String toJson(Object value) {
 		try {
 			return objectMapper.writeValueAsString(value);
 		} catch (JsonProcessingException exception) {
@@ -722,6 +771,12 @@ public class PhysicalConnectorService {
 	public record PersonCandidateInput(
 			String externalPersonRef, String externalDisplayName, String email, String phone,
 			String externalEmployeeNumber
+	) {
+	}
+
+	public record DeviceCandidateInput(
+			String externalDeviceRef, String externalDeviceName,
+			String externalDeviceType, Map<String, String> metadata
 	) {
 	}
 

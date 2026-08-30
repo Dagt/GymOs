@@ -36,6 +36,38 @@ try {
         throw "Rejected insecure installation changed its target directory."
     }
 
+    $profileInstallRoot = Join-Path $testRoot "profile-install"
+    $profileSource = Join-Path $bundle "config\hikcentral-profile.example.json"
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer `
+        -InstallRoot $profileInstallRoot `
+        -CloudBaseUrl "http://localhost:8080" `
+        -ConnectorKey "profile-smoke" `
+        -Provider HIKCENTRAL `
+        -HikCentralBaseUrl "https://hikcentral.invalid:8443" `
+        -HikCentralAppKey "profile-app-key" `
+        -ManagedAccessLevelRefs "CENTRO_GENERAL" `
+        -HikCentralCapabilityProfile $profileSource `
+        -SkipActivation -SkipProviderSecret -SkipDoctor -SkipScheduledTask
+    if ($LASTEXITCODE -ne 0) {
+        throw "HikCentral profile installation failed with code $LASTEXITCODE."
+    }
+    $profileConfiguration = Get-Content -LiteralPath (
+        Join-Path $profileInstallRoot "config\connector.properties") -Raw
+    if (-not $profileConfiguration.Contains("hikcentral.capabilityProfilePath=")) {
+        throw "Installer did not activate the supplied HikCentral capability profile."
+    }
+    $installedProfile = Join-Path $profileInstallRoot "config\hikcentral-profile.json"
+    if (-not (Test-Path -LiteralPath $installedProfile -PathType Leaf) -or
+        (Get-FileHash -LiteralPath $installedProfile -Algorithm SHA256).Hash -ne
+        (Get-FileHash -LiteralPath $profileSource -Algorithm SHA256).Hash) {
+        throw "Installed HikCentral capability profile differs from the supplied file."
+    }
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $uninstaller `
+        -InstallRoot $profileInstallRoot
+    if ($LASTEXITCODE -ne 0) {
+        throw "Profile smoke uninstall failed with code $LASTEXITCODE."
+    }
+
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer `
         -InstallRoot $installRoot `
         -CloudBaseUrl "http://localhost:8080" `

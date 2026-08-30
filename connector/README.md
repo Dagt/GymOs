@@ -13,17 +13,24 @@ Este primer incremento incluye:
 - driver `SIMULATOR` para pruebas sin hardware;
 - contrato neutral `AccessProviderDriver`;
 - base del driver `HIKCENTRAL` con diagnóstico OpenAPI y asignación exacta de
-  Access Levels administrados por GymFort.
+  Access Levels administrados por GymFort;
+- descubrimiento neutral de personas y dispositivos con vinculación explícita;
+- ingestión durable de eventos, autorización GymFort y apertura remota auditada;
+- dos modos por punto: proveedor administrado o validación GymFort en línea;
+- perfil declarativo HikCentral para adaptar rutas/campos OpenAPI sin recompilar.
 
 Diseño y aceptación:
 
 - [Arquitectura y garantías](docs/architecture.md)
 - [Matriz de aceptación HikCentral](docs/hikcentral-site-acceptance-matrix.md)
+- [Matriz integral Centro/Tecnológica](docs/TEST-MATRIX.md)
+- [Perfil OpenAPI configurable](docs/HIKCENTRAL-CAPABILITY-PROFILE.md)
 - [Instalación piloto en Windows](docs/windows-pilot-installation.md)
 
-No es todavía una integración certificada para producción: faltan validación
-contra una instalación real, eventos HikCentral, enrolamiento asistido y el
-modo de autorización local para paquetes de visitas medidos.
+El flujo completo está automatizado con el simulador. Todavía no es una
+integración certificada para producción física: deben completarse el perfil
+con la documentación OpenAPI de la instalación, las pruebas con HikCentral y
+el torniquete reales, el enrolamiento facial local y la firma Authenticode.
 
 ## Compilar y probar
 
@@ -77,11 +84,18 @@ directorio predeterminado es `runtime/logs` y puede cambiarse con
 ## HikCentral
 
 Configura `connector.provider=HIKCENTRAL`, `hikcentral.baseUrl`,
-`hikcentral.appKey` y la lista cerrada `hikcentral.managedAccessLevelRefs`.
+`hikcentral.appKey` y, cuando existan permisos autónomos, la lista cerrada
+`hikcentral.managedAccessLevelRefs`. La lista puede quedar vacía en una
+instalación exclusivamente `GYMFORT_ONLINE`.
 `hikcentral.baseUrl` exige HTTPS. Si el servidor usa una CA local, exporta su
 certificado X.509 y configura `hikcentral.trustedCertificatePath`; esto agrega
 esa confianza sin reemplazar las autoridades públicas ni desactivar la
 verificación del nombre del servidor.
+Para descubrimiento, eventos y apertura remota configura además
+`hikcentral.capabilityProfilePath`; consulta la guía del perfil. Sin ese archivo
+el modo estático de Access Levels continúa funcionando, pero `GYMFORT_ONLINE`
+no puede habilitarse. El Connector reporta sus capacidades en el heartbeat y
+el backend exige `EVENT_POLLING` y `REMOTE_OPEN` antes de aceptar ese modo.
 Guarda el App Secret desde una consola interactiva:
 
 ```powershell
@@ -89,4 +103,6 @@ Guarda el App Secret desde una consola interactiva:
 ```
 
 El driver sólo agrega o retira al socio de los Access Levels declarados como
-administrados. Nunca elimina permisos que estén fuera de ese conjunto.
+administrados. Nunca elimina permisos que estén fuera de ese conjunto. Una
+lista vacía desactiva esa sincronización sin afectar descubrimiento, eventos o
+apertura remota.

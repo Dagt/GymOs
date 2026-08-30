@@ -20,8 +20,11 @@ import com.gymos.access.infrastructure.AccessRepository.TemporaryPassRecord;
 import com.gymos.access.infrastructure.AccessRepository.VisitPassRecord;
 import com.gymos.access.infrastructure.PhysicalAccessRepository;
 import com.gymos.access.infrastructure.PhysicalAccessRepository.ConnectionRecord;
+import com.gymos.access.infrastructure.PhysicalAccessRepository.ConnectorContext;
 import com.gymos.access.infrastructure.PhysicalAccessRepository.DesiredStateRecord;
 import com.gymos.access.infrastructure.PhysicalAccessRepository.DeviceLinkRecord;
+import com.gymos.access.infrastructure.PhysicalAccessRepository.PhysicalAuthorizationRecord;
+import com.gymos.access.infrastructure.PhysicalAccessRepository.DeviceCandidateRecord;
 import com.gymos.audit.api.AuditService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -197,6 +200,16 @@ public class AccessService {
 				benefits, mappings, deviceLinks);
 	}
 
+	@Transactional(readOnly = true)
+	public List<DeviceCandidateRecord> physicalDeviceCandidates(GymOsPrincipal principal, int limit) {
+		requireBranch(principal);
+		requirePhysicalManagement(principal);
+		ConnectionRecord connection = requiredPhysicalConnection(principal);
+		return physicalAccessRepository.deviceCandidates(
+				principal.organizationId(), principal.branchId(), connection.id(),
+				Math.max(1, Math.min(limit, 200)));
+	}
+
 	@Transactional
 	public PhysicalIntegrationView configurePhysicalIntegration(
 			GymOsPrincipal principal,
@@ -369,6 +382,7 @@ public class AccessService {
 			UUID deviceId,
 			String externalDeviceRef,
 			String externalDeviceName,
+			String authorizationMode,
 			String correlationId
 	) {
 		requireBranch(principal);
@@ -389,6 +403,14 @@ public class AccessService {
 		}
 		String externalRef = requiredText(externalDeviceRef, "PHYSICAL_ACCESS_DEVICE_REF_REQUIRED",
 				"Indica la referencia externa de la puerta o dispositivo.");
+		String normalizedAuthorizationMode = normalizeAuthorizationMode(authorizationMode);
+		if ("GYMFORT_ONLINE".equals(normalizedAuthorizationMode)) {
+			Set<String> reportedCapabilities = Set.copyOf(fromJson(connection.connectorCapabilitiesJson()));
+			if (!reportedCapabilities.containsAll(Set.of("EVENT_POLLING", "REMOTE_OPEN"))) {
+				throw new BusinessException("PHYSICAL_ONLINE_CAPABILITIES_REQUIRED",
+						"El Connector debe reportar sondeo de eventos y apertura remota antes de habilitar GymFort en línea.");
+			}
+		}
 		var duplicate = physicalAccessRepository.deviceLinkByExternalRef(
 				principal.organizationId(), principal.branchId(), connection.id(), externalRef).orElse(null);
 		if (duplicate != null && !duplicate.accessDeviceId().equals(device.id())) {
@@ -399,10 +421,27 @@ public class AccessService {
 		}
 		DeviceLinkRecord link = physicalAccessRepository.upsertDeviceLink(
 				connection, device.id(), externalRef, trimToNull(externalDeviceName),
+				normalizedAuthorizationMode,
 				principal.userId(), OffsetDateTime.now());
+		ensureAuthorizationModesDoNotConflict(principal, connection);
+		physicalSynchronizationService.reconcileConnection(
+				connection, "physical-device-link:" + link.id() + ":" + safeCorrelationId(correlationId),
+				"RECONCILE", "BACKOFFICE", principal.userId());
 		auditService.record(principal, "PHYSICAL_ACCESS_DEVICE_LINKED", "ACCESS_PROVIDER_DEVICE_LINK",
 				link.id(), "BACKOFFICE", "deviceId=" + device.id(), correlationId);
 		return physicalDeviceLinkView(link);
+	}
+
+	public PhysicalDeviceLinkView linkPhysicalDevice(
+			GymOsPrincipal principal,
+			UUID deviceId,
+			String externalDeviceRef,
+			String externalDeviceName,
+			String correlationId
+	) {
+		return linkPhysicalDevice(
+				principal, deviceId, externalDeviceRef, externalDeviceName,
+				"PROVIDER_MANAGED", correlationId);
 	}
 
 	@Transactional
@@ -415,8 +454,157 @@ public class AccessService {
 				principal.organizationId(), principal.branchId(), connection.id(), deviceId)) {
 			throw new BusinessException("PHYSICAL_ACCESS_DEVICE_LINK_NOT_FOUND", "El punto no tiene un vínculo externo.");
 		}
+		physicalSynchronizationService.reconcileConnection(
+				connection, "physical-device-unlink:" + deviceId + ":" + safeCorrelationId(correlationId),
+				"RECONCILE", "BACKOFFICE", principal.userId());
 		auditService.record(principal, "PHYSICAL_ACCESS_DEVICE_UNLINKED", "ACCESS_DEVICE",
 				deviceId, "BACKOFFICE", null, correlationId);
+	}
+
+	@Transactional
+	public PhysicalAuthorizationView requestPhysicalAccess(
+			ConnectorContext connector,
+			PhysicalAuthorizationInput input,
+			String correlationId
+	) {
+		String providerKey = providerCatalog.normalize(input.providerKey());
+		if (!connector.providerKey().equals(providerKey)) {
+			throw new BusinessException("PHYSICAL_EVENT_PROVIDER_MISMATCH",
+					"El evento no pertenece al proveedor autenticado.");
+		}
+		String externalEventId = requiredText(input.externalEventId(), "PHYSICAL_EVENT_ID_REQUIRED",
+				"El evento requiere un identificador externo.");
+		String externalDeviceRef = requiredText(input.externalDeviceRef(), "PHYSICAL_EVENT_DEVICE_REQUIRED",
+				"El evento requiere un recurso externo.");
+		DeviceLinkRecord deviceLink = physicalAccessRepository.deviceLinkByExternalRef(
+				connector.organizationId(), connector.branchId(), connector.connectionId(), externalDeviceRef)
+				.orElseThrow(() -> new BusinessException("PHYSICAL_EVENT_DEVICE_UNRESOLVED",
+						"El recurso externo no está vinculado a un punto de esta sucursal."));
+		String externalPersonRef = trimToNull(input.externalPersonRef());
+		var clientLink = externalPersonRef == null ? null : physicalAccessRepository.clientLinkByExternalRef(
+				connector.organizationId(), connector.branchId(), connector.connectionId(), externalPersonRef)
+				.orElse(null);
+		String providerDecision = input.providerDecision() == null ? null
+				: input.providerDecision().trim().toUpperCase(Locale.ROOT);
+		if (providerDecision != null && !Set.of("GRANTED", "DENIED").contains(providerDecision)) {
+			throw new BusinessException("PHYSICAL_EVENT_DECISION_INVALID", "La decisión física no es válida.");
+		}
+		OffsetDateTime now = OffsetDateTime.now();
+		OffsetDateTime occurredAt = input.occurredAt() == null ? now : input.occurredAt();
+		if (occurredAt.isAfter(now.plusMinutes(5))) {
+			throw new BusinessException("PHYSICAL_EVENT_TIME_INVALID", "El evento no puede estar fechado en el futuro.");
+		}
+		PhysicalAuthorizationRecord authorization = physicalAccessRepository.lockOrCreateAuthorization(
+				connector, deviceLink, clientLink == null ? null : clientLink.clientId(), externalEventId,
+				externalPersonRef, externalDeviceRef, providerDecision, occurredAt, now);
+		if (!authorization.accessDeviceId().equals(deviceLink.accessDeviceId())
+				|| !java.util.Objects.equals(authorization.clientId(),
+						clientLink == null ? null : clientLink.clientId())
+				|| !java.util.Objects.equals(authorization.externalPersonRef(), externalPersonRef)
+				|| !authorization.externalDeviceRef().equals(externalDeviceRef)
+				|| !java.util.Objects.equals(authorization.providerDecision(), providerDecision)
+				|| !authorization.authorizationMode().equals(deviceLink.authorizationMode())
+				|| !authorization.occurredAt().toInstant().equals(occurredAt.toInstant())) {
+			throw new BusinessException("PHYSICAL_EVENT_ID_COLLISION",
+					"El identificador del evento ya fue utilizado con otros datos físicos.");
+		}
+		if (!"PENDING".equals(authorization.decision())) {
+			if (isExpiredPendingOnlineActuation(authorization, now)) {
+				authorization = physicalAccessRepository.reportActuation(
+						connector, authorization.id(), "FAILED", null,
+						"La autorización venció antes de que el Connector confirmara la apertura.", now)
+						.orElse(authorization);
+				if (authorization.accessLogId() != null) {
+					physicalAccessRepository.updateAccessLogCommandStatus(
+							connector.organizationId(), connector.branchId(), authorization.accessLogId(),
+							"REMOTE_OPEN_EXPIRED");
+				}
+			}
+			return physicalAuthorizationView(authorization);
+		}
+
+		String eventType = input.eventType() == null || input.eventType().isBlank()
+				? "ACCESS_ATTEMPT" : input.eventType().trim().toUpperCase(Locale.ROOT);
+		Map<String, String> metadata = connectorService.sanitizeMetadata(input.metadata());
+		AccessDecisionResponse accessDecision;
+		if ("PROVIDER_MANAGED".equals(deviceLink.authorizationMode())) {
+			String decision = providerDecision == null ? "DENIED" : providerDecision;
+			String reason = clientLink == null && externalPersonRef != null
+					? "EXTERNAL_PERSON_UNRESOLVED"
+					: ("GRANTED".equals(decision) ? "PROVIDER_GRANTED" : "PROVIDER_DENIED");
+			var recorded = physicalAccessRepository.insertExternalEvent(
+					connector, deviceLink.accessDeviceId(), clientLink == null ? null : clientLink.clientId(),
+					providerKey, externalEventId, externalPersonRef, externalDeviceRef, eventType,
+					toJson(metadata), decision, reason, occurredAt, safeCorrelationId(correlationId), now);
+			accessDecision = accessRepository.decision(recorded.accessLogId())
+					.orElseThrow(() -> new BusinessException("ACCESS_LOG_NOT_FOUND",
+							"No fue posible recuperar la decisión física."));
+		} else if (occurredAt.isBefore(now.minus(connectorService.onlineAuthorizationMaxEventAge()))) {
+			AccessDeviceRecord device = accessRepository.deviceById(
+					connector.organizationId(), connector.branchId(), deviceLink.accessDeviceId()).orElseThrow();
+			ClientAccessRecord client = clientLink == null ? null : resolveClient(
+					connectorPrincipal(connector), clientLink.clientId(), null);
+			accessDecision = recordDecision(
+					connectorPrincipal(connector), device, client, null, null, "STALE_PHYSICAL_EVENT", "DENIED",
+					"CONNECTOR", "El evento llegó fuera de la ventana segura para una apertura en línea.",
+					now, correlationId);
+			physicalAccessRepository.markPhysicalDecision(
+					connector, accessDecision.logId(), "NOT_SENT", externalEventId, externalPersonRef,
+					externalDeviceRef, eventType, toJson(metadata));
+			accessDecision = accessRepository.decision(accessDecision.logId()).orElse(accessDecision);
+		} else if (clientLink == null) {
+			AccessDeviceRecord device = accessRepository.deviceById(
+					connector.organizationId(), connector.branchId(), deviceLink.accessDeviceId()).orElseThrow();
+			accessDecision = recordDecision(
+					connectorPrincipal(connector), device, null, null, null, "IDENTITY_CHECK", "DENIED",
+					"CONNECTOR", "La persona física no está vinculada con un socio de GymFort.", now, correlationId);
+			physicalAccessRepository.markPhysicalDecision(
+					connector, accessDecision.logId(), "NOT_SENT", externalEventId, externalPersonRef,
+					externalDeviceRef, eventType, toJson(metadata));
+			accessDecision = accessRepository.decision(accessDecision.logId()).orElse(accessDecision);
+		} else {
+			accessDecision = requestAccess(
+					connectorPrincipal(connector),
+					new AccessRequestCommand(clientLink.clientId(), null, deviceLink.deviceCode(),
+							"physical:" + connector.connectionId() + ":" + externalEventId),
+					correlationId);
+			physicalAccessRepository.markPhysicalDecision(
+					connector, accessDecision.logId(), "GRANTED".equals(accessDecision.decision())
+							? "REMOTE_OPEN_PENDING" : "NOT_SENT",
+					externalEventId, externalPersonRef, externalDeviceRef, eventType, toJson(metadata));
+			accessDecision = accessRepository.decision(accessDecision.logId()).orElse(accessDecision);
+		}
+
+		String actuationStatus = "GYMFORT_ONLINE".equals(deviceLink.authorizationMode())
+				&& "GRANTED".equals(accessDecision.decision()) ? "PENDING" : "NOT_REQUIRED";
+		authorization = physicalAccessRepository.completeAuthorization(
+				connector, authorization.id(), accessDecision.logId(), accessDecision.decision(), actuationStatus, now);
+		return physicalAuthorizationView(authorization);
+	}
+
+	@Transactional
+	public PhysicalAuthorizationView reportPhysicalActuation(
+			ConnectorContext connector, UUID authorizationId, String status,
+			String externalOperationRef, String error
+	) {
+		String normalizedStatus = status == null ? "FAILED" : status.trim().toUpperCase(Locale.ROOT);
+		if (!Set.of("SUCCEEDED", "FAILED", "UNCERTAIN").contains(normalizedStatus)) {
+			throw new BusinessException("PHYSICAL_ACTUATION_STATUS_INVALID",
+					"El estado de apertura física no es válido.");
+		}
+		PhysicalAuthorizationRecord authorization = physicalAccessRepository.reportActuation(
+				connector, authorizationId, normalizedStatus, trimToNull(externalOperationRef),
+				trimToNull(error), OffsetDateTime.now())
+				.orElseThrow(() -> new BusinessException(
+						"PHYSICAL_ACTUATION_TRANSITION_INVALID",
+						"La autorización no admite ese resultado de apertura."));
+		if (authorization.accessLogId() != null) {
+			physicalAccessRepository.updateAccessLogCommandStatus(
+					connector.organizationId(), connector.branchId(), authorization.accessLogId(),
+					"SUCCEEDED".equals(normalizedStatus) ? "REMOTE_OPEN_SUCCEEDED"
+							: "UNCERTAIN".equals(normalizedStatus) ? "REMOTE_OPEN_UNCERTAIN" : "REMOTE_OPEN_FAILED");
+		}
+		return physicalAuthorizationView(authorization);
 	}
 
 	@Transactional
@@ -442,6 +630,14 @@ public class AccessService {
 		}
 		accessRepository.replaceDeviceBenefits(
 				principal.organizationId(), principal.branchId(), device.id(), principal.userId(), normalizedIds);
+		physicalAccessRepository.connection(principal.organizationId(), principal.branchId())
+				.ifPresent(connection -> {
+					ensureAuthorizationModesDoNotConflict(principal, connection);
+					physicalSynchronizationService.reconcileConnection(
+							connection, "physical-device-benefit:" + device.id() + ":"
+									+ safeCorrelationId(correlationId),
+							"RECONCILE", "BACKOFFICE", principal.userId());
+				});
 		auditService.record(principal, "ACCESS_DEVICE_BENEFITS_REPLACED", "ACCESS_DEVICE", device.id(),
 				"BACKOFFICE", "benefits=" + normalizedIds.size(), correlationId);
 		return accessRepository.deviceRequiredBenefitIds(
@@ -451,6 +647,21 @@ public class AccessService {
 	private AccessDeviceRecord accessDevice(GymOsPrincipal principal, UUID deviceId) {
 		return accessRepository.deviceById(principal.organizationId(), principal.branchId(), deviceId)
 				.orElseThrow(() -> new BusinessException("ACCESS_DEVICE_NOT_FOUND", "El dispositivo no existe en la sucursal."));
+	}
+
+	private void ensureAuthorizationModesDoNotConflict(
+			GymOsPrincipal principal, ConnectionRecord connection
+	) {
+		Map<UUID, Set<String>> modesByBenefit = new LinkedHashMap<>();
+		for (var mode : accessRepository.physicalBenefitAuthorizationModes(
+				principal.organizationId(), principal.branchId(), connection.id())) {
+			modesByBenefit.computeIfAbsent(mode.benefitId(), ignored -> new java.util.HashSet<>())
+					.add(mode.authorizationMode());
+		}
+		if (modesByBenefit.values().stream().anyMatch(modes -> modes.size() > 1)) {
+			throw new BusinessException("PHYSICAL_AUTHORIZATION_MODE_CONFLICT",
+					"Un mismo beneficio no puede abrirse a la vez por HikCentral y por GymFort en línea.");
+		}
 	}
 
 	private String normalizeDeviceCode(String deviceCode) {
@@ -486,16 +697,17 @@ public class AccessService {
 		AccessDeviceRecord device = resolveDevice(principal, request.deviceCode());
 		ClientAccessRecord client = resolveClient(principal, request.clientId(), request.identifier());
 		OffsetDateTime now = OffsetDateTime.now();
+		String source = accessDecisionSource(principal);
 		List<UUID> requiredBenefitIds = accessRepository.deviceRequiredBenefitIds(
 				principal.organizationId(), principal.branchId(), device.id());
 		if (requiredBenefitIds.size() > 1) {
 			return recordDecision(principal, device, client, null, null, "CONFIGURATION_CHECK", "DENIED",
-					"RECEPTION", "El punto físico tiene más de un beneficio requerido; corrige su configuración V1.",
+					source, "El punto físico tiene más de un beneficio requerido; corrige su configuración V1.",
 					now, correlationId);
 		}
 		if (providerCatalog.isProductive(device.provider()) && requiredBenefitIds.isEmpty()) {
 			return recordDecision(principal, device, client, null, null, "CONFIGURATION_CHECK", "DENIED",
-					"RECEPTION", "El punto físico no tiene un beneficio ACCESS configurado.", now, correlationId);
+					source, "El punto físico no tiene un beneficio ACCESS configurado.", now, correlationId);
 		}
 		EligibilityDecision eligibility = eligibilityPolicy.evaluate(EligibilityRequest.access(
 				principal.organizationId(), principal.branchId(), client.id(), BusinessTime.today(),
@@ -503,11 +715,11 @@ public class AccessService {
 		ActiveMembership membership = eligibility.membership();
 
 		if (eligibility.eligible()) {
-			return recordDecision(principal, device, client, membership.id(), null, "MEMBERSHIP_CHECK", "GRANTED", "RECEPTION", "Membresia activa hasta " + membership.endsOn() + ".", now, correlationId);
+			return recordDecision(principal, device, client, membership.id(), null, "MEMBERSHIP_CHECK", "GRANTED", source, "Membresia activa hasta " + membership.endsOn() + ".", now, correlationId);
 		}
 		if (eligibility.reason() == Reason.CLIENT_NOT_ACTIVE) {
 			return recordDecision(principal, device, client, null, null, "MEMBERSHIP_CHECK", "DENIED",
-					"RECEPTION", "Cliente inactivo o suspendido.", now, correlationId);
+					source, "Cliente inactivo o suspendido.", now, correlationId);
 		}
 
 		String visitIdempotencyKey = "access:" + (
@@ -591,7 +803,7 @@ public class AccessService {
 	) {
 		AccessDecisionResponse response = recordDecision(
 				principal, device, client, membershipId, temporaryPassId, accessType, decision,
-				"RECEPTION", reason, occurredAt, correlationId);
+				accessDecisionSource(principal), reason, occurredAt, correlationId);
 		if (packageUsage != null) {
 			visitPackages.linkAccessLog(
 					principal.organizationId(), packageUsage.usageId(), packageUsage.usageMode(),
@@ -710,7 +922,7 @@ public class AccessService {
 	private PhysicalIntegrationConnectionView defaultPhysicalConnection() {
 		return new PhysicalIntegrationConnectionView(
 				null, "", "", null, false, "DISABLED", false,
-				null, null, null, 0, 0, null, null);
+				null, null, null, 0, 0, null, List.of(), null);
 	}
 
 	private PhysicalIntegrationConnectionView physicalConnectionView(ConnectionRecord connection) {
@@ -719,7 +931,8 @@ public class AccessService {
 				connection.id(), connection.providerKey(), connection.displayName(), connection.connectorKey(),
 				connection.enabled(), health.status(), health.credentialActive(), health.lastHeartbeatAt(),
 				health.lastSynchronizedAt(), health.lastError(), health.pendingJobs(), health.failedJobs(),
-				health.connectorVersion(), connection.connectorActivatedAt());
+				health.connectorVersion(), fromJson(connection.connectorCapabilitiesJson()),
+				connection.connectorActivatedAt());
 	}
 
 	private PhysicalAccessBenefitView physicalAccessBenefitView(PhysicalAccessBenefitRecord benefit) {
@@ -735,7 +948,54 @@ public class AccessService {
 	private PhysicalDeviceLinkView physicalDeviceLinkView(DeviceLinkRecord link) {
 		return new PhysicalDeviceLinkView(
 				link.id(), link.accessDeviceId(), link.deviceName(), link.deviceCode(),
-				link.externalDeviceRef(), link.externalDeviceName(), link.updatedAt());
+				link.externalDeviceRef(), link.externalDeviceName(), link.authorizationMode(), link.updatedAt());
+	}
+
+	private String normalizeAuthorizationMode(String value) {
+		String normalized = value == null || value.isBlank()
+				? "PROVIDER_MANAGED" : value.trim().toUpperCase(Locale.ROOT);
+		if (!Set.of("PROVIDER_MANAGED", "GYMFORT_ONLINE").contains(normalized)) {
+			throw new BusinessException("PHYSICAL_AUTHORIZATION_MODE_INVALID",
+					"El modo de autorización física no es válido.");
+		}
+		return normalized;
+	}
+
+	private GymOsPrincipal connectorPrincipal(ConnectorContext connector) {
+		return new GymOsPrincipal(
+				null, connector.organizationId(), connector.branchId(),
+				"physical-connector", "GymFort Physical Connector", Set.of());
+	}
+
+	private PhysicalAuthorizationView physicalAuthorizationView(PhysicalAuthorizationRecord authorization) {
+		String reason = authorization.accessLogId() == null ? null
+				: accessRepository.decision(authorization.accessLogId()).map(AccessDecisionResponse::reason).orElse(null);
+		return new PhysicalAuthorizationView(
+				authorization.id(), authorization.accessLogId(), authorization.externalEventId(),
+				authorization.decision(), authorization.authorizationMode(), authorization.actuationStatus(),
+				"GYMFORT_ONLINE".equals(authorization.authorizationMode())
+						&& "GRANTED".equals(authorization.decision())
+						&& "PENDING".equals(authorization.actuationStatus()),
+				reason, authorization.updatedAt());
+	}
+
+	private boolean isExpiredPendingOnlineActuation(
+			PhysicalAuthorizationRecord authorization, OffsetDateTime now
+	) {
+		return "GYMFORT_ONLINE".equals(authorization.authorizationMode())
+				&& "GRANTED".equals(authorization.decision())
+				&& "PENDING".equals(authorization.actuationStatus())
+				&& authorization.occurredAt().isBefore(
+						now.minus(connectorService.onlineAuthorizationMaxEventAge()));
+	}
+
+	private String toJson(Map<String, String> value) {
+		try {
+			return objectMapper.writeValueAsString(value == null ? Map.of() : value);
+		} catch (JsonProcessingException exception) {
+			throw new BusinessException("PHYSICAL_EVENT_METADATA_INVALID",
+					"Los metadatos del evento físico no son válidos.");
+		}
 	}
 
 	private PhysicalSyncStateView physicalSyncStateView(DesiredStateRecord state) {
@@ -817,9 +1077,22 @@ public class AccessService {
 				principal.userId(),
 				safeCorrelationId(correlationId)
 		);
-		auditService.record(principal, "GRANTED".equals(decision) ? "ACCESS_GRANTED" : "ACCESS_DENIED", "ACCESS_LOG", logId, source, reason, correlationId);
+		String auditAction = "GRANTED".equals(decision) ? "ACCESS_GRANTED" : "ACCESS_DENIED";
+		if (principal.userId() == null && "CONNECTOR".equals(source)) {
+			auditService.recordSystem(
+					principal.organizationId(), principal.branchId(), null, auditAction,
+					"ACCESS_LOG", logId, source, reason, correlationId);
+		} else {
+			auditService.record(
+					principal, auditAction, "ACCESS_LOG", logId, source, reason, correlationId);
+		}
 		return accessRepository.decision(logId)
 				.orElseThrow(() -> new BusinessException("ACCESS_LOG_NOT_FOUND", "No fue posible recuperar la decision de acceso."));
+	}
+
+	private String accessDecisionSource(GymOsPrincipal principal) {
+		return principal.userId() == null && "physical-connector".equals(principal.username())
+				? "CONNECTOR" : "RECEPTION";
 	}
 
 	private UUID safeCorrelationId(String correlationId) {
@@ -876,8 +1149,12 @@ public class AccessService {
 			int pendingJobs,
 			int failedJobs,
 			String connectorVersion,
+			List<String> connectorCapabilities,
 			OffsetDateTime connectorActivatedAt
 	) {
+		public PhysicalIntegrationConnectionView {
+			connectorCapabilities = connectorCapabilities == null ? List.of() : List.copyOf(connectorCapabilities);
+		}
 	}
 
 	public record PhysicalAccessBenefitView(UUID id, String code, String name) {
@@ -899,6 +1176,32 @@ public class AccessService {
 			String deviceCode,
 			String externalDeviceRef,
 			String externalDeviceName,
+			String authorizationMode,
+			OffsetDateTime updatedAt
+	) {
+	}
+
+	public record PhysicalAuthorizationInput(
+			String providerKey,
+			String externalEventId,
+			String externalPersonRef,
+			String externalDeviceRef,
+			OffsetDateTime occurredAt,
+			String providerDecision,
+			String eventType,
+			Map<String, String> metadata
+	) {
+	}
+
+	public record PhysicalAuthorizationView(
+			UUID authorizationId,
+			UUID accessLogId,
+			String externalEventId,
+			String decision,
+			String authorizationMode,
+			String actuationStatus,
+			boolean shouldOpen,
+			String reason,
 			OffsetDateTime updatedAt
 	) {
 	}

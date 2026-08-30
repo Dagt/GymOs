@@ -123,6 +123,94 @@ class PhysicalAccessRepositoryIntegrationTests {
 	}
 
 	@Test
+	void rotatingConnectorKeyClearsRuntimeStateAndReportedCapabilities() {
+		Fixture fixture = fixture();
+		OffsetDateTime now = OffsetDateTime.now();
+		fixture.jdbc().sql("""
+				UPDATE access_provider_connection
+				SET last_heartbeat_at = :now,
+				    last_synchronized_at = :now,
+				    connector_reported_status = 'HEALTHY',
+				    connector_capabilities = '["EVENT_POLLING", "REMOTE_OPEN"]'::jsonb,
+				    last_error = 'stale error'
+				WHERE id = :connectionId
+				""")
+				.param("now", now)
+				.param("connectionId", fixture.connection().id())
+				.update();
+
+		var accessRepository = new AccessRepository(fixture.jdbc());
+		accessRepository.upsertPhysicalProviderConnection(
+				fixture.organizationId(), fixture.branchId(), "HIKCENTRAL", "HikCentral",
+				"rotated-" + fixture.connection().id(), true, null);
+
+		var runtimeState = fixture.jdbc().sql("""
+				SELECT last_heartbeat_at, last_synchronized_at, connector_reported_status,
+				       connector_capabilities::text AS connector_capabilities, last_error
+				FROM access_provider_connection
+				WHERE organization_id = :organizationId
+				  AND branch_id = :branchId
+				""")
+				.param("organizationId", fixture.organizationId())
+				.param("branchId", fixture.branchId())
+				.query((rs, rowNumber) -> new Object[] {
+						rs.getObject("last_heartbeat_at"),
+						rs.getObject("last_synchronized_at"),
+						rs.getObject("connector_reported_status"),
+						rs.getString("connector_capabilities"),
+						rs.getObject("last_error")})
+				.single();
+
+		assertThat(runtimeState).containsExactly(null, null, null, "[]", null);
+	}
+
+	@Test
+	void physicalBenefitAuthorizationModesRemainTenantAndBranchScoped() {
+		Fixture fixture = fixture();
+		Fixture otherTenant = fixture();
+		UUID benefitId = UUID.randomUUID();
+		fixture.jdbc().sql("""
+				INSERT INTO benefit (
+				    id, organization_id, branch_id, code, name, benefit_type, discount_type,
+				    requires_evidence, combinable, priority, status, access_scope,
+				    created_at, updated_at, version
+				)
+				VALUES (:id, :organizationId, :branchId, :code, 'Acceso General', 'ACCESS', 'NONE',
+				        FALSE, FALSE, 100, 'ACTIVE', 'LOCAL', now(), now(), 0)
+				""")
+				.param("id", benefitId)
+				.param("organizationId", fixture.organizationId())
+				.param("branchId", fixture.branchId())
+				.param("code", "ACCESS-" + benefitId)
+				.update();
+		UUID providerDeviceId = insertDevice(fixture, "PROVIDER");
+		UUID onlineDeviceId = insertDevice(fixture, "ONLINE");
+		for (UUID deviceId : List.of(providerDeviceId, onlineDeviceId)) {
+			fixture.jdbc().sql("""
+					INSERT INTO access_device_benefit (
+					    access_device_id, benefit_id, organization_id, created_at
+					)
+					VALUES (:deviceId, :benefitId, :organizationId, now())
+					""")
+					.param("deviceId", deviceId)
+					.param("benefitId", benefitId)
+					.param("organizationId", fixture.organizationId())
+					.update();
+		}
+		insertDeviceLink(fixture, providerDeviceId, "door-provider", "PROVIDER_MANAGED");
+		insertDeviceLink(fixture, onlineDeviceId, "door-online", "GYMFORT_ONLINE");
+
+		var repository = new AccessRepository(fixture.jdbc());
+		assertThat(repository.physicalBenefitAuthorizationModes(
+				fixture.organizationId(), fixture.branchId(), fixture.connection().id()))
+				.extracting(AccessRepository.PhysicalBenefitAuthorizationModeRecord::authorizationMode)
+				.containsExactly("GYMFORT_ONLINE", "PROVIDER_MANAGED");
+		assertThat(repository.physicalBenefitAuthorizationModes(
+				otherTenant.organizationId(), otherTenant.branchId(), otherTenant.connection().id()))
+				.isEmpty();
+	}
+
+	@Test
 	void supersededDesiredStateWaitsForTheActiveLeaseAndCancelsTheOldAttempt() {
 		Fixture fixture = fixture();
 		OffsetDateTime now = OffsetDateTime.now();
@@ -221,6 +309,83 @@ class PhysicalAccessRepositoryIntegrationTests {
 		assertThatThrownBy(() -> fixture.repository().upsertDeviceLink(
 				fixture.connection(), otherDeviceId, "door-foreign", "Otra", null, OffsetDateTime.now()))
 				.hasRootCauseInstanceOf(SQLException.class);
+	}
+
+	@Test
+	void onlineAuthorizationsAreIdempotentAndActuationDoesNotCreateAnotherAccessDecision() {
+		Fixture fixture = fixture();
+		UUID deviceId = insertDevice(fixture, "ONLINE");
+		var link = fixture.repository().upsertDeviceLink(
+				fixture.connection(), deviceId, "door-online", "Torniquete online",
+				"GYMFORT_ONLINE", null, OffsetDateTime.now());
+		OffsetDateTime now = OffsetDateTime.now();
+		var first = fixture.repository().lockOrCreateAuthorization(
+				fixture.connector(), link, fixture.clientId(), "online-event-1", "person-42",
+				"door-online", null, now, now);
+		var duplicate = fixture.repository().lockOrCreateAuthorization(
+				fixture.connector(), link, fixture.clientId(), "online-event-1", "person-altered",
+				"door-online", "DENIED", now.plusSeconds(1), now.plusSeconds(1));
+		assertThat(duplicate.id()).isEqualTo(first.id());
+		assertThat(duplicate.externalPersonRef()).isEqualTo("person-42");
+		assertThat(duplicate.authorizationMode()).isEqualTo("GYMFORT_ONLINE");
+
+		UUID logId = UUID.randomUUID();
+		fixture.jdbc().sql("""
+				INSERT INTO access_log (
+				    id, organization_id, branch_id, device_id, client_id,
+				    access_type, decision, source, reason, command_status,
+				    occurred_at, created_at, correlation_id
+				) VALUES (
+				    :id, :organizationId, :branchId, :deviceId, :clientId,
+				    'MEMBERSHIP_CHECK', 'GRANTED', 'CONNECTOR', 'OK', 'REMOTE_OPEN_PENDING',
+				    :now, :now, :correlationId
+				)
+				""")
+				.param("id", logId)
+				.param("organizationId", fixture.organizationId())
+				.param("branchId", fixture.branchId())
+				.param("deviceId", deviceId)
+				.param("clientId", fixture.clientId())
+				.param("now", now)
+				.param("correlationId", UUID.randomUUID())
+				.update();
+		var decided = fixture.repository().completeAuthorization(
+				fixture.connector(), first.id(), logId, "GRANTED", "PENDING", now);
+		var actuated = fixture.repository().reportActuation(
+				fixture.connector(), decided.id(), "SUCCEEDED", "hcp:open:1", null, now.plusSeconds(1))
+				.orElseThrow();
+
+		assertThat(actuated.actuationStatus()).isEqualTo("SUCCEEDED");
+		assertThat(actuated.externalOperationRef()).isEqualTo("hcp:open:1");
+		assertThat(fixture.repository().reportActuation(
+				fixture.connector(), decided.id(), "SUCCEEDED", "hcp:open:1", null, now.plusSeconds(2)))
+				.isPresent();
+		assertThat(fixture.repository().reportActuation(
+				fixture.connector(), decided.id(), "FAILED", null, "late contradictory result",
+				now.plusSeconds(3))).isEmpty();
+		assertThat(fixture.jdbc().sql("SELECT COUNT(*) FROM access_log WHERE id = :id")
+				.param("id", logId).query(Integer.class).single()).isEqualTo(1);
+	}
+
+	@Test
+	void discoveredDevicesRequireAnExplicitTenantScopedLink() {
+		Fixture fixture = fixture();
+		var candidate = fixture.repository().upsertDeviceCandidate(
+				fixture.connector(), "discovered-door", "Puerta detectada", "DOOR",
+				"{\"model\":\"test\"}", OffsetDateTime.now());
+		assertThat(candidate.status()).isEqualTo("UNLINKED");
+
+		UUID deviceId = insertDevice(fixture, "DISCOVERED");
+		fixture.repository().upsertDeviceLink(
+				fixture.connection(), deviceId, "discovered-door", "Puerta detectada",
+				"PROVIDER_MANAGED", null, OffsetDateTime.now());
+		assertThat(fixture.repository().deviceCandidates(
+				fixture.organizationId(), fixture.branchId(), fixture.connection().id(), 20))
+				.singleElement()
+				.satisfies(found -> {
+					assertThat(found.status()).isEqualTo("LINKED");
+					assertThat(found.linkedAccessDeviceId()).isEqualTo(deviceId);
+				});
 	}
 
 	@Test
@@ -461,6 +626,25 @@ class PhysicalAccessRepositoryIntegrationTests {
 				.param("code", suffix + "-" + deviceId)
 				.update();
 		return deviceId;
+	}
+
+	private void insertDeviceLink(Fixture fixture, UUID deviceId, String externalRef, String mode) {
+		fixture.jdbc().sql("""
+				INSERT INTO access_provider_device_link (
+				    id, organization_id, branch_id, connection_id, access_device_id,
+				    external_device_ref, authorization_mode, created_at, updated_at, version
+				)
+				VALUES (:id, :organizationId, :branchId, :connectionId, :deviceId,
+				        :externalRef, :mode, now(), now(), 0)
+				""")
+				.param("id", UUID.randomUUID())
+				.param("organizationId", fixture.organizationId())
+				.param("branchId", fixture.branchId())
+				.param("connectionId", fixture.connection().id())
+				.param("deviceId", deviceId)
+				.param("externalRef", externalRef)
+				.param("mode", mode)
+				.update();
 	}
 
 	private DriverManagerDataSource dataSource() {

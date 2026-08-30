@@ -16,6 +16,7 @@ public final class ConnectorDaemon {
 
     private final CloudGateway cloud;
     private final ConnectorWorker worker;
+    private final ProviderRuntimeWorker runtimeWorker;
     private final AccessProviderDriver driver;
     private final String connectorVersion;
     private final String instanceId;
@@ -32,8 +33,22 @@ public final class ConnectorDaemon {
             Duration pollInterval,
             Duration heartbeatInterval
     ) {
+        this(cloud, worker, null, driver, connectorVersion, instanceId, pollInterval, heartbeatInterval);
+    }
+
+    public ConnectorDaemon(
+            CloudGateway cloud,
+            ConnectorWorker worker,
+            ProviderRuntimeWorker runtimeWorker,
+            AccessProviderDriver driver,
+            String connectorVersion,
+            String instanceId,
+            Duration pollInterval,
+            Duration heartbeatInterval
+    ) {
         this.cloud = cloud;
         this.worker = worker;
+        this.runtimeWorker = runtimeWorker;
         this.driver = driver;
         this.connectorVersion = connectorVersion;
         this.instanceId = instanceId;
@@ -54,6 +69,9 @@ public final class ConnectorDaemon {
                     nextHeartbeat = now.plus(heartbeatInterval);
                 }
                 worker.runOnce();
+                if (runtimeWorker != null) {
+                    runtimeWorker.runOnce();
+                }
                 consecutiveFailures = 0;
                 sleep(pollInterval);
             } catch (CloudApiException exception) {
@@ -80,7 +98,9 @@ public final class ConnectorDaemon {
 
     private void sendHeartbeat() {
         ProviderHealth health = driver.health();
-        cloud.heartbeat(health.healthy() ? "HEALTHY" : "DEGRADED", connectorVersion, instanceId, health.detail());
+        cloud.heartbeat(
+                health.healthy() ? "HEALTHY" : "DEGRADED", connectorVersion, instanceId,
+                health.detail(), health.capabilities().stream().map(Enum::name).collect(java.util.stream.Collectors.toSet()));
     }
 
     Duration backoff(int failures) {

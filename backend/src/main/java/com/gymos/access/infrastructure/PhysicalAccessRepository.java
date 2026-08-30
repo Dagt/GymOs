@@ -92,6 +92,7 @@ public class PhysicalAccessRepository {
 			String reportedStatus,
 			String connectorVersion,
 			String instanceId,
+			String capabilitiesJson,
 			String lastError,
 			OffsetDateTime now
 	) {
@@ -101,6 +102,7 @@ public class PhysicalAccessRepository {
 				    connector_reported_status = :reportedStatus,
 				    connector_version = :connectorVersion,
 				    last_connector_instance_id = :instanceId,
+				    connector_capabilities = CAST(:capabilitiesJson AS jsonb),
 				    sync_status = :reportedStatus,
 				    last_error = :lastError,
 				    updated_at = :now,
@@ -114,6 +116,7 @@ public class PhysicalAccessRepository {
 				.param("reportedStatus", reportedStatus)
 				.param("connectorVersion", connectorVersion)
 				.param("instanceId", instanceId)
+				.param("capabilitiesJson", capabilitiesJson)
 				.param("lastError", lastError)
 				.param("connectionId", connector.connectionId())
 				.param("organizationId", connector.organizationId())
@@ -141,6 +144,7 @@ public class PhysicalAccessRepository {
 				UPDATE access_provider_connection
 				SET connector_activated_at = NULL,
 				    connector_reported_status = NULL,
+				    connector_capabilities = '[]'::jsonb,
 				    sync_status = CASE WHEN enabled THEN 'AWAITING_CONNECTOR' ELSE 'DISABLED' END,
 				    updated_at = :now,
 				    version = version + 1
@@ -304,7 +308,8 @@ public class PhysicalAccessRepository {
 	public List<DeviceLinkRecord> deviceLinks(UUID organizationId, UUID branchId, UUID connectionId) {
 		return jdbcClient.sql("""
 				SELECT link.id, link.access_device_id, d.name AS device_name, d.device_code,
-				       link.external_device_ref, link.external_device_name, link.updated_at
+				       link.external_device_ref, link.external_device_name,
+				       link.authorization_mode, link.updated_at
 				FROM access_provider_device_link link
 				JOIN access_device d
 				  ON d.id = link.access_device_id
@@ -327,7 +332,8 @@ public class PhysicalAccessRepository {
 	) {
 		return jdbcClient.sql("""
 				SELECT link.id, link.access_device_id, d.name AS device_name, d.device_code,
-				       link.external_device_ref, link.external_device_name, link.updated_at
+				       link.external_device_ref, link.external_device_name,
+				       link.authorization_mode, link.updated_at
 				FROM access_provider_device_link link
 				JOIN access_device d
 				  ON d.id = link.access_device_id
@@ -351,31 +357,33 @@ public class PhysicalAccessRepository {
 			UUID deviceId,
 			String externalDeviceRef,
 			String externalDeviceName,
+			String authorizationMode,
 			UUID actorUserId,
 			OffsetDateTime now
 	) {
-		return jdbcClient.sql("""
+		DeviceLinkRecord link = jdbcClient.sql("""
 				INSERT INTO access_provider_device_link (
 				    id, organization_id, branch_id, connection_id, access_device_id,
-				    external_device_ref, external_device_name, created_at, updated_at,
+				    external_device_ref, external_device_name, authorization_mode, created_at, updated_at,
 				    created_by, updated_by, version
 				)
 				VALUES (
 				    :id, :organizationId, :branchId, :connectionId, :deviceId,
-				    :externalDeviceRef, :externalDeviceName, :now, :now,
+				    :externalDeviceRef, :externalDeviceName, :authorizationMode, :now, :now,
 				    :actorUserId, :actorUserId, 0
 				)
 				ON CONFLICT (connection_id, access_device_id)
 				DO UPDATE SET
 				    external_device_ref = EXCLUDED.external_device_ref,
 				    external_device_name = EXCLUDED.external_device_name,
+				    authorization_mode = EXCLUDED.authorization_mode,
 				    updated_at = EXCLUDED.updated_at,
 				    updated_by = EXCLUDED.updated_by,
 				    version = access_provider_device_link.version + 1
 				RETURNING id, access_device_id,
 				          (SELECT name FROM access_device WHERE id = access_device_id) AS device_name,
 				          (SELECT device_code FROM access_device WHERE id = access_device_id) AS device_code,
-				          external_device_ref, external_device_name, updated_at
+				          external_device_ref, external_device_name, authorization_mode, updated_at
 				""")
 				.param("id", UUID.randomUUID())
 				.param("organizationId", connection.organizationId())
@@ -384,27 +392,77 @@ public class PhysicalAccessRepository {
 				.param("deviceId", deviceId)
 				.param("externalDeviceRef", externalDeviceRef)
 				.param("externalDeviceName", externalDeviceName)
+				.param("authorizationMode", authorizationMode)
 				.param("now", now)
 				.param("actorUserId", actorUserId)
 				.query(this::mapDeviceLink)
 				.single();
+		jdbcClient.sql("""
+				UPDATE access_provider_device_candidate
+				SET status = 'LINKED', linked_access_device_id = :deviceId,
+				    updated_at = :now, version = version + 1
+				WHERE organization_id = :organizationId
+				  AND branch_id = :branchId
+				  AND connection_id = :connectionId
+				  AND external_device_ref = :externalDeviceRef
+				""")
+				.param("deviceId", deviceId)
+				.param("now", now)
+				.param("organizationId", connection.organizationId())
+				.param("branchId", connection.branchId())
+				.param("connectionId", connection.id())
+				.param("externalDeviceRef", externalDeviceRef)
+				.update();
+		return link;
+	}
+
+	public DeviceLinkRecord upsertDeviceLink(
+			ConnectionRecord connection,
+			UUID deviceId,
+			String externalDeviceRef,
+			String externalDeviceName,
+			UUID actorUserId,
+			OffsetDateTime now
+	) {
+		return upsertDeviceLink(
+				connection, deviceId, externalDeviceRef, externalDeviceName,
+				"PROVIDER_MANAGED", actorUserId, now);
 	}
 
 	public boolean deleteDeviceLink(
 			UUID organizationId, UUID branchId, UUID connectionId, UUID deviceId
 	) {
-		return jdbcClient.sql("""
+		String externalRef = jdbcClient.sql("""
 				DELETE FROM access_provider_device_link
 				WHERE organization_id = :organizationId
 				  AND branch_id = :branchId
 				  AND connection_id = :connectionId
 				  AND access_device_id = :deviceId
+				RETURNING external_device_ref
 				""")
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
 				.param("connectionId", connectionId)
 				.param("deviceId", deviceId)
-				.update() == 1;
+				.query(String.class)
+				.optional()
+				.orElse(null);
+		if (externalRef == null) return false;
+		jdbcClient.sql("""
+				UPDATE access_provider_device_candidate
+				SET status = 'UNLINKED', linked_access_device_id = NULL,
+				    updated_at = NOW(), version = version + 1
+				WHERE organization_id = :organizationId
+				  AND branch_id = :branchId
+				  AND connection_id = :connectionId
+				  AND external_device_ref = :externalDeviceRef
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("connectionId", connectionId)
+				.param("externalDeviceRef", externalRef)
+				.update();
+		return true;
 	}
 
 	public Optional<ClientLinkRecord> clientLink(
@@ -1242,12 +1300,295 @@ public class PhysicalAccessRepository {
 		return result;
 	}
 
+	public PhysicalAuthorizationRecord lockOrCreateAuthorization(
+			ConnectorContext connector,
+			DeviceLinkRecord deviceLink,
+			UUID clientId,
+			String externalEventId,
+			String externalPersonRef,
+			String externalDeviceRef,
+			String providerDecision,
+			OffsetDateTime occurredAt,
+			OffsetDateTime now
+	) {
+		jdbcClient.sql("""
+				INSERT INTO access_physical_authorization (
+				    id, organization_id, branch_id, connection_id, access_device_id,
+				    client_id, external_event_id, external_person_ref, external_device_ref,
+				    provider_decision, authorization_mode, decision, actuation_status,
+				    occurred_at, created_at, updated_at, version
+				)
+				VALUES (
+				    :id, :organizationId, :branchId, :connectionId, :deviceId,
+				    :clientId, :externalEventId, :externalPersonRef, :externalDeviceRef,
+				    :providerDecision, :authorizationMode, 'PENDING', 'NOT_REQUIRED',
+				    :occurredAt, :now, :now, 0
+				)
+				ON CONFLICT (connection_id, external_event_id) DO NOTHING
+				""")
+				.param("id", UUID.randomUUID())
+				.param("organizationId", connector.organizationId())
+				.param("branchId", connector.branchId())
+				.param("connectionId", connector.connectionId())
+				.param("deviceId", deviceLink.accessDeviceId())
+				.param("clientId", clientId)
+				.param("externalEventId", externalEventId)
+				.param("externalPersonRef", externalPersonRef)
+				.param("externalDeviceRef", externalDeviceRef)
+				.param("providerDecision", providerDecision)
+				.param("authorizationMode", deviceLink.authorizationMode())
+				.param("occurredAt", occurredAt)
+				.param("now", now)
+				.update();
+
+		return jdbcClient.sql("""
+				SELECT id, organization_id, branch_id, connection_id, access_device_id,
+				       client_id, external_event_id, external_person_ref, external_device_ref,
+				       provider_decision, authorization_mode, decision, access_log_id,
+				       actuation_status, external_operation_ref, last_error, occurred_at, updated_at
+				FROM access_physical_authorization
+				WHERE organization_id = :organizationId
+				  AND branch_id = :branchId
+				  AND connection_id = :connectionId
+				  AND external_event_id = :externalEventId
+				FOR UPDATE
+				""")
+				.param("organizationId", connector.organizationId())
+				.param("branchId", connector.branchId())
+				.param("connectionId", connector.connectionId())
+				.param("externalEventId", externalEventId)
+				.query(this::mapPhysicalAuthorization)
+				.single();
+	}
+
+	public PhysicalAuthorizationRecord completeAuthorization(
+			ConnectorContext connector,
+			UUID authorizationId,
+			UUID accessLogId,
+			String decision,
+			String actuationStatus,
+			OffsetDateTime now
+	) {
+		return jdbcClient.sql("""
+				UPDATE access_physical_authorization
+				SET access_log_id = :accessLogId,
+				    decision = :decision,
+				    actuation_status = :actuationStatus,
+				    updated_at = :now,
+				    version = version + 1
+				WHERE id = :authorizationId
+				  AND organization_id = :organizationId
+				  AND branch_id = :branchId
+				  AND connection_id = :connectionId
+				RETURNING id, organization_id, branch_id, connection_id, access_device_id,
+				          client_id, external_event_id, external_person_ref, external_device_ref,
+				          provider_decision, authorization_mode, decision, access_log_id,
+				          actuation_status, external_operation_ref, last_error, occurred_at, updated_at
+				""")
+				.param("accessLogId", accessLogId)
+				.param("decision", decision)
+				.param("actuationStatus", actuationStatus)
+				.param("now", now)
+				.param("authorizationId", authorizationId)
+				.param("organizationId", connector.organizationId())
+				.param("branchId", connector.branchId())
+				.param("connectionId", connector.connectionId())
+				.query(this::mapPhysicalAuthorization)
+				.single();
+	}
+
+	public Optional<PhysicalAuthorizationRecord> reportActuation(
+			ConnectorContext connector,
+			UUID authorizationId,
+			String status,
+			String externalOperationRef,
+			String error,
+			OffsetDateTime now
+	) {
+		return jdbcClient.sql("""
+				UPDATE access_physical_authorization
+				SET actuation_status = :status,
+				    external_operation_ref = :externalOperationRef,
+				    last_error = :error,
+				    updated_at = :now,
+				    version = version + 1
+				WHERE id = :authorizationId
+				  AND organization_id = :organizationId
+				  AND branch_id = :branchId
+				  AND connection_id = :connectionId
+				  AND decision = 'GRANTED'
+				  AND authorization_mode = 'GYMFORT_ONLINE'
+				  AND (
+				      actuation_status = 'PENDING'
+				      OR actuation_status = :status
+				      OR (actuation_status = 'UNCERTAIN' AND :status = 'SUCCEEDED')
+				  )
+				RETURNING id, organization_id, branch_id, connection_id, access_device_id,
+				          client_id, external_event_id, external_person_ref, external_device_ref,
+				          provider_decision, authorization_mode, decision, access_log_id,
+				          actuation_status, external_operation_ref, last_error, occurred_at, updated_at
+				""")
+				.param("status", status)
+				.param("externalOperationRef", externalOperationRef)
+				.param("error", error)
+				.param("now", now)
+				.param("authorizationId", authorizationId)
+				.param("organizationId", connector.organizationId())
+				.param("branchId", connector.branchId())
+				.param("connectionId", connector.connectionId())
+				.query(this::mapPhysicalAuthorization)
+				.optional();
+	}
+
+	public void markPhysicalDecision(
+			ConnectorContext connector, UUID accessLogId, String commandStatus,
+			String externalEventId, String externalPersonRef, String externalDeviceRef,
+			String externalEventType, String metadataJson
+	) {
+		jdbcClient.sql("""
+				UPDATE access_log
+				SET source = 'CONNECTOR',
+				    command_status = :commandStatus,
+				    provider_connection_id = :connectionId,
+				    provider_key = :providerKey,
+				    external_event_id = :externalEventId,
+				    external_person_ref = :externalPersonRef,
+				    external_device_ref = :externalDeviceRef,
+				    external_event_type = :externalEventType,
+				    external_metadata_json = CAST(:metadataJson AS jsonb)
+				WHERE id = :accessLogId
+				  AND organization_id = :organizationId
+				  AND branch_id = :branchId
+				""")
+				.param("commandStatus", commandStatus)
+				.param("connectionId", connector.connectionId())
+				.param("providerKey", connector.providerKey())
+				.param("externalEventId", externalEventId)
+				.param("externalPersonRef", externalPersonRef)
+				.param("externalDeviceRef", externalDeviceRef)
+				.param("externalEventType", externalEventType)
+				.param("metadataJson", metadataJson)
+				.param("accessLogId", accessLogId)
+				.param("organizationId", connector.organizationId())
+				.param("branchId", connector.branchId())
+				.update();
+	}
+
+	public void updateAccessLogCommandStatus(
+			UUID organizationId, UUID branchId, UUID accessLogId, String commandStatus
+	) {
+		jdbcClient.sql("""
+				UPDATE access_log
+				SET command_status = :commandStatus
+				WHERE id = :accessLogId
+				  AND organization_id = :organizationId
+				  AND branch_id = :branchId
+				""")
+				.param("commandStatus", commandStatus)
+				.param("accessLogId", accessLogId)
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.update();
+	}
+
+	public DeviceCandidateRecord upsertDeviceCandidate(
+			ConnectorContext connector,
+			String externalDeviceRef,
+			String externalDeviceName,
+			String externalDeviceType,
+			String metadataJson,
+			OffsetDateTime now
+	) {
+		return jdbcClient.sql("""
+				INSERT INTO access_provider_device_candidate (
+				    id, organization_id, branch_id, connection_id, external_device_ref,
+				    external_device_name, external_device_type, status, linked_access_device_id,
+				    first_seen_at, last_seen_at, metadata_json, created_at, updated_at, version
+				)
+				VALUES (
+				    :id, :organizationId, :branchId, :connectionId, :externalDeviceRef,
+				    :externalDeviceName, :externalDeviceType, 'UNLINKED', NULL,
+				    :now, :now, CAST(:metadataJson AS jsonb), :now, :now, 0
+				)
+				ON CONFLICT (connection_id, external_device_ref)
+				DO UPDATE SET
+				    external_device_name = EXCLUDED.external_device_name,
+				    external_device_type = EXCLUDED.external_device_type,
+				    last_seen_at = EXCLUDED.last_seen_at,
+				    metadata_json = EXCLUDED.metadata_json,
+				    updated_at = EXCLUDED.updated_at,
+				    status = CASE WHEN access_provider_device_candidate.status = 'IGNORED'
+				                  THEN 'IGNORED' ELSE access_provider_device_candidate.status END,
+				    version = access_provider_device_candidate.version + 1
+				RETURNING id, external_device_ref, external_device_name, external_device_type,
+				          status, linked_access_device_id, last_seen_at
+				""")
+				.param("id", UUID.randomUUID())
+				.param("organizationId", connector.organizationId())
+				.param("branchId", connector.branchId())
+				.param("connectionId", connector.connectionId())
+				.param("externalDeviceRef", externalDeviceRef)
+				.param("externalDeviceName", externalDeviceName)
+				.param("externalDeviceType", externalDeviceType)
+				.param("metadataJson", metadataJson)
+				.param("now", now)
+				.query(this::mapDeviceCandidate)
+				.single();
+	}
+
+	public List<DeviceCandidateRecord> deviceCandidates(
+			UUID organizationId, UUID branchId, UUID connectionId, int limit
+	) {
+		return jdbcClient.sql("""
+				SELECT id, external_device_ref, external_device_name, external_device_type,
+				       status, linked_access_device_id, last_seen_at
+				FROM access_provider_device_candidate
+				WHERE organization_id = :organizationId
+				  AND branch_id = :branchId
+				  AND connection_id = :connectionId
+				ORDER BY CASE status WHEN 'UNLINKED' THEN 0 WHEN 'LINKED' THEN 1 ELSE 2 END,
+				         last_seen_at DESC
+				LIMIT :limit
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("connectionId", connectionId)
+				.param("limit", limit)
+				.query(this::mapDeviceCandidate)
+				.list();
+	}
+
+	private PhysicalAuthorizationRecord mapPhysicalAuthorization(java.sql.ResultSet rs, int rowNum)
+			throws java.sql.SQLException {
+		return new PhysicalAuthorizationRecord(
+				rs.getObject("id", UUID.class), rs.getObject("organization_id", UUID.class),
+				rs.getObject("branch_id", UUID.class), rs.getObject("connection_id", UUID.class),
+				rs.getObject("access_device_id", UUID.class), rs.getObject("client_id", UUID.class),
+				rs.getString("external_event_id"), rs.getString("external_person_ref"),
+				rs.getString("external_device_ref"), rs.getString("provider_decision"),
+				rs.getString("authorization_mode"), rs.getString("decision"),
+				rs.getObject("access_log_id", UUID.class), rs.getString("actuation_status"),
+				rs.getString("external_operation_ref"), rs.getString("last_error"),
+				rs.getObject("occurred_at", OffsetDateTime.class),
+				rs.getObject("updated_at", OffsetDateTime.class));
+	}
+
+	private DeviceCandidateRecord mapDeviceCandidate(java.sql.ResultSet rs, int rowNum)
+			throws java.sql.SQLException {
+		return new DeviceCandidateRecord(
+				rs.getObject("id", UUID.class), rs.getString("external_device_ref"),
+				rs.getString("external_device_name"), rs.getString("external_device_type"),
+				rs.getString("status"), rs.getObject("linked_access_device_id", UUID.class),
+				rs.getObject("last_seen_at", OffsetDateTime.class));
+	}
+
 	private String connectionSelect() {
 		return """
 				SELECT c.id, c.organization_id, c.branch_id, c.provider_key, c.display_name,
 				       c.connector_key, c.enabled, c.sync_status, c.last_heartbeat_at,
 				       c.last_synchronized_at, c.last_error, c.connector_activated_at,
 				       c.connector_reported_status, c.connector_version, c.last_connector_instance_id
+				       , c.connector_capabilities::text AS connector_capabilities
 				FROM access_provider_connection c
 				""";
 	}
@@ -1273,7 +1614,7 @@ public class PhysicalAccessRepository {
 				rs.getObject("last_synchronized_at", OffsetDateTime.class), rs.getString("last_error"),
 				rs.getObject("connector_activated_at", OffsetDateTime.class),
 				rs.getString("connector_reported_status"), rs.getString("connector_version"),
-				rs.getString("last_connector_instance_id"));
+				rs.getString("last_connector_instance_id"), rs.getString("connector_capabilities"));
 	}
 
 	private ActivationRecord mapActivation(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {
@@ -1299,6 +1640,7 @@ public class PhysicalAccessRepository {
 				rs.getObject("id", UUID.class), rs.getObject("access_device_id", UUID.class),
 				rs.getString("device_name"), rs.getString("device_code"),
 				rs.getString("external_device_ref"), rs.getString("external_device_name"),
+				rs.getString("authorization_mode"),
 				rs.getObject("updated_at", OffsetDateTime.class));
 	}
 
@@ -1345,8 +1687,19 @@ public class PhysicalAccessRepository {
 			UUID id, UUID organizationId, UUID branchId, String providerKey, String displayName,
 			String connectorKey, boolean enabled, String syncStatus, OffsetDateTime lastHeartbeatAt,
 			OffsetDateTime lastSynchronizedAt, String lastError, OffsetDateTime connectorActivatedAt,
-			String connectorReportedStatus, String connectorVersion, String lastConnectorInstanceId
+			String connectorReportedStatus, String connectorVersion, String lastConnectorInstanceId,
+			String connectorCapabilitiesJson
 	) {
+		public ConnectionRecord(
+				UUID id, UUID organizationId, UUID branchId, String providerKey, String displayName,
+				String connectorKey, boolean enabled, String syncStatus, OffsetDateTime lastHeartbeatAt,
+				OffsetDateTime lastSynchronizedAt, String lastError, OffsetDateTime connectorActivatedAt,
+				String connectorReportedStatus, String connectorVersion, String lastConnectorInstanceId
+		) {
+			this(id, organizationId, branchId, providerKey, displayName, connectorKey, enabled,
+					syncStatus, lastHeartbeatAt, lastSynchronizedAt, lastError, connectorActivatedAt,
+					connectorReportedStatus, connectorVersion, lastConnectorInstanceId, "[]");
+		}
 	}
 
 	public record ActivationRecord(
@@ -1370,8 +1723,16 @@ public class PhysicalAccessRepository {
 
 	public record DeviceLinkRecord(
 			UUID id, UUID accessDeviceId, String deviceName, String deviceCode,
-			String externalDeviceRef, String externalDeviceName, OffsetDateTime updatedAt
+			String externalDeviceRef, String externalDeviceName, String authorizationMode,
+			OffsetDateTime updatedAt
 	) {
+		public DeviceLinkRecord(
+				UUID id, UUID accessDeviceId, String deviceName, String deviceCode,
+				String externalDeviceRef, String externalDeviceName, OffsetDateTime updatedAt
+		) {
+			this(id, accessDeviceId, deviceName, deviceCode, externalDeviceRef,
+					externalDeviceName, "PROVIDER_MANAGED", updatedAt);
+		}
 	}
 
 	public record ClientLinkRecord(UUID clientId, String externalPersonRef, OffsetDateTime linkedAt) {
@@ -1409,6 +1770,23 @@ public class PhysicalAccessRepository {
 
 	public record ExternalEventInsertResult(
 			UUID accessLogId, boolean created, UUID clientId, UUID deviceId, String reason
+	) {
+	}
+
+	public record PhysicalAuthorizationRecord(
+			UUID id, UUID organizationId, UUID branchId, UUID connectionId,
+			UUID accessDeviceId, UUID clientId, String externalEventId,
+			String externalPersonRef, String externalDeviceRef, String providerDecision,
+			String authorizationMode, String decision, UUID accessLogId,
+			String actuationStatus, String externalOperationRef, String lastError,
+			OffsetDateTime occurredAt, OffsetDateTime updatedAt
+	) {
+	}
+
+	public record DeviceCandidateRecord(
+			UUID id, String externalDeviceRef, String externalDeviceName,
+			String externalDeviceType, String status, UUID linkedAccessDeviceId,
+			OffsetDateTime lastSeenAt
 	) {
 	}
 }

@@ -111,6 +111,7 @@ export default function AccessPage() {
             }
             busy={access.busy}
             candidates={access.physicalCandidates}
+            deviceCandidates={access.physicalDeviceCandidates}
             connectionName={access.physicalConnectionName}
             connectorActivation={access.connectorActivation}
             connectorKey={access.physicalConnectorKey}
@@ -122,6 +123,7 @@ export default function AccessPage() {
             externalPersonRef={access.externalPersonRef}
             externalDeviceName={access.externalDeviceName}
             externalDeviceRef={access.externalDeviceRef}
+            authorizationMode={access.physicalAuthorizationMode}
             integration={access.physicalIntegration}
             mappingDrafts={access.physicalMappingDrafts}
             onActivationIssue={access.issueConnectorActivation}
@@ -134,6 +136,7 @@ export default function AccessPage() {
             onExternalPersonRefChange={access.setExternalPersonRef}
             onExternalDeviceNameChange={access.setExternalDeviceName}
             onExternalDeviceRefChange={access.setExternalDeviceRef}
+            onAuthorizationModeChange={access.setPhysicalAuthorizationMode}
             onLinkClient={access.linkSelectedPhysicalClient}
             onMappingChange={access.setPhysicalMapping}
             onQueueSynchronization={access.queueSelectedPhysicalSynchronization}

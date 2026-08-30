@@ -1,0 +1,48 @@
+{
+  "persons": {
+    "path": "/artemis/REPLACE_FROM_INSTALLED_OPENAPI/person/search",
+    "request": { "pageNo": "${cursor}", "pageSize": "${limit}" },
+    "listPointer": "/data/list",
+    "paginationMode": "PAGE_NUMBER",
+    "totalPointer": "/data/total",
+    "fields": {
+      "id": "/personId",
+      "name": "/personName",
+      "email": "/email",
+      "phone": "/phoneNo",
+      "employeeNumber": "/jobNo"
+    }
+  },
+  "devices": {
+    "path": "/artemis/REPLACE_FROM_INSTALLED_OPENAPI/device/search",
+    "request": { "pageNo": "${cursor}", "pageSize": "${limit}" },
+    "listPointer": "/data/list",
+    "paginationMode": "PAGE_NUMBER",
+    "totalPointer": "/data/total",
+    "fields": { "id": "/indexCode", "name": "/name", "type": "/resourceType" }
+  },
+  "events": {
+    "path": "/artemis/REPLACE_FROM_INSTALLED_OPENAPI/access-event/search",
+    "request": { "cursor": "${cursor}", "pageSize": "${limit}", "endTime": "${now}" },
+    "listPointer": "/data/list",
+    "nextCursorPointer": "/data/nextCursor",
+    "hasMorePointer": "/data/hasMore",
+    "timestampFormat": "ISO_OFFSET_DATE_TIME",
+    "valueMappings": {
+      "decision": { "1": "GRANTED", "0": "DENIED" }
+    },
+    "fields": {
+      "id": "/eventId",
+      "personId": "/personId",
+      "deviceId": "/doorIndexCode",
+      "occurredAt": "/eventTime",
+      "decision": "/decision",
+      "eventType": "/eventType"
+    }
+  },
+  "remoteOpen": {
+    "path": "/artemis/REPLACE_FROM_INSTALLED_OPENAPI/door/open",
+    "request": { "doorIndexCode": "${externalDeviceRef}" },
+    "operationRefPointer": "/data/operationId"
+  }
+}

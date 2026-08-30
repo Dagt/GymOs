@@ -12,6 +12,7 @@ import type {
   PhysicalClientState,
   PhysicalConnectorActivationCode,
   PhysicalDeviceLink,
+  PhysicalDeviceCandidate,
   PhysicalIntegration,
   PhysicalIntegrationPayload,
   PhysicalPersonCandidate,
@@ -184,6 +185,7 @@ export async function linkPhysicalDevice(
   deviceId: string,
   externalDeviceRef: string,
   externalDeviceName?: string | null,
+  authorizationMode: "PROVIDER_MANAGED" | "GYMFORT_ONLINE" = "PROVIDER_MANAGED",
 ): Promise<PhysicalDeviceLink> {
   return apiFetch<PhysicalDeviceLink>(
     `/access/physical-integration/devices/${deviceId}/link`,
@@ -191,7 +193,7 @@ export async function linkPhysicalDevice(
     {
       method: "PUT",
       body: JSON.stringify(
-        normalizePayload({ externalDeviceRef, externalDeviceName }),
+        normalizePayload({ externalDeviceRef, externalDeviceName, authorizationMode }),
       ),
     },
   );
@@ -205,6 +207,15 @@ export async function unlinkPhysicalDevice(
     `/access/physical-integration/devices/${deviceId}/link`,
     accessToken,
     { method: "DELETE" },
+  );
+}
+
+export async function getPhysicalDeviceCandidates(
+  accessToken: string,
+): Promise<PhysicalDeviceCandidate[]> {
+  return apiFetch<PhysicalDeviceCandidate[]>(
+    "/access/physical-integration/device-candidates?limit=200",
+    accessToken,
   );
 }
 

@@ -232,6 +232,34 @@ public class AccessRepository {
 				.list();
 	}
 
+	public List<PhysicalBenefitAuthorizationModeRecord> physicalBenefitAuthorizationModes(
+			UUID organizationId, UUID branchId, UUID connectionId
+	) {
+		return jdbcClient.sql("""
+				SELECT DISTINCT adb.benefit_id, link.authorization_mode
+				FROM access_provider_device_link link
+				JOIN access_device device
+				  ON device.id = link.access_device_id
+				 AND device.organization_id = link.organization_id
+				 AND device.branch_id = link.branch_id
+				JOIN access_device_benefit adb
+				  ON adb.access_device_id = device.id
+				 AND adb.organization_id = device.organization_id
+				WHERE link.organization_id = :organizationId
+				  AND link.branch_id = :branchId
+				  AND link.connection_id = :connectionId
+				  AND device.status = 'ACTIVE'
+				  AND device.deleted_at IS NULL
+				ORDER BY adb.benefit_id, link.authorization_mode
+				""")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("connectionId", connectionId)
+				.query((rs, rowNumber) -> new PhysicalBenefitAuthorizationModeRecord(
+						rs.getObject("benefit_id", UUID.class), rs.getString("authorization_mode")))
+				.list();
+	}
+
 	public boolean accessBenefitsExist(UUID organizationId, UUID branchId, List<UUID> benefitIds) {
 		if (benefitIds == null || benefitIds.isEmpty()) {
 			return true;
@@ -366,7 +394,26 @@ public class AccessRepository {
 				    connector_key = EXCLUDED.connector_key,
 				    enabled = EXCLUDED.enabled,
 				    sync_status = EXCLUDED.sync_status,
-				    last_error = CASE WHEN EXCLUDED.enabled THEN access_provider_connection.last_error ELSE NULL END,
+				    last_heartbeat_at = CASE
+				        WHEN access_provider_connection.connector_key IS DISTINCT FROM EXCLUDED.connector_key
+				          OR NOT EXCLUDED.enabled THEN NULL
+				        ELSE access_provider_connection.last_heartbeat_at END,
+				    connector_reported_status = CASE
+				        WHEN access_provider_connection.connector_key IS DISTINCT FROM EXCLUDED.connector_key
+				          OR NOT EXCLUDED.enabled THEN NULL
+				        ELSE access_provider_connection.connector_reported_status END,
+				    last_synchronized_at = CASE
+				        WHEN access_provider_connection.connector_key IS DISTINCT FROM EXCLUDED.connector_key
+				          OR NOT EXCLUDED.enabled THEN NULL
+				        ELSE access_provider_connection.last_synchronized_at END,
+				    connector_capabilities = CASE
+				        WHEN access_provider_connection.connector_key IS DISTINCT FROM EXCLUDED.connector_key
+				          OR NOT EXCLUDED.enabled THEN '[]'::jsonb
+				        ELSE access_provider_connection.connector_capabilities END,
+				    last_error = CASE
+				        WHEN access_provider_connection.connector_key IS DISTINCT FROM EXCLUDED.connector_key
+				          OR NOT EXCLUDED.enabled THEN NULL
+				        ELSE access_provider_connection.last_error END,
 				    updated_at = EXCLUDED.updated_at,
 				    updated_by = EXCLUDED.updated_by,
 				    version = access_provider_connection.version + 1
@@ -1062,6 +1109,9 @@ public class AccessRepository {
 	}
 
 	public record PhysicalAccessBenefitRecord(UUID id, String code, String name) {
+	}
+
+	public record PhysicalBenefitAuthorizationModeRecord(UUID benefitId, String authorizationMode) {
 	}
 
 	public record PhysicalProviderConnectionRecord(

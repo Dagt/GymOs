@@ -113,6 +113,9 @@ val pilotBundle by tasks.registering(Sync::class) {
     from("connector.example.properties") {
         into("config")
     }
+    from("config/hikcentral-profile.example.json") {
+        into("config")
+    }
     from("docs") {
         into("docs")
     }

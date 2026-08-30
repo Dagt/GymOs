@@ -32,6 +32,10 @@ boundary:
 - stale managed references are removed;
 - unrelated/manual HikCentral privileges are never removed.
 
+The ownership set may be empty for an online-only installation. In that case
+the driver does not query or advertise Access Level assignment; person/device
+discovery, events and remote opening remain independently negotiated.
+
 ## Delivery guarantees
 
 The Cloud claim token prevents an old worker from completing a recovered lease.

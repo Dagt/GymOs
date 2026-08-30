@@ -68,7 +68,9 @@ activation code never do. Operators can tune:
 - `GYMOS_CONNECTOR_ACTIVATION_MAX_FAILURES` and
   `GYMOS_CONNECTOR_ACTIVATION_FAILURE_WINDOW`;
 - `GYMOS_CONNECTOR_AUTH_MAX_FAILURES` and
-  `GYMOS_CONNECTOR_AUTH_FAILURE_WINDOW`.
+  `GYMOS_CONNECTOR_AUTH_FAILURE_WINDOW`;
+- `GYMOS_CONNECTOR_ONLINE_MAX_EVENT_AGE` (two minutes by default), which
+  prevents delayed provider history from actuating a live door.
 
 Cloud validates the secret on every call. `last_authenticated_at` is an
 operational "recently authenticated" marker rather than a per-request ledger:
@@ -252,31 +254,37 @@ Never use an OpenAPI package copied from an unrelated HikCentral release.
 ## 9. Face enrollment and GymFort identity link
 
 Face templates remain inside HikCentral and its terminals. GymFort stores only
-the opaque HikCentral person identifier. The currently implemented safe flow is:
+the opaque HikCentral person identifier. The safe enrollment flow is:
 
 1. the receptionist creates or locates the person in HikCentral and captures
    the face with the site's supported enrollment terminal;
-2. the receptionist obtains the opaque HikCentral person identifier;
-3. an Owner or Manager pastes that identifier on the exact GymFort client in
-   the physical integration console;
+2. the Connector imports the opaque person as a candidate; exact email/phone
+   matches may be suggested but are never accepted automatically;
+3. an Owner or Manager confirms the candidate against the exact GymFort client
+   (manual paste remains available as a fallback);
 4. linking stores `externalPersonRef` and enqueues the complete desired Access
    Level set, regardless of the branch where the membership was sold;
 5. the Connector reconciles only the Access Levels declared as GymFort-owned.
 
-Candidate import, automatic person creation and assisted enrollment are later
-contract increments. Today a job without `externalPersonRef` is blocked
-intentionally; the Connector must not guess identity by a fuzzy name. A future
-workflow may create the HikCentral person using an immutable GymFort reference,
-return the new opaque person identifier, then wait for local face capture before
-enabling access.
+Automatic person creation and assisted facial capture remain later contract
+increments. A job without `externalPersonRef` is blocked intentionally; the
+Connector never guesses identity by a fuzzy name. Face templates remain local.
 
 Long-lived membership rights can be distributed as Access Levels. A metered
 visit-package access cannot be represented as a permanent HikCentral Access
-Level because that would bypass GymFort's atomic visit consumption. It requires
-the later online/local decision mode: recognition event → GymFort eligibility
-and consumption → one opening command. Until that path passes real hardware
-tests, visit packages must not be advertised as physically enforced by this
-adapter.
+Level because that would bypass GymFort's atomic visit consumption. It uses
+`GYMFORT_ONLINE`: recognition event → idempotent GymFort eligibility and
+consumption → one audited opening command. This path is automated with the
+simulator; until the matched HikCentral profile and real hardware pass the site
+matrix, visit packages must not be advertised as physically enforced there.
+Benefits used exclusively by online devices are excluded from autonomous Access
+Level synchronization, and one benefit cannot mix `PROVIDER_MANAGED` with
+`GYMFORT_ONLINE` inside the same connection. The HikCentral person can remain
+enrolled for recognition, but no local Access Level may open that online door.
+Online events also have a configurable maximum age (two minutes by default).
+Historical events and pending authorizations that expire never actuate a door
+or consume a visit; a confirmed successful opening cannot later be downgraded
+by a contradictory acknowledgement.
 
 ## 10. Site acceptance gate
 

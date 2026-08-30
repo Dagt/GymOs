@@ -52,6 +52,7 @@ gymos:
       authentication-max-failures: ${GYMOS_CONNECTOR_AUTH_MAX_FAILURES:12}
       authentication-failure-window: ${GYMOS_CONNECTOR_AUTH_FAILURE_WINDOW:2m}
       last-authenticated-write-interval: ${GYMOS_CONNECTOR_LAST_AUTH_WRITE_INTERVAL:5m}
+      online-authorization-max-event-age: ${GYMOS_CONNECTOR_ONLINE_MAX_EVENT_AGE:2m}
   seed:
     enabled: ${GYMOS_SEED_ENABLED:false}
     owner-email: ${GYMOS_DEMO_OWNER_EMAIL:}

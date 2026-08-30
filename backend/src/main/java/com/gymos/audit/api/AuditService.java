@@ -42,7 +42,8 @@ public class AuditService {
 			String reason,
 			String correlationId
 	) {
-		insert(organizationId, branchId, actorUserId, "USER", action, entityType, entityId, origin, reason, correlationId);
+		insert(organizationId, branchId, actorUserId, actorUserId == null ? "SYSTEM" : "USER",
+				action, entityType, entityId, origin, reason, correlationId);
 	}
 
 	private void insert(

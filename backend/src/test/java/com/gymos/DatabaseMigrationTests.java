@@ -1189,6 +1189,98 @@ class DatabaseMigrationTests {
 	}
 
 	@Test
+	void onlinePhysicalAuthorizationMigrationUpgradesV103WithoutChangingExistingDeviceAuthority() throws Exception {
+		String schema = migrationSchema("physical_v104_upgrade");
+		migrateSchema(schema, "103");
+		UUID organizationId = UUID.randomUUID();
+		UUID branchId = UUID.randomUUID();
+		UUID connectionId = UUID.randomUUID();
+		UUID deviceId = UUID.randomUUID();
+		UUID linkId = UUID.randomUUID();
+
+		try (var connection = schemaConnection(schema)) {
+			insertOrganization(connection, organizationId);
+			insertBranch(connection, organizationId, branchId);
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO access_device (
+					    id, organization_id, branch_id, name, device_code, device_type, status,
+					    provider, adapter_config_json, created_at, updated_at, version
+					)
+					VALUES (?, ?, ?, 'Torniquete existente', ?, 'TURNSTILE', 'ACTIVE',
+					        'HIKCENTRAL', '{}'::jsonb, now(), now(), 0)
+					""")) {
+				statement.setObject(1, deviceId);
+				statement.setObject(2, organizationId);
+				statement.setObject(3, branchId);
+				statement.setString(4, "TURNSTILE-" + deviceId);
+				statement.executeUpdate();
+			}
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO access_provider_connection (
+					    id, organization_id, branch_id, provider_key, display_name, connector_key,
+					    enabled, sync_status, created_at, updated_at, version
+					)
+					VALUES (?, ?, ?, 'HIKCENTRAL', 'HikCentral existente', ?, TRUE,
+					        'AWAITING_CONNECTOR', now(), now(), 0)
+					""")) {
+				statement.setObject(1, connectionId);
+				statement.setObject(2, organizationId);
+				statement.setObject(3, branchId);
+				statement.setString(4, "upgrade-v104-" + connectionId);
+				statement.executeUpdate();
+			}
+			try (var statement = connection.prepareStatement("""
+					INSERT INTO access_provider_device_link (
+					    id, organization_id, branch_id, connection_id, access_device_id,
+					    external_device_ref, external_device_name, created_at, updated_at, version
+					)
+					VALUES (?, ?, ?, ?, ?, 'existing-door-1', 'Puerta existente', now(), now(), 0)
+					""")) {
+				statement.setObject(1, linkId);
+				statement.setObject(2, organizationId);
+				statement.setObject(3, branchId);
+				statement.setObject(4, connectionId);
+				statement.setObject(5, deviceId);
+				statement.executeUpdate();
+			}
+		}
+
+		migrateSchema(schema, null);
+
+		try (var connection = schemaConnection(schema)) {
+			assertThat(columnExists(connection, schema, "access_provider_device_link", "authorization_mode"))
+					.isTrue();
+			assertThat(columnExists(connection, schema, "access_provider_connection", "connector_capabilities"))
+					.isTrue();
+			assertThat(tableExists(connection, schema, "access_physical_authorization")).isTrue();
+			assertThat(tableExists(connection, schema, "access_provider_device_candidate")).isTrue();
+			try (var statement = connection.prepareStatement("""
+					SELECT link.authorization_mode, connection.connector_capabilities::text AS capabilities
+					FROM access_provider_device_link link
+					JOIN access_provider_connection connection ON connection.id = link.connection_id
+					WHERE link.id = ?
+					""")) {
+				statement.setObject(1, linkId);
+				try (var resultSet = statement.executeQuery()) {
+					assertThat(resultSet.next()).isTrue();
+					assertThat(resultSet.getString("authorization_mode")).isEqualTo("PROVIDER_MANAGED");
+					assertThat(resultSet.getString("capabilities")).isEqualTo("[]");
+				}
+			}
+			assertThatThrownBy(() -> {
+				try (var statement = connection.prepareStatement("""
+						UPDATE access_provider_device_link
+						SET authorization_mode = 'UNSAFE_UNKNOWN_MODE'
+						WHERE id = ?
+						""")) {
+					statement.setObject(1, linkId);
+					statement.executeUpdate();
+				}
+			}).isInstanceOf(SQLException.class);
+		}
+	}
+
+	@Test
 	void saleIdempotencyKeyIsUniqueWithinOrganization() throws Exception {
 		try (var connection = DriverManager.getConnection(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())) {
 			UUID organizationId = UUID.randomUUID();

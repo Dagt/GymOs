@@ -10,7 +10,8 @@ public record PhysicalConnectorProperties(
 		Duration activationFailureWindow,
 		int authenticationMaxFailures,
 		Duration authenticationFailureWindow,
-		Duration lastAuthenticatedWriteInterval
+		Duration lastAuthenticatedWriteInterval,
+		Duration onlineAuthorizationMaxEventAge
 ) {
 	@ConstructorBinding
 	public PhysicalConnectorProperties {
@@ -32,5 +33,20 @@ public record PhysicalConnectorProperties(
 				|| lastAuthenticatedWriteInterval.isZero()) {
 			lastAuthenticatedWriteInterval = Duration.ofMinutes(5);
 		}
+		if (onlineAuthorizationMaxEventAge == null || onlineAuthorizationMaxEventAge.isNegative()
+				|| onlineAuthorizationMaxEventAge.isZero()) {
+			onlineAuthorizationMaxEventAge = Duration.ofMinutes(2);
+		}
+	}
+
+	public PhysicalConnectorProperties(
+			int activationMaxFailures,
+			Duration activationFailureWindow,
+			int authenticationMaxFailures,
+			Duration authenticationFailureWindow,
+			Duration lastAuthenticatedWriteInterval
+	) {
+		this(activationMaxFailures, activationFailureWindow, authenticationMaxFailures,
+				authenticationFailureWindow, lastAuthenticatedWriteInterval, Duration.ofMinutes(2));
 	}
 }

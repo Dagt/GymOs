@@ -6,6 +6,13 @@ import com.gymfort.connector.provider.ProviderException;
 import com.gymfort.connector.provider.ProviderHealth;
 import com.gymfort.connector.provider.ProviderSyncCommand;
 import com.gymfort.connector.provider.ProviderSyncResult;
+import com.gymfort.connector.provider.ProviderPage;
+import com.gymfort.connector.provider.ProviderPerson;
+import com.gymfort.connector.provider.ProviderDevice;
+import com.gymfort.connector.provider.ProviderAccessEvent;
+import com.gymfort.connector.provider.ProviderOpenCommand;
+import com.gymfort.connector.provider.ProviderOpenResult;
+import com.gymfort.connector.provider.ProviderActuationException;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -27,7 +34,7 @@ public final class HikCentralDriver implements AccessProviderDriver {
     public ProviderHealth health() {
         try {
             String version = api.version();
-            Set<String> available = api.accessLevelIds();
+            Set<String> available = managedAccessLevelRefs.isEmpty() ? Set.of() : api.accessLevelIds();
             Set<String> missing = new HashSet<>(managedAccessLevelRefs);
             missing.removeAll(available);
             if (!missing.isEmpty()) {
@@ -71,11 +78,37 @@ public final class HikCentralDriver implements AccessProviderDriver {
         }
     }
 
-    private Set<ProviderCapability> capabilities() {
-        return Set.of(
-                ProviderCapability.VERSION_DISCOVERY,
-                ProviderCapability.PERSON_LOOKUP,
-                ProviderCapability.ACCESS_LEVEL_ASSIGNMENT);
+    @Override public ProviderPage<ProviderPerson> persons(String cursor, int limit) {
+        return api.persons(cursor, limit);
+    }
+
+    @Override public ProviderPage<ProviderDevice> devices(String cursor, int limit) {
+        return api.devices(cursor, limit);
+    }
+
+    @Override public ProviderPage<ProviderAccessEvent> events(String cursor, int limit) {
+        return api.events(cursor, limit);
+    }
+
+    @Override
+    public ProviderOpenResult remoteOpen(ProviderOpenCommand command) {
+        try {
+            return api.remoteOpen(command);
+        } catch (HikCentralApiException exception) {
+            throw new ProviderActuationException(
+                    exception.getMessage(), exception.retryable(), exception.retryable(), exception);
+        }
+    }
+
+    @Override
+    public Set<ProviderCapability> capabilities() {
+        Set<ProviderCapability> result = new HashSet<>(Set.of(ProviderCapability.VERSION_DISCOVERY));
+        if (!managedAccessLevelRefs.isEmpty()) result.add(ProviderCapability.ACCESS_LEVEL_ASSIGNMENT);
+        if (api.supportsPersonSearch()) result.add(ProviderCapability.PERSON_LOOKUP);
+        if (api.supportsDeviceSearch()) result.add(ProviderCapability.DEVICE_DISCOVERY);
+        if (api.supportsEventSearch()) result.add(ProviderCapability.EVENT_POLLING);
+        if (api.supportsRemoteOpen()) result.add(ProviderCapability.REMOTE_OPEN);
+        return Set.copyOf(result);
     }
 
     @Override

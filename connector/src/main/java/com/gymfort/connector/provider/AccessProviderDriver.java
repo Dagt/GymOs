@@ -10,7 +10,27 @@ public interface AccessProviderDriver extends AutoCloseable {
 
     ProviderHealth health();
 
+    default java.util.Set<ProviderCapability> capabilities() {
+        return health().capabilities();
+    }
+
     ProviderSyncResult synchronize(ProviderSyncCommand command);
+
+    default ProviderPage<ProviderPerson> persons(String cursor, int limit) {
+        return ProviderPage.empty(cursor);
+    }
+
+    default ProviderPage<ProviderDevice> devices(String cursor, int limit) {
+        return ProviderPage.empty(cursor);
+    }
+
+    default ProviderPage<ProviderAccessEvent> events(String cursor, int limit) {
+        return ProviderPage.empty(cursor);
+    }
+
+    default ProviderOpenResult remoteOpen(ProviderOpenCommand command) {
+        throw new ProviderException("El proveedor no admite apertura remota en este perfil.", false);
+    }
 
     @Override
     default void close() {

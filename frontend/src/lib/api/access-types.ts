@@ -150,6 +150,7 @@ export type PhysicalIntegrationConnection = {
   pendingJobs: number;
   failedJobs: number;
   connectorVersion: string | null;
+  connectorCapabilities: string[];
   connectorActivatedAt: string | null;
 };
 
@@ -173,7 +174,18 @@ export type PhysicalDeviceLink = {
   deviceCode: string;
   externalDeviceRef: string;
   externalDeviceName: string | null;
+  authorizationMode: "PROVIDER_MANAGED" | "GYMFORT_ONLINE";
   updatedAt: string;
+};
+
+export type PhysicalDeviceCandidate = {
+  id: string;
+  externalDeviceRef: string;
+  externalDeviceName: string | null;
+  externalDeviceType: string | null;
+  status: "UNLINKED" | "LINKED" | "IGNORED";
+  linkedAccessDeviceId: string | null;
+  lastSeenAt: string;
 };
 
 export type PhysicalIntegration = {

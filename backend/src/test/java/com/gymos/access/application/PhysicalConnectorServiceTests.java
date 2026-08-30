@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -16,6 +17,7 @@ import com.gymos.access.infrastructure.PhysicalAccessRepository.ActivationRecord
 import com.gymos.access.infrastructure.PhysicalAccessRepository.ConnectionRecord;
 import com.gymos.access.infrastructure.PhysicalAccessRepository.ConnectorContext;
 import com.gymos.access.infrastructure.PhysicalAccessRepository.CredentialRecord;
+import com.gymos.access.infrastructure.PhysicalAccessRepository.DeviceLinkRecord;
 import com.gymos.access.infrastructure.PhysicalAccessRepository.JobCounts;
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.ApiAuthenticationException;
@@ -138,7 +140,8 @@ class PhysicalConnectorServiceTests {
 		ConnectorContext context = service.authenticate(
 				"connector-main", connectorSecret, "198.51.100.12", "auth-correlation");
 		var health = service.heartbeat(
-				context, "HEALTHY", "1.2.3", "instance-main", "stale local error");
+				context, "HEALTHY", "1.2.3", "instance-main",
+				Set.of("REMOTE_OPEN", "EVENT_POLLING"), "stale local error");
 
 		assertThat(context.credentialId()).isEqualTo(credential.id());
 		assertThat(health.status()).isEqualTo("HEALTHY");
@@ -151,7 +154,8 @@ class PhysicalConnectorServiceTests {
 		assertThat(Duration.between(staleBefore.getValue(), authenticatedAt.getValue()))
 				.isEqualTo(properties.lastAuthenticatedWriteInterval());
 		verify(repository).updateHeartbeat(
-				eq(context), eq("HEALTHY"), eq("1.2.3"), eq("instance-main"), eq(null), any());
+				eq(context), eq("HEALTHY"), eq("1.2.3"), eq("instance-main"),
+				eq("[\"EVENT_POLLING\",\"REMOTE_OPEN\"]"), eq(null), any());
 	}
 
 	@Test
@@ -295,5 +299,27 @@ class PhysicalConnectorServiceTests {
 						exception -> assertThat(exception.code()).isEqualTo("PHYSICAL_EVENT_DEVICE_UNRESOLVED"));
 		verify(repository).deviceLinkByExternalRef(
 				organizationId, branchId, connectionId, "door-from-another-branch");
+	}
+
+	@Test
+	void legacyProviderEventEndpointCannotBypassAnOnlineGymFortDecision() {
+		ConnectorContext context = new ConnectorContext(
+				UUID.randomUUID(), organizationId, branchId, connectionId,
+				"HIKCENTRAL", "connector-main");
+		DeviceLinkRecord online = new DeviceLinkRecord(
+				UUID.randomUUID(), UUID.randomUUID(), "Torniquete", "TURN-01", "door-online", null,
+				"GYMFORT_ONLINE", OffsetDateTime.now());
+		when(repository.deviceLinkByExternalRef(
+				organizationId, branchId, connectionId, "door-online")).thenReturn(Optional.of(online));
+		var event = new PhysicalConnectorService.PhysicalEventInput(
+				"HIKCENTRAL", "event-online", "person-42", "door-online",
+				OffsetDateTime.now(), "GRANTED", "ACCESS_ATTEMPT", null, java.util.Map.of());
+
+		assertThatThrownBy(() -> service.ingestEvent(context, event, "event-correlation"))
+				.isInstanceOfSatisfying(BusinessException.class,
+						exception -> assertThat(exception.code())
+								.isEqualTo("PHYSICAL_EVENT_AUTHORIZATION_REQUIRED"));
+		verify(repository, never()).insertExternalEvent(
+				any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
 	}
 }

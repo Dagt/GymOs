@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.access.infrastructure.AccessRepository;
 import com.gymos.access.infrastructure.AccessRepository.ClientAccessRecord;
 import com.gymos.access.infrastructure.AccessRepository.PhysicalBenefitMappingRecord;
+import com.gymos.access.infrastructure.AccessRepository.PhysicalBenefitAuthorizationModeRecord;
 import com.gymos.access.infrastructure.PhysicalAccessRepository;
 import com.gymos.access.infrastructure.PhysicalAccessRepository.ClientLinkRecord;
 import com.gymos.access.infrastructure.PhysicalAccessRepository.ConnectionRecord;
@@ -137,6 +138,55 @@ class PhysicalAccessSynchronizationServiceTests {
 				.thenReturn(Optional.of(state));
 
 		service.reconcileClient(connection, clientId, "benefit:changed:1", null, "BENEFIT_CONFIGURATION", null);
+
+		verify(physicalRepository, never()).enqueueJob(any(), any(), any(), any(), any(), any());
+	}
+
+	@Test
+	void onlineBenefitIsNotGrantedAsAnAutonomousProviderAccessLevel() {
+		UUID benefitId = UUID.randomUUID();
+		when(eligibilityPolicy.evaluate(any())).thenReturn(new EligibilityDecision(
+				true, Reason.ELIGIBLE, null, List.of(benefit(benefitId))));
+		when(accessRepository.physicalBenefitMappings(organizationId, branchId, connectionId))
+				.thenReturn(List.of(new PhysicalBenefitMappingRecord(
+						benefitId, "ACCESS-GYM", "Acceso gimnasio", "LEVEL-PRIMARY", "Principal")));
+		when(accessRepository.physicalBenefitAuthorizationModes(organizationId, branchId, connectionId))
+				.thenReturn(List.of(new PhysicalBenefitAuthorizationModeRecord(benefitId, "GYMFORT_ONLINE")));
+		DesiredStateRecord state = state("[]", "REVOKE", "PENDING", null);
+		when(physicalRepository.upsertDesiredState(
+				eq(connection), eq(clientId), eq("[]"), eq("REVOKE"), eq("PENDING"),
+				isNull(), isNull(), eq("online-device:1"), isNull(), any())).thenReturn(state);
+		when(physicalRepository.desiredState(organizationId, branchId, connectionId, clientId))
+				.thenReturn(Optional.of(state));
+
+		service.reconcileClient(connection, clientId, "online-device:1", null, "DEVICE_CONFIGURATION", null);
+
+		verify(physicalRepository).enqueueJob(
+				eq(connection), eq(state), eq("person-42"), any(), eq("DEVICE_CONFIGURATION"), any());
+	}
+
+	@Test
+	void mixedProviderAndOnlineModesForTheSameBenefitAreBlocked() {
+		UUID benefitId = UUID.randomUUID();
+		when(eligibilityPolicy.evaluate(any())).thenReturn(new EligibilityDecision(
+				true, Reason.ELIGIBLE, null, List.of(benefit(benefitId))));
+		when(accessRepository.physicalBenefitMappings(organizationId, branchId, connectionId))
+				.thenReturn(List.of(new PhysicalBenefitMappingRecord(
+						benefitId, "ACCESS-GYM", "Acceso gimnasio", "LEVEL-PRIMARY", "Principal")));
+		when(accessRepository.physicalBenefitAuthorizationModes(organizationId, branchId, connectionId))
+				.thenReturn(List.of(
+						new PhysicalBenefitAuthorizationModeRecord(benefitId, "PROVIDER_MANAGED"),
+						new PhysicalBenefitAuthorizationModeRecord(benefitId, "GYMFORT_ONLINE")));
+		DesiredStateRecord state = state(
+				"[\"LEVEL-PRIMARY\"]", "UPSERT", "BLOCKED", "PHYSICAL_AUTHORIZATION_MODE_CONFLICT");
+		when(physicalRepository.upsertDesiredState(
+				eq(connection), eq(clientId), eq("[\"LEVEL-PRIMARY\"]"), eq("UPSERT"), eq("BLOCKED"),
+				eq("PHYSICAL_AUTHORIZATION_MODE_CONFLICT"), any(), eq("mixed-device:1"), isNull(), any()))
+				.thenReturn(state);
+		when(physicalRepository.desiredState(organizationId, branchId, connectionId, clientId))
+				.thenReturn(Optional.of(state));
+
+		service.reconcileClient(connection, clientId, "mixed-device:1", null, "DEVICE_CONFIGURATION", null);
 
 		verify(physicalRepository, never()).enqueueJob(any(), any(), any(), any(), any(), any());
 	}

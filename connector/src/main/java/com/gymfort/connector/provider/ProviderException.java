@@ -1,6 +1,6 @@
 package com.gymfort.connector.provider;
 
-public final class ProviderException extends RuntimeException {
+public class ProviderException extends RuntimeException {
     private final boolean retryable;
 
     public ProviderException(String message, boolean retryable) {

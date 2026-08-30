@@ -126,9 +126,16 @@ diagnóstico visible de puntos legacy inválidos. El primer GymFort Local
 Connector ya existe como ejecutable independiente: consume el contrato cloud,
 conserva idempotencia durable en SQLite, protege secretos con DPAPI e incluye
 simulador y adapter OpenAPI de HikCentral para asignación exacta de Access
-Levels. Siguen pendientes el enrolamiento asistido, los eventos, el modo medido
-de paquetes, el servicio Windows productivo (el piloto usa tarea al iniciar
-sesión) y toda validación con HikCentral y el torniquete reales.
+Levels. Este incremento agrega descubrimiento de personas/dispositivos,
+eventos con cursor durable, autorización GymFort en línea, apertura remota con
+acuse y estado incierto fail-safe, y consumo físico de paquetes sin doble
+descuento. La compatibilidad se describe mediante un perfil OpenAPI por sitio,
+sin recompilar el Connector; admite paginación por cursor o página y negocia sus
+capacidades con Cloud. Los beneficios de puntos en línea se excluyen de Access
+Levels autónomos y no pueden mezclar ambos modos, evitando que HikCentral abra
+antes de la decisión de GymFort. Siguen pendientes la captura facial asistida, el
+servicio Windows productivo (el piloto usa tarea al iniciar sesión), firma de
+código y toda validación con HikCentral y el torniquete reales.
 
 Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún módulo se considera completo por el nombre de una rama: la evidencia proviene de código, migraciones, pruebas y validación del entorno.
 
@@ -145,7 +152,7 @@ Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún 
 | [Ventas](modulos/07-sales.md) | FUNCIONAL | POS, ventas contextualizadas, inscripción separada, compra dedicada de membresías/paquetes, pagos, recibos e inventario | Concurrencia/conciliación E2E y política de reembolso parcial (`SAL-001`) |
 | [Membresías](modulos/08-memberships.md) | ESTABILIZADO | Periodos inclusivos, activa única, alta con inscripción, renovación/cambio multi-sucursal, visibilidad de kiosco y exención por plan | E2E financiero completo |
 | [Beneficios/elegibilidad](modulos/09-benefits.md) | ESTABILIZADO | Descuentos por plan y acceso `LOCAL|PLAN_COVERAGE`, incluidas sedes cubiertas sin duplicar beneficios | Matriz PostgreSQL/E2E y mapeos físicos locales (`BEN-003`) |
-| [Acceso](modulos/10-access.md) | CONNECTOR LOCAL EN DESARROLLO | Elegibilidad, puntos, bitácora, Connector API, consumo atómico/idempotente de paquetes y ejecutable local con paquete Windows piloto y adapter OpenAPI HikCentral inicial | Enrolamiento/eventos, servicio Windows productivo y aceptación real de Connector/HikCentral (`ACC-002`); torniquete de paquetes (`ACC-005`) |
+| [Acceso](modulos/10-access.md) | CONNECTOR LOCAL EN ACEPTACIÓN | Elegibilidad, puntos, bitácora, Connector API, consumo atómico/idempotente de paquetes, eventos/autorización/apertura neutral, paquete Windows piloto y adapter HikCentral configurable | Captura facial asistida, servicio Windows productivo, firma y aceptación real Connector/HikCentral (`ACC-002`, `ACC-005`) |
 | [Kiosco](modulos/11-selfservice.md) | FUNCIONAL / ACEPTACIÓN | Apertura sólo por Recepción, sesión aislada, registro, membresías, paquetes visibles con Stripe pendiente, Checkout protegido, domiciliación, reservas, wellness y datos | Publicar ejecución automatizada de Stripe sandbox y E2E de paquetes (`SELF-001`) |
 | [Reservas](modulos/12-bookings.md) | FUNCIONAL | Recursos, disponibilidad, pago y acceso multi-sucursal | Colisiones/cancelación/E2E (`BKG-001`) |
 | [Inventario](modulos/13-inventory.md) | ESTABILIZADO | Existencias, movimientos, alertas, transferencias y conteos paginados; valuación | Feedback por partida (`INV-002`) |
@@ -307,7 +314,9 @@ idempotentemente las diferencias; V86–V103 se instalaron
 sin `repair` manual, borrado ni pérdida de datos. V84 permanece igual a la
 versión publicada en `main`. Otro callback acotado prepara el cambio de
 nulabilidad previo a V86 en instalaciones históricas.
-Branding por sucursal continúa después. El Connector HikCentral, cobranza SaaS
-y hardening operativo permanecen como frentes separados.
+Branding por sucursal, cobranza SaaS y hardening operativo permanecen como
+frentes separados. El Connector HikCentral está listo como paquete piloto; su
+aprobación productiva depende de ejecutar la matriz física contra la versión,
+licencia OpenAPI y torniquete reales del gimnasio.
 
 El detalle vive en `modulos/`, la deuda única en el documento 28 y la situación Git en el documento 29.

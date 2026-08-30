@@ -37,7 +37,7 @@ class ConnectorConfigTest {
     }
 
     @Test
-    void rejectsHikCentralWithoutAnExplicitOwnershipBoundary() throws Exception {
+    void allowsOnlineOnlyHikCentralWithoutAutonomousAccessLevels() throws Exception {
         Path configFile = tempDirectory.resolve("connector.properties");
         Files.writeString(configFile, """
                 cloud.baseUrl=https://gymfort.example
@@ -47,9 +47,9 @@ class ConnectorConfigTest {
                 hikcentral.appKey=app-key
                 """);
 
-        assertThatThrownBy(() -> ConnectorConfig.load(configFile))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("managedAccessLevelRefs");
+        ConnectorConfig config = ConnectorConfig.load(configFile);
+
+        assertThat(config.hikCentral().managedAccessLevelRefs()).isEmpty();
     }
 
     @Test

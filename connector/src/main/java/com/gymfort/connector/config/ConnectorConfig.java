@@ -20,6 +20,7 @@ public record ConnectorConfig(
         Path stateDirectory,
         Duration pollInterval,
         Duration heartbeatInterval,
+        Duration discoveryInterval,
         int claimLimit,
         int leaseSeconds,
         HikCentralConfig hikCentral
@@ -42,6 +43,7 @@ public record ConnectorConfig(
                 : path.toAbsolutePath().getParent().resolve(configuredStateDirectory).normalize();
         Duration pollInterval = duration(properties, "connector.pollInterval", Duration.ofSeconds(2));
         Duration heartbeatInterval = duration(properties, "connector.heartbeatInterval", Duration.ofMinutes(1));
+        Duration discoveryInterval = duration(properties, "connector.discoveryInterval", Duration.ofMinutes(15));
         int claimLimit = integer(properties, "connector.claimLimit", 20, 1, 50);
         int leaseSeconds = integer(properties, "connector.leaseSeconds", 90, 30, 300);
 
@@ -51,13 +53,10 @@ public record ConnectorConfig(
                     requireHttpUri(properties, "hikcentral.baseUrl"),
                     required(properties, "hikcentral.appKey", 180),
                     csv(properties.getProperty("hikcentral.managedAccessLevelRefs")),
-                    optionalPath(properties, "hikcentral.trustedCertificatePath", path));
+                    optionalPath(properties, "hikcentral.trustedCertificatePath", path),
+                    optionalPath(properties, "hikcentral.capabilityProfilePath", path));
             if (!"https".equals(hikCentral.baseUrl().getScheme())) {
                 throw new IllegalArgumentException("hikcentral.baseUrl debe utilizar https.");
-            }
-            if (hikCentral.managedAccessLevelRefs().isEmpty()) {
-                throw new IllegalArgumentException(
-                        "hikcentral.managedAccessLevelRefs debe declarar los niveles propiedad de GymFort.");
             }
         } else if (!"SIMULATOR".equals(providerKey)) {
             throw new IllegalArgumentException("Proveedor no soportado por este build: " + providerKey);
@@ -69,9 +68,13 @@ public record ConnectorConfig(
         if (heartbeatInterval.compareTo(Duration.ofMinutes(5)) >= 0) {
             throw new IllegalArgumentException("connector.heartbeatInterval debe ser menor a cinco minutos.");
         }
+        if (discoveryInterval.isNegative() || discoveryInterval.isZero()
+                || discoveryInterval.compareTo(Duration.ofHours(24)) > 0) {
+            throw new IllegalArgumentException("connector.discoveryInterval debe estar entre PT1S y PT24H.");
+        }
         return new ConnectorConfig(
                 cloudBaseUrl, connectorKey, providerKey, instanceId, stateDirectory,
-                pollInterval, heartbeatInterval, claimLimit, leaseSeconds, hikCentral);
+                pollInterval, heartbeatInterval, discoveryInterval, claimLimit, leaseSeconds, hikCentral);
     }
 
     private static URI requireHttpUri(Properties properties, String key) {
@@ -170,7 +173,8 @@ public record ConnectorConfig(
             URI baseUrl,
             String appKey,
             Set<String> managedAccessLevelRefs,
-            Path trustedCertificatePath
+            Path trustedCertificatePath,
+            Path capabilityProfilePath
     ) {
         public HikCentralConfig {
             managedAccessLevelRefs = Set.copyOf(managedAccessLevelRefs);

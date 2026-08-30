@@ -9,6 +9,7 @@ param(
     [string]$HikCentralAppKey,
     [string[]]$ManagedAccessLevelRefs,
     [string]$HikCentralTrustedCertificate,
+    [string]$HikCentralCapabilityProfile,
     [switch]$SkipActivation,
     [switch]$SkipProviderSecret,
     [switch]$SkipDoctor,
@@ -72,6 +73,7 @@ if ($cloudUri.Scheme -ne "https" -and -not $cloudUri.IsLoopback) {
 }
 
 $trustedCertificateBytes = $null
+$capabilityProfileBytes = $null
 if ($Provider -eq "HIKCENTRAL") {
     $HikCentralBaseUrl = Read-RequiredValue $HikCentralBaseUrl "URL LAN de HikCentral OpenAPI"
     $HikCentralAppKey = Read-RequiredValue $HikCentralAppKey "App Key de HikCentral"
@@ -80,13 +82,10 @@ if ($Provider -eq "HIKCENTRAL") {
     if ($hikCentralUri.Scheme -ne "https") {
         throw "HikCentralBaseUrl debe utilizar https."
     }
-    if ($null -eq $ManagedAccessLevelRefs -or $ManagedAccessLevelRefs.Count -eq 0) {
-        $ManagedAccessLevelRefs = (Read-RequiredValue $null "IDs de Access Level separados por coma").Split(",")
+    if ($null -eq $ManagedAccessLevelRefs) {
+        $ManagedAccessLevelRefs = @()
     }
     $ManagedAccessLevelRefs = @($ManagedAccessLevelRefs | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-    if ($ManagedAccessLevelRefs.Count -eq 0) {
-        throw "Debe declarar al menos un Access Level administrado por GymFort."
-    }
     if (-not [string]::IsNullOrWhiteSpace($HikCentralTrustedCertificate) -and
         -not (Test-Path -LiteralPath $HikCentralTrustedCertificate -PathType Leaf)) {
         throw "No existe el certificado indicado: $HikCentralTrustedCertificate"
@@ -94,6 +93,19 @@ if ($Provider -eq "HIKCENTRAL") {
     if (-not [string]::IsNullOrWhiteSpace($HikCentralTrustedCertificate)) {
         $trustedCertificateBytes = [IO.File]::ReadAllBytes(
             (Resolve-Path -LiteralPath $HikCentralTrustedCertificate).Path)
+    }
+    if (-not [string]::IsNullOrWhiteSpace($HikCentralCapabilityProfile) -and
+        -not (Test-Path -LiteralPath $HikCentralCapabilityProfile -PathType Leaf)) {
+        throw "No existe el perfil HikCentral indicado: $HikCentralCapabilityProfile"
+    }
+    if (-not [string]::IsNullOrWhiteSpace($HikCentralCapabilityProfile)) {
+        $capabilityProfileBytes = [IO.File]::ReadAllBytes(
+            (Resolve-Path -LiteralPath $HikCentralCapabilityProfile).Path)
+        try {
+            [Text.Encoding]::UTF8.GetString($capabilityProfileBytes) | ConvertFrom-Json | Out-Null
+        } catch {
+            throw "El perfil HikCentral no contiene JSON valido."
+        }
     }
 }
 
@@ -140,6 +152,7 @@ try {
         "connector.stateDirectory=$normalizedState"
         "connector.pollInterval=PT2S"
         "connector.heartbeatInterval=PT1M"
+        "connector.discoveryInterval=PT15M"
         "connector.claimLimit=20"
         "connector.leaseSeconds=90"
     )
@@ -147,6 +160,11 @@ try {
         $configuration += "hikcentral.baseUrl=$($HikCentralBaseUrl.TrimEnd('/'))"
         $configuration += "hikcentral.appKey=$HikCentralAppKey"
         $configuration += "hikcentral.managedAccessLevelRefs=$($ManagedAccessLevelRefs -join ',')"
+        if ($null -ne $capabilityProfileBytes) {
+            $installedProfile = Join-Path $configDirectory "hikcentral-profile.json"
+            [IO.File]::WriteAllBytes($installedProfile, $capabilityProfileBytes)
+            $configuration += "hikcentral.capabilityProfilePath=$($installedProfile.Replace('\', '/'))"
+        }
         if ($null -ne $trustedCertificateBytes) {
             $certificateDirectory = Join-Path $configDirectory "certificates"
             New-Item -ItemType Directory -Path $certificateDirectory -Force | Out-Null

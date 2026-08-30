@@ -10,6 +10,7 @@ import type {
   PhysicalConnectorActivationCode,
   PhysicalIntegration,
   PhysicalPersonCandidate,
+  PhysicalDeviceCandidate,
 } from "@/lib/api";
 import {
   accessDeviceReadiness,
@@ -339,6 +340,7 @@ export function PhysicalAccessIntegrationSection({
   availableDeviceBenefits,
   busy,
   candidates,
+  deviceCandidates,
   connectionName,
   connectorActivation,
   connectorKey,
@@ -349,6 +351,7 @@ export function PhysicalAccessIntegrationSection({
   devices,
   externalDeviceName,
   externalDeviceRef,
+  authorizationMode,
   externalPersonRef,
   integration,
   mappingDrafts,
@@ -366,6 +369,7 @@ export function PhysicalAccessIntegrationSection({
   onExternalPersonRefChange,
   onExternalDeviceNameChange,
   onExternalDeviceRefChange,
+  onAuthorizationModeChange,
   onLinkClient,
   onMappingChange,
   onQueueSynchronization,
@@ -381,6 +385,7 @@ export function PhysicalAccessIntegrationSection({
   availableDeviceBenefits: PhysicalAccessBenefit[];
   busy: boolean;
   candidates: PhysicalPersonCandidate[];
+  deviceCandidates: PhysicalDeviceCandidate[];
   connectionName: string;
   connectorActivation: PhysicalConnectorActivationCode | null;
   connectorKey: string;
@@ -391,6 +396,7 @@ export function PhysicalAccessIntegrationSection({
   devices: AccessDevice[];
   externalDeviceName: string;
   externalDeviceRef: string;
+  authorizationMode: "PROVIDER_MANAGED" | "GYMFORT_ONLINE";
   externalPersonRef: string;
   integration: PhysicalIntegration | null;
   mappingDrafts: Record<string, { reference: string; name: string }>;
@@ -408,6 +414,9 @@ export function PhysicalAccessIntegrationSection({
   onExternalPersonRefChange: (value: string) => void;
   onExternalDeviceNameChange: (value: string) => void;
   onExternalDeviceRefChange: (value: string) => void;
+  onAuthorizationModeChange: (
+    value: "PROVIDER_MANAGED" | "GYMFORT_ONLINE",
+  ) => void;
   onLinkClient: () => void;
   onMappingChange: (
     benefitId: string,
@@ -602,11 +611,19 @@ export function PhysicalAccessIntegrationSection({
                 </div>
                 <ConnectionStatus connection={connection} />
               </div>
-              <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-5">
                 <DecisionDetail label="Último heartbeat" value={connection.lastHeartbeatAt ? formatDateTime(connection.lastHeartbeatAt) : "Nunca"} />
                 <DecisionDetail label="Versión" value={connection.connectorVersion ?? "Sin reportar"} />
                 <DecisionDetail label="Jobs pendientes" value={String(connection.pendingJobs)} />
                 <DecisionDetail label="Jobs fallidos" value={String(connection.failedJobs)} />
+                <DecisionDetail
+                  label="Capacidades"
+                  value={
+                    connection.connectorCapabilities.length
+                      ? connection.connectorCapabilities.join(", ")
+                      : "Sin reportar"
+                  }
+                />
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
@@ -746,6 +763,38 @@ export function PhysicalAccessIntegrationSection({
                   <p className="mt-1 text-sm text-[var(--brand-muted)]">
                     Vincula explícitamente este punto GymFort con la puerta o torniquete que reportará el Connector.
                   </p>
+                  {deviceCandidates.some((candidate) => candidate.status === "UNLINKED") ? (
+                    <label className="mt-3 grid gap-2 text-sm font-semibold text-[var(--brand-muted)]">
+                      Recursos descubiertos por el Connector
+                      <select
+                        className="h-10 rounded-lg border border-[var(--brand-line)] bg-white px-3 text-sm"
+                        onChange={(event) => {
+                          const candidate = deviceCandidates.find(
+                            (item) => item.id === event.target.value,
+                          );
+                          if (candidate) {
+                            onExternalDeviceRefChange(candidate.externalDeviceRef);
+                            onExternalDeviceNameChange(
+                              candidate.externalDeviceName ?? "",
+                            );
+                          }
+                        }}
+                        value=""
+                      >
+                        <option value="">Selecciona un recurso detectado</option>
+                        {deviceCandidates
+                          .filter((candidate) => candidate.status === "UNLINKED")
+                          .map((candidate) => (
+                            <option key={candidate.id} value={candidate.id}>
+                              {candidate.externalDeviceName ?? candidate.externalDeviceRef}
+                              {candidate.externalDeviceType
+                                ? ` · ${candidate.externalDeviceType}`
+                                : ""}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                  ) : null}
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <label className="grid gap-2 text-sm font-semibold text-[var(--brand-muted)]">
                       Referencia externa
@@ -766,6 +815,40 @@ export function PhysicalAccessIntegrationSection({
                         placeholder="Ej. Torniquete entrada"
                         value={externalDeviceName}
                       />
+                    </label>
+                    <label className="grid gap-2 text-sm font-semibold text-[var(--brand-muted)] md:col-span-2">
+                      Quién decide y abre
+                      <select
+                        className="h-10 rounded-lg border border-[var(--brand-line)] bg-white px-3 text-sm"
+                        onChange={(event) =>
+                          onAuthorizationModeChange(
+                            event.target.value as
+                              | "PROVIDER_MANAGED"
+                              | "GYMFORT_ONLINE",
+                          )
+                        }
+                        value={authorizationMode}
+                      >
+                        <option value="PROVIDER_MANAGED">
+                          El proveedor decide; GymFort recibe el registro
+                        </option>
+                        <option
+                          disabled={
+                            !connection.connectorCapabilities.includes("EVENT_POLLING") ||
+                            !connection.connectorCapabilities.includes("REMOTE_OPEN")
+                          }
+                          value="GYMFORT_ONLINE"
+                        >
+                          GymFort valida en línea y el Connector abre
+                        </option>
+                      </select>
+                      <span className="text-xs font-normal leading-5">
+                        Usa validación en línea para paquetes de visitas o cuando
+                        el saldo deba descontarse antes de abrir. Requiere que el
+                        perfil OpenAPI admita eventos y apertura remota. HikCentral
+                        sólo debe reconocer a la persona: ningún nivel local debe
+                        abrir esta puerta antes de la decisión de GymFort.
+                      </span>
                     </label>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">

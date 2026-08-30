@@ -8,6 +8,7 @@ import {
   getPhysicalClientState,
   getPhysicalIntegration,
   getPhysicalPersonCandidates,
+  getPhysicalDeviceCandidates,
   getStoredSession,
   issuePhysicalConnectorActivation,
   linkPhysicalClient,
@@ -31,6 +32,7 @@ import {
   type PhysicalClientState,
   type PhysicalConnectorActivationCode,
   type PhysicalIntegration,
+  type PhysicalDeviceCandidate,
   type PhysicalPersonCandidate,
   type StoredSession,
 } from "@/lib/api";
@@ -65,10 +67,16 @@ export function useAccessController() {
   const [externalPersonRef, setExternalPersonRef] = useState("");
   const [externalDeviceRef, setExternalDeviceRef] = useState("");
   const [externalDeviceName, setExternalDeviceName] = useState("");
+  const [physicalAuthorizationMode, setPhysicalAuthorizationMode] = useState<
+    "PROVIDER_MANAGED" | "GYMFORT_ONLINE"
+  >("PROVIDER_MANAGED");
   const [connectorActivation, setConnectorActivation] =
     useState<PhysicalConnectorActivationCode | null>(null);
   const [physicalCandidates, setPhysicalCandidates] = useState<
     PhysicalPersonCandidate[]
+  >([]);
+  const [physicalDeviceCandidates, setPhysicalDeviceCandidates] = useState<
+    PhysicalDeviceCandidate[]
   >([]);
   const [lastDecision, setLastDecision] = useState<AccessDecision | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -123,6 +131,9 @@ export function useAccessController() {
         );
         setExternalDeviceRef(initialDeviceLink?.externalDeviceRef ?? "");
         setExternalDeviceName(initialDeviceLink?.externalDeviceName ?? "");
+        setPhysicalAuthorizationMode(
+          initialDeviceLink?.authorizationMode ?? "PROVIDER_MANAGED",
+        );
         hydratePhysicalIntegration(loadedPhysicalIntegration);
         if (
           hasPermission(stored, "access.physical.manage") &&
@@ -130,6 +141,9 @@ export function useAccessController() {
         ) {
           setPhysicalCandidates(
             await getPhysicalPersonCandidates(stored.accessToken),
+          );
+          setPhysicalDeviceCandidates(
+            await getPhysicalDeviceCandidates(stored.accessToken),
           );
         }
       } catch (exception) {
@@ -244,6 +258,9 @@ export function useAccessController() {
     );
     setExternalDeviceRef(link?.externalDeviceRef ?? "");
     setExternalDeviceName(link?.externalDeviceName ?? "");
+    setPhysicalAuthorizationMode(
+      link?.authorizationMode ?? "PROVIDER_MANAGED",
+    );
   }
 
   async function evaluateAccess() {
@@ -643,9 +660,13 @@ export function useAccessController() {
         selectedDevice.id,
         externalDeviceRef.trim(),
         externalDeviceName.trim() || null,
+        physicalAuthorizationMode,
       );
       hydratePhysicalIntegration(
         await getPhysicalIntegration(session.accessToken),
+      );
+      setPhysicalDeviceCandidates(
+        await getPhysicalDeviceCandidates(session.accessToken),
       );
       setMessage(`${selectedDevice.name} quedó vinculado al recurso externo.`);
     } catch (exception) {
@@ -670,6 +691,9 @@ export function useAccessController() {
       setExternalDeviceName("");
       hydratePhysicalIntegration(
         await getPhysicalIntegration(session.accessToken),
+      );
+      setPhysicalDeviceCandidates(
+        await getPhysicalDeviceCandidates(session.accessToken),
       );
       setMessage(`${selectedDevice.name} quedó sin recurso externo.`);
     } catch (exception) {
@@ -749,9 +773,11 @@ export function useAccessController() {
     message,
     physicalClientState,
     physicalCandidates,
+    physicalDeviceCandidates,
     physicalConnectionName,
     physicalConnectorKey,
     physicalProviderKey,
+    physicalAuthorizationMode,
     physicalIntegration,
     physicalMappingDrafts,
     physicalSyncEnabled,
@@ -793,6 +819,7 @@ export function useAccessController() {
     setPhysicalConnectionName,
     setPhysicalConnectorKey,
     setPhysicalProviderKey,
+    setPhysicalAuthorizationMode,
     setPhysicalMapping,
     setPhysicalSyncEnabled,
     setQuery,
