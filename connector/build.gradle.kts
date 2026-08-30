@@ -110,6 +110,7 @@ val pilotBundle by tasks.registering(Sync::class) {
     from("scripts") {
         into("scripts")
     }
+    from("scripts/INICIAR-PRUEBA-LOCAL.cmd")
     from("connector.example.properties") {
         into("config")
     }

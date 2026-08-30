@@ -4,6 +4,15 @@ This runbook installs a self-contained Connector on the Windows PC that can
 reach HikCentral. Java, Gradle and the GymFort source repository are not needed
 on that PC.
 
+## Ruta simplificada para GymFort local
+
+Cuando backend, frontend y Connector correrán en la misma laptop del gimnasio,
+usa primero [Prueba local rápida](PRUEBA-LOCAL-RAPIDA.md). Después de extraer el
+ZIP sólo hay que ejecutar `INICIAR-PRUEBA-LOCAL.cmd`; el asistente detecta
+`localhost`, abre GymFort, comprueba HikCentral, instala y ejecuta `doctor`.
+Los pasos manuales de este documento quedan como referencia avanzada y para
+despliegues donde GymFort no corre en el mismo equipo.
+
 ## 1. Prepare GymFort
 
 In Centro, as Owner or Manager:

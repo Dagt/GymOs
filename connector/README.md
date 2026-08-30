@@ -21,6 +21,7 @@ Este primer incremento incluye:
 
 Diseño y aceptación:
 
+- [Prueba local rápida](docs/PRUEBA-LOCAL-RAPIDA.md)
 - [Arquitectura y garantías](docs/architecture.md)
 - [Matriz de aceptación HikCentral](docs/hikcentral-site-acceptance-matrix.md)
 - [Matriz integral Centro/Tecnológica](docs/TEST-MATRIX.md)
@@ -52,6 +53,21 @@ backend\gradlew.bat -p connector pilotChecksum
 `pilotChecksum` produce una imagen Windows autocontenida con su propio Java,
 scripts de instalación y un SHA-256 para verificar la copia. Consulta el
 runbook antes de llevarla al gimnasio.
+
+## Primera prueba en una laptop local
+
+Si GymFort corre en la misma laptop Windows (`localhost:8080` y
+`localhost:3000`), extrae el ZIP y ejecuta:
+
+```text
+INICIAR-PRUEBA-LOCAL.cmd
+```
+
+El asistente detecta GymFort, abre la configuración física, comprueba la red de
+HikCentral, ayuda a confiar explícitamente su certificado público, instala,
+ejecuta `doctor` y arranca la tarea. Para la primera prueba elige modo `BASIC`;
+el perfil de eventos y apertura remota sólo se vuelve obligatorio al pasar a
+`GYMFORT_ONLINE`.
 
 ## Desarrollo con simulador
 

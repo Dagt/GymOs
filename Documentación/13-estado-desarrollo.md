@@ -136,6 +136,11 @@ Levels autónomos y no pueden mezclar ambos modos, evitando que HikCentral abra
 antes de la decisión de GymFort. Siguen pendientes la captura facial asistida, el
 servicio Windows productivo (el piloto usa tarea al iniciar sesión), firma de
 código y toda validación con HikCentral y el torniquete reales.
+El paquete piloto incluye además `INICIAR-PRUEBA-LOCAL.cmd`: un asistente para
+cuando GymFort corre en la misma laptop del gimnasio. Detecta backend/frontend
+en localhost, abre la consola correcta, valida la red HikCentral, permite
+confirmar el certificado público presentado y ejecuta instalación + `doctor`.
+La primera etapa `BASIC` no exige todavía el perfil de eventos/apertura remota.
 
 Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún módulo se considera completo por el nombre de una rama: la evidencia proviene de código, migraciones, pruebas y validación del entorno.
 

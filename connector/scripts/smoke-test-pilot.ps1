@@ -8,9 +8,13 @@ param(
 $ErrorActionPreference = "Stop"
 $bundle = (Resolve-Path -LiteralPath $BundleRoot).Path
 $installer = Join-Path $bundle "scripts\install-pilot.ps1"
+$localSetup = Join-Path $bundle "scripts\setup-local-test.ps1"
+$localLauncher = Join-Path $bundle "INICIAR-PRUEBA-LOCAL.cmd"
 $backupScript = Join-Path $bundle "scripts\backup-connector.ps1"
 $uninstaller = Join-Path $bundle "scripts\uninstall-pilot.ps1"
-foreach ($required in @($installer, $backupScript, $uninstaller, (Join-Path $bundle "app\GymFortConnector.exe"))) {
+foreach ($required in @(
+    $installer, $localSetup, $localLauncher, $backupScript, $uninstaller,
+    (Join-Path $bundle "app\GymFortConnector.exe"))) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
         throw "Pilot bundle is incomplete: $required"
     }
@@ -22,6 +26,50 @@ $backupRoot = Join-Path $testRoot "backups"
 New-Item -ItemType Directory -Path $testRoot -Force | Out-Null
 
 try {
+    $guidedInstallRoot = Join-Path $testRoot "guided-local"
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $localSetup `
+        -InstallRoot $guidedInstallRoot `
+        -GymFortApiUrl "http://localhost:8080" `
+        -GymFortWebUrl "http://localhost:3000" `
+        -ConnectorKey "guided-smoke" `
+        -Provider SIMULATOR `
+        -NonInteractive -NoBrowser -SkipNetworkChecks `
+        -SkipActivation -SkipProviderSecret -SkipDoctor -SkipScheduledTask
+    if ($LASTEXITCODE -ne 0) {
+        throw "Guided local setup failed with code $LASTEXITCODE."
+    }
+    $guidedConfiguration = Get-Content -Raw -LiteralPath (
+        Join-Path $guidedInstallRoot "config\connector.properties")
+    if (-not $guidedConfiguration.Contains("cloud.baseUrl=http://localhost:8080") -or
+        -not $guidedConfiguration.Contains("connector.key=guided-smoke")) {
+        throw "Guided local setup did not create the expected configuration."
+    }
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $uninstaller `
+        -InstallRoot $guidedInstallRoot
+    if ($LASTEXITCODE -ne 0) {
+        throw "Guided local setup uninstall failed with code $LASTEXITCODE."
+    }
+
+    $guidedOnlineRoot = Join-Path $testRoot "guided-online-placeholder"
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $localSetup `
+        -InstallRoot $guidedOnlineRoot `
+        -GymFortApiUrl "http://localhost:8080" `
+        -GymFortWebUrl "http://localhost:3000" `
+        -ConnectorKey "guided-online-smoke" `
+        -Provider HIKCENTRAL `
+        -HikCentralMode ONLINE `
+        -HikCentralBaseUrl "https://hikcentral.invalid:8443" `
+        -HikCentralAppKey "guided-app-key" `
+        -HikCentralCapabilityProfile (Join-Path $bundle "config\hikcentral-profile.example.json") `
+        -NonInteractive -NoBrowser -SkipNetworkChecks `
+        -SkipActivation -SkipProviderSecret -SkipDoctor -SkipScheduledTask
+    if ($LASTEXITCODE -eq 0) {
+        throw "Guided ONLINE setup accepted an unfinished capability profile."
+    }
+    if (Test-Path -LiteralPath $guidedOnlineRoot) {
+        throw "Rejected guided ONLINE setup changed its installation target."
+    }
+
     $rejectedRoot = Join-Path $testRoot "insecure-cloud"
     & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $installer `
         -InstallRoot $rejectedRoot `
