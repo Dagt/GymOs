@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Guía de backlog y directrices Codex
+    url: https://github.com/Dagt/GymOs/blob/main/Documentaci%C3%B3n/36-epicas-backlog-codex.md
+    about: Revisa backlog, dependencias y criterios de cierre antes de proponer nuevos issues
