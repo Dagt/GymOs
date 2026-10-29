@@ -43,3 +43,7 @@ Los documentos canónicos son `01`, `03`, `09`, `12`, `33` y la implementación;
 Un nuevo requerimiento no autoriza reemplazar stack por gusto. Cambio de schema exige nueva Flyway, compatibilidad histórica y contrato API. Diferencia documental relevante no se resuelve «adivinando»; registrar OQ y evidencia. Los estados de repositorio/CI jamás se infieren del nombre de rama. Para decisiones de privacidad/fiscalidad, la aceptación del dueño no sustituye revisión legal aplicable.
 
 El documento `45` mantiene preguntas abiertas, `42` mantiene requisitos; ambos se actualizan cuando se acepta un ADR.
+
+## ADR individuales propuestas
+
+Consultar [índice ADR](adr/README.md) y las propuestas [sesión/refresh](adr/ADR-001-sesiones-refresh-y-csrf.md), [pagos/refunds](adr/ADR-002-finanzas-reembolso-concurrencia.md), [acceso físico](adr/ADR-003-acceso-fisico-hikcentral-fail-closed.md) y [marca por sede](adr/ADR-004-branding-por-sucursal.md). Ninguna está aceptada sin aprobación explícita.

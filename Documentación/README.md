@@ -108,3 +108,4 @@ Se adopta el procedimiento usado en [TrailerSaas](https://github.com/Dagt/Traile
 **Precedencia:** constitución y ADR aceptados; requisitos/reglas aprobados; contratos/código/migraciones comprobados en rama del issue; fichas actualizadas; propuestas, notas y registros históricos. Las contradicciones se registran en OQ/ADR; Codex no decide de forma unilateral. Los documentos nuevos etiquetados como propuesta no significan decisiones aprobadas.
 
 **Snapshot 29/10:** main `136ce72` (V103); feature/local-access-connector `8955cdb` (V104, no fusionada, CI fallido). Los PR #1–20 corresponden al historial; backlog vigente [issues #21–59](https://github.com/Dagt/GymOs/issues).
+- [47 — Equivalencia del método TrailerSaas](47-referencia-metodologia-trailersaas.md): mapeo de documentación, issues, normas y diferencias funcionales.
