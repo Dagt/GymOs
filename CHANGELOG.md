@@ -1,5 +1,12 @@
 # Changelog
 
+## Gobernanza documental (29/10/2026) — propuesta en rama, sin merge
+
+- MVP y puertas de salida, 7 épicas/32 issues, FR/BR/NFR, flujos UX, máquinas de estados, QA, ADR, preguntas abiertas y workflow Codex según método TrailerSaas.
+- Auditoría de main V103 y Local Connector V104 en rama no integrada; distinción pruebas históricas, CI fallido y hardware pendiente.
+- Adendas a documentos canónicos sin cambiar comportamiento de código ni migraciones.
+
+
 Los cambios relevantes de GymFort se documentan aquí. `GymOS` permanece como
 nombre técnico interno durante la transición de marca.
 

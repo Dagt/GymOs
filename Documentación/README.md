@@ -2,7 +2,7 @@
 
 Versión documental: 0.9
 Estado: FUENTE CANÓNICA
-Corte: 26 de agosto de 2026
+Corte base: 26 de agosto de 2026; actualizado con adenda 29 de octubre de 2026
 
 GymFort es la identidad comercial vigente. `GymOS`/`gymos` permanece como nombre técnico histórico en paquetes Java, variables, base de datos y algunos artefactos; una migración de marca no debe romper contratos ni datos existentes.
 
@@ -83,3 +83,28 @@ Quedan fuera de V1: aplicación móvil/portal remoto completo del socio, cobros 
 3. Cambios de endpoint, permiso o migración actualizan 05, 06 y la matriz de permisos.
 4. Cambios operativos actualizan `docs/operations`, `docs/testing` o `infra`.
 5. No crear cierres, prompts o listas de pendientes paralelas; Git conserva el historial y el documento 28 conserva la deuda activa.
+
+
+## Índice de desarrollo guiado por issues — adenda 29/10/2026
+
+Se adopta el procedimiento usado en [TrailerSaas](https://github.com/Dagt/TrailerSaas), **sin sobrescribir** los 34 documentos históricos ni las 22 fichas existentes:
+
+| Capa | Documento | Propósito |
+|---|---|---|
+| Reglas agentes | [AGENTS.md](../AGENTS.md) | Jerarquía y seguridad |
+| Producto/MVP | [35](35-mvp-y-criterios-de-salida.md) | Alcance, exclusiones, gates |
+| Épicas/Issues | [36](36-epicas-backlog-codex.md) | 7 épicas y 32 issues, olas, DoD |
+| Auditoría verificable | [37](37-auditoria-repositorio-2026-10-29.md) | Ramas/SHA, riesgos, CI y límites |
+| Workflow Codex | [38](38-directrices-codex-y-plantillas.md) | Un issue → PR Draft → QA → revisión |
+| Design System | [39](39-sistema-diseno-y-ux.md) | Tokens, patrones, accesibilidad |
+| QA aceptación | [40](40-qa-matriz-de-aceptacion-y-evidencias.md) | Matriz de evidencia por riesgo |
+| NFR | [41](41-requisitos-no-funcionales.md) | Seguridad, calidad y operación |
+| FR/BR/WF | [42](42-requisitos-reglas-trazabilidad.md) | Requisitos y reglas trazables |
+| Máquinas de estados | [43](43-maquinas-estados-y-workflows.md) | Invariantes/transiciones |
+| UX por actor | [44](44-flujos-ux-por-rol.md) | Flujos y pantallas reales |
+| Preguntas abiertas | [45](45-preguntas-y-decisiones-pendientes.md) | Decisiones pendientes |
+| ADR | [46](46-decisiones-arquitectonicas-adr.md) | Revisión/aceptación arquitectónica |
+
+**Precedencia:** constitución y ADR aceptados; requisitos/reglas aprobados; contratos/código/migraciones comprobados en rama del issue; fichas actualizadas; propuestas, notas y registros históricos. Las contradicciones se registran en OQ/ADR; Codex no decide de forma unilateral. Los documentos nuevos etiquetados como propuesta no significan decisiones aprobadas.
+
+**Snapshot 29/10:** main `136ce72` (V103); feature/local-access-connector `8955cdb` (V104, no fusionada, CI fallido). Los PR #1–20 corresponden al historial; backlog vigente [issues #21–59](https://github.com/Dagt/GymOs/issues).
