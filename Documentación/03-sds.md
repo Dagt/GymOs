@@ -1,5 +1,8 @@
 ﻿# 3. Software Design Specification
 
+> **Adenda de arquitectura 29/10/2026:** La enumeración histórica de 3.2 repite payments y omite módulos existentes platformadmin, platformbilling, visitpackages, eligibility y common. [#58](https://github.com/Dagt/GymOs/issues/58) debe verificar paquetes y fronteras reales con Spring Modulith antes de refactorizar. Ver [registro ADR](46-decisiones-arquitectonicas-adr.md).
+
+
 ## 3.1 Estilo arquitectónico
 
 GymFort se implementa como monolito modular con Spring Modulith. El repositorio conserva el nombre técnico GymOS. Cada módulo representa un dominio delimitado y expone únicamente contratos públicos.

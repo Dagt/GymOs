@@ -1,7 +1,7 @@
 # 28. Registro vivo de hallazgos y deuda técnica
 
 Estado: VIGENTE / OBLIGATORIO
-Corte: 29 de agosto de 2026
+Corte funcional: 29 de agosto de 2026; hallazgos de auditoría: 29 de octubre de 2026
 
 ## 1. Propósito y regla de actualización
 
@@ -41,6 +41,13 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 | AUD-001 | P1 | Auditoría | ABIERTA | No existe matriz completa de mutaciones sensibles contra `audit_log`. | Cobertura automatizada, retención e inmutabilidad definidas. |
 | DB-001 | P0 | Datos/Flyway | ABIERTA | V102, base limpia y upgrades desde V83/V84/V85/V99 se ejecutaron en PostgreSQL real dentro de las 115/115 pruebas verdes del 29/08/2026. Además, el volumen local histórico en V85 se actualizó hasta V102 sin `repair` manual, borrado ni pérdida de datos: V84 permanece igual a `main`, un callback reconoce sólo los checksums exactos del V84 piloto y del primer V102 de prueba, V102 converge idempotentemente ambas formas conocidas y el callback previo a V86 corrige sólo la nulabilidad requerida por esa migración. | Incorporar la misma matriz al pipeline CI permanente, probar restore/rollback operativo y conservar snapshots de base previos a cada despliegue. |
 | OPS-001 | P1 | Producción | ABIERTA | Faltan observabilidad, backups restaurables y runbooks verificados. | Simulacro, alertas y procedimientos de recuperación. |
+
+| AUTH-UX-001 | P1 | Login/UX | ABIERTA | `auth.ts` muestra error construible con HTTP status, URL interna y correlationId. Puede exponer diagnóstico técnico; verificar render en runtime. [#32](https://github.com/Dagt/GymOs/issues/32) | Mensajes neutrales y pruebas de seguridad/UX. |
+| UX-001 | P1 | Frontend/UI | ABIERTA | CSS disperso y `globals.css` ~175 KB; no existe evidencia de consistencia visual por rol. [#47](https://github.com/Dagt/GymOs/issues/47) | Design System versionado, captura real, accesibilidad. |
+| UX-003 | P1 | Frontend/build | ABIERTA | `apply-coaches-ui.mjs` se ejecuta desde predev/prebuild/pretest/prelint/pretypecheck y puede modificar `coaches/page.tsx`. [#49](https://github.com/Dagt/GymOs/issues/49) | Build/test sin mutación automática de fuente; regresión de coaching. |
+| QA-RELEASE-001 | P0 | CI/Release | ABIERTA | Runs main y Connector fallidos, logs históricos no recuperables; causa no confirmada. Sin E2E/Stripe full CI actual. [#44](https://github.com/Dagt/GymOs/issues/44) [#59](https://github.com/Dagt/GymOs/issues/59) | Reproducir, FULL CI del HEAD y evidencias verificables. |
+| CONN-004 | P1 | Connector/docs | ABIERTA | La rama experimental tiene descripciones contradictorias de polling y remote open entre README y architecture. [#41](https://github.com/Dagt/GymOs/issues/41) | Matriz capacidades/sitio + documentación coherente. |
+| DOC-001 | P1 | Documentación | EN_CURSO | `13-estado-desarrollo` refería no-merge de rama cuyo SHA está en main. [#57](https://github.com/Dagt/GymOs/issues/57) | Estado/índices corregidos y PR documental fusionado tras revisión. |
 
 ## 3. Hallazgos cerrados en este corte
 
@@ -110,3 +117,8 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 ## 4. Historia
 
 Los registros anteriores fueron consolidados y retirados del árbol para evitar fuentes paralelas. Git conserva su historia. Este documento es la única lista operativa.
+
+
+## Adenda 29/10/2026 — enlace con GitHub Issues
+
+Los 7 epics #21–27 y 32 issues #28–59 convierten deuda y producto pendiente en backlog ejecutable, sin sustituir los identificadores anteriores. Un issue creado no convierte un hallazgo en resuelto: cierre requiere código/validación/PR/merge y evidencia del SHA. [Auditoría](37-auditoria-repositorio-2026-10-29.md), [Backlog](36-epicas-backlog-codex.md). Los hallazgos auditados son estáticos; no se afirma un exploit demostrado.

@@ -29,6 +29,7 @@ Cada ficha debe separar lo implementado, pendiente y fuera de alcance; enlazar l
 | `19-audit.md` | `audit` | Bitácora de acciones |
 | `20-common-operations.md` | `common` e infraestructura | API común, datos y operación |
 | `21-payments.md` | `payments` | Stripe, Mercado Pago, webhooks y recurrencia |
+| `22-platform-billing.md` | `platformadmin`, `platformbilling` | Cobranza SaaS manual, cartera y contratos por sucursal |
 
 Para el cierre de Automatizaciones/email consultar además:
 
@@ -41,3 +42,5 @@ Para el control físico consultar además:
 
 - `../../docs/operations/physical-access-connector.md`;
 - `../../docs/operations/access-device-troubleshooting.md`.
+
+> **Adenda 29/10/2026:** El Connector V104 sólo está en rama experimental; no se clasifica como integrado a main. Catálogo de planificación y QA en [documentos 35–46](../README.md).

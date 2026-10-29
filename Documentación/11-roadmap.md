@@ -1,5 +1,8 @@
 # 11. Roadmap de implementación
 
+> **Adenda 29/10/2026:** El bloque histórico «En curso inmediato» refleja agosto. Los planes/beneficios/paquetes multi-sucursal (V98–V103) ya están en main, pero faltan E2E conectadas/seguridad/hardware para certificar. El Connector existe en rama posterior no fusionada. Usar [MVP](35-mvp-y-criterios-de-salida.md), [backlog](36-epicas-backlog-codex.md) y [auditoría](37-auditoria-repositorio-2026-10-29.md) como corte operativo actual.
+
+
 Corte: 26 de agosto de 2026
 
 Este documento expresa secuencia y estado, no sustituye el estado verificable del documento 13 ni la deuda del 28.
