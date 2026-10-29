@@ -1,5 +1,8 @@
 # 13. Estado actual de desarrollo
 
+> **ACTUALIZACIÓN DOCUMENTAL 29/10/2026 (prioritaria sobre encabezado histórico):** La rama feature/multibranch-plans-benefits-visits ya tiene el mismo HEAD que main (136ce72, V103); la frase histórica «sin merge» es obsoleta. La rama más reciente feature/local-access-connector está cuatro commits adelantada (8955cdb, V104), pero no está fusionada ni certificada en sitio. CI main y Connector aparecen fallidos sin logs recuperables. Ver [auditoría](37-auditoria-repositorio-2026-10-29.md), [MVP](35-mvp-y-criterios-de-salida.md), [backlog](36-epicas-backlog-codex.md) y [matriz QA](40-qa-matriz-de-aceptacion-y-evidencias.md).
+
+
 Estado: FUENTE CANÓNICA / EN PROGRESO
 Corte: 29 de agosto de 2026
 Código auditado: `feature/multibranch-plans-benefits-visits`, incluyendo V103.

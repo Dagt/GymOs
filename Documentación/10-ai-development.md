@@ -1,5 +1,8 @@
 # 10. Desarrollo Asistido por IA
 
+> **Norma vigente 29/10/2026:** para Codex se exige AGENTS.md, [35 MVP](35-mvp-y-criterios-de-salida.md), [36 backlog](36-epicas-backlog-codex.md), [38 proceso issue→PR Draft](38-directrices-codex-y-plantillas.md), [44 flujos UX](44-flujos-ux-por-rol.md) y [40 QA](40-qa-matriz-de-aceptacion-y-evidencias.md). El prompt maestro histórico permanece como referencia, no autoriza merge/despliegue.
+
+
 **Corte documental:** 21 de agosto de 2026.
 
 ## 10.1 Modelo operativo

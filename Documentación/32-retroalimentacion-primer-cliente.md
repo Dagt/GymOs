@@ -1,5 +1,8 @@
 # Retroalimentación del primer cliente
 
+> **Adenda 29/10/2026:** los lotes de socios/variantes/paquetes y beneficios multi-sucursal están en main hasta V103, sin acreditar aceptación integrada Stripe/HikCentral. El lote 5 (multibranding por sucursal) sigue pendiente en [#51](https://github.com/Dagt/GymOs/issues/51). Los estados «en desarrollo» abajo son históricos; consultar [auditoría actual](37-auditoria-repositorio-2026-10-29.md).
+
+
 Estado: ANÁLISIS COMPLETO / LOTES 1 Y 2 IMPLEMENTADOS / LOTES 3–4 EN DESARROLLO
 
 Corte: 26 de agosto de 2026

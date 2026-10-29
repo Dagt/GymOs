@@ -1,5 +1,8 @@
 # GymFort
 
+> **Auditoría 29/10/2026:** La existencia de la funcionalidad descrita no certifica su uso en producción. main (136ce72) contiene V103. La rama feature/local-access-connector (8955cdb, 4 commits por encima de main) contiene V104 y el ejecutable local, SIN merge ni certificación de hardware. Los últimos CI consultados reportan fallo. Plan nuevo: [MVP](Documentación/35-mvp-y-criterios-de-salida.md), [Backlog](Documentación/36-epicas-backlog-codex.md), [Auditoría](Documentación/37-auditoria-repositorio-2026-10-29.md).
+
+
 GymFort es una plataforma SaaS modular para la operación integral de gimnasios
 y centros de bienestar. El nombre técnico histórico del repositorio, paquetes,
 variables y base de datos continúa siendo `GymOS`/`gymos` mientras se completa
