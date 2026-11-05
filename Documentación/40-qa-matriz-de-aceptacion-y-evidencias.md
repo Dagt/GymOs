@@ -72,6 +72,7 @@ Todo issue refleja cobertura positiva, negativa, concurrencia cuando aplique, te
 | PostgreSQL limpio y upgrade V103 con bitácora existente | `DatabaseMigrationTests` y arranque Flyway de las suites PostgreSQL |
 | Error de red después de confirmar, recarga, misma clave, saldo y corrección por supervisor | `frontend/e2e/manual-check-in.spec.ts`, Chromium con API interceptada. La integración de datos se verifica en PostgreSQL. |
 
-Comandos completos en `AGENTS.md`. Para ejecutar Playwright con el puerto
+El job frontend de CI ejecuta la suite Playwright completa en Chromium.
+Comandos locales en `AGENTS.md`. Para ejecutar Playwright con el puerto
 predeterminado ocupado, configura `PLAYWRIGHT_PORT=3100`. Registra el SHA y
 los resultados del run en el PR de [#61](https://github.com/Dagt/GymOs/issues/61).
