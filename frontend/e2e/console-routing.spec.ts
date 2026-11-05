@@ -398,6 +398,7 @@ test.describe("consolas por rol", () => {
     };
     const savedPayloads: Array<Record<string, unknown>> = [];
     let failNextSave = false;
+    let saveResponse = Promise.withResolvers<void>();
     await bootAs(page, user({
       console: "TENANT_OWNER",
       roles: ["Dueno del gimnasio"],
@@ -418,7 +419,7 @@ test.describe("consolas por rol", () => {
           await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ message: "Fallo simulado de socios" }) });
           return true;
         }
-        await new Promise((resolve) => setTimeout(resolve, 40));
+        await saveResponse.promise;
         lifecycle = { ...lifecycle, ...payload, updatedAt: "2026-08-26T12:00:00Z", version: lifecycle.version + 1 };
         await route.fulfill({ contentType: "application/json", body: JSON.stringify(lifecycle) });
         return true;
@@ -441,6 +442,7 @@ test.describe("consolas por rol", () => {
     await page.getByLabel("Importe (MXN)").fill("175");
     await page.getByLabel("Periodo de inactividad").fill("8");
     await expect(page.getByText("Guardando...")).toBeVisible();
+    saveResponse.resolve();
     await expect(page.getByText("Guardado")).toBeVisible();
     expect(savedPayloads.at(-1)).toMatchObject({
       registrationFeeLabel: "Alta anual",
@@ -450,9 +452,11 @@ test.describe("consolas por rol", () => {
 
     const registrationFee = page.getByRole("switch", { name: "Cobrar inscripción" });
     const automaticInactivation = page.getByRole("switch", { name: "Dar de baja automáticamente" });
+    saveResponse = Promise.withResolvers<void>();
     await registrationFee.click();
     await automaticInactivation.click();
     await expect(page.getByText("Guardando...")).toBeVisible();
+    saveResponse.resolve();
     await expect(page.getByText("Guardado")).toBeVisible();
     expect(savedPayloads.at(-1)).toMatchObject({
       registrationFeeEnabled: true,
@@ -469,6 +473,7 @@ test.describe("consolas por rol", () => {
   test("medios de cobro usa autosave serializado y rollback", async ({ page }) => {
     const savedPayloads: Array<Record<string, unknown>> = [];
     let failNextSave = false;
+    const saveResponse = Promise.withResolvers<void>();
     let paymentConfiguration = {
       receptionManualTerminalEnabled: false,
       receptionMercadoPagoEnabled: false,
@@ -500,7 +505,7 @@ test.describe("consolas por rol", () => {
           await route.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ message: "Fallo simulado de cobros" }) });
           return true;
         }
-        await new Promise((resolve) => setTimeout(resolve, 150));
+        await saveResponse.promise;
         paymentConfiguration = {
           ...paymentConfiguration,
           ...payload,
@@ -521,6 +526,7 @@ test.describe("consolas por rol", () => {
     await manualTerminal.click();
     await stripeCheckout.click();
     await expect(page.getByText("Guardando...")).toBeVisible();
+    saveResponse.resolve();
     await expect(page.getByText("Guardado")).toBeVisible();
     expect(savedPayloads.at(-1)).toMatchObject({
       receptionManualTerminalEnabled: true,
@@ -537,6 +543,7 @@ test.describe("consolas por rol", () => {
   test("toggles del kiosco conservan intención, autosave serializa y revierte errores", async ({ page }) => {
     const savedPayloads: Array<Record<string, boolean>> = [];
     let failNextSave = false;
+    const saveResponse = Promise.withResolvers<void>();
     const settingsFrom = (payload: Record<string, boolean>) => ({
       branchId: branches[0].id,
       branchName: branches[0].name,
@@ -589,9 +596,7 @@ test.describe("consolas por rol", () => {
           });
           return true;
         }
-        // Keep the mocked request pending long enough to assert the user-visible
-        // autosave state even when the complete Playwright suite runs concurrently.
-        await new Promise((resolve) => setTimeout(resolve, 250));
+        await saveResponse.promise;
         await route.fulfill({ contentType: "application/json", body: JSON.stringify(settingsFrom(payload)) });
         return true;
       }
@@ -618,6 +623,7 @@ test.describe("consolas por rol", () => {
     await registration.click();
     await resourceBooking.click();
     await expect(page.getByText("Guardando...")).toBeVisible();
+    saveResponse.resolve();
     await expect(page.getByText("Guardado")).toBeVisible();
 
     const latest = savedPayloads.at(-1);
