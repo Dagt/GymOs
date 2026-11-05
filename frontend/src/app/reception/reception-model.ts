@@ -67,8 +67,19 @@ export function getFocusActions(): FocusAction[] {
   return FOCUS_ACTIONS;
 }
 
-export function getVisibleFocusActions(canLaunchKiosk: boolean): FocusAction[] {
-  return FOCUS_ACTIONS.filter((action) => action.href !== "/kiosk/launch" || canLaunchKiosk);
+export function getVisibleFocusActions(canLaunchKiosk: boolean, canCheckIn: boolean): FocusAction[] {
+  const actions = FOCUS_ACTIONS.filter((action) => action.href !== "/kiosk/launch" || canLaunchKiosk);
+  if (!canCheckIn) return actions;
+  return [
+    {
+      title: "Acceso presencial",
+      detail: "Consulta la membresía, los beneficios y el saldo antes de registrar una entrada.",
+      href: "/reception/check-in",
+      label: "Registrar entrada",
+      accent: "people",
+    },
+    ...actions,
+  ];
 }
 
 export function getQuickActions(): { primary: FocusAction; secondary: FocusAction[] } {

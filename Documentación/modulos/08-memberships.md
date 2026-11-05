@@ -124,3 +124,11 @@ Estas políticas sí aplican a los planes de membresía, no sólo a los paquetes
 un plan oculto queda fuera de altas/cambios del kiosco pero se vende en
 Recepción y se renueva si el socio ya lo posee; `WAIVED` omite inscripción en
 alta, renovación o cambio cuyo plan objetivo tenga esa política.
+
+## Registro manual en recepción
+
+ACC-006 usa `EligibilityPolicy` con el beneficio `ACCESS` elegido y la fecha
+de la sucursal. Se respeta la gracia vigente y se registra el ID de la membresía
+que concede ese derecho. La membresía tiene prioridad sobre el paquete para el
+mismo beneficio. La reversión de una entrada por membresía conserva la vigencia
+y registra la corrección operativa. Ver [Access](10-access.md).

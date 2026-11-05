@@ -1582,3 +1582,31 @@ presenta como fallida una identificación o alta ya confirmada.
 con la sucursal activa del principal. Cambiar inscripción, inactividad,
 checkout o domiciliación en Centro no modifica Tecnológica. Los endpoints de
 vinculación de proveedor siguen administrando una cuenta organizacional.
+
+## ACC-006 — API de registro presencial
+
+Prefijo `/api/v1/access/manual-check-ins`. OpenAPI se genera desde
+`ManualCheckInController`. Requiere identidad TENANT, sucursal activa y
+`access.check-in`.
+
+| Método y ruta relativa | Contrato |
+| --- | --- |
+| `GET /clients?query=...` | Entre 2 y 100 caracteres. Hasta 20 coincidencias por nombre, teléfono o UUID visibles en la sucursal. |
+| `GET /clients/{clientId}` | `client`, `membership`, `visitPackage`, `options` y `denialReason`. Sólo consulta. |
+| `GET /` | `branchId`, `branchName`, `timezone`, `entries` con los últimos 30 registros. |
+| `POST /` | Header `Idempotency-Key` UUID. Cuerpo con `branchId`, `clientId`, `benefitId` opcional y, para excepción, `overrideOf` y `overrideReason` hasta 300 caracteres. |
+| `POST /{id}/reversal` | Cuerpo con `branchId` y `reason` obligatorio, hasta 300 caracteres. Requiere también `access.check-in.reverse`. |
+
+El POST registra `GRANTED`, `DENIED` o `DUPLICATE` y responde 200 con la
+entrada. Incluye fecha operativa, hora, organización, sucursal, socio, actor,
+motivo, referencia de membresía o paquete y saldo anterior/posterior si aplica.
+`benefitId` ausente registra rechazo cuando el socio no cuenta con un derecho
+seleccionado. Repetir clave y cuerpo devuelve la misma entrada y su estado de
+reversión actual. Cambiar el contexto o el cuerpo para la misma clave devuelve
+`CHECK_IN_KEY_REUSED` (400). En un duplicado, `duplicateOf` identifica la
+entrada original. Para confirmar otra entrada dentro de la ventana, se usa otra
+clave y `access.check-in.override`. El contexto de la sucursal se valida
+también contra el JWT. Las reversiones repetidas por el mismo actor y motivo
+devuelven la misma corrección. Un intento incompatible devuelve
+`CHECK_IN_ALREADY_REVERSED`. `GET /api/v1/access/logs` añade `reversedAt`
+y muestra `DUPLICATE` para intentos manuales repetidos.

@@ -3,6 +3,7 @@ package com.gymos.visitpackages.application.port;
 import com.gymos.catalog.api.VisitPackageBenefitUsageMode;
 import com.gymos.visitpackages.api.operations.VisitPackageOperations.VisitPackageEntitlementView;
 import com.gymos.visitpackages.api.operations.VisitPackageAccessOperations.VisitPackageAccessResult;
+import com.gymos.visitpackages.api.operations.VisitPackageAccessOperations.VisitRestoration;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -41,6 +42,10 @@ public interface VisitPackageEntitlementPort {
 			UUID accessDeviceId, String idempotencyKey, LocalDate businessDate, OffsetDateTime occurredAt);
 	boolean linkAccessLog(
 			UUID organizationId, UUID usageId, VisitPackageBenefitUsageMode usageMode, UUID accessLogId);
+
+	Optional<VisitRestoration> reverseConsumption(
+			UUID organizationId, UUID branchId, UUID clientId, UUID accessLogId,
+			String reason, LocalDate businessDate, OffsetDateTime now);
 
 	record ActivationDefinition(UUID entitlementId, int validityDays, String status) {}
 }

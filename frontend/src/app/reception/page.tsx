@@ -16,7 +16,7 @@ import {
   type StoredSession,
 } from "@/lib/api";
 import { ReceptionRenewalWidget } from "./ReceptionRenewalWidget";
-import { canLaunchKiosk } from "@/lib/role-model";
+import { canLaunchKiosk, canRegisterCheckIn } from "@/lib/role-model";
 
 export default function ReceptionPage() {
   const [session, setSession] = useState<StoredSession | null>(null);
@@ -81,7 +81,7 @@ export default function ReceptionPage() {
   const visibleBranchName = activeBranch?.name ?? (session?.user.branchId ? "Sucursal activa" : null);
   const receptionOrganizationName =
     organization?.tradeName ?? session?.user.brandName ?? session?.user.organizationName ?? "GymFort";
-  const focusActions = session ? getVisibleFocusActions(canLaunchKiosk(session.user)) : [];
+  const focusActions = session ? getVisibleFocusActions(canLaunchKiosk(session.user), canRegisterCheckIn(session.user)) : [];
 
   async function switchBranch(branchId: string) {
     if (!session || branchId === session.user.branchId) {

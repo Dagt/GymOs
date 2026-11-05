@@ -12,6 +12,12 @@ nombre técnico interno durante la transición de marca.
 
 ## 0.7.0-pilot-readiness - Unreleased
 
+- ACC-006 incorpora el registro presencial de entradas en Recepción. Usa los
+  derechos de membresía y paquete, protege el saldo con idempotencia y
+  concurrencia en PostgreSQL, y conserva el historial y sus reversiones.
+- Actualiza Next.js, su configuración de ESLint y Wrangler para corregir los
+  hallazgos altos y críticos del gate npm de seguridad.
+
 - Adopt the visible GymFort product identity while preserving compatible
   internal `gymos` packages, variables and data identifiers.
 - Put the tenant logo, gym name and active branch first in the sidebar; move the

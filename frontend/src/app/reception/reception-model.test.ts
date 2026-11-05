@@ -23,6 +23,11 @@ test("reception model provides data-dense layout configuration for hybrid contex
 });
 
 test("reception actions hide kiosk launch unless the session is allowed to open it", () => {
-  assert.equal(getVisibleFocusActions(false).some((action) => action.href === "/kiosk/launch"), false);
-  assert.equal(getVisibleFocusActions(true).some((action) => action.href === "/kiosk/launch"), true);
+  assert.equal(getVisibleFocusActions(false, false).some((action) => action.href === "/kiosk/launch"), false);
+  assert.equal(getVisibleFocusActions(true, false).some((action) => action.href === "/kiosk/launch"), true);
+});
+
+test("reception exposes check-in as the first action only with its permission", () => {
+  assert.equal(getVisibleFocusActions(false, true)[0].href, "/reception/check-in");
+  assert.equal(getVisibleFocusActions(true, false).some((action) => action.href === "/reception/check-in"), false);
 });

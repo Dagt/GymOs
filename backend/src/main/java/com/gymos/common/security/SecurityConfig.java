@@ -151,6 +151,12 @@ public class SecurityConfig {
 						.requestMatchers(org.springframework.http.HttpMethod.DELETE,
 								"/api/v1/access/physical-integration/**")
 								.hasAuthority("access.physical.manage")
+						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/access/manual-check-ins",
+								"/api/v1/access/manual-check-ins/**").hasAuthority("access.check-in")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/access/manual-check-ins")
+								.hasAuthority("access.check-in")
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/access/manual-check-ins/*/reversal")
+								.hasAuthority("access.check-in.reverse")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/access/**").hasAuthority("access.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/access/commands/open")
 								.hasAuthority("access.manual.open")

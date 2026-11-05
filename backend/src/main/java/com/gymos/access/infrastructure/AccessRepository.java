@@ -826,11 +826,13 @@ public class AccessRepository {
 		return jdbcClient.sql("""
 				SELECT l.id, l.decision, l.access_type, l.source, l.reason, l.command_status, l.occurred_at,
 				       d.name AS device_name, d.device_code,
-				       c.id AS client_id, person.first_name || ' ' || person.last_name AS client_name
+				       c.id AS client_id, person.first_name || ' ' || person.last_name AS client_name,
+				       reversal.occurred_at AS reversed_at
 				FROM access_log l
 				LEFT JOIN access_device d ON d.id = l.device_id
 				LEFT JOIN client c ON c.id = l.client_id
 				LEFT JOIN person person ON person.id = c.person_id
+				LEFT JOIN access_manual_reversal reversal ON reversal.access_log_id = l.id
 				WHERE l.organization_id = :organizationId
 				  AND l.branch_id = :branchId
 				ORDER BY l.occurred_at DESC
@@ -850,7 +852,8 @@ public class AccessRepository {
 						resultSet.getString("device_name"),
 						resultSet.getString("device_code"),
 						resultSet.getObject("client_id", UUID.class),
-						resultSet.getString("client_name")
+						resultSet.getString("client_name"),
+						resultSet.getObject("reversed_at", OffsetDateTime.class)
 				))
 				.list();
 	}
@@ -1160,7 +1163,8 @@ public class AccessRepository {
 			String deviceName,
 			String deviceCode,
 			UUID clientId,
-			String clientName
+			String clientName,
+			OffsetDateTime reversedAt
 	) {
 	}
 }

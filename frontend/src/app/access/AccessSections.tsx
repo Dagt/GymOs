@@ -1051,14 +1051,16 @@ export function AccessLogsSection({
                   </td>
                   <td className="px-4 py-3">
                     <StatusBadge
-                      tone={log.decision === "GRANTED" ? "success" : "danger"}
+                      tone={log.reversedAt || log.decision === "DUPLICATE" ? "warning"
+                        : log.decision === "GRANTED" ? "success" : "danger"}
                     >
-                      {log.decision === "GRANTED" ? "Concedido" : "Denegado"}
+                      {log.reversedAt ? "Revertido" : log.decision === "DUPLICATE" ? "Duplicado"
+                        : log.decision === "GRANTED" ? "Concedido" : "Denegado"}
                     </StatusBadge>
                   </td>
                   <td className="px-4 py-3 text-[var(--brand-muted)]">
                     <span className="block font-semibold text-[var(--brand-ink)]">
-                      {log.deviceName ?? "Sin punto"}
+                      {log.source === "MANUAL" ? "Recepción manual" : log.deviceName ?? "Sin punto"}
                     </span>
                     <span className="text-xs">{humanize(log.accessType)}</span>
                   </td>

@@ -165,3 +165,9 @@ El modo inicial será de **sincronización de permisos**: HikCentral y terminale
 ## Definición de terminado
 
 Una capacidad está terminada cuando tiene contrato, permisos, reglas de tenant/sucursal, migración cuando aplica, auditoría, errores seguros, pruebas, documentación y validación en el entorno objetivo. Para proveedores externos se requiere además evidencia sandbox/productiva controlada y runbook de recuperación.
+
+## Check-in sin torniquete
+
+ACC-006 incorpora al piloto cloud-only el registro presencial, consumo
+transaccional y corrección auditada. El criterio de salida incluye CI verde del
+SHA final y un recorrido de aceptación por Recepción. [Issue #61](https://github.com/Dagt/GymOs/issues/61).

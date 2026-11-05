@@ -4,6 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.gymos.common.api.BusinessException;
+import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.access.application.ManualCheckInService;
+import com.gymos.access.infrastructure.ManualCheckInRepository;
+import com.gymos.access.infrastructure.ManualCheckInRepository.Entry;
+import com.gymos.audit.api.AuditService;
+import com.gymos.eligibility.application.DefaultEligibilityPolicy;
+import com.gymos.eligibility.infrastructure.EligibilityRepository;
+import com.gymos.visitpackages.application.VisitPackageAccessService;
 import com.gymos.access.infrastructure.AccessRepository;
 import com.gymos.benefits.infrastructure.BenefitRepository;
 import com.gymos.catalog.api.VisitPackageBenefitUsage;
@@ -16,6 +24,9 @@ import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import org.springframework.security.access.AccessDeniedException;
 import java.util.UUID;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Executors;
@@ -473,6 +484,215 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 				.isEqualTo(LocalDate.of(2026, 8, 28));
 	}
 
+	@Test
+	void receptionConsumesFiveVisitsWithoutChargingIncludedBenefitsAndRejectsSixth() {
+		Fixture fixture = fixture(5);
+		UUID general = fixture.insertAccessBenefit(fixture.branchA(), "GENERAL", "PLAN_COVERAGE");
+		UUID shower = fixture.insertAccessBenefit(fixture.branchA(), "SHOWER", "LOCAL");
+		fixture.activate(List.of(
+				new BenefitCoverage(general, VisitPackageBenefitUsageMode.CONSUMES_VISIT, List.of(fixture.branchA())),
+				new BenefitCoverage(shower, VisitPackageBenefitUsageMode.INCLUDED_WITH_VISIT, List.of(fixture.branchA()))));
+		fixture.makeCurrent();
+		var desk = fixture.desk();
+		var receiver = fixture.actor(fixture.branchA(), false);
+		var preview = desk.preview(receiver, fixture.clientId());
+		assertThat(preview.options()).extracting(ManualCheckInService.AccessOption::id).containsExactly(general);
+		assertThat(preview.visitPackage().benefits()).extracting(ManualCheckInService.PackageBenefit::id)
+				.containsExactlyInAnyOrder(general, shower);
+		assertThat(fixture.register(desk, receiver, UUID.randomUUID(), shower).decision()).isEqualTo("DENIED");
+
+		for (int before = 5; before > 0; before--) {
+			UUID key = UUID.randomUUID();
+			Entry entry = fixture.register(desk, receiver, key, general);
+			assertThat(entry.decision()).isEqualTo("GRANTED");
+			assertThat(entry.remainingBefore()).isEqualTo(before);
+			assertThat(entry.remainingAfter()).isEqualTo(before - 1);
+			assertThat(entry.method()).isEqualTo("MANUAL");
+			assertThat(entry.actorUserId()).isEqualTo(receiver.userId());
+			assertThat(entry.businessDate()).isEqualTo(fixture.today());
+			assertThat(fixture.register(desk, receiver, key, general)).isEqualTo(entry);
+			fixture.age(entry);
+		}
+		Entry denied = fixture.register(desk, receiver, UUID.randomUUID(), general);
+		assertThat(denied.decision()).isEqualTo("DENIED");
+		assertThat(denied.reason()).contains("agotado");
+		assertThat(fixture.consumptionCount()).isEqualTo(5);
+		assertThat(fixture.includedAccessCount()).isZero();
+		assertThat(fixture.remaining()).isZero();
+		assertThat(desk.history(receiver).entries()).hasSize(7);
+		assertThat(fixture.count("audit_log")).isEqualTo(7);
+		assertThat(fixture.count("sale")).isEqualTo(1);
+		assertThat(fixture.count("payment")).isZero();
+		assertThat(fixture.jdbc().sql("SELECT count(*) FROM access_log WHERE organization_id=:org AND device_id IS NOT NULL")
+				.param("org", fixture.organizationId()).query(Integer.class).single()).isZero();
+	}
+
+	@Test
+	void receptionUsesExistingMembershipGraceAndNeverConsumesWhenMembershipGrantsTheSameRight() {
+		Fixture fixture = fixture(2);
+		UUID general = fixture.activateConsuming(List.of(fixture.branchA()));
+		fixture.makeCurrent();
+		UUID membership = fixture.addMembership(general, fixture.today().minusDays(1), fixture.today());
+		var desk = fixture.desk();
+		var receiver = fixture.actor(fixture.branchA(), false);
+		var supervisor = fixture.actor(fixture.branchA(), true);
+		var grant = fixture.register(desk, receiver, UUID.randomUUID(), general);
+		assertThat(grant.membershipId()).isEqualTo(membership);
+		assertThat(grant.entitlementId()).isNull();
+		assertThat(fixture.remaining()).isEqualTo(2);
+		assertThat(fixture.reverse(desk, supervisor, grant.id(), "Error de identificación").reversal().remainingAfter()).isNull();
+		assertThat(fixture.remaining()).isEqualTo(2);
+
+		fixture.jdbc().sql("UPDATE membership SET grace_ends_on=ends_on WHERE id=:id").param("id", membership).update();
+		Entry packageGrant = fixture.register(desk, receiver, UUID.randomUUID(), general);
+		assertThat(packageGrant.entitlementId()).isNotNull();
+		assertThat(packageGrant.membershipId()).isNull();
+		assertThat(packageGrant.remainingAfter()).isEqualTo(1);
+		fixture.age(packageGrant);
+		fixture.jdbc().sql("UPDATE visit_package_entitlement SET valid_until=:end WHERE sale_id=:sale")
+				.param("end", fixture.today().minusDays(1)).param("sale", fixture.saleId()).update();
+		assertThat(fixture.register(desk, receiver, UUID.randomUUID(), general).reason()).contains("vencido");
+		assertThat(fixture.remaining()).isEqualTo(1);
+	}
+
+	@Test
+	void receptionDeniesExpiredMembershipSuspendedInactiveAndWrongBranchPackage() {
+		Fixture fixture = fixture(2);
+		UUID general = fixture.activateConsuming(List.of(fixture.branchA()));
+		fixture.makeCurrent();
+		fixture.addMembership(general, fixture.today().minusDays(2), fixture.today().minusDays(1));
+		var desk = fixture.desk();
+		var receiver = fixture.actor(fixture.branchA(), false);
+		for (String status : List.of("SUSPENDED", "INACTIVE")) {
+			fixture.jdbc().sql("UPDATE client SET status=:status WHERE id=:id")
+					.param("id", fixture.clientId()).param("status", status).update();
+			assertThat(desk.preview(receiver, fixture.clientId()).options()).isEmpty();
+			assertThat(fixture.register(desk, receiver, UUID.randomUUID(), general).reason()).contains("inactivo");
+		}
+		fixture.jdbc().sql("UPDATE client SET status='ACTIVE' WHERE id=:id").param("id", fixture.clientId()).update();
+		fixture.jdbc().sql("UPDATE visit_package_entitlement SET valid_until=:end WHERE sale_id=:sale")
+				.param("end", fixture.today().minusDays(1)).param("sale", fixture.saleId()).update();
+		assertThat(desk.preview(receiver, fixture.clientId()).membership()).isNull();
+		assertThat(fixture.register(desk, receiver, UUID.randomUUID(), general).decision()).isEqualTo("DENIED");
+
+		fixture.makeCurrent();
+		fixture.jdbc().sql("UPDATE client SET home_branch_id=:branch WHERE id=:id")
+				.param("branch", fixture.branchB()).param("id", fixture.clientId()).update();
+		fixture.jdbc().sql("DELETE FROM visit_package_entitlement_branch WHERE organization_id=:org AND branch_id=:branch")
+				.param("org", fixture.organizationId()).param("branch", fixture.branchB()).update();
+		var branchBActor = fixture.actor(fixture.branchB(), false);
+		assertThat(desk.preview(branchBActor, fixture.clientId()).options()).isEmpty();
+		assertThat(fixture.register(desk, branchBActor, UUID.randomUUID(), general).reason()).contains("no cubre");
+		assertThat(fixture.consumptionCount()).isZero();
+	}
+
+	@Test
+	void receptionSerializesConcurrentReceptionistsAndSupportsAnAuditedDistinctEntry() throws Exception {
+		Fixture fixture = fixture(2);
+		UUID general = fixture.activateConsuming(List.of(fixture.branchA()));
+		fixture.makeCurrent();
+		var desk = fixture.desk();
+		var first = fixture.actor(fixture.branchA(), false);
+		var second = fixture.actor(fixture.branchA(), false);
+		var supervisor = fixture.actor(fixture.branchA(), true);
+		UUID firstKey = UUID.randomUUID();
+		UUID secondKey = UUID.randomUUID();
+		var attempts = simultaneous(
+				() -> fixture.register(desk, first, firstKey, general),
+				() -> fixture.register(desk, second, secondKey, general));
+		assertThat(attempts).extracting(Entry::decision).containsExactlyInAnyOrder("GRANTED", "DUPLICATE");
+		var replays = simultaneous(
+				() -> fixture.register(desk, first, firstKey, general),
+				() -> fixture.register(desk, second, firstKey, general));
+		assertThat(replays).containsExactly(attempts.getFirst(), attempts.getFirst());
+		Entry original = attempts.stream().filter(entry -> entry.decision().equals("GRANTED")).findFirst().orElseThrow();
+		Entry duplicate = attempts.stream().filter(entry -> entry.decision().equals("DUPLICATE")).findFirst().orElseThrow();
+		assertThat(duplicate.duplicateOf()).isEqualTo(original.id());
+		assertThat(fixture.remaining()).isEqualTo(1);
+		assertThatThrownBy(() -> fixture.register(desk, first, firstKey, UUID.randomUUID()))
+				.isInstanceOfSatisfying(BusinessException.class, error -> assertThat(error.code()).isEqualTo("CHECK_IN_KEY_REUSED"));
+		assertThatThrownBy(() -> fixture.transaction().execute(tx -> desk.register(second, second.branchId(), UUID.randomUUID(),
+				fixture.clientId(), general, original.id(), "Reingreso", "test")))
+				.isInstanceOf(AccessDeniedException.class);
+		Entry distinct = fixture.transaction().execute(tx -> desk.register(supervisor, supervisor.branchId(), UUID.randomUUID(),
+				fixture.clientId(), general, original.id(), "Reingreso confirmado", "test"));
+		assertThat(distinct.decision()).isEqualTo("GRANTED");
+		assertThat(distinct.overrideOf()).isEqualTo(original.id());
+		assertThat(distinct.overrideReason()).isEqualTo("Reingreso confirmado");
+		assertThat(fixture.remaining()).isZero();
+		assertThat(fixture.consumptionCount()).isEqualTo(2);
+	}
+
+	@Test
+	void lastVisitIsSharedAcrossBranchesAndConcurrentReversalCreditsExactlyOnce() throws Exception {
+		Fixture fixture = fixture(1);
+		UUID general = fixture.activateConsuming(List.of(fixture.branchA(), fixture.branchB()));
+		fixture.makeCurrent();
+		var desk = fixture.desk();
+		var first = fixture.actor(fixture.branchA(), false);
+		var second = fixture.actor(fixture.branchB(), false);
+		var entries = simultaneous(
+				() -> fixture.register(desk, first, UUID.randomUUID(), general),
+				() -> fixture.register(desk, second, UUID.randomUUID(), general));
+		assertThat(entries).extracting(Entry::decision).containsExactlyInAnyOrder("GRANTED", "DENIED");
+		Entry grant = entries.stream().filter(entry -> entry.decision().equals("GRANTED")).findFirst().orElseThrow();
+		var supervisor = fixture.actor(grant.branchId(), true);
+		assertThat(fixture.remaining()).isZero();
+		assertThatThrownBy(() -> fixture.reverse(desk, fixture.actor(grant.branchId(), false), grant.id(), "Error"))
+				.isInstanceOf(AccessDeniedException.class);
+		var corrections = simultaneous(
+				() -> fixture.reverse(desk, supervisor, grant.id(), "Error"),
+				() -> fixture.reverse(desk, supervisor, grant.id(), "Error"));
+		assertThat(corrections.getFirst()).isEqualTo(corrections.getLast());
+		assertThat(corrections.getFirst().reversal().remainingBefore()).isZero();
+		assertThat(corrections.getFirst().reversal().remainingAfter()).isEqualTo(1);
+		assertThat(fixture.remaining()).isEqualTo(1);
+		assertThat(fixture.count("access_manual_reversal")).isEqualTo(1);
+		assertThat(fixture.count("audit_log")).isEqualTo(3);
+		assertThatThrownBy(() -> fixture.reverse(desk, supervisor, grant.id(), "Otro motivo"))
+				.isInstanceOfSatisfying(BusinessException.class, error -> assertThat(error.code()).isEqualTo("CHECK_IN_ALREADY_REVERSED"));
+		assertThat(fixture.register(desk, supervisor, UUID.randomUUID(), general).remainingAfter()).isZero();
+	}
+
+	@Test
+	void receptionSearchAndWritesStayInTenantAndBranch() {
+		Fixture fixture = fixture(1);
+		Fixture other = fixture(1);
+		var desk = fixture.desk();
+		var first = fixture.actor(fixture.branchA(), true);
+		var second = fixture.actor(fixture.branchB(), true);
+		UUID general = fixture.activateConsuming(List.of(fixture.branchA()));
+		fixture.makeCurrent();
+		var person = desk.search(first, fixture.clientId().toString()).getFirst();
+		assertThat(desk.search(first, "Paola")).containsExactly(person);
+		assertThat(desk.search(first, person.phone())).containsExactly(person);
+		assertThat(desk.search(first, other.clientId().toString())).isEmpty();
+		assertThat(desk.search(second, fixture.clientId().toString())).isEmpty();
+		assertThatThrownBy(() -> desk.preview(second, fixture.clientId())).isInstanceOf(BusinessException.class);
+		assertThatThrownBy(() -> fixture.transaction().execute(tx -> desk.register(
+				first, second.branchId(), UUID.randomUUID(), fixture.clientId(), general, null, null, "test")))
+				.isInstanceOf(AccessDeniedException.class);
+		assertThatThrownBy(() -> fixture.transaction().execute(tx -> desk.register(
+				first, first.branchId(), UUID.randomUUID(), other.clientId(), general, null, null, "test")))
+				.isInstanceOf(BusinessException.class);
+		Entry grant = fixture.register(desk, first, UUID.randomUUID(), general);
+		assertThat(desk.history(second).entries()).isEmpty();
+		assertThatThrownBy(() -> fixture.reverse(desk, second, grant.id(), "Error")).isInstanceOf(BusinessException.class);
+		assertThatThrownBy(() -> fixture.reverse(desk, other.actor(other.branchA(), true), grant.id(), "Error"))
+				.isInstanceOf(BusinessException.class);
+		assertThat(desk.history(first).entries()).containsExactly(grant);
+	}
+
+	private static <T> List<T> simultaneous(java.util.concurrent.Callable<T> first, java.util.concurrent.Callable<T> second)
+			throws Exception {
+		var gate = new CyclicBarrier(2);
+		try (var pool = Executors.newFixedThreadPool(2)) {
+			var a = pool.submit(() -> { gate.await(10, TimeUnit.SECONDS); return first.call(); });
+			var b = pool.submit(() -> { gate.await(10, TimeUnit.SECONDS); return second.call(); });
+			return List.of(a.get(15, TimeUnit.SECONDS), b.get(15, TimeUnit.SECONDS));
+		}
+	}
+
 	private static VisitPackageBenefitUsage consumes(UUID benefitId) {
 		return new VisitPackageBenefitUsage(benefitId, VisitPackageBenefitUsageMode.CONSUMES_VISIT);
 	}
@@ -565,6 +785,75 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 			UUID organizationId, UUID branchA, UUID branchB, UUID clientId, UUID packagePlanId,
 			UUID saleId, UUID deviceA, UUID deviceB, int totalVisits
 	) {
+		ManualCheckInService desk() {
+			return new ManualCheckInService(new ManualCheckInRepository(jdbc),
+					new DefaultEligibilityPolicy(new EligibilityRepository(jdbc)),
+					new VisitPackageAccessService(repository), new AuditService(jdbc));
+		}
+
+		GymOsPrincipal actor(UUID branch, boolean supervisor) {
+			return new GymOsPrincipal(UUID.randomUUID(), organizationId, branch, "fixture", "Fixture",
+					supervisor ? Set.of("access.check-in", "access.check-in.override", "access.check-in.reverse")
+							: Set.of("access.check-in"));
+		}
+
+		LocalDate today() {
+			return repository.businessDate(organizationId, branchA, OffsetDateTime.now());
+		}
+
+		void makeCurrent() {
+			jdbc.sql("UPDATE visit_package_entitlement SET valid_from=:from, valid_until=:until WHERE sale_id=:sale")
+					.param("from", today().minusDays(2)).param("until", today().plusDays(27)).param("sale", saleId).update();
+		}
+
+		void age(Entry entry) {
+			jdbc.sql("UPDATE access_log SET occurred_at=occurred_at - interval '2 minutes' WHERE id=:id")
+					.param("id", entry.id()).update();
+		}
+
+		int count(String table) {
+			return jdbc.sql("SELECT count(*) FROM " + table + " WHERE organization_id=:org")
+					.param("org", organizationId).query(Integer.class).single();
+		}
+
+		Entry register(ManualCheckInService desk, GymOsPrincipal actor, UUID key, UUID benefit) {
+			return transaction.execute(tx -> desk.register(actor, actor.branchId(), key, clientId, benefit, null, null, "test"));
+		}
+
+		Entry reverse(ManualCheckInService desk, GymOsPrincipal actor, UUID log, String reason) {
+			return transaction.execute(tx -> desk.reverse(actor, actor.branchId(), log, reason, "test"));
+		}
+
+		UUID addMembership(UUID benefit, LocalDate ends, LocalDate graceEnds) {
+			UUID product = UUID.randomUUID();
+			UUID plan = UUID.randomUUID();
+			UUID membership = UUID.randomUUID();
+			jdbc.sql("""
+					INSERT INTO catalog_product (id, organization_id, sku, name, product_type, commercial_subtype,
+					    price_cents, currency, taxable, status, created_at, updated_at, version)
+					VALUES (:id, :org, :sku, 'Plan mensual', 'MEMBERSHIP_PLAN', 'MEMBERSHIP',
+					    1000, 'MXN', true, 'ACTIVE', now(), now(), 0)
+					""").param("id", product).param("org", organizationId).param("sku", "M-" + product).update();
+			jdbc.sql("""
+					INSERT INTO membership_plan (id, organization_id, product_id, duration_days, grace_days,
+					    benefits_json, multi_branch_access, status, created_at, updated_at, version)
+					VALUES (:id, :org, :product, 30, 1, '{}'::jsonb, false, 'ACTIVE', now(), now(), 0)
+					""").param("id", plan).param("org", organizationId).param("product", product).update();
+			jdbc.sql("""
+					INSERT INTO benefit_membership_plan (benefit_id, membership_plan_id, organization_id, created_at)
+					VALUES (:benefit, :plan, :org, now())
+					""").param("benefit", benefit).param("plan", plan).param("org", organizationId).update();
+			jdbc.sql("""
+					INSERT INTO membership (id, organization_id, branch_id, client_id, plan_id, sale_id, status,
+					    activated_at, starts_on, ends_on, grace_ends_on, created_at, updated_at, version)
+					VALUES (:id, :org, :branch, :client, :plan, :sale, 'ACTIVE',
+					    now(), :start, :end, :grace, now(), now(), 0)
+					""").param("id", membership).param("org", organizationId).param("branch", branchA)
+					.param("client", clientId).param("plan", plan).param("sale", saleId)
+					.param("start", ends.minusDays(29)).param("end", ends).param("grace", graceEnds).update();
+			return membership;
+		}
+
 		UUID insertAccessBenefit(UUID branchId, String code, String scope) {
 			UUID benefitId = UUID.randomUUID();
 			jdbc.sql("""

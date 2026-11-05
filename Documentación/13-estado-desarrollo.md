@@ -310,3 +310,10 @@ Branding por sucursal continúa después. El Connector HikCentral, cobranza SaaS
 y hardening operativo permanecen como frentes separados.
 
 El detalle vive en `modulos/`, la deuda única en el documento 28 y la situación Git en el documento 29.
+
+## ACC-006 — Check-in manual de recepción
+
+Rama de entrega basada en `470e1b4bff4cc98d5f030bc49fcfe8cdc9cb94f9`.
+Incluye V105 y el recorrido de registro, historial y reversión en Recepción.
+La aceptación del piloto depende de CI del SHA final y de la verificación
+operativa. Evidencia y estado del gate en [#61](https://github.com/Dagt/GymOs/issues/61).
