@@ -19,7 +19,15 @@ const packageStatus: Record<string, string> = {
 
 export default function ManualCheckInPage() {
   const [session, setSession] = useState<StoredSession | null>();
-  useEffect(() => { setSession(getStoredSession()); }, []);
+  useEffect(() => {
+    const readSession = () => setSession(getStoredSession());
+    const timer = window.setTimeout(readSession, 0);
+    window.addEventListener("gymos.session-refreshed", readSession);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("gymos.session-refreshed", readSession);
+    };
+  }, []);
 
   if (session === undefined) return <LoadingScreen text="Cargando registro de entradas…" />;
   if (!session) return <AuthRequired title="Inicia sesión para registrar entradas" message="Selecciona tu sucursal de trabajo." />;
@@ -116,7 +124,9 @@ function CheckInDesk({ session, branchId, storageKey }: { session: StoredSession
       try {
         entry = await registerCheckIn(token, request);
       } catch (exception) {
-        if (exception instanceof Error && exception.message.includes("Código: CHECK_IN_OVERRIDE_STALE.")) {
+        if (exception instanceof Error && [
+          "CHECK_IN_OVERRIDE_STALE", "CHECK_IN_CLIENT_NOT_FOUND", "CHECK_IN_KEY_REUSED", "VALIDATION_ERROR",
+        ].some((code) => exception.message.includes("Código: " + code + "."))) {
           sessionStorage.removeItem(storageKey);
           setPending(null);
           resetSelection();
@@ -211,7 +221,7 @@ function CheckInDesk({ session, branchId, storageKey }: { session: StoredSession
               <p>{preview.membership
                 ? preview.membership.planName + " · vence " + preview.membership.endsOn
                   + (preview.membership.graceEndsOn > preview.membership.endsOn ? " · gracia hasta " + preview.membership.graceEndsOn : "")
-                : "Sin membresía vigente en esta sucursal"}</p>
+                : preview.membershipExpired ? "Membresía vencida" : "Sin membresía vigente en esta sucursal"}</p>
               {preview.visitPackage && <div>
                 <p>{preview.visitPackage.name} · {packageStatus[preview.visitPackage.status]} · {preview.visitPackage.remainingVisits} visitas restantes</p>
                 {preview.visitPackage.validUntil && <p>Vence {preview.visitPackage.validUntil}</p>}

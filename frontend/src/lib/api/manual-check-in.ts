@@ -8,6 +8,7 @@ export type CheckInClient = { id: string; name: string; phone: string | null; st
 export type CheckInPreview = {
   client: CheckInClient;
   membership: { planName: string; endsOn: string; graceEndsOn: string } | null;
+  membershipExpired: boolean;
   visitPackage: {
     name: string;
     status: string;

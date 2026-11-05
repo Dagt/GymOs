@@ -6,6 +6,7 @@ import com.gymos.eligibility.api.EligibilityPolicy.EligibilityDecision;
 import com.gymos.eligibility.api.EligibilityPolicy.EligibilityRequest;
 import com.gymos.eligibility.api.EligibilityPolicy.EligibleBenefit;
 import com.gymos.eligibility.api.EligibilityPolicy.Reason;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -34,6 +35,11 @@ public class DefaultEligibilityPolicy implements EligibilityPolicy {
 			case BOOKING -> booking(request);
 			case ACCESS -> access(request);
 		};
+	}
+
+	@Override
+	public boolean hasExpiredAccessMembership(UUID organizationId, UUID branchId, UUID clientId, LocalDate effectiveOn) {
+		return facts.hasExpiredAccessMembership(organizationId, branchId, clientId, effectiveOn);
 	}
 
 	private EligibilityDecision pricing(EligibilityRequest request) {

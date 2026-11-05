@@ -405,14 +405,14 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 		Optional<Integer> restored = jdbcClient.sql("""
 				UPDATE visit_package_entitlement e
 				SET remaining_visits=e.remaining_visits+1,
-				    status=CASE WHEN e.valid_until<:businessDate THEN 'EXPIRED' ELSE 'ACTIVE' END,
+				    status=CASE WHEN e.status='EXPIRED' OR e.valid_until<:businessDate THEN 'EXPIRED' ELSE 'ACTIVE' END,
 				    updated_at=:now, version=e.version+1
 				FROM visit_package_consumption c
 				WHERE c.organization_id=:org AND c.branch_id=:branch AND c.access_log_id=:log
 				  AND c.status='CONSUMED' AND c.entitlement_id=e.id AND c.organization_id=e.organization_id
 				  AND e.client_id=:client AND e.deleted_at IS NULL
 				  AND e.status IN ('ACTIVE', 'CONSUMED', 'EXPIRED') AND e.remaining_visits<e.total_visits
-				  AND (e.valid_until<:businessDate OR NOT EXISTS (
+				  AND (e.status='EXPIRED' OR e.valid_until<:businessDate OR NOT EXISTS (
 				      SELECT 1 FROM visit_package_entitlement other
 				      WHERE other.organization_id=e.organization_id AND other.client_id=e.client_id
 				        AND other.id<>e.id AND other.deleted_at IS NULL

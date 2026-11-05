@@ -78,7 +78,9 @@ public class ManualCheckInService {
 					.forEach(benefit -> options.putIfAbsent(benefit.id(),
 							new AccessOption(benefit.id(), benefit.name(), "VISIT_PACKAGE")));
 		}
-		return new Preview(client, decision.membership(), visitPackage, List.copyOf(options.values()),
+		boolean membershipExpired = decision.reason() == Reason.ACTIVE_MEMBERSHIP_REQUIRED
+				&& eligibility.hasExpiredAccessMembership(actor.organizationId(), actor.branchId(), clientId, date);
+		return new Preview(client, decision.membership(), membershipExpired, visitPackage, List.copyOf(options.values()),
 				options.isEmpty() ? denial(decision.reason(), visitPackage) : null);
 	}
 
@@ -292,7 +294,7 @@ public class ManualCheckInService {
 	public record PackageBenefit(UUID id, String name, String mode) {}
 	public record PackageView(UUID id, String name, String status, int remainingVisits, LocalDate validFrom,
 			LocalDate validUntil, boolean branchCovered, List<PackageBenefit> benefits) {}
-	public record Preview(Client client, ActiveMembership membership, PackageView visitPackage,
+	public record Preview(Client client, ActiveMembership membership, boolean membershipExpired, PackageView visitPackage,
 			List<AccessOption> options, String denialReason) {}
 	public record History(UUID branchId, String branchName, String timezone, List<Entry> entries) {}
 }

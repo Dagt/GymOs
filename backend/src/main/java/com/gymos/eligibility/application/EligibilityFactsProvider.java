@@ -13,6 +13,8 @@ public interface EligibilityFactsProvider {
 	Optional<ActiveMembership> activeMembership(
 			UUID organizationId, UUID branchId, UUID clientId, LocalDate effectiveOn);
 
+	boolean hasExpiredAccessMembership(UUID organizationId, UUID branchId, UUID clientId, LocalDate effectiveOn);
+
 	List<EligibleBenefit> pricingBenefits(
 			UUID organizationId, UUID branchId, UUID clientId, LocalDate effectiveOn, UUID targetPlanId);
 

@@ -1,4 +1,4 @@
-﻿# 6. Contratos API
+# 6. Contratos API
 
 Base path: `/api/v1`
 
@@ -1592,7 +1592,7 @@ Prefijo `/api/v1/access/manual-check-ins`. OpenAPI se genera desde
 | Método y ruta relativa | Contrato |
 | --- | --- |
 | `GET /clients?query=...` | Entre 2 y 100 caracteres. Hasta 20 coincidencias por nombre, teléfono o UUID visibles en la sucursal. |
-| `GET /clients/{clientId}` | `client`, `membership`, `visitPackage`, `options` y `denialReason`. Sólo consulta. |
+| `GET /clients/{clientId}` | `client`, `membership`, `membershipExpired`, `visitPackage`, `options` y `denialReason`. Sólo consulta. |
 | `GET /` | `branchId`, `branchName`, `timezone`, `entries` con los últimos 30 registros. |
 | `POST /` | Header `Idempotency-Key` UUID. Cuerpo con `branchId`, `clientId`, `benefitId` opcional y, para excepción, `overrideOf` y `overrideReason` hasta 300 caracteres. |
 | `POST /{id}/reversal` | Cuerpo con `branchId` y `reason` obligatorio, hasta 300 caracteres. Requiere también `access.check-in.reverse`. |

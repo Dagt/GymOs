@@ -13,7 +13,7 @@ const grant: CheckInEntry = {
   remainingAfter: 4, duplicateOf: null, reversal: null,
 };
 const available: CheckInPreview = {
-  client, membership: null,
+  client, membership: null, membershipExpired: false,
   visitPackage: {
     name: "Paquete de cinco", status: "ACTIVE", remainingVisits: 5, validFrom: "2026-11-01",
     validUntil: "2026-11-30", branchCovered: true,
@@ -118,11 +118,12 @@ test("permite revertir una entrada autorizada a un supervisor con motivo", async
 
 test("muestra paquete agotado y registra el rechazo sin seleccionar un derecho", async ({ page }) => {
   const { posts } = await boot(page, { preview: {
-    ...available, options: [], denialReason: "El paquete está agotado.",
+    ...available, membershipExpired: true, options: [], denialReason: "El paquete está agotado.",
     visitPackage: { ...available.visitPackage!, status: "CONSUMED", remainingVisits: 0 },
   } });
   await selectClient(page);
   await expect(page.getByText(/Agotado.*0 visitas restantes/)).toBeVisible();
+  await expect(page.getByText("Membresía vencida", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Registrar rechazo" }).click();
   await expect(page.getByRole("status").getByText("Entrada rechazada", { exact: true })).toBeVisible();
   expect(posts[0].body).toEqual({ branchId, clientId, benefitId: null });

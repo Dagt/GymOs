@@ -72,6 +72,21 @@ public class EligibilityRepository implements EligibilityFactsProvider {
 	}
 
 	@Override
+	public boolean hasExpiredAccessMembership(UUID organizationId, UUID branchId, UUID clientId, LocalDate effectiveOn) {
+		return jdbcClient.sql("""
+				SELECT EXISTS (
+				    SELECT 1 FROM membership m
+				    JOIN membership_plan mp ON mp.id=m.plan_id AND mp.organization_id=m.organization_id
+				    WHERE m.organization_id=:organizationId AND m.client_id=:clientId
+				      AND (m.branch_id=:branchId OR mp.multi_branch_access)
+				      AND m.deleted_at IS NULL AND mp.deleted_at IS NULL
+				      AND (m.status='EXPIRED' OR (m.status='ACTIVE' AND m.grace_ends_on<:effectiveOn))
+				)
+				""").param("organizationId", organizationId).param("branchId", branchId)
+				.param("clientId", clientId).param("effectiveOn", effectiveOn).query(Boolean.class).single();
+	}
+
+	@Override
 	public List<EligibleBenefit> pricingBenefits(
 			UUID organizationId, UUID branchId, UUID clientId, LocalDate effectiveOn, UUID targetPlanId
 	) {

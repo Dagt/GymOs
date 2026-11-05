@@ -14,6 +14,11 @@ import java.util.UUID;
 public interface EligibilityPolicy {
 	EligibilityDecision evaluate(EligibilityRequest request);
 
+	/** History indicator for staff. Authorization still comes from evaluate. */
+	default boolean hasExpiredAccessMembership(UUID organizationId, UUID branchId, UUID clientId, LocalDate effectiveOn) {
+		return false;
+	}
+
 	enum Purpose {
 		MEMBERSHIP_PRICING,
 		BOOKING,

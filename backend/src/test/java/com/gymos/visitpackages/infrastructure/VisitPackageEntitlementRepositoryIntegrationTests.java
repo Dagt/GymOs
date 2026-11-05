@@ -572,7 +572,9 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 		fixture.jdbc().sql("UPDATE client SET status='ACTIVE' WHERE id=:id").param("id", fixture.clientId()).update();
 		fixture.jdbc().sql("UPDATE visit_package_entitlement SET valid_until=:end WHERE sale_id=:sale")
 				.param("end", fixture.today().minusDays(1)).param("sale", fixture.saleId()).update();
-		assertThat(desk.preview(receiver, fixture.clientId()).membership()).isNull();
+		var expired = desk.preview(receiver, fixture.clientId());
+		assertThat(expired.membership()).isNull();
+		assertThat(expired.membershipExpired()).isTrue();
 		assertThat(fixture.register(desk, receiver, UUID.randomUUID(), general).decision()).isEqualTo("DENIED");
 
 		fixture.makeCurrent();
