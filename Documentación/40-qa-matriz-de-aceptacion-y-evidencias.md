@@ -71,6 +71,7 @@ Todo issue refleja cobertura positiva, negativa, concurrencia cuando aplique, te
 | Reversión, reintento simultáneo, aislamiento tenant/sucursal e historial separado de ventas | Misma suite y `SecurityAuthorizationTests` |
 | PostgreSQL limpio y upgrade V103 con bitácora existente | `DatabaseMigrationTests` y arranque Flyway de las suites PostgreSQL |
 | Error de red después de confirmar, recarga, misma clave, saldo y corrección por supervisor | `frontend/e2e/manual-check-in.spec.ts`, Chromium con API interceptada. La integración de datos se verifica en PostgreSQL. |
+| Paquete vencido con saldo, agotado con membresía vigente y derecho que cambia tras la consulta | `manual-check-in.spec.ts` comprueba que sólo se ofrecen derechos de la respuesta vigente. La suite PostgreSQL valida que el rechazo de una reversión conserve el ledger y que el crédito posterior mantenga vencido el paquete original. |
 
 El job frontend de CI ejecuta la suite Playwright completa en Chromium.
 Comandos locales en `AGENTS.md`. Para ejecutar Playwright con el puerto

@@ -513,6 +513,10 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 			assertThat(fixture.register(desk, receiver, key, general)).isEqualTo(entry);
 			fixture.age(entry);
 		}
+		var exhausted = desk.preview(receiver, fixture.clientId());
+		assertThat(exhausted.visitPackage().status()).isEqualTo("CONSUMED");
+		assertThat(exhausted.visitPackage().remainingVisits()).isZero();
+		assertThat(exhausted.options()).isEmpty();
 		Entry denied = fixture.register(desk, receiver, UUID.randomUUID(), general);
 		assertThat(denied.decision()).isEqualTo("DENIED");
 		assertThat(denied.reason()).contains("agotado");
@@ -575,6 +579,9 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 		var expired = desk.preview(receiver, fixture.clientId());
 		assertThat(expired.membership()).isNull();
 		assertThat(expired.membershipExpired()).isTrue();
+		assertThat(expired.visitPackage().status()).isEqualTo("EXPIRED");
+		assertThat(expired.visitPackage().remainingVisits()).isEqualTo(2);
+		assertThat(expired.options()).isEmpty();
 		assertThat(fixture.register(desk, receiver, UUID.randomUUID(), general).decision()).isEqualTo("DENIED");
 
 		fixture.makeCurrent();
@@ -654,6 +661,40 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 		assertThatThrownBy(() -> fixture.reverse(desk, supervisor, grant.id(), "Otro motivo"))
 				.isInstanceOfSatisfying(BusinessException.class, error -> assertThat(error.code()).isEqualTo("CHECK_IN_ALREADY_REVERSED"));
 		assertThat(fixture.register(desk, supervisor, UUID.randomUUID(), general).remainingAfter()).isZero();
+	}
+
+	@Test
+	void reversalKeepsAnExpiredPackageExpiredAndPreservesTheReplacement() {
+		Fixture fixture = fixture(1);
+		UUID general = fixture.activateConsuming(List.of(fixture.branchA()));
+		fixture.makeCurrent();
+		var desk = fixture.desk();
+		var supervisor = fixture.actor(fixture.branchA(), true);
+		var original = fixture.register(desk, supervisor, UUID.randomUUID(), general);
+		assertThat(original.remainingAfter()).isZero();
+		fixture.activateReplacement(List.of(new BenefitCoverage(
+				general, VisitPackageBenefitUsageMode.CONSUMES_VISIT, List.of(fixture.branchA()))),
+				fixture.today(), OffsetDateTime.now());
+
+		assertThatThrownBy(() -> fixture.reverse(desk, supervisor, original.id(), "Registro equivocado"))
+				.isInstanceOfSatisfying(BusinessException.class,
+						error -> assertThat(error.code()).isEqualTo("VISIT_PACKAGE_RESTORATION_UNAVAILABLE"));
+		assertThat(fixture.remaining()).isZero();
+		assertThat(fixture.count("access_manual_reversal")).isZero();
+		assertThat(desk.history(supervisor).entries()).containsExactly(original);
+
+		fixture.jdbc().sql("UPDATE visit_package_entitlement SET valid_until=:end WHERE sale_id=:sale")
+				.param("end", fixture.today().minusDays(1)).param("sale", fixture.saleId()).update();
+		var corrected = fixture.reverse(desk, supervisor, original.id(), "Registro equivocado");
+		assertThat(corrected.reversal().remainingBefore()).isZero();
+		assertThat(corrected.reversal().remainingAfter()).isEqualTo(1);
+		assertThat(fixture.repository().bySale(fixture.organizationId(), fixture.saleId())).get()
+				.satisfies(previous -> {
+					assertThat(previous.status()).isEqualTo("EXPIRED");
+					assertThat(previous.remainingVisits()).isEqualTo(1);
+				});
+		assertThat(fixture.repository().open(fixture.organizationId(), fixture.clientId())).get()
+				.satisfies(replacement -> assertThat(replacement.remainingVisits()).isEqualTo(1));
 	}
 
 	@Test
@@ -898,6 +939,10 @@ class VisitPackageEntitlementRepositoryIntegrationTests {
 					""")
 					.param("organizationId", organizationId).param("saleId", saleId)
 					.param("now", now).update();
+			activateReplacement(benefits, validFrom, now);
+		}
+
+		void activateReplacement(List<BenefitCoverage> benefits, LocalDate validFrom, OffsetDateTime now) {
 			UUID replacementSaleId = UUID.randomUUID();
 			jdbc.sql("""
 					INSERT INTO sale (id, organization_id, branch_id, client_id, sale_number, status,

@@ -61,6 +61,8 @@ function CheckInDesk({ session, branchId, storageKey }: { session: StoredSession
   const searchInput = useRef<HTMLInputElement>(null);
   const canOverride = session.user.permissions.includes("access.check-in.override");
   const canReverse = session.user.permissions.includes("access.check-in.reverse");
+  const selectedAccess = preview?.options.find((option) => option.id === benefitId);
+  const hasPackageAccess = preview?.options.some((option) => option.source === "VISIT_PACKAGE");
 
   useEffect(() => {
     let active = true;
@@ -110,10 +112,15 @@ function CheckInDesk({ session, branchId, storageKey }: { session: StoredSession
   async function select(clientId: string) {
     await run(async () => {
       resetSelection();
-      const data = await previewCheckIn(token, clientId);
-      setPreview(data);
-      setBenefitId(data.options.length === 1 ? data.options[0].id : "");
+      await loadPreview(clientId);
     });
+  }
+
+  async function loadPreview(clientId: string, preferredBenefitId?: string | null) {
+    const data = await previewCheckIn(token, clientId);
+    setPreview(data);
+    const preferred = data.options.find((option) => option.id === preferredBenefitId);
+    setBenefitId(preferred?.id ?? (data.options.length === 1 ? data.options[0].id : ""));
   }
 
   async function submit(request: CheckInRequest) {
@@ -138,13 +145,11 @@ function CheckInDesk({ session, branchId, storageKey }: { session: StoredSession
       setResult(entry);
       setOverride(null);
       setHistoryVersion((version) => version + 1);
-      if (entry.decision === "DUPLICATE") {
-        const data = await previewCheckIn(token, entry.clientId);
-        setPreview(data);
-        setBenefitId(data.options.some((option) => option.id === request.benefitId)
-          ? request.benefitId ?? "" : data.options.length === 1 ? data.options[0].id : "");
+      setPreview(null);
+      setBenefitId("");
+      if (entry.decision === "DUPLICATE" || (entry.decision === "DENIED" && request.benefitId !== null)) {
+        await loadPreview(entry.clientId, request.benefitId);
       } else {
-        setPreview(null);
         setMatches(null);
         setQuery("");
       }
@@ -154,9 +159,9 @@ function CheckInDesk({ session, branchId, storageKey }: { session: StoredSession
 
   function confirm(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!preview || pending || (preview.options.length > 0 && !benefitId)) return;
+    if (!preview || pending || (preview.options.length > 0 && !selectedAccess)) return;
     void submit({
-      key: crypto.randomUUID(), branchId, clientId: preview.client.id, benefitId: benefitId || null,
+      key: crypto.randomUUID(), branchId, clientId: preview.client.id, benefitId: selectedAccess?.id ?? null,
       ...(override !== null && result?.duplicateOf ? { overrideOf: result.duplicateOf, overrideReason: override.trim() } : {}),
     });
   }
@@ -226,11 +231,11 @@ function CheckInDesk({ session, branchId, storageKey }: { session: StoredSession
                 <p>{preview.visitPackage.name} · {packageStatus[preview.visitPackage.status]} · {preview.visitPackage.remainingVisits} visitas restantes</p>
                 {preview.visitPackage.validUntil && <p>Vence {preview.visitPackage.validUntil}</p>}
                 {!preview.visitPackage.branchCovered && <p>El paquete no cubre esta sucursal.</p>}
-                {preview.visitPackage.benefits.filter((benefit) => benefit.mode === "INCLUDED_WITH_VISIT").map((benefit) => (
+                {hasPackageAccess && preview.visitPackage.benefits.filter((benefit) => benefit.mode === "INCLUDED_WITH_VISIT").map((benefit) => (
                   <p key={benefit.id}>{benefit.name} · incluido con la visita del paquete</p>
                 ))}
               </div>}
-              {preview.denialReason ? <p>{preview.denialReason}</p> : (
+              {preview.options.length === 0 ? <p>{preview.denialReason ?? "No hay un derecho de acceso aplicable."}</p> : (
                 <label className="flex flex-col gap-1">
                   Derecho de acceso
                   <select className="app-input" disabled={busy || !!pending || (result?.decision === "DUPLICATE" && override === null)}
@@ -252,9 +257,9 @@ function CheckInDesk({ session, branchId, storageKey }: { session: StoredSession
                   onChange={(event) => setOverride(event.target.value)} disabled={busy || !!pending} />
               </label>}
               {(result?.decision !== "DUPLICATE" || override !== null) && (
-                <button className="app-button" disabled={busy || !!pending || (!!preview.options.length && !benefitId)
+                <button className="app-button" disabled={busy || !!pending || (preview.options.length > 0 && !selectedAccess)
                   || (override !== null && !override.trim())}>
-                  {override !== null ? "Confirmar entrada distinta" : preview.denialReason ? "Registrar rechazo" : "Confirmar entrada"}
+                  {override !== null ? "Confirmar entrada distinta" : preview.options.length === 0 ? "Registrar rechazo" : "Confirmar entrada"}
                 </button>
               )}
             </form>

@@ -6,14 +6,14 @@
 1. Selecciona la sucursal donde está el socio y abre **Recepción → Registrar entrada**.
 2. Busca por nombre, teléfono o identificador del socio. Elige el resultado verificando el nombre y el teléfono.
 3. Revisa membresía, gracia si aplica, paquete, saldo y cobertura. Si hay varios derechos de acceso, elige el que corresponde a la entrada. Con un solo derecho, la pantalla lo selecciona.
-4. Confirma la entrada. Si el socio no tiene un derecho aplicable, puedes registrar el rechazo. El resultado de la confirmación prevalece sobre la consulta anterior.
+4. Confirma la entrada. Si la consulta devuelve cero derechos aplicables, la única acción disponible es registrar el rechazo. Si el derecho deja de estar disponible antes de confirmar, se muestra la decisión del servidor y se actualiza la consulta.
 5. Si se pierde la respuesta, pulsa **Reintentar entrada**. La pestaña conserva la misma operación al recargar y la consulta nuevamente con la clave original.
 
 **Entradas recientes** muestra hasta 30 registros de la sucursal en su zona horaria. Actualiza la lista si otra persona está atendiendo en paralelo. Las entradas rechazadas, repetidas y revertidas quedan visibles.
 
 ## Derechos y saldo
 
-Se evalúa el beneficio `ACCESS` elegido en la fecha operativa de la sucursal. La membresía que concede ese derecho tiene prioridad y conserva el saldo del paquete. Si la membresía no lo concede, un paquete vigente con cobertura puede autorizarlo cuando su snapshot define `CONSUMES_VISIT`. Los beneficios `INCLUDED_WITH_VISIT` de la sucursal se muestran como parte de esa visita. El socio debe tener estado activo.
+Se evalúa el beneficio `ACCESS` elegido en la fecha operativa de la sucursal. La membresía que concede ese derecho tiene prioridad y conserva el saldo del paquete. Si la membresía no lo concede, un paquete vigente con cobertura puede autorizarlo cuando su snapshot define `CONSUMES_VISIT`. Recepción muestra los beneficios `INCLUDED_WITH_VISIT` de la sucursal cuando el servidor ofrece una opción de entrada con ese paquete. Los paquetes vencidos o agotados conservan su estado y saldo visibles, y una membresía vigente puede seguir autorizando el acceso. El socio debe tener estado activo.
 
 ## Duplicados y correcciones
 
