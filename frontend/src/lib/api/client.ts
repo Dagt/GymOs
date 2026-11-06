@@ -171,6 +171,7 @@ async function performRefresh(slot: string, expected?: string): Promise<RefreshR
     const response = await sessionRequest("refresh", slot, {
       headers: { "X-GymFort-Refresh-Request": operation },
     }).catch(() => null);
+    if (sessionSlot() !== slot) return { status: "rejected" };
     if (response?.status === 401) {
       clearSession();
       window.dispatchEvent(new Event("gymfort.session-expired"));

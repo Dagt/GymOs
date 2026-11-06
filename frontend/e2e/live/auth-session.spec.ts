@@ -49,7 +49,9 @@ test("login, refresh tras una respuesta perdida y logout contra Spring real", as
       await route.continue();
     }
   });
+  const delivered = page.waitForResponse((response) => response.url() === api + "/auth/refresh" && response.status() === 200);
   await page.reload();
+  const renewed = await (await delivered).json();
   await expect(page.getByRole("button", { name: "Salir", exact: true })).toBeVisible();
   expect(operations.length >= 2 && operations[0] === operations[1]).toBe(true);
   await page.unroute(api + "/auth/refresh");
@@ -60,8 +62,8 @@ test("login, refresh tras una respuesta perdida y logout contra Spring real", as
   await page.getByRole("button", { name: "Salir", exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
   expect((await context.cookies()).some((cookie) => cookie.name.startsWith("__Host-gymfort-refresh-"))).toBe(false);
-  const rejected = await fetch(api + "/auth/me", { headers: { Authorization: `Bearer ${issued.accessToken}` } });
-  expect(rejected.status()).toBe(401);
+  const rejected = await fetch(api + "/auth/me", { headers: { Authorization: `Bearer ${renewed.accessToken}` } });
+  expect(rejected.status).toBe(401);
 });
 
 test("la navegación mantiene la sesión al caducar el JWT real", async ({ page }) => {
@@ -77,8 +79,9 @@ test("la navegación mantiene la sesión al caducar el JWT real", async ({ page 
     return response.status;
   }, { timeout: 20_000, intervals: [500, 1000] }).toBe(401);
   const renewed = page.waitForResponse((response) => response.url() === api + "/auth/refresh" && response.status() === 200);
-  await page.locator('a[href="/clients"]').first().click();
+  await page.getByRole("button", { name: "Consultar", exact: true }).click();
   await renewed;
-  await expect(page).toHaveURL(/\/clients$/);
+  await page.getByRole("link", { name: "Ventas y pagos" }).click();
+  await expect(page).toHaveURL(/\/reports\/sales$/);
   await expect(page.getByRole("button", { name: "Salir", exact: true })).toBeVisible();
 });
