@@ -66,3 +66,7 @@ esa ruta, y webhooks públicos endurecidos en
 - Almacenamiento de PAN/CVV.
 - Confirmación por redirect o por dato enviado por el navegador.
 - Llaves Stripe en frontend, imágenes Docker o repositorio.
+
+## SAL-001
+
+Los webhooks se reclaman por evento e intento, verifican la cuenta u orden y aplican el pago con sus efectos locales en una transacción. Tras timeout de Point, recuperar la misma orden evita un segundo cobro.

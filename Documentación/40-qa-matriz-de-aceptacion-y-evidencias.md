@@ -82,3 +82,7 @@ El job frontend de CI ejecuta la suite Playwright completa en Chromium.
 Comandos locales en `AGENTS.md`. Para ejecutar Playwright con el puerto
 predeterminado ocupado, configura `PLAYWRIGHT_PORT=3100`. Registra el SHA y
 los resultados del run en el PR de [#61](https://github.com/Dagt/GymOs/issues/61).
+
+## SAL-001
+
+La [matriz SAL-001](../docs/operations/sales-integrity.md) distingue pruebas HTTP con PostgreSQL, pruebas de navegador con transporte simulado y la validación operativa pendiente.

@@ -1,6 +1,6 @@
 # Inventario de endpoints y permisos efectivos de GymFort
 
-Base auditada `58a5d4d4b24bcc598059b05a4ac70d11a2fe937b` con el PR #65. Inventario estático de las 298 operaciones de los 39 controladores Spring y del primer matcher aplicable en `SecurityConfig`. Las comprobaciones de dominio pueden limitar aún más una autoridad HTTP. El alcance se clasifica por el dato principal de la operación. Las excepciones y la evidencia de ejecución se mantienen en la [matriz de aislamiento](multi-tenant-verification.md).
+Base auditada `58a5d4d4b24bcc598059b05a4ac70d11a2fe937b` con el PR #65. Inventario estático de las 299 operaciones de los 39 controladores Spring y del primer matcher aplicable en `SecurityConfig`. Las comprobaciones de dominio pueden limitar aún más una autoridad HTTP. El alcance se clasifica por el dato principal de la operación. Las excepciones y la evidencia de ejecución se mantienen en la [matriz de aislamiento](multi-tenant-verification.md).
 
 `SecurityAuthorizationTests.documentedOperationsMatchSpringRoutingAndEffectiveAuthorities` compara estas filas con el registro real de rutas y el autorizador de Spring. Comprueba solicitudes anónimas, sesiones sin permisos y cada autoridad individual del inventario. La prueba verifica la capa HTTP de autorización. La matriz de aislamiento indica qué operaciones también tienen prueba de pertenencia con PostgreSQL.
 
@@ -358,6 +358,7 @@ Base auditada `58a5d4d4b24bcc598059b05a4ac70d11a2fe937b` con el PR #65. Inventar
 | `POST /api/v1/sales/payments/{paymentId}/validate` | `payment.manual.validate` | B | `SalesController` |
 | `POST /api/v1/sales/payments/{paymentId}/reject` | `payment.manual.reject` | B | `SalesController` |
 | `POST /api/v1/sales/payments/{paymentId}/receipt` | `payment.receipt.upload` | B/F | `SalesController` |
+| `POST /api/v1/sales/{saleId}/cancel` | `sale.refund` | B | `SalesController` |
 | `POST /api/v1/sales/{saleId}/refunds` | `sale.refund` | B | `SalesController` |
 
 ## security

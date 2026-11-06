@@ -321,3 +321,7 @@ Rama de entrega basada en `470e1b4bff4cc98d5f030bc49fcfe8cdc9cb94f9`.
 Incluye V105 y el recorrido de registro, historial y reversión en Recepción.
 La aceptación del piloto depende de CI del SHA final y de la verificación
 operativa. Evidencia y estado del gate en [#61](https://github.com/Dagt/GymOs/issues/61).
+
+## SAL-001
+
+SAL-001 incorpora bloqueos transaccionales y recuperación de ventas, pagos y webhooks. La aceptación operativa de cobros integrados sigue sujeta a Stripe test y a comprobar Point antes de su habilitación.

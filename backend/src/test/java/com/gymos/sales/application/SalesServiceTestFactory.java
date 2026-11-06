@@ -7,6 +7,7 @@ import com.gymos.sales.infrastructure.MembershipSaleCommandRepository;
 import com.gymos.sales.infrastructure.SaleCommandRepository;
 import com.gymos.sales.infrastructure.SalePaymentCompletionRepository;
 import com.gymos.sales.infrastructure.SalesPaymentCommandRepository;
+import com.gymos.sales.infrastructure.SalesFinancialIntegrityRepository;
 import com.gymos.sales.infrastructure.SalesReadRepository;
 import com.gymos.sales.infrastructure.SalesRefundCommandRepository;
 import com.gymos.sales.infrastructure.SalesReportRepository;
@@ -38,14 +39,17 @@ final class SalesServiceTestFactory {
 		SaleCreationService saleCreationService = new SaleCreationService(salesRepository, new SaleLineResolver(salesRepository),
 				new SaleCommandRepository(jdbcClient), auditService, eventPublisher);
 		SalesRefundCommandRepository refundCommandRepository = new SalesRefundCommandRepository(jdbcClient);
+		SalesFinancialIntegrityGuard financialIntegrity = new SalesFinancialIntegrityGuard(
+				salesRepository, mock(SalesFinancialIntegrityRepository.class), mock(PaymentConfigurationOperations.class));
 		SalesRefundService refundService = new SalesRefundService(
 				lookupService,
 				new SalesRefundIdempotencyService(salesRepository),
-				new SalesRefundValidationService(salesRepository, lookupService),
+				new SalesRefundValidationService(salesRepository, lookupService, financialIntegrity),
 				new SalesRefundProcessor(refundCommandRepository, eventPublisher, auditService)
 		);
 		SalesPointOfSaleService pointOfSaleService = new SalesPointOfSaleService(
-				saleDetailQuery, saleCreationService, paymentService, refundService, completionService);
+				saleDetailQuery, saleCreationService, paymentService, refundService, completionService,
+				financialIntegrity, new SaleCommandRepository(jdbcClient), auditService);
 		return new SalesService(
 				saleDetailQuery,
 				new SalesReportingQuery(salesReadRepository, new SalesReportRepository(jdbcClient)),

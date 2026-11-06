@@ -27,8 +27,13 @@ class InventorySaleDeductionRepository {
 		if (movementExists(organizationId, branchId, productId, saleId)) {
 			return StockDeductionResult.ALREADY_PROCESSED;
 		}
+		releaseStock(stockId, saleId);
 		boolean allowNegative = isNegativeStockAllowed(organizationId, branchId);
-		int quantityAfter = stock.quantityOnHand() - quantity;
+		long after = (long) stock.quantityOnHand() - quantity;
+		if (after < Integer.MIN_VALUE) {
+			throw new BusinessException("INVENTORY_QUANTITY_INVALID", "El saldo de inventario está fuera de rango.");
+		}
+		int quantityAfter = (int) after;
 		if (quantityAfter < 0 && !allowNegative) {
 			throw new BusinessException("INVENTORY_STOCK_INSUFFICIENT", "La venta supera las existencias disponibles de " + productName + ".");
 		}
@@ -49,6 +54,41 @@ class InventorySaleDeductionRepository {
 				.param("saleId", saleId).param("occurredAt", occurredAt).param("correlationId", correlationId)
 				.update();
 		return StockDeductionResult.DEDUCTED;
+	}
+
+	void reserve(UUID organizationId, UUID branchId, UUID productId, UUID saleId, int quantity, OffsetDateTime now) {
+		UUID stockId = stockCommands.ensureStock(organizationId, branchId, productId, null, now);
+		var stock = stockCommands.lock(organizationId, branchId, stockId).orElseThrow();
+		if (hasReservation(organizationId, branchId, productId, saleId)) return;
+		if ((long) stock.quantityOnHand() - stockCommands.reservedQuantity(stockId) < quantity) {
+			throw new BusinessException("INVENTORY_STOCK_INSUFFICIENT", "No hay unidades disponibles para reservar antes del cobro con Point.");
+		}
+		jdbcClient.sql("""
+				INSERT INTO inventory_sale_reservation(stock_id, sale_id, quantity, created_at)
+				VALUES (:stock, :sale, :quantity, :now)
+				""").param("stock", stockId).param("sale", saleId).param("quantity", quantity).param("now", now).update();
+	}
+
+	boolean hasReservation(UUID organizationId, UUID branchId, UUID productId, UUID saleId) {
+		return jdbcClient.sql("""
+				SELECT EXISTS (SELECT 1 FROM inventory_sale_reservation r JOIN inventory_stock s ON s.id = r.stock_id
+				WHERE r.sale_id = :sale AND s.organization_id = :org AND s.branch_id = :branch AND s.product_id = :product)
+				""").param("sale", saleId).param("org", organizationId).param("branch", branchId)
+				.param("product", productId).query(Boolean.class).single();
+	}
+
+	void releaseSale(UUID organizationId, UUID branchId, UUID saleId) {
+		var stocks = jdbcClient.sql("""
+				SELECT s.id FROM inventory_sale_reservation r JOIN inventory_stock s ON s.id = r.stock_id
+				WHERE r.sale_id = :sale AND s.organization_id = :org AND s.branch_id = :branch
+				ORDER BY s.product_id FOR UPDATE OF s
+				""").param("sale", saleId).param("org", organizationId).param("branch", branchId).query(UUID.class).list();
+		for (UUID stock : stocks) releaseStock(stock, saleId);
+	}
+
+	private void releaseStock(UUID stockId, UUID saleId) {
+		jdbcClient.sql("DELETE FROM inventory_sale_reservation WHERE stock_id = :stock AND sale_id = :sale")
+				.param("stock", stockId).param("sale", saleId).update();
 	}
 
 	private boolean isNegativeStockAllowed(UUID organizationId, UUID branchId) {

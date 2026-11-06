@@ -129,3 +129,7 @@ Los 7 epics #21–27 y 32 issues #28–59 convierten deuda y producto pendiente 
 | --- | --- | --- | --- |
 | ACC-006 | P0 | Implementado en rama, sujeto a gates | Registrar evidencia de V105, concurrencia, permisos, recuperación de red y CI del SHA del Draft en [#61](https://github.com/Dagt/GymOs/issues/61). |
 | ACC-006-REV | P1 | Restricción operativa | Una devolución que reabriría un paquete entra en conflicto con otro paquete abierto. Resolver primero el paquete abierto con el proceso comercial. Un posible modelo de crédito diferido requiere decisión comercial y coordinación con #35. |
+
+## SAL-001
+
+Pendientes del piloto tras SAL-001 (#33). Conciliar cobros integrados abiertos de la versión anterior a V106, validar Point en entorno de pruebas y acreditar Stripe/kiosco con #34. Los reembolsos de proveedor requieren un proceso conciliado y la política de paquetes parcialmente consumidos sigue en ADR-002 y #35.

@@ -105,4 +105,8 @@ public class SalesService implements SalesOperations {
 	public SaleDetailResult requestRefund(GymOsPrincipal principal, UUID saleId, RequestRefundCommand request, String correlationId) {
 		return pointOfSaleService.requestRefund(principal, saleId, request, correlationId);
 	}
+
+	public SaleDetailResult cancel(GymOsPrincipal principal, UUID saleId, String reason, String correlationId) {
+		return pointOfSaleService.cancel(principal, saleId, reason, correlationId);
+	}
 }

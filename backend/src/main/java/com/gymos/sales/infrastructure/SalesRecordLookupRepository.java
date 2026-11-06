@@ -50,6 +50,12 @@ class SalesRecordLookupRepository {
 				.single();
 	}
 
+	void lockIdempotency(UUID organizationId, String operation, String key) {
+		jdbcClient.sql("SELECT pg_advisory_xact_lock(hashtextextended(:key, 0))")
+				.param("key", "sales:" + organizationId + ":" + operation + ":" + key)
+				.query((result, row) -> Boolean.TRUE).single();
+	}
+
 	Optional<SaleHeader> saleHeaderByIdempotencyKey(UUID organizationId, String idempotencyKey) {
 		return jdbcClient.sql("""
 				SELECT s.id, s.sale_number, s.branch_id, s.client_id,

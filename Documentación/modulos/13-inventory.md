@@ -43,3 +43,7 @@ Base histórica: PR #6. Última revisión dentro del árbol integrado actual:
 paginación. V95 agrega familias/códigos al catálogo sin modificar las claves de
 producto usadas por stock, conteos, transferencias o movimientos.
 Contrato y límites: [paginación de listados](../../docs/operations/list-pagination.md).
+
+## SAL-001
+
+Point reserva unidades por venta y sede bajo el bloqueo del stock, sin alterar el saldo físico. La venta pagada consume la reserva y escribe el movimiento. Los demás egresos respetan esas unidades.

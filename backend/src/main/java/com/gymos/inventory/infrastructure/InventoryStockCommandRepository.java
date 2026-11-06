@@ -83,6 +83,10 @@ public class InventoryStockCommandRepository {
 
 	public void update(UUID stockId, int quantityOnHand, int reorderPoint, Long averageCostCents,
 			UUID actorUserId, OffsetDateTime now) {
+		long reserved = reservedQuantity(stockId);
+		if (reserved > 0 && quantityOnHand < reserved) {
+			throw new BusinessException("INVENTORY_STOCK_RESERVED", "Hay unidades reservadas para un cobro pendiente.");
+		}
 		int updated = jdbcClient.sql("""
 				UPDATE inventory_stock
 				SET quantity_on_hand = :quantityOnHand,
@@ -103,6 +107,11 @@ public class InventoryStockCommandRepository {
 		if (updated != 1) {
 			throw new BusinessException("INVENTORY_STOCK_NOT_FOUND", "No fue posible actualizar existencias.");
 		}
+	}
+
+	long reservedQuantity(UUID stockId) {
+		return jdbcClient.sql("SELECT COALESCE(SUM(quantity), 0) FROM inventory_sale_reservation WHERE stock_id = :id")
+				.param("id", stockId).query(Long.class).single();
 	}
 
 	public void updateBranchSettings(UUID organizationId, UUID branchId, boolean allowNegativeStock, UUID actorUserId, OffsetDateTime now) {

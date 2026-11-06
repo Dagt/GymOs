@@ -111,29 +111,52 @@ class RecurringBillingPostgresIntegrationTests {
 
 	@Test
 	void duplicateWebhookIsClaimedOnceAndFailedDeliveryCanBeRecoveredOnce() throws Exception {
+		UUID claimed;
 		String eventId = "evt_concurrent_" + UUID.randomUUID();
 		CountDownLatch start = new CountDownLatch(1);
 		try (var executor = Executors.newFixedThreadPool(8)) {
-			List<Future<Boolean>> registrations = new ArrayList<>();
+			List<Future<UUID>> registrations = new ArrayList<>();
 			for (int index = 0; index < 8; index++) {
 				registrations.add(executor.submit(() -> {
 					start.await();
+					UUID attempt = UUID.randomUUID();
 					return providerRepository.registerWebhook(
-							"STRIPE", eventId, "payment_intent.succeeded", "hash", tenant.organizationId()
-					);
+							"STRIPE", eventId, "payment_intent.succeeded", "hash", tenant.organizationId(), attempt
+					) ? attempt : null;
 				}));
 			}
 			start.countDown();
-			assertThat(trueCount(registrations)).isEqualTo(1);
+			List<UUID> claims = new ArrayList<>();
+			for (Future<UUID> registration : registrations) {
+				UUID claim = registration.get(10, java.util.concurrent.TimeUnit.SECONDS);
+				if (claim != null) claims.add(claim);
+			}
+			assertThat(claims).hasSize(1);
+			claimed = claims.getFirst();
 		}
 
-		providerRepository.completeWebhook("STRIPE", eventId, "FAILED", "timeout");
+		providerRepository.completeWebhook("STRIPE", eventId, "FAILED", "timeout", claimed);
 		assertThat(providerRepository.registerWebhook(
-				"STRIPE", eventId, "payment_intent.succeeded", "hash", tenant.organizationId()
+				"STRIPE", eventId, "payment_intent.succeeded", "hash", tenant.organizationId(), UUID.randomUUID()
 		)).isTrue();
 		assertThat(providerRepository.registerWebhook(
-				"STRIPE", eventId, "payment_intent.succeeded", "hash", tenant.organizationId()
+				"STRIPE", eventId, "payment_intent.succeeded", "hash", tenant.organizationId(), UUID.randomUUID()
 		)).isFalse();
+	}
+
+	@Test
+	void abandonedWebhookCanBeReclaimedWithoutLettingItsOldAttemptOverwriteTheResult() {
+		String event = "evt_abandoned";
+		UUID abandoned = UUID.randomUUID();
+		UUID replacement = UUID.randomUUID();
+		assertThat(providerRepository.registerWebhook("STRIPE", event, "checkout.session.completed", "hash", tenant.organizationId(), abandoned)).isTrue();
+		jdbcClient.sql("UPDATE payment_provider_webhook_event SET processing_started_at = now() - interval '6 minutes' WHERE external_event_id = :id")
+				.param("id", event).update();
+		assertThat(providerRepository.registerWebhook("STRIPE", event, "checkout.session.completed", "changed", tenant.organizationId(), replacement)).isFalse();
+		assertThat(providerRepository.registerWebhook("STRIPE", event, "checkout.session.completed", "hash", tenant.organizationId(), replacement)).isTrue();
+		providerRepository.completeWebhook("STRIPE", event, "PROCESSED", null, replacement);
+		providerRepository.completeWebhook("STRIPE", event, "FAILED", "abandoned", abandoned);
+		assertThat(providerRepository.webhookHistory(tenant.organizationId(), 0, 10).items().getFirst().status()).isEqualTo("PROCESSED");
 	}
 
 	@Test
@@ -143,11 +166,11 @@ class RecurringBillingPostgresIntegrationTests {
 		for (int index = 0; index < 3; index++) {
 			providerRepository.registerWebhook(
 					"STRIPE", "evt_primary_" + index, "payment_intent.succeeded", "hash" + index,
-					tenant.organizationId()
+					tenant.organizationId(), UUID.randomUUID()
 			);
 		}
 		providerRepository.registerWebhook(
-				"STRIPE", "evt_other", "payment_intent.succeeded", "other", otherTenant.organizationId()
+				"STRIPE", "evt_other", "payment_intent.succeeded", "other", otherTenant.organizationId(), UUID.randomUUID()
 		);
 
 		var firstWebhooks = providerRepository.webhookHistory(tenant.organizationId(), 0, 2);

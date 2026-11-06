@@ -36,7 +36,7 @@ public class SalesReportRepository {
 				  AND s.branch_id = :branchId
 				  AND s.sold_at >= :from
 				  AND s.sold_at < :toExclusive
-				  AND s.deleted_at IS NULL
+				  AND s.deleted_at IS NULL AND s.status <> 'CANCELLED'
 				""")
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
@@ -137,7 +137,7 @@ public class SalesReportRepository {
 				  AND s.branch_id = :branchId
 				  AND s.sold_at >= :from
 				  AND s.sold_at < :toExclusive
-				  AND s.deleted_at IS NULL
+				  AND s.deleted_at IS NULL AND s.status <> 'CANCELLED'
 				GROUP BY COALESCE(s.business_context, 'RETAIL_SALE')
 				ORDER BY business_context
 				""")

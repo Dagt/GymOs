@@ -61,3 +61,6 @@ Product Owner prioriza issue; Codex hace **revisión de código actual primero**
 ## 7. Prompt de arranque
 
 Consultar `38-directrices-codex-y-plantillas.md` y comenzar por el **issue #59 o #44** para entender/recuperar CI, sin alterar código financiero todavía. La auditoría documental puede revisarse y fusionarse primero. El issue #38 debe tratarse como evaluación de una rama de riesgo, no como orden de merge inmediato.
+## SAL-001
+
+SAL-001 (#33) cubre integridad de operaciones locales, reservas y aplicación idempotente. PAY-001 (#34) aporta la evidencia de Stripe y la recuperación del kiosco. VIS-001 (#35) cubre los recorridos de paquetes.

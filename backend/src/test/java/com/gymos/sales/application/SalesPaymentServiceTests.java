@@ -32,7 +32,7 @@ class SalesPaymentServiceTests {
 		ManualPaymentCommand command = new ManualPaymentCommand("CASH", 1_000, null, null, true, null, "payment-key");
 		when(fixture.salesRepository().paymentRequestHashByIdempotencyKey(fixture.organizationId(), "payment-key"))
 				.thenReturn(Optional.empty());
-		when(fixture.commandRepository().saleIdByIdempotencyKey(fixture.organizationId(), "payment-key"))
+		when(fixture.commandRepository().paymentByIdempotencyKey(fixture.organizationId(), "payment-key"))
 				.thenReturn(Optional.empty());
 
 		fixture.service().record(fixture.principal(), fixture.saleId(), command, "correlation");

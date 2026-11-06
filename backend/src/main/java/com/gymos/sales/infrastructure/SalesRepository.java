@@ -57,6 +57,10 @@ public class SalesRepository {
 		recordLookup.lockSaleForRefund(organizationId, saleId);
 	}
 
+	public void lockIdempotency(UUID organizationId, String operation, String key) {
+		recordLookup.lockIdempotency(organizationId, operation, key);
+	}
+
 	public Optional<SaleHeader> saleHeaderByIdempotencyKey(UUID organizationId, String idempotencyKey) {
 		return recordLookup.saleHeaderByIdempotencyKey(organizationId, idempotencyKey);
 	}

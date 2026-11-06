@@ -31,6 +31,9 @@ class SalesPaymentLifecycleService {
 		UUID saleId = lookupService.saleForPayment(principal, paymentId).id();
 		var payment = lookupService.payment(principal, paymentId);
 		if ("COMPLETED".equals(payment.status())) return saleId;
+		if ("REJECTED".equals(payment.status())) {
+			throw new BusinessException("PAYMENT_ALREADY_REJECTED", "No puedes validar un pago rechazado.");
+		}
 		commandRepository.complete(principal.organizationId(), paymentId, principal.userId(), OffsetDateTime.now());
 		auditService.record(principal, "PAYMENT_VALIDATED", "PAYMENT", paymentId, "POS", null, correlationId);
 		completionService.recalculate(principal.organizationId(), saleId, principal.userId());

@@ -133,10 +133,16 @@ async function performRequest(path: string, init: RequestInit): Promise<Response
   }
 }
 
+export class ApiResponseError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+  }
+}
+
 async function readResponse<T>(response: Response, path: string): Promise<T> {
   if (!response.ok) {
     const error = await response.json().catch(() => null);
-    throw new Error(formatApiError(response, path, error));
+    throw new ApiResponseError(response.status, formatApiError(response, path, error));
   }
 
   if (response.status === 204) {

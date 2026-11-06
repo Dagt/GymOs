@@ -55,9 +55,15 @@ class PaymentWebhookServiceTests {
 				new PaymentProviderProperties.Stripe("sk_test", WEBHOOK_SECRET, null, null, "https://stripe.test"),
 				new PaymentProviderProperties.MercadoPago("client", "secret", "http://redirect", "mp_secret", "https://mp.test", "https://auth.test")
 		);
+		when(repository.markOperationStatus(any(UUID.class), eq("COMPLETED"), anyString(), eq(true))).thenReturn(true);
+		when(configurationRepository.providerConfiguration(any(UUID.class))).thenReturn(new PaymentConfigurationView(
+				true, false, null, null, false, true, false, "acct_test", true
+		));
 		service = new PaymentWebhookService(
 				properties, objectMapper, http, repository, configurationRepository,
-				mercadoPagoProviderService, stripeRecurringBillingService, eventPublisher
+				mercadoPagoProviderService, stripeRecurringBillingService,
+				new ProviderPaymentCompletionService(repository, stripeRecurringBillingService, eventPublisher),
+				com.gymos.common.observability.TenantTelemetry.noOp()
 		);
 	}
 
@@ -72,12 +78,12 @@ class PaymentWebhookServiceTests {
 				operationId, organizationId, branchId, "STRIPE", "CHECKOUT_SESSION", saleId, paymentId,
 				UUID.randomUUID(), "cs_test_123", "stripe:test", "OPEN", 12_345, "MXN", "https://checkout", "{}", null
 		);
-		String payload = "{\"id\":\"evt_test_123\",\"type\":\"checkout.session.completed\",\"data\":{\"object\":{\"id\":\"cs_test_123\"}}}";
+		String payload = "{\"id\":\"evt_test_123\",\"type\":\"checkout.session.completed\",\"account\":\"acct_test\",\"data\":{\"object\":{\"id\":\"cs_test_123\"}}}";
 		long timestamp = Instant.now().getEpochSecond();
 		String signature = "t=" + timestamp + ",v1=" + hmac(WEBHOOK_SECRET, timestamp + "." + payload);
 
 		when(repository.operationByExternalId("STRIPE", "cs_test_123")).thenReturn(Optional.of(operation));
-		when(repository.registerWebhook(eq("STRIPE"), eq("evt_test_123"), eq("checkout.session.completed"), anyString(), eq(organizationId))).thenReturn(true);
+		when(repository.registerWebhook(eq("STRIPE"), eq("evt_test_123"), eq("checkout.session.completed"), anyString(), eq(organizationId), any(UUID.class))).thenReturn(true);
 		when(configurationRepository.providerConfiguration(organizationId)).thenReturn(new PaymentConfigurationView(
 				true, false, null, null, false, true, false, "acct_test", true
 		));
@@ -94,7 +100,7 @@ class PaymentWebhookServiceTests {
 		assertThat(event.amountCents()).isEqualTo(12_345);
 		verify(repository).markOperationStatus(eq(operationId), eq("COMPLETED"), anyString(), eq(true));
 		verify(repository).saveReceiptUrl(operationId, "https://pay.stripe.com/receipts/test");
-		verify(repository).completeWebhook("STRIPE", "evt_test_123", "PROCESSED", null);
+		verify(repository).completeWebhook(eq("STRIPE"), eq("evt_test_123"), eq("PROCESSED"), isNull(), any(UUID.class));
 	}
 
 	@Test
@@ -109,7 +115,7 @@ class PaymentWebhookServiceTests {
 
 	@Test
 	void stripeIgnoresPaymentIntentEmittedForCheckoutSession() throws Exception {
-		String payload = "{\"id\":\"evt_checkout_pi\",\"type\":\"payment_intent.succeeded\",\"data\":{\"object\":{\"id\":\"pi_checkout\"}}}";
+		String payload = "{\"id\":\"evt_checkout_pi\",\"type\":\"payment_intent.succeeded\",\"account\":\"acct_test\",\"data\":{\"object\":{\"id\":\"pi_checkout\"}}}";
 		long timestamp = Instant.now().getEpochSecond();
 		String signature = "t=" + timestamp + ",v1=" + hmac(WEBHOOK_SECRET, timestamp + "." + payload);
 		when(repository.operationByExternalId("STRIPE", "pi_checkout")).thenReturn(Optional.empty());
@@ -144,12 +150,12 @@ class PaymentWebhookServiceTests {
 		UUID operationId = UUID.randomUUID();
 		UUID paymentId = UUID.randomUUID();
 		OperationRecord operation = recurringOperation(operationId, organizationId, paymentId, "pi_recurring_ok");
-		String payload = "{\"id\":\"evt_recurring_ok\",\"type\":\"payment_intent.succeeded\",\"data\":{\"object\":{\"id\":\"pi_recurring_ok\"}}}";
+		String payload = "{\"id\":\"evt_recurring_ok\",\"type\":\"payment_intent.succeeded\",\"account\":\"acct_test\",\"data\":{\"object\":{\"id\":\"pi_recurring_ok\"}}}";
 		long timestamp = Instant.now().getEpochSecond();
 		String signature = "t=" + timestamp + ",v1=" + hmac(WEBHOOK_SECRET, timestamp + "." + payload);
 
 		when(repository.operationByExternalId("STRIPE", "pi_recurring_ok")).thenReturn(Optional.of(operation));
-		when(repository.registerWebhook(eq("STRIPE"), eq("evt_recurring_ok"), eq("payment_intent.succeeded"), anyString(), eq(organizationId))).thenReturn(true);
+		when(repository.registerWebhook(eq("STRIPE"), eq("evt_recurring_ok"), eq("payment_intent.succeeded"), anyString(), eq(organizationId), any(UUID.class))).thenReturn(true);
 		when(stripeRecurringBillingService.fetchPaymentIntent(operation)).thenReturn(objectMapper.readTree(
 				"{\"id\":\"pi_recurring_ok\",\"status\":\"succeeded\",\"amount\":12345,\"amount_received\":12345,\"currency\":\"mxn\"}"
 		));
@@ -161,7 +167,7 @@ class PaymentWebhookServiceTests {
 		verify(eventPublisher).publishEvent(eventCaptor.capture());
 		ProviderPaymentCompletedV1 event = (ProviderPaymentCompletedV1) eventCaptor.getValue();
 		assertThat(event.paymentId()).isEqualTo(paymentId);
-		verify(repository).completeWebhook("STRIPE", "evt_recurring_ok", "PROCESSED", null);
+		verify(repository).completeWebhook(eq("STRIPE"), eq("evt_recurring_ok"), eq("PROCESSED"), isNull(), any(UUID.class));
 	}
 
 	@Test
@@ -170,12 +176,12 @@ class PaymentWebhookServiceTests {
 		OperationRecord operation = recurringOperation(
 				UUID.randomUUID(), organizationId, UUID.randomUUID(), "pi_recurring_failed"
 		);
-		String payload = "{\"id\":\"evt_recurring_failed\",\"type\":\"payment_intent.payment_failed\",\"data\":{\"object\":{\"id\":\"pi_recurring_failed\"}}}";
+		String payload = "{\"id\":\"evt_recurring_failed\",\"type\":\"payment_intent.payment_failed\",\"account\":\"acct_test\",\"data\":{\"object\":{\"id\":\"pi_recurring_failed\"}}}";
 		long timestamp = Instant.now().getEpochSecond();
 		String signature = "t=" + timestamp + ",v1=" + hmac(WEBHOOK_SECRET, timestamp + "." + payload);
 
 		when(repository.operationByExternalId("STRIPE", "pi_recurring_failed")).thenReturn(Optional.of(operation));
-		when(repository.registerWebhook(eq("STRIPE"), eq("evt_recurring_failed"), eq("payment_intent.payment_failed"), anyString(), eq(organizationId))).thenReturn(true);
+		when(repository.registerWebhook(eq("STRIPE"), eq("evt_recurring_failed"), eq("payment_intent.payment_failed"), anyString(), eq(organizationId), any(UUID.class))).thenReturn(true);
 		when(stripeRecurringBillingService.fetchPaymentIntent(operation)).thenReturn(objectMapper.readTree(
 				"{\"id\":\"pi_recurring_failed\",\"status\":\"requires_payment_method\",\"last_payment_error\":{\"decline_code\":\"insufficient_funds\"}}"
 		));
@@ -184,7 +190,7 @@ class PaymentWebhookServiceTests {
 
 		verify(stripeRecurringBillingService).failRecurringCharge(operation, "insufficient_funds");
 		verifyNoInteractions(eventPublisher);
-		verify(repository).completeWebhook("STRIPE", "evt_recurring_failed", "PROCESSED", null);
+		verify(repository).completeWebhook(eq("STRIPE"), eq("evt_recurring_failed"), eq("PROCESSED"), isNull(), any(UUID.class));
 	}
 
 	@Test
@@ -193,14 +199,14 @@ class PaymentWebhookServiceTests {
 		OperationRecord operation = recurringOperation(
 				UUID.randomUUID(), organizationId, UUID.randomUUID(), "pi_recurring_duplicate"
 		);
-		String payload = "{\"id\":\"evt_recurring_duplicate\",\"type\":\"payment_intent.succeeded\",\"data\":{\"object\":{\"id\":\"pi_recurring_duplicate\"}}}";
+		String payload = "{\"id\":\"evt_recurring_duplicate\",\"type\":\"payment_intent.succeeded\",\"account\":\"acct_test\",\"data\":{\"object\":{\"id\":\"pi_recurring_duplicate\"}}}";
 		long timestamp = Instant.now().getEpochSecond();
 		String signature = "t=" + timestamp + ",v1=" + hmac(WEBHOOK_SECRET, timestamp + "." + payload);
 		when(repository.operationByExternalId("STRIPE", "pi_recurring_duplicate"))
 				.thenReturn(Optional.of(operation));
 		when(repository.registerWebhook(
 				eq("STRIPE"), eq("evt_recurring_duplicate"), eq("payment_intent.succeeded"),
-				anyString(), eq(organizationId)
+				anyString(), eq(organizationId), any(UUID.class)
 		)).thenReturn(true, false);
 		when(stripeRecurringBillingService.fetchPaymentIntent(operation)).thenReturn(objectMapper.readTree(
 				"{\"id\":\"pi_recurring_duplicate\",\"status\":\"succeeded\",\"amount\":12345,\"amount_received\":12345,\"currency\":\"mxn\"}"
@@ -211,7 +217,45 @@ class PaymentWebhookServiceTests {
 
 		verify(stripeRecurringBillingService, times(1)).completeRecurringCharge(eq(operation), anyString());
 		verify(eventPublisher, times(1)).publishEvent(any(Object.class));
-		verify(repository, times(1)).completeWebhook("STRIPE", "evt_recurring_duplicate", "PROCESSED", null);
+		verify(repository, times(1)).completeWebhook(eq("STRIPE"), eq("evt_recurring_duplicate"), eq("PROCESSED"), isNull(), any(UUID.class));
+	}
+
+	@Test
+	void signedStripeDeliveryFromAnotherConnectedAccountCannotConfirmPayment() throws Exception {
+		UUID organizationId = UUID.randomUUID();
+		OperationRecord operation = recurringOperation(UUID.randomUUID(), organizationId, UUID.randomUUID(), "pi_scoped");
+		String payload = """
+				{"id":"evt_other_account","type":"payment_intent.succeeded","account":"acct_other","data":{"object":{"id":"pi_scoped"}}}
+				""";
+		long timestamp = Instant.now().getEpochSecond();
+		when(repository.operationByExternalId("STRIPE", "pi_scoped")).thenReturn(Optional.of(operation));
+
+		String signature = "t=" + timestamp + ",v1=" + hmac(WEBHOOK_SECRET, timestamp + "." + payload);
+		assertThatThrownBy(() -> service.stripe(payload, signature)).isInstanceOfSatisfying(BusinessException.class,
+				error -> assertThat(error.code()).isEqualTo("STRIPE_WEBHOOK_ACCOUNT_MISMATCH"));
+		verifyNoInteractions(http, eventPublisher);
+	}
+
+	@Test
+	void pointParsesExactTextualAmountAndRejectsMismatchedCurrency() throws Exception {
+		UUID organizationId = UUID.randomUUID();
+		UUID saleId = UUID.randomUUID();
+		OperationRecord operation = new OperationRecord(UUID.randomUUID(), organizationId, UUID.randomUUID(),
+				"MERCADO_PAGO", "POINT_ORDER", saleId, UUID.randomUUID(), null, "ORD-test",
+				"point-test", "AWAITING_PAYMENT", 12_345, "MXN", null, "{}", null);
+		when(mercadoPagoProviderService.accessToken(organizationId)).thenReturn("test");
+		String order = """
+				{"id":"ORD-test","external_reference":"gymos-%s","status":"processed",
+				 "transactions":{"payments":[{"status":"processed","amount":"123.45","currency_id":"%s"}]}}
+				""";
+		when(http.exchange("GET", "https://mp.test/v1/orders/ORD-test", Map.of("Authorization", "Bearer test"), null, null))
+				.thenReturn(objectMapper.readTree(order.formatted(saleId, "USD")),
+						objectMapper.readTree(order.formatted(saleId, "MXN")));
+		assertThatThrownBy(() -> service.reconcile(operation)).isInstanceOfSatisfying(BusinessException.class,
+				error -> assertThat(error.code()).isEqualTo("PROVIDER_PAYMENT_AMOUNT_MISMATCH"));
+		verifyNoInteractions(eventPublisher);
+		service.reconcile(operation);
+		verify(eventPublisher).publishEvent(any(Object.class));
 	}
 
 	private OperationRecord recurringOperation(

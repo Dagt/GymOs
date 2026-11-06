@@ -332,7 +332,7 @@ public class PaymentProviderRepository {
 				    provider_payload_json = CAST(:payloadJson AS jsonb),
 				    expires_at = :expiresAt,
 				    updated_at = :updatedAt, version = version + 1
-				WHERE id = :operationId
+				WHERE id = :operationId AND external_operation_id IS NULL AND status <> 'COMPLETED'
 				""")
 				.param("externalId", externalId)
 				.param("status", status)
@@ -344,22 +344,23 @@ public class PaymentProviderRepository {
 				.update();
 	}
 
-	public void markOperationStatus(UUID operationId, String status, String payloadJson, boolean completed) {
+	public boolean markOperationStatus(UUID operationId, String status, String payloadJson, boolean completed) {
 		OffsetDateTime now = OffsetDateTime.now();
-		jdbcClient.sql("""
+		return jdbcClient.sql("""
 				UPDATE payment_provider_operation
 				SET status = :status,
 				    provider_payload_json = CAST(:payloadJson AS jsonb),
 				    completed_at = CASE WHEN :completed THEN :now ELSE completed_at END,
 				    updated_at = :now, version = version + 1
-				WHERE id = :operationId
+				WHERE id = :operationId AND status <> 'COMPLETED'
+				  AND NOT (provider = 'MERCADO_PAGO' AND completed_at IS NOT NULL)
 				""")
 				.param("status", status)
 				.param("payloadJson", payloadJson == null ? "{}" : payloadJson)
 				.param("completed", completed)
 				.param("now", now)
 				.param("operationId", operationId)
-				.update();
+				.update() == 1;
 	}
 
 	public void saveReceiptUrl(UUID operationId, String receiptUrl) {
@@ -375,22 +376,26 @@ public class PaymentProviderRepository {
 				.update();
 	}
 
-	public boolean registerWebhook(String provider, String eventId, String eventType, String payloadHash, UUID organizationId) {
+	public boolean registerWebhook(String provider, String eventId, String eventType, String payloadHash, UUID organizationId, UUID attemptId) {
 		return jdbcClient.sql("""
 				INSERT INTO payment_provider_webhook_event (
 				    id, organization_id, provider, external_event_id, event_type,
-				    payload_hash, status, received_at
+				    payload_hash, status, received_at, processing_attempt_id, processing_started_at
 				)
-				VALUES (:id, :organizationId, :provider, :eventId, :eventType, :payloadHash, 'PROCESSING', :now)
+				VALUES (:id, :organizationId, :provider, :eventId, :eventType, :payloadHash, 'PROCESSING', :now, :attemptId, :now)
 				ON CONFLICT (provider, external_event_id) DO UPDATE SET
-				    organization_id = EXCLUDED.organization_id,
-				    event_type = EXCLUDED.event_type,
-				    payload_hash = EXCLUDED.payload_hash,
 				    status = 'PROCESSING',
 				    error_message = NULL,
 				    processed_at = NULL,
-				    received_at = EXCLUDED.received_at
-				WHERE payment_provider_webhook_event.status = 'FAILED'
+				    processing_attempt_id = EXCLUDED.processing_attempt_id,
+				    processing_started_at = EXCLUDED.processing_started_at
+				WHERE payment_provider_webhook_event.organization_id IS NOT DISTINCT FROM EXCLUDED.organization_id
+				  AND payment_provider_webhook_event.event_type IS NOT DISTINCT FROM EXCLUDED.event_type
+				  AND payment_provider_webhook_event.payload_hash = EXCLUDED.payload_hash
+				  AND (payment_provider_webhook_event.status = 'FAILED'
+				    OR (payment_provider_webhook_event.status = 'PROCESSING'
+				      AND COALESCE(payment_provider_webhook_event.processing_started_at,
+				                   payment_provider_webhook_event.received_at) <= :now - interval '5 minutes'))
 				""")
 				.param("id", UUID.randomUUID())
 				.param("organizationId", organizationId)
@@ -398,21 +403,24 @@ public class PaymentProviderRepository {
 				.param("eventId", eventId)
 				.param("eventType", eventType)
 				.param("payloadHash", payloadHash)
+				.param("attemptId", attemptId)
 				.param("now", OffsetDateTime.now())
 				.update() == 1;
 	}
 
-	public void completeWebhook(String provider, String eventId, String status, String error) {
+	public void completeWebhook(String provider, String eventId, String status, String error, UUID attemptId) {
 		jdbcClient.sql("""
 				UPDATE payment_provider_webhook_event
 				SET status = :status, error_message = :error, processed_at = :processedAt
 				WHERE provider = :provider AND external_event_id = :eventId
+				  AND status = 'PROCESSING' AND processing_attempt_id = :attemptId
 				""")
 				.param("status", status)
 				.param("error", error)
 				.param("processedAt", OffsetDateTime.now())
 				.param("provider", provider)
 				.param("eventId", eventId)
+				.param("attemptId", attemptId)
 				.update();
 	}
 

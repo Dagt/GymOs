@@ -31,20 +31,20 @@ class SalesPaymentRecordingService {
 		this.eventPublisher = eventPublisher;
 	}
 
-	void record(GymOsPrincipal principal, UUID saleId, ManualPaymentCommand request, String correlationId) {
+	UUID record(GymOsPrincipal principal, UUID saleId, ManualPaymentCommand request, String correlationId) {
 		SaleHeader sale = lookupService.saleForBranch(principal, saleId);
 		String requestHash = SalesIdempotency.paymentRequestHash(request);
 		String idempotencyKey = SalesIdempotency.blankToNull(request.idempotencyKey());
 		if (idempotencyKey != null) {
-			var existingSaleId = commandRepository.saleIdByIdempotencyKey(principal.organizationId(), idempotencyKey);
+			var existingSaleId = commandRepository.paymentByIdempotencyKey(principal.organizationId(), idempotencyKey);
 			if (existingSaleId.isPresent()) {
-				if (!existingSaleId.get().equals(saleId)) {
+				if (!existingSaleId.get().saleId().equals(saleId)) {
 					throw new BusinessException("IDEMPOTENCY_KEY_REUSED", "La llave de idempotencia ya fue usada en otra venta.");
 				}
 				SalesIdempotency.ensureSameRequest(
 						salesRepository.paymentRequestHashByIdempotencyKey(principal.organizationId(), idempotencyKey).orElse(null),
 						requestHash);
-				return;
+				return existingSaleId.get().id();
 			}
 		}
 		if (SalesIdempotency.blankToNull(request.receiptObjectKey()) != null) {
@@ -65,5 +65,6 @@ class SalesPaymentRecordingService {
 		auditService.record(principal, "PAYMENT_RECORDED", "PAYMENT", paymentId, "POS", null, correlationId);
 		eventPublisher.publishEvent(new PaymentRecordedV1("payment-recorded:" + paymentId, principal.organizationId(), principal.branchId(),
 				saleId, paymentId, method, status, request.amountCents(), sale.currency(), now));
+		return paymentId;
 	}
 }

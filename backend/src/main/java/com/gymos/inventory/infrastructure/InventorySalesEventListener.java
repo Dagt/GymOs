@@ -8,6 +8,8 @@ import com.gymos.inventory.infrastructure.InventorySaleDeductionRepository.Stock
 import com.gymos.sales.api.events.PaymentCompletedLineItemV1;
 import com.gymos.sales.api.events.PaymentCompletedV1;
 import com.gymos.sales.api.events.RefundProcessedV1;
+import com.gymos.sales.api.events.PointSaleStockRequested;
+import com.gymos.sales.api.events.PointSaleStockReleased;
 import com.gymos.sales.api.events.SaleItemsRefundedLineV1;
 import com.gymos.sales.api.events.SaleItemsRefundedV1;
 import java.nio.charset.StandardCharsets;
@@ -49,12 +51,13 @@ public class InventorySalesEventListener {
 		if (physicalQuantities.isEmpty()) return;
 		OffsetDateTime occurredAt = event.occurredAt() == null ? OffsetDateTime.now() : event.occurredAt();
 		UUID correlationId = UUID.nameUUIDFromBytes(("inventory:" + event.eventKey()).getBytes(StandardCharsets.UTF_8));
-		physicalQuantities.forEach((productId, quantity) -> catalog.product(event.organizationId(), productId)
-				.filter(CatalogProductOperations.CatalogProductSnapshot::physicalInventoryTracked)
+		physicalQuantities.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> catalog.product(event.organizationId(), entry.getKey())
+				.filter(product -> product.physicalInventoryTracked()
+						|| saleDeductions.hasReservation(event.organizationId(), event.branchId(), entry.getKey(), event.saleId()))
 				.ifPresent(product -> {
 					StockDeductionResult result = saleDeductions.deductPaidSaleItem(
-							event.organizationId(), event.branchId(), productId, product.name(),
-							event.saleId(), quantity, occurredAt, correlationId
+							event.organizationId(), event.branchId(), entry.getKey(), product.name(),
+							event.saleId(), entry.getValue(), occurredAt, correlationId
 					);
 					if (result == StockDeductionResult.DEDUCTED) {
 						auditService.recordSystem(
@@ -64,6 +67,25 @@ public class InventorySalesEventListener {
 						);
 					}
 				}));
+	}
+
+	@EventListener
+	@Transactional
+	public void onPointStockRequested(PointSaleStockRequested event) {
+		Map<UUID, Integer> quantities = event.items().stream().filter(item -> "PHYSICAL".equals(item.itemType()))
+				.collect(Collectors.toMap(PaymentCompletedLineItemV1::productId, PaymentCompletedLineItemV1::quantity, Math::addExact));
+		OffsetDateTime now = OffsetDateTime.now();
+		quantities.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry ->
+				catalog.product(event.organizationId(), entry.getKey())
+						.filter(CatalogProductOperations.CatalogProductSnapshot::physicalInventoryTracked)
+						.ifPresent(product -> saleDeductions.reserve(event.organizationId(), event.branchId(), product.id(),
+								event.saleId(), entry.getValue(), now)));
+	}
+
+	@EventListener
+	@Transactional
+	public void onPointStockReleased(PointSaleStockReleased event) {
+		saleDeductions.releaseSale(event.organizationId(), event.branchId(), event.saleId());
 	}
 
 	@EventListener
@@ -85,7 +107,7 @@ public class InventorySalesEventListener {
 						SaleItemsRefundedLineV1::productId,
 						Collectors.summingInt(SaleItemsRefundedLineV1::quantity)
 				));
-		List<RefundedInventoryItem> items = requestedQuantities.entrySet().stream()
+		List<RefundedInventoryItem> items = requestedQuantities.entrySet().stream().sorted(Map.Entry.comparingByKey())
 				.filter(entry -> catalog.product(event.organizationId(), entry.getKey())
 						.filter(CatalogProductOperations.CatalogProductSnapshot::physicalInventoryTracked)
 						.isPresent())

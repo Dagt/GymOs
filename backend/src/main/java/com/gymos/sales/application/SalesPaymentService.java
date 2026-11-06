@@ -19,8 +19,8 @@ class SalesPaymentService {
 		this.lifecycleService = lifecycleService;
 	}
 
-	void record(GymOsPrincipal principal, UUID saleId, ManualPaymentCommand request, String correlationId) {
-		recordingService.record(principal, saleId, request, correlationId);
+	UUID record(GymOsPrincipal principal, UUID saleId, ManualPaymentCommand request, String correlationId) {
+		return recordingService.record(principal, saleId, request, correlationId);
 	}
 
 	UUID uploadReceipt(GymOsPrincipal principal, UUID paymentId, MultipartFile file, String correlationId) {

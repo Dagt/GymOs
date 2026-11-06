@@ -31,6 +31,12 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import com.gymos.payments.application.MercadoPagoProviderService;
+import com.gymos.payments.api.MercadoPagoPointOperations.PointOrderResult;
+import com.gymos.payments.api.events.PointPaymentClosed;
+import com.gymos.payments.api.events.ProviderPaymentCompletedV1;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
@@ -84,6 +90,8 @@ class TenantIsolationPostgresIntegrationTests {
 
 	@Autowired MockMvc http;
 	@Autowired JdbcClient jdbc;
+	@Autowired ApplicationEventPublisher events;
+	@MockitoBean MercadoPagoProviderService pointProvider;
 	@Autowired JwtService jwt;
 	@Autowired SessionRegistry sessions;
 	@Autowired RefreshCredentials refreshCredentials;
@@ -910,6 +918,234 @@ class TenantIsolationPostgresIntegrationTests {
 	private MockHttpServletRequestBuilder auth(MockHttpServletRequestBuilder request, String token) {
 		return request.header("Authorization", "Bearer " + token);
 	}
+
+	@Test
+	void simultaneousCashSalesForLastUnitCommitExactlyOneSalePaymentAndMovement() throws Exception {
+		UUID product = stockProduct(tenant, tenant.branchId);
+		String cashier = token(tenant.ownerId, tenant.branchId, Set.of("sale.create"), "Recepcion");
+		var results = race(java.util.List.of(
+				() -> retail(cashier, product, "last-a", 100),
+				() -> retail(cashier, product, "last-b", 100)
+		));
+		assertThat(results).extracting(result -> result.getResponse().getStatus()).containsExactlyInAnyOrder(200, 400);
+		assertThat(json.readTree(results.stream().filter(result -> result.getResponse().getStatus() == 400)
+				.findFirst().orElseThrow().getResponse().getContentAsString()).path("code").asText())
+				.isEqualTo("INVENTORY_STOCK_INSUFFICIENT");
+		assertThat(count("SELECT count(*) FROM sale WHERE organization_id=:id AND status='PAID'", tenant.organizationId)).isEqualTo(1);
+		assertThat(count("SELECT count(*) FROM payment WHERE organization_id=:id AND status='COMPLETED'", tenant.organizationId)).isEqualTo(1);
+		assertThat(count("SELECT count(*) FROM inventory_movement WHERE product_id=:id AND movement_type='SALE'", product)).isEqualTo(1);
+		assertThat(count("SELECT quantity_on_hand FROM inventory_stock WHERE product_id=:id", product)).isZero();
+	}
+
+	@Test
+	void tenIdenticalRequestsAndTimeoutReplayReturnOriginalPersistedSale() throws Exception {
+		UUID product = stockProduct(tenant, tenant.branchId);
+		String cashier = token(tenant.ownerId, tenant.branchId, Set.of("sale.create"), "Recepcion");
+		java.util.List<java.util.concurrent.Callable<MvcResult>> attempts = java.util.stream.IntStream.range(0, 10)
+				.mapToObj(index -> (java.util.concurrent.Callable<MvcResult>) () -> retail(cashier, product, "same-request", 100))
+				.toList();
+		var responses = race(attempts);
+		UUID saleId = saleId(responses.getFirst());
+		for (MvcResult response : responses) assertThat(saleId(response)).isEqualTo(saleId);
+		// Discarding the first response models the server committing before the client receives it.
+		assertThat(saleId(retail(cashier, product, "same-request", 100))).isEqualTo(saleId);
+		assertThat(retail(cashier, product, "same-request", 99).getResponse().getContentAsString()).contains("IDEMPOTENCY_KEY_REUSED");
+		assertThat(count("SELECT count(*) FROM sale WHERE organization_id=:id", tenant.organizationId)).isEqualTo(1);
+		assertThat(count("SELECT count(*) FROM payment WHERE sale_id=:id", saleId)).isEqualTo(1);
+		assertThat(count("SELECT count(*) FROM inventory_movement WHERE reference_id=:id", saleId)).isEqualTo(1);
+	}
+
+	@Test
+	void concurrentPaymentsAndRefundsUsePersistedRemainingBalance() throws Exception {
+		UUID product = stockProduct(tenant, tenant.branchId);
+		String manager = token(tenant.ownerId, tenant.branchId,
+				Set.of("sale.create", "payment.manual.create", "sale.refund"), "Gerente");
+		UUID saleId = saleId(retail(manager, product, "unpaid", 0));
+		var samePayments = race(java.util.List.of(
+				() -> pay(manager, saleId, "payment-same", 60),
+				() -> pay(manager, saleId, "payment-same", 60)));
+		for (MvcResult response : samePayments) assertThat(saleId(response)).isEqualTo(saleId);
+		assertThat(count("SELECT count(*) FROM payment WHERE sale_id=:id", saleId)).isEqualTo(1);
+		assertThat(count("SELECT balance_cents FROM sale WHERE id=:id", saleId)).isEqualTo(40);
+		var competingPayments = race(java.util.List.of(
+				() -> pay(manager, saleId, "payment-a", 40),
+				() -> pay(manager, saleId, "payment-b", 40)));
+		assertThat(competingPayments).extracting(result -> result.getResponse().getStatus()).containsExactlyInAnyOrder(200, 400);
+		assertThat(count("SELECT paid_cents FROM sale WHERE id=:id", saleId)).isEqualTo(100);
+		assertThat(count("SELECT count(*) FROM inventory_movement WHERE reference_id=:id", saleId)).isEqualTo(1);
+		var refunds = race(java.util.List.of(
+				() -> saleMutation(manager, saleId, "refunds", "{\"amountCents\":60,\"reason\":\"Devolución\",\"idempotencyKey\":\"refund-a\"}"),
+				() -> saleMutation(manager, saleId, "refunds", "{\"amountCents\":60,\"reason\":\"Devolución\",\"idempotencyKey\":\"refund-b\"}")));
+		assertThat(refunds).extracting(result -> result.getResponse().getStatus()).containsExactlyInAnyOrder(200, 400);
+		assertThat(count("SELECT SUM(amount_cents) FROM sale_refund WHERE sale_id=:id AND status='PROCESSED'", saleId)).isEqualTo(60);
+		assertThat(count("SELECT quantity_on_hand FROM inventory_stock WHERE product_id=:id", product)).isZero();
+	}
+
+	@Test
+	void cancellationAndPaymentCompeteAndForeignActorsCannotCancel() throws Exception {
+		UUID product = stockProduct(tenant, tenant.branchId);
+		String manager = token(tenant.ownerId, tenant.branchId,
+				Set.of("sale.create", "payment.manual.create", "sale.refund"), "Gerente");
+		UUID saleId = saleId(retail(manager, product, "cancel-race", 0));
+		String reason = "{\"reason\":\"Captura equivocada\"}";
+		String cashier = token(tenant.ownerId, tenant.branchId, Set.of("sale.create"), "Recepcion");
+		assertThat(saleMutation(cashier, saleId, "cancel", reason).getResponse().getStatus()).isEqualTo(403);
+		String outside = access(new GymOsPrincipal(foreign.ownerId, foreign.organizationId, foreign.branchId,
+				"fixture", "Fixture", Set.of("sale.refund"), Set.of("Gerente"), false));
+		assertThat(saleMutation(outside, saleId, "cancel", reason).getResponse().getContentAsString()).contains("SALE_NOT_FOUND");
+		var results = race(java.util.List.of(
+				() -> pay(manager, saleId, "race-payment", 100),
+				() -> saleMutation(manager, saleId, "cancel", reason)));
+		assertThat(results).extracting(result -> result.getResponse().getStatus()).containsExactlyInAnyOrder(200, 400);
+		boolean cancelled = results.get(1).getResponse().getStatus() == 200;
+		assertThat(count("SELECT paid_cents FROM sale WHERE id=:id", saleId)).isEqualTo(cancelled ? 0 : 100);
+		assertThat(count("SELECT count(*) FROM inventory_movement WHERE reference_id=:id", saleId)).isEqualTo(cancelled ? 0 : 1);
+		if (cancelled) {
+			assertThat(saleId(saleMutation(manager, saleId, "cancel", reason))).isEqualTo(saleId);
+			assertThat(auditCount(tenant.organizationId, tenant.branchId, "SALE_CANCELLED", saleId)).isEqualTo(1);
+		}
+	}
+
+	@Test
+	void simultaneousBranchesAndTenantsKeepIndependentStockAndKeys() throws Exception {
+		UUID product = stockProduct(tenant, tenant.branchId, north);
+		UUID otherProduct = stockProduct(foreign, foreign.branchId);
+		jdbc.sql("INSERT INTO user_branch_access(user_id,branch_id,access_scope) VALUES (:user,:branch,'BRANCH')")
+				.param("user", tenant.ownerId).param("branch", north).update();
+		String southCashier = token(tenant.ownerId, tenant.branchId, Set.of("sale.create"), "Recepcion");
+		String northCashier = token(tenant.ownerId, north, Set.of("sale.create"), "Recepcion");
+		String foreignCashier = access(new GymOsPrincipal(foreign.ownerId, foreign.organizationId, foreign.branchId,
+				"fixture", "Fixture", Set.of("sale.create"), Set.of("Recepcion"), false));
+		var results = race(java.util.List.of(
+				() -> retail(southCashier, product, "shared-key", 100),
+				() -> retail(northCashier, product, "north-key", 100),
+				() -> retail(foreignCashier, otherProduct, "shared-key", 100)));
+		for (MvcResult result : results) saleId(result);
+		assertThat(retail(northCashier, product, "shared-key", 100).getResponse().getContentAsString())
+				.contains("IDEMPOTENCY_KEY_REUSED").doesNotContain(saleId(results.getFirst()).toString());
+		assertThat(count("SELECT count(*) FROM inventory_movement WHERE product_id=:id", product)).isEqualTo(2);
+		assertThat(count("SELECT count(*) FROM inventory_stock WHERE product_id=:id AND quantity_on_hand=0", product)).isEqualTo(2);
+		assertThat(count("SELECT count(*) FROM inventory_movement WHERE product_id=:id", otherProduct)).isEqualTo(1);
+	}
+
+	@Test
+	void pointReservesBeforeSendingAndConsumesTheReservationOnlyOnceOnConfirmation() throws Exception {
+		UUID product = stockProduct(tenant, tenant.branchId);
+		String manager = pointManager();
+		UUID saleId = saleId(retail(manager, product, "point-sale", 0));
+		UUID paymentId = preparePoint(manager, saleId);
+		assertThat(count("SELECT count(*) FROM inventory_sale_reservation WHERE sale_id=:id", saleId)).isEqualTo(1);
+		assertThat(count("SELECT quantity_on_hand FROM inventory_stock WHERE product_id=:id", product)).isEqualTo(1);
+		assertThat(retail(manager, product, "competing-cash", 100).getResponse().getContentAsString())
+				.contains("INVENTORY_STOCK_RESERVED");
+		var completion = new ProviderPaymentCompletedV1("point-confirmed", tenant.organizationId, tenant.branchId,
+				"MERCADO_PAGO", UUID.randomUUID(), "ORD-fixture", saleId, paymentId, 100, "MXN", OffsetDateTime.now());
+		events.publishEvent(completion);
+		events.publishEvent(completion);
+		assertThat(count("SELECT count(*) FROM inventory_sale_reservation WHERE sale_id=:id", saleId)).isZero();
+		assertThat(count("SELECT quantity_on_hand FROM inventory_stock WHERE product_id=:id", product)).isZero();
+		assertThat(count("SELECT count(*) FROM inventory_movement WHERE reference_id=:id", saleId)).isEqualTo(1);
+		assertThat(count("SELECT paid_cents FROM sale WHERE id=:id", saleId)).isEqualTo(100);
+	}
+
+	@Test
+	void pointTerminalClosureReleasesTheReservationAndDoesNotCreateAStockMovement() throws Exception {
+		UUID product = stockProduct(tenant, tenant.branchId);
+		String manager = pointManager();
+		UUID saleId = saleId(retail(manager, product, "point-expired", 0));
+		UUID paymentId = preparePoint(manager, saleId);
+		var expired = new PointPaymentClosed(tenant.organizationId, tenant.branchId, saleId, paymentId, "EXPIRED");
+		events.publishEvent(expired);
+		events.publishEvent(expired);
+		assertThat(count("SELECT count(*) FROM inventory_sale_reservation WHERE sale_id=:id", saleId)).isZero();
+		assertThat(count("SELECT count(*) FROM inventory_movement WHERE reference_id=:id", saleId)).isZero();
+		assertThat(count("SELECT count(*) FROM payment WHERE id=:id AND status='REJECTED'", paymentId)).isEqualTo(1);
+		assertThat(count("SELECT paid_cents FROM sale WHERE id=:id", saleId)).isZero();
+		saleId(retail(manager, product, "cash-after-expiry", 100));
+	}
+
+	private String pointManager() {
+		jdbc.sql("""
+				INSERT INTO organization_payment_configuration(organization_id, mercado_pago_account_id, mercado_pago_connected_at, created_at, updated_at)
+				VALUES (:org, 'point-fixture', now(), now(), now())
+				""").param("org", tenant.organizationId).update();
+		jdbc.sql("UPDATE branch SET reception_mercado_pago_enabled=true, mercado_pago_terminal_id='terminal-test' WHERE id=:branch")
+				.param("branch", tenant.branchId).update();
+		org.mockito.Mockito.when(pointProvider.createOrder(org.mockito.ArgumentMatchers.any()))
+				.thenReturn(new PointOrderResult(UUID.randomUUID(), "ORD-fixture", "CREATED"));
+		return token(tenant.ownerId, tenant.branchId, Set.of("sale.create", "payment.manual.create"), "Gerente");
+	}
+
+	private UUID preparePoint(String manager, UUID saleId) throws Exception {
+		var response = saleMutation(manager, saleId, "payments", """
+				{"method":"CARD_MERCADO_PAGO","amountCents":100,"validateNow":false,"idempotencyKey":"point-payment"}
+				""");
+		saleId(response);
+		UUID paymentId = UUID.fromString(json.readTree(response.getResponse().getContentAsString()).path("operationPaymentId").asText());
+		http.perform(auth(post("/api/v1/sales/payments/{id}/mercado-pago-order", paymentId), manager)).andExpect(status().isOk());
+		return paymentId;
+	}
+
+	private UUID stockProduct(OperationalTestData gym, UUID... branches) {
+		UUID product = UUID.randomUUID();
+		jdbc.sql("""
+				INSERT INTO catalog_product(id, organization_id, sku, name, product_type, price_cents, currency,
+				                            status, inventory_tracked, created_at, updated_at)
+				VALUES (:id, :org, :sku, 'Producto concurrente', 'PHYSICAL', 100, 'MXN', 'ACTIVE', true, now(), now())
+				""").param("id", product).param("sku", product.toString()).param("org", gym.organizationId).update();
+		for (UUID branch : branches) {
+			jdbc.sql("INSERT INTO catalog_product_branch(organization_id, branch_id, product_id, created_at) VALUES (:org,:branch,:product,now())")
+					.param("org", gym.organizationId).param("branch", branch).param("product", product).update();
+			jdbc.sql("""
+					INSERT INTO inventory_stock(id, organization_id, branch_id, product_id, quantity_on_hand, created_at, updated_at)
+					VALUES (:id,:org,:branch,:product,1,now(),now())
+					""").param("id", UUID.randomUUID()).param("org", gym.organizationId).param("branch", branch).param("product", product).update();
+		}
+		return product;
+	}
+
+	private MvcResult retail(String token, UUID product, String key, int amount) throws Exception {
+		String payment = amount == 0 ? "null" : """
+				{"method":"CASH","amountCents":%d,"validateNow":true}
+				""".formatted(amount);
+		return http.perform(auth(post("/api/v1/sales"), token).contentType("application/json").content("""
+				{"items":[{"productId":"%s","quantity":1,"discountCents":0}],"discountCents":0,"payment":%s,"idempotencyKey":"%s"}
+				""".formatted(product, payment, key))).andReturn();
+	}
+
+	private MvcResult pay(String token, UUID saleId, String key, int amount) throws Exception {
+		return saleMutation(token, saleId, "payments", """
+				{"method":"CASH","amountCents":%d,"validateNow":true,"idempotencyKey":"%s"}
+				""".formatted(amount, key));
+	}
+
+	private MvcResult saleMutation(String token, UUID saleId, String operation, String body) throws Exception {
+		return http.perform(auth(post("/api/v1/sales/{saleId}/" + operation, saleId), token)
+				.contentType("application/json").content(body)).andReturn();
+	}
+
+	private UUID saleId(MvcResult response) throws Exception {
+		assertThat(response.getResponse().getStatus()).withFailMessage(response.getResponse().getContentAsString()).isEqualTo(200);
+		return UUID.fromString(json.readTree(response.getResponse().getContentAsString()).path("sale").path("id").asText());
+	}
+
+	private long count(String query, UUID id) {
+		return jdbc.sql(query).param("id", id).query(Long.class).single();
+	}
+
+	private java.util.List<MvcResult> race(java.util.List<java.util.concurrent.Callable<MvcResult>> actions) throws Exception {
+		CyclicBarrier barrier = new CyclicBarrier(actions.size());
+		try (var executor = Executors.newFixedThreadPool(actions.size())) {
+			var pending = actions.stream().map(action -> executor.submit(() -> {
+				barrier.await(10, TimeUnit.SECONDS);
+				return action.call();
+			})).toList();
+			var results = new java.util.ArrayList<MvcResult>();
+			for (var result : pending) results.add(result.get(20, TimeUnit.SECONDS));
+			return results;
+		}
+	}
+
 
 	private String token(UUID user, UUID branch, Set<String> permissions, String role) {
 		return access(new GymOsPrincipal(user, tenant.organizationId, branch, "fixture", "Fixture", permissions, Set.of(role), false));

@@ -20,6 +20,7 @@ import {
 } from "@/lib/api";
 import { calculateSubtotal, isMembershipPlanProduct, resolveScannedProduct } from "./pos-model";
 import { playScanBeep, useBarcodeScanner } from "./barcode-scanner";
+import { runSaleWrite } from "@/lib/sale-write";
 import { usePaginatedQuery } from "@/lib/usePaginatedQuery";
 import {
   type CartItem,
@@ -52,7 +53,7 @@ export default function PosPage() {
   const [saving, setSaving] = useState(false);
   const [highlightedProductId, setHighlightedProductId] = useState<string | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
-  const saleOperationKey = useRef<string | null>(null);
+  const saleInFlight = useRef(false);
 
   useBarcodeScanner({
     onScan: (code) => void handleBarcodeScan(code),
@@ -164,15 +165,14 @@ export default function PosPage() {
 
   async function submitSale(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!session || cart.length === 0) return;
+    if (!session || cart.length === 0 || saleInFlight.current) return;
+    saleInFlight.current = true;
     setSaving(true);
     setError(null);
     setMessage(null);
     try {
       const amountCents = paymentAmount.trim() ? Math.round(Number(paymentAmount) * 100) : subtotal;
-      const idempotencyKey = saleOperationKey.current ?? `pos:${crypto.randomUUID()}`;
-      saleOperationKey.current = idempotencyKey;
-      const sale = await createSale(session.accessToken, {
+      const payload = {
         clientId: selectedClient?.id ?? null,
         items: cart.map((item) => ({
           productId: item.product.id,
@@ -189,26 +189,38 @@ export default function PosPage() {
           validateNow: paymentMethod === "CARD_MERCADO_PAGO" ? false : validateNow,
           notes: null,
         } : null,
-        idempotencyKey,
+      };
+      const sale = await runSaleWrite(session, "pos", payload, async (idempotencyKey) => {
+        const result = await createSale(session.accessToken, { ...payload, idempotencyKey });
+        if (payload.payment?.method === "CARD_MERCADO_PAGO") {
+          const payment = result.payments.find((item) => item.id === result.operationPaymentId);
+          if (!payment) throw new Error(`Consulta la venta ${result.sale.saleNumber} antes de volver a cobrar.`);
+          if (payment.status === "PENDING_VALIDATION") {
+            try {
+              await createMercadoPagoPointOrder(session.accessToken, payment.id);
+            } catch {
+              throw new Error(`La venta ${result.sale.saleNumber} está registrada. Falta confirmar el envío a Point.`);
+            }
+          }
+        }
+        return result;
       });
-      if (paymentMethod === "CARD_MERCADO_PAGO") {
-        const payment = sale.payments.find((item) => item.method === "CARD_MERCADO_PAGO" && item.status === "PENDING_VALIDATION");
-        if (!payment) throw new Error("La venta se registro, pero no se encontro el pago pendiente para enviar a Point.");
-        await createMercadoPagoPointOrder(session.accessToken, payment.id);
-        setMessage(`Cobro de la venta ${sale.sale.saleNumber} enviado a la terminal Point. Esperando confirmacion.`);
-      } else {
-        setMessage(`Venta ${sale.sale.saleNumber} registrada.`);
-      }
-      saleOperationKey.current = null;
+      setMessage(paymentMethod === "CARD_MERCADO_PAGO" && sale.sale.status !== "PAID"
+        ? `Venta ${sale.sale.saleNumber} registrada. Consulta el estado del pago en el historial.`
+        : `Venta ${sale.sale.saleNumber} registrada.`);
       setCart([]);
       setPaymentReference("");
+      setPaymentAmount("");
       setSelectedClient(null);
       setClients([]);
       setClientQuery("");
-      setSales(await getRecentSales(session.accessToken));
+      void getRecentSales(session.accessToken).then(setSales).catch(() => {
+        setError("La venta quedó registrada. No fue posible actualizar el historial.");
+      });
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible registrar venta.");
     } finally {
+      saleInFlight.current = false;
       setSaving(false);
     }
   }
@@ -229,7 +241,7 @@ export default function PosPage() {
       <div className="flex flex-col gap-8 w-full max-w-[1600px] mx-auto">
         {message ? (
           <div className="p-4 rounded-2xl border-2 border-green-100 bg-green-50 text-green-700 font-black flex items-center gap-3 animate-in fade-in slide-in-from-top-4 shadow-sm">
-            <span className="text-xl">✅</span>
+            <span className="text-xl">âœ…</span>
             {message}
           </div>
         ) : null}
