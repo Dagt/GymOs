@@ -48,10 +48,8 @@ export default function BenefitsPage() {
   const [editing, setEditing] = useState<BenefitSummary | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  const canManageBenefits = Boolean(
-    session?.user.permissions.includes("benefit.manage")
-      || session?.user.permissions.includes("platform.admin"),
-  );
+  const branchId = session?.user.branchId;
+  const canManageBenefits = Boolean(branchId && session?.user.permissions.includes("benefit.manage"));
 
   useEffect(() => {
     let active = true;
@@ -91,7 +89,7 @@ export default function BenefitsPage() {
   }, []);
 
   async function openEditor(benefit: BenefitSummary | null) {
-    if (!session) return;
+    if (!session || !canManageBenefits || (benefit?.branchId && benefit.branchId !== branchId)) return;
     setError(null);
     setMessage(null);
     try {
@@ -222,7 +220,7 @@ export default function BenefitsPage() {
                     <p className="font-black">{benefit.name}</p>
                     <p className="mt-1 text-xs text-[var(--brand-muted)]">{benefit.code} · {benefit.benefitType === "ACCESS" ? "Acceso" : "Descuento"}{benefit.accessScope === "PLAN_COVERAGE" ? " · Cobertura del plan" : benefit.branchId === null ? " · Todas las sucursales" : " · Local"}{benefit.status === "INACTIVE" ? " · Inactivo" : ""}</p>
                   </div>
-                  {canManageBenefits ? <button className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--brand-muted)] transition-colors hover:bg-[var(--brand-surface)] hover:text-[var(--brand-primary)] focus-visible:outline-2 focus-visible:outline-offset-2" onClick={() => void openEditor(benefit)} type="button" aria-label={`Editar ${benefit.name}`} title={`Editar ${benefit.name}`}><Pencil className="h-4 w-4" aria-hidden="true" /></button> : null}
+                  {canManageBenefits && (!benefit.branchId || benefit.branchId === branchId) ? <button className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--brand-muted)] transition-colors hover:bg-[var(--brand-surface)] hover:text-[var(--brand-primary)] focus-visible:outline-2 focus-visible:outline-offset-2" onClick={() => void openEditor(benefit)} type="button" aria-label={`Editar ${benefit.name}`} title={`Editar ${benefit.name}`}><Pencil className="h-4 w-4" aria-hidden="true" /></button> : null}
                 </div>
                 <p className="mt-3 text-sm text-[var(--brand-muted)]">
                   {benefit.benefitType === "ACCESS" ? "Acceso heredado del plan" : benefit.discountType === "PERCENT" ? `${benefit.discountPercent ?? 0}% de descuento` : benefit.discountType}

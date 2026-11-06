@@ -2,7 +2,9 @@
 
 Estado: VIGENTE / COBERTURA PARCIAL
 Fuente primaria: `backend/src/main/java/com/gymos/common/security/SecurityConfig.java`  
-Última revisión: 23 de agosto de 2026
+Última revisión: 5 de noviembre de 2026
+
+La revisión de #29 parte de `58a5d4d4b24bcc598059b05a4ac70d11a2fe937b` con el PR #65 incorporado. La referencia por verbo, ruta y autoridad efectiva está en el [inventario de endpoints](endpoint-permissions.md). Los límites por recurso, las regresiones y los pendientes figuran en la [matriz de aislamiento](multi-tenant-verification.md).
 
 Esta matriz resume el permiso mínimo HTTP. Los servicios deben volver a validar organización, sucursal, propiedad y estado del recurso; una coincidencia de ruta no sustituye autorización de negocio.
 
@@ -24,8 +26,8 @@ Esta matriz resume el permiso mínimo HTTP. Los servicios deben volver a validar
 | Superficie | Lectura | Mutación/operación |
 |---|---|---|
 | Organización | `organization.read` | `organization.update`; alta/estado tenant: `platform.admin` |
-| Sucursales | `branch.read` | `branch.create`, `branch.update` |
-| Equipo | `user.read` | `user.manage` con filtro de roles/sucursales |
+| Sucursales | `branch.read` y compatibilidades operativas del inventario y catálogo | `branch.create`, `branch.update`; consulta por tenant explícito para plataforma o soporte con `branch.read` en el mismo tenant |
+| Equipo | `user.read`; gerencia ve su equipo en la sede activa | `user.manage` más jerarquía; gerencia necesita la sede activa y todas las sucursales afectadas |
 | Onboarding | `onboarding.manage` | `onboarding.manage` |
 | Clientes | `client.read` | `client.create`, `client.update`, `client.import` |
 | Catálogo | `catalog.read` y compatibilidades de consumo | `catalog.create`, `catalog.update`, `catalog.status.manage`, `catalog.archive`, `catalog.image.manage`, `catalog.category.manage` |
@@ -34,6 +36,8 @@ Esta matriz resume el permiso mínimo HTTP. Los servicios deben volver a validar
 | Ventas | `sale.read`, `report.sales.read` | `sale.create`, `sale.refund` |
 | Pagos manuales | lectura por venta | `payment.manual.create/validate/reject`, `payment.receipt.upload` |
 | Acceso/visitas | `access.read`, `visit.read` | Operación lógica: `access.manage`, `visit.create`, `visit.consume`; configuración física/candidatos: `access.physical.manage`; apertura excepcional: `access.manual.open` |
+| Check-in de recepción | `access.check-in` | `access.check-in` para registrar y `access.check-in.reverse` para revertir. Ambas requieren identidad tenant, sede activa y comprobación de pertenencia. |
+| Paquetes vendidos | `client.read`, `membership.read` o `sale.create` | `membership.read` o `sale.create` para cotizar, `sale.create` para vender. Socio visible en backoffice o verificado en kiosco. |
 | Inventario | `inventory.read` | `inventory.manage` |
 | Recursos/reservas | `resource.read`, `booking.read` | `resource.manage`, `booking.manage`, `booking.payment.manage` |
 | Coaches | `coach.read`, `coach.metrics.read` | `coach.manage`, `coach.profile.manage` |
@@ -83,11 +87,11 @@ Después de aplicar una migración de permisos, una sesión ya emitida debe reno
 - Recepción puede operar POS, socios, reservas y kiosco según permisos, pero no administrar tenant/proveedores/automatizaciones administrativas.
 - Recepción no administra proveedores físicos, credenciales, candidatos ni
   apertura manual; conserva sólo las operaciones lógicas otorgadas por su rol.
-- Soporte usa `platform.admin`, contexto tenant explícito y auditoría `PLATFORM_SUPPORT`, pero no puede iniciar kioscos de socios.
+- `platform.admin` permite iniciar soporte con motivo. El JWT temporal de soporte tiene autoridades operativas, un tenant fijo y auditoría `PLATFORM_SUPPORT`. La sesión no concede lanzamiento de kiosco, recuperación de contraseñas internas ni check-in manual.
 
 ## Brechas de cobertura
 
-1. Convertir cada familia en pruebas positivas/negativas por rol, tenant, sucursal y UUID ajeno (`GEN-001`).
+1. Ampliar la regresión HTTP/PostgreSQL a las filas de la matriz aún cubiertas por inspección o por pruebas de módulo (`GEN-001`).
 2. Deshabilitar docs/actuator públicos en producción mediante perfil.
 3. Verificar que cada mutación sensible escriba `audit_log` (`AUD-001`).
 4. Mantener regresión explícita de V77/V78/V80/V84 y de planes multi-sucursal.

@@ -1,5 +1,7 @@
 package com.gymos.sales.api;
 
+import com.gymos.clients.api.operations.ClientBranchAccess;
+
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.sales.application.SalesService;
@@ -52,10 +54,12 @@ import org.springframework.web.multipart.MultipartFile;
 public class SalesController {
 	private final SalesService salesService;
 	private final SalesProviderPaymentService providerPaymentService;
+	private final ClientBranchAccess clients;
 
-	public SalesController(SalesService salesService, SalesProviderPaymentService providerPaymentService) {
+	public SalesController(SalesService salesService, SalesProviderPaymentService providerPaymentService, ClientBranchAccess clients) {
 		this.salesService = salesService;
 		this.providerPaymentService = providerPaymentService;
+		this.clients = clients;
 	}
 
 	@PostMapping("/payments/{paymentId}/mercado-pago-order")
@@ -86,6 +90,9 @@ public class SalesController {
 			@Valid @RequestBody CreateSaleRequest request,
 			HttpServletRequest servletRequest
 	) {
+		if (request.clientId() != null) {
+			clients.requireVisible(principal, request.clientId());
+		}
 		return toResponse(salesService.create(principal, request.toCommand(), correlationId(servletRequest)));
 	}
 

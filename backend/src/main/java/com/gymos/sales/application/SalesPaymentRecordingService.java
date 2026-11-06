@@ -47,6 +47,9 @@ class SalesPaymentRecordingService {
 				return;
 			}
 		}
+		if (SalesIdempotency.blankToNull(request.receiptObjectKey()) != null) {
+			throw new BusinessException("PAYMENT_RECEIPT_UPLOAD_REQUIRED", "Adjunta el comprobante al pago mediante la carga de archivos.");
+		}
 		if (request.amountCents() <= 0) {
 			throw new BusinessException("PAYMENT_AMOUNT_INVALID", "El pago debe ser mayor a cero.");
 		}
@@ -56,7 +59,7 @@ class SalesPaymentRecordingService {
 		UUID paymentId = UUID.randomUUID();
 		commandRepository.create(new PaymentRecord(paymentId, principal.organizationId(), principal.branchId(), saleId, sale.clientId(),
 				method, status, request.amountCents(), sale.currency(), SalesIdempotency.blankToNull(request.reference()),
-				SalesIdempotency.blankToNull(request.receiptObjectKey()), now, "COMPLETED".equals(status) ? now : null,
+				null, now, "COMPLETED".equals(status) ? now : null,
 				"COMPLETED".equals(status) ? principal.userId() : null, SalesIdempotency.blankToNull(request.notes()),
 				principal.userId(), idempotencyKey, requestHash));
 		auditService.record(principal, "PAYMENT_RECORDED", "PAYMENT", paymentId, "POS", null, correlationId);

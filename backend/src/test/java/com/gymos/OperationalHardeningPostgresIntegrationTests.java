@@ -215,7 +215,7 @@ class OperationalHardeningPostgresIntegrationTests {
         var foreign = new OperationalTestData(jdbc);
         assertCode(() -> tx(() -> service.updateBenefit(foreign.owner, benefit.id(), update, "test")), "BENEFIT_NOT_FOUND");
         var otherBranch = new GymOsPrincipal(data.ownerId, data.organizationId, UUID.randomUUID(), "owner", "Dueño", Set.of("benefit.manage"), Set.of("Dueno del gimnasio"), false);
-        assertCode(() -> tx(() -> service.updateBenefit(otherBranch, benefit.id(), update, "test")), "BENEFIT_BRANCH_MISMATCH");
+        assertCode(() -> tx(() -> service.updateBenefit(otherBranch, benefit.id(), update, "test")), "BENEFIT_NOT_FOUND");
         var viewer = new GymOsPrincipal(data.ownerId, data.organizationId, data.branchId, "viewer", "Consulta", Set.of("benefit.read"), Set.of("Recepcion"), false);
         assertThatThrownBy(() -> tx(() -> service.updateBenefit(viewer, benefit.id(), update, "test")))
                 .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);

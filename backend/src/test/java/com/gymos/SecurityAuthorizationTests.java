@@ -12,8 +12,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.security.JwtService;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -21,9 +27,17 @@ import com.gymos.common.security.UserCredentialVersionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.mock.web.MockHttpServletRequest;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping;
+import org.springframework.web.util.ServletRequestPathUtils;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -34,11 +48,69 @@ class SecurityAuthorizationTests {
 
 	@Autowired
 	private JwtService jwtService;
+	@Autowired private RequestMappingHandlerMapping requestMappingHandlerMapping;
+	@Autowired private SecurityFilterChain securityFilterChain;
 	@MockitoBean private UserCredentialVersionRepository credentialVersions;
 
 	@BeforeEach
 	void activeFixtureCredentials() {
-		org.mockito.Mockito.when(credentialVersions.isCurrent(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyLong())).thenReturn(true);
+		org.mockito.Mockito.when(credentialVersions.isCurrent(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+	}
+
+	@Test
+	void documentedOperationsMatchSpringRoutingAndEffectiveAuthorities() throws Exception {
+		var documented = new LinkedHashMap<String, String>();
+		var row = Pattern.compile("^\\| `([A-Z]+ /api/[^`]+)` \\| (.+?) \\|");
+		for (String line : Files.readAllLines(Path.of("..", "docs", "security", "endpoint-permissions.md"))) {
+			var match = row.matcher(line);
+			if (match.find()) {
+				assertThat(documented.put(match.group(1), match.group(2))).as(match.group(1)).isNull();
+			}
+		}
+		var mapped = requestMappingHandlerMapping.getHandlerMethods().entrySet().stream()
+				.filter(entry -> entry.getValue().getBeanType().getPackageName().startsWith("com.gymos."))
+				.flatMap(entry -> entry.getKey().getMethodsCondition().getMethods().stream()
+						.flatMap(method -> entry.getKey().getPatternValues().stream().map(path -> method.name() + " " + path)))
+				.collect(Collectors.toSet());
+		assertThat(documented.keySet()).containsExactlyInAnyOrderElementsOf(mapped);
+
+		var manager = securityFilterChain.getFilters().stream()
+				.filter(AuthorizationFilter.class::isInstance).map(AuthorizationFilter.class::cast)
+				.findFirst().orElseThrow().getAuthorizationManager();
+		var anonymous = new AnonymousAuthenticationToken("audit", "anonymous",
+				List.of(new SimpleGrantedAuthority("ROLE_ANONYMOUS")));
+		var authenticated = UsernamePasswordAuthenticationToken.authenticated("audit", null, List.of());
+		var authority = Pattern.compile("`([a-z][a-z0-9.-]+)`");
+		var authorities = documented.values().stream().flatMap(value -> authority.matcher(value).results())
+				.map(match -> match.group(1)).collect(Collectors.toSet());
+		for (var operation : documented.entrySet()) {
+			var parts = operation.getKey().split(" ", 2);
+			var request = new MockHttpServletRequest(parts[0],
+					parts[1].replaceAll("\\{[^}]+}", "00000000-0000-4000-8000-000000000001"));
+			ServletRequestPathUtils.parseAndCache(request);
+			String rule = operation.getValue();
+			boolean publicRoute = rule.equals("Público") || rule.equals("Credencial del protocolo");
+			assertThat(manager.authorize(() -> anonymous, request).isGranted())
+					.as("%s as anonymous", operation.getKey()).isEqualTo(publicRoute);
+			assertThat(manager.authorize(() -> authenticated, request).isGranted())
+					.as("%s without authorities", operation.getKey()).isEqualTo(publicRoute || rule.equals("JWT autenticado"));
+			if (!publicRoute && !rule.equals("JWT autenticado")) {
+				var permitted = authority.matcher(rule).results().map(match -> match.group(1)).collect(Collectors.toSet());
+				assertThat(permitted).as(operation.getKey()).isNotEmpty();
+				for (String permission : authorities) {
+					var actor = UsernamePasswordAuthenticationToken.authenticated("audit", null,
+							List.of(new SimpleGrantedAuthority(permission)));
+					assertThat(manager.authorize(() -> actor, request).isGranted())
+							.as("%s with %s", operation.getKey(), permission).isEqualTo(permitted.contains(permission));
+				}
+			}
+		}
+	}
+
+	@Test
+	@WithMockUser(authorities = "platform.admin")
+	void unclassifiedOperationsFailClosed() throws Exception {
+		mockMvc.perform(get("/api/v1/unclassified-operation")).andExpect(status().isForbidden());
 	}
 
 	@Test
@@ -60,7 +132,7 @@ class SecurityAuthorizationTests {
 
 	@Test
 	void revokedJwtIsRejectedBeforeController() throws Exception {
-		org.mockito.Mockito.when(credentialVersions.isCurrent(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyLong())).thenReturn(false);
+		org.mockito.Mockito.when(credentialVersions.isCurrent(org.mockito.ArgumentMatchers.any())).thenReturn(false);
 		String token = jwtService.accessToken(new GymOsPrincipal(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "coach", "Coach", Set.of("client.read")));
 		mockMvc.perform(get("/api/v1/clients/search").header("Authorization", "Bearer " + token))
 				.andExpect(status().isUnauthorized());

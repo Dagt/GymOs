@@ -31,8 +31,8 @@ class SalesPaymentReceiptService {
 		if (file == null || file.isEmpty()) {
 			throw new BusinessException("PAYMENT_RECEIPT_REQUIRED", "Selecciona un archivo de comprobante.");
 		}
-		UUID saleId = lookupService.saleIdForPayment(principal, paymentId);
-		SaleHeader sale = lookupService.saleForBranch(principal, saleId);
+		SaleHeader sale = lookupService.saleForPayment(principal, paymentId);
+		UUID saleId = sale.id();
 		String objectKey = receiptObjectKey(principal.organizationId(), saleId, paymentId, file.getOriginalFilename());
 		try {
 			objectStorageService.putReceipt(objectKey, file.getContentType(), file.getSize(), file.getInputStream());

@@ -1,6 +1,7 @@
 package com.gymos.sales.application;
 
 import com.gymos.common.api.BusinessException;
+import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.sales.infrastructure.SalesRepository;
 import com.gymos.sales.model.PaymentDetail;
 import com.gymos.sales.model.SaleHeader;
@@ -10,8 +11,10 @@ final class SalesRecordResolver {
 	private SalesRecordResolver() {
 	}
 
-	static SaleHeader requireSale(SalesRepository repository, UUID organizationId, UUID saleId) {
-		return repository.saleHeader(organizationId, saleId)
+	static SaleHeader requireSaleForBranch(SalesRepository repository, GymOsPrincipal principal, UUID saleId) {
+		SalesAccessGuard.requireBranch(principal);
+		return repository.saleHeader(principal.organizationId(), saleId)
+				.filter(sale -> principal.branchId().equals(sale.branchId()))
 				.orElseThrow(() -> new BusinessException("SALE_NOT_FOUND", "La venta no existe o no esta disponible."));
 	}
 
@@ -20,8 +23,11 @@ final class SalesRecordResolver {
 				.orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "El pago no existe o no esta disponible."));
 	}
 
-	static UUID requireSaleIdForPayment(SalesRepository repository, UUID organizationId, UUID paymentId) {
-		return repository.saleIdForPayment(organizationId, paymentId)
+	static SaleHeader requirePaymentSaleForBranch(SalesRepository repository, GymOsPrincipal principal, UUID paymentId) {
+		SalesAccessGuard.requireBranch(principal);
+		return repository.saleIdForPayment(principal.organizationId(), paymentId)
+				.flatMap(saleId -> repository.saleHeader(principal.organizationId(), saleId))
+				.filter(sale -> principal.branchId().equals(sale.branchId()))
 				.orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "El pago no existe o no esta disponible."));
 	}
 }

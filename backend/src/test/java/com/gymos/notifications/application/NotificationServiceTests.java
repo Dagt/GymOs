@@ -35,7 +35,8 @@ class NotificationServiceTests {
 		when(provider.available()).thenReturn(true);
 		NotificationProperties properties = properties();
 		service = new NotificationService(
-				repository, audit, List.of(provider), new NotificationRecipientHasher(properties), properties
+				repository, audit, List.of(provider), new NotificationRecipientHasher(properties), properties,
+				mock(com.gymos.clients.api.operations.ClientBranchAccess.class)
 		);
 	}
 

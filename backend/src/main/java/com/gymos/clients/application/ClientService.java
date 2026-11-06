@@ -1,6 +1,7 @@
 package com.gymos.clients.application;
 
 import com.gymos.audit.api.AuditService;
+import com.gymos.clients.api.operations.ClientBranchAccess;
 import com.gymos.clients.api.operations.ClientLookupOperations;
 import com.gymos.clients.api.events.ClientAccessStatusChangedV1;
 import com.gymos.clients.api.operations.ClientVerificationResult;
@@ -31,7 +32,7 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class ClientService implements ClientLookupOperations {
+public class ClientService implements ClientLookupOperations, ClientBranchAccess {
 	private final ClientRepository clientRepository;
 	private final ClientCommandRepository commandRepository;
 	private final AuditService auditService;
@@ -97,12 +98,30 @@ public class ClientService implements ClientLookupOperations {
 	}
 
 	@Transactional(readOnly = true)
-	public ClientDetailResult detail(GymOsPrincipal principal, UUID clientId) {
+	@Override
+	public void requireVisible(GymOsPrincipal principal, UUID clientId) {
+		visibleClient(principal, clientId);
+	}
+
+	@Transactional(readOnly = true)
+	@Override
+	public boolean hasVisibleEmail(GymOsPrincipal principal, String email) {
 		requirePrincipal(principal);
 		requireBranch(principal);
-		ClientDetail client = clientRepository.findDetail(principal.organizationId(), principal.branchId(), clientId)
+		return clientRepository.hasVisibleEmail(principal.organizationId(), principal.branchId(), email);
+	}
+
+	private ClientDetail visibleClient(GymOsPrincipal principal, UUID clientId) {
+		requirePrincipal(principal);
+		requireBranch(principal);
+		return clientRepository.findDetail(principal.organizationId(), principal.branchId(), clientId)
 				.orElseThrow(() -> new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible."));
-		List<ClientTimelineEntry> timeline = clientRepository.timeline(principal.organizationId(), clientId);
+	}
+
+	@Transactional(readOnly = true)
+	public ClientDetailResult detail(GymOsPrincipal principal, UUID clientId) {
+		ClientDetail client = visibleClient(principal, clientId);
+		List<ClientTimelineEntry> timeline = clientRepository.timeline(principal.organizationId(), principal.branchId(), clientId);
 		return new ClientDetailResult(client, timeline);
 	}
 
@@ -113,10 +132,7 @@ public class ClientService implements ClientLookupOperations {
 			UpdateClientCommand request,
 			String correlationId
 	) {
-		requirePrincipal(principal);
-		requireBranch(principal);
-		ClientDetail existing = clientRepository.findDetail(principal.organizationId(), principal.branchId(), clientId)
-				.orElseThrow(() -> new BusinessException("CLIENT_NOT_FOUND", "El cliente no existe o no esta disponible."));
+		ClientDetail existing = visibleClient(principal, clientId);
 		requireBirthDate(request.birthDate());
 		String email = blankToNull(request.email());
 		String phone = blankToNull(request.phone());

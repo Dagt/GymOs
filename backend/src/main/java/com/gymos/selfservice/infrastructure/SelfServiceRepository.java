@@ -74,7 +74,7 @@ public class SelfServiceRepository {
 				.optional();
 	}
 
-	public List<BranchKioskConfigurationRecord> branchConfigurations(UUID organizationId) {
+	public List<BranchKioskConfigurationRecord> branchConfigurations(UUID organizationId, UUID actorUserId, boolean support) {
 		return jdbcClient.sql("""
 				SELECT branch.id AS branch_id, branch.name AS branch_name,
 				       COALESCE(terminal.status, 'NOT_CONFIGURED') AS status,
@@ -95,9 +95,13 @@ public class SelfServiceRepository {
 				WHERE branch.organization_id = :organizationId
 				  AND branch.status = 'ACTIVE'
 				  AND branch.deleted_at IS NULL
+				  AND (:support OR EXISTS (SELECT 1 FROM user_branch_access uba
+				                       WHERE uba.user_id = :actorUserId AND uba.branch_id = branch.id))
 				ORDER BY branch.name, branch.id
 				""")
 				.param("organizationId", organizationId)
+				.param("actorUserId", actorUserId)
+				.param("support", support)
 				.query((rs, row) -> new BranchKioskConfigurationRecord(
 						rs.getObject("branch_id", UUID.class), rs.getString("branch_name"),
 						rs.getString("status"), rs.getString("allowed_actions_json"),
@@ -107,7 +111,7 @@ public class SelfServiceRepository {
 	}
 
 	public boolean configureBranch(
-			UUID organizationId, UUID branchId, UUID actorUserId, BranchKioskConfigurationData data
+			UUID organizationId, UUID branchId, UUID actorUserId, boolean support, BranchKioskConfigurationData data
 	) {
 		OffsetDateTime now = OffsetDateTime.now();
 		return jdbcClient.sql("""
@@ -131,6 +135,8 @@ public class SelfServiceRepository {
 				FROM branch
 				WHERE id = :branchId AND organization_id = :organizationId
 				  AND status = 'ACTIVE' AND deleted_at IS NULL
+				  AND (:support OR EXISTS (SELECT 1 FROM user_branch_access uba
+				                       WHERE uba.user_id = :actorUserId AND uba.branch_id = branch.id))
 				ON CONFLICT (organization_id, branch_id, device_code)
 				    WHERE deleted_at IS NULL
 				DO UPDATE SET
@@ -143,6 +149,7 @@ public class SelfServiceRepository {
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
 				.param("actorUserId", actorUserId)
+				.param("support", support)
 				.param("clientRegistration", data.clientRegistration())
 				.param("membershipEnrollment", data.membershipEnrollment())
 				.param("visitPackagePurchase", data.visitPackagePurchase())
@@ -187,9 +194,13 @@ public class SelfServiceRepository {
 				       s.launched_by_user_id,
 				       t.allowed_actions_json::text AS allowed_actions_json
 				FROM self_service_session s
+				JOIN organization o ON o.id = s.organization_id AND o.status = 'ACTIVE' AND o.deleted_at IS NULL
+				JOIN branch b ON b.id = s.branch_id AND b.organization_id = s.organization_id
+				 AND b.status = 'ACTIVE' AND b.deleted_at IS NULL
 				JOIN self_service_terminal t
 				  ON t.id = s.terminal_id
 				 AND t.organization_id = s.organization_id
+				 AND t.branch_id = s.branch_id
 				 AND t.status = 'ACTIVE'
 				 AND t.deleted_at IS NULL
 				WHERE s.id = :sessionId

@@ -1,6 +1,5 @@
 package com.gymos.sales.application;
 
-import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.sales.infrastructure.SalesRepository;
 import com.gymos.sales.model.PaymentDetail;
@@ -17,21 +16,14 @@ class SalesLookupService {
 	}
 
 	SaleHeader saleForBranch(GymOsPrincipal principal, UUID saleId) {
-		SaleHeader sale = salesRepository.saleHeader(principal.organizationId(), saleId)
-				.orElseThrow(() -> new BusinessException("SALE_NOT_FOUND", "La venta no existe o no esta disponible."));
-		if (!sale.branchId().equals(principal.branchId())) {
-			throw new BusinessException("SALE_BRANCH_MISMATCH", "La venta pertenece a otra sucursal.");
-		}
-		return sale;
+		return SalesRecordResolver.requireSaleForBranch(salesRepository, principal, saleId);
 	}
 
 	PaymentDetail payment(GymOsPrincipal principal, UUID paymentId) {
-		return salesRepository.payment(principal.organizationId(), paymentId)
-				.orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "El pago no existe o no esta disponible."));
+		return SalesRecordResolver.requirePayment(salesRepository, principal.organizationId(), paymentId);
 	}
 
-	UUID saleIdForPayment(GymOsPrincipal principal, UUID paymentId) {
-		return salesRepository.saleIdForPayment(principal.organizationId(), paymentId)
-				.orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "El pago no existe o no esta disponible."));
+	SaleHeader saleForPayment(GymOsPrincipal principal, UUID paymentId) {
+		return SalesRecordResolver.requirePaymentSaleForBranch(salesRepository, principal, paymentId);
 	}
 }

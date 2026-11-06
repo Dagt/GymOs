@@ -1,5 +1,7 @@
 # Organizaciones y sucursales
 
+La sesión firmada se revalida contra la organización, la sede y las asignaciones activas. Gerencia consulta el equipo de su sede y necesita alcance sobre todas las sucursales afectadas para cambiar el rol o estado de una cuenta o recuperar su acceso. El directorio por UUID de organización se limita a plataforma y a soporte del tenant con permiso `branch.read`. [Matriz de autorización por operación](../../docs/security/endpoint-permissions.md).
+
 Estado: `FUNCIONAL`
 Última revisión: 26 de agosto de 2026
 Código: `backend/.../organizations`, `/platform/gymnasiums`, `/settings/organization`, `/users`

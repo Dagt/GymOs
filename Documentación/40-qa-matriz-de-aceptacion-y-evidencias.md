@@ -12,6 +12,8 @@
 - **Operación:** staging, backing object storage, restore ensayado, alertas y recuperación; anotar RPO/RTO medidos.
 
 ## 2. Matriz de regresión mínima
+
+Las regresiones de #29 se agregan a `TenantIsolationPostgresIntegrationTests` y `operational-hardening.spec.ts`. La [matriz de aislamiento](../docs/security/multi-tenant-verification.md) indica qué flujos se prueban por HTTP/PostgreSQL, cuáles usan API interceptada en Playwright y cuáles se verificaron por inspección.
 | ID | Recorrido o fallo inducido | Evidencia requerida | Issue |
 |---|---|---|---|
 | QA-SEC-01 | Tenant A solicita por UUID recurso de B | Denegación y cero lectura/escritura cross-tenant HTTP/PG | #29 |

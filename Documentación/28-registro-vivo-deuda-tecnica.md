@@ -15,11 +15,11 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 
 | ID | Pri. | Módulo | Estado | Hallazgo e impacto | Criterio de cierre |
 |---|---|---|---|---|---|
-| GEN-001 | P0 | General/seguridad | ABIERTA | La autorización no aplica uniformemente propiedad, sucursal y organización. | Matriz automatizada positiva/negativa para módulos sensibles. |
+| GEN-001 | P0 | General/seguridad | EN_CURSO | #29 comprueba los matchers de los 298 endpoints y amplía las regresiones HTTP/PostgreSQL de operaciones críticas. La cobertura de proveedores y almacenamiento en staging se sigue en #34 y #43. | Verificar la [matriz de aislamiento](../docs/security/multi-tenant-verification.md) y los checks del SHA del PR #66. |
 | AUTH-001 | P0 | Identidad | ABIERTA | El refresh token requiere revisar almacenamiento y exposición en cliente. | Mecanismo seguro, rotación y pruebas de reutilización. |
 | GEN-002 | P1 | General/arquitectura | ABIERTA | Algunos módulos carecen de puertos de aplicación consistentes. | Fronteras documentadas y verificadas por pruebas de arquitectura. |
 | GEN-004 | P1 | General/calidad | ABIERTA | No existe suite E2E homogénea de recorridos críticos. | E2E en CI para autenticación, venta, membresía, reserva, inventario y rutina. |
-| ORG-001 | P1 | Organizaciones | ABIERTA | Cobertura incompleta de UUID ajeno, sucursales y CRUD de equipo. | Pruebas positivas/negativas por rol, tenant y sucursal. |
+| ORG-001 | P1 | Organizaciones | EN_CURSO | #29 protege cuentas multisede, revalida la sucursal del JWT y verifica autoridades y roles asignables contra el tenant. La suite HTTP/PostgreSQL cubre roles ajenos, cambios de sede, edición de sucursales y soporte temporal. | Revisar evidencia y estado del PR #66. |
 | CFG-001 | P2 | Configuración | ABIERTA | Marca/logotipo no tiene ciclo completo de archivo y limpieza. | Carga, reemplazo, fallback, eliminación y pruebas. |
 | CFG-003 | P1 | Configuración/multibranding | ABIERTA | Un tenant puede operar sucursales con marcas distintas, pero el modelo vigente sólo resuelve nombre, logo, colores y correo desde `organization`. | Perfil de marca por sucursal con fallback organizacional; resolución consistente en consola, recepción, kiosco, correo, recibos y PDFs; pruebas al cambiar de sucursal. |
 | ONB-001 | P1 | Onboarding | ABIERTA | Falta demostrar idempotencia y recuperación de altas parciales. | Pruebas transaccionales y reintento seguro. |

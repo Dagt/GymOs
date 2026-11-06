@@ -25,15 +25,8 @@ public class SalesProviderPaymentService {
 			UUID paymentId
 	) {
 		SalesAccessGuard.requireBranch(principal);
-		var payment = salesRepository.payment(principal.organizationId(), paymentId)
-				.orElseThrow(() -> new BusinessException("PAYMENT_NOT_FOUND", "El pago no existe o no esta disponible."));
-		UUID saleId = salesRepository.saleIdForPayment(principal.organizationId(), paymentId)
-				.orElseThrow(() -> new BusinessException("SALE_NOT_FOUND", "La venta del pago no existe."));
-		var sale = salesRepository.saleHeader(principal.organizationId(), saleId)
-				.orElseThrow(() -> new BusinessException("SALE_NOT_FOUND", "La venta no existe o no esta disponible."));
-		if (!principal.branchId().equals(sale.branchId())) {
-			throw new BusinessException("SALE_BRANCH_MISMATCH", "La venta pertenece a otra sucursal.");
-		}
+		var sale = SalesRecordResolver.requirePaymentSaleForBranch(salesRepository, principal, paymentId);
+		var payment = SalesRecordResolver.requirePayment(salesRepository, principal.organizationId(), paymentId);
 		if (!"CARD_MERCADO_PAGO".equals(payment.method())) {
 			throw new BusinessException("MERCADO_PAGO_PAYMENT_METHOD_REQUIRED", "El pago no fue registrado como Mercado Pago Point.");
 		}
@@ -44,7 +37,7 @@ public class SalesProviderPaymentService {
 			throw new BusinessException("PAYMENT_ALREADY_REJECTED", "El pago ya fue rechazado.");
 		}
 		return mercadoPagoPointOperations.createOrder(new MercadoPagoPointOperations.CreatePointOrderCommand(
-				principal.organizationId(), sale.branchId(), saleId, paymentId, sale.clientId(),
+				principal.organizationId(), sale.branchId(), sale.id(), paymentId, sale.clientId(),
 				payment.amountCents(), payment.currency(), "mp-point:" + paymentId
 		));
 	}

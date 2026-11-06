@@ -36,7 +36,7 @@ public class BenefitService {
 	@Transactional(readOnly = true)
 	public List<BenefitSummary> benefits(GymOsPrincipal principal) {
 		requirePrincipal(principal);
-		return benefitRepository.benefitsForBranch(principal.organizationId(), principal.branchId());
+		return benefitRepository.benefitsForBranch(principal.organizationId(), requireSelectedBranch(principal, null));
 	}
 
 	@Transactional(readOnly = true)
@@ -60,10 +60,7 @@ public class BenefitService {
 	@Transactional
 	public BenefitSummary createBenefit(GymOsPrincipal principal, CreateBenefitCommand command, String correlationId) {
 		requirePrincipal(principal);
-		UUID benefitBranchId = command.branchId() == null ? principal.branchId() : command.branchId();
-		if (benefitBranchId == null) {
-			throw new BusinessException("BRANCH_REQUIRED", "Selecciona una sucursal para crear el beneficio.");
-		}
+		UUID benefitBranchId = requireSelectedBranch(principal, command.branchId());
 		validatePlanLinks(principal, command, benefitBranchId);
 		if (benefitRepository.codeExists(principal.organizationId(), benefitBranchId, command.code())) {
 			throw new BusinessException("BENEFIT_ALREADY_EXISTS", "Ya existe un beneficio con ese codigo.");
@@ -143,11 +140,10 @@ public class BenefitService {
 		if (!principal.permissions().contains("benefit.manage")) {
 			throw new org.springframework.security.access.AccessDeniedException("benefit.manage required");
 		}
+		UUID branchId = requireSelectedBranch(principal, null);
 		BenefitSummary current = benefitRepository.benefit(principal.organizationId(), benefitId)
+				.filter(benefit -> benefit.branchId() == null || benefit.branchId().equals(branchId))
 				.orElseThrow(() -> new BusinessException("BENEFIT_NOT_FOUND", "El beneficio no está disponible."));
-		if (principal.branchId() == null || (current.branchId() != null && !current.branchId().equals(principal.branchId()))) {
-			throw new BusinessException("BENEFIT_BRANCH_MISMATCH", "Selecciona la sucursal del beneficio para editarlo.");
-		}
 		CreateBenefitCommand definition = new CreateBenefitCommand(
 				current.branchId(), current.code(), command.name(), current.benefitType(), command.discountType(),
 				command.discountValueCents(), command.discountPercent(), command.requiresEvidence(), command.combinable(),
@@ -206,21 +202,18 @@ public class BenefitService {
 			String correlationId
 	) {
 		requirePrincipal(principal);
+		UUID assignmentBranchId = requireSelectedBranch(principal, command.branchId());
 		if (!benefitRepository.clientExists(principal.organizationId(), command.clientId())) {
 			throw new BusinessException("CLIENT_NOT_FOUND", "El cliente no esta disponible.");
 		}
 		BenefitSummary benefit = benefitRepository.benefit(principal.organizationId(), command.benefitId())
+				.filter(candidate -> candidate.branchId() == null || candidate.branchId().equals(assignmentBranchId))
 				.orElseThrow(() -> new BusinessException("BENEFIT_NOT_FOUND", "El beneficio no esta disponible."));
 		if (!"ACTIVE".equals(benefit.status())) {
 			throw new BusinessException("BENEFIT_NOT_ELIGIBLE", "El beneficio no esta activo.");
 		}
-		UUID assignmentBranchId = command.branchId() == null ? principal.branchId() : command.branchId();
-		if (assignmentBranchId == null
-				|| !benefitRepository.branchExists(principal.organizationId(), assignmentBranchId)) {
+		if (!benefitRepository.branchExists(principal.organizationId(), assignmentBranchId)) {
 			throw new BusinessException("BRANCH_NOT_AVAILABLE", "La sucursal de la asignacion no pertenece a la organizacion.");
-		}
-		if (benefit.branchId() != null && !benefit.branchId().equals(assignmentBranchId)) {
-			throw new BusinessException("BENEFIT_BRANCH_MISMATCH", "El beneficio no esta disponible en la sucursal seleccionada.");
 		}
 		if ("ACCESS".equalsIgnoreCase(benefit.benefitType())) {
 			throw new BusinessException(
@@ -264,6 +257,17 @@ public class BenefitService {
 		if (principal == null) {
 			throw new BusinessException("AUTHENTICATION_REQUIRED", "Debes iniciar sesion para continuar.");
 		}
+	}
+
+	private UUID requireSelectedBranch(GymOsPrincipal principal, UUID requestedBranchId) {
+		UUID branchId = principal.branchId();
+		if (branchId == null) {
+			throw new BusinessException("BRANCH_REQUIRED", "Selecciona una sucursal.");
+		}
+		if (requestedBranchId != null && !requestedBranchId.equals(branchId)) {
+			throw new org.springframework.security.access.AccessDeniedException("Benefit operation requires the selected branch");
+		}
+		return branchId;
 	}
 
 	private boolean positive(Number value) {

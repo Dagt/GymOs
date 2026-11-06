@@ -6,6 +6,7 @@ import com.gymos.benefits.application.command.CreateBenefitCommand;
 import com.gymos.benefits.application.command.UpdateBenefitCommand;
 import com.gymos.benefits.infrastructure.BenefitRepository.BenefitSummary;
 import com.gymos.benefits.infrastructure.BenefitRepository.ClientBenefitSummary;
+import com.gymos.clients.api.operations.ClientBranchAccess;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
@@ -32,9 +33,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1")
 public class BenefitController {
 	private final BenefitService benefitService;
+	private final ClientBranchAccess clients;
 
-	public BenefitController(BenefitService benefitService) {
+	public BenefitController(BenefitService benefitService, ClientBranchAccess clients) {
 		this.benefitService = benefitService;
+		this.clients = clients;
 	}
 
 	@GetMapping("/benefits")
@@ -52,6 +55,7 @@ public class BenefitController {
 			@AuthenticationPrincipal GymOsPrincipal principal,
 			@PathVariable UUID clientId
 	) {
+		clients.requireVisible(principal, clientId);
 		return benefitService.clientBenefits(principal, clientId);
 	}
 
@@ -71,6 +75,7 @@ public class BenefitController {
 			@Valid @RequestBody AssignClientBenefitRequest request,
 			HttpServletRequest servletRequest
 	) {
+		clients.requireVisible(principal, clientId);
 		return benefitService.assignToClient(principal, request.toCommand(clientId), correlationId(servletRequest));
 	}
 

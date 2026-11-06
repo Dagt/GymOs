@@ -1,5 +1,6 @@
 package com.gymos.memberships.api;
 
+import com.gymos.clients.api.operations.ClientBranchAccess;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.memberships.application.command.ChangeMembershipPlanCommand;
@@ -33,15 +34,18 @@ public class MembershipController {
 	private final MembershipService membershipService;
 	private final MembershipPricingService pricingService;
 	private final com.gymos.memberships.application.MembershipEnrollmentService enrollmentService;
+	private final ClientBranchAccess clients;
 
 	public MembershipController(
 			MembershipService membershipService,
 			MembershipPricingService pricingService,
-			com.gymos.memberships.application.MembershipEnrollmentService enrollmentService
+			com.gymos.memberships.application.MembershipEnrollmentService enrollmentService,
+			ClientBranchAccess clients
 	) {
 		this.membershipService = membershipService;
 		this.pricingService = pricingService;
 		this.enrollmentService = enrollmentService;
+		this.clients = clients;
 	}
 
 	@PostMapping("/membership-quotes")
@@ -49,6 +53,7 @@ public class MembershipController {
 			@AuthenticationPrincipal GymOsPrincipal principal,
 			@Valid @RequestBody MembershipQuoteRequest request
 	) {
+		clients.requireVisible(principal, request.clientId());
 		return pricingService.quote(principal, request.clientId(), request.planId());
 	}
 
@@ -58,6 +63,7 @@ public class MembershipController {
 			@Valid @RequestBody MembershipEnrollmentRequest request,
 			HttpServletRequest servletRequest
 	) {
+		clients.requireVisible(principal, request.clientId());
 		return toResponse(enrollmentService.enroll(
 				principal, request.toCommand(), correlationId(servletRequest)));
 	}
@@ -67,6 +73,7 @@ public class MembershipController {
 			@AuthenticationPrincipal GymOsPrincipal principal,
 			@PathVariable UUID clientId
 	) {
+		clients.requireVisible(principal, clientId);
 		return membershipService.forClient(principal, clientId);
 	}
 

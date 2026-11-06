@@ -204,6 +204,8 @@ class SelfServiceKioskConfigurationIntegrationTests {
 				.param("personId", personId)
 				.param("username", "operator-" + userId)
 				.update();
+		jdbc.sql("INSERT INTO user_branch_access(user_id, branch_id, access_scope) VALUES (:user, :branch, 'BRANCH')")
+				.param("user", userId).param("branch", branchId).update();
 	}
 
 	private PaymentConfigurationView pendingStripe() {

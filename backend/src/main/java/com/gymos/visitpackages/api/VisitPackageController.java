@@ -1,5 +1,6 @@
 package com.gymos.visitpackages.api;
 
+import com.gymos.clients.api.operations.ClientBranchAccess;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.visitpackages.api.operations.VisitPackageOperations;
@@ -26,9 +27,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1")
 public class VisitPackageController {
 	private final VisitPackageOperations operations;
+	private final ClientBranchAccess clients;
 
-	public VisitPackageController(VisitPackageOperations operations) {
+	public VisitPackageController(VisitPackageOperations operations, ClientBranchAccess clients) {
 		this.operations = operations;
+		this.clients = clients;
 	}
 
 	@PostMapping("/visit-packages/quotes")
@@ -36,6 +39,7 @@ public class VisitPackageController {
 			@AuthenticationPrincipal GymOsPrincipal principal,
 			@Valid @RequestBody VisitPackageQuoteRequest request
 	) {
+		clients.requireVisible(principal, request.clientId());
 		return operations.quote(principal, request.clientId(), request.packagePlanId());
 	}
 
@@ -45,6 +49,7 @@ public class VisitPackageController {
 			@Valid @RequestBody VisitPackagePurchaseRequest request,
 			HttpServletRequest servletRequest
 	) {
+		clients.requireVisible(principal, request.clientId());
 		return operations.purchase(principal, request.toCommand(), correlationId(servletRequest));
 	}
 
@@ -53,6 +58,7 @@ public class VisitPackageController {
 			@AuthenticationPrincipal GymOsPrincipal principal,
 			@PathVariable UUID clientId
 	) {
+		clients.requireVisible(principal, clientId);
 		return operations.current(principal, clientId).orElse(null);
 	}
 
@@ -61,6 +67,7 @@ public class VisitPackageController {
 			@AuthenticationPrincipal GymOsPrincipal principal,
 			@PathVariable UUID clientId
 	) {
+		clients.requireVisible(principal, clientId);
 		return operations.history(principal, clientId, 20);
 	}
 

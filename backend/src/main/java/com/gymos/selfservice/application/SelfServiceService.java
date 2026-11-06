@@ -743,9 +743,9 @@ public class SelfServiceService {
 	}
 
 	private SessionRecord kioskBrowserSession(UUID sessionId, String sessionToken) {
-		SessionRecord session = repository.session(sessionId).orElseThrow(() -> new BusinessException("SELF_SERVICE_SESSION_NOT_FOUND", "La sesion no existe."));
+		SessionRecord session = repository.session(sessionId).orElseThrow(this::invalidKioskSession);
 		if (session.sessionTokenHash() == null || sessionToken == null || !MessageDigest.isEqual(session.sessionTokenHash().getBytes(StandardCharsets.UTF_8), tokenHash(sessionToken).getBytes(StandardCharsets.UTF_8))) {
-			throw new BusinessException("SELF_SERVICE_SESSION_INVALID", "La sesion del kiosco no es valida.");
+			throw invalidKioskSession();
 		}
 		if (!"ACTIVE".equals(session.status())) {
 			throw new BusinessException("SELF_SERVICE_SESSION_ENDED", "El modo kiosco ya no esta activo.");
@@ -754,6 +754,10 @@ public class SelfServiceService {
 			throw new BusinessException("SELF_SERVICE_BROWSER_MODE_EXPIRED", "El modo kiosco debe ser abierto nuevamente por recepcion.");
 		}
 		return session;
+	}
+
+	private BusinessException invalidKioskSession() {
+		return new BusinessException("SELF_SERVICE_SESSION_INVALID", "La sesion del kiosco no es valida.");
 	}
 
 	private void ensureNotBlocked(SessionRecord session) {

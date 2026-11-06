@@ -233,7 +233,7 @@ class CoachingServiceSecurityTests {
 		assertThat(updated.branches()).extracting(branch -> branch.id())
 				.containsExactly(secondBranchId);
 		verify(repository).updateCoachProfileDetails(
-				eq(organizationId), eq(coachUserId), eq("[\"Fuerza\",\"Movilidad\"]"),
+				eq(organizationId), eq(coachUserId), eq(managedBranches), eq("[\"Fuerza\",\"Movilidad\"]"),
 				eq("Trabajo funcional"), eq(userId), any()
 		);
 		verify(repository).upsertCoachBranchProfile(

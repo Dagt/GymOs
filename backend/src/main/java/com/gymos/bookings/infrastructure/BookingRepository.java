@@ -123,34 +123,21 @@ public class BookingRepository {
 				.update();
 	}
 
-	public boolean saleExists(UUID organizationId, UUID branchId, UUID saleId) {
-		Integer count = jdbcClient.sql("""
-				SELECT COUNT(*)
-				FROM sale
-				WHERE organization_id = :organizationId
-				  AND branch_id = :branchId
-				  AND id = :saleId
-				  AND deleted_at IS NULL
-				""")
-				.param("organizationId", organizationId)
-				.param("branchId", branchId)
-				.param("saleId", saleId)
-				.query(Integer.class)
-				.single();
-		return count > 0;
-	}
-
-	public void upsertBookingPayment(UUID organizationId, UUID branchId, UUID bookingId, UUID saleId, String status, OffsetDateTime expiresAt) {
+	public boolean upsertBookingPayment(UUID organizationId, UUID branchId, UUID bookingId, UUID saleId, String status, OffsetDateTime expiresAt) {
 		OffsetDateTime now = OffsetDateTime.now();
-		jdbcClient.sql("""
+		return jdbcClient.sql("""
 				INSERT INTO booking_payment (
 				    id, organization_id, branch_id, booking_id, sale_id, status, expires_at, created_at, updated_at, version
 				)
-				VALUES (
-				    :id, :organizationId, :branchId, :bookingId, :saleId, :status, :expiresAt, :createdAt, :updatedAt, 0
-				)
+				SELECT :id, b.organization_id, b.branch_id, b.id, s.id, :status, :expiresAt, :createdAt, :updatedAt, 0
+				FROM booking b
+				JOIN sale s ON s.organization_id = b.organization_id AND s.branch_id = b.branch_id
+				 AND s.client_id = b.client_id AND s.id = :saleId AND s.deleted_at IS NULL
+				WHERE b.organization_id = :organizationId AND b.branch_id = :branchId
+				  AND b.id = :bookingId AND b.deleted_at IS NULL
 				ON CONFLICT (organization_id, booking_id)
 				DO UPDATE SET
+				    branch_id = EXCLUDED.branch_id,
 				    sale_id = EXCLUDED.sale_id,
 				    status = EXCLUDED.status,
 				    expires_at = EXCLUDED.expires_at,
@@ -166,7 +153,7 @@ public class BookingRepository {
 				.param("expiresAt", expiresAt)
 				.param("createdAt", now)
 				.param("updatedAt", now)
-				.update();
+				.update() == 1;
 	}
 
 	private String bookingSelect() {
@@ -176,11 +163,14 @@ public class BookingRepository {
 				       b.status, b.starts_at, b.ends_at, b.notes,
 				       bp.id AS booking_payment_id, bp.sale_id, bp.status AS payment_status, s.sale_number
 				FROM booking b
-				JOIN resource r ON r.id = b.resource_id
-				JOIN client c ON c.id = b.client_id
-				JOIN person p ON p.id = c.person_id
-				LEFT JOIN booking_payment bp ON bp.booking_id = b.id AND bp.organization_id = b.organization_id
-				LEFT JOIN sale s ON s.id = bp.sale_id
+				JOIN resource r ON r.id = b.resource_id AND r.organization_id = b.organization_id AND r.branch_id = b.branch_id
+				JOIN client c ON c.id = b.client_id AND c.organization_id = b.organization_id
+				JOIN person p ON p.id = c.person_id AND p.organization_id = b.organization_id
+				LEFT JOIN (booking_payment bp
+				    JOIN sale s ON s.id = bp.sale_id AND s.organization_id = bp.organization_id
+				     AND s.branch_id = bp.branch_id AND s.deleted_at IS NULL)
+				  ON bp.booking_id = b.id AND bp.organization_id = b.organization_id AND bp.branch_id = b.branch_id
+				  AND s.client_id = b.client_id
 				""";
 	}
 
