@@ -21,6 +21,12 @@ import org.springframework.http.converter.HttpMessageNotReadableException;
 public class GlobalExceptionHandler {
 	private static final Logger LOGGER = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+	@ExceptionHandler(ApiConflictException.class)
+	ResponseEntity<ApiError> handleConflict(ApiConflictException exception, HttpServletRequest request) {
+		return ResponseEntity.status(HttpStatus.CONFLICT)
+				.body(ApiError.of(exception.code(), exception.getMessage(), Map.of(), correlationId(request)));
+	}
+
 	@ExceptionHandler(BusinessException.class)
 	ResponseEntity<ApiError> handleBusiness(BusinessException exception, HttpServletRequest request) {
 		return ResponseEntity.badRequest()

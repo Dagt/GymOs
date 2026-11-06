@@ -1,3 +1,4 @@
+import { mockStaffSession } from "./session-fixtures";
 import { expect, test, type Page } from "@playwright/test";
 
 const organizationId = "11111111-1111-4111-8111-111111111111";
@@ -88,11 +89,7 @@ async function bootAsManager(page: Page) {
     surfaceColor: "#F4F7FB",
   };
 
-  await page.addInitScript(({ currentUser }) => {
-    window.localStorage.setItem("gymos.accessToken", "e2e-access-token");
-    window.localStorage.setItem("gymos.refreshToken", "e2e-refresh-token");
-    window.localStorage.setItem("gymos.currentUser", JSON.stringify(currentUser));
-  }, { currentUser: user });
+  await mockStaffSession(page, "e2e-access-token", user);
 }
 
 function responseFor(path: string, url: URL) {

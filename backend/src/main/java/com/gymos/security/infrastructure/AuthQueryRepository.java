@@ -2,9 +2,9 @@ package com.gymos.security.infrastructure;
 
 import com.gymos.common.security.AccountScope;
 import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.common.security.UserAuthorities;
 import java.time.Instant;
 import java.util.List;
-import java.util.LinkedHashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -13,12 +13,6 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class AuthQueryRepository {
-	private static final String SCOPED_ROLES = """
-			FROM user_role ur
-			JOIN user_account u ON u.id = ur.user_id
-			JOIN role r ON r.id = ur.role_id AND r.account_scope = u.account_scope AND r.deleted_at IS NULL
-			 AND (r.organization_id = u.organization_id OR (r.organization_id IS NULL AND r.system_role))
-			""";
 	private final JdbcClient jdbcClient;
 
 	public AuthQueryRepository(JdbcClient jdbcClient) {
@@ -196,45 +190,16 @@ public class AuthQueryRepository {
 	private List<AuthenticatedUser> findUsers(String sql, String parameterName, Object parameterValue) {
 		return jdbcClient.sql(sql)
 				.param(parameterName, parameterValue)
-				.query((resultSet, rowNumber) -> new AuthenticatedUser(
-						resultSet.getObject("id", UUID.class),
-						AccountScope.valueOf(resultSet.getString("account_scope")),
-						resultSet.getObject("organization_id", UUID.class),
-						resultSet.getString("username"),
-						resultSet.getString("password_hash"),
-						resultSet.getString("full_name"),
-						findPermissions(resultSet.getObject("id", UUID.class)),
-						findRoles(resultSet.getObject("id", UUID.class)),
-						resultSet.getLong("credential_version")
-				))
+				.query((resultSet, rowNumber) -> {
+					UUID userId = resultSet.getObject("id", UUID.class);
+					UserAuthorities authorities = UserAuthorities.load(jdbcClient, userId);
+					return new AuthenticatedUser(
+							userId, AccountScope.valueOf(resultSet.getString("account_scope")),
+							resultSet.getObject("organization_id", UUID.class), resultSet.getString("username"),
+							resultSet.getString("password_hash"), resultSet.getString("full_name"),
+							authorities.permissions(), authorities.roles(), resultSet.getLong("credential_version"));
+				})
 				.list();
-	}
-
-	private Set<String> findPermissions(UUID userId) {
-		return new LinkedHashSet<>(jdbcClient.sql("""
-				SELECT DISTINCT p.code
-				""" + SCOPED_ROLES + """
-				JOIN role_permission rp ON rp.role_id = r.id
-				JOIN permission p ON p.id = rp.permission_id AND p.deleted_at IS NULL
-				WHERE ur.user_id = :userId
-				  AND (u.account_scope = 'PLATFORM' OR p.code NOT LIKE 'platform.%')
-				ORDER BY p.code
-				""")
-				.param("userId", userId)
-				.query(String.class)
-				.list());
-	}
-
-	private Set<String> findRoles(UUID userId) {
-		return new LinkedHashSet<>(jdbcClient.sql("""
-				SELECT DISTINCT r.name
-				""" + SCOPED_ROLES + """
-				WHERE ur.user_id = :userId
-				ORDER BY r.name
-				""")
-				.param("userId", userId)
-				.query(String.class)
-				.list());
 	}
 
 	public record AuthenticatedUser(

@@ -1,7 +1,6 @@
 # Identidad y seguridad
 
-Estado: `ESTABILIZADO PARA PRODUCCIÓN PILOTO`
-Última revisión: 25 de agosto de 2026
+Estado: `AUTH-001 IMPLEMENTADO EN RAMA / ACEPTACIÓN OPERATIVA PENDIENTE`
 
 ## Implementado
 
@@ -9,16 +8,19 @@ Estado: `ESTABILIZADO PARA PRODUCCIÓN PILOTO`
   pertenece a organización/sucursal y una cuenta tenant exige organización;
 - V86 aplica estas invariantes también en PostgreSQL para `person`,
   `user_account`, roles, asignaciones de rol y accesos persistentes a sucursal;
-- login global por `user_account.username`, JWT con `scope` obligatorio y
-  refresh v2 que vuelve a validar estado, ámbito y contexto antes de renovarse;
+- login global por `user_account.username`, JWT corto con familia revocable y
+  renovación v3 en cookie HttpOnly. El navegador mantiene el JWT en memoria y
+  conserva sólo un selector de cookie en almacenamiento de pestaña;
 - login, refresh, selección de sucursal y contexto de sesión;
 - roles y permisos aplicados en backend;
 - V78 limita estrictamente el lanzamiento de kiosco a Recepción y V77 separa
   administración de cuenta Stripe de su configuración operativa;
 - consolas y navegación condicionadas por rol;
-- rotación y gracia de refresh, suspensión y soporte de plataforma explícito;
-  entrar a un tenant exige motivo, genera auditoría, tiene expiración
-  configurable y salir revoca el refresh de soporte;
+- rotación atómica en Redis, reintento acotado, revocación por reutilización,
+  logout de la familia y revalidación de concesiones vigentes en PostgreSQL;
+- entrar a soporte exige motivo y genera auditoría. El cambio de sucursal
+  conserva su vencimiento. La salida explícita rota el contexto y la expiración
+  requiere volver a autenticarse;
 - bootstrap opcional e idempotente del primer administrador `PLATFORM` mediante
   variables de entorno y lock transaccional PostgreSQL; exige el permiso
   efectivo `platform.admin`, no confunde soporte con administración, no crea
@@ -78,7 +80,8 @@ Estado: `ESTABILIZADO PARA PRODUCCIÓN PILOTO`
 
 ## Pendiente
 
-- almacenamiento seguro del refresh token (`AUTH-001`);
+- verificar en staging el corte coordinado, rollback, cookies entre los orígenes
+  reales y operación de Redis. [Runbook de sesiones](../../docs/operations/staff-sessions.md);
 - autorización uniforme por propiedad/tenant/sucursal (`GEN-001`);
 - ampliar pruebas negativas por módulo y endurecer perfiles de documentación.
 

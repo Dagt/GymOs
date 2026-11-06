@@ -15,8 +15,21 @@ public record GymOsPrincipal(
 		Set<String> roles,
 		boolean supportMode,
 		Instant supportExpiresAt,
-		long credentialVersion
+		long credentialVersion,
+		SessionBinding session
 ) {
+	public GymOsPrincipal(UUID userId, AccountScope accountScope, UUID organizationId, UUID branchId,
+			String username, String fullName, Set<String> permissions, Set<String> roles,
+			boolean supportMode, Instant supportExpiresAt, long credentialVersion) {
+		this(userId, accountScope, organizationId, branchId, username, fullName, permissions, roles,
+				supportMode, supportExpiresAt, credentialVersion, null);
+	}
+
+	public GymOsPrincipal withSession(SessionBinding binding) {
+		return new GymOsPrincipal(userId, accountScope, organizationId, branchId, username, fullName,
+				permissions, roles, supportMode, supportExpiresAt, credentialVersion, binding);
+	}
+
 	public GymOsPrincipal(UUID userId, AccountScope accountScope, UUID organizationId, UUID branchId,
 			String username, String fullName, Set<String> permissions, Set<String> roles,
 			boolean supportMode, Instant supportExpiresAt) {

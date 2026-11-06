@@ -17,13 +17,18 @@ El [inventario de endpoints](../docs/security/endpoint-permissions.md) registra 
 
 ## 6.1 Auth
 
-- `POST /auth/login`
-- `POST /auth/refresh`
-- `POST /auth/logout`
-- `POST /auth/forgot-password`
-- `POST /auth/reset-password`
-- `GET /auth/me`
-- `POST /auth/select-branch`
+| Operación | Contrato de sesión |
+| --- | --- |
+| `POST /auth/login` | JSON `username`, `password`. Emite JWT y cookie de renovación. |
+| `POST /auth/refresh` | Cookie y UUID en `X-GymFort-Refresh-Request`, sin cuerpo. Rotación atómica. |
+| `POST /auth/logout` | Cookie, sin cuerpo. Revoca la familia incluso con JWT vencido y elimina la cookie con `204`. |
+| `GET /auth/me` | JWT Bearer con familia y contexto vigentes. |
+| `POST /auth/select-branch` | JWT, cookie y JSON `branchId`. Requiere `branch.read` y sede autorizada. |
+| `POST /auth/select-organization` | JWT de plataforma, cookie y JSON `organizationId`, `reason`. Crea contexto temporal de soporte. |
+| `POST /auth/exit-support` | JWT y cookie de soporte vigentes, sin cuerpo. Restaura plataforma y revoca el contexto anterior. |
+| `POST /auth/password-recovery/accept` | Token de recuperación de un uso y nueva contraseña. Invalida las sesiones anteriores. |
+
+Las operaciones POST de sesión requieren `Origin` exacto permitido y un UUID de pestaña en `X-GymFort-Session`. La respuesta de emisión devuelve `accessToken`, `tokenType`, `expiresIn` y `user`. El refresh sólo se entrega con `Set-Cookie` y la respuesta usa `Cache-Control: no-store`. Una credencial inválida devuelve `401 REFRESH_TOKEN_INVALID`. Una rotación concurrente con otro identificador o una revisión desactualizada devuelve `409 SESSION_CHANGED`. El reintento de renovación usa el mismo identificador durante la ventana de 30 segundos. Los cambios de sede y soporte rotan la cookie y dejan de aceptar JWT del contexto anterior.
 
 `CurrentUser` debe devolver el contexto visual efectivo de la sucursal activa:
 

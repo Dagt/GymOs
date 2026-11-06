@@ -140,7 +140,7 @@ Estados usados: `FUNCIONAL`, `ESTABILIZADO`, `PARCIAL` y `PLANIFICADO`. Ningún 
 | Módulo | Estado | Implementado | Pendiente principal |
 |---|---|---|---|
 | [Organizaciones](modulos/01-organizations.md) | FUNCIONAL | Plataforma, tenants, sucursales, equipo, soporte y marca organizacional persistente | Marca distinta por sucursal (`CFG-003`) y matriz negativa (`ORG-001`) |
-| [Identidad y seguridad](modulos/02-identity-security.md) | ESTABILIZADO PARA PRODUCCIÓN PILOTO | Ámbitos PLATFORM/TENANT, bootstrap, JWT/refresh v2, soporte temporal, invitación de dueño, recuperación de staff y revocación de sesiones | Endurecer almacenamiento cliente del refresh (`AUTH-001`) |
+| [Identidad y seguridad](modulos/02-identity-security.md) | AUTH-001 EN REVISIÓN | Ámbitos PLATFORM/TENANT, bootstrap, JWT corto, familia revocable en Redis, refresh HttpOnly, soporte temporal e invitación y recuperación | Aceptación operativa de sesiones, TLS, Redis y rollback en staging. |
 | [Configuración](modulos/03-configuration.md) | FUNCIONAL | Marca tenant, cobros, socios, kiosco con autosave y correo por permisos; UI unificada | Perfil de marca por sucursal (`CFG-003`) y ciclo de logo (`CFG-001`) |
 | [Onboarding](modulos/04-onboarding.md) | FUNCIONAL | Checklist, setup piloto idempotente e importación inicial | Recuperación probada de altas parciales (`ONB-001`) |
 | [Socios](modulos/05-clients.md) | FUNCIONAL | Alta, búsqueda, detalle, importación, inscripción, baja automática reversible y visibilidad multi-sucursal | PII, duplicados y pruebas CRUD (`CLI-001`) |

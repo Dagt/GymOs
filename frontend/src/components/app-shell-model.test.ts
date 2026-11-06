@@ -119,7 +119,6 @@ test("branchless tenant users only see setup-safe links", () => {
 test("platform shell uses neutral GymFort brand outside support mode", () => {
   const session: StoredSession = {
     accessToken: "token",
-    refreshToken: "refresh",
     user: user({
       brandName: "Tenant Brand",
 	  logoUrl: "/tenants/tenant/logo.png",
@@ -143,7 +142,6 @@ test("platform shell uses neutral GymFort brand outside support mode", () => {
 test("support mode uses tenant brand even for platform administrator", () => {
   const session: StoredSession = {
     accessToken: "token",
-    refreshToken: "refresh",
     user: user({
       brandName: "Tenant Brand",
 	  logoUrl: "/tenants/tenant/logo.png",

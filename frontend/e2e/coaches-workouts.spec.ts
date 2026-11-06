@@ -1,3 +1,4 @@
+import { mockStaffSession } from "./session-fixtures";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import { businessToday } from "../src/lib/business-date";
 
@@ -598,11 +599,7 @@ async function bootCoaching(
     if (override && await override(route, path, url)) return;
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(responseFor(path)) });
   });
-  await page.addInitScript(({ user }) => {
-    window.localStorage.setItem("gymos.accessToken", "coaching-e2e-access");
-    window.localStorage.setItem("gymos.refreshToken", "coaching-e2e-refresh");
-    window.localStorage.setItem("gymos.currentUser", JSON.stringify(user));
-  }, { user });
+  await mockStaffSession(page, "coaching-e2e-access", user);
 }
 
 function responseFor(path: string) {

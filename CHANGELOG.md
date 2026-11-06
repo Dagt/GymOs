@@ -12,6 +12,8 @@ nombre técnico interno durante la transición de marca.
 
 ## 0.7.0-pilot-readiness - Unreleased
 
+- AUTH-001 (#28) mueve el refresh a cookies HttpOnly y el JWT a memoria. Redis rota y revoca familias, y Spring revalida permisos y contexto antes de autorizar las operaciones.
+
 - GEN-001 y ORG-001 documentan los permisos por endpoint y refuerzan el aislamiento por tenant y sucursal en equipo, socios, ventas, beneficios, kiosco, bienestar e inventario. El backend revalida el contexto de los JWT y registra las mutaciones autorizadas con el contexto operativo.
 - La validación de #29 coteja las 298 operaciones con Spring y comprueba con PostgreSQL la pertenencia de roles, ventas asociadas a reservas, preferencias de socios, comprobantes históricos y respuestas ante UUIDs de venta o pago fuera de alcance.
 

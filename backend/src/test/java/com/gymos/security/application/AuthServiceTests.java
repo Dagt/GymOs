@@ -2,34 +2,27 @@ package com.gymos.security.application;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.security.AccountScope;
-import com.gymos.common.security.JwtService;
+import com.gymos.common.security.SessionRegistry;
 import com.gymos.security.infrastructure.AuthQueryRepository;
 import java.util.Set;
 import java.util.UUID;
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
-import org.springframework.data.redis.core.ValueOperations;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.security.authentication.AuthenticationManager;
 
 class AuthServiceTests {
 	@Test
 	void selectingBranchWithoutUserAccessIsDenied() {
-		AuthenticationManager authenticationManager = mock(AuthenticationManager.class);
-		AuthQueryRepository authQueryRepository = mock(AuthQueryRepository.class);
-		JwtService jwtService = mock(JwtService.class);
-		StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
-		AuditService auditService = mock(AuditService.class);
-		AuthService authService = new AuthService(authenticationManager, authQueryRepository, jwtService, redisTemplate, auditService);
+		var fixture = new AuthSessionTestFixture();
+		var authQueryRepository = fixture.users;
+		var authService = fixture.service;
+		var auditService = fixture.audit;
 
 		UUID userId = UUID.randomUUID();
 		UUID organizationId = UUID.randomUUID();
@@ -48,7 +41,7 @@ class AuthServiceTests {
 						userId, AccountScope.TENANT, organizationId, "admin@gymos.local", "hash",
 						"Admin GymOS", Set.of("branch.read"), Set.of("Gerente"))));
 
-		assertThatThrownBy(() -> authService.selectBranch(principal, foreignBranchId, "test-correlation"))
+		assertThatThrownBy(() -> authService.selectBranch(principal, foreignBranchId, null, "test-correlation"))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						org.assertj.core.api.Assertions.assertThat(exception.code()).isEqualTo("BRANCH_ACCESS_DENIED"));
 
@@ -58,13 +51,7 @@ class AuthServiceTests {
 
 	@Test
 	void platformAdminCurrentUserStartsInPlatformConsole() {
-		AuthService authService = new AuthService(
-				mock(AuthenticationManager.class),
-				mock(AuthQueryRepository.class),
-				mock(JwtService.class),
-				mock(StringRedisTemplate.class),
-				mock(AuditService.class)
-		);
+		AuthService authService = new AuthSessionTestFixture().service;
 		GymOsPrincipal principal = new GymOsPrincipal(
 				UUID.randomUUID(),
 				AccountScope.PLATFORM,
@@ -87,13 +74,7 @@ class AuthServiceTests {
 
 	@Test
 	void platformAdminInSupportModeUsesTenantOwnerConsole() {
-		AuthService authService = new AuthService(
-				mock(AuthenticationManager.class),
-				mock(AuthQueryRepository.class),
-				mock(JwtService.class),
-				mock(StringRedisTemplate.class),
-				mock(AuditService.class)
-		);
+		AuthService authService = new AuthSessionTestFixture().service;
 		GymOsPrincipal principal = new GymOsPrincipal(
 				UUID.randomUUID(),
 				AccountScope.PLATFORM,
@@ -116,14 +97,10 @@ class AuthServiceTests {
 
 	@Test
 	void supportModeCanSelectTenantBranchWithoutUserBranchAccess() {
-		AuthenticationManager authenticationManager = mock(AuthenticationManager.class);
-		AuthQueryRepository authQueryRepository = mock(AuthQueryRepository.class);
-		JwtService jwtService = mock(JwtService.class);
-		StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
-		@SuppressWarnings("unchecked")
-		ValueOperations<String, String> valueOperations = mock(ValueOperations.class);
-		AuditService auditService = mock(AuditService.class);
-		AuthService authService = new AuthService(authenticationManager, authQueryRepository, jwtService, redisTemplate, auditService);
+		var fixture = new AuthSessionTestFixture();
+		var authQueryRepository = fixture.users;
+		var authService = fixture.service;
+		var auditService = fixture.audit;
 
 		UUID userId = UUID.randomUUID();
 		UUID organizationId = UUID.randomUUID();
@@ -142,7 +119,7 @@ class AuthServiceTests {
 		);
 		when(authQueryRepository.branchBelongsToOrganization(branchId, organizationId)).thenReturn(true);
 		when(authQueryRepository.userHasBranchAccess(userId, branchId)).thenReturn(false);
-		when(authQueryRepository.findActiveUserById(userId)).thenReturn(java.util.Optional.of(new AuthQueryRepository.AuthenticatedUser(
+		var user = new AuthQueryRepository.AuthenticatedUser(
 				userId,
 				AccountScope.PLATFORM,
 				null,
@@ -151,12 +128,15 @@ class AuthServiceTests {
 				"Admin GymOS",
 				Set.of("platform.admin", "branch.read"),
 				Set.of("Administrador GymOS")
-		)));
-		when(redisTemplate.opsForValue()).thenReturn(valueOperations);
-		when(jwtService.issueTokens(org.mockito.ArgumentMatchers.any(GymOsPrincipal.class), org.mockito.ArgumentMatchers.anyString()))
-				.thenReturn(new JwtService.TokenPair("access", "refresh", 3600));
+		);
+		when(authQueryRepository.findActiveUserById(userId)).thenReturn(java.util.Optional.of(user));
+		var active = fixture.session(user, principal);
+		when(fixture.sessions.rotate(org.mockito.ArgumentMatchers.eq(active.id()), org.mockito.ArgumentMatchers.eq(0L),
+				org.mockito.ArgumentMatchers.eq(0L), org.mockito.ArgumentMatchers.eq("!"),
+				org.mockito.ArgumentMatchers.eq(1L), org.mockito.ArgumentMatchers.anyString()))
+				.thenReturn(SessionRegistry.Rotation.NEXT);
 
-		var result = authService.selectBranch(principal, branchId, "support-correlation");
+		var result = authService.selectBranch(active.principal(), branchId, active.cookie(), "support-correlation");
 
 		assertThat(result.user().supportMode()).isTrue();
 		assertThat(result.user().branchId()).isEqualTo(branchId);

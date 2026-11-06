@@ -14,7 +14,7 @@ Este documento expresa secuencia y estado, no sustituye el estado verificable de
 ### Cimientos y SaaS multi-tenant
 
 - Monorepo, Spring Modulith, Next.js, Flyway, PostgreSQL, Redis y MinIO.
-- JWT/refresh, RBAC granular, organización, sucursal, soporte y auditoría.
+- JWT/refresh, RBAC granular, organización, sucursal, soporte y auditoría. AUTH-001 añade familias revocables y refresh HttpOnly. El piloto requiere validar el corte y rollback en staging.
 - Consolas separadas para plataforma, dueño, gerente, recepción y coach.
 - Identidad GymFort permanente más personalización visual por gimnasio.
 

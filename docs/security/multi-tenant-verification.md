@@ -48,6 +48,10 @@ Las regresiones se ejecutaron también contra `55e7376347f463730ce2130b7d467e35a
 | B · Infraestructura | Falta comprobar la política del bucket real en staging y las superficies públicas de salud y documentación en el perfil de operación. | [#43](https://github.com/Dagt/GymOs/issues/43) |
 | C · Ampliación de cobertura | La comprobación del matcher abarca las 298 operaciones. La cobertura de persistencia es por flujos representativos. Variaciones adicionales de catálogo, aprovisionamiento de plataforma y automatizaciones pueden ampliarse. | [#29](https://github.com/Dagt/GymOs/issues/29) |
 
+### Sesiones AUTH-001
+
+El JWT de personal exige una familia Redis activa y su revisión vigente. Un cambio de sede o soporte invalida la revisión anterior. La cuenta, el ámbito, el tenant, la sede y las concesiones efectivas se revalidan con PostgreSQL. La prueba HTTP usa PostgreSQL y Redis reales para revocación, refresh concurrente y denegaciones entre contextos. El escenario Chromium conectado usa el mismo backend y un seed local. El [runbook de sesiones](../operations/staff-sessions.md) delimita la aceptación operativa.
+
 ### CI externo
 
 Workers Builds de `gymfort-web` ya fallaba en ramas secundarias antes de #29, incluida una rama documental. El build interno OpenNext es una comprobación independiente. El estado de CI de #29 se registra por SHA en su PR. Si Workers Builds sigue fallando, se requiere verificación del proveedor o una excepción explícita del propietario para este PR. [Check histórico del PR #60](https://github.com/Dagt/GymOs/runs/123714043406).

@@ -1,3 +1,4 @@
+import { mockStaffSession } from "./session-fixtures";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 const sessionId = "11111111-1111-4111-8111-111111111111";
@@ -7,19 +8,16 @@ const visitPackagePlanId = "66666666-6666-4666-8666-666666666666";
 
 test("el kiosco aplica capacidades, no ofrece pago manual y actualiza contacto", async ({ page }) => {
   let contactPayload: Record<string, unknown> | null = null;
-  await page.addInitScript(() => {
-    window.sessionStorage.setItem("gymos.accessToken", "reception-access-token");
-    window.sessionStorage.setItem("gymos.refreshToken", "reception-refresh-token");
-    window.sessionStorage.setItem("gymos.currentUser", JSON.stringify({
-      id: "77777777-7777-4777-8777-777777777777",
+  await mockStaffSession(page, "reception-access-token", {
+      userId: "77777777-7777-4777-8777-777777777777",
+      accountScope: "TENANT",
       username: "recepcion",
       fullName: "Recepcion Prueba",
       organizationId: "88888888-8888-4888-8888-888888888888",
       branchId: "99999999-9999-4999-8999-999999999999",
       permissions: ["selfservice.session.launch"],
       roles: ["Recepcion"],
-    }));
-  });
+    });
   await mockKiosk(page, async (route, path) => {
     const method = route.request().method();
     if (method === "POST" && path === "/self-service/kiosk-sessions") {
@@ -770,19 +768,16 @@ test("una recarga recupera el modo kiosco y borra al socio anterior", async ({ p
 test("un socio sin membresia puede abrir Stripe Checkout con una intencion idempotente", async ({ page }) => {
   let enrollmentPayload: Record<string, unknown> | null = null;
   let paymentCompleted = false;
-  await page.addInitScript(() => {
-    window.sessionStorage.setItem("gymos.accessToken", "reception-access-token");
-    window.sessionStorage.setItem("gymos.refreshToken", "reception-refresh-token");
-    window.sessionStorage.setItem("gymos.currentUser", JSON.stringify({
-      id: "77777777-7777-4777-8777-777777777777",
+  await mockStaffSession(page, "reception-access-token", {
+      userId: "77777777-7777-4777-8777-777777777777",
+      accountScope: "TENANT",
       username: "recepcion",
       fullName: "Recepcion Prueba",
       organizationId: "88888888-8888-4888-8888-888888888888",
       branchId: "99999999-9999-4999-8999-999999999999",
       permissions: ["selfservice.session.launch"],
       roles: ["Recepcion"],
-    }));
-  });
+    });
   await mockKiosk(page, async (route, path) => {
     const method = route.request().method();
     if (method === "POST" && path === "/self-service/kiosk-sessions") {
@@ -939,19 +934,16 @@ test("si falla la cotización explica que no hubo cargo y conserva una referenci
 
 test("muestra comprobante y permite recuperar una domiciliacion PAST_DUE con otra tarjeta", async ({ page }) => {
   let setupPayload: Record<string, unknown> | null = null;
-  await page.addInitScript(() => {
-    window.sessionStorage.setItem("gymos.accessToken", "reception-access-token");
-    window.sessionStorage.setItem("gymos.refreshToken", "reception-refresh-token");
-    window.sessionStorage.setItem("gymos.currentUser", JSON.stringify({
-      id: "77777777-7777-4777-8777-777777777777",
+  await mockStaffSession(page, "reception-access-token", {
+      userId: "77777777-7777-4777-8777-777777777777",
+      accountScope: "TENANT",
       username: "recepcion",
       fullName: "Recepcion Prueba",
       organizationId: "88888888-8888-4888-8888-888888888888",
       branchId: "99999999-9999-4999-8999-999999999999",
       permissions: ["selfservice.session.launch"],
       roles: ["Recepcion"],
-    }));
-  });
+    });
   await mockKiosk(page, async (route, path) => {
     const method = route.request().method();
     if (method === "POST" && path === "/self-service/kiosk-sessions") return fulfill(route, sessionResponse());
@@ -1024,19 +1016,16 @@ test("muestra comprobante y permite recuperar una domiciliacion PAST_DUE con otr
 test("el socio acepta terminos versionados antes de tokenizar la domiciliacion", async ({ page }) => {
   let setupPayload: Record<string, unknown> | null = null;
   let setupStarted = false;
-  await page.addInitScript(() => {
-    window.sessionStorage.setItem("gymos.accessToken", "reception-access-token");
-    window.sessionStorage.setItem("gymos.refreshToken", "reception-refresh-token");
-    window.sessionStorage.setItem("gymos.currentUser", JSON.stringify({
-      id: "77777777-7777-4777-8777-777777777777",
+  await mockStaffSession(page, "reception-access-token", {
+      userId: "77777777-7777-4777-8777-777777777777",
+      accountScope: "TENANT",
       username: "recepcion",
       fullName: "Recepcion Prueba",
       organizationId: "88888888-8888-4888-8888-888888888888",
       branchId: "99999999-9999-4999-8999-999999999999",
       permissions: ["selfservice.session.launch"],
       roles: ["Recepcion"],
-    }));
-  });
+    });
   await mockKiosk(page, async (route, path) => {
     const method = route.request().method();
     if (method === "POST" && path === "/self-service/kiosk-sessions") {

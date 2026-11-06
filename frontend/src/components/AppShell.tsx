@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { isActive, resolveShellBrand, visibleSectionsForConsole } from "@/components/app-shell-model";
 import { AppNotice } from "@/components/AppNotice";
-import { clearSession, exitSupport, getBranches, selectBranch, storeSession, type StoredSession } from "@/lib/api";
+import { logout, exitSupport, getBranches, selectBranch, type StoredSession } from "@/lib/api";
 import { getConsoleProfile, isPlatformAdmin, isSupportMode, resolveUserConsole } from "@/lib/role-model";
 
 type BranchOption = {
@@ -47,6 +47,8 @@ export function AppShell({
   const [availableBranches, setAvailableBranches] = useState<BranchOption[]>([]);
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
   const [switchingBranch, setSwitchingBranch] = useState(false);
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [closingSession, setClosingSession] = useState(false);
 	const [leavingSupport, setLeavingSupport] = useState(false);
   const [failedBrandLogoUrl, setFailedBrandLogoUrl] = useState<string | null>(null);
 
@@ -136,7 +138,6 @@ export function AppShell({
         if (cancelled) return;
 
         if (nextSession.user.branchId && nextSession.user.branchId !== session.user.branchId) {
-          storeSession(nextSession);
           setResolvedBranch({ branchId: nextSession.user.branchId, name: "Sucursal seleccionada" });
           router.replace(pathname);
           router.refresh();
@@ -155,22 +156,32 @@ export function AppShell({
     };
   }, [consoleType, hasBranch, pathname, platformAdmin, router, session.accessToken, session.user.branchId, session.user.organizationId, session.user.userId, variant]);
 
-  function logout() {
-    clearSession();
-    window.sessionStorage.removeItem(BRANCH_RECOVERY_KEY);
-    router.push("/login");
+  async function closeSession() {
+    if (closingSession) return;
+    setClosingSession(true);
+    setSessionError(null);
+    try {
+      await logout();
+      window.sessionStorage.removeItem(BRANCH_RECOVERY_KEY);
+      router.replace("/login");
+    } catch (error) {
+      setSessionError(error instanceof Error ? error.message : "No se pudo cerrar la sesión.");
+    } finally {
+      setClosingSession(false);
+    }
   }
 
   async function changeBranch(branchId: string) {
     if (!branchId || branchId === session.user.branchId || switchingBranch) return;
     setSwitchingBranch(true);
     try {
-      const selectedSession = await selectBranch(session.accessToken, branchId);
-      storeSession(selectedSession);
+      await selectBranch(session.accessToken, branchId);
       window.sessionStorage.removeItem(BRANCH_RECOVERY_KEY);
       // We use hard reload to ensure all contexts, themes and session hooks across the app 
       // are fully synchronized with the new branch identity immediately.
       window.location.reload();
+    } catch (error) {
+      setSessionError(error instanceof Error ? error.message : "No fue posible cambiar la sucursal.");
     } finally {
       setSwitchingBranch(false);
     }
@@ -180,13 +191,11 @@ export function AppShell({
 		if (leavingSupport) return;
 		setLeavingSupport(true);
 		try {
-			const platformSession = await exitSupport(session.accessToken, session.refreshToken);
-			storeSession(platformSession);
+			await exitSupport(session.accessToken);
 			router.replace("/platform");
 			router.refresh();
-		} catch {
-			clearSession();
-			router.push("/login");
+		} catch (error) {
+			setSessionError(error instanceof Error ? error.message : "No fue posible salir de soporte.");
 		} finally {
 			setLeavingSupport(false);
 		}
@@ -195,6 +204,7 @@ export function AppShell({
   return (
     <main className={`admin-console ${hideSidebar ? "no-sidebar" : ""} ${supportMode ? "support-mode" : ""} ${pageClassName ?? ""}`}>
       <div className="app-notice-region" id="app-notice-region" />
+      {sessionError ? <p className="app-error" role="alert">{sessionError}</p> : null}
       {!hideSidebar ? (
         <aside className="admin-sidebar">
           <div className="admin-sidebar-brand">
@@ -214,7 +224,7 @@ export function AppShell({
               <span>{session.user.fullName}</span>
               <small>{session.user.username}</small>
             </div>
-            <button onClick={logout} type="button">Salir</button>
+            <button disabled={closingSession} onClick={closeSession} type="button">{closingSession ? "Cerrando…" : "Salir"}</button>
           </section>
 
 		  {supportMode ? (

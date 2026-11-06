@@ -1,3 +1,4 @@
+import { mockStaffSession } from "./session-fixtures";
 import { expect, test, type Page, type Route } from "@playwright/test";
 import type { PlatformOwnerAccess } from "../src/lib/api/platform-customer-types";
 
@@ -797,11 +798,7 @@ async function bootAs(
     });
   });
 
-  await page.addInitScript(({ user: initUser }) => {
-    window.sessionStorage.setItem("gymos.accessToken", "e2e-access-token");
-    window.sessionStorage.setItem("gymos.refreshToken", "e2e-refresh-token");
-    window.sessionStorage.setItem("gymos.currentUser", JSON.stringify(initUser));
-  }, { user: currentUser });
+  await mockStaffSession(page, "e2e-access-token", currentUser);
 }
 
 function responseFor(path: string, currentUser: TestUser) {

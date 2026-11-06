@@ -1,3 +1,4 @@
+import { mockStaffSession } from "./session-fixtures";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 const user = {
@@ -132,9 +133,5 @@ async function boot(
     }
     await handler(route, path);
   });
-  await page.addInitScript(({ currentUser }) => {
-    window.localStorage.setItem("gymos.accessToken", "e2e-access-token");
-    window.localStorage.setItem("gymos.refreshToken", "e2e-refresh-token");
-    window.localStorage.setItem("gymos.currentUser", JSON.stringify(currentUser));
-  }, { currentUser: user });
+  await mockStaffSession(page, "e2e-access-token", user);
 }

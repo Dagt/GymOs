@@ -1,3 +1,4 @@
+import { mockStaffSession } from "./session-fixtures";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 type TestUser = {
@@ -704,11 +705,7 @@ async function bootCatalog(
     if (override && await override(route, path)) return;
     await route.fulfill({ contentType: "application/json", body: JSON.stringify(responseFor(path)) });
   });
-  await page.addInitScript(({ user }) => {
-    window.localStorage.setItem("gymos.accessToken", "catalog-e2e-access");
-    window.localStorage.setItem("gymos.refreshToken", "catalog-e2e-refresh");
-    window.localStorage.setItem("gymos.currentUser", JSON.stringify(user));
-  }, { user: currentUser });
+  await mockStaffSession(page, "catalog-e2e-access", currentUser);
 }
 
 function responseFor(path: string) {

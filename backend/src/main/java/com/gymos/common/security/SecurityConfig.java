@@ -6,6 +6,8 @@ import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -13,6 +15,7 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -30,9 +33,13 @@ public class SecurityConfig {
 	SecurityFilterChain securityFilterChain(
 			HttpSecurity http,
 			JwtAuthenticationFilter jwtAuthenticationFilter,
-			ObjectMapper objectMapper
+			ObjectMapper objectMapper,
+			Environment environment,
+			SecurityProperties properties
 	) throws Exception {
+		if (!environment.acceptsProfiles(Profiles.of("local", "test"))) properties.requireConfiguredSigningSecret();
 		return http.csrf(AbstractHttpConfigurer::disable).cors(Customizer.withDefaults())
+				.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 				.authorizeHttpRequests(authorize -> authorize
 						.requestMatchers("/api/v1/payment-webhooks/**").permitAll()
 						.requestMatchers("/api/v1/physical-connectors/**").permitAll()
@@ -46,7 +53,8 @@ public class SecurityConfig {
 						.requestMatchers("/api/v1/platform/billing/**").hasAuthority("platform.admin")
 						.requestMatchers("/api/v1/platform/customers/**").hasAuthority("platform.admin")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/auth/me").authenticated()
-						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/auth/logout", "/api/v1/auth/exit-support").authenticated()
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/auth/logout").permitAll()
+						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/auth/exit-support").authenticated()
 						.requestMatchers("/api/v1/auth/select-branch").hasAuthority("branch.read")
 						.requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/roles", "/api/v1/users/internal").hasAuthority("user.read")
 						.requestMatchers(org.springframework.http.HttpMethod.POST, "/api/v1/users/internal").hasAuthority("user.manage")

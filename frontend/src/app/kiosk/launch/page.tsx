@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { getStoredSession, launchKioskSession } from "@/lib/api";
+import { SESSION_SLOT_KEY } from "@/lib/api/session";
 import { encodeKioskLaunch } from "@/lib/kiosk-launch";
 import { canLaunchKiosk, getPostLoginPath } from "@/lib/role-model";
 
@@ -40,6 +41,7 @@ export default function KioskLaunchPage() {
       return;
     }
     kioskWindow.opener = null;
+    kioskWindow.sessionStorage.removeItem(SESSION_SLOT_KEY);
     kioskWindow.document.title = "Preparando kiosco...";
     kioskWindow.document.body.innerHTML = "<main style='font-family:sans-serif;display:grid;place-items:center;min-height:100vh'><p>Preparando autoservicio seguro...</p></main>";
     setLaunching(true); setError(null);

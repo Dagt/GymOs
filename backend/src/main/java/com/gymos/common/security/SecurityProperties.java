@@ -9,22 +9,13 @@ public record SecurityProperties(
 		List<String> corsAllowedOrigins,
 		String jwtSecret,
 		long accessTokenSeconds,
-		long receptionAccessTokenSeconds,
 		long refreshTokenDays,
 		long platformSupportMinutes
 ) {
-	public SecurityProperties(List<String> corsAllowedOrigins, String jwtSecret, long accessTokenSeconds, long refreshTokenDays) {
-		this(corsAllowedOrigins, jwtSecret, accessTokenSeconds, 86_400, refreshTokenDays, 30);
-	}
+	static final String LOCAL_SECRET = "dev-only-change-this-secret-before-production-please";
 
-	public SecurityProperties(
-			List<String> corsAllowedOrigins,
-			String jwtSecret,
-			long accessTokenSeconds,
-			long receptionAccessTokenSeconds,
-			long refreshTokenDays
-	) {
-		this(corsAllowedOrigins, jwtSecret, accessTokenSeconds, receptionAccessTokenSeconds, refreshTokenDays, 30);
+	public SecurityProperties(List<String> corsAllowedOrigins, String jwtSecret, long accessTokenSeconds, long refreshTokenDays) {
+		this(corsAllowedOrigins, jwtSecret, accessTokenSeconds, refreshTokenDays, 30);
 	}
 
 	@ConstructorBinding
@@ -33,13 +24,10 @@ public record SecurityProperties(
 			corsAllowedOrigins = List.of("http://localhost:3000");
 		}
 		if (jwtSecret == null || jwtSecret.isBlank()) {
-			jwtSecret = "dev-only-change-this-secret-before-production-please";
+			jwtSecret = LOCAL_SECRET;
 		}
 		if (accessTokenSeconds <= 0) {
 			accessTokenSeconds = 900;
-		}
-		if (receptionAccessTokenSeconds <= 0) {
-			receptionAccessTokenSeconds = 86_400;
 		}
 		if (refreshTokenDays <= 0) {
 			refreshTokenDays = 7;
@@ -47,5 +35,17 @@ public record SecurityProperties(
 		if (platformSupportMinutes <= 0) {
 			platformSupportMinutes = 30;
 		}
+	}
+
+	void requireConfiguredSigningSecret() {
+		if (jwtSecret.trim().length() < 32 || LOCAL_SECRET.equals(jwtSecret)
+				|| "replace-with-64-plus-random-characters".equals(jwtSecret)) {
+			throw new IllegalStateException("Configure a strong GYMOS_JWT_SECRET outside local and test profiles");
+		}
+	}
+
+	@Override
+	public String toString() {
+		return "SecurityProperties[signing secret redacted]";
 	}
 }

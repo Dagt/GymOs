@@ -12,7 +12,8 @@ Esta matriz resume el permiso mínimo HTTP. Los servicios deben volver a validar
 
 | Ruta | Regla adicional |
 |---|---|
-| `/api/v1/auth/login`, `/api/v1/auth/refresh` | Credenciales/refresh válidos y rate limit aplicable |
+| `POST /api/v1/auth/login`, `/api/v1/auth/refresh`, `/api/v1/auth/logout` | Origen exacto y selector de cookie. Login valida credenciales y bloqueo de intentos. Refresh valida familia, revisión y rotación. Logout revoca la familia que presenta la cookie. |
+| `POST /api/v1/auth/select-branch`, `/api/v1/auth/select-organization`, `/api/v1/auth/exit-support` | JWT y cookie de la misma familia, origen válido, autoridad y contexto de tenant, sede o plataforma según operación. |
 | `/api/v1/self-service/**` excepto alta de sesión | Token temporal, sesión activa, tenant/sucursal y capacidad |
 | `POST /api/v1/self-service/kiosk-sessions` | No es pública: exige `selfservice.session.launch` y rol exclusivo de Recepción |
 | `/api/v1/payment-webhooks/**` | Firma del proveedor, inbox durable, deduplicación y conciliación |

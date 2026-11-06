@@ -1,3 +1,4 @@
+import { mockStaffSession } from "./session-fixtures";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 const orgId = "11111111-1111-4111-8111-111111111111";
@@ -59,9 +60,7 @@ async function boot(page: Page, override?: (route: Route, path: string, url: URL
     if (path.endsWith("/reports/summary")) return void await json(route, { fromDate: from, toDate: to, currency: "MXN", sales: { saleCount: 0, totalCents: 0, paidCents: 0, balanceCents: 0, paidSales: 0, partiallyPaidSales: 0, pendingSales: 0 }, payments: { paymentCount: 0, completedPayments: 0, pendingPayments: 0, rejectedPayments: 0, completedCents: 0, pendingCents: 0, rejectedCents: 0 }, salesByStatus: [], salesByBusinessContext: [], paymentsByMethod: [], recentSales: [] });
     await json(route, []);
   });
-  await page.addInitScript((user) => {
-    sessionStorage.setItem("gymos.accessToken", "operational-e2e-only"); sessionStorage.setItem("gymos.refreshToken", "operational-e2e-refresh"); sessionStorage.setItem("gymos.currentUser", JSON.stringify(user));
-  }, currentUser);
+  await mockStaffSession(page, "operational-e2e-only", currentUser);
 }
 
 test("edita Sauna, conserva VIP y añade el plan VIP diario sin duplicar el beneficio", async ({ page }, testInfo) => {

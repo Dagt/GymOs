@@ -16,7 +16,7 @@ Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo
 | ID | Pri. | Módulo | Estado | Hallazgo e impacto | Criterio de cierre |
 |---|---|---|---|---|---|
 | GEN-001 | P0 | General/seguridad | EN_CURSO | #29 comprueba los matchers de los 298 endpoints y amplía las regresiones HTTP/PostgreSQL de operaciones críticas. La cobertura de proveedores y almacenamiento en staging se sigue en #34 y #43. | Verificar la [matriz de aislamiento](../docs/security/multi-tenant-verification.md) y los checks del SHA del PR #66. |
-| AUTH-001 | P0 | Identidad | ABIERTA | El refresh token requiere revisar almacenamiento y exposición en cliente. | Mecanismo seguro, rotación y pruebas de reutilización. |
+| AUTH-001 | P0 | Identidad | EN REVISIÓN | Cookie HttpOnly y JWT en memoria. Rotación y revocación por familia en Redis. El backend revalida cuenta, concesiones y sede. | Verificar el mismo SHA en CI y completar la aceptación operativa del corte y rollback en staging. |
 | GEN-002 | P1 | General/arquitectura | ABIERTA | Algunos módulos carecen de puertos de aplicación consistentes. | Fronteras documentadas y verificadas por pruebas de arquitectura. |
 | GEN-004 | P1 | General/calidad | ABIERTA | No existe suite E2E homogénea de recorridos críticos. | E2E en CI para autenticación, venta, membresía, reserva, inventario y rutina. |
 | ORG-001 | P1 | Organizaciones | EN_CURSO | #29 protege cuentas multisede, revalida la sucursal del JWT y verifica autoridades y roles asignables contra el tenant. La suite HTTP/PostgreSQL cubre roles ajenos, cambios de sede, edición de sucursales y soporte temporal. | Revisar evidencia y estado del PR #66. |

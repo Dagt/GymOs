@@ -111,6 +111,13 @@ jobs:
             tail -n 180 /tmp/frontend-playwright.log
             exit 1
           fi
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "25"
+      - name: Test live browser sessions
+        working-directory: .
+        run: bash scripts/test-auth-browser.sh
       - name: Upload frontend diagnostics
         if: failure()
         uses: actions/upload-artifact@v4

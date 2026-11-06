@@ -43,8 +43,7 @@ export default function RootLayout({
       data-scroll-behavior="smooth"
     >
       <body className="min-h-full flex flex-col">
-        <SessionRouteGuard />
-        {children}
+        <SessionRouteGuard>{children}</SessionRouteGuard>
         <TenantThemeProvider />
       </body>
     </html>

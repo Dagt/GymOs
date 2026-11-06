@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { clearSession, getStoredSession, type StoredSession } from "@/lib/api";
+import { logout, getStoredSession, type StoredSession } from "@/lib/api";
 import { getPostLoginPath } from "@/lib/session-routing";
 
 const features = [
@@ -47,6 +47,7 @@ const pricingFaq = [
 export default function Home() {
   const [session, setSession] = useState<StoredSession | null>(null);
   const [ready, setReady] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -58,17 +59,23 @@ export default function Home() {
 
   const destination = session ? getPostLoginPath(session.user) : "/login";
 
-  function logout() {
-    clearSession();
-    setSession(null);
+  async function closeSession() {
+    try {
+      await logout();
+      setSession(null);
+      setLogoutError(null);
+    } catch (error) {
+      setLogoutError(error instanceof Error ? error.message : "No se pudo cerrar la sesión.");
+    }
   }
 
   return <main className="landing-page">
     <header className="landing-nav">
       <Link className="landing-logo" href="/" aria-label="GymFort, inicio"><Image src="/gymfort_web_assets/gymfort-logo-navbar-96px.png" alt="GymFort" width={216} height={40} priority /></Link>
       <nav aria-label="Navegación principal"><a href="#solucion">Solución</a><a href="#funciones">Funciones</a><a href="#como-funciona">Cómo funciona</a><a href="#precios">Precios</a><Link href="/support">Soporte</Link><a href="#contacto">Contacto</a></nav>
-      <div className="landing-nav-actions">{ready && session ? <button onClick={logout}>Salir</button> : null}<Link className="landing-login" href={destination}>{session ? "Ir a mi panel" : "Iniciar sesión"}</Link></div>
+      <div className="landing-nav-actions">{ready && session ? <button onClick={closeSession}>Salir</button> : null}<Link className="landing-login" href={destination}>{session ? "Ir a mi panel" : "Iniciar sesión"}</Link></div>
     </header>
+    {logoutError ? <p role="alert">{logoutError}</p> : null}
 
     <section className="landing-hero" id="solucion">
       <div className="landing-hero-copy"><p className="landing-eyebrow"><span /> Gestión inteligente para gimnasios</p><h1>Todo tu gimnasio.<br /><em>Un solo sistema.</em></h1><p className="landing-lead">GymFort centraliza miembros, accesos, ventas, reservas, inventario y reportes para que tu equipo opere con claridad y tú puedas enfocarte en crecer.</p><div className="landing-hero-actions"><Link className="landing-primary-cta" href={destination}>{session ? "Continuar al panel" : "Acceder a la plataforma"}<span>→</span></Link><a className="landing-secondary-cta" href="#precios">Ver precios</a></div><div className="landing-trust"><span>✓ Información centralizada</span><span>✓ Acceso desde la nube</span><span>✓ Roles y permisos</span></div></div>
