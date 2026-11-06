@@ -1085,7 +1085,7 @@ class TenantIsolationPostgresIntegrationTests {
 				INSERT INTO organization_payment_configuration(organization_id, mercado_pago_account_id, mercado_pago_connected_at, created_at, updated_at)
 				VALUES (:org, 'point-fixture', now(), now(), now())
 				""").param("org", tenant.organizationId).update();
-		jdbc.sql("UPDATE branch SET reception_mercado_pago_enabled=true, mercado_pago_terminal_id='terminal-test' WHERE id=:branch")
+		jdbc.sql("UPDATE branch SET reception_manual_terminal_enabled=false, reception_mercado_pago_enabled=true, mercado_pago_terminal_id='terminal-test' WHERE id=:branch")
 				.param("branch", tenant.branchId).update();
 		org.mockito.Mockito.when(pointProvider.createOrder(org.mockito.ArgumentMatchers.any()))
 				.thenReturn(new PointOrderResult(UUID.randomUUID(), "ORD-fixture", "CREATED"));
