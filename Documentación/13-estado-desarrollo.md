@@ -1,5 +1,9 @@
 # 13. Estado actual de desarrollo
 
+## Aislamiento multi-tenant en revisión
+
+El trabajo de #29 parte del commit `58a5d4d4b24bcc598059b05a4ac70d11a2fe937b`, que incorpora check-in manual y reversiones de #65. El [inventario por operación](../docs/security/endpoint-permissions.md) y la [matriz de verificación](../docs/security/multi-tenant-verification.md) separan controles implementados, pruebas y cobertura pendiente. El PR y sus checks del SHA vigente determinan el estado de revisión.
+
 > **ACTUALIZACIÓN DOCUMENTAL 29/10/2026 (prioritaria sobre encabezado histórico):** La rama feature/multibranch-plans-benefits-visits ya tiene el mismo HEAD que main (136ce72, V103); la frase histórica «sin merge» es obsoleta. La rama más reciente feature/local-access-connector está cuatro commits adelantada (8955cdb, V104), pero no está fusionada ni certificada en sitio. CI main y Connector aparecen fallidos sin logs recuperables. Ver [auditoría](37-auditoria-repositorio-2026-10-29.md), [MVP](35-mvp-y-criterios-de-salida.md), [backlog](36-epicas-backlog-codex.md) y [matriz QA](40-qa-matriz-de-aceptacion-y-evidencias.md).
 
 

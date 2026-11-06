@@ -129,7 +129,7 @@ public class CoachingService {
 		));
 		OffsetDateTime now = OffsetDateTime.now();
 		coachingRepository.updateCoachProfileDetails(
-				principal.organizationId(), coachUserId, specialtiesJson, bio,
+				principal.organizationId(), coachUserId, managedBranchIds, specialtiesJson, bio,
 				principal.userId(), now
 		);
 		List<UUID> activeBranchIds = "ACTIVE".equals(status) ? selectedBranchIds : List.of();

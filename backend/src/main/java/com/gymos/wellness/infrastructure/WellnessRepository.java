@@ -1,5 +1,7 @@
 package com.gymos.wellness.infrastructure;
 
+import com.gymos.common.api.BusinessException;
+
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
@@ -347,17 +349,17 @@ public class WellnessRepository {
 	public UUID createAppointment(UUID organizationId, UUID branchId, UUID actorUserId, CreateAppointmentData data) {
 		OffsetDateTime now = OffsetDateTime.now();
 		UUID appointmentId = UUID.randomUUID();
-		jdbcClient.sql("""
+		int inserted = jdbcClient.sql("""
 				INSERT INTO wellness_appointment (
 				    id, organization_id, branch_id, professional_id, service_id, client_id,
 				    starts_at, ends_at, status, notes, confirmed_by_user_id, confirmed_at,
 				    created_at, updated_at, created_by, updated_by, version
 				)
-				VALUES (
-				    :id, :organizationId, :branchId, :professionalId, :serviceId, :clientId,
+				SELECT :id, :organizationId, :branchId, :professionalId, :serviceId, c.id,
 				    :startsAt, :endsAt, :status, :notes, :confirmedByUserId, :confirmedAt,
 				    :createdAt, :updatedAt, :createdBy, :updatedBy, 0
-				)
+				FROM client c
+				WHERE c.id = :clientId AND c.organization_id = :organizationId AND c.deleted_at IS NULL
 				""")
 				.param("id", appointmentId)
 				.param("organizationId", organizationId)
@@ -376,6 +378,9 @@ public class WellnessRepository {
 				.param("createdBy", actorUserId)
 				.param("updatedBy", actorUserId)
 				.update();
+		if (inserted == 0) {
+			throw new BusinessException("CLIENT_NOT_FOUND", "No se encontró el socio.");
+		}
 		return appointmentId;
 	}
 
@@ -389,10 +394,10 @@ public class WellnessRepository {
 				       a.starts_at, a.ends_at, a.status, a.notes, a.cancellation_reason, a.confirmed_by_user_id, a.confirmed_at,
 				       a.created_at, a.updated_at
 				FROM wellness_appointment a
-				JOIN professional p ON p.id = a.professional_id
-				LEFT JOIN professional_service ps ON ps.id = a.service_id
-				JOIN client c ON c.id = a.client_id
-				JOIN person cp ON cp.id = c.person_id
+				JOIN professional p ON p.id = a.professional_id AND p.organization_id = a.organization_id AND p.branch_id = a.branch_id
+				LEFT JOIN professional_service ps ON ps.id = a.service_id AND ps.professional_id = p.id
+				JOIN client c ON c.id = a.client_id AND c.organization_id = a.organization_id
+				JOIN person cp ON cp.id = c.person_id AND cp.organization_id = a.organization_id
 				WHERE a.organization_id = :organizationId
 				  AND a.branch_id = :branchId
 				  AND a.deleted_at IS NULL
@@ -436,10 +441,10 @@ public class WellnessRepository {
 				       a.starts_at, a.ends_at, a.status, a.notes, a.cancellation_reason, a.confirmed_by_user_id, a.confirmed_at,
 				       a.created_at, a.updated_at
 				FROM wellness_appointment a
-				JOIN professional p ON p.id = a.professional_id
-				LEFT JOIN professional_service ps ON ps.id = a.service_id
-				JOIN client c ON c.id = a.client_id
-				JOIN person cp ON cp.id = c.person_id
+				JOIN professional p ON p.id = a.professional_id AND p.organization_id = a.organization_id AND p.branch_id = a.branch_id
+				LEFT JOIN professional_service ps ON ps.id = a.service_id AND ps.professional_id = p.id
+				JOIN client c ON c.id = a.client_id AND c.organization_id = a.organization_id
+				JOIN person cp ON cp.id = c.person_id AND cp.organization_id = a.organization_id
 				WHERE a.organization_id = :organizationId
 				  AND a.branch_id = :branchId
 				  AND a.id = :appointmentId

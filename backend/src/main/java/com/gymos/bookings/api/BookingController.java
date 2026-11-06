@@ -7,6 +7,7 @@ import com.gymos.bookings.application.command.LinkBookingPaymentCommand;
 import com.gymos.bookings.infrastructure.BookingResourceRepository.ResourceRecord;
 import com.gymos.bookings.infrastructure.BookingRepository.AvailabilitySlot;
 import com.gymos.bookings.infrastructure.BookingRepository.BookingRecord;
+import com.gymos.clients.api.operations.ClientBranchAccess;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,9 +36,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1")
 public class BookingController {
 	private final BookingService bookingService;
+	private final ClientBranchAccess clients;
 
-	public BookingController(BookingService bookingService) {
+	public BookingController(BookingService bookingService, ClientBranchAccess clients) {
 		this.bookingService = bookingService;
+		this.clients = clients;
 	}
 
 	@GetMapping("/resources")
@@ -102,6 +105,7 @@ public class BookingController {
 			@Valid @RequestBody CreateBookingRequest request,
 			HttpServletRequest servletRequest
 	) {
+		clients.requireVisible(principal, request.clientId());
 		return bookingService.createBooking(principal, request.toCommand(), correlationId(servletRequest));
 	}
 

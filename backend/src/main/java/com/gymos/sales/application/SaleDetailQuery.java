@@ -26,7 +26,18 @@ class SaleDetailQuery {
 
 	SaleDetailResult detail(UUID organizationId, UUID saleId) {
 		SaleHeader sale = salesRepository.saleHeader(organizationId, saleId)
-				.orElseThrow(() -> new BusinessException("SALE_NOT_FOUND", "La venta no existe o no esta disponible."));
+				.orElseThrow(this::unavailable);
+		return detail(sale, organizationId, saleId);
+	}
+
+	SaleDetailResult detailForBranch(UUID organizationId, UUID branchId, UUID saleId) {
+		SaleHeader sale = salesRepository.saleHeader(organizationId, saleId)
+				.filter(candidate -> branchId.equals(candidate.branchId()))
+				.orElseThrow(this::unavailable);
+		return detail(sale, organizationId, saleId);
+	}
+
+	private SaleDetailResult detail(SaleHeader sale, UUID organizationId, UUID saleId) {
 		return new SaleDetailResult(
 				sale,
 				salesReadRepository.saleItems(organizationId, saleId),
@@ -35,5 +46,9 @@ class SaleDetailQuery {
 				salesReadRepository.refunds(organizationId, saleId),
 				salesReadRepository.membershipsForSale(organizationId, saleId)
 		);
+	}
+
+	private BusinessException unavailable() {
+		return new BusinessException("SALE_NOT_FOUND", "La venta no existe o no esta disponible.");
 	}
 }

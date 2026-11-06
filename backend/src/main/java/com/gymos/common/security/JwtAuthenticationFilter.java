@@ -27,7 +27,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 		String authorization = request.getHeader("Authorization");
 		if (authorization != null && authorization.startsWith("Bearer ")) {
 			jwtService.parseAccessToken(authorization.substring(7)).ifPresent(principal -> {
-				if (!credentials.isCurrent(principal.userId(), principal.credentialVersion())) return;
+				if (!credentials.isCurrent(principal)) return;
 				var authorities = principal.permissions().stream()
 						.map(SimpleGrantedAuthority::new)
 						.toList();

@@ -42,9 +42,9 @@ class KioskSettingsServiceTests {
 		when(paymentConfiguration.configuration(organizationId, branchId)).thenReturn(
 				new PaymentConfigurationView(false, false, null, null, false, false, false, null, false)
 		);
-		when(repository.configureBranch(eq(organizationId), eq(branchId), eq(principal.userId()), any()))
+		when(repository.configureBranch(eq(organizationId), eq(branchId), eq(principal.userId()), eq(false), any()))
 				.thenReturn(true);
-		when(repository.branchConfigurations(organizationId)).thenReturn(List.of(
+		when(repository.branchConfigurations(organizationId, principal.userId(), false)).thenReturn(List.of(
 				new BranchKioskConfigurationRecord(
 						branchId,
 						"Centro",
@@ -68,7 +68,7 @@ class KioskSettingsServiceTests {
 		ArgumentCaptor<BranchKioskConfigurationData> persisted =
 				ArgumentCaptor.forClass(BranchKioskConfigurationData.class);
 		verify(repository).configureBranch(
-				eq(organizationId), eq(branchId), eq(principal.userId()), persisted.capture());
+				eq(organizationId), eq(branchId), eq(principal.userId()), eq(false), persisted.capture());
 		assertThat(persisted.getValue().clientRegistration()).isTrue();
 		assertThat(persisted.getValue().membershipEnrollment()).isTrue();
 		assertThat(persisted.getValue().visitPackagePurchase()).isTrue();

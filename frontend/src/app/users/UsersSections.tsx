@@ -25,12 +25,12 @@ import {
   withSynchronizedLoginEmail,
 } from "./UsersRoleHelpers";
 
-export function TeamOverview({ branches, roles, onCreateUser }: { branches: BranchSummary[]; roles: RoleOption[]; onCreateUser: () => void }) {
+export function TeamOverview({ branches, roles, canCreateUser, onCreateUser }: { branches: BranchSummary[]; roles: RoleOption[]; canCreateUser: boolean; onCreateUser: () => void }) {
   return (
     <section className="app-card p-5">
       <div className="admin-panel-header">
         <div><p>Equipo</p><h2>Gestiona a tus colaboradores</h2></div>
-        <button className="app-button" disabled={roles.length === 0 || branches.length === 0} onClick={onCreateUser} type="button">Crear usuario</button>
+        {canCreateUser ? <button className="app-button" disabled={roles.length === 0 || branches.length === 0} onClick={onCreateUser} type="button">Crear usuario</button> : null}
       </div>
       {branches.length === 0 ? (
         <section className="team-warning"><strong>Primero crea una sucursal</strong><span>Sin sucursales no podrás asignar acceso operativo a recepción, coaches o gerencia.</span><Link href="/settings/organization">Crear sucursal</Link></section>
@@ -46,6 +46,7 @@ export function TeamOverview({ branches, roles, onCreateUser }: { branches: Bran
 }
 
 export function UsersTable({
+  branches,
   roles,
   saving,
   session,
@@ -55,6 +56,7 @@ export function UsersTable({
   onToggleStatus,
   onRecoverPassword,
 }: {
+  branches: BranchSummary[];
   roles: RoleOption[];
   saving: boolean;
   session: StoredSession;
@@ -64,6 +66,9 @@ export function UsersTable({
   onToggleStatus: (user: InternalUserSummary) => void;
   onRecoverPassword: (user: InternalUserSummary) => void;
 }) {
+  const isSupport = Boolean(session.user.supportMode);
+  const isOwnerSession = session.user.roles.some((role) => displayRoleName(role) === "Dueno del gimnasio");
+  const assignedBranchIds = new Set(branches.filter((branch) => branch.status === "ACTIVE").map((branch) => branch.id));
   return (
     <section className="app-card p-5">
       <div className="admin-panel-header">
@@ -84,7 +89,10 @@ export function UsersTable({
           const isCurrentUser = user.id === session.user.userId;
           const isOwner = user.roles.some((role) => displayRoleName(role) === "Dueno del gimnasio");
           const isCoach = user.roles.some((role) => displayRoleName(role) === "Coach");
-          const canManage = !isCurrentUser && canManageUserForSession(session.user.roles, user.roles, Boolean(session.user.platformAdmin));
+          const canManage = !isCurrentUser && session.user.permissions.includes("user.manage")
+            && canManageUserForSession(session.user.roles, user.roles, isSupport)
+            && (isSupport || isOwnerSession || (user.branchIds.includes(session.user.branchId ?? "")
+              && user.branchIds.every((branchId) => assignedBranchIds.has(branchId))));
           return (
             <article key={user.id} data-status={user.status}>
               <div className="team-user-identity">

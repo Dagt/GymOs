@@ -14,6 +14,21 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public class ClientRepository {
+	private static final String BRANCH_VISIBILITY = """
+			  AND (
+			      c.home_branch_id IS NULL OR c.home_branch_id = :branchId
+			      OR EXISTS (
+			          SELECT 1 FROM membership m
+			          JOIN membership_plan mp ON mp.id = m.plan_id AND mp.organization_id = m.organization_id
+			          WHERE m.organization_id = c.organization_id AND m.client_id = c.id
+			            AND m.status = 'ACTIVE' AND m.deleted_at IS NULL AND mp.deleted_at IS NULL
+			            AND (m.branch_id = :branchId OR mp.multi_branch_access)
+			            AND (SELECT (CURRENT_TIMESTAMP AT TIME ZONE b.timezone)::date
+			                 FROM branch b WHERE b.id = :branchId AND b.organization_id = c.organization_id)
+			                BETWEEN m.starts_on AND m.grace_ends_on
+			      )
+			  )
+			""";
 	private final JdbcClient jdbcClient;
 
 	public ClientRepository(JdbcClient jdbcClient) {
@@ -95,29 +110,12 @@ public class ClientRepository {
 				       p.phone, p.email, p.photo_reference, p.status AS person_status,
 				       c.created_at, c.updated_at
 				FROM client c
-				JOIN person p ON p.id = c.person_id
+				JOIN person p ON p.id = c.person_id AND p.organization_id = c.organization_id
 				WHERE c.organization_id = :organizationId
 				  AND c.id = :clientId
 				  AND c.deleted_at IS NULL
 				  AND p.deleted_at IS NULL
-				  AND (
-				      c.home_branch_id IS NULL
-				      OR c.home_branch_id = :branchId
-				      OR EXISTS (
-				          SELECT 1
-				          FROM membership m
-				          JOIN membership_plan mp ON mp.id = m.plan_id
-				          WHERE m.organization_id = c.organization_id
-				            AND m.client_id = c.id
-				            AND m.status = 'ACTIVE'
-				            AND m.deleted_at IS NULL
-				            AND (
-				                m.branch_id = :branchId
-				                OR mp.multi_branch_access = true
-				            )
-				      )
-				  )
-				""")
+				""" + BRANCH_VISIBILITY)
 				.param("organizationId", organizationId)
 				.param("branchId", branchId)
 				.param("clientId", clientId)
@@ -153,7 +151,7 @@ public class ClientRepository {
 				       TRIM(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) AS full_name,
 				       p.email, p.phone, c.status, c.inactivation_reason
 				FROM client c
-				JOIN person p ON p.id = c.person_id
+				JOIN person p ON p.id = c.person_id AND p.organization_id = c.organization_id
 				WHERE c.organization_id = :organizationId
 				  AND (
 				      c.status = 'ACTIVE'
@@ -235,7 +233,7 @@ public class ClientRepository {
 				       TRIM(p.first_name || ' ' || p.last_name || ' ' || COALESCE(p.maternal_last_name, '')) AS full_name,
 				       p.email, p.phone
 				FROM client c
-				JOIN person p ON p.id = c.person_id
+				JOIN person p ON p.id = c.person_id AND p.organization_id = c.organization_id
 				WHERE c.organization_id = :organizationId
 				  AND c.id = :clientId
 				  AND c.status = 'ACTIVE'
@@ -262,7 +260,9 @@ public class ClientRepository {
 		int safePage = Math.max(0, page);
 		int safeSize = Math.min(100, Math.max(1, size));
 		ClientFilter filter = clientFilter(organizationId, branchId, query, status);
-		long total = jdbcClient.sql("SELECT COUNT(*) FROM client c JOIN person p ON p.id = c.person_id " + filter.predicate())
+		long total = jdbcClient.sql("""
+				SELECT COUNT(*) FROM client c JOIN person p ON p.id = c.person_id AND p.organization_id = c.organization_id
+				""" + filter.predicate())
 				.params(filter.parameters()).query(Long.class).single();
 		return PageResponse.of(searchItems(filter, safeSize, (long) safePage * safeSize), safePage, safeSize, total);
 	}
@@ -273,7 +273,7 @@ public class ClientRepository {
 				       c.status AS client_status, current_membership.plan_name AS current_plan_name,
 				       current_membership.membership_status, c.joined_at, c.updated_at
 				FROM client c
-				JOIN person p ON p.id = c.person_id
+				JOIN person p ON p.id = c.person_id AND p.organization_id = c.organization_id
 				LEFT JOIN LATERAL (
 				    SELECT product.name AS plan_name,
 				           CASE
@@ -328,24 +328,7 @@ public class ClientRepository {
 				WHERE c.organization_id = :organizationId
 				  AND c.deleted_at IS NULL
 				  AND p.deleted_at IS NULL
-				  AND (
-				      c.home_branch_id IS NULL
-				      OR c.home_branch_id = :branchId
-				      OR EXISTS (
-				          SELECT 1
-				          FROM membership m
-				          JOIN membership_plan mp ON mp.id = m.plan_id
-				          WHERE m.organization_id = c.organization_id
-				            AND m.client_id = c.id
-				            AND m.status = 'ACTIVE'
-				            AND m.deleted_at IS NULL
-				            AND (
-				                m.branch_id = :branchId
-				                OR mp.multi_branch_access = true
-				            )
-				      )
-				  )
-				""");
+				""" + BRANCH_VISIBILITY);
 		if (status != null && !status.isBlank()) {
 			sql.append(" AND c.status = :status\n");
 			parameters.put("status", status.trim().toUpperCase(Locale.ROOT));
@@ -365,17 +348,19 @@ public class ClientRepository {
 
 	private record ClientFilter(String predicate, Map<String, Object> parameters) { }
 
-	public List<ClientTimelineEntry> timeline(UUID organizationId, UUID clientId) {
+	public List<ClientTimelineEntry> timeline(UUID organizationId, UUID branchId, UUID clientId) {
 		return jdbcClient.sql("""
 				SELECT action, origin, reason, occurred_at
 				FROM audit_log
 				WHERE organization_id = :organizationId
+				  AND branch_id = :branchId
 				  AND entity_type = 'CLIENT'
 				  AND entity_id = :clientId
 				ORDER BY occurred_at DESC
 				LIMIT 20
 				""")
 				.param("organizationId", organizationId)
+				.param("branchId", branchId)
 				.param("clientId", clientId)
 				.query((resultSet, rowNumber) -> new ClientTimelineEntry(
 						resultSet.getString("action"),

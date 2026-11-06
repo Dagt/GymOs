@@ -54,8 +54,8 @@ public class SalesService implements SalesOperations {
 
 	@Transactional(readOnly = true)
 	public SaleDetailResult detail(GymOsPrincipal principal, UUID saleId) {
-		SalesAccessGuard.requirePrincipal(principal);
-		return saleDetailQuery.detail(principal.organizationId(), saleId);
+		SalesAccessGuard.requireBranch(principal);
+		return saleDetailQuery.detailForBranch(principal.organizationId(), principal.branchId(), saleId);
 	}
 
 	public SaleDetailResult create(GymOsPrincipal principal, CreateSaleCommand request, String correlationId) {

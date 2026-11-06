@@ -79,9 +79,10 @@ public class OrganizationService {
 	@Transactional(readOnly = true)
 	public List<BranchSummary> branchesForOrganization(GymOsPrincipal principal, UUID organizationId) {
 		requirePrincipal(principal);
-		if (!principal.platformIdentity()
-				|| (principal.supportMode() && !organizationId.equals(principal.organizationId()))) {
-			throw new BusinessException("PLATFORM_ACCESS_REQUIRED", "Solo Admin GymOS puede consultar sucursales por gimnasio.");
+		if (!principal.platformAdmin()
+				&& !(principal.platformSupport() && organizationId.equals(principal.organizationId())
+				     && principal.permissions().contains("branch.read"))) {
+			throw new org.springframework.security.access.AccessDeniedException("Organization branch directory is restricted");
 		}
 		return organizationQueryRepository.findBranchesForOrganization(organizationId);
 	}

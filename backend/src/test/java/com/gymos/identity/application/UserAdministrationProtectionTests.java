@@ -37,7 +37,7 @@ class UserAdministrationProtectionTests {
 	void ownerCannotChangeAnotherOwnerRole() {
 		GymOsPrincipal principal = ownerPrincipal();
 		UUID targetUserId = UUID.randomUUID();
-		when(repository.userBelongsToOrganization(principal.organizationId(), targetUserId)).thenReturn(true);
+		when(repository.lockUser(principal.organizationId(), targetUserId)).thenReturn(true);
 		when(repository.findUsers(principal.organizationId())).thenReturn(List.of(ownerUser(targetUserId)));
 
 		BusinessException exception = assertThrows(
@@ -52,7 +52,7 @@ class UserAdministrationProtectionTests {
 	void ownerCannotSuspendAnotherOwner() {
 		GymOsPrincipal principal = ownerPrincipal();
 		UUID targetUserId = UUID.randomUUID();
-		when(repository.userBelongsToOrganization(principal.organizationId(), targetUserId)).thenReturn(true);
+		when(repository.lockUser(principal.organizationId(), targetUserId)).thenReturn(true);
 		when(repository.findUsers(principal.organizationId())).thenReturn(List.of(ownerUser(targetUserId)));
 
 		BusinessException exception = assertThrows(
@@ -98,7 +98,7 @@ class UserAdministrationProtectionTests {
 				List.of("Centro"),
 				List.of(branchId)
 		);
-		when(repository.userBelongsToOrganization(principal.organizationId(), targetUserId)).thenReturn(true);
+		when(repository.lockUser(principal.organizationId(), targetUserId)).thenReturn(true);
 		when(repository.findUsers(principal.organizationId())).thenReturn(List.of(target));
 		when(repository.roleBelongsToOrganization(principal.organizationId(), roleId)).thenReturn(true);
 		when(repository.roleHasPermission(roleId, "platform.admin")).thenReturn(false);

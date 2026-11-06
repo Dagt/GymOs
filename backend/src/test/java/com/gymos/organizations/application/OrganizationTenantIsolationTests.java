@@ -67,8 +67,7 @@ class OrganizationTenantIsolationTests {
 		);
 
 		assertThatThrownBy(() -> service.branchesForOrganization(principal, UUID.randomUUID()))
-				.isInstanceOfSatisfying(BusinessException.class, exception ->
-						assertThat(exception.code()).isEqualTo("PLATFORM_ACCESS_REQUIRED"));
+				.isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
 
 		verifyNoInteractions(repository, commandRepository, auditService);
 	}

@@ -1,7 +1,43 @@
 # Plan de verificación multi-tenant de GymFort
 
 Estado: VIGENTE / EJECUCIÓN PARCIAL
-Última revisión documental: 2026-08-21
+Última revisión documental: 2026-11-05
+
+## Auditoría del issue #29
+
+Base revisada `58a5d4d4b24bcc598059b05a4ac70d11a2fe937b`, que incorpora el PR #65. El [inventario de endpoints](endpoint-permissions.md) registra 298 rutas de Spring y sus autoridades. Las pruebas HTTP usan JWT firmados por el backend, el filtro real, servicios y JDBC con PostgreSQL 18 migrado por Flyway. Las pruebas Playwright de Equipo prueban el contrato visual con API interceptada.
+
+| Superficie | Límite aplicado | Evidencia y hallazgos |
+| --- | --- | --- |
+| Autenticación, sesiones y soporte | El JWT fija el tenant y la sede. El filtro revalida versión de credenciales, cuenta, tenant activo y sede activa y asignada. Soporte opera con tenant explícito y temporal. | HTTP/PostgreSQL para cambio de sede, intento contra otro tenant, revocación de asignación, suspensión y soporte. El ciclo de vida de refresh, cierre y revocación global sigue en [#28](https://github.com/Dagt/GymOs/issues/28). |
+| Plataforma, gimnasios y sucursales | Consola SaaS con permiso de plataforma. La consulta por tenant explícito admite administrador o soporte del tenant con `branch.read`. El directorio de sucursales del mismo tenant sigue disponible para destinos de inventario y flujos de catálogo. | HTTP/PostgreSQL para límites de soporte. Inspección del alta, suspensión, cobro comercial y marca pública. |
+| Equipo, roles y permisos | Permisos HTTP efectivos. Gerencia ve personal de la sede activa y administra una cuenta sólo si su alcance cubre todas las sedes de destino. Dueño conserva ámbito de organización y protección de otros dueños. Soporte queda acotado al tenant y la recuperación interna exige identidad tenant. | PATCH y GET sobre cuentas reales, permiso parcial, alcance multisede y auditoría. Playwright para ocultación de acciones. |
+| Socios, membresías y paquetes | Para operaciones de personal por UUID, expediente de la sede o socio visible por cobertura de membresía vigente, incluida gracia según su vigencia. La cobertura compartida de los paquetes en check-in sigue en Eligibility y el ledger, y Kiosco usa el socio verificado. | GET/POST con UUID de otra sede y tenant. Caso positivo con membresía multisede y denegación después de su vigencia. Las fichas históricas sin sede conservan visibilidad de organización. |
+| Beneficios | Definiciones locales y asignaciones operan sobre la sede activa. El catálogo de accesos mantiene definiciones de organización con cobertura de plan. | POST con `branchId` de otra sede y tenant. GET de asignaciones con visibilidad del socio. |
+| Catálogo e inventario | Definiciones de catálogo compartidas con disponibilidades por sede. Stock local. Transferencias sólo entre sedes de la misma organización. Origen envía y destino recibe. | Transferencia HTTP/PostgreSQL denegada sin escritura, flujo positivo multisede e inspección de permisos separados de catálogo y archivos. |
+| Ventas, pagos y devoluciones | Venta, pago y archivo se vinculan al tenant y sede de la operación. La carga de comprobante genera la clave en servidor. | HTTP/PostgreSQL reprodujo la lectura de detalle POS de otra sede antes de agregar el filtro. También cubre pago ajeno e inyección de `receiptObjectKey`. Conciliación, devoluciones y consistencia financiera de extremo a extremo siguen en [#33](https://github.com/Dagt/GymOs/issues/33). |
+| Accesos y check-in manual | Sólo tenant en sede activa para entradas y reversión, con permiso distinto, cliente visible y pertenencia en SQL. Conector usa su propio alcance; los paquetes conservan idempotencia y locks. | HTTP/PostgreSQL para `branchId` manipulado, socio de otro tenant y ausencia de historial. Las suites Access y de paquetes cubren reversiones y concurrencia. |
+| Kiosco y configuraciones operativas | Las operaciones de socio se vinculan al UUID y token de la sesión y su contexto persistido. La configuración del kiosco admite las sucursales asignadas o las del tenant de soporte. | HTTP/PostgreSQL para configurar una sede no asignada y otra asignada. Inspección de capacidades, identidad, expiración y parámetros de recursos de Kiosco. |
+| Recursos, reservas y Bienestar | Recursos y citas de la sede. Alta de reserva/cita con socio visible en backoffice. Una cita no puede enlazar un socio de otro tenant en persistencia. | GET, PUT y DELETE contra recurso local/ajeno. POST y lectura de citas con JDBC real. Se conservan transacciones de reservas y flujos de autoservicio. |
+| Coaches, ejercicios y rutinas | Consultas de sede y propiedad de la rutina según `own/all`. El perfil se puede editar en sedes asignadas al operador. | Pruebas de módulo e inspección. La actualización de biografía y especialidades filtra las sucursales administradas en SQL. |
+| Automatizaciones y notificaciones | Reglas, ejecuciones, destinos, colas y configuración se resuelven con el tenant del principal y el ámbito de cada operación. La operación manual por UUID exige destinatario visible y el reintento limita el mensaje a la sede o al ámbito organizacional. | HTTP/PostgreSQL para destinatarios y reintentos de otra sede o tenant. Otras rutas administrativas cuentan con inspección y suites de módulo. |
+| Reportes | Reporte del dueño y ventas se calculan en la sucursal activa. Las altas se atribuyen a la sede de alta. Historial de proveedores y otros agregados definidos como organizacionales exigen su permiso específico. | HTTP/PostgreSQL con ventas y socios simultáneos en dos sucursales y otro tenant. |
+| Stripe y Mercado Pago | Configuración del proveedor por tenant, modalidades por sede, callback OAuth y webhooks autenticados por protocolo con conciliación de cuenta y operación. | Inspección y suites de pagos. Falta prueba conectada de los escenarios cruzados con sandbox del proveedor. |
+| Almacenamiento | Objetos de marca pública servidos por el identificador de organización. Imágenes de producto y comprobantes se escriben con prefijos del recurso. El proxy Next de marca codifica el UUID y sólo consulta la ruta pública de marca. | Inyección de referencia de comprobante por HTTP cubierta. Falta verificación de la política real del bucket MinIO y revisión de referencias históricas anteriores a esta corrección. |
+
+| Perfil | Regla efectiva por operación |
+| --- | --- |
+| Administración de plataforma | `platform.admin` para cartera, configuración comercial y entrada temporal a soporte. Fuera de soporte carece de contexto tenant. |
+| Soporte temporal | Autoridades operativas derivadas del contexto de soporte, tenant seleccionado y expiración. Sin permisos de plataforma, check-in manual, lanzamiento de kiosco ni recuperación interna. |
+| Dueño | Acciones según las authorities asignadas. Administración de equipo y configuración del tenant con límites para cuentas dueñas. Operación local desde la sucursal seleccionada. |
+| Gerencia | Permisos de lectura y escritura independientes. Cuenta multisede administrable sólo con alcance sobre todas sus sedes y pertenencia a la activa. |
+| Recepción | Permisos de operación y check-in separados de reversión, apertura física, proveedores y administración. Kiosco requiere el permiso y rol operativo de recepción. |
+| Coach | Operaciones propias con `*.own`, ampliación únicamente con los permisos explícitos `*.all`. |
+| Permiso parcial o rol personalizado | El matcher usa authorities. La jerarquía de equipo, el kiosco, propiedad de rutinas y los ámbitos de plataforma/sede agregan condiciones de dominio. |
+
+### CI externo
+
+Workers Builds de `gymfort-web` ya fallaba en ramas secundarias antes de #29, incluida una rama documental. El build interno OpenNext es una comprobación independiente. El estado de CI de #29 se registra por SHA en su PR. Si Workers Builds sigue fallando, se requiere verificación del proveedor o una excepción explícita del propietario para este PR. [Check histórico del PR #60](https://github.com/Dagt/GymOs/runs/123714043406).
 
 La deuda y criterios pendientes derivados de este plan se registran en
 `../../Documentación/28-registro-vivo-deuda-tecnica.md` (`GEN-001` y deudas por
@@ -74,7 +110,7 @@ Estado observado:
 
 Pendiente:
 
-- Prueba negativa de acceso/uso de `receiptObjectKey` ajeno.
+- Revisar referencias históricas ya persistidas y comprobar permisos del bucket real. La API rechaza claves aportadas al crear pagos nuevos.
 - Validación de tamaño máximo y MIME.
 - Normalización de nombre de archivo ya existe parcialmente; revisar extensiones permitidas.
 

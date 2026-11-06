@@ -1,6 +1,7 @@
 package com.gymos.notifications.application;
 
 import com.gymos.audit.api.AuditService;
+import com.gymos.clients.api.operations.ClientBranchAccess;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.notifications.api.EmailDeliveryPort;
@@ -32,13 +33,15 @@ public class NotificationService {
 	private final Map<String, EmailDeliveryPort> emailProviders;
 	private final NotificationRecipientHasher recipientHasher;
 	private final NotificationProperties.Smtp smtpProperties;
+	private final ClientBranchAccess clients;
 
 	public NotificationService(
 			NotificationRepository notificationRepository,
 			AuditService auditService,
 			List<EmailDeliveryPort> emailProviders,
 			NotificationRecipientHasher recipientHasher,
-			NotificationProperties notificationProperties
+			NotificationProperties notificationProperties,
+			ClientBranchAccess clients
 	) {
 		this.notificationRepository = notificationRepository;
 		this.auditService = auditService;
@@ -47,6 +50,7 @@ public class NotificationService {
 		));
 		this.recipientHasher = recipientHasher;
 		this.smtpProperties = notificationProperties.smtp();
+		this.clients = clients;
 	}
 
 	@Transactional(readOnly = true)
@@ -60,6 +64,14 @@ public class NotificationService {
 	@Transactional
 	public NotificationRecord create(GymOsPrincipal principal, CreateNotificationCommand command, String correlationId) {
 		requireBranch(principal);
+		String recipientType = normalizeRecipientType(command.recipientType(), command.recipientId(), command.recipient());
+		if (command.recipientId() != null && "CLIENT".equals(recipientType)) {
+			clients.requireVisible(principal, command.recipientId());
+		}
+		if (command.recipientId() != null && "USER".equals(recipientType)
+				&& !notificationRepository.userAssignedToBranch(principal.organizationId(), principal.branchId(), command.recipientId())) {
+			throw new BusinessException("NOTIFICATION_RECIPIENT_NOT_FOUND", "El destinatario no esta disponible.");
+		}
 		UUID notificationId = createSystem(
 				principal.organizationId(), principal.branchId(), principal.userId(), command, correlationId
 		);
@@ -237,7 +249,8 @@ public class NotificationService {
 			GymOsPrincipal principal, UUID notificationId, String correlationId
 	) {
 		requireBranch(principal);
-		if (!notificationRepository.requeueDeadLetter(principal.organizationId(), notificationId, OffsetDateTime.now())) {
+		if (!notificationRepository.requeueDeadLetter(
+				principal.organizationId(), principal.branchId(), notificationId, OffsetDateTime.now())) {
 			throw new BusinessException("NOTIFICATION_NOT_RETRYABLE", "El correo no existe o no esta en dead letter.");
 		}
 		auditService.record(

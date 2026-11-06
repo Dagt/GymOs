@@ -44,6 +44,7 @@ public class OwnerDashboardRepository {
 						SELECT COUNT(*)
 						FROM client
 						WHERE organization_id = :organizationId
+						  AND home_branch_id = :branchId
 						  AND joined_at >= :from
 						  AND joined_at < :toExclusive
 						  AND deleted_at IS NULL

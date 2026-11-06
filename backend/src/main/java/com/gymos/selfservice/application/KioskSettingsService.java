@@ -35,7 +35,7 @@ public class KioskSettingsService {
 	@Transactional
 	public List<BranchKioskSettings> configurations(GymOsPrincipal principal) {
 		requireOrganization(principal);
-		return repository.branchConfigurations(principal.organizationId()).stream()
+		return repository.branchConfigurations(principal.organizationId(), principal.userId(), principal.platformSupport()).stream()
 				.map(record -> {
 					var payments = paymentConfiguration.configuration(principal.organizationId(), record.branchId());
 					return new BranchKioskSettings(
@@ -53,7 +53,7 @@ public class KioskSettingsService {
 	) {
 		requireOrganization(principal);
 		if (!repository.configureBranch(
-				principal.organizationId(), branchId, principal.userId(),
+				principal.organizationId(), branchId, principal.userId(), principal.platformSupport(),
 				new BranchKioskConfigurationData(
 						command.clientRegistration(),
 						command.membershipEnrollment(), command.visitPackagePurchase(), command.membershipRenewal(),

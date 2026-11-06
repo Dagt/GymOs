@@ -83,6 +83,7 @@ public class CoachingRepository {
 				    FROM coach profile
 				    WHERE profile.organization_id = u.organization_id
 				      AND profile.user_account_id = u.id
+				      AND profile.branch_id IN (:branchIds)
 				      AND profile.deleted_at IS NULL
 				    ORDER BY profile.updated_at DESC
 				    LIMIT 1
@@ -153,7 +154,7 @@ public class CoachingRepository {
 	}
 
 	public void updateCoachProfileDetails(
-			UUID organizationId, UUID userId, String specialtiesJson, String bio,
+			UUID organizationId, UUID userId, List<UUID> branchIds, String specialtiesJson, String bio,
 			UUID actorUserId, OffsetDateTime now
 	) {
 		jdbcClient.sql("""
@@ -165,6 +166,7 @@ public class CoachingRepository {
 				    version = version + 1
 				WHERE organization_id = :organizationId
 				  AND user_account_id = :userId
+				  AND branch_id IN (:branchIds)
 				  AND deleted_at IS NULL
 				""")
 				.param("specialtiesJson", specialtiesJson)
@@ -173,6 +175,7 @@ public class CoachingRepository {
 				.param("actorUserId", actorUserId)
 				.param("organizationId", organizationId)
 				.param("userId", userId)
+				.param("branchIds", branchIds)
 				.update();
 	}
 

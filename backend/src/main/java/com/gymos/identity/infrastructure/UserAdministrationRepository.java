@@ -133,19 +133,29 @@ public class UserAdministrationRepository {
 		return count > 0;
 	}
 
-	public boolean userBelongsToOrganization(UUID organizationId, UUID userId) {
-		Integer count = jdbcClient.sql("""
-				SELECT COUNT(*)
+	public boolean lockUser(UUID organizationId, UUID userId) {
+		return jdbcClient.sql("""
+				SELECT id
 				FROM user_account
 				WHERE id = :userId
 				  AND organization_id = :organizationId
 				  AND deleted_at IS NULL
+				FOR UPDATE
 				""")
 				.param("userId", userId)
 				.param("organizationId", organizationId)
-				.query(Integer.class)
-				.single();
-		return count > 0;
+				.query(UUID.class)
+				.optional().isPresent();
+	}
+
+	public List<UUID> activeBranchIds(UUID organizationId, UUID userId) {
+		return jdbcClient.sql("""
+				SELECT b.id
+				FROM user_branch_access uba
+				JOIN branch b ON b.id = uba.branch_id
+				WHERE uba.user_id = :userId AND b.organization_id = :organizationId
+				  AND b.status = 'ACTIVE' AND b.deleted_at IS NULL
+				""").param("userId", userId).param("organizationId", organizationId).query(UUID.class).list();
 	}
 
 	public Optional<UserCoachProfileData> userCoachProfileData(UUID organizationId, UUID userId) {
@@ -155,9 +165,9 @@ public class UserAdministrationRepository {
 				    TRIM(CONCAT(p.first_name, ' ', p.last_name, ' ', COALESCE(p.maternal_last_name, ''))) AS display_name,
 				    p.email,
 				    p.phone,
-				    COALESCE(array_remove(array_agg(DISTINCT uba.branch_id), NULL), ARRAY[]::uuid[]) AS branch_ids
+				    COALESCE(array_remove(array_agg(DISTINCT b.id), NULL), ARRAY[]::uuid[]) AS branch_ids
 				FROM user_account u
-				JOIN person p ON p.id = u.person_id
+				JOIN person p ON p.id = u.person_id AND p.organization_id = u.organization_id
 				LEFT JOIN user_branch_access uba ON uba.user_id = u.id
 				LEFT JOIN branch b ON b.id = uba.branch_id AND b.organization_id = u.organization_id AND b.deleted_at IS NULL
 				WHERE u.organization_id = :organizationId
@@ -317,11 +327,11 @@ public class UserAdministrationRepository {
 				        ARRAY[]::uuid[]
 				    ) AS branch_ids
 				FROM user_account u
-				JOIN person p ON p.id = u.person_id
+				JOIN person p ON p.id = u.person_id AND p.organization_id = u.organization_id
 				LEFT JOIN user_role ur ON ur.user_id = u.id
-				LEFT JOIN role r ON r.id = ur.role_id
+				LEFT JOIN role r ON r.id = ur.role_id AND (r.organization_id IS NULL OR r.organization_id = u.organization_id)
 				LEFT JOIN user_branch_access uba ON uba.user_id = u.id
-				LEFT JOIN branch b ON b.id = uba.branch_id AND b.deleted_at IS NULL
+				LEFT JOIN branch b ON b.id = uba.branch_id AND b.organization_id = u.organization_id AND b.deleted_at IS NULL
 				WHERE u.organization_id = :organizationId
 				  AND u.deleted_at IS NULL
 				GROUP BY u.id, p.first_name, p.last_name, p.maternal_last_name, u.username, p.email, p.phone, u.status

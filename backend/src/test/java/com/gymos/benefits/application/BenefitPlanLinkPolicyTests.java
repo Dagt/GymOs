@@ -133,22 +133,12 @@ class BenefitPlanLinkPolicyTests {
 		UUID clientId = UUID.randomUUID();
 		UUID benefitId = UUID.randomUUID();
 		UUID foreignBranchId = UUID.randomUUID();
-		when(repository.clientExists(organizationId, clientId)).thenReturn(true);
-		when(repository.benefit(organizationId, benefitId)).thenReturn(java.util.Optional.of(
-				new BenefitSummary(
-						benefitId, null, "STUDENT", "Estudiante", "STUDENT", "PERCENT",
-						null, 10.0, false, false, 10, null, null, "ACTIVE", List.of()
-				)
-		));
-		when(repository.branchExists(organizationId, foreignBranchId)).thenReturn(false);
-
 		assertThatThrownBy(() -> service.assignToClient(
 				principal,
 				new AssignClientBenefitCommand(
 						clientId, benefitId, foreignBranchId, LocalDate.now(), LocalDate.now().plusMonths(1), null),
 				"test"
-		)).isInstanceOfSatisfying(BusinessException.class,
-				exception -> assertThat(exception.code()).isEqualTo("BRANCH_NOT_AVAILABLE"));
+		)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
 	}
 
 	@Test

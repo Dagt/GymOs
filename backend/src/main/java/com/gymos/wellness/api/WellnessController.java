@@ -1,5 +1,6 @@
 package com.gymos.wellness.api;
 
+import com.gymos.clients.api.operations.ClientBranchAccess;
 import com.gymos.common.api.Correlation;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.wellness.application.WellnessService;
@@ -42,9 +43,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1")
 public class WellnessController {
 	private final WellnessService wellnessService;
+	private final ClientBranchAccess clients;
 
-	public WellnessController(WellnessService wellnessService) {
+	public WellnessController(WellnessService wellnessService, ClientBranchAccess clients) {
 		this.wellnessService = wellnessService;
+		this.clients = clients;
 	}
 
 	@GetMapping("/professionals")
@@ -137,6 +140,7 @@ public class WellnessController {
 			@Valid @RequestBody CreateAppointmentRequest request,
 			HttpServletRequest servletRequest
 	) {
+		clients.requireVisible(principal, request.clientId());
 		return wellnessService.createAppointment(principal, request.toCommand(), correlationId(servletRequest));
 	}
 

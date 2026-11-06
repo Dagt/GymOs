@@ -46,7 +46,7 @@ async function boot(page: Page, override?: (route: Route, path: string, url: URL
     if (path === "/auth/me") return void await json(route, currentUser);
     if (path === "/system/info") return void await json(route, { capabilities: ["operational-pagination-v1"] });
     if (path === "/organizations/current") return void await json(route, { id: orgId, tradeName: "Gimnasio de prueba" });
-    if (path.endsWith("/branches")) return void await json(route, [{ id: branchId, name: "Centro", code: "CEN" }]);
+    if (path.endsWith("/branches")) return void await json(route, [{ id: branchId, name: "Centro", code: "CEN", status: "ACTIVE" }]);
     if (path === "/benefits") return void await json(route, [benefit]);
     if (path === "/catalog/plans") return void await json(route, [{ id: vip, name: "VIP", durationDays: 30, status: "ACTIVE" }, { id: daily, name: "VIP diario", durationDays: 1, status: "ACTIVE" }]);
     if (path === "/users/internal") return void await json(route, staff);
@@ -256,14 +256,28 @@ test("cancelar un cambio de rol conserva el rol vigente en la fila", async ({ pa
   expect(mutations).toBe(0);
 });
 
-test("gerencia no ofrece recuperación para empleados ajenos a su sucursal", async ({ page }) => {
-  await boot(page, async (route, path) => path === "/users/internal" ? json(route, [staff[0], staff[1], { ...staff[1], id: "other-branch", fullName: "Coach Norte", branchIds: ["other-branch"], branches: ["Norte"] }]) : false,
-    { ...owner, roles: ["Gerente"], console: "TENANT_MANAGER" });
+test("gerencia ve su equipo y limita los cambios de cuentas que cubren otras sucursales", async ({ page }) => {
+  await boot(page, async (route, path) => path === "/users/internal" ? json(route, [
+    staff[0], staff[1],
+    { ...staff[1], id: "other-branch", fullName: "Coach Norte", branchIds: ["other-branch"], branches: ["Norte"] },
+    { ...staff[1], id: "shared-coach", fullName: "Coach Compartido", branchIds: [branchId, "other-branch"], branches: ["Centro", "Norte"] },
+  ]) : false, { ...owner, userId: "manager", roles: ["Gerente"], console: "TENANT_MANAGER" });
   await page.goto("/users");
   const rows = page.getByRole("region", { name: "Usuarios del gimnasio" }).getByRole("article");
   await expect(rows.filter({ hasText: "Coach Ana" }).getByRole("button", { name: "Recuperar contraseña" })).toBeVisible();
-  await expect(rows.filter({ hasText: "Coach Norte" }).getByRole("button", { name: "Recuperar contraseña" })).toHaveCount(0);
+  await expect(rows.filter({ hasText: "Coach Norte" })).toHaveCount(0);
+  await expect(rows.filter({ hasText: "Coach Compartido" }).getByText("Solo lectura")).toBeVisible();
   await expect(rows.filter({ hasText: "Dueño Prueba" })).toHaveCount(0);
+});
+
+test("un gerente con user.read puede consultar al equipo sin acciones de escritura", async ({ page }) => {
+  await boot(page, undefined, { ...owner, userId: "manager", roles: ["Gerente"], console: "TENANT_MANAGER",
+    permissions: owner.permissions.filter((permission) => permission !== "user.manage") });
+  await page.goto("/users");
+  await expect(page.getByText("Coach Ana", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Crear usuario" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Recuperar contraseña" })).toHaveCount(0);
+  await expect(page.getByRole("combobox", { name: "Rol de Coach Ana" })).toHaveCount(0);
 });
 
 test("los tres historiales de pagos solicitan 100 y mantienen scroll interno", async ({ page }) => {

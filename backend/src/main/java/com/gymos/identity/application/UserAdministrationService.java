@@ -71,6 +71,7 @@ public class UserAdministrationService {
 		String roleName = repository.roleName(command.roleId());
 		requireAssignableRole(principal, roleName);
 		List<UUID> branchIds = command.branchIds() == null ? List.of() : command.branchIds().stream().distinct().toList();
+		requireBranchManagement(principal, branchIds);
 		for (UUID branchId : branchIds) {
 			if (!repository.branchBelongsToOrganization(principal.organizationId(), branchId)) {
 				throw new BusinessException("BRANCH_NOT_AVAILABLE", "Una sucursal seleccionada no pertenece a este gimnasio.");
@@ -139,7 +140,7 @@ public class UserAdministrationService {
 		if (principal.userId().equals(userId) && !"ACTIVE".equals(normalizedStatus)) {
 			throw new BusinessException("SELF_STATUS_CHANGE_NOT_ALLOWED", "No puedes suspender tu propia cuenta.");
 		}
-		if (!repository.userBelongsToOrganization(principal.organizationId(), userId)) {
+		if (!repository.lockUser(principal.organizationId(), userId)) {
 			throw new BusinessException("USER_NOT_FOUND", "El usuario no pertenece a este gimnasio.");
 		}
 		InternalUserSummary targetUser = requireManageableUser(principal, userId);
@@ -165,7 +166,7 @@ public class UserAdministrationService {
 		if (principal.userId().equals(userId)) {
 			throw new BusinessException("SELF_ROLE_CHANGE_NOT_ALLOWED", "No puedes cambiar el rol de tu propia cuenta.");
 		}
-		if (!repository.userBelongsToOrganization(principal.organizationId(), userId)) {
+		if (!repository.lockUser(principal.organizationId(), userId)) {
 			throw new BusinessException("USER_NOT_FOUND", "El usuario no pertenece a este gimnasio.");
 		}
 		InternalUserSummary targetUser = requireManageableUser(principal, userId);
@@ -211,6 +212,7 @@ public class UserAdministrationService {
 		if (!canManageUser(principal, user.roles())) {
 			throw new BusinessException("USER_NOT_MANAGEABLE", "Tu perfil no puede administrar ese usuario.");
 		}
+		requireBranchManagement(principal, user.branchIds());
 		return user;
 	}
 
@@ -221,10 +223,6 @@ public class UserAdministrationService {
 			throw new org.springframework.security.access.AccessDeniedException("Staff password recovery is restricted");
 		}
 		InternalUserSummary user = requireManageableUser(principal, userId);
-		if (isPrincipalManager(principal) && !isPrincipalOwner(principal)
-				&& (principal.branchId() == null || !user.branchIds().contains(principal.branchId()))) {
-			throw new org.springframework.security.access.AccessDeniedException("Staff recovery is restricted to the selected branch");
-		}
 		if (!"ACTIVE".equals(user.status())) {
 			throw new BusinessException("PASSWORD_RESET_USER_INACTIVE", "Reactiva explícitamente al usuario antes de recuperar su acceso.");
 		}
@@ -287,7 +285,8 @@ public class UserAdministrationService {
 			return true;
 		}
 		if (isPrincipalManager(principal)) {
-			return targetUser.roles().stream()
+			return principal.branchId() != null && targetUser.branchIds().contains(principal.branchId())
+					&& targetUser.roles().stream()
 					.map(this::normalizeRoleName)
 					.noneMatch(role -> isOwnerRole(role) || isManagerRole(role));
 		}
@@ -319,6 +318,14 @@ public class UserAdministrationService {
 		return principal.roles().stream()
 				.map(this::normalizeRoleName)
 				.anyMatch(this::isOwnerRole);
+	}
+
+	private void requireBranchManagement(GymOsPrincipal principal, List<UUID> targetBranches) {
+		if (isPrincipalManager(principal) && !isPrincipalOwner(principal) && !principal.platformSupport()
+				&& (principal.branchId() == null || !targetBranches.contains(principal.branchId())
+				    || !repository.activeBranchIds(principal.organizationId(), principal.userId()).containsAll(targetBranches))) {
+			throw new org.springframework.security.access.AccessDeniedException("User operation exceeds the manager's assigned branches");
+		}
 	}
 
 	private boolean isPrincipalManager(GymOsPrincipal principal) {

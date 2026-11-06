@@ -61,8 +61,9 @@ public class BenefitRepository {
 			return benefits(organizationId);
 		}
 		return benefits(organizationId).stream()
-				.filter(benefit -> !"ACCESS".equals(benefit.benefitType())
-						|| accessBenefitCoversBranch(benefit, branchId))
+				.filter(benefit -> "ACCESS".equals(benefit.benefitType())
+						? accessBenefitCoversBranch(benefit, branchId)
+						: benefit.branchId() == null || branchId.equals(benefit.branchId()))
 				.toList();
 	}
 
@@ -345,7 +346,7 @@ public class BenefitRepository {
 				""")
 				.param("id", id)
 				.param("organizationId", principal.organizationId())
-				.param("branchId", command.branchId() == null ? principal.branchId() : command.branchId())
+				.param("branchId", principal.branchId())
 				.param("clientId", command.clientId())
 				.param("benefitId", command.benefitId())
 				.param("validFrom", command.validFrom())

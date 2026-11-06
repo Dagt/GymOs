@@ -96,7 +96,7 @@ export default function UsersPage() {
         setRoles(availableRoles);
         setUsers(existingUsers);
         setCoachProfiles(existingCoachProfiles);
-        const selectableRoles = availableRoles.filter((role) => canShowRoleForSession(stored.user.roles, role.name, stored.user.platformAdmin));
+        const selectableRoles = availableRoles.filter((role) => canShowRoleForSession(stored.user.roles, role.name, Boolean(stored.user.supportMode)));
         const defaultRole = selectableRoles.find((role) => displayRoleName(role.name) === "Recepcion") ?? selectableRoles[0];
         const defaultRoleLabel = displayRoleName(defaultRole?.name ?? "");
         setForm((current) => ({
@@ -127,15 +127,18 @@ export default function UsersPage() {
   }, []);
 
   const activeBranch = branches.find((branch) => branch.id === session?.user.branchId) ?? null;
-  const selectableRoles = roles.filter((role) => canShowRoleForSession(session?.user.roles ?? [], role.name, Boolean(session?.user.platformAdmin)));
-  const visibleUsers = users.filter((user) => canSeeUserForSession(session?.user.roles ?? [], user.roles, Boolean(session?.user.platformAdmin)));
+  const isSupport = Boolean(session?.user.supportMode);
+  const selectableRoles = roles.filter((role) => canShowRoleForSession(session?.user.roles ?? [], role.name, isSupport));
   const selectedRoleLabel = displayRoleName(selectableRoles.find((role) => role.id === form.roleId)?.name ?? "");
   const ownerRoleSelected = selectedRoleLabel === "Dueno del gimnasio";
   const coachRoleSelected = selectedRoleLabel === "Coach";
-  const managerSingleBranchLocked = selectedRoleLabel !== "Dueno del gimnasio"
-    && branches.length === 1
-    && (session?.user.roles ?? []).some((role) => displayRoleName(role) === "Gerente")
-    && !session?.user.platformAdmin;
+  const sessionRoleLabels = (session?.user.roles ?? []).map(displayRoleName);
+  const managerBranchId = !isSupport && !sessionRoleLabels.includes("Dueno del gimnasio")
+    && sessionRoleLabels.includes("Gerente") ? activeBranch?.id : undefined;
+  const managerSingleBranchLocked = Boolean(managerBranchId) && branches.length === 1;
+  const visibleUsers = users.filter((user) => user.id === session?.user.userId
+    || (canSeeUserForSession(session?.user.roles ?? [], user.roles, isSupport)
+      && (!managerBranchId || user.branchIds.includes(managerBranchId))));
 
   async function submitUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -203,7 +206,7 @@ export default function UsersPage() {
   }
 
   function updateBranchAccess(branchId: string, checked: boolean) {
-    if (managerSingleBranchLocked) {
+    if (managerSingleBranchLocked || (!checked && branchId === managerBranchId)) {
       return;
     }
     setForm((current) => ({
@@ -224,7 +227,7 @@ export default function UsersPage() {
         ? branches.map((branch) => branch.id)
         : branches.length === 1
           ? [branches[0].id]
-          : current.branchIds,
+          : managerBranchId ? [...new Set([managerBranchId, ...current.branchIds])] : current.branchIds,
     }));
     setShowCreateUser(true);
   }
@@ -364,9 +367,10 @@ export default function UsersPage() {
       {error ? <FormError message={error} /> : null}
       {message ? <AppNotice message={message} tone="success" /> : null}
 
-      <TeamOverview branches={branches} roles={selectableRoles} onCreateUser={openCreateUser} />
+      <TeamOverview branches={branches} roles={selectableRoles} canCreateUser={session.user.permissions.includes("user.manage")} onCreateUser={openCreateUser} />
 
       <UsersTable
+        branches={branches}
         roles={selectableRoles}
         saving={saving}
         session={session}

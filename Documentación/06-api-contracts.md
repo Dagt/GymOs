@@ -2,6 +2,15 @@
 
 Base path: `/api/v1`
 
+## Alcance y autorización
+
+El [inventario de endpoints](../docs/security/endpoint-permissions.md) registra la ruta y la autoridad HTTP de cada operación. La organización y la sucursal se obtienen del contexto firmado y revalidado. Las operaciones que aceptan una sucursal explícita verifican asignación, alcance de soporte, origen/destino o cobertura según su contrato.
+
+- `POST /benefits` y `POST /clients/{clientId}/benefits` admiten `branchId` omitido o igual a la sede activa. Un valor diferente devuelve `403 PERMISSION_DENIED`.
+- Los recursos de socio fuera de la visibilidad del operador devuelven `CLIENT_NOT_FOUND`, con el mismo código que un UUID inexistente. El detalle POS requiere la sede activa y devuelve `SALE_NOT_FOUND` para ventas no disponibles.
+- `POST /sales/{saleId}/payments` admite `receiptObjectKey` nulo por compatibilidad. Las referencias nuevas se generan mediante `POST /sales/payments/{paymentId}/receipt`.
+- `GET /kiosk-settings/branches` muestra sedes activas asignadas o las del tenant de soporte. `PUT /kiosk-settings/branches/{branchId}` aplica el mismo alcance. Un UUID de sesión kiosco inexistente o un token incorrecto devuelve `SELF_SERVICE_SESSION_INVALID`.
+
 ## 6.1 Auth
 
 - `POST /auth/login`

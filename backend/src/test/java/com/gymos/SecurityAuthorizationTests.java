@@ -38,7 +38,13 @@ class SecurityAuthorizationTests {
 
 	@BeforeEach
 	void activeFixtureCredentials() {
-		org.mockito.Mockito.when(credentialVersions.isCurrent(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyLong())).thenReturn(true);
+		org.mockito.Mockito.when(credentialVersions.isCurrent(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+	}
+
+	@Test
+	@WithMockUser(authorities = "platform.admin")
+	void unclassifiedOperationsFailClosed() throws Exception {
+		mockMvc.perform(get("/api/v1/unclassified-operation")).andExpect(status().isForbidden());
 	}
 
 	@Test
@@ -60,7 +66,7 @@ class SecurityAuthorizationTests {
 
 	@Test
 	void revokedJwtIsRejectedBeforeController() throws Exception {
-		org.mockito.Mockito.when(credentialVersions.isCurrent(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyLong())).thenReturn(false);
+		org.mockito.Mockito.when(credentialVersions.isCurrent(org.mockito.ArgumentMatchers.any())).thenReturn(false);
 		String token = jwtService.accessToken(new GymOsPrincipal(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "coach", "Coach", Set.of("client.read")));
 		mockMvc.perform(get("/api/v1/clients/search").header("Authorization", "Bearer " + token))
 				.andExpect(status().isUnauthorized());

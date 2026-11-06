@@ -1,6 +1,7 @@
 package com.gymos.inventory.infrastructure;
 
 import com.gymos.common.api.PageResponse;
+import com.gymos.common.api.BusinessException;
 import com.gymos.inventory.application.query.InventoryHistorySearchCriteria;
 import com.gymos.inventory.application.query.InventoryTransferItemView;
 import com.gymos.inventory.application.query.InventoryTransferView;
@@ -26,6 +27,8 @@ class InventoryTransferRepository {
 	PageResponse<InventoryTransferView> search(UUID organizationId, UUID branchId, InventoryHistorySearchCriteria criteria) {
 		long total = jdbcClient.sql("""
 				SELECT COUNT(*) FROM inventory_transfer t
+				JOIN branch destination ON destination.id = t.destination_branch_id
+				  AND destination.organization_id = t.organization_id
 				WHERE t.organization_id=:organizationId AND (t.origin_branch_id=:branchId OR t.destination_branch_id=:branchId)
 				""" + activeFilter(criteria))
 				.param("organizationId", organizationId).param("branchId", branchId).query(Long.class).single();
@@ -44,7 +47,7 @@ class InventoryTransferRepository {
 				       t.shipped_at, t.shipped_by, t.received_at, t.received_by
 				FROM inventory_transfer t
 				JOIN branch ob ON ob.id = t.origin_branch_id
-				JOIN branch db ON db.id = t.destination_branch_id
+				JOIN branch db ON db.id = t.destination_branch_id AND db.organization_id = t.organization_id
 				WHERE t.organization_id = :organizationId
 				  AND (t.origin_branch_id = :branchId OR t.destination_branch_id = :branchId)
 				""" + activeFilter(criteria) + " ORDER BY t.created_at DESC, t.id DESC LIMIT :size OFFSET :offset")
@@ -96,7 +99,7 @@ class InventoryTransferRepository {
 				       t.shipped_at, t.shipped_by, t.received_at, t.received_by
 				FROM inventory_transfer t
 				JOIN branch ob ON ob.id = t.origin_branch_id
-				JOIN branch db ON db.id = t.destination_branch_id
+				JOIN branch db ON db.id = t.destination_branch_id AND db.organization_id = t.organization_id
 				WHERE t.organization_id = :organizationId AND t.id = :transferId
 				  AND (t.origin_branch_id = :branchId OR t.destination_branch_id = :branchId)
 				""")
@@ -139,16 +142,21 @@ class InventoryTransferRepository {
 
 	UUID create(UUID organizationId, UUID originBranchId, UUID destinationBranchId, String notes, UUID actorUserId, OffsetDateTime now) {
 		UUID id = UUID.randomUUID();
-		jdbcClient.sql("""
+		int inserted = jdbcClient.sql("""
 				INSERT INTO inventory_transfer (
 				 id, organization_id, origin_branch_id, destination_branch_id, status, notes, created_at, updated_at, created_by, version
-				) VALUES (
-				 :id, :organizationId, :originBranchId, :destinationBranchId, 'REQUESTED', :notes, :now, :now, :actorUserId, 0
 				)
+				SELECT :id, :organizationId, :originBranchId, destination.id, 'REQUESTED', :notes, :now, :now, :actorUserId, 0
+				FROM branch destination
+				WHERE destination.id = :destinationBranchId AND destination.organization_id = :organizationId
+				  AND destination.status = 'ACTIVE' AND destination.deleted_at IS NULL
 				""")
 				.param("id", id).param("organizationId", organizationId)
 				.param("originBranchId", originBranchId).param("destinationBranchId", destinationBranchId)
 				.param("notes", notes).param("now", now).param("actorUserId", actorUserId).update();
+		if (inserted == 0) {
+			throw new BusinessException("INVENTORY_TRANSFER_DESTINATION_NOT_FOUND", "La sucursal destino no está disponible.");
+		}
 		return id;
 	}
 

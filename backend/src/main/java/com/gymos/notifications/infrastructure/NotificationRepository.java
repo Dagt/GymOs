@@ -103,6 +103,18 @@ public class NotificationRepository {
 				.single();
 	}
 
+	public boolean userAssignedToBranch(UUID organizationId, UUID branchId, UUID recipientId) {
+		return jdbcClient.sql("""
+				SELECT EXISTS (
+				    SELECT 1 FROM user_account u
+				    JOIN user_branch_access uba ON uba.user_id = u.id
+				    WHERE u.id = :recipientId AND u.organization_id = :organizationId
+				      AND u.deleted_at IS NULL AND uba.branch_id = :branchId
+				)
+				""").param("organizationId", organizationId).param("branchId", branchId)
+				.param("recipientId", recipientId).query(Boolean.class).single();
+	}
+
 	public Optional<RecipientRecord> recipient(UUID organizationId, String recipientType, UUID recipientId) {
 		if ("CLIENT".equals(recipientType)) {
 			return jdbcClient.sql("""
@@ -337,14 +349,15 @@ public class NotificationRepository {
 				.param("availableAt", availableAt).param("error", error).param("now", now).update();
 	}
 
-	public boolean requeueDeadLetter(UUID organizationId, UUID notificationId, OffsetDateTime now) {
+	public boolean requeueDeadLetter(UUID organizationId, UUID branchId, UUID notificationId, OffsetDateTime now) {
 		return jdbcClient.sql("""
 				UPDATE notification_log SET status = 'QUEUED', attempt_count = 0,
 				 available_at = :now, locked_until = NULL, error_message = NULL,
 				 updated_at = :now, version = version + 1
 				WHERE organization_id = :organizationId AND id = :notificationId
+				  AND (branch_id = :branchId OR branch_id IS NULL)
 				  AND channel = 'EMAIL' AND status = 'DEAD_LETTER'
-				""").param("organizationId", organizationId).param("notificationId", notificationId)
+				""").param("organizationId", organizationId).param("branchId", branchId).param("notificationId", notificationId)
 				.param("now", now).update() == 1;
 	}
 
