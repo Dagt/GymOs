@@ -588,7 +588,7 @@ class TenantIsolationPostgresIntegrationTests {
 		}
 		for (UUID outside : Set.of(northSale, foreignSale, UUID.randomUUID())) {
 			http.perform(auth(post("/api/v1/sales/{id}/payments", outside), token).contentType("application/json")
-							.content("{\"method\":\"CASH\",\"amountCents\":10000}"))
+							.content("{\"method\":\"CASH\",\"amountCents\":10000,\"validateNow\":false}"))
 					.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("SALE_NOT_FOUND"));
 			http.perform(auth(post("/api/v1/sales/{id}/refunds", outside), token).contentType("application/json")
 							.content("{\"amountCents\":10,\"reason\":\"Prueba ajena\"}"))
