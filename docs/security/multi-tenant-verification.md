@@ -5,7 +5,7 @@ Estado: VIGENTE / EJECUCIÓN PARCIAL
 
 ## Auditoría del issue #29
 
-Base revisada `58a5d4d4b24bcc598059b05a4ac70d11a2fe937b`, que incorpora el PR #65. El [inventario de endpoints](endpoint-permissions.md) registra 298 rutas de Spring y sus autoridades. Las pruebas HTTP usan JWT firmados por el backend, el filtro real, servicios y JDBC con PostgreSQL 18 migrado por Flyway. Las pruebas Playwright de Equipo prueban el contrato visual con API interceptada.
+Base revisada `58a5d4d4b24bcc598059b05a4ac70d11a2fe937b`, que incorpora el PR #65. El [inventario de endpoints](endpoint-permissions.md) registra 298 rutas de Spring y sus autoridades. Las pruebas HTTP usan JWT firmados por el backend, el filtro real, servicios y JDBC con PostgreSQL 18 migrado por Flyway. La emisión de sesión usa Redis 8 efímero. Las pruebas Playwright de Equipo prueban el contrato visual con API interceptada.
 
 | Superficie | Límite aplicado | Evidencia y hallazgos |
 | --- | --- | --- |

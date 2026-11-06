@@ -23,11 +23,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -38,6 +40,7 @@ import tools.jackson.databind.ObjectMapper;
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class TenantIsolationPostgresIntegrationTests {
 	private static final String KIOSK_SETTINGS = """
 			{"clientRegistration":false,"membershipEnrollment":true,"visitPackagePurchase":false,
@@ -48,11 +51,16 @@ class TenantIsolationPostgresIntegrationTests {
 	@Container
 	static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18-alpine");
 
+	@Container
+	static final GenericContainer<?> redis = new GenericContainer<>("redis:8-alpine").withExposedPorts(6379);
+
 	@DynamicPropertySource
 	static void database(DynamicPropertyRegistry properties) {
 		properties.add("spring.datasource.url", postgres::getJdbcUrl);
 		properties.add("spring.datasource.username", postgres::getUsername);
 		properties.add("spring.datasource.password", postgres::getPassword);
+		properties.add("spring.data.redis.host", redis::getHost);
+		properties.add("spring.data.redis.port", () -> redis.getMappedPort(6379));
 	}
 
 	@Autowired MockMvc http;
