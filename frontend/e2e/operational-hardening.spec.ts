@@ -93,6 +93,16 @@ test("edita Sauna, conserva VIP y añade el plan VIP diario sin duplicar el bene
   await expect(page.getByRole("button", { name: "Editar Sauna" })).toHaveCount(1);
 });
 
+test("una sede puede consultar un beneficio compartido sin editar la definición de otra sucursal", async ({ page }) => {
+  await boot(page, async (route, path) => path === "/benefits" ? json(route, [
+    benefit, { ...benefit, id: "other-benefit", branchId: "other-branch", name: "Acceso compartido", accessScope: "PLAN_COVERAGE" },
+  ]) : false);
+  await page.goto("/benefits");
+  await expect(page.getByText("Acceso compartido", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Editar Acceso compartido" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Editar Sauna" })).toBeVisible();
+});
+
 test("editar un acceso preserva sus vigencias y evidencia históricas sin exponer controles", async ({ page }) => {
   const legacy = { ...benefit, validFrom: "2026-01-01", validUntil: "2027-01-01", requiresEvidence: true };
   let payload: Record<string, unknown> | null = null;

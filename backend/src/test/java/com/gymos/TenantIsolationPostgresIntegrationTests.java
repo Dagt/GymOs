@@ -39,6 +39,12 @@ import tools.jackson.databind.ObjectMapper;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class TenantIsolationPostgresIntegrationTests {
+	private static final String KIOSK_SETTINGS = """
+			{"clientRegistration":false,"membershipEnrollment":true,"visitPackagePurchase":false,
+			 "membershipRenewal":true,"membershipPlanChange":true,"resourceBooking":true,
+			 "wellnessBooking":false,"profileUpdate":true,"autopay":true}
+			""";
+
 	@Container
 	static final PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:18-alpine");
 
@@ -127,23 +133,18 @@ class TenantIsolationPostgresIntegrationTests {
 				 "discountType":"PERCENT","discountPercent":10,"status":"ACTIVE",
 				 "requiresEvidence":false,"combinable":false,"priority":10}
 				""";
-		String kioskSettings = """
-				{"clientRegistration":false,"membershipEnrollment":true,"visitPackagePurchase":false,
-				 "membershipRenewal":true,"membershipPlanChange":true,"resourceBooking":true,
-				 "wellnessBooking":false,"profileUpdate":true,"autopay":true}
-				""";
 		for (UUID unavailable : Set.of(north, foreign.branchId)) {
 			http.perform(auth(post("/api/v1/benefits"), token).contentType("application/json")
 					.content(definition.formatted(unavailable))).andExpect(status().isForbidden());
 			http.perform(auth(put("/api/v1/kiosk-settings/branches/{id}", unavailable), token)
-							.contentType("application/json").content(kioskSettings))
+							.contentType("application/json").content(KIOSK_SETTINGS))
 					.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("KIOSK_BRANCH_NOT_FOUND"));
 		}
 		http.perform(auth(get("/api/v1/kiosk-settings/branches"), token))
 				.andExpect(jsonPath("$.length()").value(1)).andExpect(jsonPath("$[0].branchId").value(tenant.branchId.toString()));
 		assignBranch(tenant.ownerId, north);
 		http.perform(auth(put("/api/v1/kiosk-settings/branches/{id}", north), token)
-						.contentType("application/json").content(kioskSettings))
+						.contentType("application/json").content(KIOSK_SETTINGS))
 				.andExpect(status().isOk());
 		http.perform(auth(post("/api/v1/benefits"), token).contentType("application/json")
 				.content(definition.formatted(north))).andExpect(status().isForbidden());
@@ -174,10 +175,10 @@ class TenantIsolationPostgresIntegrationTests {
 				.query(Integer.class).single()).isZero();
 		jdbc.sql("UPDATE sale SET status='PAID', paid_cents=total_cents, balance_cents=0 WHERE id=:id")
 				.param("id", localSale).update();
-		String reportDate = OffsetDateTime.now(ZoneOffset.UTC).toLocalDate().toString();
+		var reportDate = OffsetDateTime.now(ZoneOffset.UTC).toLocalDate();
 		http.perform(auth(get("/api/v1/reports/owner-dashboard"), token).param("branchId", north.toString())
 						.param("organizationId", foreign.organizationId.toString())
-						.param("fromDate", reportDate).param("toDate", reportDate))
+						.param("fromDate", reportDate.minusDays(1).toString()).param("toDate", reportDate.toString()))
 				.andExpect(status().isOk()).andExpect(jsonPath("$.saleCount").value(1))
 				.andExpect(jsonPath("$.paidRevenueCents").value(100)).andExpect(jsonPath("$.newClients").value(1));
 	}
@@ -398,7 +399,7 @@ class TenantIsolationPostgresIntegrationTests {
 				VALUES (:id, :person, :username, 'test-hash', 'ACTIVE', 'PLATFORM', now(), now())
 				""").param("id", platform).param("person", person).param("username", platform.toString()).update();
 		var support = new GymOsPrincipal(platform, AccountScope.PLATFORM, tenant.organizationId, tenant.branchId,
-				"support", "Soporte QA", Set.of("branch.read", "client.read", "access.check-in"),
+				"support", "Soporte QA", Set.of("branch.read", "client.read", "access.check-in", "selfservice.settings.manage"),
 				Set.of("Administrador GymOS"), true, java.time.Instant.now().plusSeconds(60));
 		String token = jwt.accessToken(support);
 		http.perform(auth(get("/api/v1/organizations/{id}/branches", tenant.organizationId), token)).andExpect(status().isOk());
@@ -407,6 +408,15 @@ class TenantIsolationPostgresIntegrationTests {
 		http.perform(auth(get("/api/v1/clients/{id}", foreign.client()), token)).andExpect(status().isBadRequest());
 		http.perform(auth(get("/api/v1/access/manual-check-ins"), token)).andExpect(status().isForbidden());
 		http.perform(auth(get("/api/v1/platform/customers"), token)).andExpect(status().isForbidden());
+		http.perform(auth(put("/api/v1/kiosk-settings/branches/{id}", foreign.branchId), token)
+				.contentType("application/json").content(KIOSK_SETTINGS)).andExpect(status().isBadRequest());
+		http.perform(auth(put("/api/v1/kiosk-settings/branches/{id}", tenant.branchId), token)
+				.contentType("application/json").content(KIOSK_SETTINGS)).andExpect(status().isOk());
+		assertThat(jdbc.sql("""
+				SELECT origin FROM audit_log WHERE organization_id=:org AND branch_id=:branch
+				  AND actor_user_id=:actor AND action='KIOSK_BRANCH_SETTINGS_UPDATED' AND entity_id=:branch
+				""").param("org", tenant.organizationId).param("branch", tenant.branchId).param("actor", platform)
+				.query(String.class).single()).isEqualTo("PLATFORM_SUPPORT");
 	}
 
 	private MockHttpServletRequestBuilder auth(MockHttpServletRequestBuilder request, String token) {
