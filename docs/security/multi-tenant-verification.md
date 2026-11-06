@@ -37,7 +37,7 @@ Base revisada `58a5d4d4b24bcc598059b05a4ac70d11a2fe937b`, que incorpora el PR #6
 
 ### Criterios de cierre y deuda
 
-Las cuatro regresiones se ejecutaron también contra `55e7376347f463730ce2130b7d467e35a6e6c51b`. La reserva aceptó una venta de otro socio, la consulta de preferencias fuera de alcance devolvió 200, el directorio listó un rol de otro tenant y el detalle POS devolvió una clave histórica de comprobante ajeno.
+Las regresiones se ejecutaron también contra `55e7376347f463730ce2130b7d467e35a6e6c51b`. La reserva aceptó una venta de otro socio, la consulta de preferencias fuera de alcance devolvió 200, el directorio listó un rol de otro tenant y el detalle POS devolvió una clave histórica de comprobante ajeno. La validación de un pago de otra sucursal devolvió `PAYMENT_EXCEEDS_BALANCE` porque una comprobación financiera corría antes de autorizar la sucursal.
 
 | Clase | Evidencia | Seguimiento |
 | --- | --- | --- |

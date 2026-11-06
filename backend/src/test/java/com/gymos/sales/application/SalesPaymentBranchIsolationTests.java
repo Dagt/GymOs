@@ -20,7 +20,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.aop.aspectj.annotation.AspectJProxyFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.web.multipart.MultipartFile;
@@ -116,18 +115,13 @@ class SalesPaymentBranchIsolationTests {
 		AuditService auditService = mock(AuditService.class);
 		ObjectStorageService objectStorageService = mock(ObjectStorageService.class);
 		ApplicationEventPublisher eventPublisher = mock(ApplicationEventPublisher.class);
-		SalesService target = SalesServiceTestFactory.create(
+		SalesService service = SalesServiceTestFactory.create(
 				jdbcClient,
 				salesRepository,
 				auditService,
 				objectStorageService,
 				eventPublisher
 		);
-		AspectJProxyFactory proxyFactory = new AspectJProxyFactory(target);
-		proxyFactory.setProxyTargetClass(true);
-		proxyFactory.addAspect(new SalesPaymentBranchGuard(salesRepository));
-		SalesService service = proxyFactory.getProxy();
-
 		UUID organizationId = UUID.randomUUID();
 		UUID activeBranchId = UUID.randomUUID();
 		UUID foreignBranchId = UUID.randomUUID();

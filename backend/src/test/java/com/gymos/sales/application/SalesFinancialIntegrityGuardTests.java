@@ -35,9 +35,6 @@ class SalesFinancialIntegrityGuardTests {
 		Fixture fixture = fixture(5_000, 4_000);
 		when(fixture.salesRepository().payment(fixture.organizationId(), fixture.paymentId()))
 				.thenReturn(Optional.of(payment(fixture.paymentId(), "PENDING_VALIDATION", 5_000)));
-		when(fixture.salesRepository().saleIdForPayment(fixture.organizationId(), fixture.paymentId()))
-				.thenReturn(Optional.of(fixture.saleId()));
-
 		assertThatThrownBy(() -> fixture.guard().guardValidatedPayment(fixture.principal(), fixture.paymentId()))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.code()).isEqualTo("PAYMENT_EXCEEDS_BALANCE"));
@@ -93,6 +90,7 @@ class SalesFinancialIntegrityGuardTests {
 				"MXN", null, now, now, now
 		);
 		when(salesRepository.saleHeader(organizationId, saleId)).thenReturn(Optional.of(sale));
+		when(salesRepository.saleIdForPayment(organizationId, paymentId)).thenReturn(Optional.of(saleId));
 		return new Fixture(guard, salesRepository, integrityRepository, principal, organizationId, saleId, paymentId);
 	}
 

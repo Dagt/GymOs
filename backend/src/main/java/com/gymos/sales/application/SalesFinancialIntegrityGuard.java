@@ -43,13 +43,13 @@ class SalesFinancialIntegrityGuard {
 		if (principal == null || request == null) {
 			return;
 		}
+		var sale = SalesRecordResolver.requireSaleForBranch(salesRepository, principal, saleId);
 		paymentConfigurationService.requireReceptionMethod(principal.organizationId(), principal.branchId(), request.method());
 		requireProviderPending(request);
 		String key = normalizedKey(request.idempotencyKey());
 		if (key != null && integrityRepository.paymentSaleByIdempotencyKey(principal.organizationId(), key).isPresent()) {
 			return;
 		}
-		var sale = SalesRecordResolver.requireSale(salesRepository, principal.organizationId(), saleId);
 		if (request.amountCents() > sale.balanceCents()) {
 			throw new BusinessException("PAYMENT_EXCEEDS_BALANCE", "El pago no puede superar el saldo pendiente de la venta.");
 		}
@@ -60,6 +60,7 @@ class SalesFinancialIntegrityGuard {
 		if (principal == null) {
 			return;
 		}
+		var sale = SalesRecordResolver.requirePaymentSaleForBranch(salesRepository, principal, paymentId);
 		var payment = SalesRecordResolver.requirePayment(salesRepository, principal.organizationId(), paymentId);
 		if ("CARD_MERCADO_PAGO".equals(payment.method()) || "CARD_ONLINE".equals(payment.method())) {
 			throw new BusinessException("PROVIDER_PAYMENT_MANUAL_VALIDATION_FORBIDDEN", "Este pago solo puede confirmarse mediante el webhook firmado del proveedor.");
@@ -67,12 +68,6 @@ class SalesFinancialIntegrityGuard {
 		if ("COMPLETED".equals(payment.status())) {
 			return;
 		}
-		UUID saleId = SalesRecordResolver.requireSaleIdForPayment(
-				salesRepository,
-				principal.organizationId(),
-				paymentId
-		);
-		var sale = SalesRecordResolver.requireSale(salesRepository, principal.organizationId(), saleId);
 		if (payment.amountCents() > sale.balanceCents()) {
 			throw new BusinessException("PAYMENT_EXCEEDS_BALANCE", "El pago no puede superar el saldo pendiente de la venta.");
 		}
@@ -81,6 +76,7 @@ class SalesFinancialIntegrityGuard {
 	@Before("execution(* com.gymos.sales.application.SalesService.rejectPayment(..)) && args(principal,paymentId,..)")
 	void guardProviderPaymentRejection(GymOsPrincipal principal, UUID paymentId) {
 		if (principal == null) return;
+		SalesRecordResolver.requirePaymentSaleForBranch(salesRepository, principal, paymentId);
 		var payment = SalesRecordResolver.requirePayment(salesRepository, principal.organizationId(), paymentId);
 		if ("CARD_MERCADO_PAGO".equals(payment.method()) || "CARD_ONLINE".equals(payment.method())) {
 			throw new BusinessException(
@@ -95,9 +91,14 @@ class SalesFinancialIntegrityGuard {
 		if (principal == null || request == null || request.paymentId() == null) {
 			return;
 		}
+		SalesRecordResolver.requireSaleForBranch(salesRepository, principal, saleId);
 		String key = normalizedKey(request.idempotencyKey());
 		if (key != null && salesRepository.refundByIdempotencyKey(principal.organizationId(), key).isPresent()) {
 			return;
+		}
+		var paymentSale = SalesRecordResolver.requirePaymentSaleForBranch(salesRepository, principal, request.paymentId());
+		if (!saleId.equals(paymentSale.id())) {
+			throw new BusinessException("PAYMENT_SALE_MISMATCH", "El pago no pertenece a la venta.");
 		}
 		var payment = SalesRecordResolver.requirePayment(
 				salesRepository,

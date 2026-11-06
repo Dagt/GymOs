@@ -568,7 +568,8 @@ class TenantIsolationPostgresIntegrationTests {
 		UUID northPayment = payment(tenant.organizationId, north, northSale);
 		UUID foreignPayment = payment(foreign.organizationId, foreign.branchId, foreignSale);
 		String token = token(tenant.ownerId, tenant.branchId,
-				Set.of("payment.manual.validate", "payment.manual.reject", "payment.receipt.upload", "sale.refund", "sale.create"), "Gerente");
+				Set.of("payment.manual.create", "payment.manual.validate", "payment.manual.reject",
+						"payment.receipt.upload", "sale.refund", "sale.create"), "Gerente");
 		var file = new MockMultipartFile("file", "qa.pdf", "application/pdf", new byte[] {1});
 		for (UUID outside : Set.of(northPayment, foreignPayment, UUID.randomUUID())) {
 			http.perform(auth(post("/api/v1/sales/payments/{id}/validate", outside), token))
@@ -586,6 +587,9 @@ class TenantIsolationPostgresIntegrationTests {
 					.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("PAYMENT_NOT_FOUND"));
 		}
 		for (UUID outside : Set.of(northSale, foreignSale, UUID.randomUUID())) {
+			http.perform(auth(post("/api/v1/sales/{id}/payments", outside), token).contentType("application/json")
+							.content("{\"method\":\"CASH\",\"amountCents\":10000}"))
+					.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("SALE_NOT_FOUND"));
 			http.perform(auth(post("/api/v1/sales/{id}/refunds", outside), token).contentType("application/json")
 							.content("{\"amountCents\":10,\"reason\":\"Prueba ajena\"}"))
 					.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("SALE_NOT_FOUND"));
