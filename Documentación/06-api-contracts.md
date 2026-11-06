@@ -13,6 +13,7 @@ El [inventario de endpoints](../docs/security/endpoint-permissions.md) registra 
 - `POST /bookings/{bookingId}/payments` requiere que la venta pertenezca al socio de la reserva y a su sucursal y organización. Una venta anónima, ajena o inexistente devuelve `SALE_NOT_FOUND`. El detalle omite asociaciones históricas fuera de alcance.
 - Para consultar o cambiar preferencias de correo con `client.update`, la dirección debe corresponder a un socio visible desde la sede activa. `notification.manage` y `notification.settings.manage` conservan el alcance de organización.
 - El detalle POS sólo devuelve referencias de comprobante bajo el prefijo del tenant, la venta y el pago correspondientes.
+- Las mutaciones de ventas y pagos devuelven `SALE_NOT_FOUND` o `PAYMENT_NOT_FOUND` tanto para UUIDs inexistentes como para los de otra sucursal o tenant. `PAYMENT_SALE_MISMATCH` sigue disponible para un pago visible de otra venta.
 
 ## 6.1 Auth
 

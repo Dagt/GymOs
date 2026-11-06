@@ -28,8 +28,7 @@ class SalesPaymentLifecycleService {
 	}
 
 	UUID validate(GymOsPrincipal principal, UUID paymentId, String correlationId) {
-		UUID saleId = lookupService.saleIdForPayment(principal, paymentId);
-		lookupService.saleForBranch(principal, saleId);
+		UUID saleId = lookupService.saleForPayment(principal, paymentId).id();
 		var payment = lookupService.payment(principal, paymentId);
 		if ("COMPLETED".equals(payment.status())) return saleId;
 		commandRepository.complete(principal.organizationId(), paymentId, principal.userId(), OffsetDateTime.now());
@@ -39,8 +38,7 @@ class SalesPaymentLifecycleService {
 	}
 
 	UUID reject(GymOsPrincipal principal, UUID paymentId, String reason, String correlationId) {
-		UUID saleId = lookupService.saleIdForPayment(principal, paymentId);
-		lookupService.saleForBranch(principal, saleId);
+		UUID saleId = lookupService.saleForPayment(principal, paymentId).id();
 		var payment = lookupService.payment(principal, paymentId);
 		if ("COMPLETED".equals(payment.status())) {
 			throw new BusinessException("PAYMENT_ALREADY_COMPLETED", "No puedes rechazar un pago completado.");

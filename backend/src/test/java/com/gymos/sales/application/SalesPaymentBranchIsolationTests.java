@@ -46,7 +46,7 @@ class SalesPaymentBranchIsolationTests {
 				"test-correlation"
 		))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
-						assertThat(exception.code()).isEqualTo("SALE_BRANCH_MISMATCH"));
+						assertThat(exception.code()).isEqualTo("SALE_NOT_FOUND"));
 
 		verify(fixture.salesRepository()).saleHeader(fixture.organizationId(), fixture.saleId());
 		verifyNoInteractions(fixture.jdbcClient(), fixture.auditService(), fixture.objectStorageService(), fixture.eventPublisher());
@@ -65,7 +65,7 @@ class SalesPaymentBranchIsolationTests {
 				"test-correlation"
 		))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
-						assertThat(exception.code()).isEqualTo("SALE_BRANCH_MISMATCH"));
+						assertThat(exception.code()).isEqualTo("PAYMENT_NOT_FOUND"));
 
 		verify(fixture.salesRepository()).saleIdForPayment(fixture.organizationId(), fixture.paymentId());
 		verify(fixture.salesRepository()).saleHeader(fixture.organizationId(), fixture.saleId());
@@ -83,7 +83,7 @@ class SalesPaymentBranchIsolationTests {
 				"test-correlation"
 		))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
-						assertThat(exception.code()).isEqualTo("SALE_BRANCH_MISMATCH"));
+						assertThat(exception.code()).isEqualTo("PAYMENT_NOT_FOUND"));
 
 		verify(fixture.salesRepository()).saleIdForPayment(fixture.organizationId(), fixture.paymentId());
 		verify(fixture.salesRepository()).saleHeader(fixture.organizationId(), fixture.saleId());
@@ -102,7 +102,7 @@ class SalesPaymentBranchIsolationTests {
 				"test-correlation"
 		))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
-						assertThat(exception.code()).isEqualTo("SALE_BRANCH_MISMATCH"));
+						assertThat(exception.code()).isEqualTo("PAYMENT_NOT_FOUND"));
 
 		verify(fixture.salesRepository()).saleIdForPayment(fixture.organizationId(), fixture.paymentId());
 		verify(fixture.salesRepository()).saleHeader(fixture.organizationId(), fixture.saleId());

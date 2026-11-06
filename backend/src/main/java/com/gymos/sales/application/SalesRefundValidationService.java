@@ -106,9 +106,9 @@ class SalesRefundValidationService {
 
 	private void validatePaymentSelection(GymOsPrincipal principal, UUID saleId, RequestRefundCommand request) {
 		if (request.paymentId() == null) return;
-		var payment = lookupService.payment(principal, request.paymentId());
-		UUID paymentSaleId = lookupService.saleIdForPayment(principal, request.paymentId());
+		UUID paymentSaleId = lookupService.saleForPayment(principal, request.paymentId()).id();
 		if (!paymentSaleId.equals(saleId)) throw new BusinessException("PAYMENT_SALE_MISMATCH", "El pago no pertenece a la venta.");
+		var payment = lookupService.payment(principal, request.paymentId());
 		if (!"COMPLETED".equals(payment.status())) throw new BusinessException("PAYMENT_NOT_COMPLETED", "Solo puedes reembolsar pagos completados.");
 		if (request.amountCents() > payment.amountCents()) throw new BusinessException("REFUND_EXCEEDS_PAYMENT", "El reembolso no puede superar el pago seleccionado.");
 	}

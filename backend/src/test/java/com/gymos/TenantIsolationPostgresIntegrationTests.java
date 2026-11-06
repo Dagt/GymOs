@@ -568,19 +568,29 @@ class TenantIsolationPostgresIntegrationTests {
 		UUID northPayment = payment(tenant.organizationId, north, northSale);
 		UUID foreignPayment = payment(foreign.organizationId, foreign.branchId, foreignSale);
 		String token = token(tenant.ownerId, tenant.branchId,
-				Set.of("payment.manual.validate", "payment.manual.reject", "payment.receipt.upload", "sale.refund"), "Gerente");
+				Set.of("payment.manual.validate", "payment.manual.reject", "payment.receipt.upload", "sale.refund", "sale.create"), "Gerente");
 		var file = new MockMultipartFile("file", "qa.pdf", "application/pdf", new byte[] {1});
-		for (UUID outside : Set.of(northPayment, foreignPayment)) {
-			http.perform(auth(post("/api/v1/sales/payments/{id}/validate", outside), token)).andExpect(status().isBadRequest());
+		for (UUID outside : Set.of(northPayment, foreignPayment, UUID.randomUUID())) {
+			http.perform(auth(post("/api/v1/sales/payments/{id}/validate", outside), token))
+					.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("PAYMENT_NOT_FOUND"));
 			http.perform(auth(post("/api/v1/sales/payments/{id}/reject", outside), token)
 							.contentType("application/json").content("{\"reason\":\"Prueba ajena\"}"))
-					.andExpect(status().isBadRequest());
+					.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("PAYMENT_NOT_FOUND"));
 			http.perform(multipart("/api/v1/sales/payments/{id}/receipt", outside).file(file)
 							.header("Authorization", "Bearer " + token))
-					.andExpect(status().isBadRequest());
+					.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("PAYMENT_NOT_FOUND"));
+			http.perform(auth(post("/api/v1/sales/payments/{id}/mercado-pago-order", outside), token))
+					.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("PAYMENT_NOT_FOUND"));
 			http.perform(auth(post("/api/v1/sales/{id}/refunds", localSale), token).contentType("application/json")
 							.content("{\"paymentId\":\"%s\",\"amountCents\":10,\"reason\":\"Prueba ajena\"}".formatted(outside)))
-					.andExpect(status().isBadRequest());
+					.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("PAYMENT_NOT_FOUND"));
+		}
+		for (UUID outside : Set.of(northSale, foreignSale, UUID.randomUUID())) {
+			http.perform(auth(post("/api/v1/sales/{id}/refunds", outside), token).contentType("application/json")
+							.content("{\"amountCents\":10,\"reason\":\"Prueba ajena\"}"))
+					.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("SALE_NOT_FOUND"));
+		}
+		for (UUID outside : Set.of(northPayment, foreignPayment)) {
 			assertThat(jdbc.sql("SELECT status FROM payment WHERE id=:id AND receipt_object_key IS NULL")
 					.param("id", outside).query(String.class).single()).isEqualTo("PENDING_VALIDATION");
 		}

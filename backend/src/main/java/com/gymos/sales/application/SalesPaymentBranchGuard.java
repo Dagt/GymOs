@@ -1,6 +1,5 @@
 package com.gymos.sales.application;
 
-import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.sales.infrastructure.SalesRepository;
 import java.util.UUID;
@@ -31,14 +30,6 @@ class SalesPaymentBranchGuard {
 		if (principal == null || principal.branchId() == null) {
 			return;
 		}
-		UUID saleId = SalesRecordResolver.requireSaleIdForPayment(
-				salesRepository,
-				principal.organizationId(),
-				paymentId
-		);
-		var sale = SalesRecordResolver.requireSale(salesRepository, principal.organizationId(), saleId);
-		if (!principal.branchId().equals(sale.branchId())) {
-			throw new BusinessException("SALE_BRANCH_MISMATCH", "La venta pertenece a otra sucursal.");
-		}
+		SalesRecordResolver.requirePaymentSaleForBranch(salesRepository, principal, paymentId);
 	}
 }

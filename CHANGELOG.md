@@ -13,7 +13,7 @@ nombre técnico interno durante la transición de marca.
 ## 0.7.0-pilot-readiness - Unreleased
 
 - GEN-001 y ORG-001 documentan los permisos por endpoint y refuerzan el aislamiento por tenant y sucursal en equipo, socios, ventas, beneficios, kiosco, bienestar e inventario. El backend revalida el contexto de los JWT y registra las mutaciones autorizadas con el contexto operativo.
-- La validación de #29 coteja las 298 operaciones con Spring y comprueba con PostgreSQL la pertenencia de roles, ventas asociadas a reservas, preferencias de socios y comprobantes históricos.
+- La validación de #29 coteja las 298 operaciones con Spring y comprueba con PostgreSQL la pertenencia de roles, ventas asociadas a reservas, preferencias de socios, comprobantes históricos y respuestas ante UUIDs de venta o pago fuera de alcance.
 
 - ACC-006 incorpora el registro presencial de entradas en Recepción. Usa los
   derechos de membresía y paquete, protege el saldo con idempotencia y
