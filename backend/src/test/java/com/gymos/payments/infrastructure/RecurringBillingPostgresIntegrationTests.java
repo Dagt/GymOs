@@ -110,6 +110,19 @@ class RecurringBillingPostgresIntegrationTests {
 	}
 
 	@Test
+	void duplicateFailureOnlyIncrementsTheMandateCounterOnce() {
+		recurringRepository.materializeDueCharges(LocalDate.now(ZoneOffset.UTC), 10);
+		var now = OffsetDateTime.now(ZoneOffset.UTC).plusSeconds(1);
+		var charge = recurringRepository.dueCharges(now, 10).getFirst();
+		assertThat(recurringRepository.claimCharge(charge.id(), now, now.plusMinutes(5))).isTrue();
+		var attempt = recurringRepository.charge(charge.id()).orElseThrow();
+		assertThat(recurringRepository.failCharge(attempt, "declined", 3, now.plusDays(1))).isPresent();
+		assertThat(recurringRepository.failCharge(attempt, "duplicate", 3, now.plusDays(1))).isEmpty();
+		assertThat(jdbcClient.sql("SELECT consecutive_failures FROM recurring_payment_mandate WHERE id = :id")
+				.param("id", tenant.mandateId()).query(Integer.class).single()).isEqualTo(1);
+	}
+
+	@Test
 	void duplicateWebhookIsClaimedOnceAndFailedDeliveryCanBeRecoveredOnce() throws Exception {
 		UUID claimed;
 		String eventId = "evt_concurrent_" + UUID.randomUUID();

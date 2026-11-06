@@ -408,13 +408,13 @@ public class StripeRecurringBillingService implements StripeRecurringOperations 
 	@Transactional
 	public Optional<ChargeRecord> failRecurringCharge(OperationRecord operation, String errorCode) {
 		Optional<ChargeRecord> existing = recurringRepository.chargeForOperation(operation.id());
-		if (existing.isEmpty() || Set.of("SUCCEEDED", "FAILED", "CANCELLED").contains(existing.get().status())) {
+		if (existing.isEmpty() || !"AWAITING_PROVIDER".equals(existing.get().status())) {
 			return Optional.empty();
 		}
-		ChargeRecord failed = recurringRepository.failCharge(
-				existing.get().id(), trim(errorCode, 500), 3,
-				OffsetDateTime.now(ZoneOffset.UTC).plusDays(1)
-		);
+		var result = recurringRepository.failCharge(existing.get(), trim(errorCode, 500), 3,
+				OffsetDateTime.now(ZoneOffset.UTC).plusDays(1));
+		if (result.isEmpty()) return result;
+		ChargeRecord failed = result.get();
 		providerRepository.markOperationStatus(operation.id(), "FAILED", "{}", false);
 		boolean exhausted = "FAILED".equals(failed.status());
 		eventPublisher.publishEvent(new RecurringChargeFailedV1(

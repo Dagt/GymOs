@@ -982,6 +982,22 @@ class TenantIsolationPostgresIntegrationTests {
 	}
 
 	@Test
+	void refundingAPartialPaymentDoesNotRestockAnUndeliveredSaleOrAllowGrossBalanceReuse() throws Exception {
+		UUID product = stockProduct(tenant, tenant.branchId);
+		String manager = token(tenant.ownerId, tenant.branchId,
+				Set.of("sale.create", "payment.manual.create", "sale.refund"), "Gerente");
+		UUID saleId = saleId(retail(manager, product, "partial-refund", 50));
+		saleId(saleMutation(manager, saleId, "refunds", """
+				{"amountCents":50,"reason":"Se devuelve el anticipo","idempotencyKey":"partial-refund"}
+				"""));
+		assertThat(count("SELECT quantity_on_hand FROM inventory_stock WHERE product_id=:id", product)).isEqualTo(1);
+		assertThat(count("SELECT count(*) FROM inventory_movement WHERE product_id=:id", product)).isZero();
+		assertThat(pay(manager, saleId, "after-refund", 50).getResponse().getContentAsString())
+				.contains("SALE_REFUNDED_PAYMENT_FORBIDDEN");
+		assertThat(count("SELECT count(*) FROM payment WHERE sale_id=:id", saleId)).isEqualTo(1);
+	}
+
+	@Test
 	void cancellationAndPaymentCompeteAndForeignActorsCannotCancel() throws Exception {
 		UUID product = stockProduct(tenant, tenant.branchId);
 		String manager = token(tenant.ownerId, tenant.branchId,

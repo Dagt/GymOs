@@ -37,6 +37,9 @@ class SalesFinancialIntegrityGuard {
 			if (integrityRepository.paymentSaleByIdempotencyKey(principal.organizationId(), key).isPresent()) return;
 		}
 		requireOpenSale(sale.status());
+		if (sale.balanceCents() > 0 && salesRepository.processedRefundTotal(principal.organizationId(), saleId) > 0) {
+			throw new BusinessException("SALE_REFUNDED_PAYMENT_FORBIDDEN", "La venta quedó cerrada para cobros tras registrar una devolución.");
+		}
 		paymentConfigurationService.requireReceptionMethod(principal.organizationId(), principal.branchId(), request.method());
 		requireProviderPending(request);
 		if (request.amountCents() > sale.balanceCents() - integrityRepository.pendingPaymentTotal(principal.organizationId(), saleId)) {
@@ -84,6 +87,9 @@ class SalesFinancialIntegrityGuard {
 	void guardRefund(GymOsPrincipal principal, UUID saleId, RequestRefundCommand request) {
 		if (principal == null || request == null) {
 			return;
+		}
+		if (integrityRepository.pendingPaymentTotal(principal.organizationId(), saleId) > 0) {
+			throw new BusinessException("SALE_REFUND_PAYMENT_PENDING", "Resuelve los pagos pendientes antes de registrar la devolución.");
 		}
 		if (request.paymentId() == null) {
 			if (integrityRepository.hasCompletedProviderPayment(principal.organizationId(), saleId)) {

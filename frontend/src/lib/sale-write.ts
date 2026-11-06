@@ -32,7 +32,7 @@ export async function runSaleWrite<T>(
       clearPending(scope);
       return result;
     } catch (error) {
-      if (error instanceof ApiResponseError && error.status === 400) {
+      if (!pending && error instanceof ApiResponseError && error.status === 400) {
         clearPending(scope);
         throw error;
       }
