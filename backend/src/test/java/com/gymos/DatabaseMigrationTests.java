@@ -106,7 +106,7 @@ class DatabaseMigrationTests {
 			jdbc.sql("""
 					INSERT INTO sale (id, organization_id, branch_id, sale_number, status, subtotal_cents,
 					                  total_cents, paid_cents, balance_cents, currency, sold_at, created_at, updated_at, idempotency_key)
-					VALUES (:id,:org,:branch,'S-ORIGINAL','PAID',100,100,100,0,'MXN',now(),now(), 'original')
+					VALUES (:id,:org,:branch,'S-ORIGINAL','PAID',100,100,100,0,'MXN',now(),now(),now(),'original')
 					""").param("id", sale).param("org", tenant.organizationId).param("branch", tenant.branchId).update();
 			jdbc.sql("""
 					INSERT INTO payment_provider_webhook_event(id, organization_id, provider, external_event_id,
