@@ -13,6 +13,7 @@ import com.gymos.support.OperationalTestData;
 import com.gymos.wellness.infrastructure.WellnessRepository;
 import com.gymos.wellness.infrastructure.WellnessRepository.CreateAppointmentData;
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -173,8 +174,10 @@ class TenantIsolationPostgresIntegrationTests {
 				.query(Integer.class).single()).isZero();
 		jdbc.sql("UPDATE sale SET status='PAID', paid_cents=total_cents, balance_cents=0 WHERE id=:id")
 				.param("id", localSale).update();
+		String reportDate = OffsetDateTime.now(ZoneOffset.UTC).toLocalDate().toString();
 		http.perform(auth(get("/api/v1/reports/owner-dashboard"), token).param("branchId", north.toString())
-						.param("organizationId", foreign.organizationId.toString()))
+						.param("organizationId", foreign.organizationId.toString())
+						.param("fromDate", reportDate).param("toDate", reportDate))
 				.andExpect(status().isOk()).andExpect(jsonPath("$.saleCount").value(1))
 				.andExpect(jsonPath("$.paidRevenueCents").value(100)).andExpect(jsonPath("$.newClients").value(1));
 	}
@@ -444,9 +447,9 @@ class TenantIsolationPostgresIntegrationTests {
 		UUID id = UUID.randomUUID();
 		jdbc.sql("""
 				INSERT INTO notification_log(id, organization_id, branch_id, channel, recipient, body,
-				                             status, created_at, updated_at)
+				                             status, created_at, updated_at, available_at)
 				VALUES (:id, :org, :branch, 'EMAIL', 'test@example.invalid', 'Prueba',
-				        'DEAD_LETTER', now(), now())
+				        'DEAD_LETTER', now(), now(), now())
 				""").param("id", id).param("org", organization).param("branch", branch).update();
 		return id;
 	}
