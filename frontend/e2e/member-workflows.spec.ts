@@ -1,3 +1,4 @@
+import { mockStaffSession } from "./session-fixtures";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 const clientId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
@@ -353,11 +354,7 @@ async function bootMemberWorkflow(
     await fulfill(route, []);
   });
 
-  await page.addInitScript((currentUser) => {
-    window.sessionStorage.setItem("gymos.accessToken", "member-e2e-access");
-    window.sessionStorage.setItem("gymos.refreshToken", "member-e2e-refresh");
-    window.sessionStorage.setItem("gymos.currentUser", JSON.stringify(currentUser));
-  }, user);
+  await mockStaffSession(page, "member-e2e-access", user);
 }
 
 async function fulfill(route: Route, body: unknown) {

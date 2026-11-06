@@ -7,7 +7,6 @@ import {
   getStoredSession,
   selectBranch,
   selectOrganization,
-  storeSession,
   uploadManagedOrganizationLogo,
   updateOrganizationStatus,
   type BranchSummary,
@@ -249,7 +248,6 @@ export function usePlatformGymnasiumsController() {
 		  return null;
 		}
 		const supportResponse = await selectOrganization(session.accessToken, organizationId, reason);
-        storeSession(supportResponse);
         setSession(supportResponse);
         nextSession = supportResponse;
       }
@@ -279,7 +277,6 @@ export function usePlatformGymnasiumsController() {
 		}
 		if (availableBranches.length === 1) {
 			const selectedSession = await selectBranch(nextSession.accessToken, availableBranches[0].id);
-			storeSession(selectedSession);
 			setSession(selectedSession);
 			router.push("/dashboard");
 			return;
@@ -309,7 +306,6 @@ export function usePlatformGymnasiumsController() {
         return;
       }
       const nextSession = await selectBranch(supportSession.accessToken, branchId);
-      storeSession(nextSession);
       setSession(nextSession);
       await refreshBranches(nextSession.accessToken, selectedOrganization.id);
       if (navigate) {
@@ -476,7 +472,6 @@ export function usePlatformGymnasiumsController() {
         phone: normalizePhone(branchForm.phone ?? ""),
       });
 		const selectedSession = await selectBranch(nextSession.accessToken, createdBranch.id);
-		storeSession(selectedSession);
 		setSession(selectedSession);
       setBranchForm(emptyBranchForm);
       setShowCreateBranch(false);

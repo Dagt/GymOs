@@ -1,3 +1,4 @@
+import { mockStaffSession } from "./session-fixtures";
 
 import { expect, test, type Page } from "@playwright/test";
 import type { CheckInEntry, CheckInPreview } from "../src/lib/api/manual-check-in";
@@ -44,11 +45,7 @@ async function boot(page: Page, {
     username: "reception@example.test", fullName: "Recepción de prueba", permissions, roles: ["Recepcion"],
     platformAdmin: false, supportMode: false, supportExpiresAt: null, console: "RECEPTION",
   };
-  await page.addInitScript((actor) => {
-    sessionStorage.setItem("gymos.accessToken", "fixture-access");
-    sessionStorage.setItem("gymos.refreshToken", "fixture-refresh");
-    sessionStorage.setItem("gymos.currentUser", JSON.stringify(actor));
-  }, user);
+  await mockStaffSession(page, "fixture-access", user);
   await page.route("**/api/v1/**", async (route) => {
     const request = route.request();
     const url = new URL(request.url());

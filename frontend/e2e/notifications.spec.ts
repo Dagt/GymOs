@@ -1,3 +1,4 @@
+import { mockStaffSession } from "./session-fixtures";
 import { expect, test, type Page, type Route } from "@playwright/test";
 
 test("una automatizacion de membresia puede enviar correo al socio del evento", async ({ page }) => {
@@ -107,10 +108,7 @@ async function boot(
   page: Page,
   handler: (route: Route, path: string) => Promise<boolean>,
 ) {
-  await page.addInitScript(() => {
-    window.localStorage.setItem("gymos.accessToken", "e2e-access-token");
-    window.localStorage.setItem("gymos.refreshToken", "e2e-refresh-token");
-    window.localStorage.setItem("gymos.currentUser", JSON.stringify({
+  await mockStaffSession(page, "e2e-access-token", {
       userId: "44444444-4444-4444-8444-444444444444",
       accountScope: "TENANT",
       organizationId: "11111111-1111-4111-8111-111111111111",
@@ -120,8 +118,7 @@ async function boot(
       permissions: ["automation.read", "automation.manage", "automation.execute", "notification.read", "notification.manage"],
       roles: ["Dueno del gimnasio"],
       console: "TENANT_OWNER",
-    }));
-  });
+    });
   await page.route("**/api/v1/**", async (route) => {
     const path = new URL(route.request().url()).pathname.replace(/^\/api\/v1/, "");
     if (await handler(route, path)) return;

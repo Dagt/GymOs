@@ -9,6 +9,16 @@ import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.AccountScope;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.security.JwtService;
+import com.gymos.common.security.SessionBinding;
+import com.gymos.common.security.SessionContext;
+import com.gymos.common.security.SessionRegistry;
+import com.gymos.common.security.RefreshCredentials;
+import com.gymos.common.security.UserCredentialVersionRepository;
+import jakarta.servlet.http.Cookie;
+import java.time.Instant;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import com.gymos.support.OperationalTestData;
 import com.gymos.wellness.infrastructure.WellnessRepository;
 import com.gymos.wellness.infrastructure.WellnessRepository.CreateAppointmentData;
@@ -19,9 +29,14 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -30,6 +45,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -39,8 +55,9 @@ import tools.jackson.databind.ObjectMapper;
 
 @Tag("postgres-integration")
 @Testcontainers
+@ExtendWith(OutputCaptureExtension.class)
 @SpringBootTest(properties = {"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none"})
-@AutoConfigureMockMvc
+@AutoConfigureMockMvc(print = MockMvcPrint.NONE)
 @ActiveProfiles("test")
 @DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class TenantIsolationPostgresIntegrationTests {
@@ -68,6 +85,11 @@ class TenantIsolationPostgresIntegrationTests {
 	@Autowired MockMvc http;
 	@Autowired JdbcClient jdbc;
 	@Autowired JwtService jwt;
+	@Autowired SessionRegistry sessions;
+	@Autowired RefreshCredentials refreshCredentials;
+	@Autowired UserCredentialVersionRepository credentials;
+	@Autowired StringRedisTemplate redisTemplate;
+	private static final String SLOT = "00000000-0000-4000-8000-000000000001";
 	@Autowired ObjectMapper json;
 	@Autowired WellnessRepository wellness;
 	@Autowired PasswordEncoder passwordEncoder;
@@ -138,7 +160,7 @@ class TenantIsolationPostgresIntegrationTests {
 		String token = token(tenant.ownerId, tenant.branchId, Set.of("client.read", "membership.read"), "Recepcion");
 		http.perform(auth(get("/api/v1/clients/{id}", client), token)).andExpect(status().isOk());
 		http.perform(auth(get("/api/v1/memberships/{id}", membership), token)).andExpect(status().isOk());
-		String outside = jwt.accessToken(new GymOsPrincipal(foreign.ownerId, foreign.organizationId, foreign.branchId,
+		String outside = access(new GymOsPrincipal(foreign.ownerId, foreign.organizationId, foreign.branchId,
 				"fixture", "Fixture", Set.of("membership.read", "sale.create"), Set.of("Recepcion"), false));
 		http.perform(auth(get("/api/v1/memberships/{id}", membership), outside)).andExpect(status().isBadRequest());
 		http.perform(auth(post("/api/v1/memberships/{id}/renew", membership), outside)
@@ -241,26 +263,32 @@ class TenantIsolationPostgresIntegrationTests {
 	@Test
 	void selectingAssignedBranchRetainsLegitimateAccessAndRevocationInvalidatesTheToken() throws Exception {
 		UUID client = northClient();
+		grant(tenant.ownerId, "client.read");
 		String token = token(tenant.ownerId, tenant.branchId, Set.of("branch.read", "client.read"), "Gerente");
+		String separateSession = token(tenant.ownerId, tenant.branchId, Set.of("branch.read", "client.read"), "Gerente");
 		for (UUID unavailable : Set.of(north, foreign.branchId)) {
-			http.perform(auth(post("/api/v1/auth/select-branch"), token).contentType("application/json")
+			http.perform(transition(post("/api/v1/auth/select-branch"), token).contentType("application/json")
 							.content("{\"branchId\":\"%s\"}".formatted(unavailable)))
 					.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("BRANCH_ACCESS_DENIED"));
 		}
 		assignBranch(tenant.ownerId, north);
-		grant(tenant.ownerId, "client.read");
-		var selected = http.perform(auth(post("/api/v1/auth/select-branch"), token).contentType("application/json")
+		var selected = http.perform(transition(post("/api/v1/auth/select-branch"), token).contentType("application/json")
 						.content("{\"branchId\":\"%s\"}".formatted(north)))
 				.andExpect(status().isOk()).andExpect(jsonPath("$.user.branchId").value(north.toString())).andReturn();
 		String northToken = json.readTree(selected.getResponse().getContentAsByteArray()).path("accessToken").asText();
 		http.perform(auth(get("/api/v1/clients/{id}", client), northToken)).andExpect(status().isOk());
+		var northSession = browserSession(selected, SLOT);
+		var renewed = browserSession(refresh(northSession.cookie(), SLOT, UUID.randomUUID()), SLOT);
+		http.perform(auth(get("/api/v1/clients/{id}", client), renewed.access())).andExpect(status().isOk());
 		assertThat(auditCount(tenant.organizationId, north, "BRANCH_SELECTED", north)).isEqualTo(1);
 		jdbc.sql("DELETE FROM user_branch_access WHERE user_id=:user AND branch_id=:branch")
 				.param("user", tenant.ownerId).param("branch", north).update();
 		http.perform(auth(get("/api/v1/clients/{id}", client), northToken)).andExpect(status().isUnauthorized());
-		http.perform(auth(get("/api/v1/auth/me"), token)).andExpect(status().isOk());
-		jdbc.sql("UPDATE organization SET status='SUSPENDED' WHERE id=:id").param("id", tenant.organizationId).update();
+		assertThat(refresh(renewed.cookie(), SLOT, UUID.randomUUID()).getResponse().getStatus()).isEqualTo(401);
 		http.perform(auth(get("/api/v1/auth/me"), token)).andExpect(status().isUnauthorized());
+		http.perform(auth(get("/api/v1/auth/me"), separateSession)).andExpect(status().isOk());
+		jdbc.sql("UPDATE organization SET status='SUSPENDED' WHERE id=:id").param("id", tenant.organizationId).update();
+		http.perform(auth(get("/api/v1/auth/me"), separateSession)).andExpect(status().isUnauthorized());
 	}
 
 	@Test
@@ -340,7 +368,7 @@ class TenantIsolationPostgresIntegrationTests {
 						.content(body.formatted(north, product)))
 				.andExpect(status().isOk()).andExpect(jsonPath("$.destinationBranchId").value(north.toString())).andReturn();
 		String transferId = json.readTree(response.getResponse().getContentAsByteArray()).path("id").asText();
-		String outside = jwt.accessToken(new GymOsPrincipal(foreign.ownerId, foreign.organizationId, foreign.branchId,
+		String outside = access(new GymOsPrincipal(foreign.ownerId, foreign.organizationId, foreign.branchId,
 				"fixture", "Fixture", Set.of("inventory.read", "inventory.manage"), Set.of("Gerente"), false));
 		http.perform(auth(get("/api/v1/inventory/transfers/{id}", transferId), outside)).andExpect(status().isBadRequest());
 		http.perform(auth(post("/api/v1/inventory/transfers/{id}/ship", transferId), outside)).andExpect(status().isBadRequest());
@@ -404,7 +432,7 @@ class TenantIsolationPostgresIntegrationTests {
 				"fixture", "Fixture", Set.of(launchPermission), Set.of("Recepcion"), false);
 		var localSession = json.readTree(http.perform(auth(post(launchPath), reception)).andExpect(status().isOk())
 				.andReturn().getResponse().getContentAsByteArray());
-		var otherSession = json.readTree(http.perform(auth(post(launchPath), jwt.accessToken(foreignReception))).andExpect(status().isOk())
+		var otherSession = json.readTree(http.perform(auth(post(launchPath), access(foreignReception))).andExpect(status().isOk())
 				.andReturn().getResponse().getContentAsByteArray());
 		String summary = "/api/v1/self-service/sessions/{id}/summary";
 		String localId = localSession.path("sessionId").asText();
@@ -465,7 +493,7 @@ class TenantIsolationPostgresIntegrationTests {
 		jdbc.sql("INSERT INTO user_role(user_id, role_id) VALUES (:user,:role)")
 				.param("user", staff).param("role", outsideRole).update();
 		String staffToken = token(staff, tenant.branchId, Set.of("branch.read"), "Recepcion");
-		var selected = http.perform(auth(post("/api/v1/auth/select-branch"), staffToken)
+		var selected = http.perform(transition(post("/api/v1/auth/select-branch"), staffToken)
 						.contentType("application/json").content("{\"branchId\":\"%s\"}".formatted(tenant.branchId)))
 				.andExpect(status().isOk()).andReturn();
 		String issued = json.readTree(selected.getResponse().getContentAsByteArray()).path("accessToken").asText();
@@ -649,7 +677,7 @@ class TenantIsolationPostgresIntegrationTests {
 					.param("id", user).param("hash", passwordEncoder.encode(password)).update();
 			jdbc.sql("DELETE FROM user_role WHERE user_id=:id").param("id", user).update();
 			assignSystemRole(user, role.getKey(), "TENANT");
-			var loggedIn = http.perform(post("/api/v1/auth/login").contentType("application/json")
+			var loggedIn = http.perform(browser(post("/api/v1/auth/login")).contentType("application/json")
 							.content("{\"username\":\"%s\",\"password\":\"%s\"}".formatted(user, password)))
 					.andExpect(status().isOk()).andExpect(jsonPath("$.user.branchId").value(tenant.branchId.toString())).andReturn();
 			String token = json.readTree(loggedIn.getResponse().getContentAsByteArray()).path("accessToken").asText();
@@ -673,10 +701,10 @@ class TenantIsolationPostgresIntegrationTests {
 		assignSystemRole(platform, "Administrador GymOS", "PLATFORM");
 		var admin = new GymOsPrincipal(platform, AccountScope.PLATFORM, null, null,
 				"support", "Soporte QA", Set.of("platform.admin"), Set.of("Administrador GymOS"), false, null);
-		String adminToken = jwt.accessToken(admin);
+		String adminToken = access(admin);
 		http.perform(auth(get("/api/v1/platform/customers"), adminToken)).andExpect(status().isOk());
 		http.perform(auth(get("/api/v1/clients/{id}", tenant.client()), adminToken)).andExpect(status().isForbidden());
-		var selected = http.perform(auth(post("/api/v1/auth/select-organization"), adminToken)
+		var selected = http.perform(transition(post("/api/v1/auth/select-organization"), adminToken)
 						.contentType("application/json").content("""
 								{"organizationId":"%s","reason":"Validación del contexto temporal"}
 								""".formatted(tenant.organizationId)))
@@ -700,9 +728,183 @@ class TenantIsolationPostgresIntegrationTests {
 				  AND actor_user_id=:actor AND action='KIOSK_BRANCH_SETTINGS_UPDATED' AND entity_id=:branch
 				""").param("org", tenant.organizationId).param("branch", tenant.branchId).param("actor", platform)
 				.query(String.class).single()).isEqualTo("PLATFORM_SUPPORT");
-		String expired = jwt.accessToken(new GymOsPrincipal(platform, AccountScope.PLATFORM, tenant.organizationId,
+		var support = browserSession(selected, SLOT);
+		var supportRenewal = refresh(support.cookie(), SLOT, UUID.randomUUID());
+		var renewed = browserSession(supportRenewal, SLOT);
+		String expiresAt = json.readTree(selected.getResponse().getContentAsByteArray()).path("user").path("supportExpiresAt").asText();
+		assertThat(json.readTree(supportRenewal.getResponse().getContentAsByteArray())
+				.path("user").path("supportExpiresAt").asText()).isEqualTo(expiresAt);
+		http.perform(auth(get("/api/v1/platform/customers"), adminToken)).andExpect(status().isUnauthorized());
+		var exit = http.perform(browser(auth(post("/api/v1/auth/exit-support"), renewed.access())).cookie(renewed.cookie()))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.user.supportMode").value(false)).andReturn();
+		http.perform(auth(get("/api/v1/platform/customers"), browserSession(exit, SLOT).access())).andExpect(status().isOk());
+		http.perform(auth(get("/api/v1/auth/me"), renewed.access())).andExpect(status().isUnauthorized());
+		String expired = access(new GymOsPrincipal(platform, AccountScope.PLATFORM, tenant.organizationId,
 				tenant.branchId, "support", "Soporte QA", Set.of("branch.read"), admin.roles(), true, java.time.Instant.EPOCH));
 		http.perform(auth(get("/api/v1/auth/me"), expired)).andExpect(status().isUnauthorized());
+		String fingerprint = credentials.authorityFingerprint(platform);
+		Instant expires = Instant.now().plusSeconds(3600);
+		var expiredContext = new SessionContext(platform, AccountScope.PLATFORM, tenant.organizationId,
+				tenant.branchId, true, Instant.EPOCH, 0, fingerprint, expires);
+		UUID expiredId = sessions.create(expiredContext.serialize(), expires);
+		assertThat(refresh(new Cookie("__Host-gymfort-refresh-" + SLOT, refreshCredentials.issue(expiredId, 0)),
+				SLOT, UUID.randomUUID()).getResponse().getStatus()).isEqualTo(401);
+	}
+
+	@Test
+	void refreshRotationIsAtomicAndRetiredCredentialsRevokeOnlyTheirFamily() throws Exception {
+		UUID user = loginUser();
+		var initial = loginSession(user, SLOT);
+		var other = loginSession(user, UUID.randomUUID().toString());
+		UUID operation = UUID.randomUUID();
+		var start = new CyclicBarrier(2);
+		MvcResult first;
+		MvcResult second;
+		try (var executor = Executors.newVirtualThreadPerTaskExecutor()) {
+			java.util.concurrent.Callable<MvcResult> request = () -> {
+				start.await(10, TimeUnit.SECONDS);
+				return refresh(initial.cookie(), SLOT, operation);
+			};
+			var a = executor.submit(request);
+			var b = executor.submit(request);
+			first = a.get(15, TimeUnit.SECONDS);
+			second = b.get(15, TimeUnit.SECONDS);
+		}
+		var renewed = browserSession(first, SLOT);
+		var retried = browserSession(second, SLOT);
+		assertThat(renewed.cookie().getValue().equals(retried.cookie().getValue())).isTrue();
+		assertThat(renewed.cookie().getValue().equals(initial.cookie().getValue())).isFalse();
+		assertThat(refresh(initial.cookie(), SLOT, UUID.randomUUID()).getResponse().getStatus()).isEqualTo(409);
+		http.perform(auth(get("/api/v1/auth/me"), renewed.access())).andExpect(status().isOk());
+		var binding = jwt.parseAccessToken(initial.access()).orElseThrow().session();
+		String key = "gymos:session:v3:" + binding.id();
+		assertThat(redisTemplate.opsForHash().values(key).contains(renewed.cookie().getValue())).isFalse();
+		redisTemplate.opsForHash().put(key, "retryUntil", "0");
+		assertThat(refresh(initial.cookie(), SLOT, UUID.randomUUID()).getResponse().getStatus()).isEqualTo(401);
+		http.perform(auth(get("/api/v1/auth/me"), renewed.access())).andExpect(status().isUnauthorized());
+		assertThat(refresh(renewed.cookie(), SLOT, UUID.randomUUID()).getResponse().getStatus()).isEqualTo(401);
+		http.perform(auth(get("/api/v1/auth/me"), other.access())).andExpect(status().isOk());
+		assertThat(auditCount(tenant.organizationId, tenant.branchId, "AUTH_REFRESH_REUSED", user)).isEqualTo(1);
+	}
+
+	@Test
+	void browserCookieIsProtectedAndLogoutRevokesAccessWithoutAValidBearer(CapturedOutput output) throws Exception {
+		UUID user = loginUser();
+		var session = loginSession(user, SLOT);
+		String otherSlot = UUID.randomUUID().toString();
+		var other = loginSession(user, otherSlot);
+		http.perform(post("/api/v1/auth/refresh").cookie(session.cookie()).header("X-GymFort-Session", SLOT)
+						.header("X-GymFort-Refresh-Request", UUID.randomUUID()))
+				.andExpect(status().isForbidden());
+		http.perform(post("/api/v1/auth/logout").cookie(session.cookie()).header("Origin", "https://untrusted.invalid")
+						.header("X-GymFort-Session", SLOT))
+				.andExpect(status().isForbidden());
+		http.perform(post("/api/v1/auth/logout").cookie(session.cookie()).header("Origin", "http://localhost:3000"))
+				.andExpect(status().isForbidden());
+		assertThat(refresh(session.cookie(), otherSlot, UUID.randomUUID()).getResponse().getStatus()).isEqualTo(401);
+		http.perform(auth(get("/api/v1/auth/me"), session.access())).andExpect(status().isOk());
+		http.perform(browser(post("/api/v1/auth/logout")).cookie(session.cookie()))
+				.andExpect(status().isNoContent()).andExpect(cookie().maxAge(session.cookie().getName(), 0));
+		http.perform(auth(get("/api/v1/auth/me"), session.access())).andExpect(status().isUnauthorized());
+		assertThat(refresh(session.cookie(), SLOT, UUID.randomUUID()).getResponse().getStatus()).isEqualTo(401);
+		http.perform(auth(get("/api/v1/auth/me"), other.access())).andExpect(status().isOk());
+		assertThat(auditCount(tenant.organizationId, tenant.branchId, "AUTH_LOGOUT", user)).isEqualTo(1);
+		assertThat(output.getAll().contains(session.cookie().getValue())
+				|| output.getAll().contains(session.access()) || output.getAll().contains("SessionFixtureQA!2026")).isFalse();
+	}
+
+	@Test
+	void recoveryAndDeactivationRevokeBothAccessAndRefresh() throws Exception {
+		UUID staff = loginUser();
+		var session = loginSession(staff, SLOT);
+		var other = loginSession(staff, UUID.randomUUID().toString());
+		String owner = token(tenant.ownerId, tenant.branchId, Set.of("user.manage"), "Dueno del gimnasio");
+		var issued = http.perform(auth(post("/api/v1/users/internal/{id}/password-recovery", staff), owner))
+				.andExpect(status().isOk()).andReturn();
+		String reset = json.readTree(issued.getResponse().getContentAsByteArray()).path("resetUrl").asText().split("#token=")[1];
+		http.perform(post("/api/v1/auth/password-recovery/accept").contentType("application/json")
+				.content(json.writeValueAsString(java.util.Map.of("token", reset, "password", "NextSessionQA!2026"))))
+				.andExpect(status().isOk());
+		http.perform(auth(get("/api/v1/auth/me"), session.access())).andExpect(status().isUnauthorized());
+		http.perform(auth(get("/api/v1/auth/me"), other.access())).andExpect(status().isUnauthorized());
+		assertThat(refresh(session.cookie(), SLOT, UUID.randomUUID()).getResponse().getStatus()).isEqualTo(401);
+		http.perform(loginRequest(staff, SLOT, "BadSessionQA!2026")).andExpect(status().isUnauthorized());
+		var renewed = browserSession(http.perform(loginRequest(staff, SLOT, "NextSessionQA!2026")).andReturn(), SLOT);
+		http.perform(auth(patch("/api/v1/users/internal/{id}/status", staff), owner)
+						.contentType("application/json").content("{\"status\":\"SUSPENDED\"}"))
+				.andExpect(status().isOk());
+		http.perform(auth(get("/api/v1/auth/me"), renewed.access())).andExpect(status().isUnauthorized());
+		assertThat(refresh(renewed.cookie(), SLOT, UUID.randomUUID()).getResponse().getStatus()).isEqualTo(401);
+	}
+
+	@Test
+	void withdrawingAnEffectivePermissionInvalidatesEverySessionImmediately() throws Exception {
+		UUID user = loginUser();
+		grant(user, "client.read");
+		var session = loginSession(user, SLOT);
+		http.perform(auth(get("/api/v1/clients/search"), session.access())).andExpect(status().isOk());
+		jdbc.sql("""
+				DELETE FROM role_permission rp USING user_role ur, permission p
+				WHERE ur.user_id=:id AND ur.role_id=rp.role_id AND p.id=rp.permission_id AND p.code='client.read'
+				""").param("id", user).update();
+		http.perform(auth(get("/api/v1/clients/search"), session.access())).andExpect(status().isUnauthorized());
+		assertThat(refresh(session.cookie(), SLOT, UUID.randomUUID()).getResponse().getStatus()).isEqualTo(401);
+		var renewed = loginSession(user, SLOT);
+		http.perform(auth(get("/api/v1/auth/me"), renewed.access())).andExpect(status().isOk());
+		http.perform(auth(get("/api/v1/clients/search"), renewed.access())).andExpect(status().isForbidden());
+	}
+
+	private UUID loginUser() {
+		return tenant.user("Recepcion", passwordEncoder.encode("SessionFixtureQA!2026"));
+	}
+
+	private BrowserSession loginSession(UUID user, String slot) throws Exception {
+		return browserSession(http.perform(loginRequest(user, slot, "SessionFixtureQA!2026")).andReturn(), slot);
+	}
+
+	private MockHttpServletRequestBuilder loginRequest(UUID user, String slot, String password) throws Exception {
+		return post("/api/v1/auth/login").header("Origin", "http://localhost:3000").header("X-GymFort-Session", slot)
+				.contentType("application/json").content(json.writeValueAsString(java.util.Map.of("username", user, "password", password)));
+	}
+
+	private BrowserSession browserSession(MvcResult result, String slot) throws Exception {
+		assertThat(result.getResponse().getStatus()).isEqualTo(200);
+		String name = "__Host-gymfort-refresh-" + slot;
+		String header = result.getResponse().getHeader("Set-Cookie");
+		assertThat(header != null && header.startsWith(name + "=") && header.contains("HttpOnly")
+				&& header.contains("Secure") && header.contains("SameSite=Strict") && header.contains("Path=/")
+				&& !header.contains("Domain=")).isTrue();
+		assertThat(result.getResponse().getHeader("Cache-Control")).isEqualTo("no-store");
+		var response = json.readTree(result.getResponse().getContentAsByteArray());
+		assertThat(response.has("refreshToken")).isFalse();
+		String value = header.substring(name.length() + 1, header.indexOf(';'));
+		return new BrowserSession(response.path("accessToken").asText(), new Cookie(name, value));
+	}
+
+	private MvcResult refresh(Cookie cookie, String slot, UUID operation) throws Exception {
+		return http.perform(post("/api/v1/auth/refresh").header("Origin", "http://localhost:3000")
+				.header("X-GymFort-Session", slot).header("X-GymFort-Refresh-Request", operation).cookie(cookie)).andReturn();
+	}
+
+	private record BrowserSession(String access, Cookie cookie) {
+		@Override public String toString() { return "BrowserSession[redacted]"; }
+	}
+
+	private MockHttpServletRequestBuilder browser(MockHttpServletRequestBuilder request) {
+		return request.header("Origin", "http://localhost:3000").header("X-GymFort-Session", SLOT);
+	}
+
+	private MockHttpServletRequestBuilder transition(MockHttpServletRequestBuilder request, String accessToken) {
+		var binding = jwt.parseAccessToken(accessToken).orElseThrow().session();
+		return browser(auth(request, accessToken))
+				.cookie(new Cookie("__Host-gymfort-refresh-" + SLOT, refreshCredentials.issue(binding.id(), 0)));
+	}
+
+	private String access(GymOsPrincipal principal) {
+		String fingerprint = credentials.authorityFingerprint(principal.userId());
+		Instant expiresAt = Instant.now().plusSeconds(3600);
+		UUID id = sessions.create(SessionContext.from(principal, fingerprint, expiresAt).serialize(), expiresAt);
+		return jwt.accessToken(principal.withSession(new SessionBinding(id, 0, fingerprint)));
 	}
 
 	private MockHttpServletRequestBuilder auth(MockHttpServletRequestBuilder request, String token) {
@@ -710,7 +912,7 @@ class TenantIsolationPostgresIntegrationTests {
 	}
 
 	private String token(UUID user, UUID branch, Set<String> permissions, String role) {
-		return jwt.accessToken(new GymOsPrincipal(user, tenant.organizationId, branch, "fixture", "Fixture", permissions, Set.of(role), false));
+		return access(new GymOsPrincipal(user, tenant.organizationId, branch, "fixture", "Fixture", permissions, Set.of(role), false));
 	}
 
 	private UUID northClient() {

@@ -8,7 +8,6 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -56,6 +55,11 @@ public class JwtService {
 		payload.put("supportExpiresAt", principal.supportExpiresAt() == null ? null : principal.supportExpiresAt().getEpochSecond());
 		payload.put("iat", now.getEpochSecond());
 		payload.put("credentialVersion", principal.credentialVersion());
+		if (principal.session() != null) {
+			payload.put("sid", principal.session().id().toString());
+			payload.put("ctx", principal.session().revision());
+			payload.put("authz", principal.session().authorityFingerprint());
+		}
 		payload.put("exp", now.plusSeconds(lifetimeSeconds).getEpochSecond());
 		return sign(payload);
 	}
@@ -94,7 +98,9 @@ public class JwtService {
 					roles == null ? Set.of() : Set.copyOf(roles),
 					supportMode,
 					supportExpiresAt,
-					((Number) payload.getOrDefault("credentialVersion", 0)).longValue()
+					((Number) payload.getOrDefault("credentialVersion", 0)).longValue(),
+					payload.get("sid") == null ? null : new SessionBinding(UUID.fromString((String) payload.get("sid")),
+							((Number) payload.get("ctx")).longValue(), (String) payload.get("authz"))
 			));
 		} catch (Exception exception) {
 			return Optional.empty();
@@ -120,31 +126,9 @@ public class JwtService {
 	}
 
 	private long accessTokenLifetime(GymOsPrincipal principal) {
-		return isReception(principal)
-				? properties.receptionAccessTokenSeconds()
-				: properties.accessTokenSeconds();
-	}
-
-	private boolean isReception(GymOsPrincipal principal) {
-		boolean explicitReceptionRole = principal.roles().stream()
-				.map(role -> role.toLowerCase(Locale.ROOT))
-				.anyMatch(role -> role.contains("recepcion") || role.contains("recepción") || role.contains("reception"));
-		if (explicitReceptionRole) {
-			return true;
-		}
-		boolean elevatedRole = principal.roles().stream()
-				.map(role -> role.toLowerCase(Locale.ROOT))
-				.anyMatch(role -> role.contains("dueno")
-						|| role.contains("dueño")
-						|| role.contains("owner")
-						|| role.contains("administrador")
-						|| role.contains("admin")
-						|| role.contains("gerente")
-						|| role.contains("manager")
-						|| role.contains("coach"));
-		return !elevatedRole
-				&& principal.permissions().contains("sale.create")
-				&& principal.permissions().contains("client.read");
+		long lifetime = properties.accessTokenSeconds();
+		if (principal.supportExpiresAt() == null) return lifetime;
+		return Math.max(0, Math.min(lifetime, principal.supportExpiresAt().getEpochSecond() - Instant.now().getEpochSecond()));
 	}
 
 	private String sign(Map<String, Object> payload) {
@@ -185,6 +169,10 @@ public class JwtService {
 	}
 
 	public record TokenPair(String accessToken, String refreshToken, long expiresIn) {
+		@Override
+		public String toString() {
+			return "TokenPair[credentials redacted]";
+		}
 	}
 
 	private static final class MessageDigestSupport {

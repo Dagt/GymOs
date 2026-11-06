@@ -5,6 +5,11 @@ public record AuthResult(
 		String refreshToken,
 		String tokenType,
 		long expiresIn,
+		java.time.Instant sessionExpiresAt,
 		CurrentUserResult user
 ) {
+	@Override
+	public String toString() {
+		return "AuthResult[credentials redacted]";
+	}
 }

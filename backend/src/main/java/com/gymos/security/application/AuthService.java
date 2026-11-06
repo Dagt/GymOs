@@ -2,10 +2,20 @@ package com.gymos.security.application;
 
 import com.gymos.audit.api.AuditService;
 import com.gymos.common.api.BusinessException;
+import com.gymos.common.api.ApiAuthenticationException;
+import com.gymos.common.api.ApiConflictException;
 import com.gymos.common.security.AccountScope;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.security.JwtService;
 import com.gymos.common.security.SecurityProperties;
+import com.gymos.common.security.RefreshCredentials;
+import com.gymos.common.security.RefreshCredentials.Credential;
+import com.gymos.common.security.SessionBinding;
+import com.gymos.common.security.SessionContext;
+import com.gymos.common.security.SessionRegistry;
+import com.gymos.common.security.SessionRegistry.Rotation;
+import com.gymos.common.security.SessionRegistry.State;
+import com.gymos.common.security.UserAuthorities;
 import com.gymos.security.application.result.AuthResult;
 import com.gymos.security.application.result.CurrentUserResult;
 import com.gymos.security.infrastructure.AuthQueryRepository;
@@ -13,58 +23,35 @@ import com.gymos.security.infrastructure.AuthQueryRepository.AuthenticatedUser;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
 public class AuthService {
-	private static final String REFRESH_PREFIX = "gymos:refresh:v2:";
-	private static final String SESSION_SEPARATOR = "|";
-	private static final String SESSION_VERSION = "v2";
-	private static final String ROTATED_PREFIX = "rotated:";
-	private static final Duration ROTATION_GRACE = Duration.ofSeconds(15);
-
 	private final AuthenticationManager authenticationManager;
 	private final AuthQueryRepository authQueryRepository;
 	private final JwtService jwtService;
-	private final StringRedisTemplate redisTemplate;
+	private final SessionRegistry sessions;
+	private final RefreshCredentials refreshCredentials;
 	private final AuditService auditService;
 	private final SecurityProperties securityProperties;
 
-	@Autowired
-	public AuthService(
-			AuthenticationManager authenticationManager,
-			AuthQueryRepository authQueryRepository,
-			JwtService jwtService,
-			StringRedisTemplate redisTemplate,
-			AuditService auditService,
-			SecurityProperties securityProperties
-	) {
+	public AuthService(AuthenticationManager authenticationManager, AuthQueryRepository authQueryRepository,
+			JwtService jwtService, SessionRegistry sessions, RefreshCredentials refreshCredentials,
+			AuditService auditService, SecurityProperties securityProperties) {
 		this.authenticationManager = authenticationManager;
 		this.authQueryRepository = authQueryRepository;
 		this.jwtService = jwtService;
-		this.redisTemplate = redisTemplate;
+		this.sessions = sessions;
+		this.refreshCredentials = refreshCredentials;
 		this.auditService = auditService;
 		this.securityProperties = securityProperties;
 	}
 
-	AuthService(
-			AuthenticationManager authenticationManager,
-			AuthQueryRepository authQueryRepository,
-			JwtService jwtService,
-			StringRedisTemplate redisTemplate,
-			AuditService auditService
-	) {
-		this(authenticationManager, authQueryRepository, jwtService, redisTemplate, auditService,
-				new SecurityProperties(null, null, 900, 86_400, 7, 30));
-	}
-
 	@Transactional
-	public AuthResult login(String username, String password, String correlationId) {
+	public AuthResult login(String username, String password, String previousCookie, String correlationId) {
 		// Bind authentication to the password generation observed before checking it.
 		// A concurrent recovery must not turn an old-password login into a new-generation session.
 		var beforeAuthentication = authQueryRepository.findActiveUserByLoginIdentifier(username);
@@ -83,43 +70,54 @@ public class AuthService {
 			throw new BusinessException("PLATFORM_ACCESS_REQUIRED", "La cuenta de plataforma no tiene un rol administrativo valido.");
 		}
 		GymOsPrincipal principal = user.toPrincipal(defaultBranchFor(user));
-		AuthResult response = issue(principal);
+		String fingerprint = fingerprint(user);
+		Instant expiresAt = Instant.now().plus(Duration.ofDays(securityProperties.refreshTokenDays()));
+		SessionContext context = SessionContext.from(principal, fingerprint, expiresAt);
+		UUID sessionId = sessions.create(context.serialize(), expiresAt);
+		refreshCredentials.parse(previousCookie)
+				.ifPresent(previous -> sessions.revokeFamily(previous.sessionId(), previous.generation()));
+		AuthResult response = issueAccess(principal, context, sessionId, 0, 0);
 		auditService.recordSystem(
 				principal.organizationId(), null, principal.userId(), "AUTH_LOGIN", "USER",
 				principal.userId(), "BACKOFFICE", null, correlationId);
 		return response;
 	}
 
-	@Transactional(readOnly = true)
-	public AuthResult refresh(String refreshToken) {
-		String storedValue = redisTemplate.opsForValue().get(refreshKey(refreshToken));
-		if (storedValue == null) {
+	@Transactional(noRollbackFor = ApiAuthenticationException.class)
+	public AuthResult refresh(String refreshToken, UUID operationId, String correlationId) {
+		Credential credential = refreshCredentials.parse(refreshToken).orElseThrow(this::invalidRefresh);
+		UUID id = credential.sessionId();
+		State state = sessions.find(id).orElseThrow(this::invalidRefresh);
+		SessionContext context = parseSessionContext(state.context());
+		GymOsPrincipal principal = restoreOrRevoke(context, id, state.revision());
+		Rotation rotation = sessions.rotate(id, credential.generation(), state.revision(), operationId.toString(),
+				state.revision(), state.context());
+		if (rotation == Rotation.REUSED) {
+			auditService.recordSystem(context.organizationId(), context.branchId(), context.userId(),
+					"AUTH_REFRESH_REUSED", "USER", context.userId(), "BACKOFFICE", null, correlationId);
 			throw invalidRefresh();
 		}
-		if (storedValue.startsWith(ROTATED_PREFIX)) {
-			String replacementToken = storedValue.substring(ROTATED_PREFIX.length());
-			String replacementSession = redisTemplate.opsForValue().get(refreshKey(replacementToken));
-			if (replacementSession == null || replacementSession.startsWith(ROTATED_PREFIX)) {
-				throw invalidRefresh();
-			}
-			return issueAccess(restorePrincipalFor(replacementSession), replacementToken);
-		}
-		GymOsPrincipal principal = restorePrincipalFor(storedValue);
-		AuthResult rotated = issue(principal);
-		redisTemplate.opsForValue().set(
-				refreshKey(refreshToken), ROTATED_PREFIX + rotated.refreshToken(), ROTATION_GRACE);
-		return rotated;
+		long generation = rotatedGeneration(rotation, credential.generation());
+		State current = sessions.find(id).filter(value -> value.generation() == generation)
+				.orElseThrow(AuthService::sessionConflict);
+		if (current.revision() != state.revision()) throw sessionConflict();
+		return issueAccess(principal, context, id, generation, state.revision());
 	}
 
 	@Transactional
-	public void logout(GymOsPrincipal principal, String refreshToken, String correlationId) {
-		requirePrincipal(principal);
-		revokeOwnedRefresh(principal, refreshToken);
-		auditService.record(principal, "AUTH_LOGOUT", "USER", principal.userId(), "BACKOFFICE", null, correlationId);
+	public void logout(String refreshToken, String correlationId) {
+		refreshCredentials.parse(refreshToken).ifPresent(credential -> sessions.find(credential.sessionId())
+				.ifPresent(state -> {
+					if (sessions.revokeFamily(credential.sessionId(), credential.generation())) {
+						SessionContext context = parseSessionContext(state.context());
+						auditService.recordSystem(context.organizationId(), context.branchId(), context.userId(),
+								"AUTH_LOGOUT", "USER", context.userId(), "BACKOFFICE", null, correlationId);
+					}
+				}));
 	}
 
 	@Transactional
-	public AuthResult selectBranch(GymOsPrincipal principal, UUID branchId, String correlationId) {
+	public AuthResult selectBranch(GymOsPrincipal principal, UUID branchId, String refreshToken, String correlationId) {
 		requirePrincipal(principal);
 		AuthenticatedUser user = activeUser(principal.userId());
 		GymOsPrincipal selectedPrincipal;
@@ -141,7 +139,7 @@ public class AuthService {
 			selectedPrincipal = user.toSupportPrincipal(
 					principal.organizationId(), branchId, principal.supportExpiresAt());
 		}
-		AuthResult response = issue(selectedPrincipal);
+		AuthResult response = changeContext(principal, selectedPrincipal, user, refreshToken);
 		auditService.recordSystem(
 				selectedPrincipal.organizationId(), branchId, principal.userId(), "BRANCH_SELECTED", "BRANCH",
 				branchId, principal.supportMode() ? "PLATFORM_SUPPORT" : "BACKOFFICE", null, correlationId);
@@ -153,6 +151,7 @@ public class AuthService {
 			GymOsPrincipal principal,
 			UUID organizationId,
 			String reason,
+			String refreshToken,
 			String correlationId
 	) {
 		requirePlatformAdmin(principal);
@@ -165,17 +164,14 @@ public class AuthService {
 			throw new BusinessException("PLATFORM_ACCESS_REQUIRED", "La cuenta ya no tiene acceso administrativo de plataforma.");
 		}
 		UUID branchId = authQueryRepository.firstActiveBranch(organizationId).orElse(null);
-		Instant expiresAt = Instant.now().plus(Duration.ofMinutes(securityProperties.platformSupportMinutes()));
+		Instant expiresAt = Instant.now().plus(Duration.ofMinutes(securityProperties.platformSupportMinutes()))
+				.truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
 		GymOsPrincipal supportPrincipal = user.toSupportPrincipal(organizationId, branchId, expiresAt);
-		AuthResult response = issue(supportPrincipal);
+		AuthResult response = changeContext(principal, supportPrincipal, user, refreshToken);
 		auditService.recordSystem(
 				organizationId, branchId, principal.userId(), "PLATFORM_SUPPORT_STARTED", "ORGANIZATION",
 				organizationId, "PLATFORM_SUPPORT", normalizedReason, correlationId);
 		return response;
-	}
-
-	AuthResult selectOrganization(GymOsPrincipal principal, UUID organizationId, String correlationId) {
-		return selectOrganization(principal, organizationId, "Legacy support request", correlationId);
 	}
 
 	@Transactional
@@ -189,9 +185,8 @@ public class AuthService {
 		if (!user.platformAdmin()) {
 			throw new BusinessException("PLATFORM_ACCESS_REQUIRED", "La cuenta ya no tiene acceso administrativo de plataforma.");
 		}
-		revokeOwnedRefresh(principal, refreshToken);
 		GymOsPrincipal platformPrincipal = user.toPrincipal(null);
-		AuthResult response = issue(platformPrincipal);
+		AuthResult response = changeContext(principal, platformPrincipal, user, refreshToken);
 		auditService.recordSystem(
 				principal.organizationId(), principal.branchId(), principal.userId(), "PLATFORM_SUPPORT_ENDED",
 				"ORGANIZATION", principal.organizationId(), "PLATFORM_SUPPORT", null, correlationId);
@@ -203,34 +198,55 @@ public class AuthService {
 		return toResponse(principal);
 	}
 
-	private AuthResult issue(GymOsPrincipal principal) {
-		String refreshToken = UUID.randomUUID().toString();
-		redisTemplate.opsForValue().set(
-				refreshKey(refreshToken), RefreshSession.from(principal).serialize(), refreshLifetime(principal));
-		return issueAccess(principal, refreshToken);
+	private AuthResult changeContext(GymOsPrincipal principal, GymOsPrincipal next, AuthenticatedUser user,
+			String refreshToken) {
+		SessionBinding binding = principal.session();
+		Credential credential = refreshCredentials.parse(refreshToken).orElseThrow(this::invalidRefresh);
+		if (binding == null || !binding.id().equals(credential.sessionId())
+				|| principal.credentialVersion() != user.credentialVersion()
+				|| !binding.authorityFingerprint().equals(fingerprint(user))) throw invalidRefresh();
+		State state = sessions.find(binding.id()).orElseThrow(this::invalidRefresh);
+		if (state.revision() != binding.revision() || state.generation() != credential.generation()) throw sessionConflict();
+		SessionContext previous = parseSessionContext(state.context());
+		SessionContext context = SessionContext.from(next, previous.fingerprint(), previous.expiresAt());
+		long revision = state.revision() + 1;
+		long generation = rotatedGeneration(sessions.rotate(binding.id(), credential.generation(), binding.revision(),
+				"!", revision, context.serialize()), credential.generation());
+		return issueAccess(next, context, binding.id(), generation, revision);
 	}
 
-	private Duration refreshLifetime(GymOsPrincipal principal) {
-		if (principal.supportMode()) {
-			long seconds = Duration.between(Instant.now(), principal.supportExpiresAt()).toSeconds();
-			if (seconds <= 0) {
-				throw new BusinessException("PLATFORM_SUPPORT_EXPIRED", "La sesion de soporte termino. Vuelve al panel de plataforma.");
-			}
-			return Duration.ofSeconds(seconds);
+	private long rotatedGeneration(Rotation result, long presented) {
+		return switch (result) {
+			case NEXT -> presented + 1;
+			case CURRENT -> presented;
+			case CONFLICT -> throw sessionConflict();
+			case INVALID, REUSED -> throw invalidRefresh();
+		};
+	}
+
+	private AuthResult issueAccess(GymOsPrincipal principal, SessionContext context, UUID id, long generation, long revision) {
+		GymOsPrincipal bound = principal.withSession(new SessionBinding(id, revision, context.fingerprint()));
+		JwtService.TokenPair tokens = jwtService.issueTokens(bound, refreshCredentials.issue(id, generation));
+		Instant cookieExpiry = principal.supportMode() && principal.supportExpiresAt().isBefore(context.expiresAt())
+				? principal.supportExpiresAt() : context.expiresAt();
+		return new AuthResult(tokens.accessToken(), tokens.refreshToken(), "Bearer", tokens.expiresIn(), cookieExpiry,
+				toResponse(bound));
+	}
+
+	private GymOsPrincipal restoreOrRevoke(SessionContext context, UUID id, long revision) {
+		try {
+			return restorePrincipalFor(context);
+		} catch (ApiAuthenticationException invalid) {
+			sessions.revokeContext(id, revision);
+			throw invalid;
 		}
-		return Duration.ofDays(securityProperties.refreshTokenDays());
 	}
 
-	private AuthResult issueAccess(GymOsPrincipal principal, String refreshToken) {
-		JwtService.TokenPair tokens = jwtService.issueTokens(principal, refreshToken);
-		return new AuthResult(
-				tokens.accessToken(), tokens.refreshToken(), "Bearer", tokens.expiresIn(), toResponse(principal));
-	}
-
-	private GymOsPrincipal restorePrincipalFor(String storedSession) {
-		RefreshSession session = parseRefreshSession(storedSession);
+	private GymOsPrincipal restorePrincipalFor(SessionContext session) {
 		AuthenticatedUser user = activeUser(session.userId());
-		if (session.credentialVersion() != user.credentialVersion()) throw invalidRefresh();
+		if (session.credentialVersion() != user.credentialVersion()
+				|| !session.fingerprint().equals(fingerprint(user))
+				|| !Instant.now().isBefore(session.expiresAt())) throw invalidRefresh();
 		if (user.accountScope() != session.accountScope()) {
 			throw invalidRefresh();
 		}
@@ -270,39 +286,24 @@ public class AuthService {
 		return user.toPrincipal(session.branchId());
 	}
 
-	private RefreshSession parseRefreshSession(String storedSession) {
+	private SessionContext parseSessionContext(String storedSession) {
 		try {
 			String[] parts = storedSession.split("\\|", -1);
-			if ((parts.length != 7 && parts.length != 8) || !SESSION_VERSION.equals(parts[0])) {
-				throw new IllegalArgumentException("Invalid refresh session version");
-			}
-			return new RefreshSession(
-					UUID.fromString(parts[1]), AccountScope.valueOf(parts[2]),
+			if (parts.length != 9) throw invalidRefresh();
+			return new SessionContext(
+					UUID.fromString(parts[0]), AccountScope.valueOf(parts[1]),
+					parts[2].isBlank() ? null : UUID.fromString(parts[2]),
 					parts[3].isBlank() ? null : UUID.fromString(parts[3]),
-					parts[4].isBlank() ? null : UUID.fromString(parts[4]),
-					Boolean.parseBoolean(parts[5]),
-					parts[6].isBlank() ? null : Instant.ofEpochSecond(Long.parseLong(parts[6])),
-					parts.length == 8 ? Long.parseLong(parts[7]) : 0);
+					Boolean.parseBoolean(parts[4]),
+					parts[5].isBlank() ? null : Instant.ofEpochSecond(Long.parseLong(parts[5])),
+					Long.parseLong(parts[6]), parts[7], Instant.ofEpochMilli(Long.parseLong(parts[8])));
 		} catch (RuntimeException exception) {
 			throw invalidRefresh();
 		}
 	}
 
-	private void revokeOwnedRefresh(GymOsPrincipal principal, String refreshToken) {
-		String key = refreshKey(refreshToken);
-		String storedValue = redisTemplate.opsForValue().get(key);
-		if (storedValue == null) return;
-		String storedSession = storedValue;
-		String replacementToken = null;
-		if (storedValue.startsWith(ROTATED_PREFIX)) {
-			replacementToken = storedValue.substring(ROTATED_PREFIX.length());
-			storedSession = redisTemplate.opsForValue().get(refreshKey(replacementToken));
-		}
-		if (storedSession != null && !storedSession.startsWith(ROTATED_PREFIX)
-				&& parseRefreshSession(storedSession).userId().equals(principal.userId())) {
-			redisTemplate.delete(key);
-			if (replacementToken != null) redisTemplate.delete(refreshKey(replacementToken));
-		}
+	private String fingerprint(AuthenticatedUser user) {
+		return new UserAuthorities(user.permissions(), user.roles()).fingerprint();
 	}
 
 	private AuthenticatedUser activeUser(UUID userId) {
@@ -376,36 +377,12 @@ public class AuthService {
 		return normalized;
 	}
 
-	private BusinessException invalidRefresh() {
-		return new BusinessException("REFRESH_TOKEN_INVALID", "La sesion ya no es valida.");
+	private ApiAuthenticationException invalidRefresh() {
+		return new ApiAuthenticationException("REFRESH_TOKEN_INVALID", "Tu sesión terminó. Inicia sesión de nuevo.");
 	}
 
-	private String refreshKey(String refreshToken) {
-		return REFRESH_PREFIX + refreshToken;
+	private static ApiConflictException sessionConflict() {
+		return new ApiConflictException("SESSION_CHANGED", "La sesión cambió. Intenta de nuevo.");
 	}
 
-	private record RefreshSession(
-			UUID userId,
-			AccountScope accountScope,
-			UUID organizationId,
-			UUID branchId,
-			boolean supportMode,
-			Instant supportExpiresAt,
-			long credentialVersion
-	) {
-		private static RefreshSession from(GymOsPrincipal principal) {
-			return new RefreshSession(
-					principal.userId(), principal.accountScope(), principal.organizationId(), principal.branchId(),
-					principal.supportMode(), principal.supportExpiresAt(), principal.credentialVersion());
-		}
-
-		private String serialize() {
-			return SESSION_VERSION + SESSION_SEPARATOR + userId + SESSION_SEPARATOR
-					+ accountScope.name() + SESSION_SEPARATOR
-					+ (organizationId == null ? "" : organizationId) + SESSION_SEPARATOR
-					+ (branchId == null ? "" : branchId) + SESSION_SEPARATOR
-					+ supportMode + SESSION_SEPARATOR
-					+ (supportExpiresAt == null ? "" : supportExpiresAt.getEpochSecond()) + SESSION_SEPARATOR + credentialVersion;
-		}
-	}
 }

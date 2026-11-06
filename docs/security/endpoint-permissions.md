@@ -366,7 +366,7 @@ Base auditada `58a5d4d4b24bcc598059b05a4ac70d11a2fe937b` con el PR #65. Inventar
 | --- | --- | --- | --- |
 | `POST /api/v1/auth/login` | Credencial del protocolo | S | `AuthController` |
 | `POST /api/v1/auth/refresh` | Credencial del protocolo | S | `AuthController` |
-| `POST /api/v1/auth/logout` | JWT autenticado | S | `AuthController` |
+| `POST /api/v1/auth/logout` | Credencial del protocolo | S | `AuthController` |
 | `GET /api/v1/auth/me` | JWT autenticado | S | `AuthController` |
 | `POST /api/v1/auth/select-branch` | `branch.read` | S | `AuthController` |
 | `POST /api/v1/auth/select-organization` | `platform.admin` | A/S | `AuthController` |

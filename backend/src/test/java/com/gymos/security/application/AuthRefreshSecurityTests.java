@@ -2,322 +2,106 @@ package com.gymos.security.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.gymos.audit.api.AuditService;
-import com.gymos.common.api.BusinessException;
-import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.common.api.ApiAuthenticationException;
 import com.gymos.common.security.AccountScope;
-import com.gymos.common.security.JwtService;
-import com.gymos.security.infrastructure.AuthQueryRepository;
-import java.time.Duration;
+import com.gymos.common.security.GymOsPrincipal;
+import com.gymos.common.security.SessionRegistry;
+import com.gymos.security.infrastructure.AuthQueryRepository.AuthenticatedUser;
+import java.time.Instant;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
-import org.springframework.security.authentication.AuthenticationManager;
 
 class AuthRefreshSecurityTests {
+	private final AuthSessionTestFixture fixture = new AuthSessionTestFixture();
+	private final AuthenticatedUser user = new AuthenticatedUser(UUID.randomUUID(), AccountScope.TENANT,
+			UUID.randomUUID(), "coach", "hash", "Coach", Set.of("workout.read.own"), Set.of("Coach"), 0);
+
 	@Test
-	void changingPasswordInvalidatesLegacyAndCurrentRefreshTokens() {
-		AuthQueryRepository repository = mock(AuthQueryRepository.class);
-		StringRedisTemplate redis = mock(StringRedisTemplate.class);
-		@SuppressWarnings("unchecked") ValueOperations<String, String> values = mock(ValueOperations.class);
-		JwtService jwt = mock(JwtService.class);
-		AuthService service = new AuthService(mock(AuthenticationManager.class), repository, jwt, redis, mock(AuditService.class));
-		UUID userId = UUID.randomUUID(), org = UUID.randomUUID();
-		when(redis.opsForValue()).thenReturn(values);
-		when(repository.findActiveUserById(userId)).thenReturn(Optional.of(new AuthQueryRepository.AuthenticatedUser(
-				userId, AccountScope.TENANT, org, "coach", "hash", "Coach", Set.of("workout.read.own"), Set.of("Coach"), 1)));
-		for (String stored : java.util.List.of(tenantSession(userId, org, null), tenantSession(userId, org, null) + "|0")) {
-			when(values.get("gymos:refresh:v2:old-session")).thenReturn(stored);
-			assertThatThrownBy(() -> service.refresh("old-session")).isInstanceOfSatisfying(BusinessException.class,
-					error -> assertThat(error.code()).isEqualTo("REFRESH_TOKEN_INVALID"));
+	void legacyAndManipulatedRefreshNeverReadRedis() {
+		String signed = fixture.credentials.issue(UUID.randomUUID(), 0);
+		for (String token : Set.of("v2-token", signed.replace(".0.", ".1."))) {
+			assertThatThrownBy(() -> fixture.service.refresh(token, UUID.randomUUID(), "test"))
+					.isInstanceOf(ApiAuthenticationException.class);
 		}
-		verify(jwt, never()).issueTokens(any(), anyString());
+		verifyNoInteractions(fixture.sessions, fixture.users);
 	}
 
 	@Test
 	void passwordRecoveryDuringLoginCannotIssueANewGenerationTokenUsingOldPassword() {
-		AuthQueryRepository repository = mock(AuthQueryRepository.class);
-		JwtService jwt = mock(JwtService.class);
-		AuthenticationManager manager = mock(AuthenticationManager.class);
-		AuthService service = new AuthService(manager, repository, jwt, mock(StringRedisTemplate.class), mock(AuditService.class));
-		UUID id = UUID.randomUUID(), org = UUID.randomUUID();
-		var old = new AuthQueryRepository.AuthenticatedUser(id, AccountScope.TENANT, org, "coach", "oldhash", "Coach", Set.of(), Set.of("Coach"), 0);
-		var reset = new AuthQueryRepository.AuthenticatedUser(id, AccountScope.TENANT, org, "coach", "newhash", "Coach", Set.of(), Set.of("Coach"), 1);
-		when(repository.findActiveUserByLoginIdentifier("coach")).thenReturn(Optional.of(old), Optional.of(reset));
-		assertThatThrownBy(() -> service.login("coach", "OldPassword123!", "test"))
+		var reset = new AuthenticatedUser(user.userId(), AccountScope.TENANT, user.organizationId(),
+				user.username(), "newhash", user.fullName(), user.permissions(), user.roles(), 1);
+		when(fixture.users.findActiveUserByLoginIdentifier("coach")).thenReturn(Optional.of(user), Optional.of(reset));
+		assertThatThrownBy(() -> fixture.service.login("coach", "OldPassword123!", null, "test"))
 				.isInstanceOf(org.springframework.security.authentication.BadCredentialsException.class);
-		verify(jwt, never()).issueTokens(any(), anyString());
-	}
-	@Test
-	void refreshRotatesTokenAndPreservesTenantContext() {
-		AuthQueryRepository repository = mock(AuthQueryRepository.class);
-		JwtService jwtService = mock(JwtService.class);
-		StringRedisTemplate redis = mock(StringRedisTemplate.class);
-		@SuppressWarnings("unchecked")
-		ValueOperations<String, String> values = mock(ValueOperations.class);
-		AuthService service = new AuthService(
-				mock(AuthenticationManager.class), repository, jwtService, redis, mock(AuditService.class));
-
-		UUID userId = UUID.randomUUID();
-		UUID organizationId = UUID.randomUUID();
-		UUID branchId = UUID.randomUUID();
-		String previousToken = "previous-refresh";
-		String storedSession = tenantSession(userId, organizationId, branchId);
-		AuthQueryRepository.AuthenticatedUser user = user(userId, organizationId, Set.of("branch.read"));
-
-		when(redis.opsForValue()).thenReturn(values);
-		when(values.get("gymos:refresh:v2:" + previousToken)).thenReturn(storedSession);
-		when(repository.findActiveUserById(userId)).thenReturn(Optional.of(user));
-		when(repository.organizationIsActive(organizationId)).thenReturn(true);
-		when(repository.branchBelongsToOrganization(branchId, organizationId)).thenReturn(true);
-		when(repository.userHasBranchAccess(userId, branchId)).thenReturn(true);
-		when(jwtService.issueTokens(any(GymOsPrincipal.class), anyString()))
-				.thenAnswer(invocation -> new JwtService.TokenPair("access", invocation.getArgument(1), 900));
-
-		var result = service.refresh(previousToken);
-
-		assertThat(result.user().organizationId()).isEqualTo(organizationId);
-		assertThat(result.user().branchId()).isEqualTo(branchId);
-		assertThat(result.refreshToken()).isNotEqualTo(previousToken);
-		verify(values).set("gymos:refresh:v2:" + result.refreshToken(), storedSession + "|0", Duration.ofDays(7));
-		verify(values).set(
-				"gymos:refresh:v2:" + previousToken,
-				"rotated:" + result.refreshToken(),
-				Duration.ofSeconds(15)
-		);
+		verifyNoInteractions(fixture.sessions);
 	}
 
 	@Test
-	void platformRefreshPreservesPlatformScopeWithoutInventingATenant() {
-		AuthQueryRepository repository = mock(AuthQueryRepository.class);
-		JwtService jwtService = mock(JwtService.class);
-		StringRedisTemplate redis = mock(StringRedisTemplate.class);
-		@SuppressWarnings("unchecked")
-		ValueOperations<String, String> values = mock(ValueOperations.class);
-		AuthService service = new AuthService(
-				mock(AuthenticationManager.class), repository, jwtService, redis, mock(AuditService.class));
+	void removedPermissionOrDisabledAccountRevokesTheFamily() {
+		var reduced = new AuthenticatedUser(user.userId(), AccountScope.TENANT, user.organizationId(),
+				user.username(), user.passwordHash(), user.fullName(), Set.of(), user.roles(), user.credentialVersion());
+		for (Optional<AuthenticatedUser> lookup : java.util.List.of(Optional.of(reduced), Optional.<AuthenticatedUser>empty())) {
+			var active = fixture.session(user, user.toPrincipal(null));
+			when(fixture.users.findActiveUserById(user.userId())).thenReturn(lookup);
+			assertThatThrownBy(() -> fixture.service.refresh(active.cookie(), UUID.randomUUID(), "test"))
+					.isInstanceOf(ApiAuthenticationException.class);
+			verify(fixture.sessions).revokeContext(active.id(), 0);
+		}
+	}
 
-		UUID userId = UUID.randomUUID();
-		String refreshToken = "platform-refresh";
-		when(redis.opsForValue()).thenReturn(values);
-		when(values.get("gymos:refresh:v2:" + refreshToken))
-				.thenReturn("v2|" + userId + "|PLATFORM|||false|");
-		when(repository.findActiveUserById(userId)).thenReturn(Optional.of(new AuthQueryRepository.AuthenticatedUser(
-				userId, AccountScope.PLATFORM, null, "platform@gymfort.mx", "hash", "Platform Admin",
-				Set.of("platform.admin", "organization.read"), Set.of("Administrador GymOS"))));
-		when(jwtService.issueTokens(any(GymOsPrincipal.class), anyString()))
-				.thenAnswer(invocation -> new JwtService.TokenPair("access", invocation.getArgument(1), 900));
-
-		var result = service.refresh(refreshToken);
-
-		assertThat(result.user().accountScope()).isEqualTo(AccountScope.PLATFORM);
-		assertThat(result.user().organizationId()).isNull();
-		assertThat(result.user().branchId()).isNull();
-		assertThat(result.user().supportMode()).isFalse();
+	@Test
+	void crossTenantBranchInStoredSessionIsRejected() {
+		UUID branch = UUID.randomUUID();
+		var active = fixture.session(user, user.toPrincipal(branch));
+		when(fixture.users.findActiveUserById(user.userId())).thenReturn(Optional.of(user));
+		when(fixture.users.organizationIsActive(user.organizationId())).thenReturn(true);
+		when(fixture.users.userHasBranchAccess(user.userId(), branch)).thenReturn(true);
+		assertThatThrownBy(() -> fixture.service.refresh(active.cookie(), UUID.randomUUID(), "test"))
+				.isInstanceOf(ApiAuthenticationException.class);
+		verify(fixture.sessions).revokeContext(active.id(), 0);
 	}
 
 	@Test
 	void cachedPlatformScopeCannotPromoteATenantAccount() {
-		AuthQueryRepository repository = mock(AuthQueryRepository.class);
-		StringRedisTemplate redis = mock(StringRedisTemplate.class);
-		@SuppressWarnings("unchecked")
-		ValueOperations<String, String> values = mock(ValueOperations.class);
-		AuthService service = new AuthService(
-				mock(AuthenticationManager.class), repository, mock(JwtService.class), redis, mock(AuditService.class));
-
-		UUID userId = UUID.randomUUID();
-		UUID organizationId = UUID.randomUUID();
-		when(redis.opsForValue()).thenReturn(values);
-		when(values.get("gymos:refresh:v2:ambiguous-scope"))
-				.thenReturn("v2|" + userId + "|PLATFORM|||false|");
-		when(repository.findActiveUserById(userId)).thenReturn(Optional.of(
-				user(userId, organizationId, Set.of("organization.read"))));
-
-		assertThatThrownBy(() -> service.refresh("ambiguous-scope"))
-				.isInstanceOfSatisfying(BusinessException.class,
-						exception -> assertThat(exception.code()).isEqualTo("REFRESH_TOKEN_INVALID"));
+		var platform = new GymOsPrincipal(user.userId(), AccountScope.PLATFORM, null, null, user.username(), user.fullName(),
+				Set.of("platform.admin"), Set.of("Admin"), false, null);
+		var active = fixture.session(user, platform);
+		when(fixture.users.findActiveUserById(user.userId())).thenReturn(Optional.of(user));
+		assertThatThrownBy(() -> fixture.service.refresh(active.cookie(), UUID.randomUUID(), "test"))
+				.isInstanceOf(ApiAuthenticationException.class);
 	}
 
 	@Test
-	void disabledAccountCannotRenewAnExistingRefreshSession() {
-		AuthQueryRepository repository = mock(AuthQueryRepository.class);
-		StringRedisTemplate redis = mock(StringRedisTemplate.class);
-		@SuppressWarnings("unchecked")
-		ValueOperations<String, String> values = mock(ValueOperations.class);
-		AuthService service = new AuthService(
-				mock(AuthenticationManager.class), repository, mock(JwtService.class), redis, mock(AuditService.class));
-
-		UUID userId = UUID.randomUUID();
-		UUID organizationId = UUID.randomUUID();
-		when(redis.opsForValue()).thenReturn(values);
-		when(values.get("gymos:refresh:v2:disabled-user"))
-				.thenReturn(tenantSession(userId, organizationId, null));
-		when(repository.findActiveUserById(userId)).thenReturn(Optional.empty());
-
-		assertThatThrownBy(() -> service.refresh("disabled-user"))
-				.isInstanceOfSatisfying(BusinessException.class,
-						exception -> assertThat(exception.code()).isEqualTo("REFRESH_TOKEN_INVALID"));
+	void tenantWithoutBranchCanRenewTheSameOrganization() {
+		var active = fixture.session(user, user.toPrincipal(null));
+		var operation = UUID.randomUUID();
+		when(fixture.users.findActiveUserById(user.userId())).thenReturn(Optional.of(user));
+		when(fixture.users.organizationIsActive(user.organizationId())).thenReturn(true);
+		when(fixture.sessions.find(active.id())).thenReturn(
+				Optional.of(new SessionRegistry.State(0, 0, active.context())),
+				Optional.of(new SessionRegistry.State(1, 0, active.context())));
+		when(fixture.sessions.rotate(active.id(), 0, 0, operation.toString(), 0, active.context()))
+				.thenReturn(SessionRegistry.Rotation.NEXT);
+		var renewed = fixture.service.refresh(active.cookie(), operation, "test");
+		assertThat(renewed.user().branchId()).isNull();
+		assertThat(renewed.user().organizationId()).isEqualTo(user.organizationId());
+		assertThat(renewed.refreshToken()).isEqualTo(fixture.credentials.issue(active.id(), 1));
 	}
 
 	@Test
-	void ownerCanRefreshHomeOrganizationWithoutBranchAssignment() {
-		AuthQueryRepository repository = mock(AuthQueryRepository.class);
-		JwtService jwtService = mock(JwtService.class);
-		StringRedisTemplate redis = mock(StringRedisTemplate.class);
-		@SuppressWarnings("unchecked")
-		ValueOperations<String, String> values = mock(ValueOperations.class);
-		AuthService service = new AuthService(
-				mock(AuthenticationManager.class), repository, jwtService, redis, mock(AuditService.class));
-
-		UUID userId = UUID.randomUUID();
-		UUID organizationId = UUID.randomUUID();
-		String refreshToken = "owner-refresh";
-		String storedSession = tenantSession(userId, organizationId, null);
-
-		when(redis.opsForValue()).thenReturn(values);
-		when(values.get("gymos:refresh:v2:" + refreshToken)).thenReturn(storedSession);
-		when(repository.findActiveUserById(userId)).thenReturn(Optional.of(new AuthQueryRepository.AuthenticatedUser(
-				userId, organizationId, "owner@gymos.local", "hash", "Owner", Set.of("organization.read"), Set.of("Dueño"))));
-		when(repository.organizationIsActive(organizationId)).thenReturn(true);
-		when(jwtService.issueTokens(any(GymOsPrincipal.class), anyString()))
-				.thenAnswer(invocation -> new JwtService.TokenPair("access", invocation.getArgument(1), 900));
-
-		var result = service.refresh(refreshToken);
-
-		assertThat(result.user().organizationId()).isEqualTo(organizationId);
-		assertThat(result.user().branchId()).isNull();
-		verify(repository, never()).userHasOrganizationAccess(userId, organizationId);
-	}
-
-	@Test
-	void concurrentRefreshWithinGraceReturnsTheReplacementToken() {
-		AuthQueryRepository repository = mock(AuthQueryRepository.class);
-		JwtService jwtService = mock(JwtService.class);
-		StringRedisTemplate redis = mock(StringRedisTemplate.class);
-		@SuppressWarnings("unchecked")
-		ValueOperations<String, String> values = mock(ValueOperations.class);
-		AuthService service = new AuthService(
-				mock(AuthenticationManager.class), repository, jwtService, redis, mock(AuditService.class));
-
-		UUID userId = UUID.randomUUID();
-		UUID organizationId = UUID.randomUUID();
-		UUID branchId = UUID.randomUUID();
-		String previousToken = "previous-refresh";
-		String replacementToken = "replacement-refresh";
-		String storedSession = tenantSession(userId, organizationId, branchId);
-
-		when(redis.opsForValue()).thenReturn(values);
-		when(values.get("gymos:refresh:v2:" + previousToken)).thenReturn("rotated:" + replacementToken);
-		when(values.get("gymos:refresh:v2:" + replacementToken)).thenReturn(storedSession);
-		when(repository.findActiveUserById(userId)).thenReturn(Optional.of(user(userId, organizationId, Set.of("branch.read"))));
-		when(repository.organizationIsActive(organizationId)).thenReturn(true);
-		when(repository.branchBelongsToOrganization(branchId, organizationId)).thenReturn(true);
-		when(repository.userHasBranchAccess(userId, branchId)).thenReturn(true);
-		when(jwtService.issueTokens(any(GymOsPrincipal.class), eq(replacementToken)))
-				.thenReturn(new JwtService.TokenPair("access", replacementToken, 900));
-
-		var result = service.refresh(previousToken);
-
-		assertThat(result.refreshToken()).isEqualTo(replacementToken);
-		assertThat(result.user().organizationId()).isEqualTo(organizationId);
-		assertThat(result.user().branchId()).isEqualTo(branchId);
-	}
-
-	@Test
-	void expiredRotationGraceCannotBeUsedAgain() {
-		StringRedisTemplate redis = mock(StringRedisTemplate.class);
-		@SuppressWarnings("unchecked")
-		ValueOperations<String, String> values = mock(ValueOperations.class);
-		AuthService service = new AuthService(
-				mock(AuthenticationManager.class), mock(AuthQueryRepository.class), mock(JwtService.class), redis, mock(AuditService.class));
-
-		when(redis.opsForValue()).thenReturn(values);
-		when(values.get("gymos:refresh:v2:expired-refresh")).thenReturn(null);
-
-		assertThatThrownBy(() -> service.refresh("expired-refresh"))
-				.isInstanceOfSatisfying(BusinessException.class,
-						exception -> assertThat(exception.code()).isEqualTo("REFRESH_TOKEN_INVALID"));
-	}
-
-	@Test
-	void logoutDoesNotRevokeRefreshTokenOwnedByAnotherUser() {
-		StringRedisTemplate redis = mock(StringRedisTemplate.class);
-		@SuppressWarnings("unchecked")
-		ValueOperations<String, String> values = mock(ValueOperations.class);
-		AuditService auditService = mock(AuditService.class);
-		AuthService service = new AuthService(
-				mock(AuthenticationManager.class), mock(AuthQueryRepository.class), mock(JwtService.class), redis, auditService);
-
-		UUID currentUserId = UUID.randomUUID();
-		UUID otherUserId = UUID.randomUUID();
-		UUID organizationId = UUID.randomUUID();
-		String token = "foreign-refresh";
-		GymOsPrincipal principal = new GymOsPrincipal(
-				currentUserId, organizationId, null, "current@gymos.local", "Current User", Set.of());
-
-		when(redis.opsForValue()).thenReturn(values);
-		when(values.get("gymos:refresh:v2:" + token))
-				.thenReturn(tenantSession(otherUserId, organizationId, null));
-
-		service.logout(principal, token, "logout-correlation");
-
-		verify(redis, never()).delete("gymos:refresh:v2:" + token);
-		verify(auditService).record(
-				principal, "AUTH_LOGOUT", "USER", currentUserId, "BACKOFFICE", null, "logout-correlation");
-	}
-
-	@Test
-	void refreshRejectsBranchNoLongerAccessibleToUser() {
-		AuthQueryRepository repository = mock(AuthQueryRepository.class);
-		StringRedisTemplate redis = mock(StringRedisTemplate.class);
-		@SuppressWarnings("unchecked")
-		ValueOperations<String, String> values = mock(ValueOperations.class);
-		AuthService service = new AuthService(
-				mock(AuthenticationManager.class), repository, mock(JwtService.class), redis, mock(AuditService.class));
-
-		UUID userId = UUID.randomUUID();
-		UUID organizationId = UUID.randomUUID();
-		UUID revokedBranchId = UUID.randomUUID();
-		String token = "revoked-branch-refresh";
-		when(redis.opsForValue()).thenReturn(values);
-		when(values.get("gymos:refresh:v2:" + token))
-				.thenReturn(tenantSession(userId, organizationId, revokedBranchId));
-		when(repository.findActiveUserById(userId)).thenReturn(Optional.of(user(userId, organizationId, Set.of())));
-		when(repository.organizationIsActive(organizationId)).thenReturn(true);
-		when(repository.branchBelongsToOrganization(revokedBranchId, organizationId)).thenReturn(true);
-		when(repository.userHasBranchAccess(userId, revokedBranchId)).thenReturn(false);
-
-		assertThatThrownBy(() -> service.refresh(token))
-				.isInstanceOfSatisfying(BusinessException.class,
-						exception -> assertThat(exception.code()).isEqualTo("REFRESH_TOKEN_INVALID"));
-	}
-
-	private AuthQueryRepository.AuthenticatedUser user(UUID userId, UUID organizationId, Set<String> permissions) {
-		return new AuthQueryRepository.AuthenticatedUser(
-				userId,
-				AccountScope.TENANT,
-				organizationId,
-				"user@gymos.local",
-				"hash",
-				"GymOS User",
-				permissions,
-				Set.of("Gerente")
-		);
-	}
-
-	private String tenantSession(UUID userId, UUID organizationId, UUID branchId) {
-		return "v2|" + userId + "|TENANT|" + organizationId + "|"
-				+ (branchId == null ? "" : branchId) + "|false|";
+	void expiredSupportCannotBeRenewedIntoPlatformAccess() {
+		var admin = new AuthenticatedUser(UUID.randomUUID(), AccountScope.PLATFORM, null, "admin", "hash",
+				"Admin", Set.of("platform.admin", "branch.read"), Set.of("Admin"));
+		var active = fixture.session(admin, admin.toSupportPrincipal(UUID.randomUUID(), null, Instant.EPOCH));
+		when(fixture.users.findActiveUserById(admin.userId())).thenReturn(Optional.of(admin));
+		assertThatThrownBy(() -> fixture.service.refresh(active.cookie(), UUID.randomUUID(), "test"))
+				.isInstanceOf(ApiAuthenticationException.class);
+		verify(fixture.sessions).revokeContext(active.id(), 0);
 	}
 }

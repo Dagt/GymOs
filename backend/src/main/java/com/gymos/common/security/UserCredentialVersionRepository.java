@@ -10,6 +10,10 @@ public class UserCredentialVersionRepository {
 	private final JdbcClient jdbc;
 	public UserCredentialVersionRepository(JdbcClient jdbc) { this.jdbc = jdbc; }
 
+	public String authorityFingerprint(UUID userId) {
+		return UserAuthorities.load(jdbc, userId).fingerprint();
+	}
+
 	public boolean isCurrent(GymOsPrincipal principal) {
 		String sql = """
 				SELECT EXISTS (

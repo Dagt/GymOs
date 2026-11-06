@@ -1,55 +1,65 @@
-import { apiFetch, publicApiFetch } from "./client";
-import type { AuthResponse, CurrentUser, StoredSession, UserConsole } from "./auth-types";
+import { accessForSessionChange, apiFetch, currentTokenFor, publicApiFetch, sessionRequest } from "./client";
+import { clearLegacySession, clearRefreshOperation, clearSession, sessionSlot, storeSession, withSessionLock } from "./session";
+import type { AuthResponse, CurrentUser, UserConsole } from "./auth-types";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api/v1";
-const ACCESS_TOKEN_KEY = "gymos.accessToken";
-const REFRESH_TOKEN_KEY = "gymos.refreshToken";
-const CURRENT_USER_KEY = "gymos.currentUser";
+export { clearSession, getStoredSession, storeCurrentUser } from "./session";
+export { restoreSession } from "./client";
 
 export async function login(username: string, password: string): Promise<AuthResponse> {
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+  clearLegacySession();
+  const slot = sessionSlot(true);
+  if (!slot) throw new Error("No fue posible preparar la sesión.");
+  return withSessionLock(slot, async () => {
+    const response = await sendSessionRequest("login", slot, {
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username: username.trim(), password }),
     });
-  } catch {
-    throw new Error(`No se pudo conectar con el servidor (${API_BASE_URL}). Revisa que el backend este encendido.`);
-  }
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => null);
-    if (response.status === 401) {
-      throw new Error("Usuario o contrasena incorrectos.");
-    }
-    throw new Error(formatLoginError(response, error));
-  }
-
-  return normalizeAuthResponse(await response.json());
+    if (response.status === 401) throw new Error("Usuario o contraseña incorrectos.");
+    return installSession(response);
+  });
 }
 
 export async function selectBranch(accessToken: string, branchId: string): Promise<AuthResponse> {
-  return normalizeAuthResponse(await apiFetch<AuthResponse>("/auth/select-branch", accessToken, {
-    method: "POST",
-    body: JSON.stringify({ branchId }),
-  }));
+  return changeSession("select-branch", accessToken, { branchId });
 }
 
 export async function selectOrganization(accessToken: string, organizationId: string, reason: string): Promise<AuthResponse> {
-  return normalizeAuthResponse(await apiFetch<AuthResponse>("/auth/select-organization", accessToken, {
-    method: "POST",
-    body: JSON.stringify({ organizationId, reason }),
-  }));
+  return changeSession("select-organization", accessToken, { organizationId, reason });
 }
 
-export async function exitSupport(accessToken: string, refreshToken: string): Promise<AuthResponse> {
-  return normalizeAuthResponse(await apiFetch<AuthResponse>("/auth/exit-support", accessToken, {
-    method: "POST",
-    body: JSON.stringify({ refreshToken }),
-  }));
+export async function exitSupport(accessToken: string): Promise<AuthResponse> {
+  return changeSession("exit-support", accessToken);
+}
+
+async function changeSession(path: string, expected: string, body?: Record<string, string>) {
+  const slot = sessionSlot();
+  if (!slot) throw new Error("Tu sesión terminó. Inicia sesión de nuevo.");
+  const token = await accessForSessionChange(expected);
+  return withSessionLock(slot, async () => {
+    const response = await sendSessionRequest(path, slot, {
+      headers: { Authorization: `Bearer ${currentTokenFor(token)}`, ...(body ? { "Content-Type": "application/json" } : {}) },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    return installSession(response);
+  });
+}
+
+async function installSession(response: Response): Promise<AuthResponse> {
+  if (!response.ok) {
+    const error = await response.json().catch(() => null) as { message?: string } | null;
+    throw new Error(error?.message ?? "No fue posible completar la operación de sesión.");
+  }
+  const session = normalizeAuthResponse(await response.json());
+  clearRefreshOperation();
+  storeSession(session);
+  return session;
+}
+
+function sendSessionRequest(path: string, slot: string, init: RequestInit = {}) {
+  return sessionRequest(path, slot, init).catch(() => {
+    throw new Error("No se pudo conectar con GymFort. Revisa tu conexión e intenta de nuevo.");
+  });
 }
 
 export async function acceptUserInvitation(token: string, password: string): Promise<void> {
@@ -79,83 +89,15 @@ export async function getCurrentUser(accessToken: string): Promise<CurrentUser> 
   return normalizeCurrentUser(await apiFetch<CurrentUser>("/auth/me", accessToken));
 }
 
-export async function logout(accessToken: string, refreshToken: string): Promise<void> {
-  await apiFetch<void>("/auth/logout", accessToken, {
-    method: "POST",
-    body: JSON.stringify({ refreshToken }),
-  });
-}
-
-export function storeSession(session: AuthResponse) {
-  const normalized = normalizeAuthResponse(session);
-  const storage = browserSessionStorage();
-  if (!storage) return;
-  storage.setItem(ACCESS_TOKEN_KEY, normalized.accessToken);
-  storage.setItem(REFRESH_TOKEN_KEY, normalized.refreshToken);
-  storage.setItem(CURRENT_USER_KEY, JSON.stringify(normalized.user));
-  clearLegacySharedSession();
-}
-
-export function storeCurrentUser(user: CurrentUser) {
-  browserSessionStorage()?.setItem(CURRENT_USER_KEY, JSON.stringify(normalizeCurrentUser(user)));
-}
-
-export function getStoredSession(): StoredSession | null {
-  const storage = browserSessionStorage();
-  if (!storage) return null;
-  migrateLegacySession(storage);
-
-  const accessToken = storage.getItem(ACCESS_TOKEN_KEY);
-  const refreshToken = storage.getItem(REFRESH_TOKEN_KEY);
-  const currentUser = storage.getItem(CURRENT_USER_KEY);
-
-  if (!accessToken || !refreshToken || !currentUser) {
-    return null;
-  }
-
-  try {
-    const parsed = JSON.parse(currentUser) as CurrentUser;
-    return {
-      accessToken,
-      refreshToken,
-      user: normalizeCurrentUser(parsed),
-    };
-  } catch {
+export async function logout(): Promise<void> {
+  const slot = sessionSlot();
+  if (!slot) return clearSession();
+  await withSessionLock(slot, async () => {
+    const response = await sendSessionRequest("logout", slot);
+    if (!response.ok) throw new Error("No se pudo cerrar la sesión. Intenta de nuevo.");
     clearSession();
-    return null;
-  }
-}
-
-export function clearSession() {
-  const storage = browserSessionStorage();
-  storage?.removeItem(ACCESS_TOKEN_KEY);
-  storage?.removeItem(REFRESH_TOKEN_KEY);
-  storage?.removeItem(CURRENT_USER_KEY);
-  clearLegacySharedSession();
-}
-
-function browserSessionStorage() {
-  return typeof window === "undefined" ? null : window.sessionStorage;
-}
-
-function migrateLegacySession(storage: Storage) {
-  if (storage.getItem(ACCESS_TOKEN_KEY) || typeof window === "undefined") return;
-  const legacyAccessToken = window.localStorage.getItem(ACCESS_TOKEN_KEY);
-  const legacyRefreshToken = window.localStorage.getItem(REFRESH_TOKEN_KEY);
-  const legacyCurrentUser = window.localStorage.getItem(CURRENT_USER_KEY);
-  if (legacyAccessToken && legacyRefreshToken && legacyCurrentUser) {
-    storage.setItem(ACCESS_TOKEN_KEY, legacyAccessToken);
-    storage.setItem(REFRESH_TOKEN_KEY, legacyRefreshToken);
-    storage.setItem(CURRENT_USER_KEY, legacyCurrentUser);
-  }
-  clearLegacySharedSession();
-}
-
-function clearLegacySharedSession() {
-  if (typeof window === "undefined") return;
-  window.localStorage.removeItem(ACCESS_TOKEN_KEY);
-  window.localStorage.removeItem(REFRESH_TOKEN_KEY);
-  window.localStorage.removeItem(CURRENT_USER_KEY);
+    window.dispatchEvent(new Event("gymfort.session-expired"));
+  });
 }
 
 function normalizeCurrentUser(user: CurrentUser): CurrentUser {

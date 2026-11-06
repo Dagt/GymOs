@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useState } from "react";
-import { getStoredSession, login, storeSession } from "@/lib/api";
+import { getStoredSession, login, restoreSession } from "@/lib/api";
 import { getPostLoginPath } from "@/lib/session-routing";
 
 export default function LoginPage() {
@@ -16,13 +16,18 @@ export default function LoginPage() {
   const [checkingSession, setCheckingSession] = useState(true);
 
   useEffect(() => {
-    const stored = getStoredSession();
-    if (stored) {
-      router.replace(getPostLoginPath(stored.user));
-      return;
-    }
-    const timer = window.setTimeout(() => setCheckingSession(false), 0);
-    return () => window.clearTimeout(timer);
+    let active = true;
+    void restoreSession().then((status) => {
+      if (!active) return;
+      const stored = getStoredSession();
+      if (stored) {
+        router.replace(getPostLoginPath(stored.user));
+      } else {
+        if (status === "unavailable") setError("No se pudo restaurar tu sesión. Revisa tu conexión.");
+        setCheckingSession(false);
+      }
+    });
+    return () => { active = false; };
   }, [router]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -31,7 +36,6 @@ export default function LoginPage() {
     setError(null);
     try {
       const session = await login(username, password);
-      storeSession(session);
       router.replace(getPostLoginPath(session.user));
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible iniciar sesion.");

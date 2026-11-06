@@ -24,7 +24,6 @@ export type CurrentUser = {
 
 export type AuthResponse = {
   accessToken: string;
-  refreshToken: string;
   tokenType: "Bearer";
   expiresIn: number;
   user: CurrentUser;
@@ -32,6 +31,5 @@ export type AuthResponse = {
 
 export type StoredSession = {
   accessToken: string;
-  refreshToken: string;
   user: CurrentUser;
 };

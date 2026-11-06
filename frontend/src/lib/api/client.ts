@@ -1,52 +1,76 @@
+import type { AuthResponse } from "./auth-types";
+import {
+  accessClaims, clearLegacySession, clearRefreshOperation, clearSession, getStoredSession,
+  refreshOperation, sameAccessContext, sessionSlot, storeSession, withSessionLock,
+} from "./session";
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8080/api/v1";
-
 let refreshPromise: Promise<RefreshResult> | null = null;
-
-const REFRESH_MARGIN_MILLISECONDS = 30_000;
-const ACCESS_TOKEN_KEY = "gymos.accessToken";
-const REFRESH_TOKEN_KEY = "gymos.refreshToken";
-const CURRENT_USER_KEY = "gymos.currentUser";
+let contextChanged = false;
 
 type RefreshResult =
   | { status: "refreshed"; accessToken: string }
-  | { status: "rejected" }
-  | { status: "unavailable" };
+  | { status: "rejected" | "unavailable" | "changed" };
+
+const expiredMessage = "Tu sesión terminó. Inicia sesión de nuevo.";
+const unavailableMessage = "No se pudo renovar la sesión. Revisa tu conexión e intenta de nuevo.";
+const contextMessage = "La sesión cambió en otra pestaña. Recarga el panel antes de continuar.";
 
 export async function apiFetch<T>(
   path: string,
   accessToken: string,
   init: RequestInit = {},
 ): Promise<T> {
-  let tokenUsed = currentAccessToken() ?? accessToken;
-
-  if (tokenNeedsRefresh(tokenUsed)) {
-    const proactiveRefresh = await refreshAccessToken(tokenUsed);
-    if (proactiveRefresh.status === "refreshed") {
-      tokenUsed = proactiveRefresh.accessToken;
-    }
+  let token = currentTokenFor(accessToken);
+  const expiresAt = accessClaims(token)?.exp;
+  if (expiresAt && expiresAt * 1000 <= Date.now() + 30_000) {
+    const refresh = await refreshAccessToken(token);
+    if (refresh.status !== "unavailable") token = requireRefreshed(refresh);
   }
+  const response = await authenticatedRequest(path, token, init);
+  if (response.status !== 401) return readResponse<T>(response, path);
 
-  let response = await authenticatedRequest(path, tokenUsed, init);
-  if (response.status !== 401 && response.status !== 403) {
-    return readResponse<T>(response, path);
-  }
+  const refresh = await refreshAccessToken(token);
+  const renewed = requireRefreshed(refresh);
+  return readResponse<T>(await authenticatedRequest(path, currentTokenFor(renewed), init), path);
+}
 
-  const newerToken = currentAccessToken();
-  if (newerToken && newerToken !== tokenUsed) {
-    tokenUsed = newerToken;
-    response = await authenticatedRequest(path, tokenUsed, init);
-    if (response.status !== 401 && response.status !== 403) {
-      return readResponse<T>(response, path);
-    }
-  }
+export function currentTokenFor(expected: string) {
+  if (contextChanged) throw new Error(contextMessage);
+  const current = getStoredSession()?.accessToken;
+  if (!current) throw new Error(expiredMessage);
+  if (!sameAccessContext(expected, current)) throw new Error(contextMessage);
+  return current;
+}
 
-  const refresh = await refreshAccessToken(tokenUsed);
-  if (refresh.status !== "refreshed") {
-    return readResponse<T>(response, path);
-  }
+function requireRefreshed(result: RefreshResult) {
+  if (result.status === "refreshed") return result.accessToken;
+  throw new Error(result.status === "changed" ? contextMessage
+    : result.status === "unavailable" ? unavailableMessage : expiredMessage);
+}
 
-  const retry = await authenticatedRequest(path, refresh.accessToken, init);
-  return readResponse<T>(retry, path);
+export async function restoreSession() {
+  clearLegacySession();
+  if (getStoredSession()) return "refreshed";
+  return (await refreshAccessToken()).status;
+}
+
+export async function sessionRequest(path: string, slot: string, init: RequestInit = {}) {
+  return fetch(`${API_BASE_URL}/auth/${path}`, {
+    ...init,
+    method: "POST",
+    credentials: "include",
+    cache: "no-store",
+    headers: { "X-GymFort-Session": slot, ...init.headers },
+  });
+}
+
+export async function accessForSessionChange(expected: string) {
+  const access = currentTokenFor(expected);
+  const expiresAt = accessClaims(access)?.exp;
+  return expiresAt && expiresAt * 1000 <= Date.now() + 30_000
+    ? requireRefreshed(await refreshAccessToken(access))
+    : access;
 }
 
 export async function publicApiFetch<T>(
@@ -56,6 +80,7 @@ export async function publicApiFetch<T>(
   const isFormData = init.body instanceof FormData;
   return readResponse<T>(await performRequest(path, {
     ...init,
+    credentials: "omit",
     headers: {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...init.headers,
@@ -89,6 +114,7 @@ async function authenticatedRequest(path: string, accessToken: string, init: Req
   const isFormData = init.body instanceof FormData;
   return performRequest(path, {
     ...init,
+    credentials: "omit",
     headers: {
       ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...init.headers,
@@ -121,94 +147,54 @@ async function readResponse<T>(response: Response, path: string): Promise<T> {
   return (text ? JSON.parse(text) : undefined) as T;
 }
 
-async function refreshAccessToken(expectedAccessToken: string): Promise<RefreshResult> {
-  if (typeof window === "undefined") return { status: "unavailable" };
-
-  const current = currentAccessToken();
-  if (current && current !== expectedAccessToken) {
-    return { status: "refreshed", accessToken: current };
+function refreshAccessToken(expected?: string): Promise<RefreshResult> {
+  if (contextChanged) return Promise.resolve({ status: "changed" });
+  const slot = sessionSlot();
+  if (!slot) return Promise.resolve({ status: "rejected" });
+  const current = getStoredSession()?.accessToken;
+  if (expected && current && expected !== current) {
+    return Promise.resolve(sameAccessContext(expected, current)
+      ? { status: "refreshed", accessToken: current }
+      : { status: "changed" });
   }
 
-  if (refreshPromise) return refreshPromise;
-
-  refreshPromise = performRefresh(expectedAccessToken).finally(() => {
+  refreshPromise ??= withSessionLock(slot, () => performRefresh(slot, expected)).finally(() => {
     refreshPromise = null;
   });
   return refreshPromise;
 }
 
-async function performRefresh(expectedAccessToken: string): Promise<RefreshResult> {
-  const storage = browserSessionStorage();
-  const refreshToken = storage?.getItem(REFRESH_TOKEN_KEY);
-  if (!storage || !refreshToken) return { status: "rejected" };
-
-  const tokenBeforeRequest = currentAccessToken();
-  if (tokenBeforeRequest && tokenBeforeRequest !== expectedAccessToken) {
-    return { status: "refreshed", accessToken: tokenBeforeRequest };
+async function performRefresh(slot: string, expected?: string): Promise<RefreshResult> {
+  if (sessionSlot() !== slot) return { status: "rejected" };
+  const operation = refreshOperation();
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const response = await sessionRequest("refresh", slot, {
+      headers: { "X-GymFort-Refresh-Request": operation },
+    }).catch(() => null);
+    if (sessionSlot() !== slot) return { status: "rejected" };
+    if (response?.status === 401) {
+      clearSession();
+      window.dispatchEvent(new Event("gymfort.session-expired"));
+      return { status: "rejected" };
+    }
+    if (response?.ok) {
+      const next = await response.json().catch(() => null) as AuthResponse | null;
+      if (next?.accessToken && next.user && sessionSlot() === slot) {
+        clearRefreshOperation();
+        if (expected && !sameAccessContext(expected, next.accessToken)) {
+          contextChanged = true;
+          window.dispatchEvent(new Event("gymfort.session-context-changed"));
+          return { status: "changed" };
+        }
+        storeSession(next);
+        return { status: "refreshed", accessToken: next.accessToken };
+      }
+    } else if (response && response.status !== 409) {
+      return { status: "unavailable" };
+    }
+    if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 150));
   }
-
-  let response: Response;
-  try {
-    response = await fetch(`${API_BASE_URL}/auth/refresh`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken }),
-    });
-  } catch {
-    return { status: "unavailable" };
-  }
-
-  if (!response.ok) {
-    if ([400, 401, 403].includes(response.status)) return { status: "rejected" };
-    return { status: "unavailable" };
-  }
-
-  const session = await response.json().catch(() => null) as {
-    accessToken?: string;
-    refreshToken?: string;
-    user?: unknown;
-  } | null;
-  if (!session?.accessToken || !session.refreshToken) {
-    return { status: "unavailable" };
-  }
-
-  storage.setItem(ACCESS_TOKEN_KEY, session.accessToken);
-  storage.setItem(REFRESH_TOKEN_KEY, session.refreshToken);
-  if (session.user) {
-    storage.setItem(CURRENT_USER_KEY, JSON.stringify(session.user));
-  }
-  window.dispatchEvent(new Event("gymos.session-refreshed"));
-  return { status: "refreshed", accessToken: session.accessToken };
-}
-
-function browserSessionStorage() {
-  return typeof window === "undefined" ? null : window.sessionStorage;
-}
-
-function currentAccessToken() {
-  return browserSessionStorage()?.getItem(ACCESS_TOKEN_KEY) ?? null;
-}
-
-function tokenNeedsRefresh(accessToken: string) {
-  const expiresAt = accessTokenExpiration(accessToken);
-  return expiresAt !== null && expiresAt <= Date.now() + REFRESH_MARGIN_MILLISECONDS;
-}
-
-function accessTokenExpiration(accessToken: string): number | null {
-  if (typeof window === "undefined" || typeof TextDecoder === "undefined") return null;
-  const parts = accessToken.split(".");
-  if (parts.length !== 3) return null;
-
-  try {
-    const normalized = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
-    const binary = window.atob(padded);
-    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
-    const payload = JSON.parse(new TextDecoder().decode(bytes)) as { exp?: unknown };
-    return typeof payload.exp === "number" ? payload.exp * 1000 : null;
-  } catch {
-    return null;
-  }
+  return { status: "unavailable" };
 }
 
 function operationKey(...parts: string[]) {

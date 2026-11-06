@@ -1,3 +1,4 @@
+import { mockStaffSession } from "./session-fixtures";
 import type { Page, Route } from "@playwright/test";
 
 export const branchId = "22222222-2222-4222-8222-222222222222";
@@ -97,15 +98,11 @@ export async function bootPagination(page: Page, override?: (route: Route, path:
     if (path === "/exercises/equipment-options") return void await json(route, ["Barra", "Trineo especial"]);
     return void await json(route, []);
   });
-  await page.addInitScript(({ user }) => {
-    localStorage.setItem("gymos.accessToken", "pagination-e2e-only");
-    localStorage.setItem("gymos.refreshToken", "pagination-e2e-refresh-only");
-    localStorage.setItem("gymos.currentUser", JSON.stringify(user));
-  }, { user: {
+  await mockStaffSession(page, "pagination-e2e-only", {
     userId, accountScope: "TENANT", organizationId: orgId, branchId, username: "pagination@example.test", fullName: "Usuario de prueba",
     permissions: ["client.read", "client.create", "catalog.read", "catalog.create", "catalog.update", "catalog.archive", "inventory.read", "inventory.manage", "sale.create", "sale.read", "branch.read", "organization.read",
       ...(coach ? ["coach.read", "exercise.read", "exercise.create", "exercise.manage", "workout.read.own", "workout.manage.own", "workout.assign"] : [])],
     roles: [coach ? "Coach" : "Dueno del gimnasio"], platformAdmin: false, supportMode: false, supportExpiresAt: null,
     console: coach ? "COACH" : "TENANT_OWNER", organizationName: "Gimnasio de prueba", brandName: "GymFort QA", logoUrl: "", primaryColor: "#173c2a", accentColor: "#EAB308", surfaceColor: "#F4F7FB",
-  } });
+  });
 }

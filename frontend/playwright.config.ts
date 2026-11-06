@@ -5,6 +5,7 @@ const localUrl = "http://127.0.0.1:" + port;
 
 export default defineConfig({
   testDir: "./e2e",
+  testIgnore: "live/**",
   timeout: 30_000,
   webServer: {
     command: "node node_modules/next/dist/bin/next dev --hostname 127.0.0.1 --port " + port,

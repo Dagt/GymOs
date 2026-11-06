@@ -12,6 +12,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.common.security.JwtService;
+import com.gymos.common.security.SessionBinding;
+import com.gymos.common.security.SessionRegistry;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -51,10 +53,17 @@ class SecurityAuthorizationTests {
 	@Autowired private RequestMappingHandlerMapping requestMappingHandlerMapping;
 	@Autowired private SecurityFilterChain securityFilterChain;
 	@MockitoBean private UserCredentialVersionRepository credentialVersions;
+	@MockitoBean private SessionRegistry sessions;
 
 	@BeforeEach
 	void activeFixtureCredentials() {
 		org.mockito.Mockito.when(credentialVersions.isCurrent(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+		org.mockito.Mockito.when(credentialVersions.authorityFingerprint(org.mockito.ArgumentMatchers.any())).thenReturn("fixture");
+		org.mockito.Mockito.when(sessions.isCurrent(org.mockito.ArgumentMatchers.any())).thenReturn(true);
+	}
+
+	private String access(GymOsPrincipal principal) {
+		return jwtService.accessToken(principal.withSession(new SessionBinding(UUID.randomUUID(), 0, "fixture")));
 	}
 
 	@Test
@@ -133,9 +142,27 @@ class SecurityAuthorizationTests {
 	@Test
 	void revokedJwtIsRejectedBeforeController() throws Exception {
 		org.mockito.Mockito.when(credentialVersions.isCurrent(org.mockito.ArgumentMatchers.any())).thenReturn(false);
-		String token = jwtService.accessToken(new GymOsPrincipal(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "coach", "Coach", Set.of("client.read")));
+		String token = access(new GymOsPrincipal(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "coach", "Coach", Set.of("client.read")));
 		mockMvc.perform(get("/api/v1/clients/search").header("Authorization", "Bearer " + token))
 				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void legacyJwtWithoutSessionBindingIsRejected() throws Exception {
+		String legacy = jwtService.accessToken(new GymOsPrincipal(UUID.randomUUID(), UUID.randomUUID(), null,
+				"fixture", "Fixture", Set.of("client.read")));
+		mockMvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + legacy))
+				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void unavailableSessionStoreFailsClosedWithARetryableResponse() throws Exception {
+		org.mockito.Mockito.when(sessions.isCurrent(org.mockito.ArgumentMatchers.any()))
+				.thenThrow(new org.springframework.data.redis.RedisConnectionFailureException("fixture"));
+		String token = access(new GymOsPrincipal(UUID.randomUUID(), UUID.randomUUID(), null,
+				"fixture", "Fixture", Set.of("client.read")));
+		mockMvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + token))
+				.andExpect(status().isServiceUnavailable()).andExpect(jsonPath("$.code").value("SESSION_UNAVAILABLE"));
 	}
 
 	@Test
@@ -164,7 +191,7 @@ class SecurityAuthorizationTests {
 
 	@Test
 	void validJwtWithoutOrganizationPermissionReturnsForbiddenInsteadOfInvalidSession() throws Exception {
-		String token = jwtService.accessToken(new GymOsPrincipal(
+		String token = access(new GymOsPrincipal(
 				UUID.randomUUID(),
 				UUID.randomUUID(),
 				UUID.randomUUID(),
@@ -183,7 +210,7 @@ class SecurityAuthorizationTests {
 
 	@Test
 	void organizationUpdateAuthorityCanReadCurrentOrganization() throws Exception {
-		String token = jwtService.accessToken(new GymOsPrincipal(
+		String token = access(new GymOsPrincipal(
 				UUID.randomUUID(),
 				UUID.randomUUID(),
 				UUID.randomUUID(),

@@ -20,6 +20,9 @@ Las regresiones de #29 se agregan a `TenantIsolationPostgresIntegrationTests` y 
 | QA-SEC-02 | Gerente de sucursal A cambia recurso, tarifa, inventario o usuario solo B | 403/404, sin mutación y auditable | #29 |
 | QA-SEC-03 | PLATFORM fuera de soporte toca TENANT y TENANT toca PLATFORM | No acceso, soporte temporal/caducado probado | #29 |
 | QA-SEC-04 | Refresh concurrente, token reutilizado/robado, expiración, logout | Sin sesión persistente indebida; threat model | #28 |
+| QA-SEC-04a | Cookie, CSRF, credencial legada y pérdida de contraseña, rol o sucursal | `TenantIsolationPostgresIntegrationTests` con Redis y PostgreSQL reales. La matriz de autoridades compara las 298 rutas de Spring. | #28 |
+| QA-SEC-04b | Login, recarga, respuesta perdida, cookie invisible a JS, aislamiento por pestaña y logout | `scripts/test-auth-browser.sh` ejecuta Chromium con Next, Spring, PostgreSQL y Redis. La interrupción de red se induce después de contactar al backend. | #28 |
+| QA-SEC-04c | Cookies en dominios finales, reinicio de Redis, corte y rollback | Aceptación pendiente con las URLs y políticas del staging real. [Runbook](../docs/operations/staff-sessions.md). | #28 |
 | QA-SEC-05 | Login incorrecto, 429 o backend indisponible | Mensajes públicos sin URI, HTTP ni correlation ID | #32 |
 | QA-CRM-01 | Alta/socio duplicado e import CSV con filas inválidas | No PII ajena, feedback por fila, transacción definida | #30 |
 | QA-ONB-01 | Alta cliente confirmada, SMTP falla después | Tenant permanece; invitación se puede reemitir | #45 |

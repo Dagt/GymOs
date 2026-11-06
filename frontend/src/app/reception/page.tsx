@@ -10,7 +10,6 @@ import {
   getCurrentOrganization,
   getStoredSession,
   selectBranch,
-  storeSession,
   type BranchSummary,
   type OrganizationSummary,
   type StoredSession,
@@ -44,10 +43,8 @@ export default function ReceptionPage() {
         const onlyBranch = availableBranches.length === 1 ? availableBranches[0] : null;
         if (!storedSession.user.branchId && onlyBranch) {
           const nextSession = await selectBranch(storedSession.accessToken, onlyBranch.id);
-          storeSession(nextSession);
           effectiveSession = {
             accessToken: nextSession.accessToken,
-            refreshToken: nextSession.refreshToken,
             user: nextSession.user,
           };
         }
@@ -92,10 +89,8 @@ export default function ReceptionPage() {
     setError(null);
     try {
       const nextSession = await selectBranch(session.accessToken, branchId);
-      storeSession(nextSession);
       setSession({
         accessToken: nextSession.accessToken,
-        refreshToken: nextSession.refreshToken,
         user: nextSession.user,
       });
     } catch (exception) {
