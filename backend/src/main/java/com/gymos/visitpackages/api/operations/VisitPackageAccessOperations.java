@@ -25,6 +25,14 @@ public interface VisitPackageAccessOperations {
 			UUID accessLogId
 	);
 
+	/** Snapshot for a client whose visibility has already been checked by Access. */
+	Optional<VisitPackageOperations.VisitPackageEntitlementView> packageForAccess(UUID organizationId, UUID clientId);
+
+	VisitRestoration reverseConsumption(
+			UUID organizationId, UUID branchId, UUID clientId, UUID accessLogId, String reason, OffsetDateTime now);
+
+	record VisitRestoration(int remainingBefore, int remainingAfter) {}
+
 	record VisitPackageAccessResult(
 			UUID usageId,
 			UUID baseConsumptionId,

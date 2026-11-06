@@ -34,7 +34,8 @@ export type AccessDecision = {
 
 export type AccessLog = {
   id: string;
-  decision: "GRANTED" | "DENIED";
+  decision: "GRANTED" | "DENIED" | "DUPLICATE";
+  reversedAt?: string | null;
   accessType: string;
   source: string;
   reason: string | null;

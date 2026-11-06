@@ -61,3 +61,19 @@ En el corte auditado, main y la rama del Connector muestran fallos CI; no hay ev
 
 ## 5. Definition of Done de QA
 Todo issue refleja cobertura positiva, negativa, concurrencia cuando aplique, tenant/sucursal/rol, error/timeout, mutaciones auditables y rollback. Mantener evidencia reproducible en PR. Después del merge, actualizar documentación y deuda con fecha y commit real.
+## ACC-006 — Matriz de registro presencial
+
+| Escenario | Evidencia reproducible |
+| --- | --- |
+| Membresía y gracia, vencida, socio inactivo o suspendido, prioridad sobre el paquete | `VisitPackageEntitlementRepositoryIntegrationTests`, contra Eligibility y PostgreSQL reales |
+| Cinco consumos, sexto rechazo, paquete vencido o fuera de sede, beneficio incluido, saldo compartido | Misma suite, fixtures de snapshots, ledger y auditoría |
+| Dos recepcionistas, reintento idéntico, clave con otro cuerpo, dos ingresos legítimos y última visita en dos sedes | Misma suite, transacciones concurrentes y barrera |
+| Reversión, reintento simultáneo, aislamiento tenant/sucursal e historial separado de ventas | Misma suite y `SecurityAuthorizationTests` |
+| PostgreSQL limpio y upgrade V103 con bitácora existente | `DatabaseMigrationTests` y arranque Flyway de las suites PostgreSQL |
+| Error de red después de confirmar, recarga, misma clave, saldo y corrección por supervisor | `frontend/e2e/manual-check-in.spec.ts`, Chromium con API interceptada. La integración de datos se verifica en PostgreSQL. |
+| Paquete vencido con saldo, agotado con membresía vigente y derecho que cambia tras la consulta | `manual-check-in.spec.ts` comprueba que sólo se ofrecen derechos de la respuesta vigente. La suite PostgreSQL valida que el rechazo de una reversión conserve el ledger y que el crédito posterior mantenga vencido el paquete original. |
+
+El job frontend de CI ejecuta la suite Playwright completa en Chromium.
+Comandos locales en `AGENTS.md`. Para ejecutar Playwright con el puerto
+predeterminado ocupado, configura `PLAYWRIGHT_PORT=3100`. Registra el SHA y
+los resultados del run en el PR de [#61](https://github.com/Dagt/GymOs/issues/61).

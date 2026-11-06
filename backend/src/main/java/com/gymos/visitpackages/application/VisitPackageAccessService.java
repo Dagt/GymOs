@@ -3,6 +3,7 @@ package com.gymos.visitpackages.application;
 import com.gymos.catalog.api.VisitPackageBenefitUsageMode;
 import com.gymos.common.api.BusinessException;
 import com.gymos.visitpackages.api.operations.VisitPackageAccessOperations;
+import com.gymos.visitpackages.api.operations.VisitPackageOperations.VisitPackageEntitlementView;
 import com.gymos.visitpackages.application.port.VisitPackageEntitlementPort;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -36,6 +37,24 @@ public class VisitPackageAccessService implements VisitPackageAccessOperations {
 				organizationId, branchId, clientId,
 				requiredBenefitIds == null ? List.of() : List.copyOf(requiredBenefitIds),
 				accessDeviceId, idempotencyKey.trim(), businessDate, occurredAt);
+	}
+
+	@Override
+	@Transactional(readOnly = true)
+	public Optional<VisitPackageEntitlementView> packageForAccess(UUID organizationId, UUID clientId) {
+		return entitlements.open(organizationId, clientId)
+				.or(() -> entitlements.history(organizationId, clientId, 1).stream().findFirst());
+	}
+
+	@Override
+	@Transactional
+	public VisitRestoration reverseConsumption(
+			UUID organizationId, UUID branchId, UUID clientId, UUID accessLogId, String reason, OffsetDateTime now
+	) {
+		LocalDate businessDate = entitlements.businessDate(organizationId, branchId, now);
+		return entitlements.reverseConsumption(organizationId, branchId, clientId, accessLogId, reason, businessDate, now)
+				.orElseThrow(() -> new BusinessException("VISIT_PACKAGE_RESTORATION_UNAVAILABLE",
+						"No se pudo devolver la visita. Revisa el estado del paquete original y si hay otro paquete activo o pendiente."));
 	}
 
 	@Override

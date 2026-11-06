@@ -23,7 +23,7 @@
   "dependencies": {
     "@opennextjs/cloudflare": "1.20.2",
     "lucide-react": "^1.33.0",
-    "next": "16.3.2",
+    "next": "16.4.5",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "recharts": "^3.10.1"
@@ -35,9 +35,9 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",
-    "eslint-config-next": "16.3.2",
+    "eslint-config-next": "16.4.5",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "wrangler": "4.125.0"
+    "wrangler": "4.158.0"
   }
 }

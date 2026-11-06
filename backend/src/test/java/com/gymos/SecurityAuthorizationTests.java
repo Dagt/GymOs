@@ -42,6 +42,23 @@ class SecurityAuthorizationTests {
 	}
 
 	@Test
+	@WithMockUser(authorities = {"access.read", "access.manage", "access.manual.open"})
+	void physicalAccessPermissionsDoNotGrantManualReceptionAccess() throws Exception {
+		mockMvc.perform(get("/api/v1/access/manual-check-ins")).andExpect(status().isForbidden());
+		mockMvc.perform(get("/api/v1/access/manual-check-ins/clients").param("query", "fixture"))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(post("/api/v1/access/manual-check-ins")).andExpect(status().isForbidden());
+	}
+
+	@Test
+	@WithMockUser(authorities = "access.check-in")
+	void manualReceptionPermissionDoesNotGrantReversalOrDoorOpening() throws Exception {
+		mockMvc.perform(post("/api/v1/access/manual-check-ins/{id}/reversal", UUID.randomUUID()))
+				.andExpect(status().isForbidden());
+		mockMvc.perform(post("/api/v1/access/commands/open")).andExpect(status().isForbidden());
+	}
+
+	@Test
 	void revokedJwtIsRejectedBeforeController() throws Exception {
 		org.mockito.Mockito.when(credentialVersions.isCurrent(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyLong())).thenReturn(false);
 		String token = jwtService.accessToken(new GymOsPrincipal(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "coach", "Coach", Set.of("client.read")));

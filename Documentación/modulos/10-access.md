@@ -410,3 +410,24 @@ seleccionar B si sólo existen accesos incluidos o locales de A.
 La API manual histórica `visit_pass` queda para lectura mientras se regularizan
 datos. Sus operaciones de alta y consumo rechazan nuevas escrituras con
 `VISIT_PASS_LEGACY_READ_ONLY`.
+
+## 15. ACC-006 — Registro manual en recepción
+
+`/reception/check-in` usa la sucursal autenticada para buscar y consultar socios,
+confirmar el derecho `ACCESS` elegido y leer las últimas 30 entradas. La
+visibilidad permite sede de origen y sedes con membresía vigente o paquete
+vigente con un derecho de consumo en el snapshot. `EligibilityPolicy` decide
+el derecho de membresía con la fecha local, incluida la gracia. Si el mismo
+derecho está cubierto por membresía, se conserva el saldo del paquete. Para
+paquetes, se confirma un derecho `CONSUMES_VISIT` y se muestran los beneficios
+incluidos que cubren esa sede.
+
+Access registra en `access_log` con `source=MANUAL` y
+`access_type=MANUAL_CHECK_IN`. La operación usa una clave UUID por organización,
+un lock de transacción por clave, un lock de fila por socio y las restricciones
+del ledger existente. Log, consumo, vínculo y auditoría se confirman en la misma
+transacción. La ventana de duplicados es de 60 segundos por socio y sede.
+Una excepción auditada exige autorización de supervisor y la referencia a la
+última entrada concedida de esa ventana. La reversión queda en
+`access_manual_reversal` y conserva la decisión original. V105 agrega el
+historial manual y los permisos. Ver el [runbook](../../docs/operations/reception-manual-check-in.md).

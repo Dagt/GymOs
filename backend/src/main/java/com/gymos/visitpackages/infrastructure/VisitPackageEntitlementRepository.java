@@ -6,6 +6,7 @@ import com.gymos.visitpackages.api.operations.VisitPackageOperations.VisitPackag
 import com.gymos.visitpackages.api.operations.VisitPackageOperations.VisitPackageBenefitView;
 import com.gymos.visitpackages.api.operations.VisitPackageOperations.VisitPackageConsumptionView;
 import com.gymos.visitpackages.api.operations.VisitPackageAccessOperations.VisitPackageAccessResult;
+import com.gymos.visitpackages.api.operations.VisitPackageAccessOperations.VisitRestoration;
 import com.gymos.visitpackages.application.port.VisitPackageEntitlementPort;
 import com.gymos.visitpackages.application.port.VisitPackageEntitlementPort.BenefitCoverage;
 import java.time.LocalDate;
@@ -391,6 +392,49 @@ public class VisitPackageEntitlementRepository implements VisitPackageEntitlemen
 				+ "WHERE organization_id=:organizationId AND id=:accessLogId)")
 				.param("organizationId", organizationId).param("usageId", usageId)
 				.param("accessLogId", accessLogId).update() == 1;
+	}
+
+	@Override
+	public Optional<VisitRestoration> reverseConsumption(
+			UUID organizationId, UUID branchId, UUID clientId, UUID accessLogId,
+			String reason, LocalDate businessDate, OffsetDateTime now
+	) {
+		// Serialize against purchases and consumption, including calls from other branches.
+		jdbcClient.sql("SELECT id FROM client WHERE organization_id=:org AND id=:client FOR UPDATE")
+				.param("org", organizationId).param("client", clientId).query(UUID.class).single();
+		Optional<Integer> restored = jdbcClient.sql("""
+				UPDATE visit_package_entitlement e
+				SET remaining_visits=e.remaining_visits+1,
+				    status=CASE WHEN e.status='EXPIRED' OR e.valid_until<:businessDate THEN 'EXPIRED' ELSE 'ACTIVE' END,
+				    updated_at=:now, version=e.version+1
+				FROM visit_package_consumption c
+				WHERE c.organization_id=:org AND c.branch_id=:branch AND c.access_log_id=:log
+				  AND c.status='CONSUMED' AND c.entitlement_id=e.id AND c.organization_id=e.organization_id
+				  AND e.client_id=:client AND e.deleted_at IS NULL
+				  AND e.status IN ('ACTIVE', 'CONSUMED', 'EXPIRED') AND e.remaining_visits<e.total_visits
+				  AND (e.status='EXPIRED' OR e.valid_until<:businessDate OR NOT EXISTS (
+				      SELECT 1 FROM visit_package_entitlement other
+				      WHERE other.organization_id=e.organization_id AND other.client_id=e.client_id
+				        AND other.id<>e.id AND other.deleted_at IS NULL
+				        AND other.status IN ('ACTIVE', 'PENDING_PAYMENT')
+				  ))
+				RETURNING e.remaining_visits
+				""").param("org", organizationId).param("branch", branchId).param("log", accessLogId)
+				.param("client", clientId).param("businessDate", businessDate).param("now", now)
+				.query(Integer.class).optional();
+		if (restored.isEmpty()) {
+			return Optional.empty();
+		}
+		int updated = jdbcClient.sql("""
+				UPDATE visit_package_consumption
+				SET status='REVERSED', reversed_at=:now, reversal_reason=:reason
+				WHERE organization_id=:org AND branch_id=:branch AND access_log_id=:log AND status='CONSUMED'
+				""").param("org", organizationId).param("branch", branchId).param("log", accessLogId)
+				.param("reason", reason).param("now", now).update();
+		if (updated != 1) {
+			throw new IllegalStateException("Manual check-in must reverse exactly one consumption");
+		}
+		return restored.map(after -> new VisitRestoration(after - 1, after));
 	}
 
 	private Optional<VisitPackageAccessResult> usageByKey(UUID organizationId, String idempotencyKey) {

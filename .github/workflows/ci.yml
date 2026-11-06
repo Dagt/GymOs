@@ -102,6 +102,15 @@ jobs:
             tail -n 160 /tmp/frontend-cloudflare-build.log
             exit 1
           fi
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Test browser workflows
+        shell: bash
+        run: |
+          if ! npm run test:e2e -- --workers=2 > /tmp/frontend-playwright.log 2>&1; then
+            tail -n 180 /tmp/frontend-playwright.log
+            exit 1
+          fi
       - name: Upload frontend diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
@@ -113,6 +122,8 @@ jobs:
             /tmp/frontend-build.log
             /tmp/frontend-cloudflare-build.log
             /tmp/frontend-audit.log
+            /tmp/frontend-playwright.log
+            frontend/test-results
           if-no-files-found: ignore
 
   docker:

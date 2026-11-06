@@ -122,3 +122,10 @@ Los registros anteriores fueron consolidados y retirados del árbol para evitar 
 ## Adenda 29/10/2026 — enlace con GitHub Issues
 
 Los 7 epics #21–27 y 32 issues #28–59 convierten deuda y producto pendiente en backlog ejecutable, sin sustituir los identificadores anteriores. Un issue creado no convierte un hallazgo en resuelto: cierre requiere código/validación/PR/merge y evidencia del SHA. [Auditoría](37-auditoria-repositorio-2026-10-29.md), [Backlog](36-epicas-backlog-codex.md). Los hallazgos auditados son estáticos; no se afirma un exploit demostrado.
+
+## Seguimiento ACC-006
+
+| ID | Prioridad | Estado | Seguimiento |
+| --- | --- | --- | --- |
+| ACC-006 | P0 | Implementado en rama, sujeto a gates | Registrar evidencia de V105, concurrencia, permisos, recuperación de red y CI del SHA del Draft en [#61](https://github.com/Dagt/GymOs/issues/61). |
+| ACC-006-REV | P1 | Restricción operativa | Una devolución que reabriría un paquete entra en conflicto con otro paquete abierto. Resolver primero el paquete abierto con el proceso comercial. Un posible modelo de crédito diferido requiere decisión comercial y coordinación con #35. |

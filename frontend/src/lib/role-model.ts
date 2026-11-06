@@ -96,6 +96,9 @@ export function isSupportMode(user: CurrentUser) {
 
 export function canAccessRoute(user: CurrentUser, pathname: string) {
   const console = resolveUserConsole(user);
+  if (matches(pathname, "/reception/check-in")) {
+    return canRegisterCheckIn(user);
+  }
   if (matches(pathname, "/kiosk/launch")) {
     return canLaunchKiosk(user);
   }
@@ -130,6 +133,10 @@ export function canAccessRoute(user: CurrentUser, pathname: string) {
     return receptionRoutes.some((route) => matches(pathname, route));
   }
   return coachRoutes.some((route) => matches(pathname, route));
+}
+
+export function canRegisterCheckIn(user: CurrentUser) {
+  return user.accountScope === "TENANT" && user.permissions.includes("access.check-in");
 }
 
 export function canLaunchKiosk(user: CurrentUser) {

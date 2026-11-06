@@ -53,6 +53,49 @@ class DatabaseMigrationTests {
 	}
 
 	@Test
+	void upgradesV103AndPreservesExistingAccessHistory() throws Exception {
+		String schema = migrationSchema("manual_check_in");
+		migrateSchema(schema, "103");
+		UUID log = UUID.randomUUID();
+		UUID organization = UUID.randomUUID();
+		UUID branch = UUID.randomUUID();
+		try (var connection = schemaConnection(schema)) {
+			var jdbc = JdbcClient.create(new SingleConnectionDataSource(connection, true));
+			jdbc.sql("""
+					INSERT INTO organization (id, legal_name, trade_name, status, timezone, default_currency, created_at, updated_at)
+					VALUES (:id, 'Fixture', 'Fixture', 'ACTIVE', 'America/Mexico_City', 'MXN', now(), now())
+					""").param("id", organization).update();
+			jdbc.sql("""
+					INSERT INTO branch (id, organization_id, name, code, timezone, status, created_at, updated_at)
+					VALUES (:id, :org, 'Centro', 'CENTRO', 'America/Mexico_City', 'ACTIVE', now(), now())
+					""").param("id", branch).param("org", organization).update();
+		}
+		try (var connection = schemaConnection(schema); var statement = connection.prepareStatement("""
+				INSERT INTO access_log (id, organization_id, branch_id, access_type, decision, source,
+				                       occurred_at, created_at, correlation_id)
+				VALUES (?, ?, ?, 'MEMBERSHIP_CHECK', 'GRANTED', 'RECEPTION', now(), now(), ?)
+				""")) {
+			statement.setObject(1, log);
+			statement.setObject(2, organization);
+			statement.setObject(3, branch);
+			statement.setObject(4, UUID.randomUUID());
+			statement.executeUpdate();
+		}
+		migrateSchema(schema, null);
+		try (var connection = schemaConnection(schema); var statement = connection.prepareStatement("""
+				SELECT decision, source, manual_request_id FROM access_log WHERE id=?
+				""")) {
+			statement.setObject(1, log);
+			try (var result = statement.executeQuery()) {
+				assertThat(result.next()).isTrue();
+				assertThat(result.getString("decision")).isEqualTo("GRANTED");
+				assertThat(result.getString("source")).isEqualTo("RECEPTION");
+				assertThat(result.getObject("manual_request_id")).isNull();
+			}
+		}
+	}
+
+	@Test
 	void flywayAddsArchitecturalStabilizationColumns() throws Exception {
 		try (var connection = DriverManager.getConnection(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())) {
 			assertThat(columnExists(connection, "user_account", "credential_version")).isTrue();

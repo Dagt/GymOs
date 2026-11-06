@@ -493,8 +493,9 @@ impide reconocer al socio desde otra sede; la autorización concreta sigue
 evaluándose con la sucursal del kiosco. Alternar entre identificación y registro
 reinicia la sesión antes de capturar a la siguiente persona.
 
-Los endpoints de consumo pertenecen al módulo `access`; no se exponen como un
-botón normal para descontar saldos manualmente.
+Access es el punto de entrada del consumo. ACC-006 incorpora la confirmación
+del ingreso presencial de un socio en Recepción, con elegibilidad y movimiento
+de ledger vinculados a la entrada.
 
 ## 9. UX objetivo
 
@@ -701,3 +702,15 @@ Cada etapa debe mantener compilación y pruebas verdes. No se habilita compra de
 paquetes en producción hasta que venta, activación, consumo y exclusividad estén
 integrados de extremo a extremo. La evidencia local no sustituye la aceptación
 externa con Stripe sandbox conectado ni la prueba de los dispositivos físicos.
+
+## ACC-006 — Paquetes en el registro presencial
+
+Recepción confirma una entrada por un derecho concreto, reusando el ledger
+`visit_package_consumption`. Con `CONSUMES_VISIT` se descuenta una unidad y
+`access_log_id` identifica la entrada. `INCLUDED_WITH_VISIT` se muestra como
+parte de la visita base para esa sucursal. Un beneficio incluido por el paquete
+queda fuera de las opciones de ingreso independiente. Una membresía que concede
+el mismo derecho tiene prioridad. El historial de paquetes conserva el consumo
+original y su estado `REVERSED` cuando un supervisor acredita la unidad con
+motivo. Se conserva la vigencia original y el máximo de un paquete abierto.
+Ver el [runbook](../docs/operations/reception-manual-check-in.md).

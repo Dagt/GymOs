@@ -82,6 +82,7 @@ const ownerSections: NavigationSection[] = [
     title: "Mostrador",
     links: [
       { label: "Caja / POS", href: "/pos", hint: "Ventas y pagos", permissions: ["sale.create"] },
+      { label: "Registro de entradas", href: "/reception/check-in", hint: "Acceso presencial e historial", permissions: ["access.check-in"] },
       { label: "Accesos", href: "/access", hint: "Visitas y pases", permissions: ["access.read", "visit.read"] },
     ],
   },
@@ -118,6 +119,7 @@ const managerSections: NavigationSection[] = [
     title: "Mostrador",
     links: [
       { label: "Caja / POS", href: "/pos", hint: "Ventas", permissions: ["sale.create"] },
+      { label: "Registro de entradas", href: "/reception/check-in", hint: "Acceso presencial e historial", permissions: ["access.check-in"] },
     ],
   },
 ];
@@ -128,6 +130,7 @@ const receptionSections: NavigationSection[] = [
     links: [
       { label: "Inicio recepción", href: "/reception", hint: "Acciones del día", permissions: ["client.read", "sale.create"] },
       { label: "Caja / POS", href: "/pos", hint: "Ventas y pagos", permissions: ["sale.create"] },
+      { label: "Registro de entradas", href: "/reception/check-in", hint: "Acceso presencial e historial", permissions: ["access.check-in"] },
       { label: "Pantalla para socios", href: "/kiosk/launch", hint: "Abrir kiosco seguro", permissions: ["selfservice.session.launch"] },
     ],
   },
