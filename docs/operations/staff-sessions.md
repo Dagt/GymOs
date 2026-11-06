@@ -21,5 +21,5 @@ El diseño se documenta en [ADR-001](../../Documentación/adr/ADR-001-sesiones-r
 ## Reproducción
 
 - Backend desde `backend` con Java 25 y Docker. Ejecutar `./gradlew test postgresIntegrationTest --no-daemon --console=plain`.
-- Navegador conectado en Linux desde la raíz. Instalar las dependencias del frontend y Chromium de Playwright. Ejecutar `bash scripts/test-auth-browser.sh`. Requiere los puertos locales 18028, 31929, 55428 y 56428 libres.
+- Navegador conectado en Linux desde la raíz. Instalar las dependencias del frontend y Chromium de Playwright. Ejecutar `bash scripts/test-auth-browser.sh`. La prueba asigna puertos locales dinámicamente para PostgreSQL, Redis, Spring y Next.
 - La suite general Playwright intercepta servicios en flujos de negocio. El escenario de sesión conectado tiene una configuración separada y se ejecuta en un paso explícito de CI.

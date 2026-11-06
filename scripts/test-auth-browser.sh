@@ -12,21 +12,24 @@ cleanup() {
 }
 trap cleanup EXIT
 
-docker run --rm -d --name "$test_name-postgres" -p 127.0.0.1:55428:5432 \
+docker run --rm -d --name "$test_name-postgres" -p 127.0.0.1::5432 \
   -e POSTGRES_DB=gymos -e POSTGRES_USER=gymos -e POSTGRES_PASSWORD=gymos postgres:18-alpine >/dev/null
-docker run --rm -d --name "$test_name-redis" -p 127.0.0.1:56428:6379 redis:8-alpine >/dev/null
+docker run --rm -d --name "$test_name-redis" -p 127.0.0.1::6379 redis:8-alpine >/dev/null
 
-export GYMOS_DB_URL=jdbc:postgresql://localhost:55428/gymos
-export GYMOS_REDIS_PORT=56428
-export GYMOS_CORS_ALLOWED_ORIGINS=http://localhost:31929
+postgres_binding="$(docker port "$test_name-postgres" 5432/tcp)"
+redis_binding="$(docker port "$test_name-redis" 6379/tcp)"
+export GYMOS_DB_URL="jdbc:postgresql://127.0.0.1:${postgres_binding##*:}/gymos"
+export GYMOS_REDIS_HOST=127.0.0.1
+export GYMOS_REDIS_PORT="${redis_binding##*:}"
+PLAYWRIGHT_AUTH_PORT="$(node -e 'const socket = require("node:net").createServer(); socket.listen(0, "localhost", () => { console.log(socket.address().port); socket.close(); });')"
+export PLAYWRIGHT_AUTH_PORT
+export GYMOS_CORS_ALLOWED_ORIGINS="http://localhost:$PLAYWRIGHT_AUTH_PORT"
 export GYMOS_SEED_ENABLED=true
 export GYMOS_ACCESS_TOKEN_SECONDS=12
 export GYMOS_DEMO_OWNER_EMAIL=auth-browser@example.test
 export GYMOS_DEMO_OWNER_PASSWORD='AuthBrowserFixture!2026'
 export SPRING_PROFILES_ACTIVE=local
-export PORT=18028
-export NEXT_PUBLIC_API_BASE_URL=http://localhost:18028/api/v1
-export PLAYWRIGHT_AUTH_PORT=31929
+export PORT=0
 
 for attempt in {1..30}; do
   if docker exec "$test_name-postgres" pg_isready -h 127.0.0.1 -U gymos -d gymos >/dev/null; then break; fi
@@ -35,7 +38,9 @@ done
 (cd backend && chmod +x gradlew && exec setsid ./gradlew bootRun --no-daemon --console=plain) >"$log" 2>&1 &
 backend_pid=$!
 for attempt in {1..180}; do
-  if curl --fail --silent "$NEXT_PUBLIC_API_BASE_URL/system/info" >/dev/null; then
+  backend_port="$(sed -n 's/.*Tomcat started on port \([0-9][0-9]*\) .*/\1/p' "$log" | tail -n 1)"
+  if [[ -n "$backend_port" ]] && curl --fail --silent "http://localhost:$backend_port/api/v1/system/info" >/dev/null; then
+    export NEXT_PUBLIC_API_BASE_URL="http://localhost:$backend_port/api/v1"
     cd frontend
     npx playwright test --config=playwright.auth.config.ts
     exit
