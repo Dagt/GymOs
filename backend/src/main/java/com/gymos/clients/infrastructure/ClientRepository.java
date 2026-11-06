@@ -103,6 +103,20 @@ public class ClientRepository {
 		return count > 0;
 	}
 
+	public boolean hasVisibleEmail(UUID organizationId, UUID branchId, String email) {
+		return jdbcClient.sql("""
+				SELECT EXISTS (
+				    SELECT 1 FROM client c
+				    JOIN person p ON p.id = c.person_id AND p.organization_id = c.organization_id
+				    WHERE c.organization_id = :organizationId AND c.deleted_at IS NULL
+				      AND p.deleted_at IS NULL AND LOWER(p.email) = :email
+				""" + BRANCH_VISIBILITY + ")")
+				.param("organizationId", organizationId)
+				.param("branchId", branchId)
+				.param("email", email)
+				.query(Boolean.class).single();
+	}
+
 	public Optional<ClientDetail> findDetail(UUID organizationId, UUID branchId, UUID clientId) {
 		return jdbcClient.sql("""
 				SELECT c.id AS client_id, c.status AS client_status, c.joined_at, c.notes,

@@ -264,11 +264,11 @@ public class BookingService {
 		if ("CANCELLED".equals(current.status()) || "COMPLETED".equals(current.status())) {
 			throw new BusinessException("BOOKING_ALREADY_CLOSED", "La reserva ya esta cerrada.");
 		}
-		if (!bookingRepository.saleExists(principal.organizationId(), principal.branchId(), command.saleId())) {
-			throw new BusinessException("SALE_NOT_FOUND", "La venta no existe o no esta disponible en esta sucursal.");
-		}
 		String status = command.status().trim().toUpperCase();
-		bookingRepository.upsertBookingPayment(principal.organizationId(), principal.branchId(), bookingId, command.saleId(), status, command.expiresAt());
+		if (!bookingRepository.upsertBookingPayment(principal.organizationId(), principal.branchId(), bookingId,
+				command.saleId(), status, command.expiresAt())) {
+			throw new BusinessException("SALE_NOT_FOUND", "La venta no está disponible para esta reserva.");
+		}
 		auditService.record(principal, "BOOKING_PAYMENT_LINKED", "BOOKING", bookingId, "RECEPTION", status, correlationId);
 		if ("PAID".equals(status) && "RESERVED".equals(current.status())) {
 			bookingRepository.updateStatus(principal.organizationId(), principal.branchId(), bookingId, "CONFIRMED", principal.userId());

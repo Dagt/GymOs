@@ -10,6 +10,9 @@ El [inventario de endpoints](../docs/security/endpoint-permissions.md) registra 
 - Los recursos de socio fuera de la visibilidad del operador devuelven `CLIENT_NOT_FOUND`, con el mismo código que un UUID inexistente. El detalle POS requiere la sede activa y devuelve `SALE_NOT_FOUND` para ventas no disponibles.
 - `POST /sales/{saleId}/payments` admite `receiptObjectKey` nulo por compatibilidad. Las referencias nuevas se generan mediante `POST /sales/payments/{paymentId}/receipt`.
 - `GET /kiosk-settings/branches` muestra sedes activas asignadas o las del tenant de soporte. `PUT /kiosk-settings/branches/{branchId}` aplica el mismo alcance. Un UUID de sesión kiosco inexistente o un token incorrecto devuelve `SELF_SERVICE_SESSION_INVALID`.
+- `POST /bookings/{bookingId}/payments` requiere que la venta pertenezca al socio de la reserva y a su sucursal y organización. Una venta anónima, ajena o inexistente devuelve `SALE_NOT_FOUND`. El detalle omite asociaciones históricas fuera de alcance.
+- Para consultar o cambiar preferencias de correo con `client.update`, la dirección debe corresponder a un socio visible desde la sede activa. `notification.manage` y `notification.settings.manage` conservan el alcance de organización.
+- El detalle POS sólo devuelve referencias de comprobante bajo el prefijo del tenant, la venta y el pago correspondientes.
 
 ## 6.1 Auth
 

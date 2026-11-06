@@ -34,16 +34,16 @@ public class UserAdministrationRepository {
 				    FROM role r
 				    LEFT JOIN role_permission rp ON rp.role_id = r.id
 				    WHERE r.deleted_at IS NULL
-				      AND (r.organization_id = :organizationId OR r.system_role = TRUE)
+				      AND (r.organization_id = :organizationId OR (r.organization_id IS NULL AND r.system_role))
 				      AND (
 				          :includePlatformRoles = TRUE
-				          OR NOT EXISTS (
+				          OR (r.account_scope = 'TENANT' AND NOT EXISTS (
 				              SELECT 1
 				              FROM role_permission platform_rp
 				              JOIN permission platform_permission ON platform_permission.id = platform_rp.permission_id
 				              WHERE platform_rp.role_id = r.id
 				                AND platform_permission.code = 'platform.admin'
-				          )
+				          ))
 				      )
 				    GROUP BY r.id, r.name, r.description, r.system_role, r.created_at
 				)
@@ -81,7 +81,8 @@ public class UserAdministrationRepository {
 				FROM role
 				WHERE id = :roleId
 				  AND deleted_at IS NULL
-				  AND (organization_id = :organizationId OR system_role = TRUE)
+				  AND account_scope = 'TENANT'
+				  AND (organization_id = :organizationId OR (organization_id IS NULL AND system_role))
 				""")
 				.param("roleId", roleId)
 				.param("organizationId", organizationId)

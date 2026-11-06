@@ -23,6 +23,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.jdbc.core.simple.JdbcClient;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -68,6 +70,7 @@ class TenantIsolationPostgresIntegrationTests {
 	@Autowired JwtService jwt;
 	@Autowired ObjectMapper json;
 	@Autowired WellnessRepository wellness;
+	@Autowired PasswordEncoder passwordEncoder;
 
 	private OperationalTestData tenant;
 	private OperationalTestData foreign;
@@ -104,6 +107,14 @@ class TenantIsolationPostgresIntegrationTests {
 									{"clientId":"%s","packagePlanId":"%s","organizationId":"%s","branchId":"%s"}
 									""".formatted(unavailable, UUID.randomUUID(), foreign.organizationId, north)))
 					.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("CLIENT_NOT_FOUND"));
+			for (var purchase : java.util.Map.of("/api/v1/visit-packages/purchases", "packagePlanId",
+					"/api/v1/membership-enrollments", "planId").entrySet()) {
+				http.perform(auth(post(purchase.getKey()), token).contentType("application/json")
+								.content("""
+										{"clientId":"%s","%s":"%s","method":"CASH","validateNow":true,"idempotencyKey":"qa"}
+										""".formatted(unavailable, purchase.getValue(), UUID.randomUUID())))
+						.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("CLIENT_NOT_FOUND"));
+			}
 		}
 		http.perform(auth(get("/api/v1/clients/{id}/visit-package", home),
 				token(tenant.ownerId, tenant.branchId, Set.of("sale.create"), "Recepcion"))).andExpect(status().isOk());
@@ -127,6 +138,32 @@ class TenantIsolationPostgresIntegrationTests {
 		String token = token(tenant.ownerId, tenant.branchId, Set.of("client.read", "membership.read"), "Recepcion");
 		http.perform(auth(get("/api/v1/clients/{id}", client), token)).andExpect(status().isOk());
 		http.perform(auth(get("/api/v1/memberships/{id}", membership), token)).andExpect(status().isOk());
+		String outside = jwt.accessToken(new GymOsPrincipal(foreign.ownerId, foreign.organizationId, foreign.branchId,
+				"fixture", "Fixture", Set.of("membership.read", "sale.create"), Set.of("Recepcion"), false));
+		http.perform(auth(get("/api/v1/memberships/{id}", membership), outside)).andExpect(status().isBadRequest());
+		http.perform(auth(post("/api/v1/memberships/{id}/renew", membership), outside)
+						.contentType("application/json").content("{\"method\":\"CASH\",\"validateNow\":true}"))
+				.andExpect(status().isBadRequest());
+		UUID benefit = UUID.randomUUID();
+		jdbc.sql("""
+				INSERT INTO benefit(id, organization_id, branch_id, code, name, benefit_type,
+				                    discount_type, status, access_scope, created_at, updated_at)
+				VALUES (:id,:org,:branch,'QA-ACCESS','Acceso multisede','ACCESS','NONE','ACTIVE','PLAN_COVERAGE',now(),now())
+				""").param("id", benefit).param("org", tenant.organizationId).param("branch", north).update();
+		jdbc.sql("INSERT INTO benefit_membership_plan(organization_id, benefit_id, membership_plan_id) VALUES (:org,:benefit,:plan)")
+				.param("org", tenant.organizationId).param("benefit", benefit).param("plan", plan).update();
+		String reception = token(tenant.ownerId, tenant.branchId, Set.of("access.check-in"), "Recepcion");
+		String checkIn = "/api/v1/access/manual-check-ins";
+		UUID key = UUID.randomUUID();
+		String request = "{\"branchId\":\"%s\",\"clientId\":\"%s\",\"benefitId\":\"%s\"}"
+				.formatted(tenant.branchId, client, benefit);
+		for (int attempt = 0; attempt < 2; attempt++) {
+			http.perform(auth(post(checkIn), reception).header("Idempotency-Key", key)
+							.contentType("application/json").content(request))
+					.andExpect(status().isOk()).andExpect(jsonPath("$.decision").value("GRANTED"))
+					.andExpect(jsonPath("$.membershipId").value(membership.toString()));
+		}
+		http.perform(auth(get(checkIn), reception)).andExpect(jsonPath("$.entries.length()").value(1));
 		jdbc.sql("UPDATE membership SET ends_on=CURRENT_DATE-2, grace_ends_on=CURRENT_DATE-2 WHERE id=:id")
 				.param("id", membership).update();
 		http.perform(auth(get("/api/v1/clients/{id}", client), token))
@@ -189,6 +226,16 @@ class TenantIsolationPostgresIntegrationTests {
 						.param("fromDate", reportDate.minusDays(1).toString()).param("toDate", reportDate.toString()))
 				.andExpect(status().isOk()).andExpect(jsonPath("$.saleCount").value(1))
 				.andExpect(jsonPath("$.paidRevenueCents").value(100)).andExpect(jsonPath("$.newClients").value(1));
+		UUID localPayment = payment(tenant.organizationId, tenant.branchId, localSale);
+		jdbc.sql("UPDATE payment SET receipt_object_key=:key WHERE id=:id")
+				.param("key", receipt).param("id", localPayment).update();
+		http.perform(auth(get("/api/v1/sales/{id}", localSale), token))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.payments[0].receiptObjectKey").doesNotExist());
+		String ownReceipt = "receipts/" + tenant.organizationId + "/" + localSale + "/" + localPayment + "/qa.pdf";
+		jdbc.sql("UPDATE payment SET receipt_object_key=:key WHERE id=:id")
+				.param("key", ownReceipt).param("id", localPayment).update();
+		http.perform(auth(get("/api/v1/sales/{id}", localSale), token))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.payments[0].receiptObjectKey").value(ownReceipt));
 	}
 
 	@Test
@@ -293,6 +340,10 @@ class TenantIsolationPostgresIntegrationTests {
 						.content(body.formatted(north, product)))
 				.andExpect(status().isOk()).andExpect(jsonPath("$.destinationBranchId").value(north.toString())).andReturn();
 		String transferId = json.readTree(response.getResponse().getContentAsByteArray()).path("id").asText();
+		String outside = jwt.accessToken(new GymOsPrincipal(foreign.ownerId, foreign.organizationId, foreign.branchId,
+				"fixture", "Fixture", Set.of("inventory.read", "inventory.manage"), Set.of("Gerente"), false));
+		http.perform(auth(get("/api/v1/inventory/transfers/{id}", transferId), outside)).andExpect(status().isBadRequest());
+		http.perform(auth(post("/api/v1/inventory/transfers/{id}/ship", transferId), outside)).andExpect(status().isBadRequest());
 		http.perform(auth(post("/api/v1/inventory/transfers/{id}/ship", transferId), token))
 				.andExpect(status().isOk());
 		http.perform(auth(post("/api/v1/inventory/transfers/{id}/receive", transferId), token))
@@ -395,6 +446,205 @@ class TenantIsolationPostgresIntegrationTests {
 	}
 
 	@Test
+	void rolesFromAnotherTenantCannotBeListedAssignedOrInheritedAtTokenIssuance() throws Exception {
+		UUID staff = tenant.user("Recepcion", "test-hash");
+		UUID outsideUser = foreign.user("Rol de otro gimnasio", "test-hash");
+		UUID outsideRole = jdbc.sql("SELECT role_id FROM user_role WHERE user_id=:id")
+				.param("id", outsideUser).query(UUID.class).single();
+		jdbc.sql("UPDATE role SET system_role=true WHERE id=:id").param("id", outsideRole).update();
+		grant(outsideUser, "user.manage");
+
+		String ownerToken = token(tenant.ownerId, tenant.branchId, Set.of("user.read", "user.manage"), "Dueno del gimnasio");
+		http.perform(auth(get("/api/v1/users/roles"), ownerToken))
+				.andExpect(status().isOk()).andExpect(jsonPath("$[?(@.id == '%s')]".formatted(outsideRole)).isEmpty());
+		http.perform(auth(patch("/api/v1/users/internal/{id}/role", staff), ownerToken)
+						.contentType("application/json").content("{\"roleId\":\"%s\"}".formatted(outsideRole)))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("ROLE_NOT_AVAILABLE"));
+		assertThat(auditCount(tenant.organizationId, tenant.branchId, "INTERNAL_USER_ROLE_UPDATED", staff)).isZero();
+		grant(staff, "branch.read");
+		jdbc.sql("INSERT INTO user_role(user_id, role_id) VALUES (:user,:role)")
+				.param("user", staff).param("role", outsideRole).update();
+		String staffToken = token(staff, tenant.branchId, Set.of("branch.read"), "Recepcion");
+		var selected = http.perform(auth(post("/api/v1/auth/select-branch"), staffToken)
+						.contentType("application/json").content("{\"branchId\":\"%s\"}".formatted(tenant.branchId)))
+				.andExpect(status().isOk()).andReturn();
+		String issued = json.readTree(selected.getResponse().getContentAsByteArray()).path("accessToken").asText();
+		assertThat(jwt.parseAccessToken(issued).orElseThrow().permissions()).containsExactly("branch.read");
+		assertThat(jwt.parseAccessToken(issued).orElseThrow().roles()).containsExactly("Recepcion");
+		UUID receptionRole = jdbc.sql("""
+				SELECT id FROM role WHERE name='Recepcion' AND organization_id IS NULL AND system_role
+				  AND account_scope='TENANT' AND deleted_at IS NULL
+				""").query(UUID.class).single();
+		http.perform(auth(patch("/api/v1/users/internal/{id}/role", staff), ownerToken)
+						.contentType("application/json").content("{\"roleId\":\"%s\"}".formatted(receptionRole)))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.roles[0]").value("Recepcion"));
+		http.perform(auth(get("/api/v1/auth/me"), issued)).andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void branchWritesAndOrganizationStatusUseDifferentAdministrativeScopes() throws Exception {
+		String token = token(tenant.ownerId, tenant.branchId, Set.of("branch.read", "branch.update"), "Dueno del gimnasio");
+		String branchBody = """
+				{"name":"Nueva sede","code":"NORTE-2","timezone":"America/Mexico_City","phone":"+525512345678"}
+				""";
+		for (UUID outside : Set.of(north, foreign.branchId)) {
+			http.perform(auth(put("/api/v1/organizations/current/branches/{id}", outside), token)
+							.contentType("application/json").content(branchBody))
+					.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("BRANCH_ACCESS_DENIED"));
+			assertThat(auditCount(tenant.organizationId, tenant.branchId, "BRANCH_UPDATED", outside)).isZero();
+		}
+		http.perform(auth(patch("/api/v1/organizations/{id}/status", foreign.organizationId), token)
+				.contentType("application/json").content("{\"status\":\"SUSPENDED\"}")).andExpect(status().isForbidden());
+		assignBranch(tenant.ownerId, north);
+		http.perform(auth(put("/api/v1/organizations/current/branches/{id}", north), token)
+						.contentType("application/json").content(branchBody))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.name").value("Nueva sede"));
+		assertThat(auditCount(tenant.organizationId, tenant.branchId, "BRANCH_UPDATED", north)).isEqualTo(1);
+	}
+
+	@Test
+	void bookingPaymentRequiresTheSameClientBranchAndTenant() throws Exception {
+		UUID client = tenant.client();
+		UUID booking = booking(tenant.organizationId, tenant.branchId, client);
+		UUID northBooking = booking(tenant.organizationId, north, northClient());
+		UUID foreignBooking = booking(foreign.organizationId, foreign.branchId, foreign.client());
+		UUID ownSale = saleForClient(tenant.organizationId, tenant.branchId, client);
+		UUID otherClientSale = saleForClient(tenant.organizationId, tenant.branchId, tenant.client());
+		UUID northSale = saleForClient(tenant.organizationId, north, client);
+		UUID foreignSale = saleForClient(foreign.organizationId, foreign.branchId, foreign.client());
+		String token = token(tenant.ownerId, tenant.branchId, Set.of("booking.read", "booking.payment.manage"), "Gerente");
+		String path = "/api/v1/bookings/{id}/payments";
+		String body = "{\"saleId\":\"%s\",\"status\":\"PENDING\"}";
+		for (UUID outside : Set.of(otherClientSale, northSale, foreignSale, UUID.randomUUID())) {
+			http.perform(auth(post(path, booking), token).contentType("application/json").content(body.formatted(outside)))
+					.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("SALE_NOT_FOUND"));
+		}
+		for (UUID outside : Set.of(northBooking, foreignBooking)) {
+			http.perform(auth(post(path, outside), token).contentType("application/json").content(body.formatted(ownSale)))
+					.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("BOOKING_NOT_FOUND"));
+		}
+		assertThat(auditCount(tenant.organizationId, tenant.branchId, "BOOKING_PAYMENT_LINKED", booking)).isZero();
+		jdbc.sql("""
+				INSERT INTO booking_payment(id, organization_id, branch_id, booking_id, sale_id, status, created_at, updated_at)
+				VALUES (:id,:org,:branch,:booking,:sale,'PENDING',now(),now())
+				""").param("id", UUID.randomUUID()).param("org", tenant.organizationId).param("branch", tenant.branchId)
+				.param("booking", booking).param("sale", foreignSale).update();
+		http.perform(auth(get("/api/v1/bookings/{id}", booking), token))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.saleId").doesNotExist())
+				.andExpect(jsonPath("$.saleNumber").doesNotExist());
+		http.perform(auth(post(path, booking), token).contentType("application/json").content(body.formatted(ownSale)))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.saleId").value(ownSale.toString()));
+	}
+
+	@Test
+	void restrictedEmailPreferencesRequireAVisibleClient() throws Exception {
+		String path = "/api/v1/notifications/email-preferences";
+		String local = email(tenant.client());
+		String northEmail = email(northClient());
+		String foreignEmail = email(foreign.client());
+		String reception = token(tenant.ownerId, tenant.branchId, Set.of("client.update"), "Recepcion");
+		String body = "{\"recipient\":\"%s\",\"emailEnabled\":false,\"marketingEnabled\":false}";
+		for (String outside : Set.of(northEmail, foreignEmail, "unknown@example.invalid")) {
+			http.perform(auth(get(path), reception).param("recipient", outside)).andExpect(status().isForbidden());
+			http.perform(auth(put(path), reception).contentType("application/json").content(body.formatted(outside)))
+					.andExpect(status().isForbidden());
+		}
+		assertThat(auditCount(tenant.organizationId, tenant.branchId, "NOTIFICATION_EMAIL_PREFERENCE_UPDATED",
+				tenant.organizationId)).isZero();
+		http.perform(auth(put(path), reception).contentType("application/json").content(body.formatted(local.toUpperCase(java.util.Locale.ROOT))))
+				.andExpect(status().is2xxSuccessful());
+		http.perform(auth(get(path), reception).param("recipient", local))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.emailEnabled").value(false));
+		String manager = token(tenant.ownerId, tenant.branchId, Set.of("notification.manage"), "Gerente");
+		http.perform(auth(put(path), manager).contentType("application/json").content(body.formatted(northEmail)))
+				.andExpect(status().is2xxSuccessful());
+	}
+
+	@Test
+	void foreignPaymentCannotBeValidatedRejectedAttachedOrRefunded() throws Exception {
+		UUID localSale = sale(tenant.organizationId, tenant.branchId, 100);
+		UUID northSale = sale(tenant.organizationId, north, 100);
+		UUID foreignSale = sale(foreign.organizationId, foreign.branchId, 100);
+		UUID northPayment = payment(tenant.organizationId, north, northSale);
+		UUID foreignPayment = payment(foreign.organizationId, foreign.branchId, foreignSale);
+		String token = token(tenant.ownerId, tenant.branchId,
+				Set.of("payment.manual.validate", "payment.manual.reject", "payment.receipt.upload", "sale.refund"), "Gerente");
+		var file = new MockMultipartFile("file", "qa.pdf", "application/pdf", new byte[] {1});
+		for (UUID outside : Set.of(northPayment, foreignPayment)) {
+			http.perform(auth(post("/api/v1/sales/payments/{id}/validate", outside), token)).andExpect(status().isBadRequest());
+			http.perform(auth(post("/api/v1/sales/payments/{id}/reject", outside), token)
+							.contentType("application/json").content("{\"reason\":\"Prueba ajena\"}"))
+					.andExpect(status().isBadRequest());
+			http.perform(multipart("/api/v1/sales/payments/{id}/receipt", outside).file(file)
+							.header("Authorization", "Bearer " + token))
+					.andExpect(status().isBadRequest());
+			http.perform(auth(post("/api/v1/sales/{id}/refunds", localSale), token).contentType("application/json")
+							.content("{\"paymentId\":\"%s\",\"amountCents\":10,\"reason\":\"Prueba ajena\"}".formatted(outside)))
+					.andExpect(status().isBadRequest());
+			assertThat(jdbc.sql("SELECT status FROM payment WHERE id=:id AND receipt_object_key IS NULL")
+					.param("id", outside).query(String.class).single()).isEqualTo("PENDING_VALIDATION");
+		}
+		assertThat(jdbc.sql("SELECT count(*) FROM sale_refund WHERE sale_id=:id")
+				.param("id", localSale).query(Integer.class).single()).isZero();
+	}
+
+	@Test
+	void manualCheckInHistoryAndReversalsUseTenantBranchAndEffectivePermission() throws Exception {
+		UUID local = manualGrant(tenant, tenant.branchId, tenant.client());
+		UUID northGrant = manualGrant(tenant, north, northClient());
+		UUID foreignGrant = manualGrant(foreign, foreign.branchId, foreign.client());
+		String operator = token(tenant.ownerId, tenant.branchId, Set.of("access.check-in"), "Recepcion");
+		String manager = token(tenant.ownerId, tenant.branchId, Set.of("access.check-in", "access.check-in.reverse"), "Gerente");
+		String path = "/api/v1/access/manual-check-ins";
+		String reversal = "{\"branchId\":\"%s\",\"reason\":\"Entrada de prueba\"}";
+		http.perform(auth(get(path), operator)).andExpect(status().isOk())
+				.andExpect(jsonPath("$.entries.length()").value(1)).andExpect(jsonPath("$.entries[0].id").value(local.toString()));
+		http.perform(auth(post(path + "/{id}/reversal", local), operator).contentType("application/json")
+				.content(reversal.formatted(tenant.branchId))).andExpect(status().isForbidden());
+		http.perform(auth(post(path + "/{id}/reversal", northGrant), manager).contentType("application/json")
+				.content(reversal.formatted(north))).andExpect(status().isForbidden());
+		for (UUID outside : Set.of(northGrant, foreignGrant, UUID.randomUUID())) {
+			http.perform(auth(post(path + "/{id}/reversal", outside), manager).contentType("application/json")
+							.content(reversal.formatted(tenant.branchId)))
+					.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("CHECK_IN_NOT_FOUND"));
+		}
+		http.perform(auth(post(path + "/{id}/reversal", local), manager).contentType("application/json")
+						.content(reversal.formatted(tenant.branchId)))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.reversal.reason").value("Entrada de prueba"));
+		assertThat(auditCount(tenant.organizationId, tenant.branchId, "MANUAL_CHECK_IN_REVERSED", local)).isEqualTo(1);
+	}
+
+	@Test
+	void seededTenantRolesCanAuthenticateAndReachTheirLegitimateRoutes() throws Exception {
+		var routes = java.util.Map.of(
+				"Dueno del gimnasio", "/api/v1/organizations/current",
+				"Gerente", "/api/v1/inventory",
+				"Recepcion", "/api/v1/access/manual-check-ins",
+				"Coach", "/api/v1/workouts");
+		String password = "FixturePassword-29!";
+		UUID coach = tenant.coach();
+		UUID coachUser = jdbc.sql("SELECT user_account_id FROM coach WHERE id=:id")
+				.param("id", coach).query(UUID.class).single();
+		for (var role : routes.entrySet()) {
+			UUID user = switch (role.getKey()) {
+				case "Dueno del gimnasio" -> tenant.ownerId;
+				case "Coach" -> coachUser;
+				default -> tenant.user(role.getKey(), "test-hash");
+			};
+			jdbc.sql("UPDATE user_account SET password_hash=:hash WHERE id=:id")
+					.param("id", user).param("hash", passwordEncoder.encode(password)).update();
+			jdbc.sql("DELETE FROM user_role WHERE user_id=:id").param("id", user).update();
+			assignSystemRole(user, role.getKey(), "TENANT");
+			var loggedIn = http.perform(post("/api/v1/auth/login").contentType("application/json")
+							.content("{\"username\":\"%s\",\"password\":\"%s\"}".formatted(user, password)))
+					.andExpect(status().isOk()).andExpect(jsonPath("$.user.branchId").value(tenant.branchId.toString())).andReturn();
+			String token = json.readTree(loggedIn.getResponse().getContentAsByteArray()).path("accessToken").asText();
+			http.perform(auth(get(role.getValue()), token)).andExpect(status().isOk());
+			http.perform(auth(get("/api/v1/platform/customers"), token)).andExpect(status().isForbidden());
+		}
+	}
+
+	@Test
 	void supportCanOnlyReadSelectedTenantAndCannotReuseTenantOperationsAsPlatformAdmin() throws Exception {
 		UUID platform = UUID.randomUUID();
 		UUID person = UUID.randomUUID();
@@ -406,16 +656,27 @@ class TenantIsolationPostgresIntegrationTests {
 				INSERT INTO user_account(id, person_id, username, password_hash, status, account_scope, created_at, updated_at)
 				VALUES (:id, :person, :username, 'test-hash', 'ACTIVE', 'PLATFORM', now(), now())
 				""").param("id", platform).param("person", person).param("username", platform.toString()).update();
-		var support = new GymOsPrincipal(platform, AccountScope.PLATFORM, tenant.organizationId, tenant.branchId,
-				"support", "Soporte QA", Set.of("branch.read", "client.read", "access.check-in", "selfservice.settings.manage"),
-				Set.of("Administrador GymOS"), true, java.time.Instant.now().plusSeconds(60));
-		String token = jwt.accessToken(support);
+		assignSystemRole(platform, "Administrador GymOS", "PLATFORM");
+		var admin = new GymOsPrincipal(platform, AccountScope.PLATFORM, null, null,
+				"support", "Soporte QA", Set.of("platform.admin"), Set.of("Administrador GymOS"), false, null);
+		String adminToken = jwt.accessToken(admin);
+		http.perform(auth(get("/api/v1/platform/customers"), adminToken)).andExpect(status().isOk());
+		http.perform(auth(get("/api/v1/clients/{id}", tenant.client()), adminToken)).andExpect(status().isForbidden());
+		var selected = http.perform(auth(post("/api/v1/auth/select-organization"), adminToken)
+						.contentType("application/json").content("""
+								{"organizationId":"%s","reason":"Validación del contexto temporal"}
+								""".formatted(tenant.organizationId)))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.user.supportMode").value(true)).andReturn();
+		String token = json.readTree(selected.getResponse().getContentAsByteArray()).path("accessToken").asText();
+		assertThat(auditCount(tenant.organizationId, tenant.branchId, "PLATFORM_SUPPORT_STARTED", tenant.organizationId)).isEqualTo(1);
 		http.perform(auth(get("/api/v1/organizations/{id}/branches", tenant.organizationId), token)).andExpect(status().isOk());
 		http.perform(auth(get("/api/v1/organizations/{id}/branches", foreign.organizationId), token)).andExpect(status().isForbidden());
 		http.perform(auth(get("/api/v1/clients/{id}", tenant.client()), token)).andExpect(status().isOk());
 		http.perform(auth(get("/api/v1/clients/{id}", foreign.client()), token)).andExpect(status().isBadRequest());
 		http.perform(auth(get("/api/v1/access/manual-check-ins"), token)).andExpect(status().isForbidden());
 		http.perform(auth(get("/api/v1/platform/customers"), token)).andExpect(status().isForbidden());
+		http.perform(auth(patch("/api/v1/organizations/{id}/status", foreign.organizationId), token)
+				.contentType("application/json").content("{\"status\":\"SUSPENDED\"}")).andExpect(status().isForbidden());
 		http.perform(auth(put("/api/v1/kiosk-settings/branches/{id}", foreign.branchId), token)
 				.contentType("application/json").content(KIOSK_SETTINGS)).andExpect(status().isBadRequest());
 		http.perform(auth(put("/api/v1/kiosk-settings/branches/{id}", tenant.branchId), token)
@@ -425,6 +686,9 @@ class TenantIsolationPostgresIntegrationTests {
 				  AND actor_user_id=:actor AND action='KIOSK_BRANCH_SETTINGS_UPDATED' AND entity_id=:branch
 				""").param("org", tenant.organizationId).param("branch", tenant.branchId).param("actor", platform)
 				.query(String.class).single()).isEqualTo("PLATFORM_SUPPORT");
+		String expired = jwt.accessToken(new GymOsPrincipal(platform, AccountScope.PLATFORM, tenant.organizationId,
+				tenant.branchId, "support", "Soporte QA", Set.of("branch.read"), admin.roles(), true, java.time.Instant.EPOCH));
+		http.perform(auth(get("/api/v1/auth/me"), expired)).andExpect(status().isUnauthorized());
 	}
 
 	private MockHttpServletRequestBuilder auth(MockHttpServletRequestBuilder request, String token) {
@@ -461,6 +725,49 @@ class TenantIsolationPostgresIntegrationTests {
 		return sale;
 	}
 
+	private UUID saleForClient(UUID organization, UUID branch, UUID client) {
+		UUID id = sale(organization, branch, 100);
+		jdbc.sql("UPDATE sale SET client_id=:client WHERE id=:id").param("client", client).param("id", id).update();
+		return id;
+	}
+
+	private UUID booking(UUID organization, UUID branch, UUID client) {
+		UUID id = UUID.randomUUID();
+		jdbc.sql("""
+				INSERT INTO booking(id, organization_id, branch_id, resource_id, client_id, status,
+				                    starts_at, ends_at, created_at, updated_at)
+				VALUES (:id,:org,:branch,:resource,:client,'RESERVED',now(),now()+interval '1 hour',now(),now())
+				""").param("id", id).param("org", organization).param("branch", branch)
+				.param("resource", resource(organization, branch)).param("client", client).update();
+		return id;
+	}
+
+	private String email(UUID client) {
+		return jdbc.sql("SELECT p.email FROM client c JOIN person p ON p.id=c.person_id WHERE c.id=:id")
+				.param("id", client).query(String.class).single();
+	}
+
+	private UUID payment(UUID organization, UUID branch, UUID sale) {
+		UUID id = UUID.randomUUID();
+		jdbc.sql("""
+				INSERT INTO payment(id, organization_id, branch_id, sale_id, method, status,
+				                    amount_cents, currency, received_at, created_at, updated_at)
+				VALUES (:id,:org,:branch,:sale,'TRANSFER','PENDING_VALIDATION',100,'MXN',now(),now(),now())
+				""").param("id", id).param("org", organization).param("branch", branch).param("sale", sale).update();
+		return id;
+	}
+
+	private UUID manualGrant(OperationalTestData gym, UUID branch, UUID client) {
+		UUID id = UUID.randomUUID();
+		jdbc.sql("""
+				INSERT INTO access_log(id, organization_id, branch_id, client_id, access_type, decision, source,
+				                       occurred_at, created_at, created_by, correlation_id, manual_request_id, manual_business_date)
+				VALUES (:id,:org,:branch,:client,'ENTRY','GRANTED','MANUAL',now(),now(),:actor,:id,:id,CURRENT_DATE)
+				""").param("id", id).param("org", gym.organizationId).param("branch", branch).param("client", client)
+				.param("actor", gym.ownerId).update();
+		return id;
+	}
+
 	private UUID notification(UUID organization, UUID branch) {
 		UUID id = UUID.randomUUID();
 		jdbc.sql("""
@@ -475,6 +782,14 @@ class TenantIsolationPostgresIntegrationTests {
 	private void assignBranch(UUID user, UUID branch) {
 		jdbc.sql("INSERT INTO user_branch_access(user_id, branch_id, access_scope) VALUES (:user, :branch, 'BRANCH')")
 				.param("user", user).param("branch", branch).update();
+	}
+
+	private void assignSystemRole(UUID user, String role, String scope) {
+		assertThat(jdbc.sql("""
+				INSERT INTO user_role(user_id, role_id)
+				SELECT :user, r.id FROM role r WHERE r.name=:role AND r.account_scope=:scope
+				  AND r.organization_id IS NULL AND r.system_role AND r.deleted_at IS NULL
+				""").param("user", user).param("role", role).param("scope", scope).update()).isEqualTo(1);
 	}
 
 	private void grant(UUID user, String permission) {

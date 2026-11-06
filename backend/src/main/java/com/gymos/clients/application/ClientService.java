@@ -103,6 +103,14 @@ public class ClientService implements ClientLookupOperations, ClientBranchAccess
 		visibleClient(principal, clientId);
 	}
 
+	@Transactional(readOnly = true)
+	@Override
+	public boolean hasVisibleEmail(GymOsPrincipal principal, String email) {
+		requirePrincipal(principal);
+		requireBranch(principal);
+		return clientRepository.hasVisibleEmail(principal.organizationId(), principal.branchId(), email);
+	}
+
 	private ClientDetail visibleClient(GymOsPrincipal principal, UUID clientId) {
 		requirePrincipal(principal);
 		requireBranch(principal);

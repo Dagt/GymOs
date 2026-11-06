@@ -86,3 +86,6 @@ Referencias vigentes: `../../docs/security/permissions-matrix.md` y
 `../../docs/operations/platform-identity-bootstrap.md`.
 Recuperación del equipo, propiedades y límites:
 [cierre operativo](../../docs/operations/operational-hardening.md).
+## Roles asignados y autoridades
+
+Un rol local sólo es visible y asignable en su organización aunque esté marcado como rol de sistema. Las plantillas globales conservan su ámbito de cuenta. La emisión de JWT y el cambio de sede ignoran vínculos de rol ajenos o eliminados y permisos retirados. [Matriz de aislamiento](../../docs/security/multi-tenant-verification.md).

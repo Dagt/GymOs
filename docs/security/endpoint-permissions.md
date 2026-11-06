@@ -2,6 +2,8 @@
 
 Base auditada `58a5d4d4b24bcc598059b05a4ac70d11a2fe937b` con el PR #65. Inventario estático de las 298 operaciones de los 39 controladores Spring y del primer matcher aplicable en `SecurityConfig`. Las comprobaciones de dominio pueden limitar aún más una autoridad HTTP. El alcance se clasifica por el dato principal de la operación. Las excepciones y la evidencia de ejecución se mantienen en la [matriz de aislamiento](multi-tenant-verification.md).
 
+`SecurityAuthorizationTests.documentedOperationsMatchSpringRoutingAndEffectiveAuthorities` compara estas filas con el registro real de rutas y el autorizador de Spring. Comprueba solicitudes anónimas, sesiones sin permisos y cada autoridad individual del inventario. La prueba verifica la capa HTTP de autorización. La matriz de aislamiento indica qué operaciones también tienen prueba de pertenencia con PostgreSQL.
+
 `hasAnyAuthority` se representa con «o». «Credencial del protocolo» indica que el filtro de JWT de personal no exige autoridad para la ruta y que la autenticación específica se hace en el flujo. Las operaciones de sistema y marca pública son deliberadamente públicas. La regla final deniega las rutas sin matcher.
 
 | Código | Alcance |
@@ -12,7 +14,7 @@ Base auditada `58a5d4d4b24bcc598059b05a4ac70d11a2fe937b` con el PR #65. Inventar
 | B | Organización y sucursal activa. |
 | V | Visibilidad del socio de la sede con excepciones de cobertura de membresía. |
 | M | Transferencia entre sucursales del mismo tenant, con origen/destino según operación. |
-| R | Asignación de sucursales, cuenta destinataria o propiedad según las reglas de equipo y coaching. |
+| R | Asignación de sucursales, destinatario, propiedad del recurso o vínculo entre recursos de un mismo socio. |
 | T | Identidad tenant y permisos operativos, con controles adicionales en el servicio. |
 | C | Activación con código o credencial del conector vinculada a su organización y sucursal. |
 | W | Protocolo del proveedor, firma de webhook o estado OAuth de un solo uso. |
@@ -110,7 +112,7 @@ Base auditada `58a5d4d4b24bcc598059b05a4ac70d11a2fe937b` con el PR #65. Inventar
 | `POST /api/v1/bookings/{bookingId}/check-in` | `booking.manage` | B | `BookingController` |
 | `POST /api/v1/bookings/{bookingId}/complete` | `booking.manage` | B | `BookingController` |
 | `POST /api/v1/bookings/{bookingId}/cancel` | `booking.manage` | B | `BookingController` |
-| `POST /api/v1/bookings/{bookingId}/payments` | `booking.payment.manage` | B | `BookingController` |
+| `POST /api/v1/bookings/{bookingId}/payments` | `booking.payment.manage` | B+R | `BookingController` |
 
 ## catalog
 
@@ -271,8 +273,8 @@ Base auditada `58a5d4d4b24bcc598059b05a4ac70d11a2fe937b` con el PR #65. Inventar
 | `GET /api/v1/notifications/email-configuration` | `notification.read` o `notification.settings.manage` | O/B | `NotificationController` |
 | `PUT /api/v1/notifications/email-configuration` | `notification.settings.manage` | O/B | `NotificationController` |
 | `POST /api/v1/notifications/email-configuration/test` | `notification.settings.manage` | O/B | `NotificationController` |
-| `PUT /api/v1/notifications/email-preferences` | `client.update` o `notification.manage` o `notification.settings.manage` | O/B | `NotificationController` |
-| `GET /api/v1/notifications/email-preferences` | `client.update` o `notification.manage` o `notification.settings.manage` | O/B | `NotificationController` |
+| `PUT /api/v1/notifications/email-preferences` | `client.update` o `notification.manage` o `notification.settings.manage` | O/B+V | `NotificationController` |
+| `GET /api/v1/notifications/email-preferences` | `client.update` o `notification.manage` o `notification.settings.manage` | O/B+V | `NotificationController` |
 | `POST /api/v1/notifications/{notificationId}/retry` | `notification.manage` | O/B | `NotificationController` |
 
 ## onboarding

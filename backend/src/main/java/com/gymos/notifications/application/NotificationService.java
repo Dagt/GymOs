@@ -220,8 +220,8 @@ public class NotificationService {
 			GymOsPrincipal principal, String recipient, boolean emailEnabled,
 			boolean marketingEnabled, String correlationId
 	) {
-		requirePreferenceManagement(principal);
 		String normalized = normalizeEmail(recipient, true);
+		requirePreferenceManagement(principal, normalized);
 		notificationRepository.setEmailPreference(
 				principal.organizationId(), recipientHasher.hash(normalized), emailEnabled,
 				emailEnabled && marketingEnabled, principal.userId()
@@ -234,8 +234,8 @@ public class NotificationService {
 
 	@Transactional(readOnly = true)
 	public EmailPreferenceView emailPreference(GymOsPrincipal principal, String recipient) {
-		requirePreferenceManagement(principal);
 		String normalized = normalizeEmail(recipient, true);
+		requirePreferenceManagement(principal, normalized);
 		var preference = notificationRepository.emailPreference(
 				principal.organizationId(), recipientHasher.hash(normalized)
 		);
@@ -377,16 +377,14 @@ public class NotificationService {
 		}
 	}
 
-	private void requirePreferenceManagement(GymOsPrincipal principal) {
+	private void requirePreferenceManagement(GymOsPrincipal principal, String email) {
 		requirePrincipal(principal);
-		if (!principal.permissions().contains("client.update")
-				&& !principal.permissions().contains("notification.manage")
-				&& !principal.permissions().contains("notification.settings.manage")
-				&& !principal.permissions().contains("platform.admin")) {
-			throw new BusinessException(
-					"NOTIFICATION_PREFERENCE_FORBIDDEN",
-					"No tienes permiso para administrar las preferencias de correo."
-			);
+		if (principal.permissions().contains("notification.manage")
+				|| principal.permissions().contains("notification.settings.manage")) {
+			return;
+		}
+		if (!principal.permissions().contains("client.update") || !clients.hasVisibleEmail(principal, email)) {
+			throw new org.springframework.security.access.AccessDeniedException("Email preference is outside the authorized client scope");
 		}
 	}
 

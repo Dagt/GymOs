@@ -116,7 +116,9 @@ public class SalesReadRepository {
 	public List<PaymentDetail> payments(UUID organizationId, UUID saleId) {
 		return jdbcClient.sql("""
 				SELECT id, method, status, amount_cents, currency, reference,
-				       receipt_object_key, received_at, validated_at, notes
+				       CASE WHEN starts_with(receipt_object_key, concat('receipts/', organization_id, '/', sale_id, '/', id, '/'))
+				            THEN receipt_object_key END AS receipt_object_key,
+				       received_at, validated_at, notes
 				FROM payment
 				WHERE organization_id = :organizationId
 				  AND sale_id = :saleId
