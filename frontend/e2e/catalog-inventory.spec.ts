@@ -747,6 +747,7 @@ function responseFor(path: string) {
   if (path === "/catalog/products/search") {
     return { items: [product], page: 0, size: 25, totalElements: 1, totalPages: 1 };
   }
+  if (path.startsWith("/catalog/products/by-barcode/")) return product;
   if (path === "/catalog/products/summary") return summary;
   if (path === "/catalog/categories" || path === "/catalog/plans" || path === "/catalog/product-families") return [];
   if (path.startsWith("/sales")) return [];
