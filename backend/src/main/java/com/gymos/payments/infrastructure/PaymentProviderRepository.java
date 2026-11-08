@@ -335,7 +335,7 @@ public class PaymentProviderRepository {
 				WHERE id = :operationId AND external_operation_id IS NULL AND status <> 'COMPLETED'
 				""")
 				.param("externalId", externalId)
-				.param("status", status)
+				.param("status", unverifiedStatus(status))
 				.param("checkoutUrl", checkoutUrl)
 				.param("payloadJson", payloadJson == null ? "{}" : payloadJson)
 				.param("expiresAt", expiresAt)
@@ -355,12 +355,16 @@ public class PaymentProviderRepository {
 				WHERE id = :operationId AND status <> 'COMPLETED'
 				  AND NOT (provider = 'MERCADO_PAGO' AND completed_at IS NOT NULL)
 				""")
-				.param("status", status)
+				.param("status", completed ? status : unverifiedStatus(status))
 				.param("payloadJson", payloadJson == null ? "{}" : payloadJson)
 				.param("completed", completed)
 				.param("now", now)
 				.param("operationId", operationId)
 				.update() == 1;
+	}
+
+	private String unverifiedStatus(String status) {
+		return "COMPLETED".equalsIgnoreCase(status) ? "AWAITING_PAYMENT" : status;
 	}
 
 	public void markPointReconciliationRequired(UUID operationId) {

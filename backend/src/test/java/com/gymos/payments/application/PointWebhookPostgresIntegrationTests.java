@@ -126,6 +126,20 @@ class PointWebhookPostgresIntegrationTests {
 		verify(gateway, times(2)).exchange("GET", url, headers, null, null);
 	}
 
+	@Test
+	void providerStatusWithoutVerificationCannotPersistAsCompleted() {
+		var tenant = new OperationalTestData(jdbc);
+		UUID operationId = operations.createOperation(new CreateOperationData(tenant.organizationId(), tenant.branchId,
+				"STRIPE", "RECURRING_PAYMENT_INTENT", null, null, null, "unverified-status", 12345, "MXN"));
+		operations.markOperationCreated(operationId, "pi_unverified", "COMPLETED", null, "{}", null);
+		assertThat(operations.operation(operationId).orElseThrow().status()).isEqualTo("AWAITING_PAYMENT");
+
+		assertThat(operations.markOperationStatus(operationId, "COMPLETED", "{}", false)).isTrue();
+		assertThat(operations.operation(operationId).orElseThrow().status()).isEqualTo("AWAITING_PAYMENT");
+		assertThat(operations.markOperationStatus(operationId, "COMPLETED", "{}", true)).isTrue();
+		assertThat(operations.operation(operationId).orElseThrow().status()).isEqualTo("COMPLETED");
+	}
+
 	private String financialStatus(String table, UUID id) {
 		return jdbc.sql("SELECT status FROM " + table + " WHERE id=:id").param("id", id).query(String.class).single();
 	}

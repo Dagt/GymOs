@@ -340,14 +340,14 @@ class PaymentWebhookServiceTests {
 	}
 
 	@Test
-	void stripeCannotPersistAnUnverifiedCompletedStatusFromARecurringIntent() throws Exception {
+	void stripeTreatsAnUnknownCompletedStatusAsUnverified() throws Exception {
 		var operation = recurringOperation(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "pi_strict");
 		when(stripeRecurringBillingService.fetchPaymentIntent(operation))
 				.thenReturn(objectMapper.readTree("{\"id\":\"pi_strict\",\"status\":\"completed\"}"));
 
 		service.reconcile(operation);
 
-		verify(repository).markOperationStatus(eq(operation.id()), eq("AWAITING_PAYMENT"), anyString(), eq(false));
+		verify(repository).markOperationStatus(eq(operation.id()), eq("COMPLETED"), anyString(), eq(false));
 		verifyNoInteractions(eventPublisher);
 	}
 

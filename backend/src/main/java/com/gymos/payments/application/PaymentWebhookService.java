@@ -111,7 +111,7 @@ public class PaymentWebhookService {
 			}
 			JsonNode session = fetchStripeSession(operation);
 			if (!"paid".equalsIgnoreCase(session.path("payment_status").asText())) {
-				repository.markOperationStatus(operation.id(), pendingStatus(session, "OPEN"), json(session), false);
+				repository.markOperationStatus(operation.id(), providerStatus(session, "OPEN"), json(session), false);
 				repository.completeWebhook("STRIPE", eventId, "IGNORED", null, attemptId);
 				webhookMetric(operation, "STRIPE", eventType, "ignored");
 				return;
@@ -155,7 +155,7 @@ public class PaymentWebhookService {
 			webhookMetric(operation, "STRIPE", eventType, "processed_failure");
 			return;
 		}
-		repository.markOperationStatus(operation.id(), pendingStatus(paymentIntent, "PROCESSING"), json(paymentIntent), false);
+		repository.markOperationStatus(operation.id(), providerStatus(paymentIntent, "PROCESSING"), json(paymentIntent), false);
 		repository.completeWebhook("STRIPE", eventId, "IGNORED", null, attemptId);
 		webhookMetric(operation, "STRIPE", eventType, "ignored");
 	}
@@ -242,9 +242,8 @@ public class PaymentWebhookService {
 		return charge.path("receipt_url").asText();
 	}
 
-	private String pendingStatus(JsonNode providerObject, String fallback) {
-		String status = providerObject.path("status").asText(fallback).toUpperCase(java.util.Locale.ROOT);
-		return "COMPLETED".equals(status) ? "AWAITING_PAYMENT" : status;
+	private String providerStatus(JsonNode providerObject, String fallback) {
+		return providerObject.path("status").asText(fallback).toUpperCase(java.util.Locale.ROOT);
 	}
 
 	public void reconcile(OperationRecord operation) {
@@ -266,7 +265,7 @@ public class PaymentWebhookService {
 				} else if (java.util.Set.of("requires_payment_method", "requires_action", "canceled").contains(status)) {
 					stripeRecurringBillingService.failRecurringCharge(operation, status.toUpperCase());
 				} else {
-					repository.markOperationStatus(operation.id(), pendingStatus(paymentIntent, "PROCESSING"), json(paymentIntent), false);
+					repository.markOperationStatus(operation.id(), providerStatus(paymentIntent, "PROCESSING"), json(paymentIntent), false);
 				}
 				return;
 			}
@@ -279,7 +278,7 @@ public class PaymentWebhookService {
 				ensureAmount(operation, stripeAmount(session.path("amount_total")), session.path("currency").asText("").toUpperCase());
 				completion.complete(operation, json(session), receiptUrl(session));
 			} else {
-				repository.markOperationStatus(operation.id(), pendingStatus(session, "OPEN"), json(session), false);
+				repository.markOperationStatus(operation.id(), providerStatus(session, "OPEN"), json(session), false);
 			}
 			return;
 		}
@@ -322,7 +321,7 @@ public class PaymentWebhookService {
 	}
 
 	private void updateUnpaidPointOrder(OperationRecord operation, JsonNode order) {
-		String status = pendingStatus(order, "PENDING");
+		String status = providerStatus(order, "PENDING");
 		if (java.util.Set.of("EXPIRED", "CANCELED", "CANCELLED", "REJECTED").contains(status)) {
 			completion.closePoint(operation, status, json(order));
 		} else {
