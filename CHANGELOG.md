@@ -14,6 +14,8 @@ nombre técnico interno durante la transición de marca.
 
 - SAL-001 (#33) serializa ventas, pagos, devoluciones y cancelaciones, protege las reservas de Point y permite recuperar operaciones con resultado incierto desde recepción.
 
+- Point requiere moneda explícita de la orden e importe efectivamente pagado. Las respuestas insuficientes quedan pendientes de conciliación.
+
 - AUTH-001 (#28) mueve el refresh a cookies HttpOnly y el JWT a memoria. Redis rota y revoca familias, y Spring revalida permisos y contexto antes de autorizar las operaciones.
 
 - GEN-001 y ORG-001 documentan los permisos por endpoint y refuerzan el aislamiento por tenant y sucursal en equipo, socios, ventas, beneficios, kiosco, bienestar e inventario. El backend revalida el contexto de los JWT y registra las mutaciones autorizadas con el contexto operativo.

@@ -86,3 +86,10 @@ los resultados del run en el PR de [#61](https://github.com/Dagt/GymOs/issues/61
 ## SAL-001
 
 La [matriz SAL-001](../docs/operations/sales-integrity.md) distingue pruebas HTTP con PostgreSQL, pruebas de navegador con transporte simulado y la validación operativa pendiente.
+
+| Caso SAL-001 | Evidencia | Criterio |
+| --- | --- | --- |
+| Point en MXN, moneda distinta, ausente, nula, vacía, inválida o contradictoria | `PaymentWebhookServiceTests` con HTTP simulado | Sólo confirma con moneda verificable y con el importe pagado correcto. |
+| Importe Point ausente, inferior, fraccionario fuera de rango o contradictorio. Stripe con importe no entero | `PaymentWebhookServiceTests` con HTTP simulado | Sin evento de confirmación. |
+| Webhook Point firmado, respuesta insuficiente, reintento corregido y entrega duplicada | `PointWebhookPostgresIntegrationTests` con HTTP de GymFort y PostgreSQL real. Respuesta del proveedor simulada | Persiste el error de conciliación. La venta y el pago quedan pendientes hasta validar la consulta. La entrega duplicada no vuelve a consultar el proveedor. |
+| Point conectado | Pendiente de entorno controlado | Capturar `currency` y `paid_amount` de una orden acreditada y reconciliarla sin exponer credenciales. |

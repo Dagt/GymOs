@@ -177,3 +177,5 @@ SHA final y un recorrido de aceptación por Recepción. [Issue #61](https://gith
 ## SAL-001
 
 El piloto con cobros depende de la verificación de SAL-001 (#33), Stripe test (#34) y los recorridos operativos de paquetes (#35).
+
+La habilitación piloto de Point requiere verificar moneda e importe pagado en la consulta autoritativa de una orden acreditada.

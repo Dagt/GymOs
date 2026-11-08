@@ -325,3 +325,5 @@ operativa. Evidencia y estado del gate en [#61](https://github.com/Dagt/GymOs/is
 ## SAL-001
 
 SAL-001 incorpora bloqueos transaccionales y recuperación de ventas, pagos y webhooks. La aceptación operativa de cobros integrados sigue sujeta a Stripe test y a comprobar Point antes de su habilitación.
+
+La corrección SAL-001 rechaza órdenes Point sin evidencia de moneda o importe pagado. La prueba HTTP con PostgreSQL usa respuestas simuladas de Point. Sigue pendiente la comprobación con proveedor conectado.

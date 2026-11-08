@@ -133,3 +133,5 @@ Los 7 epics #21–27 y 32 issues #28–59 convierten deuda y producto pendiente 
 ## SAL-001
 
 Pendientes del piloto tras SAL-001 (#33). Conciliar cobros integrados abiertos de la versión anterior a V106, validar Point en entorno de pruebas y acreditar Stripe/kiosco con #34. Los reembolsos de proveedor requieren un proceso conciliado y la política de paquetes parcialmente consumidos sigue en ADR-002 y #35.
+
+Point mantiene pendientes las órdenes que carecen de moneda o importe pagado verificables. Falta confirmar esos campos con una cuenta conectada de pruebas. Consulta el [runbook de conciliación](../docs/operations/sales-integrity.md).

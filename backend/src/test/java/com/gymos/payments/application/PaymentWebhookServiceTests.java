@@ -14,6 +14,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.gymos.common.api.BusinessException;
 import com.gymos.payments.api.PaymentConfigurationView;
 import com.gymos.payments.api.events.ProviderPaymentCompletedV1;
@@ -32,6 +33,8 @@ import javax.crypto.spec.SecretKeySpec;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
@@ -237,25 +240,147 @@ class PaymentWebhookServiceTests {
 	}
 
 	@Test
-	void pointParsesExactTextualAmountAndRejectsMismatchedCurrency() throws Exception {
+	void pointAcceptsDocumentedOrderCurrencyAndExactPaidAmount() throws Exception {
+		var operation = pointOperation();
+		var order = pointOrder(operation);
+		pointLookup(operation, order);
+
+		service.reconcile(operation);
+
+		verify(eventPublisher).publishEvent(any(Object.class));
+		verifyNoReconciliationFlag(operation);
+	}
+
+	@ParameterizedTest
+	@CsvSource(nullValues = "MISSING", value = {
+			"MISSING, POINT_CURRENCY_UNVERIFIED",
+			"null, POINT_CURRENCY_UNVERIFIED",
+			"'\"\"', POINT_CURRENCY_UNVERIFIED",
+			"'\"MX1\"', POINT_CURRENCY_UNVERIFIED",
+			"'\"ZZZ\"', POINT_CURRENCY_UNVERIFIED",
+			"'\"USD\"', POINT_CURRENCY_MISMATCH"
+	})
+	void pointRejectsMissingInvalidOrMismatchedOrderCurrency(String currencyJson, String expectedCode) throws Exception {
+		var operation = pointOperation();
+		var order = pointOrder(operation);
+		if (currencyJson == null) {
+			order.remove("currency");
+			((ObjectNode) order.path("transactions").path("payments").path(0)).put("currency_id", "MXN");
+		} else {
+			order.set("currency", objectMapper.readTree(currencyJson));
+		}
+		pointLookup(operation, order);
+
+		assertPointRejected(operation, expectedCode);
+	}
+
+	@Test
+	void pointRejectsContradictoryTransactionCurrency() throws Exception {
+		var operation = pointOperation();
+		var order = pointOrder(operation);
+		((ObjectNode) order.path("transactions").path("payments").path(0)).put("currency_id", "USD");
+		pointLookup(operation, order);
+
+		assertPointRejected(operation, "POINT_CURRENCY_MISMATCH");
+	}
+
+	@ParameterizedTest
+	@CsvSource(nullValues = "MISSING", value = {"MISSING", "123.44", "123.4501", "0"})
+	void pointRejectsMissingOrDifferentPaidAmountEvenWhenRequestedAmountMatches(String paidAmount) throws Exception {
+		var operation = pointOperation();
+		var order = pointOrder(operation);
+		var payment = (ObjectNode) order.path("transactions").path("payments").path(0);
+		if (paidAmount == null) payment.remove("paid_amount");
+		else payment.put("paid_amount", paidAmount);
+		pointLookup(operation, order);
+
+		assertPointRejected(operation, "PROVIDER_PAYMENT_AMOUNT_MISMATCH");
+	}
+
+	@Test
+	void pointRejectsContradictoryOrderAndTransactionPaidAmounts() throws Exception {
+		var operation = pointOperation();
+		var order = pointOrder(operation).put("total_paid_amount", "120.00");
+		pointLookup(operation, order);
+
+		assertPointRejected(operation, "PROVIDER_PAYMENT_AMOUNT_MISMATCH");
+	}
+
+	@Test
+	void pointRejectsProcessedOrderAfterPartialRefundAndWithoutPaymentId() throws Exception {
+		var operation = pointOperation();
+		var order = pointOrder(operation);
+		var payment = (ObjectNode) order.path("transactions").path("payments").path(0);
+		payment.remove("id");
+		pointLookup(operation, order);
+		assertPointRejected(operation, "POINT_PAYMENT_UNVERIFIED");
+
+		payment.put("id", "PAY-test");
+		order.put("status_detail", "partially_refunded");
+		assertThatThrownBy(() -> service.reconcile(operation)).isInstanceOfSatisfying(BusinessException.class,
+				error -> assertThat(error.code()).isEqualTo("POINT_PAYMENT_UNVERIFIED"));
+		verifyNoInteractions(eventPublisher);
+	}
+
+	@ParameterizedTest
+	@CsvSource({"12345.9", "'\"12345\"'"})
+	void stripeRejectsNonIntegerJsonAmountsInsteadOfCoercingThem(String amount) throws Exception {
 		UUID organizationId = UUID.randomUUID();
-		UUID saleId = UUID.randomUUID();
-		OperationRecord operation = new OperationRecord(UUID.randomUUID(), organizationId, UUID.randomUUID(),
-				"MERCADO_PAGO", "POINT_ORDER", saleId, UUID.randomUUID(), null, "ORD-test",
-				"point-test", "AWAITING_PAYMENT", 12_345, "MXN", null, "{}", null);
-		when(mercadoPagoProviderService.accessToken(organizationId)).thenReturn("test");
-		String order = """
-				{"id":"ORD-test","external_reference":"gymos-%s","status":"processed",
-				 "transactions":{"payments":[{"status":"processed","amount":"123.45","currency_id":"%s"}]}}
-				""";
-		when(http.exchange("GET", "https://mp.test/v1/orders/ORD-test", Map.of("Authorization", "Bearer test"), null, null))
-				.thenReturn(objectMapper.readTree(order.formatted(saleId, "USD")),
-						objectMapper.readTree(order.formatted(saleId, "MXN")));
+		var operation = new OperationRecord(UUID.randomUUID(), organizationId, UUID.randomUUID(),
+				"STRIPE", "CHECKOUT_SESSION", UUID.randomUUID(), UUID.randomUUID(), null, "cs_strict",
+				"strict", "OPEN", 12_345, "MXN", null, "{}", null);
+		when(http.exchange(eq("GET"), eq("https://stripe.test/v1/checkout/sessions/cs_strict?expand[]=payment_intent.latest_charge"), any(), isNull(), isNull()))
+				.thenReturn(objectMapper.readTree("""
+						{"id":"cs_strict","payment_status":"paid","currency":"mxn","amount_total":%s}
+						""".formatted(amount)));
+
 		assertThatThrownBy(() -> service.reconcile(operation)).isInstanceOfSatisfying(BusinessException.class,
 				error -> assertThat(error.code()).isEqualTo("PROVIDER_PAYMENT_AMOUNT_MISMATCH"));
 		verifyNoInteractions(eventPublisher);
+	}
+
+	@Test
+	void stripeCannotPersistAnUnverifiedCompletedStatusFromARecurringIntent() throws Exception {
+		var operation = recurringOperation(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "pi_strict");
+		when(stripeRecurringBillingService.fetchPaymentIntent(operation))
+				.thenReturn(objectMapper.readTree("{\"id\":\"pi_strict\",\"status\":\"completed\"}"));
+
 		service.reconcile(operation);
-		verify(eventPublisher).publishEvent(any(Object.class));
+
+		verify(repository).markOperationStatus(eq(operation.id()), eq("AWAITING_PAYMENT"), anyString(), eq(false));
+		verifyNoInteractions(eventPublisher);
+	}
+
+	private void assertPointRejected(OperationRecord operation, String expectedCode) {
+		assertThatThrownBy(() -> service.reconcile(operation)).isInstanceOfSatisfying(BusinessException.class,
+				error -> assertThat(error.code()).isEqualTo(expectedCode));
+		verify(repository).markPointReconciliationRequired(operation.id());
+		verifyNoInteractions(eventPublisher);
+	}
+
+	private void verifyNoReconciliationFlag(OperationRecord operation) {
+		verify(repository, org.mockito.Mockito.never()).markPointReconciliationRequired(operation.id());
+	}
+
+	private OperationRecord pointOperation() {
+		return new OperationRecord(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(),
+				"MERCADO_PAGO", "POINT_ORDER", UUID.randomUUID(), UUID.randomUUID(), null, "ORD-test",
+				"point-test", "AWAITING_PAYMENT", 12_345, "MXN", null, "{}", null);
+	}
+
+	private ObjectNode pointOrder(OperationRecord operation) throws Exception {
+		return (ObjectNode) objectMapper.readTree("""
+				{"id":"ORD-test","type":"point","external_reference":"gymos-%s","currency":"MXN",
+				 "status":"processed","status_detail":"accredited","total_paid_amount":"123.45",
+				 "transactions":{"payments":[{"id":"PAY-test","status":"processed","status_detail":"accredited",
+				 "amount":"123.45","paid_amount":"123.45"}]}}
+				""".formatted(operation.saleId()));
+	}
+
+	private void pointLookup(OperationRecord operation, ObjectNode order) {
+		when(mercadoPagoProviderService.accessToken(operation.organizationId())).thenReturn("test");
+		when(http.exchange("GET", "https://mp.test/v1/orders/ORD-test", Map.of("Authorization", "Bearer test"), null, null))
+				.thenReturn(order);
 	}
 
 	private OperationRecord recurringOperation(

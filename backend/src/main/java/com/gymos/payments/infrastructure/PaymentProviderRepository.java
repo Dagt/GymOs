@@ -363,6 +363,18 @@ public class PaymentProviderRepository {
 				.update() == 1;
 	}
 
+	public void markPointReconciliationRequired(UUID operationId) {
+		jdbcClient.sql("""
+				UPDATE payment_provider_operation
+				SET status = 'RECONCILIATION_REQUIRED', updated_at = :now, version = version + 1
+				WHERE id = :operationId AND provider = 'MERCADO_PAGO'
+				  AND status <> 'COMPLETED' AND completed_at IS NULL
+				""")
+				.param("operationId", operationId)
+				.param("now", OffsetDateTime.now())
+				.update();
+	}
+
 	public void saveReceiptUrl(UUID operationId, String receiptUrl) {
 		if (receiptUrl == null || receiptUrl.isBlank()) return;
 		jdbcClient.sql("""

@@ -70,3 +70,5 @@ esa ruta, y webhooks públicos endurecidos en
 ## SAL-001
 
 Los webhooks se reclaman por evento e intento, verifican la cuenta u orden y aplican el pago con sus efectos locales en una transacción. Tras timeout de Point, recuperar la misma orden evita un segundo cobro.
+
+Point compara la moneda de la orden consultada y el importe efectivamente pagado con los de la operación. Una respuesta insuficiente conserva la operación para conciliación y la venta pendiente. Stripe exige importes enteros en unidades menores, según sus contratos de Checkout y PaymentIntent.
