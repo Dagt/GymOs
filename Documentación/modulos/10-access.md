@@ -1,8 +1,8 @@
 # Accesos y control físico
 
-Estado: `CONTROL PLANE CLOUD ESTABILIZADO PARA INICIAR CONNECTOR / CONNECTOR LOCAL Y ADAPTER HIKCENTRAL PENDIENTES`
+Estado (corte 2026-11-09): `CONTROL PLANE EN MAIN; CONNECTOR EJECUTABLE Y ADAPTER HIKCENTRAL EN RAMA EXPERIMENTAL NO INTEGRADA; HARDWARE SIN CERTIFICACIÓN SITE`
 
-Última revisión: 26 de agosto de 2026
+Última revisión de estado: 9 de noviembre de 2026. Los apartados históricos conservan el alcance de su entrega; consultar [preparación piloto](../../docs/operations/hikcentral-pilot-discovery.md) para el estado por rama.
 
 ## 1. Alcance y fuente de verdad
 
@@ -363,12 +363,13 @@ La cobertura dedicada demuestra, entre otros casos:
 
 ## 13. Pendiente antes de producción física
 
-La entrega deja GymFort Cloud listo para iniciar la integración, no listo para
-abrir el torniquete. Faltan obligatoriamente:
+El estado de `main` no incluye el ejecutable `connector/` ni certificación de apertura real. La rama histórica `feature/local-access-connector` (SHA `8955cdb7682376bd66fbc733610e84d24ebfe9c9`) contiene implementación de Connector, SIMULATOR y adapter HikCentral, pero **no está integrada y no fue validada contra el hardware del gimnasio**. La migración V104 existe únicamente en esa rama hasta revisar su incorporación. Issues: [#38](https://github.com/Dagt/GymOs/issues/38), [#39](https://github.com/Dagt/GymOs/issues/39), [#40](https://github.com/Dagt/GymOs/issues/40), [#41](https://github.com/Dagt/GymOs/issues/41). Véase [descubrimiento de sitio](../../docs/operations/hikcentral-pilot-discovery.md).
+
+Faltan obligatoriamente:
 
 1. descubrimiento técnico de la instalación del cliente;
-2. implementar, empaquetar y actualizar de forma segura GymFort Local Connector;
-3. implementar el adapter HikCentral contra API/SDK oficial confirmado;
+2. auditar e integrar el Connector de la rama experimental, empaquetarlo y actualizarlo de forma segura;
+3. ajustar el adapter HikCentral existente a la API/SDK oficial correspondiente a la versión instalada;
 4. comprobar alta/actualización, concesión, revocación y reconciliación reales;
 5. comprobar eventos reales, reloj, duplicados y mapeo de dispositivos;
 6. probar caída/recuperación de Internet, Cloud, Connector y HikCentral;
