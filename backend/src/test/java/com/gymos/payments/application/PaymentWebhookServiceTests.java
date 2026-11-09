@@ -116,6 +116,45 @@ class PaymentWebhookServiceTests {
 						assertThat(exception.code()).isEqualTo("STRIPE_WEBHOOK_SIGNATURE_INVALID"));
 	}
 
+	@ParameterizedTest
+	@CsvSource({
+			"checkout.session.expired, expired, , EXPIRED",
+			"checkout.session.async_payment_failed, complete, requires_payment_method, FAILED",
+			"checkout.session.completed, complete, processing, COMPLETE"
+	})
+	void stripeRecordsAuthoritativeUnpaidStateWithoutCompletingPayment(
+			String eventType, String sessionStatus, String intentStatus, String operationStatus
+	) throws Exception {
+		UUID organizationId = UUID.randomUUID();
+		UUID operationId = UUID.randomUUID();
+		OperationRecord operation = new OperationRecord(
+				operationId, organizationId, UUID.randomUUID(), "STRIPE", "CHECKOUT_SESSION",
+				UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), "cs_unpaid", "stripe:test",
+				"OPEN", 12_345, "MXN", "https://checkout", "{}", null
+		);
+		String payload = """
+				{"id":"evt_unpaid","type":"%s","account":"acct_test","data":{"object":{"id":"cs_unpaid"}}}
+				""".formatted(eventType);
+		long timestamp = Instant.now().getEpochSecond();
+		String signature = "t=" + timestamp + ",v1=" + hmac(WEBHOOK_SECRET, timestamp + "." + payload);
+		when(repository.operationByExternalId("STRIPE", "cs_unpaid")).thenReturn(Optional.of(operation));
+		when(repository.registerWebhook(eq("STRIPE"), eq("evt_unpaid"), eq(eventType), anyString(),
+				eq(organizationId), any(UUID.class))).thenReturn(true);
+		when(configurationRepository.providerConfiguration(organizationId)).thenReturn(new PaymentConfigurationView(
+				true, false, null, null, false, true, false, "acct_test", true));
+		ObjectNode session = objectMapper.createObjectNode().put("id", "cs_unpaid")
+				.put("status", sessionStatus).put("payment_status", "unpaid");
+		if (intentStatus != null) session.putObject("payment_intent").put("status", intentStatus);
+		when(http.exchange(eq("GET"), eq("https://stripe.test/v1/checkout/sessions/cs_unpaid?expand[]=payment_intent.latest_charge"),
+				any(), isNull(), isNull())).thenReturn(session);
+
+		service.stripe(payload, signature);
+
+		verify(repository).markOperationStatus(eq(operationId), eq(operationStatus), anyString(), eq(false));
+		verify(repository).completeWebhook(eq("STRIPE"), eq("evt_unpaid"), eq("IGNORED"), isNull(), any(UUID.class));
+		verifyNoInteractions(eventPublisher);
+	}
+
 	@Test
 	void stripeIgnoresPaymentIntentEmittedForCheckoutSession() throws Exception {
 		String payload = "{\"id\":\"evt_checkout_pi\",\"type\":\"payment_intent.succeeded\",\"account\":\"acct_test\",\"data\":{\"object\":{\"id\":\"pi_checkout\"}}}";

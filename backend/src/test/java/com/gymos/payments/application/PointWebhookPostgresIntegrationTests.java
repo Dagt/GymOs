@@ -1,6 +1,8 @@
 package com.gymos.payments.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -10,9 +12,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.gymos.payments.api.StripeCheckoutOperations.CreateCheckoutSessionCommand;
 import com.gymos.payments.application.port.ProviderHttpGateway;
+import com.gymos.payments.infrastructure.PaymentConfigurationRepository;
 import com.gymos.payments.infrastructure.PaymentProviderRepository;
 import com.gymos.payments.infrastructure.PaymentProviderRepository.CreateOperationData;
+import com.gymos.selfservice.infrastructure.SelfServiceRepository;
 import com.gymos.support.OperationalTestData;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -45,6 +50,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 		"spring.flyway.enabled=true", "spring.jpa.hibernate.ddl-auto=none",
 		"gymos.payment-providers.mercado-pago.webhook-secret=point-test-secret",
 		"gymos.payment-providers.mercado-pago.api-base-url=https://point.test",
+		"gymos.payment-providers.stripe.secret-key=sk_test_fixture",
+		"gymos.payment-providers.stripe.webhook-secret=stripe-test-secret",
+		"gymos.payment-providers.stripe.api-base-url=https://stripe.test",
 		"gymos.payment-providers.reconciliation-delay-ms=3600000"
 })
 @AutoConfigureMockMvc(print = MockMvcPrint.NONE)
@@ -64,6 +72,8 @@ class PointWebhookPostgresIntegrationTests {
 	@Autowired JdbcClient jdbc;
 	@Autowired MockMvc http;
 	@Autowired PaymentProviderRepository operations;
+	@Autowired PaymentConfigurationRepository paymentConfiguration;
+	@Autowired StripeProviderService stripe;
 	@Autowired ObjectMapper json;
 	@MockitoBean MercadoPagoProviderService point;
 	@MockitoBean ProviderHttpGateway gateway;
@@ -138,6 +148,96 @@ class PointWebhookPostgresIntegrationTests {
 		assertThat(operations.operation(operationId).orElseThrow().status()).isEqualTo("AWAITING_PAYMENT");
 		assertThat(operations.markOperationStatus(operationId, "COMPLETED", "{}", true)).isTrue();
 		assertThat(operations.operation(operationId).orElseThrow().status()).isEqualTo("COMPLETED");
+	}
+
+	@Test
+	void stripeRetryAfterExpiryStaysScopedAndLateEventsDoNotDuplicatePayment() throws Exception {
+		var tenant = new OperationalTestData(jdbc);
+		UUID client = tenant.client();
+		UUID sale = UUID.randomUUID();
+		UUID payment = UUID.randomUUID();
+		jdbc.sql("""
+				INSERT INTO sale(id, organization_id, branch_id, client_id, sale_number, status, business_context,
+				                 subtotal_cents, total_cents, paid_cents, balance_cents, currency, sold_at, created_at, updated_at)
+				VALUES (:sale,:org,:branch,:client,'STRIPE-QA','PENDING_PAYMENT','MEMBERSHIP_ENROLLMENT',
+				        12345,12345,0,12345,'MXN',now(),now(),now())
+				""").param("sale", sale).param("org", tenant.organizationId).param("branch", tenant.branchId)
+				.param("client", client).update();
+		jdbc.sql("""
+				INSERT INTO payment(id, organization_id, branch_id, sale_id, client_id, method, status, amount_cents,
+				                    currency, received_at, created_at, updated_at)
+				VALUES (:id,:org,:branch,:sale,:client,'CARD_ONLINE','PENDING_VALIDATION',12345,'MXN',now(),now(),now())
+				""").param("id", payment).param("org", tenant.organizationId).param("branch", tenant.branchId)
+				.param("sale", sale).param("client", client).update();
+		paymentConfiguration.providerConfiguration(tenant.organizationId);
+		operations.saveStripeAccount(tenant.organizationId, tenant.ownerId, "acct_fixture", true, "{}");
+		jdbc.sql("UPDATE branch SET stripe_self_checkout_enabled=true WHERE id=:id").param("id", tenant.branchId).update();
+		var headers = Map.of("Authorization", "Bearer sk_test_fixture", "Stripe-Account", "acct_fixture");
+		UUID first = stripeOperation(tenant, sale, payment, client, "cs_expired");
+		var kiosk = new SelfServiceRepository(jdbc);
+		var otherTenant = new OperationalTestData(jdbc);
+		when(gateway.exchange("GET", stripeUrl("cs_expired"), headers, null, null))
+				.thenReturn(json.readTree("""
+						{"id":"cs_expired","status":"expired","payment_status":"unpaid"}
+						"""));
+
+		deliverStripe("evt_expired", "checkout.session.expired", "cs_expired").andExpect(status().isOk());
+		assertThat(operations.operation(first).orElseThrow().status()).isEqualTo("EXPIRED");
+		assertThat(financialStatus("sale", sale)).isEqualTo("PENDING_PAYMENT");
+		assertThat(financialStatus("payment", payment)).isEqualTo("PENDING_VALIDATION");
+		assertThat(kiosk.recoverableCheckout(tenant.organizationId, tenant.branchId, client, payment)).isPresent();
+		assertThat(kiosk.recoverableCheckout(otherTenant.organizationId, otherTenant.branchId, client, payment)).isEmpty();
+		assertThat(kiosk.recoverableCheckout(tenant.organizationId, otherTenant.branchId, client, payment)).isEmpty();
+		assertThat(kiosk.recoverableCheckout(tenant.organizationId, tenant.branchId, tenant.client(), payment)).isEmpty();
+
+		var retryHeaders = Map.of("Authorization", "Bearer sk_test_fixture", "Stripe-Account", "acct_fixture",
+				"Idempotency-Key", "stripe-retry:" + payment + ":" + first);
+		when(gateway.exchange(eq("POST"), eq("https://stripe.test/v1/checkout/sessions"), eq(retryHeaders),
+				anyString(), eq("application/x-www-form-urlencoded"))).thenReturn(json.readTree("""
+						{"id":"cs_paid","status":"open","url":"https://checkout.stripe.test/cs_paid"}
+						"""));
+		var retry = new CreateCheckoutSessionCommand(tenant.organizationId, tenant.branchId, client, sale, payment,
+				12345, "MXN", false, "Contratacion de membresia", "original-key");
+		var reopened = stripe.createCheckout(retry);
+		assertThat(stripe.createCheckout(retry)).isEqualTo(reopened);
+		assertThat(reopened.providerSessionId()).isEqualTo("cs_paid");
+		when(gateway.exchange("GET", stripeUrl("cs_paid"), headers, null, null))
+				.thenReturn(json.readTree("""
+						{"id":"cs_paid","status":"complete","payment_status":"paid","amount_total":12345,"currency":"mxn"}
+						"""));
+		deliverStripe("evt_paid", "checkout.session.completed", "cs_paid").andExpect(status().isOk());
+		deliverStripe("evt_paid", "checkout.session.completed", "cs_paid").andExpect(status().isOk());
+		deliverStripe("evt_late", "checkout.session.async_payment_failed", "cs_paid").andExpect(status().isOk());
+
+		assertThat(operations.operation(reopened.operationId()).orElseThrow().status()).isEqualTo("COMPLETED");
+		assertThat(financialStatus("payment", payment)).isEqualTo("COMPLETED");
+		assertThat(financialStatus("sale", sale)).isEqualTo("PAID");
+		assertThat(paidCents(sale)).isEqualTo(12345);
+		assertThat(kiosk.recoverableCheckout(tenant.organizationId, tenant.branchId, client, payment)).isEmpty();
+		verify(gateway, times(2)).exchange("GET", stripeUrl("cs_paid"), headers, null, null);
+	}
+
+	private UUID stripeOperation(OperationalTestData tenant, UUID sale, UUID payment, UUID client, String session) {
+		UUID operation = operations.createOperation(new CreateOperationData(tenant.organizationId, tenant.branchId,
+				"STRIPE", "CHECKOUT_SESSION", sale, payment, client, session, 12345, "MXN"));
+		operations.markOperationCreated(operation, session, "OPEN", "https://checkout.stripe.test/" + session, "{}", null);
+		return operation;
+	}
+
+	private String stripeUrl(String session) {
+		return "https://stripe.test/v1/checkout/sessions/" + session + "?expand[]=payment_intent.latest_charge";
+	}
+
+	private org.springframework.test.web.servlet.ResultActions deliverStripe(String event, String type, String session) throws Exception {
+		String body = """
+				{"id":"%s","type":"%s","account":"acct_fixture","data":{"object":{"id":"%s"}}}
+				""".formatted(event, type, session);
+		long timestamp = Instant.now().getEpochSecond();
+		var mac = Mac.getInstance("HmacSHA256");
+		mac.init(new SecretKeySpec("stripe-test-secret".getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+		String signature = HexFormat.of().formatHex(mac.doFinal((timestamp + "." + body).getBytes(StandardCharsets.UTF_8)));
+		return http.perform(post("/api/v1/payment-webhooks/stripe").header("Stripe-Signature", "t=" + timestamp + ",v1=" + signature)
+				.contentType("application/json").content(body));
 	}
 
 	private String financialStatus(String table, UUID id) {

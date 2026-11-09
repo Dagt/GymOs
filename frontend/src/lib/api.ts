@@ -166,6 +166,7 @@ export {
   getKioskVisitPackageQuote,
   getKioskCurrentVisitPackage,
   getKioskSummary,
+  recoverKioskCheckout,
   renewMembershipFromKiosk,
   resetKioskSession,
   registerKioskClient,

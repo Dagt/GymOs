@@ -334,10 +334,16 @@ public class SelfServiceRepository {
 				.update();
 	}
 
-	public void resetSession(UUID sessionId, OffsetDateTime now, OffsetDateTime expiresAt) {
+	public void lockSession(UUID sessionId) {
+		jdbcClient.sql("SELECT id FROM self_service_session WHERE id = :sessionId FOR UPDATE")
+				.param("sessionId", sessionId).query(UUID.class).optional();
+	}
+
+	public void resetSession(UUID sessionId, String tokenHash, OffsetDateTime now, OffsetDateTime expiresAt) {
 		jdbcClient.sql("""
 				UPDATE self_service_session
 				SET client_id = NULL,
+				    session_token_hash = :tokenHash,
 				    status = 'ACTIVE',
 				    verification_method = NULL,
 				    verification_attempts = 0,
@@ -351,6 +357,7 @@ public class SelfServiceRepository {
 				  AND deleted_at IS NULL
 				""")
 				.param("sessionId", sessionId)
+				.param("tokenHash", tokenHash)
 				.param("now", now)
 				.param("expiresAt", expiresAt)
 				.update();
@@ -593,14 +600,22 @@ public class SelfServiceRepository {
 				       END AS tracking_status,
 				       payment.amount_cents, payment.currency, payment.received_at,
 				       operation.provider, operation.receipt_url, operation.checkout_url,
+				       COALESCE(operation.provider = 'STRIPE' AND operation.operation_type = 'CHECKOUT_SESSION'
+				           AND sale.status <> 'CANCELLED' AND payment.amount_cents = sale.balance_cents
+				           AND payment.status = 'PENDING_VALIDATION'
+				           AND operation.status IN ('CREATING', 'OPEN', 'EXPIRED', 'FAILED'), false) AS checkout_recoverable,
 				       operation.updated_at AS provider_updated_at
 				FROM payment
-				JOIN sale ON sale.id = payment.sale_id
+				JOIN sale ON sale.id = payment.sale_id AND sale.organization_id = payment.organization_id
+				  AND sale.branch_id = payment.branch_id AND sale.client_id = payment.client_id
+				  AND sale.deleted_at IS NULL
 				LEFT JOIN LATERAL (
-				    SELECT provider, status, receipt_url, checkout_url, updated_at
+				    SELECT provider, status, receipt_url, checkout_url, updated_at, operation_type
 				    FROM payment_provider_operation operation
 				    WHERE operation.organization_id = payment.organization_id
 				      AND operation.payment_id = payment.id
+				      AND operation.branch_id = payment.branch_id AND operation.sale_id = sale.id
+				      AND operation.client_id = payment.client_id
 				    ORDER BY operation.created_at DESC, operation.id DESC
 				    LIMIT 1
 				) operation ON TRUE
@@ -621,10 +636,35 @@ public class SelfServiceRepository {
 						rs.getLong("amount_cents"), rs.getString("currency"),
 						rs.getObject("received_at", OffsetDateTime.class), rs.getString("provider"),
 						rs.getString("receipt_url"), rs.getString("checkout_url"),
-						rs.getObject("provider_updated_at", OffsetDateTime.class)
+						rs.getObject("provider_updated_at", OffsetDateTime.class), rs.getBoolean("checkout_recoverable")
 				))
 				.list();
 	}
+
+	public Optional<RecoverableCheckout> recoverableCheckout(UUID organizationId, UUID branchId, UUID clientId, UUID paymentId) {
+		return jdbcClient.sql("""
+				SELECT sale.id AS sale_id, sale.business_context, payment.amount_cents, payment.currency
+				FROM payment
+				JOIN sale ON sale.id = payment.sale_id AND sale.organization_id = payment.organization_id
+				  AND sale.branch_id = payment.branch_id AND sale.client_id = payment.client_id
+				JOIN LATERAL (
+				    SELECT operation_type, provider, status FROM payment_provider_operation
+				    WHERE organization_id = payment.organization_id AND branch_id = payment.branch_id
+				      AND sale_id = sale.id AND payment_id = payment.id AND client_id = payment.client_id
+				    ORDER BY created_at DESC, id DESC LIMIT 1
+				) operation ON operation.provider = 'STRIPE' AND operation.operation_type = 'CHECKOUT_SESSION'
+				WHERE payment.organization_id = :org AND payment.branch_id = :branch AND payment.client_id = :client
+				  AND payment.id = :payment AND payment.method = 'CARD_ONLINE' AND payment.status = 'PENDING_VALIDATION'
+				  AND payment.deleted_at IS NULL AND sale.deleted_at IS NULL AND sale.status <> 'CANCELLED'
+				  AND payment.amount_cents = sale.balance_cents AND payment.amount_cents > 0
+				  AND operation.status IN ('CREATING', 'OPEN', 'EXPIRED', 'FAILED')
+				""").param("org", organizationId).param("branch", branchId).param("client", clientId)
+				.param("payment", paymentId).query((rs, row) -> new RecoverableCheckout(
+						rs.getObject("sale_id", UUID.class), rs.getString("business_context"),
+						rs.getLong("amount_cents"), rs.getString("currency"))).optional();
+	}
+
+	public record RecoverableCheckout(UUID saleId, String context, long amountCents, String currency) {}
 
 	public record TerminalRecord(
 			UUID id,
@@ -753,6 +793,6 @@ public class SelfServiceRepository {
 	public record SelfServicePaymentRecord(
 			UUID id, UUID saleId, String saleNumber, String method, String status,
 			long amountCents, String currency, OffsetDateTime receivedAt, String provider,
-			String receiptUrl, String checkoutUrl, OffsetDateTime providerUpdatedAt
+			String receiptUrl, String checkoutUrl, OffsetDateTime providerUpdatedAt, boolean checkoutRecoverable
 	) {}
 }

@@ -67,4 +67,5 @@ export type RenewMembershipResponse = {
   providerOperationId?: string | null;
   checkoutUrl?: string | null;
   checkoutStatus?: string | null;
+  providerSessionId?: string | null;
 };

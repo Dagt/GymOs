@@ -56,23 +56,27 @@ export default function KioskCheckoutResultPage() {
   const [view, setView] = useState<ResultView>(checkingView);
 
   useEffect(() => {
+    const reloadRestoredPage = (event: PageTransitionEvent) => {
+      if (event.persisted) window.location.reload();
+    };
+    window.addEventListener("pageshow", reloadRestoredPage);
     const timer = window.setTimeout(() => {
       const params = new URLSearchParams(window.location.search);
       const returnStatus = params.get("status");
       const storedContext = readKioskAutopayReturn(window.sessionStorage);
       const storedPaymentContext = readKioskPaymentReturn(window.sessionStorage);
       const storedSession = readKioskBrowserSession(window.sessionStorage);
-      setContext(storedContext);
-      setPaymentContext(storedPaymentContext);
+      setContext(storedContext?.sessionId === storedSession?.sessionId ? storedContext : null);
+      setPaymentContext(storedPaymentContext?.sessionId === storedSession?.sessionId ? storedPaymentContext : null);
       setSession(storedSession);
 
       if (returnStatus === "autopay-cancelled" || returnStatus === "cancelled") {
         setView({
           phase: "CANCELLED",
-          title: returnStatus === "autopay-cancelled" ? "Configuración cancelada" : "Pago cancelado",
+          title: returnStatus === "autopay-cancelled" ? "Saliste de la configuración" : "Saliste de Checkout",
           message: returnStatus === "autopay-cancelled"
-            ? "No guardamos una tarjeta nueva ni modificamos tu autorización de domiciliación."
-            : "Stripe no confirmó ningún pago y no realizamos cambios en tu membresía.",
+            ? "Puedes comprobar el estado de tu domiciliación desde el kiosco."
+            : "Consulta tus pagos antes de volver a intentar. El regreso desde Stripe no confirma ni cancela el cargo.",
         });
         return;
       }
@@ -82,6 +86,14 @@ export default function KioskCheckoutResultPage() {
             phase: "UNAVAILABLE",
             title: "La sesión del pago ya no está disponible",
             message: "Por seguridad no podemos consultar datos de otra sesión. Solicita apoyo en recepción.",
+          });
+          return;
+        }
+        if (!matchesStripeCheckoutSession(storedPaymentContext, params.get("session_id"))) {
+          setView({
+            phase: "UNAVAILABLE",
+            title: "El resultado no corresponde a este pago",
+            message: "Vuelve al kiosco y verifica tu identidad para consultar tus pagos.",
           });
           return;
         }
@@ -115,7 +127,10 @@ export default function KioskCheckoutResultPage() {
       }
       setPollKind("AUTOPAY");
     }, 0);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("pageshow", reloadRestoredPage);
+    };
   }, []);
 
   useEffect(() => {
@@ -131,9 +146,10 @@ export default function KioskCheckoutResultPage() {
           session!.sessionId,
           session!.sessionToken,
           context!.membershipId,
+          AbortSignal.timeout(8_000),
         );
         if (!active) return;
-        const result = classifyKioskAutopayResult(mandate);
+        const result = classifyKioskAutopayResult(mandate?.id === context!.mandateId ? mandate : null);
         if (result === "SUCCESS") {
           setView({
             phase: "SUCCESS",
@@ -193,15 +209,15 @@ export default function KioskCheckoutResultPage() {
     async function checkPayment() {
       attempts += 1;
       try {
-        const summary = await getKioskSummary(session!.sessionId, session!.sessionToken);
+        const summary = await getKioskSummary(session!.sessionId, session!.sessionToken, AbortSignal.timeout(8_000));
         if (!active) return;
         const payment = summary.paymentActivity.find((item) =>
-          item.id === paymentContext!.paymentId || item.saleId === paymentContext!.saleId);
+          item.id === paymentContext!.paymentId && item.saleId === paymentContext!.saleId);
         if (payment?.status === "COMPLETED") {
           setView({
             phase: "SUCCESS",
             title: "Pago confirmado",
-            message: "Stripe confirmó el cargo. Tu operación de membresía quedó registrada de forma segura.",
+            message: "Stripe confirmó el cargo. La operación quedó registrada de forma segura.",
             payment,
           });
           return;
@@ -210,7 +226,7 @@ export default function KioskCheckoutResultPage() {
           setView({
             phase: "FAILED",
             title: "El pago no fue completado",
-            message: "No realizamos cambios en tu membresía. Puedes intentarlo nuevamente desde el kiosco o solicitar apoyo en recepción.",
+            message: "Puedes consultar el pago en el kiosco y continuar la operación cuando esté disponible.",
             payment,
           });
           return;
@@ -246,6 +262,15 @@ export default function KioskCheckoutResultPage() {
   }, [paymentContext, pollKind, retryCycle, session]);
 
   const returnPath = context?.returnPath ?? paymentContext?.returnPath ?? "/kiosk/launch";
+  useEffect(() => {
+    if (!session) return;
+    const timer = window.setTimeout(() => {
+      clearKioskAutopayReturn(window.sessionStorage);
+      clearKioskPaymentReturn(window.sessionStorage);
+      window.location.replace(returnPath);
+    }, Math.max(0, Math.min(150_000, Date.parse(session.expiresAt) - Date.now())));
+    return () => window.clearTimeout(timer);
+  }, [returnPath, session]);
   const canRetry = view.phase === "PENDING" || (view.phase === "FAILED" && pollKind !== null);
   const style = {
     "--brand-primary": session?.primaryColor ?? undefined,
@@ -256,7 +281,7 @@ export default function KioskCheckoutResultPage() {
   function returnToKiosk() {
     clearKioskAutopayReturn(window.sessionStorage);
     clearKioskPaymentReturn(window.sessionStorage);
-    window.location.assign(returnPath);
+    window.location.replace(returnPath);
   }
 
   function retry() {

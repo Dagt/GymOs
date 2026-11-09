@@ -115,7 +115,9 @@ public class StripeRecurringBillingService implements StripeRecurringOperations 
 						"La llave de la solicitud ya fue utilizada en otra domiciliacion."
 				);
 			}
-			return setupResult(existingMandate);
+			if (!"PENDING_SETUP".equals(existingMandate.status())) {
+				return setupResult(existingMandate);
+			}
 		}
 		MandateRecord currentMandate = recurringRepository.currentMandate(
 				context.organizationId(), context.branchId(), context.clientId(), context.membershipId()
@@ -130,20 +132,28 @@ public class StripeRecurringBillingService implements StripeRecurringOperations 
 		}
 
 		CustomerRecord customer = ensureCustomer(context);
-		UUID mandateId = recurringRepository.createPendingMandate(new CreateMandateData(
+		UUID mandateId = existingMandate == null ? recurringRepository.createPendingMandate(new CreateMandateData(
 				context.organizationId(), context.branchId(), context.clientId(), context.membershipId(),
 				context.planId(), customer.id(), terms.termsVersion(), terms.consentText(), terms.amountRule(),
 				OffsetDateTime.now(ZoneOffset.UTC), safeOrigin(command.consentOrigin()), idempotencyKey,
 				context.nextChargeOn()
-		));
+		)) : existingMandate.id();
 		MandateRecord mandate = recurringRepository.mandate(mandateId).orElseThrow();
+		if (!mandate.branchId().equals(context.branchId()) || !mandate.clientId().equals(context.clientId())
+				|| !mandate.membershipId().equals(context.membershipId())) {
+			throw new BusinessException("RECURRING_IDEMPOTENCY_CONTEXT_MISMATCH", "La llave corresponde a otra domiciliacion.");
+		}
 		OperationRecord existingOperation = providerRepository.latestOperationForMandate(
 				context.organizationId(), PROVIDER, "SETUP_SESSION", mandateId
 		).orElse(null);
-		UUID operationId = existingOperation == null
+		boolean expired = existingOperation != null && "EXPIRED".equals(existingOperation.status());
+		String setupKey = expired
+				? "stripe-setup-retry:" + existingOperation.id()
+				: "stripe-setup-v2:" + PaymentProviderEncoding.sha256Hex(context.organizationId() + ":" + idempotencyKey);
+		UUID operationId = existingOperation == null || expired
 				? providerRepository.createOperation(new CreateOperationData(
 						context.organizationId(), context.branchId(), PROVIDER, "SETUP_SESSION",
-						null, null, context.clientId(), "stripe-setup:" + idempotencyKey,
+						null, null, context.clientId(), setupKey,
 						0, normalizeCurrency(context.currency()), mandateId, null
 				))
 				: existingOperation.id();
@@ -161,9 +171,10 @@ public class StripeRecurringBillingService implements StripeRecurringOperations 
 		body.put("success_url", frontendUrl("/kiosk/checkout/result?status=autopay-success&session_id={CHECKOUT_SESSION_ID}"));
 		body.put("cancel_url", frontendUrl("/kiosk/checkout/result?status=autopay-cancelled"));
 		body.put("client_reference_id", context.membershipId());
-		body.put("metadata[gymos_operation_id]", operationId);
-		body.put("metadata[gymos_mandate_id]", mandateId);
-		body.put("setup_intent_data[metadata][gymos_mandate_id]", mandateId);
+		// The provider can accept the request before our local transaction commits.
+		// Use stable metadata so Stripe accepts the same body on a retry after rollback.
+		body.put("metadata[gymos_membership_id]", context.membershipId());
+		body.put("setup_intent_data[metadata][gymos_membership_id]", context.membershipId());
 		JsonNode response = http.exchange(
 				"POST", stripeUrl("/v1/checkout/sessions"),
 				stripeHeaders(configuration.stripeAccountId(), operation.idempotencyKey()),
@@ -249,8 +260,15 @@ public class StripeRecurringBillingService implements StripeRecurringOperations 
 			return mandate;
 		}
 		JsonNode session = fetchStripeObject(operation.organizationId(), "/v1/checkout/sessions/" + operation.externalOperationId());
-		if (!"setup".equalsIgnoreCase(session.path("mode").asText())
-				|| !"complete".equalsIgnoreCase(session.path("status").asText())) {
+		if (!operation.externalOperationId().equals(session.path("id").asText())
+				|| !"setup".equals(session.path("mode").asText())) {
+			throw new BusinessException("STRIPE_SETUP_SESSION_INVALID", "Stripe devolvio una sesion de tarjeta distinta.");
+		}
+		if ("expired".equals(session.path("status").asText())) {
+			providerRepository.markOperationStatus(operation.id(), "EXPIRED", json(session), false);
+			return mandate;
+		}
+		if (!"complete".equals(session.path("status").asText())) {
 			throw new BusinessException("STRIPE_SETUP_INCOMPLETE", "Stripe aun no completo la tokenizacion de la tarjeta.");
 		}
 		String setupIntentId = session.path("setup_intent").asText();
@@ -258,7 +276,8 @@ public class StripeRecurringBillingService implements StripeRecurringOperations 
 			throw new BusinessException("STRIPE_SETUP_INTENT_MISSING", "Stripe no devolvio la autorizacion de la tarjeta.");
 		}
 		JsonNode setupIntent = fetchStripeObject(operation.organizationId(), "/v1/setup_intents/" + setupIntentId);
-		if (!"succeeded".equalsIgnoreCase(setupIntent.path("status").asText())) {
+		if (!setupIntentId.equals(setupIntent.path("id").asText())
+				|| !"succeeded".equals(setupIntent.path("status").asText())) {
 			throw new BusinessException("STRIPE_SETUP_INCOMPLETE", "La autorizacion de tarjeta no fue completada.");
 		}
 		if (!mandate.externalCustomerId().equals(setupIntent.path("customer").asText())) {
@@ -524,7 +543,9 @@ public class StripeRecurringBillingService implements StripeRecurringOperations 
 		return new MandateSetupResult(
 				mandate.id(), mandate.status(), operation == null ? null : operation.id(),
 				operation == null ? null : operation.externalOperationId(),
-				operation == null ? null : operation.checkoutUrl(), mandate.termsVersion(), mandate.nextChargeOn()
+				operation != null && "OPEN".equals(operation.status()) && "PENDING_SETUP".equals(mandate.status())
+						? operation.checkoutUrl() : null,
+				mandate.termsVersion(), mandate.nextChargeOn()
 		);
 	}
 

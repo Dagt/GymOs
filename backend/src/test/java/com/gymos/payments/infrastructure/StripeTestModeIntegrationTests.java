@@ -110,6 +110,32 @@ class StripeTestModeIntegrationTests {
 		);
 	}
 
+	@Test
+	@EnabledIfEnvironmentVariable(named = "GYMOS_STRIPE_TEST_ACCOUNT_ID", matches = "acct_.+")
+	void connectedCheckoutIsIdempotentAndCanExpireUnpaid() {
+		String url = API + "/v1/checkout/sessions";
+		Map<String, String> createHeaders = new LinkedHashMap<>(headers);
+		createHeaders.put("Idempotency-Key", "gymos-stripe-test-checkout-" + UUID.randomUUID());
+		String body = form(Map.of(
+				"mode", "payment", "payment_method_types[0]", "card",
+				"success_url", "https://example.invalid/test/success?session_id={CHECKOUT_SESSION_ID}",
+				"cancel_url", "https://example.invalid/test/cancel",
+				"line_items[0][quantity]", "1", "line_items[0][price_data][currency]", "mxn",
+				"line_items[0][price_data][unit_amount]", "5000",
+				"line_items[0][price_data][product_data][name]", "GymFort Checkout test"
+		));
+		JsonNode opened = gateway.exchange("POST", url, createHeaders, body, "application/x-www-form-urlencoded");
+		JsonNode repeated = gateway.exchange("POST", url, createHeaders, body, "application/x-www-form-urlencoded");
+		String id = opened.path("id").asText();
+		assertThat(id).startsWith("cs_test_");
+		assertThat(repeated.path("id").asText()).isEqualTo(id);
+		assertThat(opened.path("livemode").asBoolean(true)).isFalse();
+		assertThat(opened.path("status").asText()).isEqualTo("open");
+		JsonNode expired = gateway.exchange("POST", url + "/" + id + "/expire", headers, "", "application/x-www-form-urlencoded");
+		assertThat(expired.path("status").asText()).isEqualTo("expired");
+		assertThat(expired.path("payment_status").asText()).isEqualTo("unpaid");
+	}
+
 	private JsonNode retrieve(String paymentIntentId) {
 		return gateway.exchange("GET", API + "/v1/payment_intents/" + paymentIntentId, headers, null, null);
 	}

@@ -14,6 +14,7 @@ import com.gymos.payments.infrastructure.PaymentProviderRepository.CreateOperati
 import com.gymos.payments.infrastructure.PaymentProviderRepository.OperationRecord;
 import java.time.OffsetDateTime;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
@@ -78,6 +79,9 @@ public class StripeProviderService implements StripeCheckoutOperations {
 				.filter(value -> value != null && !value.isBlank())
 				.orElseThrow(() -> new BusinessException("STRIPE_NOT_LINKED", "Inicia la vinculacion de Stripe antes de verificarla."));
 		JsonNode response = http.exchange("GET", stripeUrl("/v1/accounts/" + accountId), stripeHeaders(null), null, null);
+		if (!accountId.equals(requiredText(response, "id", "STRIPE_ACCOUNT_INVALID"))) {
+			throw new BusinessException("STRIPE_ACCOUNT_INVALID", "Stripe devolvió una cuenta distinta de la vinculada.");
+		}
 		boolean connected = response.path("details_submitted").asBoolean(false)
 				&& response.path("charges_enabled").asBoolean(false);
 		providerRepository.saveStripeAccount(
@@ -116,7 +120,13 @@ public class StripeProviderService implements StripeCheckoutOperations {
 						command.amountCents(), normalizeCurrency(command.currency())
 				));
 		OperationRecord existing = providerRepository.operation(operationId).orElseThrow();
+		if (!matchesCheckout(existing, command)) {
+			throw new BusinessException("STRIPE_CHECKOUT_CONTEXT_MISMATCH", "La operación de Stripe no corresponde a este pago.");
+		}
 		if (existing.externalOperationId() != null && existing.checkoutUrl() != null) {
+			if (!"OPEN".equals(existing.status())) {
+				throw new BusinessException("STRIPE_CHECKOUT_AWAITING_RESULT", "Consulta el estado del pago antes de volver a abrir Checkout.");
+			}
 			return new CheckoutSessionResult(operationId, existing.externalOperationId(), existing.checkoutUrl(), existing.status());
 		}
 
@@ -155,11 +165,21 @@ public class StripeProviderService implements StripeCheckoutOperations {
 		body.put("capabilities[card_payments][requested]", true);
 		body.put("capabilities[transfers][requested]", true);
 		body.put("metadata[gymos_organization_id]", principal.organizationId());
-		JsonNode response = http.exchange("POST", stripeUrl("/v1/accounts"), stripeHeaders(null),
+		JsonNode response = http.exchange("POST", stripeUrl("/v1/accounts"), stripeHeaders(null, "gymfort-connect:" + principal.organizationId()),
 				PaymentProviderEncoding.form(body), "application/x-www-form-urlencoded");
 		String accountId = requiredText(response, "id", "STRIPE_ACCOUNT_INVALID");
 		providerRepository.saveStripeAccount(principal.organizationId(), principal.userId(), accountId, false, json(response));
 		return accountId;
+	}
+
+	private boolean matchesCheckout(OperationRecord operation, CreateCheckoutSessionCommand command) {
+		return "CHECKOUT_SESSION".equals(operation.operationType())
+				&& Objects.equals(operation.branchId(), command.branchId())
+				&& Objects.equals(operation.clientId(), command.clientId())
+				&& Objects.equals(operation.saleId(), command.saleId())
+				&& Objects.equals(operation.paymentId(), command.paymentId())
+				&& operation.amountCents() == command.amountCents()
+				&& operation.currency().equals(normalizeCurrency(command.currency()));
 	}
 
 	private void validateCheckout(CreateCheckoutSessionCommand command) {

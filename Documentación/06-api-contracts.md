@@ -1640,3 +1640,25 @@ y muestra `DUPLICATE` para intentos manuales repetidos.
 GymFort verifica `GET /v1/orders/{order_id}` con la credencial OAuth del tenant. Exige una orden de tipo `point`, con identificador y referencia de venta coincidentes, y una única transacción identificada. La orden y la transacción deben indicar `processed` y `accredited`. La moneda autoritativa es `currency` en la raíz de la orden consultada. El importe es `transactions.payments[0].paid_amount`, expresado como decimal en texto. Si se informa `total_paid_amount`, debe coincidir con el importe de la transacción. Un `currency_id` adicional puede revelar una contradicción, pero no sustituye `currency`.
 
 Con evidencia insuficiente o contradictoria, el webhook devuelve el error de validación, el pago y la venta permanecen pendientes y la operación puede volver a conciliarse. La [guía de Point](https://www.mercadopago.com.mx/developers/en/docs/mp-point/payment-processing) muestra `currency` en la orden consultada. La [referencia GET](https://www.mercadopago.com.mx/developers/es/reference/in-person-payments/point/orders/get-order/get) incluye un ejemplo sin ese campo. La presencia del dato en una cuenta conectada queda pendiente de verificación.
+
+## PAY-001 / SELF-001 — Retomar Stripe Checkout
+
+`POST /api/v1/self-service/sessions/{sessionId}/payments/{paymentId}/checkout`
+requiere `X-Self-Service-Session-Token` con socio verificado. No recibe cuerpo.
+Sólo recupera un pago Stripe pendiente, de la organización, sucursal y socio
+de la sesión, por el importe pendiente de la venta y con la capacidad
+correspondiente habilitada. Devuelve `paymentId`, `saleId`, `providerSessionId`,
+`checkoutUrl` y `status`. Si el pago está fuera de alcance o ya no es
+recuperable, devuelve `SELF_SERVICE_CHECKOUT_NOT_RECOVERABLE`.
+
+El resumen incluye `checkoutRecoverable` en la actividad de pagos. Las altas,
+renovaciones, cambios de plan y compras de paquetes devuelven
+`providerSessionId` junto con el URL cuando corresponde. El retorno se coteja
+con esa sesión y con el pago exacto. Stripe `checkout.session.expired` y
+`checkout.session.async_payment_failed` se tratan según el estado consultado
+en la cuenta Connect. Salir desde el navegador no cancela un cargo.
+
+`POST /api/v1/self-service/sessions/{sessionId}/reset` devuelve una credencial
+nueva. El cliente debe reemplazar `sessionToken` y descartar los contextos
+anteriores. El token anterior queda inválido y se conserva el límite del
+lanzamiento original.

@@ -25,6 +25,8 @@ una llave live. Verifica:
 - confirmación off-session exitosa;
 - estado `requires_action`;
 - rechazo por fondos insuficientes.
+- creación idempotente y expiración sin cargo de Checkout en una cuenta Connect
+  test. Este caso también requiere `GYMOS_STRIPE_TEST_ACCOUNT_ID`.
 
 ## 2. Preparar la aplicación local
 
@@ -45,7 +47,7 @@ cuentas Connect al backend:
 
 ```powershell
 stripe login
-stripe listen --events checkout.session.completed,checkout.session.async_payment_succeeded,payment_intent.succeeded,payment_intent.payment_failed --forward-connect-to http://localhost:8080/api/v1/payment-webhooks/stripe
+stripe listen --events checkout.session.completed,checkout.session.async_payment_succeeded,checkout.session.async_payment_failed,checkout.session.expired,payment_intent.succeeded,payment_intent.payment_failed --forward-connect-to http://localhost:8080/api/v1/payment-webhooks/stripe
 ```
 
 Copia el `whsec_...` mostrado por ese comando a
@@ -111,6 +113,32 @@ Recorridos mínimos:
    mover silenciosamente la membresía de origen.
 
 ## 5. Recuperación e idempotencia
+
+En staging, emplea exclusivamente un gimnasio ficticio y una cuenta Connect
+sandbox ya autorizada. Confirma que las operaciones de Stripe tienen
+`livemode=false`. Usa los callback de staging configurados para esa cuenta.
+
+1. Inicia una compra. Antes del webhook, vuelve desde Checkout, recarga el
+   resultado y comprueba que el kiosco no presenta el pago como confirmado.
+   Entrega después el evento firmado y verifica una sola acreditación.
+2. Cierra el navegador durante Checkout. Desde Recepción abre otra sesión,
+   vuelve a verificar al mismo socio y usa **Mis pagos → Continuar pago**.
+   Comprueba que conserva el mismo pago y la misma venta. Si Stripe confirmó la
+   expiración, espera una nueva sesión de Checkout para ese mismo pago.
+3. Corta la conexión antes de recibir la respuesta de Checkout y repite el
+   paso anterior. Prueba también cancelación, rechazo y webhook duplicado o
+   tardío. Con un segundo socio o en otra sucursal el pago anterior no aparece.
+4. Después de finalizar, usa Atrás y recarga. Debe aparecer la verificación
+   vacía o una instrucción de reapertura, sin datos del socio ni acceso a
+   Recepción. Repite con el cierre interrumpido por falta de red.
+5. En domiciliación, interrumpe la captura de tarjeta y vuelve a intentar con
+   la misma operación. Comprueba expiración, fallo del cobro, conciliación y
+   revocación. No pruebes reembolsos con datos reales. La devolución de pagos de
+   proveedor desde GymFort sigue bloqueada según ADR-002 y #35.
+
+Registra SHA, fecha, IDs opacos de prueba, resultados y nivel de evidencia.
+Los escenarios de navegador con API simulada y los de PostgreSQL con gateway
+simulado no sustituyen esta validación.
 
 Para verificar recuperación real:
 

@@ -1,5 +1,12 @@
 # Payments
 
+Checkout trata los eventos firmados de expiración y fallo asíncrono con una
+lectura autoritativa de la cuenta Connect. Un intento terminal sin pago puede
+volver a abrirse sobre la misma venta y el mismo pago. Setup vuelve a usar la
+solicitud estable mientras se recupera de un timeout. Los reembolsos Stripe
+siguen bloqueados en la ruta manual. Consulta la [matriz de
+evidencia](../40-qa-matriz-de-aceptacion-y-evidencias.md#pay-001-y-self-001-34).
+
 Estado: FUNCIONAL / LISTO PARA ACEPTACIÓN CONECTADA
 Última revisión: 21 de agosto de 2026
 

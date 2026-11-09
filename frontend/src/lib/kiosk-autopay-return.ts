@@ -9,6 +9,7 @@ const MAX_RETURN_AGE_MS = 60 * 60 * 1000;
 export type KioskAutopayReturnContext = {
   sessionId: string;
   membershipId: string;
+  mandateId: string;
   providerSessionId: string | null;
   returnPath: string;
   startedAt: string;
@@ -18,6 +19,7 @@ export type KioskPaymentReturnContext = {
   sessionId: string;
   paymentId: string;
   saleId: string;
+  providerSessionId: string | null;
   returnPath: string;
   startedAt: string;
 };
@@ -54,6 +56,7 @@ export function readKioskAutopayReturn(
     if (
       !context.sessionId
       || !context.membershipId
+      || !context.mandateId
       || !safeReturnPath(context.returnPath)
       || !Number.isFinite(startedAt)
       || startedAt > now + 60_000
@@ -65,6 +68,7 @@ export function readKioskAutopayReturn(
     return {
       sessionId: context.sessionId,
       membershipId: context.membershipId,
+      mandateId: context.mandateId,
       providerSessionId: context.providerSessionId?.trim() || null,
       returnPath: context.returnPath,
       startedAt: context.startedAt!,
@@ -96,6 +100,7 @@ export function readKioskPaymentReturn(
       sessionId: context.sessionId,
       paymentId: context.paymentId,
       saleId: context.saleId,
+      providerSessionId: context.providerSessionId?.trim() || null,
       returnPath: context.returnPath!,
       startedAt: context.startedAt!,
     };
@@ -113,26 +118,28 @@ export function readKioskBrowserSession(
   if (!value) return null;
   try {
     const session = JSON.parse(value) as KioskSessionResponse;
+    const expires = Date.parse(session.expiresAt);
     if (
       !session.sessionId
       || !session.sessionToken
       || !session.expiresAt
-      || new Date(session.expiresAt).getTime() <= now
+      || !Number.isFinite(expires) || expires <= now
     ) {
+      clearKioskBrowserState(storage);
       return null;
     }
     return session;
   } catch {
+    clearKioskBrowserState(storage);
     return null;
   }
 }
 
 export function matchesStripeCheckoutSession(
-  context: KioskAutopayReturnContext,
+  context: Pick<KioskAutopayReturnContext, "providerSessionId">,
   returnedSessionId: string | null,
 ) {
-  if (!context.providerSessionId) return true;
-  return context.providerSessionId === returnedSessionId;
+  return Boolean(context.providerSessionId && context.providerSessionId === returnedSessionId);
 }
 
 export function classifyKioskAutopayResult(
@@ -151,6 +158,12 @@ export function clearKioskPaymentReturn(storage: BrowserStorage) {
   storage.removeItem(KIOSK_PAYMENT_RETURN_KEY);
 }
 
+export function clearKioskBrowserState(storage: BrowserStorage) {
+  storage.removeItem(KIOSK_BROWSER_SESSION_KEY);
+  clearKioskAutopayReturn(storage);
+  clearKioskPaymentReturn(storage);
+}
+
 function validCommonContext(
   context: { returnPath?: string; startedAt?: string },
   now: number,
@@ -163,5 +176,5 @@ function validCommonContext(
 }
 
 function safeReturnPath(value: string | undefined): value is string {
-  return Boolean(value && value.startsWith("/kiosk/") && !value.startsWith("//"));
+  return Boolean(value && /^\/kiosk\/[a-zA-Z0-9_-]+$/.test(value) && value !== "/kiosk/launch");
 }

@@ -125,7 +125,7 @@ class StripeRecurringBillingServiceTests {
 				eq("application/x-www-form-urlencoded")
 		);
 		assertThat(body.getValue()).contains("mode=setup");
-		assertThat(body.getValue()).contains("setup_intent_data%5Bmetadata%5D%5Bgymos_mandate_id%5D");
+		assertThat(body.getValue()).contains("setup_intent_data%5Bmetadata%5D%5Bgymos_membership_id%5D");
 		assertThat(body.getValue()).doesNotContain("setup_intent_data%5Busage%5D");
 	}
 

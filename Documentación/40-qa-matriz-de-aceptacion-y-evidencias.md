@@ -1,5 +1,24 @@
 # 40. QA de GymFort: matriz de aceptación, entornos y evidencia
 
+## PAY-001 y SELF-001 (#34)
+
+Base auditada `6990e724f5161b14f064207d2aa27b66cd884b64` (merge #68).
+Las filas identifican el entorno de la prueba. Los resultados por SHA se
+registran en el PR.
+
+| Capacidad existente | Brecha observada y acción | Evidencia reproducible |
+| --- | --- | --- |
+| Stripe Connect Express y permisos de configuración | Alta sin clave estable y revalidación sin cotejar ID. Se endurecieron ambos puntos. | Código y pruebas backend. Onboarding, cuentas incompletas y callback real pendientes en Stripe test. |
+| Checkout y webhooks firmados | Sin tratamiento de expiración y fallos asíncronos ni recuperación del pago original. Se añadieron estados y recuperación. | `PaymentWebhookServiceTests` con respuestas simuladas. `PointWebhookPostgresIntegrationTests` con HTTP de la app, Flyway, PostgreSQL y gateway simulado. |
+| Acreditación por eventos de ventas | Se conserva el servicio de finalización y sus consumidores. Se comprueba que reintentos y eventos tardíos no duplican el saldo pagado. | PostgreSQL con gateway simulado y suites de Sales, Memberships y Visit Packages. Acreditación conectada pendiente. |
+| Mandatos, revocación y worker recurrente | El intento de Setup podía cambiar su payload tras un rollback. Se hizo estable y se contempla la expiración autoritativa. | `StripeRecurringBillingServiceTests` y suite recurrente backend. Cobro, fallos y revocación conectados pendientes. |
+| Kiosco con sesión limitada | El cierre reutilizaba la credencial y el retorno no se ataba al pago exacto. Se rota la credencial, se limita la recuperación y se cotejan los identificadores. | PostgreSQL para rotación y alcance. `e2e/kiosk.spec.ts` con API simulada para retorno tardío, recarga, cancelación y red. |
+| Reembolsos de proveedor | La ruta manual rechaza pagos de proveedor. No hay confirmación de reembolsos Stripe integrados. | Guardas y regresiones de SAL-001. Pendiente de conciliación y decisión de derechos en #35 y ADR-002. |
+
+`stripeTest` exige una llave `sk_test_` existente. El caso Checkout conectado
+también exige una cuenta Connect test. Ningún escenario operativo de staging
+queda aprobado por esta matriz. [Guía de ejecución](../docs/testing/stripe-kiosk-test-mode.md).
+
 **Estado: directriz PROPUESTA para piloto. Corte: 2026-10-29.** Ninguna fila marcada como objetivo equivale a ejecución aprobada. Se aprovechan pruebas existentes y `34-matriz-pruebas-centro-tecnologica.md`; no duplicar suites por nombre.
 
 ## 1. Jerarquía y límites de pruebas

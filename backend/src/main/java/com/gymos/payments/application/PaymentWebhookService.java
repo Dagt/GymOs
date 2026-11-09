@@ -65,6 +65,7 @@ public class PaymentWebhookService {
 		String eventType = event.path("type").asText("unknown");
 		if (!java.util.Set.of(
 				"checkout.session.completed", "checkout.session.async_payment_succeeded",
+				"checkout.session.async_payment_failed", "checkout.session.expired",
 				"payment_intent.succeeded", "payment_intent.payment_failed"
 		).contains(eventType)) {
 			return;
@@ -111,7 +112,7 @@ public class PaymentWebhookService {
 			}
 			JsonNode session = fetchStripeSession(operation);
 			if (!"paid".equalsIgnoreCase(session.path("payment_status").asText())) {
-				repository.markOperationStatus(operation.id(), providerStatus(session, "OPEN"), json(session), false);
+				recordUnpaidStripeCheckout(operation, session);
 				repository.completeWebhook("STRIPE", eventId, "IGNORED", null, attemptId);
 				webhookMetric(operation, "STRIPE", eventType, "ignored");
 				return;
@@ -217,6 +218,16 @@ public class PaymentWebhookService {
 		return session;
 	}
 
+	private void recordUnpaidStripeCheckout(OperationRecord operation, JsonNode session) {
+		String status = providerStatus(session, "OPEN");
+		String intentStatus = session.path("payment_intent").path("status").asText();
+		if ("COMPLETE".equals(status) && "unpaid".equals(session.path("payment_status").asText())
+				&& java.util.Set.of("requires_payment_method", "canceled").contains(intentStatus)) {
+			status = "FAILED";
+		}
+		repository.markOperationStatus(operation.id(), status, json(session), false);
+	}
+
 	private JsonNode fetchPointOrder(OperationRecord operation) {
 		String token = mercadoPagoProviderService.accessToken(operation.organizationId());
 		JsonNode order = http.exchange("GET", mercadoPagoUrl("/v1/orders/" + operation.externalOperationId()),
@@ -278,7 +289,7 @@ public class PaymentWebhookService {
 				ensureAmount(operation, stripeAmount(session.path("amount_total")), session.path("currency").asText("").toUpperCase());
 				completion.complete(operation, json(session), receiptUrl(session));
 			} else {
-				repository.markOperationStatus(operation.id(), providerStatus(session, "OPEN"), json(session), false);
+				recordUnpaidStripeCheckout(operation, session);
 			}
 			return;
 		}

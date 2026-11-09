@@ -66,3 +66,17 @@ cd backend
 
 La suite Stripe rechaza llaves live y se omite sin secreto. Guía completa:
 [`../testing/stripe-kiosk-test-mode.md`](../testing/stripe-kiosk-test-mode.md).
+
+## Recuperación de un pago Stripe (#34)
+
+Si Checkout se interrumpe, solicita al socio que se verifique de nuevo en la
+sucursal donde se originó el pago. Desde **Mis pagos → Continuar pago** puede
+reabrir el pago original si su estado lo permite. Si ya se está conciliando,
+espera el estado del proveedor antes de repetir la compra. El mensaje de
+cancelación en el navegador indica que se salió de Checkout.
+
+Si no se pudo cerrar la sesión por falta de red, abre un kiosco nuevo desde
+Recepción. Si se cerró el navegador o expiró el modo kiosco, se requiere
+igualmente un nuevo lanzamiento. Para investigar una operación, usa el
+identificador interno de venta/pago y el historial técnico. No copies
+credenciales ni datos personales en el ticket.

@@ -768,6 +768,7 @@ test("una recarga recupera el modo kiosco y borra al socio anterior", async ({ p
 test("un socio sin membresia puede abrir Stripe Checkout con una intencion idempotente", async ({ page }) => {
   let enrollmentPayload: Record<string, unknown> | null = null;
   let paymentCompleted = false;
+  let resultRequests = 0;
   await mockStaffSession(page, "reception-access-token", {
       userId: "77777777-7777-4777-8777-777777777777",
       accountScope: "TENANT",
@@ -813,6 +814,7 @@ test("un socio sin membresia puede abrir Stripe Checkout con una intencion idemp
       return fulfill(route, membershipQuote());
     }
     if (method === "GET" && path === `/self-service/sessions/${sessionId}/summary`) {
+      resultRequests += 1;
       return fulfill(route, {
         ...summaryResponse(),
         memberships: [],
@@ -834,7 +836,6 @@ test("un socio sin membresia puede abrir Stripe Checkout con una intencion idemp
     }
     if (method === "POST" && path === `/self-service/sessions/${sessionId}/membership-enrollments`) {
       enrollmentPayload = route.request().postDataJSON() as Record<string, unknown>;
-      paymentCompleted = true;
       return fulfill(route, {
         saleId: "66666666-6666-4666-8666-666666666666",
         saleNumber: "V-001",
@@ -846,6 +847,7 @@ test("un socio sin membresia puede abrir Stripe Checkout con una intencion idemp
         membership: null,
         paymentId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
         providerOperationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+        providerSessionId: "cs_payment",
         checkoutUrl: `${new URL(page.url()).origin}/kiosk/checkout/result?status=success&session_id=cs_payment`,
         checkoutStatus: "OPEN",
       });
@@ -868,12 +870,78 @@ test("un socio sin membresia puede abrir Stripe Checkout con una intencion idemp
   await expect(review.getByText("$949.00")).toBeVisible();
   await page.getByRole("button", { name: "Confirmar y continuar a Stripe" }).click();
 
+  await expect(page.getByRole("heading", { name: "Estamos verificando el resultado" })).toBeVisible();
+  await expect.poll(() => resultRequests).toBeGreaterThan(0);
+  await expect(page.getByRole("heading", { name: "Pago confirmado" })).toHaveCount(0);
+  paymentCompleted = true;
+  await page.reload();
   await expect(page.getByRole("heading", { name: "Pago confirmado" })).toBeVisible();
   await expect(page.getByText("$949.00")).toBeVisible();
   expect(enrollmentPayload?.planId).toBe(planId);
   expect(enrollmentPayload?.idempotencyKey).toEqual(expect.stringMatching(/^kiosk-enrollment:[0-9a-f-]+$/));
   const persistedKeys = await page.evaluate(() => window.sessionStorage.getItem("gymos.kioskOperationKeys"));
   expect(persistedKeys).toContain("kiosk-enrollment");
+  await page.goto("/kiosk/checkout/result?status=success&session_id=cs_otra");
+  await expect(page.getByRole("heading", { name: "El resultado no corresponde a este pago" })).toBeVisible();
+  await expect(page.getByText("$949.00")).toHaveCount(0);
+});
+
+test("retoma el mismo pago tras una caída de red y borra al socio aunque falle el cierre", async ({ page }) => {
+  const paymentId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const saleId = "66666666-6666-4666-8666-666666666666";
+  let retries = 0;
+  let denyReset = false;
+  const currentSummary = {
+    ...summaryResponse(),
+    capabilities: { ...capabilities(), onlineCardPaymentsReady: true },
+    paymentActivity: [{
+      id: paymentId, saleId, saleNumber: "V-001", method: "CARD_ONLINE", status: "EXPIRED",
+      amountCents: 94900, currency: "MXN", receivedAt: "2026-08-20T15:00:00Z", provider: "STRIPE",
+      receiptUrl: null, checkoutUrl: null, providerUpdatedAt: null, checkoutRecoverable: true,
+    }],
+  };
+  await mockKiosk(page, async (route, path) => {
+    const sessionPath = `/self-service/sessions/${sessionId}`;
+    if (path === `${sessionPath}/verify` || path === `${sessionPath}/summary`) return fulfill(route, currentSummary);
+    if (path === `${sessionPath}/reset` && denyReset) {
+      await route.abort("internetdisconnected");
+      return true;
+    }
+    if (path === `${sessionPath}/payments/${paymentId}/checkout`) {
+      retries += 1;
+      if (retries === 1) {
+        await route.abort("internetdisconnected");
+        return true;
+      }
+      return fulfill(route, {
+        paymentId, saleId, providerSessionId: "cs_retry", status: "OPEN",
+        checkoutUrl: `${new URL(page.url()).origin}/kiosk/checkout/result?status=cancelled`,
+      });
+    }
+    return false;
+  });
+  await openLaunchedKiosk(page);
+  await page.getByPlaceholder("Correo o teléfono").fill("andrea@example.com");
+  await page.getByLabel("Fecha de nacimiento en formato día mes año").fill("10/05/1994");
+  await page.getByRole("button", { name: "Continuar de forma segura" }).click();
+  await page.getByRole("button", { name: /Mis pagos/i }).click();
+  const resume = page.getByRole("button", { name: "Continuar pago" });
+  await resume.click();
+  await expect.poll(() => retries).toBe(1);
+  await expect(resume).toBeEnabled();
+  await resume.click();
+  await expect(page.getByRole("heading", { name: "Saliste de Checkout" })).toBeVisible();
+  expect(retries).toBe(2);
+  await page.getByRole("button", { name: /volver al kiosco/i }).click();
+  await expect(page.getByRole("heading", { name: "Verifica tu identidad" })).toBeVisible();
+  await page.getByPlaceholder("Correo o teléfono").fill("andrea@example.com");
+  await page.getByLabel("Fecha de nacimiento en formato día mes año").fill("10/05/1994");
+  await page.getByRole("button", { name: "Continuar de forma segura" }).click();
+  await expect(page.getByText("Andrea Socia").first()).toBeVisible();
+  denyReset = true;
+  await page.getByRole("button", { name: "Terminar sesión y borrar mis datos" }).click();
+  await expect(page.getByText("Andrea Socia")).toHaveCount(0);
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("gymos.kioskBrowserSession"))).toBeNull();
 });
 
 test("si falla la cotización explica que no hubo cargo y conserva una referencia de soporte", async ({ page }) => {

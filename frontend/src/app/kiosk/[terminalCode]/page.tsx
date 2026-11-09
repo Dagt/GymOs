@@ -20,6 +20,7 @@ import {
   renewMembershipFromKiosk,
   registerKioskClient,
   resetKioskSession,
+  recoverKioskCheckout,
   revokeKioskAutopay,
   setupKioskAutopay,
   updateKioskContactData,
@@ -57,6 +58,9 @@ import {
   KIOSK_BROWSER_SESSION_KEY,
   writeKioskAutopayReturn,
   writeKioskPaymentReturn,
+  clearKioskBrowserState,
+  clearKioskAutopayReturn,
+  clearKioskPaymentReturn,
 } from "@/lib/kiosk-autopay-return";
 import { consumeKioskLaunch } from "@/lib/kiosk-launch";
 
@@ -133,6 +137,8 @@ export default function KioskPage() {
   const [activePanel, setActivePanel] = useState<KioskPanel>("memberships");
   const operationKeys = useRef(new Map<string, string>());
   const membershipCheckoutInFlight = useRef(false);
+  const recoveringCheckout = useRef(false);
+  const [checkoutRecoveryBusy, setCheckoutRecoveryBusy] = useState(false);
   const checkoutRef = useRef<HTMLElement | null>(null);
 
   const birthDate = useMemo(() => parseMexicanDate(birthDateDisplay) ?? "", [birthDateDisplay]);
@@ -191,6 +197,8 @@ export default function KioskPage() {
         const resumed = readBrowserKioskSession();
         if (resumed) {
           const reset = await resetKioskSession(resumed.sessionId, resumed.sessionToken);
+          clearKioskAutopayReturn(window.sessionStorage);
+          clearKioskPaymentReturn(window.sessionStorage);
           writeBrowserKioskSession(reset);
           clearPersistedOperationKeys();
           if (active) setSession(reset);
@@ -210,7 +218,14 @@ export default function KioskPage() {
       }
     }
     void start();
-    return () => { active = false; };
+    const reloadRestoredPage = (event: PageTransitionEvent) => {
+      if (event.persisted) window.location.reload();
+    };
+    window.addEventListener("pageshow", reloadRestoredPage);
+    return () => {
+      active = false;
+      window.removeEventListener("pageshow", reloadRestoredPage);
+    };
   }, []);
 
   async function verify(event: FormEvent<HTMLFormElement>) {
@@ -229,7 +244,7 @@ export default function KioskPage() {
         identifier,
         birthDate,
       );
-      await openMemberDashboard(nextSummary);
+      if (readBrowserKioskSession()?.sessionToken === session.sessionToken) await openMemberDashboard(nextSummary, session.sessionToken);
     } catch (exception) {
       setError(friendlyVerificationError(exception));
     } finally {
@@ -248,6 +263,8 @@ export default function KioskPage() {
       // haya quedado asociada aunque la respuesta anterior se haya interrumpido.
       const reset = await resetKioskSession(session.sessionId, session.sessionToken);
       writeBrowserKioskSession(reset);
+      clearKioskAutopayReturn(window.sessionStorage);
+      clearKioskPaymentReturn(window.sessionStorage);
       setSession(reset);
       setSummary(null);
       setIdentifier("");
@@ -285,7 +302,7 @@ export default function KioskPage() {
         phone: normalizePhone(registration.phone),
         email: registration.email.trim() || null,
       });
-      await openMemberDashboard(nextSummary);
+      if (readBrowserKioskSession()?.sessionToken === session.sessionToken) await openMemberDashboard(nextSummary, session.sessionToken);
       setMessage(nextSummary.memberships.length === 0
         ? nextSummary.capabilities.membershipEnrollmentAllowed && nextSummary.capabilities.visitPackagePurchaseAllowed
           ? "Tu registro quedó listo. Ahora puedes elegir una membresía o un paquete de visitas."
@@ -302,7 +319,7 @@ export default function KioskPage() {
     }
   }
 
-  async function openMemberDashboard(nextSummary: KioskSummaryResponse) {
+  async function openMemberDashboard(nextSummary: KioskSummaryResponse, sessionToken: string) {
     if (!session) return;
     // La identidad ya fue verificada. Una consulta secundaria del dashboard no debe
     // convertir ese éxito en un mensaje falso de registro o datos incorrectos.
@@ -331,6 +348,7 @@ export default function KioskPage() {
     const openPackage = settledValue(openPackageResult, undefined);
     const bookingResources = settledValue(resourcesResult, []);
     const professionals = settledValue(professionalsResult, []);
+    if (readBrowserKioskSession()?.sessionToken !== sessionToken) return;
     setSummary(nextSummary);
     setActivePanel("memberships");
     setMembershipReview(null);
@@ -576,13 +594,14 @@ export default function KioskPage() {
               ),
             })
             : null;
-      if (!response) return;
+      if (!response || readBrowserKioskSession()?.sessionToken !== session.sessionToken) return;
       if (response.checkoutUrl) {
         if (response.paymentId) {
           writeKioskPaymentReturn(window.sessionStorage, {
             sessionId: session.sessionId,
             paymentId: response.paymentId,
             saleId: response.saleId,
+            providerSessionId: response.providerSessionId ?? null,
             returnPath: window.location.pathname,
             startedAt: new Date().toISOString(),
           });
@@ -590,7 +609,7 @@ export default function KioskPage() {
         window.location.assign(response.checkoutUrl);
         return;
       }
-      setSummary(await getKioskSummary(session.sessionId, session.sessionToken));
+      await refreshPaymentHistory(session);
       setMembershipReview(null);
       if (kind === "renewal") {
         setMessage(response.membership ? `Renovada hasta ${formatDay(response.membership.endsOn)}.` : "Pago pendiente.");
@@ -601,9 +620,44 @@ export default function KioskPage() {
       }
     } catch (exception) {
       setMembershipError(membershipCheckoutError(exception));
+      void refreshPaymentHistory(session);
     } finally {
       membershipCheckoutInFlight.current = false;
       setWorkingMembershipId(null);
+    }
+  }
+
+  async function refreshPaymentHistory(currentSession: KioskSessionResponse) {
+    try {
+      const next = await getKioskSummary(currentSession.sessionId, currentSession.sessionToken, AbortSignal.timeout(8_000));
+      if (readBrowserKioskSession()?.sessionToken === currentSession.sessionToken) setSummary(next);
+    } catch {
+      // The member can re-identify to see the current pending payment.
+    }
+  }
+
+  async function continueCheckout(paymentId: string) {
+    if (!session || recoveringCheckout.current) return;
+    recoveringCheckout.current = true;
+    setCheckoutRecoveryBusy(true);
+    setError(null);
+    try {
+      const checkout = await recoverKioskCheckout(session.sessionId, session.sessionToken, paymentId);
+      if (readBrowserKioskSession()?.sessionToken !== session.sessionToken) return;
+      writeKioskPaymentReturn(window.sessionStorage, {
+        sessionId: session.sessionId,
+        saleId: checkout.saleId,
+        paymentId: checkout.paymentId,
+        providerSessionId: checkout.providerSessionId,
+        returnPath: window.location.pathname,
+        startedAt: new Date().toISOString(),
+      });
+      window.location.assign(checkout.checkoutUrl);
+    } catch {
+      setError("No pudimos continuar el pago. Consulta su estado antes de iniciar otro cobro.");
+    } finally {
+      recoveringCheckout.current = false;
+      setCheckoutRecoveryBusy(false);
     }
   }
 
@@ -646,11 +700,13 @@ export default function KioskPage() {
           visitPackageQuote.packagePlanId,
         ),
       );
+      if (readBrowserKioskSession()?.sessionToken !== session.sessionToken) return;
       if (response.checkoutUrl) {
         writeKioskPaymentReturn(window.sessionStorage, {
           sessionId: session.sessionId,
           paymentId: response.paymentId,
           saleId: response.saleId,
+            providerSessionId: response.providerSessionId,
           returnPath: window.location.pathname,
           startedAt: new Date().toISOString(),
         });
@@ -667,6 +723,7 @@ export default function KioskPage() {
         : "La compra quedó pendiente de confirmación del pago.");
     } catch (exception) {
       setVisitPackageError(visitPackageOperationError(exception, "checkout"));
+      void refreshPaymentHistory(session);
     } finally {
       setVisitPackageBusy(false);
     }
@@ -683,6 +740,7 @@ export default function KioskPage() {
         ...(contactEmail.trim() ? { email: contactEmail.trim() } : {}),
         ...(contactPhone.trim() ? { phone: contactPhone.trim() } : {}),
       });
+      if (readBrowserKioskSession()?.sessionToken !== session.sessionToken) return;
       setSummary({ ...summary, clientName: profile.displayName, profile });
       setContactEmail("");
       setContactPhone("");
@@ -741,10 +799,12 @@ export default function KioskPage() {
         ),
         replacing,
       );
+      if (readBrowserKioskSession()?.sessionToken !== session.sessionToken) return;
       if (response.checkoutUrl) {
         writeKioskAutopayReturn(window.sessionStorage, {
           sessionId: session.sessionId,
           membershipId: autopayMembership.id,
+          mandateId: response.mandateId,
           providerSessionId: response.providerSessionId,
           returnPath: window.location.pathname,
           startedAt: new Date().toISOString(),
@@ -796,9 +856,8 @@ export default function KioskPage() {
 
   const resetClientSession = useCallback(async (messageText = "Sesión cerrada. La pantalla está lista para el siguiente socio.") => {
     if (!session) return;
-    const reset = await resetKioskSession(session.sessionId, session.sessionToken);
-    writeBrowserKioskSession(reset);
-    setSession(reset);
+    setSession(null);
+    clearBrowserKioskSession();
     setSummary(null); setIdentifier(""); setBirthDateDisplay(""); setEntryMode("verify");
     setPlans([]); setTargetPlanId("");
     setVisitPackagePlans([]); setCurrentVisitPackage(null); setSelectedVisitPackagePlanId(""); setSelectedCommercialOfferType(null);
@@ -812,6 +871,13 @@ export default function KioskPage() {
     setActivePanel("memberships");
     operationKeys.current.clear();
     clearPersistedOperationKeys();
+    try {
+      const reset = await resetKioskSession(session.sessionId, session.sessionToken);
+      writeBrowserKioskSession(reset);
+      setSession(reset);
+    } catch {
+      setError("La sesión se cerró en esta pantalla. Pide a recepción que abra el kiosco nuevamente.");
+    }
   }, [session]);
 
   useEffect(() => {
@@ -1117,7 +1183,11 @@ export default function KioskPage() {
                       </div>
                       <div className="flex gap-2">
                         {payment.receiptUrl ? <a className="kiosk-secondary-action" href={payment.receiptUrl} rel="noreferrer" target="_blank">Ver comprobante</a> : null}
-                        {!payment.receiptUrl && payment.checkoutUrl && ["OPEN", "PENDING_VALIDATION"].includes(payment.status) ? <a className="kiosk-primary-action small" href={payment.checkoutUrl}>Continuar pago</a> : null}
+                        {payment.checkoutRecoverable && summary.capabilities.onlineCardPaymentsReady ? (
+                          <button className="kiosk-primary-action small" type="button" disabled={checkoutRecoveryBusy} onClick={() => void continueCheckout(payment.id)}>
+                            {checkoutRecoveryBusy ? "Consultando…" : "Continuar pago"}
+                          </button>
+                        ) : null}
                       </div>
                     </article>
                   ))}
@@ -1674,7 +1744,7 @@ function readBrowserKioskSession(): KioskSessionResponse | null {
 }
 
 function clearBrowserKioskSession() {
-  if (typeof window !== "undefined") window.sessionStorage.removeItem(KIOSK_BROWSER_SESSION_KEY);
+  if (typeof window !== "undefined") clearKioskBrowserState(window.sessionStorage);
 }
 
 function writeBrowserKioskSession(session: KioskSessionResponse) {

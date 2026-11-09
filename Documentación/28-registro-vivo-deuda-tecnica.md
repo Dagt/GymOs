@@ -1,5 +1,13 @@
 # 28. Registro vivo de hallazgos y deuda técnica
 
+En el corte #34 sigue pendiente la ejecución conectada de Connect, Checkout y
+mandatos porque el entorno de trabajo carece de credenciales Stripe test
+habilitadas. La devolución de pagos integrados queda bloqueada por
+conciliación. El reembolso de derechos usados corresponde a #35 y ADR-002.
+El reemplazo de tarjeta pendiente usa la política existente de un único
+mandato vigente o en captura por membresía. Registrar en staging el efecto de
+abandonar un reemplazo antes de aprobar la operación recurrente del piloto.
+
 Estado: VIGENTE / OBLIGATORIO
 Corte funcional: 29 de agosto de 2026; hallazgos de auditoría: 29 de octubre de 2026
 

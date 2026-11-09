@@ -1,5 +1,12 @@
 # 35. MVP piloto de GymFort y criterios de salida
 
+Para #34, registra una ejecución conectada con cuenta Connect sandbox, un
+Checkout real confirmado mediante webhook, recuperación desde otro lanzamiento
+del kiosco y un ciclo recurrente con rechazo y revocación. Las pruebas locales
+y de CI son evidencia separada. Mantén el piloto con pagos en espera hasta
+ejecutar el [procedimiento de staging](../docs/testing/stripe-kiosk-test-mode.md)
+y acordar la gestión de reembolsos de proveedor.
+
 **Corte documental:** 29 de octubre de 2026. **Base de código:** `main` = `136ce72b4613b0a59c2b37d5734a6bb0b0ef3a92`, 29/08/2026. El desarrollo más reciente del Connector está fuera de `main`, en `feature/local-access-connector` = `8955cdb7682376bd66fbc733610e84d24ebfe9c9`, 30/08/2026. **No es una certificación de ejecución actual ni de producción.**
 
 ## 1. Qué producto se está cerrando

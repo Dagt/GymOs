@@ -258,8 +258,11 @@ class SelfServiceServiceTests {
 	}
 
 	@Test
-	void repeatedVerificationOfAnAssociatedSessionReturnsItsCurrentClientWithoutReplacingIt() {
+	void repeatedVerificationOnlyReturnsTheCurrentClientAfterValidatingTheSameIdentity() {
 		givenSession("{\"clientRegistration\":true}");
+		when(clients.verifyForSelfService(any())).thenReturn(
+				Optional.of(new ClientVerificationResult(UUID.randomUUID(), "Otro Socio")),
+				Optional.of(new ClientVerificationResult(clientId, "Andrea Existente")));
 		when(clients.selfServiceProfile(organizationId, clientId)).thenReturn(Optional.of(
 				new SelfServiceClientProfile(clientId, "Andrea Existente", "an***@example.com", "***1234")
 		));
@@ -267,14 +270,20 @@ class SelfServiceServiceTests {
 		when(repository.pendingPayments(organizationId, branchId, clientId)).thenReturn(List.of());
 		when(repository.paymentActivity(organizationId, branchId, clientId)).thenReturn(List.of());
 
-		var result = service.verify(
+		assertThatThrownBy(() -> service.verify(
 				sessionId, token,
 				new com.gymos.selfservice.application.command.VerifySessionCommand(
 						"otra-persona@example.com", LocalDate.of(1990, 1, 1)),
+				"correlation", "127.0.0.1"))
+				.isInstanceOfSatisfying(BusinessException.class, exception ->
+						assertThat(exception.code()).isEqualTo("SELF_SERVICE_SESSION_ALREADY_VERIFIED"));
+
+		var result = service.verify(sessionId, token,
+				new com.gymos.selfservice.application.command.VerifySessionCommand(
+						"andrea@example.com", LocalDate.of(1990, 1, 1)),
 				"correlation", "127.0.0.1");
 
 		assertThat(result.clientName()).isEqualTo("Andrea Existente");
-		verify(clients, org.mockito.Mockito.never()).verifyForSelfService(any());
 		verify(repository, org.mockito.Mockito.never()).markVerified(any(), any(), any(), any());
 	}
 
