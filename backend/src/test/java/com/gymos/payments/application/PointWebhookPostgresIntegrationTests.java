@@ -159,6 +159,7 @@ class PointWebhookPostgresIntegrationTests {
 	void stripeRetryAfterExpiryStaysScopedAndLateEventsDoNotDuplicatePayment() throws Exception {
 		var tenant = new OperationalTestData(jdbc);
 		UUID client = tenant.client();
+		UUID plan = tenant.plan("Membresía Checkout", 30);
 		UUID sale = UUID.randomUUID();
 		UUID payment = UUID.randomUUID();
 		jdbc.sql("""
@@ -168,6 +169,13 @@ class PointWebhookPostgresIntegrationTests {
 				        12345,12345,0,12345,'MXN',now(),now(),now())
 				""").param("sale", sale).param("org", tenant.organizationId).param("branch", tenant.branchId)
 				.param("client", client).update();
+		jdbc.sql("""
+				INSERT INTO sale_item(id, sale_id, organization_id, product_id, item_type, name, quantity,
+				                      unit_price_cents, total_cents, created_at)
+				SELECT :id,:sale,:org,product_id,'MEMBERSHIP_PLAN','Membresía Checkout',1,12345,12345,now()
+				FROM membership_plan WHERE id=:plan AND organization_id=:org
+				""").param("id", UUID.randomUUID()).param("sale", sale)
+				.param("org", tenant.organizationId).param("plan", plan).update();
 		jdbc.sql("""
 				INSERT INTO payment(id, organization_id, branch_id, sale_id, client_id, method, status, amount_cents,
 				                    currency, received_at, created_at, updated_at)
@@ -190,6 +198,7 @@ class PointWebhookPostgresIntegrationTests {
 		assertThat(operations.operation(first).orElseThrow().status()).isEqualTo("EXPIRED");
 		assertThat(financialStatus("sale", sale)).isEqualTo("PENDING_PAYMENT");
 		assertThat(financialStatus("payment", payment)).isEqualTo("PENDING_VALIDATION");
+		assertThat(activatedMemberships(sale)).isZero();
 		assertThat(kiosk.recoverableCheckout(tenant.organizationId, tenant.branchId, client, payment)).isPresent();
 		assertThat(kiosk.recoverableCheckout(otherTenant.organizationId, otherTenant.branchId, client, payment)).isEmpty();
 		assertThat(kiosk.recoverableCheckout(tenant.organizationId, otherTenant.branchId, client, payment)).isEmpty();
@@ -218,6 +227,7 @@ class PointWebhookPostgresIntegrationTests {
 		assertThat(financialStatus("payment", payment)).isEqualTo("COMPLETED");
 		assertThat(financialStatus("sale", sale)).isEqualTo("PAID");
 		assertThat(paidCents(sale)).isEqualTo(12345);
+		assertThat(activatedMemberships(sale)).isOne();
 		assertThat(kiosk.recoverableCheckout(tenant.organizationId, tenant.branchId, client, payment)).isEmpty();
 		verify(gateway, times(2)).exchange("GET", stripeUrl("cs_paid"), headers, null, null);
 
@@ -260,6 +270,11 @@ class PointWebhookPostgresIntegrationTests {
 
 	private long paidCents(UUID sale) {
 		return jdbc.sql("SELECT paid_cents FROM sale WHERE id=:id").param("id", sale).query(Long.class).single();
+	}
+
+	private long activatedMemberships(UUID sale) {
+		return jdbc.sql("SELECT count(*) FROM membership WHERE sale_id=:sale AND status='ACTIVE'")
+				.param("sale", sale).query(Long.class).single();
 	}
 
 	private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder webhook(

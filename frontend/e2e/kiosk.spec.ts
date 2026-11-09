@@ -101,6 +101,7 @@ test("una apertura directa explica que no existe un ID de computadora que captur
 
 test("la pestaña que abre Recepción no puede restaurar la sesión administrativa", async ({ page }) => {
   await mockStaffSession(page, "reception-access-token", {
+    console: "RECEPTION",
     userId: "77777777-7777-4777-8777-777777777777",
     accountScope: "TENANT",
     username: "recepcion",
