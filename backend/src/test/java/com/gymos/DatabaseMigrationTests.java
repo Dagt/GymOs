@@ -96,6 +96,40 @@ class DatabaseMigrationTests {
 	}
 
 	@Test
+	void upgradesV105PreservingFinancialHistoryAndWebhookEvidence() throws Exception {
+		String schema = migrationSchema("sales_integrity");
+		migrateSchema(schema, "105");
+		UUID sale = UUID.randomUUID();
+		try (var connection = schemaConnection(schema)) {
+			var jdbc = JdbcClient.create(new SingleConnectionDataSource(connection, true));
+			var tenant = new com.gymos.support.OperationalTestData(jdbc);
+			jdbc.sql("""
+					INSERT INTO sale (id, organization_id, branch_id, sale_number, status, subtotal_cents,
+					                  total_cents, paid_cents, balance_cents, currency, sold_at, created_at, updated_at, idempotency_key)
+					VALUES (:id,:org,:branch,'S-ORIGINAL','PAID',100,100,100,0,'MXN',now(),now(),now(),'original')
+					""").param("id", sale).param("org", tenant.organizationId).param("branch", tenant.branchId).update();
+			jdbc.sql("""
+					INSERT INTO payment_provider_webhook_event(id, organization_id, provider, external_event_id,
+					                                          payload_hash, status, received_at)
+					VALUES (:id,:org,'STRIPE','evt_historical','original-hash','PROCESSED',now())
+					""").param("id", UUID.randomUUID()).param("org", tenant.organizationId).update();
+		}
+		migrateSchema(schema, null);
+		try (var connection = schemaConnection(schema)) {
+			var jdbc = JdbcClient.create(new SingleConnectionDataSource(connection, true));
+			assertThat(jdbc.sql("""
+					SELECT count(*) FROM sale WHERE id=:id AND paid_cents=100 AND status='PAID'
+					  AND idempotency_key='original' AND initial_payment_id IS NULL AND cancellation_reason IS NULL
+					""").param("id", sale).query(Long.class).single()).isEqualTo(1);
+			assertThat(jdbc.sql("""
+					SELECT count(*) FROM payment_provider_webhook_event WHERE external_event_id='evt_historical'
+					  AND payload_hash='original-hash' AND status='PROCESSED' AND processing_attempt_id IS NULL
+					""").query(Long.class).single()).isEqualTo(1);
+			assertThat(jdbc.sql("SELECT count(*) FROM inventory_sale_reservation").query(Long.class).single()).isZero();
+		}
+	}
+
+	@Test
 	void flywayAddsArchitecturalStabilizationColumns() throws Exception {
 		try (var connection = DriverManager.getConnection(postgres.getJdbcUrl(), postgres.getUsername(), postgres.getPassword())) {
 			assertThat(columnExists(connection, "user_account", "credential_version")).isTrue();

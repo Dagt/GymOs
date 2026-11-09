@@ -63,6 +63,7 @@ class SalesFinancialIntegrityGuardTests {
 		assertThatThrownBy(() -> fixture.guard().guardValidatedPayment(fixture.principal(), fixture.paymentId()))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.code()).isEqualTo("PROVIDER_PAYMENT_MANUAL_VALIDATION_FORBIDDEN"));
+		when(fixture.integrityRepository().providerSubmissionMayHaveStarted(fixture.organizationId(), fixture.paymentId())).thenReturn(true);
 		assertThatThrownBy(() -> fixture.guard().guardProviderPaymentRejection(fixture.principal(), fixture.paymentId()))
 				.isInstanceOfSatisfying(BusinessException.class, exception ->
 						assertThat(exception.code()).isEqualTo("PROVIDER_PAYMENT_MANUAL_REJECTION_FORBIDDEN"));

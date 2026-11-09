@@ -3,17 +3,13 @@ package com.gymos.sales.application;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.security.GymOsPrincipal;
 import com.gymos.payments.api.PaymentConfigurationOperations;
-import com.gymos.sales.application.command.CreateSaleCommand;
 import com.gymos.sales.application.command.ManualPaymentCommand;
 import com.gymos.sales.application.command.RequestRefundCommand;
 import com.gymos.sales.infrastructure.SalesFinancialIntegrityRepository;
 import com.gymos.sales.infrastructure.SalesRepository;
 import java.util.UUID;
-import org.aspectj.lang.annotation.Aspect;
-import org.aspectj.lang.annotation.Before;
 import org.springframework.stereotype.Component;
 
-@Aspect
 @Component
 class SalesFinancialIntegrityGuard {
 	private final SalesRepository salesRepository;
@@ -30,37 +26,34 @@ class SalesFinancialIntegrityGuard {
 		this.paymentConfigurationService = paymentConfigurationService;
 	}
 
-	@Before("execution(* com.gymos.sales.application.SalesService.create(..)) && args(principal,request,..)")
-	void guardInitialPayment(GymOsPrincipal principal, CreateSaleCommand request) {
-		if (principal != null && request != null && request.payment() != null) {
-			paymentConfigurationService.requireReceptionMethod(principal.organizationId(), principal.branchId(), request.payment().method());
-			requireProviderPending(request.payment());
-		}
-	}
-
-	@Before("execution(* com.gymos.sales.application.SalesService.addPayment(..)) && args(principal,saleId,request,..)")
 	void guardAddedPayment(GymOsPrincipal principal, UUID saleId, ManualPaymentCommand request) {
 		if (principal == null || request == null) {
 			return;
 		}
-		var sale = SalesRecordResolver.requireSaleForBranch(salesRepository, principal, saleId);
+		var sale = lockSale(principal, saleId);
+		String key = normalizedKey(request.idempotencyKey());
+		if (key != null) {
+			salesRepository.lockIdempotency(principal.organizationId(), "payment", key);
+			if (integrityRepository.paymentSaleByIdempotencyKey(principal.organizationId(), key).isPresent()) return;
+		}
+		requireOpenSale(sale.status());
+		if (sale.balanceCents() > 0 && salesRepository.processedRefundTotal(principal.organizationId(), saleId) > 0) {
+			throw new BusinessException("SALE_REFUNDED_PAYMENT_FORBIDDEN", "La venta quedó cerrada para cobros tras registrar una devolución.");
+		}
 		paymentConfigurationService.requireReceptionMethod(principal.organizationId(), principal.branchId(), request.method());
 		requireProviderPending(request);
-		String key = normalizedKey(request.idempotencyKey());
-		if (key != null && integrityRepository.paymentSaleByIdempotencyKey(principal.organizationId(), key).isPresent()) {
-			return;
-		}
-		if (request.amountCents() > sale.balanceCents()) {
+		if (request.amountCents() > sale.balanceCents() - integrityRepository.pendingPaymentTotal(principal.organizationId(), saleId)) {
 			throw new BusinessException("PAYMENT_EXCEEDS_BALANCE", "El pago no puede superar el saldo pendiente de la venta.");
 		}
 	}
 
-	@Before("execution(* com.gymos.sales.application.SalesService.validatePayment(..)) && args(principal,paymentId,..)")
 	void guardValidatedPayment(GymOsPrincipal principal, UUID paymentId) {
 		if (principal == null) {
 			return;
 		}
-		var sale = SalesRecordResolver.requirePaymentSaleForBranch(salesRepository, principal, paymentId);
+		var authorized = SalesRecordResolver.requirePaymentSaleForBranch(salesRepository, principal, paymentId);
+		salesRepository.lockSaleForRefund(principal.organizationId(), authorized.id());
+		var sale = SalesRecordResolver.requireSaleForBranch(salesRepository, principal, authorized.id());
 		var payment = SalesRecordResolver.requirePayment(salesRepository, principal.organizationId(), paymentId);
 		if ("CARD_MERCADO_PAGO".equals(payment.method()) || "CARD_ONLINE".equals(payment.method())) {
 			throw new BusinessException("PROVIDER_PAYMENT_MANUAL_VALIDATION_FORBIDDEN", "Este pago solo puede confirmarse mediante el webhook firmado del proveedor.");
@@ -68,17 +61,22 @@ class SalesFinancialIntegrityGuard {
 		if ("COMPLETED".equals(payment.status())) {
 			return;
 		}
+		requireOpenSale(sale.status());
+		if ("REJECTED".equals(payment.status())) {
+			throw new BusinessException("PAYMENT_ALREADY_REJECTED", "No puedes validar un pago rechazado.");
+		}
 		if (payment.amountCents() > sale.balanceCents()) {
 			throw new BusinessException("PAYMENT_EXCEEDS_BALANCE", "El pago no puede superar el saldo pendiente de la venta.");
 		}
 	}
 
-	@Before("execution(* com.gymos.sales.application.SalesService.rejectPayment(..)) && args(principal,paymentId,..)")
 	void guardProviderPaymentRejection(GymOsPrincipal principal, UUID paymentId) {
 		if (principal == null) return;
-		SalesRecordResolver.requirePaymentSaleForBranch(salesRepository, principal, paymentId);
+		var sale = SalesRecordResolver.requirePaymentSaleForBranch(salesRepository, principal, paymentId);
+		salesRepository.lockSaleForRefund(principal.organizationId(), sale.id());
 		var payment = SalesRecordResolver.requirePayment(salesRepository, principal.organizationId(), paymentId);
-		if ("CARD_MERCADO_PAGO".equals(payment.method()) || "CARD_ONLINE".equals(payment.method())) {
+		if ("CARD_ONLINE".equals(payment.method()) || ("CARD_MERCADO_PAGO".equals(payment.method())
+				&& integrityRepository.providerSubmissionMayHaveStarted(principal.organizationId(), paymentId))) {
 			throw new BusinessException(
 					"PROVIDER_PAYMENT_MANUAL_REJECTION_FORBIDDEN",
 					"El estado final de este pago debe conciliarse con el proveedor; no puede rechazarse manualmente."
@@ -86,14 +84,17 @@ class SalesFinancialIntegrityGuard {
 		}
 	}
 
-	@Before("execution(* com.gymos.sales.application.SalesService.requestRefund(..)) && args(principal,saleId,request,..)")
 	void guardRefund(GymOsPrincipal principal, UUID saleId, RequestRefundCommand request) {
-		if (principal == null || request == null || request.paymentId() == null) {
+		if (principal == null || request == null) {
 			return;
 		}
-		SalesRecordResolver.requireSaleForBranch(salesRepository, principal, saleId);
-		String key = normalizedKey(request.idempotencyKey());
-		if (key != null && salesRepository.refundByIdempotencyKey(principal.organizationId(), key).isPresent()) {
+		if (integrityRepository.pendingPaymentTotal(principal.organizationId(), saleId) > 0) {
+			throw new BusinessException("SALE_REFUND_PAYMENT_PENDING", "Resuelve los pagos pendientes antes de registrar la devolución.");
+		}
+		if (request.paymentId() == null) {
+			if (integrityRepository.hasCompletedProviderPayment(principal.organizationId(), saleId)) {
+				throw providerRefundRequired();
+			}
 			return;
 		}
 		var paymentSale = SalesRecordResolver.requirePaymentSaleForBranch(salesRepository, principal, request.paymentId());
@@ -105,9 +106,29 @@ class SalesFinancialIntegrityGuard {
 				principal.organizationId(),
 				request.paymentId()
 		);
+		if ("CARD_ONLINE".equals(payment.method()) || "CARD_MERCADO_PAGO".equals(payment.method())) {
+			throw providerRefundRequired();
+		}
 		long refunded = integrityRepository.processedRefundTotalForPayment(principal.organizationId(), request.paymentId());
-		if (refunded + request.amountCents() > payment.amountCents()) {
+		if (request.amountCents() > payment.amountCents() - refunded) {
 			throw new BusinessException("REFUND_EXCEEDS_PAYMENT", "Los reembolsos acumulados no pueden superar el pago seleccionado.");
+		}
+	}
+
+	com.gymos.sales.model.SaleHeader lockSale(GymOsPrincipal principal, UUID saleId) {
+		SalesRecordResolver.requireSaleForBranch(salesRepository, principal, saleId);
+		salesRepository.lockSaleForRefund(principal.organizationId(), saleId);
+		return SalesRecordResolver.requireSaleForBranch(salesRepository, principal, saleId);
+	}
+
+	private BusinessException providerRefundRequired() {
+		return new BusinessException("PROVIDER_REFUND_REQUIRES_RECONCILIATION",
+				"Los pagos integrados deben reembolsarse y conciliarse con el proveedor.");
+	}
+
+	private void requireOpenSale(String status) {
+		if ("CANCELLED".equals(status)) {
+			throw new BusinessException("SALE_CANCELLED", "La venta está cancelada.");
 		}
 	}
 

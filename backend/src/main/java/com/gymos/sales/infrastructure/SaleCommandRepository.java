@@ -21,13 +21,13 @@ public class SaleCommandRepository {
 				    id, organization_id, branch_id, client_id, sale_number, status,
 				    subtotal_cents, discount_cents, total_cents, paid_cents, balance_cents,
 				    currency, notes, sold_at, created_at, updated_at, created_by, updated_by, version,
-				    idempotency_key, idempotency_request_hash
+				    idempotency_key, idempotency_request_hash, business_context
 				)
 				VALUES (
 				    :id, :organizationId, :branchId, :clientId, :saleNumber, 'PENDING_PAYMENT',
 				    :subtotalCents, :discountCents, :totalCents, 0, :totalCents,
 				    :currency, :notes, :occurredAt, :occurredAt, :occurredAt, :actorUserId, :actorUserId, 0,
-				    :idempotencyKey, :idempotencyRequestHash
+				    :idempotencyKey, :idempotencyRequestHash, 'RETAIL_SALE'
 				)
 				""")
 				.param("id", sale.id())
@@ -79,6 +79,41 @@ public class SaleCommandRepository {
 					.param("total" + index, item.totalCents());
 		}
 		statement.update();
+	}
+
+	public boolean cancelUnpaidRetailSale(UUID organizationId, UUID branchId, UUID saleId, UUID actor, String reason) {
+		return jdbcClient.sql("""
+				UPDATE sale s SET status = 'CANCELLED', cancellation_reason = :reason, balance_cents = 0,
+				    updated_at = now(), updated_by = :actor, version = version + 1
+				WHERE s.organization_id = :organizationId AND s.branch_id = :branchId AND s.id = :saleId
+				  AND s.status = 'PENDING_PAYMENT' AND s.paid_cents = 0 AND s.payment_completed_at IS NULL
+				  AND COALESCE(s.business_context, 'RETAIL_SALE') = 'RETAIL_SALE' AND s.deleted_at IS NULL
+				  AND NOT EXISTS (
+				    SELECT 1 FROM payment p WHERE p.organization_id = s.organization_id AND p.sale_id = s.id
+				    AND p.status <> 'REJECTED' AND p.deleted_at IS NULL
+				  )
+				""").param("organizationId", organizationId).param("branchId", branchId).param("saleId", saleId)
+				.param("actor", actor).param("reason", reason).update() == 1;
+	}
+
+	public java.util.Optional<UUID> initialPaymentId(UUID organizationId, UUID saleId) {
+		return jdbcClient.sql("""
+				SELECT initial_payment_id FROM sale WHERE organization_id = :organizationId AND id = :saleId
+				  AND deleted_at IS NULL AND initial_payment_id IS NOT NULL
+				""").param("organizationId", organizationId).param("saleId", saleId).query(UUID.class).optional();
+	}
+
+	public void setInitialPayment(UUID organizationId, UUID saleId, UUID paymentId) {
+		jdbcClient.sql("UPDATE sale SET initial_payment_id = :paymentId WHERE organization_id = :organizationId AND id = :saleId")
+				.param("paymentId", paymentId).param("organizationId", organizationId).param("saleId", saleId).update();
+	}
+
+	public boolean sameCancellation(UUID organizationId, UUID branchId, UUID saleId, String reason) {
+		return jdbcClient.sql("""
+				SELECT EXISTS (SELECT 1 FROM sale WHERE organization_id = :organizationId AND branch_id = :branchId
+				  AND id = :saleId AND status = 'CANCELLED' AND cancellation_reason = :reason AND deleted_at IS NULL)
+				""").param("organizationId", organizationId).param("branchId", branchId).param("saleId", saleId)
+				.param("reason", reason).query(Boolean.class).single();
 	}
 
 	public record SaleRecord(

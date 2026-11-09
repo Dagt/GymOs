@@ -1,6 +1,7 @@
 package com.gymos.sales.application;
 
 import com.gymos.audit.api.AuditService;
+import com.gymos.common.api.BusinessException;
 import com.gymos.payments.api.PaymentConfigurationOperations;
 import com.gymos.sales.api.events.PaymentRecordedV1;
 import com.gymos.sales.api.events.SaleCreatedV1;
@@ -73,8 +74,12 @@ class MembershipSalesService {
 				draft.method(), draft.reference(), draft.validateNow(), draft.notes(), draft.businessContext());
 		String normalizedKey = SalesIdempotency.blankToNull(draft.idempotencyKey());
 		if (normalizedKey != null) {
+			salesRepository.lockIdempotency(draft.organizationId(), "sale", normalizedKey);
 			var existing = salesRepository.saleHeaderByIdempotencyKey(draft.organizationId(), normalizedKey);
 			if (existing.isPresent()) {
+				if (!draft.branchId().equals(existing.get().branchId())) {
+					throw new BusinessException("IDEMPOTENCY_KEY_REUSED", "La llave de idempotencia no está disponible para esta operación.");
+				}
 				SalesIdempotency.ensureSameRequest(salesRepository.saleRequestHashByIdempotencyKey(draft.organizationId(), normalizedKey).orElse(null), requestHash);
 				return toResult(draft.organizationId(), existing.get());
 			}
@@ -85,6 +90,10 @@ class MembershipSalesService {
 		UUID paymentId = UUID.randomUUID();
 		String saleNumber = "S-" + now.format(SALE_NUMBER_FORMAT) + "-" + saleId.toString().substring(0, 6).toUpperCase();
 		String normalizedMethod = draft.method().trim().toUpperCase();
+		if (draft.totalCents() > 0 && draft.validateNow()
+				&& java.util.Set.of("CARD_ONLINE", "CARD_MERCADO_PAGO").contains(normalizedMethod)) {
+			throw new BusinessException("PROVIDER_PAYMENT_CANNOT_VALIDATE_NOW", "El pago integrado requiere confirmación del proveedor.");
+		}
 		boolean completed = draft.totalCents() == 0 || draft.validateNow() || "CASH".equals(normalizedMethod);
 		String paymentStatus = completed ? "COMPLETED" : "PENDING_VALIDATION";
 		String saleStatus = completed ? "PAID" : "PENDING_PAYMENT";
@@ -97,7 +106,7 @@ class MembershipSalesService {
 				draft.listPriceCents(), draft.discountCents(), draft.totalCents(), paidCents, balanceCents, draft.currency(),
 				draft.appliedBenefits(),
 				SalesIdempotency.blankToNull(draft.reference()), SalesIdempotency.blankToNull(draft.notes()),
-				normalizedKey, requestHash, normalizedKey == null ? null : normalizedKey + ":payment", paymentHash,
+				normalizedKey, requestHash, normalizedKey == null ? null : "membership-payment:" + paymentId, paymentHash,
 				draft.businessContext(), now, completed ? now : null, completed ? draft.actorUserId() : null);
 		boolean created = "VISIT_PACKAGE".equals(itemType)
 				? commandRepository.createVisitPackage(record)

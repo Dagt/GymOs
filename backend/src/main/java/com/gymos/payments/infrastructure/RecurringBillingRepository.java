@@ -375,25 +375,27 @@ public class RecurringBillingRepository {
 				.update();
 	}
 
-	public ChargeRecord failCharge(UUID chargeId, String error, int maximumAttempts, OffsetDateTime nextAttemptAt) {
-		ChargeRecord current = charge(chargeId).orElseThrow();
+	public Optional<ChargeRecord> failCharge(ChargeRecord current, String error, int maximumAttempts, OffsetDateTime nextAttemptAt) {
 		boolean exhausted = current.attemptNumber() >= maximumAttempts;
 		OffsetDateTime now = OffsetDateTime.now();
-		jdbcClient.sql("""
+		int updated = jdbcClient.sql("""
 				UPDATE recurring_charge_occurrence
 				SET status = :status, next_attempt_at = :nextAttemptAt,
 				    locked_until = NULL, last_error = :error,
 				    completed_at = CASE WHEN :exhausted THEN :now ELSE NULL END,
 				    updated_at = :now, version = version + 1
-				WHERE id = :chargeId AND status <> 'SUCCEEDED'
+				WHERE id = :chargeId AND status = :expectedStatus AND attempt_number = :attempt
 				""")
 				.param("status", exhausted ? "FAILED" : "RETRY_SCHEDULED")
 				.param("nextAttemptAt", nextAttemptAt)
 				.param("error", error)
 				.param("exhausted", exhausted)
 				.param("now", now)
-				.param("chargeId", chargeId)
+				.param("chargeId", current.id())
+				.param("expectedStatus", current.status())
+				.param("attempt", current.attemptNumber())
 				.update();
+		if (updated == 0) return Optional.empty();
 		jdbcClient.sql("""
 				UPDATE recurring_payment_mandate
 				SET status = 'PAST_DUE', consecutive_failures = consecutive_failures + 1,
@@ -404,7 +406,7 @@ public class RecurringBillingRepository {
 				.param("error", error)
 				.param("now", now)
 				.update();
-		return charge(chargeId).orElseThrow();
+		return charge(current.id());
 	}
 
 	public int cancelUnstartedChargesForMandate(UUID mandateId, String reason) {

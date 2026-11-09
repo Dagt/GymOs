@@ -20,10 +20,12 @@ import org.springframework.stereotype.Service;
 class SalesRefundValidationService {
 	private final SalesRepository salesRepository;
 	private final SalesLookupService lookupService;
+	private final SalesFinancialIntegrityGuard financialIntegrity;
 
-	SalesRefundValidationService(SalesRepository salesRepository, SalesLookupService lookupService) {
+	SalesRefundValidationService(SalesRepository salesRepository, SalesLookupService lookupService, SalesFinancialIntegrityGuard financialIntegrity) {
 		this.salesRepository = salesRepository;
 		this.lookupService = lookupService;
+		this.financialIntegrity = financialIntegrity;
 	}
 
 	void lockSale(GymOsPrincipal principal, UUID saleId) {
@@ -34,6 +36,7 @@ class SalesRefundValidationService {
 		if (request.amountCents() <= 0) {
 			throw new BusinessException("REFUND_AMOUNT_INVALID", "El reembolso debe ser mayor a cero.");
 		}
+		financialIntegrity.guardRefund(principal, saleId, request);
 		validatePaymentSelection(principal, saleId, request);
 		long alreadyRefunded = salesRepository.processedRefundTotal(principal.organizationId(), saleId);
 		long refundable = sale.paidCents() - alreadyRefunded;

@@ -299,7 +299,7 @@ class SalesRefundServiceTests {
 		return new SalesRefundService(
 				lookupService,
 				new SalesRefundIdempotencyService(salesRepository),
-				new SalesRefundValidationService(salesRepository, lookupService),
+				new SalesRefundValidationService(salesRepository, lookupService, mock(SalesFinancialIntegrityGuard.class)),
 				new SalesRefundProcessor(commandRepository, eventPublisher, auditService)
 		);
 	}

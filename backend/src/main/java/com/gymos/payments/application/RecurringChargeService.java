@@ -56,7 +56,7 @@ public class RecurringChargeService implements RecurringChargeOperations {
 	public void continueCharge(RecurringRenewalSale sale) {
 		if (sale == null || sale.chargeId() == null || sale.saleId() == null) return;
 		ChargeRecord charge = recurringRepository.charge(sale.chargeId()).orElse(null);
-		if (charge == null || Set.of("CANCELLED", "FAILED", "SUCCEEDED", "AWAITING_PROVIDER").contains(charge.status())) {
+		if (charge == null || !"PROCESSING".equals(charge.status())) {
 			return;
 		}
 		if (charge.saleId() == null) {
@@ -83,7 +83,7 @@ public class RecurringChargeService implements RecurringChargeOperations {
 	@Transactional
 	public void preparationFailed(UUID chargeId, String error) {
 		ChargeRecord charge = recurringRepository.charge(chargeId).orElse(null);
-		if (charge == null || Set.of("CANCELLED", "FAILED", "SUCCEEDED", "AWAITING_PROVIDER").contains(charge.status())) {
+		if (charge == null || !"PROCESSING".equals(charge.status())) {
 			return;
 		}
 		handleProcessingFailure(charge, new IllegalStateException(error));
@@ -122,9 +122,9 @@ public class RecurringChargeService implements RecurringChargeOperations {
 			return;
 		}
 		String error = safeError(exception);
-		ChargeRecord failed = recurringRepository.failCharge(
-				charge.id(), error, 3, OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(15)
-		);
+		var result = recurringRepository.failCharge(charge, error, 3, OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(15));
+		if (result.isEmpty()) return;
+		ChargeRecord failed = result.get();
 		eventPublisher.publishEvent(new RecurringChargeFailedV1(
 				"recurring-charge-failed:" + failed.id() + ":" + failed.attemptNumber(),
 				failed.organizationId(), failed.branchId(), failed.clientId(), failed.membershipId(),

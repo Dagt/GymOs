@@ -53,6 +53,13 @@ export async function addManualPayment(
   });
 }
 
+export async function cancelSale(accessToken: string, saleId: string, reason: string): Promise<SaleDetailResponse> {
+  return apiFetch<SaleDetailResponse>(`/sales/${saleId}/cancel`, accessToken, {
+    method: "POST",
+    body: JSON.stringify({ reason }),
+  });
+}
+
 export async function requestSaleRefund(
   accessToken: string,
   saleId: string,

@@ -173,3 +173,9 @@ Una capacidad está terminada cuando tiene contrato, permisos, reglas de tenant/
 ACC-006 incorpora al piloto cloud-only el registro presencial, consumo
 transaccional y corrección auditada. El criterio de salida incluye CI verde del
 SHA final y un recorrido de aceptación por Recepción. [Issue #61](https://github.com/Dagt/GymOs/issues/61).
+
+## SAL-001
+
+El piloto con cobros depende de la verificación de SAL-001 (#33), Stripe test (#34) y los recorridos operativos de paquetes (#35).
+
+La habilitación piloto de Point requiere verificar moneda e importe pagado en la consulta autoritativa de una orden acreditada.

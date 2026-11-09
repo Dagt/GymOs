@@ -87,6 +87,8 @@ export function SalePaymentsSection({
     manualCardEnabled,
     mercadoPagoEnabled,
   validatingPaymentId,
+  canRecord,
+  writing,
   uploadingPaymentId,
   rejectingPaymentId,
   rejectReason,
@@ -95,6 +97,7 @@ export function SalePaymentsSection({
   onValidate,
   onUpload,
   onReject,
+  onRetryPoint,
   onRejectReasonChange,
 }: {
   data: SaleDetailResponse;
@@ -102,6 +105,8 @@ export function SalePaymentsSection({
     manualCardEnabled: boolean;
     mercadoPagoEnabled: boolean;
   validatingPaymentId: string | null;
+  canRecord: boolean;
+  writing: boolean;
   uploadingPaymentId: string | null;
   rejectingPaymentId: string | null;
   rejectReason: string;
@@ -110,12 +115,13 @@ export function SalePaymentsSection({
   onValidate: (paymentId: string) => void;
   onUpload: (paymentId: string, file: File | null) => void;
   onReject: (paymentId: string) => void;
+  onRetryPoint?: (paymentId: string) => void;
   onRejectReasonChange: (value: string) => void;
 }) {
   return (
     <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
       <h2 className="text-xl font-semibold">Pagos</h2>
-      {data.sale.balanceCents > 0 ? (
+      {canRecord && data.sale.status !== "CANCELLED" && data.sale.balanceCents > 0 ? (
         <form className="mt-4 grid gap-3 rounded-md border border-[#d8ddd2] bg-[#f6f7f2] p-4" onSubmit={onSubmit}>
           <h3 className="font-semibold">Registrar pago</h3>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -138,20 +144,21 @@ export function SalePaymentsSection({
               <input checked={form.validateNow} disabled={form.method === "CARD_MERCADO_PAGO"} onChange={(event) => onFormChange({ ...form, validateNow: event.target.checked })} type="checkbox" />
               {form.method === "CARD_MERCADO_PAGO" ? "Confirmacion automatica por webhook" : "Validar pago ahora"}
           </label>
-          <button className="h-10 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]" type="submit">Registrar pago</button>
+          <button className="h-10 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white transition hover:bg-[#243d30]" disabled={writing} type="submit">{writing ? "Procesando…" : "Registrar pago"}</button>
         </form>
       ) : null}
       <div className="mt-4 grid gap-3">
         {data.payments.length === 0 ? <p className="text-sm text-[#5d6b63]">Sin pagos registrados.</p> : null}
         {data.payments.map((payment) => (
-          <PaymentCard key={payment.id} payment={payment} validating={validatingPaymentId === payment.id} uploading={uploadingPaymentId === payment.id} rejecting={rejectingPaymentId === payment.id} rejectReason={rejectReason} onValidate={onValidate} onUpload={onUpload} onReject={onReject} onRejectReasonChange={onRejectReasonChange} />
+          <PaymentCard key={payment.id} payment={payment} validating={validatingPaymentId === payment.id} uploading={uploadingPaymentId === payment.id} rejecting={rejectingPaymentId === payment.id} rejectReason={rejectReason} onValidate={onValidate} onUpload={onUpload} onReject={onReject} onRejectReasonChange={onRejectReasonChange} onRetryPoint={onRetryPoint} writing={writing} />
         ))}
       </div>
     </section>
   );
 }
 
-function PaymentCard({ payment, validating, uploading, rejecting, rejectReason, onValidate, onUpload, onReject, onRejectReasonChange }: {
+function PaymentCard({ payment, validating, uploading, rejecting, rejectReason, onValidate, onUpload, onReject, onRejectReasonChange, onRetryPoint, writing }: {
+  onRetryPoint?: (paymentId: string) => void; writing: boolean;
   payment: PaymentDetail; validating: boolean; uploading: boolean; rejecting: boolean; rejectReason: string;
   onValidate: (paymentId: string) => void; onUpload: (paymentId: string, file: File | null) => void; onReject: (paymentId: string) => void; onRejectReasonChange: (value: string) => void;
 }) {
@@ -162,7 +169,14 @@ function PaymentCard({ payment, validating, uploading, rejecting, rejectReason, 
       {payment.receiptObjectKey ? <p className="mt-2 break-all text-xs text-[#6f7a73]">Comprobante: {payment.receiptObjectKey}</p> : null}
       <label className="mt-3 grid gap-2 text-sm font-medium text-[#42514a]">Comprobante<input className="text-sm" disabled={uploading} onChange={(event) => onUpload(payment.id, event.target.files?.[0] ?? null)} type="file" /></label>
       {payment.status === "PENDING_VALIDATION" && providerManaged ? (
-        <p className="mt-3 rounded-md bg-[#f2f5f1] p-3 text-sm text-[#42514a]">Esperando confirmacion firmada de Mercado Pago. Este pago no admite validacion manual.</p>
+        <div className="mt-3 rounded-md bg-[#f2f5f1] p-3 text-sm text-[#42514a]">
+          <p>Esperando confirmación del proveedor.</p>
+          {payment.method === "CARD_MERCADO_PAGO" && onRetryPoint ? (
+            <button className="app-button-secondary mt-2" disabled={writing} onClick={() => onRetryPoint(payment.id)} type="button">
+              Recuperar envío a Point
+            </button>
+          ) : null}
+        </div>
       ) : null}
       {payment.status === "PENDING_VALIDATION" && !providerManaged ? (
         <div className="mt-3 grid gap-2">
@@ -175,8 +189,10 @@ function PaymentCard({ payment, validating, uploading, rejecting, rejectReason, 
   );
 }
 
-export function SaleRefundsSection({ data, form, onFormChange, onSubmit }: {
+export function SaleRefundsSection({ data, form, onFormChange, onSubmit, canRefund, writing }: {
   data: SaleDetailResponse;
+  canRefund: boolean;
+  writing: boolean;
   form: RefundFormState;
   onFormChange: (next: RefundFormState) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -191,7 +207,7 @@ export function SaleRefundsSection({ data, form, onFormChange, onSubmit }: {
   return (
     <section className="rounded-lg border border-[#d8ddd2] bg-white p-5 shadow-sm">
       <h2 className="text-xl font-semibold">Reembolsos</h2>
-      {refundable > 0 ? (
+      {canRefund && refundable > 0 ? (
         <form className="mt-4 grid gap-3 rounded-md border border-[#d8ddd2] bg-[#f6f7f2] p-4" onSubmit={onSubmit}>
           <h3 className="font-semibold">Registrar reembolso</h3>
           <label className="flex items-center gap-2 text-sm font-medium text-[#42514a]">
@@ -240,7 +256,7 @@ export function SaleRefundsSection({ data, form, onFormChange, onSubmit }: {
             </label>
           </div>
           <label className="grid gap-2 text-sm font-medium text-[#42514a]">Motivo<textarea className="min-h-20 rounded-md border border-[#cdd5ca] px-3 py-2 text-sm" onChange={(event) => onFormChange({ ...form, reason: event.target.value })} value={form.reason} /></label>
-          <button className="h-10 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white disabled:opacity-60" disabled={!form.reason.trim() || (form.itemized && selectedCount === 0)} type="submit">Registrar reembolso</button>
+          <button className="h-10 rounded-md bg-[#13251c] px-4 text-sm font-semibold text-white disabled:opacity-60" disabled={writing || !form.reason.trim() || (form.itemized && selectedCount === 0)} type="submit">Registrar reembolso</button>
         </form>
       ) : <p className="mt-4 text-sm text-[#5d6b63]">No hay saldo pagado disponible para reembolso.</p>}
       <div className="mt-4 grid gap-3">{data.refunds.length === 0 ? <p className="text-sm text-[#5d6b63]">Sin reembolsos registrados.</p> : null}{data.refunds.map((refund) => <article className="rounded-md border border-[#d8ddd2] px-4 py-3" key={refund.id}><div className="flex items-start justify-between gap-3"><div><p className="font-semibold">{refund.status}</p><p className="mt-1 text-sm text-[#5d6b63]">{refund.reason}</p><p className="mt-1 text-xs text-[#6f7a73]">{formatDateTime(refund.requestedAt)}</p></div><p className="font-semibold">{formatMoney(refund.amountCents, refund.currency)}</p></div></article>)}</div>

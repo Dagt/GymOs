@@ -105,6 +105,7 @@ export {
   addManualPayment,
   createMercadoPagoPointOrder,
   createSale,
+  cancelSale,
   getRecentSales,
   getSale,
   getSalesReport,

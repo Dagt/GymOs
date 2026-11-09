@@ -25,6 +25,7 @@ class SalesRefundIdempotencyService {
 		if (idempotencyKey == null) {
 			return new IdempotentRefund(null, Optional.empty());
 		}
+		salesRepository.lockIdempotency(organizationId, "refund", idempotencyKey);
 		var existing = salesRepository.refundByIdempotencyKey(organizationId, idempotencyKey);
 		if (existing.isEmpty()) {
 			return new IdempotentRefund(idempotencyKey, Optional.empty());
@@ -33,6 +34,7 @@ class SalesRefundIdempotencyService {
 		List<RefundItemSnapshot> storedItems = salesRepository.refundItems(organizationId, refund.id());
 		if (!refund.saleId().equals(saleId)
 				|| refund.amountCents() != request.amountCents()
+				|| !Objects.equals(SalesIdempotency.blankToNull(refund.reason()), SalesIdempotency.blankToNull(request.reason()))
 				|| !Objects.equals(request.paymentId(), refund.paymentId())
 				|| !sameItems(request.items(), storedItems)) {
 			throw new BusinessException("IDEMPOTENCY_KEY_REUSED", "La llave de idempotencia ya fue usada en otro reembolso.");

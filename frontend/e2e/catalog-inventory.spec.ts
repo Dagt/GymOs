@@ -623,6 +623,40 @@ test.describe("catalogo e inventario", () => {
     expect(completeCatalogRequests).toBe(0);
   });
 
+  test("POS conserva la operación tras perder la respuesta y bloquea otro carrito", async ({ page }) => {
+    const keys: string[] = [];
+    await bootCatalog(page, owner(), async (route, path) => {
+      if (path !== "/sales" || route.request().method() !== "POST") return false;
+      const payload = route.request().postDataJSON() as { idempotencyKey: string };
+      keys.push(payload.idempotencyKey);
+      if (keys.length === 1) {
+        await route.abort("connectionreset");
+      } else {
+        await route.fulfill({
+          json: { sale: { saleNumber: "S-QA-33", status: "PAID" }, payments: [] },
+        });
+      }
+      return true;
+    });
+    await page.goto("/pos");
+    const productButton = page.getByRole("button", { name: /Agua/ });
+    const submit = page.getByRole("button", { name: /registrar venta/i });
+    await productButton.click();
+    await submit.click();
+    await expect(page.getByText(/No se pudo confirmar el resultado/)).toBeVisible();
+    await productButton.click();
+    await submit.click();
+    await expect(page.getByText(/Hay una operación sin confirmar/)).toBeVisible();
+    expect(keys).toHaveLength(1);
+
+    await page.reload();
+    await productButton.click();
+    await submit.click();
+    await expect(page.getByText("Venta S-QA-33 registrada.")).toBeVisible();
+    expect(keys).toHaveLength(2);
+    expect(keys[1]).toBe(keys[0]);
+  });
+
   test("las tarjetas del POS contienen nombres y SKU extensos sin solaparse", async ({ page }) => {
     const longProduct = {
       ...product,
@@ -713,6 +747,7 @@ function responseFor(path: string) {
   if (path === "/catalog/products/search") {
     return { items: [product], page: 0, size: 25, totalElements: 1, totalPages: 1 };
   }
+  if (path.startsWith("/catalog/products/by-barcode/")) return product;
   if (path === "/catalog/products/summary") return summary;
   if (path === "/catalog/categories" || path === "/catalog/plans" || path === "/catalog/product-families") return [];
   if (path.startsWith("/sales")) return [];

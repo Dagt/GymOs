@@ -1628,3 +1628,15 @@ también contra el JWT. Las reversiones repetidas por el mismo actor y motivo
 devuelven la misma corrección. Un intento incompatible devuelve
 `CHECK_IN_ALREADY_REVERSED`. `GET /api/v1/access/logs` añade `reversedAt`
 y muestra `DUPLICATE` para intentos manuales repetidos.
+
+## SAL-001 — Reintentos, pagos y cancelación
+
+`POST /api/v1/sales`, `POST /api/v1/sales/{saleId}/payments` y `POST /api/v1/sales/{saleId}/refunds` admiten `idempotencyKey` en el cuerpo. Repite la clave y el contenido para recuperar el estado de la misma operación. Reutilizarla para otro contenido o sede devuelve `IDEMPOTENCY_KEY_REUSED`. La creación de venta y el alta de pago devuelven `operationPaymentId` cuando identifican el pago de esa operación. Puede ser nulo en ventas históricas.
+
+`POST /api/v1/sales/{saleId}/cancel` requiere `sale.refund`, sucursal activa y un cuerpo con `reason` de 3 a 500 caracteres. Se admite una venta de mostrador sin pagos pendientes ni confirmados. Repetir el mismo motivo devuelve la venta cancelada. Los reembolsos de pagos integrados requieren evidencia conciliada del proveedor y devuelven `PROVIDER_REFUND_REQUIRES_RECONCILIATION` por la ruta manual.
+
+### Confirmación de Point
+
+GymFort verifica `GET /v1/orders/{order_id}` con la credencial OAuth del tenant. Exige una orden de tipo `point`, con identificador y referencia de venta coincidentes, y una única transacción identificada. La orden y la transacción deben indicar `processed` y `accredited`. La moneda autoritativa es `currency` en la raíz de la orden consultada. El importe es `transactions.payments[0].paid_amount`, expresado como decimal en texto. Si se informa `total_paid_amount`, debe coincidir con el importe de la transacción. Un `currency_id` adicional puede revelar una contradicción, pero no sustituye `currency`.
+
+Con evidencia insuficiente o contradictoria, el webhook devuelve el error de validación, el pago y la venta permanecen pendientes y la operación puede volver a conciliarse. La [guía de Point](https://www.mercadopago.com.mx/developers/en/docs/mp-point/payment-processing) muestra `currency` en la orden consultada. La [referencia GET](https://www.mercadopago.com.mx/developers/es/reference/in-person-payments/point/orders/get-order/get) incluye un ejemplo sin ese campo. La presencia del dato en una cuenta conectada queda pendiente de verificación.

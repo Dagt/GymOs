@@ -160,14 +160,11 @@ public class MercadoPagoProviderService implements MercadoPagoPointOperations {
 		OperationRecord latest = providerRepository.latestOperationForPayment(
 				command.organizationId(), PROVIDER, "POINT_ORDER", command.paymentId()
 		).orElse(null);
-		String operationKey = latest != null && retryableTerminal(latest.status())
-				? "mp-retry:" + command.paymentId() + ":" + latest.id()
-				: command.idempotencyKey();
-		UUID operationId = latest != null && !retryableTerminal(latest.status())
+		UUID operationId = latest != null
 				? latest.id()
 				: providerRepository.createOperation(new CreateOperationData(
 						command.organizationId(), command.branchId(), PROVIDER, "POINT_ORDER",
-						command.saleId(), command.paymentId(), command.clientId(), operationKey,
+						command.saleId(), command.paymentId(), command.clientId(), command.idempotencyKey(),
 						command.amountCents(), normalizeCurrency(command.currency())
 				));
 		OperationRecord existing = providerRepository.operation(operationId).orElseThrow();
@@ -191,7 +188,7 @@ public class MercadoPagoProviderService implements MercadoPagoPointOperations {
 		JsonNode response = http.exchange("POST", mercadoPagoUrl("/v1/orders"), headers, json(body), "application/json");
 		String orderId = requiredText(response, "id", "MERCADO_PAGO_ORDER_INVALID");
 		String status = response.path("status").asText("created").toUpperCase();
-		providerRepository.markOperationCreated(operationId, orderId, status, null, json(response), OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(10));
+		providerRepository.markOperationCreated(operationId, orderId, "AWAITING_PAYMENT", null, json(response), OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(10));
 		return new PointOrderResult(operationId, orderId, status);
 	}
 
@@ -295,10 +292,6 @@ public class MercadoPagoProviderService implements MercadoPagoPointOperations {
 
 	private String normalizeCurrency(String currency) {
 		return blank(currency) ? "MXN" : currency.trim().toUpperCase();
-	}
-
-	private boolean retryableTerminal(String status) {
-		return status != null && java.util.Set.of("EXPIRED", "CANCELED", "CANCELLED", "REJECTED", "FAILED").contains(status.toUpperCase());
 	}
 
 	private boolean blank(String value) {

@@ -70,3 +70,7 @@ pendiente conserva exactamente la semántica cotizada.
 El POS genérico rechaza paquetes configurados con
 `SALE_VISIT_PACKAGE_OPERATION_REQUIRED`: recepción y kiosco utilizan la
 operación dedicada para que nunca exista una venta pagada sin entitlement.
+
+## SAL-001
+
+La venta y sus mutaciones usan claves por organización y verifican la sucursal del recurso. La cancelación de mostrador sin pagos activos conserva motivo, auditoría e historial. Los pagos integrados requieren confirmación y devolución conciliadas.

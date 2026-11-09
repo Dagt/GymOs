@@ -37,8 +37,12 @@ class SaleCreationService {
 		String requestHash = SalesIdempotency.saleRequestHash(request);
 		String idempotencyKey = SalesIdempotency.blankToNull(request.idempotencyKey());
 		if (idempotencyKey != null) {
+			salesRepository.lockIdempotency(principal.organizationId(), "sale", idempotencyKey);
 			var existing = salesRepository.saleHeaderByIdempotencyKey(principal.organizationId(), idempotencyKey);
 			if (existing.isPresent()) {
+				if (!principal.branchId().equals(existing.get().branchId()) || (existing.get().businessContext() != null && !"RETAIL_SALE".equals(existing.get().businessContext()))) {
+					throw new BusinessException("IDEMPOTENCY_KEY_REUSED", "La llave de idempotencia no está disponible para esta operación.");
+				}
 				SalesIdempotency.ensureSameRequest(salesRepository.saleRequestHashByIdempotencyKey(principal.organizationId(), idempotencyKey).orElse(null), requestHash);
 				return new CreationResult(existing.get().id(), false);
 			}

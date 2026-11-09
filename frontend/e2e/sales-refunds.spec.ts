@@ -120,6 +120,30 @@ test("registra devolucion por cantidad y solicita reposicion de inventario", asy
   await expect(page.getByText("Devuelto 2 de 3")).toBeVisible();
 });
 
+test("cancela una venta sin pagos y conserva el detalle", async ({ page }) => {
+  const unpaid = {
+    ...sale,
+    sale: { ...sale.sale, status: "PENDING_PAYMENT", businessContext: "RETAIL_SALE", paidCents: 0, balanceCents: 3000 },
+    payments: [],
+  };
+  const cancelled = { ...unpaid, sale: { ...unpaid.sale, status: "CANCELLED", balanceCents: 0 } };
+  let reason: string | undefined;
+  await boot(page, async (route, path) => {
+    if (path === `/sales/${sale.sale.id}/cancel` && route.request().method() === "POST") {
+      reason = route.request().postDataJSON().reason;
+      await route.fulfill({ json: cancelled });
+      return;
+    }
+    await route.fulfill({ json: path === `/sales/${sale.sale.id}` ? unpaid : {} });
+  });
+  await page.goto(`/sales/${sale.sale.id}`);
+  await page.getByLabel("Motivo de cancelación").fill("Captura duplicada");
+  await page.getByRole("button", { name: "Cancelar venta" }).click();
+  await expect(page.getByText(/CANCELLED/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Cancelar venta" })).toHaveCount(0);
+  expect(reason).toBe("Captura duplicada");
+});
+
 async function boot(
   page: Page,
   handler: (route: Route, path: string) => Promise<void>,

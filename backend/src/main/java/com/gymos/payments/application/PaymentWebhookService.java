@@ -4,25 +4,22 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gymos.common.api.BusinessException;
 import com.gymos.common.observability.TenantTelemetry;
-import com.gymos.payments.api.events.ProviderPaymentCompletedV1;
 import com.gymos.payments.application.port.ProviderHttpGateway;
 import com.gymos.payments.infrastructure.PaymentConfigurationRepository;
 import com.gymos.payments.infrastructure.PaymentProviderRepository;
 import com.gymos.payments.infrastructure.PaymentProviderRepository.OperationRecord;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.UUID;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -36,10 +33,9 @@ public class PaymentWebhookService {
 	private final PaymentConfigurationRepository configurationRepository;
 	private final MercadoPagoProviderService mercadoPagoProviderService;
 	private final StripeRecurringBillingService stripeRecurringBillingService;
-	private final ApplicationEventPublisher eventPublisher;
+	private final ProviderPaymentCompletionService completion;
 	private final TenantTelemetry telemetry;
 
-	@Autowired
 	public PaymentWebhookService(
 			PaymentProviderProperties properties,
 			ObjectMapper objectMapper,
@@ -48,7 +44,7 @@ public class PaymentWebhookService {
 			PaymentConfigurationRepository configurationRepository,
 			MercadoPagoProviderService mercadoPagoProviderService,
 			StripeRecurringBillingService stripeRecurringBillingService,
-			ApplicationEventPublisher eventPublisher,
+			ProviderPaymentCompletionService completion,
 			TenantTelemetry telemetry
 	) {
 		this.properties = properties;
@@ -58,25 +54,8 @@ public class PaymentWebhookService {
 		this.configurationRepository = configurationRepository;
 		this.mercadoPagoProviderService = mercadoPagoProviderService;
 		this.stripeRecurringBillingService = stripeRecurringBillingService;
-		this.eventPublisher = eventPublisher;
+		this.completion = completion;
 		this.telemetry = telemetry;
-	}
-
-	PaymentWebhookService(
-			PaymentProviderProperties properties,
-			ObjectMapper objectMapper,
-			ProviderHttpGateway http,
-			PaymentProviderRepository repository,
-			PaymentConfigurationRepository configurationRepository,
-			MercadoPagoProviderService mercadoPagoProviderService,
-			StripeRecurringBillingService stripeRecurringBillingService,
-			ApplicationEventPublisher eventPublisher
-	) {
-		this(
-				properties, objectMapper, http, repository, configurationRepository,
-				mercadoPagoProviderService, stripeRecurringBillingService, eventPublisher,
-				TenantTelemetry.noOp()
-		);
 	}
 
 	public void stripe(String rawBody, String signatureHeader) {
@@ -110,7 +89,11 @@ public class PaymentWebhookService {
 			}
 			return;
 		}
-		if (!repository.registerWebhook("STRIPE", eventId, eventType, PaymentProviderEncoding.sha256Hex(rawBody), operation.organizationId())) {
+		if (!stripeAccount(operation).equals(event.path("account").asText())) {
+			throw new BusinessException("STRIPE_WEBHOOK_ACCOUNT_MISMATCH", "La cuenta de Stripe no corresponde a la operación.");
+		}
+		UUID attemptId = UUID.randomUUID();
+		if (!repository.registerWebhook("STRIPE", eventId, eventType, PaymentProviderEncoding.sha256Hex(rawBody), operation.organizationId(), attemptId)) {
 			webhookMetric(operation, "STRIPE", eventType, "duplicate");
 			return;
 		}
@@ -118,30 +101,29 @@ public class PaymentWebhookService {
 		try {
 			if ("SETUP_SESSION".equals(operation.operationType())) {
 				stripeRecurringBillingService.completeSetup(operation);
-				repository.completeWebhook("STRIPE", eventId, "PROCESSED", null);
+				repository.completeWebhook("STRIPE", eventId, "PROCESSED", null, attemptId);
 				webhookMetric(operation, "STRIPE", eventType, "processed");
 				return;
 			}
 			if ("RECURRING_PAYMENT_INTENT".equals(operation.operationType())) {
-				processRecurringPaymentIntent(operation, eventType, eventId);
+				processRecurringPaymentIntent(operation, eventType, eventId, attemptId);
 				return;
 			}
 			JsonNode session = fetchStripeSession(operation);
 			if (!"paid".equalsIgnoreCase(session.path("payment_status").asText())) {
-				repository.markOperationStatus(operation.id(), session.path("status").asText("OPEN").toUpperCase(), json(session), false);
-				repository.completeWebhook("STRIPE", eventId, "IGNORED", null);
+				repository.markOperationStatus(operation.id(), providerStatus(session, "OPEN"), json(session), false);
+				repository.completeWebhook("STRIPE", eventId, "IGNORED", null, attemptId);
 				webhookMetric(operation, "STRIPE", eventType, "ignored");
 				return;
 			}
-			long amount = session.path("amount_total").asLong(-1);
+			long amount = stripeAmount(session.path("amount_total"));
 			String currency = session.path("currency").asText("").toUpperCase();
 			ensureAmount(operation, amount, currency);
-			storeReceipt(operation, session);
-			publishCompletion(operation, "STRIPE", eventId, json(session));
-			repository.completeWebhook("STRIPE", eventId, "PROCESSED", null);
+			completion.complete(operation, json(session), receiptUrl(session));
+			repository.completeWebhook("STRIPE", eventId, "PROCESSED", null, attemptId);
 			webhookMetric(operation, "STRIPE", eventType, "processed");
 		} catch (RuntimeException exception) {
-			repository.completeWebhook("STRIPE", eventId, "FAILED", safeMessage(exception));
+			repository.completeWebhook("STRIPE", eventId, "FAILED", safeMessage(exception), attemptId);
 			webhookMetric(operation, "STRIPE", eventType, "failed");
 			throw exception;
 		}
@@ -150,32 +132,31 @@ public class PaymentWebhookService {
 	private void processRecurringPaymentIntent(
 			OperationRecord operation,
 			String eventType,
-			String eventId
+			String eventId,
+			UUID attemptId
 	) {
 		JsonNode paymentIntent = stripeRecurringBillingService.fetchPaymentIntent(operation);
+		ensureIdentity(operation, paymentIntent);
 		String status = paymentIntent.path("status").asText("processing");
 		if ("succeeded".equalsIgnoreCase(status)) {
-			long amount = paymentIntent.path("amount_received").asLong(paymentIntent.path("amount").asLong(-1));
+			long amount = stripeAmount(paymentIntent.path("amount_received"));
 			String currency = paymentIntent.path("currency").asText("").toUpperCase();
 			ensureAmount(operation, amount, currency);
-			storeReceipt(operation, paymentIntent);
-			stripeRecurringBillingService.completeRecurringCharge(operation, json(paymentIntent));
-			publishCompletion(operation, "STRIPE", eventId, json(paymentIntent));
-			repository.completeWebhook("STRIPE", eventId, "PROCESSED", null);
+			completion.complete(operation, json(paymentIntent), receiptUrl(paymentIntent));
+			repository.completeWebhook("STRIPE", eventId, "PROCESSED", null, attemptId);
 			webhookMetric(operation, "STRIPE", eventType, "processed");
 			return;
 		}
-		if ("payment_intent.payment_failed".equals(eventType)
-				|| java.util.Set.of("requires_payment_method", "requires_action", "canceled").contains(status)) {
+		if (java.util.Set.of("requires_payment_method", "requires_action", "canceled").contains(status)) {
 			String failureCode = paymentIntent.path("last_payment_error").path("decline_code").asText();
 			if (failureCode.isBlank()) failureCode = paymentIntent.path("last_payment_error").path("code").asText(status.toUpperCase());
 			stripeRecurringBillingService.failRecurringCharge(operation, failureCode);
-			repository.completeWebhook("STRIPE", eventId, "PROCESSED", null);
+			repository.completeWebhook("STRIPE", eventId, "PROCESSED", null, attemptId);
 			webhookMetric(operation, "STRIPE", eventType, "processed_failure");
 			return;
 		}
-		repository.markOperationStatus(operation.id(), status.toUpperCase(), json(paymentIntent), false);
-		repository.completeWebhook("STRIPE", eventId, "IGNORED", null);
+		repository.markOperationStatus(operation.id(), providerStatus(paymentIntent, "PROCESSING"), json(paymentIntent), false);
+		repository.completeWebhook("STRIPE", eventId, "IGNORED", null, attemptId);
 		webhookMetric(operation, "STRIPE", eventType, "ignored");
 	}
 
@@ -196,60 +177,73 @@ public class PaymentWebhookService {
 		String eventId = notificationId == null || notificationId.isBlank()
 				? (eventType == null ? "order" : eventType) + ":" + dataId + ":" + requestId
 				: notificationId;
-		if (!repository.registerWebhook("MERCADO_PAGO", eventId, eventType, PaymentProviderEncoding.sha256Hex(rawBody), operation.organizationId())) {
+		UUID attemptId = UUID.randomUUID();
+		if (!repository.registerWebhook("MERCADO_PAGO", eventId, eventType, PaymentProviderEncoding.sha256Hex(rawBody), operation.organizationId(), attemptId)) {
 			webhookMetric(operation, "MERCADO_PAGO", eventType, "duplicate");
 			return;
 		}
 		webhookMetric(operation, "MERCADO_PAGO", eventType, "accepted");
 		try {
-			String token = mercadoPagoProviderService.accessToken(operation.organizationId());
-			JsonNode order = http.exchange("GET", mercadoPagoUrl("/v1/orders/" + dataId), Map.of("Authorization", "Bearer " + token), null, null);
-			if (!mercadoPagoPaid(order)) {
-				repository.markOperationStatus(operation.id(), order.path("status").asText("PENDING").toUpperCase(), json(order), false);
-				repository.completeWebhook("MERCADO_PAGO", eventId, "IGNORED", null);
+			if (!reconcilePointOrder(operation)) {
+				repository.completeWebhook("MERCADO_PAGO", eventId, "IGNORED", null, attemptId);
 				webhookMetric(operation, "MERCADO_PAGO", eventType, "ignored");
 				return;
 			}
-			long amount = mercadoPagoAmount(order);
-			ensureAmount(operation, amount, "MXN");
-			publishCompletion(operation, "MERCADO_PAGO", eventId, json(order));
-			repository.completeWebhook("MERCADO_PAGO", eventId, "PROCESSED", null);
+			repository.completeWebhook("MERCADO_PAGO", eventId, "PROCESSED", null, attemptId);
 			webhookMetric(operation, "MERCADO_PAGO", eventType, "processed");
 		} catch (RuntimeException exception) {
-			repository.completeWebhook("MERCADO_PAGO", eventId, "FAILED", safeMessage(exception));
+			repository.completeWebhook("MERCADO_PAGO", eventId, "FAILED", safeMessage(exception), attemptId);
 			webhookMetric(operation, "MERCADO_PAGO", eventType, "failed");
 			throw exception;
 		}
 	}
 
-	private JsonNode fetchStripeSession(OperationRecord operation) {
+	private String stripeAccount(OperationRecord operation) {
 		String accountId = configurationRepository.providerConfiguration(operation.organizationId()).stripeAccountId();
 		if (accountId == null || accountId.isBlank()) {
 			throw new BusinessException("STRIPE_ACCOUNT_MISSING", "La cuenta conectada de Stripe ya no esta disponible.");
 		}
-		Map<String, String> headers = new LinkedHashMap<>();
-		headers.put("Authorization", "Bearer " + properties.stripe().secretKey());
-		headers.put("Stripe-Account", accountId);
-		return http.exchange(
-				"GET", stripeUrl("/v1/checkout/sessions/" + operation.externalOperationId()
-						+ "?expand[]=payment_intent.latest_charge"), headers, null, null
-		);
+		return accountId;
 	}
 
-	private void storeReceipt(OperationRecord operation, JsonNode providerObject) {
+	private JsonNode fetchStripeSession(OperationRecord operation) {
+		JsonNode session = http.exchange(
+				"GET", stripeUrl("/v1/checkout/sessions/" + operation.externalOperationId()
+						+ "?expand[]=payment_intent.latest_charge"),
+				Map.of("Authorization", "Bearer " + properties.stripe().secretKey(), "Stripe-Account", stripeAccount(operation)),
+				null, null
+		);
+		ensureIdentity(operation, session);
+		return session;
+	}
+
+	private JsonNode fetchPointOrder(OperationRecord operation) {
+		String token = mercadoPagoProviderService.accessToken(operation.organizationId());
+		JsonNode order = http.exchange("GET", mercadoPagoUrl("/v1/orders/" + operation.externalOperationId()),
+				Map.of("Authorization", "Bearer " + token), null, null);
+		ensureIdentity(operation, order);
+		String reference = order.path("external_reference").asText();
+		if (!"point".equals(order.path("type").asText()) || !("gymos-" + operation.saleId()).equals(reference)) {
+			throw new BusinessException("PROVIDER_PAYMENT_IDENTITY_MISMATCH", "La referencia del proveedor no corresponde a la venta.");
+		}
+		return order;
+	}
+
+	private void ensureIdentity(OperationRecord operation, JsonNode response) {
+		JsonNode id = response.path("id");
+		if (!id.isTextual() || !operation.externalOperationId().equals(id.textValue())) {
+			throw new BusinessException("PROVIDER_PAYMENT_IDENTITY_MISMATCH", "El recurso del proveedor no corresponde a la operación.");
+		}
+	}
+
+	private String receiptUrl(JsonNode providerObject) {
 		JsonNode charge = providerObject.path("latest_charge");
 		if (charge.isMissingNode()) charge = providerObject.path("payment_intent").path("latest_charge");
-		String receiptUrl = charge.path("receipt_url").asText();
-		if (!receiptUrl.isBlank()) repository.saveReceiptUrl(operation.id(), receiptUrl);
+		return charge.path("receipt_url").asText();
 	}
 
-	private void publishCompletion(OperationRecord operation, String provider, String eventId, String payload) {
-		eventPublisher.publishEvent(new ProviderPaymentCompletedV1(
-				"provider-payment-completed:" + provider + ":" + operation.id(),
-				operation.organizationId(), operation.branchId(), provider, operation.id(), operation.externalOperationId(),
-				operation.saleId(), operation.paymentId(), operation.amountCents(), operation.currency(), OffsetDateTime.now(ZoneOffset.UTC)
-		));
-		repository.markOperationStatus(operation.id(), "COMPLETED", payload, true);
+	private String providerStatus(JsonNode providerObject, String fallback) {
+		return providerObject.path("status").asText(fallback).toUpperCase(java.util.Locale.ROOT);
 	}
 
 	public void reconcile(OperationRecord operation) {
@@ -257,21 +251,21 @@ public class PaymentWebhookService {
 		if ("STRIPE".equals(operation.provider())) {
 			if ("RECURRING_PAYMENT_INTENT".equals(operation.operationType())) {
 				JsonNode paymentIntent = stripeRecurringBillingService.fetchPaymentIntent(operation);
+				ensureIdentity(operation, paymentIntent);
 				String status = paymentIntent.path("status").asText("PROCESSING");
 				if ("succeeded".equalsIgnoreCase(status)) {
 					ensureAmount(
 							operation,
-							paymentIntent.path("amount_received").asLong(paymentIntent.path("amount").asLong(-1)),
+							stripeAmount(paymentIntent.path("amount_received")),
 							paymentIntent.path("currency").asText("").toUpperCase()
 					);
-					stripeRecurringBillingService.completeRecurringCharge(operation, json(paymentIntent));
-					publishCompletion(operation, "STRIPE", "reconciliation:" + operation.id(), json(paymentIntent));
+					completion.complete(operation, json(paymentIntent), receiptUrl(paymentIntent));
 				} else if ("requires_confirmation".equals(status)) {
 					stripeRecurringBillingService.confirmRecurringPayment(operation);
 				} else if (java.util.Set.of("requires_payment_method", "requires_action", "canceled").contains(status)) {
 					stripeRecurringBillingService.failRecurringCharge(operation, status.toUpperCase());
 				} else {
-					repository.markOperationStatus(operation.id(), status.toUpperCase(), json(paymentIntent), false);
+					repository.markOperationStatus(operation.id(), providerStatus(paymentIntent, "PROCESSING"), json(paymentIntent), false);
 				}
 				return;
 			}
@@ -281,50 +275,102 @@ public class PaymentWebhookService {
 			}
 			JsonNode session = fetchStripeSession(operation);
 			if ("paid".equalsIgnoreCase(session.path("payment_status").asText())) {
-				ensureAmount(operation, session.path("amount_total").asLong(-1), session.path("currency").asText("").toUpperCase());
-				storeReceipt(operation, session);
-				publishCompletion(operation, "STRIPE", "reconciliation:" + operation.id(), json(session));
+				ensureAmount(operation, stripeAmount(session.path("amount_total")), session.path("currency").asText("").toUpperCase());
+				completion.complete(operation, json(session), receiptUrl(session));
 			} else {
-				repository.markOperationStatus(operation.id(), session.path("status").asText("OPEN").toUpperCase(), json(session), false);
+				repository.markOperationStatus(operation.id(), providerStatus(session, "OPEN"), json(session), false);
 			}
 			return;
 		}
 		if ("MERCADO_PAGO".equals(operation.provider())) {
-			String token = mercadoPagoProviderService.accessToken(operation.organizationId());
-			JsonNode order = http.exchange("GET", mercadoPagoUrl("/v1/orders/" + operation.externalOperationId()), Map.of("Authorization", "Bearer " + token), null, null);
-			if (mercadoPagoPaid(order)) {
-				ensureAmount(operation, mercadoPagoAmount(order), "MXN");
-				publishCompletion(operation, "MERCADO_PAGO", "reconciliation:" + operation.id(), json(order));
-			} else {
-				repository.markOperationStatus(operation.id(), order.path("status").asText("PENDING").toUpperCase(), json(order), false);
-			}
+			reconcilePointOrder(operation);
 		}
 	}
 
+	private long stripeAmount(JsonNode amount) {
+		return amount.isIntegralNumber() && amount.canConvertToLong() ? amount.longValue() : -1;
+	}
+
 	private void ensureAmount(OperationRecord operation, long amount, String currency) {
-		if (amount != operation.amountCents() || !operation.currency().equalsIgnoreCase(currency)) {
+		if (amount < 0 || amount != operation.amountCents() || !operation.currency().equalsIgnoreCase(currency)) {
 			repository.markOperationStatus(operation.id(), "AMOUNT_MISMATCH", "{}", false);
 			throw new BusinessException("PROVIDER_PAYMENT_AMOUNT_MISMATCH", "El monto confirmado por el proveedor no coincide con la venta.");
 		}
 	}
 
-	private boolean mercadoPagoPaid(JsonNode order) {
-		String orderStatus = order.path("status").asText();
-		if ("processed".equalsIgnoreCase(orderStatus) || "completed".equalsIgnoreCase(orderStatus)) return true;
-		JsonNode payments = order.path("transactions").path("payments");
-		if (!payments.isArray()) return false;
-		for (JsonNode payment : payments) {
-			String status = payment.path("status").asText();
-			if ("processed".equalsIgnoreCase(status) || "approved".equalsIgnoreCase(status) || "accredited".equalsIgnoreCase(status)) return true;
+	private boolean reconcilePointOrder(OperationRecord operation) {
+		JsonNode order = fetchPointOrder(operation);
+		JsonNode status = order.path("status");
+		try {
+			if (!status.isTextual() || status.textValue().isBlank()) {
+				throw new BusinessException("POINT_PAYMENT_UNVERIFIED", "La orden de Point no contiene un estado verificable.");
+			}
+			if ("processed".equals(status.textValue())) {
+				validatePointPayment(operation, order);
+			}
+		} catch (BusinessException exception) {
+			repository.markPointReconciliationRequired(operation.id());
+			throw exception;
 		}
-		return false;
+		if (!"processed".equals(status.textValue())) {
+			updateUnpaidPointOrder(operation, order);
+			return false;
+		}
+		completion.complete(operation, json(order), receiptUrl(order));
+		return true;
 	}
 
-	private long mercadoPagoAmount(JsonNode order) {
+	private void updateUnpaidPointOrder(OperationRecord operation, JsonNode order) {
+		String status = providerStatus(order, "PENDING");
+		if (java.util.Set.of("EXPIRED", "CANCELED", "CANCELLED", "REJECTED").contains(status)) {
+			completion.closePoint(operation, status, json(order));
+		} else {
+			repository.markOperationStatus(operation.id(), status, json(order), false);
+		}
+	}
+
+	private void validatePointPayment(OperationRecord operation, JsonNode order) {
 		JsonNode payments = order.path("transactions").path("payments");
-		if (!payments.isArray() || payments.isEmpty()) return -1;
+		JsonNode payment = payments.path(0);
+		if (!payments.isArray() || payments.size() != 1
+				|| !accredited(order) || !accredited(payment)
+				|| !payment.path("id").isTextual() || payment.path("id").textValue().isBlank()) {
+			throw new BusinessException("POINT_PAYMENT_UNVERIFIED", "La orden no acredita una única transacción identificable.");
+		}
+		String currency = pointCurrency(order.path("currency"));
+		// currency_id was read by older versions. It may flag a contradiction, never supply the order currency.
+		if ((order.has("currency_id") && !currency.equals(pointCurrency(order.path("currency_id"))))
+				|| (payment.has("currency_id") && !currency.equals(pointCurrency(payment.path("currency_id"))))
+				|| !operation.currency().equalsIgnoreCase(currency)) {
+			throw new BusinessException("POINT_CURRENCY_MISMATCH", "La moneda confirmada por Point no coincide con la operación.");
+		}
+		long paid = pointAmount(payment.path("paid_amount"));
+		if (paid <= 0 || paid != operation.amountCents()
+				|| (order.has("total_paid_amount") && paid != pointAmount(order.path("total_paid_amount")))) {
+			throw new BusinessException("PROVIDER_PAYMENT_AMOUNT_MISMATCH", "El monto pagado en Point no coincide con la operación.");
+		}
+	}
+
+	private boolean accredited(JsonNode record) {
+		return "processed".equals(record.path("status").asText())
+				&& "accredited".equals(record.path("status_detail").asText());
+	}
+
+	private String pointCurrency(JsonNode value) {
+		if (!value.isTextual() || !value.textValue().matches("[A-Z]{3}")) {
+			throw new BusinessException("POINT_CURRENCY_UNVERIFIED", "La respuesta de Point no contiene una moneda válida.");
+		}
 		try {
-			return payments.get(0).path("amount").decimalValue().movePointRight(2).longValueExact();
+			return java.util.Currency.getInstance(value.textValue()).getCurrencyCode();
+		} catch (IllegalArgumentException exception) {
+			throw new BusinessException("POINT_CURRENCY_UNVERIFIED", "La respuesta de Point no contiene una moneda válida.");
+		}
+	}
+
+	private long pointAmount(JsonNode amount) {
+		if (!amount.isTextual() || !amount.textValue().matches("[0-9]{1,19}(\\.[0-9]{1,2})?")) return -1;
+		try {
+			return new BigDecimal(amount.textValue()).movePointRight(2).longValueExact();
 		} catch (ArithmeticException exception) {
 			return -1;
 		}
@@ -337,7 +383,9 @@ public class PaymentWebhookService {
 		long timestamp = parseTimestamp(parts.get("t"), "STRIPE_WEBHOOK_SIGNATURE_INVALID");
 		ensureFresh(timestamp, "STRIPE_WEBHOOK_SIGNATURE_EXPIRED");
 		String expected = hmacHex(secret, timestamp + "." + payload);
-		if (!constantTimeHex(expected, parts.get("v1"))) {
+		if (header == null || java.util.Arrays.stream(header.split(","))
+				.map(String::trim).filter(part -> part.startsWith("v1="))
+				.noneMatch(part -> constantTimeHex(expected, part.substring(3)))) {
 			throw new BusinessException("STRIPE_WEBHOOK_SIGNATURE_INVALID", "La firma del webhook de Stripe no es valida.");
 		}
 	}
@@ -379,7 +427,8 @@ public class PaymentWebhookService {
 	}
 
 	private void ensureFresh(long timestamp, String code) {
-		if (Math.abs(Instant.now().getEpochSecond() - timestamp) > SIGNATURE_TOLERANCE_SECONDS) {
+		long now = Instant.now().getEpochSecond();
+		if (timestamp < now - SIGNATURE_TOLERANCE_SECONDS || timestamp > now + SIGNATURE_TOLERANCE_SECONDS) {
 			throw new BusinessException(code, "La firma del webhook esta fuera de la ventana permitida.");
 		}
 	}
@@ -430,8 +479,7 @@ public class PaymentWebhookService {
 	}
 
 	private String safeMessage(RuntimeException exception) {
-		String message = exception.getMessage();
-		return message == null ? exception.getClass().getSimpleName() : message.substring(0, Math.min(1000, message.length()));
+		return exception instanceof BusinessException business ? business.code() : exception.getClass().getSimpleName();
 	}
 
 	private void webhookMetric(OperationRecord operation, String provider, String eventType, String outcome) {

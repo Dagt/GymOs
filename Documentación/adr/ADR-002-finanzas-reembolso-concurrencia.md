@@ -18,3 +18,6 @@ Aprobar comportamiento refund por tipo de artículo y escenario: producto físic
 
 ## QA de salida
 PostgreSQL concurrente, webhook duplicate/out of order, cancel/refund parciales, límite saldo y roll-forward. Contratos Stripe test y Point sandbox donde habilitados, screenshots UI de estado del pago con respaldo autoritativo. ADR aceptada antes de desarrollar cambios económicos.
+## SAL-001
+
+Decisión técnica de SAL-001. Bloqueo de fila de venta y clave transaccional en PostgreSQL. Reserva de inventario antes de Point y conciliación del pago con sus efectos locales. Las opciones de política comercial de devoluciones siguen pendientes.

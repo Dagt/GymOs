@@ -64,3 +64,6 @@ Definir y capturar tiempos objetivo antes de firmar: registro de socio, venta co
 **Ola 0:** cerrar CI, estado y docs #57/#59; investigar fallos antes de tomar métricas. **Ola 1:** seguridad #28/#29, pagos #33/#34, datos #42, E2E #44. **Ola 2:** piloto/staging #43/#46, onboarding #45, regresión reservas/paquetes #35/#36. **Ola 3:** conector #38–40 si contrato exige torniquete, multibranding #51 para dos marcas. **Ola 4:** DS/UX #47–50 y producto pos-MVP #52–56; UX bloqueante se adelanta por impacto.
 
 Enlazar decisiones a `36-epicas-backlog-codex.md`. El Product Owner aprueba cada gate; Codex propone y desarrolla, no certifica por sí mismo.
+## SAL-001
+
+Para abrir caja con cobros integrados, comprueba recuperación ante timeout, conciliación y expiración del proveedor, y stock reservado bajo concurrencia. La simulación del proveedor sólo acredita el comportamiento local.

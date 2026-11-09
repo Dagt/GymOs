@@ -90,6 +90,7 @@ export type MembershipDetail = {
 
 export type SaleDetailResponse = {
   sale: SaleHeader;
+  operationPaymentId?: string | null;
   items: SaleItemDetail[];
   appliedBenefits: AppliedBenefitDetail[];
   payments: PaymentDetail[];

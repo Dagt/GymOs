@@ -26,6 +26,7 @@ class SaleLineResolver {
 		}
 
 		Map<UUID, ProductForSale> products = new LinkedHashMap<>();
+		Map<UUID, Long> quantities = new LinkedHashMap<>();
 		List<ResolvedSaleLine> lines = new ArrayList<>(items.size());
 		long subtotalCents = 0;
 		long itemDiscountCents = 0;
@@ -33,6 +34,10 @@ class SaleLineResolver {
 		boolean containsMembershipPlan = false;
 
 		for (SaleItemCommand item : items) {
+			if (item == null || item.productId() == null || item.quantity() < 1
+					|| quantities.merge(item.productId(), (long) item.quantity(), Long::sum) > Integer.MAX_VALUE) {
+				throw new BusinessException("SALE_ITEM_QUANTITY_INVALID", "La cantidad total del producto está fuera de rango.");
+			}
 			ProductForSale product = products.computeIfAbsent(
 					item.productId(),
 					productId -> salesRepository.productForSale(organizationId, branchId, productId)
@@ -51,15 +56,15 @@ class SaleLineResolver {
 				);
 			}
 
-			long lineSubtotalCents = product.priceCents() * item.quantity();
+			long lineSubtotalCents = lineSubtotal(product.priceCents(), item.quantity());
 			long discountCents = Math.max(0, item.discountCents());
 			if (discountCents > lineSubtotalCents) {
 				throw new BusinessException("SALE_ITEM_DISCOUNT_INVALID", "El descuento de un item no puede superar su subtotal.");
 			}
 
 			containsMembershipPlan |= "MEMBERSHIP_PLAN".equals(product.productType());
-			subtotalCents += lineSubtotalCents;
-			itemDiscountCents += discountCents;
+			subtotalCents = addMoney(subtotalCents, lineSubtotalCents);
+			itemDiscountCents = addMoney(itemDiscountCents, discountCents);
 			lines.add(new ResolvedSaleLine(
 					product.id(),
 					product.productType(),
@@ -72,7 +77,7 @@ class SaleLineResolver {
 		}
 
 		long headerDiscountCents = Math.max(0, requestedHeaderDiscountCents);
-		long totalDiscountCents = itemDiscountCents + headerDiscountCents;
+		long totalDiscountCents = addMoney(itemDiscountCents, headerDiscountCents);
 		if (totalDiscountCents > subtotalCents) {
 			throw new BusinessException("SALE_DISCOUNT_INVALID", "El descuento total no puede superar el subtotal.");
 		}
@@ -91,6 +96,22 @@ class SaleLineResolver {
 				currency,
 				containsMembershipPlan
 		);
+	}
+
+	private long lineSubtotal(long price, int quantity) {
+		try {
+			return Math.multiplyExact(price, quantity);
+		} catch (ArithmeticException exception) {
+			throw new BusinessException("SALE_AMOUNT_OUT_OF_RANGE", "El importe de la venta está fuera de rango.");
+		}
+	}
+
+	private long addMoney(long first, long second) {
+		try {
+			return Math.addExact(first, second);
+		} catch (ArithmeticException exception) {
+			throw new BusinessException("SALE_AMOUNT_OUT_OF_RANGE", "El importe de la venta está fuera de rango.");
+		}
 	}
 
 	record ResolvedSale(

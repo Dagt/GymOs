@@ -14,9 +14,9 @@ public class SalesPaymentCommandRepository {
 		this.jdbcClient = jdbcClient;
 	}
 
-	public Optional<UUID> saleIdByIdempotencyKey(UUID organizationId, String idempotencyKey) {
+	public Optional<ExistingPayment> paymentByIdempotencyKey(UUID organizationId, String idempotencyKey) {
 		return jdbcClient.sql("""
-				SELECT sale_id
+				SELECT id, sale_id
 				FROM payment
 				WHERE organization_id = :organizationId
 				  AND idempotency_key = :idempotencyKey
@@ -24,9 +24,11 @@ public class SalesPaymentCommandRepository {
 				""")
 				.param("organizationId", organizationId)
 				.param("idempotencyKey", idempotencyKey)
-				.query(UUID.class)
+				.query((rs, row) -> new ExistingPayment(rs.getObject("id", UUID.class), rs.getObject("sale_id", UUID.class)))
 				.optional();
 	}
+
+	public record ExistingPayment(UUID id, UUID saleId) {}
 
 	public void create(PaymentRecord payment) {
 		jdbcClient.sql("""

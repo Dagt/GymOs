@@ -63,5 +63,9 @@ export async function resolveScannedProduct(
   code: string,
   lookupByBarcode: (barcode: string) => Promise<ProductSummary>,
 ): Promise<ProductSummary> {
-  return findProductByBarcodeOrSku(products, code) ?? lookupByBarcode(code.trim());
+  const product = findProductByBarcodeOrSku(products, code) ?? await lookupByBarcode(code.trim());
+  if (!product?.id || !/^[A-Z]{3}$/.test(product.currency) || !Number.isSafeInteger(product.priceCents)) {
+    throw new Error("La búsqueda por código no devolvió un producto válido.");
+  }
+  return product;
 }

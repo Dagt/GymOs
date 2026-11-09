@@ -2,11 +2,13 @@
 
 import { useParams } from "next/navigation";
 import type { FormEvent } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppShell, InlineError, LoadingScreen } from "@/components/AppShell";
 import { AuthRequired as AuthRequiredCard } from "@/components/AuthRequired";
+import { runSaleWrite } from "@/lib/sale-write";
 import {
   addManualPayment,
+  cancelSale,
   createMercadoPagoPointOrder,
   getPaymentConfiguration,
   getSale,
@@ -60,6 +62,9 @@ export default function SaleDetailPage() {
   const [manualCardEnabled, setManualCardEnabled] = useState(false);
   const [mercadoPagoEnabled, setMercadoPagoEnabled] = useState(false);
   const [refundForm, setRefundForm] = useState(INITIAL_REFUND_FORM);
+  const [cancelReason, setCancelReason] = useState("");
+  const [writing, setWriting] = useState<"payment" | "refund" | "cancel" | null>(null);
+  const writeInFlight = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -132,26 +137,30 @@ export default function SaleDetailPage() {
     const amountCents = paymentForm.amount.trim()
       ? Math.round(Number(paymentForm.amount) * 100)
       : data.sale.balanceCents;
-    setError(null);
-    try {
-      const response = await addManualPayment(session.accessToken, data.sale.id, {
-        method: paymentForm.method,
-        amountCents,
-        reference: paymentForm.reference,
-        receiptObjectKey: null,
-        validateNow: paymentForm.method === "CARD_MERCADO_PAGO" ? false : paymentForm.validateNow,
-        notes: null,
-      });
-      if (paymentForm.method === "CARD_MERCADO_PAGO") {
-        const payment = [...response.payments].reverse().find((item) => item.method === "CARD_MERCADO_PAGO" && item.status === "PENDING_VALIDATION");
-        if (!payment) throw new Error("No se encontro el pago pendiente para enviar a Point.");
-        await createMercadoPagoPointOrder(session.accessToken, payment.id);
+    const payload = {
+      method: paymentForm.method,
+      amountCents,
+      reference: paymentForm.reference,
+      receiptObjectKey: null,
+      validateNow: paymentForm.method === "CARD_MERCADO_PAGO" ? false : paymentForm.validateNow,
+      notes: null,
+    };
+    const succeeded = await runWrite("payment", () => runSaleWrite(session, `payment:${data.sale.id}`, payload, async (idempotencyKey) => {
+      const response = await addManualPayment(session.accessToken, data.sale.id, { ...payload, idempotencyKey });
+      if (payload.method === "CARD_MERCADO_PAGO") {
+        const payment = response.payments.find((item) => item.id === response.operationPaymentId);
+        if (!payment) throw new Error("Consulta el historial de la venta antes de volver a cobrar.");
+        if (payment.status === "PENDING_VALIDATION") {
+          try {
+            await createMercadoPagoPointOrder(session.accessToken, payment.id);
+          } catch {
+            throw new Error("El pago quedó registrado. Falta confirmar el envío a Point.");
+          }
+        }
       }
-      setData(response);
-      setPaymentForm((current) => ({ ...current, amount: "", reference: "" }));
-    } catch (exception) {
-      setError(messageFrom(exception, "No fue posible registrar el pago o enviarlo a Point."));
-    }
+      return response;
+    }), "No fue posible registrar el pago.");
+    if (succeeded) setPaymentForm(INITIAL_PAYMENT_FORM);
   }
 
   async function submitRefund(event: FormEvent<HTMLFormElement>) {
@@ -168,16 +177,42 @@ export default function SaleDetailPage() {
     const amountCents = refundForm.amount.trim()
       ? Math.round(Number(refundForm.amount) * 100)
       : suggestedAmount;
-    const succeeded = await runAction(
-      () => requestSaleRefund(session.accessToken, data.sale.id, {
-        paymentId: refundForm.paymentId || null,
-        amountCents,
-        reason: refundForm.reason,
-        items: refundForm.itemized ? items : undefined,
-      }),
-      "No fue posible registrar reembolso.",
-    );
+    const payload = {
+      paymentId: refundForm.paymentId || null,
+      amountCents,
+      reason: refundForm.reason,
+      items: refundForm.itemized ? items : undefined,
+    };
+    const succeeded = await runWrite("refund", () => runSaleWrite(session, `refund:${data.sale.id}`, payload,
+      (idempotencyKey) => requestSaleRefund(session.accessToken, data.sale.id, { ...payload, idempotencyKey })),
+    "No fue posible registrar reembolso.");
     if (succeeded) setRefundForm(INITIAL_REFUND_FORM);
+  }
+
+  async function retryPoint(paymentId: string) {
+    if (!session || !data) return;
+    await runWrite("payment", async () => {
+      await createMercadoPagoPointOrder(session.accessToken, paymentId);
+      return getSale(session.accessToken, data.sale.id);
+    }, "No fue posible recuperar el envío a Point.");
+  }
+
+  async function submitCancellation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session || !data) return;
+    await runWrite("cancel", () => cancelSale(session.accessToken, data.sale.id, cancelReason), "No fue posible cancelar la venta.");
+  }
+
+  async function runWrite(kind: NonNullable<typeof writing>, action: () => Promise<SaleDetailResponse>, fallback: string) {
+    if (writeInFlight.current) return false;
+    writeInFlight.current = true;
+    setWriting(kind);
+    try {
+      return await runAction(action, fallback);
+    } finally {
+      writeInFlight.current = false;
+      setWriting(null);
+    }
   }
 
   async function runAction(
@@ -201,6 +236,10 @@ export default function SaleDetailPage() {
   if (!session) return <AuthRequiredCard message="Necesitas una sesion activa para consultar ventas." title="Inicia sesion para ver esta venta" />;
   if (!data) return <LoadingScreen text="Preparando detalle de venta..." />;
 
+  const mayRefund = session.user.permissions.includes("sale.refund");
+  const canCancel = mayRefund && data.sale.businessContext === "RETAIL_SALE" && data.sale.status === "PENDING_PAYMENT"
+    && data.sale.paidCents === 0 && data.payments.every((payment) => payment.status === "REJECTED");
+
   return (
     <AppShell
       eyebrow="Venta"
@@ -217,6 +256,7 @@ export default function SaleDetailPage() {
           mercadoPagoEnabled={mercadoPagoEnabled}
           onFormChange={(next) => setPaymentForm(next.method === "CARD_MERCADO_PAGO" ? { ...next, validateNow: false } : next)}
           onReject={reject}
+          onRetryPoint={session.user.permissions.includes("sale.create") ? retryPoint : undefined}
           onRejectReasonChange={setRejectReason}
           onSubmit={submitPayment}
           onUpload={uploadReceipt}
@@ -225,8 +265,21 @@ export default function SaleDetailPage() {
           rejectingPaymentId={rejectingPaymentId}
           uploadingPaymentId={uploadingPaymentId}
           validatingPaymentId={validatingPaymentId}
+          canRecord={session.user.permissions.includes("payment.manual.create")}
+          writing={writing !== null}
         />
-        <SaleRefundsSection data={data} form={refundForm} onFormChange={setRefundForm} onSubmit={submitRefund} />
+        <SaleRefundsSection data={data} form={refundForm} onFormChange={setRefundForm} onSubmit={submitRefund} canRefund={mayRefund} writing={writing !== null} />
+        {canCancel ? (
+          <form className="grid gap-3 rounded-2xl border border-gray-100 bg-white p-5" onSubmit={submitCancellation}>
+            <label className="grid gap-2 text-sm font-medium">
+              Motivo de cancelación
+              <input className="h-10 rounded-md border border-gray-200 px-3" value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} required minLength={3} maxLength={500} />
+            </label>
+            <button className="app-button-secondary" type="submit" disabled={writing !== null || cancelReason.trim().length < 3}>
+              {writing === "cancel" ? "Cancelando…" : "Cancelar venta"}
+            </button>
+          </form>
+        ) : null}
         <SaleMembershipsSection data={data} />
         {error ? <InlineError message={error} /> : null}
       </section>

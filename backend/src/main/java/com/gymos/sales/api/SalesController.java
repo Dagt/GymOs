@@ -150,6 +150,12 @@ public class SalesController {
 		return toResponse(salesService.requestRefund(principal, saleId, request.toCommand(), correlationId(servletRequest)));
 	}
 
+	@PostMapping("/{saleId}/cancel")
+	SaleDetailResponse cancel(@AuthenticationPrincipal GymOsPrincipal principal, @PathVariable UUID saleId,
+			@Valid @RequestBody RejectPaymentRequest request, HttpServletRequest servletRequest) {
+		return toResponse(salesService.cancel(principal, saleId, request.reason(), correlationId(servletRequest)));
+	}
+
 	private SaleDetailResponse toResponse(SaleDetailResult result) {
 		return new SaleDetailResponse(
 				result.sale(),
@@ -157,7 +163,8 @@ public class SalesController {
 				result.appliedBenefits(),
 				result.payments(),
 				result.refunds(),
-				result.memberships()
+				result.memberships(),
+				result.operationPaymentId()
 		);
 	}
 
@@ -263,7 +270,8 @@ public class SalesController {
 			List<AppliedBenefitDetail> appliedBenefits,
 			List<PaymentDetail> payments,
 			List<RefundDetail> refunds,
-			List<MembershipDetail> memberships
+			List<MembershipDetail> memberships,
+			UUID operationPaymentId
 	) {
 	}
 
