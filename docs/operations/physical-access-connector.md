@@ -2,9 +2,7 @@
 
 Last reviewed: 2026-08-23.
 
-This document is the implementation handoff for the local process that will
-bridge GymFort Cloud with a physical-access provider. The cloud contract is
-implemented. No HikCentral SDK/API call is implemented or assumed here.
+This document describes the cloud-side contract present in `main` (reviewed against the 2026-11-09 tree). The independent Connector executable, SIMULATOR and a HikCentral OpenAPI adapter exist **only** on the unmerged `feature/local-access-connector` branch (SHA `8955cdb7682376bd66fbc733610e84d24ebfe9c9`). That adapter has code and automated tests but no certified connection to the gym's actual HikCentral installation or physical turnstile. `main` does not contain a deployable local Connector. Do not treat simulator tests or source code as hardware acceptance. See [site discovery runbook](hikcentral-pilot-discovery.md) and issues #38–#41.
 
 ## 1. Trust boundary
 
@@ -221,7 +219,7 @@ unmatched. It never links by fuzzy name. A privileged human confirms the match.
 
 ## 8. HikCentral discovery gate
 
-Before writing the adapter, record from the actual client installation:
+Before enabling or completing the experimental adapter for the actual site, record:
 
 - HikCentral Professional edition/version and active licenses;
 - terminal/controller model and firmware;
