@@ -486,6 +486,7 @@ export default function KioskPage() {
       setMessage("Tu reserva fue creada correctamente.");
       setBookingNotes("");
       const items = await getKioskBookingAvailability(session.sessionId, session.sessionToken, resourceId, bookingDate);
+      if (readBrowserKioskSession()?.sessionToken !== session.sessionToken) return;
       setSlots(items.filter((item) => item.available && new Date(item.startsAt).getTime() > Date.now()));
       setSelectedSlot(null);
     } catch (exception) {
@@ -507,6 +508,7 @@ export default function KioskPage() {
         startsAt: wellnessSlot.startsAt,
         notes: wellnessNotes.trim() || undefined,
       });
+      if (readBrowserKioskSession()?.sessionToken !== session.sessionToken) return;
       setMessage(`Tu cita con ${appointment.professionalName} fue creada correctamente.`);
       setWellnessNotes("");
       const items = await getKioskWellnessAvailability(
@@ -516,6 +518,7 @@ export default function KioskPage() {
         wellnessServiceId,
         wellnessDate,
       );
+      if (readBrowserKioskSession()?.sessionToken !== session.sessionToken) return;
       setWellnessSlots(items.filter((item) => item.available && new Date(item.startsAt).getTime() > Date.now()));
       setWellnessSlot(null);
     } catch (exception) {
@@ -545,6 +548,7 @@ export default function KioskPage() {
         kind === "renewal" ? "RENEWAL" : kind === "change" ? "PLAN_CHANGE" : "ENROLLMENT",
         membership?.id,
       );
+      if (readBrowserKioskSession()?.sessionToken !== session.sessionToken) return;
       setMembershipReview({ kind, membership, quote });
     } catch (exception) {
       setMembershipError(membershipQuoteError(exception));
@@ -670,11 +674,13 @@ export default function KioskPage() {
     setError(null);
     setMessage(null);
     try {
-      setVisitPackageQuote(await getKioskVisitPackageQuote(
+      const quote = await getKioskVisitPackageQuote(
         session.sessionId,
         session.sessionToken,
         selectedVisitPackagePlanId,
-      ));
+      );
+      if (readBrowserKioskSession()?.sessionToken !== session.sessionToken) return;
+      setVisitPackageQuote(quote);
     } catch (exception) {
       setVisitPackageError(visitPackageOperationError(exception, "quote"));
     } finally {
@@ -706,17 +712,19 @@ export default function KioskPage() {
           sessionId: session.sessionId,
           paymentId: response.paymentId,
           saleId: response.saleId,
-            providerSessionId: response.providerSessionId,
+          providerSessionId: response.providerSessionId,
           returnPath: window.location.pathname,
           startedAt: new Date().toISOString(),
         });
         window.location.assign(response.checkoutUrl);
         return;
       }
-      setCurrentVisitPackage(await getKioskCurrentVisitPackage(
+      const current = await getKioskCurrentVisitPackage(
         session.sessionId,
         session.sessionToken,
-      ) ?? null);
+      );
+      if (readBrowserKioskSession()?.sessionToken !== session.sessionToken) return;
+      setCurrentVisitPackage(current ?? null);
       setVisitPackageQuote(null);
       setMessage(response.entitlementStatus === "ACTIVE"
         ? "Tu paquete de visitas quedó activo."
@@ -768,6 +776,7 @@ export default function KioskPage() {
           ? getKioskAutopayTerms(session.sessionId, session.sessionToken, membership.id)
           : Promise.resolve(null),
       ]);
+      if (readBrowserKioskSession()?.sessionToken !== session.sessionToken) return;
       setAutopayMandate(mandate ?? null);
       setAutopayTerms(terms);
     } catch (exception) {
@@ -813,11 +822,13 @@ export default function KioskPage() {
         return;
       }
       setMessage("La autorización quedó registrada y está siendo verificada con Stripe.");
-      setAutopayMandate(await getKioskAutopayMandate(
+      const mandate = await getKioskAutopayMandate(
         session.sessionId,
         session.sessionToken,
         autopayMembership.id,
-      ) ?? null);
+      );
+      if (readBrowserKioskSession()?.sessionToken !== session.sessionToken) return;
+      setAutopayMandate(mandate ?? null);
     } catch (exception) {
       setError(exception instanceof Error ? exception.message : "No fue posible iniciar la domiciliación.");
     } finally {
@@ -837,6 +848,7 @@ export default function KioskPage() {
         autopayMembership.id,
         "Revocación solicitada por el socio desde el kiosco",
       );
+      if (readBrowserKioskSession()?.sessionToken !== session.sessionToken) return;
       setAutopayMandate(revoked);
       setAutopayAccepted(false);
       forgetStableOperationKey(
@@ -859,11 +871,11 @@ export default function KioskPage() {
     setSession(null);
     clearBrowserKioskSession();
     setSummary(null); setIdentifier(""); setBirthDateDisplay(""); setEntryMode("verify");
-    setPlans([]); setTargetPlanId("");
+    setPlans([]); setTargetPlanId(""); setMembershipReview(null); setMembershipError(null);
     setVisitPackagePlans([]); setCurrentVisitPackage(null); setSelectedVisitPackagePlanId(""); setSelectedCommercialOfferType(null);
     setVisitPackageQuote(null); setVisitPackageError(null); setVisitPackageBusy(false);
     setRegistration({ ...EMPTY_REGISTRATION }); setRegistrationBirthDateDisplay("");
-    setContactEmail(""); setContactPhone(""); setResources([]); setSlots([]); setSelectedSlot(null); setMessage(messageText);
+    setContactEmail(""); setContactPhone(""); setResources([]); setSlots([]); setSelectedSlot(null); setBookingNotes(""); setMessage(messageText);
     setError(null);
     setWellnessProfessionals([]); setWellnessProfessionalId(""); setWellnessServices([]); setWellnessServiceId("");
     setWellnessSlots([]); setWellnessSlot(null); setWellnessNotes("");

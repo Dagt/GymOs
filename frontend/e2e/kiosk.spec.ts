@@ -99,6 +99,40 @@ test("una apertura directa explica que no existe un ID de computadora que captur
   await expect(page.getByRole("button", { name: "Continuar de forma segura" })).toHaveCount(0);
 });
 
+test("la pestaña que abre Recepción no puede restaurar la sesión administrativa", async ({ page }) => {
+  await mockStaffSession(page, "reception-access-token", {
+    userId: "77777777-7777-4777-8777-777777777777",
+    accountScope: "TENANT",
+    username: "recepcion",
+    fullName: "Recepcion Prueba",
+    organizationId: "88888888-8888-4888-8888-888888888888",
+    branchId: "99999999-9999-4999-8999-999999999999",
+    permissions: ["selfservice.session.launch"],
+    roles: ["Recepcion"],
+  });
+  await mockKiosk(page, async (route, path) => {
+    if (route.request().method() === "POST" && path === "/self-service/kiosk-sessions") {
+      return fulfill(route, sessionResponse());
+    }
+    return false;
+  });
+  await page.goto("/kiosk/launch");
+  const [kiosk] = await Promise.all([
+    page.waitForEvent("popup"),
+    page.getByRole("button", { name: "Abrir kiosco en otra pestaña" }).click(),
+  ]);
+  await expect(kiosk.getByRole("heading", { name: "Verifica tu identidad" })).toBeVisible();
+  expect(await kiosk.evaluate(() => sessionStorage.getItem("gymfort.session.slot"))).toBeNull();
+  let refreshRequests = 0;
+  await kiosk.route("**/api/v1/auth/refresh", async (route) => {
+    refreshRequests += 1;
+    await route.abort();
+  });
+  await kiosk.goto("/reception");
+  await expect(kiosk.getByRole("heading", { name: "Inicia sesion para continuar" })).toBeVisible();
+  expect(refreshRequests).toBe(0);
+});
+
 test("los paquetes configurados siguen visibles con Stripe pendiente y no permiten Checkout", async ({ page }) => {
   const packageSummary = {
     ...summaryResponse(),
@@ -914,7 +948,7 @@ test("retoma el mismo pago tras una caída de red y borra al socio aunque falle 
         return true;
       }
       return fulfill(route, {
-        paymentId, saleId, providerSessionId: "cs_retry", status: "OPEN",
+        paymentId, saleId, providerSessionId: "cs_retry",
         checkoutUrl: `${new URL(page.url()).origin}/kiosk/checkout/result?status=cancelled`,
       });
     }

@@ -1648,8 +1648,8 @@ requiere `X-Self-Service-Session-Token` con socio verificado. No recibe cuerpo.
 Sólo recupera un pago Stripe pendiente, de la organización, sucursal y socio
 de la sesión, por el importe pendiente de la venta y con la capacidad
 correspondiente habilitada. Devuelve `paymentId`, `saleId`, `providerSessionId`,
-`checkoutUrl` y `status`. Si el pago está fuera de alcance o ya no es
-recuperable, devuelve `SELF_SERVICE_CHECKOUT_NOT_RECOVERABLE`.
+`checkoutUrl`. Si el pago está fuera de alcance o ya no es
+recuperable, devuelve `SELF_SERVICE_CHECKOUT_NOT_AVAILABLE`.
 
 El resumen incluye `checkoutRecoverable` en la actividad de pagos. Las altas,
 renovaciones, cambios de plan y compras de paquetes devuelven

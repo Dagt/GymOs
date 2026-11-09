@@ -1,6 +1,7 @@
 package com.gymos.payments.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
@@ -12,11 +13,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.gymos.common.api.BusinessException;
 import com.gymos.payments.api.StripeCheckoutOperations.CreateCheckoutSessionCommand;
 import com.gymos.payments.application.port.ProviderHttpGateway;
 import com.gymos.payments.infrastructure.PaymentConfigurationRepository;
 import com.gymos.payments.infrastructure.PaymentProviderRepository;
 import com.gymos.payments.infrastructure.PaymentProviderRepository.CreateOperationData;
+import com.gymos.sales.application.SalesService;
+import com.gymos.sales.application.command.RequestRefundCommand;
 import com.gymos.selfservice.infrastructure.SelfServiceRepository;
 import com.gymos.support.OperationalTestData;
 import java.nio.charset.StandardCharsets;
@@ -74,6 +78,7 @@ class PointWebhookPostgresIntegrationTests {
 	@Autowired PaymentProviderRepository operations;
 	@Autowired PaymentConfigurationRepository paymentConfiguration;
 	@Autowired StripeProviderService stripe;
+	@Autowired SalesService sales;
 	@Autowired ObjectMapper json;
 	@MockitoBean MercadoPagoProviderService point;
 	@MockitoBean ProviderHttpGateway gateway;
@@ -215,6 +220,15 @@ class PointWebhookPostgresIntegrationTests {
 		assertThat(paidCents(sale)).isEqualTo(12345);
 		assertThat(kiosk.recoverableCheckout(tenant.organizationId, tenant.branchId, client, payment)).isEmpty();
 		verify(gateway, times(2)).exchange("GET", stripeUrl("cs_paid"), headers, null, null);
+
+		for (long amount : new long[]{1_000, 12_345}) {
+			assertThatThrownBy(() -> sales.requestRefund(tenant.owner, sale,
+					new RequestRefundCommand(payment, amount, "Devolución Stripe", "refund-" + amount), "refund-test"))
+					.isInstanceOfSatisfying(BusinessException.class, exception ->
+							assertThat(exception.code()).isEqualTo("PROVIDER_REFUND_REQUIRES_RECONCILIATION"));
+		}
+		assertThat(jdbc.sql("SELECT count(*) FROM sale_refund WHERE sale_id=:sale")
+				.param("sale", sale).query(Long.class).single()).isZero();
 	}
 
 	private UUID stripeOperation(OperationalTestData tenant, UUID sale, UUID payment, UUID client, String session) {
