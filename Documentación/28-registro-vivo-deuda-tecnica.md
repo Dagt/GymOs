@@ -24,6 +24,14 @@ En el mismo cambio que resuelva una deuda se debe cambiar su estado a `RESUELTA`
 
 Campos obligatorios: identificador estable, prioridad, módulo, estado, hallazgo, impacto, evidencia y criterio de cierre. Estados: `ABIERTA`, `EN_CURSO`, `BLOQUEADA`, `RESUELTA`, `ACEPTADA`.
 
+### Hallazgo cerrado en la rama de contrataciones de recepción
+
+**BUG-01 · P1 · Paquetes de visitas · RESUELTA (10/11/2026).** La ficha construía
+una clave de 124 caracteres y el DTO admite 120. El formulario compartido usa
+un UUID por operación y lo conserva en el reintento del mismo payload. La
+prueba HTTP/PostgreSQL reproduce el rechazo y comprueba venta, pago, vigencia,
+saldo y auditoría. ACC-005 conserva la aceptación conectada pendiente.
+
 ## 2. Deuda activa
 
 | ID | Pri. | Módulo | Estado | Hallazgo e impacto | Criterio de cierre |

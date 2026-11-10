@@ -20,7 +20,7 @@ import {
 } from "./ClientDetailHelpers";
 import { useClientDetailController } from "./useClientDetailController";
 import { EmailPreferencesCard } from "./EmailPreferencesCard";
-import { VisitPackageCard } from "./VisitPackageCard";
+import { VisitPackageCard } from "@/components/VisitPackageCard";
 
 export default function ClientDetailPage() {
   const controller = useClientDetailController();
@@ -99,7 +99,12 @@ export default function ClientDetailPage() {
             />
           ) : null}
           {controller.canReadMemberships ? (
-            <VisitPackageCard clientId={controller.data.client.id} session={controller.session} />
+            <VisitPackageCard
+              key={controller.data.client.id}
+              clientId={controller.data.client.id}
+              clientName={clientFullName(controller.data.client)}
+              session={controller.session}
+            />
           ) : null}
           {controller.canReadBenefits ? (
             <ClientBenefitsSection

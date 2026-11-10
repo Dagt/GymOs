@@ -153,6 +153,95 @@ class TenantIsolationPostgresIntegrationTests {
 	}
 
 	@Test
+	void packagePurchaseRejectsOldBrowserKeyAndPersistsOneSaleWithTheCorrectedKey() throws Exception {
+		UUID client = tenant.client();
+		UUID benefit = UUID.randomUUID();
+		jdbc.sql("""
+				INSERT INTO benefit(id, organization_id, branch_id, code, name, benefit_type, discount_type,
+				                    status, access_scope, created_at, updated_at)
+				VALUES (:id, :org, :branch, 'QA-VISIT', 'Acceso', 'ACCESS', 'NONE', 'ACTIVE', 'LOCAL', now(), now())
+				""").param("id", benefit).param("org", tenant.organizationId).param("branch", tenant.branchId).update();
+		String catalog = token(tenant.ownerId, tenant.branchId, Set.of("catalog.create"), "Gerente");
+		String definition = """
+				{"sku":"QA-PACK","name":"Paquete QA","priceCents":35000,"currency":"MXN","totalVisits":5,
+				 "validityDays":21,"branchScope":"SELECTED_BRANCHES","branchIds":["%s"],"benefitIds":["%s"],
+				 "registrationFeePolicy":"WAIVED","status":"ACTIVE"}
+				""".formatted(tenant.branchId, benefit);
+		var created = http.perform(auth(post("/api/v1/catalog/visit-package-plans"), catalog)
+						.contentType("application/json").content(definition))
+				.andExpect(status().isOk()).andReturn();
+		UUID plan = UUID.fromString(json.readTree(created.getResponse().getContentAsString()).get("id").asText());
+		String reception = token(tenant.ownerId, tenant.branchId, Set.of("client.read", "sale.create"), "Recepcion");
+		String endpoint = "/api/v1/visit-packages/purchases";
+		String request = """
+				{"clientId":"%s","packagePlanId":"%s","method":"%s","reference":"QA-123",
+				 "validateNow":true,"idempotencyKey":"%s"}
+				""";
+		http.perform(auth(post("/api/v1/visit-packages/quotes"), reception).contentType("application/json")
+						.content("""
+								{"clientId":"%s","packagePlanId":"%s"}
+								""".formatted(client, plan)))
+				.andExpect(status().isOk()).andExpect(jsonPath("$.totalVisits").value(5))
+				.andExpect(jsonPath("$.validityDays").value(21)).andExpect(jsonPath("$.totalCents").value(35000));
+
+		UUID key = UUID.randomUUID();
+		String oldKey = "visit-package:" + client + ":" + plan + ":" + key;
+		assertThat(oldKey).hasSize(124);
+		http.perform(auth(post(endpoint), reception).contentType("application/json")
+						.content(request.formatted(client, plan, "CASH", oldKey)))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+				.andExpect(jsonPath("$.details.idempotencyKey").exists()).andExpect(jsonPath("$.correlationId").exists());
+		http.perform(auth(post(endpoint), reception).contentType("application/json")
+						.content(request.formatted(client, plan, "", key)))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.details.method").exists());
+		http.perform(auth(post(endpoint), reception).contentType("application/json")
+						.content(request.formatted(client, UUID.randomUUID(), "CASH", key)))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VISIT_PACKAGE_PLAN_NOT_AVAILABLE"));
+		http.perform(auth(post(endpoint), reception).contentType("application/json")
+						.content(request.formatted(client, plan, "CARD_MERCADO_PAGO", key)))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("RECEPTION_MERCADO_PAGO_DISABLED"));
+		jdbc.sql("UPDATE visit_package_plan SET status='INACTIVE' WHERE id=:id").param("id", plan).update();
+		http.perform(auth(post(endpoint), reception).contentType("application/json")
+						.content(request.formatted(client, plan, "CASH", key)))
+				.andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("VISIT_PACKAGE_PLAN_NOT_AVAILABLE"));
+		jdbc.sql("UPDATE visit_package_plan SET status='ACTIVE' WHERE id=:id").param("id", plan).update();
+
+		assertThat(jdbc.sql("SELECT count(*) FROM sale WHERE client_id=:client").param("client", client)
+				.query(Integer.class).single()).isZero();
+		for (String method : Set.of("CASH", "TRANSFER")) {
+			UUID buyer = "CASH".equals(method) ? client : tenant.client();
+			String payload = request.formatted(buyer, plan, method, UUID.randomUUID());
+			String saleId = null;
+			for (int attempt = 0; attempt < 2; attempt++) {
+				var purchase = http.perform(auth(post(endpoint), reception).contentType("application/json").content(payload))
+						.andExpect(status().isOk()).andExpect(jsonPath("$.entitlementStatus").value("ACTIVE"))
+						.andExpect(jsonPath("$.saleStatus").value("PAID")).andExpect(jsonPath("$.paidCents").value(35000))
+						.andReturn();
+				String returnedSaleId = json.readTree(purchase.getResponse().getContentAsString()).get("saleId").asText();
+				if (saleId != null) assertThat(returnedSaleId).isEqualTo(saleId);
+				saleId = returnedSaleId;
+			}
+
+			var current = http.perform(auth(get("/api/v1/clients/{id}/visit-package", buyer), reception))
+					.andExpect(status().isOk()).andExpect(jsonPath("$.saleId").value(saleId))
+					.andExpect(jsonPath("$.remainingVisits").value(5)).andReturn();
+			var entitlement = json.readTree(current.getResponse().getContentAsString());
+			assertThat(java.time.LocalDate.parse(entitlement.get("validUntil").asText()))
+					.isEqualTo(java.time.LocalDate.parse(entitlement.get("validFrom").asText()).plusDays(20));
+			http.perform(auth(get("/api/v1/clients/{id}/visit-packages", buyer), reception))
+					.andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1));
+			assertThat(jdbc.sql("SELECT count(*) FROM sale WHERE client_id=:client").param("client", buyer)
+					.query(Integer.class).single()).isEqualTo(1);
+			assertThat(jdbc.sql("SELECT method FROM payment WHERE sale_id=:sale").param("sale", UUID.fromString(saleId))
+					.query(String.class).list()).containsExactly(method);
+			assertThat(jdbc.sql("""
+					SELECT count(*) FROM audit_log WHERE entity_id=:entitlement AND action='VISIT_PACKAGE_PURCHASE_CREATED'
+					""").param("entitlement", UUID.fromString(entitlement.get("id").asText()))
+					.query(Integer.class).single()).isEqualTo(1);
+		}
+	}
+
+	@Test
 	void sharedMembershipAllowsTheClientInAnotherBranchOnlyWhileCovered() throws Exception {
 		UUID client = northClient();
 		UUID plan = tenant.plan("Multisede", 30);

@@ -13,6 +13,12 @@ de expiración y fallo. La [matriz QA](40-qa-matriz-de-aceptacion-y-evidencias.m
 separa pruebas automatizadas, Stripe test y staging. La aceptación externa y
 los reembolsos de proveedor continúan pendientes.
 
+## Contrataciones en recepción
+
+«Membresías y paquetes» centraliza la búsqueda, asignación, renovación,
+cambio de plan y venta de paquetes. Comparte la venta de paquetes con
+el expediente y actualiza el saldo tras el cobro.
+
 ## Aislamiento multi-tenant en revisión
 
 El trabajo de #29 parte del commit `58a5d4d4b24bcc598059b05a4ac70d11a2fe937b`, que incorpora check-in manual y reversiones de #65. El [inventario por operación](../docs/security/endpoint-permissions.md) se coteja con Spring en CI. La [matriz de verificación](../docs/security/multi-tenant-verification.md) identifica qué flujos se probaron además con HTTP/PostgreSQL, las deudas de otros issues y el check externo. El PR #66 conserva los resultados por SHA.

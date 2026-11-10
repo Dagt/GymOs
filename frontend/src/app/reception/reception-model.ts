@@ -67,8 +67,15 @@ export function getFocusActions(): FocusAction[] {
   return FOCUS_ACTIONS;
 }
 
-export function getVisibleFocusActions(canLaunchKiosk: boolean, canCheckIn: boolean): FocusAction[] {
+export function getVisibleFocusActions(canLaunchKiosk: boolean, canCheckIn: boolean, canManageMemberships = false): FocusAction[] {
   const actions = FOCUS_ACTIONS.filter((action) => action.href !== "/kiosk/launch" || canLaunchKiosk);
+  if (canManageMemberships) actions.splice(1, 0, {
+    title: "Contrataciones",
+    detail: "Asigna y renueva membresías, cambia planes y vende paquetes de visitas.",
+    href: "/reception/memberships",
+    label: "Membresías y paquetes",
+    accent: "people",
+  });
   if (!canCheckIn) return actions;
   return [
     {

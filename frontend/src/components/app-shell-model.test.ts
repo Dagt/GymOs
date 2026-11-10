@@ -62,7 +62,7 @@ test("reception navigation is limited to front desk work", () => {
   assert.equal(labels.includes("Renovaciones"), false);
   assert.equal(labels.includes("Equipo y accesos"), false);
   assert.equal(labels.includes("Configuración"), false);
-  assert.deepEqual(sectionLinks(sections, "Mostrador"), ["Inicio recepción", "Caja / POS", "Pantalla para socios"]);
+  assert.deepEqual(sectionLinks(sections, "Mostrador"), ["Inicio recepción", "Membresías y paquetes", "Caja / POS", "Pantalla para socios"]);
   assert.deepEqual(sectionLinks(sections, "Atención a socios"), ["Socios", "Reservas", "Wellness"]);
   assert.deepEqual(sectionLinks(sections, "Seguimiento"), ["Ventas y pagos"]);
 });

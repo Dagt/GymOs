@@ -31,3 +31,9 @@ test("reception exposes check-in as the first action only with its permission", 
   assert.equal(getVisibleFocusActions(false, true)[0].href, "/reception/check-in");
   assert.equal(getVisibleFocusActions(true, false).some((action) => action.href === "/reception/check-in"), false);
 });
+
+test("reception only links to memberships and packages with commercial permissions", () => {
+  const href = "/reception/memberships";
+  assert.equal(getVisibleFocusActions(true, true, false).some((action) => action.href === href), false);
+  assert.equal(getVisibleFocusActions(true, true, true).find((action) => action.href === href)?.label, "Membresías y paquetes");
+});
