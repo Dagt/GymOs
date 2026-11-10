@@ -260,6 +260,7 @@ export type { RenewMembershipResponse };
 export type KioskRecoveredCheckout = {
   saleId: string;
   paymentId: string;
-  providerSessionId: string;
-  checkoutUrl: string;
+  providerSessionId: string | null;
+  checkoutUrl: string | null;
+  status: "OPEN" | "COMPLETED" | "AWAITING_PAYMENT";
 };

@@ -12,6 +12,10 @@ nombre técnico interno durante la transición de marca.
 
 ## 0.7.0-pilot-readiness - Unreleased
 
+- La recuperación de Checkout verifica el estado actual en Stripe antes de
+  redirigir o crear otro intento. Conserva el pago original y reserva los
+  reemplazos de forma idempotente en PostgreSQL.
+
 - PAY-001 y SELF-001 (#34) permiten retomar el pago original del kiosco tras volver a verificar al socio. El retorno de Stripe se vincula a la sesión, el pago o el mandato exactos. El cierre del kiosco rota la credencial y limpia los datos del socio.
 - Checkout y la captura de tarjeta distinguen la expiración y los estados pendientes que Stripe informa. Los reintentos conservan la idempotencia. La aceptación conectada en Stripe test y staging permanece pendiente.
 

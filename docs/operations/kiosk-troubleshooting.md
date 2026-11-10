@@ -69,6 +69,11 @@ La suite Stripe rechaza llaves live y se omite sin secreto. Guía completa:
 
 ## Recuperación de un pago Stripe (#34)
 
+Si **Continuar pago** muestra «pendiente de conciliación», espera a que
+GymFort confirme el resultado en Stripe. Si persiste, solicita a Recepción
+que revise el historial técnico con la referencia de venta. Si el pago ya
+está confirmado, se mostrará como pagado sin abrir Checkout.
+
 Si Checkout se interrumpe, solicita al socio que se verifique de nuevo en la
 sucursal donde se originó el pago. Desde **Mis pagos → Continuar pago** puede
 reabrir el pago original si su estado lo permite. Si ya se está conciliando,

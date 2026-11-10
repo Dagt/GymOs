@@ -1,5 +1,10 @@
 # 28. Registro vivo de hallazgos y deuda técnica
 
+PAY-001 requiere revisión operativa cuando una creación de Checkout sin ID
+externo supera la ventana segura de idempotencia. Los reintentos de kiosco
+no generan una sesión nueva en ese caso. El historial técnico y el dashboard
+Stripe permiten buscar el intento por su referencia interna.
+
 En el corte #34 sigue pendiente la ejecución conectada de Connect, Checkout y
 mandatos porque el entorno de trabajo carece de credenciales Stripe test
 habilitadas. La devolución de pagos integrados queda bloqueada por

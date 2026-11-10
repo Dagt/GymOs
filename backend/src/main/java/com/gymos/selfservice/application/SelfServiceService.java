@@ -567,6 +567,9 @@ public class SelfServiceService {
 		SessionRecord session = verifiedSession(sessionId, sessionToken);
 		var payment = repository.recoverableCheckout(session.organizationId(), session.branchId(), session.clientId(), paymentId)
 				.orElseThrow(() -> new BusinessException("SELF_SERVICE_CHECKOUT_NOT_AVAILABLE", "El pago no está disponible para continuar."));
+		if ("COMPLETED".equals(payment.paymentStatus())) {
+			return new RecoveredCheckout(payment.saleId(), paymentId, null, null, "COMPLETED");
+		}
 		var capabilities = capabilities(session);
 		String description = switch (payment.context()) {
 			case "MEMBERSHIP_ENROLLMENT" -> checkoutDescription(capabilities, SelfServiceCapability.MEMBERSHIP_ENROLLMENT, "Contratacion de membresia");
@@ -579,9 +582,11 @@ public class SelfServiceService {
 		var checkout = stripeCheckoutOperations.createCheckout(new StripeCheckoutOperations.CreateCheckoutSessionCommand(
 				session.organizationId(), session.branchId(), session.clientId(), payment.saleId(), paymentId,
 				payment.amountCents(), payment.currency(), false, description, "stripe-checkout:" + paymentId));
-		auditService.recordSystem(session.organizationId(), session.branchId(), null, "SELF_SERVICE_CHECKOUT_RECOVERED",
-				"PAYMENT", paymentId, "SELF_SERVICE_KIOSK", null, correlationId);
-		return new RecoveredCheckout(payment.saleId(), paymentId, checkout.providerSessionId(), checkout.checkoutUrl());
+		if (checkout.checkoutUrl() != null) {
+			auditService.recordSystem(session.organizationId(), session.branchId(), null, "SELF_SERVICE_CHECKOUT_RECOVERED",
+					"PAYMENT", paymentId, "SELF_SERVICE_KIOSK", checkout.operationId().toString(), correlationId);
+		}
+		return new RecoveredCheckout(payment.saleId(), paymentId, checkout.providerSessionId(), checkout.checkoutUrl(), checkout.status());
 	}
 
 	private String checkoutDescription(SelfServiceCapabilities capabilities, SelfServiceCapability capability, String description) {
@@ -589,7 +594,7 @@ public class SelfServiceService {
 		return description;
 	}
 
-	public record RecoveredCheckout(UUID saleId, UUID paymentId, String providerSessionId, String checkoutUrl) {}
+	public record RecoveredCheckout(UUID saleId, UUID paymentId, String providerSessionId, String checkoutUrl, String status) {}
 
 	private StripeCheckoutOperations.CheckoutSessionResult stripeCheckout(
 			SessionRecord session,

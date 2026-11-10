@@ -1645,11 +1645,19 @@ Con evidencia insuficiente o contradictoria, el webhook devuelve el error de val
 
 `POST /api/v1/self-service/sessions/{sessionId}/payments/{paymentId}/checkout`
 requiere `X-Self-Service-Session-Token` con socio verificado. No recibe cuerpo.
-Sólo recupera un pago Stripe pendiente, de la organización, sucursal y socio
-de la sesión, por el importe pendiente de la venta y con la capacidad
-correspondiente habilitada. Devuelve `paymentId`, `saleId`, `providerSessionId`,
-`checkoutUrl`. Si el pago está fuera de alcance o ya no es
-recuperable, devuelve `SELF_SERVICE_CHECKOUT_NOT_AVAILABLE`.
+Limita la consulta a la organización, sucursal y socio de la sesión. Para
+abrir Checkout exige la capacidad correspondiente y que el importe del pago
+coincida con el saldo de la venta. Devuelve `paymentId`, `saleId`, `status`,
+`providerSessionId` y `checkoutUrl`. Las dos últimas propiedades son nulas
+salvo en estado `OPEN`.
+
+- `OPEN` indica una sesión utilizable según la cuenta Connect.
+- `COMPLETED` indica pago aplicado y venta pagada en GymFort.
+- `AWAITING_PAYMENT` indica que debe conciliarse el resultado antes de
+  permitir otro intento.
+
+Si el pago está fuera de alcance o no está disponible para recuperación,
+devuelve `SELF_SERVICE_CHECKOUT_NOT_AVAILABLE`.
 
 El resumen incluye `checkoutRecoverable` en la actividad de pagos. Las altas,
 renovaciones, cambios de plan y compras de paquetes devuelven
@@ -1657,6 +1665,13 @@ renovaciones, cambios de plan y compras de paquetes devuelven
 con esa sesión y con el pago exacto. Stripe `checkout.session.expired` y
 `checkout.session.async_payment_failed` se tratan según el estado consultado
 en la cuenta Connect. Salir desde el navegador no cancela un cargo.
+La reapertura consulta Stripe y comprueba sesión, referencia de venta,
+importe, moneda y exposición del PaymentIntent. Una expiración sin pago
+ni fondos pendientes, o un intento cerrado con intención cancelada sin
+fondos, permite crear otra sesión para el mismo pago y venta. Una creación
+interrumpida reutiliza la misma clave durante un máximo de 23 horas desde
+su reserva. Las operaciones sin identificador que superen esa ventana
+quedan pendientes de revisión en Stripe.
 
 `POST /api/v1/self-service/sessions/{sessionId}/reset` devuelve una credencial
 nueva. El cliente debe reemplazar `sessionToken` y descartar los contextos

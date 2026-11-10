@@ -949,7 +949,7 @@ test("retoma el mismo pago tras una caída de red y borra al socio aunque falle 
         return true;
       }
       return fulfill(route, {
-        paymentId, saleId, providerSessionId: "cs_retry",
+        paymentId, saleId, providerSessionId: "cs_retry", status: "OPEN",
         checkoutUrl: `${new URL(page.url()).origin}/kiosk/checkout/result?status=cancelled`,
       });
     }
@@ -977,6 +977,62 @@ test("retoma el mismo pago tras una caída de red y borra al socio aunque falle 
   await page.getByRole("button", { name: "Terminar sesión y borrar mis datos" }).click();
   await expect(page.getByText("Andrea Socia")).toHaveCount(0);
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem("gymos.kioskBrowserSession"))).toBeNull();
+});
+
+test("otro navegador verifica al socio y muestra la conciliación sin abrir otro Checkout", async ({ browser, baseURL }) => {
+  const newSession = { ...sessionResponse(), sessionId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd", sessionToken: "new-kiosk-token" };
+  const paymentId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+  const saleId = "66666666-6666-4666-8666-666666666666";
+  let verified = false;
+  let completed = false;
+  const context = await browser.newContext({ baseURL });
+  try {
+    const page = await context.newPage();
+    await page.addInitScript((launch) => {
+      window.sessionStorage.setItem("gymos.kioskBrowserSession", JSON.stringify(launch));
+    }, newSession);
+    await mockKiosk(page, async (route, path) => {
+      const root = `/self-service/sessions/${newSession.sessionId}`;
+      if (path === `${root}/reset`) return fulfill(route, newSession);
+      if (path === `${root}/verify` || path === `${root}/summary`) {
+        if (path.endsWith("/verify")) verified = true;
+        expect(verified).toBe(true);
+        return fulfill(route, {
+          ...summaryResponse(), sessionId: newSession.sessionId,
+          capabilities: { ...capabilities(), onlineCardPaymentsReady: true },
+          paymentActivity: [{
+            id: paymentId, saleId, saleNumber: "V-001", method: "CARD_ONLINE", status: completed ? "COMPLETED" : "FAILED",
+            amountCents: 94900, currency: "MXN", receivedAt: "2026-08-20T15:00:00Z",
+            provider: "STRIPE", receiptUrl: null, checkoutRecoverable: !completed,
+          }],
+        });
+      }
+      if (path === `${root}/payments/${paymentId}/checkout`) {
+        expect(route.request().headers()["x-self-service-session-token"]).toBe(newSession.sessionToken);
+        return fulfill(route, {
+          paymentId, saleId, providerSessionId: null, checkoutUrl: null,
+          status: completed ? "COMPLETED" : "AWAITING_PAYMENT",
+        });
+      }
+      return false;
+    });
+    await page.goto("/kiosk/reception");
+    await expect(page.getByRole("button", { name: "Continuar pago" })).toHaveCount(0);
+    await page.getByPlaceholder("Correo o teléfono").fill("andrea@example.com");
+    await page.getByLabel("Fecha de nacimiento en formato día mes año").fill("10/05/1994");
+    await page.getByRole("button", { name: "Continuar de forma segura" }).click();
+    await page.getByRole("button", { name: /Mis pagos/i }).click();
+    await page.getByRole("button", { name: "Continuar pago" }).click();
+    await expect(page.getByText(/pago está pendiente de conciliación/)).toBeVisible();
+    await expect(page).toHaveURL(/\/kiosk\/reception$/);
+    completed = true;
+    await page.getByRole("button", { name: "Continuar pago" }).click();
+    await expect(page.getByText("Este pago ya está confirmado.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Continuar pago" })).toHaveCount(0);
+    await expect(page).toHaveURL(/\/kiosk\/reception$/);
+  } finally {
+    await context.close();
+  }
 });
 
 test("si falla la cotización explica que no hubo cargo y conserva una referencia de soporte", async ({ page }) => {

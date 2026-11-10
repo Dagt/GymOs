@@ -2,6 +2,11 @@
 
 ## Stripe y kiosco (#34)
 
+La recuperación de Checkout en el PR #69 exige evidencia actual de Stripe
+para reutilizar una sesión o abrir un reemplazo. El flujo conserva el pago y
+la venta. Las pruebas con un gateway simulado y PostgreSQL no sustituyen la
+verificación conectada en Stripe Sandbox.
+
 La propuesta implementa recuperación de Checkout sobre la venta y el pago
 existentes, rotación de la sesión al limpiar el kiosco y estados autoritativos
 de expiración y fallo. La [matriz QA](40-qa-matriz-de-aceptacion-y-evidencias.md#pay-001-y-self-001-34)

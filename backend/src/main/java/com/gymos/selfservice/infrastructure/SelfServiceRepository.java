@@ -601,7 +601,9 @@ public class SelfServiceRepository {
 				       payment.amount_cents, payment.currency, payment.received_at,
 				       operation.provider, operation.receipt_url, operation.checkout_url,
 				       COALESCE(operation.provider = 'STRIPE' AND operation.operation_type = 'CHECKOUT_SESSION'
-				           AND sale.status <> 'CANCELLED' AND payment.amount_cents = sale.balance_cents
+				           AND sale.status = 'PENDING_PAYMENT' AND payment.amount_cents = sale.balance_cents
+				           AND sale.business_context IN ('MEMBERSHIP_ENROLLMENT', 'MEMBERSHIP_RENEWAL',
+				                                         'MEMBERSHIP_PLAN_CHANGE', 'VISIT_PACKAGE_PURCHASE')
 				           AND payment.status = 'PENDING_VALIDATION'
 				           AND operation.status IN ('CREATING', 'OPEN', 'EXPIRED', 'FAILED'), false) AS checkout_recoverable,
 				       operation.updated_at AS provider_updated_at
@@ -643,7 +645,7 @@ public class SelfServiceRepository {
 
 	public Optional<RecoverableCheckout> recoverableCheckout(UUID organizationId, UUID branchId, UUID clientId, UUID paymentId) {
 		return jdbcClient.sql("""
-				SELECT sale.id AS sale_id, sale.business_context, payment.amount_cents, payment.currency
+				SELECT sale.id AS sale_id, sale.business_context, payment.amount_cents, payment.currency, payment.status
 				FROM payment
 				JOIN sale ON sale.id = payment.sale_id AND sale.organization_id = payment.organization_id
 				  AND sale.branch_id = payment.branch_id AND sale.client_id = payment.client_id
@@ -654,17 +656,21 @@ public class SelfServiceRepository {
 				    ORDER BY created_at DESC, id DESC LIMIT 1
 				) operation ON operation.provider = 'STRIPE' AND operation.operation_type = 'CHECKOUT_SESSION'
 				WHERE payment.organization_id = :org AND payment.branch_id = :branch AND payment.client_id = :client
-				  AND payment.id = :payment AND payment.method = 'CARD_ONLINE' AND payment.status = 'PENDING_VALIDATION'
-				  AND payment.deleted_at IS NULL AND sale.deleted_at IS NULL AND sale.status <> 'CANCELLED'
-				  AND payment.amount_cents = sale.balance_cents AND payment.amount_cents > 0
-				  AND operation.status IN ('CREATING', 'OPEN', 'EXPIRED', 'FAILED')
+				  AND payment.id = :payment AND payment.method = 'CARD_ONLINE'
+				  AND payment.deleted_at IS NULL AND sale.deleted_at IS NULL
+				  AND sale.business_context IN ('MEMBERSHIP_ENROLLMENT', 'MEMBERSHIP_RENEWAL',
+				                               'MEMBERSHIP_PLAN_CHANGE', 'VISIT_PACKAGE_PURCHASE')
+				  AND ((payment.status = 'COMPLETED' AND sale.status = 'PAID')
+				       OR (payment.status = 'PENDING_VALIDATION' AND sale.status = 'PENDING_PAYMENT'
+				           AND payment.amount_cents = sale.balance_cents AND payment.amount_cents > 0
+				           AND operation.status IN ('CREATING', 'OPEN', 'EXPIRED', 'FAILED')))
 				""").param("org", organizationId).param("branch", branchId).param("client", clientId)
 				.param("payment", paymentId).query((rs, row) -> new RecoverableCheckout(
 						rs.getObject("sale_id", UUID.class), rs.getString("business_context"),
-						rs.getLong("amount_cents"), rs.getString("currency"))).optional();
+						rs.getLong("amount_cents"), rs.getString("currency"), rs.getString("status"))).optional();
 	}
 
-	public record RecoverableCheckout(UUID saleId, String context, long amountCents, String currency) {}
+	public record RecoverableCheckout(UUID saleId, String context, long amountCents, String currency, String paymentStatus) {}
 
 	public record TerminalRecord(
 			UUID id,

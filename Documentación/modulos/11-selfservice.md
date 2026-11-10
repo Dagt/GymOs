@@ -1,5 +1,9 @@
 # Autoservicio y kiosco
 
+**Continuar pago** sólo redirige cuando el backend recibe una URL utilizable
+de Stripe. Si el pago ya está aplicado, muestra la confirmación. Si falta
+evidencia, muestra que está pendiente de conciliación y refresca **Mis pagos**.
+
 El socio puede continuar un Checkout interrumpido desde **Mis pagos**, tras
 verificarse en la sucursal de origen. Se usa el pago original. El retorno no
 confirma el pago y se coteja con la sesión de Stripe exacta. Cerrar, alternar

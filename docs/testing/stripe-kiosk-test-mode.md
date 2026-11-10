@@ -128,6 +128,10 @@ sandbox ya autorizada. Confirma que las operaciones de Stripe tienen
 3. Corta la conexión antes de recibir la respuesta de Checkout y repite el
    paso anterior. Prueba también cancelación, rechazo y webhook duplicado o
    tardío. Con un segundo socio o en otra sucursal el pago anterior no aparece.
+   Repite la recuperación en paralelo desde dos navegadores. Comprueba en
+   Stripe que ambos usan la misma sesión y que el historial tiene un solo
+   reemplazo por intento anterior. Prueba también un PaymentIntent en
+   procesamiento. El kiosco debe informar que el pago requiere conciliación.
 4. Después de finalizar, usa Atrás y recarga. Debe aparecer la verificación
    vacía o una instrucción de reapertura, sin datos del socio ni acceso a
    Recepción. Repite con el cierre interrumpido por falta de red.

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 public class PaymentProviderRepository {
@@ -260,6 +261,61 @@ public class PaymentProviderRepository {
 				.query(this::mapOperation)
 				.optional();
 	}
+
+	public String checkoutPaymentState(CreateOperationData data) {
+		return checkoutPaymentState(data, false);
+	}
+
+	private String checkoutPaymentState(CreateOperationData data, boolean lockSale) {
+		return jdbcClient.sql("""
+				SELECT CASE
+				    WHEN payment.status = 'COMPLETED' AND sale.status = 'PAID' THEN 'COMPLETED'
+				    WHEN payment.status = 'PENDING_VALIDATION' AND sale.status = 'PENDING_PAYMENT'
+				         AND sale.balance_cents = payment.amount_cents THEN 'PENDING_VALIDATION'
+				    ELSE 'AWAITING_PAYMENT'
+				END
+				FROM sale JOIN payment ON payment.sale_id = sale.id
+				  AND payment.organization_id = sale.organization_id AND payment.branch_id = sale.branch_id
+				  AND payment.client_id = sale.client_id
+				WHERE sale.id = :sale AND sale.organization_id = :org AND sale.branch_id = :branch
+				  AND sale.client_id = :client AND payment.id = :payment AND payment.method = 'CARD_ONLINE'
+				  AND payment.amount_cents = :amount AND payment.currency = :currency
+				  AND sale.deleted_at IS NULL AND payment.deleted_at IS NULL
+				""" + (lockSale ? " FOR UPDATE OF sale" : ""))
+				.param("sale", data.saleId()).param("org", data.organizationId()).param("branch", data.branchId())
+				.param("client", data.clientId()).param("payment", data.paymentId())
+				.param("amount", data.amountCents()).param("currency", data.currency())
+				.query(String.class).optional().orElse("AWAITING_PAYMENT");
+	}
+
+	@Transactional
+	public CheckoutReservation reserveCheckout(CreateOperationData data, UUID expectedLatest) {
+		// Serialize reservations with payment completion on the sale row. No provider I/O under this lock.
+		String state = checkoutPaymentState(data, true);
+		if (!"PENDING_VALIDATION".equals(state)) return new CheckoutReservation(state, null);
+		var latest = latestOperationForPayment(data.organizationId(), data.provider(), data.operationType(), data.paymentId()).orElse(null);
+		UUID latestId = latest == null ? null : latest.id();
+		if (!java.util.Objects.equals(latestId, expectedLatest)) return new CheckoutReservation(state, null);
+		if (latest != null && "COMPLETED".equals(latest.status())) return new CheckoutReservation("AWAITING_PAYMENT", null);
+		return new CheckoutReservation(state, operation(createOperation(data)).orElseThrow());
+	}
+
+	public boolean checkoutCreationReplayAllowed(UUID operationId) {
+		return jdbcClient.sql("""
+				SELECT EXISTS (SELECT 1 FROM payment_provider_operation
+				               WHERE id = :id AND created_at > CURRENT_TIMESTAMP - INTERVAL '23 hours')
+				""").param("id", operationId).query(Boolean.class).single();
+	}
+
+	public void requestCheckoutReconciliation(UUID operationId) {
+		jdbcClient.sql("""
+				UPDATE payment_provider_operation SET status = 'AWAITING_PAYMENT', version = version + 1
+				WHERE id = :id AND provider = 'STRIPE' AND operation_type = 'CHECKOUT_SESSION'
+				  AND external_operation_id IS NOT NULL AND status IN ('OPEN', 'EXPIRED', 'FAILED')
+				""").param("id", operationId).update();
+	}
+
+	public record CheckoutReservation(String paymentState, OperationRecord operation) {}
 
 	public Optional<OperationRecord> latestOperationForMandate(
 			UUID organizationId,

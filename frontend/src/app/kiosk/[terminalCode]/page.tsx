@@ -648,6 +648,15 @@ export default function KioskPage() {
     try {
       const checkout = await recoverKioskCheckout(session.sessionId, session.sessionToken, paymentId);
       if (readBrowserKioskSession()?.sessionToken !== session.sessionToken) return;
+      if (checkout.status !== "OPEN" || !checkout.checkoutUrl || !checkout.providerSessionId) {
+        if (checkout.status === "COMPLETED") {
+          setMessage("Este pago ya está confirmado.");
+        } else {
+          setError("El pago está pendiente de conciliación. Consulta su estado antes de iniciar otro cobro.");
+        }
+        await refreshPaymentHistory(session);
+        return;
+      }
       writeKioskPaymentReturn(window.sessionStorage, {
         sessionId: session.sessionId,
         saleId: checkout.saleId,
@@ -658,7 +667,9 @@ export default function KioskPage() {
       });
       window.location.assign(checkout.checkoutUrl);
     } catch {
-      setError("No pudimos continuar el pago. Consulta su estado antes de iniciar otro cobro.");
+      if (readBrowserKioskSession()?.sessionToken === session.sessionToken) {
+        setError("No pudimos continuar el pago. Consulta su estado antes de iniciar otro cobro.");
+      }
     } finally {
       recoveringCheckout.current = false;
       setCheckoutRecoveryBusy(false);

@@ -13,6 +13,12 @@ No copies payloads, tarjeta, correos ni secretos en logs, alertas o tickets.
 
 ## Recuperación después de una caída
 
+Para Checkout, coteja la sesión y su PaymentIntent en la cuenta Connect
+correcta antes de autorizar otro intento. Si la creación lleva 23 horas o más
+sin ID externo, busca la sesión por la referencia de venta y la metadata del
+intento. Escala a conciliación si hay fondos recibidos, pendientes de captura
+o un estado desconocido. Conserva todas las operaciones en el historial.
+
 1. Restaura PostgreSQL, red y Stripe antes de modificar registros.
 2. Revisa `/actuator/health`, Prometheus y los historiales tenant.
 3. Espera el vencimiento del lease de cinco minutos; los workers recuperan con
